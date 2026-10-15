@@ -1,5 +1,11 @@
 # `matrix_t`
 
+`mat_round(A)` applies nearest-integer rounding to supported matrix spectra,
+using the same spectral engine as `mat_sgn`. Exact halfway eigenvalues round
+away from zero; complex eigenvalues are rounded component-wise. This is not
+entry-wise rounding. Unsupported matrix classes return `NULL`; at a rounding
+discontinuity there is no analytic matrix derivative.
+
 `matrix_t` is a generic high-precision matrix type with two public element
 families: `number_t` for numeric work and `expr_t *` for symbolic work.
 Numeric matrices can still hold exact rationals, floating-point values, and

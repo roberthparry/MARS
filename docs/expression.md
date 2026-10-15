@@ -2,6 +2,33 @@
 
 `expr_t` is a reference-counted expression DAG for differentiable values.
 
+## Nearest-integer rounding
+
+`round(x)` and the public constructor `expr_round(x)` round to the nearest
+integer, with exact halves away from zero. Complex values are rounded in each
+component. Expression, Function and TeX output retain the function name.
+
+```text
+round(2.49)
+round(2.5)
+round(-2.5)
+```
+
+Output, respectively:
+
+```text
+2
+3
+-3
+```
+
+As with `floor` and `ceil`, symbolic differentiation gives zero almost
+everywhere; the derivative does not exist at half-integer jumps. For real
+affine arguments, integration uses the continuous primitive
+`u*round(u) - round(u)^2/2`, divided by the affine slope. Finite sums support
+direct evaluation and symbolic upper bounds for small rational progressions;
+unsupported symbolic cases retain the formal operation.
+
 ## Cooperative calculation control
 
 For numerical curves, [`sampler_expression()`](sampler.md) evaluates private
@@ -575,6 +602,7 @@ additional special functions, parameter conditions or continuation machinery.
 
 | Functions | Remaining issue |
 | --- | --- |
+| `round` | Nearest-integer staircases have ordinary transforms for real linear arguments, but no dedicated Laplace rule is implemented. |
 | `asec`, `acosec`, `atan2` | Branch boundaries, multi-argument choices and integrable endpoint singularities need explicit treatment. The supported `asin` and `acos` pairs and their remaining argument restrictions are described above. |
 | `asech`, `acosech`, `acoth` | Further inverse-hyperbolic transforms require special-function/branch formulas; real-domain and complex-domain interpretations differ. |
 | `arcversin`, `arcvercos`, `arccoversin`, `arccovercos`, `archaversin`, `archavercos`, `archacoversin`, `archacovercos` | Reduce to inverse circular functions, so their branch restrictions carry over. |

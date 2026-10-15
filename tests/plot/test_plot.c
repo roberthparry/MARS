@@ -75,12 +75,14 @@ static void test_plot_escaping(void)
 {
     plot_options_t options = plot_options_default();
     options.title = "σ <script>& test";
+    options.legend = false;
     plot_t *plot = plot_new(&options);
     plot_point_t points[] = {{NUM_ZERO, NUM_ZERO, true}, {NUM_ONE, NUM_ONE, false}};
     bool ok = plot && plot_add_points(plot, points, 2, "</text><script>", PLOT_POINTS, 0xabcdef);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     xml_t *document = svg ? xml_from_text(svg) : NULL;
     ok = document && strstr(string_c_str(svg), "σ &lt;script&gt;&amp; test") &&
+         strstr(string_c_str(svg), "<title>&lt;/text&gt;&lt;script&gt;</title>") &&
          !strstr(string_c_str(svg), "<script>") && strstr(string_c_str(svg), "<circle");
     xml_free(document);
     string_free(svg);
@@ -220,7 +222,14 @@ static void test_plot_label_notation(void)
     plot_point_t points[] = {{NUM_ZERO, NUM_ZERO, true}, {NUM_ONE, small, false}};
     bool ok = plot && plot_add_points(plot, points, 2, "", PLOT_LINES, 0);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
-    ok = svg && strstr(string_c_str(svg), "×10⁻") && !strstr(string_c_str(svg), "e-09");
+    ok = svg && strstr(string_c_str(svg), "×10⁻") && strstr(string_c_str(svg), "data-y-max=\"");
+    /* Machine-readable viewport attributes may use exponents; visible tick labels must not. */
+    const char *cursor = svg ? string_c_str(svg) : NULL;
+    while (ok && (cursor = strstr(cursor, "<text"))) {
+        const char *end = strstr(cursor, "</text>"), *exponent = strstr(cursor, "e-09");
+        ok = end && (!exponent || exponent > end);
+        cursor = end ? end + 7 : NULL;
+    }
     string_free(svg);
     plot_free(plot);
     num_destroy(&small);
@@ -463,6 +472,28 @@ static void test_plot_surface(void)
     computation_free(control);
     plot_free(plot);
     TEST_ASSERT_TRUE(ok, "owned surface leaves missing cells open and honours rendering cancellation");
+
+    number_t steep_axis[17], steep_heights[17 * 17];
+    for (size_t i = 0; i < 17; ++i)
+        steep_axis[i] = num_create_from_long((long)i);
+    for (size_t i = 0; i < 17 * 17; ++i)
+        steep_heights[i] = num_create_from_long(i % 2 ? -1 : 1);
+    plot = plot_new(NULL);
+    ok = plot && plot_set_surface(plot, steep_axis, 17, steep_axis, 17, steep_heights);
+    svg = ok ? plot_to_svg(plot) : NULL;
+    faces = 0;
+    for (const char *p = svg ? strstr(string_c_str(svg), "<path fill=") : NULL; p; p = strstr(p + 10, "<path fill="))
+        ++faces;
+    ok = svg && faces == 512 && strstr(string_c_str(svg), "data-uv=") &&
+         strstr(string_c_str(svg), "data-x-min=\"0\" data-x-max=\"16\"") &&
+         strstr(string_c_str(svg), "data-y-min=\"0\" data-y-max=\"16\"");
+    string_free(svg);
+    plot_free(plot);
+    for (size_t i = 0; i < 17; ++i)
+        num_destroy(&steep_axis[i]);
+    for (size_t i = 0; i < 17 * 17; ++i)
+        num_destroy(&steep_heights[i]);
+    TEST_ASSERT_TRUE(ok, "finite alternating steep facets are never mistaken for missing data");
 
     number_t coords[] = {NUM_ZERO, NUM_ONE}, missing[] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
     plot_options_t options = plot_options_default();

@@ -123,7 +123,7 @@ static matrix_t *mat_apply_unary(const matrix_t *A, void (*number_f)(void *out, 
 matrix_t *mat_apply_scalar_callbacks(const matrix_t *A, void (*number_f)(void *, const void *),
                                     void (*expression_f)(void *, const void *))
 {
-    return mat_fun_apply(A, number_f, expression_f, NULL);
+    return mat_fun_apply(A, number_f, expression_f, A && A->elem == &number_elem ? number_f : NULL);
 }
 
 static int mat_elem_supports_numeric_algorithms(const matrix_t *A)

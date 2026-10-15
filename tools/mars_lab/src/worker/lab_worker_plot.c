@@ -18,7 +18,7 @@
 
 /* Produce one real-valued curve while preserving the worksheet's original expression. */
 int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
-                    const char *scale, const char *y_lower, const char *y_upper)
+                    const char *scale, const char *y_lower, const char *y_upper, bool preview)
 {
     if (!variable || !expr_is_variable(variable)) {
         printf("error       Select a variable to plot.\n");
@@ -42,7 +42,8 @@ int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *
     lo = bounds[0];
     hi = bounds[1];
     sampler_t *samples = ranged ?
-        lab_worker_plot_samples(source, expr_symbol_name(variable), lo, hi, ymin, ymax, &plotting_precision) : NULL;
+        lab_worker_plot_samples_quality(source, expr_symbol_name(variable), lo, hi, ymin, ymax,
+                                         &plotting_precision, preview) : NULL;
     /* Drawing also needs the range's precision, but never the worksheet's unnecessarily large default. */
     num_set_default_prec_bits(plotting_precision);
     plot_options_t options = plot_options_default();
@@ -113,8 +114,9 @@ int lab_worker_plot_output(const char *source, const expr_t *expression, const s
         printf("plot_svg    %s\n", string_c_str(svg));
         printf("differentiable  yes\n");
     } else {
-        const char *message = saved == ENXIO ? "Unable to infer a useful real plotting range for this expression. "
-                                             "Supply bounds and bind any remaining parameters." :
+        const char *message = saved == ENXIO ? "Automatic range selection failed: the trial windows did not contain "
+                                             "enough finite real variation to choose a view. Set explicit axis bounds; "
+                                             "this does not establish that the expression cannot be plotted." :
                               saved == EINVAL ? "Plot bounds must be finite real values with lower < upper." :
                               saved == ENODATA ? "No finite real points found in the sampled range. Check the formula's "
                                                 "domain, convergence and any unset parameters, or change the range." :

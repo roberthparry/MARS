@@ -972,15 +972,18 @@ static number_t eval_solution_rhs_with_sampled_indices(const expr_t *rhs, const 
     return value;
 }
 
-static void print_solution_numerics(const equation_solutions_t *solutions, expr_bindings_t *bindings,
-                                    const size_t *order, int precision)
+static string_t *solution_numerics(const equation_solutions_t *solutions, expr_bindings_t *bindings,
+                                    const size_t *order, int precision, const char *prefix)
 {
     size_t count = equ_solutions_count(solutions);
     const char *branch_parameter = solutions_integer_branch_parameter(solutions, bindings, order);
+    string_t *text = string_new();
+    if (!text)
+        return NULL;
 
     if (count == 0u) {
-        printf("numeric     \n");
-        return;
+        string_append_format(text, "%s\n", prefix);
+        return text;
     }
 
     for (size_t i = 0u; i < count; ++i) {
@@ -999,15 +1002,44 @@ static void print_solution_numerics(const equation_solutions_t *solutions, expr_
 
         sample_note(note, sizeof(note), sampled_k, sampled_branch, branch_parameter);
 
+        /* Label every protocol row so decoding never exposes continuation padding in a result card. */
         if (name && value_text)
-            printf("%s%s %s %s%s\n", i == 0u ? "numeric     " : "            ", name, relation, value_text, note);
+            string_append_format(text, "%s%s %s %s%s\n", prefix, name, relation, value_text, note);
         else
-            printf("%s%s%s\n", i == 0u ? "numeric     " : "            ", value_text ? value_text : "(null)", note);
+            string_append_format(text, "%s%s%s\n", prefix, value_text ? value_text : "(null)", note);
 
         free(value_text);
         num_destroy(&value);
         equ_free(display);
     }
+    return text;
+}
+
+static void print_solution_numerics(const equation_solutions_t *solutions, expr_bindings_t *bindings,
+                                    const size_t *order, int precision, const char *prefix)
+{
+    string_t *text = solution_numerics(solutions, bindings, order, precision, prefix);
+    if (text)
+        fputs(string_c_str(text), stdout);
+    string_free(text);
+}
+
+/* Retain worksheet-precision numerical solutions for reuse while only the viewport changes. */
+string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int precision)
+{
+    equation_solutions_t *solutions = equ_derive_solutions_with_context(equation, NULL);
+    expr_bindings_t *bindings = equ_bindings(equation);
+    string_t *text;
+    if (solutions && equ_solutions_count(solutions)) {
+        size_t *order = ordered_solution_indices(solutions, bindings);
+        text = solution_numerics(solutions, bindings, order, precision, "plot_solutions ");
+        free(order);
+    } else {
+        text = string_sprintf("plot_solutions %s\n", solutions && equ_solutions_proven_empty(solutions)
+                                        ? "No solutions." : "No explicit solutions found.");
+    }
+    equ_solutions_free(solutions);
+    return text;
 }
 
 static void print_equation_bindings(const equation_t *equation)
@@ -1066,7 +1098,7 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     print_solutions(solutions, bindings, solution_order, precision, true);
     print_solutions_TeX(solutions, bindings, solution_order);
     print_derivation_TeX(tex, solutions, bindings, solution_order);
-    print_solution_numerics(solutions, bindings, solution_order, precision);
+    print_solution_numerics(solutions, bindings, solution_order, precision, "numeric     ");
 
     free(solution_order);
     free(residual_value_text);

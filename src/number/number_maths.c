@@ -3643,6 +3643,28 @@ number_t num_floor(const number_t number)
     return number_apply_unary_math(number, qf_floor, qc_floor, number_mpfr_floor_mut, NULL);
 }
 
+/* Round without converting exact values or adding half to a large floating-point argument. */
+number_t num_round(const number_t number)
+{
+    NUM_SCOPE(scope);
+    if (!number_is_valid_value(&number))
+        return number_invalid();
+    if (!num_is_finite(number))
+        return num_scope_detach(num_clone(number));
+    if (!num_is_real(number)) {
+        number_t real = num_round(num_real_part(number));
+        number_t imag = num_round(num_imag_part(number));
+        return num_scope_detach(num_add(real, num_mul(NUM_I, imag)));
+    }
+    if (num_is_integer(number))
+        return num_scope_detach(num_clone(number));
+    number_t magnitude = num_abs(number);
+    number_t integer = num_floor(magnitude);
+    number_t remainder = num_sub(magnitude, integer);
+    number_t rounded = num_ge(remainder, NUM_HALF) ? num_add(integer, NUM_ONE) : num_clone(integer);
+    return num_scope_detach(num_lt(number, NUM_ZERO) ? num_neg(rounded) : rounded);
+}
+
 number_t num_ceil(const number_t number)
 {
     NUM_SCOPE(scope);

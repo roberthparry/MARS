@@ -10,6 +10,7 @@
 #include "lab_dom.h"
 #include "lab_layout.h"
 #include "lab_result.h"
+#include "lab_view.h"
 #include "lab_evaluation_dom.h"
 
 static int lab_evaluation_field(int data, const char *key, int fallback)
@@ -31,6 +32,9 @@ void lab_evaluation_render(unsigned mode, int data, int expandable)
         return;
     }
     int rendered = lab_dom_query(0, "#rendered"), empty = lab_dom_string("");
+    /* A same-mode evaluation must not inherit the previous Plot heading. */
+    lab_dom_write(lab_dom_query(0, "#renderedTitle"), 0, "", lab_dom_string(lab_view_text(mode, 2)));
+    lab_dom_write(lab_dom_query(0, "#valueTitle"), 0, "", lab_dom_string(lab_view_text(mode, 5)));
     lab_result_render_invalidate();
     lab_evaluation_data(rendered, "responsiveFit", lab_dom_string(mode == 2 ? "true" : "false"));
     lab_dom_class(rendered, "vertically-wrapped-tex", 0);

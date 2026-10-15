@@ -1734,6 +1734,90 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
     de_free(de);
 }
 
+static void test_diffequ_modified_emden_initial_conditions(void)
+{
+    const char *sources[] = {
+        "y'' + 6y*y' + 4y^3 = 0; y(0)=1; y'(0)=0",
+        "y'' + 6y*y' + 4y^3 = 0; y(2)=1; y'(2)=0",
+        "y'' + 6y*y' + 4y^3 = 0; y(0)=0; y'(0)=0",
+        "y'' + 6y*y' + 4y^3 = 0; y(0)=0; y'(0)=1",
+        "y'' + 6y*y' + 4y^3 = 0; y(0)=1; y'(0)=-2",
+        "3y'' - 18y*y' + 12y^3 = 0; y(0)=1; y'(0)=0",
+        "Dtt(z)+6z*Dt(z)+4z^3=0; z(0)=1; Dt(z)(0)=0"
+    };
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        WANT_LONG(sources[i], de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+        WANT_LONG("exact Emden solver", de_solve_result_solver(result), DE_SOLVER_LINEAR_TRANSFORMATION);
+        const equation_t *solution = de_solve_result_at(result, 0);
+        string_t *display = equ_to_text(solution, style_UNBOUND);
+        ASSERT_TRUE(display && !strstr(string_c_str(display), "NAN"));
+        if (i == 3)
+            WANT_TEXT("unit-slope initial-value solution display", string_c_str(display), "y = (x)/(x² + 1)");
+        string_free(display);
+        const expr_t *x = de_independent_at(de, 0);
+        expr_t *residual = equ_residual(de_equation(de));
+        expr_t *applied = expr_substitute(residual, equ_lhs(solution), equ_rhs(solution));
+        for (long sample = 0; sample <= 2; ++sample) {
+            expr_t *point = expr_const_long(sample);
+            expr_t *at = expr_substitute(applied, x, point);
+            number_t value = expr_eval(at);
+            WANT_NUMBER("exact ODE residual at sample", value, NUM_ZERO);
+            num_destroy(&value);
+            expr_free(at);
+            expr_free(point);
+        }
+        for (size_t j = 0; j < de_condition_count(de); ++j) {
+            const equation_t *condition = de_condition_at(de, j);
+            expr_t *lhs = expr_substitute(equ_lhs(condition), equ_lhs(solution), equ_rhs(solution));
+            expr_t *at = expr_substitute(lhs, x, de_condition_argument_at(de, j, 0));
+            expr_t *error = expr_sub_simplify_owned(at, expr_clone(equ_rhs(condition)));
+            WANT_LONG("exact supplied initial condition", expr_is_exact_zero(error), 1);
+            expr_free(error);
+            expr_free(lhs);
+        }
+        expr_free(applied);
+        expr_free(residual);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
+static void test_diffequ_modified_emden_condition_scope(void)
+{
+    const char *partial[] = {"y''+6y*y'+4y^3=0; y(2)=1", "y''+6y*y'+4y^3=0; y'(2)=0"};
+    for (size_t i = 0; i < sizeof partial / sizeof *partial; ++i) {
+        diffequ_t *de = de_from_string(partial[i]);
+        diffequ_solve_result_t *result = de_solve(de);
+        WANT_LONG("one datum retains an exact solution family", de_solve_result_status(result), DE_SOLVE_STATUS_SOLVED);
+        const equation_t *solution = de_solve_result_at(result, 0), *condition = de_condition_at(de, 0);
+        expr_t *lhs = expr_substitute(equ_lhs(condition), equ_lhs(solution), equ_rhs(solution));
+        expr_t *at = expr_substitute(lhs, de_independent_at(de, 0), de_condition_argument_at(de, 0, 0));
+        expr_t *error = expr_sub_simplify_owned(at, expr_clone(equ_rhs(condition)));
+        WANT_LONG("partial initial condition is imposed exactly", expr_is_exact_zero(error), 1);
+        char *text = expr_to_string(equ_rhs(solution), style_UNBOUND);
+        ASSERT_TRUE(text && strstr(text, "C"));
+        free(text);
+        expr_free(error);
+        expr_free(lhs);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+    const char *unsupported[] = {
+        "y''+6y*y'+4y^3=0; y(0)=1; y'(1)=0",
+        "y''+6y*y'+4y^3=0; y(0)=1; y(0)=2",
+        "y''+6y*y'+4y^3=0; y(0)=1; y'(0)=0; y''(0)=0"
+    };
+    for (size_t i = 0; i < sizeof unsupported / sizeof *unsupported; ++i) {
+        diffequ_t *de = de_from_string(unsupported[i]);
+        diffequ_solve_result_t *result = de_solve(de);
+        ASSERT_TRUE(de_solve_result_status(result) != DE_SOLVE_STATUS_SOLVED);
+        de_solve_result_free(result);
+        de_free(de);
+    }
+}
+
 static void test_diffequ_rejects_quartic_emden_point_linearization(void)
 {
     diffequ_t *de = de_from_string("y'' + 3*y*y' + y^4 = 0");
@@ -2933,7 +3017,7 @@ static void test_diffequ_second_order_pde_forcing_superposition(void)
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = exp(x-y) + exp(x+y)",
                                    "z = F(y - 3x) + G(y - 2x) + ½·exp(x - y) + ¹⁄₁₂·exp(x + y)");
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = exp(x-y) - cos(x-y)",
-                                   "z = F(y - 3x) + G(y - 2x) + ½·exp(x - y) + ½·cos(x - y)");
+                                   "z = F(y - 3x) + G(y - 2x) + ½·cos(x - y) + ½·exp(x - y)");
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx + 5z_xy + 6z_yy = 2sin(x-y)",
                                    "z = F(y - 3x) + G(y - 2x) - sin(x - y)");
 }
@@ -4733,6 +4817,24 @@ static void example_diffequation_linearising_a_lie_symmetric_ode(void)
     ASSERT_TRUE(valid);
 }
 
+/* README example from docs/diffequation.md: exact scaled Emden initial-value solution. */
+static void example_diffequation_emden_initial_value(void)
+{
+    const char *source = "y'' + 6*y*y' + 4*y^3 = 0; y(0)=1; y'(0)=0";
+    diffequ_t *de = de_from_string(source);
+    diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+    const equation_t *solution = de_solve_result_at(result, 0);
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    bool ok = de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+              de_solve_result_solver(result) == DE_SOLVER_LINEAR_TRANSFORMATION && text &&
+              !strcmp(string_c_str(text), "y = (2x + 1)/(2x² + 2x + 1)");
+    printf("input = %s\nsolver = linear transformation\nsolution = %s\n", source, text ? string_c_str(text) : "NULL");
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(de);
+    ASSERT_TRUE(ok);
+}
+
 /* README example from docs/diffequation.md: weighted cyclic characteristics. */
 static void example_diffequation_weighted_cyclic_pde(void)
 {
@@ -4974,6 +5076,8 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_derivative_quadratic_problem);
     RUN_TEST_CASE(test_diffequ_linearizes_exact_third_order_problem);
     RUN_TEST_CASE(test_diffequ_linearizes_modified_emden_problem);
+    RUN_TEST_CASE(test_diffequ_modified_emden_initial_conditions);
+    RUN_TEST_CASE(test_diffequ_modified_emden_condition_scope);
     RUN_TEST_CASE(test_diffequ_linearizes_scaled_modified_emden_problem);
     RUN_TEST_CASE(test_diffequ_modified_emden_uses_coefficient_rule);
     RUN_TEST_CASE(test_diffequ_solves_hydrogen_ground_state);
@@ -5082,6 +5186,7 @@ int tests_main(void)
 
     TEST_SECTION("README Output Example");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_solving_an_ode, readme_examples, "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_emden_initial_value, readme_examples, "diffequation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_linearising_a_lie_symmetric_ode, readme_examples,
                                   "diffequation,readme,output,lie-symmetry");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_weighted_cyclic_pde, readme_examples,

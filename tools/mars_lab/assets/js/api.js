@@ -227,8 +227,8 @@ async function fetchDatetimeWeather(state, signal, request = null) {
 }
 
 // Native continuations own calculus decisions; browser callbacks expose atomic capabilities.
-function takeCalculus(wrt, action, actionButton = null, preview = false) {
-    return labFlowContinue(7, {wrt, action, actionButton, preview});
+function takeCalculus(wrt, action, actionButton = null, preview = false, live = false) {
+    return labFlowContinue(7, {wrt, action, actionButton, preview, live});
 }
 
 async function takeDerivative(wrt, actionButton = null) {
@@ -241,6 +241,17 @@ async function takeIntegral(wrt, actionButton = null) {
 
 async function takePlot(wrt, actionButton = null) {
     return takeCalculus(wrt, 'plot', actionButton);
+}
+
+// Browser timer only; native code validates the captured worksheet and chooses the redraw.
+let plotControlsTimer;
+function schedulePlotControls(state, delay) {
+    clearTimeout(plotControlsTimer);
+    plotControlsTimer = setTimeout(() => {
+        plotControlsTimer = undefined;
+        labDOM.services(labDOM.call('lab_plot_controls_dispatch', 2, null, state),
+                        {takePlot: wrt => takeCalculus(wrt, 'plot', null, false, true)});
+    }, delay);
 }
 
 /** Keep only the newest browser timer for each native camera gesture. */

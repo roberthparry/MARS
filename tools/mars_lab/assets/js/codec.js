@@ -138,7 +138,7 @@ export function createCodec(environment = {}) {
             const bytes = ArrayBuffer.isView(buffer) ?
                 new Uint8Array(backing, buffer.byteOffset, buffer.byteLength) : new Uint8Array(backing);
             if (bytes.length > this.exports().lab_browser_message_limit())
-                throw new Error('Lab Protobuf response exceeds 4 MiB');
+                throw new Error('Lab Protobuf response exceeds 8 MiB');
             return bytes;
         },
         encode(value) {

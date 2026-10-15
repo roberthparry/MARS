@@ -161,11 +161,12 @@ static void lab_evaluation_install_equation_begin(const lab_evaluation_install_t
 static void lab_evaluation_install_solver_end(const lab_evaluation_install_t *state)
 {
     const char *mode = state->mode == 1 ? "equation" : "diffequation";
-    if (state->mode == 2) {
+    if (state->mode == 2)
         lab_evaluation_install_emit(state->calls, "setValueText", 1, lab_dom_get(state->cards, "value"));
-        lab_evaluation_install_emit(state->calls, "setValueCardVisible", 1, lab_dom_scalar(1, 1));
+    /* Plotting hides this card; every completed solver evaluation must restore it. */
+    lab_evaluation_install_emit(state->calls, "setValueCardVisible", 1, lab_dom_scalar(1, 1));
+    if (state->mode == 2)
         lab_evaluation_install_emit(state->calls, "clearVariableValues", 0);
-    }
     lab_evaluation_install_emit(state->calls, "modeSource", 2, lab_dom_string(mode),
                                 lab_dom_get(state->context, "text"));
     lab_evaluation_install_emit(state->calls, "saveWorksheetState", 1, lab_dom_string(mode));

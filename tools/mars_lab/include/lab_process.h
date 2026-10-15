@@ -22,6 +22,9 @@
 
 typedef struct _string_t string_t;
 
+/** @brief Initialise bounded anonymous plot caches before forking request workers; failure disables caching. */
+void lab_proc_plot_cache_init(void);
+
 /**
  * @brief Snapshot a completed process call using its saved errno and exit status.
  * Pass the boolean return, saved errno, returned status and supplied timeout immediately after a run.

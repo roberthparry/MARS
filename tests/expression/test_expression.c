@@ -596,6 +596,21 @@ static void example_readme_examples(void)
     TEST_ASSERT_TRUE(run_README_md_example() == 0, "README examples run");
 }
 
+static void example_round(void)
+{
+    /* README example: nearest-integer rounding in docs/expression.md. */
+    const char *inputs[] = {"round(2.49)", "round(2.5)", "round(-2.5)"};
+    const double expected[] = {2.0, 3.0, -3.0};
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(*inputs); ++i) {
+        expr_t *expression = expr_from_string(inputs[i], NULL);
+        ASSERT_NOT_NULL(expression);
+        double value = qf_to_double(expr_eval_qf(expression));
+        printf("%.0f\n", value);
+        TEST_ASSERT_TRUE(value == expected[i], "README round output");
+        expr_free(expression);
+    }
+}
+
 /* README example: principal indexed radicals in docs/expression.md. */
 static void example_indexed_roots(void)
 {
@@ -675,6 +690,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_signal_readme_examples, readme_examples, "signal,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_orthopoly_readme_examples, readme_examples, "orthopoly,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_indexed_roots, readme_examples, "expression,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_round, readme_examples, "expression,readme,round");
 
     return TESTS_EXIT_CODE();
 }

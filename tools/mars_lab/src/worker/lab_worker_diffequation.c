@@ -159,7 +159,12 @@ int lab_worker_diffequation(int argc, char **argv)
     diagnostic = de_solve_result_diagnostic(result);
 
     printf("input %s\n", source);
-    for (size_t i = 0; i < de_independent_count(de); ++i) {
+    size_t dimensions = de_independent_count(de), count = de_solve_result_count(result);
+    bool plottable = de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && count > 0 && count <= 16 &&
+                     (dimensions == 1 || (dimensions == 2 && count == 1));
+    for (size_t i = 0; plottable && i < count; ++i)
+        plottable = expr_is_variable(equ_lhs(de_solve_result_at(result, i)));
+    for (size_t i = 0; plottable && i < dimensions; ++i) {
         expr_t *axis = expr_new_named_var(NUM_NAN, expr_symbol_name(de_independent_at(de, i)));
         char *name = axis ? expr_to_string(axis, style_UNBOUND) : NULL;
         if (name)

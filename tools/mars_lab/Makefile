@@ -90,7 +90,7 @@ LAB_WASM_LD ?= wasm-ld
 # Workers need only the codec and queue policy, never DOM imports or UI state.
 $(LAB_CODEC_WASM): $(addprefix $(LAB_BUILD_DIR)/wasm/src/,lab_browser.o lab_memory.o lab_jobs.o lab_job_worker.o) tools/mars_lab/wasm/lab_codec.imports tools/mars_lab/Makefile
 	"$(LAB_WASM_LD)" --no-entry --export-all --allow-undefined-file=tools/mars_lab/wasm/lab_codec.imports \
-	    --initial-memory=16777216 --max-memory=16777216 $(filter %.o,$^) -o $@
+	    --initial-memory=33554432 --max-memory=33554432 $(filter %.o,$^) -o $@
 .PHONY: check-lab-wasm-deps
 check-lab-wasm-deps:
 	@set -eu; \

@@ -613,6 +613,7 @@ static int lab_flow_request_calculus(int frame)
             return lab_flow_call(frame, CLEAR_ERROR, "clearResultDetails", 0, 0, 1, options);
         }
         case CLEAR_ERROR:
+            lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 1);
             return lab_flow_call(frame, DISPLAY, "clearRenderedError", 0, 0, 0);
         case DISPLAY:
             return lab_flow_call(frame, SCALAR, matrix && !scalar ? "displayMatrixResult" : "displayCalculusResult", 0,
@@ -659,6 +660,11 @@ static int lab_flow_request_calculus(int frame)
         case ERROR_CLEAR: {
             if (!lab_flow_request_truth(frame, "current"))
                 return lab_flow_done(0);
+            if (lab_flow_request_truth(frame, "live")) {
+                lab_dom_write(lab_dom_id("plotFeedback"), 0, "", lab_dom_get(frame, "error"));
+                lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 0);
+                return lab_flow_call(frame, DONE, "setStatus", 0, 0, 1, lab_dom_string("Check plot settings"));
+            }
             int options = lab_dom_object(5);
             lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
             return lab_flow_call(frame, matrix ? ERROR_VARIABLES : ERROR_RENDER, "clearResultDetails", 0, 0, 1,

@@ -121,7 +121,7 @@ try {
     rejects(() => tbaWire.decode(new Uint8Array([8, 2])), 'wrong protocol version rejected');
     rejects(() => tbaWire.decode(tbaWire.encode(sample).slice(0, -1)), 'truncated envelope rejected');
     rejects(() => tbaWire.encode({value: NaN}), 'non-finite value rejected');
-    rejects(() => tbaWire.encode({text: 'x'.repeat(4194305)}), 'oversized encode rejected');
+    rejects(() => tbaWire.encode({text: 'x'.repeat(wasm.lab_browser_message_limit() + 1)}), 'oversized encode rejected');
     const pollution = Object.create(null);
     pollution.__proto__ = {polluted: true};
     const safe = tbaWire.decode(tbaWire.encode(pollution));

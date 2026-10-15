@@ -221,7 +221,13 @@ dispatch improves UI responsiveness, not necessarily total completion time.
 
 `wasm/src/lab_jobs.c` owns admission, FIFO selection and non-reused completion
 tokens. At most eight queued/running jobs and 8 MiB of retained input are admitted,
-with the existing 4 MiB per-message limit. Queue overload rejects explicitly.
+with an 8 MiB per-message transport limit. Queue overload rejects explicitly.
+Successful plot replies carry the SVG only in `presentation.calculus.plot.svg`;
+the redundant top-level `plot_svg` and raw worker transcript are omitted at the
+HTTP boundary. Native in-process results remain available for diagnostics and tests.
+If a response still cannot be encoded, the server returns HTTP 500 with a bounded
+Protobuf diagnostic instead of an untyped failure response. Worksheet storage
+retains its separate 4 MiB limit; codec worker memory is bounded to 32 MiB.
 Each job has a 30-second deadline including queueing and worker startup. Abort
 signals cancel queued work; cancelling running work terminates its worker. Late
 messages from a replaced worker cannot complete a newer request. Startup errors,
@@ -239,7 +245,7 @@ identity check so callbacks from a replaced browser object cannot enter the
 current controller.
 `js/codec.js` supplies the shared host-value bridge; all Protobuf validation remains
 in C. `js/codec_worker.js` loads the codec-only `wasm/lab_codec.wasm`, with fixed
-16 MiB private linear memory and no DOM imports. There is one lazily started worker
+32 MiB private linear memory and no DOM imports. There is one lazily started worker
 per page, reused between jobs; no `SharedArrayBuffer`, atomics, pthreads or blocking
 UI waits are introduced. Input buffers remain caller-owned and are not detached.
 Transferred decoded objects are still subject to the existing request-token checks
@@ -405,7 +411,7 @@ old finaliser cannot remove a newer request for the same text.
 `integrator.js` and its route are removed too. C/WASM owns row selection,
 reconciliation, editing, structured row-text formatting and monotonically
 numbered form revisions. Formatting copies names and bounds verbatim rather
-than parsing their mathematics; transfer buffers remain bounded to 4 MiB.
+than parsing their mathematics; transfer buffers remain bounded to 8 MiB.
 The whole row batch now crosses into C once: C normalises each structured row,
 copies its UTF-8 fields, inserts notation and newline separators, and publishes
 one completed string. Batches are limited to 256 rows and 4 MiB of output;
@@ -473,7 +479,7 @@ returned choices; it does not maintain a second field-policy table.
 Restoration retains authored DateTime whitespace while capture trims values.
 Clear preserves town selection and the almanac jurisdiction. Named-town offsets
 and manually edited DateTime offsets retain priority over jurisdiction replies.
-The codec and worker admission share a native 4 MiB message limit. The browser
+The codec and worker admission share a native 8 MiB message limit. The browser
 stream and buffer adapters obtain this bound through `lab_browser_message_limit()`;
 they still reject oversized input before copying it into WebAssembly memory.
 
@@ -1000,8 +1006,8 @@ requires it.
 
 ### Native function plots
 
-**Plot type** has two radio overrides: **2-D curve** and **3-D surface**.
-Leaving both unselected chooses the type automatically. Automatic selection draws
+**Plot type** offers **Auto**, **2-D curve** and **3-D surface**.
+Auto chooses the type automatically. Automatic selection draws
 a surface when exactly one other non-constant variable is unset; otherwise
 it draws a curve. Ambiguous additional variables require an explicit
 **Second variable** and numerical bindings for any remaining parameters.
@@ -1028,8 +1034,8 @@ Surface plot ready: u(x,y) = x^2 + y^2; height axis: u
 ```
 
 Plot type, variables, ranges, Y scale and camera controls live inside the
-**Plot** card, below the image, including when the card is expanded. Press
-**Update plot** to apply changed ranges or plot type without leaving the card.
+**Plot** card, below the image, including when the card is expanded. Changes
+redraw automatically after a short pause; no update button is needed.
 Choose variables using the compact radio buttons populated from native binding
 metadata. A single **Plot** button uses the selected first variable, initially the
 first available variable in the native catalogue;
@@ -1037,9 +1043,15 @@ the second is chosen automatically unless an explicit radio choice is selected. 
 cannot occupy both axes. Each variable keeps its **From/To** pair together.
 The vertical-range controls are available for both curves and surfaces; the
 3-D camera controls are displayed only for surfaces.
-Plot settings use inline radio buttons, not dropdowns. **Reset** beside an
-optional group clears its override and restores automatic behaviour; there is
-no separate Automatic option. Resetting a choice preserves entered range bounds.
+Plot settings use compact button-style radio choices, not dropdowns. Choosing
+**Auto** for the range clears explicit bounds and hides all bound-entry fields
+in Expression, Equation and Differential Equation plots. Axis choices remain
+available when there are multiple variables. **Fit all** reveals horizontal
+bounds; **Manual limits** also reveals vertical bounds. Blank horizontal bounds
+remain automatic. Manual vertical limits wait until both fields are filled.
+Delayed edits are discarded after a worksheet change or newer explicit request.
+Incomplete or invalid live bounds leave the last valid plot visible and show
+validation feedback beside the controls; correcting the bounds redraws the plot.
 
 The **Azimuth** slider in **3-D view** rotates around the surface; **Elevation** tilts the view;
 **Roll** turns the view clockwise in the screen plane. All three support mouse,
@@ -1061,37 +1073,46 @@ native redraw is in flight; subsequent movements replace the pending camera
 position, so stale movements cannot build up a queue. Dragging uses a 13×13
 preview mesh, retaining the normal numerical precision checks and domain gaps.
 No spline smoothing is applied across discontinuities. Releasing the mouse or lifting the finger,
-including outside the plot, retains the final position and requests one full
-70×70 redraw, even when the last preview already reached that angle. Escape, losing browser
+including outside the plot, retains the final position and requests one
+full-quality redraw, even when the last preview already reached that angle. Escape, losing browser
 focus or a lost release restores the original camera. A superseding request
 invalidates an unfinished drag. Preview and final redraws resample the native surface.
-This also works when expanded. Right-click and 2-D plots keep their normal
-behaviour; Ctrl+wheel zoom remains available.
+This also works when expanded. Right-click keeps its normal behaviour;
+2-D dragging pans instead of rotating, and Ctrl+wheel zoom remains available.
 Touch dragging also works with a pen. The finger that starts the gesture owns it;
 additional fingers cannot change or end that rotation. A browser-cancelled touch
 restores the original view. Touches over the 3-D plot rotate it instead of scrolling
-the page; scrolling and browser gestures elsewhere, including over 2-D plots, are unchanged.
+the page; touches over a 2-D plot pan it. Scrolling and browser gestures outside
+plot images are unchanged.
 Over a 3-D plot, **Shift+wheel** adjusts elevation like a vertical drag and
 **Alt+wheel** adjusts azimuth like a horizontal drag. Wheel down increases the
 angle; wheel up decreases it, in 5° steps with the same limits as dragging.
 Sliders and readouts follow the camera. Wheel rotation uses the same 13×13 preview
-and coalesced redraws as dragging, then restores the full 70×70 mesh after
+and coalesced redraws as dragging, then restores the full-quality mesh after
 300 ms without further wheel movement. Escape or losing browser focus restores
 the starting camera. Ctrl takes precedence for zoom; Shift+Alt together
 does not rotate. Wheel rotation is inactive during a drag.
 Axis numbers are spaced to avoid collisions at shared corners and during
 rotation; crowded numbers may be omitted while their tick marks remain visible.
 
-Surfaces use 70×70 uniformly sampled vertices (9,522 triangles for a complete grid)
+Surfaces start with 70×70 uniformly sampled vertices (9,522 triangles for a complete grid)
 and an adjustable oblique view, with
 blue/teal/gold height shading. Automatic height scaling crops extreme spikes near
 poles so they do not flatten the rest of the surface. **Height range** in the Plot
 card offers **Fit all** or **Manual limits**; enter a finite **Minimum** and
-**Maximum**, then press **Update plot**. **Reset** restores automatic cropping.
+**Maximum**; the plot updates automatically. **Auto** restores automatic cropping.
 The range applies to the height axis named in the formula title (usually `u`),
 not either independent variable. Rotation previews and animation use the same
 selected policy; manual limits remain fixed. Clipped facets stop at the chosen
-heights rather than creating flat caps. Missing real values leave holes. Coarse
+heights rather than creating flat caps. Full-quality plots also sample edge
+midpoints and cell centres, retaining a 139×139 grid when interpolation disagrees
+by more than 0.5% of the largest sampled absolute height, or sampled validity changes.
+Refinement is bounded rather than a guarantee that all oscillations are resolved;
+narrow the axes for finer detail. Steep finite facets are not deleted merely for
+their height differences. Missing real values leave holes. Opposite-sign edges
+receive up to eight bisection probes: non-real/non-finite interiors or sustained
+growth beyond eight times the endpoint magnitudes mark sampled gaps. This is a
+bounded singularity heuristic, not a domain proof. Coarse
 7×7 higher-precision checks increase the working precision when needed; the
 normal starting mantissa is 53 bits, independent of worksheet precision.
 Neither sampled binding is changed in the worksheet. This surface view
@@ -1106,12 +1127,15 @@ variable is sampled independently of its worksheet value, which is preserved.
 
 Blank horizontal bounds mean **Automatic**, independently for each endpoint and
 each surface variable. The native worker probes the expression at bounded
-coordinate scales, looking for enough finite real values and visible variation;
+coordinate scales, including intermediate scales between powers of ten, looking
+for enough finite real values and visible variation. Well-populated discrete
+levels count as variation even when there are no intermediate heights;
 it trims invalid outer margins only where no bound was supplied. An entered
 endpoint is never moved. This is an expression-dependent viewing heuristic, not
 a fixed −10-to-10 range or a proof of the complete real domain. It can miss narrow
-or distant features; when no useful window is found it asks for explicit bounds
-and any missing parameter bindings. Explicit ranges bypass this range search.
+or distant features; when no useful window is found it reports that automatic
+range selection failed and asks for explicit bounds. That failure does not prove
+the expression is unplottable. Explicit ranges bypass this range search.
 Plots retain gaps inside the chosen window.
 
 For example, enter `asin(x)`, leave both bounds blank, and press **Plot**.
@@ -1121,14 +1145,15 @@ The output is the inverse-sine curve over its real interval:
 Automatic curve: asin(x), x from -1 to 1
 ```
 
-The **Vertical range** (curves) or **Height range** (surfaces) offers **Fit all** and **Manual limits** radio overrides.
-With neither selected, the range is automatic. Automatic scaling
+The **Vertical range** (curves) or **Height range** (surfaces) sub-card offers
+**Auto**, **Fit all** and **Manual limits**. Auto is the default.
+Automatic scaling
 uses a horizontally distributed range estimate for curves, or finite grid heights
 for surfaces, to keep extreme values near poles from flattening the rest of the plot.
 It is a viewing heuristic, not a proof of divergence. Cropping adds no visible annotation.
 Fit all includes every finite sampled value.
 For Manual limits, supply finite **Minimum** and **Maximum**, with minimum
-strictly below maximum. Press **Update plot** after changing these controls.
+strictly below maximum. Changes update the plot automatically.
 Tick labels use rounded decimal steps, never fractions; very
 large or small labels use `×10` with superscript exponents.
 Solid bottom and left axes sit beside the numerical tick labels, with the top
@@ -1165,9 +1190,37 @@ a plotting heading into another mode.
 Hold **Ctrl** and use the mouse wheel over a 2-D or 3-D plot to zoom in (up)
 or out (down). Shift+wheel and Alt+wheel rotate 3-D plots as described above;
 otherwise, without Ctrl, wheel events retain their normal browser behaviour
-and do not change plot zoom. Zoom uses the same bounded levels as the
-card's **−**, **+** and percentage-reset controls, including when expanded.
-It scales the existing SVG without resampling or changing the chosen ranges.
+and do not change plot zoom. For 2-D plots, Ctrl+wheel changes both axis ranges
+around the pointer. For 3-D surfaces it changes both independent-variable ranges
+around the point on the visible mesh facet, preserving camera orientation and
+the chosen height-scaling policy. Surface background zoom uses the domain centre.
+Both request fresh native samples; the image stays fitted to
+the card. **−** and **+** change the ranges around their centre, and **Reset**
+restores the range controls captured before zooming. Pointer coordinates use the
+SVG screen transformation, so nested headings, clipping and fitting do not offset
+hover readings or gesture anchors. A vertical hover guide shows
+an approximate x coordinate, calculated from renderer-owned viewport metadata,
+and includes the native integration-constant values when a solution-family curve is hovered,
+and disappears outside the chart. It does not obscure curve-identity tooltips or
+appear in copied SVG output. Native SVG hover titles are suppressed in the interactive
+curve plot to avoid duplicate tooltips; their text remains accessible and is preserved
+in copied SVG output. Inspection and gesture arithmetic use browser-sized
+coordinates; non-finite or collapsed coordinate ranges require manual native bounds.
+Surface rotation controls are unchanged; plot zoom does not magnify the SVG.
+Drag a 2-D plot with the mouse or a finger to pan horizontally and vertically
+without changing its scale. Existing curves move immediately inside clipped
+plot windows while moves are coalesced into native redraws. Drag previews use
+an adaptive sampling budget of 513 evaluations per curve instead of 8193, with fewer subdivisions and
+no derivative construction; numerical precision checks remain enabled. Release
+finishes at full detail. Escape or pointer cancellation restores the starting
+view. Reset restores the view from before zooming or panning.
+The **2-D curve** choice is hidden while another plotting variable is unset.
+Fix the other variable's value to make a curve available; clearing that value
+returns an incompatible curve selection to **Auto**.
+Zoom-generated range fields use interval-aware precision: broad intervals show
+short bounds, while narrow intervals retain more digits. Trailing zeroes are
+omitted. Sampling retains the unrounded gesture coordinates until a bound is
+edited; manually entered bounds keep their authored precision.
 Scrolling outside the plot image, including over its controls, behaves normally;
 other result cards still require Ctrl or Command with the wheel to zoom.
 
@@ -1187,17 +1240,60 @@ The plotting limit is 32,768 working bits, with bounds and reference checks
 limited to 65,536 bits; unresolved precision requirements produce an error.
 
 Equation mode also offers **Plot** after evaluation. It draws the left and right
-sides as separately coloured, labelled curves on common axes; their intersections
+sides as separately coloured curves on common axes; their intersections
 represent real solutions within the plotted range. Select one equation variable
 and bind any remaining parameters. The equation in the editor is unchanged.
+The **Solutions** card stays visible below the plot, including during live range
+updates. Its values are computed from the current equation using the same native
+solver and numerical formatter as Evaluate, rather than retained from an older result.
+There is no generic left/right legend; hovering over a curve identifies its native
+expression. Automatic equation framing samples both sides and their residual,
+using connected crossings and detected turning points to choose padded horizontal
+and vertical limits. Large outer tails do not flatten the root region. This is a
+bounded viewing heuristic inside the initial domain, not a guarantee of finding
+every solution. Without usable features, the ordinary automatic policy remains.
+Explicit horizontal endpoints are preserved, manual vertical limits take precedence,
+and **Fit all** bypasses feature cropping.
+Evaluating again after a plot restores the mathematical result heading and the
+Solutions card, including the numerical roots; plotting does not remove solver results.
 
 Differential Equation mode offers **Plot** for explicit ordinary differential-equation
 solutions, using the declared independent variable and the problem's initial
-conditions. All returned explicit branches are drawn (up to sixteen). Unset
-integration constants, implicit solutions and series-only results
-are not guessed or silently replaced: supply sufficient conditions or use an
-explicit expression in Expression mode. A PDE with two independent variables and
-one explicit solution is plotted as a 70×70 surface, including solutions constant
+conditions. All returned explicit branches are drawn (up to sixteen). The plot
+title shows the solved equation or equations; a single solution has no redundant
+legend, while multiple branches retain numbered legends. With no or incomplete
+initial conditions, up to two free integration constants per branch produce representative
+family curves: one selects five values; two select a nine-member Cartesian grid.
+Private copies promote the generated constants to sampling variables. Adaptive
+sweeps use first and second derivatives with respect to each constant over
+−4 to 4, at x = −2, 0 and 2 and companion-constant values −1 and 1.
+Values are selected by quantiles of bounded angular ordinate sensitivity, with
+a uniform floor to retain quieter regions. This bounded exploratory heuristic
+is not a global search; when no usable sensitivity exists, fixed seeds are retained.
+Authored parameters are never varied. The general solution stays in the title, marked as representative real
+members; hover over a curve to see its selected constants in a tooltip, without
+an overlapping family legend. Reaching a curve keeps it at full brightness and
+dims the other solution curves; moving into empty plot space or leaving the plot
+restores the whole family. These are illustrations,
+not additional initial conditions or an exhaustive family. Non-real members in
+the selected viewport are omitted. At most sixteen curves are drawn across all
+branches; larger families require more initial conditions.
+
+For fully automatic horizontal family bounds, a bounded sampler pass measures
+ordinate changes in evenly spaced horizontal bins. It frames the central 80% of
+that activity with padding, retains located stationary points, and leaves
+edge-dominated growth alone. Extreme ordinates are limited for this framing
+estimate so that poles do not dominate it. This is a viewing heuristic, not a
+complete feature search. Explicit horizontal endpoints disable this refinement.
+Live updates apply the selected ranges in Equation and Differential Equation
+modes as well as Expression mode; manual vertical limits override automatic scaling.
+
+Authored parameters are never varied automatically: bind any unresolved problem
+parameters first. Implicit solutions, arbitrary functions and series-only results
+are not guessed or silently replaced; use an explicit expression in Expression
+mode where appropriate. The Plot button is hidden for implicit,
+series-only and unsupported-dimensional results. A PDE with two independent variables and
+one explicit solution is plotted as a refinable surface, including solutions constant
 along either coordinate. The surface retains the usual camera controls, touch
 gestures, previews and automatic/manual height limits. Higher-dimensional problems
 and multiple PDE branches currently require selecting a concrete expression or
@@ -1205,6 +1301,17 @@ slice in Expression mode; no branch is silently chosen. Both solver modes share
 native sampling and SVG rendering with Expression mode. Plot requests use `/eval` with
 `action: "plot"` and `plot_source_mode: "equation"` or `"diffequation"`; the
 unchanged mathematical source remains in `expression`.
+
+The existing server keeps a bounded, shared-memory cache for Equation and
+Differential Equation plots. Repeated identical requests reuse completed native
+results; changed viewports reuse solved curves and representative family choices
+but still sample the new view. Source, mode, precision and executable changes
+invalidate the relevant records. Displayed numerical solutions retain worksheet
+precision; heuristic family-parameter exploration is capped at 128 bits. Curve
+sampling retains its independent precision validation and escalation policy.
+There is no additional server or persistent cache. Restarting the server clears
+the records; `MARS_LAB_PLOT_CACHE=0` disables reuse for profiling. Requests with an
+explicit non-zero calculation work limit bypass the cache.
 
 Adaptive curves use native first derivatives and repeated differentiation for
 second derivatives. Tangent/secant and curvature checks supplement the value
@@ -1218,8 +1325,8 @@ eight candidates receive at most twelve local Newton steps using the gradient an
 Hessian (including mixed second derivatives), confined to neighbouring grid cells.
 Finite small-gradient candidates with a definite Hessian contribute height limits;
 saddles and unresolved or unsupported candidates do not. Preview and manual-height
-plots skip this search. The 70×70 mesh is unchanged: an improved height range does
-not add missing geometric detail, and flat or unsampled extrema can still be missed.
+plots skip this search. Extrema search changes the height range, independently of
+midpoint-driven mesh refinement; flat or unsampled extrema can still be missed.
 
 The final curve sampling pass uses 64 initial intervals, at most 8,193 evaluations and
 eight adaptive subdivision levels. Validation probes additionally consume the

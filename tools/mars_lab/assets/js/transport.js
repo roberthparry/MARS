@@ -49,7 +49,10 @@ const labDOM = (() => {
         node => node.viewBox?.baseVal.height || 0, node => node.getBoundingClientRect().left,
         node => node.getBoundingClientRect().top, node => node.getBoundingClientRect().bottom,
         node => node.clientHeight, node => node.scrollHeight,
-        node => Number(node.isConnected && node.clientHeight > 0 && node.getClientRects().length > 0)
+        node => Number(node.isConnected && node.clientHeight > 0 && node.getClientRects().length > 0),
+        node => node.getScreenCTM()?.a ?? NaN, node => node.getScreenCTM()?.b ?? NaN,
+        node => node.getScreenCTM()?.c ?? NaN, node => node.getScreenCTM()?.d ?? NaN,
+        node => node.getScreenCTM()?.e ?? NaN, node => node.getScreenCTM()?.f ?? NaN
     ];
     function services(plan, registry) {
         if (active)
@@ -274,6 +277,7 @@ const labDOM = (() => {
             lab_dom_remove: (node, key) => values[node]?.removeAttribute(literal(key)),
             lab_dom_number: id => Number(values[id]) || 0,
             lab_dom_format: (number, prefix, suffix) => remember(literal(prefix) + number + literal(suffix)),
+            lab_dom_precision: (number, digits) => remember(String(Number(number.toPrecision(digits)))),
             lab_dom_join: (left, right, suffix) =>
                 remember(String(values[left] || '') + String(values[right] || '') + literal(suffix)),
             lab_dom_query: (parent, selector) =>
@@ -380,7 +384,7 @@ async function labFetch(url, options = {}) {
                     length += value.length;
                     if (length > labWire.exports().lab_browser_message_limit()) {
                         await reader.cancel();
-                        throw new Error('Lab Protobuf response exceeds 4 MiB');
+                        throw new Error('Lab Protobuf response exceeds 8 MiB');
                     }
                     parts.push(value);
                 }

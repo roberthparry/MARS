@@ -765,6 +765,10 @@ number_t num_root(const number_t number, const number_t order);
 /** @brief Return the square, preserving exact integer and rational arithmetic within the precision budget. */
 number_t num_sqr(const number_t number);
 number_t num_floor(const number_t number);
+
+/** @brief Round to the nearest integer, with exact halves away from zero; round complex components separately. */
+number_t num_round(const number_t number);
+
 number_t num_ceil(const number_t number);
 
 /**

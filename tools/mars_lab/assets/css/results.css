@@ -42,7 +42,8 @@
   min-height: 0;
 }
 
-.rendered:has([data-surface]) svg {
+.rendered:has([data-surface]) svg,
+.rendered:has([data-plot-chart][data-x-min]) svg {
   cursor: grab;
   user-select: none;
   touch-action: none;
@@ -409,6 +410,7 @@ pre {
 }
 
 .rendered {
+  position: relative;
   margin: 0;
   min-width: 0;
   min-height: 12rem;
@@ -456,4 +458,31 @@ pre {
 .rendered.error,
 #rendered.error {
   font-family: Georgia, "Times New Roman", serif;
+}
+
+.plot-pointer-line,
+.plot-pointer-tip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#rendered [data-x-min]:has(.plot-curve-active) [data-series]:not(.plot-curve-active) {
+  opacity: 0.18;
+}
+
+.plot-pointer-line {
+  width: 0;
+  border-left: 1px dashed #e6c778;
+}
+
+.plot-pointer-tip {
+  max-width: calc(100% - 20px);
+  padding: 4px 7px;
+  border: 1px solid #94b8b1;
+  border-radius: 5px;
+  background: #142921;
+  color: #e6c778;
+  font: 12px monospace;
+  overflow-wrap: anywhere;
 }

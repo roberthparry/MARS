@@ -5,7 +5,7 @@
  * Parses equation graphs without browser-side rewriting. Both algebraic sides
  * share one viewport; explicit ODE solution branches are sampled independently.
  * Two-variable PDE solutions use the shared surface renderer. Implicit solutions,
- * unset parameters and unsupported dimensions are reported,
+ * unset authored parameters and unsupported dimensions are reported,
  * never replaced by guessed functions. Existing guarded sampling and clipping
  * policies apply to every curve in the isolated calculation process.
  */
@@ -18,9 +18,12 @@
 #include "equation-t.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
+#include "lab_worker_plot_prepared.h"
 
-static int plot_curves(const char *input, const char *title, const char *axis,
-                       const expr_t *const *curves, size_t count, bool equation, char **argv)
+static int plot_curves(const char *input, const char *title_text, const char *title, const char *axis,
+                       const expr_t *const *curves, string_t *const *labels, size_t count,
+                       bool equation, bool family, char **argv)
 {
     char *sources[16] = {0};
     number_t bounds[4] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
@@ -61,6 +64,14 @@ static int plot_curves(const char *input, const char *title, const char *axis,
         bounds[1] = num_clone(NUM_ONE);
         ranged = true;
     }
+    if (ok && ranged && family && !*argv[5] && !*argv[6])
+        lab_worker_plot_frame(sources, count, axis, bounds);
+    bool feature_frame = ok && ranged && equation && !strcmp(argv[7], "auto") &&
+                         lab_worker_plot_equation_frame(curves, sources, axis, !*argv[5] && !*argv[6], bounds);
+    if (feature_frame) {
+        ymin = num_clone(bounds[2]);
+        ymax = num_clone(bounds[3]);
+    }
     plot_options_t options = plot_options_default();
     options.x_label = axis;
     options.y_label = "";
@@ -68,33 +79,49 @@ static int plot_curves(const char *input, const char *title, const char *axis,
     options.axis_colour = 0x94b8b1;
     options.grid_colour = 0x82aaa3;
     options.label_colour = 0xb8ccc5;
-    options.legend = true;
+    options.legend = !equation && !family && count > 1;
     options.smart_y = !strcmp(argv[7], "auto");
     plot_t *plot = ok && ranged ? plot_new(&options) : NULL;
     ok = ok && plot;
-    static const unsigned colours[] = {0x78d8cb, 0xe8bd65, 0xd68cc4, 0x8caff0};
+    static const unsigned colours[] = {
+        0x78d8cb, 0xe8bd65, 0xd68cc4, 0x8caff0, 0xa9d879, 0xf0a06a, 0xb2a1ec, 0xe0dbb5,
+        0xec8294, 0x70bad8, 0xd0ce70, 0xa6d8ba, 0xd6a9d1, 0xb5c9e8, 0xd8b393, 0xc1d3c9
+    };
+    size_t drawn = 0;
     for (size_t i = 0; ok && i < count; ++i) {
         size_t precision = 53;
-        sampler_t *samples = lab_worker_plot_samples(sources[i], axis, bounds[0], bounds[1], ymin, ymax, &precision);
+        sampler_t *samples = lab_worker_plot_samples_quality(sources[i], axis, bounds[0], bounds[1], ymin, ymax,
+                                                              &precision, !strcmp(argv[17], "preview"));
         bool finite = false;
         /* At most 8193 points per curve; reject an entirely unavailable branch rather than hide it. */
-        for (size_t j = 0; !finite && j < sampler_count(samples); ++j)
+        for (size_t j = 0; samples && !finite && j < sampler_count(samples); ++j)
             finite = sampler_point(samples, j)->valid;
+        /* A representative parameter choice may have no real points in this viewport. */
+        if (!finite && family && (samples || errno == ENODATA || errno == EDOM || errno == ENXIO)) {
+            sampler_free(samples);
+            continue;
+        }
         if (precision > drawing_precision)
             drawing_precision = precision;
         char label[40];
-        snprintf(label, sizeof label, "Solution %zu", i + 1);
-        ok = finite && plot_add_sampler(plot, samples, equation ? (i ? "Right side" : "Left side") : label,
-                                          PLOT_LINES, colours[i % 4]);
+        if (count > 1)
+            snprintf(label, sizeof label, "Solution %zu", i + 1);
+        else
+            label[0] = '\0';
+        const char *name = labels ? string_c_str(labels[i]) : label;
+        ok = finite && plot_add_sampler(plot, samples, equation ? sources[i] : name,
+                                          PLOT_LINES, colours[i]);
+        drawn += ok;
         sampler_free(samples);
     }
     num_set_default_prec_bits(drawing_precision);
-    if (ok && manual)
+    ok = ok && drawn > 0;
+    if (ok && (manual || feature_frame))
         ok = plot_set_bounds(plot, bounds[0], bounds[1], ymin, ymax);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     if (svg) {
         printf("input %s\nexpression %s\nplot_title %s\nplot_title_TeX %s\nplot_svg %s\ndifferentiable no\n",
-               input, input, input, title ? title : "", string_c_str(svg));
+               input, input, title_text ? title_text : "", title ? title : "", string_c_str(svg));
     } else {
         printf("error Unable to plot finite real curves. Supply valid bounds and values for remaining parameters; "
                "for differential equations supply sufficient initial conditions.\n");
@@ -147,11 +174,30 @@ int lab_worker_solver_plot(int argc, char **argv)
             return 1;
         }
         const expr_t *curves[] = {equ_lhs(equ), equ_rhs(equ)};
-        char *title = equ_to_TeX_body_wrapped(equ, 110);
         for (size_t i = 0; i < expr_bindings_count(bindings); ++i)
             if (!expr_bindings_is_constant_at(bindings, i))
                 print_axis(expr_bindings_name_at(bindings, i));
-        int rc = plot_curves(argv[1], title, axis, curves, 2, true, argv);
+        lab_plot_prepared_t *prepared = lab_worker_plot_prepared_read(argc, argv);
+        if (prepared && prepared->count == 2 && !prepared->family) {
+            int rc = plot_curves(argv[1], string_c_str(prepared->title), string_c_str(prepared->TeX), axis,
+                                 (const expr_t *const *)prepared->curves, NULL, 2, true, false, argv);
+            if (!rc)
+                fputs(string_c_str(prepared->numeric), stdout);
+            lab_worker_plot_prepared_free(prepared);
+            equ_free(equ);
+            return rc;
+        }
+        lab_worker_plot_prepared_free(prepared);
+        char *title = equ_to_TeX_body_wrapped(equ, 110);
+        int rc = plot_curves(argv[1], argv[1], title, axis, curves, NULL, 2, true, false, argv);
+        if (!rc) {
+            string_t *numeric = lab_worker_equation_plot_solutions(equ, atoi(argv[3]));
+            if (numeric) {
+                fputs(string_c_str(numeric), stdout);
+                lab_worker_plot_prepared_write(argc, argv, argv[1], title, curves, NULL, 2, false, numeric);
+            }
+            string_free(numeric);
+        }
         free(title);
         equ_free(equ);
         return rc;
@@ -177,6 +223,16 @@ int lab_worker_solver_plot(int argc, char **argv)
                "for a PDE surface.\n");
         return 1;
     }
+    lab_plot_prepared_t *prepared = dimensions == 1 ? lab_worker_plot_prepared_read(argc, argv) : NULL;
+    if (prepared) {
+        print_axis(axis);
+        int rc = plot_curves(argv[1], string_c_str(prepared->title), string_c_str(prepared->TeX), axis,
+                             (const expr_t *const *)prepared->curves, prepared->labels, prepared->count,
+                             false, prepared->family, argv);
+        lab_worker_plot_prepared_free(prepared);
+        de_free(de);
+        return rc;
+    }
     diffequ_solve_result_t *solutions = de_solve_with_context(de, 0, NULL);
     size_t count = solutions ? de_solve_result_count(solutions) : 0;
     bool explicit = count > 0 && count <= 16 && de_solve_result_status(solutions) == DE_SOLVE_STATUS_SOLVED;
@@ -201,10 +257,46 @@ int lab_worker_solver_plot(int argc, char **argv)
                                           equ_lhs(de_solve_result_at(solutions, 0)), argc, argv);
         free(source);
     } else if (explicit) {
-        char *title = de_to_string(de, style_LATEX);
+        string_t *title_text = string_new(), *title_TeX = string_new();
+        bool titled = title_text && title_TeX;
+        if (titled && count > 1)
+            titled = string_append_cstr(title_TeX, "\\begin{aligned}") >= 0;
+        for (size_t i = 0; titled && i < count; ++i) {
+            const equation_t *solution = de_solve_result_at(solutions, i);
+            string_t *text = equ_to_text(solution, style_UNBOUND);
+            char *TeX = equ_to_TeX_body_wrapped(solution, 110);
+            titled = text && TeX &&
+                     string_append_format(title_text, "%s%s", i ? "; " : "", string_c_str(text)) >= 0 &&
+                     string_append_format(title_TeX, "%s%s", i ? "\\\\ " : "", TeX) >= 0;
+            free(TeX);
+            string_free(text);
+        }
+        if (titled && count > 1)
+            titled = string_append_cstr(title_TeX, "\\end{aligned}") >= 0;
+        expr_t *members[16] = {NULL};
+        string_t *labels[16] = {NULL};
+        size_t member_count = 0;
+        bool family = false;
+        bool expanded = titled && lab_worker_plot_family(de_constants(de), axis, curves, count,
+                                                          members, labels, &member_count, &family);
+        if (expanded && family)
+            titled = string_append_cstr(title_text, " — representative real members") >= 0 &&
+                     string_append_cstr(title_TeX, "\\quad\\text{representative real members}") >= 0;
         print_axis(axis);
-        rc = plot_curves(argv[1], title, axis, curves, count, false, argv);
-        free(title);
+        if (titled && expanded)
+            rc = plot_curves(argv[1], string_c_str(title_text), string_c_str(title_TeX), axis,
+                              (const expr_t *const *)members, labels, member_count, false, family, argv);
+        else if (!titled)
+            printf("error Unable to format the solution plot title.\n");
+        if (!rc)
+            lab_worker_plot_prepared_write(argc, argv, string_c_str(title_text), string_c_str(title_TeX),
+                                           (const expr_t *const *)members, labels, member_count, family, NULL);
+        for (size_t i = 0; i < member_count; ++i) {
+            expr_free(members[i]);
+            string_free(labels[i]);
+        }
+        string_free(title_TeX);
+        string_free(title_text);
     } else {
         printf("error Plotting requires explicit real solution functions; implicit, series-only or unsupported "
                "solutions cannot yet be plotted.\n");

@@ -70,6 +70,7 @@ function labStartEventBindings() {
         selectWorksheetMode,
         normaliseWorksheetControl,
         takePlot,
+        schedulePlotControls,
         redrawPlotDrag,
         schedulePlotWheelEnd,
         startGoalSeekFromEvent,

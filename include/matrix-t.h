@@ -1377,6 +1377,9 @@ matrix_t *mat_jordan_profile_expr(const matrix_t *A, const expr_t *eigenvalue);
 matrix_t *mat_exp(const matrix_t *A);
 matrix_t *mat_sin(const matrix_t *A);
 
+/** @brief Round supported matrix spectra to nearest integers, with halves away from zero; not entry-wise rounding. */
+matrix_t *mat_round(const matrix_t *A);
+
 /**
  * @brief Apply real signum through spectral functional calculus on real spectra.
  * @param A Square matrix belonging to a class supported by the spectral engine, as for mat_step().

@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "lab_presentation.h"
+#include "lab_wire.h"
 #define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
 #include "internal/lab_evaluate_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
@@ -131,7 +132,7 @@ static void test_lab_extra_plot(void)
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "reversed plot ranges produce a useful error");
     fields = request("/eval", "{\"expression\":\"x+a\",\"action\":\"plot\",\"plot_kind\":\"curve\"}", &status);
-    ok = !test_lab_ok(fields, true) && contains(fields, "error", "bind any remaining parameters");
+    ok = !test_lab_ok(fields, true) && contains(fields, "error", "Automatic range selection failed");
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "unset parameters never become invented plotted values");
     fields = request("/eval", "{\"expression\":\"zeta(x)\",\"action\":\"plot\",\"precision\":40}", &status);
@@ -160,6 +161,50 @@ static void test_lab_extra_plot(void)
     ok = !test_lab_ok(fields, true) && contains(fields, "error", "manual bounds");
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "invalid vertical bounds are rejected before sampling");
+}
+
+static void test_lab_extra_surface_continuity(void)
+{
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"acos(sin(@pi-x*y))\",\"action\":\"plot\","
+                             "\"plot_lower\":\"-20\",\"plot_upper\":\"20\",\"plot_second_lower\":\"-20\","
+                             "\"plot_second_upper\":\"20\",\"plot_scale\":\"all\"}", &status);
+    size_t facets = 0;
+    const char *svg = lab_eval_text(fields, "plot_svg");
+    for (const char *p = strstr(svg, "<path fill="); p; p = strstr(p + 11, "<path fill="))
+        ++facets;
+    bool ok = status == 200 && test_lab_ok(fields, true) && facets == 2 * 138 * 138;
+    bool failed = true;
+    ok = ok && lab_presentation_adapt(fields);
+    array_t *encoded = ok ? lab_wire_encode_response(fields, &failed) : NULL;
+    json_t *decoded = encoded ? lab_wire_decode(array_get(encoded, 0), array_size(encoded)) : NULL;
+    const json_t *card = lab_eval_get(lab_eval_get(lab_eval_get(decoded, "presentation"), "calculus"), "plot");
+    ok = ok && !failed && decoded && !strcmp(svg, lab_eval_text(card, "svg")) &&
+         !*lab_eval_text(decoded, "plot_svg") && !*lab_eval_text(decoded, "raw");
+    json_free(decoded);
+    array_destroy(encoded);
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "rapid bounded surface is refined without deleting finite steep facets");
+}
+
+static void test_lab_extra_plot_stepped_ranges(void)
+{
+    expect_response("/eval", "{\"expression\":\"floor(e^(abs(x*y/2))+round(1/cos(x*y)))\","
+                              "\"action\":\"plot\",\"precision\":116}", 200u, "plot_svg", "data-surface");
+    expect_response("/eval", "{\"expression\":\"floor(x)+0*y\",\"action\":\"plot\","
+                              "\"plot_kind\":\"surface\",\"wrt\":\"x\",\"plot_second\":\"y\","
+                              "\"plot_lower\":\"-0.5\",\"plot_upper\":\"0.5\"}",
+                    200u, "plot_svg", "data-surface");
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"sqrt(-x^2-1)\",\"action\":\"plot\"}", &status);
+    bool ok = status == 422 && contains(fields, "error", "Automatic range selection failed") &&
+              contains(fields, "error", "trial windows") && !contains(fields, "error", "bind any remaining");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "failed automatic search reports its limits without claiming parameters are missing");
 }
 
 static void test_lab_extra_plot_series_domain(void)
@@ -307,7 +352,7 @@ static void test_lab_extra_surface(void)
     expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_second_lower\":\"2\","
                               "\"plot_second_upper\":\"1\"}", 422u, "error", "bounds");
     expect_response("/eval", "{\"expression\":\"sqrt(-1-x^2-y^2)\",\"action\":\"plot\"}",
-                    422u, "error", "Unable to infer");
+                    422u, "error", "Automatic range selection failed");
     expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_azimuth\":\"nan\"}",
                     422u, "error", "finite azimuth");
     expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_elevation\":\"90\"}",
@@ -358,7 +403,8 @@ static void test_lab_extra_plot_ranges(void)
     expect_response("/eval", "{\"expression\":\"sqrt(1-x^2-y^2)\",\"action\":\"plot\","
                               "\"plot_lower\":\"\",\"plot_upper\":\"\","
                               "\"plot_second_lower\":\"\",\"plot_second_upper\":\"\"}", 200u, "plot_svg", "data-surface");
-    expect_response("/eval", "{\"expression\":\"sqrt(-1-x^2)\",\"action\":\"plot\"}", 422u, "error", "Supply bounds");
+    expect_response("/eval", "{\"expression\":\"sqrt(-1-x^2)\",\"action\":\"plot\"}",
+                    422u, "error", "Automatic range selection failed");
     expect_response("/eval", "{\"expression\":\"x\",\"action\":\"plot\",\"plot_lower\":\"bad(\"}",
                     422u, "error", "bounds");
 }
@@ -391,6 +437,26 @@ static void test_lab_extra_plot_preview(void)
     TEST_ASSERT_TRUE(ok, "70-by-70 full grids and 13-by-13 drag previews retain native titles and axes");
     expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_quality\":\"unknown\"}",
                     422u, "error", "plotting quality");
+    const char *const modes[] = {"expression", "equation", "diffequation"};
+    const char *const sources[] = {"sin(30*x)", "sin(30*x)=0", "Dx(y)=30*cos(30*x); y(0)=0"};
+    for (unsigned i = 0; i < 3; ++i) {
+        size_t lengths[2] = {0};
+        for (unsigned quality = 0; quality < 2; ++quality) {
+            string_t *payload = string_sprintf("{\"expression\":\"%s\",\"plot_source_mode\":\"%s\","
+                "\"action\":\"plot\",\"precision\":17,\"plot_lower\":\"-2\",\"plot_upper\":\"2\","
+                "\"plot_quality\":\"%s\"}", sources[i], modes[i], quality ? "full" : "preview");
+            json_t *result = request("/eval", string_c_str(payload), &status);
+            const string_t *svg = json_string_value(lab_eval_get(result, "plot_svg"));
+            if (status == 200u && test_lab_ok(result, true) && svg)
+                lengths[quality] = string_byte_length(svg);
+            else
+                show_failure(result);
+            json_free(result);
+            string_free(payload);
+        }
+        TEST_ASSERT_TRUE(lengths[0] > 0 && lengths[1] > lengths[0],
+                         "all curve modes use reduced sampling for previews and restore full detail");
+    }
 }
 
 static void test_lab_extra_solver_plots(void)
@@ -399,18 +465,22 @@ static void test_lab_extra_solver_plots(void)
     json_t *result = request("/eval", "{\"expression\":\"x^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
                                      "\"plot_source_mode\":\"equation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", &status);
     bool ok = status == 200 && test_lab_ok(result, true) && contains(result, "plot_svg", "data-series=\"1\"") &&
-              contains(result, "plot_svg", "Left side") && contains(result, "plot_svg", "Right side");
+              !strcmp(lab_eval_text(result, "plot_solutions"), "x = -1\nx = 1") &&
+              !contains(result, "plot_svg", "Left side") && !contains(result, "plot_svg", "Right side");
     if (!ok)
         show_failure(result);
     json_free(result);
     result = request("/eval", "{\"expression\":\"Dx(y)=x*y; y(0)=1\",\"wrt\":\"x\",\"action\":\"plot\","
                               "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", &status);
     bool de_ok = status == 200 && test_lab_ok(result, true) && contains(result, "plot_svg", "data-series=\"0\"") &&
-                 contains(result, "plot_svg", "Solution 1");
+                 !contains(result, "plot_svg", "Solution 1") && contains(result, "plot_title", "y = ") &&
+                 !contains(result, "plot_title_TeX", "\\frac{d");
     if (!de_ok)
         show_failure(result);
     json_free(result);
     TEST_ASSERT_TRUE(ok && de_ok, "native equation sides and initial-value solution share the plot-card protocol");
+    expect_response("/eval", "{\"expression\":\"x^2=4\",\"action\":\"plot\",\"plot_source_mode\":\"equation\"}",
+                    200u, "plot_solutions", "x = 2");
     expect_response("/eval", "{\"expression\":\"{2*Dx(u)+Dy(u)=0 | x=?, y=?; ; u(x,0)=x^2}\","
                              "\"wrt\":\"x\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\","
                              "\"plot_lower\":\"-2\",\"plot_upper\":\"2\",\"plot_second_lower\":\"-2\","
@@ -419,21 +489,180 @@ static void test_lab_extra_solver_plots(void)
                              "\"wrt\":\"y\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\"}",
                     200u, "plot_svg", "data-surface");
     expect_response("/eval", "{\"expression\":\"x^2=x+2\",\"action\":\"plot\",\"plot_source_mode\":\"equation\"}",
-                    200u, "plot_svg", "Right side");
+                    200u, "plot_svg", "data-series=\"1\"");
     expect_response("/eval", "{\"expression\":\"Dx(y)=0; y(0)=1\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}",
-                    200u, "plot_svg", "Solution 1");
+                    200u, "plot_title", "y = 1");
+    result = request("/eval", "{\"expression\":\"y''+6yy'+4y^3=0; y(0)=0; y'(0)=1\",\"action\":\"plot\","
+                              "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-10\",\"plot_upper\":\"10\"}", &status);
+    ok = status == 200 && contains(result, "plot_title_TeX", "\\frac{x}{") &&
+         contains(result, "plot_title", "y = (x)/(x² + 1)") && !contains(result, "plot_svg", "Solution 1");
+    if (!ok)
+        show_failure(result);
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "ODE plot title identifies the exact solution without a redundant single-series legend");
     expect_response("/eval", "{\"expression\":\"{x=a | x=?; a=?}\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"equation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}",
                     422u, "error", "parameters");
     expect_response("/eval", "{\"expression\":\"x^2=1\",\"action\":\"plot\",\"plot_source_mode\":\"equation\","
                              "\"plot_lower\":\"2\",\"plot_upper\":\"-2\"}", 422u, "error", "bounds");
     expect_response("/eval", "{\"expression\":\"Dx(y)=y\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\","
-                             "\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", 422u, "error", "initial conditions");
+                             "\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", 200u, "plot_svg", "data-series=\"4\"");
     expect_response("/eval", "{\"expression\":\"x^2=1\",\"action\":\"plot\",\"plot_source_mode\":\"equation\","
                              "\"plot_kind\":\"surface\"}", 422u, "error", "2-D curves");
     expect_response("/eval", "{\"expression\":\"x\",\"action\":\"plot\",\"plot_source_mode\":\"unknown\"}",
                     422u, "error", "source mode");
+}
+
+static void test_lab_extra_equation_frame(void)
+{
+    static const struct {
+        const char *left, *right, *axis;
+        bool found;
+    } cases[] = {
+        {"x^4-x^3-26x^2+4x+8", "0", "x", true},
+        {"t^2", "t+2", "t", true},
+        {"x^4", "0", "x", true},
+        {"sin(x)", "0", "x", true},
+        {"exp(x)", "2", "x", true},
+        {"1/x", "0", "x", false},
+        {"x", "x+1", "x", false}
+    };
+    bool ok = true;
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        expr_t *sides[] = {expr_from_string(cases[i].left, NULL), expr_from_string(cases[i].right, NULL)};
+        char *sources[] = {expr_to_string(sides[0], style_EXPRESSION), expr_to_string(sides[1], style_EXPRESSION)};
+        number_t bounds[] = {num_create_from_long(-10), num_create_from_long(10), NUM_NAN, NUM_NAN};
+        bool found = lab_worker_plot_equation_frame((const expr_t *const *)sides, sources, cases[i].axis, true, bounds);
+        ok = ok && found == cases[i].found;
+        if (found)
+            ok = ok && num_lt(bounds[0], bounds[1]) && num_lt(bounds[2], bounds[3]);
+        if (!i)
+            ok = ok && num_to_double(bounds[0]) > -7 && num_to_double(bounds[0]) < -5 &&
+                 num_to_double(bounds[1]) > 6 && num_to_double(bounds[1]) < 8 &&
+                 num_to_double(bounds[2]) < -200 && num_to_double(bounds[2]) > -300 &&
+                 num_to_double(bounds[3]) > 200 && num_to_double(bounds[3]) < 300;
+        for (unsigned j = 0; j < 2; ++j) {
+            free(sources[j]);
+            expr_free(sides[j]);
+        }
+        for (unsigned j = 0; j < 4; ++j)
+            num_destroy(&bounds[j]);
+    }
+    TEST_ASSERT_TRUE(ok, "equation framing uses generic turning points and crossings, not polynomial-specific rules or poles");
+    unsigned status = 0;
+    json_t *result = request("/eval", "{\"expression\":\"x^4-x^3-26x^2+4x+8=0\",\"action\":\"plot\","
+                                     "\"plot_source_mode\":\"equation\"}", &status);
+    ok = status == 200 && contains(result, "plot_svg", ">-200</text>") &&
+         contains(result, "plot_svg", ">200</text>") && !contains(result, "plot_svg", ">2000</text>") &&
+         !contains(result, "plot_svg", "Left side") && !contains(result, "plot_svg", "Right side");
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "automatic quartic plot exposes all turning points at a useful vertical scale");
+    expect_response("/eval", "{\"expression\":\"x^4-x^3-26x^2+4x+8=0\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_scale\":\"all\"}",
+                    200u, "plot_svg", ">2000</text>");
+    expect_response("/eval", "{\"expression\":\"x^4-x^3-26x^2+4x+8=0\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_lower\":\"-10\",\"plot_upper\":\"10\"}",
+                    200u, "plot_svg", ">10</text>");
+}
+
+static void test_lab_extra_solution_families(void)
+{
+    char *frame_sources[] = {"x/(x^2+1)", "1/x"};
+    number_t frame[4] = {num_create_from_long(-10), num_create_from_long(10), NUM_NAN, NUM_NAN};
+    lab_worker_plot_frame(frame_sources, 2, "x", frame);
+    bool framed = num_to_double(frame[0]) > -8 && num_to_double(frame[1]) < 8 &&
+                  num_to_double(frame[0]) < -1 && num_to_double(frame[1]) > 1;
+    for (size_t i = 0; i < 4; ++i)
+        num_destroy(&frame[i]);
+    TEST_ASSERT_TRUE(framed, "sampler framing crops quiet tails but retains the turning points and pole region");
+    expr_bindings_t *bindings = NULL;
+    expr_t *source = expr_from_string("{C*x+D | x=?; C=?, D=?}", &bindings);
+    const expr_t *branches[] = {source};
+    expr_t *curves[16] = {NULL};
+    string_t *labels[16] = {NULL};
+    size_t count = 0;
+    bool family = false;
+    bool ok = source && lab_worker_plot_family(NULL, "x", branches, 1, curves, labels, &count, &family) &&
+              family && count == 9;
+    for (size_t i = 0; i < count; ++i) {
+        char *text = expr_to_string(curves[i], style_EXPRESSION);
+        expr_bindings_t *values = NULL;
+        expr_t *curve = text ? expr_from_string(text, &values) : NULL;
+        expr_t *axis = values ? expr_bindings_get(values, "x") : NULL;
+        if (axis)
+            expr_set_val(axis, NUM_TWO);
+        number_t actual = curve ? expr_eval(curve) : num_clone(NUM_NAN);
+        double c = 0, d = 0;
+        const char *label = string_c_str(labels[i]);
+        bool parsed = label && sscanf(label, "C = %lf, D = %lf", &c, &d) == 2;
+        ok = ok && parsed && fabs(num_to_double(actual) - (2 * c + d)) < 1e-9 &&
+             (i != 0 || fabs(c + 1) > 0.01) && string_find(labels[i], "C = ") >= 0 &&
+             string_find(labels[i], "D = ") >= 0;
+        num_destroy(&actual);
+        expr_free(curve);
+        expr_bindings_free(values);
+        free(text);
+        expr_free(curves[i]);
+        string_free(labels[i]);
+    }
+    if (bindings && expr_bindings_get(bindings, "x"))
+        expr_set_val(expr_bindings_get(bindings, "x"), NUM_TWO);
+    number_t original = expr_eval(source);
+    ok = ok && num_is_nan(original);
+    num_destroy(&original);
+    expr_free(source);
+    expr_bindings_free(bindings);
+    TEST_ASSERT_TRUE(ok, "family members carry distinct native constant values without mutating the general formula");
+
+    const char *scaled[] = {"{C*x | x=?; C=?}", "{10*C*x | x=?; C=?}"};
+    double first[2] = {0};
+    for (size_t scale = 0; scale < 2; ++scale) {
+        source = expr_from_string(scaled[scale], &bindings);
+        branches[0] = source;
+        ok = source && lab_worker_plot_family(NULL, "x", branches, 1, curves, labels, &count, &family) &&
+             family && count == 5;
+        if (ok)
+            ok = sscanf(string_c_str(labels[0]), "C = %lf", &first[scale]) == 1;
+        for (size_t i = 0; i < count; ++i) {
+            expr_free(curves[i]);
+            string_free(labels[i]);
+        }
+        expr_free(source);
+        expr_bindings_free(bindings);
+        TEST_ASSERT_TRUE(ok, "one-parameter sensitivity sweep produces five labelled members");
+    }
+    TEST_ASSERT_TRUE(fabs(first[1]) < fabs(first[0]),
+                     "higher parameter sensitivity concentrates representatives nearer the active region");
+
+    unsigned status = 0;
+    json_t *result = request("/eval", "{\"expression\":\"y''+6yy'+4y^3=0\",\"action\":\"plot\","
+                                     "\"plot_source_mode\":\"diffequation\"}", &status);
+    ok = status == 200 && contains(result, "plot_svg", "data-series=\"8\"") &&
+         contains(result, "plot_svg", "<title>C₁ = ") &&
+         contains(result, "plot_svg", ", C₂ = ") &&
+         !contains(result, "plot_svg", "C₂ = 1</text>") &&
+         contains(result, "plot_title", "C₁") && contains(result, "plot_title", "representative real members");
+    if (!ok)
+        show_failure(result);
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "unconditioned Emden plots a labelled two-constant family instead of failing");
+    result = request("/eval", "{\"expression\":\"y''+6yy'+4y^3=0\",\"action\":\"plot\","
+                     "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-10\",\"plot_upper\":\"10\","
+                     "\"plot_scale\":\"manual\",\"plot_y_lower\":\"-2\",\"plot_y_upper\":\"2\"}", &status);
+    ok = status == 200 && contains(result, "plot_svg", ">-10</text>") &&
+         contains(result, "plot_svg", ">10</text>") && contains(result, "plot_svg", ">-1</text>") &&
+         !contains(result, "plot_svg", ">5</text>\n<g data-plot-tick=\"1\"");
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "family plotting preserves explicit horizontal and vertical bounds");
+    expect_response("/eval", "{\"expression\":\"y''+6yy'+4y^3=0; y(0)=0\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"diffequation\"}", 200u, "plot_svg", "data-series=\"4\"");
+    expect_response("/eval", "{\"expression\":\"{Dx(y)=a*y | x=?; a=?;}\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"diffequation\"}", 422u, "error", "parameter a");
+    expect_response("/eval", "{\"expression\":\"{Dx(y)=a*y | x=?; a=2;}\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"diffequation\"}", 200u, "plot_svg", "data-series=\"4\"");
+    expect_response("/eval", "{\"expression\":\"Dxxx(y)=0\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"diffequation\"}", 422u, "error", "two free integration constants");
 }
 
 static void test_lab_extra_plot_turning_points(void)
@@ -929,10 +1158,25 @@ static void test_lab_extra_equation_real_surd_numerics(void)
         ok = root && string_find(root, "i") < 0 && string_find(root, "≈") >= 0 &&
              string_find(root, "E") < 0 && string_find(root, "e") < 0 && string_find(root, "×10") < 0 && ok;
     }
-    if (!ok)
+    string_t *rows = string_new();
+    for (size_t i = 0u; rows && i < json_array_size(roots); ++i) {
+        const string_t *root = json_string_value(json_array_get(roots, i));
+        if (root)
+            string_append_format(rows, "%s%s", i ? "\n" : "", string_c_str(root));
+    }
+    json_t *plot = request("/eval", "{\"expression\":\"x^4-x^3-26x^2+4x+8=0\",\"precision\":78,"
+                                  "\"action\":\"plot\",\"plot_source_mode\":\"equation\"}", &status);
+    ok = ok && rows && status == 200u && test_lab_ok(plot, true) &&
+         !strcmp(lab_eval_text(plot, "plot_solutions"), string_c_str(rows)) &&
+         !strcmp(lab_eval_text(response, "numeric"), string_c_str(rows));
+    if (!ok) {
         show_failure(response);
+        show_failure(plot);
+    }
+    json_free(plot);
+    string_free(rows);
     json_free(response);
-    TEST_ASSERT_TRUE(ok, "78-digit quartic approximations retain four real roots and their exact surds");
+    TEST_ASSERT_TRUE(ok, "78-digit quartic roots retain their digits and align equally in evaluation and plot records");
 
     response = request("/equation-eval", "{\"equation\":\"x=1+i/10^90\",\"precision\":78}", &status);
     roots = test_lab_member(response, "numeric_solutions");
@@ -1069,6 +1313,13 @@ static void test_lab_extra_diffequation(void)
         show_failure(response);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "ODE results identify the independent coordinate by name, not its unset value");
+    response = request("/diffequation-eval", "{\"diffequation\":\"y''+3y*y'+y^4=0; y(0)=1; y'(0)=0\"}", &status);
+    ok = status == 200 && contains(response, "status", "series") &&
+         json_array_size(test_lab_member(response, "binding_values")) == 0;
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "Local-series results do not advertise plotting coordinates");
+    expect_response("/diffequation-eval", "{\"diffequation\":\"y''+6y*y'+4y^3=0; y(0)=0; y'(0)=1\"}",
+                    200u, "solutions", "y = (x)/(x² + 1)");
 }
 
 static void test_lab_extra_context_results(void)
@@ -1332,14 +1583,18 @@ void test_lab_evaluation_extra_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_extra_plot, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_surface_continuity, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_height, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_names, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_ranges, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_stepped_ranges, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_preview, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_series_domain, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_tangent_bounds, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_turning_points, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_solver_plots, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_solution_families, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_equation_frame, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_title_fallback, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);

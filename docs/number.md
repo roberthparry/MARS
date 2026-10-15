@@ -493,6 +493,7 @@ owning `number_t`.
 | `num_imag_part(x)` | Extracts the imaginary component. |
 | `num_arg(x)` | Returns the principal complex argument in radians. |
 | `num_floor(x)` | Returns the greatest integer not exceeding a real input. |
+| `num_round(x)` | Returns the nearest integer, with exact halves away from zero; complex components are rounded independently. Exact integers and rationals are not converted to double, and non-finite inputs are preserved. |
 | `num_ceil(x)` | Returns the least integer not less than a real input. |
 | `num_hypot(x, y)` | Returns `sqrt(x² + y²)` with scaling that avoids needless overflow or underflow. |
 

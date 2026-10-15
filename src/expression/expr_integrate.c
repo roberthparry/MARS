@@ -42,7 +42,31 @@ static expr_t *integrate_real_domain_rule(const expr_t *expr, const expr_t *wrt)
     return out;
 }
 
+/* The continuous primitive is u*round(u) - round(u)^2/2, including at half-integer joins. */
+static expr_t *integrate_round_rule(const expr_t *expr, const expr_t *wrt)
+{
+    expr_t *constant = NULL;
+    expr_t *coefficient = NULL;
+    expr_t *out = NULL;
+    if (match_symbolic_affine_constant_and_coeff(expr->a, wrt, &constant, &coefficient) &&
+        !expr_const_is_zero(coefficient)) {
+        expr_t *product = expr_mul(expr->a, expr);
+        expr_t *square = expr_pow_long(expr, 2L);
+        expr_t *half_square = square ? expr_div_long(square, 2L) : NULL;
+        expr_t *difference = product && half_square ? expr_sub(product, half_square) : NULL;
+        out = difference ? expr_div(difference, coefficient) : NULL;
+        expr_free(difference);
+        expr_free(half_square);
+        expr_free(square);
+        expr_free(product);
+    }
+    expr_free(coefficient);
+    expr_free(constant);
+    return out;
+}
+
 static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_COUNT] = {
+    [EXPR_KIND_ROUND] = {.primitive = integrate_round_rule},
     [EXPR_KIND_CONST] = {.structural = integrate_constant_rule},
     [EXPR_KIND_VAR] = {.structural = integrate_var_rule},
     [EXPR_KIND_ADD] = {.structural = integrate_add_rule},

@@ -43,7 +43,7 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
             'setRenderedResult,setExpressionEditor',
             'installEvaluationTextCards,present,source,saveWorksheetState,derivative,variables'
         ],
-        ['render,installEvaluationTextCards,renderVariableValues', 'modeSource,saveWorksheetState,variables'],
+        ['render,installEvaluationTextCards,renderVariableValues', 'setValueCardVisible,modeSource,saveWorksheetState,variables'],
         [
             'render,scheduleRenderedTeXFit,solverTextCards,present',
             'setValueText,setValueCardVisible,clearVariableValues,modeSource,saveWorksheetState,variables'
@@ -85,6 +85,7 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
         equal(service(plan(mode, 1), 'variables').args[1], false, 'solver plots do not enable expression calculus');
     }
     equal(service(plan(2, 1), 'setValueCardVisible').args[0], true, 'solver value card is explicitly visible');
+    equal(service(plan(1, 1), 'setValueCardVisible').args[0], true, 'equation solutions are restored after plotting');
     equal(plan(5, 0).calls[3].args[0], cards.calendar[3], 'calendar card records retain identity');
 
     const authored = {name: 'x', value: 'authored π/5', display: 'authored display'};

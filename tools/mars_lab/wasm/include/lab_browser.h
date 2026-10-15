@@ -14,7 +14,7 @@
 #include <stdint.h>
 
 /** @brief Maximum encoded message size shared by the codec and worker admission. */
-enum { lab_browser_limit = 4 * 1024 * 1024 };
+enum { lab_browser_limit = 8 * 1024 * 1024 };
 
 /** @brief Return the maximum encoded message size in bytes for host-side admission. */
 unsigned lab_browser_message_limit(void);
@@ -30,7 +30,7 @@ unsigned lab_browser_base64_limit(void);
 
 /**
  * @brief Borrow the codec's fixed input staging buffer.
- * @return Writable region of 4 MiB, valid for the module lifetime.
+ * @return Writable region of 8 MiB, valid for the module lifetime.
  */
 unsigned char *lab_browser_input_buffer(void);
 
@@ -55,7 +55,7 @@ uint32_t lab_browser_encode(int root);
 
 /**
  * @brief Decode a complete version-one envelope from the input staging buffer.
- * @param size Staged byte count, at most 4 MiB.
+ * @param size Staged byte count, at most 8 MiB.
  * @return Decoded host object handle, or -1 for invalid data or exceeded limits.
  */
 int lab_browser_decode(uint32_t size);

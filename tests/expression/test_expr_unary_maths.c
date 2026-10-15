@@ -256,6 +256,40 @@ void test_sqrt(void)
     expr_free(c);
 }
 
+static void test_round(void)
+{
+    check_expr_string_qf("round positive half", "round(2.5)", qf_from_double(3.0));
+    check_expr_string_qf("round negative half", "round(-2.5)", qf_from_double(-3.0));
+    check_expr_string_qf("round below half", "round(2.49)", QF_TWO);
+    check_expr_string_qf("round in bindings", "{ x | x = round(-2.5) }", qf_from_double(-3.0));
+    check_expr_string_qf("round finite sum", "sum(k,1,4,round(k/2))", qf_from_double(6.0));
+    check_expr_string_qf("round negative finite sum", "sum(k,1,4,round(-k/2))", qf_from_double(-6.0));
+    check_expr_string_qf("round symbolic upper sum", "{ sum(k,1,n,round(k/2)) | n = 4 }", qf_from_double(6.0));
+    check_expr_string_qf("round negative symbolic sum", "{ sum(k,1,n,round(-k/2)) | n = 5 }", qf_from_double(-9.0));
+    check_expr_string_qf("round odd period sum", "{ sum(k,1,n,round(2*k/3)) | n = 5 }", qf_from_double(10.0));
+    expr_t *x = test_expr_new_named_var_d(1.25, "x");
+    expr_t *rounded = expr_round(x);
+    expr_t *primitive = expr_integrate(rounded, x);
+    ASSERT_NOT_NULL(primitive);
+    check_q_at(__FILE__, __LINE__, 1, "round derivative away from jumps",
+               expr_eval_qf(expr_get_deriv(rounded, x)), QF_ZERO);
+    check_q_at(__FILE__, __LINE__, 1, "round primitive", expr_eval_qf(primitive), qf_from_double(0.75));
+    check_q_at(__FILE__, __LINE__, 1, "round primitive derivative",
+               expr_eval_qf(expr_get_deriv(primitive, x)), QF_ONE);
+    test_expr_set_val_d(x, -1.5);
+    check_q_at(__FILE__, __LINE__, 1, "round primitive at negative join",
+               expr_eval_qf(primitive), QF_ONE);
+    const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
+    for (size_t i = 0u; i < sizeof(styles) / sizeof(*styles); ++i) {
+        char *text = expr_to_string(rounded, styles[i]);
+        TEST_ASSERT_TRUE(text && strstr(text, "round"), "round retained in every rendering");
+        free(text);
+    }
+    expr_free(primitive);
+    expr_free(rounded);
+    expr_free(x);
+}
+
 void test_floor(void)
 {
     expr_t *c = test_expr_new_var_d(1.75);
@@ -411,6 +445,7 @@ void test_maths_functions(void)
     TEST_RUN_SUBTEST(test_log10, NULL);
     TEST_RUN_SUBTEST(test_sqrt, NULL);
     TEST_RUN_SUBTEST(test_floor, NULL);
+    TEST_RUN_SUBTEST(test_round, NULL);
     TEST_RUN_SUBTEST(test_ceil, NULL);
     TEST_RUN_SUBTEST(test_pow_d, NULL);
     TEST_RUN_SUBTEST(test_pow_d_complex, NULL);

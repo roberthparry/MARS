@@ -79,13 +79,18 @@ static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimension
     }
     if (high - low < 1e-10 && !constant)
         return false;
-    unsigned interior = 0;
+    unsigned interior = 0, lower_level = 0, upper_level = 0;
     for (unsigned i = 0; i < finite; ++i) {
         double fraction = constant ? 0.5 : (values[i] - low) / (high - low);
         interior += fraction > 0.001 && fraction < 0.999;
+        lower_level += fraction <= 0.001;
+        upper_level += fraction >= 0.999;
     }
     /* A solitary spike or an almost entirely underflowed tail is not a useful automatic view. */
-    if (interior < (finite + 7) / 8)
+    /* A well-populated two-level step is informative despite having no interior heights.
+     * Requiring both levels to cover a quarter of the probes still rejects solitary spikes. */
+    bool stepped = lower_level >= (finite + 3) / 4 && upper_level >= (finite + 3) / 4;
+    if (interior < (finite + 7) / 8 && !stepped)
         return false;
     for (unsigned axis = 0; axis < dimensions; ++axis) {
         if (minimum[axis] >= maximum[axis])
@@ -168,7 +173,10 @@ bool lab_worker_plot_ranges(const char *source, const char *first, const char *s
         num_destroy(&value);
     }
     /* A finite work budget, not a key search: stop at the first informative real window. */
-    static const char *const scales[] = {"10", "1", "0.1", "0.01", "0.001", "100", "1000", "10000"};
+    static const char *const scales[] = {
+        "10", "1", "0.1", "0.01", "0.001", "100", "1000", "10000",
+        "5", "2", "0.5", "0.2", "0.05", "0.02", "0.005", "0.002", "20", "50", "200", "500", "2000", "5000"
+    };
     for (unsigned attempt = 0; ok && !found && attempt < sizeof scales / sizeof *scales; ++attempt) {
         NUM_SCOPE(candidate_numbers);
         number_t radius = endpoint(scales[attempt]);

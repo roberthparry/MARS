@@ -2,7 +2,12 @@
 
 `qcomplex_t` is a double-double complex number with `qfloat_t` real and imaginary parts, providing approximately 106 bits of precision (~31–32 decimal digits) across the full complex plane.
 
+`qc_round(z)` rounds the real and imaginary components independently to their
+nearest integers, with exact halves away from zero. This is component-wise
+rounding, not rounding the magnitude; each component follows `qf_round`.
+
 ## Implementation organisation
+
 
 The implementation groups Bessel I/K/Y and Struve H/L adapters in
 `src/qcomplex/qcomplex_cylindrical.c` and polynomial and signal functions in

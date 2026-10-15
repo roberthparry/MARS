@@ -197,6 +197,9 @@ double lab_dom_number(int value);
  * @return Scoped browser string. */
 int lab_dom_format(double value, const char *prefix, const char *suffix);
 
+/** @brief Format a browser number with 1–17 significant digits, omitting redundant trailing zeroes. */
+int lab_dom_precision(double value, unsigned digits);
+
 /** @brief Join opaque text. @param left First handle. @param right Second handle. @param suffix Literal suffix.
  * @return Scoped string. */
 int lab_dom_join(int left, int right, const char *suffix);
@@ -258,7 +261,8 @@ void lab_dom_checked(int node, int checked);
 
 /** @brief Measure browser geometry. @param node Node. @param kind Client width 0, SVG absolute width/height 1/2,
  * rectangle width/height 3/4, SVG view-box width/height 5/6, rectangle left/top/bottom 7/8/9,
- * client height 10, scroll height 11, connected and visible layout flag 12.
+ * client height 10, scroll height 11, connected and visible layout flag 12,
+ * SVG screen transformation coefficients a/b/c/d/e/f 13 through 18.
  * @return Browser measurement, or zero for an absent node. */
 double lab_dom_measure(int node, unsigned kind);
 

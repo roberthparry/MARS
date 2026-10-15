@@ -17,7 +17,12 @@ void lab_plot_controls_sync(void);
 /** @brief Select the first axis for a direct plot action. @param variable Opaque native variable name. */
 void lab_plot_controls_prepare(int variable);
 
-/** @brief Handle plot settings. @param action Change 0, reset click 1. @param event Browser event. @param context Reserved. */
+/**
+ * @brief Handle plot setting changes and delayed redraws.
+ * @param action Change 0, input 1, timer 2, Auto click 3.
+ * @param event Browser event.
+ * @param context Timer snapshot.
+ */
 void lab_plot_controls_dispatch(unsigned action, int event, int context);
 
 #endif

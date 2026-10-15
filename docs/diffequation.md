@@ -351,6 +351,21 @@ symmetry = SL(3, ℝ)
 solution = y = (2x + C₁)/(2·(x² + C₁x + C₂))
 ```
 
+The scaled family also accepts a value and/or first derivative at the same
+initial point. With scale $a$, set $t=x-x_0$ and
+$b=y'_0+a y_0^2$. The exact solution is
+$y=(y_0+bt)/(1+a y_0t+ab t^2/2)$, on intervals where the denominator is
+non-zero. An omitted datum remains arbitrary; zero and linear auxiliary
+polynomials are retained rather than lost through division by a quadratic
+coefficient. Conditions at different points or duplicate conditions are not
+handled by this initial-value path.
+
+```text
+input = y'' + 6*y*y' + 4*y^3 = 0; y(0)=1; y'(0)=0
+solver = linear transformation
+solution = y = (2x + 1)/(2x² + 2x + 1)
+```
+
 ## Lie-Symmetry Analysis
 
 `de_solve_result_symmetry(...)` returns the borrowed UTF-8 name of a symmetry

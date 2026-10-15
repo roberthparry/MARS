@@ -317,51 +317,50 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           </div>
           <div class="rendered" id="rendered"></div>
           <div class="target-row plot-range" id="plotRange">
-            <fieldset class="plot-group"><legend>Plot type</legend>
+            <div class="plot-group plot-options-card" id="plotKindGroup" role="group" aria-labelledby="plotKindTitle">
+              <span class="plot-options-title" id="plotKindTitle">Plot type</span>
               <input type="hidden" id="plotKind" value="auto">
               <div class="plot-choices" id="plotKindChoices">
+                <label><input type="radio" name="plotKind" value="auto"><span>Auto</span></label>
                 <label><input type="radio" name="plotKind" value="curve"><span>2-D curve</span></label>
                 <label><input type="radio" name="plotKind" value="surface"><span>3-D surface</span></label>
-                <button class="card-action plot-reset" type="button" data-plot-reset="plotKind" aria-label="Reset plot type to automatic">Reset</button>
               </div>
-              <p class="plot-hint">Unselected: choose the plot type from the expression.</p>
-            </fieldset>
-            <p class="plot-hint">Leave range bounds blank for Automatic; enter either bound to override it.</p>
+            </div>
             <div class="plot-ranges">
-              <fieldset class="plot-group"><legend>First variable</legend>
+              <fieldset class="plot-group" id="plotFirstGroup" aria-label="First variable">
                 <input type="hidden" id="plotFirst"><div class="plot-choices" id="plotFirstChoices"></div>
                 <div class="plot-bound-pair"><div class="plot-field"><label for="plotLower">From</label><input id="plotLower" placeholder="Automatic" size="10" spellcheck="false" ></div><div class="plot-field"><label for="plotUpper">To</label><input id="plotUpper" placeholder="Automatic" size="10" spellcheck="false" ></div></div>
               </fieldset>
-              <fieldset class="plot-group" id="plotSecondGroup"><legend>Second variable</legend>
+              <div class="plot-group" id="plotSecondGroup" role="group" aria-labelledby="plotSecondTitle">
+                <span class="plot-options-title" id="plotSecondTitle">Second variable</span>
                 <input type="hidden" id="plotSecond">
                 <div class="plot-choice-row">
                   <div class="plot-choices" id="plotSecondChoices"></div>
-                  <button class="card-action plot-reset" type="button" data-plot-reset="plotSecond" aria-label="Reset second variable to automatic">Reset</button>
                 </div>
-                <p class="plot-hint">Unselected: choose the second variable from the expression.</p>
                 <div class="plot-bound-pair"><div class="plot-field"><label for="plotSecondLower">From</label><input id="plotSecondLower" placeholder="Automatic" size="10" spellcheck="false" ></div><div class="plot-field"><label for="plotSecondUpper">To</label><input id="plotSecondUpper" placeholder="Automatic" size="10" spellcheck="false" ></div></div>
-              </fieldset>
+              </div>
             </div>
-            <fieldset class="plot-group" id="plotCamera"><legend>3-D view</legend>
-              <div class="plot-field"><label for="plotAzimuth">Azimuth</label><div class="plot-angle"><input id="plotAzimuth" type="range" min="0" max="360" value="315" step="1" title="Rotate around the surface"><output id="plotAzimuthValue" for="plotAzimuth">315°</output></div></div>
-              <div class="plot-field"><label for="plotElevation">Elevation</label><div class="plot-angle"><input id="plotElevation" type="range" min="5" max="85" value="30" step="1" title="Tilt the surface view"><output id="plotElevationValue" for="plotElevation">30°</output></div></div>
-              <div class="plot-field"><label for="plotRoll">Roll</label><div class="plot-angle"><input id="plotRoll" type="range" min="0" max="360" value="0" step="1" title="Turn the view clockwise"><output id="plotRollValue" for="plotRoll">0°</output></div></div>
-              <p class="plot-hint">Drag to rotate · Shift-drag to roll · Shift-wheel to tilt · Alt-wheel to turn · Ctrl-wheel to zoom</p>
-            </fieldset>
-            <fieldset class="plot-group" id="plotVertical"><legend id="plotVerticalTitle">Vertical range</legend>
+            <div class="plot-group plot-options-card" id="plotVertical" role="group" aria-labelledby="plotVerticalTitle">
+              <span class="plot-options-title" id="plotVerticalTitle">Vertical range</span>
               <input type="hidden" id="plotScale" value="auto">
               <div class="plot-choices" id="plotScaleChoices">
+                <label><input type="radio" name="plotScale" value="auto"><span>Auto</span></label>
                 <label><input type="radio" name="plotScale" value="all"><span>Fit all</span></label>
                 <label><input type="radio" name="plotScale" value="manual"><span>Manual limits</span></label>
-                <button class="card-action plot-reset" type="button" data-plot-reset="plotScale" aria-label="Reset vertical range to automatic">Reset</button>
               </div>
-              <p class="plot-hint">Unselected: automatic scaling reduces the effect of extreme spikes.</p>
               <div class="plot-bound-pair" id="plotManual">
                 <div class="plot-field"><label for="plotYLower">Minimum</label><input id="plotYLower" placeholder="Required" size="10" spellcheck="false"></div>
                 <div class="plot-field"><label for="plotYUpper">Maximum</label><input id="plotYUpper" placeholder="Required" size="10" spellcheck="false"></div>
               </div>
-            </fieldset>
-            <button class="secondary plot-update" id="plotUpdate" type="button">Update plot</button>
+            </div>
+            <div class="plot-group plot-options-card" id="plotCamera" role="group" aria-labelledby="plotCameraTitle">
+              <span class="plot-options-title" id="plotCameraTitle">3-D view</span>
+              <div class="plot-field"><label for="plotAzimuth">Azimuth</label><div class="plot-angle"><input id="plotAzimuth" type="range" min="0" max="360" value="315" step="1" title="Rotate around the surface"><output id="plotAzimuthValue" for="plotAzimuth">315°</output></div></div>
+              <div class="plot-field"><label for="plotElevation">Elevation</label><div class="plot-angle"><input id="plotElevation" type="range" min="5" max="85" value="30" step="1" title="Tilt the surface view"><output id="plotElevationValue" for="plotElevation">30°</output></div></div>
+              <div class="plot-field"><label for="plotRoll">Roll</label><div class="plot-angle"><input id="plotRoll" type="range" min="0" max="360" value="0" step="1" title="Turn the view clockwise"><output id="plotRollValue" for="plotRoll">0°</output></div></div>
+              <p class="plot-hint">Drag to rotate · Shift-drag to roll · Shift-wheel to tilt · Alt-wheel to turn · Ctrl-wheel to zoom</p>
+            </div>
+            <p class="plot-hint hidden" id="plotFeedback" role="status"></p>
           </div>
         </div>
         <div class="card result-card">
@@ -442,7 +441,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Back</code> and <code>Forward</code> navigate the current mode's worksheet history. Switching modes does not discard your other worksheets; edits and controls are saved between sessions.</li>
             <li><code>Copy</code> on the editor copies its input; each result card has its own copy action. Mathematical display can differ from reusable source notation.</li>
             <li>Use a card's zoom controls where available, or <code>Expand</code> for a long result. Expanding a shortened mathematical result reveals its full source; copying does not truncate it.</li>
-            <li>Hold Ctrl and use the mouse wheel over a 2-D or 3-D plot to zoom in or out, including when expanded. Shift-wheel tilts 3-D plots and Alt-wheel turns them; otherwise, without Ctrl, the wheel keeps its normal scrolling behaviour. The percentage button resets zoom; scrolling outside the plot image works normally.</li>
+            <li>Hold Ctrl and use the mouse wheel over a 2-D plot to zoom its axis ranges around the pointer. The image stays fitted to the card and fresh native samples are requested. The −/+ buttons zoom around the centre; Reset restores the pre-zoom ranges. Hovering shows a vertical guide and approximate x coordinate. For 3-D plots, Ctrl-wheel magnifies the image, Shift-wheel tilts and Alt-wheel turns. Otherwise the wheel retains normal scrolling.</li>
             <li><code>Use as input</code>, when shown, returns a reusable result to the editor. It is not the same as copying the rendered TeX.</li>
             <li>Read the status and any error diagnostic before treating a result as complete. A failed calculation or timeout is not a numerical answer.</li>
           </ul>
@@ -471,11 +470,11 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <h3>Plotting A Function</h3>
           <ul>
             <li>Evaluate a formula and press the single <code>Plot</code> button. In the plot card, choose variables with radio buttons and keep each <code>From</code>/<code>To</code> range together. Blank bounds mean Automatic: native probes look for a useful real window for the expression, preserving any endpoint you supply. This bounded search can miss narrow or distant features; supply bounds if it cannot find a useful view. Mathematical bounds such as <code>-@pi</code> and <code>@pi</code> are accepted.</li>
-            <li>Plot settings use radio buttons rather than dropdowns. Leave <code>Plot type</code> unselected to choose from the expression: a 3-D height surface when exactly one other non-constant variable is unset, otherwise a curve. Choose <code>2-D curve</code> or <code>3-D surface</code> to override this. The second variable is also automatic when no radio is selected. <code>Reset</code> clears an override without changing entered bounds. Bind any remaining parameters. Only the applicable camera or vertical-range controls are shown.</li>
+            <li>Plot settings use radio buttons rather than dropdowns. Choose <code>Auto</code> for <code>Plot type</code> to choose from the expression: a 3-D height surface when exactly one other non-constant variable is unset, otherwise a curve. Choose <code>2-D curve</code> or <code>3-D surface</code> to override this. The second variable is also automatic when <code>Auto</code> is selected. <code>Auto</code> clears an override without changing entered bounds. Bind any remaining parameters. Only the applicable camera or vertical-range controls are shown.</li>
             <li>Surface dragging uses a coarser native preview for responsiveness, then restores full detail on release. Both retain precision checks; no spline smoothing is applied across discontinuities.</li>
             <li>Over a 3-D plot, Shift-wheel changes elevation like a vertical drag; Alt-wheel changes azimuth like a horizontal drag. Wheel down increases the angle and wheel up decreases it in 5° steps. Sliders and readouts follow the camera; wheel rotation uses the same coarse preview as dragging and coalesces rapid movements. After 300 ms without further movement, the full 70×70 mesh returns. Escape or losing browser focus restores the starting camera. Ctrl takes precedence for zoom. Shift+Alt together does not rotate; wheel rotation is inactive during a drag.</li>
-            <li>Surfaces use blue-to-teal-to-gold height shading and three ticked axes, with positive-end arrows labelled by variable name (height uses the title's function name, preferably <code>u</code>). In the default view, both horizontal axes increase left to right; height is the formula value. All plot controls are inside the Plot card, including when expanded. Use <strong>Update plot</strong> after changing ranges or plot type. Drag the <strong>Azimuth</strong> slider to rotate around the surface and <strong>Elevation</strong> to tilt it (5°–85°); <strong>Roll</strong> turns the view clockwise in the screen plane (0°–360°). The TeX title names the function, for example <code>u(x,y) = x²+y²</code>, choosing a name unused by existing variable or constant bindings. Labels remain upright. Degree readouts update while sliding; releasing the slider redraws the surface. Keyboard and touch adjustment work too. Left-drag or drag with one finger over the 3-D plot to turn and tilt it: dragging down increases elevation; dragging up decreases it. Hold Shift when starting a left-drag to roll. Sliders, readouts and the surface update while dragging; only the latest camera position is queued while a redraw is in flight. Lifting the finger restores full detail; a cancelled touch restores the starting view. Additional fingers do not change the active drag. Escape or losing browser focus cancels. Scrolling outside the plot and right-click are unchanged. The full 70×70 mesh leaves holes at missing real values. Height range is automatic by default, cropping extreme spikes near poles. Choose Fit all to include all finite heights, or Manual limits to enter a height Minimum and Maximum. Update plot applies the limits; Reset restores automatic cropping. Out-of-range facets are clipped, not flattened.</li>
-            <li>Leave the <code>Vertical range</code> or <code>Height range</code> radio buttons unselected for automatic scaling, which avoids letting extreme samples flatten the plot. <code>Fit all</code> includes all finite samples; <code>Manual limits</code> uses Minimum and Maximum. <code>Reset</code> clears the selection. Press <code>Update plot</code> to apply changes. Rounded decimal ticks and superscript scientific exponents keep axes readable.</li>
+            <li>Surfaces use blue-to-teal-to-gold height shading and three ticked axes, with positive-end arrows labelled by variable name (height uses the title's function name, preferably <code>u</code>). In the default view, both horizontal axes increase left to right; height is the formula value. All plot controls are inside the Plot card, including when expanded. Changes to ranges and plot type redraw automatically after a short pause. Drag the <strong>Azimuth</strong> slider to rotate around the surface and <strong>Elevation</strong> to tilt it (5°–85°); <strong>Roll</strong> turns the view clockwise in the screen plane (0°–360°). The TeX title names the function, for example <code>u(x,y) = x²+y²</code>, choosing a name unused by existing variable or constant bindings. Labels remain upright. Degree readouts update while sliding; releasing the slider redraws the surface. Keyboard and touch adjustment work too. Left-drag or drag with one finger over the 3-D plot to turn and tilt it: dragging down increases elevation; dragging up decreases it. Hold Shift when starting a left-drag to roll. Sliders, readouts and the surface update while dragging; only the latest camera position is queued while a redraw is in flight. Lifting the finger restores full detail; a cancelled touch restores the starting view. Additional fingers do not change the active drag. Escape or losing browser focus cancels. Scrolling outside the plot and right-click are unchanged. The full 70×70 mesh leaves holes at missing real values. Height range is automatic by default, cropping extreme spikes near poles. Choose Fit all to include all finite heights, or Manual limits to enter a height Minimum and Maximum. Limits apply automatically; Auto restores automatic cropping. Out-of-range facets are clipped, not flattened.</li>
+            <li>Choose <code>Auto</code> for vertical or height scaling to keep extreme samples from flattening the plot. <code>Fit all</code> includes all finite samples; <code>Manual limits</code> uses Minimum and Maximum. Changes redraw automatically after a short pause. Incomplete bounds retain the last valid plot. Rounded decimal ticks and superscript scientific exponents keep axes readable.</li>
             <li>Sampling normally uses a 53-bit mantissa, increasing precision for narrow ranges or failed higher-precision checks. It does not change either variable's worksheet value. Plot titles use the native TeX formula; recognised ellipsis series retain sigma notation.</li>
             <li>The <code>Plot</code> card displays a native SVG generated in memory and delivered through Protobuf. The Expression card retains the formula; a plot has no separate numerical Value or Function programme.</li>
             <li>Detected gaps are not joined. Adaptive sampling cannot guarantee finding every narrow feature or discontinuity; use a smaller range when necessary.</li>

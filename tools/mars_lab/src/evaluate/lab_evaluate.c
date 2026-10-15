@@ -301,7 +301,7 @@ static void lab_eval_integrator_bindings(json_t *fields, const char *precision)
     const char *argv[] = {"mars_lab", expression, "x", precision, "bindings", NULL};
     string_t *output = NULL;
     int exit_status = -1;
-    bool completed = lab_proc_run_worker(argv, ".", NULL, 10000u, 4u * 1024u * 1024u, &output, &exit_status);
+    bool completed = lab_proc_run_worker(argv, ".", NULL, 10000u, 8u * 1024u * 1024u, &output, &exit_status);
     int process_error = errno;
     if (completed && !exit_status) {
         json_t *bindings = lab_eval_fields(output);
@@ -326,7 +326,7 @@ static json_t *lab_eval_function_run(const string_t *source, unsigned precision,
     const char *argv[] = {"ophelia", string_c_str(digits), NULL};
     string_t *output = NULL;
     int exit_status = -1;
-    bool completed = lab_proc_run_worker(argv, ".", source, 30000u, 4u * 1024u * 1024u, &output, &exit_status);
+    bool completed = lab_proc_run_worker(argv, ".", source, 30000u, 8u * 1024u * 1024u, &output, &exit_status);
     int process_error = errno;
     diagnostic_t *error = lab_proc_diagnostic(completed, process_error, exit_status, 30000u);
     if (!completed) {
@@ -434,7 +434,7 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
     json_t *result = NULL;
     string_t *output = NULL;
     int exit_status = -1;
-    bool completed = valid && lab_proc_run_worker(args.argv, ".", NULL, timeout_ms, 4u * 1024u * 1024u,
+    bool completed = valid && lab_proc_run_worker(args.argv, ".", NULL, timeout_ms, 8u * 1024u * 1024u,
                                                   &output, &exit_status);
     int process_error = errno;
     diagnostic_t *worker_error = valid ? lab_proc_diagnostic(completed, process_error, exit_status, timeout_ms) : NULL;

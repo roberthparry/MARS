@@ -1072,6 +1072,13 @@ expr_t *expr_root(const expr_t *expr, const expr_t *order);
 expr_t *expr_floor(const expr_t *expr);
 
 /**
+ * @brief Construct nearest-integer rounding, with exact halves away from zero and component-wise complex rounding.
+ * @param expr Borrowed argument; retained, not consumed.
+ * @return Owned expression, or NULL for a missing argument; release with expr_free().
+ */
+expr_t *expr_round(const expr_t *expr);
+
+/**
  * @brief Construct the real signum, with values -1, 0 and +1; non-real inputs are undefined.
  *
  * @param argument Expression whose sign is required; it is retained.

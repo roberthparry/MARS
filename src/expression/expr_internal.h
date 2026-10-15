@@ -81,6 +81,7 @@ typedef enum {
     EXPR_KIND_CUBRT,
     EXPR_KIND_ROOT,
     EXPR_KIND_FLOOR,
+    EXPR_KIND_ROUND,
     EXPR_KIND_CEIL,
     EXPR_KIND_ABS,
     EXPR_KIND_CONJ,
@@ -552,6 +553,7 @@ extern const expr_ops_t ops_sqrt;
 extern const expr_ops_t ops_cubrt;
 extern const expr_ops_t ops_root;
 extern const expr_ops_t ops_floor;
+extern const expr_ops_t ops_round;
 extern const expr_ops_t ops_ceil;
 extern const expr_ops_t ops_abs;
 extern const expr_ops_t ops_conj;

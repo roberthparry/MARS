@@ -58,7 +58,7 @@ async function labCheckWorkers(check) {
     const full = [native.lab_jobs_submit(4194304), native.lab_jobs_submit(4194304)];
     check(full.every(Boolean) && !native.lab_jobs_submit(1), 'retained input budget is bounded');
     for (const token of full) native.lab_jobs_finish(token);
-    check(!native.lab_jobs_submit(0) && !native.lab_jobs_submit(4194305), 'invalid message sizes rejected');
+    check(!native.lab_jobs_submit(0) && !native.lab_jobs_submit(8388609), 'invalid message sizes rejected');
 
     const {createCodec} = await import('/js/codec.js');
     const {createJobs, worker_events, worker_actions} = await import('/js/jobs.js');
@@ -77,7 +77,7 @@ async function labCheckWorkers(check) {
     try {
         codec.bytes(new Uint8Array(message_limit + 1));
     } catch (error) {
-        oversized_rejected = error.message.includes('4 MiB');
+        oversized_rejected = error.message.includes('8 MiB');
     }
     check(oversized_rejected, 'host buffer admission rejects one byte above the native bound');
     check_lab_worker_policy(policy, worker_events, worker_actions, check);

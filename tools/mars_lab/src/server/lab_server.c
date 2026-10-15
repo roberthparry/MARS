@@ -64,8 +64,10 @@ static const string_t *lab_svr_request_header(const websrv_request_t *request, c
 static bool lab_svr_value(const websrv_request_t *request, websrv_response_t *response, const json_t *value)
 {
     (void)request;
-    array_t *bytes = lab_wire_encode(value);
-    bool ok = bytes && lab_svr_header(response, "Content-Type", "application/x-protobuf") &&
+    bool failed = false;
+    array_t *bytes = lab_wire_encode_response(value, &failed);
+    bool ok = bytes && (!failed || websrv_response_status(response, 500)) &&
+              lab_svr_header(response, "Content-Type", "application/x-protobuf") &&
               websrv_response_body(response, array_get(bytes, 0), array_size(bytes));
     array_destroy(bytes);
     return ok;

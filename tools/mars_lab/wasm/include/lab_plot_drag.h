@@ -1,6 +1,6 @@
 /**
  * @file lab_plot_drag.h
- * @brief Browser-facing interface for native surface-camera drag and wheel gestures.
+ * @brief Browser-facing interface for native curve panning and surface-camera drag and wheel gestures.
  *
  * The C controller owns gesture state, angle limits and redraw decisions. Browser
  * subscriptions retain ordinary objects, never scoped DOM handles. Callers outside

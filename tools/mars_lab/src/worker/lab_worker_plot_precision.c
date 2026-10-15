@@ -146,7 +146,7 @@ static sampler_status_t evaluate_plot_derivatives(number_t parameter, number_t *
 }
 
 static sampler_t *sample_at(const char *source, const char *variable, number_t lower, number_t upper,
-                             size_t bits, bool probes)
+                             size_t bits, bool probes, bool preview)
 {
     num_set_default_prec_bits(bits);
     expr_bindings_t *bindings = NULL;
@@ -158,18 +158,18 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
         axis = expr_new_named_var(NUM_NAN, variable);
     number_t lo = num_as_inexact_real_prec(lower, bits), hi = num_as_inexact_real_prec(upper, bits);
     sampler_options_t options = sampler_options_default();
-    options.intervals = probes ? 16 : 64;
-    options.max_evaluations = probes ? 17 : 8193;
+    options.intervals = probes || preview ? 16 : 64;
+    options.max_evaluations = probes ? 17 : preview ? 513 : 8193;
     options.method = probes ? SAMPLER_UNIFORM : SAMPLER_ADAPTIVE;
-    options.max_depth = 8;
+    options.max_depth = preview ? 4 : 8;
     options.absolute_tolerance = 1e-5;
-    options.relative_tolerance = 0.002;
+    options.relative_tolerance = preview ? 0.01 : 0.002;
     plot_evaluation_t evaluation = {.expression = expression, .axis = axis};
-    if (!probes && expression && axis)
+    if (!probes && !preview && expression && axis)
         evaluation.second_derivative = expr_create_2nd_deriv(expression, axis, axis);
     sampler_t *samples = NULL;
     if (expression && axis)
-        samples = probes ? sampler_new(evaluate_plot, &evaluation, lo, hi, &options) :
+        samples = probes || preview ? sampler_new(evaluate_plot, &evaluation, lo, hi, &options) :
             sampler_new_with_derivatives(evaluate_plot_derivatives, &evaluation, lo, hi, &options);
     int saved_error = samples ? 0 : (errno ? errno : EINVAL);
     expr_free(evaluation.second_derivative);
@@ -222,8 +222,8 @@ static bool probes_agree(const sampler_t *low, const sampler_t *high, number_t y
 }
 
 /* Only this isolated worker temporarily changes the numerical default; every exit restores it. */
-sampler_t *lab_worker_plot_samples(const char *source, const char *variable, number_t lower, number_t upper,
-                                  number_t ymin, number_t ymax, size_t *precision_bits)
+sampler_t *lab_worker_plot_samples_quality(const char *source, const char *variable, number_t lower, number_t upper,
+                                          number_t ymin, number_t ymax, size_t *precision_bits, bool preview)
 {
     size_t saved_precision = num_get_default_prec_bits();
     size_t bits = lab_worker_plot_range_precision(lower, upper);
@@ -259,8 +259,8 @@ sampler_t *lab_worker_plot_samples(const char *source, const char *variable, num
         size_t check_bits = saved_precision < 4096 ? saved_precision : 4096;
         if (reference_bits < check_bits)
             reference_bits = check_bits;
-        sampler_t *low = sample_at(source, variable, probe_lower, probe_upper, bits, true);
-        sampler_t *high = low ? sample_at(source, variable, probe_lower, probe_upper, reference_bits, true) : NULL;
+        sampler_t *low = sample_at(source, variable, probe_lower, probe_upper, bits, true, preview);
+        sampler_t *high = low ? sample_at(source, variable, probe_lower, probe_upper, reference_bits, true, preview) : NULL;
         bool agree = low && high && probes_agree(low, high, ymin, ymax);
         bool failed = !low || !high;
         sampler_free(high);
@@ -268,7 +268,7 @@ sampler_t *lab_worker_plot_samples(const char *source, const char *variable, num
         if (failed)
             break;
         if (agree) {
-            result = sample_at(source, variable, lower, upper, bits, false);
+            result = sample_at(source, variable, lower, upper, bits, false, preview);
             if (result)
                 *precision_bits = bits;
             break;
@@ -285,4 +285,11 @@ sampler_t *lab_worker_plot_samples(const char *source, const char *variable, num
     num_set_default_prec_bits(saved_precision);
     errno = saved_error;
     return result;
+}
+
+/* Range selection and stationary-point discovery always use full sampling quality. */
+sampler_t *lab_worker_plot_samples(const char *source, const char *variable, number_t lower, number_t upper,
+                                  number_t ymin, number_t ymax, size_t *precision_bits)
+{
+    return lab_worker_plot_samples_quality(source, variable, lower, upper, ymin, ymax, precision_bits, false);
 }

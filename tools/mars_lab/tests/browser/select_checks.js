@@ -9,7 +9,7 @@ window.checkLabSelects = async function checkLabSelects() {
     check(!document.querySelector('#plotRange select'), 'plot settings use inline choices, not selection menus');
     for (const id of ['plotKindChoices', 'plotScaleChoices']) {
         const radios = [...document.getElementById(id).querySelectorAll('input[type="radio"]')];
-        check(radios.length === 2, 'plot override groups contain only the two explicit choices');
+        check(radios.length === 3, 'plot choices include Auto alongside their two overrides');
         for (const radio of radios) {
             const style = getComputedStyle(radio);
             check(style.colorScheme === 'dark' && style.accentColor !== 'auto',

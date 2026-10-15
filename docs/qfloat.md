@@ -3,7 +3,12 @@
 `qfloat_t` is a double-double floating-point type built from the unevaluated sum
 of two IEEE-754 `double` values.
 
+`qf_round(x)` returns the nearest integer, with exact halfway values rounded
+away from zero. It examines both double-double components, preserves signed
+zero and non-finite values, and does not first add one half to the input.
+
 ## Implementation organisation
+
 
 The implementation groups Bessel I/K/Y and Struve H/L adapters in
 `src/qfloat/qfloat_cylindrical.c`, polynomial and signal functions in

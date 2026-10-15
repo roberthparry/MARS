@@ -24,7 +24,10 @@ static int lab_payload_or(int value, int fallback)
 
 static int lab_payload_control(const char *selector)
 {
-    return lab_dom_read(lab_dom_query(0, selector), 5, "");
+    int control = lab_dom_query(0, selector);
+    int text = lab_dom_read(control, 5, "");
+    int exact = lab_dom_get(control, "marsZoomValue");
+    return lab_dom_truth(exact) && lab_dom_equal(text, lab_dom_get(control, "marsZoomText")) ? exact : text;
 }
 
 static unsigned lab_payload_request_flags(int request)

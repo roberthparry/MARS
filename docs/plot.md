@@ -5,6 +5,10 @@ Include `plot-t.h` for the opaque `plot_t` class. It copies height grids, measur
 image **in memory** as a `string_t`. No plotting library, temporary file,
 external process, browser mathematics or JavaScript renderer is required.
 
+Curve series have individual clipped SVG windows. A client can temporarily
+translate the rendered series during a drag without painting over axis labels;
+freshly sampled data is still required to fill newly exposed parts of the domain.
+
 ## API
 
 | API | Behaviour |
@@ -83,6 +87,11 @@ are clipped before drawing conversion. Invisible markers and segments outside
 the same viewport edge are omitted. Crossing segments retain their visible
 intersection; explicit sampler gaps are never joined.
 
+Each curve series carries its XML-escaped name in an SVG `title`, providing a
+native hover tooltip even when the visible legend is disabled.
+Curve SVG viewports also carry `data-x-min`, `data-x-max`, `data-y-min` and
+`data-y-max` attributes for UI coordinate inspection. These are double-precision
+approximations of the native bounds, not a replacement for native numerical data.
 All text is XML-escaped; invalid XML control characters are rejected. SVG uses
 no scripts, external resources, generated IDs or caller-supplied markup. Its
 axis, grid and tick/axis-label colours are controlled by `axis_colour`,
@@ -107,7 +116,14 @@ sampler's gap detection is heuristic, not a continuity guarantee.
 grid into an empty scene. Both coordinate arrays must be finite, real and
 strictly increasing, with at least two elements. Heights are row-major:
 `z[row * columns + column]`. Non-real or non-finite heights leave holes;
-cells touching a missing vertex are not drawn. A surface counts as one series
+cells touching a missing vertex are not drawn. Finite steep facets are retained;
+the renderer does not infer discontinuities from their relative height changes.
+Callers with a function evaluator must sample domain gaps before supplying heights.
+Surface SVGs include approximate independent-axis bounds and per-facet affine
+coordinate maps for pointer-centred domain zoom. These describe the rendered
+mesh, not the exact function between samples; nearly edge-on facets may omit the
+map. Consumers can resample a narrower domain without enlarging the SVG artwork.
+A surface counts as one series
 and cannot be mixed with curves, replaced, or given explicit 2-D bounds.
 
 The vertex count is subject to `max_points`. Library defaults fit every finite
@@ -121,10 +137,8 @@ Three open axes have tick strokes, decimal labels and no enclosing box. Native
 label layout reserves clearance between numbers, including shared corners.
 Surface labels may move slightly outwards; labels that still cannot fit are
 omitted without removing their tick marks. Curves also thin crowded tick labels.
-Margins account for long scientific labels. On grids of at least
-17×17, cells spanning more than 60% of the total height range are omitted to
-reduce false walls at discontinuities. This heuristic can omit genuine steep
-features, and sampling can miss small holes or poles; it is not a continuity
+Margins account for long scientific labels. Sampled meshes can miss small holes,
+poles or rapid oscillations; joining finite vertices is not a continuity
 guarantee. No drawable cells gives `ENODATA`, except when a manual height interval
 excludes all facets: that viewport still displays its axes.
 

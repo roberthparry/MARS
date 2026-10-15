@@ -18,15 +18,30 @@
 #include "number-t.h"
 #include "string-t.h"
 #include "expression-t.h"
+#include "equation-t.h"
 #include "sampler-t.h"
 #include "plot-t.h"
 
 /** @brief Plot both equation sides or explicit differential-equation solutions as native curves or surfaces. */
 int lab_worker_solver_plot(int argc, char **argv);
 
+/** @brief Return owning worksheet-precision solution records, using the normal equation solution formatter. */
+string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int precision);
+
+/** @brief Build up to sixteen labelled representative ODE curves, varying only generated integration constants. */
+bool lab_worker_plot_family(expr_bindings_t *authored, const char *axis, const expr_t *const *branches,
+                             size_t branch_count, expr_t **curves, string_t **labels, size_t *count, bool *family);
+
 /** @brief Plot a native solution surface with two declared axes and a named dependent variable. */
 int lab_worker_plot_surface(const char *source, const expr_t *expression, const expr_t *first,
                             const expr_t *second, const expr_t *function, int argc, char **argv);
+
+/** @brief Refine automatic family bounds using binned sampler activity and located stationary points. */
+void lab_worker_plot_frame(char *const *sources, size_t count, const char *axis, number_t bounds[4]);
+
+/** @brief Frame native equation intersections and turning points; optionally refine automatic horizontal bounds. */
+bool lab_worker_plot_equation_frame(const expr_t *const *sides, char *const *sources, const char *axis,
+                                    bool horizontal, number_t bounds[4]);
 
 /** @brief Refine bounded surface-extremum candidates with gradients and Hessians for automatic height limits. */
 bool lab_worker_surface_extrema(plot_t *plot, const char *source, const char *first, const char *second,
@@ -61,9 +76,13 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
 sampler_t *lab_worker_plot_samples(const char *source, const char *variable, number_t lower, number_t upper,
                                   number_t ymin, number_t ymax, size_t *precision_bits);
 
+/** @brief Sample with range-aware precision; previews reduce subdivision work and omit derivative construction. */
+sampler_t *lab_worker_plot_samples_quality(const char *source, const char *variable, number_t lower, number_t upper,
+                                          number_t ymin, number_t ymax, size_t *precision_bits, bool preview);
+
 /** @brief Emit an in-memory real curve SVG for a selected variable and mathematical bound texts. */
 int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
-                    const char *scale, const char *y_lower, const char *y_upper);
+                    const char *scale, const char *y_lower, const char *y_upper, bool preview);
 
 /**
  * @brief Formats a numerical card value with decimal or Unicode power-of-ten notation.

@@ -217,9 +217,9 @@ static bool lab_wire_test_child(protobuf_t *parent, unsigned field, const protob
 
 static array_t *lab_wire_test_envelope(const protobuf_t *child)
 {
-    protobuf_t *entry = protobuf_new(4194368, 65540);
-    protobuf_t *root = protobuf_new(4194368, 65540);
-    protobuf_t *envelope = protobuf_new(4194368, 65540);
+    protobuf_t *entry = protobuf_new(8388672, 65540);
+    protobuf_t *root = protobuf_new(8388672, 65540);
+    protobuf_t *envelope = protobuf_new(8388672, 65540);
     bool ok = entry && root && envelope && protobuf_add_bytes(entry, 1, "x", 1) &&
               lab_wire_test_child(entry, 2, child) && protobuf_add_integer(root, 1, PROTOBUF_VARINT, JSON_OBJECT) &&
               lab_wire_test_child(root, 6, entry) && protobuf_add_integer(envelope, 1, PROTOBUF_VARINT, 1) &&
@@ -249,7 +249,7 @@ static bool lab_wire_test_boundary(const protobuf_t *child, const json_t *native
 
 static void test_lab_wire_byte_boundary(void)
 {
-    enum { limit = 4194304, overhead = 29 };
+    enum { limit = 8388608, overhead = 29 };
     char *payload = malloc(limit - overhead + 1);
     bool ok = payload != NULL;
     if (payload)
@@ -266,6 +266,13 @@ static void test_lab_wire_byte_boundary(void)
         json_t *root = json_new_object();
         ok = ok && value && root && json_object_set(root, key, value) &&
              lab_wire_test_boundary(child, root, extra == 0, limit + extra);
+        bool failed = false;
+        array_t *reply = lab_wire_encode_response(root, &failed);
+        json_t *decoded = reply ? lab_wire_decode(array_get(reply, 0), array_size(reply)) : NULL;
+        ok = ok && reply && decoded && failed == (extra != 0) &&
+             (!extra || (!test_lab_ok(decoded, true) && strstr(test_lab_text(decoded, "error"), "8 MiB")));
+        json_free(decoded);
+        array_destroy(reply);
         json_free(root);
         json_free(value);
         string_free(text);
@@ -273,13 +280,13 @@ static void test_lab_wire_byte_boundary(void)
     }
     string_free(key);
     free(payload);
-    TEST_ASSERT_TRUE(ok, "exactly 4 MiB accepted; one byte above rejected by encoder and decoder");
+    TEST_ASSERT_TRUE(ok, "exactly 8 MiB accepted; one byte above rejected by encoder and decoder");
 }
 
 static void test_lab_wire_node_boundary(void)
 {
     static const unsigned char nil[] = {8, 0};
-    protobuf_t *child = protobuf_new(4194368, 65540);
+    protobuf_t *child = protobuf_new(8388672, 65540);
     json_t *items = json_new_array(), *null_value = json_new_null();
     string_t *key = string_new_with("x");
     bool ok = child && items && null_value && key && protobuf_add_integer(child, 1, PROTOBUF_VARINT, JSON_ARRAY);

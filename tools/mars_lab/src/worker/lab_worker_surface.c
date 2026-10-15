@@ -19,11 +19,12 @@
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
-enum { SURFACE_SIDE = 70, SURFACE_PREVIEW_SIDE = 13 };
+enum { SURFACE_SIDE = 70, SURFACE_REFINED_SIDE = 139, SURFACE_PREVIEW_SIDE = 13 };
 
 typedef struct {
     size_t side;
-    number_t x[SURFACE_SIDE], y[SURFACE_SIDE], z[SURFACE_SIDE * SURFACE_SIDE];
+    number_t x[SURFACE_REFINED_SIDE], y[SURFACE_REFINED_SIDE];
+    number_t z[SURFACE_REFINED_SIDE * SURFACE_REFINED_SIDE];
 } surface_grid_t;
 
 typedef struct {
@@ -117,6 +118,107 @@ static surface_grid_t *grid_sample(const char *source, const char *first, const 
     return grid;
 }
 
+/* Mid-edge and cell-centre samples test interpolation, not the size of a height jump. */
+static bool grid_resolved(const surface_grid_t *coarse, const surface_grid_t *fine)
+{
+    double peak = 0;
+    for (size_t i = 0; i < fine->side * fine->side; ++i) {
+        double z = num_to_double(fine->z[i]);
+        if (isfinite(z))
+            peak = fmax(peak, fabs(z));
+    }
+    for (size_t r = 0; r < fine->side; ++r) {
+        for (size_t c = 0; c < fine->side; ++c) {
+            if (!(r % 2) && !(c % 2))
+                continue;
+            size_t a = r / 2, b = c / 2;
+            double sum = 0;
+            unsigned count = 0;
+            bool valid = true;
+            for (size_t dr = 0; dr <= r % 2; ++dr) {
+                for (size_t dc = 0; dc <= c % 2; ++dc) {
+                    double z = num_to_double(coarse->z[(a + dr) * coarse->side + b + dc]);
+                    valid = valid && isfinite(z);
+                    sum += z;
+                    ++count;
+                }
+            }
+            double actual = num_to_double(fine->z[r * fine->side + c]);
+            if (isfinite(actual) != valid ||
+                (valid && fabs(actual - sum / count) > 0.005 * fmax(peak, 1e-12)))
+                return false;
+        }
+    }
+    return true;
+}
+
+/* Opposite finite heights alone are not evidence of a pole. Require actual growth
+ * under repeated bisection, or a non-real/non-finite interior sample. */
+static bool edge_gap(expr_t *formula, expr_t *axis, number_t lo, number_t hi, number_t left, number_t right)
+{
+    NUM_SCOPE(numbers);
+    if (!num_is_real(left) || !num_is_real(right) || !num_is_finite(left) || !num_is_finite(right) ||
+        num_is_zero(left) || num_is_zero(right) || num_lt(left, NUM_ZERO) == num_lt(right, NUM_ZERO))
+        return false;
+    number_t a = num_abs(left), b = num_abs(right);
+    number_t threshold = num_mul(num_gt(a, b) ? a : b, num_create_from_long(8));
+    number_t previous = num_gt(a, b) ? a : b;
+    unsigned growing = 0;
+    for (unsigned i = 0; i < 8; ++i) {
+        number_t mid = num_div(num_add(lo, hi), NUM_TWO);
+        expr_set_val(axis, mid);
+        number_t z = expr_eval(formula);
+        if (!num_is_real(z) || !num_is_finite(z))
+            return true;
+        if (num_is_zero(z))
+            return false;
+        number_t magnitude = num_abs(z);
+        growing = num_gt(magnitude, previous) ? growing + 1 : 0;
+        previous = magnitude;
+        if (num_lt(left, NUM_ZERO) == num_lt(z, NUM_ZERO)) {
+            lo = mid;
+            left = z;
+        } else {
+            hi = mid;
+        }
+    }
+    return growing >= 3 && num_gt(previous, threshold);
+}
+
+static bool grid_gaps(surface_grid_t *grid, const char *source, const char *first, const char *second)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *formula = expr_from_string(source, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, first) : NULL;
+    expr_t *y = bindings ? expr_bindings_get(bindings, second) : NULL;
+    bool *missing = calloc(grid->side * grid->side, sizeof(*missing));
+    bool ok = formula && missing;
+    for (size_t r = 0; ok && r < grid->side; ++r) {
+        for (size_t c = 0; c < grid->side; ++c) {
+            size_t i = r * grid->side + c;
+            if (y)
+                expr_set_val(y, grid->y[r]);
+            if (x && c + 1 < grid->side &&
+                edge_gap(formula, x, grid->x[c], grid->x[c + 1], grid->z[i], grid->z[i + 1]))
+                missing[i] = missing[i + 1] = true;
+            if (x)
+                expr_set_val(x, grid->x[c]);
+            if (y && r + 1 < grid->side &&
+                edge_gap(formula, y, grid->y[r], grid->y[r + 1], grid->z[i], grid->z[i + grid->side]))
+                missing[i] = missing[i + grid->side] = true;
+        }
+    }
+    for (size_t i = 0; ok && i < grid->side * grid->side; ++i)
+        if (missing[i]) {
+            num_destroy(&grid->z[i]);
+            grid->z[i] = num_clone(NUM_NAN);
+        }
+    free(missing);
+    expr_free(formula);
+    expr_bindings_free(bindings);
+    return ok;
+}
+
 static bool grid_agrees(const surface_grid_t *low, const surface_grid_t *high)
 {
     NUM_SCOPE(numbers);
@@ -181,6 +283,19 @@ static string_t *surface_svg(const char *source, const char *first, const char *
         grid_free(low);
         if (ok && agree) {
             grid = grid_sample(source, first, second, bounds, preview ? SURFACE_PREVIEW_SIDE : SURFACE_SIDE, bits);
+            if (grid && !preview) {
+                surface_grid_t *fine = grid_sample(source, first, second, bounds, SURFACE_REFINED_SIDE, bits);
+                if (!fine || !grid_resolved(grid, fine)) {
+                    grid_free(grid);
+                    grid = fine;
+                } else {
+                    grid_free(fine);
+                }
+            }
+            if (grid && !grid_gaps(grid, source, first, second)) {
+                grid_free(grid);
+                grid = NULL;
+            }
             break;
         }
         bits *= 2;
@@ -254,7 +369,8 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
     }
     if (!second)
         return lab_worker_plot(source, expression, variable, argc > 5 ? argv[5] : "", argc > 6 ? argv[6] : "",
-                                argc > 7 ? argv[7] : "auto", argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "");
+                                argc > 7 ? argv[7] : "auto", argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "",
+                                !strcmp(quality, "preview"));
     /* At most count + 1 candidates can be occupied; each lookup uses the native binding index. */
     char name[64] = "u";
     const char *const preferred[] = {"v", "w"};

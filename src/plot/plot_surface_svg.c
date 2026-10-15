@@ -3,8 +3,8 @@
  * @brief Rotatable SVG height surfaces with depth-ordered coloured mesh facets.
  *
  * Numerical ranges are normalised before conversion to drawing coordinates.
- * Missing vertices leave holes. Facets with a very large relative height jump
- * are omitted as a conservative discontinuity heuristic, not a continuity proof.
+ * Missing vertices leave holes. Finite heights are joined regardless of slope;
+ * callers with an evaluator must sample domain gaps before supplying the mesh.
  * The camera determines projection, facet order and the exposed axes. Each render
  * is an independent bounded SVG, with no GPU or files.
  */
@@ -58,6 +58,22 @@ static camera_t camera(const plot_t *plot, double label_width)
     view.scale_x *= fit;
     view.scale_y *= fit;
     return view;
+}
+
+/* Invert a projected triangle to its normalised independent coordinates for pointer zoom. */
+static bool pointer_map(string_t *svg, const vertex_t p[3])
+{
+    double x1 = p[1].x - p[0].x, y1 = p[1].y - p[0].y;
+    double x2 = p[2].x - p[0].x, y2 = p[2].y - p[0].y;
+    double determinant = x1 * y2 - x2 * y1;
+    if (fabs(determinant) < 1e-12)
+        return true;
+    double ux = ((p[1].u - p[0].u) * y2 - (p[2].u - p[0].u) * y1) / determinant;
+    double uy = (x1 * (p[2].u - p[0].u) - x2 * (p[1].u - p[0].u)) / determinant;
+    double vx = ((p[1].v - p[0].v) * y2 - (p[2].v - p[0].v) * y1) / determinant;
+    double vy = (x1 * (p[2].v - p[0].v) - x2 * (p[1].v - p[0].v)) / determinant;
+    return string_append_format(svg, " data-uv=\"%.8g %.8g %.8g %.8g %.8g %.8g\"", ux, uy,
+        p[0].u - ux * p[0].x - uy * p[0].y, vx, vy, p[0].v - vx * p[0].x - vy * p[0].y) >= 0;
 }
 
 static bool finite_real(number_t value)
@@ -296,14 +312,11 @@ string_t *plot_surface_svg(const plot_t *plot)
             size_t indices[] = {r * columns + c, r * columns + c + 1,
                                 (r + 1) * columns + c + 1, (r + 1) * columns + c};
             bool valid = true;
-            double low = 1, high = 0;
             for (unsigned j = 0; j < 4; ++j) {
                 const vertex_t *v = &vertices[indices[j]];
                 valid = valid && v->valid;
-                low = fmin(low, v->z);
-                high = fmax(high, v->z);
             }
-            if (!valid || (columns >= 17 && rows >= 17 && high - low > 0.6))
+            if (!valid)
                 continue;
             for (unsigned j = 1; ok && j < 3; ++j) {
                 size_t a = indices[0], b = indices[j], d = indices[j + 1];
@@ -324,9 +337,11 @@ string_t *plot_surface_svg(const plot_t *plot)
         qsort(facets, faces, sizeof(*facets), far_first);
         ok = string_append_format(svg, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%u\" height=\"%u\" "
                  "viewBox=\"0 0 %u %u\" role=\"img\" data-surface=\"true\" "
-                 "data-azimuth=\"%.3f\" data-elevation=\"%.3f\" data-roll=\"%.3f\"><title>",
+                 "data-azimuth=\"%.3f\" data-elevation=\"%.3f\" data-roll=\"%.3f\" "
+                 "data-x-min=\"%.17g\" data-x-max=\"%.17g\" data-y-min=\"%.17g\" data-y-max=\"%.17g\"><title>",
                  plot->options.width, plot->options.height, plot->options.width, plot->options.height,
-                 plot->azimuth, plot->elevation, plot->roll) >= 0 &&
+                 plot->azimuth, plot->elevation, plot->roll, num_to_double(bounds[0]), num_to_double(bounds[1]),
+                 num_to_double(bounds[2]), num_to_double(bounds[3])) >= 0 &&
              plot_escape(svg, plot->title) && string_append_format(svg, "</title><text x=\"%u\" y=\"24\" "
                  "text-anchor=\"middle\" fill=\"#%06x\" font-family=\"sans-serif\" font-size=\"14\">",
                  plot->options.width / 2, (unsigned)plot->options.label_colour) >= 0 && plot_escape(svg, plot->title) &&
@@ -346,7 +361,8 @@ string_t *plot_surface_svg(const plot_t *plot)
                                        polygon[0].x, polygon[0].y) >= 0;
         for (int j = 1; ok && j < clipped; ++j)
             ok = string_append_format(svg, " L %.3f %.3f", polygon[j].x, polygon[j].y) >= 0;
-        ok = ok && string_append_cstr(svg, " Z\"/>\n") == 0;
+        ok = ok && string_append_cstr(svg, " Z\"") == 0 && pointer_map(svg, polygon) &&
+             string_append_cstr(svg, "/>\n") == 0;
     }
     ok = ok && string_append_cstr(svg, "</g>\n") == 0 && axes(svg, plot, &view, bounds) &&
          string_append_cstr(svg, "</svg>\n") == 0;

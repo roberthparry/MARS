@@ -270,6 +270,7 @@
       "example_diffequation_compact_parameter_derivatives": true,
       "example_diffequation_coupled_flow": true,
       "example_diffequation_deriving_a_lie_algebra": true,
+      "example_diffequation_emden_initial_value": true,
       "example_diffequation_forced_second_order_pde": true,
       "example_diffequation_fourier_evolution": true,
       "example_diffequation_gkdv": true,
@@ -359,6 +360,8 @@
     "test_diffequ_linearizes_exact_third_order_problem": true,
     "test_diffequ_linearizes_modified_emden_problem": true,
     "test_diffequ_linearizes_scaled_modified_emden_problem": true,
+    "test_diffequ_modified_emden_condition_scope": true,
+    "test_diffequ_modified_emden_initial_conditions": true,
     "test_diffequ_modified_emden_uses_coefficient_rule": true,
     "test_diffequ_nested_source_order_TeX": true,
     "test_diffequ_nonlinear_characteristic_uses_power_rule": true,
@@ -1333,6 +1336,7 @@
         "test_pow": true,
         "test_pow_d": true,
         "test_pow_d_complex": true,
+        "test_round": true,
         "test_sin": true,
         "test_sinh": true,
         "test_sqrt": true,
@@ -1348,6 +1352,7 @@
       "example_indexed_roots": true,
       "example_orthopoly_readme_examples": true,
       "example_readme_examples": true,
+      "example_round": true,
       "example_signal_readme_examples": true
     },
     "tests": {
@@ -1837,6 +1842,7 @@
     "test_mat_ordinary_cylindrical_symbolic": true,
     "test_mat_pow_int_d": true,
     "test_mat_pow_num": true,
+    "test_mat_round": true,
     "test_mat_roundtrips_d": true,
     "test_mat_sgn_numeric": true,
     "test_mat_simplify_symbolic_helper": true,
@@ -2121,6 +2127,7 @@
         "test_mul": true,
         "test_qf_exp": true,
         "test_qf_log": true,
+        "test_round": true,
         "test_sqrt": true,
         "test_stability": true
       }
@@ -3010,6 +3017,7 @@
       "test_lab_extra_equation": true,
       "test_lab_extra_equation_decimal_notation": true,
       "test_lab_extra_equation_explicit_bindings": true,
+      "test_lab_extra_equation_frame": true,
       "test_lab_extra_equation_greek_binding": true,
       "test_lab_extra_equation_inferred_binding": true,
       "test_lab_extra_equation_real_surd_numerics": true,
@@ -3037,14 +3045,17 @@
       "test_lab_extra_plot_preview": true,
       "test_lab_extra_plot_ranges": true,
       "test_lab_extra_plot_series_domain": true,
+      "test_lab_extra_plot_stepped_ranges": true,
       "test_lab_extra_plot_tangent_bounds": true,
       "test_lab_extra_plot_title_fallback": true,
       "test_lab_extra_plot_turning_points": true,
       "test_lab_extra_projection_fonts": true,
       "test_lab_extra_render_TeX": true,
       "test_lab_extra_repeated_gaussian_integral": true,
+      "test_lab_extra_solution_families": true,
       "test_lab_extra_solver_plots": true,
       "test_lab_extra_surface": true,
+      "test_lab_extra_surface_continuity": true,
       "test_lab_extra_surface_height": true,
       "test_lab_extra_surface_names": true,
       "test_lab_extra_unsafe_TeX_environment": true,
@@ -3646,6 +3657,12 @@
       "test_process_worker_execution": true,
       "test_process_worker_invalid_arguments": true,
       "test_process_worker_paths": true
+    }
+  },
+  "tools/mars_lab/tests/test_lab_plot_cache.c": {
+    "tests": {
+      "enabled": true,
+      "test_lab_plot_cache": true
     }
   },
   "tools/mars_lab/tests/test_lab_presentation.c": {

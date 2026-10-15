@@ -12,6 +12,7 @@
 #include "lab_result.h"
 #include "lab_view.h"
 #include "lab_plot_controls.h"
+#include "lab_plot_pointer.h"
 #include "lab_layout.h"
 
 static int lab_layout_read(int node, const char *key)
@@ -111,7 +112,8 @@ void lab_layout_zoom(int card)
     int index = lab_view_card_zoom(lab_dom_card_id(card));
     if (index < 0)
         return;
-    double zoom = lab_view_zoom(index);
+    int curve = !!lab_dom_query(card, "[data-plot-chart][data-x-min], [data-surface][data-x-min]");
+    double zoom = curve ? 1 : lab_view_zoom(index);
     /* Read inherited bases together before writes invalidate computed styles. */
     double scale = lab_layout_base(card, "--render-base-scale", 1.35) * zoom;
     double font = lab_layout_base(card, "--result-base-font-rem", 0.92) * zoom;
@@ -129,12 +131,16 @@ void lab_layout_zoom(int card)
         unsigned percent = (unsigned)(zoom * 100 + 0.5);
         lab_layout_number(button, 0, "", percent, "%");
         lab_dom_write(button, 2, "aria-label", lab_dom_format(percent, "Reset zoom from ", "%"));
+        if (curve) {
+            lab_dom_write(button, 0, "", lab_dom_string("Reset"));
+            lab_dom_write(button, 2, "aria-label", lab_dom_string("Reset plot view"));
+        }
     }
     buttons = lab_dom_all(card, "[data-zoom-step]");
     for (unsigned i = 0; i < lab_dom_count(buttons); ++i) {
         int button = lab_dom_item(buttons, i);
         int down = lab_dom_equal(lab_layout_read(button, "zoomStep"), lab_dom_string("-1"));
-        lab_dom_disabled(button, down ? index <= 0 : (unsigned)index >= lab_view_zoom_count() - 1);
+        lab_dom_disabled(button, !curve && (down ? index <= 0 : (unsigned)index >= lab_view_zoom_count() - 1));
     }
 }
 
@@ -187,6 +193,7 @@ void lab_layout_content(int svg, int fallback)
         lab_dom_class(frame, "rendered-zoom-frame", 1);
         lab_dom_write(frame, 1, "", svg);
         lab_dom_append(rendered, frame);
+        lab_plot_pointer_prepare(rendered);
     } else {
         lab_dom_write(rendered, 0, "", fallback);
     }

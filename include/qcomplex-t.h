@@ -554,6 +554,9 @@ qcomplex_t qc_E1(qcomplex_t z);                           /**< exponential integ
 qcomplex_t qc_ldexp(qcomplex_t z, int k);        /**< z * 2^k */
 qcomplex_t qc_floor(qcomplex_t z);               /**< floor(z) */
 
+/** @brief Round each component to the nearest integer, with exact halves away from zero. */
+qcomplex_t qc_round(qcomplex_t z);
+
 /**
  * @brief Real signum restricted to purely real complex arguments.
  * @param argument Input with a zero imaginary component; either signed zero is accepted.

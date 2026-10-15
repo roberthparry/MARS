@@ -16,6 +16,7 @@ lab_dom_checked
 lab_dom_effect
 lab_dom_equal
 lab_dom_format
+lab_dom_precision
 lab_dom_get
 lab_dom_has
 lab_dom_has_class

@@ -403,6 +403,9 @@ qfloat_t qf_sqr(qfloat_t x);
  */
 qfloat_t qf_floor(qfloat_t x);
 
+/** @brief Round to the nearest integer, with exact halves away from zero; preserve non-finite inputs. */
+qfloat_t qf_round(qfloat_t x);
+
 /**
  * @brief Real signum: -1 for negative arguments, zero at either signed zero, and +1 for positive arguments.
  * @param argument Real input, including either infinity.

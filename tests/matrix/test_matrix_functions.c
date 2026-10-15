@@ -42,6 +42,19 @@ static void check_cylindrical_entry(const char *label, const matrix_t *A, size_t
     num_destroy(&got);
 }
 
+static void test_mat_round(void)
+{
+    NUM_SCOPE(scope);
+    number_t diagonal[] = {num_create_from_frac(5, 2), num_create_from_frac(-5, 2)};
+    matrix_t *a = mat_create_diagonal(2u, diagonal);
+    matrix_t *rounded = mat_round(a);
+    check_bool("round diagonal produces a matrix", rounded != NULL);
+    check_cylindrical_entry("positive half eigenvalue", rounded, 0u, 0u, num_create_from_long(3));
+    check_cylindrical_entry("negative half eigenvalue", rounded, 1u, 1u, num_create_from_long(-3));
+    mat_free(rounded);
+    mat_free(a);
+}
+
 static void test_mat_sgn_numeric(void)
 {
     NUM_SCOPE(scope);
@@ -6625,6 +6638,7 @@ static void test_expr_matrix_functions(void)
 void run_matrix_function_tests(void)
 {
     TEST_RUN_CASE(test_mat_sgn_numeric, "matrix,signal,sgn");
+    TEST_RUN_CASE(test_mat_round, "matrix,round");
     TEST_RUN_CASE(test_mat_struve_h_numeric, NULL);
     TEST_RUN_CASE(test_mat_struve_h_nilpotent, NULL);
     TEST_RUN_CASE(test_mat_bessel_y_numeric_zero_order, NULL);

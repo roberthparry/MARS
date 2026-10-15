@@ -8,6 +8,7 @@
  */
 #include "lab_dom.h"
 #include "lab_workspace.h"
+#include "lab_requests.h"
 #include "lab_plot_controls.h"
 
 static int value(const char *id)
@@ -26,17 +27,36 @@ static int control_index(int name)
     return -1;
 }
 
-static int automatic_value(unsigned index)
+/* Index authored binding values once; plotting names come from the native catalogue. */
+static int curve_available(int first)
 {
-    return lab_dom_string(index < 2 ? "" : "auto");
+    int fixed = lab_dom_object(5);
+    int inputs = lab_dom_all(lab_dom_id("variableValues"), ".binding-value-input");
+    for (unsigned i = 0; i < lab_dom_count(inputs); ++i) {
+        int input = lab_dom_item(inputs, i), text = lab_dom_clean(lab_dom_read(input, 5, ""), 0);
+        lab_dom_key_set(fixed, lab_dom_read(input, 3, "bindingName"),
+                        lab_dom_scalar(1, lab_dom_length(text) && !lab_dom_equal(text, lab_dom_string("?"))));
+    }
+    int names = lab_dom_get(lab_dom_id("plotRange"), "marsPlotNames");
+    for (unsigned i = 0; i < lab_dom_count(names); ++i) {
+        int name = lab_dom_item(names, i);
+        if (!lab_dom_equal(name, first) && !lab_dom_truth(lab_dom_key_get(fixed, name)))
+            return 0;
+    }
+    return 1;
 }
 
 /* Project a bounded UI catalogue, not a symbol lookup or mathematical rewrite. */
 void lab_plot_controls_sync(void)
 {
     int solver = lab_workspace_mode() == 1 || lab_workspace_mode() == 2;
-    lab_dom_class(lab_dom_closest(lab_dom_id("plotKindChoices"), "fieldset"), "hidden", solver);
+    lab_dom_class(lab_dom_id("plotKindGroup"), "hidden", solver);
     int first = value("plotFirst"), second = value("plotSecond");
+    int curve_allowed = solver || curve_available(first);
+    int curve_option = lab_dom_query(0, "#plotKindChoices input[value='curve']");
+    lab_dom_class(lab_dom_closest(curve_option, "label"), "hidden", !curve_allowed);
+    if (!curve_allowed && lab_dom_equal(value("plotKind"), lab_dom_string("curve")))
+        lab_dom_write(lab_dom_id("plotKind"), 5, "", lab_dom_string("auto"));
     lab_dom_write(lab_dom_id("expressionPlot"), 3, "variable", first);
     if (lab_dom_length(first) && lab_dom_equal(first, second)) {
         second = lab_dom_string("");
@@ -53,14 +73,6 @@ void lab_plot_controls_sync(void)
         }
         lab_dom_release(mark);
     }
-    int resets = lab_dom_all(lab_dom_id("plotRange"), "[data-plot-reset]");
-    for (unsigned i = 0; i < lab_dom_count(resets); ++i) {
-        unsigned mark = lab_dom_mark();
-        int button = lab_dom_item(resets, i), index = control_index(lab_dom_read(button, 3, "plotReset"));
-        if (index > 0)
-            lab_dom_disabled(button, lab_dom_equal(value(controls[index]), automatic_value((unsigned)index)));
-        lab_dom_release(mark);
-    }
     int range = lab_dom_id("plotRange");
     int pde = lab_workspace_mode() == 2 && lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) == 2;
     int kind = solver ? lab_dom_string(pde ? "surface" : "curve") : value("plotKind");
@@ -71,6 +83,10 @@ void lab_plot_controls_sync(void)
     if (!curve && !surface)
         surface = lab_dom_truth(lab_dom_get(range, "marsPlotSurface")) || lab_dom_length(second);
     int multiple = lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) > 1;
+    int automatic = lab_dom_equal(value("plotScale"), lab_dom_string("auto"));
+    lab_dom_class(lab_dom_closest(lab_dom_id("plotFirstGroup"), ".plot-ranges"), "hidden", automatic && !multiple);
+    lab_dom_class(lab_dom_query(lab_dom_id("plotFirstGroup"), ".plot-bound-pair"), "hidden", automatic);
+    lab_dom_class(lab_dom_query(lab_dom_id("plotSecondGroup"), ".plot-bound-pair"), "hidden", automatic);
     lab_dom_class(lab_dom_id("plotSecondGroup"), "hidden", curve || (!surface && !multiple));
     lab_dom_class(lab_dom_id("plotCamera"), "hidden", !surface);
     lab_dom_class(lab_dom_id("plotVertical"), "hidden", 0);
@@ -94,15 +110,18 @@ static void choice(int group, const char *name, int key, int label)
 /* Build accessible native radio groups, preserving selections only while their variables exist. */
 void lab_plot_controls_variables(int names, int labels)
 {
+    lab_dom_set(lab_dom_id("plotRange"), "marsPlotNames", names);
     int groups[] = {lab_dom_id("plotFirstChoices"), lab_dom_id("plotSecondChoices")};
     int index = lab_dom_object(5);
     for (unsigned axis = 0; axis < 2; ++axis)
         lab_dom_write(groups[axis], 0, "", lab_dom_string(""));
+    choice(groups[1], "plotSecond", lab_dom_string(""), lab_dom_string("Auto"));
     for (unsigned i = 0; i < lab_dom_count(names); ++i) {
         unsigned mark = lab_dom_mark();
         int name = lab_dom_item(names, i), label = lab_dom_item(labels, i);
         lab_dom_key_set(index, name, lab_dom_scalar(1, 1));
-        choice(groups[0], "plotFirst", name, label);
+        choice(groups[0], "plotFirst", name,
+               lab_dom_count(names) == 1 ? lab_dom_join(label, lab_dom_string(" range"), "") : label);
         choice(groups[1], "plotSecond", name, label);
         lab_dom_release(mark);
     }
@@ -112,7 +131,8 @@ void lab_plot_controls_variables(int names, int labels)
         lab_dom_write(lab_dom_id("plotSecond"), 5, "", lab_dom_string(""));
     lab_dom_set(lab_dom_id("plotRange"), "marsPlotVariables", lab_dom_numeric(lab_dom_count(names)));
     lab_dom_subscribe(lab_dom_id("plotRange"), "change", "lab_plot_controls_dispatch", 0, 0, 0);
-    lab_dom_subscribe(lab_dom_id("plotRange"), "click", "lab_plot_controls_dispatch", 1, 0, 0);
+    lab_dom_subscribe(lab_dom_id("plotRange"), "input", "lab_plot_controls_dispatch", 1, 0, 0);
+    lab_dom_subscribe(lab_dom_id("plotRange"), "click", "lab_plot_controls_dispatch", 3, 0, 0);
     lab_plot_controls_sync();
 }
 
@@ -123,24 +143,68 @@ void lab_plot_controls_prepare(int variable)
     lab_plot_controls_sync();
 }
 
-/* Radios are explicit overrides; Reset clears the selection and restores native automatic policy. */
+static int current_source(void)
+{
+    int length = lab_workspace_source_get(0);
+    return length > 0 ? lab_dom_utf8_string(lab_workspace_output(), (unsigned)length) : lab_dom_string("");
+}
+
+static void emit(int calls, const char *service, int first, int second, unsigned count)
+{
+    int call = lab_dom_object(5), args = lab_dom_object(4);
+    lab_dom_push(args, first);
+    if (count == 2)
+        lab_dom_push(args, second);
+    lab_dom_set(call, "service", lab_dom_string(service));
+    lab_dom_set(call, "args", args);
+    lab_dom_push(calls, call);
+}
+
+/* Coalesce edits; never replay an old worksheet or interrupt a newer explicit request. */
 void lab_plot_controls_dispatch(unsigned action, int event, int context)
 {
-    (void)context;
-    int plan = lab_dom_object(5);
-    lab_dom_set(plan, "calls", lab_dom_object(4));
+    int plan = lab_dom_object(5), calls = lab_dom_object(4);
+    lab_dom_set(plan, "calls", calls);
     lab_dom_return(plan);
-    int target = lab_dom_get(event, "target");
-    if (action == 1) {
-        int button = lab_dom_closest(target, "[data-plot-reset]");
-        int index = button ? control_index(lab_dom_read(button, 3, "plotReset")) : -1;
-        if (index <= 0 || lab_dom_is_disabled(button))
+    if (action == 2) {
+        if (lab_dom_to_number(lab_dom_get(context, "mode")) != lab_workspace_mode() ||
+            lab_dom_to_number(lab_dom_get(context, "request")) != lab_request_latest_main() ||
+            !lab_dom_equal(lab_dom_get(context, "source"), current_source()) ||
+            !lab_dom_query(0, ".plot-card #plotRange"))
             return;
-        lab_dom_write(lab_dom_id(controls[index]), 5, "", automatic_value((unsigned)index));
-    } else if (!action && lab_dom_closest(target, ".plot-choices")) {
+        if (lab_dom_equal(value("plotScale"), lab_dom_string("manual")) &&
+            (!lab_dom_length(lab_dom_clean(value("plotYLower"), 0)) ||
+             !lab_dom_length(lab_dom_clean(value("plotYUpper"), 0))))
+            return;
+        emit(calls, "takePlot", value("plotFirst"), 0, 1);
+        return;
+    }
+    int target = lab_dom_get(event, "target");
+    if (action == 3 && (!lab_dom_equal(lab_dom_get(target, "name"), lab_dom_string("plotScale")) ||
+                       !lab_dom_equal(lab_dom_read(target, 5, ""), lab_dom_string("auto"))))
+        return;
+    if (!lab_dom_closest(target, "input") || lab_workspace_mode() > 2)
+        return;
+    /* Authored bounds take precedence over the exact coordinate behind a rounded zoom label. */
+    lab_dom_delete(target, "marsZoomText");
+    lab_dom_delete(target, "marsZoomValue");
+    if (lab_dom_closest(target, ".plot-choices")) {
         int index = control_index(lab_dom_get(target, "name"));
         if (index >= 0)
             lab_dom_write(lab_dom_id(controls[index]), 5, "", lab_dom_read(target, 5, ""));
+        if (index == 3 && lab_dom_equal(value("plotScale"), lab_dom_string("auto"))) {
+            static const char *const bounds[] = {"plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper",
+                                                 "plotYLower", "plotYUpper"};
+            for (unsigned i = 0; i < sizeof bounds / sizeof *bounds; ++i)
+                lab_dom_write(lab_dom_id(bounds[i]), 5, "", lab_dom_string(""));
+            lab_dom_delete(lab_dom_id("plotRange"), "marsZoomOriginal");
+            lab_dom_delete(lab_dom_id("plotRange"), "marsZoomChart");
+        }
     }
     lab_plot_controls_sync();
+    int state = lab_dom_object(5);
+    lab_dom_set(state, "mode", lab_dom_numeric(lab_workspace_mode()));
+    lab_dom_set(state, "request", lab_dom_numeric(lab_request_latest_main()));
+    lab_dom_set(state, "source", current_source());
+    emit(calls, "schedulePlotControls", state, lab_dom_numeric(action == 1 ? 350 : 100), 2);
 }

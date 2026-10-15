@@ -25,6 +25,21 @@ static int qf_close_value(qfloat_t got, qfloat_t want, double tol)
     return qf_close_rel(got, want, tol);
 }
 
+static void test_round(void)
+{
+    const double inputs[] = {0.0, -0.0, 0.49, -0.49, 0.5, -0.5, 1.5, -1.5, 2.49, -2.51};
+    for (size_t i = 0u; i < sizeof(inputs) / sizeof(*inputs); ++i)
+        TEST_ASSERT_TRUE(qf_eq(qf_round(qf_from_double(inputs[i])), qf_from_double(round(inputs[i]))),
+                         "nearest integer with halves away from zero");
+    TEST_ASSERT_TRUE(qf_eq(qf_round((qfloat_t){0.5, -0x1p-100}), QF_ZERO), "just below half");
+    TEST_ASSERT_TRUE(qf_eq(qf_round((qfloat_t){0.5, 0x1p-100}), QF_ONE), "just above half");
+    TEST_ASSERT_TRUE(qf_eq(qf_round((qfloat_t){0x1p100, 0.5}), (qfloat_t){0x1p100, 1.0}), "large half");
+    TEST_ASSERT_TRUE(qf_eq(qf_round((qfloat_t){0x1p100, 1.0}), (qfloat_t){0x1p100, 1.0}), "large odd integer");
+    TEST_ASSERT_TRUE(isnan(qf_to_double(qf_round(QF_NAN))), "round NaN");
+    TEST_ASSERT_TRUE(isinf(qf_to_double(qf_round(QF_INF))), "round infinity");
+    TEST_ASSERT_TRUE(signbit(qf_round(qf_from_double(-0.0)).hi), "preserve negative zero");
+}
+
 static void test_add()
 {
     printf(C_CYAN "TEST: addition\n" C_RESET);
@@ -320,6 +335,7 @@ static void test_stability()
 void test_arithmetic(void)
 {
     TEST_RUN_SUBTEST(test_add, NULL);
+    TEST_RUN_SUBTEST(test_round, NULL);
     TEST_RUN_SUBTEST(test_mul, NULL);
     TEST_RUN_SUBTEST(test_div, NULL);
     TEST_RUN_SUBTEST(test_sqrt, NULL);

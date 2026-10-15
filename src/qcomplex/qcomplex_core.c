@@ -34,6 +34,12 @@ qcomplex_t qc_ldexp(qcomplex_t z, int k)
 {
     return qc_make(qf_ldexp(qc_real(z), k), qf_ldexp(qc_imag(z), k));
 }
+/* Round the real and imaginary coordinates independently. */
+qcomplex_t qc_round(qcomplex_t z)
+{
+    return qc_make(qf_round(qc_real(z)), qf_round(qc_imag(z)));
+}
+
 qcomplex_t qc_floor(qcomplex_t z)
 {
     return qc_make(qf_floor(qc_real(z)), qf_floor(qc_imag(z)));

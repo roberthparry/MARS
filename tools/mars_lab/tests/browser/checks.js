@@ -65,45 +65,88 @@
             const control = document.getElementById(id), saved = control.value;
             const group = document.getElementById(id + 'Choices');
             const radios = [...group.querySelectorAll('input[type="radio"]')];
-            const reset = group.querySelector('[data-plot-reset]');
             if (!group.getClientRects().length)
                 continue;
-            check(control.type === 'hidden' && radios.length === 2 && radios.every(radio => radio.value !== 'auto'),
-                  'Small option sets must use two explicit radios with no Automatic option');
+            check(control.type === 'hidden' && radios.length === 3,
+                  'Plot choices expose Auto alongside their overrides');
             try {
                 control.value = 'auto';
                 control.dispatchEvent(new Event('change', {bubbles: true}));
-                check(radios.every(radio => !radio.checked) && reset.disabled,
-                      'Automatic must be the unselected default');
+                check(radios.every(radio => radio.checked === (radio.value === 'auto')),
+                      'Automatic is the default selection where exposed');
                 for (const radio of radios) {
+                    if (radio.closest('label').classList.contains('hidden'))
+                        continue;
                     radio.click();
                     check(control.value === radio.value && radio.checked &&
-                          radios.filter(option => option.checked).length === 1 && !reset.disabled,
+                          radios.filter(option => option.checked).length === 1,
                           'Radio overrides must be mutually exclusive and reach native payload controls');
-                    if (id === 'plotScale')
+                    if (id === 'plotScale') {
                         check(document.getElementById('plotManual').classList.contains('hidden') ===
                               (radio.value !== 'manual'), 'Manual limits should appear only when selected');
+                        check([...document.querySelectorAll('.plot-ranges .plot-bound-pair')].every(pair =>
+                                  pair.classList.contains('hidden') === (radio.value === 'auto')),
+                              'Auto hides both horizontal bound pairs');
+                        if (radio.value === 'auto')
+                            check(['plotLower', 'plotUpper', 'plotSecondLower', 'plotSecondUpper', 'plotYLower', 'plotYUpper']
+                                      .every(id => document.getElementById(id).value === ''),
+                                  'Auto clears hidden bounds');
+                    }
                 }
                 await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
                 const card = group.closest('.result-card').getBoundingClientRect();
                 for (const label of group.querySelectorAll('label')) {
+                    if (label.classList.contains('hidden'))
+                        continue;
                     const box = label.getBoundingClientRect();
                     check(box.left >= card.left && box.right <= card.right,
                           'Radio options must stay inside normal, expanded and narrow plot cards');
                 }
-                reset.click();
-                check(control.value === 'auto' && radios.every(radio => !radio.checked && !radio.matches(':checked')) &&
-                      reset.disabled,
-                      'Reset must return to automatic without a separate Automatic option');
-                radios[1].click();
-                check(control.value === radios[1].value && radios[1].matches(':checked') &&
-                      !Object.hasOwn(radios[1], 'checked'),
-                      'An override must be selectable again after Reset using the real browser checked state');
+                radios.find(radio => radio.value === 'auto').click();
+                check(control.value === 'auto' && radios.every(radio => radio.checked === (radio.value === 'auto')),
+                      'Auto restores automatic selection without a Reset button');
+                const override = radios.find(radio => radio.value !== 'auto' &&
+                                             !radio.closest('label').classList.contains('hidden'));
+                override.click();
+                check(control.value === override.value && override.matches(':checked') &&
+                      !Object.hasOwn(override, 'checked'),
+                      'An override must be selectable again after Auto using the real browser checked state');
             } finally {
                 control.value = saved;
                 control.dispatchEvent(new Event('change', {bubbles: true}));
             }
         }
+    }
+    async function checkLivePlotControls() {
+        check(!document.getElementById('plotUpdate') && !document.querySelector('#plotRange [data-plot-reset]'),
+              'Live plot controls have no Update or Reset buttons');
+        const lower = document.getElementById('plotLower'), upper = document.getElementById('plotUpper');
+        const saved = [lower.value, upper.value];
+        const savedScale = document.getElementById('plotScale').value;
+        document.querySelector('#plotScaleChoices input[value="all"]').click();
+        const waitFor = async predicate => {
+            const deadline = performance.now() + 15000;
+            while (!predicate() && performance.now() < deadline)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(predicate(), 'Live range edit must complete without an Update button');
+        };
+        const before = rendered.querySelector('[data-series]');
+        lower.value = '-';
+        lower.dispatchEvent(new Event('input', {bubbles: true}));
+        await waitFor(() => !document.getElementById('plotFeedback').classList.contains('hidden'));
+        check(rendered.querySelector('[data-series]') === before && !rendered.classList.contains('error'),
+              'Incomplete live bounds retain the last valid plot');
+        lower.value = '-6';
+        upper.value = '6';
+        lower.dispatchEvent(new Event('input', {bubbles: true}));
+        upper.dispatchEvent(new Event('input', {bubbles: true}));
+        await waitFor(() => rendered.querySelector('[data-series]') !== before);
+        check(document.getElementById('plotFeedback').classList.contains('hidden'),
+              'Correcting the bounds clears live validation feedback');
+        lower.value = saved[0];
+        upper.value = saved[1];
+        document.getElementById('plotScale').value = savedScale;
+        await takePlot(document.getElementById('plotFirst').value);
     }
     function checkPlotRangeAlignment() {
         const groups = [...document.querySelectorAll('.plot-ranges > .plot-group')]
@@ -133,8 +176,8 @@
         const second = [...document.querySelectorAll('#plotSecondChoices input')];
         check(first.length > 0 && first.every(radio => radio.type === 'radio'), 'Variables must be radio choices');
         check(document.getElementById('plotSecond').type === 'hidden', 'No wide free-text variable input');
-        check(second.length === first.length && second.every(radio => radio.value !== ''),
-              'Only actual variables belong in the second-axis radio group');
+        check(second.length === first.length + 1 && second[0].value === '',
+              'Second-axis choices include Auto and the native variables');
         for (const pair of document.querySelectorAll('.plot-bound-pair')) {
             if (!pair.getClientRects().length)
                 continue;
@@ -153,10 +196,13 @@
                   'Changing the first axis clears a duplicate second axis and disables that radio');
             const previous = labDOM.bindEvents({});
             let selected;
-            labDOM.bindEvents({...previous, takePlot: variable => selected = variable});
+            labDOM.bindEvents({...previous, schedulePlotControls: state => {
+                labDOM.services(labDOM.call('lab_plot_controls_dispatch', 2, null, state),
+                                {takePlot: variable => selected = variable});
+            }});
             try {
-                document.getElementById('plotUpdate').click();
-                check(selected === 'y', 'Update plot must use the selected first-axis radio');
+                y.dispatchEvent(new Event('change', {bubbles: true}));
+                check(selected === 'y', 'Live plotting must use the selected first-axis choice');
             } finally {
                 labDOM.bindEvents(previous);
                 x.click();
@@ -450,47 +496,195 @@
                   'Both wheel rotations must show a coarse native preview then restore the full 70-by-70 mesh');
         }
     }
-    function checkPlotWheelZoom() {
-        const card = rendered.closest('.result-card'), svg = rendered.querySelector('svg');
-        const path = svg.querySelector('[data-series] path'), saved = resultZoomIndex(card);
-        const initial = labWire.exports().lab_view_zoom_index(NaN);
-        const wheel = (target, deltaY, deltaX = 0, modifiers = {ctrlKey: true}) =>
-            target.dispatchEvent(new WheelEvent('wheel', {deltaY, deltaX, bubbles: true, cancelable: true, ...modifiers}));
-        try {
-            setResultZoom(card, initial);
-            const unhandled = [{}, {metaKey: true}];
-            if (!rendered.querySelector('[data-surface]'))
-                unhandled.push({shiftKey: true}, {altKey: true});
-            for (const modifiers of unhandled) {
-                check(wheel(path, -100, 0, modifiers) && wheel(svg, 100, 0, modifiers) &&
-                      wheel(card.querySelector('.card-title'), -100, 0, modifiers) &&
-                      resultZoomIndex(card) === initial,
-                      'Wheel events without an applicable plot modifier must remain unhandled and must not change zoom');
-            }
-            const width = svg.getBoundingClientRect().width;
-            check(!wheel(path, -100) && resultZoomIndex(card) === initial + 1 &&
-                  svg.getBoundingClientRect().width > width,
-                  'Ctrl+wheel over a plotted path must zoom in and prevent page scrolling');
-            const zoomedWidth = svg.getBoundingClientRect().width;
-            check(!wheel(svg, 100) && resultZoomIndex(card) === initial &&
-                  svg.getBoundingClientRect().width < zoomedWidth,
-                  'Ctrl+wheel over the plot background must zoom out');
-            check(wheel(svg, 0) && wheel(svg, 0, 100) && resultZoomIndex(card) === initial,
-                  'Zero or horizontal-only wheel motion must not change plot zoom');
-            check(wheel(card.querySelector('.card-title'), -100) &&
-                  wheel(document.getElementById('plotRoll'), -100) && resultZoomIndex(card) === initial,
-                  'Wheel outside the plot image must retain normal scrolling and control behaviour');
-            const maximum = labWire.exports().lab_view_zoom_count() - 1;
-            for (const [limit, delta] of [[0, 100], [maximum, -100]]) {
-                setResultZoom(card, limit);
-                check(!wheel(svg, delta) && resultZoomIndex(card) === limit,
-                      'Wheel zoom must respect the card zoom limits');
-            }
-            check(rendered.querySelector('[data-series] path') === path,
-                  'Wheel zoom must reuse the SVG without resampling or replacing its geometry');
-        } finally {
-            setResultZoom(card, saved);
+    async function checkCurvePointerView() {
+        const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await settle();
+        const card = rendered.closest('.result-card');
+        const chart = () => rendered.querySelector('[data-plot-chart][data-x-min]:not([data-surface])');
+        const before = chart(), width = rendered.querySelector('svg').getBoundingClientRect().width;
+        const matrix = before.getScreenCTM();
+        const left = matrix.e + Number(before.dataset.plotLeft) * matrix.a;
+        const top = matrix.f + Number(before.dataset.plotTop) * matrix.d;
+        const plotWidth = Number(before.dataset.plotWidth) * matrix.a;
+        const plotHeight = Number(before.dataset.plotHeight) * matrix.d;
+        const clientX = left + plotWidth * 0.25, clientY = top + plotHeight * 0.6;
+        const x0 = Number(before.dataset.xMin), x1 = Number(before.dataset.xMax);
+        const y0 = Number(before.dataset.yMin), y1 = Number(before.dataset.yMax);
+        const anchor = x0 * 0.75 + x1 * 0.25;
+        rendered.dispatchEvent(new PointerEvent('pointermove', {clientX, clientY, bubbles: true}));
+        const tip = rendered.querySelector('.plot-pointer-tip'), line = rendered.querySelector('.plot-pointer-line');
+        check(tip && line && !tip.classList.contains('hidden') &&
+              Math.abs(Number(tip.textContent.replace('x ≈ ', '')) - anchor) < 1e-8 &&
+              Math.abs(line.getBoundingClientRect().left - clientX) < 2,
+              'Hover guide follows the pointer and reads the native horizontal coordinate');
+        check(getComputedStyle(line).pointerEvents === 'none' && getComputedStyle(tip).pointerEvents === 'none',
+              'The hover guide must not intercept curve tooltips or gestures');
+        // Check actual rendered tick anchors, independently of the range-to-screen calculation above.
+        const bottom = Number(before.dataset.plotTop) + Number(before.dataset.plotHeight);
+        const ticks = [...before.querySelectorAll('text')].filter(tick =>
+            tick.getAttribute('text-anchor') === 'middle' && Number(tick.getAttribute('y')) > bottom &&
+            Number.isFinite(Number(tick.textContent)));
+        check(ticks.length > 1, 'The curve has visible numerical horizontal ticks');
+        for (const tick of ticks) {
+            const position = new DOMPoint(Number(tick.getAttribute('x')), Number(tick.getAttribute('y')))
+                .matrixTransform(tick.getScreenCTM());
+            if (position.x <= left + 1 || position.x >= left + plotWidth - 1)
+                continue;
+            rendered.dispatchEvent(new PointerEvent('pointermove',
+                {clientX: position.x, clientY, bubbles: true}));
+            check(Math.abs(Number(tip.textContent.replace('x ≈ ', '')) - Number(tick.textContent)) < 0.002 * (x1 - x0),
+                  'Hover coordinates agree with the rendered tick ' + tick.textContent + ': ' + tip.textContent);
         }
+        rendered.dispatchEvent(new PointerEvent('pointerleave'));
+        check(tip.classList.contains('hidden') && line.classList.contains('hidden'), 'Leaving hides the hover guide');
+        const waitChart = async previous => {
+            const deadline = performance.now() + 15000;
+            while ((!chart() || chart() === previous) && performance.now() < deadline)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(chart() && chart() !== previous, 'Viewport zoom requests a newly sampled plot');
+            await settle();
+        };
+        const zoomEvent = new WheelEvent('wheel',
+              {clientX, clientY, deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true});
+        const wheelFraction = (zoomEvent.clientX - left) / plotWidth;
+        const wheelAnchor = x0 * (1 - wheelFraction) + x1 * wheelFraction;
+        check(!before.dispatchEvent(zoomEvent),
+              'Ctrl+wheel viewport zoom prevents page scrolling');
+        await waitChart(before);
+        const after = chart();
+        check(document.getElementById('plotLower').value.length < 10 &&
+              document.getElementById('plotYLower').value.length < 10,
+              'Ordinary zoom bounds must use short interval-aware labels');
+        check(Math.abs(Number(after.dataset.xMin) - (wheelAnchor + (x0 - wheelAnchor) * 0.8)) < 1e-8 &&
+              Math.abs(Number(after.dataset.xMax) - Number(after.dataset.xMin) - (x1 - x0) * 0.8) < 1e-8 &&
+              Math.abs(Number(after.dataset.yMax) - Number(after.dataset.yMin) - (y1 - y0) * 0.8) < 1e-8,
+              'Wheel zoom shrinks both axis ranges around the pointer: ' +
+              JSON.stringify({x0, x1, y0, y1, wheelAnchor, bounds: {...after.dataset}}));
+        check(Math.abs(rendered.querySelector('svg').getBoundingClientRect().width - width) < 2,
+              'Viewport zoom must not enlarge the plot image: ' +
+              JSON.stringify({before: width, after: rendered.querySelector('svg').getBoundingClientRect().width,
+                              card: card.getBoundingClientRect().width, rendered: rendered.clientWidth}));
+        card.querySelector('[data-zoom-step="1"]').click();
+        await waitChart(after);
+        const centred = chart();
+        check(Math.abs(Number(centred.dataset.xMax) - Number(centred.dataset.xMin) - (x1 - x0) * 0.64) < 1e-8,
+              'The plus button zooms the viewport rather than the result card');
+        card.querySelector('[data-zoom-reset]').click();
+        await waitChart(centred);
+        check(Math.abs(Number(chart().dataset.xMin) - x0) < 1e-8 &&
+              Math.abs(Number(chart().dataset.xMax) - x1) < 1e-8,
+              'Reset restores the original pre-zoom view');
+        for (const pointerType of ['mouse', 'touch']) {
+            const initial = chart(), transform = initial.getScreenCTM();
+            const pw = Number(initial.dataset.plotWidth) * transform.a;
+            const ph = Number(initial.dataset.plotHeight) * transform.d;
+            const cx = Math.round(transform.e + Number(initial.dataset.plotLeft) * transform.a + pw / 2);
+            const cy = Math.round(transform.f + Number(initial.dataset.plotTop) * transform.d + ph / 2);
+            const event = (target, type, x, y, id = 41) => target.dispatchEvent(new PointerEvent(type,
+                {clientX: x, clientY: y, pointerId: id, pointerType, isPrimary: id === 41,
+                 button: 0, buttons: type === 'pointerup' ? 0 : 1, bubbles: true, cancelable: true}));
+            check(!event(initial, 'pointerdown', cx, cy), 'A primary pointer starts curve panning');
+            event(window, 'pointermove', cx + 40, cy + 25, 42);
+            check(!rendered.marsPlotDrag.changed, 'A second pointer cannot move the curve');
+            event(window, 'pointermove', cx + 40, cy + 25);
+            check(initial.querySelector('[data-series]').getAttribute('transform')?.startsWith('translate(') &&
+                  initial.querySelector('[data-series]').closest('[data-plot-window]'),
+                  'Curves follow the pointer immediately inside a clipped viewport, before any server reply');
+            event(window, 'pointerup', cx + 40, cy + 25);
+            const deadline = performance.now() + 20000;
+            while ((rendered.marsPlotDrag.busy || chart() === initial) && performance.now() < deadline)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(!rendered.marsPlotDrag.busy && !rendered.marsPlotDrag.active &&
+                  Math.abs(Number(chart().dataset.xMin) - (x0 - 40 * (x1 - x0) / pw)) < 1e-8 &&
+                  Math.abs(Number(chart().dataset.yMin) - (y0 + 25 * (y1 - y0) / ph)) < 1e-8 &&
+                  Math.abs(Number(chart().dataset.xMax) - Number(chart().dataset.xMin) - (x1 - x0)) < 1e-8,
+                  'Dragging pans both ranges without changing scale for ' + pointerType);
+            const panned = chart();
+            card.querySelector('[data-zoom-reset]').click();
+            await waitChart(panned);
+            check(Math.abs(Number(chart().dataset.xMin) - x0) < 1e-8 &&
+                  Math.abs(Number(chart().dataset.yMin) - y0) < 1e-8, 'Reset restores the pre-pan view');
+        }
+        const cancelled = chart();
+        const cancelMatrix = cancelled.getScreenCTM();
+        const cx = Math.round(cancelMatrix.e + (Number(cancelled.dataset.plotLeft) +
+                              Number(cancelled.dataset.plotWidth) / 2) * cancelMatrix.a);
+        const cy = Math.round(cancelMatrix.f + (Number(cancelled.dataset.plotTop) +
+                              Number(cancelled.dataset.plotHeight) / 2) * cancelMatrix.d);
+        const pointer = {pointerId: 51, pointerType: 'mouse', isPrimary: true, button: 0, buttons: 1,
+                         bubbles: true, cancelable: true};
+        cancelled.dispatchEvent(new PointerEvent('pointerdown', {...pointer, clientX: cx, clientY: cy}));
+        window.dispatchEvent(new PointerEvent('pointermove', {...pointer, clientX: cx - 30, clientY: cy - 20}));
+        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
+        const cancelDeadline = performance.now() + 20000;
+        while (rendered.marsPlotDrag.busy && performance.now() < cancelDeadline)
+            await new Promise(resolve => setTimeout(resolve, 25));
+        check(!rendered.marsPlotDrag.busy && !rendered.marsPlotDrag.active &&
+              Math.abs(Number(chart().dataset.xMin) - x0) < 1e-8 &&
+              Math.abs(Number(chart().dataset.yMin) - y0) < 1e-8,
+              'Escape restores both original ranges even with a pan redraw in flight');
+    }
+    async function checkPlotWheelZoom() {
+        // Expansion and native markup insertion fit the fixed viewport on the next frame.
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        if (rendered.querySelector('[data-plot-chart][data-x-min]:not([data-surface])')) {
+            await checkCurvePointerView();
+            return;
+        }
+        const card = rendered.closest('.result-card');
+        const surface = () => rendered.querySelector('[data-surface]');
+        const before = surface(), width = before.getBoundingClientRect().width;
+        const path = before.querySelector('[data-uv]'), rectangle = path.getBoundingClientRect();
+        const event = new WheelEvent('wheel', {clientX: rectangle.left + rectangle.width / 2,
+            clientY: rectangle.top + rectangle.height / 2, deltaY: -100, ctrlKey: true,
+            bubbles: true, cancelable: true});
+        const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(before.getScreenCTM().inverse());
+        const px = point.x, py = point.y;
+        const map = path.dataset.uv.split(' ').map(Number);
+        const clamp = value => Math.max(0, Math.min(1, value));
+        const fractions = [clamp(map[0] * px + map[1] * py + map[2]),
+                           clamp(map[3] * px + map[4] * py + map[5])];
+        const original = [before.dataset.xMin, before.dataset.xMax, before.dataset.yMin, before.dataset.yMax].map(Number);
+        const heightPolicy = document.getElementById('plotScale').value;
+        const waitSurface = async previous => {
+            const deadline = performance.now() + 20000;
+            while ((!surface() || surface() === previous) && performance.now() < deadline)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(surface() && surface() !== previous, 'Surface zoom must resample the mathematical domain');
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        };
+        check(path.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, bubbles: true, cancelable: true})),
+              'Unmodified wheel retains normal scrolling');
+        check(!path.dispatchEvent(event), 'Surface Ctrl+wheel prevents page scrolling');
+        await waitSurface(before);
+        const after = surface();
+        check(document.getElementById('plotLower').value.length < 10 &&
+              document.getElementById('plotSecondLower').value.length < 10,
+              'Both surface axes must use short interval-aware zoom labels');
+        check(['azimuth', 'elevation', 'roll'].every(key => after.dataset[key] === before.dataset[key]) &&
+              document.getElementById('plotScale').value === heightPolicy,
+              'Surface domain zoom preserves the camera and height-scaling policy');
+        for (let axis = 0; axis < 2; axis++) {
+            const keys = axis ? ['yMin', 'yMax'] : ['xMin', 'xMax'];
+            const lo = original[axis * 2], hi = original[axis * 2 + 1];
+            const anchor = lo * (1 - fractions[axis]) + hi * fractions[axis];
+            check(Math.abs(Number(after.dataset[keys[0]]) - (anchor + (lo - anchor) * 0.8)) < 1e-6 * (hi - lo) &&
+                  Math.abs(Number(after.dataset[keys[1]]) - Number(after.dataset[keys[0]]) - (hi - lo) * 0.8) < 1e-7,
+                  'Surface zoom is anchored at the hit facet and narrows both independent ranges: ' +
+                  JSON.stringify({axis, lo, hi, anchor, fractions, px, py, bounds: {...after.dataset}}));
+        }
+        check(Math.abs(after.getBoundingClientRect().width - width) < 2,
+              `Surface zoom must not enlarge the SVG: ${width} -> ${after.getBoundingClientRect().width}; ${after.getAttribute('style')}`);
+        card.querySelector('[data-zoom-step="1"]').click();
+        await waitSurface(after);
+        const centred = surface();
+        check(Math.abs(Number(centred.dataset.xMax) - Number(centred.dataset.xMin) -
+              (original[1] - original[0]) * 0.64) < 1e-7, 'Surface toolbar zoom narrows the domain');
+        card.querySelector('[data-zoom-reset]').click();
+        await waitSurface(centred);
+        check(Math.abs(Number(surface().dataset.xMin) - original[0]) < 1e-7 &&
+              Math.abs(Number(surface().dataset.yMax) - original[3]) < 1e-7,
+              'Surface Reset restores the original domain');
     }
     async function checkFunctionRun() {
         await runFunctionCard();
@@ -666,10 +860,10 @@
         check(labWire.encode({}).length === empty.length, 'Codec did not recover after rejected recursion');
         const numbers = labWire.decode(labWire.encode({zero: -0, tiny: Number.MIN_VALUE}));
         check(Object.is(numbers.zero, -0) && numbers.tiny === Number.MIN_VALUE, 'Binary64 edge values changed');
-        const maximum = labWire.encode({x: 'a'.repeat(4194275)});
-        check(maximum.length === 4194304, 'Exact wire limit was rejected');
-        check(labWire.decode(maximum).x.length === 4194275, 'Maximum message did not round trip');
-        check(rejects(() => labWire.encode({x: 'a'.repeat(4194276)})), 'Wire limit plus one accepted');
+        const maximum = labWire.encode({x: 'a'.repeat(8388579)});
+        check(maximum.length === 8388608, 'Exact wire limit was rejected');
+        check(labWire.decode(maximum).x.length === 8388579, 'Maximum message did not round trip');
+        check(rejects(() => labWire.encode({x: 'a'.repeat(8388580)})), 'Wire limit plus one accepted');
         for (let i = 0; i < empty.length; ++i)
             check(rejects(() => labWire.decode(empty.slice(0, i).buffer)), 'Truncated envelope accepted');
         check(rejects(() => labWire.decode(new Uint8Array([8, 2, 18, 2, 8, 5]).buffer)), 'Unknown version accepted');
@@ -697,7 +891,7 @@
         }
         check(labWire.decode(labWire.encode({valid: true})).valid, 'codec recovers after member rejection');
         check(rejects(() => labWire.encode({text: '\ud800'})), 'Invalid surrogate accepted');
-        check(rejects(() => labWire.encode({text: 'x'.repeat(4194304)})), 'Oversized message accepted');
+        check(rejects(() => labWire.encode({text: 'x'.repeat(8388608)})), 'Oversized message accepted');
         let deep = {};
         for (let i = 0; i < 34; ++i) deep = {deep};
         check(rejects(() => labWire.encode(deep)), 'Excessive nesting accepted');
@@ -722,13 +916,13 @@
         const originalFetch = window.fetch;
         try {
             for (const type of ['application/json', 'application/x-protobuf']) {
-                window.fetch = async () => new Response(new Uint8Array(4194305), {headers: {'Content-Type': type}});
+                window.fetch = async () => new Response(new Uint8Array(8388609), {headers: {'Content-Type': type}});
                 const oversized = await labFetch('/fixture');
                 let rejected = false;
                 try {
                     await oversized.labData();
                 } catch (error) {
-                    rejected = error.message.includes(type === 'application/json' ? 'Expected a Protobuf' : '4 MiB');
+                    rejected = error.message.includes(type === 'application/json' ? 'Expected a Protobuf' : '8 MiB');
                 }
                 check(rejected, `Oversized ${type} response was not bounded`);
             }
@@ -747,7 +941,7 @@
             try {
                 await (await labFetch('/fixture')).labData();
             } catch (error) {
-                rejected = error.message.includes('4 MiB');
+                rejected = error.message.includes('8 MiB');
             }
             check(rejected && cancelled, 'stream crossing the native bound is rejected and cancelled');
         } finally {
@@ -1212,17 +1406,20 @@
             const nextLayout = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             setResultZoom(plotCard, 3);
             await nextLayout();
-            checkPlotWheelZoom();
+            await checkPlotWheelZoom();
             await checkPlotChoices();
             checkPlotControls(false);
+            check(document.getElementById('plotKindGroup').classList.contains('plot-options-card'),
+                  'Expression plot type uses the compact settings card');
+            await checkLivePlotControls();
             await window.checkLabMobileLayout('curve plot');
             const curveDragTarget = rendered.querySelector('[data-series] path');
             check(curveDragTarget.dispatchEvent(new PointerEvent('pointerdown',
                   {button: 0, buttons: 1, pointerId: 11, pointerType: 'touch', isPrimary: true,
                    bubbles: true, cancelable: true})) &&
                   !rendered.classList.contains('plot-dragging'), 'Curve plots must not enable surface rotation');
-            check(getComputedStyle(rendered.querySelector('svg')).touchAction !== 'none',
-                  'Curve plots must retain normal touch scrolling');
+            check(getComputedStyle(rendered.querySelector('svg')).touchAction === 'none',
+                  'Curve plots reserve finger movement for panning');
             const formulaBox = rendered.querySelector('[data-plot-title]').getBoundingClientRect();
             const axesBox = rendered.querySelector('[data-plot-chart] [data-plot-axes]').getBoundingClientRect();
             check(formulaBox.width > 0 && formulaBox.height > 0 && formulaBox.bottom < axesBox.top,
@@ -1357,6 +1554,21 @@
             await takePlot('x');
             check(!rendered.classList.contains('error') && !!rendered.querySelector('[data-surface]'),
                   'Automatic two-variable plot must display a surface');
+            const curveOption = document.querySelector('#plotKindChoices input[value="curve"]');
+            check(!curveOption.closest('label').getClientRects().length,
+                  'A curve is not offered while the second variable is unset');
+            const fixedY = variableValues.querySelector('[data-binding-name="y"]');
+            const originalY = fixedY.value;
+            fixedY.value = '0';
+            labDOM.call('lab_plot_controls_sync');
+            check(curveOption.closest('label').getClientRects().length > 0,
+                  'Fixing the other variable at zero permits a curve');
+            document.getElementById('plotKind').value = 'curve';
+            fixedY.value = originalY;
+            labDOM.call('lab_plot_controls_sync');
+            check(!curveOption.closest('label').getClientRects().length &&
+                  document.getElementById('plotKind').value === 'auto',
+                  'Clearing the fixed value hides the curve option and removes its stale selection');
             check(document.getElementById('plotAzimuth').value === '315' &&
                   document.getElementById('plotAzimuthValue').textContent === '315°' &&
                   !!rendered.querySelector('[data-surface][data-azimuth="315.000"]'),
@@ -1385,27 +1597,39 @@
             check(heightLabels.length > 1 && Math.max(...heightLabels) === 0.5 && Math.min(...heightLabels) >= 0 &&
                   !!rendered.querySelector('[data-series] path'),
                   'Manual height bounds must crop the rendered surface without losing its axes');
-            document.querySelector('[data-plot-reset="plotScale"]').click();
+            document.querySelector('#plotScaleChoices input[value="auto"]').click();
             await takePlot('x');
             check(document.getElementById('plotScale').value === 'auto' &&
+                  document.querySelector('#plotScaleChoices input[value="auto"]').checked &&
                   document.getElementById('plotManual').getClientRects().length === 0,
                   'Reset must restore automatic surface scaling');
             check(plotControls.closest('.result-card') === rendered.closest('.result-card') &&
                   !document.getElementById('workspacePanel').contains(plotControls) &&
                   getComputedStyle(plotControls).display !== 'none',
                   'Plot controls must live inside the visible plot card');
-            for (const id of ['plotAzimuth', 'plotElevation', 'plotRoll'])
+            for (const id of ['plotAzimuth', 'plotElevation', 'plotRoll']) {
                 check(document.getElementById(id).type === 'range', '3-D camera controls must be sliders');
+                const slider = document.getElementById(id);
+                const field = slider.closest('.plot-field');
+                check(slider.getBoundingClientRect().width >= field.getBoundingClientRect().width * 0.7 &&
+                      field.querySelector('label').getBoundingClientRect().bottom <=
+                          slider.getBoundingClientRect().top,
+                      'Camera labels sit above sliders that fill their available column width');
+            }
             const savedCardWidth = plotCard.style.width;
             plotCard.style.width = '360px';
             check(getComputedStyle(plotControls).gridTemplateColumns.split(' ').length === 1 &&
                   plotControls.scrollWidth <= plotControls.clientWidth + 1 &&
-                  document.getElementById('plotAzimuth').getBoundingClientRect().width > 60,
+                  document.getElementById('plotAzimuth').getBoundingClientRect().width > 180,
                   'Narrow plot cards must stack controls and retain a usable slider without overflow');
             checkPlotRangeAlignment();
             await checkPlotChoices();
             plotCard.style.width = savedCardWidth;
             checkPlotControls(true);
+            check(document.getElementById('plotCamera').classList.contains('plot-options-card') &&
+                  document.getElementById('plotCamera').getBoundingClientRect().top >=
+                      document.getElementById('plotVertical').getBoundingClientRect().bottom,
+                  'Expression camera settings use a compact card below the ranges');
             await window.checkLabMobileLayout('surface plot and height controls');
             const facets = [...rendered.querySelectorAll('[data-surface] [data-series] path')];
             check(facets.length === 2 * 69 * 69 && new Set(facets.map(path => path.getAttribute('fill'))).size > 4,
@@ -1468,25 +1692,17 @@
                   rendered.closest('.expanded-card').contains(plotControls),
                   'Expanded plot must retain its controls');
             checkPlotRangeAlignment();
-            const secondHint = document.querySelector('#plotSecondGroup .plot-hint');
-            const savedHintWidth = secondHint.style.maxWidth;
-            try {
-                secondHint.style.maxWidth = '12ch';
-                checkPlotRangeAlignment();
-            } finally {
-                secondHint.style.maxWidth = savedHintWidth;
-            }
-            checkPlotWheelZoom();
+            await checkPlotWheelZoom();
             await checkPlotDrag();
             document.getElementById('plotAzimuth').value = '75';
             document.getElementById('plotAzimuth').dispatchEvent(new Event('input', {bubbles: true}));
-            document.getElementById('plotUpdate').click();
+            document.getElementById('plotAzimuth').dispatchEvent(new Event('change', {bubbles: true}));
             const updateDeadline = performance.now() + 15000;
             while (!rendered.querySelector('[data-surface][data-azimuth="75.000"]') && performance.now() < updateDeadline)
                 await new Promise(resolve => setTimeout(resolve, 25));
             check(!!rendered.querySelector('[data-surface][data-azimuth="75.000"]') &&
                   labWorkspace.classList.contains('result-card-expanded'),
-                  'Update plot must work without leaving the expanded card');
+                  'Live plotting must work without leaving the expanded card');
             surfaceExpand.click();
             document.getElementById('plotLower').value = '-10';
             document.getElementById('plotAzimuth').value = '45';
@@ -1499,7 +1715,13 @@
             await evaluateExpression();
             check(getComputedStyle(plotControls).display === 'none', 'Ordinary results must hide plot controls');
             for (const [mode, source, series, surface] of [
-                ['equation', 'x^2=1', 2, false], ['diffequation', 'Dx(y)=x*y; y(0)=1', 1, false],
+                ['equation', 'x^2=1', 2, false],
+                ['equation', 'x^4-x^3-26x^2+4x+8=0', 2, false],
+                ['diffequation', 'Dx(y)=x*y; y(0)=1', 1, false],
+                ['diffequation', "y''+6y*y'+4y^3=0; y(0)=1; y'(0)=0", 1, false],
+                ['diffequation', "y''+6y*y'+4y^3=0; y(0)=0; y'(0)=1", 1, false],
+                ['diffequation', "y''+6y*y'+4y^3=0", 9, false],
+                ['diffequation', 'Dx(y)=y', 5, false],
                 ['diffequation', '{2*Dx(u)+Dy(u)=0 | x=?, y=?; ; u(x,0)=x^2}', 1, true]
             ]) {
                 setMode(mode);
@@ -1512,20 +1734,132 @@
                 check(button && button.getClientRects().length > 0, mode + ' exposes Plot after evaluation: ' +
                       JSON.stringify({variables: currentVariables, buttons: derivativeButtons.outerHTML,
                                       status: statusEl.textContent, error: rendered.textContent.slice(0, 200)}));
-                document.getElementById('plotLower').value = '-2';
-                document.getElementById('plotUpper').value = '2';
+                document.getElementById('plotLower').value = mode === 'equation' ? '' : '-2';
+                document.getElementById('plotUpper').value = mode === 'equation' ? '' : '2';
                 await takePlot(button.dataset.variable);
                 check(rendered.querySelectorAll('[data-series]').length === series, mode + ' plots all native curves: ' +
                       JSON.stringify({source, variables: currentVariables, status: statusEl.textContent,
                                       error: rendered.textContent.slice(0, 400)}));
                 check(!!rendered.querySelector('[data-surface]') === surface, mode + ' selects native dimensionality');
+                if (document.getElementById('plotScale').value === 'auto')
+                    check([...document.querySelectorAll('#plotRange .plot-bound-pair')]
+                              .every(pair => pair.getClientRects().length === 0),
+                          mode + ' hides all bound-entry fields in Auto');
+                if (!surface) {
+                    const axisLabel = document.querySelector('#plotFirstChoices label:only-child');
+                    if (axisLabel) {
+                        const style = getComputedStyle(axisLabel);
+                        check(style.backgroundColor === 'rgba(0, 0, 0, 0)' &&
+                              style.borderTopColor === 'rgba(0, 0, 0, 0)' && axisLabel.textContent.endsWith(' range'),
+                              'Single-axis range has a plain readable heading, not a cramped selection chip');
+                    }
+                }
+                check((getComputedStyle(document.getElementById('plotSecondGroup')).display !== 'none') === surface,
+                      mode + ' shows second-variable controls only for a surface');
+                check((getComputedStyle(document.getElementById('plotCamera')).display !== 'none') === surface,
+                      mode + ' shows camera controls only for a surface');
+                if (mode === 'equation') {
+                    const solutionCard = document.getElementById('valueCard');
+                    check(solutionCard.getClientRects().length > 0 &&
+                          document.getElementById('valueTitle').textContent === 'Solutions' && value.textContent.trim(),
+                          'Equation plots retain their Solutions card');
+                    if (source.includes('x^4'))
+                        for (const root of ['-4.671042', '-0.489034', '0.633721', '5.526355'])
+                            check(value.textContent.includes(root), 'Equation plot includes numerical root ' + root);
+                    check(!rendered.textContent.includes('Left side') && !rendered.textContent.includes('Right side'),
+                          'Equation plots omit generic side labels');
+                    if (source.includes('x^4')) {
+                        const ticks = [...rendered.querySelectorAll('[data-plot-label="1"]')].map(t => Number(t.textContent));
+                        check(ticks.includes(-200) && ticks.includes(200) && ticks.every(t => Math.abs(t) < 300),
+                              'Automatic equation frame shows the quartic turning points without distant tails');
+                        await checkCurvePointerView();
+                        await checkLivePlotControls();
+                    }
+                }
+                if (mode === 'diffequation' && !surface && series === 1)
+                    check(!rendered.textContent.includes('Solution 1'), 'A single solution does not need a legend');
+                if (mode === 'diffequation' && !surface && series > 1) {
+                    const titles = [...rendered.querySelectorAll('[data-series] > title')];
+                    check(titles.length === series && titles.every(title => title.marsPlotLabel.includes(' = ')),
+                          'Every family curve has a native hover tooltip identifying its constants');
+                    check([...rendered.querySelectorAll('svg title')].every(title => !title.textContent) &&
+                          rendered.dataset.displaySvg.includes(titles[0].marsPlotLabel),
+                          'Only the custom tooltip is active; copied native SVG retains its labels');
+                    check(![...rendered.querySelectorAll('text')].some(text => text.textContent.includes(' = ')),
+                          'Family constants must not clutter the plot with a visible legend');
+                    const curves = [...rendered.querySelectorAll('[data-series]')];
+                    const chart = rendered.querySelector('[data-x-min]');
+                    const transform = chart.getScreenCTM();
+                    const point = {
+                        clientX: transform.e + (Number(chart.dataset.plotLeft) + Number(chart.dataset.plotWidth) / 2) * transform.a,
+                        clientY: transform.f + (Number(chart.dataset.plotTop) + Number(chart.dataset.plotHeight) / 2) * transform.d,
+                        bubbles: true, pointerType: 'mouse'
+                    };
+                    for (const active of curves.slice(0, 2)) {
+                        active.querySelector('path').dispatchEvent(new PointerEvent('pointermove', point));
+                        check(curves.every(curve => Number(getComputedStyle(curve).opacity) === (curve === active ? 1 : 0.18)),
+                              'Hovering a family curve dims only the other solutions');
+                        check(active.getAttribute('aria-label') === active.querySelector('title').marsPlotLabel,
+                              'Focused family curve retains its constant tooltip');
+                        const tooltip = rendered.querySelector('.plot-pointer-tip');
+                        check(!tooltip.classList.contains('hidden') && tooltip.textContent.includes('x ≈ ') &&
+                              tooltip.textContent.includes(active.querySelector('title').marsPlotLabel),
+                              'The visible hover tooltip combines x with the selected curve constants');
+                    }
+                    chart.dispatchEvent(new PointerEvent('pointermove', point));
+                    check(curves.every(curve => Number(getComputedStyle(curve).opacity) === 1),
+                          'Moving between curves restores the whole solution family');
+                    check(!rendered.querySelector('.plot-pointer-tip').textContent.includes(' · '),
+                          'Moving off a curve removes stale constants from the coordinate tooltip');
+                    curves[0].querySelector('path').dispatchEvent(new PointerEvent('pointermove', point));
+                    rendered.dispatchEvent(new PointerEvent('pointerleave'));
+                    check(curves.every(curve => Number(getComputedStyle(curve).opacity) === 1),
+                          'Leaving a family plot clears curve focus');
+                }
+                if (!surface) {
+                    document.querySelector('#plotScaleChoices input[value="manual"]').click();
+                    document.getElementById('plotYLower').value = '-2';
+                    document.getElementById('plotYUpper').value = '2';
+                    const beforeUpdate = rendered.querySelector('[data-series]');
+                    document.getElementById('plotYUpper').dispatchEvent(new Event('input', {bubbles: true}));
+                    const deadline = performance.now() + 15000;
+                    const updated = () => rendered.querySelector('[data-series]') &&
+                        rendered.querySelector('[data-series]') !== beforeUpdate &&
+                        rendered.querySelector('[data-plot-label="1"]');
+                    while (!updated() && performance.now() < deadline)
+                        await new Promise(resolve => setTimeout(resolve, 25));
+                    const ticks = [...rendered.querySelectorAll('[data-plot-label="1"]')].map(t => Number(t.textContent));
+                    check(rendered.querySelector('[data-series]') !== beforeUpdate && ticks.includes(-1) &&
+                          ticks.includes(1) && ticks.every(t => t >= -2 && t <= 2),
+                          mode + ' Update plot applies manual vertical bounds');
+                    if (mode === 'equation')
+                        check(document.getElementById('valueCard').getClientRects().length > 0 && value.textContent.trim(),
+                              'Live equation range updates retain the solutions');
+                    document.querySelector('#plotScaleChoices input[value="auto"]').click();
+                }
                 check((document.getElementById('plotCamera').getClientRects().length > 0) === surface,
                       mode + ' shows camera controls only for PDE surfaces');
                 check(currentMode() === mode && currentExpressionText() === authored, mode + ' retains the authored problem: ' +
                       JSON.stringify({mode: currentMode(), before: authored, after: currentExpressionText()}));
                 check(!currentDifferentiable, mode + ' does not expose expression derivative buttons');
                 await window.checkLabMobileLayout(mode + ' plot');
+                await evaluateCurrentMode();
+                const solutionCard = document.getElementById('valueCard');
+                check(solutionCard.getClientRects().length > 0 && !solutionCard.classList.contains('hidden') &&
+                      document.getElementById('valueTitle').textContent === 'Solutions',
+                      mode + ' restores its solution card after plotting in the same mode');
+                check(document.getElementById('renderedTitle').textContent ===
+                      (mode === 'equation' ? 'Rendered TeX' : 'Equation and solutions'),
+                      mode + ' restores its mathematical heading instead of retaining Plot');
+                if (mode === 'equation' && source.includes('x^4')) {
+                    for (const root of ['-4.671042', '-0.489034', '0.633721', '5.526355'])
+                        check(value.textContent.includes(root), 'Re-evaluated quartic retains numerical root ' + root);
+                }
+                await window.checkLabMobileLayout(mode + ' restored solutions');
             }
+            setExpressionEditor("y''+3y*y'+y^4=0; y(0)=1; y'(0)=0");
+            await evaluateCurrentMode();
+            check(!document.getElementById('expressionPlot'), 'Local Taylor series must not advertise unsupported plotting');
             setMode('expression');
             syncModeUI();
             setExpressionEditor('3+4');

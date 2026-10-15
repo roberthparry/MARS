@@ -60,7 +60,7 @@ static http_response_t *route_request(webmethod_t method, const char *path, cons
     json_t *object = body && type && !strcmp(type, "application/x-protobuf") ? test_lab_json(body) : NULL;
     array_t *encoded = object ? lab_wire_encode(object) : NULL;
     json_free(object);
-    http_limits_t limits = {.connect_timeout_ms = 5000, .total_timeout_ms = 75000, .max_body_bytes = 4194304};
+    http_limits_t limits = {.connect_timeout_ms = 5000, .total_timeout_ms = 75000, .max_body_bytes = 8388608};
     bool ready =
         client && request && http_client_set_limits(client, &limits) &&
         (!host || request_header(request, "Host", host)) && (!origin || request_header(request, "Origin", origin)) &&
@@ -344,6 +344,17 @@ static bool route_contracts(const char *directory)
                      test_lab_ok(result, true) && value && string_view_equals_literal(string_view_all(value), "5"),
                      "POST /eval value=5") &&
          ok;
+    json_free(result);
+    http_response_free(response);
+    response = route_request(HTTP_POST, "/eval",
+        "{\"expression\":\"acos(sin(pi-x*y))\",\"action\":\"plot\",\"precision\":116,"
+        "\"plot_lower\":\"-20\",\"plot_upper\":\"20\",\"plot_second_lower\":\"-20\","
+        "\"plot_second_upper\":\"20\",\"plot_scale\":\"all\"}", "application/x-protobuf", NULL, NULL);
+    result = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    const json_t *plot = test_lab_member(test_lab_member(test_lab_member(result, "presentation"), "calculus"), "plot");
+    ok = route_check(response, 200, test_lab_ok(result, true) && strlen(test_lab_text(plot, "svg")) > 3000000 &&
+                     !test_lab_member(result, "plot_svg") && !test_lab_member(result, "raw"),
+                     "POST /eval refined mesh fits the complete Protobuf HTTP response") && ok;
     json_free(result);
     http_response_free(response);
     return ok;

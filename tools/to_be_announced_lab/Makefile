@@ -45,14 +45,15 @@ TBA_WASM := $(TBA_BUILD_DIR)/wasm/tba_browser.wasm
 TBA_WASM_SRCS := $(sort $(wildcard tools/to_be_announced_lab/wasm/src/*.c))
 TBA_WASM_POLICY_SRCS := $(addprefix tools/to_be_announced_lab/wasm/src/,tba_chart.c tba_model.c tba_period.c)
 TBA_WASM_OBJS := $(patsubst tools/to_be_announced_lab/wasm/src/%.c,$(TBA_BUILD_DIR)/wasm/%.o,$(TBA_WASM_SRCS))
-TBA_WASM_SHARED := $(LAB_BUILD_DIR)/wasm/src/lab_browser.o $(LAB_BUILD_DIR)/wasm/src/lab_memory.o $(LAB_BUILD_DIR)/wasm/src/lab_jobs.o
+TBA_WASM_SHARED := $(LAB_BUILD_DIR)/wasm/src/lab_browser.o $(LAB_BUILD_DIR)/wasm/src/lab_memory.o \
+                   $(LAB_BUILD_DIR)/wasm/src/lab_jobs.o $(LAB_BUILD_DIR)/wasm/src/lab_job_worker.o
 $(TBA_BUILD_DIR)/wasm/%.o: tools/to_be_announced_lab/wasm/src/%.c tools/to_be_announced_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin \
 	    -nostdlib -Wmissing-prototypes -MMD -MP -MF $(@:.o=.d) -Itools/to_be_announced_lab/wasm/include -c $< -o $@
 $(TBA_WASM): $(TBA_WASM_OBJS) $(TBA_WASM_SHARED) tools/to_be_announced_lab/wasm/tba_browser.imports tools/to_be_announced_lab/Makefile
 	"$(LAB_WASM_LD)" --no-entry --export-all --allow-undefined-file=tools/to_be_announced_lab/wasm/tba_browser.imports \
-	    --initial-memory=16777216 --max-memory=16777216 $(TBA_WASM_OBJS) $(TBA_WASM_SHARED) -o $@
+	    --initial-memory=33554432 --max-memory=33554432 $(TBA_WASM_OBJS) $(TBA_WASM_SHARED) -o $@
 $(TBA_BUILD_DIR)/server/tba_server.o: CFLAGS += -DTBA_WASM_PATH='"$(abspath $(TBA_WASM))"'
 $(TBA_BUILD_DIR)/server/tba_server.o: CFLAGS += -DMARS_LAB_CODEC_PATH='"$(abspath $(LAB_CODEC_WASM))"'
 $(TBA_BUILD_DIR)/%.o: tools/to_be_announced_lab/src/%.c tools/to_be_announced_lab/Makefile Makefile | check-deps

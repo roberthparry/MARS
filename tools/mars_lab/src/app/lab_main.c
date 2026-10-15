@@ -182,6 +182,7 @@ int main(int argc, char **argv)
         perror("MARS Lab listener");
         return 1;
     }
+    lab_proc_plot_cache_init();
     pid_t children[8] = {0};
     bool failed = false;
     for (unsigned i = 0; i < workers; ++i) {

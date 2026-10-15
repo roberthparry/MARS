@@ -300,6 +300,26 @@ cleanup:
 
 /* Spectral signal functions. */
 
+static void number_round(void *out, const void *in)
+{
+    number_t value = num_round(*(const number_t *)in);
+    num_destroy((number_t *)out);
+    *(number_t *)out = value;
+}
+
+static void expression_round(void *out, const void *in)
+{
+    expr_t *value = expr_round(*(expr_t *const *)in);
+    expr_free(*(expr_t **)out);
+    *(expr_t **)out = value;
+}
+
+/* Apply nearest-integer rounding through the supported spectral engine. */
+matrix_t *mat_round(const matrix_t *a)
+{
+    return mat_apply_scalar_callbacks(a, number_round, expression_round);
+}
+
 static void number_sgn(void *out, const void *in)
 {
     number_t value = num_sgn(*(const number_t *)in);

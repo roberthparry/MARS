@@ -20,6 +20,35 @@ void run_number_public_api_tests(void)
     printf(C_CYAN "Testing number_t as a standalone public API...\n" C_RESET);
 
     {
+        const char *inputs[] = {"2.49", "2.5", "-2.5", "-2.49", "1/2", "-1/2",
+                                "9007199254740993", "18014398509481987/2", "2.5 - 1.5i"};
+        const char *expected[] = {"2", "3", "-3", "-2", "1", "-1", "9007199254740993",
+                                  "9007199254740994", "3 - 2i"};
+        for (size_t i = 0u; i < sizeof(inputs) / sizeof(*inputs); ++i) {
+            number_t input = num_create_from_string(inputs[i]);
+            number_t result = num_round(input);
+            assert_number_string("nearest integer", result, expected[i]);
+            num_destroy(&result);
+            num_destroy(&input);
+        }
+        number_t fixed[] = {num_create_from_double(-2.5), num_create_from_qfloat((qfloat_t){0.5, -0x1p-100}),
+                             num_create_from_qcomplex(qc_make(qf_from_double(2.5), qf_from_double(-1.5)))};
+        const char *fixed_expected[] = {"-3", "0", "3 - 2i"};
+        for (size_t i = 0u; i < sizeof(fixed) / sizeof(*fixed); ++i) {
+            number_t result = num_round(fixed[i]);
+            assert_number_string("fixed precision rounding", result, fixed_expected[i]);
+            num_destroy(&result);
+            num_destroy(&fixed[i]);
+        }
+        number_t precise = num_new_with_prec_bits(256u);
+        num_set_from_string(&precise, "2.4999999999999999999999999999999999999999");
+        number_t result = num_round(precise);
+        assert_number_string("multiprecision below half", result, "2");
+        num_destroy(&result);
+        num_destroy(&precise);
+    }
+
+    {
         number_t a = num_create_from_string("2");
         number_t b = num_create_from_string("3");
         number_t frac = num_create_from_string("5/6");

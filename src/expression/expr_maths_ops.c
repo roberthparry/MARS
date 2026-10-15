@@ -29,6 +29,19 @@ static expr_t *expr_math_wrap_unary(const expr_ops_t *ops, const expr_t *a)
     return expr_new_unary_internal(ops, a);
 }
 
+static number_t eval_round(expr_t *expr)
+{
+    return num_round(expr_eval_num_internal(expr->a));
+}
+
+static int fold_round_const(const number_t *in, number_t *out)
+{
+    if (!in || !out)
+        return 0;
+    *out = num_round(*in);
+    return 1;
+}
+
 static expr_t *expr_math_wrap_binary(const expr_ops_t *ops, const expr_t *a, const expr_t *b)
 {
     if (!a || !b)
@@ -639,7 +652,8 @@ bool expr_finite_progression_requires_bound_step(const expr_t *expr)
     bool required = false;
 
     if (expr_finite_progression_parts(expr, &upper, &step, &function_ops))
-        required = function_ops == &ops_floor || function_ops == &ops_ceil || function_ops == &ops_bit_not;
+        required = function_ops == &ops_floor || function_ops == &ops_ceil || function_ops == &ops_round ||
+                   function_ops == &ops_bit_not;
     expr_free(step);
     return required;
 }
@@ -3086,9 +3100,17 @@ cleanup:
     return matched;
 }
 
+typedef enum {
+    EXPR_ROUND_DOWN,
+    EXPR_ROUND_UP,
+    EXPR_ROUND_NEAREST
+} expr_rounding_t;
+
 static expr_t *expr_finite_rational_rounding_progression_closed_form(const expr_t *upper, const expr_t *step,
-                                                                     bool ceiling)
+                                                                  expr_rounding_t rounding)
 {
+    const bool ceiling = rounding == EXPR_ROUND_UP;
+    const bool nearest = rounding == EXPR_ROUND_NEAREST;
     long numerator;
     long denominator;
     bool literal_step;
@@ -3114,6 +3136,8 @@ static expr_t *expr_finite_rational_rounding_progression_closed_form(const expr_
     if (denominator == 1L)
         return expr_finite_linear_progression_closed_form(upper, step);
     literal_step = expr_is_unnamed_const(step);
+    if (nearest && !literal_step)
+        return NULL;
 
     denominator_expr = expr_const_long(denominator);
     upper_over_denominator = denominator_expr ? expr_div(upper, denominator_expr) : NULL;
@@ -3121,8 +3145,14 @@ static expr_t *expr_finite_rational_rounding_progression_closed_form(const expr_
     remainder = denominator_expr ? expr_mod(upper, denominator_expr) : NULL;
     period_increment = literal_step ? expr_const_long(numerator) : expr_mul_long(step, denominator);
     if (literal_step) {
-        const long period_value = numerator +
-                                  (numerator + (ceiling ? 1L : -1L)) * (denominator - 1L) / 2L;
+        long period_value = numerator + (numerator + (ceiling ? 1L : -1L)) * (denominator - 1L) / 2L;
+        if (nearest) {
+            period_value = 0L;
+            for (long index = 1L; index <= denominator; ++index) {
+                const long magnitude = (2L * labs(numerator) * index + denominator) / (2L * denominator);
+                period_value += numerator < 0L ? -magnitude : magnitude;
+            }
+        }
 
         period_total = expr_const_long(period_value);
     } else if (period_increment && denominator % 2L != 0L) {
@@ -3151,8 +3181,10 @@ static expr_t *expr_finite_rational_rounding_progression_closed_form(const expr_
     complete_and_partial = period && inside ? expr_mul(period, inside) : NULL;
 
     for (long index = 1L; index < denominator; ++index) {
-        const long residue_value = ceiling ? -expr_floor_div_long(-numerator * index, denominator)
-                                           : expr_floor_div_long(numerator * index, denominator);
+        const long rounded_magnitude = (2L * labs(numerator) * index + denominator) / (2L * denominator);
+        const long residue_value = nearest ? (numerator < 0L ? -rounded_magnitude : rounded_magnitude)
+                                           : (ceiling ? -expr_floor_div_long(-numerator * index, denominator)
+                                                      : expr_floor_div_long(numerator * index, denominator));
         expr_t *indicator_numerator;
         expr_t *indicator;
         expr_t *indexed_step;
@@ -3214,12 +3246,17 @@ static expr_t *expr_finite_rational_rounding_progression_closed_form(const expr_
 
 static expr_t *expr_finite_floor_progression_closed_form(const expr_t *upper, const expr_t *step)
 {
-    return expr_finite_rational_rounding_progression_closed_form(upper, step, false);
+    return expr_finite_rational_rounding_progression_closed_form(upper, step, EXPR_ROUND_DOWN);
+}
+
+static expr_t *expr_finite_round_progression_closed_form(const expr_t *upper, const expr_t *step)
+{
+    return expr_finite_rational_rounding_progression_closed_form(upper, step, EXPR_ROUND_NEAREST);
 }
 
 static expr_t *expr_finite_ceil_progression_closed_form(const expr_t *upper, const expr_t *step)
 {
-    return expr_finite_rational_rounding_progression_closed_form(upper, step, true);
+    return expr_finite_rational_rounding_progression_closed_form(upper, step, EXPR_ROUND_UP);
 }
 
 static expr_t *expr_finite_bit_not_progression_closed_form(const expr_t *upper, const expr_t *step)
@@ -4423,6 +4460,19 @@ const expr_ops_t ops_root = {.eval = eval_root,
                              .integrate = expr_integrate_dispatch_primitive,
                              .simplify = expr_simplify_root_operator,
                              .fold_const_unary = NULL};
+const expr_ops_t ops_round = {.eval = eval_round,
+                              .deriv = deriv_floor,
+                              .reverse = expr_reverse_floor,
+                              .kind = EXPR_KIND_ROUND,
+                              .arity = EXPR_OP_UNARY,
+                              .expression_name = "round",
+                              .function_name = "round",
+                              .TeX_name = "\\operatorname{round}",
+                              .apply_unary = expr_round,
+                              .finite_progression = expr_finite_round_progression_closed_form,
+                              .integrate = expr_integrate_dispatch_primitive,
+                              .simplify = expr_simplify_unary_operator,
+                              .fold_const_unary = fold_round_const};
 const expr_ops_t ops_floor = {.eval = eval_floor,
                               .deriv = deriv_floor,
                               .reverse = expr_reverse_floor,
@@ -5450,6 +5500,7 @@ expr_t *expr_apply_unary_kind(expr_op_kind_t kind, const expr_t *arg)
         [EXPR_KIND_SQRT] = &ops_sqrt,
         [EXPR_KIND_CUBRT] = &ops_cubrt,
         [EXPR_KIND_FLOOR] = &ops_floor,
+        [EXPR_KIND_ROUND] = &ops_round,
         [EXPR_KIND_CEIL] = &ops_ceil,
         [EXPR_KIND_ABS] = &ops_abs,
         [EXPR_KIND_CONJ] = &ops_conj,
@@ -5542,6 +5593,12 @@ expr_t *expr_lg(const expr_t *a)
 {
     return expr_log10(a);
 }
+/* Construct nearest-integer rounding while retaining the original symbolic argument. */
+expr_t *expr_round(const expr_t *a)
+{
+    return expr_math_wrap_unary(&ops_round, a);
+}
+
 expr_t *expr_floor(const expr_t *a)
 {
     return expr_math_wrap_unary(&ops_floor, a);

@@ -118,7 +118,19 @@ qfloat_t qf_floor(qfloat_t x)
     return r;
 }
 
-/* Round qfloat_t to nearest integer (ties to even) */
+/* Round the magnitude before restoring the sign, without adding half to a large argument. */
+qfloat_t qf_round(qfloat_t x)
+{
+    if (!isfinite(x.hi) || (x.hi == 0.0 && x.lo == 0.0))
+        return x;
+    qfloat_t magnitude = qf_abs(x);
+    qfloat_t integer = qf_floor(magnitude);
+    if (qf_ge(qf_sub(magnitude, integer), QF_HALF))
+        integer = qf_add(integer, QF_ONE);
+    return x.hi < 0.0 || (x.hi == 0.0 && x.lo < 0.0) ? qf_neg(integer) : integer;
+}
+
+/* Round qfloat_t to nearest integer (ties towards positive infinity). */
 qfloat_t qf_rint(qfloat_t x)
 {
     qfloat_t t = QF_HALF;

@@ -19,6 +19,14 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
         };
     }
     const native = (await WebAssembly.instantiate(module, imports)).exports;
+    for (const [value, span, digits] of [
+        [-8.325073956455189, 16.57, 3], [-227.25178866731676, 550, 4],
+        [1.234567891234, 1e-8, 12], [1e12, 0.01, 17],
+        [1e-100, 1e-100, 4], [0, 10, 3], [1, Infinity, 17], [1, 0, 17]
+    ]) {
+        check(native.lab_plot_bound_digits(value, span) === digits,
+              `Zoom precision must follow the interval span: ${value}, ${span}`);
+    }
     // Exercise actual WASM runtime primitives, not host shims, including unaligned ranges and canaries.
     const memory = new Uint8Array(native.memory.buffer);
     const buffer = native.lab_workspace_input(0);

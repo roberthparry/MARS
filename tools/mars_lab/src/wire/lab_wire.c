@@ -16,10 +16,11 @@
  * be recovered here.
  */
 #include <math.h>
+#include <string.h>
 
 #include "lab_wire.h"
 
-enum { lab_wire_limit = 4194304, lab_wire_nodes = 65536, lab_wire_depth = 32 };
+enum { lab_wire_limit = 8388608, lab_wire_nodes = 65536, lab_wire_depth = 32 };
 
 static bool lab_wire_child(protobuf_t *parent, unsigned field, protobuf_t *child)
 {
@@ -241,6 +242,45 @@ array_t *lab_wire_encode(const json_t *value)
               lab_wire_child(message, 2, lab_wire_write(value, 0, &nodes));
     array_t *bytes = ok ? protobuf_encode(message) : NULL;
     protobuf_free(message);
+    return bytes;
+}
+
+static const json_t *response_field(const json_t *object, const char *name)
+{
+    string_t *key = string_new_with(name);
+    const json_t *value = key ? json_object_get(object, key) : NULL;
+    string_free(key);
+    return value;
+}
+
+/* Keep the presentation image once; diagnostic records remain intact on failed evaluations. */
+array_t *lab_wire_encode_response(const json_t *value, bool *failed)
+{
+    const json_t *plot = response_field(response_field(response_field(value, "presentation"), "calculus"), "plot");
+    const string_t *svg = json_string_value(response_field(plot, "svg"));
+    bool success = false;
+    json_bool_value(response_field(value, "ok"), &success);
+    json_t *compact = success && svg && string_byte_length(svg) ? json_new_object() : NULL;
+    bool ready = !(success && svg && string_byte_length(svg)) || compact;
+    for (size_t i = 0; ready && compact && i < json_object_size(value); ++i) {
+        const string_t *key = json_object_key_at(value, i);
+        const char *name = string_c_str(key);
+        if (!strcmp(name, "raw") || !strcmp(name, "plot_svg"))
+            continue;
+        ready = json_object_set(compact, key, json_object_value_at(value, i));
+    }
+    array_t *bytes = ready ? lab_wire_encode(compact ? compact : value) : NULL;
+    json_free(compact);
+    if (failed)
+        *failed = !bytes;
+    if (!bytes) {
+        string_t *text = string_new_with("{\"ok\":false,\"error\":\"Lab response could not be encoded within the "
+                                          "8 MiB transport limit. Reduce plot detail or result size.\"}");
+        json_t *error = text ? json_from_text(text) : NULL;
+        bytes = error ? lab_wire_encode(error) : NULL;
+        json_free(error);
+        string_free(text);
+    }
     return bytes;
 }
 

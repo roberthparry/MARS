@@ -6,6 +6,7 @@
  * is visited once per rendering stage. SVG syntax uses a thread-local C numeric
  * locale; the caller's locale is restored on every exit. No external renderer,
  * temporary file, script, hyperlink or embedded resource is used.
+ * Series names remain available as native hover tooltips when legends are hidden.
  */
 #include <errno.h>
 #include <locale.h>
@@ -238,18 +239,31 @@ static bool render(svg_view_t *view, const plot_t *plot)
     view->width = plot->options.width - view->left - right;
     if (string_append_format(view->out,
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%u\" height=\"%u\" viewBox=\"0 0 %u %u\" role=\"img\" "
-        "data-plot-left=\"%.3f\" data-plot-top=\"%.3f\" data-plot-width=\"%.3f\" data-plot-height=\"%.3f\">\n<title>",
+        "data-plot-left=\"%.3f\" data-plot-top=\"%.3f\" data-plot-width=\"%.3f\" data-plot-height=\"%.3f\" "
+        "data-x-min=\"%.17g\" data-x-max=\"%.17g\" data-y-min=\"%.17g\" data-y-max=\"%.17g\">\n<title>",
         plot->options.width, plot->options.height, plot->options.width, plot->options.height,
-        view->left, view->top, view->width, view->height) < 0 ||
+        view->left, view->top, view->width, view->height,
+        num_to_double(view->bounds[0]), num_to_double(view->bounds[1]),
+        num_to_double(view->bounds[2]), num_to_double(view->bounds[3])) < 0 ||
         !plot_escape(view->out, plot->title) || string_append_cstr(view->out, "</title>\n") || !axes(view, plot))
         return false;
     for (size_t i = 0; i < plot->count; ++i) {
         const plot_series_t *series = &plot->series[i];
+        /* A local SVG viewport clips transient browser translations without moving axes or labels. */
+        if (string_append_format(view->out,
+            "<svg data-plot-window=\"true\" x=\"%.3f\" y=\"%.3f\" width=\"%.3f\" height=\"%.3f\" "
+            "viewBox=\"%.3f %.3f %.3f %.3f\" style=\"width:%.3fpx;height:%.3fpx;"
+            "transform:none;margin:0;filter:none;overflow:hidden\">\n",
+            view->left, view->top, view->width, view->height, view->left, view->top, view->width, view->height,
+            view->width, view->height) < 0)
+            return false;
         if (string_append_format(view->out, "<g data-series=\"%zu\" stroke=\"#%06x\" color=\"#%06x\" "
                                            "fill=\"%s\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n",
                                   i, (unsigned)series->colour, (unsigned)series->colour,
                                   series->style == PLOT_POINTS ? "currentColor" : "none") < 0 ||
-            !drawers[series->style](view, series) || string_append_cstr(view->out, "</g>\n"))
+            string_append_cstr(view->out, "<title>") || !plot_escape(view->out, series->name) ||
+            string_append_cstr(view->out, "</title>\n") ||
+            !drawers[series->style](view, series) || string_append_cstr(view->out, "</g></svg>\n"))
             return false;
         if (plot->options.legend && string_byte_length(series->name)) {
             double y = view->top + 16 + 18 * i;

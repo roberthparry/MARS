@@ -24,6 +24,17 @@
 
 typedef enum { DE_ATTEMPT_NOT_MATCHED, DE_ATTEMPT_SOLVED, DE_ATTEMPT_FAILED } de_attempt_t;
 
+/** @brief Construct native derivation text for the scaled modified-Emden family. */
+bool de_modified_emden_steps(const expr_t *independent, const expr_t *dependent, const expr_t *scale,
+                             char **steps_out, char **steps_TeX_out);
+
+/** @brief Recognise a modified-Emden equation and apply supported initial conditions. */
+de_attempt_t de_attempt_modified_emden_linearization(const diffequ_t *de, const expr_t *independent,
+                                                     const expr_t *dependent, const expr_t *first_derivative,
+                                                     const expr_t *second_derivative, const expr_t *residual,
+                                                     equation_t **solutions_out, size_t *solution_count_out,
+                                                     expr_t **scale_out);
+
 expr_t *de_simplify_unary_owned(expr_t *owned, expr_t *(*operation)(const expr_t *));
 expr_t *de_integrate_or_formal(const expr_t *integrand, const expr_t *wrt);
 bool de_expr_contains(const expr_t *expr, const expr_t *needle);

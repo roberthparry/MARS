@@ -11,6 +11,9 @@
 
 #include "json-t.h"
 
+/** Register bounded native solver plot cache regressions and timings. */
+void test_lab_plot_cache_cases(void);
+
 /** Register native eclipse worker geometry and orientation regressions. */
 void test_lab_eclipse_worker_cases(void);
 
