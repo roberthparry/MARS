@@ -462,6 +462,24 @@ static void test_lab_extra_plot_preview(void)
 static void test_lab_extra_solver_plots(void)
 {
     unsigned status = 0;
+    const char *integrands[] = {"{exp(Li(x)) | x=?}", "{sin(x)+a | x=?; a=2}"};
+    for (size_t i = 0; i < sizeof(integrands) / sizeof(*integrands); ++i) {
+        string_t *payload = string_sprintf("{\"expression\":\"%s\",\"action\":\"plot\","
+            "\"plot_source_mode\":\"integrator\",\"bounds\":[{\"name\":\"x\",\"lo\":\"0.1\",\"hi\":\"0.9\"}]}",
+            integrands[i]);
+        json_t *result = request("/eval", string_c_str(payload), &status);
+        bool title_ok = status == 200u && test_lab_ok(result, true) &&
+                        contains(result, "plot_svg", "data-plot-title") &&
+                        contains(result, "plot_title_TeX", i ? "\\sin" : "e^{") &&
+                        !contains(result, "plot_title_TeX", "=") &&
+                        !contains(result, "plot_title_TeX", "$") &&
+                        !contains(result, "plot_title", "|") && !contains(result, "plot_title", "=");
+        if (!title_ok)
+            show_failure(result);
+        TEST_ASSERT_TRUE(title_ok, "integrand titles use native TeX bodies and omit unset and supplied bindings");
+        json_free(result);
+        string_free(payload);
+    }
     expect_response("/eval", "{\"expression\":\"sin(x)\",\"action\":\"plot\",\"plot_source_mode\":\"integrator\","
                              "\"bounds\":[{\"name\":\"x\",\"lo\":\"-pi\",\"hi\":\"pi\"}]}",
                     200u, "plot_svg", "data-integral-shading");

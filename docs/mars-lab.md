@@ -2427,6 +2427,7 @@ The direct symbolic forms use the same editor:
 
 Integrator mode also generates an independent asynchronous Plot card on Evaluate.
 For one integration variable it draws the integrand, not the antiderivative.
+The plot title renders the integrand in TeX without its worksheet bindings.
 Finite definite limits are marked with dashed lines and the interval is shaded
 between the curve and zero: teal for positive contributions, gold for negative
 ones. Reversing the integration limits reverses the contribution colours.

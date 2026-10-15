@@ -101,15 +101,17 @@ int lab_worker_integrand_plot(int argc, char **argv)
     if (ok && finite_limits)
         ok = plot_shade_interval(plot, lower, upper);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
-    char *title = expression ? expr_to_string(expression, style_LATEX) : NULL;
+    char *title = expression ? expr_to_TeX_body(expression) : NULL;
+    char *title_text = expression ? expr_to_string(expression, style_UNBOUND) : NULL;
     if (svg)
         printf("input %s\nexpression %s\nplot_title %s\nplot_title_TeX %s\nplot_svg %s\n"
-               "binding variable\t%s\tNAN\ndifferentiable no\n", argv[1], argv[1], source,
+               "binding variable\t%s\tNAN\ndifferentiable no\n", argv[1], argv[1], title_text ? title_text : "",
                title ? title : "", string_c_str(svg), axis);
     else
         printf("error No finite real integrand curve found; check its parameters, domain and plotting bounds.\n");
     int rc = svg ? 0 : 1;
     free(title);
+    free(title_text);
     free(source);
     string_free(svg);
     plot_free(plot);
