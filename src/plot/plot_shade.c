@@ -11,17 +11,17 @@
 #define MARS_PLOT_INTERNAL_ACCESS
 #include "plot_internal.h"
 
-/* Store an oriented, finite interval independently of the displayed viewport. */
+/* Store an oriented real interval independently of the finite displayed viewport. */
 bool plot_shade_interval(plot_t *plot, number_t lower, number_t upper)
 {
     if (!plot || plot->surface_z || !num_is_real(lower) || !num_is_real(upper) ||
-        !num_is_finite(lower) || !num_is_finite(upper)) {
+        num_is_nan(lower) || num_is_nan(upper)) {
         errno = EINVAL;
         return false;
     }
     bool reversed = num_gt(lower, upper);
     number_t copies[] = {num_clone(reversed ? upper : lower), num_clone(reversed ? lower : upper)};
-    if (!num_is_finite(copies[0]) || !num_is_finite(copies[1])) {
+    if (num_is_nan(copies[0]) || num_is_nan(copies[1])) {
         num_destroy(&copies[0]);
         num_destroy(&copies[1]);
         return false;
@@ -114,7 +114,7 @@ bool plot_shade_svg(const plot_t *plot, const plot_series_t *series, string_t *o
     for (unsigned i = 0; i < 2; ++i) {
         NUM_SCOPE(numbers);
         number_t boundary = plot->shade_bounds[i];
-        if (num_lt(boundary, bounds[0]) || num_gt(boundary, bounds[1]))
+        if (!num_is_finite(boundary) || num_lt(boundary, bounds[0]) || num_gt(boundary, bounds[1]))
             continue;
         double x = num_to_double(num_div(num_sub(boundary, bounds[0]), num_sub(bounds[1], bounds[0])));
         x = frame[0] + x * frame[2];

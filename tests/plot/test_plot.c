@@ -52,6 +52,20 @@ static void test_plot_svg(void)
     string_free(svg);
     plot_free(plot);
     TEST_ASSERT_TRUE(ok, "reversed intervals shade negative contributions and retain limit markers");
+    const number_t intervals[][2] = {{NUM_NINF, NUM_ONE}, {NUM_ZERO, NUM_INF},
+                                    {NUM_NINF, NUM_INF}, {NUM_INF, NUM_NINF}};
+    for (size_t i = 0; i < sizeof(intervals) / sizeof(*intervals); ++i) {
+        plot = simple_plot(PLOT_LINES);
+        ok = plot_shade_interval(plot, intervals[i][0], intervals[i][1]);
+        svg = ok ? plot_to_svg(plot) : NULL;
+        ok = svg && strstr(string_c_str(svg), "data-integral-shading") &&
+             strstr(string_c_str(svg), i == 3 ? "data-sign=\"negative\"" : "data-sign=\"positive\"") &&
+             !strstr(string_c_str(svg), "nan") && !strstr(string_c_str(svg), "inf");
+        string_free(svg);
+        TEST_ASSERT_TRUE(!plot_shade_interval(plot, NUM_NAN, NUM_ONE), "NaN shading limits remain invalid");
+        plot_free(plot);
+        TEST_ASSERT_TRUE(ok, "infinite intervals retain signed shading with finite SVG coordinates");
+    }
 }
 
 static void test_plot_edge_axes(void)

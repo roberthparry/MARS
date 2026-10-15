@@ -462,6 +462,15 @@ static void test_lab_extra_plot_preview(void)
 static void test_lab_extra_solver_plots(void)
 {
     unsigned status = 0;
+    const char *intervals[][2] = {{"-inf", "2"}, {"-2", "inf"}, {"-inf", "inf"}, {"inf", "-inf"}};
+    for (size_t i = 0; i < sizeof(intervals) / sizeof(*intervals); ++i) {
+        string_t *payload = string_sprintf("{\"expression\":\"exp(-x^2/2)\",\"action\":\"plot\","
+            "\"plot_source_mode\":\"integrator\",\"bounds\":[{\"name\":\"x\",\"lo\":\"%s\",\"hi\":\"%s\"}]}",
+            intervals[i][0], intervals[i][1]);
+        expect_response("/eval", string_c_str(payload), 200u, "plot_svg",
+                        i == 3 ? "data-sign=\"negative\"" : "data-sign=\"positive\"");
+        string_free(payload);
+    }
     const char *integrands[] = {"{exp(Li(x)) | x=?}", "{sin(x)+a | x=?; a=2}"};
     for (size_t i = 0; i < sizeof(integrands) / sizeof(*integrands); ++i) {
         string_t *payload = string_sprintf("{\"expression\":\"%s\",\"action\":\"plot\","

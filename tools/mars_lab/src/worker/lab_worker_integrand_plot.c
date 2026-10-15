@@ -58,8 +58,9 @@ int lab_worker_integrand_plot(int argc, char **argv)
     num_set_default_prec_bits(53);
     number_t lower = limit(argv[20]), upper = limit(argv[21]);
     bool definite = *argv[20] && *argv[21];
-    bool finite_limits = definite && num_is_real(lower) && num_is_finite(lower) &&
-                         num_is_real(upper) && num_is_finite(upper);
+    bool real_limits = definite && num_is_real(lower) && !num_is_nan(lower) &&
+                       num_is_real(upper) && !num_is_nan(upper);
+    bool finite_limits = real_limits && num_is_finite(lower) && num_is_finite(upper);
     number_t bounds[] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
     char *source = expr_to_string(expression, style_EXPRESSION);
     const char *specified[] = {argv[5], argv[6], "", ""};
@@ -98,7 +99,7 @@ int lab_worker_integrand_plot(int argc, char **argv)
     ok = plot && plot_add_sampler(plot, samples, "Integrand", PLOT_LINES, 0x78d8cb);
     if (ok && manual)
         ok = plot_set_bounds(plot, bounds[0], bounds[1], ymin, ymax);
-    if (ok && finite_limits)
+    if (ok && real_limits)
         ok = plot_shade_interval(plot, lower, upper);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     char *title = expression ? expr_to_TeX_body(expression) : NULL;

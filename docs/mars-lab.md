@@ -2434,8 +2434,9 @@ ones. Reversing the integration limits reverses the contribution colours.
 Plot zoom and range edits do not change the integration limits or recompute the
 integral. The curve uses drawing precision independently of the requested result
 precision. Gaps are not filled, and shading does not assert convergence.
-Indefinite and unresolved/infinite-limit integrals currently show an unshaded
-curve; multidimensional integrands report that their plots are not yet available.
+Infinite integration limits shade the visible part of the interval; only finite
+endpoints receive dashed markers. Indefinite and unresolved-limit integrals show
+an unshaded curve; multidimensional integrands report that their plots are not yet available.
 
 Integrator mode combines exact symbolic antiderivatives with the numerical
 integrator. Add one bound row for each variable to be integrated. Leave both

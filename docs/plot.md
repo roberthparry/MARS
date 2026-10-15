@@ -19,7 +19,7 @@ freshly sampled data is still required to fill newly exposed parts of the domain
 | `plot_add_sampler(plot, samples, name, style, colour)` | Copy sample coordinates and explicit gap markers. |
 | `plot_set_surface(plot, x, columns, y, rows, z)` | Copy one row-major height grid into an empty scene. |
 | `plot_set_mesh(plot, x, y, z, count)` | Copy independent triangles, permitting multiple heights at the same horizontal coordinates. |
-| `plot_shade_interval(plot, lower, upper)` | Shade line series between the curve and zero inside an oriented finite interval, preserving gaps. |
+| `plot_shade_interval(plot, lower, upper)` | Shade line series between the curve and zero inside an oriented real interval, including infinite limits, preserving gaps. |
 | `plot_set_height_bounds(plot, minimum, maximum)` | Clip a surface to an explicit height interval. |
 | `plot_include_height(plot, height)` | Include a located finite turning-point height in automatic surface bounds without changing the mesh. |
 | `plot_set_bounds(plot, xmin, xmax, ymin, ymax)` | Copy an explicit finite real increasing viewport. |
@@ -46,8 +46,9 @@ domain. This permits volume samplers to preserve their chosen viewport.
 `plot_shade_interval()` adds signed shading and dashed interval markers to line
 series. Automatic vertical limits include zero. Explicit viewport bounds still
 win, and all shading is clipped before conversion to drawing coordinates. Reversed
-limits reverse the positive/negative contribution colours. This is an annotation
-of sampled segments, not a quadrature rule or a claim that an improper integral
+limits reverse the positive/negative contribution colours. Infinite endpoints are
+clipped to the viewport and do not receive finite-limit markers. Shading annotates
+sampled segments; it is not a quadrature rule or a claim that an improper integral
 converges. Discontinuities must be supplied as gaps by the sampler.
 
 Inputs remain caller-owned and may be freed immediately after successful

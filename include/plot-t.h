@@ -75,9 +75,10 @@ bool plot_add_points(plot_t *plot, const plot_point_t *points, size_t count, con
 bool plot_add_sampler(plot_t *plot, const sampler_t *sampler, const char *name, plot_style_t style, uint32_t colour);
 
 /**
- * @brief Shade line series between zero and their sampled values within a finite x interval.
+ * @brief Shade line series between zero and their sampled values within a real x interval.
  * Copies the limits; reversed limits reverse contribution colours. Positive and
  * negative contributions use teal and gold respectively. Gaps remain unfilled.
+ * Infinite limits are clipped to the viewport; only finite limits receive markers.
  * This visual annotation neither evaluates an integral nor certifies convergence.
  */
 bool plot_shade_interval(plot_t *plot, number_t lower, number_t upper);
