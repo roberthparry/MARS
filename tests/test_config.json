@@ -1359,6 +1359,7 @@
       "enabled": true,
       "test_arithmetic": true,
       "test_d_variants": true,
+      "test_expr_real_sample": true,
       "test_expr_t_from_string": true,
       "test_expr_t_goal_seek": true,
       "test_expr_t_imaginary_axis": true,

@@ -9,6 +9,11 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include <math.h>
+
+#include "computation-t.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #include "test_expr.h"
 
 static bool test_expr_suite_setup(void);
@@ -633,6 +638,88 @@ static void example_indexed_roots(void)
 /* Arithmetic tests                                                          */
 /* ------------------------------------------------------------------------- */
 
+typedef struct {
+    expr_real_sample_t *sample;
+    double point;
+} real_sample_control_t;
+
+static bool real_sample_controlled(void *argument)
+{
+    real_sample_control_t *context = argument;
+    double result;
+    return expr_real_sample_eval(context->sample, &context->point, &result);
+}
+
+static void test_expr_real_sample(void)
+{
+    const char *sources[] = {"cos(z)-sin(pi-x*y)", "x^2+y^2+z^2-1", "x/(y+2)-z", "abs(x)-y"};
+    const double coordinates[] = {0.37, -0.29, 0.61};
+    for (size_t i = 0; i < sizeof(sources) / sizeof(*sources); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expression = expr_from_string(sources[i], &bindings);
+        const char *names[] = {"x", "y", "z"};
+        expr_t *axes[3];
+        bool detached[3];
+        for (unsigned j = 0; j < 3; ++j) {
+            axes[j] = expr_bindings_get(bindings, names[j]);
+            detached[j] = !axes[j];
+            if (!axes[j])
+                axes[j] = expr_new_named_var(NUM_NAN, names[j]);
+            number_t coordinate = num_create_from_double(coordinates[j]);
+            expr_set_val(axes[j], coordinate);
+            num_destroy(&coordinate);
+        }
+        const expr_t *inputs[] = {axes[0], axes[1], axes[2]};
+        expr_real_sample_t *sample = expr_real_sample_new(expression, inputs, 3);
+        number_t expected = expr_eval(expression);
+        double result = NAN;
+        TEST_ASSERT_TRUE(sample && expr_real_sample_eval(sample, coordinates, &result) &&
+                         fabs(result - num_to_double(expected)) < 1e-12, "guarded sampling agrees with native value");
+        number_t unchanged = expr_eval(expression);
+        TEST_ASSERT_TRUE(num_eq(expected, unchanged), "sampling leaves the original bindings and value untouched");
+        num_destroy(&unchanged);
+        num_destroy(&expected);
+        expr_real_sample_free(sample);
+        expr_free(expression);
+        expr_bindings_free(bindings);
+        for (unsigned j = 0; j < 3; ++j)
+            if (detached[j])
+                expr_free(axes[j]);
+    }
+    const char *fallbacks[] = {"sin(x)", "1/x", "(10000000000000000+x)-10000000000000000", "exp(x)"};
+    const double points[] = {1e20, 0, 0.25, 1};
+    for (size_t i = 0; i < sizeof(points) / sizeof(*points); ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expression = expr_from_string(fallbacks[i], &bindings);
+        const expr_t *axis[] = {expr_bindings_get(bindings, "x")};
+        expr_real_sample_t *sample = expr_real_sample_new(expression, axis, 1);
+        double result = NAN;
+        TEST_ASSERT_TRUE(!expr_real_sample_eval(sample, &points[i], &result),
+                         "large arguments, poles, cancellation and unsupported operations request native fallback");
+        expr_real_sample_free(sample);
+        expr_free(expression);
+        expr_bindings_free(bindings);
+    }
+    expr_bindings_t *bindings = NULL;
+    expr_t *expression = expr_from_string("sin(x)+cos(x)", &bindings);
+    const expr_t *axis[] = {expr_bindings_get(bindings, "x")};
+    real_sample_control_t context = {.sample = expr_real_sample_new(expression, axis, 1), .point = 0.5};
+    computation_options_t options = {.work_limit = 1};
+    computation_t *control = computation_new(&options);
+    TEST_ASSERT_TRUE(context.sample && control && !computation_run(control, real_sample_controlled, &context) &&
+                     computation_status(control) == COMPUTATION_BUDGET_EXHAUSTED,
+                     "fast sampling preserves native computation work limits");
+    computation_free(control);
+    control = computation_new(NULL);
+    computation_cancel(control);
+    TEST_ASSERT_TRUE(control && !computation_run(control, real_sample_controlled, &context) &&
+                     computation_status(control) == COMPUTATION_CANCELLED, "cancelled sampling cannot publish a value");
+    computation_free(control);
+    expr_real_sample_free(context.sample);
+    expr_free(expression);
+    expr_bindings_free(bindings);
+}
+
 int tests_main(void)
 {
     /* ---------------- Arithmetic ---------------- */
@@ -675,6 +762,7 @@ int tests_main(void)
 
     TEST_SECTION("Runtime regressions");
     TEST_RUN_IN_GROUP(test_runtime_regressions, tests, NULL);
+    TEST_RUN_IN_GROUP(test_expr_real_sample, tests, NULL);
 
     TEST_SECTION("Imaginary-axis presentation");
     TEST_RUN_IN_GROUP(test_expr_t_imaginary_axis, tests, NULL);

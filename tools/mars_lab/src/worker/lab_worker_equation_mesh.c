@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
@@ -27,6 +29,7 @@ typedef struct {
 
 typedef struct {
     expr_t *residual, *variables[3];
+    expr_real_sample_t *sampling;
     number_t *coordinates[3];
     size_t count, capacity;
     mesh_edge_t *edges;
@@ -35,6 +38,9 @@ typedef struct {
 
 static double evaluate(equation_mesh_t *mesh, const double coordinate[3])
 {
+    double approximate;
+    if (expr_real_sample_eval(mesh->sampling, coordinate, &approximate))
+        return approximate;
     for (unsigned axis = 0; axis < 3; ++axis) {
         number_t value = num_create_from_double(coordinate[axis]);
         expr_set_val(mesh->variables[axis], value);
@@ -199,6 +205,8 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
     size_t precision = num_get_default_prec_bits();
     number_t saved[] = {expr_eval(first), expr_eval(second), expr_eval(third)};
     num_set_default_prec_bits(53);
+    const expr_t *axes[] = {first, second, third};
+    mesh.sampling = expr_real_sample_new(mesh.residual, axes, 3);
     double bounds[] = {-2, 2, -2, 2, -2, 2};
     bool manual = !strcmp(argv[7], "manual");
     const char *supplied[] = {argv[5], argv[6], argv[12], argv[13], manual ? argv[8] : "", manual ? argv[9] : ""};
@@ -251,6 +259,7 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
     free(title);
     string_free(svg);
     plot_free(plot);
+    expr_real_sample_free(mesh.sampling);
     expr_free(mesh.residual);
     for (unsigned i = 0; i < 6; ++i)
         num_destroy(&limits[i]);

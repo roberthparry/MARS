@@ -479,4 +479,16 @@ expr_t *expr_context_snapshot(const expr_context_t *context, const expr_t *sourc
 /** @brief Infer structural context facts without numerical sampling of compound expressions. */
 unsigned expr_context_proven_facts(const expr_context_t *context, const expr_t *source);
 
+/** @brief Private, bounded real sampling plan; unsupported or unstable evaluations use the ordinary evaluator. */
+typedef struct _expr_real_sample_t expr_real_sample_t;
+
+/** @brief Compile up to three real coordinate inputs and snapshot other finite real atoms; NULL means unavailable. */
+expr_real_sample_t *expr_real_sample_new(const expr_t *expression, const expr_t *const *axes, size_t count);
+
+/** @brief Evaluate a guarded double approximation; false requests ordinary evaluation, including cancellation checks. */
+bool expr_real_sample_eval(const expr_real_sample_t *sample, const double *coordinates, double *value);
+
+/** @brief Release a sampling plan; NULL is harmless. */
+void expr_real_sample_free(expr_real_sample_t *sample);
+
 #endif /* EXPR_SHARED_INTERNAL_H */

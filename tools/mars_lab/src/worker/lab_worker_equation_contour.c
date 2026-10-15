@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
@@ -22,6 +24,7 @@ typedef struct {
 
 typedef struct {
     expr_t *residual, *first, *second;
+    expr_real_sample_t *sampling;
     plot_point_t *points;
     size_t count, capacity;
     double extent[4];
@@ -29,6 +32,9 @@ typedef struct {
 
 static double evaluate(contour_t *contour, double x, double y)
 {
+    double coordinates[] = {x, y}, approximate;
+    if (expr_real_sample_eval(contour->sampling, coordinates, &approximate))
+        return approximate;
     number_t a = num_create_from_double(x), b = num_create_from_double(y);
     expr_set_val(contour->first, a);
     expr_set_val(contour->second, b);
@@ -184,6 +190,8 @@ int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *sec
     contour_t contour = {.residual = expr_sub(equ_lhs(equation), equ_rhs(equation)),
                          .first = first, .second = second, .capacity = 65536};
     contour.points = calloc(contour.capacity, sizeof(*contour.points));
+    const expr_t *axes[] = {first, second};
+    contour.sampling = expr_real_sample_new(contour.residual, axes, 2);
     double bounds[] = {-2, 2, -2, 2};
     bool manual = !strcmp(argv[7], "manual");
     bool fixed_x = *argv[5] || *argv[6];
@@ -255,6 +263,7 @@ int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *sec
     plot_free(plot);
     clear_points(&contour);
     free(contour.points);
+    expr_real_sample_free(contour.sampling);
     expr_free(contour.residual);
     for (unsigned i = 0; i < 4; ++i)
         num_destroy(&limits[i]);

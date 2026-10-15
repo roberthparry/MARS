@@ -1367,6 +1367,18 @@ There is no additional server or persistent cache. Restarting the server clears
 the records; `MARS_LAB_PLOT_CACHE=0` disables reuse for profiling. Requests with an
 explicit non-zero calculation work limit bypass the cache.
 
+Implicit 2-D contours and 3-D isosurfaces use guarded native double evaluation
+for supported real arithmetic and trigonometric expressions. Uncertain values
+and unsupported operations fall back to ordinary evaluation; grid density and
+edge-refinement limits are unchanged. Symbolic solutions and worksheet precision
+are unaffected. The expression guide describes the bounded sampling plan and its
+numerical limitations.
+
+Complete plot records larger than 1 MiB can now be compressed into the existing
+1 MiB cache slots, with an 8 MiB decoded-record limit. Compression and decompression
+run outside the shared cache lock; records that cannot fit still evaluate normally.
+Reuse restores the exact worker output, including SVG coordinates and labels.
+
 Adaptive curves use native first derivatives and repeated differentiation for
 second derivatives. Tangent/secant and curvature checks supplement the value
 probes; bounded bisection investigates first-derivative sign changes. Located

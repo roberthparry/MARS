@@ -5,7 +5,8 @@
  * Eight direct-indexed slots per record kind are shared by the existing request
  * processes. Exact keys protect against hash collisions, changes of source,
  * precision, viewport and rebuilt executables. A robust process-shared mutex
- * protects short record copies only; calculations never hold it. Nothing is
+ * protects short record copies only; calculations and compression never hold it.
+ * Oversized SVG records are compressed into the existing bounded slots. Nothing is
  * written to disk and cache allocation failure leaves normal execution intact.
  */
 #ifndef _GNU_SOURCE
@@ -17,15 +18,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <zstd.h>
 
 #include "file-t.h"
 #include "lab_process.h"
 #define MARS_LAB_PROCESS_INTERNAL_ACCESS
 #include "lab_process_plot_cache.h"
 
-enum { CACHE_SLOTS = 8, KEY_LIMIT = 16384, VALUE_LIMIT = 1024 * 1024, PREP_LIMIT = 256 * 1024 };
+enum { CACHE_SLOTS = 8, KEY_LIMIT = 16384, VALUE_LIMIT = 1024 * 1024, PREP_LIMIT = 256 * 1024,
+       DECODE_LIMIT = 8 * 1024 * 1024 };
 typedef struct {
-    size_t key_size, value_size;
+    size_t key_size, value_size, decoded_size;
     char key[KEY_LIMIT], value[VALUE_LIMIT];
 } plot_cache_entry_t;
 typedef struct {
@@ -123,9 +126,24 @@ string_t *lab_proc_plot_cache_get(const string_t *key, bool prepared)
         return NULL;
     plot_cache_entry_t *entry = &cache->entries[prepared][slot_for(key)];
     size_t length = string_byte_length(key);
-    string_t *value = entry->key_size == length && !memcmp(entry->key, string_c_str(key), length)
-                          ? string_new_with(entry->value) : NULL;
+    bool match = entry->key_size == length && !memcmp(entry->key, string_c_str(key), length);
+    size_t encoded_size = match ? entry->value_size : 0, decoded_size = match ? entry->decoded_size : 0;
+    char *encoded = decoded_size && decoded_size <= DECODE_LIMIT && encoded_size && encoded_size <= VALUE_LIMIT
+                        ? malloc(encoded_size) : NULL;
+    if (encoded)
+        memcpy(encoded, entry->value, encoded_size);
     pthread_mutex_unlock(&cache->mutex);
+    string_t *value = NULL;
+    if (encoded && encoded_size == decoded_size && !encoded[encoded_size - 1]) {
+        value = string_new_with(encoded);
+    } else if (encoded) {
+        char *decoded = malloc(decoded_size);
+        size_t actual = decoded ? ZSTD_decompress(decoded, decoded_size, encoded, encoded_size) : 0;
+        if (decoded && actual == decoded_size && !decoded[decoded_size - 1])
+            value = string_new_with(decoded);
+        free(decoded);
+    }
+    free(encoded);
     return value;
 }
 
@@ -133,15 +151,33 @@ string_t *lab_proc_plot_cache_get(const string_t *key, bool prepared)
 void lab_proc_plot_cache_put(const string_t *key, const string_t *value, bool prepared)
 {
     if (!key || !value || string_byte_length(key) >= KEY_LIMIT ||
-        string_byte_length(value) >= (prepared ? PREP_LIMIT : VALUE_LIMIT) || !lock_cache())
+        string_byte_length(value) >= (prepared ? PREP_LIMIT : DECODE_LIMIT))
         return;
+    size_t decoded_size = string_byte_length(value) + 1, encoded_size = decoded_size;
+    const char *data = string_c_str(value);
+    char *compressed = NULL;
+    if (decoded_size > VALUE_LIMIT) {
+        compressed = malloc(VALUE_LIMIT);
+        encoded_size = compressed ? ZSTD_compress(compressed, VALUE_LIMIT, data, decoded_size, 1) : 0;
+        if (!encoded_size || ZSTD_isError(encoded_size)) {
+            free(compressed);
+            return;
+        }
+        data = compressed;
+    }
+    if (!lock_cache()) {
+        free(compressed);
+        return;
+    }
     plot_cache_entry_t *entry = &cache->entries[prepared][slot_for(key)];
     entry->key_size = 0;
-    entry->value_size = string_byte_length(value);
-    memcpy(entry->value, string_c_str(value), entry->value_size + 1);
+    entry->value_size = encoded_size;
+    entry->decoded_size = decoded_size;
+    memcpy(entry->value, data, encoded_size);
     memcpy(entry->key, string_c_str(key), string_byte_length(key) + 1);
     entry->key_size = string_byte_length(key);
     pthread_mutex_unlock(&cache->mutex);
+    free(compressed);
 }
 
 /* Preparation is a single JSON line, never exposed to browser result cards. */
