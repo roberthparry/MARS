@@ -652,7 +652,8 @@ static bool real_sample_controlled(void *argument)
 
 static void test_expr_real_sample(void)
 {
-    const char *sources[] = {"cos(z)-sin(pi-x*y)", "x^2+y^2+z^2-1", "x/(y+2)-z", "abs(x)-y"};
+    const char *sources[] = {"cos(z)-sin(pi-x*y)", "x^2+y^2+z^2-1", "x/(y+2)-z", "abs(x)-y",
+                             "exp(-x^2/2)", "log(x+2)", "acos(sin(x*y))"};
     const double coordinates[] = {0.37, -0.29, 0.61};
     for (size_t i = 0; i < sizeof(sources) / sizeof(*sources); ++i) {
         expr_bindings_t *bindings = NULL;
@@ -673,8 +674,12 @@ static void test_expr_real_sample(void)
         expr_real_sample_t *sample = expr_real_sample_new(expression, inputs, 3);
         number_t expected = expr_eval(expression);
         double result = NAN;
-        TEST_ASSERT_TRUE(sample && expr_real_sample_eval(sample, coordinates, &result) &&
-                         fabs(result - num_to_double(expected)) < 1e-12, "guarded sampling agrees with native value");
+        bool agrees = sample && expr_real_sample_eval(sample, coordinates, &result) &&
+                      fabs(result - num_to_double(expected)) < 1e-12;
+        if (!agrees)
+            fprintf(stderr, "sample %s: plan=%s result=%.17g expected=%.17g\n", sources[i], sample ? "yes" : "no",
+                    result, num_to_double(expected));
+        TEST_ASSERT_TRUE(agrees, "guarded sampling agrees with native value");
         number_t unchanged = expr_eval(expression);
         TEST_ASSERT_TRUE(num_eq(expected, unchanged), "sampling leaves the original bindings and value untouched");
         num_destroy(&unchanged);
@@ -686,7 +691,7 @@ static void test_expr_real_sample(void)
             if (detached[j])
                 expr_free(axes[j]);
     }
-    const char *fallbacks[] = {"sin(x)", "1/x", "(10000000000000000+x)-10000000000000000", "exp(x)"};
+    const char *fallbacks[] = {"sin(x)", "1/x", "(10000000000000000+x)-10000000000000000", "zeta(x)"};
     const double points[] = {1e20, 0, 0.25, 1};
     for (size_t i = 0; i < sizeof(points) / sizeof(*points); ++i) {
         expr_bindings_t *bindings = NULL;

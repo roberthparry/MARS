@@ -22,6 +22,40 @@
 #include "sampler-t.h"
 #include "plot-t.h"
 
+/** @brief Optional guarded double evaluator over a private plotting graph. */
+typedef struct _lab_worker_sample_t lab_worker_sample_t;
+
+/** @brief Borrow a graph and up to three axes; enable doubles only at ordinary working precision. */
+lab_worker_sample_t *lab_worker_sample_new(expr_t *expression, expr_t *const *axes, size_t count, size_t bits);
+
+/** @brief Evaluate precise coordinates, falling back to the native graph when the approximation is uncertain. */
+number_t lab_worker_sample_eval(lab_worker_sample_t *sample, const number_t *coordinates);
+
+/** @brief Release the evaluator without releasing its borrowed graph or axes. */
+void lab_worker_sample_free(lab_worker_sample_t *sample);
+
+/** @brief Convert a coordinate to doubles at 53 bits, retaining native precision for escalated passes. */
+number_t lab_worker_sample_coordinate(number_t value, size_t bits);
+
+/** @brief Precise coordinate frame and guarded evaluator for an implicit equation. */
+typedef struct _lab_worker_implicit_t lab_worker_implicit_t;
+
+/** @brief Parse authored bounds before rounding and retain a private, guard-precision equation. */
+lab_worker_implicit_t *lab_worker_implicit_new(const char *source, const char *const *names,
+                                              const char *const *limits, size_t count, double *bounds);
+
+/** @brief Evaluate world coordinates, or local unit coordinates when the frame requires extra precision. */
+double lab_worker_implicit_eval(lab_worker_implicit_t *sample, const double *point);
+
+/** @brief Convert an algorithm coordinate back to an owning, precision-preserving world coordinate. */
+number_t lab_worker_implicit_coordinate(const lab_worker_implicit_t *sample, size_t axis, double value);
+
+/** @brief Return the precision required to render the frame without collapsing its coordinates. */
+size_t lab_worker_implicit_precision(const lab_worker_implicit_t *sample);
+
+/** @brief Release the private equation and its exact coordinate frame. */
+void lab_worker_implicit_free(lab_worker_implicit_t *sample);
+
 /** @brief Plot equation sides, two-coordinate contours or explicit differential-equation curves and surfaces. */
 int lab_worker_solver_plot(int argc, char **argv);
 

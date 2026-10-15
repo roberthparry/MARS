@@ -46,6 +46,8 @@ size_t lab_worker_plot_range_precision(number_t lower, number_t upper)
     if (offset > width && (long double)offset - (long double)width > plot_precision_limit - 48)
         return plot_precision_limit + 1;
     size_t needed = offset > width ? (size_t)(offset - width) + 48 : 53;
+    if ((offset > 1023 || width < -1000) && needed < 64)
+        needed = 64;
     return needed > 53 ? needed : 53;
 }
 
@@ -113,6 +115,8 @@ bool lab_worker_plot_bounds(const char *lower, const char *upper, number_t *lo, 
 typedef struct {
     expr_t *expression, *axis;
     expr_t *second_derivative;
+    expr_t *first_derivative;
+    lab_worker_sample_t *value, *first, *second;
 } plot_evaluation_t;
 
 static sampler_status_t evaluate_plot(number_t parameter, number_t *x, number_t *y, void *argument)
@@ -120,9 +124,8 @@ static sampler_status_t evaluate_plot(number_t parameter, number_t *x, number_t 
     plot_evaluation_t *plot = argument;
     /* This freshly parsed graph is private: update its free binding, including uses inside binders.
      * Display-context snapshots deliberately do not enter summations or other scoped operations. */
-    expr_set_val(plot->axis, parameter);
     *x = num_clone(parameter);
-    *y = expr_eval(plot->expression);
+    *y = lab_worker_sample_eval(plot->value, &parameter);
     return SAMPLER_VALUE;
 }
 
@@ -138,10 +141,13 @@ static sampler_status_t evaluate_plot_derivatives(number_t parameter, number_t *
     const expr_t *variables[] = {plot->axis};
     /* Reverse mode uses this private graph's actual binding node. Unsupported
      * pullbacks leave tangents unavailable; the ordinary value remains useful. */
-    if (expr_eval_derivatives(plot->expression, 1, variables, y, dy) != 0)
+    if (plot->first) {
+        *y = lab_worker_sample_eval(plot->value, &parameter);
+        *dy = lab_worker_sample_eval(plot->first, &parameter);
+    } else if (expr_eval_derivatives(plot->expression, 1, variables, y, dy) != 0)
         *y = expr_eval(plot->expression);
-    if (plot->second_derivative)
-        *ddy = expr_eval(plot->second_derivative);
+    if (plot->second)
+        *ddy = lab_worker_sample_eval(plot->second, &parameter);
     return SAMPLER_VALUE;
 }
 
@@ -156,7 +162,7 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     bool detached_axis = !axis;
     if (detached_axis)
         axis = expr_new_named_var(NUM_NAN, variable);
-    number_t lo = num_as_inexact_real_prec(lower, bits), hi = num_as_inexact_real_prec(upper, bits);
+    number_t lo = lab_worker_sample_coordinate(lower, bits), hi = lab_worker_sample_coordinate(upper, bits);
     sampler_options_t options = sampler_options_default();
     options.intervals = probes || preview ? 16 : 64;
     options.max_evaluations = probes ? 17 : preview ? 513 : 8193;
@@ -167,11 +173,20 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     plot_evaluation_t evaluation = {.expression = expression, .axis = axis};
     if (!probes && !preview && expression && axis)
         evaluation.second_derivative = expr_create_2nd_deriv(expression, axis, axis);
+    if (!probes && !preview && bits == 53 && expression && axis)
+        evaluation.first_derivative = expr_create_deriv(expression, axis);
+    evaluation.value = lab_worker_sample_new(expression, &axis, 1, bits);
+    evaluation.first = lab_worker_sample_new(evaluation.first_derivative, &axis, 1, bits);
+    evaluation.second = lab_worker_sample_new(evaluation.second_derivative, &axis, 1, bits);
     sampler_t *samples = NULL;
-    if (expression && axis)
+    if (expression && axis && evaluation.value)
         samples = probes || preview ? sampler_new(evaluate_plot, &evaluation, lo, hi, &options) :
             sampler_new_with_derivatives(evaluate_plot_derivatives, &evaluation, lo, hi, &options);
     int saved_error = samples ? 0 : (errno ? errno : EINVAL);
+    lab_worker_sample_free(evaluation.second);
+    lab_worker_sample_free(evaluation.first);
+    lab_worker_sample_free(evaluation.value);
+    expr_free(evaluation.first_derivative);
     expr_free(evaluation.second_derivative);
     if (detached_axis)
         expr_free(axis);

@@ -13,8 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MARS_SHARED_EXPR_INTERNAL_ACCESS
-#include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
@@ -23,8 +21,7 @@ typedef struct {
 } contour_vertex_t;
 
 typedef struct {
-    expr_t *residual, *first, *second;
-    expr_real_sample_t *sampling;
+    lab_worker_implicit_t *sampling;
     plot_point_t *points;
     size_t count, capacity;
     double extent[4];
@@ -32,18 +29,8 @@ typedef struct {
 
 static double evaluate(contour_t *contour, double x, double y)
 {
-    double coordinates[] = {x, y}, approximate;
-    if (expr_real_sample_eval(contour->sampling, coordinates, &approximate))
-        return approximate;
-    number_t a = num_create_from_double(x), b = num_create_from_double(y);
-    expr_set_val(contour->first, a);
-    expr_set_val(contour->second, b);
-    num_destroy(&a);
-    num_destroy(&b);
-    number_t value = expr_eval(contour->residual);
-    double result = num_is_real(value) && num_is_finite(value) ? num_to_double(value) : NAN;
-    num_destroy(&value);
-    return result;
+    double coordinates[] = {x, y};
+    return lab_worker_implicit_eval(contour->sampling, coordinates);
 }
 
 static void clear_points(contour_t *contour)
@@ -94,8 +81,9 @@ static bool triangle(contour_t *contour, const contour_vertex_t vertices[3])
     if (contour->count + 2 > contour->capacity)
         return false;
     for (unsigned i = 0; i < 2; ++i) {
-        contour->points[contour->count++] = (plot_point_t){num_create_from_double(ends[i].x),
-                                                         num_create_from_double(ends[i].y), i == 0};
+        contour->points[contour->count++] = (plot_point_t){lab_worker_implicit_coordinate(contour->sampling, 0, ends[i].x),
+                                                         lab_worker_implicit_coordinate(contour->sampling, 1, ends[i].y),
+                                                         i == 0};
         contour->extent[0] = fmin(contour->extent[0], ends[i].x);
         contour->extent[1] = fmax(contour->extent[1], ends[i].x);
         contour->extent[2] = fmin(contour->extent[2], ends[i].y);
@@ -167,59 +155,40 @@ static bool sample(contour_t *contour, const double bounds[4], size_t side)
     return ok;
 }
 
-static bool bound(const char *text, double *value)
-{
-    if (!*text)
-        return true;
-    expr_t *expression = expr_from_string(text, NULL);
-    number_t number = expression ? expr_eval(expression) : NUM_NAN;
-    bool ok = num_is_real(number) && num_is_finite(number) && isfinite(num_to_double(number));
-    if (ok)
-        *value = num_to_double(number);
-    num_destroy(&number);
-    expr_free(expression);
-    return ok;
-}
-
 /* Sample only a private worker equation; restore its binding values and numerical precision on every exit. */
 int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *second, char **argv)
 {
     size_t saved_precision = num_get_default_prec_bits();
-    number_t saved_first = expr_eval(first), saved_second = expr_eval(second);
-    num_set_default_prec_bits(53);
-    contour_t contour = {.residual = expr_sub(equ_lhs(equation), equ_rhs(equation)),
-                         .first = first, .second = second, .capacity = 65536};
+    contour_t contour = {.capacity = 65536};
     contour.points = calloc(contour.capacity, sizeof(*contour.points));
-    const expr_t *axes[] = {first, second};
-    contour.sampling = expr_real_sample_new(contour.residual, axes, 2);
     double bounds[] = {-2, 2, -2, 2};
     bool manual = !strcmp(argv[7], "manual");
     bool fixed_x = *argv[5] || *argv[6];
-    bool ok = contour.residual && contour.points &&
+    const char *names[] = {expr_symbol_name(first), expr_symbol_name(second)};
+    const char *supplied[] = {argv[5], argv[6], manual ? argv[8] : "", manual ? argv[9] : ""};
+    contour.sampling = lab_worker_implicit_new(argv[1], names, supplied, 2, bounds);
+    num_set_default_prec_bits(lab_worker_implicit_precision(contour.sampling));
+    bool ok = contour.sampling && contour.points &&
               (!strcmp(argv[7], "auto") || !strcmp(argv[7], "all") || manual) &&
-              bound(argv[5], &bounds[0]) && bound(argv[6], &bounds[1]) &&
-              (!manual || (*argv[8] && *argv[9] && bound(argv[8], &bounds[2]) && bound(argv[9], &bounds[3])));
-    if (*argv[5] && !*argv[6])
-        bounds[1] = fmax(bounds[1], bounds[0] + 4);
-    if (*argv[6] && !*argv[5])
-        bounds[0] = fmin(bounds[0], bounds[1] - 4);
+              (!manual || (*argv[8] && *argv[9]));
     ok = ok && isfinite(bounds[0]) && isfinite(bounds[1]) && bounds[0] < bounds[1] && bounds[2] < bounds[3];
     bool valid_bounds = ok;
+    double centre[] = {(bounds[0] + bounds[1]) / 2, (bounds[2] + bounds[3]) / 2};
     for (unsigned attempt = 0; ok && attempt < 5; ++attempt) {
         ok = sample(&contour, bounds, 33);
         if (contour.count || (fixed_x && manual))
             break;
         if (!fixed_x) {
-            bounds[0] *= 4;
-            bounds[1] *= 4;
+            bounds[0] = centre[0] + (bounds[0] - centre[0]) * 4;
+            bounds[1] = centre[0] + (bounds[1] - centre[0]) * 4;
         } else if (!*argv[5]) {
             bounds[0] = bounds[1] - (bounds[1] - bounds[0]) * 4;
         } else if (!*argv[6]) {
             bounds[1] = bounds[0] + (bounds[1] - bounds[0]) * 4;
         }
         if (!manual) {
-            bounds[2] *= 4;
-            bounds[3] *= 4;
+            bounds[2] = centre[1] + (bounds[2] - centre[1]) * 4;
+            bounds[3] = centre[1] + (bounds[3] - centre[1]) * 4;
         }
     }
     if (ok && contour.count && !fixed_x && !manual) {
@@ -246,7 +215,7 @@ int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *sec
     plot_t *plot = ok ? plot_new(&options) : NULL;
     number_t limits[4];
     for (unsigned i = 0; i < 4; ++i)
-        limits[i] = num_create_from_double(bounds[i]);
+        limits[i] = lab_worker_implicit_coordinate(contour.sampling, i / 2, bounds[i]);
     ok = plot && plot_add_points(plot, contour.points, contour.count, argv[1], PLOT_LINES, 0x78d8cb) &&
          plot_set_bounds(plot, limits[0], limits[1], limits[2], limits[3]);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
@@ -263,14 +232,9 @@ int lab_worker_equation_contour(equation_t *equation, expr_t *first, expr_t *sec
     plot_free(plot);
     clear_points(&contour);
     free(contour.points);
-    expr_real_sample_free(contour.sampling);
-    expr_free(contour.residual);
+    lab_worker_implicit_free(contour.sampling);
     for (unsigned i = 0; i < 4; ++i)
         num_destroy(&limits[i]);
-    expr_set_val(first, saved_first);
-    expr_set_val(second, saved_second);
-    num_destroy(&saved_first);
-    num_destroy(&saved_second);
     num_set_default_prec_bits(saved_precision);
     return rc;
 }

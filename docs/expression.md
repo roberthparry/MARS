@@ -66,14 +66,16 @@ For numerical curves, [`sampler_expression()`](sampler.md) evaluates private
 graph and binding snapshots over a real interval; it never overwrites the source
 variable's binding. [`plot_t`](plot.md) can render these samples directly as SVG.
 
-Native implicit-plot workers can additionally use the controlled internal
+Native plotting workers can additionally use the controlled internal
 `expr_real_sample_new()`, `expr_real_sample_eval()` and `expr_real_sample_free()`
 interface. This bounded plan snapshots finite real constants and accepts up to
 three double-precision coordinates. Addition, subtraction, multiplication,
-division, negation, absolute value, squares, sine and cosine have guarded fast
+division, negation, absolute value, squares, sine, cosine, exponential, natural
+and common logarithms, and inverse cosine have guarded fast
 implementations. Unsupported operations, non-finite intermediates, large trig
 arguments and excessive propagated round-off request ordinary native evaluation.
-The round-off guards are numerical heuristics, not certified interval arithmetic.
+Coordinate conversion and operation round-off are included in the guards. These
+are numerical heuristics, not certified interval arithmetic.
 Plans are limited to 256 instructions and depth 64; they neither modify source
 bindings nor change `expr_eval()` or worksheet precision. Rebuild a plan when
 non-coordinate bindings change. This interface is not an installed public API.

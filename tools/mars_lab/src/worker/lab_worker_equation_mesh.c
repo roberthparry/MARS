@@ -12,8 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MARS_SHARED_EXPR_INTERNAL_ACCESS
-#include "internal/expr_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
@@ -28,8 +26,8 @@ typedef struct {
 } mesh_edge_t;
 
 typedef struct {
-    expr_t *residual, *variables[3];
-    expr_real_sample_t *sampling;
+    lab_worker_implicit_t *sampling;
+    double extent[6];
     number_t *coordinates[3];
     size_t count, capacity;
     mesh_edge_t *edges;
@@ -38,18 +36,7 @@ typedef struct {
 
 static double evaluate(equation_mesh_t *mesh, const double coordinate[3])
 {
-    double approximate;
-    if (expr_real_sample_eval(mesh->sampling, coordinate, &approximate))
-        return approximate;
-    for (unsigned axis = 0; axis < 3; ++axis) {
-        number_t value = num_create_from_double(coordinate[axis]);
-        expr_set_val(mesh->variables[axis], value);
-        num_destroy(&value);
-    }
-    number_t value = expr_eval(mesh->residual);
-    double result = num_is_real(value) && num_is_finite(value) ? num_to_double(value) : NAN;
-    num_destroy(&value);
-    return result;
+    return lab_worker_implicit_eval(mesh->sampling, coordinate);
 }
 
 static bool refine_edge(equation_mesh_t *mesh, mesh_vertex_t a, mesh_vertex_t b, mesh_vertex_t *out)
@@ -120,8 +107,12 @@ static bool tetrahedron(equation_mesh_t *mesh, const mesh_vertex_t vertices[4])
     for (unsigned triangle = 1; triangle + 1 < count; ++triangle) {
         unsigned indices[] = {0, triangle, triangle + 1};
         for (unsigned i = 0; i < 3; ++i) {
-            for (unsigned axis = 0; axis < 3; ++axis)
-                mesh->coordinates[axis][mesh->count] = num_create_from_double(polygon[indices[i]].coordinate[axis]);
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                double value = polygon[indices[i]].coordinate[axis];
+                mesh->coordinates[axis][mesh->count] = lab_worker_implicit_coordinate(mesh->sampling, axis, value);
+                mesh->extent[2 * axis] = fmin(mesh->extent[2 * axis], value);
+                mesh->extent[2 * axis + 1] = fmax(mesh->extent[2 * axis + 1], value);
+            }
             ++mesh->count;
         }
     }
@@ -174,20 +165,6 @@ static bool sample(equation_mesh_t *mesh, const double bounds[6], unsigned side)
     return ok;
 }
 
-static bool read_bound(const char *text, double *out)
-{
-    if (!*text)
-        return true;
-    expr_t *expr = expr_from_string(text, NULL);
-    number_t value = expr ? expr_eval(expr) : NUM_NAN;
-    bool ok = num_is_real(value) && num_is_finite(value) && isfinite(num_to_double(value));
-    if (ok)
-        *out = num_to_double(value);
-    num_destroy(&value);
-    expr_free(expr);
-    return ok;
-}
-
 /* Render an implicit three-coordinate residual without choosing a height-function branch. */
 int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second, expr_t *third, char **argv)
 {
@@ -200,21 +177,19 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
             return 1;
         }
     }
-    equation_mesh_t mesh = {.residual = expr_sub(equ_lhs(equation), equ_rhs(equation)),
-                            .variables = {first, second, third}, .capacity = 196608};
+    equation_mesh_t mesh = {.capacity = 196608,
+                            .extent = {INFINITY, -INFINITY, INFINITY, -INFINITY, INFINITY, -INFINITY}};
     size_t precision = num_get_default_prec_bits();
-    number_t saved[] = {expr_eval(first), expr_eval(second), expr_eval(third)};
-    num_set_default_prec_bits(53);
-    const expr_t *axes[] = {first, second, third};
-    mesh.sampling = expr_real_sample_new(mesh.residual, axes, 3);
     double bounds[] = {-2, 2, -2, 2, -2, 2};
     bool manual = !strcmp(argv[7], "manual");
     const char *supplied[] = {argv[5], argv[6], argv[12], argv[13], manual ? argv[8] : "", manual ? argv[9] : ""};
-    bool ok = mesh.residual && (manual || !strcmp(argv[7], "auto") || !strcmp(argv[7], "all"));
+    const char *names[] = {expr_symbol_name(first), expr_symbol_name(second), expr_symbol_name(third)};
+    mesh.sampling = lab_worker_implicit_new(argv[1], names, supplied, 3, bounds);
+    num_set_default_prec_bits(lab_worker_implicit_precision(mesh.sampling));
+    bool ok = mesh.sampling && (manual || !strcmp(argv[7], "auto") || !strcmp(argv[7], "all"));
     for (unsigned axis = 0; axis < 3; ++axis) {
         mesh.coordinates[axis] = calloc(mesh.capacity, sizeof(number_t));
-        ok = ok && mesh.coordinates[axis] && read_bound(supplied[2 * axis], &bounds[2 * axis]) &&
-             read_bound(supplied[2 * axis + 1], &bounds[2 * axis + 1]) && bounds[2 * axis] < bounds[2 * axis + 1];
+        ok = ok && mesh.coordinates[axis];
     }
     if (ok)
         ok = sample(&mesh, bounds, !strcmp(argv[17], "preview") ? 13 : 25) && mesh.count;
@@ -222,12 +197,7 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
     for (unsigned axis = 0; ok && axis < 3; ++axis) {
         if (*supplied[2 * axis] || *supplied[2 * axis + 1])
             continue;
-        double lower = INFINITY, upper = -INFINITY;
-        for (size_t i = 0; i < mesh.count; ++i) {
-            double value = num_to_double(mesh.coordinates[axis][i]);
-            lower = fmin(lower, value);
-            upper = fmax(upper, value);
-        }
+        double lower = mesh.extent[2 * axis], upper = mesh.extent[2 * axis + 1];
         double padding = fmax((upper - lower) * 0.1, 0.1);
         bounds[2 * axis] = lower - padding;
         bounds[2 * axis + 1] = upper + padding;
@@ -245,7 +215,7 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
          plot_set_view(plot, view[0], view[1]) && plot_set_roll(plot, view[2]);
     number_t limits[6];
     for (unsigned i = 0; i < 6; ++i)
-        limits[i] = num_create_from_double(bounds[i]);
+        limits[i] = lab_worker_implicit_coordinate(mesh.sampling, i / 2, bounds[i]);
     ok = ok && plot_set_bounds(plot, limits[0], limits[1], limits[2], limits[3]) &&
          plot_set_height_bounds(plot, limits[4], limits[5]);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
@@ -259,16 +229,13 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
     free(title);
     string_free(svg);
     plot_free(plot);
-    expr_real_sample_free(mesh.sampling);
-    expr_free(mesh.residual);
+    lab_worker_implicit_free(mesh.sampling);
     for (unsigned i = 0; i < 6; ++i)
         num_destroy(&limits[i]);
     for (unsigned axis = 0; axis < 3; ++axis) {
         for (size_t i = 0; i < mesh.count; ++i)
             num_destroy(&mesh.coordinates[axis][i]);
         free(mesh.coordinates[axis]);
-        expr_set_val(mesh.variables[axis], saved[axis]);
-        num_destroy(&saved[axis]);
     }
     num_set_default_prec_bits(precision);
     return rc;

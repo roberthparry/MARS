@@ -102,6 +102,36 @@ static sample_value_t square(sample_value_t a, sample_value_t b)
     return multiply(a, a);
 }
 
+static sample_value_t exponential(sample_value_t a, sample_value_t b)
+{
+    (void)b;
+    double value = exp(a.value);
+    return rounded(value, fabs(value) * expm1(a.error));
+}
+
+static sample_value_t logarithm(sample_value_t a, sample_value_t b)
+{
+    (void)b;
+    if (!(a.value > a.error))
+        return (sample_value_t){NAN, INFINITY};
+    return rounded(log(a.value), a.error / (a.value - a.error));
+}
+
+static sample_value_t arccosine(sample_value_t a, sample_value_t b)
+{
+    (void)b;
+    double edge = fabs(a.value) + a.error;
+    if (!(edge < 1))
+        return (sample_value_t){NAN, INFINITY};
+    return rounded(acos(a.value), a.error / sqrt((1 - edge) * (1 + edge)));
+}
+
+static sample_value_t common_logarithm(sample_value_t a, sample_value_t b)
+{
+    sample_value_t natural = logarithm(a, b);
+    return rounded(natural.value / log(10.0), natural.error / log(10.0));
+}
+
 static const sample_operation_t operations[EXPR_KIND_COUNT] = {
     [EXPR_KIND_ADD]   = add,
     [EXPR_KIND_SUB]   = subtract,
@@ -111,6 +141,10 @@ static const sample_operation_t operations[EXPR_KIND_COUNT] = {
     [EXPR_KIND_ABS]   = absolute,
     [EXPR_KIND_SIN]   = sine,
     [EXPR_KIND_COS]   = cosine,
+    [EXPR_KIND_EXP]   = exponential,
+    [EXPR_KIND_LOG]   = logarithm,
+    [EXPR_KIND_LOG10] = common_logarithm,
+    [EXPR_KIND_ACOS]  = arccosine,
 };
 
 static bool compile(expr_real_sample_t *sample, const expr_t *expr, const expr_t *const *axes,
@@ -190,7 +224,7 @@ bool expr_real_sample_eval(const expr_real_sample_t *sample, const double *coord
         const sample_instruction_t *instruction = &sample->instructions[i];
         sample_value_t result = instruction->constant;
         if (instruction->axis >= 0)
-            result = (sample_value_t){coordinates[instruction->axis], 0};
+            result = rounded(coordinates[instruction->axis], 0);
         else if (instruction->operation)
             result = instruction->operation(values[instruction->left], values[instruction->right]);
         if (!isfinite(result.value) || !isfinite(result.error))

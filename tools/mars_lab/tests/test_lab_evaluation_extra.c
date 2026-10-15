@@ -11,7 +11,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
+#include "xml-t.h"
 #include "lab_presentation.h"
 #include "lab_wire.h"
 #define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
@@ -537,6 +539,15 @@ static void test_lab_extra_solver_plots(void)
         show_failure(sphere);
     json_free(sphere);
     TEST_ASSERT_TRUE(sphere_ok, "coarse cached sphere edges retain both hemispheres");
+    expect_response("/eval", "{\"expression\":\"(x-1e30)^2+y^2+z^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_quality\":\"preview\","
+                             "\"plot_lower\":\"1e30-2\",\"plot_upper\":\"1e30+2\"}",
+                    200u, "plot_svg", "data-mesh=\"true\"");
+    expect_response("/eval", "{\"expression\":\"(x-1e30)^2+y^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_quality\":\"preview\","
+                             "\"plot_lower\":\"1e30-2\",\"plot_upper\":\"1e30+2\","
+                             "\"plot_scale\":\"manual\",\"plot_y_lower\":\"-2\",\"plot_y_upper\":\"2\"}",
+                    200u, "plot_svg", "data-series");
     expect_response("/eval", "{\"expression\":\"(x-0.2)^2+2*(y+0.1)^2+3*z^2=1\",\"wrt\":\"x\","
                              "\"action\":\"plot\",\"plot_source_mode\":\"equation\"}",
                     200u, "plot_svg", "data-mesh=\"true\"");
@@ -889,6 +900,39 @@ static void test_lab_extra_plot_precision(void)
     TEST_ASSERT_TRUE(scoped, "private plot bindings reach summand parameters without removing convergence gaps");
     TEST_ASSERT_TRUE(close_symbolic, "symbolic bounds closer than worksheet resolution remain distinct");
     TEST_ASSERT_TRUE(restored, "failed private parses restore worksheet precision");
+
+    const char *names[] = {"x", "y", "z"};
+    const char *limits[] = {"1e30-2", "1e30+2", "-2", "2", "-2", "2"};
+    double box[6], point[] = {0.75, 0.5, 0.5};
+    lab_worker_implicit_t *implicit = lab_worker_implicit_new("(x-1e30)^2+y^2+z^2=1", names, limits, 3, box);
+    number_t left = lab_worker_implicit_coordinate(implicit, 0, 0.5);
+    number_t right = lab_worker_implicit_coordinate(implicit, 0, 0.75);
+    bool precise_mesh = implicit && box[0] == 0 && box[1] == 1 && num_lt(left, right) &&
+                        fabs(lab_worker_implicit_eval(implicit, point)) < 1e-12 &&
+                        num_get_default_prec_bits() == saved;
+    if (!precise_mesh)
+        fprintf(stderr, "implicit precision: context=%p box=%g,%g ordered=%d residual=%.17g precision=%zu/%zu\n",
+                (void *)implicit, box[0], box[1], num_lt(left, right), lab_worker_implicit_eval(implicit, point),
+                num_get_default_prec_bits(), saved);
+    num_destroy(&right);
+    num_destroy(&left);
+    lab_worker_implicit_free(implicit);
+    TEST_ASSERT_TRUE(precise_mesh, "implicit local frames preserve distinct vertices beyond double coordinate resolution");
+
+    const char *ordinary_limits[] = {"-2", "2", "-2", "2"};
+    implicit = lab_worker_implicit_new("exp(x)-1=y", names, ordinary_limits, 2, box);
+    double small[] = {1e-20, 0};
+    double residual = lab_worker_implicit_eval(implicit, small);
+    TEST_ASSERT_TRUE(implicit && residual > 0.999999e-20 && residual < 1.000001e-20,
+                     "uncertain implicit double residuals fall back to a freshly parsed guard-precision graph");
+    lab_worker_implicit_free(implicit);
+    const char *tiny_limits[] = {"1e-100", "2e-100", "0", "1e-99"};
+    implicit = lab_worker_implicit_new("exp(x)-1=y", names, tiny_limits, 2, box);
+    small[0] = 1e-100;
+    residual = lab_worker_implicit_eval(implicit, small);
+    TEST_ASSERT_TRUE(implicit && residual > 0.999999e-100 && residual < 1.000001e-100,
+                     "small implicit viewports raise guard precision sufficiently to retain cancellation residuals");
+    lab_worker_implicit_free(implicit);
 }
 
 static void test_lab_extra_surface_names(void)
@@ -947,6 +991,81 @@ static void test_lab_extra_plot_title_fallback(void)
               !contains(fields, "plot_svg", "<formula>") && *lab_eval_text(fields, "plot_title_render_error");
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "failed title rendering preserves the curve, escapes the formula and records a diagnostic");
+
+    const char *valid[] = {
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 500\" data-note=\"a > b\">"
+        "<!--mars-native-chart-body--><text><![CDATA[a < b & c]]></text><svg><path d=\"M 0 0\"/></svg></svg>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:q=\"urn:plot-test\" viewBox=\"0 0 800 500\">"
+        "<q:g q:label=\"x &amp; y\"><text>π &lt; τ</text></q:g></svg>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 500\"></svg>",
+        "<?xml version=\"1.0\"?><!--prologue--><svg xmlns=\"http://www.w3.org/2000/svg\" "
+        "viewBox=\"0 0 800 500\"><g/></svg>\n",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 500\"/>"
+    };
+    for (size_t i = 0; i < sizeof(valid) / sizeof(*valid); ++i) {
+        fields = json_new_object();
+        lab_eval_set(fields, "plot_svg", valid[i]);
+        lab_eval_set(fields, "plot_title", "<formula>&");
+        lab_eval_set(fields, "plot_title_TeX", "\\input{not-permitted}");
+        lab_eval_plot_title(fields);
+        const string_t *output = json_string_value(lab_eval_get(fields, "plot_svg"));
+        xml_t *parsed = output ? xml_from_text(output) : NULL;
+        TEST_ASSERT_TRUE(parsed && contains(fields, "plot_svg", "data-plot-chart"),
+                         "title composition preserves valid quoted attributes, namespaces, nested SVG and prologues");
+        if (!i)
+            TEST_ASSERT_TRUE(contains(fields, "plot_svg", "<!--mars-native-chart-body--><text><![CDATA[a < b & c]]>"),
+                             "original marker comments and CDATA remain verbatim chart content");
+        xml_free(parsed);
+        json_free(fields);
+    }
+    const char *invalid[] = {
+        "<svg viewBox=\"0 0 800 500\"><g></svg>",
+        "<svg viewBox=\"0 0 800 500\" viewBox=\"0 0 800 500\"></svg>",
+        "<svg viewBox=\"0 0 800 500\"></svg><svg></svg>",
+        "<!DOCTYPE svg [<!ENTITY x SYSTEM 'file:///not-read'>]><svg viewBox=\"0 0 800 500\">&x;</svg>"
+    };
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(*invalid); ++i) {
+        fields = json_new_object();
+        lab_eval_set(fields, "plot_svg", invalid[i]);
+        lab_eval_set(fields, "plot_title", "formula");
+        lab_eval_set(fields, "plot_title_TeX", "\\input{not-permitted}");
+        lab_eval_plot_title(fields);
+        TEST_ASSERT_TRUE(!strcmp(lab_eval_text(fields, "plot_svg"), invalid[i]),
+                         "invalid chart XML is not composed or accepted by the fast path");
+        json_free(fields);
+    }
+
+    string_t *large = string_new_with("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 650\">"
+                                       "<g data-series=\"0\">");
+    const char *facet = "<path fill=\"#4495ab\" d=\"M 310.765 326.560 L 310.765 321.634 L 310.765 318.911 Z\" "
+                        "data-uv=\"91645412 -0 -2.8480163e+10 -91645412 -0 2.8480163e+10\"/>\n";
+    for (size_t i = 0; large && i < 13376; ++i)
+        if (string_append_cstr(large, facet) < 0) {
+            string_free(large);
+            large = NULL;
+        }
+    fields = json_new_object();
+    ok = large && string_append_cstr(large, "</g></svg>") == 0 &&
+         lab_eval_set(fields, "plot_svg", string_c_str(large)) &&
+         lab_eval_set(fields, "plot_title", "<formula>&") &&
+         lab_eval_set(fields, "plot_title_TeX", "\\input{not-permitted}");
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    if (ok)
+        lab_eval_plot_title(fields);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double elapsed = end.tv_sec - start.tv_sec + (end.tv_nsec - start.tv_nsec) * 1e-9;
+    string_printf("Large plot title composition: %.6fs (%zu bytes)\n", elapsed, string_byte_length(large));
+    TEST_ASSERT_TRUE(ok && contains(fields, "plot_svg", "data-plot-chart") &&
+                     contains(fields, "plot_svg", "&lt;formula&gt;&amp;"),
+                     "large surface retains chart metadata and escaped fallback title");
+    const char *body_start = large ? strchr(string_c_str(large), '>') : NULL;
+    const char *copied = body_start ? strstr(lab_eval_text(fields, "plot_svg"), "<g data-series=\"0\">") : NULL;
+    size_t body_length = body_start ? string_byte_length(large) - (size_t)(body_start + 1 - string_c_str(large)) - 6 : 0;
+    TEST_ASSERT_TRUE(copied && strlen(copied) >= body_length && !memcmp(copied, body_start + 1, body_length),
+                     "all triangle geometry, hover metadata and whitespace are preserved byte for byte");
+    json_free(fields);
+    string_free(large);
 }
 
 static void test_lab_plot_title_readme(void)

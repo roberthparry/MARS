@@ -1248,9 +1248,12 @@ edited; manually entered bounds keep their authored precision.
 Scrolling outside the plot image, including over its controls, behaves normally;
 other result cards still require Ctrl or Command with the wheel to zoom.
 
-Plotting normally uses a **53-bit mantissa** (roughly 16 decimal digits),
-independently of the worksheet precision. It retains `number_t`'s exponent range,
-not the restricted exponent range of a hardware double. X bounds and manual Y
+Plotting normally uses **hardware doubles** (a 53-bit mantissa, roughly 16 decimal
+digits), independently of the worksheet precision. Shared native evaluation plans
+accelerate supported curve values, curve derivatives and surface samples.
+Unsupported operations retain the ordinary native evaluator; higher-precision
+reference passes never use the double plan. Coordinates outside the safe double
+exponent range select native arbitrary-precision arithmetic as well. X bounds and manual Y
 bounds are parsed with guard precision first; narrow ranges at large offsets
 automatically request more bits. A private copy of the authored formula and
 bindings is parsed at the plotting precision, leaving worksheet output unchanged.
@@ -1367,12 +1370,26 @@ There is no additional server or persistent cache. Restarting the server clears
 the records; `MARS_LAB_PLOT_CACHE=0` disables reuse for profiling. Requests with an
 explicit non-zero calculation work limit bypass the cache.
 
-Implicit 2-D contours and 3-D isosurfaces use guarded native double evaluation
-for supported real arithmetic and trigonometric expressions. Uncertain values
-and unsupported operations fall back to ordinary evaluation; grid density and
-edge-refinement limits are unchanged. Symbolic solutions and worksheet precision
+Implicit 2-D contours and 3-D isosurfaces use the same guarded native double plans.
+Uncertain values and unsupported operations fall back to a separately parsed
+equation with at least 128 bits and additional coordinate guard bits. Narrow or
+out-of-double-range coordinate boxes use local unit coordinates for grid and edge
+interpolation, then reconstruct native world coordinates before rendering. Thus a
+large offset does not erase the distance between adjacent mesh vertices. Authored
+bounds are parsed before conversion; grid density and edge-refinement limits are
+unchanged. This is not a certified error bound or a guarantee of resolving arbitrary
+ill-conditioning. Browser gesture and hover metadata still use JavaScript numbers;
+native precision support does not remove that separate interface limitation.
+Symbolic solutions and worksheet precision
 are unaffected. The expression guide describes the bounded sampling plan and its
 numerical limitations.
+
+Title composition stream-validates native chart SVG, then copies its body
+verbatim into a small XML-built wrapper with the rendered TeX heading. This avoids
+retaining, cloning and reserialising every triangle or curve segment. Geometry,
+hover metadata and body whitespace are preserved; malformed XML remains rejected.
+Documents with prologues or other non-native root layouts retain the general XML
+tree path, and failed TeX rendering still produces an escaped plain-text heading.
 
 Complete plot records larger than 1 MiB can now be compressed into the existing
 1 MiB cache slots, with an 8 MiB decoded-record limit. Compression and decompression

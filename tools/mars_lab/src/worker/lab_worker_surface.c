@@ -28,7 +28,8 @@ typedef struct {
 } surface_grid_t;
 
 typedef struct {
-    expr_t *formula, *axis;
+    lab_worker_sample_t *evaluation;
+    number_t second;
 } surface_row_t;
 
 static void grid_free(surface_grid_t *grid)
@@ -47,9 +48,9 @@ static void grid_free(surface_grid_t *grid)
 static sampler_status_t sample_row(number_t parameter, number_t *x, number_t *z, void *argument)
 {
     surface_row_t *row = argument;
-    expr_set_val(row->axis, parameter);
     *x = num_clone(parameter);
-    *z = expr_eval(row->formula);
+    number_t coordinates[] = {parameter, row->second};
+    *z = lab_worker_sample_eval(row->evaluation, coordinates);
     return SAMPLER_VALUE;
 }
 
@@ -69,15 +70,17 @@ static surface_grid_t *grid_sample(const char *source, const char *first, const 
     surface_grid_t *grid = calloc(1, sizeof(*grid));
     if (grid)
         grid->side = side;
-    number_t lo = num_as_inexact_real_prec(bounds[0], bits), hi = num_as_inexact_real_prec(bounds[1], bits);
-    number_t bottom = num_as_inexact_real_prec(bounds[2], bits), top = num_as_inexact_real_prec(bounds[3], bits);
+    number_t lo = lab_worker_sample_coordinate(bounds[0], bits), hi = lab_worker_sample_coordinate(bounds[1], bits);
+    number_t bottom = lab_worker_sample_coordinate(bounds[2], bits), top = lab_worker_sample_coordinate(bounds[3], bits);
     number_t span = num_sub(top, bottom);
     bool ok = grid && formula && x && y;
     sampler_options_t options = sampler_options_default();
     options.method = SAMPLER_UNIFORM;
     options.intervals = side - 1;
     options.max_evaluations = side;
-    surface_row_t row = {.formula = formula, .axis = x};
+    expr_t *axes[] = {x, y};
+    surface_row_t row = {.evaluation = lab_worker_sample_new(formula, axes, 2, bits)};
+    ok = ok && row.evaluation;
     for (size_t r = 0; ok && r < side; ++r) {
         number_t fraction = num_create_from_frac((long)r, (long)side - 1);
         number_t offset = num_mul(span, fraction);
@@ -89,7 +92,7 @@ static surface_grid_t *grid_sample(const char *source, const char *first, const 
             ok = false;
             break;
         }
-        expr_set_val(y, grid->y[r]);
+        row.second = grid->y[r];
         sampler_t *samples = sampler_new(sample_row, &row, lo, hi, &options);
         ok = samples && sampler_count(samples) == side;
         for (size_t c = 0; ok && c < side; ++c) {
@@ -100,6 +103,7 @@ static surface_grid_t *grid_sample(const char *source, const char *first, const 
         }
         sampler_free(samples);
     }
+    lab_worker_sample_free(row.evaluation);
     num_destroy(&span);
     num_destroy(&top);
     num_destroy(&bottom);
