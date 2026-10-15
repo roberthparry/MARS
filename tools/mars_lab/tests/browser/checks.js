@@ -1915,6 +1915,13 @@
                               Number(mesh.dataset.xMin) > -1.3 && Number(mesh.dataset.xMax) < 1.3 &&
                               Number(mesh.dataset.zMin) > -1.3 && Number(mesh.dataset.zMax) < 1.3,
                               'The sphere stays round inside a tightly fitted equal-unit box');
+                        const axesBox = mesh.querySelector('[data-plot-axes]').getBBox();
+                        const top = Math.min(silhouette.y, axesBox.y);
+                        const bottom = Math.max(silhouette.y + silhouette.height, axesBox.y + axesBox.height);
+                        check(silhouette.width > mesh.viewBox.baseVal.width * 0.36 &&
+                              top < mesh.viewBox.baseVal.height * 0.12 &&
+                              bottom > mesh.viewBox.baseVal.height * 0.88,
+                              'The surface and axes fill the plot without large empty top and bottom margins');
                     }
                     if (source === 'x^2+y^2=1') {
                         const chart = plotRendered.querySelector('[data-plot-chart]');

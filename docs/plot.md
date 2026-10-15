@@ -160,6 +160,9 @@ Three open axes have tick strokes, decimal labels and no enclosing box. Native
 label layout reserves clearance between numbers, including shared corners.
 Surface labels may move slightly outwards; labels that still cannot fit are
 omitted without removing their tick marks. Curves also thin crowded tick labels.
+The camera fits the visible facets and coordinate axes with space for the heading
+and labels, rather than reserving empty projected bounding-box corners. This fit
+scales both screen directions uniformly and preserves mesh proportions.
 Margins account for long scientific labels. Sampled meshes can miss small holes,
 poles or rapid oscillations; joining finite vertices is not a continuity
 guarantee. No drawable cells gives `ENODATA`, except when a manual height interval

@@ -217,6 +217,33 @@ static vertex_t axis_vertex(const camera_t *view, unsigned axis, double t)
     return at;
 }
 
+static void include_extent(double extent[4], vertex_t at)
+{
+    extent[0] = fmin(extent[0], at.x);
+    extent[1] = fmax(extent[1], at.x);
+    extent[2] = fmin(extent[2], at.y);
+    extent[3] = fmax(extent[3], at.y);
+}
+
+static void fit_camera(const plot_t *plot, camera_t *view, double extent[4], double label_width)
+{
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        include_extent(extent, axis_vertex(view, axis, 0));
+        include_extent(extent, axis_vertex(view, axis, 1));
+    }
+    double margin = fmin(fmax(45, label_width + 25), (plot->options.width - 80) / 2.0);
+    double width = extent[1] - extent[0], height = extent[3] - extent[2];
+    if (!(width > 0) || !(height > 0))
+        return;
+    /* Fit visible facets and axes, not the empty corners of a projected cuboid. */
+    double scale = fmin((plot->options.width - 2 * margin) / width,
+                       (plot->options.height - 100) / height);
+    view->cx = plot->options.width * 0.5 + scale * (view->cx - (extent[0] + extent[1]) / 2);
+    view->cy = plot->options.height * 0.5 + scale * (view->cy - (extent[2] + extent[3]) / 2);
+    view->scale_x *= scale;
+    view->scale_y *= scale;
+}
+
 static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number_t bounds[6])
 {
     plot_tick_layout_t labels = {.width = plot->options.width, .height = plot->options.height, .font_size = 11};
@@ -349,13 +376,17 @@ string_t *plot_surface_svg(const plot_t *plot)
         }
     }
     size_t faces = 0;
+    double extent[] = {INFINITY, -INFINITY, INFINITY, -INFINITY};
     for (size_t i = 0; ok && plot->mesh && i + 2 < count; i += 3) {
         facet_t facet = {.a = i, .b = i + 1, .c = i + 2};
         vertex_t polygon[5];
         int clipped = clip_facet(vertices, &facet, &view, height_bounds, spans[2], polygon, &facet.depth);
         ok = clipped >= 0;
-        if (clipped >= 3)
+        if (clipped >= 3) {
             facets[faces++] = facet;
+            for (int j = 0; j < clipped; ++j)
+                include_extent(extent, polygon[j]);
+        }
     }
     for (size_t r = 0; ok && r + 1 < rows; ++r) {
         for (size_t c = 0; ok && c + 1 < columns; ++c) {
@@ -375,8 +406,11 @@ string_t *plot_surface_svg(const plot_t *plot)
                 vertex_t polygon[5];
                 int clipped = clip_facet(vertices, &facet, &view, height_bounds, spans[2], polygon, &facet.depth);
                 ok = clipped >= 0;
-                if (clipped >= 3)
+                if (clipped >= 3) {
                     facets[faces++] = facet;
+                    for (int k = 0; k < clipped; ++k)
+                        include_extent(extent, polygon[k]);
+                }
             }
         }
     }
@@ -385,6 +419,7 @@ string_t *plot_surface_svg(const plot_t *plot)
         ok = false;
     }
     if (ok) {
+        fit_camera(plot, &view, extent, label_width);
         qsort(facets, faces, sizeof(*facets), far_first);
         ok = string_append_format(svg, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%u\" height=\"%u\" "
                  "viewBox=\"0 0 %u %u\" role=\"img\" data-surface=\"true\" "
