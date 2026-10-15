@@ -634,6 +634,7 @@ additional special functions, parameter conditions or continuation machinery.
 | Functions | Remaining issue |
 | --- | --- |
 | `round` | Nearest-integer staircases have ordinary transforms for real linear arguments, but no dedicated Laplace rule is implemented. |
+| `roundn`, `rounds` | Decimal-place and significant-digit rounding have no dedicated Laplace rules; source-dependent transforms remain symbolic. |
 | `asec`, `acosec`, `atan2` | Branch boundaries, multi-argument choices and integrable endpoint singularities need explicit treatment. The supported `asin` and `acos` pairs and their remaining argument restrictions are described above. |
 | `asech`, `acosech`, `acoth` | Further inverse-hyperbolic transforms require special-function/branch formulas; real-domain and complex-domain interpretations differ. |
 | `arcversin`, `arcvercos`, `arccoversin`, `arccovercos`, `archaversin`, `archavercos`, `archacoversin`, `archacovercos` | Reduce to inverse circular functions, so their branch restrictions carry over. |

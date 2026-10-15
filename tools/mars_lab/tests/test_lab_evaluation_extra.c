@@ -1232,8 +1232,12 @@ static void test_lab_extra_equation(void)
                            &trig_status);
     const json_t *bindings = test_lab_member(trig, "binding_values");
     bool trig_ok = trig_status == 200u && contains(trig, "solutions_TeX", "\\mathbb{Z}") &&
+                   contains(trig, "solutions_TeX", "\\pm") &&
                    contains(trig, "svg", "<svg") && !*lab_eval_text(trig, "render_error") &&
                    json_array_size(bindings) == 3u;
+    trig_ok = trig_ok && lab_presentation_adapt(trig);
+    const char *trig_text = test_lab_text(test_lab_member(trig, "presentation"), "equation_solution_text");
+    trig_ok = trig_ok && strstr(trig_text, "±") && !strstr(trig_text, "2n + 1");
     for (size_t i = 0; i < json_array_size(bindings); ++i)
         trig_ok = trig_ok && !strcmp(test_lab_text(json_array_get(bindings, i), "value"), "NAN");
     if (!trig_ok)

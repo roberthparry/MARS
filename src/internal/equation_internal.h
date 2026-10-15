@@ -100,6 +100,9 @@ void equ_solutions_clear(equation_solutions_t *solutions);
  * Optional order indexes the solutions. Expression style places definitions after a binding bar. */
 string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, const size_t *order, style_t style);
 
+/** Render structurally opposite displacements about a shared centre, retaining any common denominator. */
+string_t *equ_solution_pair_rhs_text(const equation_t *first, const equation_t *second, style_t style);
+
 /* Attach faithful native mathematical notation to an equation's underlying expression trees. */
 int equ_set_display_TeX(equation_t *equation, const string_t *lhs, const string_t *rhs);
 

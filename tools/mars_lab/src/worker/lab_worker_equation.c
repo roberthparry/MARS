@@ -584,7 +584,17 @@ static char *solution_symbolic_pair_text(const equation_solutions_t *solutions, 
             goto cleanup;
         }
     }
-    /* Pair expression trees, never approximate values or parameterised families. */
+    if (first && second && !numeric_pair &&
+        (expr_has_unbound_parameters(equ_rhs(first), 0u, NULL) ||
+         expr_has_unbound_parameters(equ_rhs(second), 0u, NULL))) {
+        string_t *paired = equ_solution_pair_rhs_text(first, second, use_TeX ? style_LATEX : style_UNBOUND);
+        if (paired) {
+            text = dup_string(string_c_str(paired));
+            string_free(paired);
+            goto cleanup;
+        }
+    }
+    /* Pair remaining closed complex expressions without comparing approximate values. */
     if (!first || !second || numeric_pair || !expr_struct_eq(equ_lhs(first), equ_lhs(second)) ||
         expr_has_unbound_parameters(equ_rhs(first), 0u, NULL) ||
         expr_has_unbound_parameters(equ_rhs(second), 0u, NULL) ||

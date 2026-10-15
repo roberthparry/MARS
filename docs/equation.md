@@ -167,7 +167,10 @@ Stored complex roots with exact rational real and imaginary components use `=`
 in paired output and numerical evaluations; inexact components retain `≈`.
 Exact algebraic conjugates are paired by their expression structure, retaining
 surds and a shared denominator with an equality sign. Parameterised families
-remain separate; numerical evaluations do not establish a symbolic pairing.
+with structurally opposite terms also share a native `±` row: the common centre
+appears first, cancelling terms are simplified, and any shared denominator and
+integer branch condition are retained. The underlying branches remain separate;
+numerical evaluations do not establish a symbolic pairing.
 
 The native search, family and interpretation notes are available through
 `equ_solutions_search_note`, `equ_solutions_family_note` and

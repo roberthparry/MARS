@@ -7,8 +7,12 @@
  * neither the solver's algebra nor the numerical values are changed by presentation.
  */
 
+#include <stdlib.h>
+
 #include "number-t.h"
 #include "string-t.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
@@ -161,6 +165,107 @@ static long equ_pair_denominator(const expr_t **centre, const expr_t **offset)
     num_destroy(&offset_scale);
     num_destroy(&centre_scale);
     return denominator;
+}
+
+/* Compact symbolic families without changing their branch parameters or underlying solution trees. */
+string_t *equ_solution_pair_rhs_text(const equation_t *first, const equation_t *second, style_t style)
+{
+    if (!first || !second || !expr_struct_eq(equ_lhs(first), equ_lhs(second)))
+        return NULL;
+    const expr_t *a = equ_rhs(first), *b = equ_rhs(second);
+    const expr_t *an = NULL, *ad = NULL, *bn = NULL, *bd = NULL, *denominator = NULL;
+    if (expr_match_div_expr(a, &an, &ad) && expr_match_div_expr(b, &bn, &bd) && expr_struct_eq(ad, bd)) {
+        a = an;
+        b = bn;
+        denominator = ad;
+    }
+    expr_t *expanded_a = expr_display_expanded(a);
+    expr_t *expanded_b = expr_display_expanded(b);
+    equ_pair_sum_t sums[2] = {0};
+    bool opposite = false;
+    size_t matched[2] = {0};
+    if (expanded_a && expanded_b && equ_pair_collect(expanded_a, false, &sums[0], 0u) &&
+        equ_pair_collect(expanded_b, false, &sums[1], 0u)) {
+        /* The collector bounds this structural comparison to at most eight terms per side. */
+        for (size_t i = 0u; !opposite && i < sums[0].count; ++i)
+            for (size_t j = 0u; !opposite && j < sums[1].count; ++j) {
+                opposite = equ_pair_opposites(sums[0].terms[i], sums[1].terms[j]);
+                if (opposite) {
+                    matched[0] = i;
+                    matched[1] = j;
+                }
+            }
+    }
+    string_t *out = NULL;
+    if (opposite) {
+        expr_t *rest[2] = {expr_new_const(NUM_ZERO), expr_new_const(NUM_ZERO)};
+        for (size_t side = 0u; side < 2u; ++side) {
+            for (size_t i = 0u; i < sums[side].count; ++i) {
+                if (i == matched[side])
+                    continue;
+                equ_pair_term_t term = sums[side].terms[i];
+                expr_t *next = term.subtract ? expr_sub(rest[side], term.expr) : expr_add(rest[side], term.expr);
+                expr_free(rest[side]);
+                rest[side] = expr_simplify_owned(next);
+            }
+        }
+        expr_t *sum = expr_add(rest[0], rest[1]);
+        expr_t *difference = expr_simplify_owned(expr_sub(rest[0], rest[1]));
+        expr_t *half_sum = expr_div_long(sum, 2L);
+        expr_t *half_difference = expr_div_long(difference, 2L);
+        expr_t *centre = expr_simplify(half_sum);
+        equ_pair_term_t displacement = sums[0].terms[matched[0]];
+        expr_t *offset = expr_simplify_owned(displacement.subtract ? expr_sub(half_difference, displacement.expr) :
+                                                                    expr_add(half_difference, displacement.expr));
+        if (offset && equ_pair_negative(offset, 0u)) {
+            expr_t *positive = expr_simplify_owned(expr_neg(offset));
+            expr_free(offset);
+            offset = positive;
+        }
+        expr_t *pretty_centre = expr_beautify(centre);
+        expr_t *pretty_offset = expr_beautify(offset);
+        expr_t *expanded_centre = expr_display_expanded(pretty_centre);
+        expr_t *expanded_offset = expr_display_expanded(pretty_offset);
+        if (expanded_centre) {
+            expr_free(pretty_centre);
+            pretty_centre = expanded_centre;
+        }
+        if (expanded_offset) {
+            expr_free(pretty_offset);
+            pretty_offset = expanded_offset;
+        }
+        char *centre_text = pretty_centre ? (style == style_LATEX ? expr_to_TeX_body(pretty_centre) :
+                                                                  expr_to_string(pretty_centre, style)) : NULL;
+        char *offset_text = pretty_offset ? (style == style_LATEX ? expr_to_TeX_body(pretty_offset) :
+                                                                  expr_to_string(pretty_offset, style)) : NULL;
+        char *denominator_text = denominator ? (style == style_LATEX ? expr_to_TeX_body(denominator) :
+                                                                      expr_to_string(denominator, style)) : NULL;
+        if (centre_text && offset_text && (!denominator || denominator_text)) {
+            if (denominator)
+                out = string_sprintf(style == style_LATEX ? "\\frac{%s \\pm \\left(%s\\right)}{%s}" :
+                                     (expr_is_variable(denominator) ? "(%s ± (%s))/%s" : "(%s ± (%s))/(%s)"),
+                                     centre_text, offset_text, denominator_text);
+            else
+                out = string_sprintf(style == style_LATEX ? "%s \\pm \\left(%s\\right)" : "%s ± (%s)",
+                                     centre_text, offset_text);
+        }
+        free(denominator_text);
+        free(offset_text);
+        free(centre_text);
+        expr_free(pretty_offset);
+        expr_free(pretty_centre);
+        expr_free(offset);
+        expr_free(centre);
+        expr_free(half_difference);
+        expr_free(half_sum);
+        expr_free(difference);
+        expr_free(sum);
+        expr_free(rest[1]);
+        expr_free(rest[0]);
+    }
+    expr_free(expanded_b);
+    expr_free(expanded_a);
+    return out;
 }
 
 /* Render each pair as one row, retaining full ownership of intermediate text locally. */

@@ -2031,6 +2031,18 @@ static void test_equation_future_keeps_periodic_sin_family_symbolic(void)
         ASSERT_TRUE(equ_solutions_count(family) >= 2);
         ASSERT_TRUE(test_equation_result_has_solution_for(family, equ_binding(problem, "z")));
         ASSERT_TRUE(test_equation_result_has_rhs_text_containing(family, style_UNBOUND, "acos"));
+        for (size_t row = 0u; row + 1u < equ_solutions_count(family); row += 2u) {
+            string_t *paired = equ_solution_pair_rhs_text(equ_solutions_at(family, row),
+                                                          equ_solutions_at(family, row + 1u), style_UNBOUND);
+            ASSERT_TRUE(paired && string_find(paired, "±") >= 0);
+            ASSERT_TRUE(string_find(paired, "2n + 1") < 0);
+            string_t *TeX = equ_solution_pair_rhs_text(equ_solutions_at(family, row),
+                                                       equ_solutions_at(family, row + 1u), style_LATEX);
+            ASSERT_TRUE(TeX && string_find(TeX, "\\pm") >= 0);
+            ASSERT_TRUE(string_find(TeX, "$") < 0 && string_find(TeX, "\\[") < 0);
+            string_free(TeX);
+            string_free(paired);
+        }
         const char *names[] = {"x", "y", "z"};
         for (unsigned j = 0; j < 3; ++j) {
             number_t value = expr_get_val(equ_binding(problem, names[j]));
