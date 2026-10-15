@@ -1326,6 +1326,12 @@ The volume search starts at −2 to 2 for omitted coordinate ranges. If no surfa
 is found, it makes at most eight expanding 13-point-grid searches, changing only
 omitted endpoints. Once found, full-quality requests resample the expanded volume
 at the normal grid density, and automatic bounds fit the mesh with padding.
+When a discovered surface touches an automatic boundary, up to three additional
+coarse searches expand the affected endpoints to look for a complete bounded
+surface. If it remains open or the search exceeds its budget, the original volume
+is retained, so unbounded surfaces do not force unlimited expansion. The selected
+volume is then sampled at the requested detail. Edge refinement allows for
+floating-point round-off near roots without treating poles as surface crossings.
 Explicit endpoints are never expanded. An empty fully specified volume retains
 its axes and zoom controls with a “No surface found in this view” notice. Implicit meshes use
 equal coordinate units and a uniform camera scale, so a sphere remains spherical

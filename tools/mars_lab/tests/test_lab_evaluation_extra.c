@@ -193,6 +193,97 @@ static void test_lab_extra_surface_continuity(void)
     TEST_ASSERT_TRUE(ok, "rapid bounded surface retains a complete grid within the transport budget");
 }
 
+typedef struct {
+    long long coordinate[6];
+} mesh_test_edge_t;
+
+static int compare_mesh_edge(const void *left, const void *right)
+{
+    const mesh_test_edge_t *a = left, *b = right;
+    for (unsigned i = 0; i < 6; ++i)
+        if (a->coordinate[i] != b->coordinate[i])
+            return a->coordinate[i] < b->coordinate[i] ? -1 : 1;
+    return 0;
+}
+
+/* Every edge of these closed fixtures must have exactly two incident facets.
+ * Quantise below sampling resolution to merge round-off at shared grid vertices. */
+static bool closed_mesh(const char *svg)
+{
+    size_t capacity = 196608, count = 0;
+    mesh_test_edge_t *edges = calloc(capacity, sizeof(*edges));
+    bool ok = edges != NULL;
+    for (const char *p = strstr(svg, "data-vertices=\""); ok && p; p = strstr(p, "data-vertices=\"")) {
+        p += strlen("data-vertices=\"");
+        long long vertices[3][3];
+        for (unsigned i = 0; i < 3; ++i)
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                char *end = NULL;
+                double value = strtod(p, &end);
+                ok &= end != p && isfinite(value);
+                vertices[i][axis] = llround(value * 1e7);
+                p = end;
+            }
+        bool degenerate = false;
+        for (unsigned i = 0; i < 3; ++i)
+            degenerate |= !memcmp(vertices[i], vertices[(i + 1) % 3], sizeof(vertices[i]));
+        if (degenerate)
+            continue;
+        for (unsigned i = 0; ok && i < 3; ++i) {
+            const long long *a = vertices[i], *b = vertices[(i + 1) % 3];
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                if (a[axis] == b[axis])
+                    continue;
+                if (a[axis] > b[axis]) {
+                    const long long *swap = a;
+                    a = b;
+                    b = swap;
+                }
+                break;
+            }
+            ok = count < capacity;
+            if (ok) {
+                memcpy(edges[count].coordinate, a, sizeof(vertices[0]));
+                memcpy(edges[count++].coordinate + 3, b, sizeof(vertices[0]));
+            }
+        }
+    }
+    if (ok)
+        qsort(edges, count, sizeof(*edges), compare_mesh_edge);
+    size_t unmatched = 0;
+    for (size_t i = 0; ok && i < count;) {
+        size_t end = i + 1;
+        while (end < count && !compare_mesh_edge(&edges[i], &edges[end]))
+            ++end;
+        unmatched += end - i != 2;
+        i = end;
+    }
+    if (unmatched)
+        string_printf("Unpaired mesh edges: %zu of %zu\n", unmatched, count);
+    free(edges);
+    return ok && count > 0 && unmatched == 0;
+}
+
+static void test_lab_extra_mesh_closed(void)
+{
+    const char *equations[] = {"x^2+y^2+z^2=9", "(sqrt(x^2+y^2)-2)^2+z^2=1"};
+    for (unsigned i = 0; i < 2; ++i) {
+        unsigned status = 0;
+        string_t *payload = string_sprintf(
+            "{\"expression\":\"%s\",\"wrt\":\"x\",\"action\":\"plot\","
+            "\"plot_source_mode\":\"equation\",\"plot_scale\":\"auto\"}", equations[i]);
+        json_t *fields = request("/eval", string_c_str(payload), &status);
+        const char *svg = lab_eval_text(fields, "plot_svg");
+        const char *lo = strstr(svg, "data-x-min=\""), *hi = strstr(svg, "data-x-max=\"");
+        bool ok = status == 200 && test_lab_ok(fields, true) && lo && hi &&
+                  strtod(lo + strlen("data-x-min=\""), NULL) < -3 &&
+                  strtod(hi + strlen("data-x-max=\""), NULL) > 3 && closed_mesh(svg);
+        json_free(fields);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "automatic sphere and torus contain complete closed surfaces beyond the initial box");
+    }
+}
+
 static void test_lab_extra_mesh_crossings(void)
 {
     /* Within this box exactly two separate phase sheets meet. Their union must
@@ -1962,6 +2053,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_solver_plots, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_mesh_budget, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_mesh_crossings, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_mesh_closed, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_solution_families, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_frame, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);

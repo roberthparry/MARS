@@ -7,6 +7,7 @@
  * independent facets use the shared plot camera and renderer. Finite sampling is
  * illustrative, not a completeness or existence proof for arbitrary equations.
  */
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,11 +46,13 @@ static bool refine_edge(equation_mesh_t *mesh, mesh_vertex_t a, mesh_vertex_t b,
     /* Require improvement over the better endpoint: a large pole must not make
      * the opposite endpoint look like an already-converged zero. */
     double scale = fmin(fabs(a.value), fabs(b.value));
+    double rounding = 32 * DBL_EPSILON * fmin(1.0, fmax(fabs(a.value), fabs(b.value)));
+    double tolerance = fmax(scale * 0.0001, rounding);
     *out = fabs(a.value) < fabs(b.value) ? a : b;
     /* Near an already-small endpoint, fourteen bisections can exhaust the budget
      * before a smooth crossing converges. Keep the residual test, but allow enough
      * bracket refinement for binary64 coordinates. Ordinary edges still exit early. */
-    for (unsigned step = 0; step < 52 && fabs(out->value) > scale * 0.0001; ++step) {
+    for (unsigned step = 0; step < 52 && fabs(out->value) > tolerance; ++step) {
         mesh_vertex_t middle = {0};
         double weight = a.value / (a.value - b.value);
         if (!isfinite(weight) || weight < 0.1 || weight > 0.9)
@@ -66,7 +69,10 @@ static bool refine_edge(equation_mesh_t *mesh, mesh_vertex_t a, mesh_vertex_t b,
         else
             b = middle;
     }
-    return fabs(out->value) <= scale * 0.001;
+    /* A nearly exact grid endpoint cannot improve below evaluation round-off.
+     * Scale the floor down for small residuals and cap it so a large pole cannot
+     * inflate the acceptance threshold at the other endpoint. */
+    return fabs(out->value) <= fmax(scale * 0.001, rounding);
 }
 
 static bool edge(equation_mesh_t *mesh, mesh_vertex_t a, mesh_vertex_t b, mesh_vertex_t *out)
@@ -232,6 +238,26 @@ static void clear_mesh(equation_mesh_t *mesh)
     mesh->overflow = false;
 }
 
+/* Probe only clipped, automatic endpoints. Unbounded surfaces must not force an
+ * ever-growing viewport; callers retain the original box if probing stays open. */
+static bool expand_clipped(const equation_mesh_t *mesh, double bounds[6], const char *const supplied[6])
+{
+    bool changed = false;
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        unsigned lo = 2 * axis, hi = lo + 1;
+        double span = bounds[hi] - bounds[lo];
+        double tolerance = span * 1e-8;
+        bool lower = !*supplied[lo] && mesh->extent[lo] <= bounds[lo] + tolerance;
+        bool upper = !*supplied[hi] && mesh->extent[hi] >= bounds[hi] - tolerance;
+        if (lower)
+            bounds[lo] -= span * 0.5;
+        if (upper)
+            bounds[hi] += span * 0.5;
+        changed |= lower || upper;
+    }
+    return changed;
+}
+
 /* Retry the complete volume, never a truncated prefix of its facets. */
 static bool sample_bounded(equation_mesh_t *mesh, const double bounds[6], unsigned *side)
 {
@@ -286,6 +312,26 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
     if (ok && mesh.count && expanded && side != 13) {
         clear_mesh(&mesh);
         ok = sample_bounded(&mesh, bounds, &side);
+    }
+    if (ok && mesh.count) {
+        double original[6], probe[6];
+        memcpy(original, bounds, sizeof(original));
+        memcpy(probe, bounds, sizeof(probe));
+        bool clipped = expand_clipped(&mesh, probe, supplied);
+        bool searched = clipped;
+        for (unsigned attempt = 0; clipped && ok && attempt < 3; ++attempt) {
+            memcpy(bounds, probe, sizeof(probe));
+            clear_mesh(&mesh);
+            ok = sample(&mesh, bounds, 13);
+            clipped = !mesh.count || expand_clipped(&mesh, probe, supplied);
+        }
+        if (searched) {
+            if (!ok || clipped)
+                memcpy(bounds, original, sizeof(original));
+            clear_mesh(&mesh);
+            mesh.excessive_levels = false;
+            ok = sample_bounded(&mesh, bounds, &side);
+        }
     }
     bool explicit_volume = true;
     for (unsigned i = 0; i < 6; ++i)

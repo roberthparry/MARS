@@ -8,6 +8,7 @@
  * components; finite sampling cannot certify completeness or find every isolated
  * zero or very small component. This isolated worker never rewrites browser text.
  */
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,8 +51,10 @@ static bool crossing(contour_t *contour, contour_vertex_t a, contour_vertex_t b,
         return false;
     /* Measure convergence against the better endpoint, not an arbitrarily large pole. */
     double scale = fmin(fabs(a.value), fabs(b.value));
+    /* Match the volume sampler's round-off floor without letting poles inflate it. */
+    double rounding = 32 * DBL_EPSILON * fmin(1.0, fmax(fabs(a.value), fabs(b.value)));
     contour_vertex_t best = fabs(a.value) < fabs(b.value) ? a : b;
-    for (unsigned i = 0; i < 52 && fabs(best.value) > scale * 0.00001; ++i) {
+    for (unsigned i = 0; i < 52 && fabs(best.value) > fmax(scale * 0.00001, rounding); ++i) {
         contour_vertex_t mid = {.x = (a.x + b.x) / 2, .y = (a.y + b.y) / 2};
         mid.value = evaluate(contour, mid.x, mid.y);
         if (!isfinite(mid.value))
@@ -64,7 +67,7 @@ static bool crossing(contour_t *contour, contour_vertex_t a, contour_vertex_t b,
             b = mid;
     }
     /* A sign change across a pole does not converge to a residual zero. */
-    if (fabs(best.value) > scale * 0.0001)
+    if (fabs(best.value) > fmax(scale * 0.0001, rounding))
         return false;
     *point = best;
     return true;
