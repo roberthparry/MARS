@@ -49,7 +49,7 @@ static int curve_available(int first)
 /* Project a bounded UI catalogue, not a symbol lookup or mathematical rewrite. */
 void lab_plot_controls_sync(void)
 {
-    int solver = lab_workspace_mode() == 1 || lab_workspace_mode() == 2;
+    int solver = lab_workspace_mode() == 1 || lab_workspace_mode() == 2 || lab_workspace_mode() == 4;
     lab_dom_class(lab_dom_id("plotKindGroup"), "hidden", solver);
     int first = value("plotFirst"), second = value("plotSecond");
     int curve_allowed = solver || curve_available(first);
@@ -73,8 +73,11 @@ void lab_plot_controls_sync(void)
         lab_dom_release(mark);
     }
     int range = lab_dom_id("plotRange");
-    int pde = lab_workspace_mode() == 2 && lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) == 2;
+    double dimensions = lab_dom_to_number(lab_dom_get(range, "marsPlotVariables"));
+    int pde = (lab_workspace_mode() == 2 && dimensions == 2) || (lab_workspace_mode() == 1 && dimensions == 3);
     int kind = solver ? lab_dom_string(pde ? "surface" : "curve") : value("plotKind");
+    if (solver && lab_dom_query(0, "#plotRendered [data-series]"))
+        kind = lab_dom_string(lab_dom_query(0, "#plotRendered [data-surface]") ? "surface" : "curve");
     int curve = lab_dom_equal(kind, lab_dom_string("curve"));
     int surface = lab_dom_equal(kind, lab_dom_string("surface"));
     if (lab_dom_query(0, "#plotRendered [data-series]"))
@@ -182,7 +185,7 @@ void lab_plot_controls_dispatch(unsigned action, int event, int context)
     if (action == 3 && (!lab_dom_equal(lab_dom_get(target, "name"), lab_dom_string("plotScale")) ||
                        !lab_dom_equal(lab_dom_read(target, 5, ""), lab_dom_string("auto"))))
         return;
-    if (!lab_dom_closest(target, "input") || lab_workspace_mode() > 2)
+    if (!lab_dom_closest(target, "input") || (lab_workspace_mode() > 2 && lab_workspace_mode() != 4))
         return;
     /* Authored bounds take precedence over the exact coordinate behind a rounded zoom label. */
     lab_dom_delete(target, "marsZoomText");

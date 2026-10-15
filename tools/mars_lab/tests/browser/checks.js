@@ -1860,6 +1860,7 @@
             for (const [mode, source, series, surface] of [
                 ['equation', 'x^2=1', 2, false],
                 ['equation', 'x^2+y^2=1', 1, false],
+                ['equation', 'x^2+y^2+z^2=1', 1, true],
                 ['equation', 'x^4-x^3-26x^2+4x+8=0', 2, false],
                 ['diffequation', 'Dx(y)=x*y; y(0)=1', 1, false],
                 ['diffequation', "y''+6y*y'+4y^3=0; y(0)=1; y'(0)=0", 1, false],
@@ -1904,6 +1905,17 @@
                 check((getComputedStyle(document.getElementById('plotCamera')).display !== 'none') === surface,
                       mode + ' shows camera controls only for a surface');
                 if (mode === 'equation') {
+                    if (source === 'x^2+y^2+z^2=1') {
+                        const mesh = plotRendered.querySelector('[data-mesh="true"]');
+                        check(mesh && Number(mesh.dataset.sampleZMin) < -0.99 &&
+                              Number(mesh.dataset.sampleZMax) > 0.99,
+                              'The sphere contains both hemispheres, not a single height branch');
+                        const silhouette = mesh.querySelector('[data-series]').getBBox();
+                        check(Math.abs(silhouette.width / silhouette.height - 1) < 0.03 &&
+                              Number(mesh.dataset.xMin) > -1.3 && Number(mesh.dataset.xMax) < 1.3 &&
+                              Number(mesh.dataset.zMin) > -1.3 && Number(mesh.dataset.zMax) < 1.3,
+                              'The sphere stays round inside a tightly fitted equal-unit box');
+                    }
                     if (source === 'x^2+y^2=1') {
                         const chart = plotRendered.querySelector('[data-plot-chart]');
                         const d = chart.dataset, quadrants = new Set();
@@ -2005,7 +2017,7 @@
                     document.querySelector('#plotScaleChoices input[value="auto"]').click();
                 }
                 check((document.getElementById('plotCamera').getClientRects().length > 0) === surface,
-                      mode + ' shows camera controls only for PDE surfaces');
+                      mode + ' shows camera controls only for surfaces');
                 check(currentMode() === mode && currentExpressionText() === authored, mode + ' retains the authored problem: ' +
                       JSON.stringify({mode: currentMode(), before: authored, after: currentExpressionText()}));
                 check(!currentDifferentiable, mode + ' does not expose expression derivative buttons');
@@ -2028,6 +2040,32 @@
             setExpressionEditor("y''+3y*y'+y^4=0; y(0)=1; y'(0)=0");
             await evaluateCurrentMode();
             check(!document.getElementById('expressionPlot'), 'Local Taylor series must not advertise unsupported plotting');
+            setMode('integrator');
+            syncModeUI();
+            setExpressionEditor('sin(x)');
+            renderIntegratorRows([{kind: 'bound', name: 'x', lo: '-pi', hi: 'pi'}]);
+            await evaluateCurrentMode();
+            await waitForAutomaticPlot();
+            check(!!plotRendered.querySelector('[data-integral-shading]') &&
+                  !!plotRendered.querySelector('[data-sign="positive"]') &&
+                  !!plotRendered.querySelector('[data-sign="negative"]'),
+                  'Integrator Evaluate independently plots and shades both signed contributions');
+            check(!!rendered.querySelector('svg') && value.textContent.trim(),
+                  'Integrator plot retains its mathematical and numerical results');
+            const integrationRows = JSON.stringify(currentIntegratorBoundRows());
+            document.getElementById('plotLower').value = '-1';
+            document.getElementById('plotUpper').value = '1';
+            await takePlot('x');
+            check(JSON.stringify(currentIntegratorBoundRows()) === integrationRows,
+                  'Integrator viewport changes never alter integration limits');
+            setExpressionEditor('sin(t)');
+            renderIntegratorRows([{kind: 'bound', name: 't', lo: '', hi: ''}]);
+            await evaluateCurrentMode();
+            await waitForAutomaticPlot();
+            check(!!plotRendered.querySelector('[data-series]') &&
+                  !plotRendered.querySelector('[data-integral-shading]') &&
+                  document.getElementById('plotFirst').value === 't',
+                  'Indefinite integrals plot the integrand without shading using the authored variable');
             setMode('expression');
             syncModeUI();
             setExpressionEditor('3+4');

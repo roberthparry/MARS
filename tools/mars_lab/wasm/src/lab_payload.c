@@ -50,8 +50,18 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
     }
     lab_dom_set(payload, "action", action);
     if (lab_dom_equal(action, lab_dom_string("plot"))) {
+        int axis = lab_dom_item(inputs, 3);
         lab_dom_set(payload, "plot_source_mode", lab_dom_item(inputs, 5));
-        lab_plot_controls_prepare(lab_dom_item(inputs, 3));
+        if (lab_dom_equal(lab_dom_item(inputs, 5), lab_dom_string("integrator"))) {
+            lab_dom_set(payload, "bounds", lab_dom_item(inputs, 7));
+            int rows = lab_dom_item(inputs, 7), names = lab_dom_object(4);
+            for (unsigned i = 0; i < lab_dom_count(rows); ++i)
+                lab_dom_push(names, lab_dom_get(lab_dom_item(rows, i), "name"));
+            lab_plot_controls_variables(names, names);
+            axis = lab_dom_item(names, 0);
+            lab_dom_set(payload, "wrt", axis);
+        }
+        lab_plot_controls_prepare(axis);
         lab_dom_class(lab_dom_id("plotCard"), "hidden", 0);
         lab_dom_set(payload, "plot_lower", lab_payload_control("#plotLower"));
         lab_dom_set(payload, "plot_upper", lab_payload_control("#plotUpper"));
@@ -63,14 +73,15 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
         lab_dom_set(payload, "plot_elevation", lab_payload_control("#plotElevation"));
         lab_dom_set(payload, "plot_roll", lab_payload_control("#plotRoll"));
         lab_dom_set(payload, "plot_quality", lab_dom_string(lab_dom_truth(lab_dom_item(inputs, 6)) ? "preview" : "full"));
-        lab_dom_write(lab_dom_query(0, "#plotRange"), 3, "rotationVariable", lab_dom_item(inputs, 3));
+        lab_dom_write(lab_dom_query(0, "#plotRange"), 3, "rotationVariable", axis);
         lab_dom_set(payload, "plot_scale", lab_payload_control("#plotScale"));
         lab_dom_set(payload, "plot_y_lower", lab_payload_control("#plotYLower"));
         lab_dom_set(payload, "plot_y_upper", lab_payload_control("#plotYUpper"));
         int mode = lab_dom_item(inputs, 5);
         if (lab_dom_equal(mode, lab_dom_string("equation")) || lab_dom_equal(mode, lab_dom_string("diffequation"))) {
-            int pde = lab_dom_equal(mode, lab_dom_string("diffequation")) &&
-                      lab_dom_to_number(lab_dom_get(lab_dom_id("plotRange"), "marsPlotVariables")) == 2;
+            double dimensions = lab_dom_to_number(lab_dom_get(lab_dom_id("plotRange"), "marsPlotVariables"));
+            int pde = (lab_dom_equal(mode, lab_dom_string("diffequation")) && dimensions == 2) ||
+                      (lab_dom_equal(mode, lab_dom_string("equation")) && dimensions == 3);
             lab_dom_set(payload, "plot_kind", lab_dom_string(pde ? "surface" : "curve"));
             if (!pde)
                 lab_dom_set(payload, "plot_second", lab_dom_string(""));

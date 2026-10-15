@@ -91,7 +91,7 @@ static bool page_escaping(const char *directory)
          string_find(page, "id=\"lab-config\"") < 0 &&
          string_find(page, "__LAB_NAME__") >= 0 && string_find(page, "MARS_LAB_DATA") < 0;
     json_t *config = lab_page_bootstrap(state);
-    ok = ok && !strcmp(test_lab_text(config, "BROWSER_ABI_VERSION"), "35");
+    ok = ok && !strcmp(test_lab_text(config, "BROWSER_ABI_VERSION"), "36");
     const json_t *token = test_lab_member(config, "CONTROL_TOKEN");
     const string_t *token_text = json_string_value(token);
     ok = ok && token_text && string_view_equals_literal(string_view_all(token_text),

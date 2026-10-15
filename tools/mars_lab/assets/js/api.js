@@ -196,7 +196,8 @@ async function fetchEvaluation(text, wrt = '', action = '', bindingSource = '', 
     return labRequests.post(
         request,
         labDOM.call(
-            'lab_payload_build', 0, [text, bindingSource, bindingValue, wrt, action, currentMode(), preview], request,
+            'lab_payload_build', 0, [text, bindingSource, bindingValue, wrt, action, currentMode(), preview,
+                                    currentMode() === 'integrator' ? currentIntegratorBoundRows() : []], request,
             requestedValuePrecision(), lastExpressionUpdatedAt),
         '/eval');
 }

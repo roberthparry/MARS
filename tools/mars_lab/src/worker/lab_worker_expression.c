@@ -2005,6 +2005,8 @@ int lab_worker_expression(int argc, char **argv)
     if (precision > 0)
         num_set_default_prec_digits((size_t)precision + 8u);
 
+    if (!strcmp(action, "plot") && argc > 18 && !strcmp(argv[18], "integrator"))
+        return lab_worker_integrand_plot(argc, argv);
     if (!strcmp(action, "plot") && argc > 18 && strcmp(argv[18], "expression"))
         return lab_worker_solver_plot(argc, argv);
 

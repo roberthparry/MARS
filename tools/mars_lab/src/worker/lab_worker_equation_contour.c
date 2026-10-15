@@ -98,6 +98,44 @@ static bool triangle(contour_t *contour, const contour_vertex_t vertices[3])
     return true;
 }
 
+/* Refine cells whose curvature could hide a closed component between grid vertices. */
+static bool cell(contour_t *contour, const contour_vertex_t corners[4], unsigned depth)
+{
+    contour_vertex_t centre = {.x = (corners[0].x + corners[2].x) / 2,
+                               .y = (corners[0].y + corners[2].y) / 2};
+    centre.value = evaluate(contour, centre.x, centre.y);
+    double minimum = fabs(centre.value), average = 0;
+    bool same = true, finite = isfinite(centre.value);
+    for (unsigned i = 0; i < 4; ++i) {
+        minimum = fmin(minimum, fabs(corners[i].value));
+        average += corners[i].value / 4;
+        same &= (corners[i].value > 0) == (centre.value > 0);
+        finite &= isfinite(corners[i].value);
+    }
+    double curvature = fabs(centre.value - average);
+    if (depth && finite && (!same || (curvature > 0 && minimum <= 2 * curvature))) {
+        contour_vertex_t middle[4];
+        for (unsigned i = 0; i < 4; ++i) {
+            unsigned next = (i + 1) % 4;
+            middle[i] = (contour_vertex_t){.x = (corners[i].x + corners[next].x) / 2,
+                                           .y = (corners[i].y + corners[next].y) / 2};
+            middle[i].value = evaluate(contour, middle[i].x, middle[i].y);
+        }
+        for (unsigned i = 0; i < 4; ++i) {
+            contour_vertex_t child[] = {corners[i], middle[i], centre, middle[(i + 3) % 4]};
+            if (!cell(contour, child, depth - 1))
+                return false;
+        }
+        return true;
+    }
+    for (unsigned i = 0; i < 4; ++i) {
+        contour_vertex_t vertices[] = {corners[i], corners[(i + 1) % 4], centre};
+        if (!triangle(contour, vertices))
+            return false;
+    }
+    return true;
+}
+
 static bool sample(contour_t *contour, const double bounds[4], size_t side)
 {
     clear_points(contour);
@@ -115,9 +153,8 @@ static bool sample(contour_t *contour, const double bounds[4], size_t side)
     for (size_t row = 0; ok && row + 1 < side; ++row) {
         for (size_t col = 0; ok && col + 1 < side; ++col) {
             size_t at = row * side + col;
-            contour_vertex_t a[] = {grid[at], grid[at + 1], grid[at + side + 1]};
-            contour_vertex_t b[] = {grid[at], grid[at + side + 1], grid[at + side]};
-            ok = triangle(contour, a) && triangle(contour, b);
+            contour_vertex_t corners[] = {grid[at], grid[at + 1], grid[at + side + 1], grid[at + side]};
+            ok = cell(contour, corners, side == 33 ? 4 : 2);
         }
     }
     free(grid);

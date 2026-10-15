@@ -125,7 +125,7 @@ static int start(int event, int state)
     int target = lab_dom_get(event, "target");
     if (lab_dom_truth(lab_dom_get(state, "busy")) || lab_dom_truth(lab_dom_get(state, "active")) ||
         lab_dom_truth(lab_dom_get(state, "wheel")) ||
-        lab_workspace_mode() > 2 || !surface ||
+        (lab_workspace_mode() > 2 && lab_workspace_mode() != 4) || !surface ||
         read_number(event, "button") != 0 ||
         !lab_dom_truth(lab_dom_get(event, "isPrimary")) ||
         lab_dom_truth(lab_dom_get(event, "ctrlKey")) || lab_dom_truth(lab_dom_get(event, "metaKey")) ||

@@ -1,6 +1,6 @@
 /**
  * @file plot-t.h
- * @brief Owned curve and height-surface scenes with in-memory SVG rendering.
+ * @brief Owned curves, height grids and triangle meshes with in-memory SVG rendering.
  *
  * plot_t copies sampled or measured number_t coordinates, labels and styles.
  * Linear bottom/left axes with open top/right edges, automatic or explicit bounds, ticks, a grid and a legend
@@ -8,6 +8,8 @@
  * Rectangular height grids have azimuth, elevation and roll controls, named positive-end
  * axis arrows, automatic or manual height limits, coloured facets and holes at missing values; they cannot be mixed
  * with curve series in the same scene. Endpoint names stay upright during rotation.
+ * Independent triangle meshes also represent implicit surfaces with multiple
+ * heights per horizontal point. Curve intervals can carry signed shading to zero.
  * Axis ticks use decimal labels, never fractions, with superscript
  * scientific exponents when needed. Crowded labels are spaced or thinned without
  * removing tick strokes. Coordinate normalisation precedes conversion to drawing doubles,
@@ -73,6 +75,14 @@ bool plot_add_points(plot_t *plot, const plot_point_t *points, size_t count, con
 bool plot_add_sampler(plot_t *plot, const sampler_t *sampler, const char *name, plot_style_t style, uint32_t colour);
 
 /**
+ * @brief Shade line series between zero and their sampled values within a finite x interval.
+ * Copies the limits; reversed limits reverse contribution colours. Positive and
+ * negative contributions use teal and gold respectively. Gaps remain unfilled.
+ * This visual annotation neither evaluates an integral nor certifies convergence.
+ */
+bool plot_shade_interval(plot_t *plot, number_t lower, number_t upper);
+
+/**
  * @brief Copy a rectangular height surface into an empty scene, excluding line/point series.
  * x and y contain strictly increasing finite real coordinates (at least two each).
  * z contains rows*columns heights in row-major order; non-real/non-finite heights
@@ -83,6 +93,15 @@ bool plot_add_sampler(plot_t *plot, const sampler_t *sampler, const char *name, 
  */
 bool plot_set_surface(plot_t *plot, const number_t *x, size_t columns, const number_t *y, size_t rows,
                       const number_t *z);
+
+/**
+ * @brief Copy independent triangular facets into an empty three-dimensional scene.
+ * The x, y and z arrays contain count finite real vertices, with each consecutive
+ * triple describing one triangle. Count must be positive and divisible by three.
+ * Unlike a height grid, a mesh permits multiple heights at the same x and y.
+ * Scene limits, camera controls and height clipping also apply to meshes.
+ */
+bool plot_set_mesh(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count);
 
 /**
  * @brief Atomically copy finite real minimum < maximum for an existing surface's height axis.
@@ -116,7 +135,12 @@ bool plot_set_view(plot_t *plot, double azimuth, double elevation);
  */
 bool plot_set_roll(plot_t *plot, double roll);
 
-/** @brief Atomically copy finite real xmin < xmax and ymin < ymax; invalid bounds give EINVAL. */
+/**
+ * @brief Atomically copy finite real xmin < xmax and ymin < ymax; invalid bounds give EINVAL.
+ * Curves are clipped to the viewport. For meshes these bounds set the horizontal
+ * camera frame; callers must supply facets already clipped to that horizontal domain.
+ * Rectangular height grids retain their own horizontal coordinate bounds.
+ */
 bool plot_set_bounds(plot_t *plot, number_t xmin, number_t xmax, number_t ymin, number_t ymax);
 
 /** @brief Restore automatic data bounds; NULL is harmless. */

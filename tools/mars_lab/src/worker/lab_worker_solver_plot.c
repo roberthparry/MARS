@@ -159,10 +159,9 @@ int lab_worker_solver_plot(int argc, char **argv)
         return 1;
     }
     bool equation = !strcmp(argv[18], "equation");
-    if ((equation && (!strcmp(argv[10], "surface") || *argv[11])) ||
-        (strcmp(argv[10], "auto") && strcmp(argv[10], "curve") && strcmp(argv[10], "surface")) ||
+    if ((strcmp(argv[10], "auto") && strcmp(argv[10], "curve") && strcmp(argv[10], "surface")) ||
         (strcmp(argv[17], "full") && strcmp(argv[17], "preview"))) {
-        printf("error Select a valid plot type and quality; algebraic equations support 2-D curves only.\n");
+        printf("error Select a valid plot type and quality.\n");
         return 1;
     }
     const char *axis = argv[2];
@@ -179,7 +178,7 @@ int lab_worker_solver_plot(int argc, char **argv)
         for (size_t i = 0; i < expr_bindings_count(bindings); ++i)
             if (!expr_bindings_is_constant_at(bindings, i))
                 print_axis(expr_bindings_name_at(bindings, i));
-        expr_t *second = NULL;
+        expr_t *second = NULL, *third = NULL;
         bool unresolved = false;
         /* The parsed binding catalogue is bounded by the authored expression; inspect each parameter once. */
         for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
@@ -191,15 +190,27 @@ int lab_worker_solver_plot(int argc, char **argv)
             num_destroy(&value);
             if (fixed)
                 continue;
-            if (expr_bindings_is_constant_at(bindings, i) || second)
+            if (expr_bindings_is_constant_at(bindings, i) || third)
                 unresolved = true;
+            else if (second)
+                third = node;
             else
                 second = node;
         }
         if (unresolved) {
             equ_free(equ);
-            printf("error Bind remaining parameters; an equation plot supports at most two free coordinates.\n");
+            printf("error Bind remaining parameters; an equation plot supports at most three free coordinates.\n");
             return 1;
+        }
+        if (third) {
+            if (*argv[11] && !strcmp(argv[11], expr_symbol_name(third))) {
+                expr_t *swap = second;
+                second = third;
+                third = swap;
+            }
+            int rc = lab_worker_equation_mesh(equ, variable, second, third, argv);
+            equ_free(equ);
+            return rc;
         }
         if (second) {
             int rc = lab_worker_equation_contour(equ, variable, second, argv);

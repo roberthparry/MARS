@@ -103,13 +103,15 @@ void plot_free(plot_t *plot)
         free(plot->series);
         for (size_t i = 0; i < plot->surface_columns; ++i)
             num_destroy(&plot->surface_x[i]);
-        for (size_t i = 0; i < plot->surface_rows; ++i)
+        for (size_t i = 0; i < (plot->mesh ? plot->surface_columns : plot->surface_rows); ++i)
             num_destroy(&plot->surface_y[i]);
         for (size_t i = 0; i < plot->surface_columns * plot->surface_rows; ++i)
             num_destroy(&plot->surface_z[i]);
         free(plot->surface_x);
         free(plot->surface_y);
         free(plot->surface_z);
+        num_destroy(&plot->shade_bounds[0]);
+        num_destroy(&plot->shade_bounds[1]);
         num_destroy(&plot->included_height[0]);
         num_destroy(&plot->included_height[1]);
         num_destroy(&plot->height_bounds[0]);
@@ -234,8 +236,8 @@ bool plot_add_sampler(plot_t *plot, const sampler_t *sampler, const char *name, 
 /* Replace an explicit viewport only after every bound is copied successfully. */
 bool plot_set_bounds(plot_t *plot, number_t xmin, number_t xmax, number_t ymin, number_t ymax)
 {
-    if (!plot || plot->surface_z || !valid_coordinate(xmin) || !valid_coordinate(xmax) || !valid_coordinate(ymin) ||
-        !valid_coordinate(ymax) || !num_lt(xmin, xmax) || !num_lt(ymin, ymax)) {
+    if (!plot || (plot->surface_z && !plot->mesh) || !valid_coordinate(xmin) || !valid_coordinate(xmax) ||
+        !valid_coordinate(ymin) || !valid_coordinate(ymax) || !num_lt(xmin, xmax) || !num_lt(ymin, ymax)) {
         errno = EINVAL;
         return false;
     }
@@ -314,6 +316,8 @@ bool plot_ranges(const plot_t *plot, number_t bounds[4])
     }
     if (!plot->fixed && (plot->options.smart_y || (plot->options.guard_gaps && gaps)) &&
         !plot_smart_range(plot, bounds))
+        return false;
+    if (!plot->fixed && plot->shaded && !update_range(bounds + 2, NUM_ZERO))
         return false;
     for (size_t axis = 0; axis < 4; axis += 2) {
         if (plot->fixed) {

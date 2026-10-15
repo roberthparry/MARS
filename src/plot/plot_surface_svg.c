@@ -1,6 +1,6 @@
 /**
  * @file plot_surface_svg.c
- * @brief Rotatable SVG height surfaces with depth-ordered coloured mesh facets.
+ * @brief Rotatable SVG height grids and independent meshes with depth-ordered coloured facets.
  *
  * Numerical ranges are normalised before conversion to drawing coordinates.
  * Missing vertices leave holes. Finite heights are joined regardless of slope;
@@ -30,18 +30,40 @@ typedef struct {
 
 typedef struct {
     double ca, sa, ce, se, cr, sr, scale_x, scale_y, cx, cy;
+    double units[3];
 } camera_t;
 
-static camera_t camera(const plot_t *plot, double label_width)
+static camera_t camera(const plot_t *plot, double label_width, const number_t bounds[6])
 {
     double radians = acos(-1) / 180;
     camera_t view = {.ca = cos(plot->azimuth * radians), .sa = sin(plot->azimuth * radians),
                      .ce = cos(plot->elevation * radians), .se = sin(plot->elevation * radians),
                      .cr = cos(plot->roll * radians), .sr = sin(plot->roll * radians),
-                     .cx = plot->options.width * 0.5, .cy = plot->options.height * 0.52};
+                     .cx = plot->options.width * 0.5, .cy = plot->options.height * 0.52, .units = {1, 1, 1}};
     double extent = fabs(view.ca) + fabs(view.sa);
     double margin = fmax(80, label_width + 20);
     margin = fmin(margin, (plot->options.width - 80) / 2.0);
+    if (plot->mesh) {
+        number_t spans[] = {num_sub(bounds[1], bounds[0]), num_sub(bounds[3], bounds[2]),
+                            num_sub(bounds[5], bounds[4])};
+        number_t longest = spans[0];
+        for (unsigned i = 1; i < 3; ++i)
+            if (num_gt(spans[i], longest))
+                longest = spans[i];
+        for (unsigned i = 0; i < 3; ++i)
+            view.units[i] = num_to_double(num_div(spans[i], longest));
+        double horizontal[] = {view.ca * view.units[0], -view.sa * view.units[1], 0};
+        double vertical[] = {-view.se * view.sa * view.units[0], -view.se * view.ca * view.units[1],
+                              -view.ce * view.units[2]};
+        double width = 0, height = 0;
+        for (unsigned i = 0; i < 3; ++i) {
+            width += fabs(view.cr * horizontal[i] - view.sr * vertical[i]);
+            height += fabs(view.sr * horizontal[i] + view.cr * vertical[i]);
+        }
+        view.scale_x = view.scale_y = fmin((plot->options.width - 2 * margin) / width,
+                                          (plot->options.height - 160) / height);
+        return view;
+    }
     view.scale_x = (plot->options.width - 2 * margin) / extent;
     view.scale_y = (plot->options.height - 160) / (view.se * extent + view.ce);
     /* Rotate the original screen geometry, then shrink uniformly to keep it in view. */
@@ -83,7 +105,8 @@ static bool finite_real(number_t value)
 
 static void project(const camera_t *view, vertex_t *vertex)
 {
-    double u = vertex->u - 0.5, v = vertex->v - 0.5, z = vertex->z - 0.5;
+    double u = (vertex->u - 0.5) * view->units[0], v = (vertex->v - 0.5) * view->units[1];
+    double z = (vertex->z - 0.5) * view->units[2];
     double away = view->sa * u + view->ca * v;
     double x = view->scale_x * (view->ca * u - view->sa * v);
     double y = -view->scale_y * (view->se * away + view->ce * z);
@@ -274,6 +297,26 @@ string_t *plot_surface_svg(const plot_t *plot)
         full_span = num_clone(NUM_ONE);
     number_t bounds[] = {plot->surface_x[0], plot->surface_x[columns - 1],
                          plot->surface_y[0], plot->surface_y[rows - 1], lo, hi};
+    if (plot->mesh) {
+        bounds[1] = bounds[0];
+        bounds[3] = bounds[2];
+        const number_t *coordinates[] = {plot->surface_x, plot->surface_y};
+        for (unsigned axis = 0; axis < 2; ++axis) {
+            for (size_t i = 0; i < count; ++i) {
+                if (num_lt(coordinates[axis][i], bounds[2 * axis]))
+                    bounds[2 * axis] = coordinates[axis][i];
+                if (num_gt(coordinates[axis][i], bounds[2 * axis + 1]))
+                    bounds[2 * axis + 1] = coordinates[axis][i];
+            }
+            if (num_eq(bounds[2 * axis], bounds[2 * axis + 1])) {
+                bounds[2 * axis] = num_sub(bounds[2 * axis], NUM_ONE);
+                bounds[2 * axis + 1] = num_add(bounds[2 * axis + 1], NUM_ONE);
+            }
+        }
+        if (plot->fixed)
+            for (unsigned i = 0; i < 4; ++i)
+                bounds[i] = plot->bounds[i];
+    }
     double label_width = 0;
     for (unsigned axis = 0; axis < 3; ++axis) {
         double width = plot_tick_width(bounds[axis * 2], bounds[axis * 2 + 1], 11);
@@ -281,7 +324,7 @@ string_t *plot_surface_svg(const plot_t *plot)
             return NULL;
         label_width = fmax(label_width, width);
     }
-    camera_t view = camera(plot, label_width);
+    camera_t view = camera(plot, label_width, bounds);
     number_t spans[] = {num_sub(bounds[1], bounds[0]), num_sub(bounds[3], bounds[2]), num_sub(hi, lo)};
     if (count > SIZE_MAX / (2 * sizeof(facet_t))) {
         errno = E2BIG;
@@ -299,13 +342,21 @@ string_t *plot_surface_svg(const plot_t *plot)
             if (!finite_real(value))
                 continue;
             at->u = fraction(plot->surface_x[c], bounds[0], spans[0]);
-            at->v = fraction(plot->surface_y[r], bounds[2], spans[1]);
+            at->v = fraction(plot->surface_y[plot->mesh ? c : r], bounds[2], spans[1]);
             at->height = value;
             at->z = fraction(value, full[0], full_span);
             at->valid = isfinite(at->u) && isfinite(at->v) && isfinite(at->z);
         }
     }
     size_t faces = 0;
+    for (size_t i = 0; ok && plot->mesh && i + 2 < count; i += 3) {
+        facet_t facet = {.a = i, .b = i + 1, .c = i + 2};
+        vertex_t polygon[5];
+        int clipped = clip_facet(vertices, &facet, &view, height_bounds, spans[2], polygon, &facet.depth);
+        ok = clipped >= 0;
+        if (clipped >= 3)
+            facets[faces++] = facet;
+    }
     for (size_t r = 0; ok && r + 1 < rows; ++r) {
         for (size_t c = 0; ok && c + 1 < columns; ++c) {
             ok = computation_step_current("plot.surface.mesh");
@@ -338,10 +389,16 @@ string_t *plot_surface_svg(const plot_t *plot)
         ok = string_append_format(svg, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%u\" height=\"%u\" "
                  "viewBox=\"0 0 %u %u\" role=\"img\" data-surface=\"true\" "
                  "data-azimuth=\"%.3f\" data-elevation=\"%.3f\" data-roll=\"%.3f\" "
-                 "data-x-min=\"%.17g\" data-x-max=\"%.17g\" data-y-min=\"%.17g\" data-y-max=\"%.17g\"><title>",
+                 "data-x-min=\"%.17g\" data-x-max=\"%.17g\" data-y-min=\"%.17g\" data-y-max=\"%.17g\" "
+                 "data-z-min=\"%.17g\" data-z-max=\"%.17g\" data-mesh=\"%s\"",
                  plot->options.width, plot->options.height, plot->options.width, plot->options.height,
                  plot->azimuth, plot->elevation, plot->roll, num_to_double(bounds[0]), num_to_double(bounds[1]),
-                 num_to_double(bounds[2]), num_to_double(bounds[3])) >= 0 &&
+                 num_to_double(bounds[2]), num_to_double(bounds[3]), num_to_double(lo), num_to_double(hi),
+                 plot->mesh ? "true" : "false") >= 0;
+        if (ok && isfinite(num_to_double(full[0])) && isfinite(num_to_double(full[1])))
+            ok = string_append_format(svg, " data-sample-z-min=\"%.17g\" data-sample-z-max=\"%.17g\"",
+                                       num_to_double(full[0]), num_to_double(full[1])) >= 0;
+        ok = ok && string_append_cstr(svg, "><title>") == 0 &&
              plot_escape(svg, plot->title) && string_append_format(svg, "</title><text x=\"%u\" y=\"24\" "
                  "text-anchor=\"middle\" fill=\"#%06x\" font-family=\"sans-serif\" font-size=\"14\">",
                  plot->options.width / 2, (unsigned)plot->options.label_colour) >= 0 && plot_escape(svg, plot->title) &&

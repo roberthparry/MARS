@@ -258,8 +258,8 @@ void lab_workspace_dom_mode(unsigned mode, int coverage)
         lab_workspace_dom_hidden("#targetRow", 1);
     lab_workspace_dom_hidden("#derivativeButtons", !(flags & 8) && mode != 1 && mode != 2);
     lab_workspace_dom_hidden("#goalSeek", !(flags & 16));
-    lab_workspace_dom_hidden("#plotRange", mode > 2);
-    lab_workspace_dom_hidden("#plotCard", mode > 2 ||
+    lab_workspace_dom_hidden("#plotRange", mode > 2 && mode != 4);
+    lab_workspace_dom_hidden("#plotCard", (mode > 2 && mode != 4) ||
                              !lab_workspace_dom_content(lab_dom_query(0, "#plotRendered"), 0));
     lab_workspace_dom_text(lab_dom_query(0, "#leftPaneTitle"), 0, "", lab_view_text(mode, 0));
     int showing_help = lab_dom_has_class(lab_dom_query(0, "#labWorkspace"), "help-open");

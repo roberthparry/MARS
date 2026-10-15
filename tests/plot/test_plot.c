@@ -43,6 +43,15 @@ static void test_plot_svg(void)
     ok = ok && svg && strstr(string_c_str(svg), "</svg>");
     string_free(svg);
     TEST_ASSERT_TRUE(ok, "valid independently owned SVG with axes and series colour");
+    plot = simple_plot(PLOT_LINES);
+    ok = plot_shade_interval(plot, NUM_ONE, NUM_ZERO);
+    svg = ok ? plot_to_svg(plot) : NULL;
+    ok = svg && strstr(string_c_str(svg), "data-integral-shading") &&
+         strstr(string_c_str(svg), "data-sign=\"negative\"") &&
+         strstr(string_c_str(svg), "data-integral-limits");
+    string_free(svg);
+    plot_free(plot);
+    TEST_ASSERT_TRUE(ok, "reversed intervals shade negative contributions and retain limit markers");
 }
 
 static void test_plot_edge_axes(void)
@@ -457,6 +466,20 @@ static bool ascending_surface_ticks(const string_t *svg)
 
 static void test_plot_surface(void)
 {
+    {
+        number_t x[] = {NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ZERO};
+        number_t y[] = {NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ZERO, NUM_ZERO, NUM_ONE};
+        number_t z[] = {NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ONE, NUM_ONE, NUM_ONE};
+        plot_t *mesh = plot_new(NULL);
+        bool ok = plot_set_mesh(mesh, x, y, z, 6);
+        string_t *svg = ok ? plot_to_svg(mesh) : NULL;
+        xml_t *document = svg ? xml_from_text(svg) : NULL;
+        ok = document && strstr(string_c_str(svg), "data-surface") && plot_series_count(mesh) == 1;
+        xml_free(document);
+        string_free(svg);
+        plot_free(mesh);
+        TEST_ASSERT_TRUE(ok, "independent facets support multiple heights at the same horizontal coordinates");
+    }
     plot_t *plot = plot_new(NULL);
     number_t axis[4], heights[16];
     for (size_t i = 0; i < 4; ++i)

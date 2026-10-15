@@ -59,10 +59,17 @@ struct _plot_t {
     bool has_included_height;
     number_t *surface_x, *surface_y, *surface_z;
     size_t surface_columns, surface_rows;
+    bool mesh;
+    bool shaded, shade_reversed;
+    number_t shade_bounds[2];
 };
 
 /** @brief Render a copied rectangular surface; caller supplies the C numeric locale. */
 string_t *plot_surface_svg(const plot_t *plot);
+
+/** @brief Append native-clipped signed shading for one line series inside its viewport. */
+bool plot_shade_svg(const plot_t *plot, const plot_series_t *series, string_t *out,
+                     const number_t bounds[4], const double frame[4]);
 
 /** @brief Format one decimal tick with superscript scientific notation; caller owns the string. */
 string_t *plot_tick_label(number_t value);

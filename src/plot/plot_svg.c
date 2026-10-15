@@ -257,12 +257,14 @@ static bool render(svg_view_t *view, const plot_t *plot)
             view->left, view->top, view->width, view->height, view->left, view->top, view->width, view->height,
             view->width, view->height) < 0)
             return false;
+        double frame[] = {view->left, view->top, view->width, view->height};
         if (string_append_format(view->out, "<g data-series=\"%zu\" stroke=\"#%06x\" color=\"#%06x\" "
                                            "fill=\"%s\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\">\n",
                                   i, (unsigned)series->colour, (unsigned)series->colour,
                                   series->style == PLOT_POINTS ? "currentColor" : "none") < 0 ||
             string_append_cstr(view->out, "<title>") || !plot_escape(view->out, series->name) ||
             string_append_cstr(view->out, "</title>\n") ||
+            !plot_shade_svg(plot, series, view->out, view->bounds, frame) ||
             !drawers[series->style](view, series) || string_append_cstr(view->out, "</g></svg>\n"))
             return false;
         if (plot->options.legend && string_byte_length(series->name)) {

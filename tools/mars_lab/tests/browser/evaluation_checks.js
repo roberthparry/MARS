@@ -329,7 +329,7 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
                 equal(calls('bindings').length, [0, 1, 3, 4].includes(index) ? 1 : 0, 'binding commit policy');
                 equal(calls('fetch').length, 1, 'one evaluation fetch');
                 equal(calls('install').length, ok ? 1 : 0, 'install only accepted results');
-                equal(calls('scheduleAutomaticPlot').length, ok && index < 3 ? 1 : 0,
+                equal(calls('scheduleAutomaticPlot').length, ok && (index < 3 || index === 4) ? 1 : 0,
                       'successful plotting modes schedule a separate plot');
                 equal(calls('commitModeState').length, 1, 'one result commit');
                 equal(calls('pushExpressionHistory').length, 1, 'previous state pushed once');

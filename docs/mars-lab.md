@@ -489,7 +489,7 @@ admission uses `lab_browser_base64_limit()`, derived from the encoded message
 bound including base64 padding. Host checks remain before container copying and
 base64 decoding; the native codec independently validates the resulting message.
 
-The browser ABI is version 35; mismatched assets require a rebuild/restart
+The browser ABI is version 36; mismatched assets require a rebuild/restart
 rather than falling back to old JavaScript policy.
 The native `/bootstrap` response also carries its compiled browser ABI. Startup
 checks that it matches WASM before loading worksheet code. This catches an old
@@ -1006,7 +1006,7 @@ requires it.
 
 ### Native function plots
 
-**Evaluate** in Expression, Equation and Differential Equation modes installs the
+**Evaluate** in Expression, Equation, Differential Equation and Integrator modes installs the
 mathematical result cards first, then generates a separate **Plot** card asynchronously.
 There is no separate Plot button. Plot failures remain local to that card; they do
 not hide successful mathematical results. New evaluations, editor changes and mode
@@ -1265,8 +1265,16 @@ of the residual in their coordinate plane. For example, evaluating `x^2+y^2=1`
 produces a unit circle centred at the origin, with both coordinate ranges initially
 about −1.2 to 1.2. This is a curve, not a height surface. The first-axis choice
 selects the horizontal coordinate; the vertical limits control the other coordinate.
-Bound parameters stay fixed, and more than two free coordinates require bindings.
-The bounded expanding grid search rejects non-finite samples and pole-like crossings,
+Bound parameters stay fixed. Three free coordinates produce a triangular isosurface
+of the residual, with the existing camera controls; more than three require bindings.
+The volume search is bounded to the selected coordinate ranges (initially −2 to 2),
+then automatic bounds fit the discovered mesh with padding. Implicit meshes use
+equal coordinate units and a uniform camera scale, so a sphere remains spherical
+at every viewing angle; explicit ranges remain untouched.
+The contour search refines cells whose curvature could hide a closed component,
+including small curves inside a tall manually selected viewport. A new expression
+starts with automatic ranges rather than inheriting a different expression's zoom.
+The bounded grid searches reject non-finite samples and pole-like crossings,
 but cannot certify completeness or guarantee detection of tiny components, isolated
 points or zero sets without a sign change. Explicit bounds can focus the search.
 
@@ -2408,6 +2416,17 @@ The direct symbolic forms use the same editor:
 | `@S(ax+b cx+d; y xy)dx` | `(½(ax²+2bx), ½(cx²+2dx); xy, ½x²y) + (C₁₁, C₁₂; C₂₁, C₂₂)` |
 
 ## Integrator mode
+
+Integrator mode also generates an independent asynchronous Plot card on Evaluate.
+For one integration variable it draws the integrand, not the antiderivative.
+Finite definite limits are marked with dashed lines and the interval is shaded
+between the curve and zero: teal for positive contributions, gold for negative
+ones. Reversing the integration limits reverses the contribution colours.
+Plot zoom and range edits do not change the integration limits or recompute the
+integral. The curve uses drawing precision independently of the requested result
+precision. Gaps are not filled, and shading does not assert convergence.
+Indefinite and unresolved/infinite-limit integrals currently show an unshaded
+curve; multidimensional integrands report that their plots are not yet available.
 
 Integrator mode combines exact symbolic antiderivatives with the numerical
 integrator. Add one bound row for each variable to be integrated. Leave both

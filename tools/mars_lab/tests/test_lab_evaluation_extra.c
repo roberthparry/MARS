@@ -462,6 +462,18 @@ static void test_lab_extra_plot_preview(void)
 static void test_lab_extra_solver_plots(void)
 {
     unsigned status = 0;
+    expect_response("/eval", "{\"expression\":\"sin(x)\",\"action\":\"plot\",\"plot_source_mode\":\"integrator\","
+                             "\"bounds\":[{\"name\":\"x\",\"lo\":\"-pi\",\"hi\":\"pi\"}]}",
+                    200u, "plot_svg", "data-integral-shading");
+    expect_response("/eval", "{\"expression\":\"x^2\",\"action\":\"plot\",\"plot_source_mode\":\"integrator\","
+                             "\"bounds\":[{\"name\":\"x\",\"lo\":\"1\",\"hi\":\"0\"}]}",
+                    200u, "plot_svg", "data-sign=\"negative\"");
+    expect_response("/eval", "{\"expression\":\"sin(t)\",\"action\":\"plot\",\"plot_source_mode\":\"integrator\","
+                             "\"bounds\":[{\"name\":\"t\",\"lo\":\"\",\"hi\":\"\"}]}",
+                    200u, "plot_svg", "data-series");
+    expect_response("/eval", "{\"expression\":\"a*x\",\"action\":\"plot\",\"plot_source_mode\":\"integrator\","
+                             "\"bounds\":[{\"name\":\"x\",\"lo\":\"0\",\"hi\":\"1\"}]}",
+                    422u, "error", "parameters");
     json_t *circle = request("/eval", "{\"expression\":\"x^2+y^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
                                      "\"plot_source_mode\":\"equation\"}", &status);
     bool circle_ok = status == 200 && test_lab_ok(circle, true) &&
@@ -481,8 +493,20 @@ static void test_lab_extra_solver_plots(void)
                              "\"plot_source_mode\":\"equation\"}", 422u, "error", "No real contour");
     expect_response("/eval", "{\"expression\":\"x^2+y^2=-1\",\"wrt\":\"x\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"equation\"}", 422u, "error", "No real contour");
-    expect_response("/eval", "{\"expression\":\"x+y+z=1\",\"wrt\":\"x\",\"action\":\"plot\","
+    expect_response("/eval", "{\"expression\":\"x+y+z+w=1\",\"wrt\":\"x\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"equation\"}", 422u, "error", "parameters");
+    expect_response("/eval", "{\"expression\":\"x^2+y^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_lower\":\"-8.77\",\"plot_upper\":\"4.48\","
+                             "\"plot_scale\":\"manual\",\"plot_y_lower\":\"-201.3\",\"plot_y_upper\":\"238.9\"}",
+                    200u, "plot_svg", "data-series");
+    expect_response("/eval", "{\"expression\":\"x^2+y^2+z^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\"}", 200u, "plot_svg", "data-surface");
+    expect_response("/eval", "{\"expression\":\"x+y+z=1\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_quality\":\"preview\"}",
+                    200u, "plot_svg", "data-surface");
+    expect_response("/eval", "{\"expression\":\"1/(x*y*z)=0\",\"wrt\":\"x\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"equation\",\"plot_quality\":\"preview\"}",
+                    422u, "error", "No real isosurface");
     expect_response("/eval", "{\"expression\":\"x^2+y^2=1\",\"wrt\":\"x\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"equation\",\"plot_lower\":\"2\",\"plot_upper\":\"-2\"}",
                     422u, "error", "bounds");
@@ -536,7 +560,7 @@ static void test_lab_extra_solver_plots(void)
     expect_response("/eval", "{\"expression\":\"Dx(y)=y\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\","
                              "\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", 200u, "plot_svg", "data-series=\"4\"");
     expect_response("/eval", "{\"expression\":\"x^2=1\",\"action\":\"plot\",\"plot_source_mode\":\"equation\","
-                             "\"plot_kind\":\"surface\"}", 422u, "error", "2-D curves");
+                             "\"plot_kind\":\"surface\"}", 200u, "plot_svg", "data-series");
     expect_response("/eval", "{\"expression\":\"x\",\"action\":\"plot\",\"plot_source_mode\":\"unknown\"}",
                     422u, "error", "source mode");
 }

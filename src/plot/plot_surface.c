@@ -1,10 +1,11 @@
 /**
  * @file plot_surface.c
- * @brief Owned rectangular height grids for native surface plots.
+ * @brief Owned height grids and independent triangle meshes for native surface plots.
  *
  * Coordinates remain number_t values. The scene copies all inputs atomically;
  * missing heights are retained as holes, never replaced with zero. Surface and
  * curve scenes are deliberately separate, with the same bounded resource policy.
+ * Triangle meshes allow implicit surfaces without imposing a height-function topology.
  */
 #include <errno.h>
 #include <stdlib.h>
@@ -20,6 +21,53 @@ static bool coordinates(const number_t *values, size_t count)
         if (!num_is_real(values[i]) || !num_is_finite(values[i]) || (i && !num_gt(values[i], values[i - 1])))
             return false;
     return true;
+}
+
+/* Copy arbitrary facets atomically; the shared surface renderer supplies the camera and axes. */
+bool plot_set_mesh(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count)
+{
+    if (!plot || plot->count || plot->surface_z || plot->fixed || !x || !y || !z || !count || count % 3) {
+        errno = EINVAL;
+        return false;
+    }
+    if (count > plot->options.max_points || count > SIZE_MAX / sizeof(number_t)) {
+        errno = E2BIG;
+        return false;
+    }
+    plot_t *copy = plot_new(&plot->options);
+    if (!copy)
+        return false;
+    copy->surface_x = calloc(count, sizeof(number_t));
+    copy->surface_y = calloc(count, sizeof(number_t));
+    copy->surface_z = calloc(count, sizeof(number_t));
+    bool ok = copy->surface_x && copy->surface_y && copy->surface_z;
+    if (ok) {
+        copy->mesh = true;
+        copy->surface_columns = count;
+        copy->surface_rows = 1;
+        const number_t *source[] = {x, y, z};
+        number_t *target[] = {copy->surface_x, copy->surface_y, copy->surface_z};
+        for (size_t i = 0; ok && i < count; ++i) {
+            ok = computation_step_current("plot.mesh.copy");
+            for (unsigned axis = 0; ok && axis < 3; ++axis) {
+                target[axis][i] = num_clone(source[axis][i]);
+                ok = num_is_real(target[axis][i]) && num_is_finite(target[axis][i]);
+            }
+        }
+    }
+    if (ok) {
+        plot->surface_x = copy->surface_x;
+        plot->surface_y = copy->surface_y;
+        plot->surface_z = copy->surface_z;
+        plot->surface_columns = count;
+        plot->surface_rows = 1;
+        plot->points = count;
+        plot->mesh = true;
+        copy->surface_x = copy->surface_y = copy->surface_z = NULL;
+        copy->surface_columns = copy->surface_rows = 0;
+    }
+    plot_free(copy);
+    return ok;
 }
 
 /* Copy height limits only after validation; sampled data remains untouched. */

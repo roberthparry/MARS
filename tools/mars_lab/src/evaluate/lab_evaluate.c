@@ -177,6 +177,8 @@ json_t *lab_eval_worker_failure(unsigned *status, int process_error, unsigned ti
     return result;
 }
 
+static bool lab_eval_integrator_bounds(arguments_t *args, const json_t *payload);
+
 static bool lab_eval_expression_arguments(arguments_t *args, const json_t *payload, const char *precision)
 {
     const char *action = lab_eval_text(payload, "action");
@@ -217,7 +219,9 @@ static bool lab_eval_expression_arguments(arguments_t *args, const json_t *paylo
                lab_eval_argument_member(args, payload, "plot_elevation", "30", false) &&
                lab_eval_argument_member(args, payload, "plot_roll", "0", false) &&
                lab_eval_argument_member(args, payload, "plot_quality", "full", false) &&
-               lab_eval_argument_member(args, payload, "plot_source_mode", "expression", false);
+               lab_eval_argument_member(args, payload, "plot_source_mode", "expression", false) &&
+               (strcmp(lab_eval_text(payload, "plot_source_mode"), "integrator") ||
+                lab_eval_integrator_bounds(args, payload));
     return true;
 }
 

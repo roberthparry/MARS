@@ -163,9 +163,25 @@ int lab_flow_evaluation(int frame, int view)
             return lab_flow_call(frame, lab_flow_eval_weather_state, "setStatus", 0, 0, 1,
                                  lab_dom_get(lab_dom_get(frame, "responsePlan"), "status"));
         case lab_flow_eval_weather_state:
-            if (lab_dom_number(mode) <= 2 &&
+            if ((lab_dom_number(mode) <= 2 || lab_dom_number(mode) == 4) &&
                 lab_dom_truth(lab_dom_get(lab_dom_get(frame, "responsePlan"), "install")) &&
                 lab_dom_truth(lab_dom_get(frame, "current"))) {
+                int range = lab_dom_id("plotRange"), source = lab_dom_get(context, "text");
+                int previous = lab_dom_read(range, 3, "plotSource");
+                if (lab_dom_length(previous) && !lab_dom_equal(source, previous)) {
+                    static const char *const limits[] = {"plotLower", "plotUpper", "plotSecondLower",
+                                                         "plotSecondUpper", "plotYLower", "plotYUpper"};
+                    for (unsigned i = 0; i < sizeof limits / sizeof *limits; ++i) {
+                        int control = lab_dom_id(limits[i]);
+                        lab_dom_write(control, 5, "", lab_dom_string(""));
+                        lab_dom_delete(control, "marsZoomValue");
+                        lab_dom_delete(control, "marsZoomText");
+                    }
+                    lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("auto"));
+                    lab_dom_delete(range, "marsZoomOriginal");
+                    lab_dom_delete(range, "marsZoomChart");
+                }
+                lab_dom_write(range, 3, "plotSource", source);
                 lab_layout_plot(0, 0);
                 return lab_flow_call(frame, lab_flow_eval_plot_scheduled, "automaticPlot", 0, 0, 1, request);
             }
