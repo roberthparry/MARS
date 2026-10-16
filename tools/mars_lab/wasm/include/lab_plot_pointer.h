@@ -21,6 +21,12 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context);
 /** @brief Choose 1–17 display digits from the interval span; invalid spans retain full precision. */
 unsigned lab_plot_bound_digits(double value, double span);
 
+/** @brief Display an interval-aware bound while retaining its unrounded value for sampling. */
+void lab_plot_write_bound(int control, double value, double span);
+
+/** @brief Format the six surface range controls from a browser-owned array of coordinate bounds. */
+void lab_plot_volume_bounds(int bounds);
+
 /** @brief Capture a curve's initial bounds, screen scale and controls for a primary-pointer pan. */
 int lab_plot_pan_start(int state, int chart, int event);
 

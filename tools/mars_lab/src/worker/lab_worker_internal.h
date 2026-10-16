@@ -115,7 +115,7 @@ size_t lab_worker_plot_check_precision(number_t lower, number_t upper);
 /** @brief Check the chart byte budget, reserving transport space for titles and other result fields. */
 bool lab_worker_plot_fits(const string_t *svg);
 
-/** @brief Label a complete view resampled at lower detail to stay within the chart byte budget. */
+/** @brief Record reduced sampling detail in SVG metadata without a visible chart annotation. */
 bool lab_worker_plot_reduced(string_t *svg);
 
 /** @brief Tag the sampled grid and visibly identify temporary gesture previews. */

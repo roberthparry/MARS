@@ -1786,7 +1786,8 @@ static void test_diffequ_modified_emden_initial_conditions(void)
 
 static void test_diffequ_modified_emden_condition_scope(void)
 {
-    const char *partial[] = {"y''+6y*y'+4y^3=0; y(2)=1", "y''+6y*y'+4y^3=0; y'(2)=0"};
+    const char *partial[] = {"y''+6y*y'+4y^3=0; y(2)=1", "y''+6y*y'+4y^3=0; y'(2)=0",
+                            "y''+6y*y'+4y^3=0; y'(0)=0"};
     for (size_t i = 0; i < sizeof partial / sizeof *partial; ++i) {
         diffequ_t *de = de_from_string(partial[i]);
         diffequ_solve_result_t *result = de_solve(de);
@@ -1798,6 +1799,14 @@ static void test_diffequ_modified_emden_condition_scope(void)
         WANT_LONG("partial initial condition is imposed exactly", expr_is_exact_zero(error), 1);
         char *text = expr_to_string(equ_rhs(solution), style_UNBOUND);
         ASSERT_TRUE(text && strstr(text, "C"));
+        if (i == 2) {
+            ASSERT_TRUE(text && strstr(text, "C₁") && !strstr(text, "C₂"));
+            char *body = equ_to_TeX_body_wrapped(solution, SIZE_MAX);
+            printf("Zero-slope family TeX: %s\n", body ? body : "(null)");
+            ASSERT_TRUE(body && strstr(body, "\\frac{C_{1}\\mkern-2mu \\left(") &&
+                        !strstr(body, "\\frac{C_{1}}{"));
+            free(body);
+        }
         free(text);
         expr_free(error);
         expr_free(lhs);

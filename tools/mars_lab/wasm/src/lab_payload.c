@@ -70,7 +70,10 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
         lab_dom_set(payload, "plot_second_lower", lab_payload_control("#plotSecondLower"));
         lab_dom_set(payload, "plot_second_upper", lab_payload_control("#plotSecondUpper"));
         lab_dom_set(payload, "plot_azimuth", lab_payload_control("#plotAzimuth"));
-        lab_dom_set(payload, "plot_elevation", lab_payload_control("#plotElevation"));
+        /* Sampling still carries a legacy SVG fallback camera; free rotation lives in the client viewport. */
+        double elevation = lab_dom_to_number(lab_payload_control("#plotElevation"));
+        lab_dom_set(payload, "plot_elevation", lab_dom_format(elevation < 5 ? 5 : elevation > 85 ? 85 : elevation,
+                                                              "", ""));
         lab_dom_set(payload, "plot_roll", lab_payload_control("#plotRoll"));
         lab_dom_set(payload, "plot_quality", lab_dom_string(lab_dom_truth(lab_dom_item(inputs, 6)) ? "preview" : "full"));
         lab_dom_write(lab_dom_query(0, "#plotRange"), 3, "rotationVariable", axis);

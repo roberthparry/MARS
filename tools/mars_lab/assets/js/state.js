@@ -361,7 +361,13 @@ function labStateSyncServices() {
         },
         stateBindingParts: text => bindingParts(text),
         stateClearFunction: () => clearFunctionRun(),
-        stateResultProjection: mode => labDOM.call('lab_workspace_dom_result_restore', modeResultState[mode]),
+        stateResultProjection: mode => {
+            labSurfacePreview.dispose();
+            const state = modeResultState[mode];
+            const result = labDOM.call('lab_workspace_dom_result_restore', state);
+            labSurfacePreview.restoreResult(state?.surfaceView);
+            return result;
+        },
         stateClearResult: () => clearResultPane(),
         stateResultValues: state => {
             ({lastTex, lastDerivativeExpression, currentVariables, currentDifferentiable, resultInputBindings} = state);

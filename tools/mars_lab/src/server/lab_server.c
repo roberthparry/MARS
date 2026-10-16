@@ -140,6 +140,9 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/locations.js", "tools/mars_lab/assets/js/locations.js", "text/javascript; charset=utf-8"},
     {"/js/results.js", "tools/mars_lab/assets/js/results.js", "text/javascript; charset=utf-8"},
     {"/js/surface.js", "tools/mars_lab/assets/js/surface.js", "text/javascript; charset=utf-8"},
+    {"/js/surface_camera.js", "tools/mars_lab/assets/js/surface_camera.js", "text/javascript; charset=utf-8"},
+    {"/js/surface_export.js", "tools/mars_lab/assets/js/surface_export.js", "text/javascript; charset=utf-8"},
+    {"/js/surface_volume.js", "tools/mars_lab/assets/js/surface_volume.js", "text/javascript; charset=utf-8"},
     {"/js/state.js", "tools/mars_lab/assets/js/state.js", "text/javascript; charset=utf-8"},
     {"/js/workspace.js", "tools/mars_lab/assets/js/workspace.js", "text/javascript; charset=utf-8"},
 };

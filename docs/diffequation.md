@@ -360,6 +360,12 @@ polynomials are retained rather than lost through division by a quadratic
 coefficient. Conditions at different points or duplicate conditions are not
 handled by this initial-value path.
 
+Without initial conditions the solution retains two independent arbitrary
+constants. A single prescribed value or slope leaves one arbitrary constant;
+in particular, prescribing a zero slope is still a constraint, not an
+unconstrained solve. Compact rational solutions keep their entire numerator
+above one fraction bar in TeX, rather than moving a numerator factor outside it.
+
 ```text
 input = y'' + 6*y*y' + 4*y^3 = 0; y(0)=1; y'(0)=0
 solver = linear transformation

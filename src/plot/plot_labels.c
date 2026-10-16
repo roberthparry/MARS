@@ -14,11 +14,12 @@
 double plot_tick_width(number_t lower, number_t upper, double font_size)
 {
     number_t ticks[12];
+    number_t span = num_sub(upper, lower);
     size_t count = plot_ticks(lower, upper, ticks);
     double width = 0;
     bool ok = count != 0;
     for (size_t i = 0; i < count; ++i) {
-        string_t *label = plot_tick_label(ticks[i]);
+        string_t *label = plot_tick_label(ticks[i], span);
         ok = ok && label;
         double measured = label ? string_length(label) * font_size * 0.8 : 0;
         if (measured > width)
@@ -26,6 +27,7 @@ double plot_tick_width(number_t lower, number_t upper, double font_size)
         string_free(label);
         num_destroy(&ticks[i]);
     }
+    num_destroy(&span);
     return ok ? width : -1;
 }
 
@@ -36,9 +38,12 @@ bool plot_tick_text(string_t *out, plot_tick_layout_t *layout, const string_t *l
     double width = string_length(label) * layout->font_size * 0.8;
     if (!width)
         return true;
-    for (unsigned attempt = 0; attempt < 4; ++attempt) {
-        double offset = attempt * layout->font_size * 1.5;
-        double at_x = x + dx * offset, at_y = y + dy * offset;
+    /* Endpoint names also try either side when nearly parallel axes converge. */
+    unsigned attempts = axis >= 3 ? 12 : 4;
+    for (unsigned attempt = 0; attempt < attempts; ++attempt) {
+        double offset = (attempt % 4) * layout->font_size * 1.5;
+        double side = attempt < 4 ? 0 : attempt < 8 ? layout->font_size * 2 : -layout->font_size * 2;
+        double at_x = x + dx * offset - dy * side, at_y = y + dy * offset + dx * side;
         double left = at_x - (anchor < 0 ? width : anchor == 0 ? width / 2 : 0);
         plot_label_box_t box = {left, at_y - layout->font_size, left + width, at_y + layout->font_size * 0.3};
         bool fits = box.left >= 2 && box.top >= 2 && box.right <= layout->width - 2 &&

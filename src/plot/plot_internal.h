@@ -71,8 +71,8 @@ string_t *plot_surface_svg(const plot_t *plot);
 bool plot_shade_svg(const plot_t *plot, const plot_series_t *series, string_t *out,
                      const number_t bounds[4], const double frame[4]);
 
-/** @brief Format one decimal tick with superscript scientific notation; caller owns the string. */
-string_t *plot_tick_label(number_t value);
+/** @brief Format a span-aware decimal tick with superscript scientific notation; caller owns the string. */
+string_t *plot_tick_label(number_t value, number_t span);
 
 /** @brief Compute owned ranges from explicit bounds or one pass over finite data. */
 bool plot_ranges(const plot_t *plot, number_t bounds[4]);

@@ -96,6 +96,10 @@ function displayCalculusResult(result) {
 }
 
 function copyTextForTarget(target) {
+    if (target === 'plot') {
+        const surface = labSurfacePreview.exportSvg();
+        if (surface) return surface;
+    }
     return labDOM.call('lab_result_copy', target, lastTex);
 }
 

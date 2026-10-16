@@ -678,6 +678,19 @@ static void test_plot_surface_height(void)
     string_free(manual);
     plot_free(plot);
     TEST_ASSERT_TRUE(ok, "manual viewport excluding the surface shows axes without invented plateaus");
+
+    number_t wide_axis[] = {NUM_ZERO, num_create_from_long(4)};
+    number_t short_axis[] = {NUM_ZERO, num_create_from_long(2)};
+    plot = plot_new(NULL);
+    ok = plot && plot_set_surface(plot, wide_axis, 2, short_axis, 2, flat) &&
+         plot_set_height_bounds(plot, NUM_ZERO, NUM_ONE);
+    manual = ok ? plot_to_svg(plot) : NULL;
+    ok = manual && strstr(string_c_str(manual), "data-units=\"1 0.5 0.25\"");
+    string_free(manual);
+    plot_free(plot);
+    num_destroy(&wide_axis[1]);
+    num_destroy(&short_axis[1]);
+    TEST_ASSERT_TRUE(ok, "height grids preserve equal coordinate units across unequal axis ranges");
 }
 
 static bool separated_tick_labels(const string_t *svg, double font_size, size_t *visible)

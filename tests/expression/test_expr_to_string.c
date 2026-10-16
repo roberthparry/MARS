@@ -2642,6 +2642,36 @@ static void test_to_string_indexed_principal_roots(void)
     }
 }
 
+static void test_to_string_compact_product_quotient_TeX(void)
+{
+    const char *sources[] = {"a*(x+1)/(x^2+1)", "b*(t-2)/(t^2+3)",
+                             "(x+1)/(2*(x^2+1))", "c*(2*c*x+1)/(2*c*x*(c*x+1)+1)"};
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        expr_t *expr = expr_from_string(sources[i], NULL);
+        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+        const char *cursor = TeX && !strncmp(TeX, "\\frac{", 6) ? TeX + 5 : NULL;
+        /* A single complete fraction must contain both the coefficient and its sum. */
+        for (unsigned part = 0; cursor && part < 2; ++part) {
+            unsigned depth = 0;
+            if (*cursor != '{') {
+                cursor = NULL;
+                break;
+            }
+            do {
+                if (*cursor == '{') ++depth;
+                if (*cursor == '}') --depth;
+                ++cursor;
+            } while (*cursor && depth);
+            if (depth) cursor = NULL;
+        }
+        bool complete = cursor && !*cursor;
+        printf("Compact quotient: %s -> %s\n", sources[i], TeX ? TeX : "(null)");
+        free(TeX);
+        expr_free(expr);
+        ASSERT_TRUE(complete);
+    }
+}
+
 static void test_to_string_complex_projection_TeX(void)
 {
     static const struct { const char *source; const char *glyph; } cases[] = {
@@ -2788,6 +2818,7 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_indexed_principal_roots, NULL);
     TEST_RUN_SUBTEST(test_to_string_conjugate_overbar_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_complex_projection_TeX, NULL);
+    TEST_RUN_SUBTEST(test_to_string_compact_product_quotient_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_exact_rational_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_square_denominator, NULL);
     TEST_RUN_SUBTEST(test_to_string_equal_conjugate_sums, NULL);

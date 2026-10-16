@@ -223,8 +223,8 @@ function setValueCardVisible(visible) {
 }
 
 function saveCurrentModeResultState(mode = currentMode()) {
-    modeResultState[mode] = labDOM.call(
-        'lab_workspace_dom_result_save', {lastTex, lastDerivativeExpression, currentVariables, currentDifferentiable});
+    modeResultState[mode] = labSurfacePreview.captureResult(() => labDOM.call(
+        'lab_workspace_dom_result_save', {lastTex, lastDerivativeExpression, currentVariables, currentDifferentiable}));
 }
 
 function restoreModeResultState(mode = currentMode()) {

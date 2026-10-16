@@ -1052,7 +1052,8 @@ The vertical-range controls are available for both curves and surfaces; the
 Complex 3-D views are automatically resampled at lower detail when their SVG
 would exceed a 6 MiB chart budget, leaving room within the 8 MiB response limit
 for the title and other fields. The complete requested coordinate range is
-retained; facets are not truncated. A note identifies reduced-detail views.
+retained; facets are not truncated. Sampling detail remains available in plot metadata,
+without an annotation over the chart.
 Zoom in for finer sampling. This safeguard does not impose a fixed zoom-out limit.
 For equal sine/cosine expressions, the native ordinary-precision mesher separates
 the two periodic phase families before triangulation. This avoids joining the
@@ -1073,68 +1074,97 @@ Failed plot redraws also retain the previous coordinate-bearing view and show a
 separate diagnostic. Zoom out or use **Reset** to recover; the zoom buttons never
 switch to enlarging the diagnostic while a previous plot is available.
 
+The compact **3-D view** controls come first, directly beneath the chart. The **Zoom** slider
+starts with a 12.5% to 6400% coordinate-volume range and extends as zoom continues,
+with 100% as the initial ranges. Its readout follows wheel, pinch and button zoom,
+using a binary exponent at extreme scales. All three spans change by the
+same factor about their current centres; axes remain fitted to the chart.
+Gesture instructions are in **Help**, rather than beneath the sliders.
 The **Azimuth** slider in **3-D view** rotates around the surface; **Elevation** tilts the view;
 **Roll** turns the view clockwise in the screen plane. All three support mouse,
 touch and keyboard adjustment, with live degree readouts.
 The defaults are 315°, 30° and 0°, respectively: both horizontal axes initially
 increase from left to right, and the height axis increases from bottom to top.
 Rotating the view changes their screen directions without reversing the values.
-Azimuth and roll span a full turn; elevation accepts 5° to 85°.
+Azimuth and roll span a full turn; elevation accepts −90° to 90°.
 For the example above, set azimuth to 120° and elevation to
 40°: the output is the same paraboloid viewed from the other side, with its
-three ticked axes and formula title retained. Releasing a slider or committing
-a keyboard adjustment requests the new view automatically.
+three ticked axes and formula title retained. Orientation controls update the retained
+WebGL view live and remain local when released: no sampling or SVG redraw is
+requested merely because the camera moved.
 
-Alternatively, **left-button drag** or **drag with one finger** directly over a 3-D plot: horizontal movement
-changes azimuth; dragging down increases elevation and dragging up decreases it. Hold **Shift** when
-starting the drag to change roll instead. Each coordinate axis, including its arrow and name, also has an
-invisible 44-pixel-wide grab area which stays finger-sized on mobile. Drag an axis
-to rotate the whole plot using the same controls: the initial finger position and
-camera angles remain the anchor throughout the gesture, including across redraws.
-No mouse wheel is needed. The HTML plot container reserves touch gestures before
-movement starts, including touches near an axis, so browser scrolling cannot take
-over a rotation. Page scrolling remains available outside the plot container.
-Axis drags rotate the retained native mesh locally,
-using WebGL depth testing when available and a depth-sorted canvas otherwise.
-The interactive canvases use an HTML overlay aligned to the fitted SVG viewport,
-including its heading and scroll offsets, rather than canvases embedded in SVG.
-The full current mesh stays visible rather than being replaced by sparse sampled
-figures. Sliders and degree readouts follow the gesture. Pointer movements are
-coalesced at animation-frame boundaries; rotation does not request new samples
-while the pointer is held. Geometry and labels come from native output, including
-normalised coordinates for narrow high-precision views; the client only projects
-them. If local rendering is unavailable, native coarse previews remain available.
-No spline smoothing is applied across discontinuities. Releasing the mouse or lifting the finger,
-including outside the plot, retains the final position and requests one
-full-quality redraw, even when the last preview already reached that angle.
-A new rotation can interrupt a pending release-time redraw and immediately reuse
-the retained WebGL view; the obsolete response cannot replace the resumed gesture.
-Escape, losing browser focus or a lost release restores the original camera. A superseding request
-invalidates an unfinished drag. The final redraw supplies the authoritative SVG
-for copying and export. Changes to the sampled coordinate region still require
-native sampling and retain its precision checks and domain-gap handling.
-Ordinary 3-D wheel zoom and pinch gestures magnify the complete retained scene
-locally, including its native axis ticks. The camera fit stays fixed and triangles
-are not cut against a changing coordinate box during the gesture. Newly exposed
-regions remain unsampled until release or wheel inactivity; a notice identifies
-that temporary view. If an extremely narrow view cannot be represented locally,
-the last view remains visible until the native precision-preserving sampler runs
-at the end of the gesture. No intermediate sampling requests are made for zoom.
-This also works when expanded. Right-click keeps its normal behaviour;
-2-D dragging pans instead of rotating, and Ctrl+wheel zoom remains available.
-Touch dragging also works with a pen. The finger that starts the gesture owns it;
-additional fingers cannot change or end that rotation. A browser-cancelled touch
-restores the original view. Touches over the 3-D plot rotate it instead of scrolling
-the page; touches over a 2-D plot pan it. Scrolling and browser gestures outside
-plot images are unchanged.
-Over a 3-D plot, **Shift+wheel** adjusts elevation like a vertical drag and
-**Alt+wheel** adjusts azimuth like a horizontal drag. Wheel down increases the
-angle; wheel up decreases it, in 5° steps with the same limits as dragging.
-Sliders and readouts follow the camera. Wheel rotation uses the same retained mesh
-and coalesced redraws as dragging, then restores the full-quality mesh after
-300 ms without further wheel movement. Escape or losing browser focus restores
-the starting camera. Ctrl takes precedence for zoom; Shift+Alt together
-does not rotate. Wheel rotation is inactive during a drag.
+Alternatively, **left-button drag** or **drag with one finger** over a 3-D plot
+to turn a virtual trackball. Dragging can pass over either pole and turn the plot
+upside down. Hold **Shift** when starting the drag for screen-plane roll.
+The initial pointer position and unit quaternion anchor the gesture; orientation
+is never reconstructed from rounded slider readouts during dragging.
+Azimuth, elevation and roll remain useful explicit controls. At a pole, their
+Euler representation is ambiguous: the readout retains the previous azimuth,
+while quaternion rotation remains unrestricted. Crossing a pole can change the
+equivalent Euler readouts abruptly without a discontinuity in the camera.
+The projected volume is fitted uniformly to the available chart space during rotation.
+Height grids and implicit meshes preserve equal coordinate units on all three axes;
+shorter numerical ranges occupy proportionately shorter edges, without axis stretching.
+
+The HTML plot container reserves touch gestures before movement starts, including
+touches near an axis. Page scrolling remains available outside the plot.
+The complete native mesh stays in a persistent WebGL viewport, with depth testing.
+Mode snapshots retain clean native SVG and the camera/volume state, not canvas
+pixels or GPU resources. Returning to a mode recreates its renderer without
+requiring another evaluation.
+A depth-sorted canvas is the fallback when WebGL is unavailable or its context is
+lost. HTML overlays align the canvases to the fitted plot and retain the native
+TeX heading. Pointer movements are coalesced at animation-frame boundaries.
+Releasing a gesture leaves the same viewport and geometry visible, ready for the
+next gesture. Escape, losing browser focus or a cancelled pointer restores the
+starting orientation; a superseding plot invalidates an unfinished gesture.
+
+Sampling and camera presentation are separate. Native MARS still supplies the
+normalised coordinates, colours, tick labels, precision checks and domain gaps.
+No expressions are evaluated or algebra rewritten in the client. Initial and
+replacement geometry currently arrive in the native SVG transport; the client
+does not request new SVG for camera movement. Editing coordinate bounds requests
+new native samples. The old view remains available while that request runs.
+
+3-D wheel zoom, pinch gestures, the Zoom slider and the zoom buttons change all
+three coordinate spans uniformly, not the on-screen size of the axes. The selected
+volume stays centred on the starting volume. The retained mesh is transformed and
+clipped at all six faces immediately; tick labels follow the selected bounds.
+On release or after a short pause, native MARS samples that volume at full detail
+using its range-aware precision policy. The preview remains interactive meanwhile.
+A new zoom or rotation cancels an obsolete refinement; late replies cannot restore
+old bounds. Rotation preserves both the selected volume and quaternion orientation.
+
+Zoom is represented by a binary exponent rather than rounded absolute browser
+coordinates. C/WebAssembly owns quaternion rotation, projection, clipping and
+gesture mathematics. It sends a fixed-size native range recipe based on the
+original endpoints, retaining authored symbolic bounds where supplied and native
+round-trip decimal bounds for automatic ranges; native MARS evaluates that recipe and samples using
+its arbitrary-precision number module. Successive gestures do not nest recipes
+or rebase through double precision. The slider follows the current exponent,
+allowing continued zoom beyond its initial range. The controller permits binary
+exponents from −1024 to 32000; native plotting retains its 65,536-bit resource
+ceiling and may reject a request requiring more precision. GPU coordinates are
+normalised before conversion to display precision. Reset restores the original range controls
+and height policy, including Automatic. Editing bounds manually establishes a new
+zoom baseline after the native result arrives. Empty volumes retain their axes
+and controls, allowing zoom out or Reset to recover the surface.
+**Copy** generates SVG on demand from the current mesh, orientation and zoom,
+including the native TeX title and projected axes. SVG uses depth-sorted triangles
+rather than a GPU depth buffer, so intersecting triangles can have different
+occlusion in the vector export.
+
+This also works when expanded. Right-click keeps its normal behaviour.
+Two-dimensional plots retain SVG rendering; dragging pans and Ctrl+wheel zooms
+their sampled ranges. A second finger on a 3-D plot starts pinch zoom; further
+fingers are ignored. Touch and pen gestures do not change page scrolling outside
+the plot.
+
+Over a 3-D plot, **Shift+wheel** adjusts elevation and **Alt+wheel** adjusts azimuth.
+Wheel down increases the angle; wheel up decreases it in 5° steps.
+Wheel rotation uses the same persistent viewport and does not request new samples
+when the wheel stops. Ctrl takes precedence for zoom; Shift+Alt together does
+not rotate. Wheel rotation is inactive during a drag.
 Axis numbers are spaced to avoid collisions at shared corners and during
 rotation; crowded numbers may be omitted while their tick marks remain visible.
 
@@ -1232,22 +1262,13 @@ Hold **Ctrl** and use the mouse wheel over a 2-D or 3-D plot to zoom in (up)
 or out (down). Shift+wheel and Alt+wheel rotate 3-D plots as described above;
 otherwise, without Ctrl, wheel events retain their normal browser behaviour
 and do not change plot zoom. For 2-D plots, Ctrl+wheel changes both axis ranges
-around the pointer. For 3-D surfaces it scales all three coordinate ranges by
-the same factor, preserving camera orientation. All three coordinates follow
-the visible facet under the pointer; height becomes manual so automatic framing
-cannot undo the zoom. Surface background zoom uses the domain centre.
-While the pointer stays still, wheel zoom retains its original coordinate anchor
-across redraws, even if a different sheet becomes visible underneath it. Reversing
-the wheel reverses the range change without drifting between sheets. Rapid wheel
-events accumulate against the latest requested bounds, not an older displayed image;
-editing a range or changing an axis starts a new viewport.
-Wheel zoom uses coarse samples while scrolling, coalescing movements into at most
-one in-flight redraw. After 300 ms without another wheel event, it resamples the
-latest ranges at normal detail, subject to the chart-size budget. No full-detail
-request is queued for each individual wheel notch.
-Both request fresh native samples; the image stays fitted to
-the card. **−** and **+** change the ranges around their centre, and **Reset**
-restores all range controls and the height policy captured before zooming. Pointer coordinates use the
+around the pointer and requests fresh native samples. For 3-D surfaces, it changes
+all three coordinate spans about the volume centre, with a clipped preview coalesced to animation frames.
+Native refinement uses the selected bounds and adjusts numerical precision when needed.
+Reversing the wheel reverses the range change without selecting a different surface
+sheet. **−** and **+** zoom about the volume centre; **Reset** restores the original ranges.
+For 2-D plots those buttons change the sampled ranges, and Reset restores the
+range controls and height policy captured before zooming. Pointer coordinates use the
 SVG screen transformation, so nested headings, clipping and fitting do not offset
 hover readings or gesture anchors. Vertical and horizontal hover guides meet at
 the reported curve point, marked by a small outlined circle. The marker and
@@ -1273,13 +1294,12 @@ an adaptive sampling budget of 513 evaluations per curve instead of 8193, with f
 no derivative construction; numerical precision checks remain enabled. Release
 finishes at full detail. Escape or pointer cancellation restores the starting
 view. Reset restores the view from before zooming or panning.
-Two-finger pinch zoom changes the plot ranges rather than magnifying the image.
-Spread fingers to zoom in and bring them together to zoom out. Curves track the
-finger midpoint, including two-finger panning; surfaces scale all three ranges
-about their centre without changing the camera. Height becomes manual until reset. Pinching
-uses coarse previews and restores full sampling when either finger lifts. Further
-fingers are ignored. Lift the remaining finger before starting another drag.
-Pointer cancellation restores the pre-gesture controls, and Reset undoes the zoom.
+Spread two fingers to zoom in and bring them together to zoom out. Curves track
+the midpoint by changing sampled ranges, with coarse previews and full sampling
+when either finger lifts. Surfaces instead retain their mesh for immediate
+coordinate-volume zoom about the volume centre, followed by native refinement on release. Further fingers
+are ignored. Lift the remaining finger before starting another drag. Pointer
+cancellation restores the pre-gesture view, and Reset undoes the zoom.
 For curve plots, Fit all retains the complete sampled range of continuous curves.
 When the sampler marks discontinuities, it protects the view from extreme tails
 near asymptotes instead of flattening all other curves. This uses the same robust
@@ -1291,7 +1311,13 @@ returns an incompatible curve selection to **Auto**.
 Zoom-generated range fields use interval-aware precision: broad intervals show
 short bounds, while narrow intervals retain more digits. Trailing zeroes are
 omitted. Sampling retains the unrounded gesture coordinates until a bound is
-edited; manually entered bounds keep their authored precision.
+edited; manually entered bounds keep their authored precision. The C/WebAssembly
+formatter applies this consistently to all three surface axes; native sampling
+receives exact range recipes rather than the displayed values. During microscopic
+zoom, controls retain the recipe until native decimal labels arrive; preview tick
+labels that cannot be represented safely are omitted until refinement finishes.
+For a very large single zoom jump, axes remain interactive while old geometry
+outside the safe relative GPU range is hidden until fresh native samples arrive.
 Scrolling outside the plot image, including over its controls, behaves normally;
 other result cards still require Ctrl or Command with the wheel to zoom.
 

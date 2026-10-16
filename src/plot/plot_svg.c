@@ -80,11 +80,16 @@ static bool valid(const plot_point_t *point)
     return num_is_real(point->x) && num_is_finite(point->x) && num_is_real(point->y) && num_is_finite(point->y);
 }
 
-string_t *plot_tick_label(number_t value)
+string_t *plot_tick_label(number_t value, number_t span)
 {
     /* Axis labels are decimal approximations, even when the tick is an exact fraction. */
     number_t decimal = num_as_inexact_real_prec(value, num_get_effective_prec_bits(value));
-    string_t *label = num_is_finite(decimal) ? num_sprintf_text("%.6n", decimal) : NULL;
+    number_t magnitude = num_abs(decimal);
+    long difference = num_is_zero(magnitude) ? 0 : num_get_exponent2(magnitude) - num_get_exponent2(span);
+    num_destroy(&magnitude);
+    int precision_digits = difference > 0 ? (int)(difference * 30103 / 100000 + 5) : 6;
+    if (precision_digits < 6) precision_digits = 6;
+    string_t *label = num_is_finite(decimal) ? num_sprintf_text("%.*n", precision_digits, decimal) : NULL;
     num_destroy(&decimal);
     if (!label)
         return NULL;
@@ -177,7 +182,7 @@ static bool axes(svg_view_t *view, const plot_t *plot)
         size_t count = plot_ticks(view->bounds[2 * axis], view->bounds[2 * axis + 1], ticks);
         ok = count > 0;
         for (size_t i = 0; i < count; ++i) {
-            string_t *label = plot_tick_label(ticks[i]);
+            string_t *label = plot_tick_label(ticks[i], view->spans[axis]);
             double position = 0;
             ok = ok && label && normalise(ticks[i], view->bounds[2 * axis], view->spans[axis], &position) &&
                  plot_tick_text(view->out, &labels, label, axis,

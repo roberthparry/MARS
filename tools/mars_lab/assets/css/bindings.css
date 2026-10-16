@@ -96,18 +96,55 @@
 }
 
 #plotCamera {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem 1.25rem;
+  padding: 0.65rem 0.9rem 0.3rem;
 }
 
 #plotCamera > .plot-field {
-  flex: 1 1 14rem;
+  position: relative;
   grid-template-columns: minmax(0, 1fr);
+  gap: 0;
 }
 
-#plotCameraTitle,
-#plotCamera .plot-hint {
-  flex-basis: 100%;
+#plotCamera .plot-field > label {
+  padding-right: 5ch;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+}
+
+#plotCamera .plot-angle {
+  display: block;
+}
+
+#plotCamera output {
+  position: absolute;
+  top: 0;
+  right: 0;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+#plotCameraTitle {
+  grid-column: 1 / -1;
+}
+
+#plotRange {
+  container-type: inline-size;
+}
+
+@container (max-width: 640px) {
+  #plotCamera {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1rem;
+  }
+}
+
+@container (max-width: 260px) {
+  #plotCamera {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 #plotRange .plot-bound-pair input {
@@ -249,6 +286,10 @@
   text-align: right;
 }
 
+.plot-magnification {
+  grid-template-columns: minmax(0, 1fr) 5ch;
+}
+
 .target-row input {
   width: 100%;
   border: 1px solid rgba(233, 244, 239, 0.28);
@@ -271,9 +312,21 @@
   border-radius: 0;
   padding: 0;
   min-width: 0;
-  height: 2rem;
+  height: 44px;
+  margin: 0;
+  box-sizing: border-box;
   background: transparent;
   cursor: pointer;
+}
+
+.plot-angle input[type="range"]:focus {
+  box-shadow: none;
+}
+
+.plot-angle input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 6px;
 }
 
 .plot-angle input[type="range"]::-moz-range-track {

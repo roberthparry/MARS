@@ -105,6 +105,11 @@ constants, without reintroducing a zero summand. Unset scalar bindings display
 as `?`, not `NAN`; an actual undefined numerical expression still displays as such.
 For example, `sinh(ix)` produces `{ sin(x)·i | x = ? }` in Expression output;
 the TeX body is the same formula without the binding section.
+
+Compact algebraic quotients retain the entire numerator, including factored
+products, above a single TeX fraction bar. Derivatives and integrals remain
+outside enclosing algebraic fractions; lengthy sums may be separated for readability.
+
 The same symbolic result supplies Expression, Function and TeX output; its numerical
 evaluation retains the selected precision. Inverse identities preserve principal
 branches and are not inferred from a variable's current numerical binding.

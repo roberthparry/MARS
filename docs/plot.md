@@ -38,7 +38,7 @@ once per bounds, copying or rendering stage, rather than searched by name.
 multiple of three. Every consecutive triple forms an independent triangle; the
 scene copies all vertices, subject to its point limit. Meshes use the same camera,
 height clipping and depth ordering as height grids. Coordinate units
-retain their proportions under a uniform camera scale rather than being
+retain their proportions for both height grids and meshes under a uniform camera scale rather than being
 stretched independently to fill the drawing rectangle. Explicit horizontal mesh
 bounds set the camera frame: supply facets already clipped to that horizontal
 domain. This permits volume samplers to preserve their chosen viewport.
@@ -207,6 +207,14 @@ Each surface facet also supplies its clipped, normalised three-dimensional
 coordinates for local camera projection without parsing mathematical expressions
 or converting large world-coordinate origins back to ordinary floats. These
 attributes do not change the standalone SVG rendering.
+
+Surface viewports also expose native-precision `data-exact-x-min`,
+`data-exact-x-max` and corresponding `y`/`z` attributes, together with
+interval-aware `data-label-*` decimal text. Exact attributes retain enough digits
+to round-trip the native value; clients must keep them as text, not convert them
+through browser numbers. The older approximate attributes remain available for
+screen inspection. Tick labels gain digits when the span is small relative to
+its origin, consistently for curves and surfaces.
 
 Each surface axis ends in an arrow pointing towards increasing values, labelled
 with the copied `x_label`, `y_label` or `z_label` option (defaults `x`, `y`, `f`).

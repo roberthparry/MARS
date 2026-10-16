@@ -136,6 +136,7 @@ void lab_plot_controls_variables(int names, int labels)
     lab_dom_subscribe(lab_dom_id("plotRange"), "change", "lab_plot_controls_dispatch", 0, 0, 0);
     lab_dom_subscribe(lab_dom_id("plotRange"), "input", "lab_plot_controls_dispatch", 1, 0, 0);
     lab_dom_subscribe(lab_dom_id("plotRange"), "click", "lab_plot_controls_dispatch", 3, 0, 0);
+    lab_dom_subscribe(lab_dom_id("plotRange"), "pointerdown", "lab_plot_controls_dispatch", 4, 0, 0);
     lab_plot_controls_sync();
 }
 
@@ -183,6 +184,20 @@ void lab_plot_controls_dispatch(unsigned action, int event, int context)
         return;
     }
     int target = lab_dom_get(event, "target");
+    if (lab_dom_closest(target, "#plotZoom")) {
+        if (action == 0 || action == 1 || action == 4)
+            emit(calls, "setSurfaceZoom", lab_dom_read(target, 5, ""), lab_dom_numeric(action), 2);
+        return;
+    }
+    if (lab_dom_closest(target, ".plot-angle") && lab_dom_closest(target, "input")) {
+        if (action == 0 || action == 1 || (action == 4 &&
+            lab_dom_to_number(lab_dom_get(event, "button")) == 0 &&
+            lab_dom_truth(lab_dom_get(event, "isPrimary"))))
+            lab_plot_slider(action == 4 ? 0 : action == 1 ? 1 : 2, event, calls);
+        return;
+    }
+    if (action == 4)
+        return;
     if (action == 3 && (!lab_dom_equal(lab_dom_get(target, "name"), lab_dom_string("plotScale")) ||
                        !lab_dom_equal(lab_dom_read(target, 5, ""), lab_dom_string("auto"))))
         return;

@@ -44,17 +44,11 @@ bool lab_worker_plot_quality(string_t *svg, bool preview, size_t side)
     return ok;
 }
 
-/* Make reduced sampling visible without changing the requested coordinate volume. */
+/* Retain sampling metadata without adding a visible chart annotation. */
 bool lab_worker_plot_reduced(string_t *svg)
 {
-    size_t length = svg ? string_byte_length(svg) : 0;
-    while (length && strchr(" \t\r\n", string_c_str(svg)[length - 1]))
-        --length;
-    return length >= 6 && !memcmp(string_c_str(svg) + length - 6, "</svg>", 6) &&
-           string_insert(svg, string_length(svg) - (string_byte_length(svg) - length) - 6,
-                         "<text data-detail-reduced=\"true\" x=\"50%\" y=\"98%\" text-anchor=\"middle\" "
-                         "fill=\"#b8ccc5\" font-family=\"sans-serif\" font-size=\"11\">"
-                         "Detail reduced for this view; zoom in for finer sampling</text>") == 0;
+    return svg && !strncmp(string_c_str(svg), "<svg ", 5) &&
+           string_insert(svg, 5, "data-detail-reduced=\"true\" ") == 0;
 }
 
 /* Produce one real-valued curve while preserving the worksheet's original expression. */

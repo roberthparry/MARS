@@ -2,14 +2,13 @@
  * @file lab_plot_drag.c
  * @brief Mouse, touch and pen curve panning and surface rotation with coalesced live redraws.
  *
- * Dragging adjusts azimuth/elevation, or roll when Shift was held at the start.
- * Downward dragging increases elevation; upward dragging decreases it.
+ * Surface dragging supplies pointer anchors to the retained quaternion camera.
+ * Shift-drag requests screen-plane roll. Angle sliders explicitly set orientation.
  * Shift+wheel adjusts elevation and Alt+wheel adjusts azimuth in the same direction.
- * Dragging, camera-wheel and range-wheel gestures use coarse previews, followed by
- * full detail on release or wheel inactivity.
- * Sliders and degree readouts update together. Only one native SVG request runs
- * at a time; further movements replace the pending camera position. Retained
- * surface rotations can interrupt release-time redraws using revision ownership.
+ * Surface cameras remain local on release; curve-range gestures refine natively.
+ * Sliders and degree readouts update together. Only one frame or native curve
+ * request runs at a time; further movements replace the pending position.
+ * Revision ownership prevents superseded interactions from adopting stale results.
  * Cancellation restores the original camera. Superseding requests and mode changes stop the gesture.
  * Browser-owned state retains real DOM objects, never transient bridge handles.
  * A second touch promotes dragging to pinch zoom; further pointers are ignored.
@@ -76,6 +75,7 @@ static void stop(int state)
     lab_dom_set(state, "dirty", lab_dom_scalar(1, 0));
     lab_dom_set(state, "pan", lab_dom_scalar(1, 0));
     lab_dom_set(state, "pinch", lab_dom_scalar(1, 0));
+    lab_dom_set(state, "slider", lab_dom_scalar(1, 0));
     lab_dom_delete(state, "secondId");
     lab_dom_delete(state, "surface");
     lab_dom_delete(state, "variable");
@@ -114,8 +114,70 @@ static void cancel(int state, int calls)
     } else
         for (unsigned axis = 0; axis < 3; ++axis)
             set_angle(axis, read_number(state, angles[axis]));
+    lab_dom_set(state, "rotationCancelled", lab_dom_scalar(1, 1));
     lab_dom_set(state, "dirty", lab_dom_get(state, "redrawn"));
     finish(state, calls);
+}
+
+static void interrupt(int state, int calls)
+{
+    int call = lab_dom_object(5), args = lab_dom_object(4);
+    double revision = lab_dom_truth(lab_dom_get(state, "revision")) ? read_number(state, "revision") : 0;
+    lab_dom_set(state, "revision", lab_dom_numeric(revision + 1));
+    lab_dom_set(state, "busy", lab_dom_scalar(1, 0));
+    lab_dom_push(args, state);
+    lab_dom_set(call, "service", lab_dom_string("interruptPlotDrag"));
+    lab_dom_set(call, "args", args);
+    lab_dom_push(calls, call);
+}
+
+static void pause_sampling(int calls)
+{
+    int call = lab_dom_object(5);
+    lab_dom_set(call, "service", lab_dom_string("pauseSurfaceSampling"));
+    lab_dom_set(call, "args", lab_dom_object(4));
+    lab_dom_push(calls, call);
+}
+
+/* Sliders use the same retained camera and revision ownership as direct rotation. */
+void lab_plot_slider(unsigned action, int event, int calls)
+{
+    int rendered = lab_dom_id("plotRendered"), state = lab_dom_get(rendered, "marsPlotDrag");
+    int surface = lab_dom_query(rendered, "[data-surface]");
+    if (!state || !surface || action > 2 || (lab_workspace_mode() > 2 && lab_workspace_mode() != 4))
+        return;
+    if (action == 2) {
+        if (lab_dom_truth(lab_dom_get(state, "active")) && lab_dom_truth(lab_dom_get(state, "slider")))
+            finish(state, calls);
+        return;
+    }
+    if (!lab_dom_truth(lab_dom_get(state, "active"))) {
+        pause_sampling(calls);
+        if (lab_dom_truth(lab_dom_get(state, "busy"))) {
+            if (!current(state) || lab_dom_truth(lab_dom_get(state, "pan")) ||
+                lab_dom_truth(lab_dom_get(state, "pinch")))
+                return;
+            interrupt(state, calls);
+        }
+        lab_plot_wheel_stop();
+        lab_dom_set(state, "surface", surface);
+        lab_dom_set(state, "variable", lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
+        lab_dom_set(state, "mode", lab_dom_numeric(lab_workspace_mode()));
+        lab_dom_set(state, "active", lab_dom_scalar(1, 1));
+        lab_dom_set(state, "slider", lab_dom_scalar(1, 1));
+        lab_dom_set(state, "trackball", lab_dom_scalar(1, 0));
+        lab_dom_set(state, "pan", lab_dom_scalar(1, 0));
+        lab_dom_set(state, "wheel", lab_dom_scalar(1, 0));
+        lab_dom_set(state, "dirty", lab_dom_scalar(1, 0));
+        lab_dom_set(state, "redrawn", lab_dom_scalar(1, lab_dom_has(surface, "data-local-renderer")));
+        lab_dom_set(state, "pointerId", lab_dom_get(event, "pointerId"));
+        for (unsigned axis = 0; axis < 3; ++axis)
+            lab_dom_set(state, angles[axis], lab_dom_read(lab_dom_query(0, controls[axis]), 5, ""));
+    }
+    if (action == 1 && lab_dom_truth(lab_dom_get(state, "slider"))) {
+        lab_dom_set(state, "dirty", lab_dom_scalar(1, 1));
+        queue(state, calls);
+    }
 }
 
 static int start(int event, int state, int calls)
@@ -137,19 +199,15 @@ static int start(int event, int state, int calls)
         lab_dom_truth(lab_dom_get(event, "altKey")) || !lab_dom_closest(target, "svg") ||
         !lab_dom_node_contains(rendered, target))
         return 0;
-    if (lab_dom_truth(lab_dom_get(state, "busy"))) {
-        int call = lab_dom_object(5), args = lab_dom_object(4);
-        double revision = lab_dom_truth(lab_dom_get(state, "revision")) ? read_number(state, "revision") : 0;
-        lab_dom_set(state, "revision", lab_dom_numeric(revision + 1));
-        lab_dom_set(state, "busy", lab_dom_scalar(1, 0));
-        lab_dom_push(args, state);
-        lab_dom_set(call, "service", lab_dom_string("interruptPlotDrag"));
-        lab_dom_set(call, "args", args);
-        lab_dom_push(calls, call);
-    }
+    if (lab_dom_truth(lab_dom_get(state, "busy")))
+        interrupt(state, calls);
     if (pan && !lab_plot_pan_start(state, surface, event))
         return 0;
     lab_dom_set(state, "pan", lab_dom_scalar(1, pan));
+    lab_dom_set(state, "slider", lab_dom_scalar(1, 0));
+    lab_dom_set(state, "trackball", lab_dom_scalar(1, !pan));
+    lab_dom_delete(state, "rotationStart");
+    lab_dom_delete(state, "rotationCancelled");
     lab_dom_set(state, "panX", lab_dom_numeric(0));
     lab_dom_set(state, "panY", lab_dom_numeric(0));
     lab_dom_set(state, "panDrawnX", lab_dom_numeric(0));
@@ -172,6 +230,8 @@ static int start(int event, int state, int calls)
     for (unsigned axis = 0; axis < 3; ++axis)
         lab_dom_set(state, angles[axis], lab_dom_read(lab_dom_query(0, controls[axis]), 5, ""));
     lab_dom_class(rendered, "plot-dragging", 1);
+    if (!pan)
+        pause_sampling(calls);
     return 1;
 }
 
@@ -184,7 +244,7 @@ static double wrapped(double value)
 
 static double limited(unsigned axis, double value)
 {
-    return axis == 1 ? (value < 5 ? 5 : value > 85 ? 85 : value) : wrapped(value);
+    return axis == 1 ? (value < -90 ? -90 : value > 90 ? 90 : value) : wrapped(value);
 }
 
 static void schedule_wheel_end(int state, int calls)
@@ -234,7 +294,8 @@ static int wheel(int event, int state, int calls)
     int shift = lab_dom_truth(lab_dom_get(event, "shiftKey"));
     int alt = lab_dom_truth(lab_dom_get(event, "altKey"));
     double delta = read_number(event, "deltaY");
-    if (lab_workspace_mode() || !surface || shift == alt || lab_dom_truth(lab_dom_get(event, "ctrlKey")) ||
+    if ((lab_workspace_mode() > 2 && lab_workspace_mode() != 4) || !surface || shift == alt ||
+        lab_dom_truth(lab_dom_get(event, "ctrlKey")) ||
         lab_dom_truth(lab_dom_get(event, "metaKey")) || lab_dom_truth(lab_dom_get(state, "active")) ||
         !__builtin_isfinite(delta) || delta == 0 || !lab_dom_closest(target, "svg") ||
         !lab_dom_node_contains(rendered, target))
@@ -257,6 +318,7 @@ static int wheel(int event, int state, int calls)
     lab_dom_set(state, "mode", lab_dom_numeric(lab_workspace_mode()));
     lab_dom_set(state, "wheel", lab_dom_scalar(1, 1));
     lab_dom_class(rendered, "plot-dragging", 1);
+    lab_dom_set(state, "trackball", lab_dom_scalar(1, 0));
     set_angle(axis, value);
     lab_dom_set(state, "dirty", lab_dom_scalar(1, 1));
     queue(state, calls);
@@ -266,6 +328,8 @@ static int wheel(int event, int state, int calls)
 
 static void move(int event, int state)
 {
+    if (lab_dom_truth(lab_dom_get(state, "slider")))
+        return;
     if (lab_dom_truth(lab_dom_get(state, "pinch"))) {
         if (lab_plot_pinch_move(state, event)) {
             lab_dom_set(state, "changed", lab_dom_scalar(1, 1));
@@ -289,21 +353,8 @@ static void move(int event, int state)
         }
         return;
     }
-    int roll = lab_dom_truth(lab_dom_get(state, "rollOnly")), changed = 0;
-    for (unsigned axis = 0; axis < 3; ++axis) {
-        double initial = read_number(state, angles[axis]), value = initial;
-        if (axis == 2 ? roll : !roll) {
-            double delta = axis == 1 ? dy : dx;
-            value = __builtin_floor(initial + delta * 0.5 + 0.5);
-            value = limited(axis, value);
-        }
-        changed |= value != lab_dom_to_number(lab_dom_read(lab_dom_query(0, controls[axis]), 5, ""));
-        set_angle(axis, value);
-    }
-    if (changed) {
-        lab_dom_set(state, "changed", lab_dom_scalar(1, 1));
-        lab_dom_set(state, "dirty", lab_dom_scalar(1, 1));
-    }
+    lab_dom_set(state, "changed", lab_dom_scalar(1, 1));
+    lab_dom_set(state, "dirty", lab_dom_scalar(1, 1));
 }
 
 /* Update controls immediately and coalesce moves while the native renderer is busy. */
@@ -359,7 +410,8 @@ void lab_plot_drag_dispatch(unsigned action, int event, int state)
     }
     if (action == 2 && read_number(event, "button") != 0)
         return;
-    lab_dom_set(plan, "prevent", lab_dom_scalar(1, 1));
+    if (!lab_dom_truth(lab_dom_get(state, "slider")))
+        lab_dom_set(plan, "prevent", lab_dom_scalar(1, 1));
     move(event, state);
     if (action == 2) {
         finish(state, calls);

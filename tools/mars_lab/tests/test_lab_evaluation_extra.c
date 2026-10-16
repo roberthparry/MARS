@@ -177,6 +177,7 @@ static void test_lab_extra_surface_continuity(void)
         ++facets;
     bool reduced = contains(fields, "plot_svg", "data-detail-reduced=\"true\"");
     bool ok = status == 200 && test_lab_ok(fields, true) &&
+              !strstr(svg, "Detail reduced for this view") && !strstr(svg, "<text data-detail-reduced") &&
               facets == (reduced ? 2 * 69 * 69 : 2 * 138 * 138);
     bool failed = true;
     ok = ok && lab_presentation_adapt(fields);
@@ -1094,6 +1095,26 @@ static void test_lab_extra_plot_precision(void)
     TEST_ASSERT_TRUE(scoped, "private plot bindings reach summand parameters without removing convergence gaps");
     TEST_ASSERT_TRUE(close_symbolic, "symbolic bounds closer than worksheet resolution remain distinct");
     TEST_ASSERT_TRUE(restored, "failed private parses restore worksheet precision");
+
+    bool microscopic = true;
+    const unsigned zooms[] = {80, 512, 4096};
+    for (unsigned i = 0; i < sizeof zooms / sizeof *zooms; ++i) {
+        string_t *lower = string_sprintf("((0)+(2))/2-((2)-(0))/2*2^(-(%u))", zooms[i]);
+        string_t *upper = string_sprintf("((0)+(2))/2+((2)-(0))/2*2^(-(%u))", zooms[i]);
+        bool ordered = lower && upper && lab_worker_plot_bounds(string_c_str(lower), string_c_str(upper), &lo, &hi);
+        microscopic = microscopic && ordered && num_lt(lo, hi) && num_to_double(lo) == 1 && num_to_double(hi) == 1 &&
+                      lab_worker_plot_range_precision(lo, hi) > zooms[i];
+        if (ordered && zooms[i] == 512) {
+            samples = lab_worker_plot_samples("x-1", "x", lo, hi, NUM_NAN, NUM_NAN, &bits);
+            microscopic = microscopic && samples && bits > 512 &&
+                          num_lt(sampler_point(samples, 0)->y, NUM_ZERO) &&
+                          num_gt(sampler_point(samples, sampler_count(samples)-1)->y, NUM_ZERO);
+            sampler_free(samples);
+        }
+        num_destroy(&lo); num_destroy(&hi);
+        string_free(lower); string_free(upper);
+    }
+    TEST_ASSERT_TRUE(microscopic, "native zoom recipes retain microscopic spans and samples around a nonzero centre");
 
     const char *names[] = {"x", "y", "z"};
     const char *limits[] = {"1e30-2", "1e30+2", "-2", "2", "-2", "2"};

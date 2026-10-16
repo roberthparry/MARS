@@ -229,6 +229,7 @@ async function fetchDatetimeWeather(state, signal, request = null) {
 
 // Native continuations own calculus decisions; browser callbacks expose atomic capabilities.
 function takeCalculus(wrt, action, actionButton = null, preview = false, live = false) {
+    if (!labSurfaceVolume.requesting) labSurfaceVolume.cancel(true);
     clearTimeout(plotControlsTimer);
     plotControlsTimer = undefined;
     return labFlowContinue(7, {wrt, action, actionButton, preview, live});
@@ -249,6 +250,7 @@ async function takePlot(wrt, actionButton = null) {
 // Browser timer only; native code validates the captured worksheet and chooses the redraw.
 let plotControlsTimer;
 function schedulePlotControls(state, delay) {
+    labSurfaceVolume.cancel(true);
     clearTimeout(plotControlsTimer);
     plotControlsTimer = setTimeout(() => {
         plotControlsTimer = undefined;
@@ -277,6 +279,25 @@ function interruptPlotDrag(state) {
     delete state.pendingToken;
 }
 
+function pauseSurfaceSampling() {
+    labSurfaceVolume.cancel();
+}
+
+function setSurfaceZoom(value, action = 1) {
+    labSurfaceVolume.slider(action);
+    if (action === 4) return;
+    const chart = document.querySelector('#plotRendered [data-surface]');
+    const view = labSurfacePreview.prepare(chart);
+    if (view && labSurfaceVolume.set(view, Number(value), false, 1))
+        labSurfacePreview.draw(chart, view.angles);
+}
+
+function zoomSurface(chart, event, reset, direction, wheel) {
+    const view = labSurfacePreview.prepare(chart);
+    if (view && labSurfaceVolume.set(view, direction > 0 ? 1.25 : 0.8, Boolean(reset), wheel ? 2 : 0, event))
+        labSurfacePreview.draw(chart, view.angles);
+}
+
 /** Await native plotting; the C gesture controller owns coalescing and continuation decisions. */
 async function redrawPlotDrag(state, variable, preview) {
     let next = [state, variable, preview];
@@ -288,14 +309,16 @@ async function redrawPlotDrag(state, variable, preview) {
         try {
             const generation = labRequests.latestMain();
             const chart = document.querySelector('#plotRendered [data-surface]');
-            const bounds = record.pinch || record.rangeWheel ?
+            const bounds = record.rangeWheel ?
                 ['plotLower', 'plotUpper', 'plotSecondLower', 'plotSecondUpper', 'plotYLower', 'plotYUpper']
                     .map(id => Number(document.getElementById(id).value)) : null;
             let local = false;
-            if (coarse && !record.pan) {
+            if (!record.pan) {
                 try {
-                    local = labSurfacePreview.draw(chart, ['plotAzimuth', 'plotElevation', 'plotRoll']
-                        .map(id => Number(document.getElementById(id).value)), bounds);
+                    const angles = ['plotAzimuth', 'plotElevation', 'plotRoll']
+                        .map(id => Number(document.getElementById(id).value));
+                    local = record.pinch ? labSurfacePreview.pinch(chart, record, angles) :
+                        labSurfacePreview.rotate(chart, record, angles);
                 } catch (_) {
                     labSurfacePreview.dispose();
                 }
@@ -322,6 +345,10 @@ async function redrawPlotDrag(state, variable, preview) {
                 if (!coarse || !accepted) labSurfacePreview.clear();
                 const plan = labDOM.call('lab_plot_drag_complete', record, Number(accepted));
                 labDOM.services(plan, {redrawPlotDrag: (...args) => next = args});
+                if (!record.active && !record.wheel && !record.pan) {
+                    const view = labSurfacePreview.prepare(document.querySelector('#plotRendered [data-surface]'));
+                    if (view) labSurfaceVolume.schedule(view);
+                }
             }
         }
     }
@@ -425,16 +452,19 @@ function labRequestFlowServices() {
         expressionWithVisibleBindings: (...args) => expressionWithVisibleBindings(...args),
         calculusTitle: text => rightPaneTitle.textContent = text,
         displayPlot: result => {
+            const camera = labSurfaceVolume.accept(labSurfacePreview.snapshot());
             labSurfacePreview.dispose();
             const value = labDOM.call('lab_layout_plot', result, null);
             const chart = document.querySelector('#plotRendered [data-surface]');
             const prepare = () => {
                 if (!chart?.isConnected) return;
-                try { labSurfacePreview.prepare(chart); }
+                try {
+                    const view = labSurfacePreview.prepare(chart, camera);
+                    if (view) labSurfacePreview.draw(chart, view.angles);
+                }
                 catch (_) { labSurfacePreview.dispose(); }
             };
-            if (window.requestIdleCallback) requestIdleCallback(prepare, {timeout: 250});
-            else setTimeout(prepare, 0);
+            prepare();
             return value;
         },
         plotError: error => labDOM.call('lab_layout_plot', null, error),

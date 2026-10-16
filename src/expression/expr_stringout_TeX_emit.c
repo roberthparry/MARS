@@ -1028,8 +1028,6 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         bool neg_den = expr_is_negative(f->b);
         const expr_t *atan_expr = NULL;
         const expr_t *denominator = NULL;
-        const expr_t *common_numerator_factor = NULL;
-        const expr_t *common_sum = NULL;
 
         if (expr_is_div(f->a) && f->a->a && f->a->b) {
             if (need)
@@ -1046,28 +1044,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
-        if (!expr_is_rendered_log_local(f->b) && match_sum_quotient(f, &common_numerator_factor, &common_sum)) {
-            if (need)
-                sbuf_puts(b, "\\left(");
-            if (!emit_TeX_rational_quotient(common_numerator_factor, f->b, b, false, PREC_LOWEST)) {
-                sbuf_puts(b, "\\frac{");
-                if (common_numerator_factor)
-                    emit_TeX_expr(common_numerator_factor, b, PREC_LOWEST);
-                else
-                    emit_TeX_expr(common_sum, b, PREC_LOWEST);
-                sbuf_puts(b, "}{");
-                emit_TeX_expr(f->b, b, PREC_LOWEST);
-                sbuf_putc(b, '}');
-            }
-            if (common_numerator_factor) {
-                sbuf_puts(b, "\\mkern-2mu \\left(");
-                emit_TeX_expr(common_sum, b, PREC_LOWEST);
-                sbuf_puts(b, "\\right)");
-            }
-            if (need)
-                sbuf_puts(b, "\\right)");
-            return;
-        }
+        /* Compact ordinary products stay together above the fraction bar. */
 
         if (emit_TeX_rational_quotient(f->a, f->b, b, false, parent_prec))
             return;

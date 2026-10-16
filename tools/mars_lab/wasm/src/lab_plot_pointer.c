@@ -1,10 +1,11 @@
 /**
  * @file lab_plot_pointer.c
- * @brief Curve guides and pointer-aligned curve/surface range zoom without magnifying SVG artwork.
+ * @brief Curve inspection and routing of curve-range zoom versus retained surface-camera zoom.
  *
  * Uses native viewport metadata and browser geometry to inspect the horizontal
- * coordinate. Zoom edits range controls around the pointer and requests native
- * resampling; toolbar buttons use the centre. Reset restores the pre-zoom controls.
+ * coordinate. Curve zoom edits ranges and requests native resampling. Surface
+ * zoom delegates to the retained volume preview; this module formats its range fields.
+ * Toolbar buttons use the centre; Reset restores the corresponding viewport.
  * Double coordinate metadata is a UI approximation; non-finite or collapsed ranges
  * are left to manual native bounds. No expression is interpreted in the browser.
  */
@@ -80,12 +81,26 @@ unsigned lab_plot_bound_digits(double value, double span)
 }
 
 /* Keep about four significant digits of the span, retaining exact gesture bounds separately. */
-static void zoom_bound(int control, double value, double span)
+void lab_plot_write_bound(int control, double value, double span)
 {
     int text = lab_dom_precision(value, lab_plot_bound_digits(value, span));
     lab_dom_set(control, "marsZoomText", text);
     lab_dom_set(control, "marsZoomValue", lab_dom_format(value, "", ""));
     lab_dom_write(control, 5, "", text);
+}
+
+/* Use the same interval-aware presentation for all three surface axes. */
+void lab_plot_volume_bounds(int bounds)
+{
+    static const char *const ids[] = {
+        "plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper", "plotYLower", "plotYUpper"
+    };
+    for (unsigned i = 0; i < 6; ++i) {
+        unsigned lower = (i / 2) * 2;
+        double span = lab_dom_to_number(lab_dom_item(bounds, lower + 1)) -
+                      lab_dom_to_number(lab_dom_item(bounds, lower));
+        lab_plot_write_bound(lab_dom_id(ids[i]), lab_dom_to_number(lab_dom_item(bounds, i)), span);
+    }
 }
 
 static int frame(int chart, double box[4], double bounds[4])
@@ -323,7 +338,7 @@ int lab_plot_pan_move(int state, double dx, double dy)
     }
     static const char *const ids[] = {"plotLower", "plotUpper", "plotYLower", "plotYUpper"};
     for (unsigned i = 0; i < 4; ++i)
-        zoom_bound(lab_dom_id(ids[i]), values[i], values[(i / 2) * 2 + 1] - values[(i / 2) * 2]);
+        lab_plot_write_bound(lab_dom_id(ids[i]), values[i], values[(i / 2) * 2 + 1] - values[(i / 2) * 2]);
     lab_dom_delete(range, "marsZoomChart");
     lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
     lab_plot_controls_sync();
@@ -360,7 +375,7 @@ void lab_plot_pan_cancel(int state)
     lab_plot_controls_sync();
 }
 
-/* UI range arithmetic changes only the requested viewport; the server resamples the original expression. */
+/* Keep surface-camera magnification separate from native curve-domain resampling. */
 int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double direction, int wheel)
 {
     int chart = lab_dom_query(card, "[data-plot-chart][data-x-min], [data-surface][data-x-min]");
@@ -368,31 +383,28 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
         return 0;
     if (!wheel)
         lab_plot_wheel_stop();
-    double box[4], bounds[6];
+    double box[4], bounds[4];
     int surface = lab_dom_has(chart, "data-surface");
-    unsigned coordinates = surface ? 6 : 4;
     if (surface) {
-        static const char *const keys[] = {"xMin", "xMax", "yMin", "yMax", "zMin", "zMax"};
-        for (unsigned i = 0; i < coordinates; ++i) {
-            bounds[i] = data(chart, keys[i]);
-            if (!finite(bounds[i]))
-                return 1;
-        }
-        box[0] = lab_dom_measure(chart, 17);
-        box[1] = lab_dom_measure(chart, 18);
-        box[2] = lab_dom_measure(chart, 13) * lab_dom_measure(chart, 5);
-        box[3] = lab_dom_measure(chart, 16) * lab_dom_measure(chart, 6);
-        if (!finite(box[0]) || !finite(box[1]) || !(box[2] > 0) || !(box[3] > 0))
-            return 1;
-    } else if (!frame(chart, box, bounds))
+        int call = lab_dom_object(5), args = lab_dom_object(4);
+        lab_dom_push(args, chart);
+        lab_dom_push(args, event);
+        lab_dom_push(args, lab_dom_numeric(reset));
+        lab_dom_push(args, lab_dom_numeric(direction));
+        lab_dom_push(args, lab_dom_numeric(wheel));
+        lab_dom_set(call, "service", lab_dom_string("zoomSurface"));
+        lab_dom_set(call, "args", args);
+        lab_dom_push(calls, call);
+        return 1;
+    }
+    unsigned coordinates = 4;
+    if (!frame(chart, box, bounds))
         return 1;
     int range = lab_dom_id("plotRange");
-    const char *ids[] = {"plotLower", "plotUpper", surface ? "plotSecondLower" : "plotYLower",
-                        surface ? "plotSecondUpper" : "plotYUpper", surface ? "plotYLower" : "plotScale",
-                        "plotYUpper", "plotScale"};
+    const char *ids[] = {"plotLower", "plotUpper", "plotYLower", "plotYUpper", "plotScale"};
     int original = lab_dom_get(range, "marsZoomOriginal");
     int title = lab_dom_join(label_text(lab_dom_query(card, "[data-plot-figure] > title")),
-                            lab_dom_string(surface ? "surface" : "curve"), "");
+                            lab_dom_string("curve"), "");
     if (!lab_dom_equal(title, lab_dom_get(range, "marsZoomTitle"))) {
         original = 0;
         lab_dom_delete(range, "marsZoomOriginal");
@@ -412,31 +424,9 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
     } else {
         double fx = wheel ? (number(event, "clientX") - box[0]) / box[2] : 0.5;
         double fy = wheel ? 1 - (number(event, "clientY") - box[1]) / box[3] : 0.5;
-        double fz = 0.5;
         if (fx < 0 || fx > 1 || fy < 0 || fy > 1)
             return 1;
-        if (surface && wheel) {
-            int facet = lab_dom_closest(lab_dom_get(event, "target"), "[data-uv]");
-            fx = fy = 0.5;
-            if (facet) {
-                int map = lab_dom_split(lab_dom_read(facet, 3, "uv"), " ");
-                double px = (number(event, "clientX") - box[0]) * lab_dom_measure(chart, 5) / box[2];
-                double py = (number(event, "clientY") - box[1]) * lab_dom_measure(chart, 6) / box[3];
-                fx = lab_dom_to_number(lab_dom_item(map, 0)) * px + lab_dom_to_number(lab_dom_item(map, 1)) * py +
-                     lab_dom_to_number(lab_dom_item(map, 2));
-                fy = lab_dom_to_number(lab_dom_item(map, 3)) * px + lab_dom_to_number(lab_dom_item(map, 4)) * py +
-                     lab_dom_to_number(lab_dom_item(map, 5));
-                if (lab_dom_count(map) >= 9)
-                    fz = lab_dom_to_number(lab_dom_item(map, 6)) * px + lab_dom_to_number(lab_dom_item(map, 7)) * py +
-                         lab_dom_to_number(lab_dom_item(map, 8));
-                if (!finite(fx) || !finite(fy) || !finite(fz))
-                    return 1;
-                fx = fx < 0 ? 0 : fx > 1 ? 1 : fx;
-                fy = fy < 0 ? 0 : fy > 1 ? 1 : fy;
-                fz = fz < 0 ? 0 : fz > 1 ? 1 : fz;
-            }
-        }
-        double fractions[] = {fx, fy, fz}, anchors[3];
+        double fractions[] = {fx, fy}, anchors[2];
         for (unsigned a = 0; a < coordinates / 2; ++a)
             anchors[a] = bounds[a * 2] * (1 - fractions[a]) + bounds[a * 2 + 1] * fractions[a];
         int previous = lab_dom_get(range, "marsZoomChart");
@@ -450,11 +440,7 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
         double px = number(event, "clientX"), py = number(event, "clientY");
         /* Repainting an overlapping sheet is not a pointer movement. Keep the world
          * anchor so reversing the wheel reverses the zoom instead of migrating sheets. */
-        int same_camera = !surface || (previous &&
-            data(previous, "azimuth") == data(chart, "azimuth") &&
-            data(previous, "elevation") == data(chart, "elevation") &&
-            data(previous, "roll") == data(chart, "roll"));
-        if (wheel && previous && anchor_state && same_camera &&
+        if (wheel && previous && anchor_state &&
             __builtin_fabs(px - lab_dom_to_number(lab_dom_item(anchor_state, 0))) <= 2 &&
             __builtin_fabs(py - lab_dom_to_number(lab_dom_item(anchor_state, 1))) <= 2) {
             for (unsigned a = 0; a < coordinates / 2; ++a)
@@ -479,7 +465,7 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
             lab_dom_set(range, "marsZoomOriginal", original);
         }
         for (unsigned i = 0; i < coordinates; ++i)
-            zoom_bound(lab_dom_id(ids[i]), values[i], values[(i / 2) * 2 + 1] - values[(i / 2) * 2]);
+            lab_plot_write_bound(lab_dom_id(ids[i]), values[i], values[(i / 2) * 2 + 1] - values[(i / 2) * 2]);
         int pending = lab_dom_object(4);
         for (unsigned i = 0; i < coordinates; ++i)
             lab_dom_push(pending, lab_dom_numeric(values[i]));

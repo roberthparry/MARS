@@ -5,13 +5,16 @@
  * Numerical ranges are normalised before conversion to drawing coordinates.
  * Missing vertices leave holes. Finite heights are joined regardless of slope;
  * callers with an evaluator must sample domain gaps before supplying the mesh.
- * The camera determines projection, facet order and the exposed axes. Each render
+ * The equal-unit camera determines projection, facet order and the exposed axes
+ * for both height grids and meshes. Each render
  * is an independent bounded SVG, with no GPU or files.
  */
 #include <errno.h>
 #include <math.h>
 #include <stdlib.h>
 
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 #define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
 #include "internal/computation_internal.h"
 #define MARS_PLOT_INTERNAL_ACCESS
@@ -40,45 +43,27 @@ static camera_t camera(const plot_t *plot, double label_width, const number_t bo
                      .ce = cos(plot->elevation * radians), .se = sin(plot->elevation * radians),
                      .cr = cos(plot->roll * radians), .sr = sin(plot->roll * radians),
                      .cx = plot->options.width * 0.5, .cy = plot->options.height * 0.52, .units = {1, 1, 1}};
-    double extent = fabs(view.ca) + fabs(view.sa);
     double margin = fmax(80, label_width + 20);
     margin = fmin(margin, (plot->options.width - 80) / 2.0);
-    if (plot->mesh) {
-        number_t spans[] = {num_sub(bounds[1], bounds[0]), num_sub(bounds[3], bounds[2]),
-                            num_sub(bounds[5], bounds[4])};
-        number_t longest = spans[0];
-        for (unsigned i = 1; i < 3; ++i)
-            if (num_gt(spans[i], longest))
-                longest = spans[i];
-        for (unsigned i = 0; i < 3; ++i)
-            view.units[i] = num_to_double(num_div(spans[i], longest));
-        double horizontal[] = {view.ca * view.units[0], -view.sa * view.units[1], 0};
-        double vertical[] = {-view.se * view.sa * view.units[0], -view.se * view.ca * view.units[1],
-                              -view.ce * view.units[2]};
-        double width = 0, height = 0;
-        for (unsigned i = 0; i < 3; ++i) {
-            width += fabs(view.cr * horizontal[i] - view.sr * vertical[i]);
-            height += fabs(view.sr * horizontal[i] + view.cr * vertical[i]);
-        }
-        view.scale_x = view.scale_y = fmin((plot->options.width - 2 * margin) / width,
-                                          (plot->options.height - 160) / height);
-        return view;
-    }
-    view.scale_x = (plot->options.width - 2 * margin) / extent;
-    view.scale_y = (plot->options.height - 160) / (view.se * extent + view.ce);
-    /* Rotate the original screen geometry, then shrink uniformly to keep it in view. */
-    double horizontal[] = {view.scale_x * view.ca, -view.scale_x * view.sa, 0};
-    double vertical[] = {-view.scale_y * view.se * view.sa, -view.scale_y * view.se * view.ca,
-                          -view.scale_y * view.ce};
+    /* Height grids and implicit meshes share one physical scale on every axis. */
+    number_t spans[] = {num_sub(bounds[1], bounds[0]), num_sub(bounds[3], bounds[2]),
+                        num_sub(bounds[5], bounds[4])};
+    number_t longest = spans[0];
+    for (unsigned i = 1; i < 3; ++i)
+        if (num_gt(spans[i], longest))
+            longest = spans[i];
+    for (unsigned i = 0; i < 3; ++i)
+        view.units[i] = num_to_double(num_div(spans[i], longest));
+    double horizontal[] = {view.ca * view.units[0], -view.sa * view.units[1], 0};
+    double vertical[] = {-view.se * view.sa * view.units[0], -view.se * view.ca * view.units[1],
+                          -view.ce * view.units[2]};
     double width = 0, height = 0;
     for (unsigned i = 0; i < 3; ++i) {
         width += fabs(view.cr * horizontal[i] - view.sr * vertical[i]);
         height += fabs(view.sr * horizontal[i] + view.cr * vertical[i]);
     }
-    double fit = fmin(1, fmin((plot->options.width - 2 * margin) / width,
-                              (plot->options.height - 160) / height));
-    view.scale_x *= fit;
-    view.scale_y *= fit;
+    view.scale_x = view.scale_y = fmin((plot->options.width - 2 * margin) / width,
+                                      (plot->options.height - 160) / height);
     return view;
 }
 
@@ -300,7 +285,7 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
             tip.x += nx * 6;
             tip.y += ny * 6;
             int side = nx < -1e-9 ? -1 : nx > 1e-9;
-            string_t *label = plot_tick_label(ticks[i]);
+            string_t *label = plot_tick_label(ticks[i], span);
             ok = ok && label && string_append_format(svg, "<g data-plot-tick=\"%u\" data-tick-fraction=\"%.17g\" "
                   "stroke=\"#%06x\" stroke-width=\"1.2\">", axis, t,
                   (unsigned)plot->options.axis_colour) >= 0 && stroke(svg, at, tip) &&
@@ -327,6 +312,33 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
             axis, a.x, a.y, b.x, b.y) >= 0;
     }
     return ok;
+}
+
+/* Preserve native coordinate precision across browser gestures and resampling. */
+static bool coordinate_metadata(string_t *svg, const number_t bounds[6])
+{
+    static const char *const names[] = {"x-min", "x-max", "y-min", "y-max", "z-min", "z-max"};
+    for (unsigned i = 0; i < 6; ++i) {
+        size_t bits = num_get_effective_prec_bits(bounds[i]);
+        int digits = (int)(bits * 30103 / 100000 + 3);
+        number_t decimal = num_as_inexact_real_prec(bounds[i], bits);
+        string_t *exact = num_sprintf_text("%.*n", digits, decimal);
+        number_t span = num_sub(bounds[(i / 2) * 2 + 1], bounds[(i / 2) * 2]);
+        number_t magnitude = num_abs(decimal);
+        long difference = num_is_zero(magnitude) ? 0 : num_get_exponent2(magnitude) - num_get_exponent2(span);
+        int shown = difference > 0 ? (int)(difference * 30103 / 100000 + 5) : 4;
+        string_t *label = num_sprintf_text("%.*n", shown, decimal);
+        bool ok = exact && label && string_append_format(svg, " data-exact-%s=\"", names[i]) >= 0 &&
+                  plot_escape(svg, exact) && string_append_format(svg, "\" data-label-%s=\"", names[i]) >= 0 &&
+                  plot_escape(svg, label) && string_append_cstr(svg, "\"") == 0;
+        string_free(exact);
+        string_free(label);
+        num_destroy(&magnitude);
+        num_destroy(&span);
+        num_destroy(&decimal);
+        if (!ok) return false;
+    }
+    return true;
 }
 
 /* Render a normalised height field into an independently owned SVG string. */
@@ -451,6 +463,8 @@ string_t *plot_surface_svg(const plot_t *plot)
                  plot->azimuth, plot->elevation, plot->roll, num_to_double(bounds[0]), num_to_double(bounds[1]),
                  num_to_double(bounds[2]), num_to_double(bounds[3]), num_to_double(lo), num_to_double(hi),
                  plot->mesh ? "true" : "false", view.units[0], view.units[1], view.units[2], label_width) >= 0;
+        number_t coordinates[] = {bounds[0], bounds[1], bounds[2], bounds[3], lo, hi};
+        if (ok) ok = coordinate_metadata(svg, coordinates);
         if (ok && !faces)
             ok = string_append_cstr(svg, " data-empty=\"true\"") == 0;
         if (ok && count && isfinite(num_to_double(full[0])) && isfinite(num_to_double(full[1])))

@@ -1,11 +1,11 @@
 /**
  * @file lab_plot_pinch.c
- * @brief Two-finger curve and surface domain zoom with bounded native redraw requests.
+ * @brief Two-finger curve-range zoom and retained surface-camera gesture state.
  *
- * Curve zoom follows the touch midpoint, including two-finger translation. Surface
- * zoom scales all three ranges about their centre, preserving the camera and
- * restoring the original height policy on reset. This module edits only viewport controls; the drag controller
- * coalesces preview requests and restores full sampling on release.
+ * Curve zoom follows the touch midpoint and edits sampling ranges. Surface gestures
+ * retain their initial midpoint and separation for local camera magnification;
+ * they never edit sampling bounds. The drag controller coalesces updates and owns
+ * completion, while cancellation restores either curve controls or camera state.
  */
 #include "lab_dom.h"
 #include "lab_plot_controls.h"
@@ -80,6 +80,11 @@ int lab_plot_pinch_start(int state, int event)
     lab_dom_set(state, "pinchGeometry", geometry);
     lab_dom_set(state, "pinchSnapshot", curve ? lab_dom_get(state, "panSnapshot") : snapshot);
     lab_dom_set(state, "pinchDistance", lab_dom_numeric(distance));
+    lab_dom_set(state, "pinchAnchorX", lab_dom_numeric((x + value(state, "touchX")) / 2));
+    lab_dom_set(state, "pinchAnchorY", lab_dom_numeric((y + value(state, "touchY")) / 2));
+    lab_dom_delete(state, "surfaceCamera");
+    lab_dom_delete(state, "surfaceExponent");
+    lab_dom_delete(state, "pinchCancelled");
     lab_dom_set(state, "secondId", lab_dom_get(event, "pointerId"));
     lab_dom_set(state, "secondX", lab_dom_numeric(x));
     lab_dom_set(state, "secondY", lab_dom_numeric(y));
@@ -87,7 +92,7 @@ int lab_plot_pinch_start(int state, int event)
     return 1;
 }
 
-/* Scale ranges, never SVG dimensions, with one immutable baseline for the complete gesture. */
+/* Update surface gesture coordinates, or scale curve ranges from their original baseline. */
 int lab_plot_pinch_move(int state, int event)
 {
     int first = lab_dom_equal(lab_dom_get(event, "pointerId"), lab_dom_get(state, "pointerId"));
@@ -98,6 +103,8 @@ int lab_plot_pinch_move(int state, int event)
     double distance = __builtin_sqrt(dx * dx + dy * dy);
     if (!(distance >= 8) || !__builtin_isfinite(distance))
         return 0;
+    if (!lab_dom_truth(lab_dom_get(state, "pan")))
+        return 1;
     double factor = value(state, "pinchDistance") / distance;
     int curve = lab_dom_truth(lab_dom_get(state, "pan")), geometry = lab_dom_get(state, "pinchGeometry");
     double g[12], bounds[6];
@@ -135,10 +142,7 @@ int lab_plot_pinch_move(int state, int event)
     for (unsigned i = 0; i < (curve ? 4u : 6u); ++i) {
         int control = lab_dom_id(control_id(i, curve));
         unsigned lower = (i / 2) * 2;
-        int text = lab_dom_precision(bounds[i], lab_plot_bound_digits(bounds[i], bounds[lower + 1] - bounds[lower]));
-        lab_dom_write(control, 5, "", text);
-        lab_dom_set(control, "marsZoomText", text);
-        lab_dom_set(control, "marsZoomValue", lab_dom_format(bounds[i], "", ""));
+        lab_plot_write_bound(control, bounds[i], bounds[lower + 1] - bounds[lower]);
     }
     lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
     lab_dom_delete(range, "marsZoomChart");
@@ -149,6 +153,10 @@ int lab_plot_pinch_move(int state, int event)
 /* Cancellation restores authored controls as well as their unrounded coordinates. */
 void lab_plot_pinch_cancel(int state)
 {
+    if (!lab_dom_truth(lab_dom_get(state, "pan"))) {
+        lab_dom_set(state, "pinchCancelled", lab_dom_scalar(1, 1));
+        return;
+    }
     int curve = lab_dom_truth(lab_dom_get(state, "pan")), snapshot = lab_dom_get(state, "pinchSnapshot");
     for (unsigned i = 0; i < (curve ? 5u : 7u); ++i) {
         int control = lab_dom_id(control_id(i, curve));
