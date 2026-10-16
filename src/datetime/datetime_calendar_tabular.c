@@ -5,7 +5,7 @@
  * Implements supported Christian, Islamic, Jewish and Ethiopian date rules and calendar text. Integer calendar
  * conversions and fixed rules are kept separate from the astronomical lunisolar calculations.
  *
- * This is part of the datetime-t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime_t implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 

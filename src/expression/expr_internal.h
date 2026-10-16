@@ -3,7 +3,7 @@
  * @brief Private expression graph layout and operator machinery.
  *
  * Defines node metadata, operation kinds, vtables and helpers used throughout the expression implementation. Other
- * modules must use expression-t.h or the controlled src/internal/expr_internal.h interface rather than depend
+ * modules must use expr_t or the controlled src/internal/expr_internal.h interface rather than depend
  * directly on this full layout.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the

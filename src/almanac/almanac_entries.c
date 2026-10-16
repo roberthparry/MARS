@@ -5,7 +5,7 @@
  * Resolves catalogue identifiers and constructs entries and snapshots containing positions, magnitudes and related
  * body properties. This is the boundary between internal position models and the public per-body results.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use the almanac module and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

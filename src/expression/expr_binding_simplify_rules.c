@@ -5,7 +5,7 @@
  * Folds numeric factors, signs and compatible powers inside binding expressions. The binding simplifier calls
  * these helpers to preserve exact symbolic values consistently across output styles.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

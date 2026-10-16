@@ -1,6 +1,6 @@
 /**
  * @file checks_support.c
- * @brief Owned collections and file-t.h-backed repository traversal for check tools.
+ * @brief Owned collections and file-module-backed repository traversal for check tools.
  *
  * These adapters preserve exact source bytes, sort paths deterministically and
  * keep filesystem handles private. Traversal never descends through symlinks.

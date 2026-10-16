@@ -5,7 +5,7 @@
  * Finds extended grapheme-cluster boundaries and supplies rune and character iteration helpers. User-visible
  * characters can contain several code points, so this layer differs from byte and code-point navigation.
  *
- * This belongs to string-t.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
+ * This belongs to string_t's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
  * distinct and preserve documented view and cursor lifetimes.
  */
 

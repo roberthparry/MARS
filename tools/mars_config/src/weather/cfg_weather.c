@@ -3,7 +3,7 @@
  * @brief Native weather-account opt-in, private key persistence and terminal prompts.
  *
  * Replaces the weather installer script without contacting the provider. File I/O
- * uses file-t.h; terminal interaction uses stdio and termios. Literal string parsing
+ * uses the file module; terminal interaction uses stdio and termios. Literal string parsing
  * never executes configuration. A private exclusive temporary file is synced then
  * renamed, so a failed write cannot truncate the previous configuration.
  */

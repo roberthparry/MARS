@@ -5,7 +5,7 @@
  * Exercises first-run secret generation, stable reloads, legacy configuration,
  * environment precedence and conflicting-key rejection under a private MARS_HOME.
  * Keys and configuration contents are compared only in memory and never printed.
- * All filesystem work uses file-t.h and the suite's bounded private-tree cleanup.
+ * All filesystem work uses the file module and the suite's bounded private-tree cleanup.
  */
 #include <stdlib.h>
 

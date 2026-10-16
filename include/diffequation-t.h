@@ -11,7 +11,7 @@
  *
  * The solver recognises particular mathematical families rather than promising a
  * closed-form solution for every differential equation. Check the reported result
- * and retained conditions; use equation-t.h for algebraic equations without
+ * and retained conditions; use equation_t for algebraic equations without
  * differential constraints.
  *
  * A problem consists of a base equation, its independent variables, constant

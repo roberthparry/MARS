@@ -5,7 +5,7 @@
  * Writes native JSON values in supported compact or formatted forms, including tagged numeric values. File and
  * text outputs share the same value representation and escaping rules.
  *
- * This implements part of json-t.h. JSON values represent data independently of network transport; the HTTP module
+ * This implements part of json_t. JSON values represent data independently of network transport; the HTTP module
  * supplies service requests and responses.
  */
 

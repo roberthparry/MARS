@@ -5,7 +5,7 @@
  * Handles compatible sums, products and reciprocal structures, including symbolic square-sum denominators. It
  * prepares algebraic shapes for specialised rules without relying on display formatting.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

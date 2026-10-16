@@ -5,7 +5,7 @@
  * Reduces supported second-order equations and constructs factorised, affine or power-law Bessel solution
  * families. The transformation is structural and subject to its coefficient and domain requirements.
  *
- * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit for diffequ_t. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

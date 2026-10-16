@@ -5,7 +5,7 @@
  * Supplies civil-date helpers and combines weekend policy with holiday occurrences to classify and count working
  * days. Calendar arithmetic alone cannot determine these jurisdiction-dependent results.
  *
- * This is part of jurisdiction-t.h and uses configured rule data. Results depend on that data's coverage and
+ * This is part of the jurisdiction_t implementation and uses configured rule data. Results depend on that data's coverage and
  * currency rather than hard-coded assumptions about the host machine.
  */
 

@@ -5,7 +5,7 @@
  * Parses native mathematical notation, bindings and generated function bodies into expression graphs. Shared
  * scanner and symbol-table helpers keep Unicode aliases and variable identity consistent.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

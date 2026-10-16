@@ -5,7 +5,7 @@
  * Builds recognised linear solution forms with symbolic parameters and simplifies verified factors. It retains
  * unresolved parameters rather than substituting sample values into the solution.
  *
- * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit for diffequ_t. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

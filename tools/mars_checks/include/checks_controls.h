@@ -47,7 +47,7 @@ void checks_installed_documents(const string_t *makefile, checks_strings_t *erro
 bool checks_provenance(const string_t *root, const string_t *source, checks_strings_t *errors);
 
 /**
- * @brief Return an owned lowercase SHA-256 hex digest, using file-t.h streaming; NULL means an I/O error.
+ * @brief Return an owned lowercase SHA-256 hex digest, using file-module streaming; NULL means an I/O error.
  * @param path Borrowed path; ownership is unchanged.
  * @return Owned string, or NULL on an I/O error; release with string_free.
  */

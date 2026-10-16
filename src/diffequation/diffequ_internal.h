@@ -3,7 +3,7 @@
  * @brief Private differential-equation problem and result structures.
  *
  * Stores the parsed equation, display forms, independent variables and conditions shared by construction, solving
- * and formatting code. Public callers inspect these through diffequation-t.h instead of accessing the layout.
+ * and formatting code. Public callers inspect these through diffequ_t instead of accessing the layout.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.

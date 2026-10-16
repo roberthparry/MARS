@@ -5,7 +5,7 @@
  * Allocates and manages string_t storage and implements construction, mutation and formatting. Normalisation and
  * validation policies are maintained at text boundaries rather than delegated to raw caller buffers.
  *
- * This belongs to string-t.h's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
+ * This belongs to string_t's UTF-8 text implementation. Keep byte offsets, code points and grapheme positions
  * distinct and preserve documented view and cursor lifetimes.
  */
 

@@ -5,7 +5,7 @@
  * Manages engine lifetime, diagnostics, default jurisdiction and location data, and serialised configuration.
  * Calendar, holiday and timezone units query this shared configured state.
  *
- * This is part of jurisdiction-t.h and uses configured rule data. Results depend on that data's coverage and
+ * This is part of the jurisdiction_t implementation and uses configured rule data. Results depend on that data's coverage and
  * currency rather than hard-coded assumptions about the host machine.
  */
 

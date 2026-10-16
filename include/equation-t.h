@@ -11,7 +11,7 @@
  * surds where possible; numerical solving is available where an exact solution is
  * not obtained. General equations are not guaranteed to have closed-form solutions.
  *
- * Use expression-t.h for the underlying symbolic expressions and diffequation-t.h for
+ * Use expr_t for the underlying symbolic expressions and diffequ_t for
  * differential equations. Respect the documented ownership of equation handles,
  * solution collections and borrowed entries within those collections.
  * Context-aware result APIs share the expr_context module's conservative sign

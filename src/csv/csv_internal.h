@@ -3,7 +3,7 @@
  * @brief Private CSV stream storage shared by parsing, headers and output.
  *
  * Owns bounded string buffers and indexed header names. Only src/csv consumes
- * this representation; application and timeseries callers use csv-t.h.
+ * this representation; application and timeseries callers use csv_t.
  */
 #ifndef MARS_CSV_INTERNAL_H
 #define MARS_CSV_INTERNAL_H

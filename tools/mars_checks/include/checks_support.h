@@ -2,7 +2,7 @@
  * @file checks_support.h
  * @brief Shared text, collection and repository I/O for the native checkers.
  *
- * Tool modules use these owned string collections and file-t.h adapters instead of
+ * Tool modules use these owned string collections and file-module adapters instead of
  * accessing MARS internals. Byte offsets are used for C and Markdown syntax;
  * strings retain their original UTF-8 bytes. Allocation failures terminate with
  * status 2. Returned strings and collections belong to the caller. No global
@@ -130,14 +130,14 @@ bool checks_equal(const string_t *text, const char *literal);
 string_t *checks_path(const string_t *root, const char *path);
 
 /**
- * @brief Read a complete UTF-8 file using file-t.h; NULL indicates an I/O error.
+ * @brief Read a complete UTF-8 file using the file module; NULL indicates an I/O error.
  * @param path Borrowed path; ownership is unchanged.
  * @return Owned string, or NULL on an I/O error; release with string_free.
  */
 string_t *checks_read(const string_t *path);
 
 /**
- * @brief Write a complete UTF-8 file using file-t.h.
+ * @brief Write a complete UTF-8 file using the file module.
  * @param path Borrowed path; ownership is unchanged.
  * @param text Borrowed UTF-8 input string.
  * @return True when the condition or operation described above succeeds; false otherwise.

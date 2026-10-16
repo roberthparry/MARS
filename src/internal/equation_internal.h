@@ -3,7 +3,7 @@
  * @brief Controlled cross-module equation interface.
  *
  * Exposes the limited equation parsing, construction and solution facilities required by other native MARS
- * modules. Use equation-t.h first; this guarded interface is for implementation collaboration, not application or
+ * modules. Use equation_t first; this guarded interface is for implementation collaboration, not application or
  * installed public use.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the

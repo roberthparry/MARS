@@ -4,7 +4,7 @@
  *
  * Reads bounded configuration strings, understands concatenated quotes and escaped
  * characters, and never executes substitutions. Duplicate conflicting assignments
- * are rejected. Publication uses file-t.h and an exclusive private staging file.
+ * are rejected. Publication uses the file module and an exclusive private staging file.
  */
 #include <sodium.h>
 #include <string.h>

@@ -5,7 +5,7 @@
  * Calculates the Moon's relation to the Earth's shadow, refines contacts and assembles lunar-eclipse results.
  * Searches depend on the configured ephemeris and requested time window.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use the almanac module and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

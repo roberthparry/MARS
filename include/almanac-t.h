@@ -9,7 +9,7 @@
  *
  * Use this module for astronomical almanacs, sky-position queries and navigation
  * calculations that need catalogue-backed results. Available bodies and date
- * coverage depend on the installed data. Use datetime-t.h for civil date operations
+ * coverage depend on the installed data. Use datetime_t for civil date operations
  * and its lighter solar and lunar helpers; this module owns the astronomical engine.
  *
  * Long-running calculation paths cooperate with an optional computation_run() scope.

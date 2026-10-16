@@ -5,7 +5,7 @@
  * Computes supported Clausen values and the order-two convenience form. Argument reduction and the layer's numeric
  * representation determine the evaluation path.
  *
- * This implements fixed double-double real arithmetic through qfloat-t.h. Its approximately 106-bit representation
+ * This implements fixed double-double real arithmetic for qfloat_t. Its approximately 106-bit representation
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 

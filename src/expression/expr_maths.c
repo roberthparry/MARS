@@ -5,7 +5,7 @@
  * Implements operation callbacks for elementary and special functions, including incomplete-gamma families.
  * Operator construction and public wrappers are defined separately in expr_maths_ops.c.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

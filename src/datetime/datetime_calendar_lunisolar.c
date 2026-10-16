@@ -5,7 +5,7 @@
  * Combines new moons, full moons and solar terms to derive supported calendar dates and observances. It connects
  * astronomical estimates to local-day calendar conventions.
  *
- * This is part of the datetime-t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime_t implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 

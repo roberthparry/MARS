@@ -5,7 +5,7 @@
  * Constructs, clones and destroys number_t values and implements common queries and operations.
  * Representation-specific work is routed through the backend tables so callers use one scalar interface.
  *
- * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 

@@ -11,7 +11,7 @@
  * Records are processed incrementally, not retained as a document. Borrowed
  * fields survive until the next csv_next call; header names survive until free.
  * Handles require external synchronisation when shared between threads. File
- * ownership, closing, atomic replacement and durability belong to file-t.h.
+ * ownership, closing, atomic replacement and durability belong to the file module.
  *
  * Long-running calculation paths cooperate with an optional computation_run() scope.
  * Without a scope, existing calls remain supported. Cancellation, deadlines and

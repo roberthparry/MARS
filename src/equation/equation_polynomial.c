@@ -5,7 +5,7 @@
  * Allocates and manipulates coefficient arrays, recognises polynomial expression shapes and rebuilds expanded
  * expressions. Root solvers depend on this representation rather than reparsing displayed mathematics.
  *
- * This belongs to the equation-t.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 

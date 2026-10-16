@@ -5,7 +5,7 @@
  * Produces native, function and TeX matrix text with binding information and shared-factor presentation.
  * Serialisation uses the same structural values while preserving exact symbolic entries.
  *
- * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of the matrix_t implementation. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

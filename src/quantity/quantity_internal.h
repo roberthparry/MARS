@@ -2,7 +2,7 @@
  * @file quantity_internal.h
  * @brief Private unit algebra, conversion dispatch and owned quantity storage.
  *
- * Used only by the quantity implementation. Public callers use quantity-t.h.
+ * Used only by the quantity implementation. Public callers use quantity_t.
  * Eight dimension axes and one symbolic pi exponent share bounded rational
  * arithmetic; registry lookup is a collision-free, checked hash lookup.
  */

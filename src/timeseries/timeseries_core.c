@@ -5,7 +5,7 @@
  * Creates regular or explicitly indexed observations and owns series values. CSV adapters live in timeseries_csv.c.
  * Calendar-aware transformations and model fitting are implemented in companion units.
  *
- * This is part of timeseries-t.h. Maintain the association between values, date indices and model metadata when
+ * This is part of the timeseries_t implementation. Maintain the association between values, date indices and model metadata when
  * constructing or transforming results.
  */
 

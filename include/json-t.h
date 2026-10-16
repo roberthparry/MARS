@@ -7,7 +7,7 @@
  * compact or formatted output. Objects use dictionary-backed named members and
  * arrays preserve ordered values.
  *
- * The module represents data independently of HTTP transport. Use http-t.h to send
+ * The module represents data independently of HTTP transport. Use the HTTP module to send
  * or receive JSON over the network, and observe ownership rules when inserting,
  * retrieving or replacing child values.
  *

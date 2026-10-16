@@ -8,7 +8,7 @@
  * containers while retaining mixed text and element content.
  *
  * This native parser requires no external XML parsing library. It is suitable for
- * document interchange and the XML representation of SOAP payloads; http-t.h supplies
+ * document interchange and the XML representation of SOAP payloads; the HTTP module supplies
  * the SOAP and network protocol handling. It is not a validating XML processor or
  * a byte-for-byte document preservation tool.
  *

@@ -5,7 +5,7 @@
  * Computes QR, Schur and eigenvalue or eigenvector results using precision-aware numerical tolerances. Factor
  * objects own their result storage and require the associated cleanup routines.
  *
- * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of the matrix_t implementation. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

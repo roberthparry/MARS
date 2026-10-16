@@ -5,7 +5,7 @@
  * Adapts qfloat_t operations to the shared numeric value interface. It keeps fixed extended precision distinct
  * from MPFR-backed configurable precision.
  *
- * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 

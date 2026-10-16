@@ -5,7 +5,7 @@
  * Evaluates the Bessel function of the second kind using the supported order and argument paths. Integer and
  * non-integer order behaviour must remain consistent with the layer's real or complex domain.
  *
- * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 

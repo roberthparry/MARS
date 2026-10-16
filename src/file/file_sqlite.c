@@ -5,7 +5,7 @@
  * Stores file contents and selected metadata using manifests and chunks, then reconstructs files through verified
  * output handling. Persistent records represent data, never live file handles or descriptors.
  *
- * This belongs to the Linux-only file-t.h implementation. Filesystem operations and transforms must retain the
+ * This belongs to the Linux-only file_t implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 

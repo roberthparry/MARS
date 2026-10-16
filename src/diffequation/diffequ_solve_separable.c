@@ -5,7 +5,7 @@
  * Separates supported dependent and independent factors, integrates them and inverts recognised primitives.
  * Implicit results are retained when a justified explicit inversion is unavailable.
  *
- * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit for diffequ_t. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

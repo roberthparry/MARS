@@ -12,7 +12,7 @@
  * Use this module for business calendars and calculations whose result depends on
  * local rules, rather than calendar arithmetic alone. Results depend on the
  * coverage and currency of the configured database; they do not establish legal
- * requirements independently of that data. Use datetime-t.h for the underlying
+ * requirements independently of that data. Use datetime_t for the underlying
  * date representation and ordinary date calculations.
  */
 

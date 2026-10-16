@@ -5,7 +5,7 @@
  * Implements path operations including deletion, moves, links and symbolic-link target queries. This unit handles
  * filesystem changes; stream byte I/O belongs to file_stream.c.
  *
- * This belongs to the Linux-only file-t.h implementation. Filesystem operations and transforms must retain the
+ * This belongs to the Linux-only file_t implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 

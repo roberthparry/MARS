@@ -5,7 +5,7 @@
  * Constructs by-value complex objects and classifies finite, infinite and NaN components. Arithmetic and
  * special-function units share these representation-level checks.
  *
- * This implements fixed double-double complex arithmetic through qcomplex-t.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 

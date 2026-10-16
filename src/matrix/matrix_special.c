@@ -5,7 +5,7 @@
  * Implements supported orthogonal polynomials, finite logarithmic sums and signal functions over matrices. The
  * functions use matrix algebra where meaningful rather than assuming scalar elementwise semantics.
  *
- * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of the matrix_t implementation. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

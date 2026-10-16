@@ -5,7 +5,7 @@
  * Implements supported complex mathematical functions and series, including hypergeometric families. The native
  * fixed-precision layer does not depend on a public multiprecision representation.
  *
- * This implements fixed double-double complex arithmetic through qcomplex-t.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 

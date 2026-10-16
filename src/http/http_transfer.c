@@ -5,7 +5,7 @@
  * Connects transport callbacks to buffered bodies, streaming sinks, cancellation and file downloads. It enforces
  * configured limits and reports transport errors separately from HTTP error responses.
  *
- * This is part of the synchronous http-t.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http_client_t client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

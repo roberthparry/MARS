@@ -4,7 +4,7 @@
  *
  * Runs before listener or cache initialisation. Uses the user's own WeatherAPI
  * account, never a shared key. Configuration is published atomically in a private
- * directory using file-t.h, with string_t parsing and no shell interpretation.
+ * directory using the file module, with string_t parsing and no shell interpretation.
  * Intended for the single-threaded installer CLI; changes umask temporarily.
  */
 #ifndef MARS_CONFIG_WEATHER_H

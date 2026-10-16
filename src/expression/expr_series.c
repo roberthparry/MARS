@@ -5,7 +5,7 @@
  * Builds supported power and reciprocal series forms and expands recognised series requests. It preserves symbolic
  * terms and indices instead of replacing the series with a sampled numerical approximation.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

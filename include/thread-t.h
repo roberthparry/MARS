@@ -4,7 +4,7 @@
  *
  * Start a callback, wait/check for completion, then join to collect its result or
  * explicitly detach. thread_t owns a lock_t completion event; all synchronisation
- * primitives belong to lock-t.h, not to a duplicate thread mutex API.
+ * primitives belong to the lock module, not to a duplicate thread mutex API.
  *
  * Serialise lifecycle calls on each handle. Join or detach before freeing it;
  * freeing never silently waits, cancels or detaches. Callback arguments/results

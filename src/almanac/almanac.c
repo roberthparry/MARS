@@ -6,7 +6,7 @@
  * configuration. Use this unit when changing resource ownership or restoring an engine, rather than numerical
  * event geometry.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use the almanac module and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

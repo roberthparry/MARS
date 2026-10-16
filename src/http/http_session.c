@@ -5,7 +5,7 @@
  * Configures session cookies, redirect limits and verified client-certificate credentials on reusable clients.
  * Session state stays in memory; applications retain responsibility for destination and credential policy.
  *
- * This is part of the synchronous http-t.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http_client_t client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

@@ -3,7 +3,7 @@
  * @brief Private owned plot series, numeric ranges and renderer helpers.
  *
  * Only plot implementation files may use this layout. Other modules insert
- * copied records through plot-t.h and never share mutable scene internals.
+ * copied records through plot_t and never share mutable scene internals.
  */
 #ifndef MARS_PLOT_INTERNAL_H
 #define MARS_PLOT_INTERNAL_H

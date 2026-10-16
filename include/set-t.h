@@ -6,8 +6,8 @@
  * removal. It supports iteration and sorted access while hiding the storage layout.
  * Equality and hashing callbacks must describe the same notion of a unique value.
  *
- * Clone and destroy callbacks control element resource ownership. Prefer array-t.h
- * when duplicates and positional sequence semantics matter, or dictionary-t.h when
+ * Clone and destroy callbacks control element resource ownership. Prefer array_t
+ * when duplicates and positional sequence semantics matter, or dictionary_t when
  * each unique key needs an associated value.
  *
  * Design:

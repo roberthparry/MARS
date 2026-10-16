@@ -5,7 +5,7 @@
  * Recognises low-degree polynomial products and divisions with affine or centred functions. It supplies repeated
  * polynomial reductions to the higher-level integration rules.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

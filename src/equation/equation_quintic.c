@@ -5,7 +5,7 @@
  * Evaluates fifth-degree polynomials and refines real and complex root candidates. It does not promise a general
  * radical formula; exact factor reductions are handled by the polynomial solving machinery.
  *
- * This belongs to the equation-t.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 

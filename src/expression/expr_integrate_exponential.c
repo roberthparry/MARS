@@ -5,7 +5,7 @@
  * Integrates supported exponential compositions and polynomial or symbolic power factors, using special-function
  * forms where required. Parameter and degree checks determine which reductions are valid.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

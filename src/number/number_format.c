@@ -5,7 +5,7 @@
  * Renders supported number representations and implements printf-style numeric formatting. Exact and complex
  * values retain their appropriate syntax rather than being forced through double conversion.
  *
- * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 

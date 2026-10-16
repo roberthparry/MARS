@@ -5,7 +5,7 @@
  * Dispatches expression, function and TeX formatting and provides printing and persistence entry points. Recursive
  * rendering is delegated to style-specific files so public wrappers remain separate from notation details.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

@@ -11,7 +11,7 @@
  * SHA-256 content hashing and SQLCipher import/export of file contents and selected metadata. These helpers
  * operate on stored data, not serialised open descriptors. Observe each operation's
  * path, overwrite, size-limit and verification policy; network transport belongs in
- * http-t.h rather than the file module.
+ * the HTTP module rather than the file module.
  *
  * Paths are copied. Handles are not shared between threads without external
  * synchronisation. Failures set errno and the initiating handle's error code;

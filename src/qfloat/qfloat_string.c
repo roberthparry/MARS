@@ -5,7 +5,7 @@
  * Converts between string_t text and fixed extended real values and produces decimal digits. It preserves the
  * two-component representation's precision across supported round trips.
  *
- * This implements fixed double-double real arithmetic through qfloat-t.h. Its approximately 106-bit representation
+ * This implements fixed double-double real arithmetic for qfloat_t. Its approximately 106-bit representation
  * is not arbitrary precision or a universal accuracy guarantee.
  */
 

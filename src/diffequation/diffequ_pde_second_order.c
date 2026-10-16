@@ -5,7 +5,7 @@
  * Constructs supported homogeneous and particular solutions, including phase-based forms. The matcher determines
  * when these formulas apply and supplies explanatory solver steps.
  *
- * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit for diffequ_t. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

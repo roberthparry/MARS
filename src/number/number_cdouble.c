@@ -6,7 +6,7 @@
  * operations. Backend dispatch keeps this fixed precision distinct from double-double and multiprecision complex
  * values.
  *
- * This belongs to number-t.h's shared scalar layer. Preserve exactness, precision policy and the distinction between
+ * This belongs to number_t's shared scalar layer. Preserve exactness, precision policy and the distinction between
  * borrowed aliases and independently owned numeric values.
  */
 

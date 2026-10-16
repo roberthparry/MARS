@@ -3,7 +3,7 @@
  * @brief Private XML tree and attribute-storage contracts.
  *
  * Defines node storage, children and dictionary-backed attributes, together with validation and attachment
- * helpers. Parser and writer implementations share these contracts while public callers use xml-t.h.
+ * helpers. Parser and writer implementations share these contracts while public callers use xml_t.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.

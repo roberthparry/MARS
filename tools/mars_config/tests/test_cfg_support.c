@@ -3,7 +3,7 @@
  * @brief Disposable process and filesystem fixtures for native installer tests.
  *
  * Owns only directories created by mkdtemp in /tmp. Runs one child at a time,
- * then removes its bounded tree through file-t.h without following symlinks.
+ * then removes its bounded tree through the file module without following symlinks.
  */
 #include <errno.h>
 #include <stdio.h>

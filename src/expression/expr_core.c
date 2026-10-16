@@ -5,7 +5,7 @@
  * Allocates nodes, manages their references and caches, and constructs variables, constants and derivative graphs.
  * This is the central ownership and evaluation machinery on which the symbolic units depend.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

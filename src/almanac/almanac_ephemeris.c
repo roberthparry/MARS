@@ -6,7 +6,7 @@
  * apparent-place corrections. Body-state requests use this unit after the database model has supplied a covering
  * segment.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use the almanac module and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

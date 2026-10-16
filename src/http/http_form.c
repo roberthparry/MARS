@@ -5,7 +5,7 @@
  * Retains ordered form fields and constructs bounded multipart snapshots, including file parts. Request
  * preparation owns the resulting bytes so transfer does not depend on caller buffers remaining mutable.
  *
- * This is part of the synchronous http-t.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http_client_t client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

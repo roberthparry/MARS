@@ -10,7 +10,7 @@
  * schemas and savepoint-protected insertion. Query export delegates escaping
  * to csv_t; CSV syntax remains the responsibility of the CSV module.
  *
- * File-content import/export is available through file-t.h; live handles and open
+ * File-content import/export is available through the file module; live handles and open
  * descriptors are not persistent objects. Applications are responsible for key
  * management, transaction policy and handling query or storage failures. Encryption
  * at rest does not replace application-level access control.

@@ -2,7 +2,7 @@
  * @file sampler_internal.h
  * @brief Private point ownership and subdivision state for the sampler implementation.
  *
- * Only sampler sources may inspect this state. Consumers use sampler-t.h;
+ * Only sampler sources may inspect this state. Consumers use the sampler module;
  * construction keeps all mutable work private until the complete result exists.
  */
 #ifndef MARS_SAMPLER_INTERNAL_H

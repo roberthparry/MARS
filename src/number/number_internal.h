@@ -3,7 +3,7 @@
  * @brief Private numeric representations and backend contracts.
  *
  * Defines the number implementation's backend kinds, storage access and shared arithmetic helpers. Other modules
- * should use number-t.h or src/internal/number_internal.h rather than depend on this complete backend layout.
+ * should use number_t or src/internal/number_internal.h rather than depend on this complete backend layout.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.

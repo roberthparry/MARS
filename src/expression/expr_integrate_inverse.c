@@ -5,7 +5,7 @@
  * Supplies antiderivatives for supported inverse-function nodes and affine arguments. These rules are called by
  * the integration dispatcher rather than changing the scalar inverse-function implementation.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

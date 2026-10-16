@@ -5,7 +5,7 @@
  * Recognises combinations that can be integrated as an exact derivative and constructs the reduced right-hand
  * side. This avoids treating a structurally linearised equation as a general nonlinear problem.
  *
- * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit for diffequ_t. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

@@ -3,7 +3,7 @@
  * @brief Private paths and bounded configuration reads for native installers.
  *
  * Resolves MARS_HOME and protects existing user-owned, single-link files before
- * reading them through file-t.h. Configuration text is handled with string_t.
+ * reading them through the file module. Configuration text is handled with string_t.
  * No shell expansion beyond a leading ~/ is performed. Called before threads.
  */
 #include <errno.h>

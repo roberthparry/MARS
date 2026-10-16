@@ -5,7 +5,7 @@
  * Reorganises simplified graphs into readable mathematical forms, including signs and Cartesian separation. It
  * supplies native presentation structure shared by output styles without relying on client-side algebra.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

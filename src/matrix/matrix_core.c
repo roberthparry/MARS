@@ -5,7 +5,7 @@
  * Implements core storage operations, element handling and shared matrix-function support, including triangular
  * divided-difference paths. Public operations dispatch through these foundations.
  *
- * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of the matrix_t implementation. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

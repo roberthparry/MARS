@@ -6,7 +6,7 @@
  * constructors. It is the registration and construction layer rather than the numerical implementation of number_t
  * functions.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

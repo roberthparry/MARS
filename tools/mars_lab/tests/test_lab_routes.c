@@ -361,7 +361,7 @@ static bool route_contracts(const char *directory)
     return ok;
 }
 
-/* Host is deliberately protected by http-t.h; send hostile headers only through this bounded socket fixture. */
+/* Host is deliberately protected by the HTTP module; send hostile headers only through this bounded socket fixture. */
 static bool hostile_request(const char *host, const char *origin)
 {
     lab_server_t *server = lab_svr_new(NULL, 0, 5000);

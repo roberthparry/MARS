@@ -2,7 +2,7 @@
  * @file checks_policy.c
  * @brief Repository traversal and command dispatch for native source policies.
  *
- * Enumerates project-owned C sources through file-t.h, pruning generated and
+ * Enumerates project-owned C sources through the file module, pruning generated and
  * third-party directories before descent and ignoring symlinks. The source-policy
  * command can select inline, functiontables or python audits, or run all by default.
  * Python source suffixes and extensionless interpreter shebangs are rejected;

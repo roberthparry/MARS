@@ -6,7 +6,7 @@
  * It coordinates expression and symbolic entry points with numerical implementations rather than embedding every
  * quadrature method here.
  *
- * This is part of integrator-t.h. Callers configure opaque integrator handles and inspect completion or error
+ * This is part of the integrator_t implementation. Callers configure opaque integrator handles and inspect completion or error
  * information rather than relying on a particular internal algorithm.
  */
 

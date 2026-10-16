@@ -8,7 +8,7 @@
  * matrices without exposing their storage layout.
  *
  * Element domains, dimensions and structural assumptions determine which operations
- * are meaningful. Use number-t.h for scalar arithmetic and expression-t.h for symbolic
+ * are meaningful. Use number_t for scalar arithmetic and expr_t for symbolic
  * entries; consult individual operations for ownership and singularity handling.
  * Context-aware snapshots share expr_context sign and domain proofs for symbolic
  * entries. Separate opt-in context solvers require proven non-zero pivots before division.

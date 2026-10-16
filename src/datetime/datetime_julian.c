@@ -5,7 +5,7 @@
  * Converts between civil dates and Julian day representations, exposes date components and validates calendar
  * ranges. Shared day and weekday queries use these conversions to avoid inconsistent calendar arithmetic.
  *
- * This is part of the datetime-t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime_t implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 

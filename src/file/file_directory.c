@@ -6,7 +6,7 @@
  * container ownership for callers that need either incremental iteration or a complete listing. Also creates
  * ordinary directories and exclusive private temporary directories for staged tool output.
  *
- * This belongs to the Linux-only file-t.h implementation. Filesystem operations and transforms must retain the
+ * This belongs to the Linux-only file_t implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 

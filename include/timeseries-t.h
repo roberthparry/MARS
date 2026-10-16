@@ -7,8 +7,8 @@
  * with numeric values so that alignment, missing observations and forecast periods
  * can be handled explicitly.
  *
- * It combines datetime-t.h indexing with number-t.h arithmetic and statistical model
- * results. Choose matrix-t.h for unindexed numerical tables; this module adds temporal
+ * It combines datetime_t indexing with number_t arithmetic and statistical model
+ * results. Choose matrix_t for unindexed numerical tables; this module adds temporal
  * semantics and supported forecasting workflows rather than a general real-time
  * stream-processing engine.
  *

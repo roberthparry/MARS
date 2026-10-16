@@ -5,7 +5,7 @@
  * Coordinates supported spectral and other function-evaluation paths and their caches, including symbolic exponent
  * handling. Dimension, domain and decomposition checks determine valid operations.
  *
- * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of the matrix_t implementation. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

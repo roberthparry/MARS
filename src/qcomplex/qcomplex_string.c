@@ -5,7 +5,7 @@
  * Parses supported real and imaginary spellings and constructs or formats qcomplex_t values. String-backed
  * scanning separates component signs and suffixes without exposing graph or matrix parsing.
  *
- * This implements fixed double-double complex arithmetic through qcomplex-t.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 

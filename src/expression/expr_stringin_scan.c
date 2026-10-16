@@ -5,7 +5,7 @@
  * Provides cursor lookahead, name parsing, aliases and superscript integer recognition. The main parser uses these
  * string_t helpers instead of performing independent byte-level tokenisation.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

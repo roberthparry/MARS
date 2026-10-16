@@ -5,7 +5,7 @@
  * Formats constants and evaluated numeric values and removes display artefacts where appropriate. It keeps numeric
  * spelling consistent across renderers without changing the underlying value.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

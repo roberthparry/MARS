@@ -5,7 +5,7 @@
  * Simplifies expression entries and detects compatible reciprocal or power factors shared across a matrix. It
  * preserves exact numeric structure instead of replacing entries with approximate samples.
  *
- * This is part of matrix-t.h. Preserve numeric and symbolic element semantics and supported storage forms; callers
+ * This is part of the matrix_t implementation. Preserve numeric and symbolic element semantics and supported storage forms; callers
  * must not rely on private matrix representation.
  */
 

@@ -5,7 +5,7 @@
  * Implements dictionary allocation, lookup, mutation, stable entry access and lazy sorted views. Key and value
  * callbacks govern equality, copying and resource cleanup independently of the hidden storage layout.
  *
- * This implements dictionary-t.h. Hash and equality callbacks must agree, and the configured clone and destroy
+ * This implements dictionary_t. Hash and equality callbacks must agree, and the configured clone and destroy
  * callbacks determine ownership of key and value resources.
  */
 

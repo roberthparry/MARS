@@ -5,7 +5,7 @@
  * Collects supported special-function compositions and products sharing compatible affine arguments. It
  * supplements elementary rules while keeping each accepted family explicit.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

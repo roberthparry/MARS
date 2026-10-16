@@ -4,7 +4,7 @@
  *
  * Equation rendering uses the expression formatter's buffers, names and output
  * state so its native and TeX representations follow the same rules. This façade
- * preserves that existing dependency; ordinary callers use expression-t.h.
+ * preserves that existing dependency; ordinary callers use expr_t.
  * It is private, requires explicit shared access and is not installed.
  */
 #ifndef MARS_SHARED_EXPR_STRINGOUT_INTERNAL_H

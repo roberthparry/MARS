@@ -5,7 +5,7 @@
  * Reads equation text, derivative syntax and initial or boundary conditions into native problem objects. It uses
  * the expression and equation parsers while preserving dependent-function identity.
  *
- * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit for diffequ_t. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

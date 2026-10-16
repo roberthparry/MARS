@@ -5,7 +5,7 @@
  * Scores candidate observer positions, refines local eclipse maxima and searches for nearby totality on land. This
  * geographical search builds on solar-eclipse geometry rather than defining a separate ephemeris.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use the almanac module and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

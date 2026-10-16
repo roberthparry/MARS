@@ -3,7 +3,7 @@
  * @brief Private UTF-8 string representation and helpers.
  *
  * Defines storage details, validation, normalisation and shared helpers used by string implementation units.
- * External callers should use string-t.h so mutation and Unicode invariants stay under module control.
+ * External callers should use string_t so mutation and Unicode invariants stay under module control.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.

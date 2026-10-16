@@ -4,7 +4,7 @@
  *
  * Builds the packaged jurisdiction database once in a disposable child home, then
  * retains only its closed database in a private runner-owned directory. Ordinary
- * and README cases copy that read-only seed through file-t.h and receive freshly
+ * and README cases copy that read-only seed through the file module and receive freshly
  * quoted, home-specific saved configuration. Production installers and SQLCipher
  * security settings are unchanged. Explicit finalisation reports cleanup errors;
  * an owner-PID-guarded exit hook is a fallback for early runner termination.

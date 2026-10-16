@@ -6,7 +6,7 @@
  * Repeated and unknown fields remain available to schema-aware callers; no external parser or schema compiler is
  * used.
  *
- * This implements protobuf-t.h. Applications supply schema knowledge and manage message ownership; the HTTP module
+ * This implements protobuf_t. Applications supply schema knowledge and manage message ownership; the HTTP module
  * provides transport and gRPC framing.
  */
 

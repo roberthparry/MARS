@@ -3,7 +3,7 @@
  * @brief Bounded CSV record validation, escaping and output publication.
  *
  * Builds one validated record before writing any of its bytes. File errors can
- * still leave partial output; atomic replacement is a caller/file-t.h concern.
+ * still leave partial output; atomic replacement is a caller/file-module concern.
  * In-memory output is explicitly bounded and never implicitly taken on free.
  */
 #include <errno.h>

@@ -7,7 +7,7 @@
  * iteration without allocating a separate object for each flag.
  *
  * This is appropriate for dense identifier ranges, occupancy maps and selection
- * masks. Use set-t.h instead when members are arbitrary values rather than bit
+ * masks. Use set_t instead when members are arbitrary values rather than bit
  * positions; very sparse, widely separated positions may need a different storage
  * strategy.
  *

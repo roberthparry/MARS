@@ -5,7 +5,7 @@
  * Builds supported real and imaginary presentations and analytic-continuation notation. Shared Cartesian structure
  * keeps the native and TeX forms consistent with the executable function form.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

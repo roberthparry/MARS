@@ -5,7 +5,7 @@
  * Manages growable word arrays and implements flag mutation, queries and Boolean combinations. Integer-indexed
  * membership is stored compactly rather than as individually allocated values.
  *
- * This implements bitset-t.h for dense integer-indexed flags. Keep word storage and locking internal; callers should
+ * This implements bitset_t for dense integer-indexed flags. Keep word storage and locking internal; callers should
  * not access the backing words directly.
  */
 

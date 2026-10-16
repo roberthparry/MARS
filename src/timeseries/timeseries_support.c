@@ -5,7 +5,7 @@
  * Provides allocation, text construction, numeric conversion and model-metadata support used across the module. It
  * centralises cleanup and data preparation rather than defining an independent forecasting method.
  *
- * This is part of timeseries-t.h. Maintain the association between values, date indices and model metadata when
+ * This is part of the timeseries_t implementation. Maintain the association between values, date indices and model metadata when
  * constructing or transforming results.
  */
 

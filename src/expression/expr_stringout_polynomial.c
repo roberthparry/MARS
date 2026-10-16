@@ -5,7 +5,7 @@
  * Orders supported sums, series and transform terms consistently in native, function and TeX forms. It is a
  * presentation pass over expression structure, not a separate polynomial solver.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

@@ -5,7 +5,7 @@
  * Provides output publication, exact reads, bounded emission and binary length encoding for file transforms.
  * Compression, encryption and database export share these helpers to keep failure cleanup consistent.
  *
- * This belongs to the Linux-only file-t.h implementation. Filesystem operations and transforms must retain the
+ * This belongs to the Linux-only file_t implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 

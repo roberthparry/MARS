@@ -5,7 +5,7 @@
  * Formats dated observations and calendar metadata and serialises supported series values. This separates
  * presentation and persistent representation from model estimation.
  *
- * This is part of timeseries-t.h. Maintain the association between values, date indices and model metadata when
+ * This is part of the timeseries_t implementation. Maintain the association between values, date indices and model metadata when
  * constructing or transforming results.
  */
 

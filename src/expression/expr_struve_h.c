@@ -5,7 +5,7 @@
  * Provides the symbolic Struve H node with evaluation, simplification and supported derivative or integral rules.
  * Numerical values are delegated to the number layer.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

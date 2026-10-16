@@ -7,7 +7,7 @@
  * integrals convergent. Nested tanh-sinh refinements reuse individual interior-node contributions at full working
  * precision, while retaining logical work accounting and partial-level truncation.
  *
- * This is part of integrator-t.h. Callers configure opaque integrator handles and inspect completion or error
+ * This is part of the integrator_t implementation. Callers configure opaque integrator handles and inspect completion or error
  * information rather than relying on a particular internal algorithm.
  */
 

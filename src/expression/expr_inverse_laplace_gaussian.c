@@ -5,7 +5,7 @@
  * Recognises supported Gaussian-related frequency expressions and their shifts. It constructs time-domain formulas
  * while keeping the transformation's parameter conditions attached.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

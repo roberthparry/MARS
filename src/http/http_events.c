@@ -5,7 +5,7 @@
  * Consumes UTF-8 fragments into bounded event records, retaining event IDs and retry values across input chunks.
  * The application supplies transport bytes and callbacks; this parser does not schedule reconnections.
  *
- * This is part of the synchronous http-t.h client. Keep transport limits, TLS policy and handle ownership consistent
+ * This is part of the synchronous http_client_t client. Keep transport limits, TLS policy and handle ownership consistent
  * with the shared client machinery; serving requests belongs to webserver.
  */
 

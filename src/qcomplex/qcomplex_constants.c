@@ -5,7 +5,7 @@
  * Defines fixed complex constants in terms of their extended real and imaginary components. These values provide
  * common identities and special values for the complex algorithms.
  *
- * This implements fixed double-double complex arithmetic through qcomplex-t.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 

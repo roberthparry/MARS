@@ -5,7 +5,7 @@
  * Constructs supported heat-equation solutions on a half-line with the recognised data and boundary structure.
  * Kernel variables and solution notation are managed here for consistent symbolic output.
  *
- * This is an implementation unit behind diffequation-t.h. Specialised solving paths apply only to recognised
+ * This is an implementation unit for diffequ_t. Specialised solving paths apply only to recognised
  * families; callers must inspect result status and any retained conditions.
  */
 

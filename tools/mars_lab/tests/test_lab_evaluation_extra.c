@@ -1350,12 +1350,54 @@ static void test_lab_auto_range_readme(void)
     string_printf("Implicit curve: x^2+y^2=1; x and y from -1.2 to 1.2\n");
 }
 
+static void test_lab_screenshots_readme(void)
+{
+    /* README screenshot examples in docs/mars-lab.md: current surface and symbolic-result captures. */
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"acos(sin(2-x*y))\",\"action\":\"plot\",\"wrt\":\"x\","
+                            "\"plot_lower\":\"-3\",\"plot_upper\":\"3\",\"plot_second_lower\":\"-3\","
+                            "\"plot_second_upper\":\"3\",\"plot_kind\":\"auto\"}", &status);
+    bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-surface") &&
+              contains(fields, "plot_title_TeX", "u(x,y) = ") && contains(fields, "plot_title_TeX", "\\sin");
+    if (!ok) show_failure(fields);
+    TEST_ASSERT_TRUE(ok, "README screenshot plots the principal inverse-cosine surface over [-3,3] squared");
+    json_free(fields);
+    string_printf("README Expression screenshot: u(x,y) = acos(sin(2-x*y)); x,y from -3 to 3\n");
+
+    fields = request("/eval", "{\"expression\":\"(sqrt(x^2+y^2)-2)^2+z^2=1\",\"action\":\"plot\","
+                             "\"wrt\":\"x\",\"plot_source_mode\":\"equation\",\"plot_scale\":\"auto\"}", &status);
+    ok = status == 200 && test_lab_ok(fields, true) && closed_mesh(lab_eval_text(fields, "plot_svg"));
+    if (!ok) show_failure(fields);
+    TEST_ASSERT_TRUE(ok, "README screenshot automatic torus is a complete closed surface");
+    json_free(fields);
+    string_printf("README Equation screenshot: (sqrt(x^2+y^2)-2)^2+z^2=1; complete torus\n");
+
+    fields = request("/diffequation-eval", "{\"diffequation\":\"y''+6y*y'+4y^3=0; y'(0)=0\"}", &status);
+    ok = status == 200 && contains(fields, "solutions", "C₁") && !contains(fields, "solutions", "C₂") &&
+         contains(fields, "solutions", "2C₁x");
+    if (!ok) show_failure(fields);
+    TEST_ASSERT_TRUE(ok, "README screenshot zero-slope Emden family retains one arbitrary constant");
+    string_printf("README Differential Equation screenshot: %s\n", lab_eval_text(fields, "solutions"));
+    json_free(fields);
+
+    fields = request("/integrator-eval",
+                     "{\"expression\":\"exp(-x^2/2)\",\"bounds\":[{\"name\":\"x\",\"lo\":\"-inf\",\"hi\":\"2\"}]}",
+                     &status);
+    ok = status == 200 && contains(fields, "symbolic", "erf") && contains(fields, "symbolic", " + 1") &&
+         !contains(fields, "symbolic", "∞");
+    if (!ok) show_failure(fields);
+    TEST_ASSERT_TRUE(ok, "README screenshot Gaussian integral evaluates its infinite endpoint");
+    string_printf("README Integrator screenshot: %s\n", lab_eval_text(fields, "symbolic"));
+    json_free(fields);
+}
+
 /* Run the documented plot inputs after the ordinary Lab regressions. */
 void test_lab_plot_readme_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_plot_title_readme, readme, NULL);
     TEST_RUN_IN_GROUP(test_lab_surface_readme, readme, NULL);
     TEST_RUN_IN_GROUP(test_lab_auto_range_readme, readme, NULL);
+    TEST_RUN_IN_GROUP(test_lab_screenshots_readme, readme, NULL);
 }
 
 static void test_lab_extra_help_examples(void)

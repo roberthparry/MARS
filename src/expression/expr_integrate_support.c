@@ -5,7 +5,7 @@
  * Provides owned-node arithmetic and common matching utilities used across integral rule files. Centralising these
  * operations keeps temporary expression cleanup and scalar factor handling consistent.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

@@ -5,7 +5,7 @@
  * Waits on non-blocking sockets and writes one framed response per connection. It centralises deadline and
  * partial-write handling without introducing persistent-connection scheduling.
  *
- * This is part of webserver-t.h's synchronous Linux listener. The HTTP client is a separate module; this
+ * This is part of websrv_t's synchronous Linux listener. The HTTP client is a separate module; this
  * implementation does not supply a production worker pool or TLS terminator.
  */
 

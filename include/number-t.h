@@ -8,7 +8,7 @@
  * and textual presentation across its supported numeric representations.
  *
  * Choose this layer for general MARS numerical work and configurable multiprecision.
- * Use qfloat-t.h or qcomplex-t.h directly only when their fixed double-double precision
+ * Use qfloat_t or qcomplex_t directly only when their fixed double-double precision
  * is specifically required. Precision and exactness depend on the input
  * representation and the operation, rather than on the public handle's size.
  *

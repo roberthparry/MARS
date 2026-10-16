@@ -3,7 +3,7 @@
  * @brief Private indexed-series storage and modelling support.
  *
  * Defines values, date indices and model-related structures and declares helpers shared by analysis, forecasting
- * and formatting units. Public users manipulate series and results through timeseries-t.h.
+ * and formatting units. Public users manipulate series and results through timeseries_t.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.

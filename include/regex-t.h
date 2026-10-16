@@ -12,7 +12,7 @@
  * not PCRE: lookaround, lazy quantifiers and named groups are not supported.
  * Use regex-t.h rather than the system regex.h. Their regex_t typedefs must not
  * appear in the same translation unit. Do not share a handle concurrently or
- * mutate a subject during a search. Ordinary literal searches belong to string-t.h.
+ * mutate a subject during a search. Ordinary literal searches belong to the string module.
  */
 #ifndef MARS_REGEX_H
 #define MARS_REGEX_H

@@ -5,7 +5,7 @@
  * Orders solutions and produces compact text with shared structure retained where possible. It works on solver
  * results rather than altering the mathematical equation to fit an output format.
  *
- * This belongs to the equation-t.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 

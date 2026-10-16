@@ -3,7 +3,7 @@
  * @brief Private web listener, route and message state.
  *
  * Defines socket ownership, method-indexed route handlers and request or response storage, plus parsing and
- * deadline-I/O helpers. These implementation details remain behind webserver-t.h's opaque handles.
+ * deadline-I/O helpers. These implementation details remain behind websrv_t's opaque handles.
  *
  * This header is an implementation detail under src/, not an installed public API. Keep its consumers within the
  * documented module boundary and preserve any explicit internal-access guards.

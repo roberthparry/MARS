@@ -6,7 +6,7 @@
  * connect file streams to string_t without Unicode normalisation, while retaining explicit handling of malformed
  * or incomplete UTF-8. Only the documented BOM and line-ending removal changes text-read bytes.
  *
- * This belongs to the Linux-only file-t.h implementation. Filesystem operations and transforms must retain the
+ * This belongs to the Linux-only file_t implementation. Filesystem operations and transforms must retain the
  * public error, ownership and output-publication contracts.
  */
 

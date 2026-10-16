@@ -11,7 +11,7 @@
  *
  * This module is suitable for local services, embedded endpoints and integration
  * tests. It supplies the shared webmethod_t type and HTTP_GET-style method constants.
- * Use http-t.h for client requests. Deployment requiring encrypted connections,
+ * Use the HTTP module for client requests. Deployment requiring encrypted connections,
  * concurrent workers or persistent connections needs facilities beyond this server.
  *
  * No TLS, workers or persistent connections. Handles require external synchronisation.

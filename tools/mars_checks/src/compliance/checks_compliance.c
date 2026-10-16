@@ -4,7 +4,7 @@
  *
  * Retains the Python control's required notices and weather safeguards, replacing
  * its required Python paths with the native control sources and build definition.
- * SHA-256 streams through file-t.h and libsodium, already a MARS dependency.
+ * SHA-256 streams through the file module and libsodium, already a MARS dependency.
  */
 #include <errno.h>
 #include <sodium.h>

@@ -5,7 +5,7 @@
  * Extracts affine arguments and polynomial factors for symbolic rules, including products with unary functions.
  * Integration and simplification use these recognisers instead of matching printed text.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

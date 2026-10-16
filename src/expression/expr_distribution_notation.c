@@ -5,7 +5,7 @@
  * Builds readable notation for distribution-valued transform results and their conditions. This presentation unit
  * keeps distribution semantics explicit rather than treating singular terms as ordinary numeric functions.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

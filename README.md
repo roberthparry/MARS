@@ -133,8 +133,11 @@ MARS Lab runs as a native C server with calculation modes linked into the same
 not separate scratch binaries, and renders TeX through `latex` and `dvisvgm`.
 Its browser interface uses HTML, CSS, JavaScript DOM adapters and a freestanding
 C/WebAssembly module for Protobuf transport, worksheet state, validation,
-request workflows and result-card control. JavaScript supplies browser API
-access; mathematical evaluation and mathematical formatting remain native.
+request workflows, result-card control and 3-D camera/volume interaction.
+Persistent WebGL rendering keeps surfaces interactive; JavaScript supplies browser
+API access and asynchronous coordination. C/WebAssembly uses display-precision
+geometry, while native MARS evaluates exact zoom-bound recipes and samples at the
+required numerical precision. Mathematical evaluation and formatting remain native.
 Native `mars_config` handles installation and links SQLCipher directly;
 neither Python nor the `sqlcipher` CLI is required for installing or
 running the Lab. Lab builds also check Clang's WebAssembly target and LLVM's

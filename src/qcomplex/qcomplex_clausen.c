@@ -5,7 +5,7 @@
  * Computes supported Clausen values and the order-two convenience form. Argument reduction and the layer's numeric
  * representation determine the evaluation path.
  *
- * This implements fixed double-double complex arithmetic through qcomplex-t.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 

@@ -26,7 +26,7 @@ string_t *test_checks_root(void)
     return checks_text(pattern);
 }
 
-/* Write a fixture through the file-t.h adapter. */
+/* Write a fixture through the file-module adapter. */
 bool test_checks_write(const string_t *root, const char *path, const char *content)
 {
     string_t *relative = checks_text(path);

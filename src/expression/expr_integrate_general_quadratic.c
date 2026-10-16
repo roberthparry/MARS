@@ -5,7 +5,7 @@
  * Constructs antiderivatives for roots, inverse roots and linear-over-root quadratic forms. This extends centred
  * cases while retaining symbolic coefficients and the associated branch assumptions.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

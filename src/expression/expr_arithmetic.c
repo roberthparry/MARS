@@ -5,7 +5,7 @@
  * Constructs arithmetic operations and their numeric-operand variants over reference-counted expression graphs.
  * This is the algebra-building layer used by symbolic callers, not merely direct scalar evaluation.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

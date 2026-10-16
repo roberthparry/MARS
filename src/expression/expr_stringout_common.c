@@ -5,7 +5,7 @@
  * Provides the common machinery used by recursive renderers, including factors, numeric atoms and naming scopes.
  * It centralises style-independent decisions that should not drift between output formats.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

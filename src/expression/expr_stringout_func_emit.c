@@ -5,7 +5,7 @@
  * Emits operation calls, numeric atoms and additive chains in the function syntax. This unit formats expression
  * bodies; declaration and binding assembly belongs to the wrapper file.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

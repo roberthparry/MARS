@@ -5,7 +5,7 @@
  * Copies graph metadata and creates independent or symbol-linked clones. These helpers support transformations
  * that must preserve symbol relationships without accidentally sharing mutable graph state.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

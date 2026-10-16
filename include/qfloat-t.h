@@ -7,7 +7,7 @@
  * arithmetic, comparisons, conversions and mathematical functions over this type.
  *
  * This is fixed double-double arithmetic, not arbitrary-precision or exact rational
- * arithmetic. Use number-t.h when a calculation needs those facilities, or qcomplex-t.h
+ * arithmetic. Use number_t when a calculation needs those facilities, or qcomplex_t
  * for complex values built from qfloat_t components. Representation precision does
  * not guarantee the same number of accurate digits for ill-conditioned operations.
  *

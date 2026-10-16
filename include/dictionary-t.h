@@ -7,7 +7,7 @@
  * hashing policies must agree about key equality.
  *
  * Copy and cleanup callbacks define ownership of stored keys and values. Choose
- * array-t.h for positional sequences or set-t.h for unique values without associated
+ * array_t for positional sequences or set_t for unique values without associated
  * payloads; dictionary entries provide the key-to-value association.
  *
  * This dictionary provides:

@@ -5,7 +5,7 @@
  * Scans top-level equality and binding syntax using MARS text views, then constructs expression-backed equations.
  * A differential-equation mode preserves undeclared function calls for that module's parser.
  *
- * This belongs to the equation-t.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 

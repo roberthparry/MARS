@@ -11,7 +11,7 @@
  * Values are passed by value. Precision is approximately 31-32 decimal digits in
  * the representation, not a universal accuracy guarantee for every operation.
  *
- * Use qfloat-t.h for the underlying real arithmetic and number-t.h for the common
+ * Use qfloat_t for the underlying real arithmetic and number_t for the common
  * MARS numeric interface, exact values or configurable multiprecision. Complex
  * functions follow their documented branch and domain conventions.
  */

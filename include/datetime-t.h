@@ -7,8 +7,8 @@
  * Timezone and daylight-saving helpers support local-time calculations, while
  * Julian dates and basic solar and lunar calculations connect dates to astronomy.
  *
- * datetime_t represents dates and times at second resolution. Use jurisdiction-t.h
- * for configured public-holiday and working-day rules, and almanac-t.h for
+ * datetime_t represents dates and times at second resolution. Use the jurisdiction module
+ * for configured public-holiday and working-day rules, and the almanac module for
  * catalogue-backed astronomical positions rather than civil calendar operations.
  *
  * Provides an opaque datetime_t type supporting:

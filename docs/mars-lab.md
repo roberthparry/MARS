@@ -697,6 +697,24 @@ header and only the interfaces it uses; there is no umbrella header.
 and scoped DOM access respectively. Worksheet state, requests, bindings,
 presentation and the other browser modules have their own matching headers.
 These interfaces are tool-private, not installed MARS library headers.
+
+The retained surface renderer separates display geometry from mathematical coordinates:
+
+- `lab_surface_math.c` provides bounded display arithmetic and quaternion camera operations.
+- `lab_surface_geometry.c` supplies projection, six-plane clipping, axis placement and
+  uniform viewport fitting for WebGL, the canvas fallback and vector export.
+- `lab_surface_volume.c` retains exact endpoint text and constructs native zoom-bound
+  recipes from a dimensionless binary exponent. It does not evaluate absolute bounds
+  using browser doubles.
+
+These C/WebAssembly operations use double-precision display values, not the native
+arbitrary-precision matrix or number modules. Native MARS evaluates the range recipes
+and performs precision-aware sampling; normalised mesh coordinates then cross the
+browser/GPU boundary. JavaScript supplies DOM and pointer-event bindings, asynchronous
+request coordination and drawing API access. Pixel layout and approximate readouts
+are not the authority for mathematical coordinates. See
+[3-D surface interaction](#3-d-surface-interaction) for controls and precision limits.
+
 All page implementations compile into `lab_browser.wasm`. The codec, memory
 helpers and job policy also link into the separate `lab_codec.wasm` worker asset;
 that smaller module has no DOM imports or worksheet state.
@@ -1074,6 +1092,8 @@ Failed plot redraws also retain the previous coordinate-bearing view and show a
 separate diagnostic. Zoom out or use **Reset** to recover; the zoom buttons never
 switch to enlarging the diagnostic while a previous plot is available.
 
+#### 3-D surface interaction
+
 The compact **3-D view** controls come first, directly beneath the chart. The **Zoom** slider
 starts with a 12.5% to 6400% coordinate-volume range and extends as zoom continues,
 with 100% as the initial ranges. Its readout follows wheel, pinch and button zoom,
@@ -1130,8 +1150,9 @@ new native samples. The old view remains available while that request runs.
 three coordinate spans uniformly, not the on-screen size of the axes. The selected
 volume stays centred on the starting volume. The retained mesh is transformed and
 clipped at all six faces immediately; tick labels follow the selected bounds.
-On release or after a short pause, native MARS samples that volume at full detail
-using its range-aware precision policy. The preview remains interactive meanwhile.
+On release or after a short pause, native MARS samples that volume at full detail,
+subject to the chart budget and its range-aware precision policy. The preview
+remains interactive meanwhile.
 A new zoom or rotation cancels an obsolete refinement; late replies cannot restore
 old bounds. Rotation preserves both the selected volume and quaternion orientation.
 
@@ -1149,6 +1170,16 @@ normalised before conversion to display precision. Reset restores the original r
 and height policy, including Automatic. Editing bounds manually establishes a new
 zoom baseline after the native result arrives. Empty volumes retain their axes
 and controls, allowing zoom out or Reset to recover the surface.
+
+Zoom-generated range fields use interval-aware precision: broad intervals show
+short bounds, while narrow intervals retain more digits, without trailing zeroes.
+The C/WebAssembly formatter covers all three axes. Displayed values do not replace
+the exact sampling recipes; manually entered bounds retain their authored precision.
+During microscopic zoom, controls retain the recipe until native decimal labels arrive.
+Preview tick labels that cannot be represented safely are omitted until refinement finishes.
+For a very large single zoom jump, axes remain interactive while old geometry outside
+the safe relative GPU range is hidden until fresh native samples arrive.
+
 **Copy** generates SVG on demand from the current mesh, orientation and zoom,
 including the native TeX title and projected axes. SVG uses depth-sorted triangles
 rather than a GPU depth buffer, so intersecting triangles can have different
@@ -1234,8 +1265,9 @@ Teal curves, muted green-grey axes and tick labels, and a faint dashed grid
 complement the gold TeX heading. These native SVG colours are preserved when
 the plot is expanded or copied.
 
-The result card is labelled **Plot** and displays an SVG generated dynamically
-in memory by [`sampler_t`](sampler.md) and [`plot_t`](plot.md). Its title is the
+The **Plot** card receives native SVG generated dynamically in memory by
+[`sampler_t`](sampler.md) and [`plot_t`](plot.md). Curves display that SVG directly;
+surfaces retain its mesh in the interactive renderer described above. Its title is the
 entered formula rendered in TeX, without numerical binding substitutions.
 Recognised ellipsis series use sigma notation: entering
 `1/1^x + 1/2^x + 1/3^x + ...` gives the title
@@ -1258,16 +1290,15 @@ other result cards. At 100% zoom the plot fits the available width; **Collapse**
 restores the two-column workspace. Mode switches restore that mode's own result
 headings and its separate plot card rather than carrying a plotting heading into another mode.
 
-Hold **Ctrl** and use the mouse wheel over a 2-D or 3-D plot to zoom in (up)
+#### Curve navigation and inspection
+
+Hold **Ctrl** and use the mouse wheel over a plot to zoom in (up)
 or out (down). Shift+wheel and Alt+wheel rotate 3-D plots as described above;
 otherwise, without Ctrl, wheel events retain their normal browser behaviour
 and do not change plot zoom. For 2-D plots, Ctrl+wheel changes both axis ranges
-around the pointer and requests fresh native samples. For 3-D surfaces, it changes
-all three coordinate spans about the volume centre, with a clipped preview coalesced to animation frames.
-Native refinement uses the selected bounds and adjusts numerical precision when needed.
-Reversing the wheel reverses the range change without selecting a different surface
-sheet. **−** and **+** zoom about the volume centre; **Reset** restores the original ranges.
-For 2-D plots those buttons change the sampled ranges, and Reset restores the
+around the pointer and requests fresh native samples. Surface controls instead use
+the [coordinate-volume zoom described above](#3-d-surface-interaction).
+For 2-D plots, **−** and **+** change the sampled ranges, and **Reset** restores the
 range controls and height policy captured before zooming. Pointer coordinates use the
 SVG screen transformation, so nested headings, clipping and fitting do not offset
 hover readings or gesture anchors. Vertical and horizontal hover guides meet at
@@ -1284,9 +1315,9 @@ Each coordinate and each constant appear on separate lines. The guide disappears
 outside the chart. It does not obscure curve-identity tooltips or
 appear in copied SVG output. Native SVG hover titles are suppressed in the interactive
 curve plot to avoid duplicate tooltips; their text remains accessible and is preserved
-in copied SVG output. Inspection and gesture arithmetic use browser-sized
+in copied SVG output. Curve inspection and gesture arithmetic use browser-sized
 coordinates; non-finite or collapsed coordinate ranges require manual native bounds.
-Surface rotation controls are unchanged; plot zoom does not magnify the SVG.
+Curve zoom changes sampled bounds rather than magnifying the SVG.
 Drag a 2-D plot with the mouse or a finger to pan horizontally and vertically
 without changing its scale. Existing curves move immediately inside clipped
 plot windows while moves are coalesced into native redraws. Drag previews use
@@ -1296,9 +1327,8 @@ finishes at full detail. Escape or pointer cancellation restores the starting
 view. Reset restores the view from before zooming or panning.
 Spread two fingers to zoom in and bring them together to zoom out. Curves track
 the midpoint by changing sampled ranges, with coarse previews and full sampling
-when either finger lifts. Surfaces instead retain their mesh for immediate
-coordinate-volume zoom about the volume centre, followed by native refinement on release. Further fingers
-are ignored. Lift the remaining finger before starting another drag. Pointer
+when either finger lifts. Further fingers are ignored.
+Lift the remaining finger before starting another drag. Pointer
 cancellation restores the pre-gesture view, and Reset undoes the zoom.
 For curve plots, Fit all retains the complete sampled range of continuous curves.
 When the sampler marks discontinuities, it protects the view from extreme tails
@@ -1308,18 +1338,13 @@ that the function is bounded or that every discontinuity is a pole.
 The **2-D curve** choice is hidden while another plotting variable is unset.
 Fix the other variable's value to make a curve available; clearing that value
 returns an incompatible curve selection to **Auto**.
-Zoom-generated range fields use interval-aware precision: broad intervals show
-short bounds, while narrow intervals retain more digits. Trailing zeroes are
-omitted. Sampling retains the unrounded gesture coordinates until a bound is
-edited; manually entered bounds keep their authored precision. The C/WebAssembly
-formatter applies this consistently to all three surface axes; native sampling
-receives exact range recipes rather than the displayed values. During microscopic
-zoom, controls retain the recipe until native decimal labels arrive; preview tick
-labels that cannot be represented safely are omitted until refinement finishes.
-For a very large single zoom jump, axes remain interactive while old geometry
-outside the safe relative GPU range is hidden until fresh native samples arrive.
+Curve range fields use interval-aware formatting without trailing zeroes.
+Sampling retains the unrounded gesture coordinates until a bound is edited;
+manually entered bounds keep their authored precision.
 Scrolling outside the plot image, including over its controls, behaves normally;
 other result cards still require Ctrl or Command with the wheel to zoom.
+
+#### Native sampling and precision
 
 Plotting normally uses **hardware doubles** (a 53-bit mantissa, roughly 16 decimal
 digits), independently of the worksheet precision. Shared native evaluation plans
@@ -1461,8 +1486,12 @@ interpolation, then reconstruct native world coordinates before rendering. Thus 
 large offset does not erase the distance between adjacent mesh vertices. Authored
 bounds are parsed before conversion; grid density and edge-refinement limits are
 unchanged. This is not a certified error bound or a guarantee of resolving arbitrary
-ill-conditioning. Browser gesture and hover metadata still use JavaScript numbers;
-native precision support does not remove that separate interface limitation.
+ill-conditioning. Curve gestures and hover interpolation remain limited to
+browser-sized coordinates. Surface zoom instead retains exact endpoint text and
+sends native range recipes, so display precision does not limit the mathematical
+bounds. Its C/WebAssembly camera and normalised GPU geometry still use display
+precision, with the preview safeguards described under
+[3-D surface interaction](#3-d-surface-interaction).
 Symbolic solutions and worksheet precision
 are unaffected. The expression guide describes the bounded sampling plan and its
 numerical limitations.
@@ -1946,7 +1975,12 @@ Native TeX inserts a small centred dot between these names and adjacent factors
 to make multiplication clear.
 Products of single-letter symbols retain their existing notation.
 
-[![MARS Lab expression mode displaying an inverse-power series as a sigma, Hurwitz-zeta formula and numerical value](images/mars-lab/expression.png?v=20260820-2)](images/mars-lab/expression.png?v=20260820-2)
+The current Expression capture shows `acos(sin(2-x*y))` with both plotting
+variables from −3 to 3. The output is the principal-value surface
+`u(x,y) = acos(sin(2-x*y))`, with equal coordinate units and the compact
+azimuth, elevation, roll and coordinate-volume zoom controls beneath it.
+
+[![MARS Lab expression mode plotting the principal-value inverse-cosine surface with compact 3-D controls](images/mars-lab/expression.png?v=20261016-full)](images/mars-lab/expression.png?v=20261016-full)
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
@@ -2334,10 +2368,11 @@ constants and supply starting values for numeric solving.
 Equation calculations may run for up to 40 seconds before the Lab reports a
 timeout. Other modes retain their own time limits.
 
-The captured input is `atan(2x) + atan(x) = pi/4`. The exact output is
-`x = (sqrt(17) - 3)/4`, accompanied by its decimal value.
+The captured input is `(sqrt(x^2+y^2)-2)^2+z^2=1`. The symbolic output is
+`z = ±sqrt(1-(sqrt(x^2+y^2)-2)^2)`; the automatic implicit plot shows the
+complete torus, with equal coordinate units and the retained 3-D controls.
 
-[![MARS Lab equation mode returning an exact surd solution](images/mars-lab/equation.png?v=20260814-3)](images/mars-lab/equation.png?v=20260814-3)
+[![MARS Lab equation mode showing a torus and its symbolic height branches in automatic mode](images/mars-lab/equation.png?v=20261016-full)](images/mars-lab/equation.png?v=20261016-full)
 
 ## Differential-equation mode
 
@@ -2346,11 +2381,15 @@ polynomial differential operators, differential forms and optional initial or
 boundary conditions. MARSlib selects a matching rule and, when derivations are
 enabled, returns the rule-derived working shown in the **Solver** card.
 
-The captured input is `y'' + x^2y = 0`. The output is the Bessel basis
+The captured input is `y''+6y*y'+4y^3=0; y'(0)=0`. The modified Emden
+solver returns the one-constant family
 
-$\quad\begin{array}{l}\displaystyle y = \sqrt{x}\left(C_1 J_{-1/4}\!\left(\frac{x^2}{2}\right) + C_2 J_{1/4}\!\left(\frac{x^2}{2}\right)\right).\end{array}$
+$\displaystyle y = \frac{C_1(2C_1x+1)}{2C_1x(C_1x+1)+1}.$
 
-[![MARS Lab differential-equation mode solving a power-law Bessel equation](images/mars-lab/differential-equation.png?v=20260814-3)](images/mars-lab/differential-equation.png?v=20260814-3)
+The zero-slope condition removes one arbitrary constant. The compact TeX
+fraction, representative real solution curves and solver working are shown together.
+
+[![MARS Lab differential-equation mode displaying the modified Emden solution family, representative curves and solver working](images/mars-lab/differential-equation.png?v=20261016-full)](images/mars-lab/differential-equation.png?v=20261016-full)
 
 Select **Help** in this mode for the accepted prime, `D`, partial-derivative and
 differential-form notation. Arbitrary constants are preserved when the problem
@@ -2470,21 +2509,21 @@ ordered higher and mixed derivatives and iterated integrals, and is not limited
 to `2 x 2` matrices.
 
 <figure>
-  <a href="images/mars-lab/matrix.png?v=20260815-6"><img src="images/mars-lab/matrix.png?v=20260815-6" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
+  <a href="images/mars-lab/matrix.png?v=20261016-full"><img src="images/mars-lab/matrix.png?v=20261016-full" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
   <figcaption><em>After clicking <strong>Evaluate</strong>.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-derivative.png?v=20260815-5"><img src="images/mars-lab/matrix-power-derivative.png?v=20260815-5" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
-  <figcaption><em>After clicking <strong>x derivative</strong>.</em></figcaption>
+  <a href="images/mars-lab/matrix-power-derivative.png?v=20261016-full"><img src="images/mars-lab/matrix-power-derivative.png?v=20261016-full" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
+  <figcaption><em>After clicking <strong>x derivative</strong>, with the TeX card at 67% to show the complete matrix.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-integral.png?v=20260815-5"><img src="images/mars-lab/matrix-power-integral.png?v=20260815-5" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
+  <a href="images/mars-lab/matrix-power-integral.png?v=20261016-full"><img src="images/mars-lab/matrix-power-integral.png?v=20261016-full" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
   <figcaption><em>After clicking <strong>x integral</strong>.</em></figcaption>
 </figure>
 
@@ -2580,11 +2619,13 @@ worker; subsequent binding and rendering work has its own time limits. Increasin
 the deadline does not change the requested precision, numerical tolerance or
 work ceiling.
 
-The captured input is `sin(x)^2` with `x` from `0` to `1`. MARS returns the
-exact antiderivative `(2x - sin(2x))/4` and the definite output
-`(2 - sin(2))/4`.
+The captured input is `exp(-x^2/2)` with `x` from `-inf` to `2`.
+MARS returns the exact definite result
+`1/2*sqrt(pi/(1/2))*(erf(2*sqrt(1/2))+1)`, approximately `2.44960215063810845`.
+The infinite endpoint has reduced to its exact limit; the plot shades the
+visible portion of the integration interval under the Gaussian curve.
 
-[![MARS Lab integrator mode returning exact indefinite and definite results](images/mars-lab/integrator.png?v=20260814-3)](images/mars-lab/integrator.png?v=20260814-3)
+[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261016-full)](images/mars-lab/integrator.png?v=20261016-full)
 
 ## Datetime mode
 
@@ -2593,10 +2634,11 @@ weather calculations. Enter a selected date, a date range and an observer
 location. A Julian day number may be used in place of the selected civil date.
 The GMT offset includes daylight saving when applicable.
 
-The captured request uses 20 August 2026 in Shrewsbury, with a date range
-ending on 1 January 2027. Its output includes the weekday, sunrise and sunset,
-moonrise and moonset, moon phase, clock changes, the asynchronously added
-weather summary, the selected date range and the year's calendar observances.
+The captured request uses 16 October 2026 in Shrewsbury, with a date range
+from 1 January 2026 to 1 January 2027. Its output includes the weekday,
+sunrise and sunset, moonrise and moonset, moon phase, clock changes, the
+selected date range and the year's calendar observances. The optional Weather
+section is collapsed in this capture.
 
 The ten calendar sections retain datetime's observance calculations, including
 estimated festivals and local sunset-start times. Jurisdiction rules continue
@@ -2612,7 +2654,7 @@ The native presentation layer supplies and escapes these tooltips for fresh and
 cached results alike; copied text, dates and estimation qualifiers are unchanged.
 No database migration is needed, and unknown names receive no guessed translation.
 
-[![MARS Lab datetime mode showing calendar and astronomical results followed by asynchronously loaded weather](images/mars-lab/datetime.png?v=20260820-1)](images/mars-lab/datetime.png?v=20260820-1)
+[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 16 October 2026](images/mars-lab/datetime.png?v=20261016-full)](images/mars-lab/datetime.png?v=20261016-full)
 
 MARS supplies no shared WeatherAPI account or key. Weather is shown only when
 the person installing MARS Lab creates their own WeatherAPI account, configures
@@ -2723,11 +2765,11 @@ Undefined orientations are explicitly labelled; missing geometry omits the
 preview rather than inventing a shape. Changing to a nearest-totality location
 requires a new evaluation, just as the contact times do.
 
-The captured request is for London at `2026-08-08 09:02:43` GMT. The output is
-the navigational-body table headed by the Sun, Moon, Mercury, Venus, Mars,
-Jupiter and Saturn.
+The captured request is for London at `2026-10-16 12:00:00` GMT. The expanded
+worksheet shows the navigational-body table, including bodies below the horizon,
+with their declination, hour angle, right ascension, altitude, azimuth and visibility.
 
-[![MARS Lab almanac mode showing the navigational-body worksheet](images/mars-lab/almanac.png)](images/mars-lab/almanac.png)
+[![MARS Lab expanded almanac worksheet showing London navigational bodies and their visibility](images/mars-lab/almanac.png?v=20261016-full)](images/mars-lab/almanac.png?v=20261016-full)
 
 ## Mobile and private remote access
 

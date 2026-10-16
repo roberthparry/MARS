@@ -6,7 +6,7 @@
  * routines support civil calendars and should not be confused with the almanac engine's catalogue-backed
  * calculations.
  *
- * This is part of the datetime-t.h implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
+ * This is part of the datetime_t implementation. Jurisdiction holiday policy belongs to the jurisdiction module,
  * while catalogue-backed apparent sky positions belong to almanac.
  */
 

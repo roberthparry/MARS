@@ -5,7 +5,7 @@
  * Coordinates specialised inverse pairs, evaluation and simplification. Unresolved transforms and surviving domain
  * restrictions remain explicit in the native expression result.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

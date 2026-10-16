@@ -5,7 +5,7 @@
  * Matches supported affine compositions and square-family radicals and builds their antiderivatives. These
  * recognisers allow parameters to remain symbolic while respecting the chosen integration variable.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

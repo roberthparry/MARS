@@ -3,7 +3,7 @@
  * @brief Private task publication and worker-pool ownership shared by executor sources.
  *
  * Only executor implementations may access mutable task storage. Public callers
- * use executor-t.h; terminal release stores publish result data to its readers.
+ * use executor_t; terminal release stores publish result data to its readers.
  */
 #ifndef MARS_EXECUTOR_INTERNAL_H
 #define MARS_EXECUTOR_INTERNAL_H

@@ -5,7 +5,7 @@
  * Parses, represents and evaluates binding expressions and produces their native, function and TeX forms. It
  * separates variable metadata and supplied values from the main expression's symbolic structure.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 

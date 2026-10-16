@@ -3002,6 +3002,7 @@
       "enabled": true,
       "test_lab_auto_range_readme": true,
       "test_lab_plot_title_readme": true,
+      "test_lab_screenshots_readme": true,
       "test_lab_surface_readme": true
     },
     "tests": {

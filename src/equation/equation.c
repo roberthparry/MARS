@@ -5,7 +5,7 @@
  * Owns equation and solution containers, coordinates supported solving paths and exposes solution inspection.
  * Polynomial recognisers and specialised root algorithms live in the companion implementation units.
  *
- * This belongs to the equation-t.h implementation. Public callers work with equations and solution collections;
+ * This belongs to the equation_t implementation. Public callers work with equations and solution collections;
  * internal matching or numerical attempts are not independent application APIs.
  */
 

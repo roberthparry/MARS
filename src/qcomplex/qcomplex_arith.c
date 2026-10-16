@@ -5,7 +5,7 @@
  * Implements arithmetic and supported elementary complex operations using qfloat components. Branch and domain
  * conventions must remain consistent with the public qcomplex interface.
  *
- * This implements fixed double-double complex arithmetic through qcomplex-t.h. It is distinct from configurable
+ * This implements fixed double-double complex arithmetic for qcomplex_t. It is distinct from configurable
  * multiprecision complex arithmetic in the number module.
  */
 

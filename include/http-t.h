@@ -11,7 +11,7 @@
  * JSON, XML and Protocol Buffers provide payload representations, not transport.
  * Include their respective headers when manipulating those documents or messages.
  * SOAP support does not provide automatic WSDL client generation, and gRPC support
- * is limited to uncompressed unary calls. Use webserver-t.h to implement a listening
+ * is limited to uncompressed unary calls. Use websrv_t to implement a listening
  * service rather than consume one.
  *
  * Uses libcurl >= 7.86.0 with verified TLS. Redirects and cookies are opt-in; environment proxies and netrc are

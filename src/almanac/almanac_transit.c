@@ -5,7 +5,7 @@
  * Calculates projected transit geometry, locates contacts and constructs per-event circumstances. The search is
  * specialised to the supported interior planets and configured ephemeris coverage.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use the almanac module and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

@@ -5,7 +5,7 @@
  * Loads holiday, observance and exception rows and evaluates their calendar or SQL date rules. The occurrence
  * assembler uses these results to apply policy over a requested date range.
  *
- * This is part of jurisdiction-t.h and uses configured rule data. Results depend on that data's coverage and
+ * This is part of the jurisdiction_t implementation and uses configured rule data. Results depend on that data's coverage and
  * currency rather than hard-coded assumptions about the host machine.
  */
 

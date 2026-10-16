@@ -5,7 +5,7 @@
  * Resolves local offsets and UTC search windows, accounts for horizon geometry, and locates body crossings. Sun
  * and Moon wrappers use the same observer-dependent machinery.
  *
- * This is part of the catalogue-backed almanac implementation. Applications should use almanac-t.h and provide the
+ * This is part of the catalogue-backed almanac implementation. Applications should use the almanac module and provide the
  * required configured data; this file is not a standalone astronomical program.
  */
 

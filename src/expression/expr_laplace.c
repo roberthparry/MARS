@@ -5,7 +5,7 @@
  * Matches supported time-domain expressions and constructs symbolic transform results with value notes and
  * restrictions. Elementary and special-function families are supplied by companion rule units.
  *
- * This is part of the expression-t.h implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
