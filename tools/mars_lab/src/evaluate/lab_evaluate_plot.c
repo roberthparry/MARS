@@ -174,14 +174,12 @@ static bool append_text(xml_t *parent, const char *name, const string_t *text, u
     return ok;
 }
 
-/* Use one SVG viewport so fitting, expansion and copying retain the mathematical heading. */
-void lab_eval_plot_title(json_t *fields)
+/* Give each projection its own scalable heading without re-rendering the mathematics. */
+static void compose_plot_title(json_t *fields, const char *key)
 {
-    const string_t *curve = json_string_value(lab_eval_get(fields, "plot_svg"));
-    const string_t *TeX = json_string_value(lab_eval_get(fields, "plot_title_TeX"));
-    if (!curve || !TeX)
+    const string_t *curve = json_string_value(lab_eval_get(fields, key));
+    if (!curve || !string_byte_length(curve))
         return;
-    lab_eval_render_field(fields, "plot_title_TeX", "plot_title_svg", "plot_title_render_error");
     chart_body_t body = {0};
     xml_t *chart = chart_root(curve, &body);
     xml_t *title = svg_root(json_string_value(lab_eval_get(fields, "plot_title_svg")));
@@ -218,10 +216,32 @@ void lab_eval_plot_title(json_t *fields)
     string_t *combined = ok ? xml_to_string(root) : NULL;
     combined = insert_chart_body(combined, &body);
     if (combined)
-        lab_eval_set(fields, "plot_svg", string_c_str(combined));
+        lab_eval_set(fields, key, string_c_str(combined));
     string_free(combined);
     string_free(view);
     xml_free(root);
     xml_free(title);
     xml_free(chart);
+}
+
+/* Use one SVG viewport per projection so fitting, expansion and copying retain the mathematical heading. */
+void lab_eval_plot_title(json_t *fields)
+{
+    const char *suffix = lab_eval_text(fields, "plot_slice_title"), *suffix_TeX = lab_eval_text(fields, "plot_slice_TeX");
+    if (*suffix) {
+        string_t *plain = string_sprintf("%s; %s", lab_eval_text(fields, "plot_title"), suffix);
+        string_t *TeX = string_sprintf("%s\\qquad %s", lab_eval_text(fields, "plot_title_TeX"), suffix_TeX);
+        if (plain && TeX) {
+            lab_eval_set(fields, "plot_title", string_c_str(plain));
+            lab_eval_set(fields, "plot_title_TeX", string_c_str(TeX));
+        }
+        string_free(plain);
+        string_free(TeX);
+    }
+    if (!*lab_eval_text(fields, "plot_svg") || !lab_eval_get(fields, "plot_title_TeX"))
+        return;
+    lab_eval_render_field(fields, "plot_title_TeX", "plot_title_svg", "plot_title_render_error");
+    static const char *const projections[] = {"plot_svg", "plot_complex_plane", "plot_components", "plot_amplitude"};
+    for (unsigned i = 0; i < sizeof(projections) / sizeof(*projections); ++i)
+        compose_plot_title(fields, projections[i]);
 }

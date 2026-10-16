@@ -19,8 +19,8 @@ void lab_bootstrap_widgets(void)
         const char *id;
         unsigned town;
         unsigned searchable;
-    } controls[] = {{"datetimeJurisdiction", 0, 1}, {"almanacJurisdiction", 0, 1},
-                    {"datetimeTown", 1, 1}, {"almanacTown", 1, 1}};
+    } controls[] = {
+        {"datetimeJurisdiction", 0, 1}, {"almanacJurisdiction", 0, 1}, {"datetimeTown", 1, 1}, {"almanacTown", 1, 1}};
     int result = lab_dom_object(5), calls = lab_dom_object(4);
     lab_dom_set(result, "calls", calls);
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i) {
@@ -29,8 +29,9 @@ void lab_bootstrap_widgets(void)
         if (controls[i].searchable) {
             lab_dom_set(options, "searchPlaceholder",
                         lab_dom_string(controls[i].town ? "Search towns" : "Search jurisdictions"));
-            lab_dom_set(options, "emptyText",
-                        lab_dom_string(controls[i].town ? "No towns for this jurisdiction" : "No matching jurisdiction"));
+            lab_dom_set(
+                options, "emptyText",
+                lab_dom_string(controls[i].town ? "No towns for this jurisdiction" : "No matching jurisdiction"));
         }
         if (controls[i].town) {
             lab_dom_set(options, "placeholder", lab_dom_string("Custom location"));
@@ -83,57 +84,118 @@ void lab_bootstrap_workspace(unsigned phase, int context)
 }
 
 /* Each stage is one asynchronous or synchronous browser capability boundary. */
+struct lab_bootstrap_step_context {
+    int frame;
+    int response;
+};
+
+static int lab_bootstrap_step_fetch(struct lab_bootstrap_step_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 1, "fetch", "response", 1, 1, lab_dom_string("/bootstrap"));
+}
+
+static int lab_bootstrap_step_fail(struct lab_bootstrap_step_context *ctx)
+{
+    if (!lab_dom_truth(lab_dom_get(ctx->response, "ok"))) {
+        int prefix = lab_dom_string(lab_dom_number(lab_dom_get(ctx->frame, "stage")) == 1
+                                        ? "Could not load Lab configuration ("
+                                        : "Could not load the Lab catalogue (");
+        return lab_flow_call(ctx->frame, 13, "fail", 0, 0, 1,
+                             lab_dom_join(prefix, lab_dom_text(lab_dom_get(ctx->response, "status")), ")"));
+    }
+    return lab_flow_call(ctx->frame, lab_dom_number(lab_dom_get(ctx->frame, "stage")) == 1 ? 2 : 6, "decode", "data", 1,
+                         1, ctx->response);
+}
+
+static int lab_bootstrap_step_fail_3(struct lab_bootstrap_step_context *ctx)
+{
+    if (!lab_dom_equal(lab_dom_get(lab_dom_get(ctx->frame, "data"), "BROWSER_ABI_VERSION"),
+                       lab_dom_text(lab_dom_numeric(lab_browser_abi_version()))))
+        return lab_flow_call(ctx->frame, 13, "fail", 0, 0, 1,
+                             lab_dom_string("The running MARS Lab server does not match the browser files. "
+                                            "Run make mars-lab-restart, then reload this page."));
+    return lab_flow_call(ctx->frame, 3, "config", 0, 0, 1, lab_dom_get(ctx->frame, "data"));
+}
+
+static int lab_bootstrap_step_fetch_4(struct lab_bootstrap_step_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 5, "fetch", "response", 1, 1, lab_dom_string("/jurisdictions"));
+}
+
+static int lab_bootstrap_step_catalogue(struct lab_bootstrap_step_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 7, "catalogue", 0, 0, 1, lab_dom_get(ctx->frame, "data"));
+}
+
+static int lab_bootstrap_step_native(struct lab_bootstrap_step_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 8, "native", "valid", 0, 2, lab_dom_string("lab_location_catalogue"),
+                         lab_dom_get(ctx->frame, "data"));
+}
+
+static int lab_bootstrap_step_fail_7(struct lab_bootstrap_step_context *ctx)
+{
+    if (!lab_dom_truth(lab_dom_get(ctx->frame, "valid")))
+        return lab_flow_call(ctx->frame, 13, "fail", 0, 0, 1, lab_dom_string("The Lab catalogue is invalid"));
+    int scripts = lab_dom_object(4);
+    static const char *const names[] = {"api",    "bindings",       "locations",      "results",
+                                        "state",  "surface_camera", "surface_export", "surface_volume",
+                                        "surface"};
+    for (unsigned i = 0; i < sizeof names / sizeof *names; ++i)
+        lab_dom_push(scripts, lab_dom_string(names[i]));
+    return lab_flow_call(ctx->frame, 9, "definitions", 0, 1, 1, scripts);
+}
+
+static int lab_bootstrap_step_script(struct lab_bootstrap_step_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 10, "script", 0, 1, 1, lab_dom_string("/js/workspace.js"));
+}
+
+static int lab_bootstrap_step_events(struct lab_bootstrap_step_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 11, "events", 0, 0, 0);
+}
+
+static int lab_bootstrap_step_widgets(struct lab_bootstrap_step_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 12, "widgets", 0, 0, 0);
+}
+
+static int lab_bootstrap_step_worksheet(struct lab_bootstrap_step_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 13, "worksheet", 0, 1, 0);
+}
+
+static int lab_bootstrap_step_otherwise(struct lab_bootstrap_step_context *ctx)
+{
+    (void)ctx;
+    return lab_flow_done(0);
+}
+
+/* Advance startup through the bounded catalogue of browser capabilities. */
 int lab_bootstrap_step(int frame, int view)
 {
     (void)view;
     int response = lab_dom_get(frame, "response");
-    switch ((unsigned)lab_dom_number(lab_dom_get(frame, "stage"))) {
-        case 0:
-            return lab_flow_call(frame, 1, "fetch", "response", 1, 1, lab_dom_string("/bootstrap"));
-        case 1:
-        case 5:
-            if (!lab_dom_truth(lab_dom_get(response, "ok"))) {
-                int prefix = lab_dom_string(lab_dom_number(lab_dom_get(frame, "stage")) == 1
-                                                ? "Could not load Lab configuration ("
-                                                : "Could not load the Lab catalogue (");
-                return lab_flow_call(frame, 13, "fail", 0, 0, 1,
-                                     lab_dom_join(prefix, lab_dom_text(lab_dom_get(response, "status")), ")"));
-            }
-            return lab_flow_call(frame, lab_dom_number(lab_dom_get(frame, "stage")) == 1 ? 2 : 6, "decode", "data", 1,
-                                 1, response);
-        case 2:
-            if (!lab_dom_equal(lab_dom_get(lab_dom_get(frame, "data"), "BROWSER_ABI_VERSION"),
-                               lab_dom_text(lab_dom_numeric(lab_browser_abi_version()))))
-                return lab_flow_call(frame, 13, "fail", 0, 0, 1,
-                                     lab_dom_string("The running MARS Lab server does not match the browser files. "
-                                                    "Run make mars-lab-restart, then reload this page."));
-            return lab_flow_call(frame, 3, "config", 0, 0, 1, lab_dom_get(frame, "data"));
-        case 3:
-            return lab_flow_call(frame, 5, "fetch", "response", 1, 1, lab_dom_string("/jurisdictions"));
-        case 6:
-            return lab_flow_call(frame, 7, "catalogue", 0, 0, 1, lab_dom_get(frame, "data"));
-        case 7:
-            return lab_flow_call(frame, 8, "native", "valid", 0, 2, lab_dom_string("lab_location_catalogue"),
-                                 lab_dom_get(frame, "data"));
-        case 8: {
-            if (!lab_dom_truth(lab_dom_get(frame, "valid")))
-                return lab_flow_call(frame, 13, "fail", 0, 0, 1, lab_dom_string("The Lab catalogue is invalid"));
-            int scripts = lab_dom_object(4);
-            static const char *const names[] = {"api", "bindings", "locations", "results", "state",
-                                               "surface_camera", "surface_export", "surface_volume", "surface"};
-            for (unsigned i = 0; i < sizeof names / sizeof *names; ++i)
-                lab_dom_push(scripts, lab_dom_string(names[i]));
-            return lab_flow_call(frame, 9, "definitions", 0, 1, 1, scripts);
-        }
-        case 9:
-            return lab_flow_call(frame, 10, "script", 0, 1, 1, lab_dom_string("/js/workspace.js"));
-        case 10:
-            return lab_flow_call(frame, 11, "events", 0, 0, 0);
-        case 11:
-            return lab_flow_call(frame, 12, "widgets", 0, 0, 0);
-        case 12:
-            return lab_flow_call(frame, 13, "worksheet", 0, 1, 0);
-        default:
-            return lab_flow_done(0);
-    }
+    struct lab_bootstrap_step_context ctx = {
+        .frame = frame,
+        .response = response,
+    };
+    static int (*const handlers[])(struct lab_bootstrap_step_context *) = {
+        [0]  = lab_bootstrap_step_fetch,
+        [1]  = lab_bootstrap_step_fail,
+        [5]  = lab_bootstrap_step_fail,
+        [2]  = lab_bootstrap_step_fail_3,
+        [3]  = lab_bootstrap_step_fetch_4,
+        [6]  = lab_bootstrap_step_catalogue,
+        [7]  = lab_bootstrap_step_native,
+        [8]  = lab_bootstrap_step_fail_7,
+        [9]  = lab_bootstrap_step_script,
+        [10] = lab_bootstrap_step_events,
+        [11] = lab_bootstrap_step_widgets,
+        [12] = lab_bootstrap_step_worksheet,
+    };
+    unsigned selected = (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](&ctx)
+                                                                               : lab_bootstrap_step_otherwise(&ctx);
 }

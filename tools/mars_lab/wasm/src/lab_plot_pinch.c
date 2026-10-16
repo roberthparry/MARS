@@ -33,6 +33,9 @@ int lab_plot_pinch_start(int state, int event)
         lab_dom_equal(lab_dom_get(event, "pointerId"), lab_dom_get(state, "pointerId")))
         return 0;
     int chart = lab_dom_get(state, "surface"), curve = lab_dom_truth(lab_dom_get(state, "pan"));
+    int panel = lab_dom_closest(lab_dom_get(event, "target"), ".complex-panel");
+    if (panel && !lab_dom_node_contains(panel, chart))
+        return 0;
     if (!lab_dom_has(chart, "data-x-min") ||
         !lab_dom_node_contains(lab_dom_id("plotRendered"), lab_dom_get(event, "target")))
         return 0;
@@ -63,6 +66,12 @@ int lab_plot_pinch_start(int state, int event)
         lab_dom_push(snapshot, lab_dom_get(control, "marsZoomText"));
         lab_dom_push(snapshot, exact);
         if (i < 4) {
+            int plane = lab_dom_get(lab_dom_id("plotRendered"), "marsComplexPlaneBounds");
+            if (lab_plot_is_plane(chart)) {
+                lab_dom_push(geometry, lab_dom_numeric(lab_dom_to_number(lab_dom_count(plane) == 4
+                    ? lab_dom_item(plane, i) : lab_dom_read(chart, 3, keys[i]))));
+                continue;
+            }
             int pending = curve && lab_dom_truth(lab_dom_get(state, "changed")) &&
                           lab_dom_equal(text, lab_dom_get(control, "marsZoomText"));
             lab_dom_push(geometry, pending ? lab_dom_numeric(lab_dom_to_number(exact)) :
@@ -78,6 +87,7 @@ int lab_plot_pinch_start(int state, int event)
         lab_dom_push(geometry, lab_dom_numeric(lab_dom_to_number(lab_dom_read(chart, 3, "zMax"))));
     }
     lab_dom_set(state, "pinchGeometry", geometry);
+    lab_dom_set(state, "pinchAutoHeight", lab_dom_scalar(1, lab_plot_auto_height(chart)));
     lab_dom_set(state, "pinchSnapshot", curve ? lab_dom_get(state, "panSnapshot") : snapshot);
     lab_dom_set(state, "pinchDistance", lab_dom_numeric(distance));
     lab_dom_set(state, "pinchAnchorX", lab_dom_numeric((x + value(state, "touchX")) / 2));
@@ -124,6 +134,10 @@ int lab_plot_pinch_move(int state, int event)
             bounds[axis * 2] >= bounds[axis * 2 + 1])
             return 0;
     }
+    if (lab_dom_truth(lab_dom_get(state, "panPlane"))) {
+        lab_plot_plane_bounds(bounds);
+        return 1;
+    }
     int range = lab_dom_id("plotRange"), title_node = lab_dom_query(0, "#plotRendered [data-plot-figure] > title");
     int title = lab_dom_get(title_node, "marsPlotLabel");
     if (!lab_dom_truth(title))
@@ -139,12 +153,14 @@ int lab_plot_pinch_move(int state, int event)
             lab_dom_push(original, lab_dom_item(snapshot, i * 3));
         lab_dom_set(range, "marsZoomOriginal", original);
     }
-    for (unsigned i = 0; i < (curve ? 4u : 6u); ++i) {
+    int auto_height = lab_dom_truth(lab_dom_get(state, "pinchAutoHeight"));
+    for (unsigned i = 0; i < (auto_height ? 2u : curve ? 4u : 6u); ++i) {
         int control = lab_dom_id(control_id(i, curve));
         unsigned lower = (i / 2) * 2;
         lab_plot_write_bound(control, bounds[i], bounds[lower + 1] - bounds[lower]);
     }
-    lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
+    if (!auto_height)
+        lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
     lab_dom_delete(range, "marsZoomChart");
     lab_plot_controls_sync();
     return 1;
@@ -153,6 +169,10 @@ int lab_plot_pinch_move(int state, int event)
 /* Cancellation restores authored controls as well as their unrounded coordinates. */
 void lab_plot_pinch_cancel(int state)
 {
+    if (lab_dom_truth(lab_dom_get(state, "panPlane"))) {
+        lab_plot_pan_cancel(state);
+        return;
+    }
     if (!lab_dom_truth(lab_dom_get(state, "pan"))) {
         lab_dom_set(state, "pinchCancelled", lab_dom_scalar(1, 1));
         return;

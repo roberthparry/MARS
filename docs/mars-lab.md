@@ -373,6 +373,16 @@ restoration, including revision checks before applying asynchronous responses.
 `lab_bootstrap.c` selects definition scripts and validates the native bootstrap
 and jurisdiction catalogue before creating the workspace.
 
+Workflow stages use bounds-checked, directly indexed C function-pointer tables,
+including synchronous state plans and bootstrap. Each handler owns one continuation
+step; shared destinations use the same handler, and immediate transitions call the
+next handler explicitly. Missing table entries retain the workflow's completion
+behaviour. Sparse terminal stages are handled separately rather than allocating
+large, mostly empty tables. Calculus and plot request sequencing lives in
+`lab_flow_request_calculus.c`, separate from the other request workflows.
+Handler contexts are stack-local to a single native call: they never retain DOM
+handles across a browser await or share mutable state between requests.
+
 `transport.js` supplies the shared synchronous and promise interpreters for these continuations. Each
 request has its own browser-owned frame; C chooses the next operation, await
 boundary, stale-result guard and recovery destination. Scoped DOM handles never
@@ -1024,6 +1034,96 @@ requires it.
 
 ### Native function plots
 
+Single-real-input functions with non-zero imaginary samples have four linked
+views inside the Plot card: a rotatable three-dimensional curve with input, real
+and imaginary axes; an equal-unit complex-plane projection; real and imaginary
+components; and amplitude. One adaptive native sample supplies all four views,
+including their domain breaks. Amplitude uses the native hypotenuse operation on
+the real and imaginary components, equivalent to complex absolute value without
+forming an avoidable squared intermediate.
+
+The views form a two-column grid on wide displays and stack on narrow displays.
+The four-view grid uses a single narrow outer gutter and compact gaps between
+cards. Cards fit their content instead of stretching to match a neighbouring camera
+panel. Each plot scales to fit its card without horizontal scrolling. Expanding a view
+retains the expression title, which is rendered natively in all four projections, and
+replaces the entire grid with that projection; collapsing restores all four views.
+The outer Plot card retains its own expansion. All four chart viewports are height-limited
+to fit the browser viewport, rather than growing indefinitely with the card width.
+Expanded curve views use thin,
+non-scaling strokes so enlarging the chart does not magnify line thickness.
+Camera controls are docked directly below the 3-D curve, inside its own card;
+they follow that view through expansion and are hidden when another projection
+is expanded. The curve's display height is limited to leave viewport space for
+its controls. Compact camera sliders fill their fields and retain touch-sized targets in either layout.
+The controls continue to work after docking, expansion and mode restoration.
+Range gestures update only their targeted complex-view card; sibling charts and
+the retained 3-D camera are not replaced. Wheel gestures outside the individual
+cards do not fall through to the first chart in the grid.
+Releasing a camera gesture on a coarse preview requests full native detail;
+the preview notice disappears when that full-detail result replaces it.
+Evaluate (including the editor's keyboard shortcut) resets plot bounds, automatic
+height, camera orientation, zoom and slice controls, even for unchanged input.
+It also clears individual plot expansion and restores the complete four-view grid.
+Internal plot redraws and precision-only reevaluations retain their current view.
+Automatic complex sampling initially
+uses the input interval from −10 to 10; authored input limits override it. The complex-plane view preserves
+equal coordinate units in a square native viewport, centred vertically within its card.
+Amplitude starts at zero to avoid magnifying numerical
+round-off in an otherwise constant magnitude.
+In Auto or Fit all, wheel, button and pinch zoom in Components and Amplitude
+change the input interval while retaining native automatic height. Manual limits
+enable two-axis zoom, which can intentionally move the curve outside the viewport.
+Components use gold for the real part and teal for the imaginary part, with a
+boxed native legend and numerical vertical ticks but no redundant “Value” title.
+Dragging inside Components or Amplitude pans its input and
+value axes; these two views share the manual value range and all projections
+share the newly sampled input interval. Mouse and touch gestures use the same
+native pan path. Amplitude retains its input-axis label and numerical ticks,
+without repeating the card's amplitude heading beside the vertical axis.
+During an ordinary drag, the existing full-detail SVG is translated locally;
+native resampling runs on release rather than replacing the chart mid-gesture.
+Ticks, tick labels, grid lines and zero guides move with their corresponding
+coordinate axis during the preview; out-of-frame ticks are hidden until the
+native redraw supplies the new tick layout. Axis titles and the frame stay fixed.
+Hover inspection is suspended during dragging, and the gesture reuses its initial
+screen scale instead of repeatedly measuring the chart after moving its curves.
+The Complex Plane and space curve use Gothic ℜ and ℑ axis titles. Dragging the Complex Plane pans
+its real/imaginary viewport independently of the sampled input interval and the
+other projections. Its zoom and Reset controls also operate on that viewport;
+equal coordinate units are preserved, so circles remain circular.
+The space curve returns to vector SVG after interaction stops, including its
+axis arrows and labels. Dragging resumes the retained local preview immediately;
+the idle SVG uses the same C/WebAssembly projection without resampling or resetting
+the camera. Surface meshes retain their existing renderer.
+For 3-D curves, zoom is camera magnification (12.5%–6400%): it does not change
+the sampled input interval or launch volume refinement. Rotation uses a fixed
+enclosing-sphere fit to avoid changes of apparent scale as the camera turns.
+Use the input-range controls to change the sampled interval. The settled SVG
+batches same-colour segments while preserving their native gaps.
+
+Real-only samples retain the existing real-curve presentation. Distributional
+Fourier results retain their components and labelled impulse weights, with an
+explicit notice that pointwise amplitude is undefined; they are not passed to
+the ordinary complex-function sampler.
+
+Supported Fourier distributions use real and imaginary curves for the regular
+part and signed arrows for Dirac impulse weights. An arrow is not a finite
+function value. A short spectrum title keeps the full formula in the result card;
+identically zero sampled components do not add duplicate curves or legend entries.
+
+For supported linear spectra with affine principal-value poles, the native transform
+display separates the ordinary part, with its excluded coordinates, from the impulse
+terms. The exclusions apply only to the ordinary curve, not to the impulse supports.
+The complete distribution remains in the copyable Expression and Function output;
+it is not replaced internally by a punctured ordinary function. Unsupported or
+infinite-series forms retain their complete distribution notation.
+The default frequency window is −10 to 10, with editable bounds;
+automatic height limits retain impulse weights as well as the regular curves.
+Infinite impulse sums are explicitly labelled previews of their first 32 terms.
+The complete series remains in the symbolic result. Delta derivatives and
+nonlinear products of distributions are not approximated as narrow peaks.
+
 **Evaluate** in Expression, Equation, Differential Equation and Integrator modes installs the
 mathematical result cards first, then generates a separate **Plot** card asynchronously.
 There is no separate Plot button. Plot failures remain local to that card; they do
@@ -1032,11 +1132,55 @@ changes invalidate obsolete plot work. Plotting does not keep Evaluate busy.
 
 **Plot type** offers **Auto**, **2-D curve** and **3-D surface**.
 Auto chooses the type automatically. Automatic selection draws
-a surface when exactly one other non-constant variable is unset; otherwise
-it draws a curve. Ambiguous additional variables require an explicit
-**Second variable** and numerical bindings for any remaining parameters.
+a surface when another non-constant variable is unset; otherwise
+it draws a curve. The first eligible remaining variable becomes the second
+axis; **Second variable** can override this choice. Additional unset symbols
+receive plot-local slice controls rather than becoming extra axes.
 Explicit 3-D mode can sample two variables even when their worksheet values
 are already supplied. Constant bindings remain parameters, never automatic axes.
+
+#### Parameter slices
+
+Up to eight additional unset parameters share a compact vertical slider panel
+to the right of the chart, keeping the surface visible while adjusting a slice.
+Vertically stacked radio buttons select the parameter when there is more than one; only
+one slider is visible at a time. Switching preserves each parameter's value and
+limits without resampling. The panel is hidden when there are no extra parameters.
+Each parameter has an exact-value field and **Auto**/**Manual** range choices.
+Every **Evaluate** selects Auto, including re-evaluation of unchanged input.
+Auto hides the lower and upper limits; Manual reveals them for editing. Returning
+to Auto requests fresh native limits, retaining the current value when it lies
+within them and otherwise choosing the native starting value. Range mode is
+remembered independently for each parameter. Supplied
+worksheet bindings remain fixed; slice controls never rewrite the worksheet.
+The plot title identifies the current parameter values, including in exports.
+
+Native C selects initial limits. A limited structural domain analysis handles
+principal inverse sine and cosine with affine parameter dependence and bounded
+real trigonometric residuals. Other expressions use bounded real-value probes
+on a fixed 25-point axis grid; this is a useful starting range, not a proof of
+the complete domain. Zero is preferred when suitable. Limits remain fixed while
+dragging and can be edited when a different range is needed.
+
+For example, evaluate `acos(sin(2-x*y)+z)` with all three variables unset.
+The output is an `x,y` surface with a `z` slider initially at zero, ranging from
+−2 to 2. The accompanying README test prints:
+
+```text
+Surface slice ready: x,y axes; z = 0; slider limits: -2 to 2
+```
+
+The slider sends integer positions over its selected interval. Native numerical
+arithmetic calculates the parameter value at sufficient precision; JavaScript
+does not interpolate mathematical coordinates. Typed exact values are retained
+independently of the rounded handle position. During dragging, coarse previews
+are requested one at a time, with only the newest pending position retained;
+release requests full detail. WebGL displays the sampled mesh, but does not
+interpolate between mathematically different slices. An empty slice keeps the
+controls available; when a previous plot is retained, an explicit notice marks it
+as the previous view.
+
+#### Surface axes
 
 For example, enter `x^2 + y^2`, leave both variables unset, and press **Evaluate**.
 With **From** −2 and **To** 2 in each variable group, the output is a shaded
@@ -1097,8 +1241,9 @@ switch to enlarging the diagnostic while a previous plot is available.
 The compact **3-D view** controls come first, directly beneath the chart. The **Zoom** slider
 starts with a 12.5% to 6400% coordinate-volume range and extends as zoom continues,
 with 100% as the initial ranges. Its readout follows wheel, pinch and button zoom,
-using a binary exponent at extreme scales. All three spans change by the
-same factor about their current centres; axes remain fitted to the chart.
+using a binary exponent at extreme scales. Horizontal spans change by the
+same factor about their current centres; height follows the policy described below.
+Axes remain fitted to the chart.
 Gesture instructions are in **Help**, rather than beneath the sliders.
 The **Azimuth** slider in **3-D view** rotates around the surface; **Elevation** tilts the view;
 **Roll** turns the view clockwise in the screen plane. All three support mouse,
@@ -1129,6 +1274,9 @@ shorter numerical ranges occupy proportionately shorter edges, without axis stre
 The HTML plot container reserves touch gestures before movement starts, including
 touches near an axis. Page scrolling remains available outside the plot.
 The complete native mesh stays in a persistent WebGL viewport, with depth testing.
+Geometry and label canvases are redrawn at their displayed device-pixel size when
+the plot is resized or expanded, rather than stretching a fixed-resolution image.
+Backing dimensions are capped at 4096 pixels per side and the WebGL device limits.
 Mode snapshots retain clean native SVG and the camera/volume state, not canvas
 pixels or GPU resources. Returning to a mode recreates its renderer without
 requiring another evaluation.
@@ -1147,7 +1295,11 @@ does not request new SVG for camera movement. Editing coordinate bounds requests
 new native samples. The old view remains available while that request runs.
 
 3-D wheel zoom, pinch gestures, the Zoom slider and the zoom buttons change all
-three coordinate spans uniformly, not the on-screen size of the axes. The selected
+three coordinate spans uniformly in Manual height and for implicit meshes, not the on-screen size of the axes.
+For explicit height grids in Auto, zoom instead changes the two horizontal spans;
+the preview retains its sampled height and native refinement selects a fresh Auto
+height for that region. The complete box is refitted uniformly, preserving equal
+coordinate units even when its proportions change. The selected
 volume stays centred on the starting volume. The retained mesh is transformed and
 clipped at all six faces immediately; tick labels follow the selected bounds.
 On release or after a short pause, native MARS samples that volume at full detail,
@@ -1170,6 +1322,16 @@ normalised before conversion to display precision. Reset restores the original r
 and height policy, including Automatic. Editing bounds manually establishes a new
 zoom baseline after the native result arrives. Empty volumes retain their axes
 and controls, allowing zoom out or Reset to recover the surface.
+
+Auto height includes the full finite sampled extent unless extreme tails trigger
+the robust range policy. Equal coordinate units do not require equal axis ranges:
+the entire volume is fitted uniformly inside the card, with space for labels.
+Selecting Auto or Fit all discards a clipped zoom preview even when the returned
+mesh is unchanged. Manual height and implicit meshes retain strict coordinate-volume
+zoom: refinement does not expand the height again or undo a microscopic selection.
+Fit all also uses strict volume zoom; select Auto for an explicit surface whose
+height should follow the horizontally selected region. Auto's extreme-tail safeguards
+remain in effect for poles and unusually large values.
 
 Zoom-generated range fields use interval-aware precision: broad intervals show
 short bounds, while narrow intervals retain more digits, without trailing zeroes.
@@ -1209,8 +1371,20 @@ The range applies to the height axis named in the formula title (usually `u`),
 not either independent variable. Rotation previews and animation use the same
 selected policy; manual limits remain fixed. Clipped facets stop at the chosen
 heights rather than creating flat caps. Full-quality plots also sample edge
-midpoints and cell centres, retaining a 139×139 grid when interpolation disagrees
-by more than 0.5% of the largest sampled absolute height, or sampled validity changes.
+midpoints and cell centres. Cells whose interpolation error exceeds 0.2% of the
+sampled height span subdivide locally, up to two levels and 10,000 leaf cells.
+Cells containing both real and non-real samples also subdivide before being
+discarded, preserving more of the valid surface near domain boundaries. Unresolved
+boundary cells remain omitted at the refinement limit rather than bridging detected
+non-real samples.
+Shared boundary vertices join coarse and fine patches without cracks. The native
+sampler retains precise coordinates; only normalised error estimates use doubles.
+The original uniform grid still determines robust height statistics, while new
+extrema extend an untrimmed automatic range. Manual limits remain unchanged.
+Preview plots skip this extra work. If the refined response is too large, the
+sampler retries the complete 70×70 uniform grid before considering a coarser grid;
+optional refinement must not lower the baseline resolution. Individual facets
+are never discarded to meet the response-size limit.
 Refinement is bounded rather than a guarantee that all oscillations are resolved;
 narrow the axes for finer detail. Steep finite facets are not deleted merely for
 their height differences. Missing real values leave holes. Opposite-sign edges
@@ -1219,9 +1393,9 @@ growth beyond eight times the endpoint magnitudes mark sampled gaps. This is a
 bounded singularity heuristic, not a domain proof. Coarse
 7×7 higher-precision checks increase the working precision when needed; the
 normal starting mantissa is 53 bits, independent of worksheet precision.
-Neither sampled binding is changed in the worksheet. This surface view
-does not adaptively refine its mesh or guarantee detection of every
-pole or narrow feature. See [surface rendering limitations](plot.md#height-surfaces).
+Neither sampled binding is changed in the worksheet. Local refinement does not
+guarantee detection of every pole or narrow feature. See
+[surface rendering limitations](plot.md#height-surfaces).
 
 Evaluate an expression with a variable to generate its plot. **From** and **To** select the parameter
 range; bounds accept native mathematical text, including

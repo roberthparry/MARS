@@ -27,6 +27,15 @@ void lab_plot_write_bound(int control, double value, double span);
 /** @brief Format the six surface range controls from a browser-owned array of coordinate bounds. */
 void lab_plot_volume_bounds(int bounds);
 
+/** @brief Identify the Argand projection, whose viewport is independent of the sampling variable. */
+int lab_plot_is_plane(int chart);
+
+/** @brief Identify component and amplitude views whose automatic height should survive input zoom. */
+int lab_plot_auto_height(int chart);
+
+/** @brief Store four real/imaginary viewport bounds without changing the shared sampling interval. */
+void lab_plot_plane_bounds(const double bounds[4]);
+
 /** @brief Capture a curve's initial bounds, screen scale and controls for a primary-pointer pan. */
 int lab_plot_pan_start(int state, int chart, int event);
 

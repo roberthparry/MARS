@@ -5,6 +5,7 @@
  * A private parsed graph receives both axis bindings, including occurrences in
  * scoped mathematical operations. Uniform sampler_t rows form an owned grid;
  * low-precision evaluations are checked against higher-precision coarse probes.
+ * Bounded local facet refinement resolves folds without densifying the whole grid.
  * The worksheet graph and numerical default survive every exit unchanged.
  */
 #include <errno.h>
@@ -19,12 +20,12 @@
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
-enum { SURFACE_SIDE = 70, SURFACE_REFINED_SIDE = 139, SURFACE_PREVIEW_SIDE = 13 };
+enum { SURFACE_SIDE = 70, SURFACE_PREVIEW_SIDE = 13 };
 
 typedef struct {
     size_t side;
-    number_t x[SURFACE_REFINED_SIDE], y[SURFACE_REFINED_SIDE];
-    number_t z[SURFACE_REFINED_SIDE * SURFACE_REFINED_SIDE];
+    number_t x[SURFACE_SIDE], y[SURFACE_SIDE];
+    number_t z[SURFACE_SIDE * SURFACE_SIDE];
 } surface_grid_t;
 
 typedef struct {
@@ -120,40 +121,6 @@ static surface_grid_t *grid_sample(const char *source, const char *first, const 
         grid = NULL;
     }
     return grid;
-}
-
-/* Mid-edge and cell-centre samples test interpolation, not the size of a height jump. */
-static bool grid_resolved(const surface_grid_t *coarse, const surface_grid_t *fine)
-{
-    double peak = 0;
-    for (size_t i = 0; i < fine->side * fine->side; ++i) {
-        double z = num_to_double(fine->z[i]);
-        if (isfinite(z))
-            peak = fmax(peak, fabs(z));
-    }
-    for (size_t r = 0; r < fine->side; ++r) {
-        for (size_t c = 0; c < fine->side; ++c) {
-            if (!(r % 2) && !(c % 2))
-                continue;
-            size_t a = r / 2, b = c / 2;
-            double sum = 0;
-            unsigned count = 0;
-            bool valid = true;
-            for (size_t dr = 0; dr <= r % 2; ++dr) {
-                for (size_t dc = 0; dc <= c % 2; ++dc) {
-                    double z = num_to_double(coarse->z[(a + dr) * coarse->side + b + dc]);
-                    valid = valid && isfinite(z);
-                    sum += z;
-                    ++count;
-                }
-            }
-            double actual = num_to_double(fine->z[r * fine->side + c]);
-            if (isfinite(actual) != valid ||
-                (valid && fabs(actual - sum / count) > 0.005 * fmax(peak, 1e-12)))
-                return false;
-        }
-    }
-    return true;
 }
 
 /* Opposite finite heights alone are not evidence of a pole. Require actual growth
@@ -287,15 +254,6 @@ static string_t *surface_svg(const char *source, const char *first, const char *
         grid_free(low);
         if (ok && agree) {
             grid = grid_sample(source, first, second, bounds, preview ? SURFACE_PREVIEW_SIDE : SURFACE_SIDE, bits);
-            if (grid && !preview) {
-                surface_grid_t *fine = grid_sample(source, first, second, bounds, SURFACE_REFINED_SIDE, bits);
-                if (!fine || !grid_resolved(grid, fine)) {
-                    grid_free(grid);
-                    grid = fine;
-                } else {
-                    grid_free(fine);
-                }
-            }
             if (grid && !grid_gaps(grid, source, first, second)) {
                 grid_free(grid);
                 grid = NULL;
@@ -320,10 +278,15 @@ static string_t *surface_svg(const char *source, const char *first, const char *
         ok = plot_set_height_bounds(plot, height_bounds[0], height_bounds[1]);
     if (ok && !manual && options.smart_y && !preview)
         ok = lab_worker_surface_extrema(plot, source, first, second, grid->x, grid->y, grid->z, grid->side);
+    if (ok && !preview)
+        ok = lab_worker_surface_refine(plot, source, first, second, grid->x, grid->y, grid->z, grid->side, bits);
     string_t *svg = ok ? plot_to_svg(plot) : NULL;
     bool reduced = false;
+    bool retry_uniform = !preview;
     while (svg && !lab_worker_plot_fits(svg) && grid->side > SURFACE_PREVIEW_SIDE) {
-        size_t side = (grid->side + 1) / 2;
+        /* Optional refinement must not skip the full-size uniform fallback. */
+        size_t side = retry_uniform ? grid->side : (grid->side + 1) / 2;
+        retry_uniform = false;
         if (side < SURFACE_PREVIEW_SIDE)
             side = SURFACE_PREVIEW_SIDE;
         string_free(svg);
@@ -390,19 +353,24 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
             bool select = *requested ? binding == requested_binding : !strcmp(kind, "surface") || num_is_nan(value);
             num_destroy(&value);
             if (select) {
-                second = binding;
+                if (!second)
+                    second = binding;
                 ++candidates;
             }
         }
     }
-    if (strcmp(kind, "curve") && (candidates > 1 || ((!strcmp(kind, "surface") || *requested) && candidates != 1))) {
+    if (strcmp(kind, "curve") && ((!strcmp(kind, "surface") || *requested) && !candidates)) {
         printf("error       Select a distinct second variable for the surface; bind any remaining parameters.\n");
         return 1;
     }
-    if (!second)
+    if (!second) {
+        const char *plane_bounds[4] = {"", "", "", ""};
+        for (unsigned i = 0; i < 4 && argc >= 24; ++i)
+            plane_bounds[i] = argv[20 + i];
         return lab_worker_plot(source, expression, variable, argc > 5 ? argv[5] : "", argc > 6 ? argv[6] : "",
                                 argc > 7 ? argv[7] : "auto", argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "",
-                                !strcmp(quality, "preview"));
+                                plane_bounds, !strcmp(quality, "preview"));
+    }
     /* At most count + 1 candidates can be occupied; each lookup uses the native binding index. */
     char name[64] = "u";
     const char *const preferred[] = {"v", "w"};
@@ -413,7 +381,10 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
             snprintf(name, sizeof(name), "u%zu", i - 1);
     }
     expr_t *function = expr_new_named_var(NUM_NAN, name);
-    int result = lab_worker_plot_surface(source, expression, variable, second, function, argc, argv);
+    char *sliced = lab_worker_surface_slice(source, expr_symbol_name(variable), expr_symbol_name(second),
+                                            argc > 19 ? argv[19] : "");
+    int result = sliced ? lab_worker_plot_surface(sliced, expression, variable, second, function, argc, argv) : 1;
+    free(sliced);
     expr_free(function);
     return result;
 }

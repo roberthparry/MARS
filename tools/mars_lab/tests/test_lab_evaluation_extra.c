@@ -165,6 +165,8 @@ static void test_lab_extra_plot(void)
     TEST_ASSERT_TRUE(ok, "invalid vertical bounds are rejected before sampling");
 }
 
+static bool paired_mesh_edges(const char *svg, bool open);
+
 static void test_lab_extra_surface_continuity(void)
 {
     unsigned status = 0;
@@ -175,10 +177,9 @@ static void test_lab_extra_surface_continuity(void)
     const char *svg = lab_eval_text(fields, "plot_svg");
     for (const char *p = strstr(svg, "<path fill="); p; p = strstr(p + 11, "<path fill="))
         ++facets;
-    bool reduced = contains(fields, "plot_svg", "data-detail-reduced=\"true\"");
     bool ok = status == 200 && test_lab_ok(fields, true) &&
               !strstr(svg, "Detail reduced for this view") && !strstr(svg, "<text data-detail-reduced") &&
-              facets == (reduced ? 2 * 69 * 69 : 2 * 138 * 138);
+              facets >= 2 * 69 * 69 && paired_mesh_edges(svg, true);
     bool failed = true;
     ok = ok && lab_presentation_adapt(fields);
     array_t *encoded = ok ? lab_wire_encode_response(fields, &failed) : NULL;
@@ -209,7 +210,7 @@ static int compare_mesh_edge(const void *left, const void *right)
 
 /* Every edge of these closed fixtures must have exactly two incident facets.
  * Quantise below sampling resolution to merge round-off at shared grid vertices. */
-static bool closed_mesh(const char *svg)
+static bool paired_mesh_edges(const char *svg, bool open)
 {
     size_t capacity = 196608, count = 0;
     mesh_test_edge_t *edges = calloc(capacity, sizeof(*edges));
@@ -256,13 +257,113 @@ static bool closed_mesh(const char *svg)
         size_t end = i + 1;
         while (end < count && !compare_mesh_edge(&edges[i], &edges[end]))
             ++end;
-        unmatched += end - i != 2;
+        bool border = false;
+        for (unsigned axis = 0; open && axis < 2; ++axis) {
+            long long value = edges[i].coordinate[axis];
+            border |= (value == 0 || value == 10000000) && value == edges[i].coordinate[axis + 3];
+        }
+        unmatched += end - i != (border ? 1 : 2);
         i = end;
     }
     if (unmatched)
         string_printf("Unpaired mesh edges: %zu of %zu\n", unmatched, count);
     free(edges);
     return ok && count > 0 && unmatched == 0;
+}
+
+static bool closed_mesh(const char *svg)
+{
+    return paired_mesh_edges(svg, false);
+}
+
+static double fold_error(const char *svg, size_t *facets, double *area)
+{
+    const char *lower = strstr(svg, "data-z-min=\""), *upper = strstr(svg, "data-z-max=\"");
+    if (!lower || !upper)
+        return INFINITY;
+    double lo = strtod(lower + strlen("data-z-min=\""), NULL);
+    double hi = strtod(upper + strlen("data-z-max=\""), NULL), error = 0;
+    *facets = 0;
+    *area = 0;
+    for (const char *p = strstr(svg, "data-vertices=\""); p; p = strstr(p, "data-vertices=\"")) {
+        p += strlen("data-vertices=\"");
+        double v[3][3], centre[3] = {0};
+        for (unsigned i = 0; i < 3; ++i)
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                char *end = NULL;
+                v[i][axis] = strtod(p, &end);
+                if (end == p)
+                    return INFINITY;
+                p = end;
+                centre[axis] += v[i][axis] / 3;
+            }
+        error = fmax(error, fabs(lo + (hi - lo) * centre[2] - fabs(centre[0] - centre[1] - 0.1)));
+        *area += fabs((v[1][0] - v[0][0]) * (v[2][1] - v[0][1]) -
+                      (v[2][0] - v[0][0]) * (v[1][1] - v[0][1])) * 0.5;
+        ++*facets;
+    }
+    return error;
+}
+
+static void test_lab_extra_surface_refinement(void)
+{
+    number_t axis[5], z[25];
+    for (unsigned i = 0; i < 5; ++i)
+        axis[i] = num_create_from_frac(i, 4);
+    for (unsigned r = 0; r < 5; ++r)
+        for (unsigned c = 0; c < 5; ++c)
+            z[r * 5 + c] = num_create_from_double(fabs((double)c / 4 - (double)r / 4 - 0.1));
+    plot_t *plot = plot_new(NULL);
+    bool ok = plot && plot_set_surface(plot, axis, 5, axis, 5, z);
+    string_t *before = ok ? plot_to_svg(plot) : NULL;
+    ok = ok && before && lab_worker_surface_refine(plot, "abs(x-y-1/10)", "x", "y", axis, axis, z, 5, 53);
+    string_t *after = ok ? plot_to_svg(plot) : NULL;
+    size_t coarse = 0, fine = 0;
+    double area_before = 0, area_after = 0;
+    double error_before = before ? fold_error(string_c_str(before), &coarse, &area_before) : INFINITY;
+    double error_after = after ? fold_error(string_c_str(after), &fine, &area_after) : INFINITY;
+    ok = ok && after && coarse == 32 && fine > coarse && fine < 512 && error_after < error_before * 0.5 &&
+         fabs(area_before - 1) < 1e-7 && fabs(area_after - 1) < 1e-7 &&
+         strstr(string_c_str(after), "data-mesh=\"false\"") && paired_mesh_edges(string_c_str(after), true);
+    TEST_ASSERT_TRUE(ok, "local folds gain accuracy with fewer facets than global refinement and no interior cracks");
+    string_free(before);
+    string_free(after);
+    plot_free(plot);
+    for (unsigned r = 0; r < 5; ++r) {
+        for (unsigned c = 0; c < 5; ++c) {
+            num_destroy(&z[r * 5 + c]);
+            double argument = (double)c / 4 - 0.1;
+            z[r * 5 + c] = argument < 0 ? num_clone(NUM_NAN) :
+                          num_create_from_double(sqrt(argument) + (double)r / 4);
+        }
+    }
+    plot = plot_new(NULL);
+    ok = plot && plot_set_surface(plot, axis, 5, axis, 5, z) &&
+         lab_worker_surface_refine(plot, "sqrt(x-1/10)+y", "x", "y", axis, axis, z, 5, 53);
+    after = ok ? plot_to_svg(plot) : NULL;
+    if (after)
+        fold_error(string_c_str(after), &fine, &area_after);
+    ok = ok && after && area_after > 0.85 && area_after <= 0.9;
+    TEST_ASSERT_TRUE(ok, "mixed domain cells retain valid subcells without filling the non-real region");
+    string_free(after);
+    plot_free(plot);
+    for (unsigned i = 0; i < 5; ++i)
+        num_destroy(&axis[i]);
+    for (unsigned i = 0; i < 25; ++i)
+        num_destroy(&z[i]);
+
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"acos(sin(2-x*y))\",\"action\":\"plot\","
+                             "\"plot_lower\":\"-4\",\"plot_upper\":\"4\",\"plot_second_lower\":\"-4\","
+                             "\"plot_second_upper\":\"4\",\"plot_scale\":\"auto\"}", &status);
+    const char *svg = lab_eval_text(fields, "plot_svg");
+    size_t count = 0;
+    for (const char *p = strstr(svg, "data-vertices=\""); p; p = strstr(p + 15, "data-vertices=\""))
+        ++count;
+    ok = status == 200 && test_lab_ok(fields, true) && count >= 2 * 69 * 69 &&
+         contains(fields, "plot_svg", "data-sample-side=\"70\"") && paired_mesh_edges(svg, true);
+    TEST_ASSERT_TRUE(ok, "oversized folded-surface refinement preserves the full uniform grid before reducing resolution");
+    json_free(fields);
 }
 
 static void test_lab_extra_mesh_closed(void)
@@ -479,6 +580,200 @@ static void test_lab_extra_surface_height(void)
          contains(preview, "plot_svg", "data-azimuth=\"120.000\"");
     json_free(preview);
     TEST_ASSERT_TRUE(ok, "coarse rotation previews preserve manual height limits");
+    for (unsigned radius = 1; radius <= 3; radius += 2) {
+        string_t *payload = string_sprintf(
+            "{\"expression\":\"acos(sin(2-x*y))\",\"action\":\"plot\",\"plot_scale\":\"auto\","
+            "\"plot_lower\":\"-%u\",\"plot_upper\":\"%u\",\"plot_second_lower\":\"-%u\","
+            "\"plot_second_upper\":\"%u\",\"plot_y_lower\":\"1\",\"plot_y_upper\":\"2\"}",
+            radius, radius, radius, radius);
+        json_t *fields = request("/eval", string_c_str(payload), &status);
+        double low = surface_height_bound(fields, false), high = surface_height_bound(fields, true);
+        ok = status == 200 && test_lab_ok(fields, true) && low < 0.02 &&
+             (radius == 1 ? high > 1.42 && high < 1.44 : high > 3.12 && high < 3.15);
+        if (!ok) show_failure(fields);
+        TEST_ASSERT_TRUE(ok, "Auto recomputes the finite folded surface height for each horizontal zoom region");
+        json_free(fields);
+        string_free(payload);
+    }
+}
+
+static void test_lab_extra_folded_laplace_plot(void)
+{
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"@L{acos(sin(2-x))}\",\"action\":\"plot\","
+                            "\"wrt\":\"s\",\"plot_quality\":\"preview\"}", &status);
+    bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-series") &&
+              !contains(fields, "function", "laplace(");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "a closed periodic Laplace spectrum automatically plots within its real convergence domain");
+}
+
+static void test_lab_extra_complex_plot(void)
+{
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"exp(i*x)\",\"action\":\"plot\","
+        "\"wrt\":\"x\",\"plot_lower\":\"-pi\",\"plot_upper\":\"pi\",\"plot_quality\":\"preview\"}", &status);
+    bool ok = status == 200 && contains(fields, "plot_svg", "data-segments=\"true\"") &&
+        contains(fields, "plot_complex_plane", "<svg") && contains(fields, "plot_components", "Imaginary") &&
+        contains(fields, "plot_amplitude", "data-series=") &&
+        !contains(fields, "plot_amplitude", ">Amplitude</text>") &&
+        contains(fields, "plot_components", "data-plot-legend=\"true\"") &&
+        !contains(fields, "plot_components", ">Value</text>") &&
+        contains(fields, "plot_components", "stroke=\"#d6aa55\"") &&
+        contains(fields, "plot_components", "stroke=\"#78d8cb\"");
+    const char *projections[] = {"plot_svg", "plot_complex_plane", "plot_components", "plot_amplitude"};
+    for (unsigned i = 0; i < sizeof(projections) / sizeof(*projections); ++i)
+        ok = ok && contains(fields, projections[i], "data-plot-title=\"true\"") &&
+             contains(fields, projections[i], "data-plot-figure=\"true\"");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "complex exponential shares native samples across helix, circle, components and amplitude");
+    expect_response("/eval", "{\"expression\":\"delta(x)^2+i*x\",\"action\":\"plot\",\"wrt\":\"x\"}",
+                    422u, "error", "distribution");
+    fields = request("/eval", "{\"expression\":\"(1+i)*(x-1)\",\"action\":\"plot\",\"wrt\":\"x\","
+        "\"plot_lower\":\"1\",\"plot_upper\":\"1+1e-30\",\"plot_quality\":\"preview\"}", &status);
+    ok = status == 200 && contains(fields, "plot_svg", "data-segment=") &&
+         contains(fields, "plot_svg", "1.000000000000000000000000000001") &&
+         contains(fields, "plot_amplitude", "data-series=");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "complex projections preserve native input bounds narrower than a double can distinguish");
+    fields = request("/eval", "{\"expression\":\"exp(i*x)\",\"action\":\"plot\",\"wrt\":\"x\","
+        "\"plot_lower\":\"-12\",\"plot_upper\":\"8\",\"plot_scale\":\"manual\","
+        "\"plot_y_lower\":\"-0.5\",\"plot_y_upper\":\"1.5\"}", &status);
+    ok = status == 200 && contains(fields, "plot_components", "data-x-min=\"-12\"") &&
+         contains(fields, "plot_components", "data-x-max=\"8\"") &&
+         contains(fields, "plot_components", "data-y-min=\"-0.5\"") &&
+         contains(fields, "plot_components", "data-y-max=\"1.5\"") &&
+         contains(fields, "plot_amplitude", "data-y-min=\"-0.5\"") &&
+         contains(fields, "plot_amplitude", "data-y-max=\"1.5\"");
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "component and amplitude panning preserve both requested axis intervals");
+    fields = request("/eval", "{\"expression\":\"exp(i*x)\",\"action\":\"plot\",\"wrt\":\"x\","
+        "\"plot_plane_real_lower\":\"-3\",\"plot_plane_real_upper\":\"1\","
+        "\"plot_plane_imag_lower\":\"-2\",\"plot_plane_imag_upper\":\"2\"}", &status);
+    ok = status == 200 && contains(fields, "plot_complex_plane", "data-x-min=\"-3\"") &&
+         contains(fields, "plot_complex_plane", "data-x-max=\"1\"") &&
+         contains(fields, "plot_complex_plane", "data-y-min=\"-2\"") &&
+         contains(fields, "plot_complex_plane", "data-y-max=\"2\"") &&
+         contains(fields, "plot_complex_plane", ">ℜ</text>") &&
+         contains(fields, "plot_complex_plane", ">ℑ</text>") &&
+         contains(fields, "plot_components", "data-x-min=\"-10\"") &&
+         contains(fields, "plot_components", "data-x-max=\"10\"");
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "Argand viewport bounds are independent of sampling, with Gothic axis titles");
+    fields = request("/eval", "{\"expression\":\"exp(i*x)\",\"action\":\"plot\",\"wrt\":\"x\","
+        "\"plot_plane_real_lower\":\"-3\"}", &status);
+    ok = status == 422;
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "partial Argand viewport bounds are rejected rather than silently changing the sample");
+}
+
+static void test_lab_extra_distribution_plot(void)
+{
+    const char *sources[] = {"@F{step(t)}", "@F{acos(sin(pi-x))}", "@F{step(x)}"};
+    const char *variables[] = {"ω", "k", "k"};
+    for (size_t i = 0; i < 3; ++i) {
+        unsigned status = 0;
+        string_t *payload = string_sprintf("{\"expression\":\"%s\",\"action\":\"plot\","
+                                           "\"wrt\":\"%s\",\"plot_quality\":\"preview\"}", sources[i], variables[i]);
+        json_t *fields = request("/eval", string_c_str(payload), &status);
+        bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-impulse") &&
+                  contains(fields, "plot_svg", "Imaginary") && !contains(fields, "function", "fourier(");
+        const char *svg = lab_eval_text(fields, "plot_svg");
+        const char *curve = svg ? strstr(svg, "data-series=\"0\"") : NULL;
+        const char *end = curve ? strstr(curve, "</g>") : NULL;
+        const char *path = curve ? strstr(curve, "<path") : NULL;
+        ok = ok && curve && end && path && path < end && contains(fields, "plot_svg", "data-x-min=\"-10\"");
+        if (!ok)
+            show_failure(fields);
+        json_free(fields);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "native Fourier distributions plot regular components and labelled impulse weights");
+        payload = string_sprintf("{\"expression\":\"%s\",\"action\":\"evaluate\",\"wrt\":\"%s\"}",
+                                 sources[i], variables[i]);
+        fields = request("/eval", string_c_str(payload), &status);
+        ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "svg", "<svg") &&
+             !*lab_eval_text(fields, "render_error");
+        if (i != 1)
+            ok = ok && contains(fields, "transform_identity_TeX", "Ordinary part") &&
+                 contains(fields, "transform_identity_TeX", "\\ne 0") &&
+                 contains(fields, "transform_identity_TeX", "Impulses") &&
+                 !contains(fields, "transform_identity_TeX", "principal value") &&
+                 contains(fields, "expression", "principal value");
+        if (!ok)
+            show_failure(fields);
+        json_free(fields);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "distribution result cards render native TeX rather than plain-text fallback");
+    }
+}
+
+static void test_lab_extra_surface_slices(void)
+{
+    const char *examples[] = {
+        "{\"expression\":\"acos(sin(2-x*y)+z)\",\"action\":\"plot\",\"plot_quality\":\"preview\"}",
+        "{\"expression\":\"acos(sin(2-x*y)+z)\",\"action\":\"plot\",\"plot_quality\":\"preview\","
+        "\"plot_slices\":\"z\\t-2\\t2\\t0\\t625\"}",
+        "{\"expression\":\"x+y+z-10^80\",\"action\":\"plot\",\"plot_quality\":\"preview\","
+        "\"plot_slices\":\"z\\t10^80\\t10^80+1/10^40\\t0\\t500\"}",
+        "{\"expression\":\"x+y+log(z-5)\",\"action\":\"plot\",\"plot_quality\":\"preview\"}",
+        "{\"expression\":\"x+y+z+w\",\"action\":\"plot\",\"plot_quality\":\"preview\"}",
+        "{\"expression\":\"acos(sin(2-x*y)+z)\",\"action\":\"plot\",\"plot_quality\":\"preview\","
+        "\"plot_slices\":\"z\\t-20\\t20\\t1/3\\t-2\"}",
+        "{\"expression\":\"acos(sin(2-x*y)+z)\",\"action\":\"plot\",\"plot_quality\":\"preview\","
+        "\"plot_slices\":\"z\\t-20\\t20\\t3\\t-2\"}"
+    };
+    for (unsigned i = 0; i < sizeof examples / sizeof *examples; ++i) {
+        unsigned status = 0;
+        json_t *fields = request("/eval", examples[i], &status);
+        bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-surface") &&
+                  contains(fields, "expression", "z = ?") && contains(fields, "plot_title", "z = ");
+        if (i == 0)
+            ok = ok && !strcmp(lab_eval_text(fields, "plot_slices"), "z\t-2\t2\t0\t500");
+        if (i == 1)
+            ok = ok && contains(fields, "plot_slices", "\t625") && contains(fields, "plot_title_TeX", "z = ") &&
+                 contains(fields, "plot_svg", "data-plot-title");
+        if (i == 2) {
+            string_t *record = string_new_with(lab_eval_text(fields, "plot_slices"));
+            size_t n = 0;
+            string_t **parts = string_split(record, "\t", &n);
+            expr_t *actual = n == 5 ? expr_from_string(string_c_str(parts[3]), NULL) : NULL;
+            expr_t *expected = expr_from_string("10^80+1/(2*10^40)", NULL);
+            number_t a = actual ? expr_eval(actual) : NUM_NAN, b = expected ? expr_eval(expected) : NUM_NAN;
+            number_t origin = num_create_from_string("1e80");
+            ok = ok && actual && expected && num_eq(a, b) && num_gt(a, origin);
+            num_destroy(&origin);
+            num_destroy(&a);
+            num_destroy(&b);
+            expr_free(actual);
+            expr_free(expected);
+            string_split_free(parts, n);
+            string_free(record);
+        }
+        if (i == 4)
+            ok = ok && contains(fields, "plot_slices", "\nw\t") && contains(fields, "plot_title", "w = ");
+        if (i == 5)
+            ok = ok && contains(fields, "plot_slices", "z\t-2\t2\t⅓\t");
+        if (i == 6)
+            ok = ok && !strcmp(lab_eval_text(fields, "plot_slices"), "z\t-2\t2\t0\t500");
+        if (!ok)
+            show_failure(fields);
+        json_free(fields);
+        TEST_ASSERT_TRUE(ok, "native slices preserve worksheet bindings, label the plot and retain exact parameter coordinates");
+    }
+    expect_response("/eval", "{\"expression\":\"x+y+z\",\"action\":\"plot\","
+                    "\"plot_slices\":\"z\\t1\\t0\\t0\\t500\"}", 422u, "error", "Invalid slice");
+    unsigned status = 0;
+    json_t *empty = request("/eval", "{\"expression\":\"acos(sin(2-x*y)+z)\",\"action\":\"plot\","
+                            "\"plot_slices\":\"z\\t-3\\t3\\t3\\t-1\"}", &status);
+    TEST_ASSERT_TRUE(status == 422 && contains(empty, "plot_slices", "z\t-3\t3\t3\t1000"),
+                     "empty slices retain their controls so the user can return to a real surface");
+    json_free(empty);
 }
 
 static void test_lab_extra_surface(void)
@@ -520,7 +815,7 @@ static void test_lab_extra_surface(void)
         json_free(fields);
         TEST_ASSERT_TRUE(ok, "native surfaces preserve bindings, holes and range-aware numerical precision");
     }
-    expect_response("/eval", "{\"expression\":\"x+y+z\",\"action\":\"plot\"}", 422u, "error", "second variable");
+    expect_response("/eval", "{\"expression\":\"x+y+z\",\"action\":\"plot\"}", 200u, "plot_slices", "z\t-2\t2\t0\t500");
     expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"wrt\":\"q\"}",
                     422u, "error", "Select a variable");
     expect_response("/eval", "{\"expression\":\"x+y\",\"action\":\"plot\",\"plot_second\":\"x\"}",
@@ -580,7 +875,7 @@ static void test_lab_extra_plot_ranges(void)
                               "\"plot_lower\":\"\",\"plot_upper\":\"\","
                               "\"plot_second_lower\":\"\",\"plot_second_upper\":\"\"}", 200u, "plot_svg", "data-surface");
     expect_response("/eval", "{\"expression\":\"sqrt(-1-x^2)\",\"action\":\"plot\"}",
-                    422u, "error", "Automatic range selection failed");
+                    200u, "plot_components", "Imaginary");
     expect_response("/eval", "{\"expression\":\"x\",\"action\":\"plot\",\"plot_lower\":\"bad(\"}",
                     422u, "error", "bounds");
 }
@@ -1202,9 +1497,12 @@ static void test_lab_extra_plot_title_fallback(void)
                                     "<g data-series=\"0\"><path d=\"M 0 0 L 1 1\"/></g></svg>");
     lab_eval_set(fields, "plot_title", "<formula>&");
     lab_eval_set(fields, "plot_title_TeX", "\\input{not-permitted}");
+    lab_eval_set(fields, "plot_components", lab_eval_text(fields, "plot_svg"));
     lab_eval_plot_title(fields);
     bool ok = contains(fields, "plot_svg", "data-plot-chart") && contains(fields, "plot_svg", "&lt;formula&gt;&amp;") &&
-              !contains(fields, "plot_svg", "<formula>") && *lab_eval_text(fields, "plot_title_render_error");
+              !contains(fields, "plot_svg", "<formula>") && *lab_eval_text(fields, "plot_title_render_error") &&
+              contains(fields, "plot_components", "&lt;formula&gt;&amp;") &&
+              contains(fields, "plot_components", "data-plot-figure");
     json_free(fields);
     TEST_ASSERT_TRUE(ok, "failed title rendering preserves the curve, escapes the formula and records a diagnostic");
 
@@ -1321,6 +1619,22 @@ static void test_lab_surface_readme(void)
     string_printf("Surface plot ready: u(x,y) = x^2 + y^2; height axis: u\n");
 }
 
+static void test_lab_surface_slice_readme(void)
+{
+    /* README example in docs/mars-lab.md: an unset third parameter receives a plot-local slice. */
+    unsigned status = 0;
+    json_t *fields = request("/eval", "{\"expression\":\"acos(sin(2-x*y)+z)\",\"action\":\"plot\"}", &status);
+    bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-surface") &&
+              !strcmp(lab_eval_text(fields, "plot_slices"), "z\t-2\t2\t0\t500") &&
+              contains(fields, "plot_title_TeX", "u(x,y) = ") && contains(fields, "plot_title", "z = 0") &&
+              contains(fields, "expression", "z = ?");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "README slice uses native limits and labels without changing worksheet bindings");
+    string_printf("Surface slice ready: x,y axes; z = 0; slider limits: -2 to 2\n");
+}
+
 static void test_lab_auto_range_readme(void)
 {
     /* README example in docs/mars-lab.md: blank bounds choose the inverse sine's real interval. */
@@ -1359,6 +1673,11 @@ static void test_lab_screenshots_readme(void)
                             "\"plot_second_upper\":\"3\",\"plot_kind\":\"auto\"}", &status);
     bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-surface") &&
               contains(fields, "plot_title_TeX", "u(x,y) = ") && contains(fields, "plot_title_TeX", "\\sin");
+    const char *surface = lab_eval_text(fields, "plot_svg");
+    const char *lower = strstr(surface, "data-exact-z-min=\"");
+    const char *upper = strstr(surface, "data-exact-z-max=\"");
+    ok = ok && lower && upper && strtod(lower + strlen("data-exact-z-min=\""), NULL) < 0.02 &&
+         strtod(upper + strlen("data-exact-z-max=\""), NULL) > 3.12;
     if (!ok) show_failure(fields);
     TEST_ASSERT_TRUE(ok, "README screenshot plots the principal inverse-cosine surface over [-3,3] squared");
     json_free(fields);
@@ -1396,6 +1715,7 @@ void test_lab_plot_readme_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_plot_title_readme, readme, NULL);
     TEST_RUN_IN_GROUP(test_lab_surface_readme, readme, NULL);
+    TEST_RUN_IN_GROUP(test_lab_surface_slice_readme, readme, NULL);
     TEST_RUN_IN_GROUP(test_lab_auto_range_readme, readme, NULL);
     TEST_RUN_IN_GROUP(test_lab_screenshots_readme, readme, NULL);
 }
@@ -2138,6 +2458,11 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_plot, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_continuity, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_surface_refinement, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_surface_slices, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_folded_laplace_plot, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_distribution_plot, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_complex_plot, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_height, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_names, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_ranges, tests, NULL);

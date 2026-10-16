@@ -10,23 +10,29 @@
 #include "lab_dom.h"
 #include "lab_flow.h"
 #include "lab_flow_request.h"
+#define MARS_LAB_FLOW_REQUEST_INTERNAL_ACCESS
+#include "lab_flow_request_internal.h"
 
-static unsigned lab_flow_request_stage(int frame)
+/* Shared request-local stage access for continuation handlers. */
+unsigned lab_flow_request_stage(int frame)
 {
     return (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
 }
 
-static int lab_flow_request_truth(int frame, const char *key)
+/* Shared request-local truth access for continuation handlers. */
+int lab_flow_request_truth(int frame, const char *key)
 {
     return lab_dom_truth(lab_dom_get(frame, key));
 }
 
-static int lab_flow_request_fallback(int value, const char *fallback)
+/* Shared request-local fallback access for continuation handlers. */
+int lab_flow_request_fallback(int value, const char *fallback)
 {
     return lab_dom_truth(value) ? value : lab_dom_string(fallback);
 }
 
-static int lab_flow_request_current(int frame, unsigned next)
+/* Shared request-local current access for continuation handlers. */
+int lab_flow_request_current(int frame, unsigned next)
 {
     return lab_flow_call(frame, next, "requestCurrent", "current", 0, 1, lab_dom_get(frame, "request"));
 }
@@ -37,12 +43,14 @@ static int lab_flow_request_finish(int frame, unsigned next)
     return lab_flow_call(frame, next, "requestFinish", 0, 0, 1, lab_dom_get(frame, "request"));
 }
 
-static int lab_flow_request_response(int frame)
+/* Shared request-local response access for continuation handlers. */
+int lab_flow_request_response(int frame)
 {
     return lab_dom_get(lab_dom_get(frame, "result"), "response");
 }
 
-static int lab_flow_request_data(int frame)
+/* Shared request-local data access for continuation handlers. */
+int lab_flow_request_data(int frame)
 {
     return lab_dom_get(lab_dom_get(frame, "result"), "data");
 }
@@ -53,399 +61,842 @@ static int lab_flow_request_ok(int frame)
            lab_dom_truth(lab_dom_get(lab_flow_request_data(frame), "ok"));
 }
 
-/* Distinct continuation cases describe an ordered protocol, not key dispatch. */
+/* Direct stage dispatch preserves the request-local protocol across browser awaits. */
+enum {
+    flow_request_function_stage_source,
+    flow_request_function_stage_clear,
+    flow_request_function_stage_begin,
+    flow_request_function_stage_start,
+    flow_request_function_stage_payload,
+    flow_request_function_stage_post,
+    flow_request_function_stage_outcome,
+    flow_request_function_stage_complete,
+    flow_request_function_stage_final_current,
+    flow_request_function_stage_final,
+    flow_request_function_stage_finish,
+    flow_request_function_stage_done,
+    flow_request_function_stage_error_current,
+    flow_request_function_stage_error,
+    flow_request_function_stage_error_final
+};
+
+struct lab_flow_request_function_context {
+    int frame;
+    int request;
+};
+
+static int lab_flow_request_function_source(struct lab_flow_request_function_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_function_stage_clear, "native", "source", 0, 1,
+                         lab_dom_string("lab_function_source"));
+}
+
+static int lab_flow_request_function_clear(struct lab_flow_request_function_context *ctx)
+{
+    if (!lab_dom_get(ctx->frame, "source"))
+        return lab_flow_done(0);
+    return lab_flow_call(ctx->frame, flow_request_function_stage_begin, "clearFunctionRun", 0, 0, 0);
+}
+
+static int lab_flow_request_function_begin(struct lab_flow_request_function_context *ctx)
+{
+    int options = lab_dom_object(5);
+    lab_dom_set(options, "input", lab_dom_scalar(1, lab_flow_request_truth(ctx->frame, "source")));
+    lab_dom_set(options, "button", lab_dom_id("functionRun"));
+    lab_dom_set(options, "disableButton", lab_dom_scalar(1, 1));
+    return lab_flow_call(ctx->frame, flow_request_function_stage_start, "requestBeginCurrent", "request", 0, 2,
+                         lab_dom_string("function"), options);
+}
+
+static int lab_flow_request_function_start(struct lab_flow_request_function_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_function_stage_payload, "native", 0, 0, 2,
+                         lab_dom_string("lab_function_start"), lab_dom_numeric(lab_dom_truth(ctx->request)));
+}
+
+static int lab_flow_request_function_payload(struct lab_flow_request_function_context *ctx)
+{
+    if (!ctx->request)
+        return lab_flow_done(0);
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_function_stage_error_current));
+    int inputs = lab_dom_object(4);
+    lab_dom_push(inputs, lab_dom_get(ctx->frame, "source"));
+    return lab_flow_call(ctx->frame, flow_request_function_stage_post, "buildPayload", "payload", 0, 3,
+                         lab_dom_numeric(5), inputs, ctx->request);
+}
+
+static int lab_flow_request_function_post(struct lab_flow_request_function_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_function_stage_outcome, "post", "result", 1, 3, ctx->request,
+                         lab_dom_get(ctx->frame, "payload"), lab_dom_string("/function-run"));
+}
+
+static int lab_flow_request_function_outcome(struct lab_flow_request_function_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_function_stage_complete, "requestOutcome", "outcome", 0, 3,
+                         ctx->request, lab_flow_request_response(ctx->frame), lab_flow_request_data(ctx->frame));
+}
+
+static int lab_flow_request_function_complete(struct lab_flow_request_function_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_function_stage_final_current, "functionComplete", 0, 0, 3,
+                         ctx->request, lab_dom_get(ctx->frame, "outcome"), lab_flow_request_data(ctx->frame));
+}
+
+static int lab_flow_request_function_error_current(struct lab_flow_request_function_context *ctx)
+{
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_function_stage_error_final));
+    return lab_flow_request_current(ctx->frame, flow_request_function_stage_error);
+}
+
+static int lab_flow_request_function_error(struct lab_flow_request_function_context *ctx)
+{
+    if (!lab_flow_request_truth(ctx->frame, "current"))
+        return lab_flow_request_current(ctx->frame, flow_request_function_stage_final);
+    return lab_flow_call(ctx->frame, flow_request_function_stage_final_current, "functionException", 0, 0, 2,
+                         ctx->request, lab_dom_get(ctx->frame, "exception"));
+}
+
+static int lab_flow_request_function_final_current(struct lab_flow_request_function_context *ctx)
+{
+    lab_dom_delete(ctx->frame, "failed");
+    return lab_flow_request_current(ctx->frame, flow_request_function_stage_final);
+}
+
+static int lab_flow_request_function_final(struct lab_flow_request_function_context *ctx)
+{
+    if (lab_flow_request_truth(ctx->frame, "current"))
+        lab_dom_disabled(lab_dom_id("functionRun"), 0);
+    return lab_flow_request_finish(ctx->frame, flow_request_function_stage_done);
+}
+
+static int lab_flow_request_function_finish(struct lab_flow_request_function_context *ctx)
+{
+    return lab_flow_request_finish(ctx->frame, flow_request_function_stage_done);
+}
+
+static int lab_flow_request_function_error_final(struct lab_flow_request_function_context *ctx)
+{
+    lab_dom_set(ctx->frame, "propagate", lab_dom_get(ctx->frame, "exception"));
+    lab_dom_delete(ctx->frame, "failed");
+    return lab_flow_request_current(ctx->frame, flow_request_function_stage_final);
+}
+
+static int lab_flow_request_function_done(struct lab_flow_request_function_context *ctx)
+{
+    if (lab_dom_get(ctx->frame, "propagate"))
+        return lab_flow_call(ctx->frame, flow_request_function_stage_done + 100, "rethrow", 0, 0, 1,
+                             lab_dom_get(ctx->frame, "propagate"));
+    return lab_flow_done(0);
+}
+
+static int lab_flow_request_function_otherwise(struct lab_flow_request_function_context *ctx)
+{
+    (void)ctx;
+    return lab_flow_done(0);
+}
+
 static int lab_flow_request_function(int frame)
 {
-    enum {
-        SOURCE,
-        CLEAR,
-        BEGIN,
-        START,
-        PAYLOAD,
-        POST,
-        OUTCOME,
-        COMPLETE,
-        FINAL_CURRENT,
-        FINAL,
-        FINISH,
-        DONE,
-        ERROR_CURRENT,
-        ERROR,
-        ERROR_FINAL
-    };
     int request = lab_dom_get(frame, "request");
-    switch (lab_flow_request_stage(frame)) {
-        case SOURCE:
-            return lab_flow_call(frame, CLEAR, "native", "source", 0, 1, lab_dom_string("lab_function_source"));
-        case CLEAR:
-            if (!lab_dom_get(frame, "source"))
-                return lab_flow_done(0);
-            return lab_flow_call(frame, BEGIN, "clearFunctionRun", 0, 0, 0);
-        case BEGIN: {
-            int options = lab_dom_object(5);
-            lab_dom_set(options, "input", lab_dom_scalar(1, lab_flow_request_truth(frame, "source")));
-            lab_dom_set(options, "button", lab_dom_id("functionRun"));
-            lab_dom_set(options, "disableButton", lab_dom_scalar(1, 1));
-            return lab_flow_call(frame, START, "requestBeginCurrent", "request", 0, 2, lab_dom_string("function"),
-                                 options);
-        }
-        case START:
-            return lab_flow_call(frame, PAYLOAD, "native", 0, 0, 2, lab_dom_string("lab_function_start"),
-                                 lab_dom_numeric(lab_dom_truth(request)));
-        case PAYLOAD: {
-            if (!request)
-                return lab_flow_done(0);
-            lab_dom_set(frame, "failed", lab_dom_numeric(ERROR_CURRENT));
-            int inputs = lab_dom_object(4);
-            lab_dom_push(inputs, lab_dom_get(frame, "source"));
-            return lab_flow_call(frame, POST, "buildPayload", "payload", 0, 3, lab_dom_numeric(5), inputs, request);
-        }
-        case POST:
-            return lab_flow_call(frame, OUTCOME, "post", "result", 1, 3, request, lab_dom_get(frame, "payload"),
-                                 lab_dom_string("/function-run"));
-        case OUTCOME:
-            return lab_flow_call(frame, COMPLETE, "requestOutcome", "outcome", 0, 3, request,
-                                 lab_flow_request_response(frame), lab_flow_request_data(frame));
-        case COMPLETE:
-            return lab_flow_call(frame, FINAL_CURRENT, "functionComplete", 0, 0, 3, request,
-                                 lab_dom_get(frame, "outcome"), lab_flow_request_data(frame));
-        case ERROR_CURRENT:
-            lab_dom_set(frame, "failed", lab_dom_numeric(ERROR_FINAL));
-            return lab_flow_request_current(frame, ERROR);
-        case ERROR:
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_request_current(frame, FINAL);
-            return lab_flow_call(frame, FINAL_CURRENT, "functionException", 0, 0, 2, request,
-                                 lab_dom_get(frame, "exception"));
-        case FINAL_CURRENT:
-            lab_dom_delete(frame, "failed");
-            return lab_flow_request_current(frame, FINAL);
-        case FINAL:
-            if (lab_flow_request_truth(frame, "current"))
-                lab_dom_disabled(lab_dom_id("functionRun"), 0);
-            return lab_flow_request_finish(frame, DONE);
-        case FINISH:
-            return lab_flow_request_finish(frame, DONE);
-        case ERROR_FINAL:
-            lab_dom_set(frame, "propagate", lab_dom_get(frame, "exception"));
-            lab_dom_delete(frame, "failed");
-            return lab_flow_request_current(frame, FINAL);
-        case DONE:
-            if (lab_dom_get(frame, "propagate"))
-                return lab_flow_call(frame, DONE + 100, "rethrow", 0, 0, 1, lab_dom_get(frame, "propagate"));
-            return lab_flow_done(0);
-        default:
-            return lab_flow_done(0);
+    struct lab_flow_request_function_context ctx = {
+        .frame = frame,
+        .request = request,
+    };
+    static int (*const handlers[])(struct lab_flow_request_function_context *) = {
+        [flow_request_function_stage_source]        = lab_flow_request_function_source,
+        [flow_request_function_stage_clear]         = lab_flow_request_function_clear,
+        [flow_request_function_stage_begin]         = lab_flow_request_function_begin,
+        [flow_request_function_stage_start]         = lab_flow_request_function_start,
+        [flow_request_function_stage_payload]       = lab_flow_request_function_payload,
+        [flow_request_function_stage_post]          = lab_flow_request_function_post,
+        [flow_request_function_stage_outcome]       = lab_flow_request_function_outcome,
+        [flow_request_function_stage_complete]      = lab_flow_request_function_complete,
+        [flow_request_function_stage_error_current] = lab_flow_request_function_error_current,
+        [flow_request_function_stage_error]         = lab_flow_request_function_error,
+        [flow_request_function_stage_final_current] = lab_flow_request_function_final_current,
+        [flow_request_function_stage_final]         = lab_flow_request_function_final,
+        [flow_request_function_stage_finish]        = lab_flow_request_function_finish,
+        [flow_request_function_stage_error_final]   = lab_flow_request_function_error_final,
+        [flow_request_function_stage_done]          = lab_flow_request_function_done,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](&ctx)
+               : lab_flow_request_function_otherwise(&ctx);
+}
+
+enum {
+    flow_request_integrator_stage_snapshot,
+    flow_request_integrator_stage_prepare,
+    flow_request_integrator_stage_guard,
+    flow_request_integrator_stage_validate,
+    flow_request_integrator_stage_cancel,
+    flow_request_integrator_stage_abort,
+    flow_request_integrator_stage_current,
+    flow_request_integrator_stage_text,
+    flow_request_integrator_stage_check_text,
+    flow_request_integrator_stage_rows,
+    flow_request_integrator_stage_check_rows,
+    flow_request_integrator_stage_render,
+    flow_request_integrator_stage_bounds,
+    flow_request_integrator_stage_check,
+    flow_request_integrator_stage_build,
+    flow_request_integrator_stage_post,
+    flow_request_integrator_stage_done
+};
+
+struct lab_flow_request_integrator_context {
+    int frame;
+    int request;
+    int snapshot;
+};
+
+static int lab_flow_request_integrator_snapshot(struct lab_flow_request_integrator_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_prepare, "integratorSnapshot", "snapshot", 0, 0);
+}
+
+static int lab_flow_request_integrator_prepare(struct lab_flow_request_integrator_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_guard, "refreshIntegratorForms", "preparedRows", 1,
+                         2, lab_dom_get(ctx->snapshot, "rows"), lab_dom_get(ctx->snapshot, "text"));
+}
+
+static int lab_flow_request_integrator_guard(struct lab_flow_request_integrator_context *ctx)
+{
+    if (!lab_flow_request_truth(ctx->frame, "preparedRows"))
+        return ctx->request ? lab_flow_request_current(ctx->frame, flow_request_integrator_stage_cancel)
+                            : lab_flow_call(ctx->frame, flow_request_integrator_stage_done, "abort", 0, 0, 1,
+                                            lab_dom_string("Obsolete integrator form preparation"));
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_validate, "requestContext", "latestContext", 0, 0);
+}
+
+static int lab_flow_request_integrator_validate(struct lab_flow_request_integrator_context *ctx)
+{
+    if (!lab_dom_equal(lab_dom_get(ctx->snapshot, "context"), lab_dom_get(ctx->frame, "latestContext"))) {
+        if (ctx->request)
+            return lab_flow_request_current(ctx->frame, flow_request_integrator_stage_cancel);
+        return lab_flow_call(ctx->frame, flow_request_integrator_stage_done, "abort", 0, 0, 1,
+                             lab_dom_string("Obsolete integrator form preparation"));
     }
+    if (ctx->request)
+        return lab_flow_request_current(ctx->frame, flow_request_integrator_stage_current);
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_check_text, "integratorText", "latestText", 0, 0);
+}
+
+static int lab_flow_request_integrator_current(struct lab_flow_request_integrator_context *ctx)
+{
+    if (!lab_flow_request_truth(ctx->frame, "current"))
+        return lab_flow_request_current(ctx->frame, flow_request_integrator_stage_cancel);
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_check_text, "integratorText", "latestText", 0, 0);
+}
+
+static int lab_flow_request_integrator_check_text(struct lab_flow_request_integrator_context *ctx)
+{
+    if (!lab_dom_equal(lab_dom_get(ctx->snapshot, "text"), lab_dom_get(ctx->frame, "latestText")))
+        return ctx->request ? lab_flow_request_current(ctx->frame, flow_request_integrator_stage_cancel)
+                            : lab_flow_call(ctx->frame, flow_request_integrator_stage_done, "abort", 0, 0, 1,
+                                            lab_dom_string("Obsolete integrator form preparation"));
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_check_rows, "integratorRowsText", "latestRowsText",
+                         0, 0);
+}
+
+static int lab_flow_request_integrator_check_rows(struct lab_flow_request_integrator_context *ctx)
+{
+    if (!lab_dom_equal(lab_dom_get(ctx->snapshot, "rowsText"), lab_dom_get(ctx->frame, "latestRowsText")))
+        return ctx->request ? lab_flow_request_current(ctx->frame, flow_request_integrator_stage_cancel)
+                            : lab_flow_call(ctx->frame, flow_request_integrator_stage_done, "abort", 0, 0, 1,
+                                            lab_dom_string("Obsolete integrator form preparation"));
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_render, "activeIntegratorRows", "active", 0, 2,
+                         lab_dom_get(ctx->frame, "preparedRows"), lab_dom_get(ctx->snapshot, "text"));
+}
+
+static int lab_flow_request_integrator_cancel(struct lab_flow_request_integrator_context *ctx)
+{
+    if (lab_flow_request_truth(ctx->frame, "current"))
+        return lab_flow_call(ctx->frame, flow_request_integrator_stage_abort, "requestCancel", 0, 0, 1,
+                             lab_dom_string("evaluate"));
+    /* A stale preparation still rejects even when its request has already ended. */
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_done, "abort", 0, 0, 1,
+                         lab_dom_string("Obsolete integrator form preparation"));
+}
+
+static int lab_flow_request_integrator_abort(struct lab_flow_request_integrator_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_done, "abort", 0, 0, 1,
+                         lab_dom_string("Obsolete integrator form preparation"));
+}
+
+static int lab_flow_request_integrator_render(struct lab_flow_request_integrator_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_bounds, "renderIntegratorRows", 0, 0, 1,
+                         lab_dom_get(lab_dom_get(ctx->frame, "active"), "rows"));
+}
+
+static int lab_flow_request_integrator_bounds(struct lab_flow_request_integrator_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_check, "native", "boundsError", 0, 2,
+                         lab_dom_string("lab_payload_bounds_error"),
+                         lab_dom_get(lab_dom_get(ctx->frame, "active"), "bounds"));
+}
+
+static int lab_flow_request_integrator_check(struct lab_flow_request_integrator_context *ctx)
+{
+    if (lab_flow_request_truth(ctx->frame, "boundsError"))
+        return lab_flow_call(ctx->frame, flow_request_integrator_stage_done, "fail", 0, 0, 1,
+                             lab_dom_get(ctx->frame, "boundsError"));
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_build, "saveWorksheetState", 0, 0, 1,
+                         lab_dom_string("integrator"));
+}
+
+static int lab_flow_request_integrator_build(struct lab_flow_request_integrator_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_post, "integratorPayload", "payload", 0, 3,
+                         lab_dom_get(ctx->snapshot, "text"), lab_dom_get(lab_dom_get(ctx->frame, "active"), "bounds"),
+                         ctx->request);
+}
+
+static int lab_flow_request_integrator_post(struct lab_flow_request_integrator_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_integrator_stage_done, "post", "value", 1, 3, ctx->request,
+                         lab_dom_get(ctx->frame, "payload"), lab_dom_string("/integrator-eval"));
+}
+
+static int lab_flow_request_integrator_otherwise(struct lab_flow_request_integrator_context *ctx)
+{
+    return lab_flow_done(lab_dom_get(ctx->frame, "value"));
 }
 
 static int lab_flow_request_integrator(int frame)
 {
-    enum {
-        SNAPSHOT,
-        PREPARE,
-        GUARD,
-        VALIDATE,
-        CANCEL,
-        ABORT,
-        CURRENT,
-        TEXT,
-        CHECK_TEXT,
-        ROWS,
-        CHECK_ROWS,
-        RENDER,
-        BOUNDS,
-        CHECK,
-        BUILD,
-        POST,
-        DONE
-    };
     int request = lab_dom_get(frame, "request"), snapshot = lab_dom_get(frame, "snapshot");
-    switch (lab_flow_request_stage(frame)) {
-        case SNAPSHOT:
-            return lab_flow_call(frame, PREPARE, "integratorSnapshot", "snapshot", 0, 0);
-        case PREPARE:
-            return lab_flow_call(frame, GUARD, "refreshIntegratorForms", "preparedRows", 1, 2,
-                                 lab_dom_get(snapshot, "rows"), lab_dom_get(snapshot, "text"));
-        case GUARD:
-            if (!lab_flow_request_truth(frame, "preparedRows"))
-                return request ? lab_flow_request_current(frame, CANCEL)
-                               : lab_flow_call(frame, DONE, "abort", 0, 0, 1,
-                                               lab_dom_string("Obsolete integrator form preparation"));
-            return lab_flow_call(frame, VALIDATE, "requestContext", "latestContext", 0, 0);
-        case VALIDATE: {
-            if (!lab_dom_equal(lab_dom_get(snapshot, "context"), lab_dom_get(frame, "latestContext"))) {
-                if (request)
-                    return lab_flow_request_current(frame, CANCEL);
-                return lab_flow_call(frame, DONE, "abort", 0, 0, 1,
-                                     lab_dom_string("Obsolete integrator form preparation"));
-            }
-            if (request)
-                return lab_flow_request_current(frame, CURRENT);
-            return lab_flow_call(frame, CHECK_TEXT, "integratorText", "latestText", 0, 0);
-        }
-        case CURRENT:
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_request_current(frame, CANCEL);
-            return lab_flow_call(frame, CHECK_TEXT, "integratorText", "latestText", 0, 0);
-        case CHECK_TEXT:
-            if (!lab_dom_equal(lab_dom_get(snapshot, "text"), lab_dom_get(frame, "latestText")))
-                return request ? lab_flow_request_current(frame, CANCEL)
-                               : lab_flow_call(frame, DONE, "abort", 0, 0, 1,
-                                               lab_dom_string("Obsolete integrator form preparation"));
-            return lab_flow_call(frame, CHECK_ROWS, "integratorRowsText", "latestRowsText", 0, 0);
-        case CHECK_ROWS:
-            if (!lab_dom_equal(lab_dom_get(snapshot, "rowsText"), lab_dom_get(frame, "latestRowsText")))
-                return request ? lab_flow_request_current(frame, CANCEL)
-                               : lab_flow_call(frame, DONE, "abort", 0, 0, 1,
-                                               lab_dom_string("Obsolete integrator form preparation"));
-            return lab_flow_call(frame, RENDER, "activeIntegratorRows", "active", 0, 2,
-                                 lab_dom_get(frame, "preparedRows"), lab_dom_get(snapshot, "text"));
-        case CANCEL:
-            if (lab_flow_request_truth(frame, "current"))
-                return lab_flow_call(frame, ABORT, "requestCancel", 0, 0, 1, lab_dom_string("evaluate"));
-            /* A stale preparation still rejects even when its request has already ended. */
-            return lab_flow_call(frame, DONE, "abort", 0, 0, 1, lab_dom_string("Obsolete integrator form preparation"));
-        case ABORT:
-            return lab_flow_call(frame, DONE, "abort", 0, 0, 1, lab_dom_string("Obsolete integrator form preparation"));
-        case RENDER:
-            return lab_flow_call(frame, BOUNDS, "renderIntegratorRows", 0, 0, 1,
-                                 lab_dom_get(lab_dom_get(frame, "active"), "rows"));
-        case BOUNDS:
-            return lab_flow_call(frame, CHECK, "native", "boundsError", 0, 2,
-                                 lab_dom_string("lab_payload_bounds_error"),
-                                 lab_dom_get(lab_dom_get(frame, "active"), "bounds"));
-        case CHECK:
-            if (lab_flow_request_truth(frame, "boundsError"))
-                return lab_flow_call(frame, DONE, "fail", 0, 0, 1, lab_dom_get(frame, "boundsError"));
-            return lab_flow_call(frame, BUILD, "saveWorksheetState", 0, 0, 1, lab_dom_string("integrator"));
-        case BUILD:
-            return lab_flow_call(frame, POST, "integratorPayload", "payload", 0, 3, lab_dom_get(snapshot, "text"),
-                                 lab_dom_get(lab_dom_get(frame, "active"), "bounds"), request);
-        case POST:
-            return lab_flow_call(frame, DONE, "post", "value", 1, 3, request, lab_dom_get(frame, "payload"),
-                                 lab_dom_string("/integrator-eval"));
-        default:
-            return lab_flow_done(lab_dom_get(frame, "value"));
-    }
+    struct lab_flow_request_integrator_context ctx = {
+        .frame = frame,
+        .request = request,
+        .snapshot = snapshot,
+    };
+    static int (*const handlers[])(struct lab_flow_request_integrator_context *) = {
+        [flow_request_integrator_stage_snapshot]   = lab_flow_request_integrator_snapshot,
+        [flow_request_integrator_stage_prepare]    = lab_flow_request_integrator_prepare,
+        [flow_request_integrator_stage_guard]      = lab_flow_request_integrator_guard,
+        [flow_request_integrator_stage_validate]   = lab_flow_request_integrator_validate,
+        [flow_request_integrator_stage_current]    = lab_flow_request_integrator_current,
+        [flow_request_integrator_stage_check_text] = lab_flow_request_integrator_check_text,
+        [flow_request_integrator_stage_check_rows] = lab_flow_request_integrator_check_rows,
+        [flow_request_integrator_stage_cancel]     = lab_flow_request_integrator_cancel,
+        [flow_request_integrator_stage_abort]      = lab_flow_request_integrator_abort,
+        [flow_request_integrator_stage_render]     = lab_flow_request_integrator_render,
+        [flow_request_integrator_stage_bounds]     = lab_flow_request_integrator_bounds,
+        [flow_request_integrator_stage_check]      = lab_flow_request_integrator_check,
+        [flow_request_integrator_stage_build]      = lab_flow_request_integrator_build,
+        [flow_request_integrator_stage_post]       = lab_flow_request_integrator_post,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](&ctx)
+               : lab_flow_request_integrator_otherwise(&ctx);
+}
+
+enum {
+    flow_request_land_stage_start,
+    flow_request_land_stage_parent,
+    flow_request_land_stage_begin,
+    flow_request_land_stage_payload,
+    flow_request_land_stage_post,
+    flow_request_land_stage_current,
+    flow_request_land_stage_accept,
+    flow_request_land_stage_bind,
+    flow_request_land_stage_finish,
+    flow_request_land_stage_done,
+    flow_request_land_stage_error_current,
+    flow_request_land_stage_error
+};
+
+struct lab_flow_request_land_context {
+    int frame;
+    int request;
+};
+
+static int lab_flow_request_land_start(struct lab_flow_request_land_context *ctx)
+{
+    int cells = lab_dom_all(lab_dom_id("rendered"), "[data-almanac-land-totality]");
+    if (!lab_dom_count(cells) || !lab_flow_request_truth(ctx->frame, "data"))
+        return lab_flow_done(0);
+    lab_dom_set(ctx->frame, "cells", cells);
+    return lab_flow_call(ctx->frame, flow_request_land_stage_begin, "requestLatestMain", "parent", 0, 0);
+}
+
+static int lab_flow_request_land_begin(struct lab_flow_request_land_context *ctx)
+{
+    int options = lab_dom_object(5);
+    lab_dom_set(options, "parent", lab_dom_get(ctx->frame, "parent"));
+    return lab_flow_call(ctx->frame, flow_request_land_stage_payload, "requestBegin", "request", 0, 3,
+                         lab_dom_string("land"), lab_dom_string("almanac"), options);
+}
+
+static int lab_flow_request_land_payload(struct lab_flow_request_land_context *ctx)
+{
+    if (!ctx->request)
+        return lab_flow_done(0);
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_land_stage_error_current));
+    return lab_flow_call(ctx->frame, flow_request_land_stage_post, "landPayload", "payload", 0, 2,
+                         lab_dom_get(ctx->frame, "data"), lab_dom_get(ctx->frame, "cells"));
+}
+
+static int lab_flow_request_land_post(struct lab_flow_request_land_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_land_stage_current, "post", "result", 1, 2, ctx->request,
+                         lab_dom_get(ctx->frame, "payload"));
+}
+
+static int lab_flow_request_land_current(struct lab_flow_request_land_context *ctx)
+{
+    return lab_flow_request_current(ctx->frame, flow_request_land_stage_accept);
+}
+
+static int lab_flow_request_land_accept(struct lab_flow_request_land_context *ctx)
+{
+    if (!lab_flow_request_truth(ctx->frame, "current"))
+        return lab_flow_request_finish(ctx->frame, flow_request_land_stage_done);
+    if (!lab_flow_request_ok(ctx->frame))
+        return lab_flow_call(ctx->frame, flow_request_land_stage_done, "fail", 0, 0, 1,
+                             lab_flow_request_fallback(lab_dom_get(lab_flow_request_data(ctx->frame), "error"),
+                                                       "Nearest land totality search failed"));
+    return lab_flow_call(ctx->frame, flow_request_land_stage_bind, "native", 0, 0, 4,
+                         lab_dom_string("lab_payload_land_apply"), lab_dom_get(ctx->frame, "cells"),
+                         lab_flow_request_data(ctx->frame), lab_dom_numeric(0));
+}
+
+static int lab_flow_request_land_bind(struct lab_flow_request_land_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_land_stage_finish, "bindAlmanacTotalityActions", 0, 0, 1,
+                         lab_dom_id("rendered"));
+}
+
+static int lab_flow_request_land_error_current(struct lab_flow_request_land_context *ctx)
+{
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_land_stage_finish));
+    return lab_flow_request_current(ctx->frame, flow_request_land_stage_error);
+}
+
+static int lab_flow_request_land_error(struct lab_flow_request_land_context *ctx)
+{
+    if (!lab_flow_request_truth(ctx->frame, "current"))
+        return lab_flow_request_finish(ctx->frame, flow_request_land_stage_done);
+    return lab_flow_call(ctx->frame, flow_request_land_stage_finish, "native", 0, 0, 4,
+                         lab_dom_string("lab_payload_land_apply"), lab_dom_get(ctx->frame, "cells"), 0,
+                         lab_dom_numeric(lab_dom_equal(lab_dom_get(lab_dom_get(ctx->frame, "exception"), "name"),
+                                                       lab_dom_string("AbortError"))
+                                             ? 1
+                                             : 2));
+}
+
+static int lab_flow_request_land_finish(struct lab_flow_request_land_context *ctx)
+{
+    return lab_flow_request_finish(ctx->frame, flow_request_land_stage_done);
+}
+
+static int lab_flow_request_land_otherwise(struct lab_flow_request_land_context *ctx)
+{
+    (void)ctx;
+    return lab_flow_done(0);
 }
 
 static int lab_flow_request_land(int frame)
 {
-    enum { START, PARENT, BEGIN, PAYLOAD, POST, CURRENT, ACCEPT, BIND, FINISH, DONE, ERROR_CURRENT, ERROR };
     int request = lab_dom_get(frame, "request");
-    switch (lab_flow_request_stage(frame)) {
-        case START: {
-            int cells = lab_dom_all(lab_dom_id("rendered"), "[data-almanac-land-totality]");
-            if (!lab_dom_count(cells) || !lab_flow_request_truth(frame, "data"))
-                return lab_flow_done(0);
-            lab_dom_set(frame, "cells", cells);
-            return lab_flow_call(frame, BEGIN, "requestLatestMain", "parent", 0, 0);
-        }
-        case BEGIN: {
-            int options = lab_dom_object(5);
-            lab_dom_set(options, "parent", lab_dom_get(frame, "parent"));
-            return lab_flow_call(frame, PAYLOAD, "requestBegin", "request", 0, 3, lab_dom_string("land"),
-                                 lab_dom_string("almanac"), options);
-        }
-        case PAYLOAD:
-            if (!request)
-                return lab_flow_done(0);
-            lab_dom_set(frame, "failed", lab_dom_numeric(ERROR_CURRENT));
-            return lab_flow_call(frame, POST, "landPayload", "payload", 0, 2, lab_dom_get(frame, "data"),
-                                 lab_dom_get(frame, "cells"));
-        case POST:
-            return lab_flow_call(frame, CURRENT, "post", "result", 1, 2, request, lab_dom_get(frame, "payload"));
-        case CURRENT:
-            return lab_flow_request_current(frame, ACCEPT);
-        case ACCEPT:
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_request_finish(frame, DONE);
-            if (!lab_flow_request_ok(frame))
-                return lab_flow_call(frame, DONE, "fail", 0, 0, 1,
-                                     lab_flow_request_fallback(lab_dom_get(lab_flow_request_data(frame), "error"),
-                                                               "Nearest land totality search failed"));
-            return lab_flow_call(frame, BIND, "native", 0, 0, 4, lab_dom_string("lab_payload_land_apply"),
-                                 lab_dom_get(frame, "cells"), lab_flow_request_data(frame), lab_dom_numeric(0));
-        case BIND:
-            return lab_flow_call(frame, FINISH, "bindAlmanacTotalityActions", 0, 0, 1, lab_dom_id("rendered"));
-        case ERROR_CURRENT:
-            lab_dom_set(frame, "failed", lab_dom_numeric(FINISH));
-            return lab_flow_request_current(frame, ERROR);
-        case ERROR:
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_request_finish(frame, DONE);
-            return lab_flow_call(frame, FINISH, "native", 0, 0, 4, lab_dom_string("lab_payload_land_apply"),
-                                 lab_dom_get(frame, "cells"), 0,
-                                 lab_dom_numeric(lab_dom_equal(lab_dom_get(lab_dom_get(frame, "exception"), "name"),
-                                                               lab_dom_string("AbortError"))
-                                                     ? 1
-                                                     : 2));
-        case FINISH:
-            return lab_flow_request_finish(frame, DONE);
-        default:
-            return lab_flow_done(0);
-    }
+    struct lab_flow_request_land_context ctx = {
+        .frame = frame,
+        .request = request,
+    };
+    static int (*const handlers[])(struct lab_flow_request_land_context *) = {
+        [flow_request_land_stage_start]         = lab_flow_request_land_start,
+        [flow_request_land_stage_begin]         = lab_flow_request_land_begin,
+        [flow_request_land_stage_payload]       = lab_flow_request_land_payload,
+        [flow_request_land_stage_post]          = lab_flow_request_land_post,
+        [flow_request_land_stage_current]       = lab_flow_request_land_current,
+        [flow_request_land_stage_accept]        = lab_flow_request_land_accept,
+        [flow_request_land_stage_bind]          = lab_flow_request_land_bind,
+        [flow_request_land_stage_error_current] = lab_flow_request_land_error_current,
+        [flow_request_land_stage_error]         = lab_flow_request_land_error,
+        [flow_request_land_stage_finish]        = lab_flow_request_land_finish,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](&ctx)
+                                                                               : lab_flow_request_land_otherwise(&ctx);
+}
+
+enum {
+    flow_request_holidays_stage_mode,
+    flow_request_holidays_stage_begin,
+    flow_request_holidays_stage_status,
+    flow_request_holidays_stage_fetch,
+    flow_request_holidays_stage_current,
+    flow_request_holidays_stage_accept,
+    flow_request_holidays_stage_ready,
+    flow_request_holidays_stage_finish,
+    flow_request_holidays_stage_done,
+    flow_request_holidays_stage_error_current,
+    flow_request_holidays_stage_error
+};
+
+struct lab_flow_request_holidays_context {
+    int frame;
+    int request;
+};
+
+static int lab_flow_request_holidays_mode(struct lab_flow_request_holidays_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_holidays_stage_begin, "currentMode", "mode", 0, 0);
+}
+
+static int lab_flow_request_holidays_begin(struct lab_flow_request_holidays_context *ctx)
+{
+    if (!lab_dom_equal(lab_dom_get(ctx->frame, "mode"), lab_dom_string("datetime")))
+        return lab_flow_done(0);
+    return lab_flow_call(ctx->frame, flow_request_holidays_stage_status, "requestBegin", "request", 0, 2,
+                         lab_dom_string("holidays"), lab_dom_string("datetime"));
+}
+
+static int lab_flow_request_holidays_status(struct lab_flow_request_holidays_context *ctx)
+{
+    if (!ctx->request)
+        return lab_flow_done(0);
+    return lab_flow_call(ctx->frame, flow_request_holidays_stage_fetch, "setStatus", 0, 0, 1,
+                         lab_dom_string("Refreshing holidays..."));
+}
+
+static int lab_flow_request_holidays_fetch(struct lab_flow_request_holidays_context *ctx)
+{
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_holidays_stage_error_current));
+    return lab_flow_call(ctx->frame, flow_request_holidays_stage_current, "fetchDatetime", "result", 1, 2, 0,
+                         ctx->request);
+}
+
+static int lab_flow_request_holidays_current(struct lab_flow_request_holidays_context *ctx)
+{
+    return lab_flow_request_current(ctx->frame, flow_request_holidays_stage_accept);
+}
+
+static int lab_flow_request_holidays_accept(struct lab_flow_request_holidays_context *ctx)
+{
+    if (!lab_flow_request_truth(ctx->frame, "current"))
+        return lab_flow_request_finish(ctx->frame, flow_request_holidays_stage_done);
+    if (!lab_flow_request_ok(ctx->frame))
+        return lab_flow_call(ctx->frame, flow_request_holidays_stage_finish, "setStatus", 0, 0, 1,
+                             lab_dom_string("Error"));
+    return lab_flow_call(ctx->frame, flow_request_holidays_stage_ready, "setDatetimeLocalText", 0, 0, 2,
+                         lab_flow_request_fallback(lab_dom_get(lab_flow_request_data(ctx->frame), "local"), ""),
+                         lab_dom_truth(lab_dom_get(lab_flow_request_data(ctx->frame), "local_sections"))
+                             ? lab_dom_get(lab_flow_request_data(ctx->frame), "local_sections")
+                             : lab_dom_object(4));
+}
+
+static int lab_flow_request_holidays_ready(struct lab_flow_request_holidays_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_holidays_stage_finish, "setStatus", 0, 0, 1, lab_dom_string("Ready"));
+}
+
+static int lab_flow_request_holidays_error_current(struct lab_flow_request_holidays_context *ctx)
+{
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_holidays_stage_finish));
+    return lab_flow_request_current(ctx->frame, flow_request_holidays_stage_error);
+}
+
+static int lab_flow_request_holidays_error(struct lab_flow_request_holidays_context *ctx)
+{
+    if (lab_flow_request_truth(ctx->frame, "current"))
+        return lab_flow_call(ctx->frame, flow_request_holidays_stage_finish, "setStatus", 0, 0, 1,
+                             lab_dom_string("Error"));
+    return lab_flow_request_finish(ctx->frame, flow_request_holidays_stage_done);
+}
+
+static int lab_flow_request_holidays_finish(struct lab_flow_request_holidays_context *ctx)
+{
+    return lab_flow_request_finish(ctx->frame, flow_request_holidays_stage_done);
+}
+
+static int lab_flow_request_holidays_otherwise(struct lab_flow_request_holidays_context *ctx)
+{
+    (void)ctx;
+    return lab_flow_done(0);
 }
 
 static int lab_flow_request_holidays(int frame)
 {
-    enum { MODE, BEGIN, STATUS, FETCH, CURRENT, ACCEPT, READY, FINISH, DONE, ERROR_CURRENT, ERROR };
     int request = lab_dom_get(frame, "request");
-    switch (lab_flow_request_stage(frame)) {
-        case MODE:
-            return lab_flow_call(frame, BEGIN, "currentMode", "mode", 0, 0);
-        case BEGIN:
-            if (!lab_dom_equal(lab_dom_get(frame, "mode"), lab_dom_string("datetime")))
-                return lab_flow_done(0);
-            return lab_flow_call(frame, STATUS, "requestBegin", "request", 0, 2, lab_dom_string("holidays"),
-                                 lab_dom_string("datetime"));
-        case STATUS:
-            if (!request)
-                return lab_flow_done(0);
-            return lab_flow_call(frame, FETCH, "setStatus", 0, 0, 1, lab_dom_string("Refreshing holidays..."));
-        case FETCH:
-            lab_dom_set(frame, "failed", lab_dom_numeric(ERROR_CURRENT));
-            return lab_flow_call(frame, CURRENT, "fetchDatetime", "result", 1, 2, 0, request);
-        case CURRENT:
-            return lab_flow_request_current(frame, ACCEPT);
-        case ACCEPT:
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_request_finish(frame, DONE);
-            if (!lab_flow_request_ok(frame))
-                return lab_flow_call(frame, FINISH, "setStatus", 0, 0, 1, lab_dom_string("Error"));
-            return lab_flow_call(frame, READY, "setDatetimeLocalText", 0, 0, 2,
-                                 lab_flow_request_fallback(lab_dom_get(lab_flow_request_data(frame), "local"), ""),
-                                 lab_dom_truth(lab_dom_get(lab_flow_request_data(frame), "local_sections"))
-                                     ? lab_dom_get(lab_flow_request_data(frame), "local_sections")
-                                     : lab_dom_object(4));
-        case READY:
-            return lab_flow_call(frame, FINISH, "setStatus", 0, 0, 1, lab_dom_string("Ready"));
-        case ERROR_CURRENT:
-            lab_dom_set(frame, "failed", lab_dom_numeric(FINISH));
-            return lab_flow_request_current(frame, ERROR);
-        case ERROR:
-            if (lab_flow_request_truth(frame, "current"))
-                return lab_flow_call(frame, FINISH, "setStatus", 0, 0, 1, lab_dom_string("Error"));
-            return lab_flow_request_finish(frame, DONE);
-        case FINISH:
-            return lab_flow_request_finish(frame, DONE);
-        default:
-            return lab_flow_done(0);
-    }
+    struct lab_flow_request_holidays_context ctx = {
+        .frame = frame,
+        .request = request,
+    };
+    static int (*const handlers[])(struct lab_flow_request_holidays_context *) = {
+        [flow_request_holidays_stage_mode]          = lab_flow_request_holidays_mode,
+        [flow_request_holidays_stage_begin]         = lab_flow_request_holidays_begin,
+        [flow_request_holidays_stage_status]        = lab_flow_request_holidays_status,
+        [flow_request_holidays_stage_fetch]         = lab_flow_request_holidays_fetch,
+        [flow_request_holidays_stage_current]       = lab_flow_request_holidays_current,
+        [flow_request_holidays_stage_accept]        = lab_flow_request_holidays_accept,
+        [flow_request_holidays_stage_ready]         = lab_flow_request_holidays_ready,
+        [flow_request_holidays_stage_error_current] = lab_flow_request_holidays_error_current,
+        [flow_request_holidays_stage_error]         = lab_flow_request_holidays_error,
+        [flow_request_holidays_stage_finish]        = lab_flow_request_holidays_finish,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](&ctx)
+               : lab_flow_request_holidays_otherwise(&ctx);
+}
+
+enum {
+    flow_request_mobile_stage_start,
+    flow_request_mobile_stage_response,
+    flow_request_mobile_stage_data,
+    flow_request_mobile_stage_done
+};
+
+static int lab_flow_request_mobile_start(int frame)
+{
+    if (!lab_dom_id("mobileAccess") || !lab_dom_id("mobileUrl") || !lab_dom_id("mobileQr"))
+        return lab_flow_done(0);
+    lab_dom_set(frame, "failed", lab_dom_numeric(flow_request_mobile_stage_done));
+    return lab_flow_call(frame, flow_request_mobile_stage_response, "mobileFetch", "response", 1, 0);
+}
+
+static int lab_flow_request_mobile_response(int frame)
+{
+    if (!lab_dom_truth(lab_dom_get(lab_dom_get(frame, "response"), "ok")))
+        return lab_flow_done(0);
+    return lab_flow_call(frame, flow_request_mobile_stage_data, "responseData", "data", 1, 1,
+                         lab_dom_get(frame, "response"));
+}
+
+static int lab_flow_request_mobile_data(int frame)
+{
+    return lab_flow_call(frame, flow_request_mobile_stage_done, "native", 0, 0, 2, lab_dom_string("lab_payload_mobile"),
+                         lab_dom_get(frame, "data"));
+}
+
+static int lab_flow_request_mobile_otherwise(int frame)
+{
+    (void)frame;
+    return lab_flow_done(0);
 }
 
 static int lab_flow_request_mobile(int frame)
 {
-    enum { START, RESPONSE, DATA, DONE };
-    switch (lab_flow_request_stage(frame)) {
-        case START:
-            if (!lab_dom_id("mobileAccess") || !lab_dom_id("mobileUrl") || !lab_dom_id("mobileQr"))
-                return lab_flow_done(0);
-            lab_dom_set(frame, "failed", lab_dom_numeric(DONE));
-            return lab_flow_call(frame, RESPONSE, "mobileFetch", "response", 1, 0);
-        case RESPONSE:
-            if (!lab_dom_truth(lab_dom_get(lab_dom_get(frame, "response"), "ok")))
-                return lab_flow_done(0);
-            return lab_flow_call(frame, DATA, "responseData", "data", 1, 1, lab_dom_get(frame, "response"));
-        case DATA:
-            return lab_flow_call(frame, DONE, "native", 0, 0, 2, lab_dom_string("lab_payload_mobile"),
-                                 lab_dom_get(frame, "data"));
-        default:
-            return lab_flow_done(0);
-    }
+    static int (*const handlers[])(int) = {
+        [flow_request_mobile_stage_start]    = lab_flow_request_mobile_start,
+        [flow_request_mobile_stage_response] = lab_flow_request_mobile_response,
+        [flow_request_mobile_stage_data]     = lab_flow_request_mobile_data,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](frame)
+               : lab_flow_request_mobile_otherwise(frame);
+}
+
+enum {
+    flow_request_forms_stage_fetch,
+    flow_request_forms_stage_decode,
+    flow_request_forms_stage_validate,
+    flow_request_forms_stage_done
+};
+
+static int lab_flow_request_forms_fetch(int frame)
+{
+    return lab_flow_call(frame, flow_request_forms_stage_decode, "rawPost", "response", 1, 3, lab_dom_string("/forms"),
+                         lab_dom_get(frame, "payload"), lab_dom_get(lab_dom_get(frame, "options"), "signal"));
+}
+
+static int lab_flow_request_forms_decode(int frame)
+{
+    return lab_flow_call(frame, flow_request_forms_stage_validate, "responseData", "data", 1, 1,
+                         lab_dom_get(frame, "response"));
+}
+
+static int lab_flow_request_forms_validate(int frame)
+{
+    int response = lab_dom_get(frame, "response"), data = lab_dom_get(frame, "data");
+    if (lab_dom_truth(lab_dom_get(response, "ok")) && lab_dom_truth(lab_dom_get(data, "ok")))
+        return lab_flow_done(data);
+    int error = lab_dom_get(data, "error");
+    if (!lab_dom_truth(error))
+        error = lab_dom_join(lab_dom_string("Form preparation failed ("), lab_dom_text(lab_dom_get(response, "status")),
+                             ")");
+    return lab_flow_call(frame, flow_request_forms_stage_done, "fail", 0, 0, 1, error);
+}
+
+static int lab_flow_request_forms_otherwise(int frame)
+{
+    (void)frame;
+    return lab_flow_done(0);
 }
 
 static int lab_flow_request_forms(int frame)
 {
-    enum { FETCH, DECODE, VALIDATE, DONE };
-    switch (lab_flow_request_stage(frame)) {
-        case FETCH:
-            return lab_flow_call(frame, DECODE, "rawPost", "response", 1, 3, lab_dom_string("/forms"),
-                                 lab_dom_get(frame, "payload"), lab_dom_get(lab_dom_get(frame, "options"), "signal"));
-        case DECODE:
-            return lab_flow_call(frame, VALIDATE, "responseData", "data", 1, 1, lab_dom_get(frame, "response"));
-        case VALIDATE: {
-            int response = lab_dom_get(frame, "response"), data = lab_dom_get(frame, "data");
-            if (lab_dom_truth(lab_dom_get(response, "ok")) && lab_dom_truth(lab_dom_get(data, "ok")))
-                return lab_flow_done(data);
-            int error = lab_dom_get(data, "error");
-            if (!lab_dom_truth(error))
-                error = lab_dom_join(lab_dom_string("Form preparation failed ("),
-                                     lab_dom_text(lab_dom_get(response, "status")), ")");
-            return lab_flow_call(frame, DONE, "fail", 0, 0, 1, error);
-        }
-        default:
-            return lab_flow_done(0);
+    static int (*const handlers[])(int) = {
+        [flow_request_forms_stage_fetch]    = lab_flow_request_forms_fetch,
+        [flow_request_forms_stage_decode]   = lab_flow_request_forms_decode,
+        [flow_request_forms_stage_validate] = lab_flow_request_forms_validate,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](frame)
+               : lab_flow_request_forms_otherwise(frame);
+}
+
+enum {
+    flow_request_presentation_stage_context,
+    flow_request_presentation_stage_current,
+    flow_request_presentation_stage_fetch,
+    flow_request_presentation_stage_decode,
+    flow_request_presentation_stage_check_current,
+    flow_request_presentation_stage_validate,
+    flow_request_presentation_stage_accept,
+    flow_request_presentation_stage_done
+};
+
+struct lab_flow_request_presentation_context {
+    int frame;
+    int request;
+};
+
+
+static int lab_flow_request_presentation_context(struct lab_flow_request_presentation_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_presentation_stage_current, "requestContext", "context", 0, 0);
+}
+
+static int lab_flow_request_presentation_check_current(struct lab_flow_request_presentation_context *ctx)
+{
+    return lab_flow_call(ctx->frame,
+                         lab_flow_request_stage(ctx->frame) == flow_request_presentation_stage_current
+                             ? flow_request_presentation_stage_fetch
+                             : flow_request_presentation_stage_validate,
+                         ctx->request ? "requestCurrent" : "requestContext", "current", 0, ctx->request ? 1 : 0,
+                         ctx->request);
+}
+
+static int lab_flow_request_presentation_validate(struct lab_flow_request_presentation_context *ctx)
+{
+    {
+        int live = ctx->request ? lab_flow_request_truth(ctx->frame, "current")
+                                : lab_dom_equal(lab_dom_get(ctx->frame, "context"), lab_dom_get(ctx->frame, "current"));
+        if (!live)
+            return lab_flow_call(ctx->frame, flow_request_presentation_stage_done, "abort", 0, 0, 1,
+                                 lab_dom_string("Obsolete presentation request"));
+        if (lab_flow_request_stage(ctx->frame) == flow_request_presentation_stage_fetch)
+            return lab_flow_call(ctx->frame, flow_request_presentation_stage_decode, "rawPost", "response", 1, 3,
+                                 lab_dom_string("/presentation"), lab_dom_get(ctx->frame, "payload"),
+                                 lab_dom_get(lab_dom_get(ctx->request, "controller"), "signal"));
+        int data = lab_dom_get(ctx->frame, "data"), response = lab_dom_get(ctx->frame, "response");
+        if (!lab_dom_truth(lab_dom_get(response, "ok")) || !lab_dom_truth(lab_dom_get(data, "ok")))
+            return lab_flow_call(
+                ctx->frame, flow_request_presentation_stage_done, "fail", 0, 0, 1,
+                lab_flow_request_fallback(lab_dom_get(data, "error"), "Native presentation request failed"));
+        return lab_flow_call(ctx->frame, flow_request_presentation_stage_done, "installPresentation", 0, 0, 1, data);
     }
+}
+
+static int lab_flow_request_presentation_decode(struct lab_flow_request_presentation_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_presentation_stage_check_current, "responseData", "data", 1, 1,
+                         lab_dom_get(ctx->frame, "response"));
+}
+
+static int lab_flow_request_presentation_otherwise(struct lab_flow_request_presentation_context *ctx)
+{
+    return lab_flow_done(lab_dom_get(ctx->frame, "data"));
 }
 
 static int lab_flow_request_presentation(int frame)
 {
-    enum { CONTEXT, CURRENT, FETCH, DECODE, CHECK_CURRENT, VALIDATE, ACCEPT, DONE };
     int request = lab_dom_get(frame, "request");
-    switch (lab_flow_request_stage(frame)) {
-        case CONTEXT:
-            return lab_flow_call(frame, CURRENT, "requestContext", "context", 0, 0);
-        case CURRENT:
-        case CHECK_CURRENT:
-            return lab_flow_call(frame, lab_flow_request_stage(frame) == CURRENT ? FETCH : VALIDATE,
-                                 request ? "requestCurrent" : "requestContext", "current", 0, request ? 1 : 0, request);
-        case FETCH:
-        case VALIDATE: {
-            int live = request ? lab_flow_request_truth(frame, "current")
-                               : lab_dom_equal(lab_dom_get(frame, "context"), lab_dom_get(frame, "current"));
-            if (!live)
-                return lab_flow_call(frame, DONE, "abort", 0, 0, 1, lab_dom_string("Obsolete presentation request"));
-            if (lab_flow_request_stage(frame) == FETCH)
-                return lab_flow_call(frame, DECODE, "rawPost", "response", 1, 3, lab_dom_string("/presentation"),
-                                     lab_dom_get(frame, "payload"),
-                                     lab_dom_get(lab_dom_get(request, "controller"), "signal"));
-            int data = lab_dom_get(frame, "data"), response = lab_dom_get(frame, "response");
-            if (!lab_dom_truth(lab_dom_get(response, "ok")) || !lab_dom_truth(lab_dom_get(data, "ok")))
-                return lab_flow_call(
-                    frame, DONE, "fail", 0, 0, 1,
-                    lab_flow_request_fallback(lab_dom_get(data, "error"), "Native presentation request failed"));
-            return lab_flow_call(frame, DONE, "installPresentation", 0, 0, 1, data);
-        }
-        case DECODE:
-            return lab_flow_call(frame, CHECK_CURRENT, "responseData", "data", 1, 1, lab_dom_get(frame, "response"));
-        default:
-            return lab_flow_done(lab_dom_get(frame, "data"));
-    }
+    struct lab_flow_request_presentation_context ctx = {
+        .frame = frame,
+        .request = request,
+    };
+    static int (*const handlers[])(struct lab_flow_request_presentation_context *) = {
+        [flow_request_presentation_stage_context]       = lab_flow_request_presentation_context,
+        [flow_request_presentation_stage_current]       = lab_flow_request_presentation_check_current,
+        [flow_request_presentation_stage_check_current] = lab_flow_request_presentation_check_current,
+        [flow_request_presentation_stage_fetch]         = lab_flow_request_presentation_validate,
+        [flow_request_presentation_stage_validate]      = lab_flow_request_presentation_validate,
+        [flow_request_presentation_stage_decode]        = lab_flow_request_presentation_decode,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](&ctx)
+               : lab_flow_request_presentation_otherwise(&ctx);
+}
+
+enum {
+    flow_request_editor_stage_cache,
+    flow_request_editor_stage_resources,
+    flow_request_editor_stage_context,
+    flow_request_editor_stage_select,
+    flow_request_editor_stage_done
+};
+
+struct lab_flow_request_editor_context {
+    int frame;
+    int view;
+};
+
+static int lab_flow_request_editor_cache(struct lab_flow_request_editor_context *ctx)
+{
+    int source = lab_dom_clean(lab_dom_text(lab_flow_request_fallback(lab_dom_get(ctx->frame, "text"), "")), 0);
+    lab_dom_set(ctx->frame, "source", source);
+    int editors = lab_dom_get(ctx->view, "editors");
+    if (lab_dom_member(editors, source))
+        return lab_flow_done(lab_dom_map_get(editors, source));
+    return lab_flow_call(ctx->frame, flow_request_editor_stage_context, "requestContext", "context", 0, 0);
+}
+
+static int lab_flow_request_editor_context(struct lab_flow_request_editor_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_editor_stage_select, "editorRequests", "requests", 0, 0);
+}
+
+static int lab_flow_request_editor_select(struct lab_flow_request_editor_context *ctx)
+{
+    int source = lab_dom_get(ctx->frame, "source"), requests = lab_dom_get(ctx->frame, "requests");
+    int pending = lab_dom_map_get(requests, source);
+    if (pending && lab_dom_equal(lab_dom_get(pending, "context"), lab_dom_get(ctx->frame, "context")))
+        return lab_flow_call(ctx->frame, flow_request_editor_stage_done, "awaitValue", "value", 1, 1,
+                             lab_dom_get(pending, "promise"));
+    pending = lab_dom_object(5);
+    lab_dom_set(pending, "context", lab_dom_get(ctx->frame, "context"));
+    lab_dom_set(pending, "promise", 0);
+    int payload = lab_dom_object(5);
+    lab_dom_set(payload, "action", lab_dom_string("editor"));
+    lab_dom_set(payload, "operation", lab_dom_string("analyse"));
+    lab_dom_set(payload, "text", source);
+    return lab_flow_call(ctx->frame, flow_request_editor_stage_done, "editorPromise", "value", 1, 3, source, pending,
+                         payload);
+}
+
+static int lab_flow_request_editor_otherwise(struct lab_flow_request_editor_context *ctx)
+{
+    return lab_flow_done(lab_dom_get(ctx->frame, "value"));
 }
 
 static int lab_flow_request_editor(int frame, int view)
 {
-    enum { CACHE, RESOURCES, CONTEXT, SELECT, DONE };
-    switch (lab_flow_request_stage(frame)) {
-        case CACHE: {
-            int source = lab_dom_clean(lab_dom_text(lab_flow_request_fallback(lab_dom_get(frame, "text"), "")), 0);
-            lab_dom_set(frame, "source", source);
-            int editors = lab_dom_get(view, "editors");
-            if (lab_dom_member(editors, source))
-                return lab_flow_done(lab_dom_map_get(editors, source));
-            return lab_flow_call(frame, CONTEXT, "requestContext", "context", 0, 0);
-        }
-        case CONTEXT:
-            return lab_flow_call(frame, SELECT, "editorRequests", "requests", 0, 0);
-        case SELECT: {
-            int source = lab_dom_get(frame, "source"), requests = lab_dom_get(frame, "requests");
-            int pending = lab_dom_map_get(requests, source);
-            if (pending && lab_dom_equal(lab_dom_get(pending, "context"), lab_dom_get(frame, "context")))
-                return lab_flow_call(frame, DONE, "awaitValue", "value", 1, 1, lab_dom_get(pending, "promise"));
-            pending = lab_dom_object(5);
-            lab_dom_set(pending, "context", lab_dom_get(frame, "context"));
-            lab_dom_set(pending, "promise", 0);
-            int payload = lab_dom_object(5);
-            lab_dom_set(payload, "action", lab_dom_string("editor"));
-            lab_dom_set(payload, "operation", lab_dom_string("analyse"));
-            lab_dom_set(payload, "text", source);
-            return lab_flow_call(frame, DONE, "editorPromise", "value", 1, 3, source, pending, payload);
-        }
-        default:
-            return lab_flow_done(lab_dom_get(frame, "value"));
-    }
+    struct lab_flow_request_editor_context ctx = {
+        .frame = frame,
+        .view = view,
+    };
+    static int (*const handlers[])(struct lab_flow_request_editor_context *) = {
+        [flow_request_editor_stage_cache]   = lab_flow_request_editor_cache,
+        [flow_request_editor_stage_context] = lab_flow_request_editor_context,
+        [flow_request_editor_stage_select]  = lab_flow_request_editor_select,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](&ctx)
+               : lab_flow_request_editor_otherwise(&ctx);
 }
 
 static int lab_flow_request_presentation_dispatch(int frame, int view)
@@ -454,329 +905,177 @@ static int lab_flow_request_presentation_dispatch(int frame, int view)
                                                    : lab_flow_request_presentation(frame);
 }
 
-static int lab_flow_request_calculus(int frame)
+enum {
+    flow_request_solver_stage_prepare,
+    flow_request_solver_stage_begin,
+    flow_request_solver_stage_install,
+    flow_request_solver_stage_post,
+    flow_request_solver_stage_publish,
+    flow_request_solver_stage_cleanup,
+    flow_request_solver_stage_finish,
+    flow_request_solver_stage_done,
+    flow_request_solver_stage_error
+};
+
+struct lab_flow_request_solver_context {
+    int frame;
+    int pending;
+    int request;
+};
+
+static int lab_flow_request_solver_prepare(struct lab_flow_request_solver_context *ctx)
 {
-    enum {
-        START,
-        CAPTURE,
-        COMMIT,
-        CURRENT,
-        SOURCE,
-        ASSEMBLE,
-        ASSEMBLED,
-        INPUT,
-        SHOW,
-        TITLE,
-        STATUS,
-        FETCH,
-        PREPARED_CURRENT,
-        MATRIX_FETCH,
-        OUTCOME,
-        ACCEPT,
-        CLEAR_ERROR,
-        DISPLAY,
-        SCALAR,
-        POST_CURRENT,
-        VARIABLES,
-        DIFFERENTIABLE,
-        BUTTONS,
-        COMMIT_STATE,
-        READY,
-        PLOT_COMMIT,
-        DONE,
-        ERROR_CURRENT,
-        ERROR_CLEAR,
-        ERROR_VARIABLES,
-        ERROR_DIFFERENTIABLE,
-        ERROR_BUTTONS,
-        ERROR_RENDER,
-        ERROR_DIGITS,
-        ERROR_STATUS,
-        INPUT_ACCEPT,
-        RETURN = 999
-    };
-    int request = lab_dom_get(frame, "request"), action = lab_dom_get(frame, "action"), wrt = lab_dom_get(frame, "wrt");
-    int matrix = lab_flow_request_truth(frame, "matrix"), scalar = lab_flow_request_truth(frame, "scalar");
-    int integral = lab_dom_equal(action, lab_dom_string("integral"));
-    int plot = lab_dom_equal(action, lab_dom_string("plot"));
-    int data = lab_flow_request_data(frame), result = lab_dom_get(frame, "calculus");
-    switch (lab_flow_request_stage(frame)) {
-        case START:
-            return lab_flow_call(frame, CAPTURE, "calculusInitial", "initial", 0, 0);
-        case CAPTURE: {
-            int initial = lab_dom_get(frame, "initial"), mode = lab_dom_get(initial, "mode");
-            matrix = lab_dom_equal(mode, lab_dom_string("matrix"));
-            scalar = matrix && lab_dom_truth(lab_dom_get(initial, "scalar"));
-            lab_dom_set(frame, "matrix", lab_dom_scalar(1, matrix));
-            lab_dom_set(frame, "scalar", lab_dom_scalar(1, scalar));
-            lab_dom_set(frame, "solverPlot", lab_dom_scalar(1, plot &&
-                (lab_dom_equal(mode, lab_dom_string("equation")) ||
-                 lab_dom_equal(mode, lab_dom_string("diffequation")))));
-            if (lab_flow_request_truth(frame, "automatic")) {
-                lab_dom_set(frame, "wrt", lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
-                return lab_flow_call(frame, CURRENT, "calculusCapture", "snapshot", 0, 0);
-            }
-            int options = lab_dom_object(5);
-            lab_dom_set(options, "button", lab_dom_get(frame, "actionButton"));
-            lab_dom_set(options, "variable", lab_dom_scalar(1, lab_dom_truth(wrt)));
-            lab_dom_set(options, "scalar", lab_dom_scalar(1, scalar));
-            return lab_flow_call(frame, RETURN, "runRequestFlow", "value", 1, 6, lab_dom_numeric(7), frame,
-                                 lab_dom_numeric(COMMIT), action, mode, options);
-        }
-        case COMMIT:
-            return lab_flow_call(frame, CURRENT, "calculusCapture", "snapshot", 0, 0);
-        case CURRENT:
-            lab_dom_set(frame, "failed", lab_dom_numeric(ERROR_CURRENT));
-            return lab_flow_call(frame, SOURCE, "commitBindings", 0, 1, 0);
-        case SOURCE:
-            return lab_flow_request_current(frame, ASSEMBLE);
-        case ASSEMBLE:
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_done(0);
-            return lab_flow_call(frame, ASSEMBLED, scalar ? "matrixScalar" : "expressionText", "source", 0, 0);
-        case ASSEMBLED:
-            if (lab_flow_request_truth(frame, "solverPlot"))
-                return lab_flow_request_current(frame, INPUT_ACCEPT);
-            if (!matrix)
-                return lab_flow_call(frame, INPUT, "expressionWithVisibleBindings", "source", 1, 2,
-                                     lab_dom_get(frame, "source"),
-                                     lab_dom_get(lab_dom_get(frame, "snapshot"), "bindings"));
-            return lab_flow_request_current(frame, INPUT_ACCEPT);
-        case INPUT:
-            return lab_flow_request_current(frame, INPUT_ACCEPT);
-        case INPUT_ACCEPT:
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_done(0);
-            return lab_flow_call(frame, SHOW, "requestInput", "accepted", 0, 3, request, lab_dom_get(frame, "source"),
-                                 wrt);
-        case SHOW:
-            if (!lab_flow_request_truth(frame, "accepted"))
-                return lab_flow_done(0);
-            return lab_flow_call(frame, TITLE, "showResults", 0, 0, 0);
-        case TITLE:
-            if (plot)
-                return lab_flow_request_current(frame, FETCH);
-            return lab_flow_call(frame, STATUS, "calculusTitle", 0, 0, 1,
-                                 lab_dom_join(lab_dom_join(lab_dom_text(wrt), lab_dom_string(" "), ""),
-                                              lab_dom_text(action), " RESULT"));
-        case STATUS:
-            return lab_flow_call(
-                frame, FETCH, "setStatus", 0, 0, 1,
-                lab_dom_join(lab_dom_string(plot ? "Plotting against " :
-                                            integral ? "Integrating with respect to " : "Differentiating d/d"),
-                             lab_dom_text(wrt), "..."));
-        case FETCH: {
-            if (matrix && !scalar) {
-                int payload = lab_dom_object(5);
-                lab_dom_set(payload, "action", lab_dom_string("editor"));
-                lab_dom_set(payload, "operation", lab_dom_string("calculus"));
-                lab_dom_set(payload, "calculus", action);
-                lab_dom_set(payload, "text", lab_dom_get(frame, "source"));
-                lab_dom_set(payload, "name", wrt);
-                return lab_flow_call(frame, PREPARED_CURRENT, "requestPresentation", "prepared", 1, 2, payload,
-                                     request);
-            }
-            return lab_flow_call(frame, OUTCOME, "fetchCalculus", "result", 1, 5, lab_dom_get(frame, "source"), wrt,
-                                 lab_dom_string(plot ? "plot" : integral ? "integral" : ""), request,
-                                 lab_dom_get(frame, "preview"));
-        }
-        case PREPARED_CURRENT:
-            return lab_flow_request_current(frame, MATRIX_FETCH);
-        case MATRIX_FETCH: {
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_done(0);
-            int options = lab_dom_object(5);
-            lab_dom_set(options, "matrixText",
-                        lab_dom_get(lab_dom_get(lab_dom_get(frame, "prepared"), "editor"), "expression"));
-            lab_dom_set(options, "operation", lab_dom_string("eval"));
-            lab_dom_set(options, "operand", lab_dom_string(""));
-            lab_dom_set(options, "skipSave", lab_dom_scalar(1, 1));
-            lab_dom_set(options, "request", request);
-            return lab_flow_call(frame, OUTCOME, "fetchMatrixOptions", "result", 1, 1, options);
-        }
-        case OUTCOME: {
-            result = lab_dom_key_get(lab_dom_get(lab_dom_get(data, "presentation"), "calculus"), action);
-            lab_dom_set(frame, "calculus", result);
-            int available = matrix && !scalar ? lab_dom_scalar(1, 1)
-                                              : lab_flow_request_fallback(lab_dom_get(result, "expression"), "");
-            return lab_flow_call(frame, ACCEPT, "requestOutcome", "outcome", 0, 4, request,
-                                 lab_flow_request_response(frame), data, available);
-        }
-        case ACCEPT: {
-            unsigned outcome = (unsigned)lab_dom_number(lab_dom_get(frame, "outcome"));
-            if (!outcome)
-                return lab_flow_done(0);
-            if (outcome == 1) {
-                int error = lab_dom_get(data, "error");
-                if (!lab_dom_truth(error))
-                    error = lab_dom_get(data, "raw");
-                if (!lab_dom_truth(error))
-                    error = lab_dom_join(lab_dom_join(lab_dom_string("No "), lab_dom_text(action), " for "),
-                                         lab_dom_text(wrt), "");
-                if (plot && lab_flow_request_truth(frame, "live")) {
-                    lab_dom_write(lab_dom_id("plotFeedback"), 0, "", error);
-                    lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 0);
-                    return lab_flow_done(0);
-                }
-                return lab_flow_call(frame, plot ? PLOT_COMMIT : DONE, plot ? "plotError" : "fail", 0, 0, 1, error);
-            }
-            if (plot)
-                return lab_flow_call(frame, PLOT_COMMIT, "displayPlot", 0, 0, 1, result);
-            int options = lab_dom_object(5);
-            lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
-            return lab_flow_call(frame, CLEAR_ERROR, "clearResultDetails", 0, 0, 1, options);
-        }
-        case CLEAR_ERROR:
-            lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 1);
-            return lab_flow_call(frame, DISPLAY, "clearRenderedError", 0, 0, 0);
-        case DISPLAY:
-            return lab_flow_call(frame, SCALAR, matrix && !scalar ? "displayMatrixResult" : "displayCalculusResult", 0,
-                                 0, 1, matrix && !scalar ? data : result);
-        case SCALAR:
-            if (matrix && !scalar)
-                return lab_flow_call(frame, POST_CURRENT, "valueTitle", 0, 0, 1,
-                                     lab_dom_string(lab_dom_truth(lab_dom_get(data, "value")) ? "Value" : "Summary"));
-            if (scalar)
-                return lab_flow_call(frame, POST_CURRENT, "setMatrixPrettyResult", 0, 1, 2,
-                                     lab_dom_get(result, "expression"), lab_dom_string(""));
-            return lab_flow_call(frame, POST_CURRENT, "derivative", 0, 0, 1,
-                                 lab_dom_equal(action, lab_dom_string("derivative")) ? lab_dom_get(result, "expression")
-                                                                                     : lab_dom_string(""));
-        case POST_CURRENT:
-            return lab_flow_request_current(frame, VARIABLES);
-        case VARIABLES:
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_done(0);
-            return lab_flow_call(frame, DIFFERENTIABLE, matrix ? "calculusVariables" : "calculusBindingVariables", 0, 0,
-                                 1,
-                                 matrix ? lab_dom_get(lab_dom_get(frame, "snapshot"), "variables")
-                                        : lab_dom_get(data, "binding_values"));
-        case DIFFERENTIABLE: {
-            int enabled =
-                lab_flow_request_truth(frame, "solverPlot") ? lab_dom_scalar(1, 0) : matrix
-                    ? lab_dom_get(lab_dom_get(frame, "snapshot"), "differentiable")
-                    : lab_dom_scalar(1, !lab_dom_equal(lab_dom_clean(lab_dom_text(lab_flow_request_fallback(
-                                                                         lab_dom_get(data, "differentiable"), "yes")),
-                                                                     1),
-                                                       lab_dom_string("no")));
-            return lab_flow_call(frame, BUTTONS, "calculusDifferentiable", 0, 0, 1, enabled);
-        }
-        case BUTTONS:
-            return lab_flow_call(frame, COMMIT_STATE, "calculusButtons", 0, 0, 0);
-        case COMMIT_STATE:
-            if (matrix && !scalar)
-                return lab_flow_call(frame, READY, "commitModeState", 0, 0, 0);
-            return lab_flow_call(frame, DONE, "setStatus", 0, 0, 1, lab_dom_string("Ready"));
-        case READY:
-            return lab_flow_call(frame, DONE, "setStatus", 0, 0, 1, lab_dom_string("Ready"));
-        case PLOT_COMMIT:
-            if (lab_flow_request_truth(frame, "preview"))
-                return lab_flow_done(0);
-            return lab_flow_call(frame, DONE, "commitModeState", 0, 0, 0);
-        case ERROR_CURRENT:
-            return lab_flow_request_current(frame, ERROR_CLEAR);
-        case ERROR_CLEAR: {
-            if (!lab_flow_request_truth(frame, "current"))
-                return lab_flow_done(0);
-            if (lab_flow_request_truth(frame, "live")) {
-                lab_dom_write(lab_dom_id("plotFeedback"), 0, "", lab_dom_get(frame, "error"));
-                lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 0);
-                return lab_flow_done(0);
-            }
-            if (plot)
-                return lab_flow_call(frame, PLOT_COMMIT, "plotError", 0, 0, 1, lab_dom_get(frame, "error"));
-            int options = lab_dom_object(5);
-            lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
-            return lab_flow_call(frame, matrix ? ERROR_VARIABLES : ERROR_RENDER, "clearResultDetails", 0, 0, 1,
-                                 options);
-        }
-        case ERROR_VARIABLES:
-            return lab_flow_call(frame, ERROR_DIFFERENTIABLE, "calculusVariables", 0, 0, 1,
-                                 lab_dom_get(lab_dom_get(frame, "snapshot"), "variables"));
-        case ERROR_DIFFERENTIABLE:
-            return lab_flow_call(frame, ERROR_BUTTONS, "calculusDifferentiable", 0, 0, 1,
-                                 lab_dom_get(lab_dom_get(frame, "snapshot"), "differentiable"));
-        case ERROR_BUTTONS:
-            return lab_flow_call(frame, ERROR_RENDER, "calculusButtons", 0, 0, 0);
-        case ERROR_RENDER:
-            return lab_flow_call(frame, ERROR_DIGITS, "setRenderedError", 0, 0, 1, lab_dom_get(frame, "error"));
-        case ERROR_DIGITS:
-            return lab_flow_call(frame, ERROR_STATUS, "resetRenderedDigits", 0, 0, 0);
-        case ERROR_STATUS:
-            return lab_flow_call(frame, DONE, "setStatus", 0, 0, 1, lab_dom_string("Error"));
-        case RETURN:
-            return lab_flow_done(lab_dom_get(frame, "value"));
-        default:
-            return lab_flow_done(0);
-    }
+    return lab_flow_call(ctx->frame, flow_request_solver_stage_begin, "solverPrepare", "pending", 0, 0);
+}
+
+static int lab_flow_request_solver_begin(struct lab_flow_request_solver_context *ctx)
+{
+    if (!ctx->pending)
+        return lab_flow_done(0);
+    return lab_flow_call(ctx->frame, flow_request_solver_stage_install, "requestBegin", "request", 0, 3,
+                         lab_dom_get(ctx->pending, "operation"), lab_dom_get(ctx->pending, "mode"),
+                         lab_dom_get(ctx->pending, "options"));
+}
+
+static int lab_flow_request_solver_install(struct lab_flow_request_solver_context *ctx)
+{
+    if (!ctx->request)
+        return lab_flow_done(0);
+    return lab_flow_call(ctx->frame, flow_request_solver_stage_post, "solverPending", 0, 0, 2, ctx->pending,
+                         ctx->request);
+}
+
+static int lab_flow_request_solver_post(struct lab_flow_request_solver_context *ctx)
+{
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_solver_stage_error));
+    return lab_flow_call(ctx->frame, flow_request_solver_stage_publish, "post", "result", 1, 3, ctx->request,
+                         lab_dom_get(ctx->pending, "payload"), lab_dom_get(ctx->pending, "endpoint"));
+}
+
+static int lab_flow_request_solver_publish(struct lab_flow_request_solver_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_solver_stage_cleanup, "solverPublish", 0, 0, 4, ctx->pending,
+                         lab_flow_request_response(ctx->frame), lab_flow_request_data(ctx->frame), lab_dom_numeric(0));
+}
+
+static int lab_flow_request_solver_error(struct lab_flow_request_solver_context *ctx)
+{
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_solver_stage_cleanup));
+    return lab_flow_call(ctx->frame, flow_request_solver_stage_cleanup, "solverPublish", 0, 0, 4, ctx->pending, 0, 0,
+                         lab_dom_numeric(1));
+}
+
+static int lab_flow_request_solver_cleanup(struct lab_flow_request_solver_context *ctx)
+{
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_solver_stage_finish));
+    return lab_flow_call(ctx->frame, flow_request_solver_stage_finish, "solverRelease", 0, 0, 1, ctx->pending);
+}
+
+static int lab_flow_request_solver_finish(struct lab_flow_request_solver_context *ctx)
+{
+    return lab_flow_request_finish(ctx->frame, flow_request_solver_stage_done);
+}
+
+static int lab_flow_request_solver_otherwise(struct lab_flow_request_solver_context *ctx)
+{
+    (void)ctx;
+    return lab_flow_done(0);
 }
 
 static int lab_flow_request_solver(int frame)
 {
-    enum { PREPARE, BEGIN, INSTALL, POST, PUBLISH, CLEANUP, FINISH, DONE, ERROR };
     int pending = lab_dom_get(frame, "pending"), request = lab_dom_get(frame, "request");
-    switch (lab_flow_request_stage(frame)) {
-        case PREPARE:
-            return lab_flow_call(frame, BEGIN, "solverPrepare", "pending", 0, 0);
-        case BEGIN:
-            if (!pending)
-                return lab_flow_done(0);
-            return lab_flow_call(frame, INSTALL, "requestBegin", "request", 0, 3, lab_dom_get(pending, "operation"),
-                                 lab_dom_get(pending, "mode"), lab_dom_get(pending, "options"));
-        case INSTALL:
-            if (!request)
-                return lab_flow_done(0);
-            return lab_flow_call(frame, POST, "solverPending", 0, 0, 2, pending, request);
-        case POST:
-            lab_dom_set(frame, "failed", lab_dom_numeric(ERROR));
-            return lab_flow_call(frame, PUBLISH, "post", "result", 1, 3, request, lab_dom_get(pending, "payload"),
-                                 lab_dom_get(pending, "endpoint"));
-        case PUBLISH:
-            return lab_flow_call(frame, CLEANUP, "solverPublish", 0, 0, 4, pending, lab_flow_request_response(frame),
-                                 lab_flow_request_data(frame), lab_dom_numeric(0));
-        case ERROR:
-            lab_dom_set(frame, "failed", lab_dom_numeric(CLEANUP));
-            return lab_flow_call(frame, CLEANUP, "solverPublish", 0, 0, 4, pending, 0, 0, lab_dom_numeric(1));
-        case CLEANUP:
-            lab_dom_set(frame, "failed", lab_dom_numeric(FINISH));
-            return lab_flow_call(frame, FINISH, "solverRelease", 0, 0, 1, pending);
-        case FINISH:
-            return lab_flow_request_finish(frame, DONE);
-        default:
-            return lab_flow_done(0);
-    }
+    struct lab_flow_request_solver_context ctx = {
+        .frame = frame,
+        .pending = pending,
+        .request = request,
+    };
+    static int (*const handlers[])(struct lab_flow_request_solver_context *) = {
+        [flow_request_solver_stage_prepare] = lab_flow_request_solver_prepare,
+        [flow_request_solver_stage_begin]   = lab_flow_request_solver_begin,
+        [flow_request_solver_stage_install] = lab_flow_request_solver_install,
+        [flow_request_solver_stage_post]    = lab_flow_request_solver_post,
+        [flow_request_solver_stage_publish] = lab_flow_request_solver_publish,
+        [flow_request_solver_stage_error]   = lab_flow_request_solver_error,
+        [flow_request_solver_stage_cleanup] = lab_flow_request_solver_cleanup,
+        [flow_request_solver_stage_finish]  = lab_flow_request_solver_finish,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](&ctx)
+               : lab_flow_request_solver_otherwise(&ctx);
+}
+
+enum {
+    flow_request_fetch_stage_build,
+    flow_request_fetch_stage_save,
+    flow_request_fetch_stage_post,
+    flow_request_fetch_stage_done
+};
+
+static const char *const lab_flow_request_fetch_endpoints[] = {"/matrix-eval", "/equation-eval", "/diffequation-eval",
+                                                               "/datetime-eval", "/almanac-eval"};
+
+static const char *const lab_flow_request_fetch_modes[] = {"matrix", "equation", "diffequation", "datetime", "almanac"};
+
+struct lab_flow_request_fetch_context {
+    int frame;
+    unsigned int mode;
+};
+
+static int lab_flow_request_fetch_build(struct lab_flow_request_fetch_context *ctx)
+{
+    if (ctx->mode == 1 || ctx->mode == 2)
+        return lab_flow_call(ctx->frame, flow_request_fetch_stage_save, "saveWorksheetState", 0, 0, 1,
+                             lab_dom_string(lab_flow_request_fetch_modes[ctx->mode]));
+    return lab_flow_call(ctx->frame, flow_request_fetch_stage_save, "fetchPayload", "payload", 0, 1, ctx->frame);
+}
+
+static int lab_flow_request_fetch_save(struct lab_flow_request_fetch_context *ctx)
+{
+    if (ctx->mode == 1 || ctx->mode == 2)
+        return lab_flow_call(ctx->frame, flow_request_fetch_stage_post, "fetchPayload", "payload", 0, 1, ctx->frame);
+    if (ctx->mode == 0 && !lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "payload"), "transient")))
+        return lab_flow_call(ctx->frame, flow_request_fetch_stage_post, "saveWorksheetState", 0, 0, 1,
+                             lab_dom_string("matrix"));
+    if (ctx->mode >= 3)
+        return lab_flow_call(ctx->frame, flow_request_fetch_stage_post,
+                             ctx->mode == 3 ? "saveLastDatetimeState" : "saveLastAlmanacState", 0, 0, 0);
+    return lab_flow_call(ctx->frame, flow_request_fetch_stage_done, "post", "value", 1, 3,
+                         lab_dom_get(ctx->frame, "request"), lab_dom_get(ctx->frame, "payload"),
+                         lab_dom_string(lab_flow_request_fetch_endpoints[ctx->mode]));
+}
+
+static int lab_flow_request_fetch_post(struct lab_flow_request_fetch_context *ctx)
+{
+    return lab_flow_call(ctx->frame, flow_request_fetch_stage_done, "post", "value", 1, 3,
+                         lab_dom_get(ctx->frame, "request"), lab_dom_get(ctx->frame, "payload"),
+                         lab_dom_string(lab_flow_request_fetch_endpoints[ctx->mode]));
+}
+
+static int lab_flow_request_fetch_otherwise(struct lab_flow_request_fetch_context *ctx)
+{
+    return lab_flow_done(lab_dom_get(ctx->frame, "value"));
 }
 
 static int lab_flow_request_fetch(int frame)
 {
-    enum { BUILD, SAVE, POST, DONE };
     unsigned mode = (unsigned)lab_dom_number(lab_dom_get(frame, "mode"));
-    static const char *const endpoints[] = {"/matrix-eval", "/equation-eval", "/diffequation-eval", "/datetime-eval",
-                                            "/almanac-eval"};
-    static const char *const modes[] = {"matrix", "equation", "diffequation", "datetime", "almanac"};
-    if (mode >= sizeof endpoints / sizeof *endpoints)
+
+    if (mode >= sizeof lab_flow_request_fetch_endpoints / sizeof *lab_flow_request_fetch_endpoints)
         return lab_flow_done(0);
-    switch (lab_flow_request_stage(frame)) {
-        case BUILD:
-            if (mode == 1 || mode == 2)
-                return lab_flow_call(frame, SAVE, "saveWorksheetState", 0, 0, 1, lab_dom_string(modes[mode]));
-            return lab_flow_call(frame, SAVE, "fetchPayload", "payload", 0, 1, frame);
-        case SAVE:
-            if (mode == 1 || mode == 2)
-                return lab_flow_call(frame, POST, "fetchPayload", "payload", 0, 1, frame);
-            if (mode == 0 && !lab_dom_truth(lab_dom_get(lab_dom_get(frame, "payload"), "transient")))
-                return lab_flow_call(frame, POST, "saveWorksheetState", 0, 0, 1, lab_dom_string("matrix"));
-            if (mode >= 3)
-                return lab_flow_call(frame, POST, mode == 3 ? "saveLastDatetimeState" : "saveLastAlmanacState", 0, 0,
-                                     0);
-            return lab_flow_call(frame, DONE, "post", "value", 1, 3, lab_dom_get(frame, "request"),
-                                 lab_dom_get(frame, "payload"), lab_dom_string(endpoints[mode]));
-        case POST:
-            return lab_flow_call(frame, DONE, "post", "value", 1, 3, lab_dom_get(frame, "request"),
-                                 lab_dom_get(frame, "payload"), lab_dom_string(endpoints[mode]));
-        default:
-            return lab_flow_done(lab_dom_get(frame, "value"));
-    }
+    struct lab_flow_request_fetch_context ctx = {
+        .frame = frame,
+        .mode = mode,
+    };
+    static int (*const handlers[])(struct lab_flow_request_fetch_context *) = {
+        [flow_request_fetch_stage_build] = lab_flow_request_fetch_build,
+        [flow_request_fetch_stage_save]  = lab_flow_request_fetch_save,
+        [flow_request_fetch_stage_post]  = lab_flow_request_fetch_post,
+    };
+    unsigned selected = lab_flow_request_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](&ctx)
+                                                                               : lab_flow_request_fetch_otherwise(&ctx);
 }
 
 /* Direct workflow indexing; stages remain private to each independent protocol. */
@@ -785,9 +1084,15 @@ int lab_flow_request(unsigned kind, int frame, int view)
     if (kind == 7)
         return lab_flow_request_presentation_dispatch(frame, view);
     static int (*const workflows[])(int) = {
-        [0] = lab_flow_request_function, [1] = lab_flow_request_calculus,     [2] = lab_flow_request_integrator,
-        [3] = lab_flow_request_land,     [4] = lab_flow_request_holidays,     [5] = lab_flow_request_mobile,
-        [6] = lab_flow_request_forms,    [7] = lab_flow_request_presentation, [8] = lab_flow_request_solver,
+        [0] = lab_flow_request_function,
+        [1] = lab_flow_request_calculus,
+        [2] = lab_flow_request_integrator,
+        [3] = lab_flow_request_land,
+        [4] = lab_flow_request_holidays,
+        [5] = lab_flow_request_mobile,
+        [6] = lab_flow_request_forms,
+        [7] = lab_flow_request_presentation,
+        [8] = lab_flow_request_solver,
         [9] = lab_flow_request_fetch,
     };
     return kind < sizeof workflows / sizeof *workflows ? workflows[kind](frame) : lab_flow_done(0);

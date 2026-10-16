@@ -6,6 +6,8 @@
  * The worker evaluates centre +/- half-span * 2^-exponent with number_t and
  * adaptive precision. Recipes never accumulate or nest across gestures. The
  * browser's numbers are only approximate labels and relative GPU transforms.
+ * Auto height grids zoom horizontally and accept a fresh native height range;
+ * implicit meshes and other height policies retain three-axis volume clipping.
  */
 #include "lab_dom.h"
 #include "lab_plot_controls.h"
@@ -68,19 +70,40 @@ void lab_surface_volume_init(int view, int saved, unsigned same)
 {
     int chart = lab_dom_get(view, "chart"), volume = lab_dom_get(saved, "volume");
     int refining = lab_dom_truth(lab_dom_get(saved, "refining"));
-    if (!volume || (!same && !refining)) {
+    int manual = lab_dom_equal(lab_dom_read(lab_dom_id("plotScale"), 5, ""), lab_dom_string("manual"));
+    int automatic = lab_dom_equal(lab_dom_read(lab_dom_id("plotScale"), 5, ""), lab_dom_string("auto"));
+    /* Auto/Fit all must discard a clipped preview even if the native mesh is unchanged.
+       Genuine zoom refinements retain their exact selected volume. */
+    int was_auto = lab_dom_truth(lab_dom_get(volume, "autoHeight"));
+    int restore_height = volume && !refining && lab_dom_truth(lab_dom_get(volume, "started")) &&
+                         ((!manual && !was_auto) || (was_auto && !automatic));
+    if (!volume || (!same && !refining) || restore_height) {
         volume = lab_dom_object(5);
         lab_dom_set(volume, "base", read_bounds(chart, keys));
         lab_dom_set(volume, "bounds", read_bounds(chart, keys));
-        lab_dom_set(volume, "exact", initial_exact(chart));
+        lab_dom_set(volume, "exact", restore_height ? read_bounds(chart, exact_keys) : initial_exact(chart));
         lab_dom_set(volume, "units", lab_dom_get(view, "units"));
         lab_dom_set(volume, "labelWidth", lab_dom_read(chart, 3, "labelWidth"));
         lab_dom_set(volume, "original", control_values());
         lab_dom_set(volume, "exponent", lab_dom_numeric(0));
         lab_dom_set(volume, "sampleExponent", lab_dom_numeric(0));
+        lab_dom_set(volume, "autoHeight", lab_dom_scalar(1,
+            lab_dom_equal(lab_dom_read(chart, 3, "mesh"), lab_dom_string("false")) &&
+            automatic));
+        if (restore_height)
+            lab_dom_set(lab_dom_get(view, "camera"), "scale", lab_dom_numeric(1));
     }
     lab_dom_set(volume, "sampled", read_bounds(chart, keys));
     if (refining) {
+        if (lab_dom_truth(lab_dom_get(volume, "autoHeight"))) {
+            int previous = lab_dom_get(volume, "bounds"), bounds = lab_dom_object(4);
+            for (unsigned i = 0; i < 6; ++i)
+                lab_dom_push(bounds, i < 4 ? lab_dom_item(previous, i) :
+                             lab_dom_numeric(lab_dom_to_number(lab_dom_read(chart, 3, keys[i]))));
+            lab_dom_set(volume, "bounds", bounds);
+            lab_dom_set(volume, "units", lab_dom_get(view, "units"));
+            lab_dom_set(volume, "labelWidth", lab_dom_read(chart, 3, "labelWidth"));
+        }
         lab_dom_set(volume, "dirty", lab_dom_scalar(1, 0));
         lab_dom_set(volume, "sampleExponent", lab_dom_get(volume, "exponent"));
         for (unsigned i = 0; i < 6 && lab_dom_truth(lab_dom_get(volume, "started")); ++i) {
@@ -132,6 +155,18 @@ int lab_surface_zoom(int view, unsigned kind, double value, int event, unsigned 
             exponent += lab_surface_log2(__builtin_sqrt(dx*dx + dy*dy) / numeric(event, "pinchDistance"));
     }
     if (reset) exponent = 0;
+    /* A space curve has one sampled parameter, not a surface domain to refine. */
+    if (lab_dom_equal(lab_dom_read(lab_dom_get(view, "chart"), 3, "segments"), lab_dom_string("true"))) {
+        if (!__builtin_isfinite(exponent))
+            return 0;
+        if (exponent < -3) exponent = -3;
+        if (exponent > 6) exponent = 6;
+        lab_dom_set(volume, "exponent", lab_dom_numeric(exponent));
+        lab_dom_set(volume, "sampleExponent", lab_dom_numeric(exponent));
+        lab_dom_set(volume, "dirty", lab_dom_scalar(1, 0));
+        lab_dom_set(camera, "scale", lab_dom_numeric(lab_surface_exp2(exponent)));
+        return 1;
+    }
     /* Native plotting has a 65,536-bit resource ceiling, not an f64 coordinate limit. */
     if (!__builtin_isfinite(exponent) || exponent > 32000 || exponent < -1024) {
         int feedback = lab_dom_id("plotFeedback");
@@ -143,7 +178,17 @@ int lab_surface_zoom(int view, unsigned kind, double value, int event, unsigned 
         lab_dom_set(volume, "original", control_values());
     int exact = lab_dom_get(volume, "exact"), base = lab_dom_get(volume, "base"), bounds = lab_dom_object(4);
     double scale = lab_surface_exp2(exponent);
+    int auto_height = lab_dom_truth(lab_dom_get(volume, "autoHeight"));
     for (unsigned i = 0; i < 6; ++i) {
+        if (auto_height && i >= 4) {
+            lab_dom_push(bounds, lab_dom_item(lab_dom_get(volume, "sampled"), i));
+            if (reset) {
+                int control = lab_dom_id(controls[i]);
+                lab_dom_write(control, 5, "", lab_dom_item(lab_dom_get(volume, "original"), i));
+                lab_dom_delete(control, "marsZoomText"); lab_dom_delete(control, "marsZoomValue");
+            }
+            continue;
+        }
         unsigned lower = (i / 2) * 2;
         double lo = lab_dom_to_number(lab_dom_item(base, lower)), hi = lab_dom_to_number(lab_dom_item(base, lower + 1));
         double half = (hi - lo) / (2 * scale), centre = lo/2 + hi/2;
@@ -164,7 +209,7 @@ int lab_surface_zoom(int view, unsigned kind, double value, int event, unsigned 
         }
     }
     lab_dom_write(lab_dom_id("plotScale"), 5, "", reset ?
-                  lab_dom_item(lab_dom_get(volume, "original"), 6) : lab_dom_string("manual"));
+                  lab_dom_item(lab_dom_get(volume, "original"), 6) : lab_dom_string(auto_height ? "auto" : "manual"));
     lab_dom_set(volume, "bounds", bounds);
     lab_dom_set(volume, "exponent", lab_dom_numeric(exponent));
     lab_dom_set(volume, "dirty", lab_dom_scalar(1, 1));

@@ -34,6 +34,36 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
         equal(frame.context, context, 'invalid stage preserves context');
     }
 
+    // Every indexed workflow must reject absent entries without an indirect-call trap.
+    for (let kind = 0; kind < 76; ++kind) {
+        const frame = {mode: 0, stage: 65535};
+        const plan = labDOM.call('lab_flow_step', kind, frame, {});
+        equal(plan.done, true, `unknown stage terminates workflow ${kind}`);
+        equal(frame.stage, 65535, 'unknown stage leaves the frame unchanged');
+        equal((plan.calls || []).length, 0, 'unknown stage schedules no browser operation');
+    }
+    for (const [kind, stage] of [[13, 7], [56, 19], [64, 4]]) {
+        const plan = labDOM.call('lab_flow_step', kind, {stage}, {});
+        equal(plan.done, true, 'a gap within a stage table uses its completion handler');
+    }
+    const returned = {exact: 'calculus return'};
+    equal(labDOM.call('lab_flow_step', 7, {stage: 999, value: returned}, {}).value, returned,
+          'sparse calculus return stage preserves the exact result');
+    for (let kind = 0; kind < 17; ++kind) {
+        const plan = labDOM.call('lab_state_sync', kind, {stage: 65535});
+        equal(plan.done, true, 'synchronous dispatch rejects unknown stages');
+        equal((plan.calls || []).length, 0, 'unknown synchronous stage has no operations');
+    }
+
+    for (const svg of ['<svg data-impulse="true"></svg>', '']) {
+        const frame = {stage: 14, action: 'plot', request: {}, result: {
+            response: {ok: true}, data: {presentation: {calculus: {plot: {svg}}}}
+        }};
+        const plan = labDOM.call('lab_flow_step', 7, frame, {});
+        equal(plan.calls[0].service, 'requestOutcome', 'plot request reaches outcome validation');
+        equal(plan.calls[0].args[3], svg, 'plot availability follows SVG, not an optional expression field');
+    }
+
     const beforeFlowMarkup = rendered.innerHTML;
     const originalContext = {text: 'original context'};
     const firstFrame = {mode: 0, stage: 0, context: originalContext, options: {skipHistoryUpdate: false}};

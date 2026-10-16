@@ -69,137 +69,309 @@ static int lab_flow_state_forms_payload(int frame, int rows, int expression, int
     return payload;
 }
 
+static int lab_flow_state_clear_state_clear_forward(int frame);
+static int lab_flow_state_clear_state_capture_request(int frame);
+
+static int lab_flow_state_clear_state_clear_prelude(int frame)
+{
+    return lab_flow_state_forms_next(frame, 1, "stateClearPrelude");
+}
+
+static int lab_flow_state_clear_state_clear_owned(int frame)
+{
+    return lab_flow_call(frame, 2, "stateClearOwned", 0, 1, 0);
+}
+
+static int lab_flow_state_clear_complete(int frame)
+{
+    (void)frame;
+    return lab_flow_done(0);
+}
+
+static int lab_flow_state_clear_state_current_history(int frame)
+{
+    return lab_flow_call(frame, 4, "stateCurrentHistory", "history", 0, 0);
+}
+
+static int lab_flow_state_clear_push_history(int frame)
+{
+    if (lab_dom_truth(lab_dom_get(lab_dom_get(frame, "history"), "text")))
+        return lab_flow_call(frame, 5, "pushHistory", 0, 0, 1, lab_dom_get(frame, "history"));
+    /* Continue for an empty worksheet. */
+    return lab_flow_state_clear_state_clear_forward(frame);
+}
+
+static int lab_flow_state_clear_state_clear_forward(int frame)
+{
+    return lab_flow_state_forms_next(frame, 6, "stateClearForward");
+}
+
+static int lab_flow_state_clear_state_clear_projection(int frame)
+{
+    return lab_flow_call(frame, 7, "stateClearProjection", "reset", 0, 0);
+}
+
+static int lab_flow_state_clear_state_blank_bounds(int frame)
+{
+    {
+        unsigned reset = (unsigned)lab_dom_number(lab_dom_get(frame, "reset"));
+        if (reset == 1)
+            return lab_flow_state_forms_next(frame, 8, "stateBlankBounds");
+        if (reset == 2)
+            return lab_flow_state_forms_next(frame, 8, "stateResetCalendar");
+        /* Continue after the mode-specific reset, if any. */
+    }
+    return lab_flow_state_clear_state_capture_request(frame);
+}
+
+static int lab_flow_state_clear_state_capture_request(int frame)
+{
+    return lab_flow_call(frame, 9, "stateCaptureRequest", "captured", 1, 1, lab_dom_get(frame, "request"));
+}
+
+static int lab_flow_state_clear_state_clear_source(int frame)
+{
+    if (!lab_dom_truth(lab_dom_get(frame, "captured")))
+        return lab_flow_done(0);
+    return lab_flow_state_forms_next(frame, 10, "stateClearSource");
+}
+
+static int lab_flow_state_clear_state_hide_target(int frame)
+{
+    return lab_flow_state_forms_next(frame, 11, "stateHideTarget");
+}
+
+static int lab_flow_state_clear_state_clear_result(int frame)
+{
+    return lab_flow_state_forms_next(frame, 12, "stateClearResult");
+}
+
+static int lab_flow_state_clear_state_save_result(int frame)
+{
+    return lab_flow_state_forms_next(frame, 13, "stateSaveResult");
+}
+
+static int lab_flow_state_clear_commit_mode_state(int frame)
+{
+    return lab_flow_state_forms_next(frame, 14, "commitModeState");
+}
+
+static int lab_flow_state_clear_state_history_buttons(int frame)
+{
+    return lab_flow_state_forms_next(frame, 15, "stateHistoryButtons");
+}
+
+static int lab_flow_state_clear_state_status(int frame)
+{
+    return lab_flow_call(frame, 16, "stateStatus", 0, 0, 1, lab_dom_string("Ready"));
+}
+
+static int lab_flow_state_clear_state_focus_editor(int frame)
+{
+    return lab_flow_state_forms_next(frame, 17, "stateFocusEditor");
+}
+
+static int lab_flow_state_clear_otherwise(int frame)
+{
+    (void)frame;
+    return lab_flow_done(0);
+}
+
 static int lab_flow_state_clear(int frame)
 {
-    switch (lab_flow_state_forms_stage(frame)) {
-        case 0:
-            return lab_flow_state_forms_next(frame, 1, "stateClearPrelude");
-        case 1:
-            return lab_flow_call(frame, 2, "stateClearOwned", 0, 1, 0);
-        case 2:
-            return lab_flow_done(0);
-        case 3:
-            return lab_flow_call(frame, 4, "stateCurrentHistory", "history", 0, 0);
-        case 4:
-            if (lab_dom_truth(lab_dom_get(lab_dom_get(frame, "history"), "text")))
-                return lab_flow_call(frame, 5, "pushHistory", 0, 0, 1, lab_dom_get(frame, "history"));
-            /* Fall through for an empty worksheet. */
-        case 5:
-            return lab_flow_state_forms_next(frame, 6, "stateClearForward");
-        case 6:
-            return lab_flow_call(frame, 7, "stateClearProjection", "reset", 0, 0);
-        case 7: {
-            unsigned reset = (unsigned)lab_dom_number(lab_dom_get(frame, "reset"));
-            if (reset == 1)
-                return lab_flow_state_forms_next(frame, 8, "stateBlankBounds");
-            if (reset == 2)
-                return lab_flow_state_forms_next(frame, 8, "stateResetCalendar");
-            /* Fall through after the mode-specific reset, if any. */
-        }
-        case 8:
-            return lab_flow_call(frame, 9, "stateCaptureRequest", "captured", 1, 1, lab_dom_get(frame, "request"));
-        case 9:
-            if (!lab_dom_truth(lab_dom_get(frame, "captured")))
-                return lab_flow_done(0);
-            return lab_flow_state_forms_next(frame, 10, "stateClearSource");
-        case 10:
-            return lab_flow_state_forms_next(frame, 11, "stateHideTarget");
-        case 11:
-            return lab_flow_state_forms_next(frame, 12, "stateClearResult");
-        case 12:
-            return lab_flow_state_forms_next(frame, 13, "stateSaveResult");
-        case 13:
-            return lab_flow_state_forms_next(frame, 14, "commitModeState");
-        case 14:
-            return lab_flow_state_forms_next(frame, 15, "stateHistoryButtons");
-        case 15:
-            return lab_flow_call(frame, 16, "stateStatus", 0, 0, 1, lab_dom_string("Ready"));
-        case 16:
-            return lab_flow_state_forms_next(frame, 17, "stateFocusEditor");
-        default:
-            return lab_flow_done(0);
-    }
+    static int (*const handlers[])(int) = {
+        [0]  = lab_flow_state_clear_state_clear_prelude,
+        [1]  = lab_flow_state_clear_state_clear_owned,
+        [2]  = lab_flow_state_clear_complete,
+        [3]  = lab_flow_state_clear_state_current_history,
+        [4]  = lab_flow_state_clear_push_history,
+        [5]  = lab_flow_state_clear_state_clear_forward,
+        [6]  = lab_flow_state_clear_state_clear_projection,
+        [7]  = lab_flow_state_clear_state_blank_bounds,
+        [8]  = lab_flow_state_clear_state_capture_request,
+        [9]  = lab_flow_state_clear_state_clear_source,
+        [10] = lab_flow_state_clear_state_hide_target,
+        [11] = lab_flow_state_clear_state_clear_result,
+        [12] = lab_flow_state_clear_state_save_result,
+        [13] = lab_flow_state_clear_commit_mode_state,
+        [14] = lab_flow_state_clear_state_history_buttons,
+        [15] = lab_flow_state_clear_state_status,
+        [16] = lab_flow_state_clear_state_focus_editor,
+    };
+    unsigned selected = lab_flow_state_forms_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](frame)
+                                                                               : lab_flow_state_clear_otherwise(frame);
+}
+
+static int lab_flow_state_forms_refresh_state_forms_request(int frame)
+{
+    if (!lab_flow_state_forms_revision(frame))
+        return lab_flow_state_forms_exhausted(frame);
+    return lab_flow_call(frame, 1, "stateFormsRequest", "result", 1, 1, lab_flow_state_forms_payload(frame, 1, 1, 0));
+}
+
+static int lab_flow_state_forms_refresh_state_forms_expression(int frame)
+{
+    return lab_flow_call(frame, 2, "stateFormsExpression", "currentExpression", 0, 0);
+}
+
+static int lab_flow_state_forms_refresh_state_forms_metadata(int frame)
+{
+    if (!lab_flow_state_forms_accept(frame))
+        return lab_flow_state_forms_null();
+    return lab_flow_call(frame, 3, "stateFormsMetadata", 0, 0, 2, lab_dom_get(frame, "expression"),
+                         lab_dom_get(frame, "result"));
+}
+
+static int lab_flow_state_forms_refresh_state_forms_rows(int frame)
+{
+    return lab_flow_call(frame, 4, "stateFormsRows", "completion", 0, 1, lab_dom_get(frame, "result"));
+}
+
+static int lab_flow_state_forms_refresh_complete(int frame)
+{
+    int completion = lab_dom_get(frame, "completion");
+    lab_dom_set(completion, "done", lab_dom_scalar(1, 1));
+    return completion;
+}
+
+static int lab_flow_state_forms_refresh_otherwise(int frame)
+{
+    (void)frame;
+    return lab_flow_done(0);
 }
 
 static int lab_flow_state_forms_refresh(int frame)
 {
-    switch (lab_flow_state_forms_stage(frame)) {
-        case 0:
-            if (!lab_flow_state_forms_revision(frame))
-                return lab_flow_state_forms_exhausted(frame);
-            return lab_flow_call(frame, 1, "stateFormsRequest", "result", 1, 1,
-                                 lab_flow_state_forms_payload(frame, 1, 1, 0));
-        case 1:
-            return lab_flow_call(frame, 2, "stateFormsExpression", "currentExpression", 0, 0);
-        case 2:
-            if (!lab_flow_state_forms_accept(frame))
-                return lab_flow_state_forms_null();
-            return lab_flow_call(frame, 3, "stateFormsMetadata", 0, 0, 2, lab_dom_get(frame, "expression"),
-                                 lab_dom_get(frame, "result"));
-        case 3:
-            return lab_flow_call(frame, 4, "stateFormsRows", "completion", 0, 1, lab_dom_get(frame, "result"));
-        case 4: {
-            int completion = lab_dom_get(frame, "completion");
-            lab_dom_set(completion, "done", lab_dom_scalar(1, 1));
-            return completion;
-        }
-        default:
-            return lab_flow_done(0);
-    }
+    static int (*const handlers[])(int) = {
+        [0] = lab_flow_state_forms_refresh_state_forms_request,
+        [1] = lab_flow_state_forms_refresh_state_forms_expression,
+        [2] = lab_flow_state_forms_refresh_state_forms_metadata,
+        [3] = lab_flow_state_forms_refresh_state_forms_rows,
+        [4] = lab_flow_state_forms_refresh_complete,
+    };
+    unsigned selected = lab_flow_state_forms_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](frame)
+               : lab_flow_state_forms_refresh_otherwise(frame);
+}
+
+static int lab_flow_state_forms_parse_state_forms_request(int frame)
+{
+    return lab_flow_call(frame, 1, "stateFormsRequest", "result", 1, 1,
+                         lab_flow_state_forms_payload(frame, 0, 0, lab_dom_string("")));
+}
+
+static int lab_flow_state_forms_parse_state_forms_rows(int frame)
+{
+    return lab_flow_call(frame, 2, "stateFormsRows", "completion", 0, 1, lab_dom_get(frame, "result"));
+}
+
+static int lab_flow_state_forms_parse_complete(int frame)
+{
+    int completion = lab_dom_get(frame, "completion");
+    lab_dom_set(completion, "done", lab_dom_scalar(1, 1));
+    return completion;
+}
+
+static int lab_flow_state_forms_parse_otherwise(int frame)
+{
+    (void)frame;
+    return lab_flow_done(0);
 }
 
 static int lab_flow_state_forms_parse(int frame)
 {
-    switch (lab_flow_state_forms_stage(frame)) {
-        case 0:
-            return lab_flow_call(frame, 1, "stateFormsRequest", "result", 1, 1,
-                                 lab_flow_state_forms_payload(frame, 0, 0, lab_dom_string("")));
-        case 1:
-            return lab_flow_call(frame, 2, "stateFormsRows", "completion", 0, 1, lab_dom_get(frame, "result"));
-        case 2: {
-            int completion = lab_dom_get(frame, "completion");
-            lab_dom_set(completion, "done", lab_dom_scalar(1, 1));
-            return completion;
-        }
-        default:
-            return lab_flow_done(0);
-    }
+    static int (*const handlers[])(int) = {
+        [0] = lab_flow_state_forms_parse_state_forms_request,
+        [1] = lab_flow_state_forms_parse_state_forms_rows,
+        [2] = lab_flow_state_forms_parse_complete,
+    };
+    unsigned selected = lab_flow_state_forms_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](frame)
+               : lab_flow_state_forms_parse_otherwise(frame);
+}
+
+static int lab_flow_state_forms_restore_guard(int frame)
+{
+    return lab_flow_state_forms_guard(frame, 1);
+}
+
+static int lab_flow_state_forms_restore_state_forms_expression(int frame)
+{
+    if (!lab_dom_truth(lab_dom_get(frame, "current")))
+        return lab_flow_done(lab_dom_scalar(1, 0));
+    if (!lab_flow_state_forms_revision(frame))
+        return lab_flow_state_forms_exhausted(frame);
+    return lab_flow_call(frame, 2, "stateFormsExpression", "expression", 0, 0);
+}
+
+static int lab_flow_state_forms_restore_state_forms_request(int frame)
+{
+    return lab_flow_call(frame, 3, "stateFormsRequest", "result", 1, 1,
+                         lab_flow_state_forms_payload(frame, 0, 1, lab_dom_get(frame, "defaultBounds")));
+}
+
+static int lab_flow_state_forms_restore_recheck(int frame)
+{
+    return lab_flow_state_forms_guard(frame, 4);
+}
+
+static int lab_flow_state_forms_restore_state_forms_expression_4(int frame)
+{
+    if (!lab_dom_truth(lab_dom_get(frame, "current")))
+        return lab_flow_done(lab_dom_scalar(1, 0));
+    return lab_flow_call(frame, 5, "stateFormsExpression", "currentExpression", 0, 0);
+}
+
+static int lab_flow_state_forms_restore_state_forms_metadata(int frame)
+{
+    if (!lab_flow_state_forms_accept(frame))
+        return lab_flow_done(lab_dom_scalar(1, 0));
+    return lab_flow_call(frame, 6, "stateFormsMetadata", 0, 0, 2, lab_dom_get(frame, "expression"),
+                         lab_dom_get(frame, "result"));
+}
+
+static int lab_flow_state_forms_restore_state_forms_rows(int frame)
+{
+    return lab_flow_call(frame, 7, "stateFormsRows", "rows", 0, 1, lab_dom_get(frame, "result"));
+}
+
+static int lab_flow_state_forms_restore_state_forms_render(int frame)
+{
+    return lab_flow_call(frame, 8, "stateFormsRender", 0, 0, 1, lab_dom_get(frame, "rows"));
+}
+
+static int lab_flow_state_forms_restore_complete(int frame)
+{
+    (void)frame;
+    return lab_flow_done(lab_dom_scalar(1, 1));
+}
+
+static int lab_flow_state_forms_restore_otherwise(int frame)
+{
+    (void)frame;
+    return lab_flow_done(0);
 }
 
 static int lab_flow_state_forms_restore(int frame)
 {
-    switch (lab_flow_state_forms_stage(frame)) {
-        case 0:
-            return lab_flow_state_forms_guard(frame, 1);
-        case 1:
-            if (!lab_dom_truth(lab_dom_get(frame, "current")))
-                return lab_flow_done(lab_dom_scalar(1, 0));
-            if (!lab_flow_state_forms_revision(frame))
-                return lab_flow_state_forms_exhausted(frame);
-            return lab_flow_call(frame, 2, "stateFormsExpression", "expression", 0, 0);
-        case 2:
-            return lab_flow_call(frame, 3, "stateFormsRequest", "result", 1, 1,
-                                 lab_flow_state_forms_payload(frame, 0, 1, lab_dom_get(frame, "defaultBounds")));
-        case 3:
-            return lab_flow_state_forms_guard(frame, 4);
-        case 4:
-            if (!lab_dom_truth(lab_dom_get(frame, "current")))
-                return lab_flow_done(lab_dom_scalar(1, 0));
-            return lab_flow_call(frame, 5, "stateFormsExpression", "currentExpression", 0, 0);
-        case 5:
-            if (!lab_flow_state_forms_accept(frame))
-                return lab_flow_done(lab_dom_scalar(1, 0));
-            return lab_flow_call(frame, 6, "stateFormsMetadata", 0, 0, 2, lab_dom_get(frame, "expression"),
-                                 lab_dom_get(frame, "result"));
-        case 6:
-            return lab_flow_call(frame, 7, "stateFormsRows", "rows", 0, 1, lab_dom_get(frame, "result"));
-        case 7:
-            return lab_flow_call(frame, 8, "stateFormsRender", 0, 0, 1, lab_dom_get(frame, "rows"));
-        case 8:
-            return lab_flow_done(lab_dom_scalar(1, 1));
-        default:
-            return lab_flow_done(0);
-    }
+    static int (*const handlers[])(int) = {
+        [0] = lab_flow_state_forms_restore_guard,
+        [1] = lab_flow_state_forms_restore_state_forms_expression,
+        [2] = lab_flow_state_forms_restore_state_forms_request,
+        [3] = lab_flow_state_forms_restore_recheck,
+        [4] = lab_flow_state_forms_restore_state_forms_expression_4,
+        [5] = lab_flow_state_forms_restore_state_forms_metadata,
+        [6] = lab_flow_state_forms_restore_state_forms_rows,
+        [7] = lab_flow_state_forms_restore_state_forms_render,
+        [8] = lab_flow_state_forms_restore_complete,
+    };
+    unsigned selected = lab_flow_state_forms_stage(frame);
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected]
+               ? handlers[selected](frame)
+               : lab_flow_state_forms_restore_otherwise(frame);
 }
 
 /* Four distinct workflows share revision policy without retaining browser handles. */

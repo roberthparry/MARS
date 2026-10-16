@@ -9,7 +9,7 @@
  * synchronous call, with indexed name lookup and bounded temporary storage.
  */
 #include "lab_dom.h"
-#include "../include/lab_forms.h"
+#include "lab_forms.h"
 #include "lab_binding_editor.h"
 #include "lab_binding.h"
 #include "lab_rows.h"

@@ -215,6 +215,12 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
         }
         return NULL;
     }
+    if ((f->ops == &ops_asin || f->ops == &ops_acos) && f->a &&
+        (f->a->ops == &ops_sin || f->a->ops == &ops_cos)) {
+        expr_t *pair = expr_fourier_folded_pair(c, f, x, w);
+        if (pair)
+            return pair;
+    }
     if (f->ops == &ops_tan || f->ops == &ops_cot || f->ops == &ops_principal_value ||
         f->ops == &ops_summation || f->ops == &ops_add || f->ops == &ops_sub) {
         expr_t *pair = expr_fourier_periodic_pair(c, f, x, w);
@@ -724,6 +730,10 @@ const char *expr_fourier_value_note(const expr_t *transform)
         expr_t *known = expr_fourier_result(transform);
         bool supported = known != NULL;
         expr_free(known);
+        if (supported && transform->a->a &&
+            (transform->a->a->ops == &ops_sin || transform->a->a->ops == &ops_cos))
+            return "This periodic triangular wave has a distributional Fourier spectrum: a series of Dirac "
+                   "impulses with complex weights, not a pointwise frequency function.";
         if (supported)
             return "This Fourier pair is distributional. Half-line reciprocal quotients use a unit-cutoff "
                    "finite part at zero. The native engine and inverse matcher preserve that convention and "

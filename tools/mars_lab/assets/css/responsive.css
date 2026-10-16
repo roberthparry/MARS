@@ -318,6 +318,7 @@
   }
 
   :is(.mode-panel, .target-row, .variable-value-box) input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]),
+  #plotSlices input[type="text"],
   .mode-panel select,
   .target-row select,
   .select-button,

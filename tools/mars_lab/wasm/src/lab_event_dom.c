@@ -15,6 +15,7 @@
 #include "lab_workspace_dom.h"
 #include "lab_workspace.h"
 #include "lab_plot_drag.h"
+#include "lab_plot_controls.h"
 #include "lab_plot_pointer.h"
 #include "lab_event_dom.h"
 
@@ -52,6 +53,10 @@ static void lab_event_run(unsigned action, int event, int plan, int calls)
     (void)action;
     (void)event;
     (void)plan;
+    if (lab_workspace_mode() <= 2 || lab_workspace_mode() == 4) {
+        lab_plot_controls_reset();
+        lab_event_emit(calls, "resetPlotPreview", 0, 0, 0);
+    }
     if (!lab_workspace_mode()) {
         lab_event_emit(calls, "clearForwardHistory", 0, 0, 0);
         lab_event_emit(calls, "clearGoalSeekRequest", 0, 0, 0);
@@ -72,6 +77,10 @@ static void lab_event_editor_key(unsigned action, int event, int plan, int calls
     (void)action;
     if (lab_event_modifier(event) && lab_event_key(event, "Enter")) {
         lab_event_prevent(plan, 0);
+        if (lab_workspace_mode() <= 2 || lab_workspace_mode() == 4) {
+            lab_plot_controls_reset();
+            lab_event_emit(calls, "resetPlotPreview", 0, 0, 0);
+        }
         lab_event_emit(calls, lab_workspace_mode() ? "evaluateCurrentMode" : "evaluateFromKeyboard", 0, 0, 0);
     }
 }
@@ -185,7 +194,7 @@ static void lab_event_expand(unsigned action, int event, int plan, int calls)
     (void)action;
     (void)plan;
     (void)calls;
-    lab_layout_expand(lab_dom_closest(lab_dom_get(event, "currentTarget"), ".result-card"), 1);
+    lab_layout_expand(lab_dom_closest(lab_dom_get(event, "currentTarget"), ".complex-panel, .result-card"), 1);
 }
 
 static void lab_event_rotate(unsigned action, int event, int plan, int calls)

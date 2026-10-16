@@ -775,6 +775,15 @@ static expr_t *elementary_inverse_arc_rule(const expr_t *f, const expr_t *t, con
     number_t value = NUM_NAN;
     bool circular = f->ops == &ops_asin || f->ops == &ops_acos;
     bool cosine = f->ops == &ops_acosh || f->ops == &ops_acos;
+    if (circular && f->a && (f->a->ops == &ops_sin || f->a->ops == &ops_cos)) {
+        number_t phase = NUM_NAN;
+        if (elementary_affine(f->a->a, t, &rate, &offset) &&
+            elementary_constant(rate, &value) && elementary_constant(offset, &phase) &&
+            num_is_real(value) && num_is_real(phase))
+            out = expr_laplace_folded_formula(f, rate, offset, s);
+        num_destroy(&phase);
+        goto done;
+    }
     if (!elementary_affine(f->a, t, &rate, &offset) || !expr_is_exact_zero(offset) ||
         !elementary_constant(rate, &value) || !num_is_real(value))
         goto done;

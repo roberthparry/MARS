@@ -122,6 +122,31 @@ static int frame(int chart, double box[4], double bounds[4])
     return box[2] > 0 && box[3] > 0 && bounds[0] < bounds[1] && bounds[2] < bounds[3];
 }
 
+/* Resolve a projection by its native card identifier, not by its mathematical labels. */
+int lab_plot_is_plane(int chart)
+{
+    return lab_dom_equal(lab_dom_read(lab_dom_closest(chart, ".complex-panel"), 3, "complexPanel"),
+                         lab_dom_string("complex_plane"));
+}
+
+/* Preserve native automatic height for complex scalar projections during zoom. */
+int lab_plot_auto_height(int chart)
+{
+    int projection = lab_dom_read(lab_dom_closest(chart, ".complex-panel"), 3, "complexPanel");
+    return !lab_dom_equal(lab_dom_read(lab_dom_id("plotScale"), 5, ""), lab_dom_string("manual")) &&
+           (lab_dom_equal(projection, lab_dom_string("components")) ||
+            lab_dom_equal(projection, lab_dom_string("amplitude")));
+}
+
+/* Keep Argand viewport coordinates separate from the input and component-value controls. */
+void lab_plot_plane_bounds(const double bounds[4])
+{
+    int values = lab_dom_object(4);
+    for (unsigned i = 0; i < 4; ++i)
+        lab_dom_push(values, lab_dom_format(bounds[i], "", ""));
+    lab_dom_set(lab_dom_id("plotRendered"), "marsComplexPlaneBounds", values);
+}
+
 static int overlay(int rendered, const char *selector, const char *class_name)
 {
     int node = lab_dom_query(rendered, selector);
@@ -205,12 +230,15 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
     (void)context;
     lab_dom_return(lab_dom_object(5));
     int rendered = lab_dom_id("plotRendered");
-    int chart = lab_dom_query(rendered, "[data-plot-chart][data-x-min]:not([data-surface])");
+    int panel = lab_dom_closest(lab_dom_get(event, "target"), ".complex-panel");
+    int chart = lab_dom_query(panel ? panel : rendered, "[data-plot-chart][data-x-min]:not([data-surface])");
     int line = lab_dom_query(rendered, ".plot-pointer-line"), tip = lab_dom_query(rendered, ".plot-pointer-tip");
     int horizontal = lab_dom_query(rendered, ".plot-pointer-horizontal");
     int marker = lab_dom_query(rendered, ".plot-pointer-marker");
     double box[4], bounds[4], x = number(event, "clientX"), y = number(event, "clientY");
-    if (action || !chart || !frame(chart, box, bounds) || x < box[0] || x > box[0] + box[2] ||
+    int dragging = lab_dom_truth(lab_dom_get(lab_dom_get(rendered, "marsPlotDrag"), "active"));
+    if (action || dragging || number(event, "buttons") != 0 || !chart || !frame(chart, box, bounds) ||
+        x < box[0] || x > box[0] + box[2] ||
         y < box[1] || y > box[1] + box[3]) {
         lab_dom_class(line, "hidden", 1);
         lab_dom_class(horizontal, "hidden", 1);
@@ -233,7 +261,7 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
     pixels(line, "height", box[3]);
     double fraction = (x - box[0]) / box[2];
     double value = bounds[0] * (1 - fraction) + bounds[1] * fraction;
-    int name = lab_dom_read(lab_dom_id("plotFirst"), 5, "");
+    int name = lab_plot_is_plane(chart) ? lab_dom_string("ℜ") : lab_dom_read(lab_dom_id("plotFirst"), 5, "");
     int text = lab_dom_join(name, lab_dom_format(value, " ≈ ", ""), "");
     double height = 0;
     double svg_x = data(chart, "plotLeft") + fraction * data(chart, "plotWidth");
@@ -241,7 +269,7 @@ void lab_plot_pointer_dispatch(unsigned action, int event, int context)
     if (curve_height(chart, svg_x, svg_y, &height)) {
         double vertical_fraction = (height - data(chart, "plotTop")) / data(chart, "plotHeight");
         double vertical_value = bounds[3] * (1 - vertical_fraction) + bounds[2] * vertical_fraction;
-        text = lab_dom_join(text, lab_dom_format(vertical_value, "\ny ≈ ", ""), "");
+        text = lab_dom_join(text, lab_dom_format(vertical_value, lab_plot_is_plane(chart) ? "\nℑ ≈ " : "\ny ≈ ", ""), "");
         pixels(horizontal, "left", box[0] - left);
         pixels(horizontal, "top", box[1] - top + vertical_fraction * box[3]);
         pixels(horizontal, "width", box[2]);
@@ -298,6 +326,8 @@ int lab_plot_pan_start(int state, int chart, int event)
         lab_dom_push(geometry, lab_dom_numeric(bounds[i]));
     lab_dom_push(geometry, lab_dom_numeric((bounds[1] - bounds[0]) / box[2]));
     lab_dom_push(geometry, lab_dom_numeric((bounds[3] - bounds[2]) / box[3]));
+    lab_dom_push(geometry, lab_dom_numeric(lab_dom_measure(chart, 13)));
+    lab_dom_push(geometry, lab_dom_numeric(lab_dom_measure(chart, 16)));
     for (unsigned i = 0; i < 5; ++i) {
         int control = lab_dom_id(ids[i]);
         lab_dom_push(snapshot, lab_dom_read(control, 5, ""));
@@ -306,6 +336,9 @@ int lab_plot_pan_start(int state, int chart, int event)
     }
     lab_dom_set(state, "panGeometry", geometry);
     lab_dom_set(state, "panSnapshot", snapshot);
+    lab_dom_set(state, "panPlane", lab_dom_scalar(1, lab_plot_is_plane(chart)));
+    lab_dom_set(state, "panPlaneSnapshot", lab_dom_get(lab_dom_id("plotRendered"), "marsComplexPlaneBounds"));
+    lab_dom_set(state, "panProjection", lab_dom_read(lab_dom_closest(chart, ".complex-panel"), 3, "complexPanel"));
     lab_dom_set(state, "panCard", lab_dom_closest(chart, ".result-card"));
     return 1;
 }
@@ -323,6 +356,10 @@ int lab_plot_pan_move(int state, double dx, double dy)
     }
     if (values[0] >= values[1] || values[2] >= values[3])
         return 0;
+    if (lab_dom_truth(lab_dom_get(state, "panPlane"))) {
+        lab_plot_plane_bounds(values);
+        return 1;
+    }
     int range = lab_dom_id("plotRange"), card = lab_dom_get(state, "panCard");
     int title = lab_dom_join(label_text(lab_dom_query(card, "[data-plot-figure] > title")),
                             lab_dom_string("curve"), "");
@@ -341,7 +378,8 @@ int lab_plot_pan_move(int state, double dx, double dy)
         lab_plot_write_bound(lab_dom_id(ids[i]), values[i], values[(i / 2) * 2 + 1] - values[(i / 2) * 2]);
     lab_dom_delete(range, "marsZoomChart");
     lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
-    lab_plot_controls_sync();
+    if (!lab_dom_truth(lab_dom_get(state, "changed")))
+        lab_plot_controls_sync();
     return 1;
 }
 
@@ -349,7 +387,10 @@ int lab_plot_pan_move(int state, double dx, double dy)
 void lab_plot_pan_preview(int state)
 {
     int chart = lab_dom_get(state, "surface");
-    double sx = lab_dom_measure(chart, 13), sy = lab_dom_measure(chart, 16);
+    int geometry = lab_dom_get(state, "panGeometry");
+    int active = lab_dom_truth(lab_dom_get(state, "active"));
+    double sx = active ? lab_dom_to_number(lab_dom_item(geometry, 6)) : lab_dom_measure(chart, 13);
+    double sy = active ? lab_dom_to_number(lab_dom_item(geometry, 7)) : lab_dom_measure(chart, 16);
     if (!(sx > 0) || !(sy > 0))
         return;
     double dx = (number(state, "panX") - number(state, "panDrawnX")) / sx;
@@ -358,11 +399,30 @@ void lab_plot_pan_preview(int state)
     int curves = lab_dom_all(chart, "[data-series]");
     for (unsigned i = 0; i < lab_dom_count(curves); ++i)
         lab_dom_write(lab_dom_item(curves, i), 2, "transform", transform);
+    /* Native groups bind each tick to its label and grid line; no tick text is reinterpreted. */
+    int ticks = lab_dom_all(chart, "[data-plot-pan-axis]");
+    double lower[] = {data(chart, "plotLeft"), data(chart, "plotTop")};
+    double upper[] = {lower[0] + data(chart, "plotWidth"), lower[1] + data(chart, "plotHeight")};
+    int shifts[] = {lab_dom_format(dx, "translate(", " 0)"), lab_dom_format(dy, "translate(0 ", ")")};
+    for (unsigned i = 0; i < lab_dom_count(ticks); ++i) {
+        unsigned mark = lab_dom_mark();
+        int tick = lab_dom_item(ticks, i);
+        unsigned axis = data(tick, "plotPanAxis") == 1;
+        double position = data(tick, "plotPanPosition") + (axis ? dy : dx);
+        lab_dom_write(tick, 2, "transform", shifts[axis]);
+        lab_dom_write(tick, 2, "visibility", lab_dom_string(
+            position < lower[axis] - 0.001 || position > upper[axis] + 0.001 ? "hidden" : "visible"));
+        lab_dom_release(mark);
+    }
 }
 
 /* Cancellation restores authored strings as well as the precise coordinates behind rounded labels. */
 void lab_plot_pan_cancel(int state)
 {
+    if (lab_dom_truth(lab_dom_get(state, "panPlane"))) {
+        lab_dom_set(lab_dom_id("plotRendered"), "marsComplexPlaneBounds", lab_dom_get(state, "panPlaneSnapshot"));
+        return;
+    }
     static const char *const ids[] = {"plotLower", "plotUpper", "plotYLower", "plotYUpper", "plotScale"};
     int snapshot = lab_dom_get(state, "panSnapshot");
     for (unsigned i = 0; i < 5; ++i) {
@@ -375,11 +435,31 @@ void lab_plot_pan_cancel(int state)
     lab_plot_controls_sync();
 }
 
+static void redraw_curve(int chart, int calls, int wheel)
+{
+    if (wheel) {
+        lab_plot_wheel_zoom(chart, calls);
+        return;
+    }
+    int call = lab_dom_object(5), args = lab_dom_object(4);
+    lab_dom_set(call, "service", lab_dom_string("takePlot"));
+    lab_dom_push(args, lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
+    lab_dom_set(call, "args", args);
+    lab_dom_push(calls, call);
+}
+
 /* Keep surface-camera magnification separate from native curve-domain resampling. */
 int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double direction, int wheel)
 {
-    int chart = lab_dom_query(card, "[data-plot-chart][data-x-min], [data-surface][data-x-min]");
+    int panel = lab_dom_closest(lab_dom_get(event, "target"), ".complex-panel");
+    if (wheel && !panel && lab_dom_query(card, ".complex-grid"))
+        return 1;
+    if (!panel)
+        panel = lab_dom_query(card, ".complex-expanded");
+    int chart = lab_dom_query(panel ? panel : card, "[data-plot-chart][data-x-min], [data-surface][data-x-min]");
     if (!chart)
+        return 0;
+    if (wheel && panel && !lab_dom_node_contains(panel, chart))
         return 0;
     if (!wheel)
         lab_plot_wheel_stop();
@@ -397,9 +477,35 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
         lab_dom_push(calls, call);
         return 1;
     }
-    unsigned coordinates = 4;
+    unsigned coordinates = lab_plot_auto_height(chart) ? 2 : 4;
     if (!frame(chart, box, bounds))
         return 1;
+    if (lab_plot_is_plane(chart)) {
+        int host = lab_dom_id("plotRendered"), pending = lab_dom_get(host, "marsComplexPlaneBounds");
+        if (reset)
+            lab_dom_delete(host, "marsComplexPlaneBounds");
+        else {
+            double fractions[] = {wheel ? (number(event, "clientX") - box[0]) / box[2] : 0.5,
+                                  wheel ? 1 - (number(event, "clientY") - box[1]) / box[3] : 0.5};
+            if (fractions[0] < 0 || fractions[0] > 1 || fractions[1] < 0 || fractions[1] > 1)
+                return 1;
+            if (lab_dom_count(pending) == 4)
+                for (unsigned i = 0; i < 4; ++i)
+                    bounds[i] = lab_dom_to_number(lab_dom_item(pending, i));
+            double factor = direction > 0 ? 0.8 : 1.25;
+            for (unsigned axis = 0; axis < 2; ++axis) {
+                double anchor = bounds[2 * axis] * (1 - fractions[axis]) + bounds[2 * axis + 1] * fractions[axis];
+                bounds[2 * axis] = anchor + (bounds[2 * axis] - anchor) * factor;
+                bounds[2 * axis + 1] = anchor + (bounds[2 * axis + 1] - anchor) * factor;
+                if (!finite(bounds[2 * axis]) || !finite(bounds[2 * axis + 1]) ||
+                    bounds[2 * axis] >= bounds[2 * axis + 1])
+                    return 1;
+            }
+            lab_plot_plane_bounds(bounds);
+        }
+        redraw_curve(chart, calls, wheel);
+        return 1;
+    }
     int range = lab_dom_id("plotRange");
     const char *ids[] = {"plotLower", "plotUpper", "plotYLower", "plotYUpper", "plotScale"};
     int original = lab_dom_get(range, "marsZoomOriginal");
@@ -414,7 +520,7 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
     if (reset) {
         if (!original)
             return 1;
-        for (unsigned i = 0; i <= coordinates; ++i) {
+        for (unsigned i = 0; i < 5; ++i) {
             lab_dom_delete(lab_dom_id(ids[i]), "marsZoomText");
             lab_dom_delete(lab_dom_id(ids[i]), "marsZoomValue");
             lab_dom_write(lab_dom_id(ids[i]), 5, "", lab_dom_item(original, i));
@@ -431,7 +537,7 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
             anchors[a] = bounds[a * 2] * (1 - fractions[a]) + bounds[a * 2 + 1] * fractions[a];
         int previous = lab_dom_get(range, "marsZoomChart");
         /* A replacement image must not roll back bounds already requested by newer wheel events. */
-        if (previous) {
+        if (previous && lab_dom_count(lab_dom_get(range, "marsZoomBounds")) == coordinates) {
             int pending = lab_dom_get(range, "marsZoomBounds");
             for (unsigned i = 0; i < coordinates; ++i)
                 bounds[i] = lab_dom_to_number(lab_dom_item(pending, i));
@@ -440,7 +546,7 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
         double px = number(event, "clientX"), py = number(event, "clientY");
         /* Repainting an overlapping sheet is not a pointer movement. Keep the world
          * anchor so reversing the wheel reverses the zoom instead of migrating sheets. */
-        if (wheel && previous && anchor_state &&
+        if (wheel && previous && lab_dom_count(anchor_state) == coordinates / 2 + 2 &&
             __builtin_fabs(px - lab_dom_to_number(lab_dom_item(anchor_state, 0))) <= 2 &&
             __builtin_fabs(py - lab_dom_to_number(lab_dom_item(anchor_state, 1))) <= 2) {
             for (unsigned a = 0; a < coordinates / 2; ++a)
@@ -460,7 +566,7 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
         }
         if (!original) {
             original = lab_dom_object(4);
-            for (unsigned i = 0; i <= coordinates; ++i)
+            for (unsigned i = 0; i < 5; ++i)
                 lab_dom_push(original, lab_dom_read(lab_dom_id(ids[i]), 5, ""));
             lab_dom_set(range, "marsZoomOriginal", original);
         }
@@ -480,21 +586,14 @@ int lab_plot_pointer_zoom(int card, int event, int calls, int reset, double dire
                 lab_dom_push(anchor_state, lab_dom_numeric(anchors[a]));
             lab_dom_set(range, "marsZoomAnchor", anchor_state);
         }
-        lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
+        if (coordinates == 4)
+            lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("manual"));
     }
     lab_plot_controls_sync();
     lab_dom_class(lab_dom_query(card, ".plot-pointer-line"), "hidden", 1);
     lab_dom_class(lab_dom_query(card, ".plot-pointer-horizontal"), "hidden", 1);
     lab_dom_class(lab_dom_query(card, ".plot-pointer-marker"), "hidden", 1);
     lab_dom_class(lab_dom_query(card, ".plot-pointer-tip"), "hidden", 1);
-    if (wheel) {
-        lab_plot_wheel_zoom(chart, calls);
-        return 1;
-    }
-    int call = lab_dom_object(5), args = lab_dom_object(4);
-    lab_dom_set(call, "service", lab_dom_string("takePlot"));
-    lab_dom_push(args, lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
-    lab_dom_set(call, "args", args);
-    lab_dom_push(calls, call);
+    redraw_curve(chart, calls, wheel);
     return 1;
 }

@@ -482,6 +482,9 @@ expr_t *expr_laplace_formula(const expr_t *transform, number_t *abscissa, expr_t
 expr_t *expr_laplace_elementary_rule(const expr_t *f, const expr_t *t, const expr_t *s,
                                    number_t *bound, expr_t **conditions);
 
+/** @brief Transform asin/acos of a sine/cosine with supplied finite real affine coefficients. */
+expr_t *expr_laplace_folded_formula(const expr_t *f, const expr_t *rate, const expr_t *offset, const expr_t *s);
+
 /** Construct the principal inverse-hyperbolic Laplace pair for a positive real rate magnitude. */
 expr_t *expr_laplace_invhyper_formula(const expr_t *s, const expr_t *rate, bool cosine, bool negative);
 

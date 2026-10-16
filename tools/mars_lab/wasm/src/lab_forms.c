@@ -21,7 +21,7 @@
  */
 #include <stdint.h>
 
-#include "../include/lab_forms.h"
+#include "lab_forms.h"
 
 static int lab_forms_finite(double value)
 {

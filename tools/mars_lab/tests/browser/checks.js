@@ -46,6 +46,482 @@
         if (!condition)
             throw new Error(message);
     }
+    async function checkDistributionPlot() {
+        setExpressionEditor('@F{step(x)}');
+        await evaluateExpression();
+        await waitForAutomaticPlot();
+        const host = document.getElementById('plotRendered');
+        check(host.querySelector('[data-impulse]') && !host.textContent.includes('No plot'),
+              'Fourier step spectrum reaches the visible plot with its impulse');
+        check(rendered.querySelector('svg') && !rendered.classList.contains('error'),
+              'Separated ordinary part and impulse render as mathematical TeX');
+    }
+    async function checkComplexGrid() {
+        setExpressionEditor('exp(i*x)');
+        await evaluateExpression();
+        const host = document.getElementById('plotRendered');
+        const deadline = performance.now() + 20000;
+        while (!host.querySelector('.complex-grid') && performance.now() < deadline)
+            await new Promise(resolve => setTimeout(resolve, 30));
+        const panels = host.querySelectorAll('.complex-panel');
+        const assertFits = async () => {
+            // Retained WebGL canvases follow the SVG through ResizeObserver and animation frames.
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            for (const panel of panels) {
+                const body = panel.querySelector('.rendered');
+                if (!panel.getClientRects().length)
+                    continue;
+                check(body.scrollWidth <= body.clientWidth + 1,
+                      `Complex projection ${panel.dataset.complexPanel} must fit: ` +
+                      `scroll=${body.scrollWidth}, width=${body.clientWidth}, host=${host.clientWidth}, ` +
+                      `expanded=${panel.dataset.expanded}`);
+                const svg = body.querySelector('.rendered-zoom-frame > svg');
+                check(svg.getBoundingClientRect().width <= body.clientWidth + 1,
+                      'The complete SVG fits inside each complex projection');
+            }
+        };
+        check(panels.length === 4 && panels[0].querySelector('[data-segment]'),
+              'Complex output must show four native projections, including a true 3-D line');
+        const hostStyle = getComputedStyle(host), gridStyle = getComputedStyle(host.querySelector('.complex-grid'));
+        check(['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']
+            .every(side => parseFloat(hostStyle[side]) <= 8 && parseFloat(gridStyle[side]) === 0) &&
+              parseFloat(gridStyle.gap) <= 8,
+              'Complex cards use one narrow outer gutter, without stacked formula padding');
+        const cameraControls = document.getElementById('plotCamera');
+        check(cameraControls.parentElement === panels[0] && document.querySelectorAll('#plotCamera').length === 1,
+              'The original camera controls belong to the 3-D curve card, not below the four-view grid');
+        const figureTitle = panel => {
+            const figure = panel.querySelector('[data-plot-figure]');
+            return figure.querySelector(':scope > title').textContent || figure.getAttribute('aria-label');
+        };
+        const formula = figureTitle(panels[0]);
+        check(formula && Array.from(panels).every(panel => panel.querySelector('[data-plot-title]') &&
+              figureTitle(panel) === formula),
+              'Every complex projection includes the same native mathematical expression title');
+        check(panels[1].querySelector('svg') && panels[2].textContent.includes('Imaginary') &&
+              panels[3].textContent.includes('Amplitude'), 'All four projections are populated');
+        await assertFits();
+        const oldWidth = host.style.width;
+        host.style.width = '340px';
+        await assertFits();
+        host.style.width = oldWidth;
+        await assertFits();
+        const plane = panels[1].querySelector('[data-x-min]');
+        const xScale = Number(plane.dataset.plotWidth) / (Number(plane.dataset.xMax) - Number(plane.dataset.xMin));
+        const yScale = Number(plane.dataset.plotHeight) / (Number(plane.dataset.yMax) - Number(plane.dataset.yMin));
+        check(Math.abs(xScale / yScale - 1) < 0.0001, 'The complex plane preserves circular geometry');
+        check(document.getElementById('plotVertical').classList.contains('hidden') &&
+              !document.getElementById('plotLower').closest('.plot-bound-pair').classList.contains('hidden'),
+              'Complex projections expose shared input limits, not misleading common output limits');
+        const chart = panels[0].querySelector('[data-surface]');
+        check(labSurfacePreview.draw(chart, [225, 30, 0]),
+              'The space curve supports the retained local renderer');
+        const button = panels[0].querySelector('button');
+        button.click();
+        check(panels[0].classList.contains('complex-expanded') && button.getAttribute('aria-expanded') === 'true',
+              'Each complex projection expands independently');
+        check(Array.from(panels).slice(1).every(panel => !panel.getClientRects().length),
+              'Expansion replaces the entire grid, not just one row');
+        check(panels[0].clientWidth >= host.querySelector('.complex-grid').clientWidth - 24,
+              'The expanded projection fills the parent plot width');
+        await assertFits();
+        const assertSharp = () => {
+            const layers = panels[0].querySelectorAll('[data-surface-overlay] canvas');
+            check(layers.length === 2, 'The 3-D plot has separate geometry and label canvases');
+            for (const layer of layers) {
+                const rect = layer.getBoundingClientRect();
+                check(layer.width >= Math.ceil(rect.width * window.devicePixelRatio) - 1 &&
+                      layer.height >= Math.ceil(rect.height * window.devicePixelRatio) - 1,
+                      'Expanded geometry and labels render at displayed device-pixel resolution');
+            }
+        };
+        assertSharp();
+        check(cameraControls.getBoundingClientRect().top >= panels[0].querySelector('.rendered').getBoundingClientRect().bottom &&
+              panels[0].getBoundingClientRect().height <= window.innerHeight,
+              'The expanded curve and its controls fit together within the viewport: ' + JSON.stringify({
+                  camera: cameraControls.getBoundingClientRect().toJSON(),
+                  body: panels[0].querySelector('.rendered').getBoundingClientRect().toJSON(),
+                  panel: panels[0].getBoundingClientRect().toJSON(), height: window.innerHeight
+              }));
+        const pixelRatio = Object.getOwnPropertyDescriptor(window, 'devicePixelRatio');
+        try {
+            Object.defineProperty(window, 'devicePixelRatio', {configurable: true, value: 2});
+            check(labSurfacePreview.draw(chart, [225, 30, 0]), 'High-density redraw succeeds');
+            assertSharp();
+        } finally {
+            if (pixelRatio) Object.defineProperty(window, 'devicePixelRatio', pixelRatio);
+            else delete window.devicePixelRatio;
+            labSurfacePreview.draw(chart, [225, 30, 0]);
+        }
+        const waitForVector = async () => {
+            const deadline = performance.now() + 5000;
+            while (chart.dataset.localRenderer !== 'svg' && performance.now() < deadline)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            const drawing = chart.querySelector('[data-surface-settled]');
+            check(chart.dataset.localRenderer === 'svg' && drawing?.querySelector('path') &&
+                  drawing.textContent.includes('ℜ') && drawing.textContent.includes('ℑ') &&
+                  getComputedStyle(panels[0].querySelector('[data-surface-overlay]')).display === 'none',
+                  'Idle space curves display vector geometry and Gothic axis labels, not a canvas');
+        };
+        await waitForVector();
+        const angleControls = ['plotAzimuth', 'plotElevation', 'plotRoll'].map(id => document.getElementById(id));
+        const savedAngles = angleControls.map(control => control.value);
+        const rect = chart.getBoundingClientRect(), quaternion = chart.dataset.cameraQuaternion;
+        const sendCurve = (target, type, offset) => target.dispatchEvent(new PointerEvent(type, {
+            pointerId: 91, pointerType: 'mouse', isPrimary: true, button: 0,
+            buttons: type === 'pointerup' ? 0 : 1, clientX: rect.left + rect.width / 2 + offset,
+            clientY: rect.top + rect.height / 2, bubbles: true, cancelable: true
+        }));
+        sendCurve(chart, 'pointerdown', 0);
+        sendCurve(window, 'pointermove', 35);
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        check(!chart.querySelector('[data-surface-settled]') && chart.dataset.localRenderer !== 'svg' &&
+              chart.dataset.cameraQuaternion !== quaternion,
+              'Dragging an idle SVG curve immediately resumes the retained camera preview');
+        sendCurve(window, 'pointerup', 35);
+        await waitForVector();
+        angleControls.forEach((control, i) => {
+            control.value = savedAngles[i];
+            document.getElementById(control.id + 'Value').textContent = savedAngles[i] + '°';
+        });
+        labSurfacePreview.draw(chart, savedAngles.map(Number));
+        button.click();
+        check(!panels[0].classList.contains('complex-expanded'), 'Projection collapse restores the grid');
+        check(Array.from(panels).every(panel => panel.getClientRects().length),
+              'Collapsing restores all four projections');
+        for (const panel of Array.from(panels).slice(1)) {
+            panel.querySelector('button').click();
+            check(!cameraControls.getClientRects().length, 'Camera controls hide when a different projection expands');
+            check(Array.from(panels).filter(entry => entry.getClientRects().length).length === 1 &&
+                  panel.getClientRects().length, 'Every projection can occupy the whole parent plot');
+            await assertFits();
+            panel.querySelector('button').click();
+        }
+        await selectWorksheetMode('matrix');
+        await selectWorksheetMode('expression');
+        const restored = host.querySelector('.complex-panel');
+        check(document.getElementById('plotCamera') === cameraControls && cameraControls.parentElement === restored &&
+              document.querySelectorAll('#plotCamera').length === 1,
+              'Mode restoration retains one live camera control set in the restored curve card');
+        restored.querySelector('button').click();
+        check(restored.classList.contains('complex-expanded'), 'Restored complex cards retain working expansion');
+        restored.querySelector('button').click();
+        await checkDockedCameraControls();
+        await checkComplexComponentsPan();
+        await checkComplexComponentsPan('complex_plane');
+        await checkComplexComponentsPan('amplitude');
+        await checkComplexAutoZoom();
+        await checkRepeatedComplexWheel();
+        await checkEvaluatePlotReset();
+    }
+
+    async function checkRepeatedComplexWheel() {
+        const host = document.getElementById('plotRendered');
+        for (const projection of ['complex_plane', 'components', 'amplitude', 'svg']) {
+            for (let burst = 0; burst < 2; ++burst) {
+                const panel = host.querySelector(`[data-complex-panel="${projection}"]`);
+                const chart = panel.querySelector('[data-plot-chart], [data-surface]');
+                const box = chart.getBoundingClientRect();
+                const event = new WheelEvent('wheel', {
+                    clientX: box.left + box.width / 2, clientY: box.top + box.height / 2,
+                    deltaY: burst ? 100 : -100, ctrlKey: true, bubbles: true, cancelable: true
+                });
+                chart.dispatchEvent(event);
+                check(event.defaultPrevented, projection + ' Ctrl+wheel cancels scrolling across redraws');
+                const deadline = performance.now() + 20000;
+                if (projection !== 'svg') {
+                    while ((chart.isConnected || host.marsPlotZoom?.busy || host.marsPlotZoom?.wheel) &&
+                           performance.now() < deadline)
+                        await new Promise(resolve => setTimeout(resolve, 25));
+                    check(!chart.isConnected && !host.marsPlotZoom?.busy && !host.marsPlotZoom?.wheel,
+                          projection + ' finishes each wheel burst and accepts the next');
+                }
+            }
+        }
+    }
+
+    async function checkDockedCameraControls() {
+        const host = document.getElementById('plotRendered');
+        const panel = () => host.querySelector('[data-complex-panel="svg"]');
+        const chart = () => panel().querySelector('[data-surface]');
+        const frame = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        for (const expanded of [false, true]) {
+            if (expanded) panel().querySelector('button').click();
+            await frame();
+            const camera = document.getElementById('plotCamera');
+            check(camera.getBoundingClientRect().height <= 150,
+                  'Docked camera controls are compact in grid and expanded views');
+            for (const slider of camera.querySelectorAll('input[type="range"]')) {
+                check(slider.getBoundingClientRect().width >= slider.parentElement.clientWidth - 1 &&
+                      slider.getBoundingClientRect().height >= 44,
+                      'Every docked slider fills its field while retaining a touch-sized target');
+            }
+            for (const [axis, id] of ['plotAzimuth', 'plotElevation', 'plotRoll'].entries()) {
+                const slider = document.getElementById(id), saved = slider.value;
+                const before = chart().dataset.cameraQuaternion;
+                const fit = labSurfacePreview.prepare(chart()).framePlan.fit;
+                slider.value = String(Number(saved) + 10);
+                slider.dispatchEvent(new Event('input', {bubbles: true}));
+                await frame();
+                check(chart().dataset.cameraQuaternion !== before &&
+                      Number(chart().dataset.localCamera.split(',')[axis]) === Number(slider.value),
+                      id + ' updates the docked curve camera, not just its readout');
+                check(Math.abs(labSurfacePreview.prepare(chart()).framePlan.fit - fit) < 1e-8,
+                      'Space-curve rotation keeps a stable fit instead of pumping its scale');
+                slider.dispatchEvent(new Event('change', {bubbles: true}));
+                await frame();
+                slider.value = saved;
+                slider.dispatchEvent(new Event('input', {bubbles: true}));
+                await frame();
+                slider.dispatchEvent(new Event('change', {bubbles: true}));
+                await frame();
+            }
+            const zoom = document.getElementById('plotZoom'), savedZoom = zoom.value;
+            const retainedChart = chart(), retainedBounds = labSurfacePreview.snapshot().volume.bounds.join(',');
+            const requestGeneration = labRequests.latestMain();
+            zoom.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, button: 0, isPrimary: true}));
+            zoom.value = String(Number(savedZoom) + 0.5);
+            zoom.dispatchEvent(new Event('input', {bubbles: true}));
+            await frame();
+            check(Number(chart().dataset.cameraZoom) > 1.3,
+                  'Docked zoom changes the preview volume');
+            zoom.value = savedZoom;
+            zoom.dispatchEvent(new Event('input', {bubbles: true}));
+            zoom.dispatchEvent(new Event('change', {bubbles: true}));
+            await waitForVolume();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            check(chart() === retainedChart && labRequests.latestMain() === requestGeneration &&
+                  !labSurfacePreview.snapshot().volume.dirty &&
+                  labSurfacePreview.snapshot().volume.bounds.join(',') === retainedBounds,
+                  'Space-curve zoom retains its samples and bounds without asynchronous volume refinement');
+            check(chart().querySelector('[data-surface-settled] [data-series]').querySelectorAll('path').length === 1,
+                  'The settled helix batches its segments into one SVG path');
+            if (expanded) panel().querySelector('button').click();
+        }
+        await takeCalculus(document.getElementById('plotFirst').value, 'plot', null, true);
+        check(chart().dataset.plotQuality === 'preview' && chart().querySelector('[data-preview-notice]'),
+              'A native coarse curve exposes its preview quality and notice');
+        const slider = document.getElementById('plotAzimuth');
+        slider.value = String((Number(slider.value) + 10) % 360);
+        slider.dispatchEvent(new Event('input', {bubbles: true}));
+        await frame();
+        slider.dispatchEvent(new Event('change', {bubbles: true}));
+        const deadline = performance.now() + 25000;
+        while (chart()?.dataset.plotQuality !== 'full' && performance.now() < deadline)
+            await new Promise(resolve => setTimeout(resolve, 25));
+        check(chart()?.dataset.plotQuality === 'full' && !chart().querySelector('[data-preview-notice]'),
+              'Releasing the camera replaces coarse samples and removes their preview notice');
+    }
+
+    async function checkEvaluatePlotReset() {
+        const host = document.getElementById('plotRendered');
+        const limits = ['plotLower', 'plotUpper', 'plotSecondLower', 'plotSecondUpper', 'plotYLower', 'plotYUpper'];
+        const camera = ['plotAzimuth', 'plotElevation', 'plotRoll', 'plotZoom'];
+        const before = host.querySelector('[data-plot-chart]');
+        limits.forEach((id, i) => {
+            const control = document.getElementById(id);
+            control.value = String(i % 2 ? 8 : 5);
+            control.marsZoomValue = control.value;
+            control.marsZoomText = control.value;
+        });
+        camera.forEach(id => { document.getElementById(id).value = '2'; });
+        document.getElementById('plotScale').value = 'manual';
+        host.marsComplexPlaneBounds = ['5', '8', '5', '8'];
+        host.querySelector('[data-complex-panel="amplitude"] button').click();
+        check(host.querySelector('.complex-expanded'), 'A single projection is expanded before Evaluate');
+        document.getElementById('run').click();
+        const deadline = performance.now() + 20000;
+        while ((!host.querySelector('[data-plot-chart]') || host.querySelector('[data-plot-chart]') === before) &&
+               performance.now() < deadline)
+            await new Promise(resolve => setTimeout(resolve, 25));
+        await waitForAutomaticPlot();
+        check(limits.every(id => document.getElementById(id).value === '' &&
+                                document.getElementById(id).marsZoomValue === undefined) &&
+              camera.every(id => document.getElementById(id).value === document.getElementById(id).defaultValue) &&
+              document.getElementById('plotScale').value === 'auto' && !host.marsComplexPlaneBounds,
+              'Evaluate resets all plot bounds, cached zoom, camera controls and Argand viewport for unchanged input');
+        const panels = [...host.querySelectorAll('.complex-panel')];
+        check(panels.length === 4 && !host.marsComplexExpanded &&
+              !host.querySelector('.complex-expanded, .complex-focused') &&
+              panels.every(panel => getComputedStyle(panel).display !== 'none' &&
+                  panel.querySelector('button').getAttribute('aria-expanded') === 'false'),
+              'Evaluate restores all four visible plots and clears single-plot expansion for unchanged input');
+        const amplitude = host.querySelector('[data-complex-panel="amplitude"] [data-plot-chart]');
+        check(amplitude && Number(amplitude.dataset.yMin) <= 1 && Number(amplitude.dataset.yMax) >= 1 &&
+              amplitude.querySelector('[data-series] path'), 'Evaluate restores the visible unit-amplitude curve');
+    }
+
+    async function checkComplexAutoZoom() {
+        const host = document.getElementById('plotRendered');
+        for (const projection of ['components', 'amplitude']) {
+            const siblings = [...host.querySelectorAll('.complex-panel')]
+                .filter(panel => panel.dataset.complexPanel !== projection)
+                .map(panel => panel.querySelector('[data-plot-chart], [data-surface]'));
+            const chart = () => host.querySelector(`[data-complex-panel="${projection}"] [data-plot-chart]`);
+            const initial = chart();
+            initial.closest('.complex-panel').querySelector('button').click();
+            await new Promise(resolve => requestAnimationFrame(resolve));
+            const matrix = initial.getScreenCTM();
+            const x = matrix.e + (Number(initial.dataset.plotLeft) + Number(initial.dataset.plotWidth) * 0.75) * matrix.a;
+            const y = matrix.f + (Number(initial.dataset.plotTop) + Number(initial.dataset.plotHeight) * 0.9) * matrix.d;
+            const span = Number(initial.dataset.xMax) - Number(initial.dataset.xMin);
+            for (let i = 0; i < 10; ++i)
+                initial.dispatchEvent(new WheelEvent('wheel', {
+                    clientX: x, clientY: y, deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true
+                }));
+            const deadline = performance.now() + 20000;
+            while ((chart() === initial || host.marsPlotDrag.busy || host.marsPlotDrag.wheel) && performance.now() < deadline)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(chart() !== initial && document.getElementById('plotScale').value !== 'manual' &&
+                  Number(chart().dataset.xMax) - Number(chart().dataset.xMin) < span / 2 &&
+                  chart().querySelector('[data-series] path'),
+                  projection + ' repeated off-curve zoom keeps automatic height and visible samples');
+            check(siblings.every(chart => chart.isConnected),
+                  projection + ' zoom leaves every sibling chart intact');
+            if (projection === 'amplitude')
+                check(Number(chart().dataset.yMin) <= 1 && Number(chart().dataset.yMax) >= 1,
+                      'Automatic amplitude zoom retains the unit-magnitude line');
+            chart().closest('.complex-panel').querySelector('button').click();
+            await evaluateExpression();
+            await waitForAutomaticPlot();
+        }
+    }
+
+    async function checkComplexComponentsPan(projection = 'components') {
+        const host = document.getElementById('plotRendered');
+        const chart = () => host.querySelector(`[data-complex-panel="${projection}"] [data-plot-chart]`);
+        const plane = projection === 'complex_plane';
+        const controls = ['plotLower', 'plotUpper', 'plotYLower', 'plotYUpper', 'plotScale']
+            .map(id => document.getElementById(id));
+        const saved = controls.map(control => control.value);
+        for (const pointerType of ['mouse', 'touch']) {
+            const initial = chart(), panel = initial.closest('.complex-panel');
+            const siblings = [...host.querySelectorAll('.complex-panel')]
+                .filter(other => other !== panel)
+                .map(other => other.querySelector('[data-plot-chart], [data-surface]'));
+            if (plane) {
+                const body = panel.querySelector('.rendered').getBoundingClientRect();
+                const frame = panel.querySelector('.rendered-zoom-frame').getBoundingClientRect();
+                check(initial.viewBox.baseVal.width === initial.viewBox.baseVal.height,
+                      'Complex plane uses a square native viewport');
+                check(Math.abs(Number(initial.dataset.plotLeft) + Number(initial.dataset.plotWidth) / 2 -
+                    initial.viewBox.baseVal.width / 2) < 0.002,
+                    'The equal-unit plotting rectangle is horizontally centred');
+                check(Math.abs((body.top + body.bottom) - (frame.top + frame.bottom)) < 2,
+                      'Complex plane is vertically centred in the available card body');
+                check(Math.abs(panel.getBoundingClientRect().bottom - body.bottom) < 2,
+                      'The complex-plane card ends with its chart rather than stretching to the camera card');
+            }
+            panel.querySelector('button').click();
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            const figure = panel.querySelector('.rendered-zoom-frame > svg');
+            const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+            check(figure.getBoundingClientRect().height <= Math.max(12 * rem, innerHeight - 18 * rem) + 1,
+                  projection + ' fits the viewport height when expanded');
+            if (plane) {
+                check(['ℜ', 'ℑ'].every(label => [...initial.querySelectorAll('text')].some(text => text.textContent === label)),
+                      'Complex-plane axes use Gothic real and imaginary symbols');
+                const imaginary = [...initial.querySelectorAll('text')].find(text => text.textContent === 'ℑ');
+                check(Number(imaginary.getAttribute('x')) < Number(initial.dataset.plotLeft) - 24 &&
+                      Math.abs(Number(imaginary.getAttribute('y')) - (Number(initial.dataset.plotTop) +
+                          Number(initial.dataset.plotHeight) / 2 + 4)) < 0.002,
+                      'The imaginary-axis label is centred to the left of the y-axis ticks');
+            } else if (projection === 'components') {
+                const real = initial.querySelector('[data-series="0"] path');
+                const imaginary = initial.querySelector('[data-series="1"] path');
+                check(getComputedStyle(real).stroke === 'rgb(214, 170, 85)' &&
+                      getComputedStyle(imaginary).stroke === 'rgb(120, 216, 203)' &&
+                      [...panel.querySelectorAll('svg')].every(svg => getComputedStyle(svg).filter === 'none'),
+                      'Real and imaginary curves retain distinct native colours without an SVG filter');
+                const legend = initial.querySelector('[data-plot-legend]');
+                check(legend?.querySelector('rect') && legend.textContent.includes('Real') &&
+                      legend.textContent.includes('Imaginary') && legend.querySelectorAll('path').length === 2,
+                      'Components have one boxed legend with coloured line samples');
+            } else {
+                const paths = [...initial.querySelectorAll('[data-series] > path')];
+                const expected = Number(initial.dataset.plotTop) + Number(initial.dataset.plotHeight) *
+                    (Number(initial.dataset.yMax) - 1) / (Number(initial.dataset.yMax) - Number(initial.dataset.yMin));
+                check(paths.length > 0 && paths.every(path => {
+                    const values = path.getAttribute('d').split(' ');
+                    return Math.abs(Number(values[2]) - expected) < 0.001 &&
+                           Math.abs(Number(values[5]) - expected) < 0.001;
+                }), 'Amplitude of exp(i*x) is one flat line, without stray curve fragments');
+            }
+            check([...initial.querySelectorAll('[data-series] > path')].every(path => {
+                const style = getComputedStyle(path);
+                return style.vectorEffect === 'non-scaling-stroke' && parseFloat(style.strokeWidth) === 1.25;
+            }), projection + ' uses thin screen-space strokes when expanded');
+            check([...panel.querySelectorAll('svg')].every(svg => getComputedStyle(svg).filter === 'none'),
+                  projection + ' uses unfiltered SVG at every nesting level');
+            check([...initial.querySelectorAll('[data-plot-grid], [data-plot-tick]')]
+                .every(element => getComputedStyle(element).fill === 'none'),
+                  'Grid and tick paths cannot inherit text fill');
+            const matrix = initial.getScreenCTM();
+            const pw = Number(initial.dataset.plotWidth) * matrix.a;
+            const ph = Number(initial.dataset.plotHeight) * matrix.d;
+            const x = matrix.e + Number(initial.dataset.plotLeft) * matrix.a + pw / 2;
+            const y = matrix.f + Number(initial.dataset.plotTop) * matrix.d + ph / 2;
+            const x0 = Number(initial.dataset.xMin), y0 = Number(initial.dataset.yMin);
+            const spanX = Number(initial.dataset.xMax) - x0, spanY = Number(initial.dataset.yMax) - y0;
+            const send = (target, type, dx, dy) => target.dispatchEvent(new PointerEvent(type, {
+                pointerId: 81, pointerType, isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+                clientX: x + dx, clientY: y + dy, bubbles: true, cancelable: true
+            }));
+            check(!send(initial, 'pointerdown', 0, 0), projection + ' captures a ' + pointerType + ' drag');
+            const paths = [...initial.querySelectorAll('[data-series] > path')];
+            const hoverCache = paths.map(path => path.marsHoverSegment);
+            send(initial, 'pointermove', 35, 20);
+            check(paths.every((path, i) => path.marsHoverSegment === hoverCache[i]) &&
+                  [...host.querySelectorAll('.plot-pointer-tip, .plot-pointer-marker')]
+                      .every(element => element.classList.contains('hidden')),
+                  projection + ' skips segment inspection and hover overlays during a real chart-targeted drag');
+            check(initial.querySelector('[data-series]').getAttribute('transform')?.startsWith('translate('),
+                  'Components respond locally before the native resampling reply');
+            const ticks = [...initial.querySelectorAll('[data-plot-pan-axis]')];
+            check(ticks.length > 0 && ticks.every(tick => {
+                const vertical = tick.dataset.plotPanAxis === '1';
+                const shift = vertical ? 20 / matrix.d : 35 / matrix.a;
+                const transform = tick.transform.baseVal.consolidate().matrix;
+                return Math.abs(transform.e - (vertical ? 0 : shift)) < 0.001 &&
+                       Math.abs(transform.f - (vertical ? shift : 0)) < 0.001;
+            }), projection + ' ticks, labels, grids and zero guides track the curve during panning');
+            await new Promise(resolve => setTimeout(resolve, 200));
+            check(chart() === initial && !host.marsPlotDrag.busy,
+                  projection + ' retains full-detail SVG without asynchronous replacements during dragging');
+            send(window, 'pointermove', 40, 25);
+            send(window, 'pointermove', 35, 20);
+            send(window, 'pointerup', 35, 20);
+            const deadline = performance.now() + 20000;
+            while ((host.marsPlotDrag.busy || chart() === initial) && performance.now() < deadline)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(chart() !== initial && !host.marsPlotDrag.busy &&
+                  Math.abs(Number(chart().dataset.xMin) - (x0 - 35 * spanX / pw)) < 1e-8 &&
+                  Math.abs(Number(chart().dataset.yMin) - (y0 + 20 * spanY / ph)) < 1e-8,
+                  projection + ' retains the completed ' + pointerType + ' pan');
+            check(siblings.every(chart => chart.isConnected),
+                  projection + ' pan leaves every sibling chart intact');
+            if (plane) {
+                check(controls.every((control, i) => control.value === saved[i]),
+                      'Argand panning does not change sampling or component bounds');
+                const after = chart();
+                const xScale = Number(after.dataset.plotWidth) / (Number(after.dataset.xMax) - Number(after.dataset.xMin));
+                const yScale = Number(after.dataset.plotHeight) / (Number(after.dataset.yMax) - Number(after.dataset.yMin));
+                check(Math.abs(xScale / yScale - 1) < 0.0001, 'Argand panning preserves circular geometry');
+                document.querySelector('#plotCard [data-zoom-reset]').click();
+                const resetDeadline = performance.now() + 20000;
+                while (chart() === after && performance.now() < resetDeadline)
+                    await new Promise(resolve => setTimeout(resolve, 25));
+                check(chart() !== after && Math.abs(Number(chart().dataset.xMin) - x0) < 1e-8 &&
+                      Math.abs(Number(chart().dataset.yMin) - y0) < 1e-8,
+                      'Reset restores the Argand viewport independently');
+            }
+            chart().closest('.complex-panel').querySelector('button').click();
+        }
+        controls.forEach((control, i) => { control.value = saved[i]; });
+        await evaluateExpression();
+        await waitForAutomaticPlot();
+    }
+
     async function checkAsynchronousPlot() {
         const original = fetchEvaluation;
         let release, started;
@@ -755,6 +1231,43 @@
         lowControl.value = lowBefore; highControl.value = highBefore;
         check(symbolicView.volume.exact[0] === 'pi-1' && symbolicView.volume.exact[1] === 'pi+1',
               'C retains authored symbolic bounds rather than rebasing them through decimal metadata');
+        if (before.dataset.mesh === 'false' && original[6] === 'auto') {
+            const autoView = {...view, camera: {...view.camera}};
+            labDOM.call('lab_surface_volume_init', autoView, null, 0);
+            labDOM.call('lab_surface_zoom', autoView, 1, 2, null, 0);
+            const autoFrame = labDOM.call('lab_surface_frame', autoView, null);
+            check(autoView.volume.autoHeight && document.getElementById('plotScale').value === 'auto' &&
+                  autoView.volume.bounds[4] === initial.volume.bounds[4] &&
+                  autoView.volume.bounds[5] === initial.volume.bounds[5] &&
+                  autoFrame.scaling[0] === 4 && autoFrame.scaling[1] === 4 && autoFrame.scaling[2] === 1,
+                  'Explicit Auto zoom narrows the horizontal region without clipping the height preview');
+            const spans = [0, 1, 2].map(i => autoView.volume.bounds[2*i+1] - autoView.volume.bounds[2*i]);
+            const lengths = [0, 1, 2].map(i => Math.hypot(...[0, 1, 2].map(j => autoFrame.rows[j*3+i])));
+            check(lengths.every((v, i) => Math.abs(v / spans[i] - lengths[0] / spans[0]) < 1e-10),
+                  'Auto height preview preserves equal physical units while its box proportions change');
+            const refinedChart = before.cloneNode(false);
+            const next = [...autoView.volume.bounds];
+            next[4] += (next[5] - next[4]) / 4;
+            const keys = ['XMin', 'XMax', 'YMin', 'YMax', 'ZMin', 'ZMax'];
+            keys.forEach((key, i) => {
+                refinedChart.dataset[key[0].toLowerCase() + key.slice(1)] = String(next[i]);
+                refinedChart.dataset['exact' + key] = String(next[i]);
+                refinedChart.dataset['label' + key] = String(next[i]);
+            });
+            const nextSpans = [0, 1, 2].map(i => next[2*i+1] - next[2*i]);
+            const refinedView = {...autoView, chart: refinedChart,
+                                 units: nextSpans.map(v => v / Math.max(...nextSpans))};
+            labDOM.call('lab_surface_volume_init', refinedView,
+                        {volume: labSurfaceVolume.clone(autoView.volume), refining: true}, 0);
+            const refinedFrame = labDOM.call('lab_surface_frame', refinedView, null);
+            check(refinedView.volume.exponent === 2 && refinedView.volume.bounds[4] === next[4] &&
+                  refinedView.volume.bounds[5] === next[5] && refinedFrame.scaling.every(v => v === 1),
+                  'Auto refinement adopts the new native height without resetting horizontal zoom');
+            labDOM.call('lab_surface_zoom', autoView, 1, 0, null, 1);
+        }
+        // The following fixtures exercise strict coordinate-volume zoom independently of Auto height.
+        view.volume.autoHeight = false;
+        initial.volume.autoHeight = false;
         const axes = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]].map(view.project);
         const wheel = deltaY => chart().dispatchEvent(new WheelEvent('wheel',
             {deltaY, ctrlKey: true, bubbles: true, cancelable: true}));
@@ -775,6 +1288,23 @@
               zoomed.volume.exact.every((v, i) => document.getElementById(controls[i]).marsZoomValue.includes(v)) &&
               controls.slice(0, 6).every(id => document.getElementById(id).marsZoomValue.includes('2^(-(')),
               'The native sampler receives exact baseline recipes rather than rounded browser coordinates');
+        for (const policy of ['auto', 'all']) {
+            document.getElementById('plotScale').value = policy;
+            const restoredView = {chart: before, units: [...view.units], camera: {...zoomed.camera}};
+            labDOM.call('lab_surface_volume_init', restoredView, zoomed, 1);
+            check(restoredView.volume.exponent === 0 && restoredView.camera.scale === 1 &&
+                  restoredView.volume.bounds.every((value, i) => value === initial.volume.base[i]) &&
+                  restoredView.volume.exact.every((value, i) => value === before.dataset[
+                      ['exactXMin', 'exactXMax', 'exactYMin', 'exactYMax', 'exactZMin', 'exactZMax'][i]]),
+                  policy + ' discards a clipped zoom preview even when the native mesh is unchanged');
+        }
+        document.getElementById('plotScale').value = 'manual';
+        const refiningView = {chart: before, units: [...view.units], camera: {...zoomed.camera}};
+        labDOM.call('lab_surface_volume_init', refiningView,
+                    {...zoomed, volume: labSurfaceVolume.clone(zoomed.volume), refining: true}, 1);
+        check(refiningView.volume.exponent === zoomed.volume.exponent &&
+              refiningView.volume.bounds.every((value, i) => value === zoomed.volume.bounds[i]),
+              'Native zoom refinement keeps the selected clipped volume rather than fitting the surface again');
         const formattedBounds = [-3.1998336521996507, 3.1998336521996507,
                                  1000000.00001234, 1000000.00005678, -1.0666112173998836, 1.0666112173998836];
         labDOM.call('lab_plot_volume_bounds', formattedBounds);
@@ -1519,9 +2049,133 @@
             const authored = '@S_{-inf}^x e^(-1/2(t-@mu)^2/@sigma^2) dt';
             setExpressionEditor(authored);
             check(expr.value === authored, 'Editor rewrote authored infinity or Greek tokens');
+            {
+                const plotRendered = document.getElementById('plotRendered');
+                setExpressionEditor('acos(sin(2-x*y)+z)');
+                await evaluateExpression();
+                await waitForAutomaticPlot();
+                const slicePanel = document.getElementById('plotSlices');
+                const slice = slicePanel.querySelector('.plot-slice');
+                check(slice && slice.dataset.name === 'z' && !slicePanel.classList.contains('hidden'),
+                      'A third free variable receives a plot-local slice panel');
+                check(slice.querySelector('.slice-lower').value === '-2' &&
+                      slice.querySelector('.slice-upper').value === '2', 'Native domain analysis selects the slice range');
+                const sliceSource = currentExpressionText();
+                const sliceSlider = slice.querySelector('.slice-slider');
+                check(getComputedStyle(sliceSlider).appearance === 'none' &&
+                      sliceSlider.getBoundingClientRect().height === 160,
+                      'The slice slider uses the compact themed track rather than the browser default');
+                check(getComputedStyle(slice.querySelector('.slice-value')).color ===
+                      getComputedStyle(document.getElementById('plotLower')).color,
+                      'Slice text fields share the MARS plot control colours');
+                check(slicePanel.querySelector('.slice-choices').classList.contains('hidden'),
+                      'A single extra variable needs no variable selector');
+                check(slice.querySelector('.slice-auto').matches(':checked') &&
+                      getComputedStyle(slice.querySelector('.slice-limits')).display === 'none',
+                      'Evaluate defaults to Auto with no visible From/To fields');
+                const waitForSlice = async predicate => {
+                    for (let n = 0; n < 600 && !predicate(); ++n)
+                        await new Promise(resolve => setTimeout(resolve, 25));
+                    check(predicate(), 'Slice response must settle: ' + statusEl.textContent);
+                };
+                sliceSlider.value = '625';
+                sliceSlider.dispatchEvent(new Event('input', {bubbles: true}));
+                await waitForSlice(() => plotRendered.querySelector('[data-plot-quality="preview"]') &&
+                                         slice.querySelector('.slice-value').value === '½');
+                check(currentExpressionText() === sliceSource, 'Dragging a slice does not edit the worksheet bindings');
+                sliceSlider.dispatchEvent(new Event('change', {bubbles: true}));
+                await waitForSlice(() => plotRendered.querySelector('[data-plot-quality="full"]'));
+                check(plotRendered.querySelector('title')?.textContent.includes('z = ½'),
+                      'The exported plot heading identifies its exact slice');
+                const exactSlice = slice.querySelector('.slice-value');
+                exactSlice.value = '1/3';
+                exactSlice.dispatchEvent(new Event('change', {bubbles: true}));
+                await waitForSlice(() => exactSlice.value === '⅓');
+                check(slice.querySelector('.slice-position').value === '-1',
+                      'The rounded slider handle cannot overwrite an exact typed value');
+                await takePlot('x');
+                check(exactSlice.value === '⅓', 'Redrawing preserves the exact slice rather than quantising it');
+                slice.querySelector('.slice-manual').click();
+                check(slice.querySelector('.slice-manual').matches(':checked') &&
+                      getComputedStyle(slice.querySelector('.slice-limits')).display !== 'none',
+                      'Manual reveals the editable range');
+                slice.querySelector('.slice-lower').value = '-4';
+                slice.querySelector('.slice-upper').value = '4';
+                await takePlot('x');
+                slice.querySelector('.slice-auto').click();
+                await waitForSlice(() => slice.querySelector('.slice-upper').value === '2');
+                check(exactSlice.value === '⅓' && slice.querySelector('.slice-lower').value === '-2' &&
+                      getComputedStyle(slice.querySelector('.slice-limits')).display === 'none',
+                      'Auto restores native limits and preserves a valid exact slice value');
+                const stage = document.getElementById('plotStage');
+                stage.style.width = '360px';
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                const chartBox = plotRendered.getBoundingClientRect(), panelBox = slicePanel.getBoundingClientRect();
+                check(panelBox.left >= chartBox.right - 1 && panelBox.width <= 73 &&
+                      getComputedStyle(sliceSlider).writingMode === 'vertical-lr',
+                      'A narrow vertical slice rail stays beside the visible plot on a mobile-width card');
+                stage.style.width = '';
+                await selectWorksheetMode('matrix');
+                await selectWorksheetMode('expression');
+                check(document.querySelector('#plotSlices .slice-value')?.value === '⅓',
+                      'Returning to the worksheet restores its accepted exact slice');
+                setExpressionEditor('x+y+z+w');
+                await evaluateExpression();
+                await waitForAutomaticPlot();
+                const choices = slicePanel.querySelectorAll('.slice-choice');
+                const rows = slicePanel.querySelectorAll('.plot-slice');
+                const checkedSlice = index => choices[index].matches(':checked') &&
+                    [...choices].filter(radio => radio.matches(':checked')).length === 1 &&
+                    [...choices].every(radio => !Object.hasOwn(radio, 'checked'));
+                check(choices.length === 2 && checkedSlice(0) &&
+                      [...rows].filter(row => getComputedStyle(row).display !== 'none').length === 1,
+                      'Multiple parameters have radio choices but only one visible slider');
+                check(choices[1].getBoundingClientRect().top >= choices[0].getBoundingClientRect().bottom &&
+                      Math.abs(choices[1].getBoundingClientRect().left - choices[0].getBoundingClientRect().left) < 1 &&
+                      getComputedStyle(slicePanel.querySelector('.slice-choices')).display === 'block',
+                      'Parameter radio buttons stack vertically in the narrow rail');
+                const beforeSelection = plotRendered.querySelector('svg');
+                choices[1].click();
+                check(checkedSlice(1) && rows[0].classList.contains('hidden') &&
+                      getComputedStyle(rows[0]).display === 'none' && getComputedStyle(rows[1]).display !== 'none' &&
+                      plotRendered.querySelector('svg') === beforeSelection,
+                      'Selecting another parameter swaps the editor without resampling');
+                const secondValue = rows[1].querySelector('.slice-value');
+                secondValue.value = '1/3';
+                secondValue.dispatchEvent(new Event('change', {bubbles: true}));
+                await waitForSlice(() => secondValue.value === '⅓');
+                check(checkedSlice(1) && !rows[1].classList.contains('hidden'),
+                      'A plot response preserves the selected parameter');
+                choices[0].click();
+                check(checkedSlice(0) && rows[0].querySelector('.slice-value').value === '0' && secondValue.value === '⅓',
+                      'Switching sliders preserves independent exact parameter values');
+                choices[1].click();
+                await selectWorksheetMode('matrix');
+                await selectWorksheetMode('expression');
+                check(slicePanel.querySelectorAll('.slice-choice')[1].matches(':checked') &&
+                      slicePanel.querySelectorAll('.slice-choice:checked').length === 1 &&
+                      slicePanel.querySelectorAll('.plot-slice:not(.hidden)').length === 1,
+                      'Worksheet restoration preserves the selected parameter');
+                let selectedRow = slicePanel.querySelector('.plot-slice:not(.hidden)');
+                selectedRow.querySelector('.slice-manual').click();
+                await selectWorksheetMode('matrix');
+                await selectWorksheetMode('expression');
+                selectedRow = slicePanel.querySelector('.plot-slice:not(.hidden)');
+                check(selectedRow.querySelector('.slice-manual').matches(':checked'),
+                      'Mode switching retains the parameter range choice');
+                await evaluateExpression();
+                await waitForAutomaticPlot();
+                check([...slicePanel.querySelectorAll('.plot-slice')].every(row =>
+                    row.querySelector('.slice-auto').matches(':checked') &&
+                    getComputedStyle(row.querySelector('.slice-limits')).display === 'none'),
+                    'Evaluate resets all ranges to Auto even for unchanged input');
+            }
             setExpressionEditor('3+4');
             await evaluateExpression();
             check(String(value.textContent).trim() === '7', 'Second native calculation should equal 7');
+            check(document.getElementById('plotSlices').classList.contains('hidden') &&
+                  !document.getElementById('plotStage').classList.contains('has-slices'),
+                  'No extra variables leaves no slice panel or reserved column');
             await checkRenderedGlyphs();
             check(currentHistoryLength() > 0, 'Evaluation history missing');
 
@@ -1538,6 +2192,8 @@
             check(parsed.dataset.fullText.includes('x'), 'Integral card lost its native expression');
             check(functionStyle.dataset.fullText.length > 0, 'Integral Function card missing');
             check(rendered.dataset.fullTex.length > 0, 'Integral TeX metadata missing');
+            await checkDistributionPlot();
+            await checkComplexGrid();
             await checkAsynchronousPlot();
             const plotRendered = document.getElementById('plotRendered');
             setExpressionEditor('asin(x)');

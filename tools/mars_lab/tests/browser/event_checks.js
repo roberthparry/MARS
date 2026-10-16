@@ -21,6 +21,7 @@ window.checkLabEvents = function checkLabEvents() {
         'clearGoalSeekRequest',
         'hideTargetEntry',
         'evaluateCurrentMode',
+        'resetPlotPreview',
         'navigateHistoryFromEvent',
         'evaluateFromKeyboard',
         'selectWorksheetMode',
@@ -261,22 +262,23 @@ window.checkLabEvents = function checkLabEvents() {
             savedRegistry && services.every(service => typeof savedRegistry[service] === 'function'),
             'bootstrap supplies every native service');
         native.lab_workspace_select(0);
-        const runServices = 'clearForwardHistory,clearGoalSeekRequest,hideTargetEntry,evaluateCurrentMode';
+        const runServices = 'resetPlotPreview,clearForwardHistory,clearGoalSeekRequest,hideTargetEntry,evaluateCurrentMode';
         expect(0, {}, runServices);
         // Check bootstrap registration before explicitly installing anything in this suite.
         send(document.getElementById('run'), click(), runServices);
         for (let mode = 1; mode < 7; ++mode) {
             native.lab_workspace_select(mode);
-            expect(0, {}, 'evaluateCurrentMode');
-            const result = expect(3, {key: 'Enter', metaKey: true}, 'evaluateCurrentMode');
+            const run = mode <= 2 || mode === 4 ? 'resetPlotPreview,evaluateCurrentMode' : 'evaluateCurrentMode';
+            expect(0, {}, run);
+            const result = expect(3, {key: 'Enter', metaKey: true}, run);
             check(result.prevent && !result.stop, 'non-expression shortcut cancellation');
         }
         native.lab_workspace_select(0);
         for (const modifier of ['ctrlKey', 'metaKey']) {
-            const result = expect(3, {key: 'Enter', [modifier]: true}, 'evaluateFromKeyboard');
+            const result = expect(3, {key: 'Enter', [modifier]: true}, 'resetPlotPreview,evaluateFromKeyboard');
             check(result.prevent && !result.stop, 'expression shortcut cancellation');
             check(
-                !send(expr, key({key: 'Enter', [modifier]: true}), 'evaluateFromKeyboard'),
+                !send(expr, key({key: 'Enter', [modifier]: true}), 'resetPlotPreview,evaluateFromKeyboard'),
                 'real editor shortcut prevents the default');
         }
         for (const event of [{key: 'Enter'}, {key: 'Escape', ctrlKey: true}, {key: 'x', metaKey: true}]) {

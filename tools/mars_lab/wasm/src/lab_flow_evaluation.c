@@ -9,6 +9,7 @@
  * retaining scoped handles or sharing mutable state between concurrent requests.
  */
 #include "lab_dom.h"
+#include "lab_plot_slices.h"
 #include "lab_flow.h"
 #include "lab_layout.h"
 
@@ -60,7 +61,290 @@ static int lab_flow_eval_current(int frame, unsigned next)
     return lab_flow_call(frame, next, "requestCurrent", "current", 0, 1, lab_dom_get(frame, "request"));
 }
 
-/* The switch is a finite continuation graph: each case performs one suspended stage. */
+/* Each handler advances one stage of the request-local continuation graph. */
+struct lab_flow_evaluation_context {
+    int frame;
+    int view;
+    int mode;
+    int options;
+    int context;
+    int request;
+    int preparation;
+    int plan;
+    int data;
+};
+
+static int lab_flow_evaluation_setup(struct lab_flow_evaluation_context *ctx);
+static int lab_flow_evaluation_previous(struct lab_flow_evaluation_context *ctx);
+static int lab_flow_evaluation_show(struct lab_flow_evaluation_context *ctx);
+static int lab_flow_evaluation_fetch(struct lab_flow_evaluation_context *ctx);
+static int lab_flow_evaluation_rethrow(struct lab_flow_evaluation_context *ctx);
+
+static int lab_flow_evaluation_start(struct lab_flow_evaluation_context *ctx)
+{
+    lab_dom_set(ctx->frame, "context", lab_dom_object(5));
+    lab_dom_set(ctx->frame, "phase", lab_dom_numeric(0));
+    return lab_flow_call(ctx->frame, lab_flow_eval_prepare, "native", "preparation", 0, 3,
+                         lab_dom_string("lab_evaluation_prepare_plan"), ctx->mode,
+                         lab_dom_numeric(lab_dom_truth(lab_dom_get(ctx->options, "skipHistoryUpdate"))));
+}
+
+static int lab_flow_evaluation_prepare(struct lab_flow_evaluation_context *ctx)
+{
+    if (!ctx->preparation)
+        return lab_flow_done(0);
+    /* Continue: the first preparation stage uses the newly allocated frame. */
+    return lab_flow_evaluation_setup(ctx);
+}
+
+static int lab_flow_evaluation_setup(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_eval_native(ctx->frame, lab_flow_eval_setup_apply, "lab_evaluation_setup", ctx->mode,
+                                lab_dom_get(ctx->frame, "phase"), ctx->context, ctx->options, ctx->view);
+}
+
+static int lab_flow_evaluation_setup_apply(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_effects(ctx->frame,
+                            lab_dom_truth(lab_dom_get(ctx->plan, "wait")) ? lab_flow_eval_setup_current
+                                                                          : lab_flow_eval_setup_next,
+                            ctx->plan);
+}
+
+static int lab_flow_evaluation_setup_current(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_eval_current(ctx->frame, lab_flow_eval_setup_next);
+}
+
+static int lab_flow_evaluation_setup_next(struct lab_flow_evaluation_context *ctx)
+{
+    if (lab_dom_truth(lab_dom_get(ctx->plan, "wait")) && !lab_dom_truth(lab_dom_get(ctx->frame, "current")))
+        return lab_flow_done(0);
+    if (!lab_dom_truth(lab_dom_get(ctx->plan, "done"))) {
+        lab_dom_set(ctx->frame, "phase", lab_dom_numeric(lab_dom_number(lab_dom_get(ctx->frame, "phase")) + 1));
+        return lab_flow_eval_native(ctx->frame, lab_flow_eval_setup_apply, "lab_evaluation_setup", ctx->mode,
+                                    lab_dom_get(ctx->frame, "phase"), ctx->context, ctx->options, ctx->view);
+    }
+    return lab_flow_call(ctx->frame, lab_flow_eval_history, "historyState", "nextState", 0, 1,
+                         lab_dom_get(ctx->context, "text"));
+}
+
+static int lab_flow_evaluation_history(struct lab_flow_evaluation_context *ctx)
+{
+    if (lab_dom_truth(lab_dom_get(ctx->preparation, "history")))
+        return lab_flow_call(ctx->frame, lab_flow_eval_previous, "previousHistory", "previousState", 0, 1,
+                             lab_dom_get(ctx->frame, "nextState"));
+    /* Continue: no history lookup is needed for precision-only evaluation. */
+    return lab_flow_evaluation_previous(ctx);
+}
+
+static int lab_flow_evaluation_previous(struct lab_flow_evaluation_context *ctx)
+{
+    if (lab_dom_truth(lab_dom_get(ctx->preparation, "input")))
+        return lab_flow_call(ctx->frame, lab_flow_eval_input, "requestInput", "accepted", 0, 2, ctx->request,
+                             lab_dom_get(ctx->context, "text"));
+    return lab_flow_call(ctx->frame, lab_flow_eval_status, "showResults", 0, 0, 0);
+}
+
+static int lab_flow_evaluation_input(struct lab_flow_evaluation_context *ctx)
+{
+    if (!lab_dom_truth(lab_dom_get(ctx->frame, "accepted")))
+        return lab_flow_done(0);
+    /* Continue after successful native input validation. */
+    return lab_flow_evaluation_show(ctx);
+}
+
+static int lab_flow_evaluation_show(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_call(ctx->frame, lab_flow_eval_status, "showResults", 0, 0, 0);
+}
+
+static int lab_flow_evaluation_status(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_call(ctx->frame, lab_flow_eval_guard, "setStatus", 0, 0, 1, lab_dom_get(ctx->preparation, "label"));
+}
+
+static int lab_flow_evaluation_guard(struct lab_flow_evaluation_context *ctx)
+{
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(lab_flow_eval_catch));
+    if (lab_dom_truth(lab_dom_get(ctx->frame, "previousState")))
+        return lab_flow_call(ctx->frame, lab_flow_eval_fetch, "pushHistory", 0, 0, 1,
+                             lab_dom_get(ctx->frame, "previousState"));
+    /* Continue: absent history has no browser effect. */
+    return lab_flow_evaluation_fetch(ctx);
+}
+
+static int lab_flow_evaluation_fetch(struct lab_flow_evaluation_context *ctx)
+{
+    static const char *const fetchers[] = {"fetchExpression", "fetchEquation", "fetchDiffequation", "fetchMatrix",
+                                           "fetchIntegrator", "fetchDatetime", "fetchAlmanac"};
+    unsigned index = (unsigned)lab_dom_number(ctx->mode);
+    if (index > 6)
+        return lab_flow_done(0);
+    return lab_flow_call(ctx->frame, lab_flow_eval_outcome, fetchers[index], "response", 1, 2, ctx->context,
+                         ctx->request);
+}
+
+static int lab_flow_evaluation_outcome(struct lab_flow_evaluation_context *ctx)
+{
+    int response = lab_dom_get(ctx->frame, "response");
+    ctx->data = lab_dom_get(response, "data");
+    lab_dom_set(ctx->frame, "data", ctx->data);
+    return lab_flow_call(ctx->frame, lab_flow_eval_response, "requestOutcome", "outcome", 0, 3, ctx->request,
+                         lab_dom_get(response, "response"), ctx->data);
+}
+
+static int lab_flow_evaluation_response(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_call(ctx->frame, lab_flow_eval_recover, "native", "responsePlan", 0, 6,
+                         lab_dom_string("lab_evaluation_response"), ctx->mode, lab_dom_get(ctx->frame, "outcome"),
+                         ctx->data, ctx->context, 0);
+}
+
+static int lab_flow_evaluation_recover(struct lab_flow_evaluation_context *ctx)
+{
+    ctx->plan = lab_dom_get(ctx->frame, "responsePlan");
+    if (!ctx->plan)
+        return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
+    return lab_flow_effects(ctx->frame, lab_flow_eval_install, ctx->plan);
+}
+
+static int lab_flow_evaluation_install(struct lab_flow_evaluation_context *ctx)
+{
+    if (lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "responsePlan"), "install")))
+        return lab_flow_call(ctx->frame, lab_flow_eval_installed, "installEvaluation", 0, 1, 5, ctx->mode, ctx->data,
+                             ctx->context, lab_dom_get(ctx->frame, "outcome"), ctx->request);
+    return lab_flow_call(ctx->frame, lab_flow_eval_ready, "commitModeState", 0, 0, 0);
+}
+
+static int lab_flow_evaluation_installed(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_eval_current(ctx->frame, lab_flow_eval_commit);
+}
+
+static int lab_flow_evaluation_commit(struct lab_flow_evaluation_context *ctx)
+{
+    if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
+        return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
+    return lab_flow_call(ctx->frame, lab_flow_eval_ready, "commitModeState", 0, 0, 0);
+}
+
+static int lab_flow_evaluation_ready(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_call(ctx->frame, lab_flow_eval_weather_state, "setStatus", 0, 0, 1,
+                         lab_dom_get(lab_dom_get(ctx->frame, "responsePlan"), "status"));
+}
+
+static int lab_flow_evaluation_weather_state(struct lab_flow_evaluation_context *ctx)
+{
+    if ((lab_dom_number(ctx->mode) <= 2 || lab_dom_number(ctx->mode) == 4) &&
+        lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "responsePlan"), "install")) &&
+        lab_dom_truth(lab_dom_get(ctx->frame, "current"))) {
+        int range = lab_dom_id("plotRange"), source = lab_dom_get(ctx->context, "text");
+        int previous = lab_dom_read(range, 3, "plotSource");
+        if (lab_dom_length(previous) && !lab_dom_equal(source, previous)) {
+            static const char *const limits[] = {"plotLower",       "plotUpper",  "plotSecondLower",
+                                                 "plotSecondUpper", "plotYLower", "plotYUpper"};
+            for (unsigned i = 0; i < sizeof limits / sizeof *limits; ++i) {
+                int control = lab_dom_id(limits[i]);
+                lab_dom_write(control, 5, "", lab_dom_string(""));
+                lab_dom_delete(control, "marsZoomValue");
+                lab_dom_delete(control, "marsZoomText");
+            }
+            lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("auto"));
+            lab_dom_delete(range, "marsZoomOriginal");
+            lab_dom_delete(range, "marsZoomChart");
+            lab_dom_delete(lab_dom_id("plotRendered"), "marsComplexPlaneBounds");
+        }
+        if (!lab_dom_equal(previous, source))
+            lab_plot_slices_clear();
+        else
+            lab_plot_slices_auto();
+        lab_dom_write(range, 3, "plotSource", source);
+        lab_layout_plot(0, 0);
+        return lab_flow_call(ctx->frame, lab_flow_eval_plot_scheduled, "automaticPlot", 0, 0, 1, ctx->request);
+    }
+    if (lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "responsePlan"), "weather")))
+        return lab_flow_call(ctx->frame, lab_flow_eval_weather, "native", "weatherState", 0, 3,
+                             lab_dom_string("lab_evaluation_weather_state"), lab_dom_get(ctx->context, "state"),
+                             ctx->data);
+    return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
+}
+
+static int lab_flow_evaluation_plot_scheduled(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
+}
+
+static int lab_flow_evaluation_weather(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_call(ctx->frame, lab_flow_eval_finally, "refreshWeather", 0, 0, 3,
+                         lab_dom_get(ctx->request, "token"), lab_dom_get(ctx->frame, "weatherState"), ctx->data);
+}
+
+static int lab_flow_evaluation_finally(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
+}
+
+static int lab_flow_evaluation_finish(struct lab_flow_evaluation_context *ctx)
+{
+    lab_dom_delete(ctx->frame, "failed");
+    if (lab_dom_truth(lab_dom_get(ctx->frame, "current")) && lab_dom_truth(lab_dom_get(ctx->preparation, "history")))
+        return lab_flow_call(ctx->frame, lab_flow_eval_done, "updateHistoryButtons", 0, 0, 0);
+    return lab_flow_done(0);
+}
+
+static int lab_flow_evaluation_catch(struct lab_flow_evaluation_context *ctx)
+{
+    lab_dom_set(ctx->frame, "failed", lab_dom_numeric(lab_flow_eval_rethrow_current));
+    return lab_flow_eval_current(ctx->frame, lab_flow_eval_caught);
+}
+
+static int lab_flow_evaluation_caught(struct lab_flow_evaluation_context *ctx)
+{
+    if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
+        return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
+    return lab_flow_call(ctx->frame, lab_flow_eval_error_plan, "native", "responsePlan", 0, 6,
+                         lab_dom_string("lab_evaluation_response"), ctx->mode, lab_dom_numeric(4), lab_dom_object(5),
+                         ctx->context, lab_dom_get(ctx->frame, "error"));
+}
+
+static int lab_flow_evaluation_error_plan(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_effects(ctx->frame, lab_flow_eval_error_effects, lab_dom_get(ctx->frame, "responsePlan"));
+}
+
+static int lab_flow_evaluation_error_effects(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_call(ctx->frame, lab_flow_eval_ready, "commitModeState", 0, 0, 0);
+}
+
+static int lab_flow_evaluation_rethrow_current(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_eval_current(ctx->frame, lab_flow_eval_rethrow_history);
+}
+
+static int lab_flow_evaluation_rethrow_history(struct lab_flow_evaluation_context *ctx)
+{
+    if (lab_dom_truth(lab_dom_get(ctx->frame, "current")) && lab_dom_truth(lab_dom_get(ctx->preparation, "history")))
+        return lab_flow_call(ctx->frame, lab_flow_eval_rethrow, "updateHistoryButtons", 0, 0, 0);
+    /* Continue: preserve a failure raised by the recovery services themselves. */
+    return lab_flow_evaluation_rethrow(ctx);
+}
+
+static int lab_flow_evaluation_rethrow(struct lab_flow_evaluation_context *ctx)
+{
+    return lab_flow_call(ctx->frame, lab_flow_eval_done, "rethrow", 0, 0, 1, lab_dom_get(ctx->frame, "exception"));
+}
+
+static int lab_flow_evaluation_otherwise(struct lab_flow_evaluation_context *ctx)
+{
+    (void)ctx;
+    return lab_flow_done(0);
+}
+
+/* Advance one evaluation stage using only this call's borrowed frame handles. */
 int lab_flow_evaluation(int frame, int view)
 {
     unsigned stage = (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
@@ -68,213 +352,169 @@ int lab_flow_evaluation(int frame, int view)
     int context = lab_dom_get(frame, "context"), request = lab_dom_get(frame, "request");
     int preparation = lab_dom_get(frame, "preparation"), plan = lab_dom_get(frame, "plan");
     int data = lab_dom_get(frame, "data");
-    switch (stage) {
-        case lab_flow_eval_start:
-            lab_dom_set(frame, "context", lab_dom_object(5));
-            lab_dom_set(frame, "phase", lab_dom_numeric(0));
-            return lab_flow_call(frame, lab_flow_eval_prepare, "native", "preparation", 0, 3,
-                                 lab_dom_string("lab_evaluation_prepare_plan"), mode,
-                                 lab_dom_numeric(lab_dom_truth(lab_dom_get(options, "skipHistoryUpdate"))));
-        case lab_flow_eval_prepare:
-            if (!preparation)
-                return lab_flow_done(0);
-            /* Fall through: the first preparation stage uses the newly allocated frame. */
-        case lab_flow_eval_setup:
-            return lab_flow_eval_native(frame, lab_flow_eval_setup_apply, "lab_evaluation_setup", mode,
-                                        lab_dom_get(frame, "phase"), context, options, view);
-        case lab_flow_eval_setup_apply:
-            return lab_flow_effects(frame,
-                                    lab_dom_truth(lab_dom_get(plan, "wait")) ? lab_flow_eval_setup_current
-                                                                             : lab_flow_eval_setup_next,
-                                    plan);
-        case lab_flow_eval_setup_current:
-            return lab_flow_eval_current(frame, lab_flow_eval_setup_next);
-        case lab_flow_eval_setup_next:
-            if (lab_dom_truth(lab_dom_get(plan, "wait")) && !lab_dom_truth(lab_dom_get(frame, "current")))
-                return lab_flow_done(0);
-            if (!lab_dom_truth(lab_dom_get(plan, "done"))) {
-                lab_dom_set(frame, "phase", lab_dom_numeric(lab_dom_number(lab_dom_get(frame, "phase")) + 1));
-                return lab_flow_eval_native(frame, lab_flow_eval_setup_apply, "lab_evaluation_setup", mode,
-                                            lab_dom_get(frame, "phase"), context, options, view);
-            }
-            return lab_flow_call(frame, lab_flow_eval_history, "historyState", "nextState", 0, 1,
-                                 lab_dom_get(context, "text"));
-        case lab_flow_eval_history:
-            if (lab_dom_truth(lab_dom_get(preparation, "history")))
-                return lab_flow_call(frame, lab_flow_eval_previous, "previousHistory", "previousState", 0, 1,
-                                     lab_dom_get(frame, "nextState"));
-            /* Fall through: no history lookup is needed for precision-only evaluation. */
-        case lab_flow_eval_previous:
-            if (lab_dom_truth(lab_dom_get(preparation, "input")))
-                return lab_flow_call(frame, lab_flow_eval_input, "requestInput", "accepted", 0, 2, request,
-                                     lab_dom_get(context, "text"));
-            return lab_flow_call(frame, lab_flow_eval_status, "showResults", 0, 0, 0);
-        case lab_flow_eval_input:
-            if (!lab_dom_truth(lab_dom_get(frame, "accepted")))
-                return lab_flow_done(0);
-            /* Fall through after successful native input validation. */
-        case lab_flow_eval_show:
-            return lab_flow_call(frame, lab_flow_eval_status, "showResults", 0, 0, 0);
-        case lab_flow_eval_status:
-            return lab_flow_call(frame, lab_flow_eval_guard, "setStatus", 0, 0, 1, lab_dom_get(preparation, "label"));
-        case lab_flow_eval_guard:
-            lab_dom_set(frame, "failed", lab_dom_numeric(lab_flow_eval_catch));
-            if (lab_dom_truth(lab_dom_get(frame, "previousState")))
-                return lab_flow_call(frame, lab_flow_eval_fetch, "pushHistory", 0, 0, 1,
-                                     lab_dom_get(frame, "previousState"));
-            /* Fall through: absent history has no browser effect. */
-        case lab_flow_eval_fetch: {
-            static const char *const fetchers[] = {"fetchExpression", "fetchEquation",   "fetchDiffequation",
-                                                   "fetchMatrix",     "fetchIntegrator", "fetchDatetime",
-                                                   "fetchAlmanac"};
-            unsigned index = (unsigned)lab_dom_number(mode);
-            if (index > 6)
-                return lab_flow_done(0);
-            return lab_flow_call(frame, lab_flow_eval_outcome, fetchers[index], "response", 1, 2, context, request);
-        }
-        case lab_flow_eval_outcome: {
-            int response = lab_dom_get(frame, "response");
-            data = lab_dom_get(response, "data");
-            lab_dom_set(frame, "data", data);
-            return lab_flow_call(frame, lab_flow_eval_response, "requestOutcome", "outcome", 0, 3, request,
-                                 lab_dom_get(response, "response"), data);
-        }
-        case lab_flow_eval_response:
-            return lab_flow_call(frame, lab_flow_eval_recover, "native", "responsePlan", 0, 6,
-                                 lab_dom_string("lab_evaluation_response"), mode, lab_dom_get(frame, "outcome"), data,
-                                 context, 0);
-        case lab_flow_eval_recover:
-            plan = lab_dom_get(frame, "responsePlan");
-            if (!plan)
-                return lab_flow_eval_current(frame, lab_flow_eval_finish);
-            return lab_flow_effects(frame, lab_flow_eval_install, plan);
-        case lab_flow_eval_install:
-            if (lab_dom_truth(lab_dom_get(lab_dom_get(frame, "responsePlan"), "install")))
-                return lab_flow_call(frame, lab_flow_eval_installed, "installEvaluation", 0, 1, 5, mode, data, context,
-                                     lab_dom_get(frame, "outcome"), request);
-            return lab_flow_call(frame, lab_flow_eval_ready, "commitModeState", 0, 0, 0);
-        case lab_flow_eval_installed:
-            return lab_flow_eval_current(frame, lab_flow_eval_commit);
-        case lab_flow_eval_commit:
-            if (!lab_dom_truth(lab_dom_get(frame, "current")))
-                return lab_flow_eval_current(frame, lab_flow_eval_finish);
-            return lab_flow_call(frame, lab_flow_eval_ready, "commitModeState", 0, 0, 0);
-        case lab_flow_eval_ready:
-            return lab_flow_call(frame, lab_flow_eval_weather_state, "setStatus", 0, 0, 1,
-                                 lab_dom_get(lab_dom_get(frame, "responsePlan"), "status"));
-        case lab_flow_eval_weather_state:
-            if ((lab_dom_number(mode) <= 2 || lab_dom_number(mode) == 4) &&
-                lab_dom_truth(lab_dom_get(lab_dom_get(frame, "responsePlan"), "install")) &&
-                lab_dom_truth(lab_dom_get(frame, "current"))) {
-                int range = lab_dom_id("plotRange"), source = lab_dom_get(context, "text");
-                int previous = lab_dom_read(range, 3, "plotSource");
-                if (lab_dom_length(previous) && !lab_dom_equal(source, previous)) {
-                    static const char *const limits[] = {"plotLower", "plotUpper", "plotSecondLower",
-                                                         "plotSecondUpper", "plotYLower", "plotYUpper"};
-                    for (unsigned i = 0; i < sizeof limits / sizeof *limits; ++i) {
-                        int control = lab_dom_id(limits[i]);
-                        lab_dom_write(control, 5, "", lab_dom_string(""));
-                        lab_dom_delete(control, "marsZoomValue");
-                        lab_dom_delete(control, "marsZoomText");
-                    }
-                    lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("auto"));
-                    lab_dom_delete(range, "marsZoomOriginal");
-                    lab_dom_delete(range, "marsZoomChart");
-                }
-                lab_dom_write(range, 3, "plotSource", source);
-                lab_layout_plot(0, 0);
-                return lab_flow_call(frame, lab_flow_eval_plot_scheduled, "automaticPlot", 0, 0, 1, request);
-            }
-            if (lab_dom_truth(lab_dom_get(lab_dom_get(frame, "responsePlan"), "weather")))
-                return lab_flow_call(frame, lab_flow_eval_weather, "native", "weatherState", 0, 3,
-                                     lab_dom_string("lab_evaluation_weather_state"), lab_dom_get(context, "state"),
-                                     data);
-            return lab_flow_eval_current(frame, lab_flow_eval_finish);
-        case lab_flow_eval_plot_scheduled:
-            return lab_flow_eval_current(frame, lab_flow_eval_finish);
-        case lab_flow_eval_weather:
-            return lab_flow_call(frame, lab_flow_eval_finally, "refreshWeather", 0, 0, 3, lab_dom_get(request, "token"),
-                                 lab_dom_get(frame, "weatherState"), data);
-        case lab_flow_eval_finally:
-            return lab_flow_eval_current(frame, lab_flow_eval_finish);
-        case lab_flow_eval_finish:
-            lab_dom_delete(frame, "failed");
-            if (lab_dom_truth(lab_dom_get(frame, "current")) && lab_dom_truth(lab_dom_get(preparation, "history")))
-                return lab_flow_call(frame, lab_flow_eval_done, "updateHistoryButtons", 0, 0, 0);
-            return lab_flow_done(0);
-        case lab_flow_eval_catch:
-            lab_dom_set(frame, "failed", lab_dom_numeric(lab_flow_eval_rethrow_current));
-            return lab_flow_eval_current(frame, lab_flow_eval_caught);
-        case lab_flow_eval_caught:
-            if (!lab_dom_truth(lab_dom_get(frame, "current")))
-                return lab_flow_eval_current(frame, lab_flow_eval_finish);
-            return lab_flow_call(frame, lab_flow_eval_error_plan, "native", "responsePlan", 0, 6,
-                                 lab_dom_string("lab_evaluation_response"), mode, lab_dom_numeric(4), lab_dom_object(5),
-                                 context, lab_dom_get(frame, "error"));
-        case lab_flow_eval_error_plan:
-            return lab_flow_effects(frame, lab_flow_eval_error_effects, lab_dom_get(frame, "responsePlan"));
-        case lab_flow_eval_error_effects:
-            return lab_flow_call(frame, lab_flow_eval_ready, "commitModeState", 0, 0, 0);
-        case lab_flow_eval_rethrow_current:
-            return lab_flow_eval_current(frame, lab_flow_eval_rethrow_history);
-        case lab_flow_eval_rethrow_history:
-            if (lab_dom_truth(lab_dom_get(frame, "current")) && lab_dom_truth(lab_dom_get(preparation, "history")))
-                return lab_flow_call(frame, lab_flow_eval_rethrow, "updateHistoryButtons", 0, 0, 0);
-            /* Fall through: preserve a failure raised by the recovery services themselves. */
-        case lab_flow_eval_rethrow:
-            return lab_flow_call(frame, lab_flow_eval_done, "rethrow", 0, 0, 1, lab_dom_get(frame, "exception"));
-        default:
-            return lab_flow_done(0);
-    }
+    struct lab_flow_evaluation_context ctx = {
+        .frame = frame,
+        .view = view,
+        .mode = mode,
+        .options = options,
+        .context = context,
+        .request = request,
+        .preparation = preparation,
+        .plan = plan,
+        .data = data,
+    };
+    static int (*const handlers[])(struct lab_flow_evaluation_context *) = {
+        [lab_flow_eval_start]           = lab_flow_evaluation_start,
+        [lab_flow_eval_prepare]         = lab_flow_evaluation_prepare,
+        [lab_flow_eval_setup]           = lab_flow_evaluation_setup,
+        [lab_flow_eval_setup_apply]     = lab_flow_evaluation_setup_apply,
+        [lab_flow_eval_setup_current]   = lab_flow_evaluation_setup_current,
+        [lab_flow_eval_setup_next]      = lab_flow_evaluation_setup_next,
+        [lab_flow_eval_history]         = lab_flow_evaluation_history,
+        [lab_flow_eval_previous]        = lab_flow_evaluation_previous,
+        [lab_flow_eval_input]           = lab_flow_evaluation_input,
+        [lab_flow_eval_show]            = lab_flow_evaluation_show,
+        [lab_flow_eval_status]          = lab_flow_evaluation_status,
+        [lab_flow_eval_guard]           = lab_flow_evaluation_guard,
+        [lab_flow_eval_fetch]           = lab_flow_evaluation_fetch,
+        [lab_flow_eval_outcome]         = lab_flow_evaluation_outcome,
+        [lab_flow_eval_response]        = lab_flow_evaluation_response,
+        [lab_flow_eval_recover]         = lab_flow_evaluation_recover,
+        [lab_flow_eval_install]         = lab_flow_evaluation_install,
+        [lab_flow_eval_installed]       = lab_flow_evaluation_installed,
+        [lab_flow_eval_commit]          = lab_flow_evaluation_commit,
+        [lab_flow_eval_ready]           = lab_flow_evaluation_ready,
+        [lab_flow_eval_weather_state]   = lab_flow_evaluation_weather_state,
+        [lab_flow_eval_plot_scheduled]  = lab_flow_evaluation_plot_scheduled,
+        [lab_flow_eval_weather]         = lab_flow_evaluation_weather,
+        [lab_flow_eval_finally]         = lab_flow_evaluation_finally,
+        [lab_flow_eval_finish]          = lab_flow_evaluation_finish,
+        [lab_flow_eval_catch]           = lab_flow_evaluation_catch,
+        [lab_flow_eval_caught]          = lab_flow_evaluation_caught,
+        [lab_flow_eval_error_plan]      = lab_flow_evaluation_error_plan,
+        [lab_flow_eval_error_effects]   = lab_flow_evaluation_error_effects,
+        [lab_flow_eval_rethrow_current] = lab_flow_evaluation_rethrow_current,
+        [lab_flow_eval_rethrow_history] = lab_flow_evaluation_rethrow_history,
+        [lab_flow_eval_rethrow]         = lab_flow_evaluation_rethrow,
+    };
+    unsigned selected = stage;
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](&ctx)
+                                                                               : lab_flow_evaluation_otherwise(&ctx);
 }
 
 /* Both normal evaluation and focused browser tests use this same installation continuation. */
+struct lab_flow_install_context {
+    int frame;
+    int view;
+    int mode;
+    int data;
+    int context;
+    int cards;
+    int request;
+};
+
+static int lab_flow_install_native(struct lab_flow_install_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 1, "native", "cards", 0, 5, lab_dom_string("lab_evaluation_cards"), ctx->mode,
+                         ctx->data, lab_dom_get(ctx->context, "text"), lab_dom_get(ctx->view, "caches"));
+}
+
+static int lab_flow_install_native_1(struct lab_flow_install_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 2, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), ctx->mode,
+                         lab_dom_numeric(0), lab_dom_get(ctx->frame, "outcome"), ctx->data, ctx->context, ctx->cards,
+                         ctx->view);
+}
+
+static int lab_flow_install_apply_initial(struct lab_flow_install_context *ctx)
+{
+    return lab_flow_effects(ctx->frame, 3, lab_dom_get(ctx->frame, "plan"));
+}
+
+static int lab_flow_install_render_solver(struct lab_flow_install_context *ctx)
+{
+    if (lab_dom_number(ctx->mode) == 2 && lab_dom_truth(lab_dom_get(ctx->cards, "solver_source"))) {
+        lab_dom_set(ctx->frame, "failed", lab_dom_numeric(5));
+        return lab_flow_call(ctx->frame, 4, "renderSolver", "solver", 1, 2, lab_dom_get(ctx->cards, "solver_source"),
+                             lab_dom_get(ctx->request, "token"));
+    }
+    return lab_flow_call(ctx->frame, 8, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), ctx->mode,
+                         lab_dom_numeric(1), lab_dom_get(ctx->frame, "outcome"), ctx->data, ctx->context, ctx->cards,
+                         ctx->view);
+}
+
+static int lab_flow_install_solver_current(struct lab_flow_install_context *ctx)
+{
+    return lab_flow_eval_current(ctx->frame, 6);
+}
+
+static int lab_flow_install_solver_failed(struct lab_flow_install_context *ctx)
+{
+    lab_dom_delete(ctx->frame, "solver");
+    return lab_flow_eval_current(ctx->frame, 6);
+}
+
+static int lab_flow_install_solver_svg(struct lab_flow_install_context *ctx)
+{
+    if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
+        return lab_flow_done(0);
+    int svg = lab_dom_get(lab_dom_get(ctx->frame, "solver"), "svg");
+    if (lab_dom_truth(svg))
+        return lab_flow_call(ctx->frame, 7, "solverSVG", 0, 0, 5, ctx->data, lab_dom_get(ctx->cards, "solver_source"),
+                             lab_dom_get(ctx->cards, "function"), svg, lab_dom_get(ctx->request, "token"));
+    lab_dom_delete(ctx->frame, "failed");
+    return lab_flow_call(ctx->frame, 8, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), ctx->mode,
+                         lab_dom_numeric(1), lab_dom_get(ctx->frame, "outcome"), ctx->data, ctx->context, ctx->cards,
+                         ctx->view);
+}
+
+static int lab_flow_install_native_7(struct lab_flow_install_context *ctx)
+{
+    lab_dom_delete(ctx->frame, "failed");
+    return lab_flow_call(ctx->frame, 8, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), ctx->mode,
+                         lab_dom_numeric(1), lab_dom_get(ctx->frame, "outcome"), ctx->data, ctx->context, ctx->cards,
+                         ctx->view);
+}
+
+static int lab_flow_install_apply_final(struct lab_flow_install_context *ctx)
+{
+    return lab_flow_effects(ctx->frame, 9, lab_dom_get(ctx->frame, "plan"));
+}
+
+static int lab_flow_install_otherwise(struct lab_flow_install_context *ctx)
+{
+    (void)ctx;
+    return lab_flow_done(0);
+}
+
+/* Select the next guarded installation stage for the current evaluation. */
 int lab_flow_install(int frame, int view)
 {
     unsigned stage = (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
     int mode = lab_dom_get(frame, "mode"), data = lab_dom_get(frame, "data");
     int context = lab_dom_get(frame, "context"), cards = lab_dom_get(frame, "cards");
     int request = lab_dom_get(frame, "request");
-    switch (stage) {
-        case 0:
-            return lab_flow_call(frame, 1, "native", "cards", 0, 5, lab_dom_string("lab_evaluation_cards"), mode, data,
-                                 lab_dom_get(context, "text"), lab_dom_get(view, "caches"));
-        case 1:
-            return lab_flow_call(frame, 2, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), mode,
-                                 lab_dom_numeric(0), lab_dom_get(frame, "outcome"), data, context, cards, view);
-        case 2:
-            return lab_flow_effects(frame, 3, lab_dom_get(frame, "plan"));
-        case 3:
-            if (lab_dom_number(mode) == 2 && lab_dom_truth(lab_dom_get(cards, "solver_source"))) {
-                lab_dom_set(frame, "failed", lab_dom_numeric(5));
-                return lab_flow_call(frame, 4, "renderSolver", "solver", 1, 2, lab_dom_get(cards, "solver_source"),
-                                     lab_dom_get(request, "token"));
-            }
-            return lab_flow_call(frame, 8, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), mode,
-                                 lab_dom_numeric(1), lab_dom_get(frame, "outcome"), data, context, cards, view);
-        case 4:
-            return lab_flow_eval_current(frame, 6);
-        case 5:
-            lab_dom_delete(frame, "solver");
-            return lab_flow_eval_current(frame, 6);
-        case 6: {
-            if (!lab_dom_truth(lab_dom_get(frame, "current")))
-                return lab_flow_done(0);
-            int svg = lab_dom_get(lab_dom_get(frame, "solver"), "svg");
-            if (lab_dom_truth(svg))
-                return lab_flow_call(frame, 7, "solverSVG", 0, 0, 5, data, lab_dom_get(cards, "solver_source"),
-                                     lab_dom_get(cards, "function"), svg, lab_dom_get(request, "token"));
-            lab_dom_delete(frame, "failed");
-            return lab_flow_call(frame, 8, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), mode,
-                                 lab_dom_numeric(1), lab_dom_get(frame, "outcome"), data, context, cards, view);
-        }
-        case 7:
-            lab_dom_delete(frame, "failed");
-            return lab_flow_call(frame, 8, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), mode,
-                                 lab_dom_numeric(1), lab_dom_get(frame, "outcome"), data, context, cards, view);
-        case 8:
-            return lab_flow_effects(frame, 9, lab_dom_get(frame, "plan"));
-        default:
-            return lab_flow_done(0);
-    }
+    struct lab_flow_install_context ctx = {
+        .frame = frame,
+        .view = view,
+        .mode = mode,
+        .data = data,
+        .context = context,
+        .cards = cards,
+        .request = request,
+    };
+    static int (*const handlers[])(struct lab_flow_install_context *) = {
+        [0] = lab_flow_install_native,
+        [1] = lab_flow_install_native_1,
+        [2] = lab_flow_install_apply_initial,
+        [3] = lab_flow_install_render_solver,
+        [4] = lab_flow_install_solver_current,
+        [5] = lab_flow_install_solver_failed,
+        [6] = lab_flow_install_solver_svg,
+        [7] = lab_flow_install_native_7,
+        [8] = lab_flow_install_apply_final,
+    };
+    unsigned selected = stage;
+    return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](&ctx)
+                                                                               : lab_flow_install_otherwise(&ctx);
 }

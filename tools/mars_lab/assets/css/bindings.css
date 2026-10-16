@@ -13,7 +13,8 @@
   padding: 0 1rem 1rem;
 }
 
-.target-row label {
+.target-row label,
+#plotCamera label {
   color: #bed3c0;
   font: 0.78rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
   letter-spacing: 0.1em;
@@ -32,6 +33,189 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
+}
+
+#plotRendered:has(> .complex-grid) {
+    padding: 0.4rem;
+}
+
+.complex-grid {
+    display: grid;
+    align-items: start;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+    padding: 0;
+}
+.complex-panel {
+    container-type: inline-size;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #78918680;
+    border-radius: 1rem;
+}
+.complex-panel > .card-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.complex-panel.complex-expanded {
+    grid-column: 1 / -1;
+}
+.complex-grid.complex-focused {
+    grid-template-columns: minmax(0, 1fr);
+}
+.complex-grid.complex-focused > .complex-panel:not(.complex-expanded) {
+    display: none;
+}
+.complex-panel .rendered {
+    padding: 0;
+    min-width: 0;
+    min-height: 0;
+}
+.complex-panel .rendered-zoom-frame,
+.complex-panel .rendered-zoom-frame > svg {
+    width: 100% !important;
+    min-width: 0;
+    max-width: 100%;
+    height: auto !important;
+    transform: none !important;
+    margin: 0 !important;
+}
+.complex-panel .rendered-zoom-frame {
+    display: block;
+}
+.complex-panel .rendered-zoom-frame svg {
+    filter: none;
+}
+.complex-panel[data-complex-panel="complex_plane"] {
+    display: flex;
+    flex-direction: column;
+}
+.complex-panel[data-complex-panel="complex_plane"] > .rendered {
+    flex: 1 0 auto;
+    display: flex;
+    align-items: center;
+}
+@media (max-width: 700px) {
+    .complex-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+#plotStage.has-slices {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+}
+
+#plotStage > #plotRendered {
+  min-width: 0;
+}
+
+#plotSlices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 5px;
+  border-left: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--muted);
+}
+
+#plotSlices.hidden,
+#plotSlices .hidden,
+#plotSlices .plot-slice.hidden {
+  display: none;
+}
+
+#plotSlices .plot-slice {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.plot-slice label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font: 0.68rem/1.3 "Cascadia Code", "DejaVu Sans Mono", monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.plot-slice > label:first-child {
+  align-items: center;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+#plotSlices input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color-scheme: dark;
+}
+
+#plotSlices input.slice-slider {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 44px;
+  height: 160px;
+  flex: 0 0 auto;
+  touch-action: none;
+}
+
+.slice-choices,
+.slice-modes {
+  display: block;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  font: 0.75rem/1.3 "Cascadia Code", "DejaVu Sans Mono", monospace;
+}
+
+.slice-choices legend,
+.slice-modes legend {
+  margin-bottom: 6px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.slice-choices label,
+.slice-modes label {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.slice-choices label + label,
+.slice-modes label + label {
+  margin-top: 4px;
+}
+
+.slice-choices input,
+.slice-modes input {
+  order: -1;
+  margin: 0;
+  accent-color: var(--accent);
+  color-scheme: dark;
+}
+
+.slice-limits {
+  display: grid;
+  gap: 8px;
 }
 
 .plot-group {
@@ -102,6 +286,26 @@
   padding: 0.65rem 0.9rem 0.3rem;
 }
 
+.complex-panel > #plotCamera {
+  margin: 0.5rem;
+  padding: 0.4rem 0.65rem 0.2rem;
+  row-gap: 0.2rem;
+  background: #10241d;
+}
+
+.complex-panel > #plotCamera > #plotCameraTitle {
+  display: none;
+}
+
+.plot-angle input[type="range"] {
+  display: block;
+  width: 100%;
+}
+
+.complex-panel .rendered-zoom-frame > svg {
+  max-height: max(12rem, calc(100svh - 18rem));
+}
+
 #plotCamera > .plot-field {
   position: relative;
   grid-template-columns: minmax(0, 1fr);
@@ -109,6 +313,7 @@
 }
 
 #plotCamera .plot-field > label {
+  font-size: 0.68rem;
   padding-right: 5ch;
   line-height: 1.4;
   letter-spacing: 0.06em;
@@ -119,6 +324,7 @@
 }
 
 #plotCamera output {
+  font-size: 0.68rem;
   position: absolute;
   top: 0;
   right: 0;
@@ -290,7 +496,8 @@
   grid-template-columns: minmax(0, 1fr) 5ch;
 }
 
-.target-row input {
+.target-row input,
+.plot-slice input[type="text"] {
   width: 100%;
   border: 1px solid rgba(233, 244, 239, 0.28);
   border-radius: 999px;
@@ -301,12 +508,13 @@
   font: 0.95rem/1.25 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
 }
 
-.target-row input:focus {
+.target-row input:focus,
+.plot-slice input[type="text"]:focus {
   border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
   box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
 }
 
-.plot-angle input[type="range"] {
+:is(.plot-angle, .plot-slice) input[type="range"] {
   appearance: none;
   border: 0;
   border-radius: 0;
@@ -319,29 +527,29 @@
   cursor: pointer;
 }
 
-.plot-angle input[type="range"]:focus {
+:is(.plot-angle, .plot-slice) input[type="range"]:focus {
   box-shadow: none;
 }
 
-.plot-angle input[type="range"]:focus-visible {
+:is(.plot-angle, .plot-slice) input[type="range"]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-radius: 6px;
 }
 
-.plot-angle input[type="range"]::-moz-range-track {
+:is(.plot-angle, .plot-slice) input[type="range"]::-moz-range-track {
   height: 0.35rem;
   border-radius: 999px;
   background: #31594e;
 }
 
-.plot-angle input[type="range"]::-moz-range-progress {
+:is(.plot-angle, .plot-slice) input[type="range"]::-moz-range-progress {
   height: 0.35rem;
   border-radius: 999px;
   background: var(--accent);
 }
 
-.plot-angle input[type="range"]::-moz-range-thumb {
+:is(.plot-angle, .plot-slice) input[type="range"]::-moz-range-thumb {
   width: 1rem;
   height: 1rem;
   border: 1px solid #c6e5ce;
@@ -349,13 +557,13 @@
   background: var(--accent);
 }
 
-.plot-angle input[type="range"]::-webkit-slider-runnable-track {
+:is(.plot-angle, .plot-slice) input[type="range"]::-webkit-slider-runnable-track {
   height: 0.35rem;
   border-radius: 999px;
   background: #31594e;
 }
 
-.plot-angle input[type="range"]::-webkit-slider-thumb {
+:is(.plot-angle, .plot-slice) input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 1rem;
   height: 1rem;
@@ -363,6 +571,26 @@
   border: 1px solid #c6e5ce;
   border-radius: 50%;
   background: var(--accent);
+}
+
+.plot-slice input[type="range"]::-moz-range-track {
+  width: 0.35rem;
+  height: 100%;
+}
+
+.plot-slice input[type="range"]::-moz-range-progress {
+  width: 0.35rem;
+  height: auto;
+}
+
+.plot-slice input[type="range"]::-webkit-slider-runnable-track {
+  width: 0.35rem;
+  height: 100%;
+}
+
+.plot-slice input[type="range"]::-webkit-slider-thumb {
+  margin-top: 0;
+  margin-left: -0.325rem;
 }
 
 .goal-start-fields {

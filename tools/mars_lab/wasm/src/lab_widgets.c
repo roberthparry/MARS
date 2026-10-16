@@ -11,7 +11,7 @@
  * No mathematical or date text is parsed; invalid months leave the DOM intact.
  */
 #include "lab_dom.h"
-#include "../include/lab_forms.h"
+#include "lab_forms.h"
 #include "lab_view.h"
 #include "lab_widgets.h"
 

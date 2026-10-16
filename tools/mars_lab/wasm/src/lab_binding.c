@@ -14,7 +14,7 @@
  * storage. Constant ordering uses a stable merge sort rather than repeated scans.
  */
 #include "lab_dom.h"
-#include "../include/lab_forms.h"
+#include "lab_forms.h"
 #include "lab_binding.h"
 
 /* Compare exact browser values with a literal without interpreting binding text. */

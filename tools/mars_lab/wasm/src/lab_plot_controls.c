@@ -7,10 +7,12 @@
  * Blank range text is sent unchanged to the native worker's automatic-range policy.
  */
 #include "lab_dom.h"
+#include "lab_layout.h"
 #include "lab_workspace.h"
 #include "lab_requests.h"
 #include "lab_plot_controls.h"
 #include "lab_plot_drag.h"
+#include "lab_plot_slices.h"
 
 static int value(const char *id)
 {
@@ -18,6 +20,40 @@ static int value(const char *id)
 }
 
 static const char *const controls[] = {"plotFirst", "plotSecond", "plotKind", "plotScale"};
+
+/* Explicit evaluation starts a new view; internal redraws and precision changes do not. */
+void lab_plot_controls_reset(void)
+{
+    static const char *const limits[] = {"plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper",
+                                         "plotYLower", "plotYUpper"};
+    static const char *const cached[] = {"marsZoomOriginal", "marsZoomChart", "marsZoomBounds",
+                                         "marsZoomAnchor", "marsZoomTitle"};
+    static const char *const camera[] = {"plotAzimuth", "plotElevation", "plotRoll", "plotZoom"};
+    static const char *const outputs[] = {"plotAzimuthValue", "plotElevationValue", "plotRollValue", "plotZoomValue"};
+    static const char *const labels[] = {"315°", "30°", "0°", "100%"};
+    for (unsigned i = 0; i < sizeof limits / sizeof *limits; ++i) {
+        int control = lab_dom_id(limits[i]);
+        lab_dom_write(control, 5, "", lab_dom_string(""));
+        lab_dom_delete(control, "marsZoomValue");
+        lab_dom_delete(control, "marsZoomText");
+    }
+    for (unsigned i = 0; i < sizeof cached / sizeof *cached; ++i)
+        lab_dom_delete(lab_dom_id("plotRange"), cached[i]);
+    for (unsigned i = 0; i < sizeof camera / sizeof *camera; ++i) {
+        int control = lab_dom_id(camera[i]);
+        lab_dom_write(control, 5, "", lab_dom_get(control, "defaultValue"));
+        lab_dom_write(lab_dom_id(outputs[i]), 0, "", lab_dom_string(labels[i]));
+    }
+    lab_dom_write(lab_dom_id("plotKind"), 5, "", lab_dom_string("auto"));
+    lab_dom_write(lab_dom_id("plotScale"), 5, "", lab_dom_string("auto"));
+    lab_dom_delete(lab_dom_id("plotRendered"), "marsComplexPlaneBounds");
+    int expanded = lab_dom_query(lab_dom_id("plotRendered"), ".complex-expanded");
+    if (expanded)
+        lab_layout_expand(expanded, 1);
+    lab_dom_delete(lab_dom_id("plotRendered"), "marsComplexExpanded");
+    lab_plot_slices_clear();
+    lab_plot_controls_sync();
+}
 
 static int control_index(int name)
 {
@@ -51,7 +87,8 @@ static int curve_available(int first)
 void lab_plot_controls_sync(void)
 {
     int solver = lab_workspace_mode() == 1 || lab_workspace_mode() == 2 || lab_workspace_mode() == 4;
-    lab_dom_class(lab_dom_id("plotKindGroup"), "hidden", solver);
+    int complex = !!lab_dom_query(0, "#plotRendered .complex-grid");
+    lab_dom_class(lab_dom_id("plotKindGroup"), "hidden", solver || complex);
     int first = value("plotFirst"), second = value("plotSecond");
     int curve_allowed = solver || curve_available(first);
     int curve_option = lab_dom_query(0, "#plotKindChoices input[value='curve']");
@@ -87,12 +124,12 @@ void lab_plot_controls_sync(void)
         surface = lab_dom_truth(lab_dom_get(range, "marsPlotSurface")) || lab_dom_length(second);
     int multiple = lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) > 1;
     int automatic = lab_dom_equal(value("plotScale"), lab_dom_string("auto"));
-    lab_dom_class(lab_dom_closest(lab_dom_id("plotFirstGroup"), ".plot-ranges"), "hidden", automatic && !multiple);
-    lab_dom_class(lab_dom_query(lab_dom_id("plotFirstGroup"), ".plot-bound-pair"), "hidden", automatic);
+    lab_dom_class(lab_dom_closest(lab_dom_id("plotFirstGroup"), ".plot-ranges"), "hidden", !complex && automatic && !multiple);
+    lab_dom_class(lab_dom_query(lab_dom_id("plotFirstGroup"), ".plot-bound-pair"), "hidden", !complex && automatic);
     lab_dom_class(lab_dom_query(lab_dom_id("plotSecondGroup"), ".plot-bound-pair"), "hidden", automatic);
-    lab_dom_class(lab_dom_id("plotSecondGroup"), "hidden", curve || (!surface && !multiple));
+    lab_dom_class(lab_dom_id("plotSecondGroup"), "hidden", complex || curve || (!surface && !multiple));
     lab_dom_class(lab_dom_id("plotCamera"), "hidden", !surface);
-    lab_dom_class(lab_dom_id("plotVertical"), "hidden", 0);
+    lab_dom_class(lab_dom_id("plotVertical"), "hidden", complex);
     lab_dom_write(lab_dom_id("plotVerticalTitle"), 0, "",
                   lab_dom_string(surface ? "Height range" : "Vertical range"));
     lab_dom_class(lab_dom_id("plotManual"), "hidden", !lab_dom_equal(value("plotScale"), lab_dom_string("manual")));
@@ -133,10 +170,10 @@ void lab_plot_controls_variables(int names, int labels)
     if (!lab_dom_truth(lab_dom_key_get(index, value("plotSecond"))))
         lab_dom_write(lab_dom_id("plotSecond"), 5, "", lab_dom_string(""));
     lab_dom_set(lab_dom_id("plotRange"), "marsPlotVariables", lab_dom_numeric(lab_dom_count(names)));
-    lab_dom_subscribe(lab_dom_id("plotRange"), "change", "lab_plot_controls_dispatch", 0, 0, 0);
-    lab_dom_subscribe(lab_dom_id("plotRange"), "input", "lab_plot_controls_dispatch", 1, 0, 0);
-    lab_dom_subscribe(lab_dom_id("plotRange"), "click", "lab_plot_controls_dispatch", 3, 0, 0);
-    lab_dom_subscribe(lab_dom_id("plotRange"), "pointerdown", "lab_plot_controls_dispatch", 4, 0, 0);
+    lab_dom_subscribe(lab_dom_id("plotCard"), "change", "lab_plot_controls_dispatch", 0, 0, 0);
+    lab_dom_subscribe(lab_dom_id("plotCard"), "input", "lab_plot_controls_dispatch", 1, 0, 0);
+    lab_dom_subscribe(lab_dom_id("plotCard"), "click", "lab_plot_controls_dispatch", 3, 0, 0);
+    lab_dom_subscribe(lab_dom_id("plotCard"), "pointerdown", "lab_plot_controls_dispatch", 4, 0, 0);
     lab_plot_controls_sync();
 }
 
@@ -180,10 +217,26 @@ void lab_plot_controls_dispatch(unsigned action, int event, int context)
             (!lab_dom_length(lab_dom_clean(value("plotYLower"), 0)) ||
              !lab_dom_length(lab_dom_clean(value("plotYUpper"), 0))))
             return;
-        emit(calls, "takePlot", value("plotFirst"), 0, 1);
+        emit(calls, "takePlot", value("plotFirst"), lab_dom_get(context, "slicePreview"), 2);
         return;
     }
     int target = lab_dom_get(event, "target");
+    /* The camera may be docked outside plotRange; slice controls retain their own subscription. */
+    if (lab_dom_equal(lab_dom_get(event, "currentTarget"), lab_dom_id("plotCard")) &&
+        !lab_dom_closest(target, "#plotRange, #plotCamera"))
+        return;
+    int slice_edit = lab_plot_slices_edit(action, target);
+    if (slice_edit == 2)
+        return;
+    if (slice_edit == 1) {
+        int state = lab_dom_object(5);
+        lab_dom_set(state, "mode", lab_dom_numeric(lab_workspace_mode()));
+        lab_dom_set(state, "request", lab_dom_numeric(lab_request_latest_main()));
+        lab_dom_set(state, "source", current_source());
+        lab_dom_set(state, "slicePreview", lab_dom_scalar(1, action == 1));
+        emit(calls, "schedulePlotSlice", state, lab_dom_numeric(action == 1 ? 40 : 0), 2);
+        return;
+    }
     if (lab_dom_closest(target, "#plotZoom")) {
         if (action == 0 || action == 1 || action == 4)
             emit(calls, "setSurfaceZoom", lab_dom_read(target, 5, ""), lab_dom_numeric(action), 2);

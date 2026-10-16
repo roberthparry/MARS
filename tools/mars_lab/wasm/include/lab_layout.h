@@ -35,6 +35,10 @@ void lab_layout_content(int svg, int fallback);
  * @param result Scoped native plot result, or zero. @param error Scoped diagnostic, or zero. */
 void lab_layout_plot(int result, int error);
 
+/** @brief Move the live camera controls beside their curve, or home before replacing/saving plot markup.
+ * @param home Non-zero parks controls outside the replaceable plot content. */
+void lab_layout_plot_camera(int home);
+
 /** @brief Fit rendered output using native variant metadata and current browser geometry. */
 void lab_layout_fit(void);
 

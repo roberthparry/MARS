@@ -480,6 +480,12 @@ pre {
   opacity: 0.18;
 }
 
+:is(#plotCard.expanded-card, #plotRendered .complex-expanded)
+  :is(svg[data-plot-chart]:not([data-surface]), svg[data-segments="true"]) [data-series] > path {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1.25px;
+}
+
 .plot-pointer-line {
   width: 0;
   border-left: 1px dashed #e6c778;

@@ -59,7 +59,9 @@ struct _plot_t {
     bool has_included_height;
     number_t *surface_x, *surface_y, *surface_z;
     size_t surface_columns, surface_rows;
-    bool mesh;
+    bool mesh, segments;
+    number_t *refined_x, *refined_y, *refined_z;
+    size_t refined_count;
     bool shaded, shade_reversed;
     number_t shade_bounds[2];
 };

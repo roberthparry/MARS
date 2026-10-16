@@ -1,13 +1,14 @@
 /**
  * Retained native surface geometry for local camera interaction. No expressions
  * are evaluated here: normalised vertices, colours and labels come from MARS.
- * WebGL depth-tests complete triangles; a painter-ordered canvas is the fallback.
- * WebGL remains visible at rest. SVG is generated on demand for vector export.
+ * WebGL depth-tests triangles or line segments; a painter-ordered canvas is the fallback.
+ * Surfaces retain WebGL at rest; line curves settle to batched SVG. Vector export
+ * uses the same native projection as the interactive view.
  */
 const labSurfacePreview = (() => {
     let current = null;
 
-    function gpu(canvas, vertices) {
+    function gpu(canvas, vertices, segments) {
         let gl;
         try { gl = canvas.getContext('webgl', {alpha: true, antialias: true, preserveDrawingBuffer: false}); }
         catch (_) { return null; }
@@ -59,6 +60,8 @@ const labSurfacePreview = (() => {
             gl.enable(gl.DEPTH_TEST);
             gl.disable(gl.CULL_FACE);
             return {
+                maxSize: Math.min(4096, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+                                  ...gl.getParameter(gl.MAX_VIEWPORT_DIMS)),
                 draw(matrix, scaling, offset, visible) {
                     if (gl.isContextLost()) return false;
                     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -67,7 +70,7 @@ const labSurfacePreview = (() => {
                     gl.uniformMatrix4fv(camera, false, matrix);
                     gl.uniform3fv(domainScale, scaling);
                     gl.uniform3fv(domainOffset, offset);
-                    gl.drawArrays(gl.TRIANGLES, 0, visible ? vertices.length / 9 : 0);
+                    gl.drawArrays(segments ? gl.LINES : gl.TRIANGLES, 0, visible ? vertices.length / 9 : 0);
                     return true;
                 },
                 dispose() {
@@ -86,12 +89,42 @@ const labSurfacePreview = (() => {
         }
     }
 
+    function removeSettled(view) {
+        clearTimeout(view.settleTimer);
+        view.settled?.remove();
+        view.settled = null;
+    }
+
+    // Line plots use the retained native projection for a crisp, vector idle view.
+    // Keep the original mesh and GPU alive so a new gesture resumes immediately.
+    function scheduleSettled(view) {
+        if (view.chart.dataset.segments !== 'true') return;
+        clearTimeout(view.settleTimer);
+        view.settleTimer = setTimeout(() => {
+            if (current !== view || !view.chart.isConnected) return;
+            const drag = document.getElementById('plotRendered').marsPlotDrag;
+            if (drag?.active || drag?.wheel || drag?.busy || labSurfaceVolume.interacting) {
+                scheduleSettled(view);
+                return;
+            }
+            const drawing = labSurfaceExport.layer(view);
+            if (!drawing) return;
+            view.settled?.remove();
+            drawing.dataset.surfaceSettled = 'true';
+            view.chart.appendChild(drawing);
+            view.settled = drawing;
+            view.overlay.style.display = 'none';
+            view.chart.dataset.localRenderer = 'svg';
+        }, 150);
+    }
+
     function clear(force = false) {
         if (!current) return;
         if (!force && current.chart.isConnected) {
             draw(current.chart, current.angles);
             return;
         }
+        removeSettled(current);
         for (const [node, visibility] of current.hidden) node.style.visibility = visibility;
         current.hidden = [];
         current.overlay.style.display = 'none';
@@ -163,7 +196,17 @@ const labSurfacePreview = (() => {
         if (current?.chart === chart) return current;
         dispose();
         if (!chart?.isConnected || !chart.dataset.units) return null;
-        const triangles = [], data = [];
+        const primitives = [], data = [];
+        const segments = chart.dataset.segments === 'true';
+        for (const path of chart.querySelectorAll('[data-segment]')) {
+            const points = path.dataset.segment.split(' ').map(Number);
+            if (points.length !== 6 || !points.every(Number.isFinite)) return null;
+            const rgb = Number.parseInt(path.getAttribute('stroke').slice(1), 16);
+            const colour = [(rgb >> 16 & 255) / 255, (rgb >> 8 & 255) / 255, (rgb & 255) / 255];
+            const ends = [points.slice(0, 3), points.slice(3, 6)];
+            primitives.push({points: ends, colour: path.getAttribute('stroke'), depth: 0});
+            ends.forEach(point => data.push(...point, ...colour, 1, 1, 1));
+        }
         for (const path of chart.querySelectorAll('[data-vertices]')) {
             const points = path.dataset.vertices.split(' ').map(Number);
             if (points.length < 9 || points.length > 15 || points.length % 3 || !points.every(Number.isFinite))
@@ -172,12 +215,12 @@ const labSurfacePreview = (() => {
             const colour = [(rgb >> 16 & 255) / 255, (rgb >> 8 & 255) / 255, (rgb & 255) / 255];
             for (let i = 3; i + 3 < points.length; i += 3) {
                 const triangle = [points.slice(0, 3), points.slice(i, i + 3), points.slice(i + 3, i + 6)];
-                triangles.push({points: triangle, colour: path.getAttribute('fill'), depth: 0});
+                primitives.push({points: triangle, colour: path.getAttribute('fill'), depth: 0});
                 triangle.forEach((point, j) => data.push(...point, ...colour,
                                                        Number(j === 0), Number(j === 1), Number(j === 2)));
             }
         }
-        if (!triangles.length && chart.dataset.empty !== 'true') return null;
+        if (!primitives.length && chart.dataset.empty !== 'true') return null;
         const units = chart.dataset.units.split(' ').map(Number);
         if (units.length !== 3 || !units.every(x => Number.isFinite(x) && x > 0)) return null;
         const width = chart.viewBox.baseVal.width, height = chart.viewBox.baseVal.height;
@@ -194,21 +237,19 @@ const labSurfacePreview = (() => {
             'transform-origin:0 0;pointer-events:none';
         let canvas = document.createElement('canvas');
         const vertices = new Float32Array(data);
-        const renderer = software ? null : gpu(canvas, vertices);
+        const renderer = software ? null : gpu(canvas, vertices, segments);
         if (!renderer) canvas = document.createElement('canvas');
         const labels = document.createElement('canvas');
-        const ratio = Math.min(window.devicePixelRatio || 1, 2);
         for (const layer of [canvas, labels]) {
-            layer.width = Math.round(width * ratio);
-            layer.height = Math.round(height * ratio);
+            // Allocate the backing stores from their displayed size on the first draw.
+            layer.width = 1;
+            layer.height = 1;
             layer.style.cssText = `position:absolute;left:0;top:0;width:${width}px;height:${height}px`;
             holder.appendChild(layer);
         }
         const context = renderer ? null : canvas.getContext('2d');
         const ink = labels.getContext('2d');
         if ((!renderer && !context) || !ink) { renderer?.dispose(); return null; }
-        context?.scale(ratio, ratio);
-        ink.scale(ratio, ratio);
         overlay.appendChild(holder);
         host.appendChild(overlay);
         const ticks = [...chart.querySelectorAll('[data-tick-fraction]')].map(node => ({
@@ -218,7 +259,7 @@ const labSurfacePreview = (() => {
         const names = [0, 1, 2].map(axis => chart.querySelector(`[data-axis-name="${axis}"]`)?.textContent || '');
         const observer = new MutationObserver(() => { if (!chart.isConnected) dispose(); });
         observer.observe(document.getElementById('plotRendered'), {childList: true, subtree: true});
-        current = {chart, host, holder, triangles, vertices, units, width, height, overlay, gpu: renderer, context, ink,
+        current = {chart, host, holder, primitives, vertices, units, width, height, overlay, gpu: renderer, context, ink,
                    ticks, names, observer, hidden: [], camera: saved && (saved.key === signature(chart) || saved.refining) ?
                        {...saved.camera} : {scale: 1, x: 0, y: 0},
                    angles: ['Azimuth', 'Elevation', 'Roll'].map(key =>
@@ -252,9 +293,28 @@ const labSurfacePreview = (() => {
         return current;
     }
 
+    // Browser pixel sizing only: geometry and camera calculations remain native.
+    function resizeBacking(view, screen) {
+        const pixels = window.devicePixelRatio || 1;
+        const xScale = Math.hypot(screen.a, screen.b) * pixels;
+        const yScale = Math.hypot(screen.c, screen.d) * pixels;
+        const limit = view.gpu?.maxSize || 4096;
+        const requestedWidth = view.width * xScale, requestedHeight = view.height * yScale;
+        const fit = Math.min(1, limit / requestedWidth, limit / requestedHeight);
+        const width = Math.max(1, Math.ceil(requestedWidth * fit));
+        const height = Math.max(1, Math.ceil(requestedHeight * fit));
+        for (const layer of view.holder.children) {
+            if (layer.width !== width) layer.width = width;
+            if (layer.height !== height) layer.height = height;
+        }
+        view.context?.setTransform(width / view.width, 0, 0, height / view.height, 0, 0);
+        view.ink.setTransform(width / view.width, 0, 0, height / view.height, 0, 0);
+    }
+
     function draw(chart, angles, bounds = null) {
         const view = prepare(chart);
         if (!view || !angles.every(Number.isFinite)) return false;
+        removeSettled(view);
         if (angles.some((value, i) => Math.abs(value - view.angles[i]) > 1e-9))
             view.orientation = labSurfaceCamera.fromAngles(angles);
         view.angles = [...angles];
@@ -262,6 +322,7 @@ const labSurfacePreview = (() => {
         // including nested SVG headings, mobile fitting, borders and scroll offsets.
         const screen = chart.getScreenCTM(), box = view.host.getBoundingClientRect();
         if (!screen) return false;
+        resizeBacking(view, screen);
         const tx = screen.e - box.left - view.host.clientLeft + view.host.scrollLeft;
         const ty = screen.f - box.top - view.host.clientTop + view.host.scrollTop;
         const xs = [0, screen.a * view.width, screen.c * view.height,
@@ -295,15 +356,21 @@ const labSurfacePreview = (() => {
         } else {
             const ctx = view.context;
             ctx.clearRect(0, 0, width, height);
-            const triangles = (frame.drawMesh ? view.triangles : []).map(triangle => ({
+            const triangles = (frame.drawMesh ? view.primitives : []).map(triangle => ({
                 ...view.polygon(triangle.points), colour: triangle.colour
-            })).filter(triangle => triangle.points.length >= 3);
+            })).filter(triangle => triangle.points.length >= (chart.dataset.segments === 'true' ? 2 : 3));
             triangles.sort((a, b) => b.depth - a.depth);
             ctx.strokeStyle = '#193d4659';
             ctx.lineWidth = 0.45;
             for (const triangle of triangles) {
                 ctx.beginPath();
                 triangle.points.forEach((p, i) => { i ? ctx.lineTo(...p) : ctx.moveTo(...p); });
+                if (chart.dataset.segments === 'true') {
+                    ctx.strokeStyle = triangle.colour;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    continue;
+                }
                 ctx.closePath();
                 ctx.fillStyle = triangle.colour;
                 ctx.fill(); ctx.stroke();
@@ -340,6 +407,7 @@ const labSurfacePreview = (() => {
         chart.dataset.volumeBounds = view.volume.bounds.join(',');
         chart.dataset.cameraQuaternion = view.orientation.join(',');
         syncZoom(view);
+        scheduleSettled(view);
         return true;
     }
 

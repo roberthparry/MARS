@@ -66,6 +66,13 @@ double lab_layout_markup_width(int markup)
 
 static void lab_layout_frame(int card, double scale, double zoom)
 {
+    if (lab_dom_query(card, ".complex-grid")) {
+        int buttons = lab_dom_all(card, ".complex-panel button");
+        for (unsigned i = 0; i < lab_dom_count(buttons); ++i)
+            lab_dom_listen(lab_dom_item(buttons, i), "click", 31, 0);
+        lab_plot_controls_sync();
+        return;
+    }
     int frame = lab_dom_query(card, ".rendered-zoom-frame");
     int svg = frame ? lab_dom_query(frame, "svg") : 0;
     if (!svg)
@@ -158,6 +165,28 @@ void lab_layout_set_zoom(int card, double index, int step)
 /* Render, toggle or collapse exclusive expansion and its accessible button state. */
 void lab_layout_expand(int card, unsigned operation)
 {
+    if (operation == 1 && lab_dom_has(card, "data-complex-panel")) {
+        int expanded = !lab_dom_equal(lab_dom_read(card, 3, "expanded"), lab_dom_string("true"));
+        int host = lab_dom_id("plotRendered"), state = lab_dom_get(host, "marsComplexExpanded");
+        if (!state) {
+            state = lab_dom_object(5);
+            lab_dom_set(host, "marsComplexExpanded", state);
+        }
+        int grid = lab_dom_closest(card, ".complex-grid"), panels = lab_dom_all(grid, ".complex-panel");
+        /* The four projections share one expanded viewport, never separate expanded rows. */
+        for (unsigned i = 0; i < lab_dom_count(panels); ++i) {
+            int panel = lab_dom_item(panels, i), selected = expanded && lab_dom_equal(panel, card);
+            lab_dom_key_set(state, lab_dom_read(panel, 3, "complexPanel"), lab_dom_scalar(1, selected));
+            lab_layout_text(panel, 3, "expanded", selected ? "true" : "false");
+            lab_dom_class(panel, "complex-expanded", selected);
+            int button = lab_dom_query(panel, "button");
+            lab_layout_text(button, 0, "", selected ? "Collapse" : "Expand");
+            lab_layout_text(button, 2, "aria-expanded", selected ? "true" : "false");
+        }
+        lab_dom_class(grid, "complex-focused", expanded);
+        lab_dom_schedule(1, lab_dom_id("plotCard"));
+        return;
+    }
     if (operation > 2)
         return;
     if (operation == 1 && lab_view_card_toggle(lab_dom_card_id(card)) == -2)
@@ -210,10 +239,95 @@ void lab_layout_content(int svg, int fallback)
     lab_layout_content_at(lab_dom_id("rendered"), svg, fallback);
 }
 
+static void complex_grid(int node, int result)
+{
+    if (!lab_dom_length(lab_dom_get(result, "complex_plane")))
+        return;
+    static const char *const keys[] = {"svg", "complex_plane", "components", "amplitude"};
+    static const char *const names[] = {"3-D curve", "Complex plane", "Components", "Amplitude"};
+    lab_layout_text(node, 0, "", "");
+    int grid = lab_dom_create("div");
+    lab_dom_class(grid, "complex-grid", 1);
+    lab_dom_append(node, grid);
+    int focused = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        int panel = lab_dom_create("section"), heading = lab_dom_create("div");
+        int title = lab_dom_create("span"), button = lab_dom_create("button"), body = lab_dom_create("div");
+        lab_dom_class(panel, "complex-panel", 1);
+        lab_layout_text(panel, 3, "complexPanel", keys[i]);
+        lab_dom_class(heading, "card-title", 1);
+        lab_layout_text(title, 0, "", names[i]);
+        lab_dom_class(button, "card-action", 1);
+        lab_layout_text(button, 2, "type", "button");
+        lab_layout_text(button, 0, "", "Expand");
+        lab_layout_text(button, 2, "aria-expanded", "false");
+        int expanded = !focused && lab_dom_truth(lab_dom_get(lab_dom_get(node, "marsComplexExpanded"), keys[i]));
+        focused = focused || expanded;
+        lab_dom_class(panel, "complex-expanded", expanded);
+        lab_layout_text(panel, 3, "expanded", expanded ? "true" : "false");
+        lab_layout_text(button, 0, "", expanded ? "Collapse" : "Expand");
+        lab_layout_text(button, 2, "aria-expanded", expanded ? "true" : "false");
+        lab_dom_listen(button, "click", 31, 0);
+        lab_dom_class(body, "rendered", 1);
+        lab_dom_append(heading, title);
+        lab_dom_append(heading, button);
+        lab_dom_append(panel, heading);
+        lab_dom_append(panel, body);
+        lab_dom_append(grid, panel);
+        lab_layout_content_at(body, lab_dom_get(result, keys[i]),
+                              lab_dom_string("Amplitude is undefined for distributions."));
+        if (i > 0) {
+            lab_layout_text(lab_dom_query(body, "svg[data-x-min]"), 3, "plotChart", "true");
+            lab_plot_pointer_prepare(body);
+        }
+    }
+    lab_dom_class(grid, "complex-focused", focused);
+}
+
+/* Move original controls, preserving listeners and values; snapshots must never clone their identifiers. */
+void lab_layout_plot_camera(int home)
+{
+    int camera = lab_dom_id("plotCamera");
+    int parent = home ? 0 : lab_dom_query(lab_dom_id("plotRendered"), "[data-complex-panel=\"svg\"]");
+    int docked = parent != 0;
+    if (!parent)
+        parent = lab_dom_id("plotRange");
+    if (camera && parent && !lab_dom_equal(lab_dom_get(camera, "parentNode"), parent)) {
+        if (docked)
+            lab_dom_append(parent, camera);
+        else
+            lab_dom_prepend(parent, camera);
+    }
+}
+
 /* Only native plot output and diagnostics enter the standalone plot card. */
 void lab_layout_plot(int result, int error)
 {
     int node = lab_dom_id("plotRendered"), svg = lab_dom_get(result, "svg");
+    int projection = lab_dom_get(result, "gestureProjection");
+    if (!error && lab_dom_length(projection)) {
+        static const char *const keys[] = {"complex_plane", "components", "amplitude"};
+        static const char *const selectors[] = {
+            "[data-complex-panel=\"complex_plane\"] .rendered",
+            "[data-complex-panel=\"components\"] .rendered",
+            "[data-complex-panel=\"amplitude\"] .rendered"
+        };
+        int body = 0, image = 0;
+        /* Only the three two-dimensional projections can issue a local range gesture. */
+        for (unsigned i = 0; i < 3; ++i)
+            if (lab_dom_equal(projection, lab_dom_string(keys[i]))) {
+                body = lab_dom_query(node, selectors[i]);
+                image = lab_dom_get(result, keys[i]);
+                break;
+            }
+        if (body && lab_dom_length(image)) {
+            lab_layout_content_at(body, image, lab_dom_string(""));
+            lab_layout_text(lab_dom_query(body, "svg[data-x-min]"), 3, "plotChart", "true");
+            lab_plot_pointer_prepare(body);
+            lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 1);
+            return;
+        }
+    }
     /* A failed navigation must not replace the coordinate-bearing chart with
      * text: its bounds and hit targets are needed to zoom back out or reset. */
     if (lab_dom_truth(error) && lab_dom_query(node, "[data-plot-chart][data-x-min], [data-surface][data-x-min]")) {
@@ -231,10 +345,16 @@ void lab_layout_plot(int result, int error)
     lab_dom_write(node, 3, "plotPending", lab_dom_string(!result && !error ? "true" : "false"));
     lab_dom_write(node, 3, "displaySvg", lab_dom_truth(error) ? lab_dom_string("") : svg);
     lab_dom_write(node, 3, "displayTex", lab_dom_get(result, "TeX"));
+    lab_layout_plot_camera(1);
     lab_layout_content_at(node, lab_dom_truth(error) ? lab_dom_string("") : svg,
                           !result && !error ? lab_dom_string("Generating plot…") : error);
+    if (!error)
+        complex_grid(node, result);
+    lab_layout_plot_camera(0);
     lab_dom_class(lab_dom_id("plotCard"), "plot-card", 1);
-    lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 1);
+    int notice = lab_dom_get(result, "notice");
+    lab_dom_write(lab_dom_id("plotFeedback"), 0, "", notice);
+    lab_dom_class(lab_dom_id("plotFeedback"), "hidden", !lab_dom_length(notice));
 }
 
 /* Update rendered source and markup together, only when native metadata enables fitting. */

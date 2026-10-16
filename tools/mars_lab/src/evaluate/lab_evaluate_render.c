@@ -87,6 +87,7 @@ static const char *const commands[] = {
     "csc",
     "cup",
     "ddot",
+    "delta",
     "dfrac",
     "diag",
     "displaystyle",

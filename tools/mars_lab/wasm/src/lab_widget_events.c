@@ -9,7 +9,7 @@
  * No date grammar or mathematical expression is parsed by this module.
  */
 #include "lab_dom.h"
-#include "../include/lab_forms.h"
+#include "lab_forms.h"
 #include "lab_widget_events.h"
 
 static void lab_widget_events_emit(int calls, const char *service, unsigned count, int first, int second, int third)

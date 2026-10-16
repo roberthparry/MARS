@@ -39,8 +39,7 @@ static int current(int state)
 {
     if (lab_dom_truth(lab_dom_get(state, "pan")))
         return lab_workspace_mode() == (unsigned)read_number(state, "mode") &&
-               lab_dom_equal(lab_dom_get(state, "surface"),
-                             lab_dom_query(0, "#plotRendered [data-plot-chart][data-x-min]:not([data-surface])")) &&
+               lab_dom_node_contains(lab_dom_id("plotRendered"), lab_dom_get(state, "surface")) &&
                lab_dom_equal(lab_dom_get(state, "variable"), lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
     return lab_workspace_mode() == (unsigned)read_number(state, "mode") &&
            lab_dom_equal(lab_dom_get(state, "surface"), lab_dom_query(0, "#plotRendered [data-surface]")) &&
@@ -49,6 +48,10 @@ static int current(int state)
 
 static void queue(int state, int calls)
 {
+    /* Keep a stable SVG during ordinary panning; resample once the pointer is released. */
+    if (lab_dom_truth(lab_dom_get(state, "pan")) && lab_dom_truth(lab_dom_get(state, "active")) &&
+        !lab_dom_truth(lab_dom_get(state, "pinch")))
+        return;
     if (lab_dom_truth(lab_dom_get(state, "busy")) || !lab_dom_truth(lab_dom_get(state, "dirty")))
         return;
     lab_dom_set(state, "busy", lab_dom_scalar(1, 1));
@@ -61,8 +64,10 @@ static void queue(int state, int calls)
     int call = lab_dom_object(5), args = lab_dom_object(4);
     lab_dom_push(args, state);
     lab_dom_push(args, lab_dom_get(state, "variable"));
-    lab_dom_push(args, lab_dom_scalar(1, lab_dom_truth(lab_dom_get(state, "active")) ||
-                                       lab_dom_truth(lab_dom_get(state, "wheel"))));
+    int preview = lab_dom_truth(lab_dom_get(state, "active")) || lab_dom_truth(lab_dom_get(state, "wheel"));
+    lab_dom_push(args, lab_dom_scalar(1, preview));
+    lab_dom_push(args, lab_dom_scalar(1, !preview &&
+        lab_dom_equal(lab_dom_read(lab_dom_get(state, "surface"), 3, "plotQuality"), lab_dom_string("preview"))));
     lab_dom_set(call, "service", lab_dom_string("redrawPlotDrag"));
     lab_dom_set(call, "args", args);
     lab_dom_push(calls, call);
@@ -74,6 +79,7 @@ static void stop(int state)
     lab_dom_set(state, "wheel", lab_dom_scalar(1, 0));
     lab_dom_set(state, "dirty", lab_dom_scalar(1, 0));
     lab_dom_set(state, "pan", lab_dom_scalar(1, 0));
+    lab_dom_set(state, "panPlane", lab_dom_scalar(1, 0));
     lab_dom_set(state, "pinch", lab_dom_scalar(1, 0));
     lab_dom_set(state, "slider", lab_dom_scalar(1, 0));
     lab_dom_delete(state, "secondId");
@@ -183,11 +189,12 @@ void lab_plot_slider(unsigned action, int event, int calls)
 static int start(int event, int state, int calls)
 {
     lab_plot_wheel_stop();
-    int rendered = lab_dom_id("plotRendered"), surface = lab_dom_query(rendered, "[data-surface]");
+    int rendered = lab_dom_id("plotRendered");
+    int target = lab_dom_get(event, "target"), panel = lab_dom_closest(target, ".complex-panel");
+    int root = panel ? panel : rendered, surface = lab_dom_query(root, "[data-surface]");
     int pan = !surface;
     if (pan)
-        surface = lab_dom_query(rendered, "[data-plot-chart][data-x-min]:not([data-surface])");
-    int target = lab_dom_get(event, "target");
+        surface = lab_dom_query(root, "[data-plot-chart][data-x-min]:not([data-surface])");
     int resume = !pan && current(state) && !lab_dom_truth(lab_dom_get(state, "pinch")) &&
                  lab_dom_has(surface, "data-local-renderer");
     if ((lab_dom_truth(lab_dom_get(state, "busy")) && !resume) || lab_dom_truth(lab_dom_get(state, "active")) ||
@@ -279,6 +286,7 @@ void lab_plot_wheel_zoom(int chart, int calls)
     lab_dom_set(state, "rangeWheel", lab_dom_scalar(1, 1));
     lab_dom_set(state, "pan", lab_dom_scalar(1, !lab_dom_has(chart, "data-surface")));
     lab_dom_set(state, "surface", chart);
+    lab_dom_set(state, "panProjection", lab_dom_read(lab_dom_closest(chart, ".complex-panel"), 3, "complexPanel"));
     lab_dom_set(state, "variable", lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
     lab_dom_set(state, "mode", lab_dom_numeric(lab_workspace_mode()));
     lab_dom_set(state, "wheel", lab_dom_scalar(1, 1));
@@ -291,6 +299,9 @@ static int wheel(int event, int state, int calls)
 {
     int rendered = lab_dom_id("plotRendered"), surface = lab_dom_query(rendered, "[data-surface]");
     int target = lab_dom_get(event, "target");
+    int panel = lab_dom_closest(target, ".complex-panel");
+    if (panel && !lab_dom_node_contains(panel, surface))
+        return 0;
     int shift = lab_dom_truth(lab_dom_get(event, "shiftKey"));
     int alt = lab_dom_truth(lab_dom_get(event, "altKey"));
     double delta = read_number(event, "deltaY");
@@ -430,8 +441,14 @@ void lab_plot_drag_complete(int state, int accepted)
         return;
     lab_dom_set(state, "busy", lab_dom_scalar(1, 0));
     int pan = lab_dom_truth(lab_dom_get(state, "pan"));
-    int surface = lab_dom_query(0, pan ? "#plotRendered [data-plot-chart][data-x-min]:not([data-surface])"
-                                      : "#plotRendered [data-surface]");
+    int root = lab_dom_id("plotRendered"), projection = lab_dom_get(state, "panProjection");
+    if (pan && lab_dom_length(projection))
+        root = lab_dom_query(root, lab_dom_equal(projection, lab_dom_string("complex_plane"))
+                                      ? "[data-complex-panel=\"complex_plane\"]"
+                                      : lab_dom_equal(projection, lab_dom_string("amplitude"))
+                                          ? "[data-complex-panel=\"amplitude\"]"
+                                          : "[data-complex-panel=\"components\"]");
+    int surface = lab_dom_query(root, pan ? "[data-plot-chart][data-x-min]:not([data-surface])" : "[data-surface]");
     if (!accepted || lab_workspace_mode() != (unsigned)read_number(state, "mode") ||
         !surface || !lab_dom_equal(lab_dom_get(state, "variable"),
             lab_dom_read(lab_dom_id("plotFirst"), 5, ""))) {

@@ -19,7 +19,8 @@ plot_options_t plot_options_default(void)
 {
     return (plot_options_t){.width = 800, .height = 500, .max_points = 1000000, .max_series = 32,
                             .title = "", .x_label = "x", .y_label = "y", .z_label = "f", .grid = true, .legend = true,
-                            .axis_colour = 0x64748b, .grid_colour = 0x94a3b8, .label_colour = 0x64748b};
+                            .axis_colour = 0x64748b, .grid_colour = 0x94a3b8, .label_colour = 0x64748b,
+                            .legend_background = 0xffffff};
 }
 
 /* Capture plain text and immutable settings without borrowing caller storage. */
@@ -29,7 +30,8 @@ plot_t *plot_new(const plot_options_t *options)
     if (settings.width < 320 || settings.width > 8192 || settings.height < 240 || settings.height > 8192 ||
         !settings.max_points || !settings.max_series || settings.max_points > SIZE_MAX / sizeof(plot_point_t) ||
         settings.max_series > SIZE_MAX / sizeof(plot_series_t) || settings.axis_colour > 0xffffffu ||
-        settings.grid_colour > 0xffffffu || settings.label_colour > 0xffffffu) {
+        settings.grid_colour > 0xffffffu || settings.label_colour > 0xffffffu ||
+        settings.legend_background > 0xffffffu) {
         errno = EINVAL;
         return NULL;
     }
@@ -110,6 +112,14 @@ void plot_free(plot_t *plot)
         free(plot->surface_x);
         free(plot->surface_y);
         free(plot->surface_z);
+        for (size_t i = 0; i < plot->refined_count; ++i) {
+            num_destroy(&plot->refined_x[i]);
+            num_destroy(&plot->refined_y[i]);
+            num_destroy(&plot->refined_z[i]);
+        }
+        free(plot->refined_x);
+        free(plot->refined_y);
+        free(plot->refined_z);
         num_destroy(&plot->shade_bounds[0]);
         num_destroy(&plot->shade_bounds[1]);
         num_destroy(&plot->included_height[0]);
@@ -136,7 +146,7 @@ static bool valid_coordinate(number_t value)
 bool plot_add_points(plot_t *plot, const plot_point_t *points, size_t count, const char *name,
                      plot_style_t style, uint32_t colour)
 {
-    if (!plot || plot->surface_z || !points || !count || style < PLOT_LINES || style > PLOT_POINTS || colour > 0xffffffu) {
+    if (!plot || plot->surface_z || !points || !count || style < PLOT_LINES || style > PLOT_IMPULSES || colour > 0xffffffu) {
         errno = EINVAL;
         return false;
     }
@@ -298,7 +308,7 @@ bool plot_ranges(const plot_t *plot, number_t bounds[4])
             if (!computation_step_current("plot.bounds"))
                 return false;
             const plot_point_t *point = &series->points[j];
-            if (j && series->style != PLOT_POINTS &&
+            if (j && series->style == PLOT_LINES &&
                 (point->break_before || !valid_coordinate(point->x) || !valid_coordinate(point->y)))
                 gaps = true;
             if (!valid_coordinate(point->x) || !valid_coordinate(point->y))
@@ -319,6 +329,28 @@ bool plot_ranges(const plot_t *plot, number_t bounds[4])
         return false;
     if (!plot->fixed && plot->shaded && !update_range(bounds + 2, NUM_ZERO))
         return false;
+    /* Impulse weights are discrete data, not outliers in the regular curve samples. */
+    bool impulses = false;
+    for (size_t i = 0; !plot->fixed && i < plot->count; ++i) {
+        const plot_series_t *series = &plot->series[i];
+        if (series->style != PLOT_IMPULSES)
+            continue;
+        impulses = true;
+        if (!update_range(bounds + 2, NUM_ZERO))
+            return false;
+        for (size_t j = 0; j < series->count; ++j)
+            if (valid_coordinate(series->points[j].x) && valid_coordinate(series->points[j].y) &&
+                !update_range(bounds + 2, series->points[j].y))
+                return false;
+    }
+    if (impulses && num_lt(bounds[2], bounds[3])) {
+        number_t span = num_sub(bounds[3], bounds[2]), fraction = num_create_from_frac(1, 16);
+        number_t padding = num_mul(span, fraction);
+        number_t low = num_sub(bounds[2], padding), high = num_add(bounds[3], padding);
+        num_destroy(&bounds[2]); num_destroy(&bounds[3]);
+        bounds[2] = low; bounds[3] = high;
+        num_destroy(&padding); num_destroy(&fraction); num_destroy(&span);
+    }
     for (size_t axis = 0; axis < 4; axis += 2) {
         if (plot->fixed) {
             num_destroy(&bounds[axis]);

@@ -5,6 +5,9 @@
  * Native MARS evaluates opaque coordinate expressions at adaptive precision.
  * WebAssembly stores only a dimensionless binary zoom exponent and display-space
  * transforms; it never subtracts rounded absolute bounds for sampling.
+ * Explicit height grids in Auto retain their sampled height during horizontal
+ * zoom and adopt the new native height on refinement. Other policies and implicit
+ * meshes retain strict three-axis volume zoom.
  */
 #ifndef MARS_LAB_SURFACE_VOLUME_H
 #define MARS_LAB_SURFACE_VOLUME_H

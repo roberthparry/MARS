@@ -99,6 +99,13 @@ bool lab_worker_plot_equation_frame(const expr_t *const *sides, char *const *sou
 bool lab_worker_surface_extrema(plot_t *plot, const char *source, const char *first, const char *second,
                                 const number_t *x, const number_t *y, const number_t *z, size_t side);
 
+/** @brief Add bounded, conforming drawing facets where native height-grid interpolation is unresolved. */
+bool lab_worker_surface_refine(plot_t *plot, const char *source, const char *first, const char *second,
+                               const number_t *x, const number_t *y, const number_t *z, size_t side, size_t bits);
+
+/** @brief Return owning plot-local bound source and emit exact slice metadata without changing the worksheet. */
+char *lab_worker_surface_slice(const char *source, const char *first, const char *second, const char *request);
+
 /** @brief Parse a plotting range with guard precision; return owning bounds without changing worksheet precision. */
 bool lab_worker_plot_bounds(const char *lower, const char *upper, number_t *lo, number_t *hi);
 
@@ -141,9 +148,22 @@ sampler_t *lab_worker_plot_samples(const char *source, const char *variable, num
 sampler_t *lab_worker_plot_samples_quality(const char *source, const char *variable, number_t lower, number_t upper,
                                           number_t ymin, number_t ymax, size_t *precision_bits, bool preview);
 
-/** @brief Emit an in-memory real curve SVG for a selected variable and mathematical bound texts. */
+/** Try a native distribution plot; return -1 when this path is not applicable. */
+int lab_worker_distribution_plot(const char *source, const expr_t *expression, const expr_t *variable,
+                                 const char *lower, const char *upper, const char *scale,
+                                 const char *y_lower, const char *y_upper, bool preview);
+
+/** @brief Try four projections with independent component and Argand bounds; return -1 for real-only output.
+ * @param plane_bounds Four borrowed real/imaginary bound strings, or NULL for automatic Argand bounds.
+ */
+int lab_worker_complex_plot(const char *source, const expr_t *expression, const expr_t *variable,
+                             const char *lower, const char *upper, const char *scale,
+                             const char *y_lower, const char *y_upper, const char *const plane_bounds[4], bool preview);
+
+/** @brief Emit native real, complex or distribution plots for one selected variable and mathematical bound texts. */
 int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
-                    const char *scale, const char *y_lower, const char *y_upper, bool preview);
+                    const char *scale, const char *y_lower, const char *y_upper,
+                    const char *const plane_bounds[4], bool preview);
 
 /**
  * @brief Formats a numerical card value with decimal or Unicode power-of-ten notation.

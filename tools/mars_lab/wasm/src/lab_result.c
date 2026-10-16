@@ -569,6 +569,7 @@ void lab_result_pretty_finish(int element, int request, int data)
 /* Clear the rendered pane as well as exclusive expansion, leaving request/state recovery to its owner. */
 void lab_result_pane_clear(void)
 {
+    lab_layout_plot_camera(1);
     lab_dom_write(lab_dom_id("plotRendered"), 0, "", lab_dom_string(""));
     lab_dom_remove(lab_dom_id("plotRendered"), "data-plot-pending");
     lab_dom_class(lab_dom_id("plotCard"), "hidden", 1);
@@ -582,6 +583,7 @@ void lab_result_pane_clear(void)
 /* Clear card metadata and pending identities together; no stale copy source survives. */
 void lab_result_details_clear(int caches, int mode)
 {
+    lab_layout_plot_camera(1);
     lab_dom_write(lab_dom_id("plotRendered"), 0, "", lab_dom_string(""));
     lab_dom_remove(lab_dom_id("plotRendered"), "data-plot-pending");
     lab_dom_class(lab_dom_id("plotCard"), "hidden", 1);

@@ -5,7 +5,8 @@
  * Rendering retains the full data extent for its discontinuity heuristic, while
  * height ticks and geometric clipping use a separate viewport. Finite grid
  * samples contribute equally to the optional percentile estimate; missing
- * values never contribute zero. This private helper serves the SVG renderer.
+ * values never contribute zero. Refined drawing facets extend untrimmed bounds
+ * without reweighting the uniform grid. This private helper serves the SVG renderer.
  */
 #include <errno.h>
 #include <stdlib.h>
@@ -50,6 +51,21 @@ bool plot_surface_range(const plot_t *plot, number_t bounds[2], number_t full[2]
             bounds[end] = num_clone(plot->height_fixed ? plot->height_bounds[end] : full[end]);
         if (smart)
             plot_trim_range(values, count, bounds);
+        bool untrimmed = !plot->height_fixed && num_eq(bounds[0], full[0]) && num_eq(bounds[1], full[1]);
+        for (size_t i = 0; ok && i < plot->refined_count; ++i) {
+            ok = computation_step_current("plot.surface.refined_range");
+            number_t value = plot->refined_z[i];
+            for (unsigned end = 0; end < 2; ++end) {
+                if (end ? num_gt(value, full[end]) : num_lt(value, full[end])) {
+                    num_destroy(&full[end]);
+                    full[end] = num_clone(value);
+                    if (untrimmed) {
+                        num_destroy(&bounds[end]);
+                        bounds[end] = num_clone(value);
+                    }
+                }
+            }
+        }
         if (!plot->height_fixed && plot->has_included_height) {
             for (unsigned end = 0; end < 2; ++end) {
                 number_t value = plot->included_height[end];
@@ -75,7 +91,7 @@ bool plot_surface_range(const plot_t *plot, number_t bounds[2], number_t full[2]
             num_destroy(&magnitude);
             num_destroy(&twenty);
         }
-        ok = num_is_finite(bounds[0]) && num_is_finite(bounds[1]) && num_lt(bounds[0], bounds[1]);
+        ok = ok && num_is_finite(bounds[0]) && num_is_finite(bounds[1]) && num_lt(bounds[0], bounds[1]);
         if (!ok)
             errno = ERANGE;
     }

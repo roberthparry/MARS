@@ -1,6 +1,6 @@
 /**
  * @file plot_surface_svg.c
- * @brief Rotatable SVG height grids and independent meshes with depth-ordered coloured facets.
+ * @brief Rotatable SVG grids, meshes and space curves with a shared equal-unit camera.
  *
  * Numerical ranges are normalised before conversion to drawing coordinates.
  * Missing vertices leave holes. Finite heights are joined regardless of slope;
@@ -341,7 +341,44 @@ static bool coordinate_metadata(string_t *svg, const number_t bounds[6])
     return true;
 }
 
-/* Render a normalised height field into an independently owned SVG string. */
+/* Clip a normalised space-curve segment to the viewing volume before projection. */
+static bool segment(const vertex_t *vertices, size_t index, const camera_t *view,
+                     const number_t bounds[2], number_t span, vertex_t out[2])
+{
+    double points[2][3];
+    for (unsigned i = 0; i < 2; ++i) {
+        const vertex_t *v = vertices + index + i;
+        if (!v->valid)
+            return false;
+        points[i][0] = v->u;
+        points[i][1] = v->v;
+        points[i][2] = fraction(v->height, bounds[0], span);
+    }
+    double start = 0, end = 1;
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        double a = points[0][axis], delta = points[1][axis] - a;
+        if (!delta) {
+            if (a < 0 || a > 1)
+                return false;
+            continue;
+        }
+        double first = -a / delta, last = (1 - a) / delta;
+        start = fmax(start, fmin(first, last));
+        end = fmin(end, fmax(first, last));
+    }
+    if (start > end)
+        return false;
+    for (unsigned i = 0; i < 2; ++i) {
+        double t = i ? end : start;
+        out[i] = (vertex_t){.u = points[0][0] + t * (points[1][0] - points[0][0]),
+                            .v = points[0][1] + t * (points[1][1] - points[0][1]),
+                            .z = points[0][2] + t * (points[1][2] - points[0][2])};
+        project(view, &out[i]);
+    }
+    return true;
+}
+
+/* Render native three-dimensional geometry into an independently owned SVG string. */
 string_t *plot_surface_svg(const plot_t *plot)
 {
     NUM_SCOPE(numbers);
@@ -384,6 +421,14 @@ string_t *plot_surface_svg(const plot_t *plot)
         label_width = fmax(label_width, width);
     }
     camera_t view = camera(plot, label_width, bounds);
+    bool faceted = plot->mesh || plot->refined_count;
+    const number_t *x = plot->refined_count ? plot->refined_x : plot->surface_x;
+    const number_t *y = plot->refined_count ? plot->refined_y : plot->surface_y;
+    const number_t *z = plot->refined_count ? plot->refined_z : plot->surface_z;
+    if (plot->refined_count) {
+        columns = count = plot->refined_count;
+        rows = 1;
+    }
     number_t spans[] = {num_sub(bounds[1], bounds[0]), num_sub(bounds[3], bounds[2]), num_sub(hi, lo)};
     if (count > SIZE_MAX / (2 * sizeof(facet_t))) {
         errno = E2BIG;
@@ -397,11 +442,11 @@ string_t *plot_surface_svg(const plot_t *plot)
         for (size_t c = 0; ok && c < columns; ++c) {
             ok = computation_step_current("plot.surface.project");
             vertex_t *at = &vertices[r * columns + c];
-            number_t value = plot->surface_z[r * columns + c];
+            number_t value = z[r * columns + c];
             if (!finite_real(value))
                 continue;
-            at->u = fraction(plot->surface_x[c], bounds[0], spans[0]);
-            at->v = fraction(plot->surface_y[plot->mesh ? c : r], bounds[2], spans[1]);
+            at->u = fraction(x[c], bounds[0], spans[0]);
+            at->v = fraction(y[faceted ? c : r], bounds[2], spans[1]);
             at->height = value;
             at->z = fraction(value, full[0], full_span);
             at->valid = isfinite(at->u) && isfinite(at->v) && isfinite(at->z);
@@ -409,7 +454,7 @@ string_t *plot_surface_svg(const plot_t *plot)
     }
     size_t faces = 0;
     double extent[] = {INFINITY, -INFINITY, INFINITY, -INFINITY};
-    for (size_t i = 0; ok && plot->mesh && i + 2 < count; i += 3) {
+    for (size_t i = 0; ok && faceted && !plot->segments && i + 2 < count; i += 3) {
         facet_t facet = {.a = i, .b = i + 1, .c = i + 2};
         vertex_t polygon[5];
         int clipped = clip_facet(vertices, &facet, &view, height_bounds, spans[2], polygon, &facet.depth);
@@ -446,7 +491,17 @@ string_t *plot_surface_svg(const plot_t *plot)
             }
         }
     }
-    if (ok && !faces && !plot->height_fixed) {
+    size_t lines = 0;
+    for (size_t i = 0; ok && plot->segments && i + 1 < count; i += 2) {
+        vertex_t ends[2];
+        ok = computation_step_current("plot.segment.project");
+        if (segment(vertices, i, &view, height_bounds, spans[2], ends)) {
+            ++lines;
+            include_extent(extent, ends[0]);
+            include_extent(extent, ends[1]);
+        }
+    }
+    if (ok && !faces && !lines && !plot->height_fixed) {
         errno = ENODATA;
         ok = false;
     }
@@ -465,7 +520,9 @@ string_t *plot_surface_svg(const plot_t *plot)
                  plot->mesh ? "true" : "false", view.units[0], view.units[1], view.units[2], label_width) >= 0;
         number_t coordinates[] = {bounds[0], bounds[1], bounds[2], bounds[3], lo, hi};
         if (ok) ok = coordinate_metadata(svg, coordinates);
-        if (ok && !faces)
+        if (ok && plot->segments)
+            ok = string_append_cstr(svg, " data-segments=\"true\"") == 0;
+        if (ok && !faces && !lines)
             ok = string_append_cstr(svg, " data-empty=\"true\"") == 0;
         if (ok && count && isfinite(num_to_double(full[0])) && isfinite(num_to_double(full[1])))
             ok = string_append_format(svg, " data-sample-z-min=\"%.17g\" data-sample-z-max=\"%.17g\"",
@@ -497,7 +554,17 @@ string_t *plot_surface_svg(const plot_t *plot)
         ok = ok && string_append_cstr(svg, "\"") == 0 && pointer_map(svg, polygon) &&
              string_append_cstr(svg, "/>\n") == 0;
     }
-    if (ok && !faces)
+    for (size_t i = 0; ok && plot->segments && i + 1 < count; i += 2) {
+        vertex_t ends[2];
+        if (!segment(vertices, i, &view, height_bounds, spans[2], ends))
+            continue;
+        ok = computation_step_current("plot.segment.draw") && string_append_format(svg,
+            "<path fill=\"none\" stroke=\"#78d8cb\" stroke-opacity=\"1\" stroke-width=\"2\" "
+            "d=\"M %.3f %.3f L %.3f %.3f\" data-segment=\"%.9g %.9g %.9g %.9g %.9g %.9g\"/>\n",
+            ends[0].x, ends[0].y, ends[1].x, ends[1].y,
+            ends[0].u, ends[0].v, ends[0].z, ends[1].u, ends[1].v, ends[1].z) >= 0;
+    }
+    if (ok && !faces && !lines)
         ok = string_append_format(svg, "<text x=\"%u\" y=\"%u\" text-anchor=\"middle\" stroke=\"none\" "
                     "fill=\"#%06x\" font-family=\"sans-serif\" font-size=\"14\">"
                     "No surface found in this view</text>", plot->options.width / 2, plot->options.height / 2,

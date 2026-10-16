@@ -1,6 +1,6 @@
 /**
  * @file plot-t.h
- * @brief Owned curves, height grids and triangle meshes with in-memory SVG rendering.
+ * @brief Owned curves, space curves, height grids and meshes with in-memory SVG rendering.
  *
  * plot_t copies sampled or measured number_t coordinates, labels and styles.
  * Linear bottom/left axes with open top/right edges, automatic or explicit bounds, ticks, a grid and a legend
@@ -10,6 +10,9 @@
  * with curve series in the same scene. Endpoint names stay upright during rotation.
  * Independent triangle meshes also represent implicit surfaces with multiple
  * heights per horizontal point. Curve intervals can carry signed shading to zero.
+ * Independent line segments represent space curves using the same equal-unit camera.
+ * Two-dimensional projections may also opt into equal physical coordinate units.
+ * Height grids can carry refined drawing facets independently of range statistics.
  * Axis ticks use decimal labels, never fractions, with superscript
  * scientific exponents when needed. Crowded labels are spaced or thinned without
  * removing tick strokes. Coordinate normalisation precedes conversion to drawing doubles,
@@ -32,8 +35,8 @@
 /** @brief Opaque mutable scene; release with plot_free(). */
 typedef struct _plot_t plot_t;
 
-/** @brief Rendering styles selected by direct function dispatch. */
-typedef enum { PLOT_LINES, PLOT_POINTS } plot_style_t;
+/** @brief Line, point or signed impulse-weight arrow rendering, selected by direct function dispatch. */
+typedef enum { PLOT_LINES, PLOT_POINTS, PLOT_IMPULSES } plot_style_t;
 
 /** @brief Borrowed input coordinate; non-real/non-finite values mark a gap. */
 typedef struct {
@@ -51,6 +54,9 @@ typedef struct {
     bool grid, legend; /**< Draw grid and series legend. */
     bool smart_y; /**< Opt-in robust curve Y or surface height range; no visible clipping annotation. */
     bool guard_gaps; /**< Use robust Y bounds for discontinuous line series even in Fit all; manual bounds win. */
+    bool equal_units; /**< Preserve equal physical coordinate units in two-dimensional projections. */
+    bool legend_box; /**< Enclose the series legend in a background box with coloured line samples. */
+    uint32_t legend_background; /**< 24-bit RGB background for a boxed legend. */
     uint32_t axis_colour, grid_colour, label_colour; /**< 24-bit RGB colours for axes, grid and tick/axis labels. */
 } plot_options_t;
 
@@ -105,6 +111,26 @@ bool plot_set_surface(plot_t *plot, const number_t *x, size_t columns, const num
  * Scene limits, camera controls and height clipping also apply to meshes.
  */
 bool plot_set_mesh(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count);
+
+/**
+ * @brief Copy independent line segments into an empty three-dimensional scene.
+ * Each consecutive pair of finite real vertices describes one segment. Count
+ * must be positive and even. Separate segments preserve sampled domain breaks.
+ * Coordinates retain native precision; camera, axes and equal-unit projection
+ * are shared with meshes. Inputs remain caller-owned and failure is atomic.
+ */
+bool plot_set_segments(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count);
+
+/**
+ * @brief Copy refined drawing facets for an existing rectangular height grid.
+ * Consecutive triples contain finite real vertices. The original grid retains
+ * ownership of horizontal bounds and robust height statistics; refined extrema
+ * extend untrimmed automatic height bounds. Supply a complete conforming mesh
+ * within the grid's horizontal domain. Attach at most once per scene. Count must
+ * be positive, divisible by three and within the remaining scene point budget.
+ * Invalid input leaves the scene unchanged.
+ */
+bool plot_set_surface_facets(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count);
 
 /**
  * @brief Atomically copy finite real minimum < maximum for an existing surface's height axis.

@@ -115,6 +115,9 @@ static inline expr_t *pi_constant(fourier_context_t *c) {
 
 /** Construct an exact Euler–Mascheroni constant with its symbolic provenance. */
 expr_t *expr_fourier_euler_constant(fourier_context_t *c);
+
+/** Construct the distributional spectrum of an affine inverse-circular triangular wave. */
+expr_t *expr_fourier_folded_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
 static inline expr_t *clean(fourier_context_t *c, const expr_t *e) { return expr_fourier_keep(c, expr_simplify(e)); }
 
 /** Clone an expression and recover exact literal coefficient provenance. */

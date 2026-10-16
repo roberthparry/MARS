@@ -328,7 +328,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               <button class="card-action copy-result" data-copy-target="plot">Copy</button>
             </span>
           </div>
-          <div class="rendered" id="plotRendered"></div>
+          <div id="plotStage"><div class="rendered" id="plotRendered"></div><aside id="plotSlices" class="hidden" aria-label="Plot-local slices"></aside></div>
           <div class="target-row plot-range" id="plotRange">
             <div class="plot-group plot-options-card" id="plotCamera" role="group" aria-labelledby="plotCameraTitle">
               <span class="plot-options-title" id="plotCameraTitle">3-D view</span>
@@ -454,7 +454,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Back</code> and <code>Forward</code> navigate the current mode's worksheet history. Switching modes does not discard your other worksheets; edits and controls are saved between sessions.</li>
             <li><code>Copy</code> on the editor copies its input; each result card has its own copy action. Mathematical display can differ from reusable source notation.</li>
             <li>Use a card's zoom controls where available, or <code>Expand</code> for a long result. Expanding a shortened mathematical result reveals its full source; copying does not truncate it.</li>
-            <li>Hold Ctrl and use the mouse wheel over a plot to zoom, or use the −/+ buttons. For 2-D plots this changes coordinate ranges and requests fresh samples; Reset restores the pre-zoom ranges. For 3-D plots, wheel, pinch and the Zoom slider shrink or expand all three coordinate spans equally about the volume centre. Axes stay fitted, and the mesh is clipped to the selected volume. Native sampling refines it after you pause or release; Reset restores the original ranges. Hovering over a curve shows coordinate guides and a marker.</li>
+            <li>Hold Ctrl and use the mouse wheel over a plot to zoom, or use the −/+ buttons. For 2-D plots this changes coordinate ranges and requests fresh samples; Reset restores the pre-zoom ranges. For explicit 3-D surfaces in Auto height, wheel, pinch and the Zoom slider change the horizontal region while native sampling refits its height after you pause or release. Manual height, Fit all and implicit surfaces instead scale all three coordinate spans equally about the volume centre. Equal coordinate units and fitting inside the chart are preserved in both cases. Reset restores the original ranges. Hovering over a curve shows coordinate guides and a marker.</li>
             <li>For 3-D plots: drag to rotate, Shift-drag to roll, Shift-wheel to tilt, Alt-wheel to turn, and Ctrl-wheel to zoom. On touch screens, drag with one finger to rotate and pinch with two fingers to zoom. Azimuth, Elevation, Roll and Zoom sliders sit directly below the chart and also support keyboard adjustment.</li>
             <li><code>Use as input</code>, when shown, returns a reusable result to the editor. It is not the same as copying the rendered TeX.</li>
             <li>Read the status and any error diagnostic before treating a result as complete. A failed calculation or timeout is not a numerical answer.</li>

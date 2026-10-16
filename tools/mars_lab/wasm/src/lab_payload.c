@@ -13,6 +13,7 @@
 #include "lab_dom.h"
 #include "lab_requests.h"
 #include "lab_plot_controls.h"
+#include "lab_plot_slices.h"
 #include "lab_payload.h"
 
 typedef void (*lab_payload_builder_t)(int payload, int inputs, int request, double updated_at);
@@ -62,6 +63,10 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
             lab_dom_set(payload, "wrt", axis);
         }
         lab_plot_controls_prepare(axis);
+        int slices = lab_plot_slices_payload();
+        lab_dom_set(payload, "plot_slices", slices);
+        if (request)
+            lab_dom_set(request, "sliceInput", slices);
         lab_dom_class(lab_dom_id("plotCard"), "hidden", 0);
         lab_dom_set(payload, "plot_lower", lab_payload_control("#plotLower"));
         lab_dom_set(payload, "plot_upper", lab_payload_control("#plotUpper"));
@@ -80,6 +85,11 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
         lab_dom_set(payload, "plot_scale", lab_payload_control("#plotScale"));
         lab_dom_set(payload, "plot_y_lower", lab_payload_control("#plotYLower"));
         lab_dom_set(payload, "plot_y_upper", lab_payload_control("#plotYUpper"));
+        int plane = lab_dom_get(lab_dom_id("plotRendered"), "marsComplexPlaneBounds");
+        static const char *const plane_keys[] = {"plot_plane_real_lower", "plot_plane_real_upper",
+                                                "plot_plane_imag_lower", "plot_plane_imag_upper"};
+        for (unsigned i = 0; i < 4; ++i)
+            lab_dom_set(payload, plane_keys[i], lab_dom_join(0, lab_dom_item(plane, i), ""));
         int mode = lab_dom_item(inputs, 5);
         if (lab_dom_equal(mode, lab_dom_string("equation")) || lab_dom_equal(mode, lab_dom_string("diffequation"))) {
             double dimensions = lab_dom_to_number(lab_dom_get(lab_dom_id("plotRange"), "marsPlotVariables"));

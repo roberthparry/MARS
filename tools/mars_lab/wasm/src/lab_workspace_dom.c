@@ -14,6 +14,7 @@
 #include "lab_dom.h"
 #include "lab_layout.h"
 #include "lab_plot_controls.h"
+#include "lab_plot_slices.h"
 #include "lab_result.h"
 #include "lab_view.h"
 #include "lab_workspace.h"
@@ -629,6 +630,7 @@ void lab_workspace_dom_result_save(int metadata)
         lab_dom_return(0);
         return;
     }
+    lab_layout_plot_camera(1);
     int state = lab_workspace_dom_result_metadata(metadata);
     int titles = lab_dom_object(4);
     for (unsigned i = 0; i < sizeof lab_workspace_dom_result_titles / sizeof *lab_workspace_dom_result_titles; ++i) {
@@ -646,12 +648,21 @@ void lab_workspace_dom_result_save(int metadata)
         lab_dom_release(mark);
     }
     lab_dom_set(state, "resultInputText", lab_dom_read(lab_dom_query(0, "#resultUseInput"), 3, "inputText"));
+    lab_dom_set(state, "plotSlices", lab_dom_get(lab_dom_id("plotSlices"), "marsSliceRecords"));
+    lab_dom_set(state, "plotSliceSelected", lab_dom_get(lab_dom_id("plotSlices"), "marsSliceSelected"));
+    lab_dom_set(state, "plotSliceModes", lab_dom_get(lab_dom_id("plotSlices"), "marsSliceModes"));
+    lab_layout_plot_camera(0);
     lab_dom_return(state);
 }
 
 /* Restore cards and reusable input before returning fresh globals for calculus controls and fitting. */
 void lab_workspace_dom_result_restore(int state)
 {
+    lab_layout_plot_camera(1);
+    lab_plot_slices_clear();
+    lab_dom_set(lab_dom_id("plotSlices"), "marsSliceSelected", lab_dom_get(state, "plotSliceSelected"));
+    lab_dom_set(lab_dom_id("plotSlices"), "marsSliceModes", lab_dom_get(state, "plotSliceModes"));
+    lab_plot_slices_apply(lab_dom_get(state, "plotSlices"), lab_dom_string(""));
     lab_result_render_invalidate();
     lab_result_solver_invalidate();
     lab_layout_expand(0, 2);
@@ -679,6 +690,9 @@ void lab_workspace_dom_result_restore(int state)
         lab_layout_plot(0, lab_dom_string("Plot cancelled when leaving this mode. Evaluate to generate it again."));
     else
         lab_dom_write(lab_dom_id("plotRendered"), 2, "aria-busy", lab_dom_string("false"));
+    /* Restored markup has fresh nodes: reconnect dynamic plot controls before accepting input. */
+    lab_layout_plot_camera(0);
+    lab_layout_zoom(lab_dom_id("plotCard"));
     lab_result_solver_restore();
     lab_result_input_set(lab_dom_get(state, "resultInputText"));
     int metadata = lab_workspace_dom_result_metadata(state);

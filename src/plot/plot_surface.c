@@ -1,11 +1,13 @@
 /**
  * @file plot_surface.c
- * @brief Owned height grids and independent triangle meshes for native surface plots.
+ * @brief Owned height grids, triangle meshes and line segments for native three-dimensional plots.
  *
  * Coordinates remain number_t values. The scene copies all inputs atomically;
  * missing heights are retained as holes, never replaced with zero. Surface and
  * curve scenes are deliberately separate, with the same bounded resource policy.
  * Triangle meshes allow implicit surfaces without imposing a height-function topology.
+ * Independent segment pairs represent space curves without artificial surface facets.
+ * Optional height-grid facets refine drawing geometry without biasing range statistics.
  */
 #include <errno.h>
 #include <stdlib.h>
@@ -23,10 +25,11 @@ static bool coordinates(const number_t *values, size_t count)
     return true;
 }
 
-/* Copy arbitrary facets atomically; the shared surface renderer supplies the camera and axes. */
-bool plot_set_mesh(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count)
+static bool set_geometry(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count,
+                         bool segments)
 {
-    if (!plot || plot->count || plot->surface_z || plot->fixed || (count && (!x || !y || !z)) || count % 3) {
+    if (!plot || plot->count || plot->surface_z || plot->fixed || (count && (!x || !y || !z)) ||
+        count % (segments ? 2 : 3) || (segments && !count)) {
         errno = EINVAL;
         return false;
     }
@@ -63,6 +66,45 @@ bool plot_set_mesh(plot_t *plot, const number_t *x, const number_t *y, const num
         plot->surface_rows = 1;
         plot->points = count;
         plot->mesh = true;
+        plot->segments = segments;
+        copy->surface_x = copy->surface_y = copy->surface_z = NULL;
+        copy->surface_columns = copy->surface_rows = 0;
+    }
+    plot_free(copy);
+    return ok;
+}
+
+/* Copy arbitrary facets atomically, sharing the camera and axes with height grids. */
+bool plot_set_mesh(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count)
+{
+    return set_geometry(plot, x, y, z, count, false);
+}
+
+/* Preserve explicit line connectivity without inventing triangular surface geometry. */
+bool plot_set_segments(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count)
+{
+    return set_geometry(plot, x, y, z, count, true);
+}
+
+/* Attach drawing refinement without reweighting the grid's height statistics. */
+bool plot_set_surface_facets(plot_t *plot, const number_t *x, const number_t *y, const number_t *z, size_t count)
+{
+    if (!plot || !plot->surface_z || plot->mesh || plot->refined_count || !count) {
+        errno = EINVAL;
+        return false;
+    }
+    if (count > plot->options.max_points - plot->points) {
+        errno = E2BIG;
+        return false;
+    }
+    plot_t *copy = plot_new(&plot->options);
+    bool ok = copy && plot_set_mesh(copy, x, y, z, count);
+    if (ok) {
+        plot->refined_x = copy->surface_x;
+        plot->refined_y = copy->surface_y;
+        plot->refined_z = copy->surface_z;
+        plot->refined_count = count;
+        plot->points += count;
         copy->surface_x = copy->surface_y = copy->surface_z = NULL;
         copy->surface_columns = copy->surface_rows = 0;
     }

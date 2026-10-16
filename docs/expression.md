@@ -632,6 +632,25 @@ non-real rates and shifted source arguments apply as for `acosh`.
 Freshly parsed complete spectra invert to the corresponding circular function;
 scalar multiples, constant offsets and exponential frequency shifts are supported.
 
+Compositions `asin(sin(a*t+b))`, `acos(sin(a*t+b))`, `asin(cos(a*t+b))`
+and `acos(cos(a*t+b))` also have ordinary unilateral transforms when `a` and `b`
+are supplied finite real constants. Their periodic triangular folds are handled
+by summing the alternating slope changes, with exact symbolic phases retained.
+Negative rates, phase shifts across multiple periods and zero rates are supported.
+Unspecified free parameters, complex coefficients and non-affine arguments retain
+the formal transform; this rule does not introduce a general periodic-function solver.
+
+For example, `@L{acos(sin(2-x))}` produces the closed form
+
+\[
+F(s)=\frac{d}{s}-\frac{1}{s^2}
+     +\frac{2e^{-ds}}{s^2(1+e^{-\pi s})},
+\qquad d=2-\frac{\pi}{2},\qquad \operatorname{Re}(s)>0.
+\]
+
+MARS may combine these terms into a single fraction. The formula can be plotted
+for real `s > 0`; the defining transform diverges on the boundary and to its left.
+
 `log` and `lg` are common-logarithm parser aliases; `ln` is the natural-logarithm
 spelling. The C constructor `expr_log` denotes the natural logarithm.
 
@@ -771,6 +790,29 @@ restrictions evaluate to zero off the impulse support; no finite value is assign
 These identities assume the relevant
 ordinary transform or tempered-distribution interpretation exists; they are
 not convergence proofs for arbitrary functions.
+
+Affine periodic folds `acos(cos(a*x+b))`, `acos(sin(a*x+b))`,
+`asin(cos(a*x+b))` and `asin(sin(a*x+b))` have exact forward impulse-series
+spectra for known non-zero real rates and real phases. Their transforms are
+tempered distributions, not ordinary convergent Fourier integrals.
+
+For example, `@F{acos(sin(pi-x))}` gives the equivalent closed series
+
+\[
+\pi^2\delta(k)+4i\sum_{n=0}^{\infty}\frac{(-1)^n}{(2n+1)^2}
+\bigl[\delta(k-(2n+1))-\delta(k+(2n+1))\bigr],\qquad k\in\mathbb R.
+\]
+
+Native output simplifies exact quarter-turn phases to real or imaginary
+alternating coefficients; other phases retain equivalent complex exponentials.
+MARS Lab plots real and imaginary impulse weights separately from the regular
+part. Arrow lengths encode weights, never finite delta values. Infinite series
+plots currently show the first 32 terms of each sum, explicitly labelled as a
+preview; the symbolic result retains the complete series. Delta derivatives,
+non-affine supports and nonlinear products of distributions are not plotted by
+this decomposition. They are rejected rather than passed to an ordinary
+pointwise complex sampler. In particular, the amplitude view is unavailable
+for distributions: impulse weights must not be confused with finite values.
 
 Unsupported transforms remain symbolic with a native evaluation note.
 This is **partial coverage**, not the entire reference table: multidimensional
@@ -1406,6 +1448,12 @@ such as `x-y` vanishes. Higher derivatives and matrix evaluation retain these
 regular values. Nonlinear arguments and sinc primitives retain entire
 hypergeometric representations.
 General principal-value integration remains symbolic.
+
+Native transform presentation can separate linear distribution results into an
+ordinary part with excluded affine poles and a separate impulse expression. These
+exclusions describe only the ordinary curve; they do not remove impulse supports.
+The underlying expression and its copyable representation retain the complete
+distribution. Unsupported forms retain their original distribution notation.
 
 Numerical evaluation affects only the Value card. These examples leave the full
 symbolic spectrum intact, including the impulse at zero needed by the inverse:

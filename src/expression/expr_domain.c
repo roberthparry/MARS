@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_EXPR_DISTRIBUTION_INTERNAL_ACCESS
+#include "internal/expr_distribution_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
@@ -521,9 +523,16 @@ char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result)
     coordinate = target->name ? expr_new_named_var(NUM_NAN, target->name) : expr_clone(target);
     char *to = expr_to_TeX_body(coordinate);
     expr_free(coordinate);
-    char *rhs = expr_to_TeX_body(result);
+    char *separated = expr_distribution_curve_TeX(result, target);
+    char *rhs = separated ? NULL : expr_to_TeX_body(result);
     char *out = NULL;
-    if (body && from && to && rhs && shifted_formal) {
+    if (body && from && to && separated) {
+        size_t size = strlen(body) + strlen(from) + strlen(to) + strlen(separated) + 100u;
+        out = malloc(size);
+        if (out)
+            snprintf(out, size, "\\begin{gathered}%s_{%s\\to %s}\\left\\{%s\\right\\}\\\\%s\\end{gathered}",
+                     source->ops->TeX_name, from, to, body, separated);
+    } else if (body && from && to && rhs && shifted_formal) {
         char *argument = expr_to_TeX_body(result->b->b->a);
         char *function = expr_to_TeX_body(result->a);
         if (argument && function) {
@@ -547,6 +556,7 @@ char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result)
                      source->ops->TeX_name,
                      from, to, body, rhs);
     }
+    free(separated);
     free(rhs);
     free(to);
     free(from);

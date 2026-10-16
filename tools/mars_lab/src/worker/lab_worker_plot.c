@@ -53,12 +53,21 @@ bool lab_worker_plot_reduced(string_t *svg)
 
 /* Produce one real-valued curve while preserving the worksheet's original expression. */
 int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
-                    const char *scale, const char *y_lower, const char *y_upper, bool preview)
+                    const char *scale, const char *y_lower, const char *y_upper,
+                    const char *const plane_bounds[4], bool preview)
 {
     if (!variable || !expr_is_variable(variable)) {
         printf("error       Select a variable to plot.\n");
         return 1;
     }
+    int distribution = lab_worker_distribution_plot(source, expression, variable, lower, upper, scale,
+                                                     y_lower, y_upper, preview);
+    if (distribution >= 0)
+        return distribution;
+    int complex = lab_worker_complex_plot(source, expression, variable, lower, upper, scale,
+                                          y_lower, y_upper, plane_bounds, preview);
+    if (complex >= 0)
+        return complex;
     size_t worksheet_precision = num_get_default_prec_bits(), plotting_precision = 53;
     number_t lo = NUM_NAN, hi = NUM_NAN, ymin = NUM_NAN, ymax = NUM_NAN;
     bool manual = !strcmp(scale, "manual");

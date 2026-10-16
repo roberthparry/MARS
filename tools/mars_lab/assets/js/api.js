@@ -259,6 +259,28 @@ function schedulePlotControls(state, delay) {
     }, delay);
 }
 
+// Transport queue only: native controls own slice values, quality and freshness checks.
+let plotSliceTimer, plotSlicePending, plotSliceRunning = false;
+function schedulePlotSlice(state, delay) {
+    plotSlicePending = state;
+    clearTimeout(plotSliceTimer);
+    if (!plotSliceRunning) plotSliceTimer = setTimeout(runPlotSlice, delay);
+}
+
+async function runPlotSlice() {
+    const state = plotSlicePending;
+    plotSlicePending = null;
+    plotSliceRunning = true;
+    try {
+        await labDOM.services(labDOM.call('lab_plot_controls_dispatch', 2, null, state), {
+            takePlot: (wrt, preview) => takeCalculus(wrt, 'plot', null, Boolean(preview), true)
+        });
+    } finally {
+        plotSliceRunning = false;
+        if (plotSlicePending) plotSliceTimer = setTimeout(runPlotSlice, 0);
+    }
+}
+
 /** Keep only the newest browser timer for each native camera gesture. */
 const plotWheelTimers = new WeakMap();
 
@@ -298,11 +320,13 @@ function zoomSurface(chart, event, reset, direction, wheel) {
         labSurfacePreview.draw(chart, view.angles);
 }
 
+const plotGestureTargets = new Map();
+
 /** Await native plotting; the C gesture controller owns coalescing and continuation decisions. */
-async function redrawPlotDrag(state, variable, preview) {
-    let next = [state, variable, preview];
+async function redrawPlotDrag(state, variable, preview, refine = false) {
+    let next = [state, variable, preview, refine];
     while (next) {
-        const [record, wrt, coarse] = next;
+        const [record, wrt, coarse, refinePreview] = next;
         const revision = record.revision || 0;
         next = null;
         let accepted = false;
@@ -323,26 +347,28 @@ async function redrawPlotDrag(state, variable, preview) {
                     labSurfacePreview.dispose();
                 }
             }
-            if (local || (coarse && bounds && chart && !record.pan)) {
+            if ((local && !refinePreview) || (coarse && bounds && chart && !record.pan)) {
                 // Yield once per frame so the native controller coalesces pointer events.
                 // A deep/unavailable zoom preview retains the last view until release,
                 // rather than starting native sampling in the middle of the gesture.
                 await new Promise(resolve => requestAnimationFrame(resolve));
                 accepted = chart.isConnected && generation === labRequests.latestMain();
             } else {
-                if (coarse) labSurfacePreview.clear();
+                if (coarse && !record.pan) labSurfacePreview.clear();
                 const pending = takeCalculus(wrt, 'plot', null, coarse);
                 const token = labRequests.latestMain();
                 record.pendingToken = token;
-                await pending;
+                if (record.pan && record.panProjection) plotGestureTargets.set(token, record.panProjection);
+                try { await pending; }
+                finally { plotGestureTargets.delete(token); }
                 if (revision !== (record.revision || 0)) return;
                 delete record.pendingToken;
                 accepted = token !== 0 && labRequests.latestMain() === token;
-                labSurfacePreview.clear();
+                if (!record.pan) labSurfacePreview.clear();
             }
         } finally {
             if (revision === (record.revision || 0)) {
-                if (!coarse || !accepted) labSurfacePreview.clear();
+                if ((!coarse || !accepted) && !record.pan) labSurfacePreview.clear();
                 const plan = labDOM.call('lab_plot_drag_complete', record, Number(accepted));
                 labDOM.services(plan, {redrawPlotDrag: (...args) => next = args});
                 if (!record.active && !record.wheel && !record.pan) {
@@ -452,6 +478,8 @@ function labRequestFlowServices() {
         expressionWithVisibleBindings: (...args) => expressionWithVisibleBindings(...args),
         calculusTitle: text => rightPaneTitle.textContent = text,
         displayPlot: result => {
+            const projection = plotGestureTargets.get(labRequests.latestMain());
+            if (projection) return labDOM.call('lab_layout_plot', {...result, gestureProjection: projection}, null);
             const camera = labSurfaceVolume.accept(labSurfacePreview.snapshot());
             labSurfacePreview.dispose();
             const value = labDOM.call('lab_layout_plot', result, null);

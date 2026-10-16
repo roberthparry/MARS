@@ -8,8 +8,20 @@ external process, browser mathematics or JavaScript renderer is required.
 Curve series have individual clipped SVG windows. A client can temporarily
 translate the rendered series during a drag without painting over axis labels;
 freshly sampled data is still required to fill newly exposed parts of the domain.
+Native `data-plot-pan-axis` groups keep ticks, labels, grid lines and zero guides
+aligned during that translation. Their `data-plot-pan-position` metadata lets
+the client hide groups outside the drawing rectangle without parsing tick text.
 
 ## API
+
+`PLOT_IMPULSES` interprets each point as a support coordinate and signed impulse
+weight. It draws an arrow from zero, with a weight tooltip; this is not a finite
+height assigned to a Dirac delta. Automatic bounds include zero and every finite
+impulse weight even when robust curve scaling is enabled. Manual bounds still
+clip the arrows. Automatic impulse ranges include a small vertical margin so
+arrowheads remain inside the frame. Arrowheads shrink with short stems;
+sub-pixel stems are omitted from drawing, without changing the stored weights.
+Use separate series for real and imaginary weights.
 
 | API | Behaviour |
 | --- | --- |
@@ -19,6 +31,8 @@ freshly sampled data is still required to fill newly exposed parts of the domain
 | `plot_add_sampler(plot, samples, name, style, colour)` | Copy sample coordinates and explicit gap markers. |
 | `plot_set_surface(plot, x, columns, y, rows, z)` | Copy one row-major height grid into an empty scene. |
 | `plot_set_mesh(plot, x, y, z, count)` | Copy independent triangles, permitting multiple heights at the same horizontal coordinates. |
+| `plot_set_segments(plot, x, y, z, count)` | Copy independent pairs of vertices as a three-dimensional space curve, preserving domain breaks. |
+| `plot_set_surface_facets(plot, x, y, z, count)` | Attach refined drawing triangles to a height grid without reweighting its robust range statistics. |
 | `plot_shade_interval(plot, lower, upper)` | Shade line series between the curve and zero inside an oriented real interval, including infinite limits, preserving gaps. |
 | `plot_set_height_bounds(plot, minimum, maximum)` | Clip a surface to an explicit height interval. |
 | `plot_include_height(plot, height)` | Include a located finite turning-point height in automatic surface bounds without changing the mesh. |
@@ -45,6 +59,29 @@ domain. This permits volume samplers to preserve their chosen viewport.
 For a zero-length mesh, the arrays may be null. Set both horizontal bounds and
 height bounds before rendering. The empty viewport retains its axes and camera,
 and displays a “No surface found in this view” notice rather than fabricated facets.
+
+`plot_set_segments()` copies a positive, even number of finite real vertices.
+Each pair is independent, so a sampler can omit connections across domain gaps.
+Segments share the native equal-unit camera, axes and viewport clipping with
+meshes, but render as lines rather than artificial narrow triangles. SVG carries
+normalised segment endpoints for retained WebGL line rendering and vector export.
+
+For two-dimensional scenes, `plot_options_t.equal_units` preserves equal physical
+coordinate units by centring a proportionate drawing rectangle inside the card.
+It defaults to false; complex-plane projections enable it to preserve angles
+and circular geometry. Numerical coordinate ranges are not altered.
+Axis titles follow this drawing rectangle: the vertical title is centred to the
+left of its tick labels, including when equal-unit fitting adds margins.
+Equal-unit views use balanced horizontal margins to centre the drawing rectangle.
+
+`plot_set_surface_facets()` attaches one copied set of finite real triangle vertices
+to an existing rectangular height grid. The positive vertex count must be divisible
+by three and fit the remaining scene point budget. The caller supplies a complete,
+conforming triangulation within the grid's horizontal domain; the renderer does not
+construct or repair it. Invalid input leaves the scene unchanged. The grid retains
+its horizontal bounds and explicit-surface identity. Its uniformly weighted samples
+still determine robust height cropping; refined extrema extend the automatic range
+only when that range was not trimmed. Explicit height limits always take precedence.
 
 `plot_shade_interval()` adds signed shading and dashed interval markers to line
 series. Automatic vertical limits include zero. Explicit viewport bounds still
@@ -116,6 +153,10 @@ intersection; explicit sampler gaps are never joined.
 
 Each curve series carries its XML-escaped name in an SVG `title`, providing a
 native hover tooltip even when the visible legend is disabled.
+Set `plot_options_t.legend_box` to enclose the legend in a background panel with
+coloured line samples. `legend_background` specifies its 24-bit RGB background
+(white by default). The boxed legend is drawn after the curves so they do not
+obscure its labels; unboxed legends remain the default.
 Curve SVG viewports also carry `data-x-min`, `data-x-max`, `data-y-min` and
 `data-y-max` attributes for UI coordinate inspection. These are double-precision
 approximations of the native bounds, not a replacement for native numerical data.

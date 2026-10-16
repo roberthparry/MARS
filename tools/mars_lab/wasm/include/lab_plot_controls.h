@@ -14,6 +14,9 @@ void lab_plot_controls_variables(int names, int labels);
 /** @brief Synchronise choices and dimensional controls with the selected type and rendered plot. */
 void lab_plot_controls_sync(void);
 
+/** @brief Restore plot ranges, camera and slice controls for an explicit Evaluate action. */
+void lab_plot_controls_reset(void);
+
 /** @brief Select the first axis for a direct plot action. @param variable Opaque native variable name. */
 void lab_plot_controls_prepare(int variable);
 

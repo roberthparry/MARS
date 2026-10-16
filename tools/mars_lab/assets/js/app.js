@@ -71,11 +71,17 @@ function labStartEventBindings() {
         normaliseWorksheetControl,
         takePlot,
         schedulePlotControls,
+        schedulePlotSlice,
         redrawPlotDrag,
         interruptPlotDrag,
         zoomSurface,
         setSurfaceZoom,
         pauseSurfaceSampling,
+        resetPlotPreview: () => {
+            labRequests.cancel('plot');
+            labSurfaceVolume.cancel();
+            labSurfacePreview.dispose();
+        },
         schedulePlotWheelEnd,
         startGoalSeekFromEvent,
         changeWorksheetPrecision,

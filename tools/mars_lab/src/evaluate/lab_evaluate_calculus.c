@@ -79,6 +79,10 @@ bool lab_pres_calculus_cards(json_t *metadata, const json_t *fields, json_t *lin
         ok = plot && lab_eval_set(plot, "expression", lab_eval_text(fields, "expression")) &&
              lab_eval_set(plot, "TeX", lab_eval_text(fields, "plot_title_TeX")) &&
              lab_eval_set(plot, "svg", lab_eval_text(fields, "plot_svg")) &&
+             lab_eval_set(plot, "complex_plane", lab_eval_text(fields, "plot_complex_plane")) &&
+             lab_eval_set(plot, "components", lab_eval_text(fields, "plot_components")) &&
+             lab_eval_set(plot, "amplitude", lab_eval_text(fields, "plot_amplitude")) &&
+             lab_eval_set(plot, "notice", lab_eval_text(fields, "plot_notice")) &&
              lab_eval_set(plot, "value", lab_eval_text(fields, "plot_solutions")) &&
              lab_eval_set(plot, "value_title", *lab_eval_text(fields, "plot_solutions") ? "Solutions" : "Value") &&
              lab_eval_set(plot, "render_title", "Plot");

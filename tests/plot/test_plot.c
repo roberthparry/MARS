@@ -28,6 +28,40 @@ static plot_t *simple_plot(plot_style_t style)
     return plot;
 }
 
+static void test_plot_segments(void)
+{
+    plot_t *plot = plot_new(NULL);
+    const number_t x[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ZERO, NUM_ONE};
+    const number_t y[] = {NUM_ZERO, NUM_ONE, NUM_ONE, NUM_ZERO};
+    const number_t z[] = {NUM_ONE, NUM_ZERO, NUM_ZERO, NUM_NEG_ONE};
+    bool ok = plot && !plot_set_segments(plot, x, y, z, 3) && plot_set_segments(plot, x, y, z, 4);
+    string_t *svg = ok ? plot_to_svg(plot) : NULL;
+    xml_t *document = svg ? xml_from_text(svg) : NULL;
+    ok = document && strstr(string_c_str(svg), "data-segments=\"true\"") &&
+         strstr(string_c_str(svg), "data-segment=\"") && !strstr(string_c_str(svg), "data-vertices=");
+    xml_free(document);
+    string_free(svg);
+    plot_free(plot);
+    TEST_ASSERT_TRUE(ok, "native space curves copy segment pairs atomically and render lines rather than facets");
+}
+
+static void test_plot_impulses(void)
+{
+    plot_options_t options = plot_options_default();
+    options.smart_y = true;
+    plot_t *plot = plot_new(&options);
+    plot_point_t points[] = {{NUM_NEG_ONE, NUM_NEG_ONE, true}, {NUM_ONE, NUM_ONE, true}};
+    bool ok = plot_add_points(plot, points, 2, "Impulse weights", PLOT_IMPULSES, 0xd6aa55);
+    string_t *svg = ok ? plot_to_svg(plot) : NULL;
+    xml_t *document = svg ? xml_from_text(svg) : NULL;
+    ok = document && strstr(string_c_str(svg), "data-impulse=\"true\"") &&
+         strstr(string_c_str(svg), "Impulse weight: -1") && strstr(string_c_str(svg), "Impulse weight: 1");
+    xml_free(document);
+    string_free(svg);
+    plot_free(plot);
+    TEST_ASSERT_TRUE(ok, "signed impulse arrows render as valid SVG with explicit weight labels");
+}
+
 static void test_plot_svg(void)
 {
     plot_t *plot = simple_plot(PLOT_LINES);
@@ -36,6 +70,8 @@ static void test_plot_svg(void)
     bool ok = document && strstr(string_c_str(svg), "data-series=\"0\"") &&
               strstr(string_c_str(svg), "#55aacc") && plot_series_count(plot) == 1 &&
               strstr(string_c_str(svg), "data-plot-axes") && strstr(string_c_str(svg), "stroke-dasharray=\"3 6\"") &&
+              strstr(string_c_str(svg), "data-plot-grid=\"true\" fill=\"none\"") &&
+              strstr(string_c_str(svg), "data-plot-tick=\"0\" fill=\"none\"") &&
               strstr(string_c_str(svg), "data-plot-tick=\"0\"") && strstr(string_c_str(svg), "data-plot-tick=\"1\"") &&
               !strstr(string_c_str(svg), "<rect") && !strstr(string_c_str(svg), "Vertical range clipped");
     xml_free(document);
@@ -43,6 +79,23 @@ static void test_plot_svg(void)
     ok = ok && svg && strstr(string_c_str(svg), "</svg>");
     string_free(svg);
     TEST_ASSERT_TRUE(ok, "valid independently owned SVG with axes and series colour");
+    plot_options_t boxed = plot_options_default();
+    boxed.legend_box = true;
+    boxed.legend_background = 0x10241d;
+    plot = plot_new(&boxed);
+    plot_point_t line_points[] = {{NUM_ZERO, NUM_ZERO, false}, {NUM_ONE, NUM_ONE, false}};
+    ok = plot && plot_add_points(plot, line_points, 2, "Real & exact", PLOT_LINES, 0xd6aa55) &&
+         plot_add_points(plot, line_points, 2, "Imaginary", PLOT_LINES, 0x78d8cb);
+    svg = ok ? plot_to_svg(plot) : NULL;
+    document = svg ? xml_from_text(svg) : NULL;
+    const char *legend = svg ? strstr(string_c_str(svg), "data-plot-legend") : NULL;
+    ok = document && legend && strstr(legend, "<rect") && strstr(legend, "#10241d") &&
+         strstr(legend, "#d6aa55") && strstr(legend, "#78d8cb") && strstr(legend, "Real &amp; exact") &&
+         !strstr(legend, "data-series=");
+    xml_free(document);
+    string_free(svg);
+    plot_free(plot);
+    TEST_ASSERT_TRUE(ok, "boxed legends retain escaped labels and colour samples above the curves");
     plot = simple_plot(PLOT_LINES);
     ok = plot_shade_interval(plot, NUM_ONE, NUM_ZERO);
     svg = ok ? plot_to_svg(plot) : NULL;
@@ -78,7 +131,7 @@ static void test_plot_edge_axes(void)
         bool bounded = plot && plot_set_bounds(plot, lower, upper, lower, upper);
         string_t *svg = bounded ? plot_to_svg(plot) : NULL;
         const char *axes = svg ? strstr(string_c_str(svg), "data-plot-axes") : NULL;
-        const char *end = axes ? strstr(axes, "</g>") : NULL;
+        const char *end = axes ? strstr(axes, "<svg data-plot-window=") : NULL;
         const char *bottom = axes ? strstr(axes, "M 96.000 436.000 L 768.000 436.000") : NULL;
         const char *left = axes ? strstr(axes, "M 96.000 48.000 L 96.000 436.000") : NULL;
         size_t paths = 0;
@@ -92,6 +145,34 @@ static void test_plot_edge_axes(void)
         plot_free(plot);
     }
     TEST_ASSERT_TRUE(ok, "bottom and left axes remain visible for every range, with top and right edges open");
+    for (unsigned layout = 0; layout < 3; ++layout) {
+        plot_options_t options = plot_options_default();
+        options.equal_units = layout != 0;
+        options.width = layout == 2 ? 320 : 800;
+        options.height = layout == 2 ? 800 : 500;
+        options.y_label = "ℑ";
+        plot_t *plot = plot_new(&options);
+        plot_point_t points[] = {{NUM_NEG_ONE, NUM_NEG_ONE, true}, {NUM_ONE, NUM_ONE, false}};
+        bool added = plot && plot_add_points(plot, points, 2, "", PLOT_LINES, 0x78d8cb);
+        string_t *svg = added ? plot_to_svg(plot) : NULL;
+        const char *source = svg ? string_c_str(svg) : "";
+        const char *metadata = strstr(source, "data-plot-left=");
+        double left = 0, top = 0, width = 0, height = 0, x = 0, y = 0;
+        bool frame = metadata && sscanf(metadata,
+            "data-plot-left=\"%lf\" data-plot-top=\"%lf\" data-plot-width=\"%lf\" data-plot-height=\"%lf\"",
+            &left, &top, &width, &height) == 4;
+        const char *label = strstr(source, ">ℑ</text>"), *text = source;
+        for (const char *next = strstr(text, "<text "); next && label && next < label;
+             next = strstr(next + 6, "<text "))
+            text = next;
+        bool aligned = frame && label && sscanf(text, "<text x=\"%lf\" y=\"%lf\"", &x, &y) == 2 &&
+                       x >= 0 && x < left - 24 && fabs(y - (top + height / 2 + 4)) < 0.002;
+        if (layout)
+            aligned = aligned && fabs(left + width / 2 - options.width / 2.0) < 0.002;
+        string_free(svg);
+        plot_free(plot);
+        TEST_ASSERT_TRUE(aligned, "vertical titles follow the drawing rectangle in ordinary, wide and tall equal-unit views");
+    }
 }
 
 static void test_plot_escaping(void)
@@ -154,6 +235,9 @@ static void test_plot_limits(void)
     ok = ok && !plot_new(&options) && errno == EINVAL;
     options = plot_options_default();
     options.label_colour = 0x1000000;
+    ok = ok && !plot_new(&options) && errno == EINVAL;
+    options = plot_options_default();
+    options.legend_background = 0x1000000;
     ok = ok && !plot_new(&options) && errno == EINVAL;
     TEST_ASSERT_TRUE(ok, "atomic scene limits, singleton bounds and no-data errors");
 }
@@ -598,6 +682,25 @@ static bool height_ticks_between(const string_t *svg, double minimum, double max
 
 static void test_plot_surface_height(void)
 {
+    number_t coordinate[] = {NUM_ZERO, NUM_ONE}, base[] = {NUM_ZERO, NUM_ONE, NUM_ONE, NUM_ZERO};
+    number_t fx[] = {NUM_ZERO, NUM_ONE, NUM_HALF}, fy[] = {NUM_ZERO, NUM_ZERO, NUM_ONE};
+    number_t fz[] = {NUM_ZERO, NUM_ONE, NUM_TWO};
+    plot_t *refined = plot_new(NULL);
+    bool attached = refined && plot_set_surface(refined, coordinate, 2, coordinate, 2, base) &&
+                    !plot_set_surface_facets(refined, fx, fy, fz, 2) &&
+                    plot_set_surface_facets(refined, fx, fy, fz, 3);
+    string_t *drawing = attached ? plot_to_svg(refined) : NULL;
+    attached = attached && drawing && strstr(string_c_str(drawing), "data-mesh=\"false\"") &&
+               strstr(string_c_str(drawing), "data-z-max=\"2\"") &&
+               !plot_set_surface_facets(refined, fx, fy, fz, 3);
+    string_free(drawing);
+    attached = attached && plot_set_height_bounds(refined, NUM_ZERO, NUM_ONE);
+    drawing = attached ? plot_to_svg(refined) : NULL;
+    attached = attached && drawing && strstr(string_c_str(drawing), "data-z-max=\"1\"");
+    string_free(drawing);
+    plot_free(refined);
+    TEST_ASSERT_TRUE(attached, "refined drawing facets retain grid identity and honour automatic and manual heights");
+
     plot_options_t options = plot_options_default();
     options.smart_y = true;
     plot_t *plot = plot_new(&options);
@@ -908,6 +1011,8 @@ static void example_plot_surface(void)
 
 int tests_main(void)
 {
+    TEST_RUN_CASE(test_plot_impulses, NULL);
+    TEST_RUN_CASE(test_plot_segments, NULL);
     TEST_RUN_CASE(test_plot_svg, NULL);
     TEST_RUN_CASE(test_plot_edge_axes, NULL);
     TEST_RUN_CASE(test_plot_escaping, NULL);

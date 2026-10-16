@@ -73,5 +73,6 @@ const labSurfaceVolume = (() => {
         return labDOM.call('lab_surface_clip', points);
     }
     return Object.freeze({initialise, clone, cancel, schedule, accept, set, slider, clip,
+        get interacting() { return held; },
         get requesting() { return requesting; }});
 })();

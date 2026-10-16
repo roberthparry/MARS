@@ -13,7 +13,7 @@
  * catalogue has no coordinate index. Per-row scopes bound temporary handle usage.
  */
 #include "lab_dom.h"
-#include "../include/lab_forms.h"
+#include "lab_forms.h"
 #include "lab_profile.h"
 #include "lab_select.h"
 #include "lab_location.h"

@@ -9,6 +9,8 @@
 #include <math.h>
 #include <string.h>
 
+#define MARS_SHARED_EXPR_DISTRIBUTION_INTERNAL_ACCESS
+#include "internal/expr_distribution_internal.h"
 #include "test_lab_math_support.h"
 
 typedef struct {
@@ -210,9 +212,148 @@ static void test_laplace_circular_readme(void)
     lab_math_contains(lab_math_text(inverse, "function"), "acosh(t)", true);
 }
 
+typedef struct {
+    double rate, phase;
+    bool outer_sine, inner_sine;
+    double complex target;
+} folded_context_t;
+
+static double complex folded_integrand(double t, void *opaque)
+{
+    folded_context_t *c = opaque;
+    double phase = c->rate * t + c->phase;
+    double inner = c->inner_sine ? sin(phase) : cos(phase);
+    return (c->outer_sine ? asin(inner) : acos(inner)) * cexp(-c->target * t);
+}
+
+static void test_laplace_folded_circular(void)
+{
+    const double rates[] = {1, -1, 2, -0.5};
+    const double phases[] = {0, 2, -20, 20};
+    for (unsigned outer = 0; outer < 2; ++outer) {
+        for (unsigned inner = 0; inner < 2; ++inner) {
+            for (unsigned i = 0; i < 4; ++i) {
+                folded_context_t context = {rates[i], phases[i], outer != 0, inner != 0, 1 + I};
+                double period = 2 * acos(-1) / fabs(rates[i]);
+                double complex expected = lab_math_simpson(folded_integrand, &context, 0, period, 20000) /
+                                          (1 - cexp(-context.target * period));
+                const json_t *fields = lab_math_laplace_circular_fields(lab_math_format(
+                    "{Laplace(%s(%s(%.17g*t+%.17g)),t,s) | s=1+i}",
+                    outer ? "asin" : "acos", inner ? "sin" : "cos", rates[i], phases[i]), "s");
+                lab_math_contains(lab_math_text(fields, "function"), "laplace(", false);
+                lab_math_close(lab_math_number(fields, "value"), expected, 2e-7);
+            }
+        }
+    }
+    const char *corners[] = {"0", "@pi", "-@pi", "2*@pi", "-2*@pi", "@pi/2"};
+    for (unsigned i = 0; i < 6; ++i) {
+        const json_t *fields = lab_math_laplace_circular_fields(lab_math_format(
+            "{Laplace(acos(cos(t+(%s))),t,s) | s=1}", corners[i]), "s");
+        lab_math_contains(lab_math_text(fields, "function"), "laplace(", false);
+        double expected = i == 1 || i == 2 ? acos(-1) - tanh(acos(-1) / 2) :
+                          i == 5 ? acos(-1) / 2 + 1 - 1 / cosh(acos(-1) / 2) : tanh(acos(-1) / 2);
+        lab_math_close(lab_math_number(fields, "value"), expected, 1e-13);
+    }
+    const char *outside[] = {"0", "-1", "i"};
+    for (unsigned i = 0; i < 3; ++i) {
+        const json_t *fields = lab_math_laplace_circular_fields(lab_math_format(
+            "{@L{acos(sin(2-x))} | s=%s}", outside[i]), "s");
+        lab_math_equal(lab_math_text(fields, "value"), "NAN");
+    }
+    const json_t *constant = lab_math_laplace_circular_fields(
+        "{Laplace(acos(sin(a*t+b)),t,s) | s=1; a=-1, b=2}", "s");
+    double d = 2 - acos(-1) / 2;
+    lab_math_contains(lab_math_text(constant, "function"), "laplace(", false);
+    lab_math_close(lab_math_number(constant, "value"), d - 1 + 2 * exp(-d) / (1 + exp(-acos(-1))), 1e-13);
+    const json_t *zero = lab_math_laplace_circular_fields(
+        "{Laplace(acos(sin(0*t+2)),t,s) | s=2}", "s");
+    lab_math_close(lab_math_number(zero, "value"), acos(sin(2)) / 2, 1e-13);
+    const json_t *free = lab_math_laplace_circular_fields(
+        "{Laplace(acos(sin(a*t+2)),t,s) | a=-1, s=1}", "s");
+    lab_math_contains(lab_math_text(free, "function"), "laplace(", true);
+    const char *unsupported[] = {"a*t+2", "i*t+2", "t^2+2"};
+    for (unsigned i = 0; i < 3; ++i) {
+        const json_t *fields = lab_math_laplace_circular_fields(lab_math_format(
+            "Laplace(acos(sin(%s)),t,s)", unsupported[i]), "s");
+        lab_math_contains(lab_math_text(fields, "function"), "laplace(", true);
+    }
+}
+
+typedef struct {
+    double rate, phase, sign;
+    size_t count;
+} spectrum_fixture_t;
+
+static bool check_spectral_weight(number_t coordinate, number_t weight, void *opaque)
+{
+    spectrum_fixture_t *fixture = opaque;
+    double k = num_to_double(coordinate) / fixture->rate;
+    number_t real = num_real_part(weight), imag = num_imag_part(weight);
+    double complex actual = num_to_double(real) + I * num_to_double(imag);
+    double complex expected = k == 0 ? acos(-1) * acos(-1) :
+        fixture->sign * 4 * cexp(I * k * fixture->phase) / (k * k);
+    lab_math_close(actual, expected, 1e-12);
+    num_destroy(&imag);
+    num_destroy(&real);
+    ++fixture->count;
+    return true;
+}
+
+static void check_folded_spectrum(const char *source, spectrum_fixture_t *fixture)
+{
+    expr_bindings_t *bindings = NULL;
+    const json_t *fields = lab_math_laplace_circular_fields(source, "k");
+    lab_math_contains(lab_math_text(fields, "function"), "fourier(", false);
+    expr_t *parsed = expr_from_string(lab_math_text(fields, "expression"), &bindings), *result = expr_simplify(parsed);
+    bool preview = false;
+    expr_t *regular = expr_distribution_decompose(result, expr_bindings_get(bindings, "k"),
+                                                   check_spectral_weight, fixture, &preview);
+    lab_math_check(regular && preview && fixture->count == (fixture->sign < 0 ? 65u : 64u),
+                   "folded Fourier spectra retain every signed odd harmonic in the bounded preview");
+    expr_free(regular);
+    expr_free(result);
+    expr_free(parsed);
+    expr_bindings_free(bindings);
+}
+
+static void test_fourier_folded_spectrum(void)
+{
+    for (unsigned outer = 0; outer < 2; ++outer) {
+        for (unsigned inner = 0; inner < 2; ++inner) {
+            for (int sign = -1; sign <= 1; sign += 2) {
+                spectrum_fixture_t fixture = {2 * sign, 0.37 - (inner ? acos(-1) / 2 : 0), outer ? 1 : -1, 0};
+                check_folded_spectrum(lab_math_format("@F{%s(%s(%d*x+37/100))}",
+                    outer ? "asin" : "acos", inner ? "sin" : "cos", 2 * sign), &fixture);
+            }
+        }
+    }
+}
+
+static void test_fourier_folded_readme(void)
+{
+    /* README example: docs/expression.md, Fourier spectrum of a shifted triangular wave. */
+    spectrum_fixture_t fixture = {-1, acos(-1) / 2, -1, 0};
+    check_folded_spectrum("@F{acos(sin(pi-x))}", &fixture);
+}
+
+static void test_laplace_folded_readme(void)
+{
+    /* README example: docs/expression.md, shifted periodic triangular wave. */
+    const json_t *fields = lab_math_laplace_circular_fields("@L{acos(sin(2-x))}", "s");
+    lab_math_contains(lab_math_text(fields, "function"), "laplace(", false);
+    lab_math_contains(lab_math_text(fields, "unbound"), "Re(s) > 0", true);
+    fields = lab_math_laplace_circular_fields("{@L{acos(sin(2-x))} | s=1}", "s");
+    double d = 2 - acos(-1) / 2;
+    lab_math_close(lab_math_number(fields, "value"), d - 1 + 2 * exp(-d) / (1 + exp(-acos(-1))), 1e-13);
+}
+
 /* Register both complete branch-sensitive forward Laplace suites. */
 void test_lab_math_laplace_circular_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_fourier_folded_spectrum, tests, NULL);
+    lab_math_reset();
+    TEST_RUN_IN_GROUP(test_laplace_folded_circular, tests, NULL);
+    lab_math_reset();
     TEST_RUN_IN_GROUP(test_laplace_circular_quadrature, tests, NULL);
     lab_math_reset();
     TEST_RUN_IN_GROUP(test_laplace_circular_domains, tests, NULL);
@@ -226,6 +367,10 @@ void test_lab_math_laplace_circular_cases(void)
 /* Run the documented branch-sensitive pairs in the final README phase. */
 void test_lab_math_laplace_circular_readme_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_fourier_folded_readme, readme_examples, NULL);
+    lab_math_reset();
+    TEST_RUN_IN_GROUP(test_laplace_folded_readme, readme_examples, NULL);
+    lab_math_reset();
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_laplace_circular_readme, readme_examples, "math,readme,output");
     lab_math_reset();
 }

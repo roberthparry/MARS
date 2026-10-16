@@ -4,7 +4,8 @@
  *
  * Inputs are normalised vertices and a quaternion; no absolute plot coordinate
  * is converted here. Frame plans drive WebGL uniforms, Canvas and vector export.
- * A uniform projected-box fit fills the viewport while preserving coordinate units.
+ * Surface projected-box fitting preserves coordinate units; space curves use a
+ * fixed enclosing-sphere fit and camera magnification for stable rotation.
  * Clipping has at most six planes and nine polygon vertices per input triangle.
  */
 #include "lab_dom.h"
@@ -53,6 +54,29 @@ static void read_frame(int handle, frame_t *frame)
 
 static unsigned clip(double polygon[12][3], unsigned count)
 {
+    if (count == 2) {
+        double start = 0, end = 1, delta[3];
+        for (unsigned axis = 0; axis < 3; ++axis) {
+            double a = polygon[0][axis];
+            delta[axis] = polygon[1][axis] - a;
+            if (!delta[axis]) {
+                if (a < 0 || a > 1)
+                    return 0;
+                continue;
+            }
+            double first = -a / delta[axis], last = (1 - a) / delta[axis];
+            double lo = first < last ? first : last, hi = first > last ? first : last;
+            if (lo > start) start = lo;
+            if (hi < end) end = hi;
+        }
+        if (start > end)
+            return 0;
+        for (unsigned axis = 0; axis < 3; ++axis) {
+            polygon[1][axis] = polygon[0][axis] + end * delta[axis];
+            polygon[0][axis] += start * delta[axis];
+        }
+        return 2;
+    }
     for (unsigned axis = 0; axis < 3; ++axis) for (unsigned bound = 0; bound < 2; ++bound) {
         double output[12][3];
         unsigned used = 0;
@@ -194,10 +218,21 @@ void lab_surface_frame(int view, int override_bounds)
     double units[3]; read_vector(lab_dom_get(view, "units"), units, 3);
     lab_surface_rotation(lab_dom_get(view, "orientation"), f.rows);
     double relative = numeric(volume, "exponent") - numeric(volume, "sampleExponent");
+    int auto_height = lab_dom_truth(lab_dom_get(volume, "autoHeight"));
+    double limited = relative > 60 ? 60 : relative < -60 ? -60 : relative;
+    if (auto_height) {
+        /* Horizontal zoom changes the box proportions, not the physical length of a coordinate unit. */
+        double factor = lab_surface_exp2(-limited);
+        units[0] *= factor;
+        units[1] *= factor;
+        double longest = units[0] > units[1] ? units[0] : units[1];
+        if (units[2] > longest) longest = units[2];
+        for (unsigned i = 0; i < 3; ++i) units[i] /= longest;
+    }
     lab_dom_set(out, "drawMesh", lab_dom_scalar(1, override_bounds || (relative >= -60 && relative <= 60)));
     for (unsigned i = 0; i < 3; ++i) {
         f.radius += units[i]*units[i];
-        f.scale[i] = lab_surface_exp2(relative > 60 ? 60 : relative < -60 ? -60 : relative);
+        f.scale[i] = auto_height && i == 2 ? 1 : lab_surface_exp2(limited);
         for (unsigned row = 0; row < 3; ++row) f.rows[row*3+i] *= units[i];
     }
     /* Explicit normalised-frame overrides are diagnostic only, never sampling bounds. */
@@ -224,6 +259,12 @@ void lab_surface_frame(int view, int override_bounds)
     double fit_width = (f.width-2*margin)/projected_width;
     double fit_height = (f.height-100)/projected_height;
     f.fit = fit_width < fit_height ? fit_width : fit_height;
+    if (lab_dom_equal(lab_dom_read(lab_dom_get(view, "chart"), 3, "segments"), lab_dom_string("true"))) {
+        /* A fixed enclosing sphere prevents automatic fitting from pumping during rotation. */
+        double available_width = f.width - 2*margin, available_height = f.height - 100;
+        f.fit = (available_width < available_height ? available_width : available_height) / (2*f.radius);
+        f.fit *= numeric(lab_dom_get(view, "camera"), "scale");
+    }
     double matrix[16] = {0};
     for (unsigned i = 0; i < 3; ++i) {
         matrix[i*4] = 2*f.fit*f.rows[i]/f.width;
