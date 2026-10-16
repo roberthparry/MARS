@@ -430,18 +430,17 @@ static void test_lab_extra_plot_series_domain(void)
     TEST_ASSERT_TRUE(ok, "wholly divergent range reports a clean diagnostic without internal worker records");
 }
 
-static double surface_maximum_tick(const json_t *fields)
+/* Tick labels may be thinned on short equal-unit axes; viewport metadata remains authoritative. */
+static double surface_height_bound(const json_t *fields, bool upper)
 {
-    const char *p = lab_eval_text(fields, "plot_svg");
-    double maximum = -INFINITY;
-    while ((p = strstr(p, "<text data-plot-label=\"2\""))) {
-        p = strchr(p, '>');
-        if (!p)
-            return NAN;
-        double value = strtod(++p, NULL);
-        maximum = fmax(maximum, value);
-    }
-    return maximum;
+    const char *key = upper ? "data-z-max=\"" : "data-z-min=\"";
+    const char *attribute = strstr(lab_eval_text(fields, "plot_svg"), key);
+    if (!attribute)
+        return NAN;
+    const char *start = attribute + strlen(key);
+    char *end = NULL;
+    double value = strtod(start, &end);
+    return end != start && *end == '"' ? value : NAN;
 }
 
 static void test_lab_extra_surface_height(void)
@@ -456,7 +455,7 @@ static void test_lab_extra_surface_height(void)
         unsigned status = 0;
         json_t *fields = payload ? request("/eval", string_c_str(payload), &status) : NULL;
         bool rendered = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "<path fill=");
-        maxima[i] = fields ? surface_maximum_tick(fields) : NAN;
+        maxima[i] = fields ? surface_height_bound(fields, true) : NAN;
         ok = ok && rendered && isfinite(maxima[i]);
         if (!rendered)
             show_failure(fields);
@@ -474,7 +473,9 @@ static void test_lab_extra_surface_height(void)
     unsigned status = 0;
     json_t *preview = request("/eval", "{\"expression\":\"x^2+y^2\",\"action\":\"plot\",\"plot_scale\":\"manual\","
         "\"plot_y_lower\":\"0\",\"plot_y_upper\":\"1/2\",\"plot_quality\":\"preview\",\"plot_azimuth\":\"120\"}", &status);
-    ok = status == 200 && test_lab_ok(preview, true) && surface_maximum_tick(preview) == 0.5 &&
+    ok = status == 200 && test_lab_ok(preview, true) && surface_height_bound(preview, false) == 0 &&
+         surface_height_bound(preview, true) == 0.5 &&
+         contains(preview, "plot_svg", "data-axis-handle=\"2\"") &&
          contains(preview, "plot_svg", "data-azimuth=\"120.000\"");
     json_free(preview);
     TEST_ASSERT_TRUE(ok, "coarse rotation previews preserve manual height limits");
@@ -1735,6 +1736,20 @@ static void test_lab_extra_equation_decimal_notation(void)
     }
 }
 
+static void test_lab_extra_gaussian_endpoint(void)
+{
+    unsigned status = 0;
+    json_t *result = request("/integrator-eval",
+        "{\"expression\":\"exp(-x^2/2)\",\"bounds\":[{\"name\":\"x\",\"lo\":\"-inf\",\"hi\":\"2\"}]}",
+        &status);
+    bool ok = status == 200 && contains(result, "tex", "erf") &&
+              contains(result, "symbolic", "erf") && contains(result, "symbolic", " + 1") &&
+              !contains(result, "symbolic", "∞");
+    if (!ok) show_failure(result);
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "Gaussian improper endpoint reduces to an exact error-function value");
+}
+
 static void test_lab_extra_number_card_markup(void)
 {
     static const struct { const char *route; const char *payload; const char *key; } cases[] = {
@@ -2096,6 +2111,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_equation_real_surd_numerics, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_decimal_notation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_number_card_markup, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_gaussian_endpoint, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_diffequation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_context_results, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_matrix, tests, NULL);

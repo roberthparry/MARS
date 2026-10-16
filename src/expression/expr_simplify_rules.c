@@ -263,7 +263,9 @@ expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg)
 
     value = expr_eval(arg);
     folded = num_new();
-    if (num_is_finite(value) && op->ops->fold_const_unary(&value, &folded) && num_is_finite(folded)) {
+    /* Endpoint identities also apply to constant expressions evaluating to real infinity. */
+    bool supported_value = num_is_finite(value) || (num_is_real(value) && num_is_inf(value));
+    if (supported_value && op->ops->fold_const_unary(&value, &folded) && num_is_finite(folded)) {
         out = expr_simplify_try_unary_symbolic_inverse_fold(op, &value, arg);
         if (!out) {
             out = expr_new_const(folded);

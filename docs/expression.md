@@ -110,6 +110,11 @@ Compact algebraic quotients retain the entire numerator, including factored
 products, above a single TeX fraction bar. Derivatives and integrals remain
 outside enclosing algebraic fractions; lengthy sums may be separated for readability.
 
+Exact function endpoint identities also simplify composite constant arguments
+that evaluate to real infinity. This includes scaled infinite arguments of
+the error function and its complement. Variable bindings are not frozen to
+infer the sign of a symbolic endpoint.
+
 The same symbolic result supplies Expression, Function and TeX output; its numerical
 evaluation retains the selected precision. Inverse identities preserve principal
 branches and are not inferred from a variable's current numerical binding.

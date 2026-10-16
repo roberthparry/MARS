@@ -4908,8 +4908,37 @@ static void test_dilog_display_and_exponential_difference_signs(void)
     }
 }
 
+static void test_composite_infinite_function_endpoints(void)
+{
+    const char *sources[] = {"erf(-inf*sqrt(1/2))", "erf(inf*sqrt(2))",
+                            "erfc(-inf*sqrt(1/2))", "erfc(inf/sqrt(2))"};
+    const long expected[] = {-1, 1, 2, 0};
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        expr_t *input = expr_from_string(sources[i], NULL);
+        expr_t *simplified = input ? expr_simplify(input) : NULL;
+        number_t value = simplified ? expr_eval(simplified) : num_clone(NUM_NAN);
+        number_t want = num_create_from_long(expected[i]);
+        char *rendered = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+        bool ok = rendered && !strstr(rendered, "erf") && !strstr(rendered, "∞") && num_eq(value, want);
+        free(rendered);
+        num_destroy(&want);
+        num_destroy(&value);
+        expr_free(simplified);
+        expr_free(input);
+        ASSERT_TRUE(ok);
+    }
+    expr_t *symbolic = expr_from_string("{erf(-inf*a) | a=2}", NULL);
+    expr_t *preserved = symbolic ? expr_simplify(symbolic) : NULL;
+    char *text = preserved ? expr_to_string(preserved, style_UNBOUND) : NULL;
+    ASSERT_TRUE(text && strstr(text, "erf") && strstr(text, "a"));
+    free(text);
+    expr_free(preserved);
+    expr_free(symbolic);
+}
+
 void test_runtime_regressions(void)
 {
+    TEST_RUN_SUBTEST(test_composite_infinite_function_endpoints, NULL);
     TEST_RUN_SUBTEST(test_simplify_rebuilt_sum_fixed_points, NULL);
     TEST_RUN_SUBTEST(test_multivariable_arbitrary_function_derivatives, NULL);
     TEST_RUN_SUBTEST(test_unset_constant_clones_combine_symbolically, NULL);
