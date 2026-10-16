@@ -270,11 +270,19 @@ function schedulePlotWheelEnd(state, revision, delay) {
     }, delay));
 }
 
+/** Cancel only the release-time request owned by the resumed gesture. */
+function interruptPlotDrag(state) {
+    if (state.pendingToken && state.pendingToken === labRequests.latestMain())
+        labRequests.cancel('plot');
+    delete state.pendingToken;
+}
+
 /** Await native plotting; the C gesture controller owns coalescing and continuation decisions. */
 async function redrawPlotDrag(state, variable, preview) {
     let next = [state, variable, preview];
     while (next) {
         const [record, wrt, coarse] = next;
+        const revision = record.revision || 0;
         next = null;
         let accepted = false;
         try {
@@ -302,14 +310,19 @@ async function redrawPlotDrag(state, variable, preview) {
                 if (coarse) labSurfacePreview.clear();
                 const pending = takeCalculus(wrt, 'plot', null, coarse);
                 const token = labRequests.latestMain();
+                record.pendingToken = token;
                 await pending;
+                if (revision !== (record.revision || 0)) return;
+                delete record.pendingToken;
                 accepted = token !== 0 && labRequests.latestMain() === token;
                 labSurfacePreview.clear();
             }
         } finally {
-            if (!coarse || !accepted) labSurfacePreview.clear();
-            const plan = labDOM.call('lab_plot_drag_complete', record, Number(accepted));
-            labDOM.services(plan, {redrawPlotDrag: (...args) => next = args});
+            if (revision === (record.revision || 0)) {
+                if (!coarse || !accepted) labSurfacePreview.clear();
+                const plan = labDOM.call('lab_plot_drag_complete', record, Number(accepted));
+                labDOM.services(plan, {redrawPlotDrag: (...args) => next = args});
+            }
         }
     }
 }

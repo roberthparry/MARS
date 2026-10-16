@@ -386,6 +386,8 @@
             check(pending.length === 0 && !rendered.classList.contains('plot-dragging'),
                   'A superseded request must discard queued movement without another request');
             seed();
+            check(getComputedStyle(rendered).touchAction === 'none',
+                  'The HTML plot scroll container must reserve touches before axis rotation begins');
             check(getComputedStyle(rendered.querySelector('svg')).touchAction === 'none',
                   'The surface must reserve finger movement for rotation rather than page scrolling');
             check(getComputedStyle(document.body).touchAction !== 'none',
@@ -565,6 +567,41 @@
             await new Promise(resolve => setTimeout(resolve, 25));
         check(rendered.querySelectorAll('[data-series] path').length > 1000 && !rendered.marsPlotDrag.busy,
               'Release must restore the full native mesh, even without a final movement');
+        const fetchBeforeResume = fetchEvaluation;
+        let delayedRelease;
+        try {
+            fetchEvaluation = (...args) => args[2] === 'plot' && !args[6] ?
+                new Promise(resolve => delayedRelease = resolve) : fetchBeforeResume(...args);
+            const retained = rendered.querySelector('[data-surface]');
+            touch(retained, 'pointerdown', 100, 100);
+            touch(window, 'pointermove', 120, 100);
+            await waitForAngle((Number(retained.dataset.azimuth) + 10) % 360);
+            touch(window, 'pointerup', 120, 100);
+            for (let i = 0; !delayedRelease && i < 100; ++i)
+                await new Promise(resolve => setTimeout(resolve, 10));
+            check(delayedRelease && rendered.marsPlotDrag.busy, 'Hold the release-time SVG redraw in flight');
+            const angle = Number(controls[0].value);
+            check(!touch(retained, 'pointerdown', 120, 100) && rendered.marsPlotDrag.active,
+                  'A fresh finger drag must start before the pending SVG redraw finishes');
+            touch(window, 'pointermove', 160, 100);
+            await waitForAngle((angle + 20) % 360);
+            delayedRelease({response: {ok: true}, data: {ok: false, error: 'Obsolete rotation fixture'}});
+            delayedRelease = null;
+            await new Promise(resolve => setTimeout(resolve, 50));
+            check(rendered.marsPlotDrag.active && retained.isConnected && retained.dataset.localRenderer &&
+                  !rendered.textContent.includes('Obsolete rotation fixture'),
+                  'An obsolete redraw cannot replace or clear a resumed WebGL gesture');
+            fetchEvaluation = fetchBeforeResume;
+            touch(window, 'pointerup', 160, 100);
+            const deadline = performance.now() + 15000;
+            while (rendered.marsPlotDrag.busy && performance.now() < deadline)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(!rendered.marsPlotDrag.busy && rendered.querySelector('[data-surface]') !== retained,
+                  'The resumed gesture still produces its final SVG after release');
+        } finally {
+            fetchEvaluation = fetchBeforeResume;
+            delayedRelease?.({response: {ok: false}, data: {ok: false}});
+        }
         for (const [modifier, axis] of [['shiftKey', 'elevation'], ['altKey', 'azimuth']]) {
             const before = rendered.querySelector('[data-surface]');
             const angle = Number(before.dataset[axis]) - 5;
@@ -583,6 +620,30 @@
         }
         const chart = rendered.querySelector('[data-surface]');
         const angles = ['azimuth', 'elevation', 'roll'].map(key => Number(chart.dataset[key]));
+        const frame = chart.closest('.rendered-zoom-frame'), figure = frame.querySelector('svg');
+        const savedFigure = figure.style.cssText, savedFrame = frame.style.cssText;
+        try {
+            // Exercise a phone-sized fitted SVG inside a scrolled, padded card.
+            figure.style.width = '280px';
+            figure.style.height = '240px';
+            frame.style.width = '280px';
+            frame.style.height = '240px';
+            labSurfacePreview.clear();
+            const before = [rendered.scrollWidth, rendered.scrollHeight, rendered.scrollLeft, rendered.scrollTop];
+            check(labSurfacePreview.draw(chart, angles), 'Phone-sized surface starts local rendering');
+            const overlay = rendered.querySelector('[data-surface-overlay]');
+            const expected = chart.getBoundingClientRect(), actual = overlay.getBoundingClientRect();
+            check(overlay.parentElement === rendered && !chart.querySelector('foreignObject') &&
+                  ['left', 'top', 'width', 'height'].every(key => Math.abs(expected[key] - actual[key]) < 1),
+                  'Interactive canvases align with the fitted SVG instead of jumping sideways');
+            check([rendered.scrollWidth, rendered.scrollHeight, rendered.scrollLeft, rendered.scrollTop]
+                  .every((value, i) => Math.abs(value - before[i]) <= 1),
+                  'Showing the mobile renderer must not enlarge or move the scrollable plot');
+        } finally {
+            labSurfacePreview.clear();
+            figure.style.cssText = savedFigure;
+            frame.style.cssText = savedFrame;
+        }
         check(labSurfacePreview.draw(chart, angles), 'Local surface renderer accepts native geometry');
         const selected = chart.dataset.localRenderer;
         sessionStorage.setItem('labSurfaceRenderer', selected);
@@ -592,7 +653,7 @@
             probe.getExtension('WEBGL_lose_context')?.loseContext();
         }
         if (selected === 'webgl') {
-            const gl = chart.querySelector('canvas').getContext('webgl');
+            const gl = rendered.querySelector('[data-surface-overlay] canvas').getContext('webgl');
             check(!gl.isContextLost() && gl.getError() === gl.NO_ERROR, 'GPU surface draw has no WebGL errors');
             const program = gl.getParameter(gl.CURRENT_PROGRAM);
             const camera = gl.getUniform(program, gl.getUniformLocation(program, 'camera'));
@@ -618,7 +679,7 @@
             };
             check(labSurfacePreview.draw(chart, angles) && chart.dataset.localRenderer === 'canvas',
                   'Unavailable WebGL uses a local canvas, not server sampling');
-            const canvas = chart.querySelector('canvas');
+            const canvas = rendered.querySelector('[data-surface-overlay] canvas');
             const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
             let painted = false;
             for (let i = 3; i < pixels.length; i += 64) painted ||= pixels[i] !== 0;
@@ -627,7 +688,7 @@
             HTMLCanvasElement.prototype.getContext = getContext;
             labSurfacePreview.dispose();
         }
-        check(!chart.querySelector('foreignObject') && !chart.dataset.localRenderer,
+        check(!rendered.querySelector('[data-surface-overlay]') && !chart.dataset.localRenderer,
               'Local-renderer disposal restores SVG interaction and releases its overlay');
     }
     async function checkPlotPinch() {
@@ -2099,7 +2160,7 @@
                         await new Promise(resolve => setTimeout(resolve, 25));
                     const preview = plotRendered.querySelector('[data-local-renderer]');
                     check(preview === initialChart && labRequests.latestMain() === initialRequest &&
-                          plotRendered.marsPlotDrag.active && preview.querySelector('canvas'),
+                          plotRendered.marsPlotDrag.active && plotRendered.querySelector('[data-surface-overlay] canvas'),
                           'Wide implicit equations rotate the retained mesh without native sampling before release');
                     send(window, 'pointerup', 140, 110);
                     const finish = performance.now() + 20000;

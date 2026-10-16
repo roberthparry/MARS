@@ -5,7 +5,6 @@
  * The SVG remains the authoritative idle view and export representation.
  */
 const labSurfacePreview = (() => {
-    const ns = 'http://www.w3.org/2000/svg';
     let current = null;
 
     function gpu(canvas, vertices) {
@@ -126,13 +125,17 @@ const labSurfacePreview = (() => {
         const units = chart.dataset.units.split(' ').map(Number);
         if (units.length !== 3 || !units.every(x => Number.isFinite(x) && x > 0)) return null;
         const width = chart.viewBox.baseVal.width, height = chart.viewBox.baseVal.height;
-        const overlay = document.createElementNS(ns, 'foreignObject');
-        overlay.setAttribute('width', width);
-        overlay.setAttribute('height', height);
-        overlay.style.pointerEvents = 'none';
-        overlay.style.display = 'none';
+        // Keep composited canvases out of SVG foreignObject: mobile engines can
+        // position those layers outside the fitted SVG when they first appear.
+        const host = chart.closest('.rendered');
+        if (!host) return null;
+        const overlay = document.createElement('div');
+        overlay.dataset.surfaceOverlay = '';
+        overlay.style.cssText = `position:absolute;left:0;top:0;width:${width}px;height:${height}px;` +
+            'transform-origin:0 0;pointer-events:none;display:none;overflow:hidden';
         const holder = document.createElement('div');
-        holder.style.cssText = `position:relative;width:${width}px;height:${height}px;pointer-events:none`;
+        holder.style.cssText = `position:relative;width:${width}px;height:${height}px;` +
+            'transform-origin:0 0;pointer-events:none';
         let canvas = document.createElement('canvas');
         const vertices = new Float32Array(data);
         const renderer = gpu(canvas, vertices);
@@ -151,7 +154,7 @@ const labSurfacePreview = (() => {
         context?.scale(ratio, ratio);
         ink.scale(ratio, ratio);
         overlay.appendChild(holder);
-        chart.appendChild(overlay);
+        host.appendChild(overlay);
         const ticks = [...chart.querySelectorAll('[data-tick-fraction]')].map(node => ({
             axis: Number(node.dataset.plotTick), fraction: Number(node.dataset.tickFraction),
             label: node.nextElementSibling?.tagName === 'text' ? node.nextElementSibling.textContent : ''
@@ -159,7 +162,7 @@ const labSurfacePreview = (() => {
         const names = [0, 1, 2].map(axis => chart.querySelector(`[data-axis-name="${axis}"]`)?.textContent || '');
         const observer = new MutationObserver(() => { if (!chart.isConnected) dispose(); });
         observer.observe(document.getElementById('plotRendered'), {childList: true, subtree: true});
-        current = {chart, triangles, vertices, units, width, height, overlay, gpu: renderer, context, ink,
+        current = {chart, host, holder, triangles, vertices, units, width, height, overlay, gpu: renderer, context, ink,
                    ticks, names, observer, hidden: []};
         canvas.addEventListener('webglcontextlost', () => { if (current?.overlay === overlay) clear(); });
         return current;
@@ -168,6 +171,25 @@ const labSurfacePreview = (() => {
     function draw(chart, angles, bounds = null) {
         const view = prepare(chart);
         if (!view || !angles.every(Number.isFinite)) return false;
+        // Map the native chart's coordinate system into the HTML scroll content,
+        // including nested SVG headings, mobile fitting, borders and scroll offsets.
+        const screen = chart.getScreenCTM(), box = view.host.getBoundingClientRect();
+        if (!screen) return false;
+        const tx = screen.e - box.left - view.host.clientLeft + view.host.scrollLeft;
+        const ty = screen.f - box.top - view.host.clientTop + view.host.scrollTop;
+        const xs = [0, screen.a * view.width, screen.c * view.height,
+                    screen.a * view.width + screen.c * view.height];
+        const ys = [0, screen.b * view.width, screen.d * view.height,
+                    screen.b * view.width + screen.d * view.height];
+        const overlayLeft = Math.min(...xs), overlayTop = Math.min(...ys);
+        // Size the clipping layer in screen pixels: transforming an 800px-wide
+        // outer box alone can still enlarge the mobile scrollable overflow area.
+        Object.assign(view.overlay.style, {
+            left: `${tx + overlayLeft}px`, top: `${ty + overlayTop}px`,
+            width: `${Math.max(...xs) - overlayLeft}px`, height: `${Math.max(...ys) - overlayTop}px`
+        });
+        view.holder.style.transform =
+            `matrix(${screen.a},${screen.b},${screen.c},${screen.d},${-overlayLeft},${-overlayTop})`;
         const {width, height, vertices} = view;
         const units = view.units;
         const scaling = [1, 1, 1], offset = [0, 0, 0];

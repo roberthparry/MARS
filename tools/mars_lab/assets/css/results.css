@@ -42,6 +42,13 @@
   min-height: 0;
 }
 
+/* Reserve gestures on the HTML scroll container as well as the SVG. Inline
+ * SVG touch-action alone is not a reliable scroll boundary on mobile browsers. */
+.rendered:has([data-surface]),
+.rendered:has([data-plot-chart][data-x-min]) {
+  touch-action: none;
+}
+
 .rendered:has([data-surface]) svg,
 .rendered:has([data-plot-chart][data-x-min]) svg {
   cursor: grab;

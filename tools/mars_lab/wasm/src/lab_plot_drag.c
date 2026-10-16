@@ -8,8 +8,9 @@
  * Dragging, camera-wheel and range-wheel gestures use coarse previews, followed by
  * full detail on release or wheel inactivity.
  * Sliders and degree readouts update together. Only one native SVG request runs
- * at a time; further movements replace the pending camera position. Cancellation
- * restores the original camera. Superseding requests and mode changes stop the gesture.
+ * at a time; further movements replace the pending camera position. Retained
+ * surface rotations can interrupt release-time redraws using revision ownership.
+ * Cancellation restores the original camera. Superseding requests and mode changes stop the gesture.
  * Browser-owned state retains real DOM objects, never transient bridge handles.
  * A second touch promotes dragging to pinch zoom; further pointers are ignored.
  */
@@ -117,7 +118,7 @@ static void cancel(int state, int calls)
     finish(state, calls);
 }
 
-static int start(int event, int state)
+static int start(int event, int state, int calls)
 {
     lab_plot_wheel_stop();
     int rendered = lab_dom_id("plotRendered"), surface = lab_dom_query(rendered, "[data-surface]");
@@ -125,7 +126,9 @@ static int start(int event, int state)
     if (pan)
         surface = lab_dom_query(rendered, "[data-plot-chart][data-x-min]:not([data-surface])");
     int target = lab_dom_get(event, "target");
-    if (lab_dom_truth(lab_dom_get(state, "busy")) || lab_dom_truth(lab_dom_get(state, "active")) ||
+    int resume = !pan && current(state) && !lab_dom_truth(lab_dom_get(state, "pinch")) &&
+                 lab_dom_has(surface, "data-local-renderer");
+    if ((lab_dom_truth(lab_dom_get(state, "busy")) && !resume) || lab_dom_truth(lab_dom_get(state, "active")) ||
         lab_dom_truth(lab_dom_get(state, "wheel")) ||
         (lab_workspace_mode() > 2 && lab_workspace_mode() != 4) || !surface ||
         read_number(event, "button") != 0 ||
@@ -134,6 +137,16 @@ static int start(int event, int state)
         lab_dom_truth(lab_dom_get(event, "altKey")) || !lab_dom_closest(target, "svg") ||
         !lab_dom_node_contains(rendered, target))
         return 0;
+    if (lab_dom_truth(lab_dom_get(state, "busy"))) {
+        int call = lab_dom_object(5), args = lab_dom_object(4);
+        double revision = lab_dom_truth(lab_dom_get(state, "revision")) ? read_number(state, "revision") : 0;
+        lab_dom_set(state, "revision", lab_dom_numeric(revision + 1));
+        lab_dom_set(state, "busy", lab_dom_scalar(1, 0));
+        lab_dom_push(args, state);
+        lab_dom_set(call, "service", lab_dom_string("interruptPlotDrag"));
+        lab_dom_set(call, "args", args);
+        lab_dom_push(calls, call);
+    }
     if (pan && !lab_plot_pan_start(state, surface, event))
         return 0;
     lab_dom_set(state, "pan", lab_dom_scalar(1, pan));
@@ -152,7 +165,7 @@ static int start(int event, int state)
     lab_dom_set(state, "pointerId", lab_dom_get(event, "pointerId"));
     lab_dom_set(state, "changed", lab_dom_scalar(1, 0));
     lab_dom_set(state, "dirty", lab_dom_scalar(1, 0));
-    lab_dom_set(state, "redrawn", lab_dom_scalar(1, 0));
+    lab_dom_set(state, "redrawn", lab_dom_scalar(1, resume));
     lab_dom_set(state, "rollOnly", lab_dom_get(event, "shiftKey"));
     lab_dom_set(state, "x", lab_dom_get(event, "clientX"));
     lab_dom_set(state, "y", lab_dom_get(event, "clientY"));
@@ -329,7 +342,7 @@ void lab_plot_drag_dispatch(unsigned action, int event, int state)
         if (lab_dom_truth(lab_dom_get(state, "active"))) {
             if (current(state) && lab_plot_pinch_start(state, event))
                 lab_dom_set(plan, "prevent", lab_dom_scalar(1, 1));
-        } else if (start(event, state))
+        } else if (start(event, state, calls))
             lab_dom_set(plan, "prevent", lab_dom_scalar(1, 1));
         return;
     }

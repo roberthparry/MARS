@@ -1091,8 +1091,13 @@ starting the drag to change roll instead. Each coordinate axis, including its ar
 invisible 44-pixel-wide grab area which stays finger-sized on mobile. Drag an axis
 to rotate the whole plot using the same controls: the initial finger position and
 camera angles remain the anchor throughout the gesture, including across redraws.
-No mouse wheel is needed. Axis drags rotate the retained native mesh locally,
+No mouse wheel is needed. The HTML plot container reserves touch gestures before
+movement starts, including touches near an axis, so browser scrolling cannot take
+over a rotation. Page scrolling remains available outside the plot container.
+Axis drags rotate the retained native mesh locally,
 using WebGL depth testing when available and a depth-sorted canvas otherwise.
+The interactive canvases use an HTML overlay aligned to the fitted SVG viewport,
+including its heading and scroll offsets, rather than canvases embedded in SVG.
 The full current mesh stays visible rather than being replaced by sparse sampled
 figures. Sliders and degree readouts follow the gesture. Pointer movements are
 coalesced at animation-frame boundaries; rotation does not request new samples
@@ -1101,8 +1106,10 @@ normalised coordinates for narrow high-precision views; the client only projects
 them. If local rendering is unavailable, native coarse previews remain available.
 No spline smoothing is applied across discontinuities. Releasing the mouse or lifting the finger,
 including outside the plot, retains the final position and requests one
-full-quality redraw, even when the last preview already reached that angle. Escape, losing browser
-focus or a lost release restores the original camera. A superseding request
+full-quality redraw, even when the last preview already reached that angle.
+A new rotation can interrupt a pending release-time redraw and immediately reuse
+the retained WebGL view; the obsolete response cannot replace the resumed gesture.
+Escape, losing browser focus or a lost release restores the original camera. A superseding request
 invalidates an unfinished drag. The final redraw supplies the authoritative SVG
 for copying and export. Changes to the sampled coordinate region still require
 native sampling and retain its precision checks and domain-gap handling.

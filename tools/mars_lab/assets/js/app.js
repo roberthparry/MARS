@@ -72,6 +72,7 @@ function labStartEventBindings() {
         takePlot,
         schedulePlotControls,
         redrawPlotDrag,
+        interruptPlotDrag,
         schedulePlotWheelEnd,
         startGoalSeekFromEvent,
         changeWorksheetPrecision,
