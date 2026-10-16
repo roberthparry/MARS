@@ -1586,6 +1586,9 @@ exact square-root-of-pi factors. Differentiating the repeated Gaussian primitive
 therefore cancels its opposite exponential terms rather than displaying numerical
 coefficients disguised as radicals. Standalone parameter addends follow the
 formula in beautified output, including a surviving integration constant.
+Beautification also absorbs rational numerators into positive rational square-root
+denominators when this reduces the radical's rational scale. The coefficient's sign
+is retained; symbolic or non-positive radicands are not subject to this rule.
 
 Gaussian cumulative integrals also have a direct outer-integration rule. For an
 integrand `exp(a*t^2+b*t+c)`, it completes the square and uses `erf` or `erfc`,

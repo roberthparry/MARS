@@ -2621,11 +2621,13 @@ work ceiling.
 
 The captured input is `exp(-x^2/2)` with `x` from `-inf` to `2`.
 MARS returns the exact definite result
-`1/2*sqrt(pi/(1/2))*(erf(2*sqrt(1/2))+1)`, approximately `2.44960215063810845`.
+`sqrt(pi/2)*(erf(sqrt(2))+1)`, approximately `2.44960215063810845`.
+The antiderivative is `sqrt(pi/2)*erf(x/sqrt(2))`. Both exact-result cards
+use the same native beautification pass, including rational radical cancellation.
 The infinite endpoint has reduced to its exact limit; the plot shades the
 visible portion of the integration interval under the Gaussian curve.
 
-[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261016-full)](images/mars-lab/integrator.png?v=20261016-full)
+[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261016-simplified)](images/mars-lab/integrator.png?v=20261016-simplified)
 
 ## Datetime mode
 
@@ -2769,7 +2771,7 @@ The captured request is for London at `2026-10-16 12:00:00` GMT. The expanded
 worksheet shows the navigational-body table, including bodies below the horizon,
 with their declination, hour angle, right ascension, altitude, azimuth and visibility.
 
-[![MARS Lab expanded almanac worksheet showing London navigational bodies and their visibility](images/mars-lab/almanac.png?v=20261016-full)](images/mars-lab/almanac.png?v=20261016-full)
+[![MARS Lab expanded almanac worksheet showing London navigational bodies and their visibility](images/mars-lab/almanac.png?v=20261016-location)](images/mars-lab/almanac.png?v=20261016-location)
 
 ## Mobile and private remote access
 

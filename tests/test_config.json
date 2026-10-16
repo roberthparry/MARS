@@ -3029,6 +3029,7 @@
       "test_lab_extra_function": true,
       "test_lab_extra_function_precision_limit": true,
       "test_lab_extra_gaussian_derivative_round_trip": true,
+      "test_lab_extra_gaussian_endpoint": true,
       "test_lab_extra_gaussian_integral": true,
       "test_lab_extra_goal_seek": true,
       "test_lab_extra_help_examples": true,

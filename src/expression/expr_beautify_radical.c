@@ -150,6 +150,26 @@ expr_t *expr_beautify_radical_factors_for_display(const expr_t *expr)
 
     if (out)
         return out;
+    if (expr_is_op(expr, &ops_div) && rational_literal(expr->a, &numerator, &denominator) &&
+        expr_is_sqrt_expr(expr->b)) {
+        long root_n;
+        long root_d;
+
+        if (rational_literal(expr->b->a, &root_n, &root_d) && root_n > 0L && root_d > 0L) {
+            number_t coefficient = num_create_from_frac(numerator, denominator);
+            number_t inverse = num_create_from_frac(root_d, root_n);
+            expr_t *reciprocal = expr_new_const(inverse);
+            expr_t *root = reciprocal ? expr_sqrt(reciprocal) : NULL;
+
+            out = root ? absorb_scale(root, coefficient) : NULL;
+            expr_free(root);
+            expr_free(reciprocal);
+            num_destroy(&inverse);
+            num_destroy(&coefficient);
+            if (out)
+                return out;
+        }
+    }
     if (expr_is_op(expr, &ops_div) && rational_literal(expr->b, &numerator, &denominator) && numerator != 0L) {
         number_t coefficient = num_create_from_frac(denominator, numerator);
 

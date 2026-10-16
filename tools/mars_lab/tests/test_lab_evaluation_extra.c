@@ -1383,7 +1383,7 @@ static void test_lab_screenshots_readme(void)
     fields = request("/integrator-eval",
                      "{\"expression\":\"exp(-x^2/2)\",\"bounds\":[{\"name\":\"x\",\"lo\":\"-inf\",\"hi\":\"2\"}]}",
                      &status);
-    ok = status == 200 && contains(fields, "symbolic", "erf") && contains(fields, "symbolic", " + 1") &&
+    ok = status == 200 && contains(fields, "symbolic", "√(π/2)·(erf(√(2)) + 1)") &&
          !contains(fields, "symbolic", "∞");
     if (!ok) show_failure(fields);
     TEST_ASSERT_TRUE(ok, "README screenshot Gaussian integral evaluates its infinite endpoint");
@@ -1784,12 +1784,30 @@ static void test_lab_extra_gaussian_endpoint(void)
     json_t *result = request("/integrator-eval",
         "{\"expression\":\"exp(-x^2/2)\",\"bounds\":[{\"name\":\"x\",\"lo\":\"-inf\",\"hi\":\"2\"}]}",
         &status);
-    bool ok = status == 200 && contains(result, "tex", "erf") &&
-              contains(result, "symbolic", "erf") && contains(result, "symbolic", " + 1") &&
+    bool ok = status == 200 && contains(result, "tex", "\\sqrt{\\frac{\\pi}{2}}") &&
+              contains(result, "tex", "\\operatorname{erf}(\\sqrt{2})") &&
+              contains(result, "symbolic", "√(π/2)·(erf(√(2)) + 1)") &&
+              contains(result, "antiderivative", "√(π/2)·erf(x/√(2))") &&
+              contains(result, "value", "2.449602150638108") &&
               !contains(result, "symbolic", "∞");
     if (!ok) show_failure(result);
     json_free(result);
     TEST_ASSERT_TRUE(ok, "Gaussian improper endpoint reduces to an exact error-function value");
+
+    /* Exercise the same positive-radical cancellation with another scale and both endpoint signs. */
+    const char *bounds[] = {"3", "-3"};
+    const char *arguments[] = {"erf(√(3))", "erf(-√(3))"};
+    for (size_t i = 0u; i < 2u; ++i) {
+        string_t *payload = string_sprintf(
+            "{\"expression\":\"exp(-x^2/3)\",\"precision\":78,"
+            "\"bounds\":[{\"name\":\"x\",\"lo\":\"-inf\",\"hi\":\"%s\"}]}", bounds[i]);
+        result = request("/integrator-eval", string_c_str(payload), &status);
+        ok = status == 200 && contains(result, "symbolic", arguments[i]);
+        if (!ok) show_failure(result);
+        json_free(result);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "exact endpoint radical cancellation preserves the sign at higher precision");
+    }
 }
 
 static void test_lab_extra_number_card_markup(void)

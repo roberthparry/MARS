@@ -444,6 +444,17 @@ static char *expr_TeX_body_display(const expr_t *expr)
 
 static char *combine_aligned_equation_TeX(const char *lhs, const char *rhs, int add_constant);
 
+/* Render both exact-result cards from the same native, beautified expression. */
+static void render_exact_result(const expr_t *expr, char **text, char **TeX)
+{
+    expr_t *display = expr_beautify(expr);
+    const expr_t *source = display ? display : expr;
+
+    *text = expr_text_dup(source, style_UNBOUND);
+    *TeX = expr_TeX_body_display(source);
+    expr_free(display);
+}
+
 static char *combine_equation_TeX(const char *lhs, const char *rhs)
 {
     size_t lhs_n;
@@ -885,12 +896,10 @@ int lab_worker_integrator(int argc, char **argv)
         if (!symbolic_result && !first_antiderivative && ndim == 1u)
             first_antiderivative = make_unevaluated_antiderivative(expr, vars[0]);
         if (first_antiderivative) {
-            antiderivative_text = expr_text_dup(first_antiderivative, style_UNBOUND);
-            antiderivative_TeX = expr_TeX_body_display(first_antiderivative);
+            render_exact_result(first_antiderivative, &antiderivative_text, &antiderivative_TeX);
         }
         if (symbolic_result) {
-            symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-            symbolic_TeX = expr_TeX_body_display(symbolic_result);
+            render_exact_result(symbolic_result, &symbolic_text, &symbolic_TeX);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num))
                 symbolic_value_text = number_text(symbolic_num);
@@ -916,8 +925,7 @@ int lab_worker_integrator(int argc, char **argv)
         if (partially_symbolic_result && remaining_numeric_ndim == 0u) {
             symbolic_result = partially_symbolic_result;
             partially_symbolic_result = NULL;
-            symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-            symbolic_TeX = expr_TeX_body_display(symbolic_result);
+            render_exact_result(symbolic_result, &symbolic_text, &symbolic_TeX);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num)) {
                 symbolic_value_text = number_text(symbolic_num);
@@ -977,8 +985,7 @@ int lab_worker_integrator(int argc, char **argv)
             expr_retain(symbolic_result);
         if (symbolic_result) {
             used_core_exact_result = 1;
-            symbolic_text = expr_text_dup(symbolic_result, style_UNBOUND);
-            symbolic_TeX = expr_TeX_body_display(symbolic_result);
+            render_exact_result(symbolic_result, &symbolic_text, &symbolic_TeX);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num)) {
                 symbolic_value_text = number_text(symbolic_num);
