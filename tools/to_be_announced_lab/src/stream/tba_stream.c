@@ -20,7 +20,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "lab_wire.h"
+#include "tba_wire.h"
 #include "tba_stream.h"
 
 enum { TBA_STREAM_LIMIT = 2 * 1024 * 1024, TBA_STREAM_CHUNK = 32768, TBA_STREAM_SLOTS = 4,
@@ -293,7 +293,7 @@ json_t *tba_stream_receive(tba_stream_t *stream, const json_t *frame, json_t **m
             source += slot->lengths[i];
             target += slot->lengths[i] - 16;
         }
-        *message = ok ? lab_wire_decode(bytes, size) : NULL;
+        *message = ok ? tba_wire_decode(bytes, size) : NULL;
         ok = ok && json_type(*message) == JSON_OBJECT;
         if (ok) {
             memcpy((*reply)->key, key, sizeof key);
@@ -325,7 +325,7 @@ json_t *tba_stream_seal(tba_stream_reply_t *reply, const json_t *result)
     if (!reply || reply->used)
         return NULL;
     reply->used = true;
-    array_t *bytes = lab_wire_encode(result);
+    array_t *bytes = tba_wire_encode(result);
     size_t size = bytes ? array_size(bytes) : 0;
     unsigned char *cipher = size && size <= TBA_STREAM_LIMIT ? malloc(size + 16) : NULL;
     json_t *envelope = tba_stream_ack();

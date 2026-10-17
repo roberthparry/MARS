@@ -60,9 +60,33 @@
         <button class="mode-tab" id="modeTabAlmanac" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="almanac">Almanac</button>
       </div>
       <div class="precision-toolbar" aria-label="Precision controls">
-        <span class="precision-label">Precision</span>
-        <button class="card-action" id="lessPrecision" type="button" aria-label="Less precision"><span class="precision-full-label">Less precision</span><span class="precision-short-label" aria-hidden="true">−</span></button>
-        <button class="card-action" id="morePrecision" type="button" aria-label="More precision"><span class="precision-full-label">More precision</span><span class="precision-short-label" aria-hidden="true">+</span></button>
+        <label class="precision-label" for="precisionSlider">Precision</label>
+        <input id="precisionSlider" type="range" min="0" max="103" step="1" value="3" aria-describedby="precisionValue">
+        <output class="precision-value" id="precisionValue" for="precisionSlider">78 digits</output>
+        <button class="card-action" id="precisionCustomToggle" type="button" aria-label="Custom precision" aria-haspopup="dialog" aria-expanded="false" aria-controls="precisionCustomPanel">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        </button>
+        <div class="precision-custom-panel hidden" id="precisionCustomPanel" role="dialog" aria-labelledby="precisionCustomTitle">
+          <div class="precision-custom-heading">
+            <h3 id="precisionCustomTitle">Custom precision</h3>
+            <button class="card-action" id="precisionCustomClose" type="button" aria-label="Close custom precision">×</button>
+          </div>
+          <label for="precisionCustomInput">Precision</label>
+          <div class="precision-custom-entry">
+            <input id="precisionCustomInput" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="precisionCustomPreview precisionCustomLimits precisionCustomError">
+            <div class="precision-custom-units" role="group" aria-label="Precision units">
+              <button class="card-action" id="precisionCustomBits" type="button" aria-pressed="false">Bits</button>
+              <button class="card-action" id="precisionCustomDigits" type="button" aria-pressed="true">Decimal digits</button>
+            </div>
+          </div>
+          <output id="precisionCustomPreview" for="precisionCustomInput" aria-live="polite"></output>
+          <p class="hidden" id="precisionCustomError" role="alert"></p>
+          <p class="precision-custom-limits" id="precisionCustomLimits">Maximum: 262,144 bits or 78,913 requested digits.</p>
+          <div class="precision-custom-actions">
+            <button class="card-action" id="precisionCustomCancel" type="button">Cancel</button>
+            <button class="card-action" id="precisionCustomApply" type="button">Apply</button>
+          </div>
+        </div>
       </div>
     </div>
     <section id="workspacePanel">
@@ -347,6 +371,14 @@ __HOLIDAY_JURISDICTION_OPTIONS__
               </div>
             </div>
             <div class="plot-ranges">
+              <div class="plot-group" id="plotInputRangeGroup" role="group" aria-labelledby="plotInputRangeTitle">
+                <span class="plot-options-title" id="plotInputRangeTitle">Input range</span>
+                <input type="hidden" id="plotInputRange" value="auto">
+                <div class="plot-choices" id="plotInputRangeChoices">
+                  <label><input type="radio" name="plotInputRange" value="auto" checked><span>Auto</span></label>
+                  <label><input type="radio" name="plotInputRange" value="manual"><span>Manual</span></label>
+                </div>
+              </div>
               <fieldset class="plot-group" id="plotFirstGroup" aria-label="First variable">
                 <input type="hidden" id="plotFirst"><div class="plot-choices" id="plotFirstChoices"></div>
                 <div class="plot-bound-pair"><div class="plot-field"><label for="plotLower">From</label><input id="plotLower" placeholder="Automatic" size="10" spellcheck="false" ></div><div class="plot-field"><label for="plotUpper">To</label><input id="plotUpper" placeholder="Automatic" size="10" spellcheck="false" ></div></div>
@@ -463,7 +495,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <div class="help-card" data-help-modes="expression,equation,diffequation,matrix,integrator">
           <h3>Precision And Numerical Notation</h3>
           <ul>
-            <li><code>More precision</code> and <code>Less precision</code> change the working arithmetic precision for subsequent calculations, not just the number of characters on screen. Evaluate again to obtain a new result.</li>
+            <li>The precision slider selects 53 to 6656 bits (up to 2004 displayed digits). Drag to preview; release to apply the working arithmetic precision and recalculate, rather than merely changing the number of characters on screen.</li>
             <li>The status shows decimal digits and binary bits. Higher precision may take longer; it does not make an unsuccessful numerical search exhaustive or remove a domain restriction.</li>
             <li>Small results use ordinary decimals down to <code>0.0001</code>; smaller magnitudes use notation such as <code>2.5×10⁻⁵</code>, with no space before <code>×10</code>. Real and imaginary parts follow the same rule.</li>
             <li><code>=</code> denotes an exact result and <code>≈</code> a numerical approximation where those relations are shown. Genuine complex values retain their imaginary part.</li>

@@ -18,7 +18,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "lab_process.h"
+#include "tba_process.h"
 #include "tba_server.h"
 
 extern char **environ;
@@ -37,7 +37,7 @@ static pid_t tba_main_spawn_worker(tba_server_t *server, tba_app_t *app)
         struct rlimit core = {0, 0};
         if (setrlimit(RLIMIT_CORE, &core) || prctl(PR_SET_DUMPABLE, 0))
             _exit(1);
-        lab_proc_set_cancel_flag(&tba_main_stopping);
+        tba_proc_set_cancel_flag(&tba_main_stopping);
         int result = 0;
         while (!tba_main_stopping) {
             int served = tba_svr_once(server);
@@ -103,7 +103,7 @@ int main(int argc, char **argv)
             return 2;
         }
     }
-    if (setenv("MARS_LAB_BIND_HOST", host, 1))
+    if (setenv("TBA_LAB_BIND_HOST", host, 1))
         return 1;
     tba_app_t *app = tba_app_new(base);
     tba_server_t *server = app ? tba_svr_new(app, host, port) : NULL;

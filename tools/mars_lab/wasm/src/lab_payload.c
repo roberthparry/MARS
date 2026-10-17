@@ -71,6 +71,8 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
         lab_dom_set(payload, "plot_lower", lab_payload_control("#plotLower"));
         lab_dom_set(payload, "plot_upper", lab_payload_control("#plotUpper"));
         lab_dom_set(payload, "plot_kind", lab_payload_control("#plotKind"));
+        if (request && lab_dom_equal(lab_dom_get(request, "plotKind"), lab_dom_string("complex_curve")))
+            lab_dom_set(payload, "plot_kind", lab_dom_string("complex_curve"));
         lab_dom_set(payload, "plot_second", lab_payload_control("#plotSecond"));
         lab_dom_set(payload, "plot_second_lower", lab_payload_control("#plotSecondLower"));
         lab_dom_set(payload, "plot_second_upper", lab_payload_control("#plotSecondUpper"));

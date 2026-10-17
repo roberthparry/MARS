@@ -5,7 +5,7 @@
  * Inputs are normalised vertices and a quaternion; no absolute plot coordinate
  * is converted here. Frame plans drive WebGL uniforms, Canvas and vector export.
  * Surface projected-box fitting preserves coordinate units; space curves use a
- * fixed enclosing-sphere fit and camera magnification for stable rotation.
+ * fixed enclosing-sphere fit for stable rotation, with input-only zoom previews.
  * Clipping has at most six planes and nine polygon vertices per input triangle.
  */
 #include "lab_dom.h"
@@ -219,12 +219,13 @@ void lab_surface_frame(int view, int override_bounds)
     lab_surface_rotation(lab_dom_get(view, "orientation"), f.rows);
     double relative = numeric(volume, "exponent") - numeric(volume, "sampleExponent");
     int auto_height = lab_dom_truth(lab_dom_get(volume, "autoHeight"));
+    int segments = lab_dom_equal(lab_dom_read(lab_dom_get(view, "chart"), 3, "segments"), lab_dom_string("true"));
     double limited = relative > 60 ? 60 : relative < -60 ? -60 : relative;
-    if (auto_height) {
+    if (segments || auto_height) {
         /* Horizontal zoom changes the box proportions, not the physical length of a coordinate unit. */
         double factor = lab_surface_exp2(-limited);
         units[0] *= factor;
-        units[1] *= factor;
+        if (!segments) units[1] *= factor;
         double longest = units[0] > units[1] ? units[0] : units[1];
         if (units[2] > longest) longest = units[2];
         for (unsigned i = 0; i < 3; ++i) units[i] /= longest;
@@ -232,7 +233,7 @@ void lab_surface_frame(int view, int override_bounds)
     lab_dom_set(out, "drawMesh", lab_dom_scalar(1, override_bounds || (relative >= -60 && relative <= 60)));
     for (unsigned i = 0; i < 3; ++i) {
         f.radius += units[i]*units[i];
-        f.scale[i] = auto_height && i == 2 ? 1 : lab_surface_exp2(limited);
+        f.scale[i] = (segments ? i != 0 : auto_height && i == 2) ? 1 : lab_surface_exp2(limited);
         for (unsigned row = 0; row < 3; ++row) f.rows[row*3+i] *= units[i];
     }
     /* Explicit normalised-frame overrides are diagnostic only, never sampling bounds. */
@@ -259,11 +260,10 @@ void lab_surface_frame(int view, int override_bounds)
     double fit_width = (f.width-2*margin)/projected_width;
     double fit_height = (f.height-100)/projected_height;
     f.fit = fit_width < fit_height ? fit_width : fit_height;
-    if (lab_dom_equal(lab_dom_read(lab_dom_get(view, "chart"), 3, "segments"), lab_dom_string("true"))) {
+    if (segments) {
         /* A fixed enclosing sphere prevents automatic fitting from pumping during rotation. */
         double available_width = f.width - 2*margin, available_height = f.height - 100;
         f.fit = (available_width < available_height ? available_width : available_height) / (2*f.radius);
-        f.fit *= numeric(lab_dom_get(view, "camera"), "scale");
     }
     double matrix[16] = {0};
     for (unsigned i = 0; i < 3; ++i) {

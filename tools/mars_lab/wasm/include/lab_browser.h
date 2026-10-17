@@ -64,7 +64,7 @@ int lab_browser_decode(uint32_t size);
  * @brief Clamp finite precision to the supported saved-value range.
  * @param value Parsed precision in bits.
  * @param fallback Value to return when value is not finite.
- * @return Finite input clamped to 17..1048576, or fallback.
+ * @return Finite input clamped to 17..262144, or fallback.
  */
 double lab_browser_precision(double value, double fallback);
 

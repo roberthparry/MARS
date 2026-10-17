@@ -19,11 +19,28 @@ static int value(const char *id)
     return lab_dom_read(lab_dom_id(id), 5, "");
 }
 
-static const char *const controls[] = {"plotFirst", "plotSecond", "plotKind", "plotScale"};
+static const char *const controls[] = {"plotFirst", "plotSecond", "plotKind", "plotScale", "plotInputRange"};
+static const char *const input_bounds[] = {"plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper"};
+
+static void input_range_auto(void)
+{
+    for (unsigned i = 0; i < sizeof input_bounds / sizeof *input_bounds; ++i) {
+        int control = lab_dom_id(input_bounds[i]);
+        lab_dom_write(control, 5, "", lab_dom_string(""));
+        lab_dom_delete(control, "marsZoomValue");
+        lab_dom_delete(control, "marsZoomText");
+    }
+    static const char *const cached[] = {"marsZoomOriginal", "marsZoomChart", "marsZoomBounds",
+                                        "marsZoomAnchor", "marsZoomTitle"};
+    for (unsigned i = 0; i < sizeof cached / sizeof *cached; ++i)
+        lab_dom_delete(lab_dom_id("plotRange"), cached[i]);
+    lab_dom_write(lab_dom_id("plotInputRange"), 5, "", lab_dom_string("auto"));
+}
 
 /* Explicit evaluation starts a new view; internal redraws and precision changes do not. */
 void lab_plot_controls_reset(void)
 {
+    input_range_auto();
     static const char *const limits[] = {"plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper",
                                          "plotYLower", "plotYUpper"};
     static const char *const cached[] = {"marsZoomOriginal", "marsZoomChart", "marsZoomBounds",
@@ -57,7 +74,7 @@ void lab_plot_controls_reset(void)
 
 static int control_index(int name)
 {
-    /* Four fixed UI groups; mathematical symbol lookup remains with native binding metadata. */
+    /* Five fixed UI groups; mathematical symbol lookup remains with native binding metadata. */
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i)
         if (lab_dom_equal(name, lab_dom_string(controls[i])))
             return (int)i;
@@ -86,6 +103,10 @@ static int curve_available(int first)
 /* Project a bounded UI catalogue, not a symbol lookup or mathematical rewrite. */
 void lab_plot_controls_sync(void)
 {
+    /* Saved and gesture-authored bounds are authoritative even without a saved selector. */
+    for (unsigned i = 0; i < sizeof input_bounds / sizeof *input_bounds; ++i)
+        if (lab_dom_length(lab_dom_clean(value(input_bounds[i]), 0)))
+            lab_dom_write(lab_dom_id("plotInputRange"), 5, "", lab_dom_string("manual"));
     int solver = lab_workspace_mode() == 1 || lab_workspace_mode() == 2 || lab_workspace_mode() == 4;
     int complex = !!lab_dom_query(0, "#plotRendered .complex-grid");
     lab_dom_class(lab_dom_id("plotKindGroup"), "hidden", solver || complex);
@@ -123,9 +144,9 @@ void lab_plot_controls_sync(void)
     if (!curve && !surface)
         surface = lab_dom_truth(lab_dom_get(range, "marsPlotSurface")) || lab_dom_length(second);
     int multiple = lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) > 1;
-    int automatic = lab_dom_equal(value("plotScale"), lab_dom_string("auto"));
-    lab_dom_class(lab_dom_closest(lab_dom_id("plotFirstGroup"), ".plot-ranges"), "hidden", !complex && automatic && !multiple);
-    lab_dom_class(lab_dom_query(lab_dom_id("plotFirstGroup"), ".plot-bound-pair"), "hidden", !complex && automatic);
+    int automatic = !lab_dom_equal(value("plotInputRange"), lab_dom_string("manual"));
+    lab_dom_class(lab_dom_closest(lab_dom_id("plotFirstGroup"), ".plot-ranges"), "hidden", 0);
+    lab_dom_class(lab_dom_query(lab_dom_id("plotFirstGroup"), ".plot-bound-pair"), "hidden", automatic);
     lab_dom_class(lab_dom_query(lab_dom_id("plotSecondGroup"), ".plot-bound-pair"), "hidden", automatic);
     lab_dom_class(lab_dom_id("plotSecondGroup"), "hidden", complex || curve || (!surface && !multiple));
     lab_dom_class(lab_dom_id("plotCamera"), "hidden", !surface);
@@ -251,7 +272,8 @@ void lab_plot_controls_dispatch(unsigned action, int event, int context)
     }
     if (action == 4)
         return;
-    if (action == 3 && (!lab_dom_equal(lab_dom_get(target, "name"), lab_dom_string("plotScale")) ||
+    if (action == 3 && ((!lab_dom_equal(lab_dom_get(target, "name"), lab_dom_string("plotScale")) &&
+                        !lab_dom_equal(lab_dom_get(target, "name"), lab_dom_string("plotInputRange"))) ||
                        !lab_dom_equal(lab_dom_read(target, 5, ""), lab_dom_string("auto"))))
         return;
     if (!lab_dom_closest(target, "input") || (lab_workspace_mode() > 2 && lab_workspace_mode() != 4))
@@ -262,18 +284,25 @@ void lab_plot_controls_dispatch(unsigned action, int event, int context)
     lab_dom_delete(target, "marsZoomValue");
     /* A range or axis edit starts a new viewport; pending wheel bounds no longer apply. */
     lab_dom_delete(lab_dom_id("plotRange"), "marsZoomChart");
+    for (unsigned i = 0; i < sizeof input_bounds / sizeof *input_bounds; ++i)
+        if (lab_dom_equal(target, lab_dom_id(input_bounds[i])))
+            lab_dom_write(lab_dom_id("plotInputRange"), 5, "", lab_dom_string("manual"));
     if (lab_dom_closest(target, ".plot-choices")) {
         int index = control_index(lab_dom_get(target, "name"));
         if (index >= 0)
             lab_dom_write(lab_dom_id(controls[index]), 5, "", lab_dom_read(target, 5, ""));
         if (index == 3 && lab_dom_equal(value("plotScale"), lab_dom_string("auto"))) {
-            static const char *const bounds[] = {"plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper",
-                                                 "plotYLower", "plotYUpper"};
-            for (unsigned i = 0; i < sizeof bounds / sizeof *bounds; ++i)
-                lab_dom_write(lab_dom_id(bounds[i]), 5, "", lab_dom_string(""));
             lab_dom_delete(lab_dom_id("plotRange"), "marsZoomOriginal");
-            lab_dom_delete(lab_dom_id("plotRange"), "marsZoomChart");
+            static const char *const bounds[] = {"plotYLower", "plotYUpper"};
+            for (unsigned i = 0; i < sizeof bounds / sizeof *bounds; ++i) {
+                int control = lab_dom_id(bounds[i]);
+                lab_dom_write(control, 5, "", lab_dom_string(""));
+                lab_dom_delete(control, "marsZoomText");
+                lab_dom_delete(control, "marsZoomValue");
+            }
         }
+        if (index == 4 && lab_dom_equal(value("plotInputRange"), lab_dom_string("auto")))
+            input_range_auto();
     }
     lab_plot_controls_sync();
     int state = lab_dom_object(5);

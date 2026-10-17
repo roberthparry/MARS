@@ -2014,6 +2014,7 @@
     "test_plot_limits": true,
     "test_plot_precision_and_clip": true,
     "test_plot_sampler_ownership": true,
+    "test_plot_segment_camera_baseline": true,
     "test_plot_segments": true,
     "test_plot_smart_range": true,
     "test_plot_stationary_range": true,
@@ -3521,18 +3522,18 @@
   "tools/mars_lab/tests/test_lab_math_laplace_circular.c": {
     "readme_examples": {
       "enabled": true,
+      "test_fourier_folded_readme": true,
       "test_laplace_circular_readme": true,
-      "test_laplace_folded_readme": true,
-      "test_fourier_folded_readme": true
+      "test_laplace_folded_readme": true
     },
     "tests": {
       "enabled": true,
+      "test_fourier_folded_spectrum": true,
       "test_laplace_circular_domains": true,
       "test_laplace_circular_independent_inverses": true,
       "test_laplace_circular_quadrature": true,
       "test_laplace_circular_rendering": true,
-      "test_laplace_folded_circular": true,
-      "test_fourier_folded_spectrum": true
+      "test_laplace_folded_circular": true
     }
   },
   "tools/mars_lab/tests/test_lab_math_laplace_derivatives.c": {

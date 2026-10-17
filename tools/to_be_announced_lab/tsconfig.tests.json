@@ -1,0 +1,5 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {"rootDir": ".", "outDir": "build/typescript_checks"},
+    "include": ["typescript/**/*.ts", "tests/browser/**/*.ts"]
+}

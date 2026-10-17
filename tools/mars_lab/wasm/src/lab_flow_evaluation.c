@@ -261,6 +261,12 @@ static int lab_flow_evaluation_weather_state(struct lab_flow_evaluation_context 
         else
             lab_plot_slices_auto();
         lab_dom_write(range, 3, "plotSource", source);
+        /* Constants still clear obsolete plot state, but must not schedule an axis-free request. */
+        if (lab_dom_number(ctx->mode) == 0 && !lab_dom_count(lab_dom_get(range, "marsPlotNames"))) {
+            lab_plot_slices_clear();
+            lab_dom_class(lab_dom_id("plotCard"), "hidden", 1);
+            return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
+        }
         lab_layout_plot(0, 0);
         return lab_flow_call(ctx->frame, lab_flow_eval_plot_scheduled, "automaticPlot", 0, 0, 1, ctx->request);
     }

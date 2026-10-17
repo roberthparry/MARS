@@ -18,6 +18,7 @@
 #include "lab_plot_controls.h"
 #include "lab_plot_pointer.h"
 #include "lab_event_dom.h"
+#include "lab_precision.h"
 
 static void lab_event_emit(int calls, const char *service, int first, int second, unsigned count)
 {
@@ -115,9 +116,41 @@ static void lab_event_goal_key(unsigned action, int event, int plan, int calls)
 
 static void lab_event_precision(unsigned action, int event, int plan, int calls)
 {
-    (void)event;
     (void)plan;
-    lab_event_emit(calls, "changeWorksheetPrecision", lab_dom_numeric(action == 14 ? 1 : -1), 0, 1);
+    int slider = lab_dom_get(event, "currentTarget");
+    if (!lab_dom_truth(slider) || lab_dom_truth(lab_dom_get(slider, "disabled")))
+        return;
+    unsigned bits = lab_workspace_precision_slider_bits(lab_dom_to_number(lab_dom_get(slider, "value")));
+    lab_workspace_dom_precision_preview(bits);
+    if (action == 14 && bits != lab_workspace_requested_precision(lab_workspace_mode()))
+        lab_event_emit(calls, "setWorksheetPrecision", lab_dom_numeric(bits), 0, 1);
+}
+
+static void lab_event_precision_track(unsigned action, int event, int plan, int calls)
+{
+    (void)action;
+    int slider = lab_dom_get(event, "currentTarget");
+    if (!lab_dom_truth(slider) || lab_dom_truth(lab_dom_get(slider, "disabled")) ||
+        lab_dom_number(lab_dom_get(event, "button")) != 0)
+        return;
+    double width = lab_dom_measure(slider, 3);
+    if (width <= 16)
+        return;
+    double position = lab_dom_to_number(lab_dom_read(slider, 5, ""));
+    double maximum = lab_dom_to_number(lab_dom_read(slider, 2, "max"));
+    if (!(maximum > 0))
+        return;
+    /* The shared range theme has a 16-pixel thumb including its border. */
+    double centre = lab_dom_measure(slider, 7) + 8 + (width - 16) * position / maximum;
+    double offset = lab_dom_number(lab_dom_get(event, "clientX")) - centre;
+    if (offset >= -8 && offset <= 8)
+        return; /* Preserve the browser's native thumb dragging. */
+    lab_event_prevent(plan, 0);
+    unsigned bits = lab_workspace_precision_slider_bits(position + (offset > 0 ? 1 : -1));
+    lab_workspace_dom_precision_slider(bits);
+    lab_dom_effect(slider, 0);
+    if (bits != lab_workspace_requested_precision(lab_workspace_mode()))
+        lab_event_emit(calls, "setWorksheetPrecision", lab_dom_numeric(bits), 0, 1);
 }
 
 static void lab_event_digits(unsigned action, int event, int plan, int calls)
@@ -244,7 +277,7 @@ static void lab_event_calendar(unsigned action, int event, int plan, int calls)
 void lab_events_dispatch(unsigned action, int event)
 {
     typedef void (*lab_event_handler_t)(unsigned, int, int, int);
-    static const lab_event_handler_t handlers[35] = {
+    static const lab_event_handler_t handlers[36] = {
         [0] = lab_event_run,
         [1] = lab_event_history,
         [2] = lab_event_history,
@@ -267,8 +300,9 @@ void lab_events_dispatch(unsigned action, int event)
         [31] = lab_event_expand,
         [32] = lab_event_rotate,
         [34] = lab_event_rotate,
+        [35] = lab_event_precision_track,
     };
-    static const char *const services[35] = {
+    static const char *const services[36] = {
         [4] = "refreshWorksheetFromInput",
         [5] = "clearWorksheetFromEvent",
         [6] = "toggleHelp",
@@ -286,7 +320,7 @@ void lab_events_dispatch(unsigned action, int event)
     lab_dom_set(plan, "calls", calls);
     if (action >= 256)
         lab_event_calendar(action, event, plan, calls);
-    else if (action < 35) {
+    else if (action < 36) {
         if (handlers[action])
             handlers[action](action, event, plan, calls);
         else if (services[action])
@@ -316,8 +350,9 @@ void lab_events_install(int document, int window)
                     {"#integratorIntervalCap", "change", 11},
                     {"#almanacTime", "input", 12},
                     {"#goalTarget", "keydown", 13},
-                    {"#morePrecision", "click", 14},
-                    {"#lessPrecision", "click", 15},
+                    {"#precisionSlider", "change", 14},
+                    {"#precisionSlider", "input", 15},
+                    {"#precisionSlider", "pointerdown", 35},
                     {"#renderedMore", "click", 16},
                     {"#parsedMore", "click", 17},
                     {"#functionMore", "click", 18},
@@ -360,6 +395,7 @@ void lab_events_install(int document, int window)
     lab_dom_listen(window, "scroll", 29, 1);
     lab_plot_drag_install(document, window);
     lab_plot_pointer_install();
+    lab_precision_install(document);
     int cards = lab_dom_all(0, ".result-card");
     for (unsigned i = 0; i < lab_dom_count(cards); ++i)
         lab_layout_zoom(lab_dom_item(cards, i));

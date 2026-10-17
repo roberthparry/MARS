@@ -222,7 +222,7 @@ static json_t *lab_state_read_state(const string_t *path, const json_t *defaults
     for (size_t i = 0; i < json_object_size(fallback); ++i) {
         const string_t *key = json_object_key_at(fallback, i);
         long long bits;
-        if ((!lab_state_integer(json_object_get(precision, key), &bits) || bits < 17 || bits > 1048576) &&
+        if ((!lab_state_integer(json_object_get(precision, key), &bits) || bits < 17 || bits > 262144) &&
             !json_object_set(precision, key, json_object_value_at(fallback, i)))
             goto fail;
     }
@@ -253,7 +253,7 @@ static bool lab_state_merge_precision(json_t *state, const json_t *updates, cons
         long long bits;
         if (!json_object_get(accepted, key) || !lab_state_integer(json_object_value_at(updates, i), &bits))
             continue;
-        bits = bits < 17 ? 17 : bits > 1048576 ? 1048576 : bits;
+        bits = bits < 17 ? 17 : bits > 262144 ? 262144 : bits;
         if (!lab_state_put_integer(precision, string_c_str(key), bits))
             return false;
     }

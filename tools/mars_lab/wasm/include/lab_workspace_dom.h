@@ -103,6 +103,12 @@ void lab_workspace_dom_target(int visible);
 void lab_workspace_dom_controls(unsigned mode, int busy, int ready, unsigned back, unsigned forward, int goal,
                                 int minimum, int maximum);
 
+/** @brief Preview a precision slider value and accessible digit/bit labels without changing calculation state. */
+void lab_workspace_dom_precision_slider(unsigned bits);
+
+/** @brief Update the precision readout without resetting the range input's pending change event. */
+void lab_workspace_dom_precision_preview(unsigned bits);
+
 /** @brief Project busy state without re-enabling initially disabled controls.
  * @param busy Non-zero disables controls; zero releases the busy state.
  * @param equation_variable Scoped equation-variable control node.

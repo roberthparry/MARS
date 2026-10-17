@@ -21,7 +21,7 @@ tba_app_t *tba_app_new(const char *base)
     tba_app_t *app = calloc(1, sizeof *app);
     if (!app)
         return NULL;
-    const char *prefix = base ? base : getenv("MARS_LAB_PUBLIC_PATH");
+    const char *prefix = base ? base : getenv("TBA_LAB_PUBLIC_PATH");
     if (!prefix)
         prefix = "/to-be-announced";
     app->base = string_new_with(!strcmp(prefix, "/") ? "" : prefix);

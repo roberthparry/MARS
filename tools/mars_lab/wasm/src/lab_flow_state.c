@@ -1087,7 +1087,8 @@ static int lab_flow_state_precision_state_history_buttons(int frame);
 
 static int lab_flow_state_precision_state_precision_step(int frame)
 {
-    return lab_flow_call(frame, 1, "statePrecisionStep", 0, 0, 1, lab_dom_get(frame, "direction"));
+    return lab_flow_call(frame, 1, "statePrecisionStep", 0, 0, 2, lab_dom_get(frame, "direction"),
+                         lab_dom_get(frame, "bits"));
 }
 
 static int lab_flow_state_precision_state_save_precision(int frame)

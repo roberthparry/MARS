@@ -41,10 +41,13 @@ MARS Lab runs as a native C server with calculation modes linked into that same
 executable. It launches itself with `--worker-control TIMEOUT_MS WORK_LIMIT MODE` for isolated calculations;
 no separate scratch worker binaries are required.
 
-The browser runs C/WebAssembly with JavaScript browser adapters and HTML/CSS, served from
+The browser runs C/WebAssembly with TypeScript-authored browser adapters and HTML/CSS, served from
 `tools/mars_lab/assets/index.html`, with its stylesheet in `tools/mars_lab/assets/index.css`
 (served as `/index.css`), an ordered import list for the component styles in `assets/css/`.
-Browser code lives in `assets/js/`, and the formatted
+Browser source lives in `tools/mars_lab/typescript/`. The native TypeScript 7 compiler
+emits JavaScript into `build/typescript/`; those generated files are ignored by Git and
+must not be edited. The server maps the existing `/js/` URLs to that build directory,
+so `assets/` contains authored assets only. The formatted
 `src/page/lab_page_catalogue.c` contains packaged worksheet defaults and presentation constants as native C tables.
 Mathematical processing remains in the native C server and workers. The stylesheet is served
 with `text/css; charset=utf-8` and the same private-access and no-cache rules as
@@ -56,6 +59,60 @@ progress bars and elapsed-time activity indicators for unmeasured work, so long
 imports and calendar generation remain visibly active. When output is redirected,
 plain status lines replace animated bars. Password and selection prompts remain
 unobstructed; a failed stage does not display successful completion.
+
+Install the native TypeScript 7 compiler as `tsc` on PATH, or supply its absolute
+path through the Make variable `LAB_TSC`. The native compiler requires neither
+Node.js nor npm. Lab builds compile the browser sources automatically;
+`lab-typecheck` checks both the application and browser tests strictly without
+emitting JavaScript. Browser tests are authored in `tests/browser/*.ts`;
+`lab-test-typescript` compiles them into the ignored `build/typescript_checks/`
+directory. The browser-test target performs this compilation automatically before
+the native harness loads the generated scripts.
+The editor discovers `tests/browser/tsconfig.json`, which inherits the same test
+configuration with emission disabled. This includes the application declarations
+when editing a browser fixture rather than treating it as an isolated script.
+Compilation errors prevent publication of new generated files. There is no
+bundler, package-manager install step or JavaScript server runtime.
+
+Browser resource owners are classes: startup manages bootstrap data, observers and
+periodic work; the transport bridge scopes native handles; request controllers own
+cancellation resources; and plot controllers own rendering and refinement resources.
+The HTTP client receives explicit network and response-decoding capabilities. Codec
+and worker communication use typed ES modules. Worksheet namespaces group related
+controller classes and their application instances; behaviour belongs to those
+instances rather than a collection of namespace functions or static methods.
+These definition scripts require no bundler. Controllers receive typed capabilities,
+with live accessors where bootstrap ordering or current native state requires them.
+Application instances carry explicit class types so mutually dependent initialisers
+do not lose their types in the editor's TypeScript checker. Compile-time regression
+checks guard the transport, request, result and plot owners against this loss of typing.
+Pure validation and formatting helpers remain functions rather than artificial
+utility classes. Native code continues to own mathematical interpretation and
+worksheet policy.
+
+The native workflow runtime combines domain capability providers into an immutable,
+directly indexed registry and rejects duplicate service names. It executes native
+continuations without taking ownership of editor, calendar, history or result state.
+Persistence and history adapters retain native-selected validation, snapshot timing
+and request guards. Browser fixtures can construct isolated controllers with fake
+capabilities; integration fixtures replace methods on their actual owners, not on
+`window`.
+
+Worksheet buffer transfer, UTF-8 validation, snapshot contracts and native-state
+views are grouped in `typescript/workspace_native.ts`. Integrator reference metadata
+belongs to its controller rather than a shared mutable global. Browser capabilities
+use explicit request options and service signatures; opaque values are retained only
+at the native transport boundary. Application disposal releases fallback resize
+listeners, native event subscriptions, codec workers, observers and owned timers.
+Plot-view disposal is separate from permanent renderer shutdown so changing a result
+can release geometry without losing the application's resize subscriptions.
+
+Browser-only presentation and binding state belong to their respective controllers;
+the worksheet session retains only editor timestamps and calendar data. These typed
+owners are independent of the native-state views and do not duplicate the native
+mathematical model. TypeScript file headers
+and public APIs carry Doxygen-style comments documenting their responsibilities.
+
 Install the external TeX rendering tools and freestanding WebAssembly toolchain as follows:
 
 ```sh
@@ -276,9 +333,9 @@ The styles are divided into:
 
 On phones the seven mode tabs form a compact, fully visible three-column grid
 with equal-width tabs. Precision controls sit at the top left beside Expression
-on the right, with the other six modes in two rows below. On phones these use a compact Precision −/+ group with
-28-pixel buttons and explicit accessible labels; wider screens retain the full
-Less precision/More precision wording. The header and decorative background are reduced, editors
+on the right, with the other six modes in two rows below. A compact, labelled precision
+slider shows the significant-digit count on both phones and wider screens.
+The header and decorative background are reduced, editors
 use a 16-pixel font and phone card action buttons use a compact 36-pixel minimum height
 with rounded rectangular styling. Worksheet actions use a smaller 32-pixel minimum
 height with reduced horizontal padding and wrap at their natural widths,
@@ -326,24 +383,27 @@ and checks visibility, page overflow and control geometry across all modes.
 These responsive checks complement, rather than replace, testing on a real
 iPhone, particularly for Safari's keyboard, safe areas and touch gestures.
 
-`js/app.js` loads the C browser module, bootstrap configuration, database catalogue
+`app.ts` (served as generated `js/app.js`) loads the C browser module, bootstrap configuration, database catalogue
 and definition scripts, then loads `workspace.js` to initialise browser references
 and views of native state. Native modules register controls through the generic
 event bridge before startup begins the initial evaluation. Startup errors are
 shown in the result pane rather than leaving an
 apparently ready but unusable worksheet.
 
-The scripts use the existing shared lexical state and explicitly controlled
-classic-script loading, not ES module imports. This preserves the worksheet's
-behaviour without adding a bundler or framework. Responsibility boundaries are:
+The worksheet adapters retain the existing shared lexical state and explicitly
+controlled classic-script loading. Codec, queue and worker code use ES modules;
+type-only imports do not alter runtime loading. This preserves the worksheet's
+behaviour without adding a bundler or framework. Maintained source boundaries are:
 
-- `transport.js`: browser value/network bridge to the bounded C Protobuf codec and scoped DOM capabilities for C.
-- `api.js`: network resources and callback capabilities for C-owned request workflows.
-- `state.js` and `workspace.js`: storage and DOM adapters for C-owned history, modes and precision.
-- `bindings.js`: authored input, native editor-state views and binding controls.
-- `results.js`: native result installation, tooltips and entry-point adapters to C-owned card layout.
-- `locations.js`: browser location, clock and date-control conversion adapters.
-- `api.js` also applies native private-network access metadata; the separate `mobile.js` adapter is removed.
+- `transport.ts`: browser value/network bridge to the bounded C Protobuf codec and scoped DOM capabilities for C.
+- `api.ts`: network resources and callback capabilities for C-owned request workflows.
+- `state.ts` and `workspace.ts`: storage and DOM adapters for C-owned history, modes and precision.
+- `bindings.ts`: authored input, native editor-state views and binding controls.
+- `results.ts`: native result installation, tooltips and entry-point adapters to C-owned card layout.
+- `locations.ts`: browser location, clock and date-control conversion adapters.
+- `surface*.ts`: retained plot resources, camera adapters, refinement scheduling and SVG export.
+- `codec.ts`, `jobs.ts`, `codec_worker.ts` and `codec_types.ts`: codec instances, worker lifecycle and validated messages.
+- `api.ts` also applies native private-network access metadata; the separate `mobile.js` adapter is removed.
 
 `evaluation.js` and its route are removed. Its evaluation, goal-seek and auxiliary
 workflows are C continuations, not JavaScript workflows relocated into another
@@ -823,7 +883,7 @@ highlight spans and the application of layout decisions; no mathematical engine 
 to the browser.
 
 Convenience adapters used only by browser regression checks live in
-`tools/mars_lab/tests/browser/native_adapters.js`, not in the production scripts.
+`tools/mars_lab/tests/browser/native_adapters.ts`, not in the production scripts.
 The private browser fixture injects them and initialises their native-dependent
 values after startup; they have no public asset route.
 
@@ -893,7 +953,8 @@ ignored independently. Scalar browser settings remain ordinary strings, and
 the native saved-state file still uses JSON. The schema, binary64 policy
 and resource limits are documented in the [Protobuf guide](protobuf.md#mars-lab-browser-wire-contract).
 The Makefile probes Clang and `wasm-ld` by compiling and linking a small module.
-No Emscripten, Python, npm or generated JavaScript codec is required. Rebuild and
+No Emscripten, Python, npm or JavaScript Protobuf generator is required. TypeScript
+compilation produces the host adapters; the Protobuf codec remains native C. Rebuild and
 restart the Lab together: an incompatible browser-module ABI reports a startup
 error, not a silent JavaScript fallback.
 
@@ -1006,8 +1067,26 @@ Each mode retains its most recent editor text, binding values and controls
 between sessions. Input events save an in-progress edit as well as a submitted
 calculation, so moving between modes or restarting the Lab does not restore an
 older expression or equation.
-The precision buttons change the working precision used by the mathematical
-helpers. The result cards provide independent zoom, expansion and copy
+The precision slider changes the working precision used by the mathematical
+helpers. Its native-defined positions start at 53 bits (binary64), then 106 bits,
+then 192 bits, followed by equal 64-bit steps through 6,656 bits. The maximum displays 2,004
+digits after rounding up; it is the first step above 2,000 digits. Binary and decimal
+precision are not exactly equivalent. Clicking the track moves one step towards the click;
+dragging the thumb previews the
+significant-digit count; releasing the thumb or committing a keyboard change saves
+the selection and refreshes the calculation once. The accessible value and tooltip
+also report bits. The `…` button opens a custom-precision editor with bits and
+decimal-digit units, a conversion preview and Apply/Cancel controls. Enter applies
+the draft; Escape or clicking outside dismisses it without changing precision.
+Custom entries accept 53–262,144 bits or 17–78,913 requested decimal digits;
+decimal requests round upwards to whole bits. This is the current application
+ceiling, not MPFR's theoretical limit. Existing calculation time limits still apply.
+The current result stays visible while a calculation is pending.
+Each mode retains its own precision. Values above the slider maximum show a
+Custom readout; moving the slider selects a value within its ordinary range again.
+Loading a saved precision does not round it to a slider step, although values
+outside the custom-entry bit limits are clamped. Precision controls are disabled
+while a calculation is busy. The result cards provide independent zoom, expansion and copy
 controls; **Use as input** returns a suitable result to the editor.
 When numerical results use powers of ten, the mantissa is joined directly to
 `×10` and its superscript exponent, without an intervening space. Real and
@@ -1042,6 +1121,10 @@ including their domain breaks. Amplitude uses the native hypotenuse operation on
 the real and imaginary components, equivalent to complex absolute value without
 forming an avoidable squared intermediate.
 
+Interior zero-coordinate guides are dashed, distinguishing them from solid data
+curves. Domain breaks remain disconnected in each projection. Near singularities,
+the last finite sampled point is not a finite limit of the function.
+
 The views form a two-column grid on wide displays and stack on narrow displays.
 The four-view grid uses a single narrow outer gutter and compact gaps between
 cards. Cards fit their content instead of stretching to match a neighbouring camera
@@ -1055,7 +1138,8 @@ non-scaling strokes so enlarging the chart does not magnify line thickness.
 Camera controls are docked directly below the 3-D curve, inside its own card;
 they follow that view through expansion and are hidden when another projection
 is expanded. The curve's display height is limited to leave viewport space for
-its controls. Compact camera sliders fill their fields and retain touch-sized targets in either layout.
+its controls. Compact camera sliders fill their fields, with smaller desktop rows
+and larger touch targets on coarse-pointer devices.
 The controls continue to work after docking, expansion and mode restoration.
 Range gestures update only their targeted complex-view card; sibling charts and
 the retained 3-D camera are not replaced. Wheel gestures outside the individual
@@ -1066,8 +1150,13 @@ Evaluate (including the editor's keyboard shortcut) resets plot bounds, automati
 height, camera orientation, zoom and slice controls, even for unchanged input.
 It also clears individual plot expansion and restores the complete four-view grid.
 Internal plot redraws and precision-only reevaluations retain their current view.
+The input range panel has Auto and Manual choices, independently of vertical
+scaling. Auto is the default and lets the native plotter choose the interval;
+Manual reveals the From/To fields. Returning to Auto clears explicit input bounds,
+including retained zoom coordinates. Evaluate restores Auto. Restored or
+gesture-selected input bounds select Manual.
 Automatic complex sampling initially
-uses the input interval from −10 to 10; authored input limits override it. The complex-plane view preserves
+uses the input interval from −10 to 10; manual input limits override it. The complex-plane view preserves
 equal coordinate units in a square native viewport, centred vertically within its card.
 Amplitude starts at zero to avoid magnifying numerical
 round-off in an otherwise constant magnitude.
@@ -1096,11 +1185,22 @@ The space curve returns to vector SVG after interaction stops, including its
 axis arrows and labels. Dragging resumes the retained local preview immediately;
 the idle SVG uses the same C/WebAssembly projection without resampling or resetting
 the camera. Surface meshes retain their existing renderer.
-For 3-D curves, zoom is camera magnification (12.5%–6400%): it does not change
-the sampled input interval or launch volume refinement. Rotation uses a fixed
-enclosing-sphere fit to avoid changes of apparent scale as the camera turns.
-Use the input-range controls to change the sampled interval. The settled SVG
+For 3-D curves, zoom narrows or widens the sampled input interval about its
+centre and requests fresh native samples. For example, 200% selects half the
+original input span; it does not magnify and crop the existing image. The real
+and imaginary ranges are fitted to the new samples, preserving the camera
+orientation. Only the 3-D card is replaced; the other projections retain their
+views. Reset restores the input range from before zooming.
+An interval containing only real values remains a 3-D curve with zero imaginary
+component; zooming does not switch that card to a different plot type.
+Rotation uses a fixed enclosing-sphere fit to avoid changes of apparent scale
+as the camera turns. The initial drawing uses that same fit, avoiding a framing
+jump on the first camera interaction. The settled SVG
 batches same-colour segments while preserving their native gaps.
+Hover near a space-curve segment to show a marker and its approximate input,
+real and imaginary coordinates. Inspection interpolates the displayed native
+samples, never across a domain gap, and follows the current camera projection.
+The marker and tooltip disappear during gestures and are not included in copied SVG.
 
 Real-only samples retain the existing real-curve presentation. Distributional
 Fourier results retain their components and labelled impulse weights, with an
@@ -1126,7 +1226,9 @@ nonlinear products of distributions are not approximated as narrow peaks.
 
 **Evaluate** in Expression, Equation, Differential Equation and Integrator modes installs the
 mathematical result cards first, then generates a separate **Plot** card asynchronously.
-There is no separate Plot button. Plot failures remain local to that card; they do
+Expression results without a non-constant plotting variable leave the Plot card
+hidden, rather than requesting an empty plot. There is no separate Plot button.
+Plot failures remain local to that card; they do
 not hide successful mathematical results. New evaluations, editor changes and mode
 changes invalidate obsolete plot work. Plotting does not keep Evaluate busy.
 

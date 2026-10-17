@@ -306,15 +306,16 @@ void lab_layout_plot(int result, int error)
     int node = lab_dom_id("plotRendered"), svg = lab_dom_get(result, "svg");
     int projection = lab_dom_get(result, "gestureProjection");
     if (!error && lab_dom_length(projection)) {
-        static const char *const keys[] = {"complex_plane", "components", "amplitude"};
+        static const char *const keys[] = {"complex_plane", "components", "amplitude", "svg"};
         static const char *const selectors[] = {
             "[data-complex-panel=\"complex_plane\"] .rendered",
             "[data-complex-panel=\"components\"] .rendered",
-            "[data-complex-panel=\"amplitude\"] .rendered"
+            "[data-complex-panel=\"amplitude\"] .rendered",
+            "[data-complex-panel=\"svg\"] .rendered"
         };
         int body = 0, image = 0;
-        /* Only the three two-dimensional projections can issue a local range gesture. */
-        for (unsigned i = 0; i < 3; ++i)
+        /* Each of the four fixed projections owns its local range gestures. */
+        for (unsigned i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
             if (lab_dom_equal(projection, lab_dom_string(keys[i]))) {
                 body = lab_dom_query(node, selectors[i]);
                 image = lab_dom_get(result, keys[i]);

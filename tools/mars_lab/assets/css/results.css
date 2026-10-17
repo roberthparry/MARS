@@ -470,7 +470,9 @@ pre {
 .plot-pointer-line,
 .plot-pointer-horizontal,
 .plot-pointer-marker,
-.plot-pointer-tip {
+.surface-pointer-marker,
+.plot-pointer-tip,
+.surface-pointer-tip {
   position: absolute;
   pointer-events: none;
   z-index: 2;
@@ -496,7 +498,8 @@ pre {
   border-top: 1px dashed #e6c778;
 }
 
-.plot-pointer-marker {
+.plot-pointer-marker,
+.surface-pointer-marker {
   box-sizing: border-box;
   width: 9px;
   height: 9px;
@@ -506,7 +509,8 @@ pre {
   transform: translate(-50%, -50%);
 }
 
-.plot-pointer-tip {
+.plot-pointer-tip,
+.surface-pointer-tip {
   max-width: calc(100% - 20px);
   padding: 4px 7px;
   border: 1px solid #94b8b1;

@@ -65,6 +65,9 @@ Each pair is independent, so a sampler can omit connections across domain gaps.
 Segments share the native equal-unit camera, axes and viewport clipping with
 meshes, but render as lines rather than artificial narrow triangles. SVG carries
 normalised segment endpoints for retained WebGL line rendering and vector export.
+Segment scenes use a fixed enclosing-sphere camera fit, shared by their initial
+SVG and interactive projection, so entering an interactive view does not change
+the framing. Rotating the curve retains its apparent scale.
 
 For two-dimensional scenes, `plot_options_t.equal_units` preserves equal physical
 coordinate units by centring a proportionate drawing rectangle inside the card.
@@ -102,7 +105,7 @@ Axes are linear. Automatic bounds cover finite points; a constant coordinate is
 expanded by the greater of one unit or five per cent of its magnitude. An
 explicit viewport clips line segments geometrically and omits outside markers.
 The renderer draws solid bottom and left axes beside the tick labels, interior
-zero guides when visible, rounded decimal tick steps, optional subtle dashed
+dashed interior zero guides when visible, rounded decimal tick steps, optional subtle dashed
 grid lines, plain-text labels and an in-plot legend, with the top and right
 edges open. Grid lines on the viewport edges are omitted. Legend entries
 that do not fit vertically are omitted. Long titles or labels can overlap:

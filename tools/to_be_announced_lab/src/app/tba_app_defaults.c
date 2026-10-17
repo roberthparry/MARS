@@ -4,7 +4,7 @@
  *
  * The native application owns these defaults; no configuration asset is parsed
  * at startup. Values retain their scalar types in the in-memory tree consumed by
- * the shared Protobuf codec. Each caller receives an independent owned copy.
+ * the local Protobuf codec. Each caller receives an independent owned copy.
  * No dataset, filename or data column is preselected: files belong to the browser.
  */
 #include "tba_app.h"

@@ -69,8 +69,10 @@ main {
 }
 
 .precision-toolbar {
-  display: flex;
-  flex-wrap: wrap;
+  position: relative;
+  z-index: 21;
+  display: grid;
+  grid-template-columns: auto minmax(6rem, 9rem) 7.5rem auto;
   align-items: center;
   justify-content: flex-end;
   gap: 0.45rem;
@@ -84,8 +86,72 @@ main {
   text-transform: uppercase;
 }
 
-.precision-short-label {
+.precision-value {
+  min-width: 0;
+  color: var(--code);
+  font: 0.72rem/1.1 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#precisionSlider {
+  width: 100%;
+  height: 1.75rem;
+}
+
+#precisionSlider:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.precision-custom-panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  box-sizing: border-box;
+  width: min(20rem, calc(100vw - 1.5rem));
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: #10271f;
+  color: var(--muted);
+  box-shadow: 0 0.6rem 1.6rem #0006;
+  font: 0.8rem/1.35 system-ui, sans-serif;
+}
+
+.precision-custom-panel.hidden,
+#precisionCustomError.hidden {
   display: none;
+}
+
+.precision-custom-heading,
+.precision-custom-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.precision-custom-heading h3 {
+  margin: 0;
+  color: #f3f8f2;
+  font: 600 0.9rem/1.3 system-ui, sans-serif;
+}
+
+.precision-custom-actions {
+  justify-content: flex-end;
+}
+
+.precision-custom-panel p {
+  margin: 0;
+}
+
+.precision-custom-limits {
+  font-size: 0.72rem;
 }
 
 .mode-tab {

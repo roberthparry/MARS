@@ -213,14 +213,14 @@ unsigned lab_workspace_default_precision(unsigned mode)
     return mode < 4 ? 256 : 53;
 }
 
-/* Normalise before converting a possibly non-finite host double to an integer. */
+/* Clamp saved and interactive settings to the Lab limits before converting to an integer. */
 unsigned lab_workspace_precision_set(unsigned mode, double bits)
 {
     if (mode >= LAB_WS_MODES)
         return 0;
     if (bits != bits || bits > 1.7976931348623157e308 || bits < -1.7976931348623157e308)
         return lab_workspace_modes[mode].precision;
-    unsigned precision = bits < 17 ? 17 : bits > 1048576 ? 1048576 : (unsigned)bits;
+    unsigned precision = bits < 53 ? 53 : bits > 262144 ? 262144 : (unsigned)bits;
     lab_workspace_modes[mode].precision = precision;
     return precision;
 }
@@ -231,14 +231,14 @@ unsigned lab_workspace_precision(unsigned mode)
     return mode < LAB_WS_MODES ? lab_workspace_modes[mode].precision : 0;
 }
 
-/* Saved legacy values below binary64 do not reduce the actual request precision. */
+/* Retain the binary64 floor even before a mode has initialised its precision. */
 unsigned lab_workspace_requested_precision(unsigned mode)
 {
     unsigned bits = lab_workspace_precision(mode);
     return bits < 53 ? 53 : bits;
 }
 
-/* Interactive precision requests preserve the original binary64 floor. */
+/* Interactive precision requests use the same limits as restored settings. */
 unsigned lab_workspace_request_precision(unsigned mode, double bits)
 {
     if (bits == bits && bits >= -1.7976931348623157e308 && bits <= 1.7976931348623157e308 && bits < 53)
@@ -251,36 +251,57 @@ unsigned lab_workspace_digits(double bits)
 {
     if (!(bits > 53))
         return 17;
-    if (bits > 1048576)
-        bits = 1048576;
+    if (bits > 262144)
+        bits = 262144;
     double digits = bits * 0.30102999566398119521;
     unsigned whole = (unsigned)digits;
     return whole + (digits > whole);
 }
 
-/* Follow binary64, double-double, then 128-bit steps. */
+/* Follow binary64, double-double, then 192 bits and 64-bit steps. */
 unsigned lab_workspace_precision_step(double bits, int direction)
 {
-    unsigned current = !(bits >= 53) ? 53 : bits > 1048576 ? 1048576 : (unsigned)bits;
+    unsigned current = !(bits >= 53) ? 53 : bits > 6656 ? 6656 : (unsigned)bits;
     if (direction > 0) {
         if (current < 106)
             return 106;
-        if (current < 256)
-            return 256;
-        return current >= 1048576 ? 1048576 : (current / 128 + 1) * 128;
+        if (current < 192)
+            return 192;
+        return current >= 6656 ? 6656 : (current / 64 + 1) * 64;
     }
     if (current <= 106)
         return 53;
-    if (current <= 256)
+    if (current <= 192)
         return 106;
-    return ((current - 1) / 128) * 128;
+    return ((current - 1) / 64) * 64;
+}
+
+/* Binary64 and double-double precede 192 bits and regular 64-bit slider steps. */
+unsigned lab_workspace_precision_slider_bits(double position)
+{
+    unsigned index = !(position >= 0) ? 0 : position > 103 ? 103 : (unsigned)position;
+    if (index < 2)
+        return index ? 106 : 53;
+    return (index + 1) * 64;
+}
+
+/* Round to the nearest offered precision without scanning the slider positions. */
+unsigned lab_workspace_precision_slider_position(unsigned bits)
+{
+    if (bits <= 79)
+        return 0;
+    if (bits <= 149)
+        return 1;
+    if (bits < 192)
+        return 2;
+    return bits >= 6656 ? 103 : (bits + 31) / 64 - 1;
 }
 
 /* Control availability follows the same native request bounds as stepping. */
 int lab_workspace_precision_can_step(unsigned mode, int direction)
 {
     unsigned bits = lab_workspace_requested_precision(mode);
-    return mode < LAB_WS_MODES && (direction > 0 ? bits < 1048576 : bits > 53);
+    return mode < LAB_WS_MODES && (direction > 0 ? bits < 6656 : bits > 53);
 }
 
 /* Reject overflow rather than truncate mathematical editor text. */

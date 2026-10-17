@@ -14,7 +14,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "lab_wire.h"
+#include "tba_wire.h"
 #include "tba_stream.h"
 #include "test_tba_support.h"
 
@@ -126,7 +126,7 @@ static bool test_tba_response(tba_stream_t *stream, const json_t *frame, const u
               EVP_DecryptUpdate(aes, plain, &count, cipher, length - 16) > 0 &&
               EVP_CIPHER_CTX_ctrl(aes, EVP_CTRL_GCM_SET_TAG, 16, cipher + length - 16) > 0 &&
               EVP_DecryptFinal_ex(aes, plain + count, &tail) > 0;
-    json_t *decoded = ok ? lab_wire_decode(plain, length - 16) : NULL;
+    json_t *decoded = ok ? tba_wire_decode(plain, length - 16) : NULL;
     ok = decoded && !strcmp(tba_json_text(decoded, "text"), tba_json_text(expected, "text")) && ok;
     json_free(decoded);
     json_free(repeated);
@@ -173,7 +173,7 @@ static bool test_tba_chunk_boundary(tba_stream_t *stream, const unsigned char *k
     bool ready = text && string_append_chars(text, (const char *)buffer, capacity - 100) == 0;
     json_t *value = ready ? json_new_string(text) : NULL, *object = json_new_object();
     ready = ready && value && object && tba_json_set(object, "text", value);
-    array_t *encoded = ready ? lab_wire_encode(object) : NULL;
+    array_t *encoded = ready ? tba_wire_encode(object) : NULL;
     size_t length = complete ? array_size(encoded) : capacity;
     const unsigned char *source = complete ? array_get(encoded, 0) : buffer;
     json_t *begin = tba_stream_begin(stream), *wrapped = NULL;
@@ -207,7 +207,7 @@ bool test_tba_stream_checks(void)
     tba_stream_t *stream = tba_stream_new();
     json_t *value = json_new_object();
     bool ok = stream && value && tba_json_string(value, "text", "private test value £");
-    array_t *bytes = ok ? lab_wire_encode(value) : NULL;
+    array_t *bytes = ok ? tba_wire_encode(value) : NULL;
     unsigned char key[32];
     randombytes_buf(key, sizeof key);
     json_t *begin = stream ? tba_stream_begin(stream) : NULL;

@@ -1,4 +1,97 @@
 /* Mode hints, goal seeking and variable/constant binding controls. */
+#precisionCustomToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  padding: 0.1rem 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+#precisionCustomToggle svg {
+  display: block;
+  width: 1.35rem;
+  height: 1.35rem;
+  fill: currentColor;
+  pointer-events: none;
+}
+
+.precision-custom-entry {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+#precisionCustomInput {
+  box-sizing: border-box;
+  flex: 1 1 7rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: #091c16;
+  color: #f3f8f2;
+  font: 0.85rem/1.3 "Cascadia Code", "DejaVu Sans Mono", monospace;
+}
+
+.precision-custom-units {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.2rem;
+}
+
+.precision-custom-units button {
+  white-space: nowrap;
+}
+
+#precisionCustomInput[aria-invalid="true"] {
+  border-color: #ffbdac;
+}
+
+.precision-custom-panel button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+  transform: none;
+}
+
+.precision-custom-panel .card-action {
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.precision-custom-units button[aria-pressed="true"],
+#precisionCustomApply {
+  background: #d4a64f;
+  color: #102017;
+  border-color: #d4a64f;
+}
+
+.precision-custom-panel :is(button, input):focus-visible,
+#precisionCustomToggle:focus-visible {
+  outline: 2px solid #d4a64f;
+  outline-offset: 2px;
+}
+
+#precisionCustomPreview {
+  min-height: 1.35em;
+  color: var(--code);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+#precisionCustomError {
+  color: #ffbdac;
+  overflow-wrap: anywhere;
+}
+
 .mode-hint {
   margin: -0.15rem 0 0;
   color: var(--muted);
@@ -282,14 +375,14 @@
 #plotCamera {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.35rem 1.25rem;
-  padding: 0.65rem 0.9rem 0.3rem;
+  gap: 0.15rem 0.85rem;
+  padding: 0.4rem 0.65rem 0.2rem;
 }
 
 .complex-panel > #plotCamera {
-  margin: 0.5rem;
-  padding: 0.4rem 0.65rem 0.2rem;
-  row-gap: 0.2rem;
+  margin: 0.3rem;
+  padding: 0.3rem 0.5rem 0.1rem;
+  row-gap: 0.1rem;
   background: #10241d;
 }
 
@@ -313,10 +406,10 @@
 }
 
 #plotCamera .plot-field > label {
-  font-size: 0.68rem;
-  padding-right: 5ch;
-  line-height: 1.4;
-  letter-spacing: 0.06em;
+  font-size: 0.65rem;
+  padding-right: 7ch;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
 }
 
 #plotCamera .plot-angle {
@@ -324,12 +417,24 @@
 }
 
 #plotCamera output {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   position: absolute;
   top: 0;
   right: 0;
   font-variant-numeric: tabular-nums;
-  line-height: 1.4;
+  line-height: 1.2;
+}
+
+/* Compact camera rows retain full-width tracks and unchanged draggable thumbs. */
+#plotCamera input[type="range"] {
+  width: 100%;
+  height: 28px;
+}
+
+@media (pointer: coarse) {
+  #plotCamera input[type="range"] {
+    height: 36px;
+  }
 }
 
 #plotCameraTitle {
@@ -343,7 +448,7 @@
 @container (max-width: 640px) {
   #plotCamera {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 1rem;
+    column-gap: 0.75rem;
   }
 }
 
@@ -514,7 +619,7 @@
   box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
 }
 
-:is(.plot-angle, .plot-slice) input[type="range"] {
+:is(.plot-angle, .plot-slice, .precision-toolbar) input[type="range"] {
   appearance: none;
   border: 0;
   border-radius: 0;
@@ -527,29 +632,29 @@
   cursor: pointer;
 }
 
-:is(.plot-angle, .plot-slice) input[type="range"]:focus {
+:is(.plot-angle, .plot-slice, .precision-toolbar) input[type="range"]:focus {
   box-shadow: none;
 }
 
-:is(.plot-angle, .plot-slice) input[type="range"]:focus-visible {
+:is(.plot-angle, .plot-slice, .precision-toolbar) input[type="range"]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-radius: 6px;
 }
 
-:is(.plot-angle, .plot-slice) input[type="range"]::-moz-range-track {
+:is(.plot-angle, .plot-slice, .precision-toolbar) input[type="range"]::-moz-range-track {
   height: 0.35rem;
   border-radius: 999px;
   background: #31594e;
 }
 
-:is(.plot-angle, .plot-slice) input[type="range"]::-moz-range-progress {
+:is(.plot-angle, .plot-slice, .precision-toolbar) input[type="range"]::-moz-range-progress {
   height: 0.35rem;
   border-radius: 999px;
   background: var(--accent);
 }
 
-:is(.plot-angle, .plot-slice) input[type="range"]::-moz-range-thumb {
+:is(.plot-angle, .plot-slice, .precision-toolbar) input[type="range"]::-moz-range-thumb {
   width: 1rem;
   height: 1rem;
   border: 1px solid #c6e5ce;
@@ -557,13 +662,13 @@
   background: var(--accent);
 }
 
-:is(.plot-angle, .plot-slice) input[type="range"]::-webkit-slider-runnable-track {
+:is(.plot-angle, .plot-slice, .precision-toolbar) input[type="range"]::-webkit-slider-runnable-track {
   height: 0.35rem;
   border-radius: 999px;
   background: #31594e;
 }
 
-:is(.plot-angle, .plot-slice) input[type="range"]::-webkit-slider-thumb {
+:is(.plot-angle, .plot-slice, .precision-toolbar) input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 1rem;
   height: 1rem;
@@ -571,6 +676,19 @@
   border: 1px solid #c6e5ce;
   border-radius: 50%;
   background: var(--accent);
+}
+
+/* Keep the precision thumb geometry in step with native track-click hit testing. */
+.precision-toolbar input[type="range"]::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+}
+
+.precision-toolbar input[type="range"]::-webkit-slider-thumb {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
 }
 
 .plot-slice input[type="range"]::-moz-range-track {

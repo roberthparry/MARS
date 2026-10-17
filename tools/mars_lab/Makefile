@@ -7,7 +7,13 @@ ifeq ($(abspath $(firstword $(MAKEFILE_LIST))),$(abspath $(lastword $(MAKEFILE_L
 MARS_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../..)
 DEBUG ?= 0
 
-.PHONY: all test browser-test memtest run clean help check-wasm-deps wasm-asm
+.PHONY: all test browser-test memtest run clean help check-wasm-deps wasm-asm typescript typecheck
+typescript:
+	+$(MAKE) --no-print-directory -C "$(MARS_ROOT)" lab-typescript
+
+typecheck:
+	+$(MAKE) --no-print-directory -C "$(MARS_ROOT)" lab-typecheck
+
 check-wasm-deps:
 	+$(MAKE) --no-print-directory -C "$(MARS_ROOT)" DEBUG=$(DEBUG) check-lab-wasm-deps
 
@@ -51,6 +57,24 @@ LAB_TEST_SRCS := $(sort $(wildcard tools/mars_lab/tests/*.c))
 LAB_TEST_HEADERS := $(wildcard tools/mars_lab/tests/*.h)
 LAB_TEST_OBJS := $(patsubst tools/mars_lab/tests/%.c,$(LAB_BUILD_DIR)/tests/%.o,$(LAB_TEST_SRCS))
 LAB_TEST_BIN := $(LAB_BUILD_DIR)/tests/test_lab_native
+
+# Browser adapters are authored in strict TypeScript. TypeScript 7's native
+# compiler needs neither Node.js nor npm; callers may supply its absolute path.
+LAB_TSC ?= tsc
+LAB_TS_CONFIG := tools/mars_lab/tsconfig.json
+LAB_TEST_TS_CONFIG := tools/mars_lab/tsconfig.tests.json
+
+.PHONY: lab-typescript lab-test-typescript lab-typecheck
+lab-typescript:
+	@command -v "$(LAB_TSC)" >/dev/null 2>&1 || { \
+	    echo "MARS Lab requires the native TypeScript 7 compiler; set LAB_TSC=/path/to/tsc." >&2; exit 1; }
+	"$(LAB_TSC)" --project $(LAB_TS_CONFIG)
+
+lab-typecheck:
+	"$(LAB_TSC)" --project $(LAB_TEST_TS_CONFIG) --noEmit
+
+lab-test-typescript: lab-typescript
+	"$(LAB_TSC)" --project $(LAB_TEST_TS_CONFIG)
 
 LAB_WASM := $(LAB_BUILD_DIR)/wasm/lab_browser.wasm
 LAB_CODEC_WASM := $(LAB_BUILD_DIR)/wasm/lab_codec.wasm
@@ -138,7 +162,7 @@ $(LAB_BUILD_DIR)/%.o: tools/mars_lab/src/%.c tools/mars_lab/Makefile Makefile
 $(LAB_BUILD_DIR)/server/lab_server.o: CFLAGS += -DMARS_LAB_WASM_PATH='"$(abspath $(LAB_WASM))"'
 $(LAB_BUILD_DIR)/server/lab_server.o: CFLAGS += -DMARS_LAB_CODEC_PATH='"$(abspath $(LAB_CODEC_WASM))"'
 
-$(LAB_SERVER): $(LAB_OBJS) $(STATIC_LIB) $(LAB_WASM) $(LAB_CODEC_WASM)
+$(LAB_SERVER): $(LAB_OBJS) $(STATIC_LIB) $(LAB_WASM) $(LAB_CODEC_WASM) | lab-typescript
 	@mkdir -p $(dir $@)
 	$(CC) $(LDFLAGS) -o $@ $(LAB_OBJS) $(STATIC_LIB) $(LDLIBS)
 
@@ -161,7 +185,7 @@ $(LAB_BUILD_DIR)/tests/test_lab_browser: $(LAB_BROWSER_SRCS) tools/mars_lab/test
 
 .PHONY: lab-browser-test
 FIREFOX ?= firefox
-lab-browser-test: $(LAB_BUILD_DIR)/tests/test_lab_browser
+lab-browser-test: $(LAB_BUILD_DIR)/tests/test_lab_browser lab-test-typescript
 	TMPDIR="$(abspath $(LAB_BUILD_DIR))" MARS_LAB_BROWSER="$(FIREFOX)" $(LAB_BUILD_DIR)/tests/test_lab_browser
 
 clean-lab:

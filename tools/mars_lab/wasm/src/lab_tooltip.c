@@ -21,10 +21,9 @@ static const struct {
                           {"goalSeek", "Find a variable value that reaches the requested target"},
                           {"help", "Show or hide help for the current mode"},
                           {"inputCopy", "Copy the current input"},
-                          {"lessPrecision", "Calculate and display fewer significant digits"},
                           {"marsDatePickerClose", "Close the date picker"},
                           {"marsDatePickerToday", "Use the current date"},
-                          {"morePrecision", "Calculate and display more significant digits"},
+                          {"precisionSlider", "Choose calculation precision; release to recalculate"},
                           {"resultUseInput", "Put this result into the current mode as a new input"},
                           {"run", "Evaluate the current input"}};
 

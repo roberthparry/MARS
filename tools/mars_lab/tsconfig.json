@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ES2022",
+        "moduleResolution": "bundler",
+        "moduleDetection": "legacy",
+        "lib": ["ES2024", "DOM", "DOM.Iterable"],
+        "strict": true,
+        "noImplicitReturns": true,
+        "noImplicitOverride": true,
+        "noFallthroughCasesInSwitch": true,
+        "noEmitOnError": true,
+        "forceConsistentCasingInFileNames": true,
+        "useDefineForClassFields": true,
+        "rootDir": "typescript",
+        "outDir": "build/typescript",
+        "newLine": "lf"
+    },
+    "include": ["typescript/**/*.ts"]
+}

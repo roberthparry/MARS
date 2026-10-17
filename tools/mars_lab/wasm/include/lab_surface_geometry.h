@@ -4,6 +4,8 @@
  *
  * The browser executes the returned drawing plans without interpreting
  * coordinates. Absolute mathematical bounds remain in native MARS.
+ * Segment previews clip only the selected input interval; accepted refinements
+ * use fresh native units and a centred sphere fit without camera magnification.
  */
 #ifndef MARS_LAB_SURFACE_GEOMETRY_H
 #define MARS_LAB_SURFACE_GEOMETRY_H

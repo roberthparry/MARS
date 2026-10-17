@@ -336,14 +336,16 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
         printf("error       Select a variable to plot.\n");
         return 1;
     }
-    if (strcmp(kind, "auto") && strcmp(kind, "curve") && strcmp(kind, "surface")) {
+    bool force_complex = !strcmp(kind, "complex_curve");
+    bool curve = force_complex || !strcmp(kind, "curve");
+    if (strcmp(kind, "auto") && !curve && strcmp(kind, "surface")) {
         printf("error       Select Automatic, 2-D curve or 3-D surface.\n");
         return 1;
     }
     const expr_t *second = NULL;
     const expr_t *requested_binding = *requested ? expr_bindings_get(bindings, requested) : NULL;
     size_t candidates = 0;
-    if (strcmp(kind, "curve") && variable) {
+    if (!curve && variable) {
         for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
             expr_t *binding = expr_bindings_expr_at(bindings, i);
             const char *name = expr_symbol_name(binding);
@@ -359,7 +361,7 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
             }
         }
     }
-    if (strcmp(kind, "curve") && ((!strcmp(kind, "surface") || *requested) && !candidates)) {
+    if (!curve && ((!strcmp(kind, "surface") || *requested) && !candidates)) {
         printf("error       Select a distinct second variable for the surface; bind any remaining parameters.\n");
         return 1;
     }
@@ -369,7 +371,7 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
             plane_bounds[i] = argv[20 + i];
         return lab_worker_plot(source, expression, variable, argc > 5 ? argv[5] : "", argc > 6 ? argv[6] : "",
                                 argc > 7 ? argv[7] : "auto", argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "",
-                                plane_bounds, !strcmp(quality, "preview"));
+                                plane_bounds, !strcmp(quality, "preview"), force_complex);
     }
     /* At most count + 1 candidates can be occupied; each lookup uses the native binding index. */
     char name[64] = "u";

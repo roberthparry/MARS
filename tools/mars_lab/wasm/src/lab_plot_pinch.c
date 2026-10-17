@@ -3,9 +3,10 @@
  * @brief Two-finger curve-range zoom and retained surface-camera gesture state.
  *
  * Curve zoom follows the touch midpoint and edits sampling ranges. Surface gestures
- * retain their initial midpoint and separation for local camera magnification;
- * they never edit sampling bounds. The drag controller coalesces updates and owns
- * completion, while cancellation restores either curve controls or camera state.
+ * retain their initial midpoint and separation for native volume zoom, including
+ * input-only refinement of space curves. The drag controller coalesces updates
+ * and owns completion. Cancellation restores curve controls or delegates full
+ * retained-volume restoration to the native surface zoom policy.
  */
 #include "lab_dom.h"
 #include "lab_plot_controls.h"
@@ -94,6 +95,7 @@ int lab_plot_pinch_start(int state, int event)
     lab_dom_set(state, "pinchAnchorY", lab_dom_numeric((y + value(state, "touchY")) / 2));
     lab_dom_delete(state, "surfaceCamera");
     lab_dom_delete(state, "surfaceExponent");
+    lab_dom_delete(state, "surfaceZoomSnapshot");
     lab_dom_delete(state, "pinchCancelled");
     lab_dom_set(state, "secondId", lab_dom_get(event, "pointerId"));
     lab_dom_set(state, "secondX", lab_dom_numeric(x));

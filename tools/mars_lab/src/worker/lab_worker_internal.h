@@ -153,17 +153,19 @@ int lab_worker_distribution_plot(const char *source, const expr_t *expression, c
                                  const char *lower, const char *upper, const char *scale,
                                  const char *y_lower, const char *y_upper, bool preview);
 
-/** @brief Try four projections with independent component and Argand bounds; return -1 for real-only output.
+/** @brief Try four projections with independent component and Argand bounds; Auto returns -1 for real-only output.
  * @param plane_bounds Four borrowed real/imaginary bound strings, or NULL for automatic Argand bounds.
+ * @param force_complex Retain the complex views during targeted refinement, including wholly real subsets.
  */
 int lab_worker_complex_plot(const char *source, const expr_t *expression, const expr_t *variable,
                              const char *lower, const char *upper, const char *scale,
-                             const char *y_lower, const char *y_upper, const char *const plane_bounds[4], bool preview);
+                             const char *y_lower, const char *y_upper, const char *const plane_bounds[4], bool preview,
+                             bool force_complex);
 
-/** @brief Emit native real, complex or distribution plots for one selected variable and mathematical bound texts. */
+/** @brief Emit native plots for one variable; force_complex preserves complex views during targeted refinement. */
 int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
                     const char *scale, const char *y_lower, const char *y_upper,
-                    const char *const plane_bounds[4], bool preview);
+                    const char *const plane_bounds[4], bool preview, bool force_complex);
 
 /**
  * @brief Formats a numerical card value with decimal or Unicode power-of-ten notation.

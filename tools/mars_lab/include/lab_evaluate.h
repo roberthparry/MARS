@@ -20,7 +20,7 @@
  *
  * Accepts /eval, /equation-eval, /diffequation-eval, /matrix-eval,
  * /integrator-eval, /function-run, /goal_seek and /render_TeX. Inputs are
- * bounded to 64 KiB per string, precision to 17–315653 decimal digits (10000
+ * bounded to 64 KiB per string, precision to 17–78914 decimal digits (10000
  * for Ophelia, which has that native limit), and
  * worker output to 4 MiB. Workers have individual bounded execution times.
  * Unknown routes return NULL without changing status, permitting dispatch to

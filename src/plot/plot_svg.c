@@ -227,7 +227,7 @@ static bool axes(svg_view_t *view, const plot_t *plot)
             ok = ok && label && normalise(ticks[i], view->bounds[2 * axis], view->spans[axis], &position);
             if (ok)
                 ok = string_append_format(view->out,
-                    "<g data-plot-pan-axis=\"%u\" data-plot-pan-position=\"%.3f\">", axis,
+                    "<g data-plot-pan-axis=\"%u\" data-plot-pan-position=\"%.3f\" stroke-dasharray=\"5 4\">", axis,
                     axis ? view->top + (1 - position) * view->height : view->left + position * view->width) >= 0;
             ok = ok &&
                  plot_tick_text(view->out, &labels, label, axis,

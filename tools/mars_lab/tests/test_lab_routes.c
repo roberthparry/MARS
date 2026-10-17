@@ -281,11 +281,12 @@ static bool route_contracts(const char *directory)
     response = route_request(HTTP_GET, "/js/evaluation.js", NULL, NULL, NULL, NULL);
     ok = response && http_response_status(response) == 404 && ok;
     http_response_free(response);
-    static const char *const scripts[] = {"api", "app", "bindings", "locations", "results", "state", "surface",
-                                         "surface_camera", "surface_export", "surface_volume", "workspace"};
+    static const char *const scripts[] = {"codec", "codec_types", "jobs", "codec_worker", "transport",
+                                         "api", "app", "bindings", "locations", "results", "state", "surface",
+                                         "surface_camera", "surface_export", "surface_hover", "surface_volume", "workspace", "workspace_native"};
     for (size_t i = 0; i < sizeof scripts / sizeof *scripts; ++i) {
         string_t *url = string_sprintf("/js/%s.js", scripts[i]);
-        string_t *path = string_sprintf("tools/mars_lab/assets/js/%s.js", scripts[i]);
+        string_t *path = string_sprintf("tools/mars_lab/build/typescript/%s.js", scripts[i]);
         file_t *file = path ? file_new(path) : NULL;
         string_t *expected = file ? file_read_all_text(file) : NULL;
         response = url ? route_request(HTTP_GET, string_c_str(url), NULL, NULL, NULL, NULL) : NULL;

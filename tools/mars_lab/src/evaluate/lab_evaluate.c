@@ -406,10 +406,10 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
     unsigned precision = 96u;
     bool function = !strcmp(entry->mode, "function");
     if (!lab_eval_unsigned_member(payload, "precision", !strcmp(entry->mode, "function") ? 50u : 96u, 17u,
-                                  function ? 10000u : 315653u, &precision))
+                                  function ? 10000u : 78914u, &precision))
         return lab_eval_failure(status, 400u,
                                 function ? "Function precision must be an integer from 17 to 10000 decimal digits"
-                                         : "Precision must be an integer from 17 to 315653 decimal digits");
+                                         : "Precision must be an integer from 17 to 78914 decimal digits");
     if (function)
         return lab_eval_function_run(input, precision, status);
 

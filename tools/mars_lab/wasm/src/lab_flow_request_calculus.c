@@ -169,6 +169,9 @@ static int lab_flow_request_calculus_status(struct lab_flow_request_calculus_con
 
 static int lab_flow_request_calculus_fetch(struct lab_flow_request_calculus_context *ctx)
 {
+    /* Representation belongs to this refinement request, never the shared Auto control. */
+    if (ctx->plot && lab_dom_equal(lab_dom_get(ctx->frame, "plotKind"), lab_dom_string("complex_curve")))
+        lab_dom_set(ctx->request, "plotKind", lab_dom_string("complex_curve"));
     if (ctx->matrix && !ctx->scalar) {
         int payload = lab_dom_object(5);
         lab_dom_set(payload, "action", lab_dom_string("editor"));

@@ -673,6 +673,110 @@ static void test_lab_extra_complex_plot(void)
     TEST_ASSERT_TRUE(ok, "partial Argand viewport bounds are rejected rather than silently changing the sample");
 }
 
+static void test_lab_extra_complex_real_subset(void)
+{
+    const char *sources[] = {"ln(-x)", "x"};
+    const char *qualities[] = {"preview", "full"};
+    for (unsigned i = 0; i < 2; ++i) {
+        for (unsigned q = 0; q < 2; ++q) {
+            unsigned status = 0;
+            string_t *payload = string_sprintf("{\"expression\":\"%s\",\"action\":\"plot\",\"wrt\":\"x\","
+                "\"plot_kind\":\"complex_curve\",\"plot_lower\":\"-10\",\"plot_upper\":\"-1\","
+                "\"plot_quality\":\"%s\"}", sources[i], qualities[q]);
+            json_t *fields = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+            string_free(payload);
+            bool ok = status == 200 && contains(fields, "plot_svg", "data-segments=\"true\"") &&
+                contains(fields, "plot_svg", "data-segment=\"") &&
+                contains(fields, "plot_complex_plane", "data-series=\"0\"") &&
+                contains(fields, "plot_components", "Imaginary") &&
+                contains(fields, "plot_amplitude", "data-series=\"0\"");
+            if (!ok)
+                show_failure(fields);
+            json_free(fields);
+            TEST_ASSERT_TRUE(ok, "targeted complex refinement retains all views on wholly real subsets");
+        }
+        unsigned status = 0;
+        string_t *payload = string_sprintf("{\"expression\":\"%s\",\"action\":\"plot\",\"wrt\":\"x\","
+            "\"plot_kind\":\"auto\",\"plot_lower\":\"-10\",\"plot_upper\":\"-1\"}", sources[i]);
+        json_t *fields = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        string_free(payload);
+        bool ok = status == 200 && contains(fields, "plot_svg", "<svg") &&
+                  !contains(fields, "plot_svg", "data-segments=\"true\"") &&
+                  !contains(fields, "plot_complex_plane", "<svg");
+        if (!ok)
+            show_failure(fields);
+        json_free(fields);
+        TEST_ASSERT_TRUE(ok, "automatic real-only plotting still selects the ordinary real representation");
+    }
+}
+
+/* Inspect only data-series paths: the zero axis is allowed to cross a domain gap. */
+static bool complex_series_gap(const char *svg, unsigned index, double singularity)
+{
+    if (!svg)
+        return false;
+    const char *names[] = {"data-plot-left=\"", "data-plot-width=\"", "data-x-min=\"", "data-x-max=\""};
+    double frame[4];
+    for (unsigned i = 0; i < 4; ++i) {
+        const char *attribute = strstr(svg, names[i]);
+        if (!attribute)
+            return false;
+        char *end = NULL;
+        frame[i] = strtod(attribute + strlen(names[i]), &end);
+        if (!end || *end != '"' || !isfinite(frame[i]))
+            return false;
+    }
+    if (!(frame[1] > 0) || !(frame[3] > frame[2]))
+        return false;
+    double gap = frame[0] + frame[1] * (singularity - frame[2]) / (frame[3] - frame[2]);
+    string_t *marker = string_sprintf("<g data-series=\"%u\"", index);
+    const char *series = marker ? strstr(svg, string_c_str(marker)) : NULL;
+    string_free(marker);
+    const char *end = series ? strstr(series, "</g>") : NULL;
+    bool left = false, right = false;
+    if (!end)
+        return false;
+    /* Every path in this bounded group is one native clipped line segment. */
+    for (const char *path = strstr(series, "<path "); path && path < end; path = strstr(path + 1, "<path ")) {
+        double x1, y1, x2, y2;
+        if (sscanf(path, "<path d=\"M %lf %lf L %lf %lf", &x1, &y1, &x2, &y2) != 4 ||
+            !isfinite(x1) || !isfinite(y1) || !isfinite(x2) || !isfinite(y2))
+            return false;
+        /* Account for the renderer's three-decimal coordinate rounding. */
+        if (fmin(x1, x2) < gap - 0.001 && fmax(x1, x2) > gap + 0.001)
+            return false;
+        left |= fmax(x1, x2) < gap - 0.001;
+        right |= fmin(x1, x2) > gap + 0.001;
+    }
+    return left && right;
+}
+
+static void test_lab_extra_complex_domain_gaps(void)
+{
+    const char *sources[] = {"ln(-x)", "ln(-2*x)", "ln(1/3-x)"};
+    const double singularities[] = {0, 0, 1.0 / 3};
+    const char *qualities[] = {"preview", "full"};
+    for (unsigned i = 0; i < 3; ++i) {
+        for (unsigned q = 0; q < 2; ++q) {
+            string_t *payload = string_sprintf("{\"expression\":\"%s\",\"action\":\"plot\",\"wrt\":\"x\","
+                "\"plot_lower\":\"-10\",\"plot_upper\":\"10\",\"plot_quality\":\"%s\"}", sources[i], qualities[q]);
+            unsigned status = 0;
+            json_t *fields = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+            string_free(payload);
+            bool ok = status == 200 &&
+                complex_series_gap(lab_eval_text(fields, "plot_components"), 0, singularities[i]) &&
+                complex_series_gap(lab_eval_text(fields, "plot_components"), 1, singularities[i]) &&
+                complex_series_gap(lab_eval_text(fields, "plot_amplitude"), 0, singularities[i]) &&
+                contains(fields, "plot_components", "data-plot-axes=\"true\"") &&
+                contains(fields, "plot_components", "stroke-dasharray=\"5 4\"");
+            if (!ok)
+                show_failure(fields);
+            json_free(fields);
+            TEST_ASSERT_TRUE(ok, "complex components and amplitude retain domain gaps independently of axes");
+        }
+    }
+}
+
 static void test_lab_extra_distribution_plot(void)
 {
     const char *sources[] = {"@F{step(t)}", "@F{acos(sin(pi-x))}", "@F{step(x)}"};
@@ -2463,6 +2567,8 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_folded_laplace_plot, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_distribution_plot, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_complex_plot, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_complex_domain_gaps, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_complex_real_subset, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_height, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_names, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_ranges, tests, NULL);

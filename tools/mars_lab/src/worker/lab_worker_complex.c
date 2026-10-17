@@ -6,6 +6,8 @@
  * components and amplitude. Parameter values and coordinates remain number_t
  * values until the plot renderer normalises them. Domain breaks are retained
  * in every projection. Distributions are handled separately, never sampled here.
+ * Targeted curve refinement may retain all four views for wholly real subsets;
+ * ordinary automatic plotting still delegates real-only output to the real plotter.
  */
 #include <errno.h>
 #include <stdlib.h>
@@ -57,10 +59,11 @@ static plot_t *scene(const char *x, const char *y, const char *z, bool equal)
     return plot_new(&options);
 }
 
-/* Return -1 for a real-only sample so its established real plotting policy remains in charge. */
+/* Auto delegates real-only samples; targeted refinement retains the existing complex representation. */
 int lab_worker_complex_plot(const char *source, const expr_t *expression, const expr_t *variable,
                              const char *lower, const char *upper, const char *scale,
-                             const char *y_lower, const char *y_upper, const char *const plane_bounds[4], bool preview)
+                             const char *y_lower, const char *y_upper, const char *const plane_bounds[4], bool preview,
+                             bool force_complex)
 {
     NUM_SCOPE(numbers);
     /* The input axis is real; prove ordinary real output before doing any extra sampling. */
@@ -68,11 +71,11 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
     bool real = assumptions && expr_context_set(assumptions, variable, EXPR_CONTEXT_FREE, EXPR_CONTEXT_REAL, NUM_NAN) &&
                 expr_context_proves(assumptions, expression, EXPR_CONTEXT_REAL);
     expr_context_free(assumptions);
-    if (real)
+    if (real && !force_complex)
         return -1;
     number_t lo = NUM_NAN, hi = NUM_NAN;
     if (!lab_worker_plot_bounds(*lower ? lower : "-10", *upper ? upper : "10", &lo, &hi))
-        return -1;
+        return force_complex ? lab_worker_plot_output(source, expression, NULL, errno, NULL, NULL, NULL) : -1;
     complex_sample_t context = {expression, variable, false};
     sampler_options_t options = sampler_options_default();
     options.intervals = preview ? 32 : 64;
@@ -82,10 +85,11 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
     if (required > saved)
         num_set_default_prec_bits(required);
     sampler_t *samples = sampler_new(complex_value, &context, lo, hi, &options);
-    if (!samples || !context.complex) {
+    if (!samples || (!context.complex && !force_complex)) {
         sampler_free(samples);
         num_set_default_prec_bits(saved);
-        return context.complex ? lab_worker_plot_output(source, expression, NULL, errno, NULL, NULL, NULL) : -1;
+        return context.complex || force_complex ?
+            lab_worker_plot_output(source, expression, NULL, errno, NULL, NULL, NULL) : -1;
     }
     size_t count = sampler_count(samples), segments = 0;
     plot_point_t *points = calloc(count * 4, sizeof(*points));

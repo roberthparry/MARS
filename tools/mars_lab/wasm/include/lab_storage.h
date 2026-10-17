@@ -23,7 +23,7 @@
 /**
  * @brief Normalise a saved precision using decimal-prefix conversion and native limits.
  * @param values Scoped two-item array containing the saved value and numeric fallback.
- * @return Parsed precision clamped to 17..1048576 bits, or the fallback when parsing is non-finite.
+ * @return Parsed precision clamped to 17..262144 bits, or the fallback when parsing is non-finite.
  */
 double lab_storage_precision(int values);
 

@@ -48,7 +48,7 @@ int lab_workspace_select(unsigned mode);
 /** @brief Return a mode's initial precision in bits. */
 unsigned lab_workspace_default_precision(unsigned mode);
 
-/** @brief Store finite saved bit precision, clamped to 17..1048576, retaining the old value for non-finite input. */
+/** @brief Store finite saved bit precision, clamped to 53..262144, retaining the old value for non-finite input. */
 unsigned lab_workspace_precision_set(unsigned mode, double bits);
 
 /** @brief Return a mode's stored bit precision, preserving the legacy 17-bit saved-value minimum. */
@@ -57,7 +57,7 @@ unsigned lab_workspace_precision(unsigned mode);
 /** @brief Return requested precision with the binary64 minimum of 53 bits, without changing saved state. */
 unsigned lab_workspace_requested_precision(unsigned mode);
 
-/** @brief Apply a user precision request with the binary64 minimum, retaining state for non-finite input. */
+/** @brief Apply a user precision request within 53..262144 bits, retaining state for non-finite input. */
 unsigned lab_workspace_request_precision(unsigned mode, double bits);
 
 /** @brief Return significant decimal digits for a bit precision, including the binary64 17-digit policy. */
@@ -65,6 +65,12 @@ unsigned lab_workspace_digits(double bits);
 
 /** @brief Return the next or previous precision step; positive direction means increase. */
 unsigned lab_workspace_precision_step(double bits, int direction);
+
+/** @brief Map positions 0..103 to 53, 106, 192, then 64-bit steps through 6656 bits. */
+unsigned lab_workspace_precision_slider_bits(double position);
+
+/** @brief Find the nearest slider position without changing an arbitrary saved precision. */
+unsigned lab_workspace_precision_slider_position(unsigned bits);
 
 /** @brief Report whether precision can increase (positive direction) or decrease at the current request setting. */
 int lab_workspace_precision_can_step(unsigned mode, int direction);

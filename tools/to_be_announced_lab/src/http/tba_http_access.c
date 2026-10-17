@@ -2,13 +2,13 @@
  * @file tba_http_access.c
  * @brief Private-network peer, Host and Origin checks for forecasting routes.
  *
- * Uses the same access policy as native MARS Lab. Forwarded addresses never
+ * Applies the private Lab's native access policy. Forwarded addresses never
  * replace the actual socket peer. Tailscale checks are read-only and fail closed.
  */
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#include "lab_mobile.h"
+#include "tba_mobile.h"
 #include "tba_http.h"
 
 static bool tba_http_equal(const string_t *text, const char *literal)
@@ -90,7 +90,7 @@ static bool tba_http_allowed_host(const string_t *host)
         string_free(mdns);
     }
     if (!local)
-        local = lab_mobile_host_allowed(host);
+        local = tba_mobile_host_allowed(host);
     string_free(name);
     return local;
 }

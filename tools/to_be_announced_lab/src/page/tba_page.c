@@ -3,7 +3,7 @@
  * @brief Safe initial HTML and client-configuration assembly.
  *
  * Native metadata populates workbench controls. Bootstrap configuration uses the
- * shared version-one Protobuf envelope (tools/mars_lab/proto/lab.proto), base64
+ * local version-one Protobuf envelope (proto/tba.proto), base64
  * encoded for safe HTML embedding, without a JSON fallback. Other external strings
  * are escaped before insertion; the template engine consumes only original text.
  */
@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "lab_wire.h"
+#include "tba_wire.h"
 #include "tba_forecast.h"
 #include "tba_page.h"
 #include "tba_series.h"
@@ -73,7 +73,7 @@ static bool tba_page_owned(json_t *values, const char *key, string_t *text)
 
 static string_t *tba_page_bootstrap(const json_t *config)
 {
-    array_t *bytes = lab_wire_encode(config);
+    array_t *bytes = tba_wire_encode(config);
     size_t size = bytes ? array_size(bytes) : 0;
     size_t capacity = sodium_base64_ENCODED_LEN(size, sodium_base64_VARIANT_ORIGINAL);
     char *encoded = bytes ? malloc(capacity) : NULL;

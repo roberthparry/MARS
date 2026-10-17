@@ -45,6 +45,84 @@ static void test_plot_segments(void)
     TEST_ASSERT_TRUE(ok, "native space curves copy segment pairs atomically and render lines rather than facets");
 }
 
+/* Reproduce the retained camera's 100% sphere fit, not a fit to visible curve extents. */
+static void segment_camera_point(const plot_options_t *options, const double units[3], double fit,
+                                 const double angles[3], const double point[3], double out[2])
+{
+    double radians = acos(-1) / 180, a = angles[0] * radians, e = angles[1] * radians, r = angles[2] * radians;
+    double u = (point[0] - 0.5) * units[0], v = (point[1] - 0.5) * units[1];
+    double z = (point[2] - 0.5) * units[2];
+    double x = cos(a) * u - sin(a) * v;
+    double y = -sin(e) * (sin(a) * u + cos(a) * v) - cos(e) * z;
+    out[0] = options->width * 0.5 + fit * (cos(r) * x - sin(r) * y);
+    out[1] = options->height * 0.5 + fit * (sin(r) * x + cos(r) * y);
+}
+
+static void test_plot_segment_camera_baseline(void)
+{
+    plot_options_t options = plot_options_default();
+    options.width = 560;
+    options.height = 420;
+    const number_t x[] = {NUM_NEG_ONE, NUM_ZERO, NUM_ZERO, NUM_ONE};
+    const number_t y[] = {NUM_ZERO, NUM_ONE, NUM_ONE, NUM_ZERO};
+    const number_t z[] = {NUM_ONE, NUM_ZERO, NUM_ZERO, NUM_NEG_ONE};
+    const double angles[][3] = {{35, 30, 0}, {122, 28, 45}, {258, 15, 344}};
+    plot_t *plot = plot_new(&options);
+    bool ok = plot && plot_set_segments(plot, x, y, z, 4);
+    for (unsigned rotation = 0; ok && rotation < 3; ++rotation) {
+        ok = plot_set_view(plot, angles[rotation][0], angles[rotation][1]) &&
+             plot_set_roll(plot, angles[rotation][2]);
+        string_t *svg = ok ? plot_to_svg(plot) : NULL;
+        const char *text = svg ? string_c_str(svg) : "";
+        const char *metadata = strstr(text, "data-units=\"");
+        const char *label = strstr(text, "data-label-width=\"");
+        double units[3], label_width;
+        ok = metadata && label && sscanf(metadata, "data-units=\"%lf %lf %lf", units, units + 1, units + 2) == 3 &&
+             sscanf(label, "data-label-width=\"%lf", &label_width) == 1;
+        if (ok) {
+            double margin = fmin(fmax(45, label_width + 25), (options.width - 80) / 2.0);
+            double fit = fmin(options.width - 2 * margin, options.height - 100) /
+                         sqrt(units[0] * units[0] + units[1] * units[1] + units[2] * units[2]);
+            unsigned segments = 0, ticks = 0;
+            for (const char *path = strstr(text, "d=\"M "); ok && path; path = strstr(path + 1, "d=\"M ")) {
+                double drawn[4], points[6];
+                if (sscanf(path, "d=\"M %lf %lf L %lf %lf\" data-segment=\"%lf %lf %lf %lf %lf %lf",
+                           drawn, drawn + 1, drawn + 2, drawn + 3,
+                           points, points + 1, points + 2, points + 3, points + 4, points + 5) != 10)
+                    continue;
+                ++segments;
+                for (unsigned end = 0; end < 2; ++end) {
+                    double expected[2];
+                    segment_camera_point(&options, units, fit, angles[rotation], points + 3 * end, expected);
+                    ok = fabs(drawn[2 * end] - expected[0]) < 0.001 &&
+                         fabs(drawn[2 * end + 1] - expected[1]) < 0.001 && ok;
+                }
+            }
+            for (const char *tick = strstr(text, "<g data-plot-tick="); ok && tick;
+                 tick = strstr(tick + 1, "<g data-plot-tick=")) {
+                unsigned axis;
+                double fraction, drawn[2], expected[2];
+                const char *path = strstr(tick, "<path d=\"M ");
+                ok = sscanf(tick, "<g data-plot-tick=\"%u\" data-tick-fraction=\"%lf", &axis, &fraction) == 2 &&
+                     axis < 3 && path && sscanf(path, "<path d=\"M %lf %lf", drawn, drawn + 1) == 2;
+                if (!ok)
+                    break;
+                double a = angles[rotation][0] * acos(-1) / 180;
+                double point[] = {sin(a) < 0, cos(a) < 0, 0};
+                if (axis == 2) { point[0] = cos(a) < 0; point[1] = sin(a) >= 0; }
+                point[axis] = fraction;
+                segment_camera_point(&options, units, fit, angles[rotation], point, expected);
+                ok = fabs(drawn[0] - expected[0]) < 0.001 && fabs(drawn[1] - expected[1]) < 0.001;
+                ++ticks;
+            }
+            ok = ok && segments == 2 && ticks > 0;
+        }
+        string_free(svg);
+    }
+    plot_free(plot);
+    TEST_ASSERT_TRUE(ok, "segment SVG vertices and axis ticks share the retained camera's centred sphere fit");
+}
+
 static void test_plot_impulses(void)
 {
     plot_options_t options = plot_options_default();
@@ -1013,6 +1091,7 @@ int tests_main(void)
 {
     TEST_RUN_CASE(test_plot_impulses, NULL);
     TEST_RUN_CASE(test_plot_segments, NULL);
+    TEST_RUN_CASE(test_plot_segment_camera_baseline, NULL);
     TEST_RUN_CASE(test_plot_svg, NULL);
     TEST_RUN_CASE(test_plot_edge_axes, NULL);
     TEST_RUN_CASE(test_plot_escaping, NULL);

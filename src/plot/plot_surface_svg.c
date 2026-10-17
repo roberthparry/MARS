@@ -6,7 +6,9 @@
  * Missing vertices leave holes. Finite heights are joined regardless of slope;
  * callers with an evaluator must sample domain gaps before supplying the mesh.
  * The equal-unit camera determines projection, facet order and the exposed axes
- * for both height grids and meshes. Each render
+ * for both height grids and meshes. Space curves use a fixed enclosing-sphere
+ * fit centred on their normalised box, matching the retained interactive camera.
+ * Each render
  * is an independent bounded SVG, with no GPU or files.
  */
 #include <errno.h>
@@ -215,6 +217,18 @@ static void include_extent(double extent[4], vertex_t at)
 
 static void fit_camera(const plot_t *plot, camera_t *view, double extent[4], double label_width)
 {
+    if (plot->segments) {
+        /* Match the retained segment camera without fitting visible branches or axes.
+         * The fixed sphere keeps the baseline scale invariant under rotation. */
+        double margin = fmin(fmax(45, label_width + 25), (plot->options.width - 80) / 2.0);
+        double diameter = sqrt(view->units[0] * view->units[0] + view->units[1] * view->units[1] +
+                               view->units[2] * view->units[2]);
+        view->scale_x = view->scale_y =
+            fmin(plot->options.width - 2 * margin, plot->options.height - 100) / diameter;
+        view->cx = plot->options.width * 0.5;
+        view->cy = plot->options.height * 0.5;
+        return;
+    }
     for (unsigned axis = 0; axis < 3; ++axis) {
         include_extent(extent, axis_vertex(view, axis, 0));
         include_extent(extent, axis_vertex(view, axis, 1));
@@ -259,7 +273,8 @@ static bool axes(string_t *svg, const plot_t *plot, const camera_t *view, number
         double dx = (b.x - a.x) / length, dy = (b.y - a.y) / length;
         int anchor = dx < -0.1 ? -1 : dx > 0.1;
         ok = string_append_format(svg, "<g data-axis-name=\"%u\">", axis) >= 0 &&
-             plot_tick_text(svg, &labels, names[axis], axis + 3, b.x + dx * 25, b.y + dy * 25 + 4,
+             plot_tick_text(svg, &labels, names[axis], axis + 3,
+                            b.x + dx * (plot->segments ? 26 : 25), b.y + dy * (plot->segments ? 26 : 25) + 4,
                             anchor, dx, dy) && string_append_cstr(svg, "</g>") == 0;
     }
     for (unsigned axis = 0; ok && axis < 3; ++axis) {

@@ -39,7 +39,7 @@ static file_t *lab_browser_file(const char *directory, const char *name)
 static bool lab_browser_prepare(const char *directory)
 {
     file_t *source = file_new_cstr("tools/mars_lab/assets/index.html");
-    file_t *checks = file_new_cstr("tools/mars_lab/tests/browser/checks.js");
+    file_t *checks = file_new_cstr("tools/mars_lab/build/typescript_checks/tests/browser/checks.js");
     file_t *page = lab_browser_file(directory, "index.html");
     string_t *html = source ? file_read_all_text(source) : NULL;
     string_t *script = checks ? file_read_all_text(checks) : NULL;
@@ -63,9 +63,10 @@ static bool lab_browser_prepare(const char *directory)
                                           "binding_flow_checks.js",   "location_flow_checks.js",
                                           "request_flow_checks.js",   "state_flow_checks.js",
                                           "transport_flow_checks.js", "editor_checks.js",
-                                          "worker_checks.js",         "mobile_layout_checks.js"};
+                                          "worker_checks.js",         "mobile_layout_checks.js",
+                                          "surface_hover_checks.js"};
     for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {
-        file_t *module = lab_browser_file("tools/mars_lab/tests/browser", modules[i]);
+        file_t *module = lab_browser_file("tools/mars_lab/build/typescript_checks/tests/browser", modules[i]);
         string_t *text = module ? file_read_all_text(module) : NULL;
         bool ok = text && !string_append_char(script, '\n') && !string_append_cstr(script, string_c_str(text));
         string_free(text);
@@ -165,7 +166,7 @@ static bool lab_browser_run(const char *directory)
             break;
         }
         clock_gettime(CLOCK_MONOTONIC, &now);
-        if (now.tv_sec - start.tv_sec > 240)
+        if (now.tv_sec - start.tv_sec > 360)
             break;
         struct timespec pause = {.tv_nsec = 100000000};
         nanosleep(&pause, NULL);

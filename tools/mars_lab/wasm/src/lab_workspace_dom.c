@@ -19,6 +19,7 @@
 #include "lab_view.h"
 #include "lab_workspace.h"
 #include "lab_workspace_dom.h"
+#include "lab_precision.h"
 
 /* Resolve the fixed control catalogue once; browser values outlive only their scoped integer handles. */
 void lab_workspace_dom_references(void)
@@ -75,8 +76,8 @@ void lab_workspace_dom_references(void)
         {"clear", "clear", 0},
         {"targetRow", "targetRow", 0},
         {"goalTarget", "goalTarget", 0},
-        {"lessPrecision", "lessPrecision", 0},
-        {"morePrecision", "morePrecision", 0},
+        {"precisionSlider", "precisionSlider", 0},
+        {"precisionValue", "precisionValue", 0},
         {"derivativeButtons", "derivativeButtons", 0},
         {"variableValues", "variableValues", 0},
         {"mobileAccess", "mobileAccess", 0},
@@ -235,6 +236,7 @@ void lab_workspace_dom_value(int visible)
 /* Project native mode policy and labels; supplied coverage text remains opaque catalogue data. */
 void lab_workspace_dom_mode(unsigned mode, int coverage)
 {
+    lab_precision_close(0);
     if (mode >= 7)
         mode = 0;
     static const char *const panels[] = {"",
@@ -341,19 +343,43 @@ void lab_workspace_dom_target(int visible)
     }
 }
 
-/* Project the native availability mask and the two explanatory disabled titles. */
+/* Preview without assigning value: range inputs must retain their native pending change event. */
+void lab_workspace_dom_precision_preview(unsigned bits)
+{
+    int slider = lab_dom_query(0, "#precisionSlider");
+    int digits = lab_dom_format(lab_workspace_digits(bits), bits > 6656 ? "Custom: " : "", " digits");
+    int description = lab_dom_join(digits, lab_dom_format(bits, " / ", " bits"), "");
+    lab_dom_write(slider, 2, "aria-valuetext", description);
+    lab_dom_write(slider, 2, "title", description);
+    lab_dom_write(lab_dom_query(0, "#precisionValue"), 0, "", digits);
+}
+
+/* Refresh the range position only outside an active input preview. */
+void lab_workspace_dom_precision_slider(unsigned bits)
+{
+    int slider = lab_dom_query(0, "#precisionSlider");
+    lab_dom_write(slider, 2, "min", lab_dom_string("0"));
+    lab_dom_write(slider, 2, "max", lab_dom_string("103"));
+    lab_dom_write(slider, 2, "step", lab_dom_string("1"));
+    lab_dom_write(slider, 5, "", lab_dom_text(lab_dom_numeric(lab_workspace_precision_slider_position(bits))));
+    lab_workspace_dom_precision_preview(bits);
+}
+
+/* Project native availability and refresh the slider from this mode's saved precision. */
 void lab_workspace_dom_controls(unsigned mode, int busy, int ready, unsigned back, unsigned forward, int goal,
                                 int minimum, int maximum)
 {
     unsigned enabled = lab_view_controls(mode, busy, ready, back, forward, goal, minimum, maximum);
-    static const char *const selectors[] = {"#run",      "#back",          "#forward",
-                                            "#goalSeek", "#lessPrecision", "#morePrecision"};
+    static const char *const selectors[] = {"#run", "#back", "#forward", "#goalSeek"};
     for (unsigned i = 0; i < sizeof selectors / sizeof *selectors; ++i)
         lab_dom_disabled(lab_dom_query(0, selectors[i]), !(enabled & (1u << i)));
     lab_workspace_dom_text(lab_dom_query(0, "#goalSeek"), 2, "title",
                            !(enabled & 8) && !busy && mode == 0 ? "Goal seek needs at least one variable binding" : "");
-    lab_workspace_dom_text(lab_dom_query(0, "#morePrecision"), 2, "title",
-                           !(enabled & 32) && !busy ? "Already at the current maximum precision setting" : "");
+    lab_dom_disabled(lab_dom_query(0, "#precisionSlider"), busy);
+    lab_dom_disabled(lab_dom_id("precisionCustomToggle"), busy);
+    if (busy)
+        lab_precision_close(0);
+    lab_workspace_dom_precision_slider(lab_workspace_requested_precision(mode));
 }
 
 static void lab_workspace_dom_disable_list(int controls, int busy, int preserve)

@@ -19,7 +19,7 @@
 #include <unistd.h>
 
 #include "http-t.h"
-#include "lab_wire.h"
+#include "tba_wire.h"
 #include "tba_chart.h"
 #include "tba_csv.h"
 #include "tba_dates.h"
@@ -199,10 +199,10 @@ static bool test_tba_wire(tba_app_t *app)
 {
     json_t *update = json_new_object();
     bool ok = update && tba_json_string(update, "target_display_name", "Unicode £ – local");
-    array_t *bytes = ok ? lab_wire_encode(update) : NULL;
+    array_t *bytes = ok ? tba_wire_encode(update) : NULL;
     http_response_t *response = bytes ? test_tba_request(app, "/to-be-announced/state", array_get(bytes, 0),
                                                         array_size(bytes), "application/x-protobuf") : NULL;
-    json_t *reply = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    json_t *reply = response ? tba_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     ok = response && http_response_status(response) == 410 && !tba_json_bool(reply, "ok") && ok;
     string_t *header = string_new_with("Content-Type");
     const string_t *type = response && header ? http_response_header_at(response, header, 0) : NULL;
@@ -213,13 +213,13 @@ static bool test_tba_wire(tba_app_t *app)
                        tba_json_text(reply, "error"));
     json_free(reply);
     http_response_free(response);
-    file_t *saved = file_new_cstr(getenv("MARS_LAB_STATE_FILE"));
+    file_t *saved = file_new_cstr(getenv("TBA_LAB_STATE_FILE"));
     file_info_t *info = saved ? file_get_info(saved) : NULL;
     ok = !info && ok;
     file_info_free(info);
     file_free(saved);
     response = test_tba_request(app, "/to-be-announced/state", NULL, 0, NULL);
-    reply = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    reply = response ? tba_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     ok = !*tba_json_text(reply, "target_display_name") && ok;
     if (*tba_json_text(reply, "target_display_name"))
         string_fprintf(stderr, "Protobuf state GET: HTTP %u, name %s\n", http_response_status(response),
@@ -232,7 +232,7 @@ static bool test_tba_wire(tba_app_t *app)
     };
     for (size_t i = 0; i < sizeof rejected / sizeof *rejected; ++i) {
         response = test_tba_request(app, "/stream/begin", rejected[i].body, strlen(rejected[i].body), rejected[i].type);
-        reply = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+        reply = response ? tba_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
         if (!response || http_response_status(response) != rejected[i].status || !*tba_json_text(reply, "error"))
             string_fprintf(stderr, "Protobuf rejection %zu: HTTP %u, expected %u, error %s\n", i,
                            http_response_status(response), rejected[i].status, tba_json_text(reply, "error"));
@@ -243,7 +243,7 @@ static bool test_tba_wire(tba_app_t *app)
     for (unsigned final = 0; final <= 1; ++final) {
         json_t *frame = json_new_object();
         bool ready = frame && tba_json_flag(frame, "final", final != 0);
-        array_t *encoded = ready ? lab_wire_encode(frame) : NULL;
+        array_t *encoded = ready ? tba_wire_encode(frame) : NULL;
         response = encoded ? test_tba_request_outcome(app, "/stream/chunk", array_get(encoded, 0), array_size(encoded),
                                                      "application/x-protobuf", final ? 2 : 1) : NULL;
         ok = response && http_response_status(response) == 400 && ok;
@@ -389,12 +389,15 @@ static void test_tba_native_routes(void)
     char directory[] = "/tmp/mars-tba-test-XXXXXX";
     TEST_ASSERT_TRUE(mkdtemp(directory) != NULL, "private fixture directory exists");
     string_t *state = string_sprintf("%s/state.pb", directory);
-    bool ok = state && setenv("MARS_LAB_STATE_FILE", string_c_str(state), 1) == 0 &&
+    bool ok = state && setenv("TBA_LAB_STATE_FILE", string_c_str(state), 1) == 0 &&
               setenv("TBA_LAB_UPLOAD_DIR", directory, 1) == 0;
     tba_app_t *app = ok ? tba_app_new(NULL) : NULL;
     ok = app && test_tba_csv() && test_tba_template() && tba_date_cstr("29/02/2024") == 20240229 &&
          tba_date_cstr("29/02/2023") == 0 && tba_date_next(20261231, "daily") == 20270101 && ok;
     const char *paths[] = {"/to-be-announced/", "/to-be-announced/index.css", "/to-be-announced/js/transport.js",
+                          "/to-be-announced/js/codec.js", "/to-be-announced/js/codec_types.js",
+                          "/to-be-announced/js/jobs.js", "/to-be-announced/js/codec_worker.js",
+                          "/to-be-announced/wasm/tba_codec.wasm",
                           "/to-be-announced/state"};
     for (size_t i = 0; app && i < sizeof paths / sizeof *paths; ++i)
         ok = test_tba_route(app, paths[i], 200) && ok;

@@ -51,10 +51,10 @@ bool lab_worker_plot_reduced(string_t *svg)
            string_insert(svg, 5, "data-detail-reduced=\"true\" ") == 0;
 }
 
-/* Produce one real-valued curve while preserving the worksheet's original expression. */
+/* Select real or complex native curves while preserving the worksheet's original expression. */
 int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *variable, const char *lower, const char *upper,
                     const char *scale, const char *y_lower, const char *y_upper,
-                    const char *const plane_bounds[4], bool preview)
+                    const char *const plane_bounds[4], bool preview, bool force_complex)
 {
     if (!variable || !expr_is_variable(variable)) {
         printf("error       Select a variable to plot.\n");
@@ -65,7 +65,7 @@ int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *
     if (distribution >= 0)
         return distribution;
     int complex = lab_worker_complex_plot(source, expression, variable, lower, upper, scale,
-                                          y_lower, y_upper, plane_bounds, preview);
+                                          y_lower, y_upper, plane_bounds, preview, force_complex);
     if (complex >= 0)
         return complex;
     size_t worksheet_precision = num_get_default_prec_bits(), plotting_precision = 53;

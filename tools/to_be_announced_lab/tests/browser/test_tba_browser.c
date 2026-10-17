@@ -2,7 +2,7 @@
  * @file test_tba_browser.c
  * @brief Real Firefox regressions for private Lab WASM and encrypted Protobuf.
  *
- * Copies assets into a private temporary root, injects browser assertions and
+ * Copies generated assets into a private temporary root, injects compiled browser assertions and
  * starts two loopback workers. No installed Lab, user settings or public service
  * is used. The bounded fixture reaps every child and removes its private files.
  */
@@ -22,6 +22,10 @@
 #include "test_harness.h"
 #include "test_tba_support.h"
 
+#ifndef TBA_BROWSER_CHECKS_PATH
+#error "Build the browser fixture with the generated TypeScript checks path"
+#endif
+
 extern char **environ;
 static const char *tba_browser_executable;
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -37,9 +41,19 @@ static file_t *tba_browser_file(const char *directory, const char *name)
 static bool tba_browser_prepare(const char *directory, uint16_t report_port)
 {
     file_t *assets = tba_browser_file(directory, "tools/to_be_announced_lab/assets");
-    file_t *scripts = assets ? tba_browser_file(file_path(assets), "js") : NULL;
-    bool ok = scripts && file_create_directory(scripts, 0700, true);
-    static const char *const names[] = {"index.html", "index.css", "js/transport.js"};
+    static const char *const script_directory = "tools/to_be_announced_lab/build/typescript";
+    file_t *scripts = tba_browser_file(directory, script_directory);
+    bool ok = assets && scripts && file_create_directory(assets, 0700, true) &&
+              file_create_directory(scripts, 0700, true);
+    static const char *const script_names[] = {"transport.js", "codec.js", "codec_types.js", "jobs.js", "codec_worker.js"};
+    for (size_t i = 0; ok && i < sizeof script_names / sizeof *script_names; ++i) {
+        file_t *source = tba_browser_file(script_directory, script_names[i]);
+        file_t *target = tba_browser_file(file_path(scripts), script_names[i]);
+        ok = source && target && file_copy(source, target, false);
+        file_free(source);
+        file_free(target);
+    }
+    static const char *const names[] = {"index.html", "index.css"};
     for (size_t i = 0; ok && i < sizeof names / sizeof *names; ++i) {
         file_t *source = tba_browser_file("tools/to_be_announced_lab/assets", names[i]);
         file_t *target = tba_browser_file(file_path(assets), names[i]);
@@ -47,19 +61,8 @@ static bool tba_browser_prepare(const char *directory, uint16_t report_port)
         file_free(source);
         file_free(target);
     }
-    file_t *shared = tba_browser_file(directory, "tools/mars_lab/assets/js");
-    ok = ok && shared && file_create_directory(shared, 0700, true);
-    static const char *const shared_names[] = {"codec.js", "jobs.js", "codec_worker.js"};
-    for (size_t i = 0; ok && i < sizeof shared_names / sizeof *shared_names; ++i) {
-        file_t *source = tba_browser_file("tools/mars_lab/assets/js", shared_names[i]);
-        file_t *target = tba_browser_file(file_path(shared), shared_names[i]);
-        ok = source && target && file_copy(source, target, false);
-        file_free(source);
-        file_free(target);
-    }
-    file_free(shared);
     file_t *page = assets ? tba_browser_file(file_path(assets), "index.html") : NULL;
-    file_t *checks = file_new_cstr("tools/to_be_announced_lab/tests/browser/checks.js");
+    file_t *checks = file_new_cstr(TBA_BROWSER_CHECKS_PATH);
     string_t *html = ok && page ? file_read_all_text(page) : NULL;
     string_t *script = checks ? file_read_all_text(checks) : NULL;
     string_t *injection = script ? string_sprintf("<script type=\"module\">\nconst reportPort = %u;\n%S\n</script></body>",
@@ -213,9 +216,9 @@ static void test_tba_browser(void)
     TEST_ASSERT_TRUE(directory && mkdtemp(directory) != NULL, "private browser root created");
     string_t *state = string_sprintf("%s/state.pb", directory);
     string_t *uploads = string_sprintf("%s/uploads", directory);
-    bool ready = state && uploads && !setenv("MARS_LAB_STATE_FILE", string_c_str(state), 1) &&
+    bool ready = state && uploads && !setenv("TBA_LAB_STATE_FILE", string_c_str(state), 1) &&
                  !setenv("TBA_LAB_UPLOAD_DIR", string_c_str(uploads), 1);
-    tba_browser_executable = getenv("MARS_LAB_BROWSER");
+    tba_browser_executable = getenv("TBA_LAB_BROWSER");
     if (!tba_browser_executable || !*tba_browser_executable)
         tba_browser_executable = "firefox";
     bool ok = ready && tba_browser_run(directory);

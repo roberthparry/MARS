@@ -289,7 +289,7 @@ unsigned char *lab_browser_input_buffer(void)
 /* Identify the complete browser ABI independently of the stable wire schema. */
 unsigned lab_browser_abi_version(void)
 {
-    return 36;
+    return 37;
 }
 
 /* Share the codec's staging bound with browser stream and buffer admission. */
@@ -375,7 +375,7 @@ double lab_browser_precision(double value, double fallback)
 {
     if (value != value || value > 1.7976931348623157e308 || value < -1.7976931348623157e308)
         return fallback;
-    return value < 17 ? 17 : value > 1048576 ? 1048576 : value;
+    return value < 17 ? 17 : value > 262144 ? 262144 : value;
 }
 
 /* Accept only the five bounded work budgets offered by the native Lab. */
