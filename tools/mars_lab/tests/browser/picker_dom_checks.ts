@@ -7,11 +7,14 @@
 
 /** Native date-picker projection and deferred browser-effect checks; the parent runs these sequentially. */
 window.checkLabPickerDom = function checkLabPickerDom() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`Picker DOM: ${message}`);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
+    }
+
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
     const native = labWire.exports();
     const saved = {
         input: WorksheetContext.marsDatePickerState.input,
@@ -24,17 +27,22 @@ window.checkLabPickerDom = function checkLabPickerDom() {
         date: WorksheetContext.almanacDate.value,
         time: WorksheetContext.almanacTime.value
     };
-    const snapshots = [
-        WorksheetContext.marsDatePicker, WorksheetContext.marsDatePickerGrid, WorksheetContext.marsDatePickerWeekdays, WorksheetContext.marsDatePickerMonth, WorksheetContext.marsDatePickerYear
-    ].map(node => ({
-              node,
-              children: [...node.childNodes],
-              value: (node as LabWorksheetTestSnapshotElement).value,
-              attributes: [...node.attributes].map(attribute => [attribute.name, attribute.value] as const)
-          }));
+    const snapshots: BindingElementSnapshot[] = [];
+    const elements = [
+        WorksheetContext.marsDatePicker, WorksheetContext.marsDatePickerGrid,
+        WorksheetContext.marsDatePickerWeekdays, WorksheetContext.marsDatePickerMonth, WorksheetContext.marsDatePickerYear
+    ];
+    for (const element of elements) {
+        const children = [...element.childNodes];
+        const value = (element as LabWorksheetTestSnapshotElement).value;
+        const attributes: [string, string][] = [];
+        for (const attribute of element.attributes)
+            attributes.push([attribute.name, attribute.value]);
+        snapshots.push({element, children, value, attributes});
+    }
     const root = document.createElement('div');
     document.body.appendChild(root);
-    const makeShell = () => {
+    function makeShell() {
         const shell = document.createElement('div');
         shell.className = 'mars-date-shell';
         const input = document.createElement('input');
@@ -45,20 +53,24 @@ window.checkLabPickerDom = function checkLabPickerDom() {
         shell.append(input, button);
         root.appendChild(shell);
         return {shell, input, button};
-    };
-    const first = makeShell(), second = makeShell();
-    const box = (node: HTMLElement, left: number, top: number, width: number, height: number) => node.getBoundingClientRect = () =>
-        ({left, top, width, height, right: left + width, bottom: top + height} as DOMRect);
+    }
+    const first = makeShell();
+    const second = makeShell();
+    function box(node: HTMLElement, left: number, top: number, width: number, height: number): void {
+        node.getBoundingClientRect = function fixtureRect(): DOMRect {
+            return {left, top, width, height, right: left + width, bottom: top + height} as DOMRect;
+        };
+    }
     const moment = {date: '2024-03-01', time: '00:01:02'};
     const almanacEvents: {target: EventTarget | null; date: string; time: string}[] = [];
-    const intercept = (event: Event) => {
+    function intercept(event: Event): void {
         if (event.target !== WorksheetContext.almanacDate && event.target !== WorksheetContext.almanacTime)
             return;
         almanacEvents.push({target: event.target, date: WorksheetContext.almanacDate.value, time: WorksheetContext.almanacTime.value});
         event.stopImmediatePropagation();
         // Deferred events must be allowed to start another native DOM call.
         marsDatePickerAnchorRect(first.shell);
-    };
+    }
     document.addEventListener('change', intercept, true);
     const oldShellClass = saved.shell?.getAttribute('class');
     try {
@@ -115,7 +127,7 @@ window.checkLabPickerDom = function checkLabPickerDom() {
             WorksheetContext.marsDatePickerGrid.querySelector<HTMLElement>('[data-iso-date="2024-01-31"]')!.classList.contains('selected'),
             'native selected-day projection');
         let changes = 0;
-        first.input.addEventListener('change', () => {
+        first.input.addEventListener('change', function recordDateChange() {
             ++changes;
             marsDatePickerAnchorRect(first.shell);
         });
@@ -150,7 +162,7 @@ window.checkLabPickerDom = function checkLabPickerDom() {
         WorksheetLocations.picker.open(null as unknown as HTMLInputElement, second.button);
         equal(WorksheetContext.marsDatePickerState.input, second.input, 'invalid open preserves ownership');
         let focusSawClosed = false;
-        second.button.addEventListener('focus', () => {
+        second.button.addEventListener('focus', function observeClosedPicker() {
             focusSawClosed = WorksheetContext.marsDatePickerState.input === null && native.lab_forms_picker_date() === 0;
             marsDatePickerAnchorRect(second.shell);
         });
@@ -206,12 +218,14 @@ window.checkLabPickerDom = function checkLabPickerDom() {
             else
                 saved.shell.setAttribute('class', oldShellClass!);
         }
-        for (const {node, children, value, attributes} of snapshots) {
-            for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
-            for (const [name, content] of attributes) node.setAttribute(name, content);
-            node.replaceChildren(...children);
+        for (const {element, children, value, attributes} of snapshots) {
+            for (const attribute of [...element.attributes])
+                element.removeAttribute(attribute.name);
+            for (const [name, content] of attributes)
+                element.setAttribute(name, content);
+            element.replaceChildren(...children);
             if (value !== undefined)
-                (node as LabWorksheetTestSnapshotElement).value = value;
+                element.value = value;
         }
         (saved.focus as HTMLElement | null)?.focus();
     }

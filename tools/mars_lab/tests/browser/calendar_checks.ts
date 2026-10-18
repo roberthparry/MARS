@@ -5,28 +5,108 @@
  * Uses native calendar metadata and browser control fixtures to verify state handling and persistence without reinterpreting calendar policy.
  */
 
-/** Calendar schema, restoration, capture and event-policy checks against real C/WASM. */
+/** @brief Exercise calendar projection with a host containing no editor or result session state. */
+function checkCalendarHostPort(): void {
+    const host = {
+        HOLIDAY_JURISDICTION_SET: WorksheetContext.HOLIDAY_JURISDICTION_SET,
+        JURISDICTION_TOWN_OPTIONS: WorksheetContext.JURISDICTION_TOWN_OPTIONS,
+        ALMANAC_WORKSHEET_TITLE: WorksheetContext.ALMANAC_WORKSHEET_TITLE,
+        worksheetSession: {
+            calendar: {almanacVisibilityMode: 'visible', datetimeAutoGmtOffset: '1', datetimeGmtOffsetTouched: false}
+        }
+    };
+    const controller = new WorksheetLocations.CalendarStateController({
+        context() { return host; },
+        mode() { return WorksheetWorkspace.mode; },
+        configuration() { return labApplication.configuration; },
+        native() { return labDOM; }
+    });
+    const capture = controller.calendarLocationContext;
+    const accept = controller.acceptCalendarLocationContext;
+    const mark = controller.markDatetimeOffsetTouched;
+    const snapshot = capture();
+    if (snapshot.visibility !== 'visible' || snapshot.automaticOffset !== '1' || snapshot.offsetTouched)
+        throw new Error('Calendar port: capture must read the supplied calendar-only state');
+    host.worksheetSession.calendar = {
+        almanacVisibilityMode: 'all', datetimeAutoGmtOffset: '-3.5', datetimeGmtOffsetTouched: false
+    };
+    mark();
+    const current = capture();
+    if (current.visibility !== 'all' || current.automaticOffset !== '-3.5' || !current.offsetTouched)
+        throw new Error('Calendar port: detached callbacks must resolve the current calendar state');
+    accept(snapshot);
+    const restored = host.worksheetSession.calendar;
+    if (restored.almanacVisibilityMode !== 'visible' || restored.datetimeAutoGmtOffset !== '1' ||
+        restored.datetimeGmtOffsetTouched)
+        throw new Error('Calendar port: accepting context must update all three flags');
+}
+
+/** @brief Calendar controls retained for restoration after the fixture. */
+interface LabCalendarSnapshot {
+    mode: 'datetime' | 'almanac';
+    state: WorksheetCalendarState;
+}
+
+/** @brief One local or server publication in the order it was observed. */
+interface LabCalendarStoredEntry {
+    key?: string;
+    payload: WorksheetCalendarState;
+}
+
+/** @brief Value-bearing controls addressed by the native calendar schema. */
+interface LabCalendarInputElements {
+    [name: string]: HTMLInputElement;
+}
+
+/** @brief Check calendar schema, restoration, capture and event policy against real C/WASM. */
 window.checkLabCalendarState = async function checkLabCalendarState() {
+    checkCalendarHostPort();
     const native = labWire.exports();
-    const check: LabTestCheck = (ok, message) => {
+    function check(ok: unknown, message: string): void {
         if (!ok)
             throw new Error('Calendar state: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) =>
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
         check(Object.is(actual, expected), message + ': ' + actual + ' != ' + expected);
-    const savedMode = WorksheetWorkspace.mode.currentMode(), savedOffset = WorksheetContext.worksheetSession.calendar.datetimeAutoGmtOffset, savedTouched = WorksheetContext.worksheetSession.calendar.datetimeGmtOffsetTouched;
-    const snapshots = (['datetime', 'almanac'] as const).map(mode => [mode, WorksheetLocations.calendar.readCalendarControls(mode)] as const);
-    const savedTriggers = [WorksheetLocations.calendarActions.triggerDatetimeAutoEvaluation, WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation];
-    const savedStore = WorksheetPersistence.persistence.publish, savedLocalStore = WorksheetPersistence.persistence.writeLocal;
-    const savedEditors = [WorksheetContext.modeEditorText.datetime, WorksheetContext.modeEditorText.almanac];
+    }
+    const savedMode = WorksheetWorkspace.mode.currentMode();
+    const savedOffset = WorksheetContext.worksheetSession.calendar.datetimeAutoGmtOffset;
+    const savedTouched = WorksheetContext.worksheetSession.calendar.datetimeGmtOffsetTouched;
+    const calendarModes = ['datetime', 'almanac'] as const;
+    const snapshots: LabCalendarSnapshot[] = [];
+    for (const mode of calendarModes) {
+        snapshots.push({mode, state: WorksheetLocations.calendar.readCalendarControls(mode)});
+    }
+    const savedTriggers = {
+        datetime: WorksheetLocations.calendarActions.triggerDatetimeAutoEvaluation,
+        almanac: WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation
+    };
+    const savedStore = WorksheetPersistence.persistence.publish;
+    const savedLocalStore = WorksheetPersistence.persistence.writeLocal;
+    const savedEditors = {
+        datetime: WorksheetContext.modeEditorText.datetime,
+        almanac: WorksheetContext.modeEditorText.almanac
+    };
     const events: [string, WorksheetAutoEvaluationOptions][] = [];
-    const stored: ([string, Record<string, unknown>] | Record<string, unknown>)[] = [];
+    const stored: LabCalendarStoredEntry[] = [];
     try {
+        const services = WorksheetLocations.locationServices;
+        check(Object.isFrozen(services), 'location service catalogue stays immutable');
+        for (const service of ['locCurrent', 'locTimeApply', 'locState', 'locRenderPicker']) {
+            check(Object.hasOwn(services, service), 'native dispatch can resolve own service: ' + service);
+        }
+        const timeInput = document.createElement('input');
+        timeInput.type = 'text';
+        const applyTime = services.locTimeApply;
+        applyTime(timeInput, '03:04:05');
+        equal(timeInput.value, '03:04:05', 'detached time service writes its supplied input');
+        equal(timeInput.selectionStart, 8, 'time service places the caret after the complete value');
+        equal(timeInput.selectionEnd, 8, 'time service collapses the selection');
         const retired = await labHttp.fetch('/js/almanac.js');
         check(
             retired.status === 404 && !labApplication.definitionScripts.includes('almanac'),
             'retired almanac script remains served or loaded');
-        equal(native.lab_browser_abi_version(), 37, 'current browser ABI is required');
+        equal(native.lab_browser_abi_version(), 43, 'current browser ABI is required');
         equal(native.lab_browser_message_limit(), 8388608, 'native message limit is 8 MiB');
         equal(native.lab_browser_member_limit(), 65536, 'native member bound preserves container admission');
         equal(native.lab_browser_handle_capacity(), 131073, 'native handle capacity preserves host admission');
@@ -52,14 +132,19 @@ window.checkLabCalendarState = async function checkLabCalendarState() {
             'date,jdn,start,end,year,jurisdiction,town,latitude,longitude,elevation,gmt_offset',
             'date,time,zone,jurisdiction,town,latitude,longitude,elevation,visibility'
         ];
-        (['datetime', 'almanac'] as const).forEach((mode, index) => {
+        for (let index = 0; index < calendarModes.length; ++index) {
+            const mode = calendarModes[index];
             equal(calendarSchema(mode).map(field => field.key).join(','), expectedKeys[index], 'native schema order');
             check(
                 calendarSchema(mode).every((field: {key: string; element: string}) => !field.element || document.getElementById(field.element)!),
                 'schema refers to missing controls');
-        });
+        }
         for (let flags = 0; flags < 32; ++flags) {
-            const [town, touched, present, automatic, suggested] = [1, 2, 4, 8, 16].map(bit => !!(flags & bit));
+            const town = (flags & 1) !== 0;
+            const touched = (flags & 2) !== 0;
+            const present = (flags & 4) !== 0;
+            const automatic = (flags & 8) !== 0;
+            const suggested = (flags & 16) !== 0;
             equal(
                 native.lab_profile_accept_offset(5, Number(town), Number(touched), Number(present), Number(automatic), Number(suggested)),
                 Number(!town && (!touched || !present || automatic)), 'DateTime offset ownership');
@@ -85,7 +170,10 @@ window.checkLabCalendarState = async function checkLabCalendarState() {
         equal(restored.start, restored.date, 'range falls back to resolved date');
         equal(restored.year, ' 2028 ', 'restoration preserves authored year whitespace');
         equal(restored.latitude, ' 51 ', 'restoration preserves authored coordinate whitespace');
-        const prefixed = Object.fromEntries(Object.entries(raw).map(([key, value]) => ['datetime_' + key, value]));
+        const prefixed: WorksheetCalendarState = {};
+        for (const [key, value] of Object.entries(raw)) {
+            prefixed['datetime_' + key] = value;
+        }
         equal(
             JSON.stringify(WorksheetLocations.calendar.calendarState('datetime', prefixed, 0, 'datetime_')), JSON.stringify(restored),
             'server and history restoration share policy');
@@ -112,7 +200,8 @@ window.checkLabCalendarState = async function checkLabCalendarState() {
         WorksheetContext.datetimeStart.value = '';
         WorksheetLocations.calendar.restoreDatetimeDefaultsIfBlank();
         equal(WorksheetContext.datetimeStart.value, WorksheetContext.datetimeDate.value, 'blank range control follows date');
-        const previousTown = WorksheetContext.datetimeTown.value, previousAlmanacJurisdiction = WorksheetContext.almanacJurisdiction.value;
+        const previousTown = WorksheetContext.datetimeTown.value;
+        const previousAlmanacJurisdiction = WorksheetContext.almanacJurisdiction.value;
         WorksheetLocations.calendar.applyCalendarState('datetime', {}, 3);
         equal(WorksheetContext.datetimeDate.value, WorksheetContext.DEFAULT_DATETIME_DATE, 'clear resets date');
         equal(WorksheetContext.datetimeJdn.value, '', 'clear resets JDN');
@@ -123,10 +212,10 @@ window.checkLabCalendarState = async function checkLabCalendarState() {
         equal(WorksheetContext.worksheetSession.calendar.almanacVisibilityMode, WorksheetContext.DEFAULT_ALMANAC_VISIBILITY, 'clear resets visibility');
 
         Reflect.set(WorksheetLocations.calendarActions, 'triggerDatetimeAutoEvaluation', (options: WorksheetAutoEvaluationOptions) => events.push(['datetime', options]));
-        Reflect.set(WorksheetLocations.calendarActions, 'triggerAlmanacAutoEvaluation', (options: Record<string, unknown>) => events.push(['almanac', options]));
+        Reflect.set(WorksheetLocations.calendarActions, 'triggerAlmanacAutoEvaluation', (options: LabTestRecord) => events.push(['almanac', options]));
         for (const mode of ['datetime', 'almanac'] as const) {
             WorksheetWorkspace.mode.setMode(mode);
-            const elements = WorksheetLocations.calendar.calendarElements(mode) as Record<string, HTMLInputElement>;
+            const elements = WorksheetLocations.calendar.calendarElements(mode) as LabCalendarInputElements;
             elements.date.value = '2024-02-29';
             elements.date.dispatchEvent(new Event('change'));
             equal(events.at(-1)![0], mode, 'date dispatch uses owning mode');
@@ -142,31 +231,45 @@ window.checkLabCalendarState = async function checkLabCalendarState() {
                 check(!events.at(-1)![1].refreshJurisdiction, 'range change does not refresh jurisdiction');
             }
         }
-        Reflect.set(WorksheetPersistence.persistence, 'publish', (payload: Record<string, unknown>) => stored.push(payload));
-        Reflect.set(WorksheetPersistence.persistence, 'writeLocal', (key: string, payload: Record<string, unknown>) => stored.push([key, payload]));
+        /** @brief Record a server publication in the common publication sequence. */
+        function recordPublished(payload: WorksheetCalendarState): number {
+            return stored.push({payload});
+        }
+
+        /** @brief Record a local publication together with its storage key. */
+        function recordLocal(key: string, payload: WorksheetCalendarState): number {
+            return stored.push({key, payload});
+        }
+
+        Reflect.set(WorksheetPersistence.persistence, 'publish', recordPublished);
+        Reflect.set(WorksheetPersistence.persistence, 'writeLocal', recordLocal);
         WorksheetPersistence.persistence.saveCalendar('datetime');
         WorksheetPersistence.persistence.saveCalendar('almanac');
-        equal((stored[0] as [string, Record<string, unknown>])[0], 'mars.exprLab.lastDatetimeState', 'DateTime local key unchanged');
-        equal((stored[2] as [string, Record<string, unknown>])[0], 'mars.exprLab.lastAlmanacState', 'almanac local key unchanged');
-        for (const [index, mode] of [[0, 'datetime'], [2, 'almanac']] as const)
-            for (const field of calendarSchema(mode))
+        equal(stored[0].key, 'mars.exprLab.lastDatetimeState', 'DateTime local key unchanged');
+        equal(stored[2].key, 'mars.exprLab.lastAlmanacState', 'almanac local key unchanged');
+        for (const [index, mode] of [[0, 'datetime'], [2, 'almanac']] as const) {
+            for (const field of calendarSchema(mode)) {
                 equal(
-                    (stored[index + 1] as Record<string, unknown>)[mode + '_' + field.key],
-                    (stored[index] as [string, Record<string, unknown>])[1][field.key],
+                    stored[index + 1].payload[mode + '_' + field.key], stored[index].payload[field.key],
                     'local and server state fields agree');
+            }
+        }
     } finally {
-        Reflect.set(WorksheetLocations.calendarActions, 'triggerDatetimeAutoEvaluation', savedTriggers[0]);
-        Reflect.set(WorksheetLocations.calendarActions, 'triggerAlmanacAutoEvaluation', savedTriggers[1]);
+        Reflect.set(WorksheetLocations.calendarActions, 'triggerDatetimeAutoEvaluation', savedTriggers.datetime);
+        Reflect.set(WorksheetLocations.calendarActions, 'triggerAlmanacAutoEvaluation', savedTriggers.almanac);
         Reflect.set(WorksheetPersistence.persistence, 'publish', savedStore);
         Reflect.set(WorksheetPersistence.persistence, 'writeLocal', savedLocalStore);
-        [WorksheetContext.modeEditorText.datetime, WorksheetContext.modeEditorText.almanac] = savedEditors;
-        for (const [mode, snapshot] of snapshots) {
-            const elements = WorksheetLocations.calendar.calendarElements(mode) as Record<string, HTMLInputElement>;
-            for (const [key, value] of Object.entries(snapshot))
-                if (elements[key])
+        WorksheetContext.modeEditorText.datetime = savedEditors.datetime;
+        WorksheetContext.modeEditorText.almanac = savedEditors.almanac;
+        for (const snapshot of snapshots) {
+            const elements = WorksheetLocations.calendar.calendarElements(snapshot.mode) as LabCalendarInputElements;
+            for (const [key, value] of Object.entries(snapshot.state)) {
+                if (elements[key]) {
                     elements[key].value = value as string;
-                else if (key === 'visibility')
+                } else if (key === 'visibility') {
                     WorksheetContext.worksheetSession.calendar.almanacVisibilityMode = value as string;
+                }
+            }
         }
         WorksheetContext.worksheetSession.calendar.datetimeAutoGmtOffset = savedOffset;
         WorksheetContext.worksheetSession.calendar.datetimeGmtOffsetTouched = savedTouched;

@@ -5,21 +5,38 @@
  * Checks deferred service arguments, scoped subscriptions and repeated catalogue access without repeating application initialisation.
  */
 
+/** @brief Browser references and array snapshots inspected by the event fixture. */
+interface BindingReferenceFixture {
+    [name: string]: unknown;
+    labTextareas: HTMLTextAreaElement[];
+    resultCards: Element[];
+}
+
+/** @brief Keyboard and pointer fields accepted by the synthetic event helper. */
+interface BindingWidgetEventOptions extends MouseEventInit, KeyboardEventInit {}
+
 /** Picker and tooltip event policy, deferred service arguments and scoped subscription regressions. */
 window.checkLabWidgetEvents = function checkLabWidgetEvents() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Widget events: ' + message);
-    };
-    const same = (actual: unknown, expected: unknown): boolean => {
+    }
+
+    function same(actual: unknown, expected: unknown): boolean {
         if (Object.is(actual, expected))
             return true;
         if (!actual || !expected || typeof actual !== 'object' || typeof expected !== 'object' ||
             actual instanceof Node || expected instanceof Node)
             return false;
         const keys = Object.keys(expected);
-        return Object.keys(actual).length === keys.length && keys.every(key => same(Reflect.get(actual, key), Reflect.get(expected, key)));
-    };
+        if (Object.keys(actual).length !== keys.length)
+            return false;
+        for (const key of keys) {
+            if (!same(Reflect.get(actual, key), Reflect.get(expected, key)))
+                return false;
+        }
+        return true;
+    }
     // Re-reading the reference catalogue must never repeat workspace/card initialisation.
     const native = labWire.exports();
     const savedMode = native.lab_workspace_mode(), savedPrecision = native.lab_workspace_precision(6);
@@ -32,7 +49,7 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
         native.lab_view_card_set_zoom(0, 1);
         native.lab_view_cards_collapse();
         native.lab_view_card_toggle(0);
-        const refs = labDOM.call<Record<string, unknown> & {labTextareas: HTMLTextAreaElement[]; resultCards: Element[]}>('lab_workspace_dom_references');
+        const refs = labDOM.call<BindingReferenceFixture>('lab_workspace_dom_references');
         for (const [name, id] of [
             ['expr', 'expr'], ['statusEl', 'status'], ['run', 'run'], ['datetimeDate', 'datetimeDate'],
             ['marsDatePicker', 'marsDatePicker'], ['matrixOperation', 'matrixOperation'], ['value', 'value']]) {
@@ -49,7 +66,7 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
         }
         const length = refs.labTextareas.length, cardCount = refs.resultCards.length;
         document.body.append(referenceFixture);
-        const fresh = labDOM.call<Record<string, unknown> & {labTextareas: HTMLTextAreaElement[]; resultCards: Element[]}>('lab_workspace_dom_references');
+        const fresh = labDOM.call<BindingReferenceFixture>('lab_workspace_dom_references');
         check(fresh !== refs && Object.keys(arrays).every(name => fresh[name] !== refs[name]),
             'each catalogue call owns independent records and arrays');
         check(refs.labTextareas.length === length && refs.resultCards.length === cardCount &&
@@ -59,7 +76,7 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
         check(fresh.labTextareas.at(-1) === referenceFixture, 'snapshot retains the actual detached node');
         fresh.labTextareas.length = 0;
         labDOM.call<BindingTestPlan>('lab_widget_events_dispatch', 255, {target: referenceFixture}, {});
-        const again = labDOM.call<Record<string, unknown> & {labTextareas: HTMLTextAreaElement[]; resultCards: Element[]}>('lab_workspace_dom_references');
+        const again = labDOM.call<BindingReferenceFixture>('lab_workspace_dom_references');
         check(again.expr === refs.expr && again.statusEl === refs.statusEl &&
             same(again.labTextareas, refs.labTextareas) && same(again.resultCards, refs.resultCards),
             'array mutation and recycled handles cannot alias another result');
@@ -76,7 +93,9 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
         if (savedExpansion >= 0)
             native.lab_view_card_toggle(savedExpansion);
     }
-    const call = (service: string, ...args: unknown[]) => ({service, args});
+    function call(service: string, ...args: unknown[]): MarsTransportServiceCall {
+        return {service, args};
+    }
     const services = [
         'openMarsDatePicker', 'closeMarsDatePicker', 'commitMarsDateValue', 'shiftMarsDatePickerMonth',
         'shiftMarsDatePickerYear', 'setMarsDatePickerMonthYear', 'commitMarsTodayValue', 'placeMarsDatePicker',
@@ -87,14 +106,19 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
     const shell = input.closest('.mars-date-shell');
     const state = {input, button: opener, shell, year: 2031, month: 2};
     const replacement = {input: otherInput, button: null, shell: otherInput.closest('.mars-date-shell'), year: 2042, month: 7};
-    const plan = (action: number, event: object = {}, context: BindingWidgetContext = state) =>
-        labDOM.call<BindingTestPlan>('lab_widget_events_dispatch', action, event, context);
-    const expect = (action: number, event: object = {}, calls: BindingTestPlan['calls'] = [], context: BindingWidgetContext = state, prevent = false) => {
+    function plan(action: number, event: object = {}, context: BindingWidgetContext = state): BindingTestPlan {
+        return labDOM.call<BindingTestPlan>('lab_widget_events_dispatch', action, event, context);
+    }
+
+    function expect(
+        action: number, event: object = {}, calls: MarsTransportServiceCall[] = [],
+        context: BindingWidgetContext = state, prevent = false
+    ): BindingTestPlan {
         const result = plan(action, event, context);
         check(same(result.calls, calls), 'ordered service arguments for action ' + action);
         check(!!result.prevent === prevent && !result.stop, 'cancellation policy for action ' + action);
         return result;
-    };
+    }
     const focusClose = call('closeMarsDatePicker', {restoreFocus: true});
     const outsideClose = call('closeMarsDatePicker', {restoreFocus: false});
     const hide = call('hideButtonTooltip');
@@ -113,28 +137,42 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
     const savedContext = {
         input: WorksheetContext.marsDatePickerState.input, button: WorksheetContext.marsDatePickerState.button, shell: WorksheetContext.marsDatePickerState.shell
     };
-    const records: BindingTestPlan['calls'] = [], reentryErrors: unknown[] = [];
-    const spies = Object.fromEntries(services.map(service => [service, (...args: unknown[]) => {
-        records.push(call(service, ...args));
-        try {
-            check(plan(255).calls.length === 0, 'service re-enters after handle scope closes');
-        } catch (error) {
-            reentryErrors.push(error);
-        }
-    }]));
-    const send = (target: EventTarget | null, type: string, expected: BindingTestPlan['calls'] = [], options: MouseEventInit & KeyboardEventInit = {}, eventTarget: EventTarget | null = null) => {
-        const event = type === 'keydown' ? new KeyboardEvent(type, {cancelable: true, ...options}) :
-            new MouseEvent(type, {cancelable: true, ...options});
+    const records: MarsTransportServiceCall[] = [];
+    const reentryErrors: unknown[] = [];
+    const spies: {[service: string]: MarsTransportService} = {};
+    for (const service of services) {
+        spies[service] = function recordService(...args: unknown[]) {
+            records.push(call(service, ...args));
+            try {
+                check(plan(255).calls.length === 0, 'service re-enters after handle scope closes');
+            } catch (error) {
+                reentryErrors.push(error);
+            }
+        };
+    }
+
+    function send(
+        target: EventTarget | null, type: string, expected: MarsTransportServiceCall[] = [],
+        options: BindingWidgetEventOptions = {}, eventTarget: EventTarget | null = null
+    ): boolean {
+        let event: KeyboardEvent | MouseEvent;
+        if (type === 'keydown')
+            event = new KeyboardEvent(type, {cancelable: true, ...options});
+        else
+            event = new MouseEvent(type, {cancelable: true, ...options});
         if (eventTarget)
             Object.defineProperty(event, 'target', {value: eventTarget});
         records.length = 0;
-        if (!target) throw new Error('Missing widget event fixture target');
+        if (!target)
+            throw new Error('Missing widget event fixture target');
         const accepted = target.dispatchEvent(event);
         check(same(records, expected), 'live ' + type + ' delivers exact service arguments once');
         return accepted;
-    };
+    }
     // Keep grid and fixture bubbling local; document subscriptions are exercised on separate targets below.
-    const stop = (event: Event) => event.stopPropagation();
+    function stop(event: Event): void {
+        event.stopPropagation();
+    }
     fixture.addEventListener('click', stop);
     WorksheetContext.marsDatePickerGrid.addEventListener('click', stop);
     const savedRegistry = labDOM.bindEvents(Object.freeze(spies));
@@ -177,7 +215,8 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
         expect(6, {}, [call('setMarsDatePickerMonthYear', 2031, '2', {commit: true})]);
         expect(7, {}, [call('setMarsDatePickerMonthYear', '2033', 2, {commit: true})]);
         expect(8, {key: 'Enter'}, [call('setMarsDatePickerMonthYear', '2033', 2, {commit: true})], state, true);
-        for (const key of ['Escape', 'Tab', 'ArrowDown']) expect(8, {key});
+        for (const key of ['Escape', 'Tab', 'ArrowDown'])
+            expect(8, {key});
         expect(9, {}, [call('commitMarsTodayValue', input), focusClose]);
         expect(9, {}, [], {...state, input: null});
         expect(10, {}, [focusClose]);
@@ -207,10 +246,11 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
         expect(255);
 
         // Install on isolated document/window targets while exercising the real page controls.
-        const testDocument = new EventTarget(), testWindow = new EventTarget();
+        const testDocument = new EventTarget();
+        const testWindow = new EventTarget();
         const add = EventTarget.prototype.addEventListener;
         const subscriptions: {target: EventTarget; type: string; options?: boolean | AddEventListenerOptions}[] = [];
-        EventTarget.prototype.addEventListener = function(type, listener, options) {
+        EventTarget.prototype.addEventListener = function recordSubscription(type, listener, options) {
             subscriptions.push({target: this, type, options});
             return add.call(this, type, listener, options);
         };

@@ -6,23 +6,70 @@
  */
 
 /// <reference path="./request_checks.d.ts" />
+
+/**
+ * @brief Compile-time checks for the native request boundary; deliberately never invoked.
+ * Missing matrix options and incomplete decoded replies must remain type errors
+ * after replacing the indirect dependency and frame declarations.
+ */
+function labCheckApiFrameContracts(requests: WorksheetRequests.MarsApiRequestPort): void {
+    const matrix: WorksheetRequests.MarsApiFetchFrame = {mode: 0, request: null, options: {operand: 'x'}};
+    const equation: WorksheetRequests.MarsApiFetchFrame = {mode: 1, request: null};
+    // @ts-expect-error Matrix fetches require their explicit options record.
+    const missingOptions: WorksheetRequests.MarsApiFetchFrame = {mode: 0, request: null};
+    // @ts-expect-error A decoded reply must have both a response and its data.
+    const incompleteReply: WorksheetRequests.MarsApiDecodedPostFrame = {request: null, payload: {}};
+    void matrix;
+    void equation;
+    void missingOptions;
+    void incompleteReply;
+    // @ts-expect-error Expression fetches require captured expression text.
+    const missingText: WorksheetRequests.MarsApiFetchContext = {kind: 'expression'};
+    const booleanResult: Promise<boolean | undefined> = requests.run(
+        'evaluate', 'expression', function () { return false; });
+    const textResult: Promise<string | undefined> = requests.runUI(
+        'evaluate', 'expression', async function () { return 'result'; });
+    void missingText;
+    void booleanResult;
+    void textResult;
+}
+
 /** Native request state and deferred-fetch regressions, invoked by the sequential browser harness. */
 window.checkLabRequests = async function checkLabRequests() {
     const native = labWire.exports();
     const savedMode = WorksheetWorkspace.mode.currentMode();
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`C requests: ${message}`);
-    };
-    const clear = () => {
+    }
+    // Public callbacks remain detachable, enumerable and replaceable after shared binding.
+    const providers = [
+        WorksheetRequests.presentation.capabilities, WorksheetRequests.evaluationTransport.capabilities,
+        WorksheetRequests.functionCard.capabilities, WorksheetRequests.plots.capabilities,
+        WorksheetRequests.solver.capabilities, WorksheetRequests.calendarRequests.capabilities,
+        WorksheetRequests.evaluation.capabilities, WorksheetRequests.goals.capabilities,
+        WorksheetRequests.runtime.capabilities
+    ];
+    for (const provider of providers)
+        check(Object.keys(provider()).length > 0, 'detached capability provider retains its controller');
+    const latestMain = WorksheetRequests.labRequests.latestMain;
+    check(latestMain() === WorksheetRequests.labRequests.latestMain(), 'detached request callback retains its manager');
+    const descriptor = Object.getOwnPropertyDescriptor(WorksheetRequests.labRequests, 'latestMain');
+    check(descriptor?.writable && descriptor.configurable && descriptor.enumerable, 'bound callbacks retain their public property attributes');
+    function clear(): void {
         for (let channel = 0; channel < 10; ++channel) native.lab_request_cancel(channel);
-    };
-    const begin = (mode: number, operation: number, scalar = 0, parent = 0) =>
-        native.lab_request_begin(mode, operation, 1, 1, scalar, parent) >>> 0;
+    }
+    function begin(mode: number, operation: number, scalar = 0, parent = 0): number {
+        return native.lab_request_begin(mode, operation, 1, 1, scalar, parent) >>> 0;
+    }
     try {
         const decoder = new TextDecoder('utf-8', {fatal: true});
-        const label = (kind: number, index: number) => decoder.decode(new Uint8Array(
-            native.memory.buffer, native.lab_request_text(kind, index), native.lab_request_text_length(kind, index)));
+        function label(kind: number, index: number): string {
+            const memory = native.memory.buffer;
+            const pointer = native.lab_request_text(kind, index);
+            const length = native.lab_request_text_length(kind, index);
+            return decoder.decode(new Uint8Array(memory, pointer, length));
+        }
         const names = [
             'evaluate', 'derivative', 'integral', 'function', 'weather', 'goal', 'bindings', 'land', 'datetimeLocation',
             'almanacLocation', 'bindingCommit', 'holidays', 'solverRender', 'solverRestoreRender', 'plot'
@@ -33,10 +80,13 @@ window.checkLabRequests = async function checkLabRequests() {
             '/datetime-jurisdiction-location', '/datetime-jurisdiction-location', '/render_TeX'
         ];
         check(native.lab_request_operation_count() === names.length, 'operation catalogue count');
-        [names, paths, ['', 'integral', 'bindings', 'plot']].forEach((entries, kind) => {
-            entries.forEach((expected, index) => check(label(kind, index) === expected, 'native catalogue label'));
+        const catalogues = [names, paths, ['', 'integral', 'bindings', 'plot']];
+        for (let kind = 0; kind < catalogues.length; ++kind) {
+            const entries = catalogues[kind];
+            for (let index = 0; index < entries.length; ++index)
+                check(label(kind, index) === entries[index], 'native catalogue label');
             check(label(kind, entries.length) === '' && label(kind, -1) === '', 'catalogue index bounds');
-        });
+        }
         check(label(3, 0) === '' && label(-1, 0) === '', 'catalogue kind bounds');
         check(!WorksheetRequests.labRequests.begin('unknown') && !WorksheetRequests.labRequests.begin('toString'), 'unknown host operation fails closed');
 
@@ -58,8 +108,13 @@ window.checkLabRequests = async function checkLabRequests() {
                                                        fixed[operation] || (mode === 3 && !scalar ? 2 : 1);
                     check(native.lab_request_endpoint(channel, token) === expected, 'table-driven endpoint');
                     check(label(1, expected) === paths[expected], 'endpoint wire path');
-                    const action = operation === 14 ? 'plot' : operation === 2 ? 'integral' :
-                        [6, 10].includes(operation) ? 'bindings' : '';
+                    let action = '';
+                    if (operation === 14)
+                        action = 'plot';
+                    else if (operation === 2)
+                        action = 'integral';
+                    else if (operation === 6 || operation === 10)
+                        action = 'bindings';
                     check(label(2, native.lab_request_action(channel, token)) === action, 'table-driven action');
                     native.lab_request_finish(channel, token);
                     check(label(1, native.lab_request_endpoint(channel, token)) === '', 'finished request has no path');
@@ -221,24 +276,49 @@ window.checkLabRequests = async function checkLabRequests() {
     const cacheKey = '__mars_request_cache_fixture__';
     const hadCacheEntry = WorksheetResults.labEvaluationView.caches.compact.has(cacheKey);
     const savedCacheEntry = WorksheetResults.labEvaluationView.caches.compact.get(cacheKey);
-    const metadata = (display: string) => ({compact_texts: [{text: cacheKey, display}]});
-    const pending: {resolve(value: Response): void; reject(reason: unknown): void; signal: AbortSignal}[] = [];
+    function metadata(display: string) {
+        return {compact_texts: [{text: cacheKey, display}]};
+    }
+    const pending: LabRequestPendingResponse[] = [];
     const applied: unknown[] = [];
-    const response = (body: unknown) => new Response(labWire.encode(body), {headers: {'Content-Type': 'application/x-protobuf'}});
-    const collect = () => WorksheetRequests.labRequests.run('evaluate', 'expression', async request => {
+    function response(body: unknown): Response {
+        return new Response(labWire.encode(body), {headers: {'Content-Type': 'application/x-protobuf'}});
+    }
+    async function collectResult(request: WorksheetRequests.MarsApiRequest): Promise<void> {
         const result = await WorksheetRequests.evaluationTransport.fetchEvaluation('2+3', '', '', '', '', request);
         if (WorksheetRequests.labRequests.outcome(request, result.response, result.data) === 2)
             applied.push(result.data.marker);
-    });
+    }
+    function collect(): Promise<void | undefined> {
+        return WorksheetRequests.labRequests.run('evaluate', 'expression', collectResult);
+    }
     try {
         WorksheetWorkspace.mode.setMode('expression');
         WorksheetRequests.labRequests.modeChanged('expression');
-        window.fetch = (url, options) => {
+        const callbackValue = {marker: 'owned callback result'};
+        function returnCallbackValue() { return callbackValue; }
+        async function resolveCallbackValue() { return callbackValue; }
+        function throwCallbackValue(): never { throw callbackValue; }
+        check(await WorksheetRequests.labRequests.run('evaluate', 'expression', returnCallbackValue) === callbackValue,
+              'native run frame preserves a synchronous callback result by identity');
+        check(await WorksheetRequests.labRequests.run('evaluate', 'expression', resolveCallbackValue) === callbackValue,
+              'native run frame awaits an asynchronous callback result without copying it');
+        let callbackError: unknown;
+        try {
+            await WorksheetRequests.labRequests.run('evaluate', 'expression', throwCallbackValue);
+        } catch (error) {
+            callbackError = error;
+        }
+        check(callbackError === callbackValue && !WorksheetRequests.labRequests.busy(),
+              'native run frame preserves arbitrary exceptions and releases request ownership');
+        window.fetch = function queueResponse(url, options) {
             if (String(url) !== '/eval')
                 return originalFetch(url, options);
             if (!options?.signal) throw new Error('Missing request signal');
             const signal = options.signal;
-            return new Promise<Response>((resolve, reject) => pending.push({resolve, reject, signal}));
+            const gate = LabTestBrowser.responseGate();
+            pending.push({resolve: gate.resolve, reject: gate.reject, signal});
+            return gate.promise;
         };
         const old = collect();
         const latest = collect();
@@ -271,23 +351,23 @@ window.checkLabRequests = async function checkLabRequests() {
         check(rejected && !WorksheetRequests.labRequests.busy(), 'owned network failure releases native busy state');
 
         WorksheetResults.labEvaluationView.caches.compact.set(cacheKey, 'retained');
-        let streamController!: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>, decodingStarted!: () => void;
-        const decoding = new Promise<void>(resolve => {
-            decodingStarted = resolve;
-        });
+        let streamController!: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>;
+        const decoding = LabTestBrowser.signal();
         const stream = new ReadableStream<Uint8Array<ArrayBuffer>>(
             {
                 start(controller) {
                     streamController = controller;
                 },
                 pull() {
-                    decodingStarted();
+                    decoding.resolve();
                 }
             },
             {highWaterMark: 0});
-        window.fetch = async () => new Response(stream, {headers: {'Content-Type': 'application/x-protobuf'}});
+        window.fetch = async function streamResponse() {
+            return new Response(stream, {headers: {'Content-Type': 'application/x-protobuf'}});
+        };
         const staleCacheRequest = collect();
-        await decoding;
+        await decoding.promise;
         const cacheOwner = WorksheetRequests.labRequests.begin('evaluate', 'expression');
         streamController.enqueue(labWire.encode({ok: true, marker: 'stale cache', presentation: metadata('obsolete')}));
         streamController.close();
@@ -301,9 +381,11 @@ window.checkLabRequests = async function checkLabRequests() {
         for (const [status, ok, expected] of [
                  [200, true, 'accepted'], [200, false, 'accepted'], [500, true, 'accepted']] as const) {
             const cacheRequest = WorksheetRequests.labRequests.begin('evaluate', 'expression');
-            window.fetch = async () => new Response(
-                labWire.encode({ok, presentation: metadata(status === 200 && ok ? 'accepted' : 'rejected')}),
-                {status, headers: {'Content-Type': 'application/x-protobuf'}});
+            window.fetch = async function cacheResponse() {
+                const display = status === 200 && ok ? 'accepted' : 'rejected';
+                const body = labWire.encode({ok, presentation: metadata(display)});
+                return new Response(body, {status, headers: {'Content-Type': 'application/x-protobuf'}});
+            };
             try {
                 await WorksheetRequests.labRequests.post(cacheRequest, {expression: '2+3'}, '');
                 check(
@@ -319,10 +401,10 @@ window.checkLabRequests = async function checkLabRequests() {
             WorksheetWorkspace.mode.setMode('matrix');
             WorksheetRequests.labRequests.modeChanged('matrix');
             const request = WorksheetRequests.labRequests.begin('integral', 'matrix', {scalar});
-            let sent!: {url: string; body: {action?: string; persist_expression?: boolean; transient?: boolean}};
-            window.fetch = async (url, options) => {
+            let sent!: LabRequestSent;
+            window.fetch = async function captureRequest(url, options) {
                 if (!(options?.body instanceof Uint8Array)) throw new Error('Missing binary body');
-                sent = {url: String(url), body: labWire.decode(options.body as Uint8Array<ArrayBuffer>) as typeof sent.body};
+                sent = {url: String(url), body: labWire.decode(options.body as Uint8Array<ArrayBuffer>) as LabRequestSentBody};
                 return response({ok: true});
             };
             try {
@@ -345,13 +427,13 @@ window.checkLabRequests = async function checkLabRequests() {
         WorksheetRequests.labRequests.finish(solverMain);
         const solverRequest = WorksheetRequests.labRequests.begin('solverRender', 'diffequation', {parent: solverMain!.token});
         let solverPending!: {resolve(value: Response): void; signal: AbortSignal};
-        window.fetch = (url, options) => {
+        window.fetch = function awaitRender(url, options) {
             check(String(url) === '/render_TeX', 'solver adapter selects the native render endpoint');
             if (!options?.signal) throw new Error('Missing solver signal');
             const signal = options.signal;
-            return new Promise<Response>(resolve => {
-                solverPending = {resolve, signal};
-            });
+            const gate = LabTestBrowser.responseGate();
+            solverPending = {resolve: gate.resolve, signal};
+            return gate.promise;
         };
         const rendering =
             WorksheetRequests.labRequests.post(solverRequest, {tex: 'x'}, '').then(() => false, error => error.name === 'AbortError');

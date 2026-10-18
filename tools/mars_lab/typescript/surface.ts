@@ -132,28 +132,63 @@ class MarsSurfaceGPU {
     }
 }
 
+/** Snapshot producer used when preserving a populated worksheet result. */
+interface MarsSurfaceCapture {
+    /** @brief Capture the current worksheet result. */
+    (): WorksheetResultSnapshot;
+}
+
+/** Snapshot producer which may have no current worksheet result. */
+interface MarsSurfaceOptionalCapture {
+    /** @brief Capture the current worksheet result when available. */
+    (): WorksheetResultSnapshot | null | undefined;
+}
+
+/** @brief Browser drawing resources allocated before assembling and initialising a retained view. */
+interface MarsSurfaceResources {
+    host: HTMLElement;
+    overlay: HTMLDivElement;
+    holder: HTMLDivElement;
+    canvas: HTMLCanvasElement;
+    vertices: Float32Array;
+    width: number;
+    height: number;
+    gpu: MarsSurfaceGPU | null;
+    context: CanvasRenderingContext2D | null;
+    ink: CanvasRenderingContext2D;
+}
+
 /** Owns the active view, overlay, observers, frame scheduling and snapshot lifecycle. */
 class MarsSurfacePreview {
     private current: MarsSurfaceView | null = null;
-    private resize_frame = 0;
-    private restoration_frame = 0;
+    private resizeFrame = 0;
+    private restorationFrame = 0;
     private closed = false;
     private hover: MarsSurfaceHover | undefined;
-    private readonly onHover = (event: Event): void => {
+    private onHover(event: Event): void {
         if (this.closed) return;
-        this.hover ??= new MarsSurfaceHover(chart => this.host.volume.interacting ? null : this.prepare(chart),
+        this.hover ??= new MarsSurfaceHover(this.hoverView.bind(this),
             this.host.native, this.events);
         this.hover.inspect(event);
-    };
+    }
+
+    private hoverView(chart: SVGSVGElement): MarsSurfaceView | null {
+        return this.host.volume.interacting ? null : this.prepare(chart);
+    }
 
     /**
      * @brief Register page-lifetime resize and page-hide callbacks for the retained preview.
      * View resources are allocated lazily; dispose() releases a view, not these listeners.
      */
     constructor(private readonly host: MarsSurfacePreviewHost, private readonly events: EventTarget = window) {
+        this.onPageHide = this.onPageHide.bind(this);
+        this.onResize = this.onResize.bind(this);
+        this.onHover = this.onHover.bind(this);
         this.events.addEventListener('pagehide', this.onPageHide);
         this.events.addEventListener('resize', this.onResize);
         this.events.addEventListener('pointermove', this.onHover);
+        // Replaced SVG paths can enter a stationary pointer without a pointermove.
+        this.events.addEventListener('pointerover', this.onHover);
     }
 
     private removeSettled(view: MarsSurfaceView): void {
@@ -167,23 +202,27 @@ class MarsSurfacePreview {
     private scheduleSettled(view: MarsSurfaceView): void {
         if (view.chart.dataset.segments !== 'true') return;
         clearTimeout(view.settleTimer);
-        view.settleTimer = setTimeout(() => {
-            if (this.current !== view || !view.chart.isConnected) return;
-            const drag = (document.getElementById('plotRendered') as
-                (HTMLElement & {marsPlotDrag?: MarsSurfaceGesture}) | null)?.marsPlotDrag;
-            if (drag?.active || drag?.wheel || drag?.busy || this.host.volume.interacting) {
-                this.scheduleSettled(view);
-                return;
-            }
-            const drawing = this.host.exporter.layer(view);
-            if (!drawing) return;
-            view.settled?.remove();
-            drawing.dataset.surfaceSettled = 'true';
-            view.chart.appendChild(drawing);
-            view.settled = drawing;
-            view.overlay.style.display = 'none';
-            view.chart.dataset.localRenderer = 'svg';
-        }, 150);
+        view.settleTimer = setTimeout(this.settleView.bind(this, view), 150);
+    }
+
+    private settleView(view: MarsSurfaceView): void {
+        if (this.current !== view || !view.chart.isConnected) return;
+        const drag = (document.getElementById('plotRendered') as
+            (HTMLElement & {marsPlotDrag?: MarsSurfaceGesture}) | null)?.marsPlotDrag;
+        if (drag?.active || drag?.wheel || drag?.busy || this.host.volume.interacting) {
+            this.scheduleSettled(view);
+            return;
+        }
+        const drawing = this.host.exporter.layer(view);
+        if (!drawing) return;
+        view.settled?.remove();
+        drawing.dataset.surfaceSettled = 'true';
+        view.chart.appendChild(drawing);
+        view.settled = drawing;
+        view.overlay.style.display = 'none';
+        view.chart.dataset.localRenderer = 'svg';
+        // SVG insertion can change the screen transform without another pointer move.
+        this.hover?.refresh(view.chart);
     }
 
     /**
@@ -198,6 +237,7 @@ class MarsSurfacePreview {
             return;
         }
         this.removeSettled(this.current);
+        // End this overlay cycle; a later draw captures the restored visibility again.
         for (const [node, visibility] of this.current.hidden) node.style.visibility = visibility;
         this.current.hidden = [];
         this.current.overlay.style.display = 'none';
@@ -219,9 +259,12 @@ class MarsSurfacePreview {
     }
 
     private signature(chart: SVGSVGElement): string {
-        return JSON.stringify([chart.closest('[data-plot-figure]')?.querySelector('title')?.textContent,
-            ...['exactXMin', 'exactXMax', 'exactYMin', 'exactYMax', 'exactZMin', 'exactZMax', 'units']
-                .map(key => chart.dataset[key])]);
+        // Identity combines the expression title with the exact domain bounds and coordinate units.
+        const parts = [chart.closest('[data-plot-figure]')?.querySelector('title')?.textContent];
+        for (const key of ['exactXMin', 'exactXMax', 'exactYMin', 'exactYMax', 'exactZMin', 'exactZMax', 'units']) {
+            parts.push(chart.dataset[key]);
+        }
+        return JSON.stringify(parts);
     }
 
     private identity(chart: SVGSVGElement): string {
@@ -244,7 +287,13 @@ class MarsSurfacePreview {
      * Adds a surface snapshot to a returned object and restores the same connected view in
      * a finally block, including when the supplied capture callback throws.
      */
-    captureResult<T extends object | null | undefined>(capture: () => T): T {
+    captureResult(capture: MarsSurfaceCapture): WorksheetResultSnapshot;
+
+    /** @brief Capture an optional result while preserving the retained surface presentation. */
+    captureResult(capture: MarsSurfaceOptionalCapture): WorksheetResultSnapshot | null | undefined;
+
+    /** @brief Restore the same connected surface even when snapshot capture throws. */
+    captureResult(capture: MarsSurfaceOptionalCapture): WorksheetResultSnapshot | null | undefined {
         const view = this.current, saved = this.snapshot();
         if (!view) return capture();
         this.clear(true);
@@ -263,22 +312,24 @@ class MarsSurfacePreview {
 
     /** @brief Restore a saved camera on the next frame, provided the restored chart remains connected. */
     restoreResult(saved: MarsSurfaceSnapshot | null): void {
-        cancelAnimationFrame(this.restoration_frame);
-        this.restoration_frame = 0;
+        cancelAnimationFrame(this.restorationFrame);
+        this.restorationFrame = 0;
         if (this.closed) return;
-        const chart = document.querySelector<SVGSVGElement>('#plotRendered [data-surface]');
-        if (!chart) return;
+        const chart = document.querySelector('#plotRendered [data-surface]');
+        if (!marsTransportIsDOM(chart, 'SVGSVGElement')) return;
         // Mode controls and fitted card dimensions settle after DOM restoration.
-        this.restoration_frame = requestAnimationFrame(() => {
-            this.restoration_frame = 0;
-            if (this.closed || !chart.isConnected) return;
-            const view = this.prepare(chart, saved);
-            if (view) this.draw(chart, view.angles);
-        });
+        this.restorationFrame = requestAnimationFrame(this.restoreView.bind(this, chart, saved));
+    }
+
+    private restoreView(chart: SVGSVGElement, saved: MarsSurfaceSnapshot | null): void {
+        this.restorationFrame = 0;
+        if (this.closed || !chart.isConnected) return;
+        const view = this.prepare(chart, saved);
+        if (view) this.draw(chart, view.angles);
     }
 
     private syncZoom(view: MarsSurfaceView): void {
-        this.host.native.call<void>('lab_surface_zoom_sync', view);
+        this.host.native.call('lab_surface_zoom_sync', view);
     }
 
     /**
@@ -292,39 +343,35 @@ class MarsSurfacePreview {
         if (this.current?.chart === chart) return this.current;
         this.dispose();
         if (!chart?.isConnected || !chart.dataset.units) return null;
-        const primitives: MarsSurfacePrimitive[] = [], data: number[] = [];
-        const segments = chart.dataset.segments === 'true';
-        for (const path of chart.querySelectorAll<SVGElement>('[data-segment]')) {
-            const points = (path.dataset.segment ?? '').split(' ').map(Number);
-            if (points.length !== 6 || !points.every(Number.isFinite)) return null;
-            const rgb = Number.parseInt((path.getAttribute('stroke') ?? '#000000').slice(1), 16);
-            const colour = [(rgb >> 16 & 255) / 255, (rgb >> 8 & 255) / 255, (rgb & 255) / 255];
-            const ends: MarsSurfacePoint3[] = [[points[0], points[1], points[2]], [points[3], points[4], points[5]]];
-            primitives.push({points: ends, colour: (path.getAttribute('stroke') ?? '#000000'), depth: 0});
-            ends.forEach(point => data.push(...point, ...colour, 1, 1, 1));
-        }
-        for (const path of chart.querySelectorAll<SVGElement>('[data-vertices]')) {
-            const points = (path.dataset.vertices ?? '').split(' ').map(Number);
-            if (points.length < 9 || points.length > 15 || points.length % 3 || !points.every(Number.isFinite))
-                return null;
-            const rgb = Number.parseInt((path.getAttribute('fill') ?? '#000000').slice(1), 16);
-            const colour = [(rgb >> 16 & 255) / 255, (rgb >> 8 & 255) / 255, (rgb & 255) / 255];
-            for (let i = 3; i + 3 < points.length; i += 3) {
-                const triangle: MarsSurfacePoint3[] = [[points[0], points[1], points[2]],
-                    [points[i], points[i + 1], points[i + 2]], [points[i + 3], points[i + 4], points[i + 5]]];
-                primitives.push({points: triangle, colour: (path.getAttribute('fill') ?? '#000000'), depth: 0});
-                triangle.forEach((point, j) => data.push(...point, ...colour,
-                                                       Number(j === 0), Number(j === 1), Number(j === 2)));
-            }
-        }
-        if (!primitives.length && chart.dataset.empty !== 'true') return null;
-        const units = chart.dataset.units.split(' ').map(Number);
-        if (units.length !== 3 || !units.every(x => Number.isFinite(x) && x > 0)) return null;
+        const mesh = this.host.native.call('lab_surface_mesh', chart) as MarsSurfaceMesh | null;
+        if (!mesh) return null;
+        const view = this.createView(chart, mesh, saved, software);
+        if (!view) return null;
+        this.restoreOrientation(view, saved);
+        this.host.volume.initialise(view, saved, saved?.key === this.signature(chart));
+        this.current = view;
+        this.observeView(view);
+        this.syncZoom(view);
+        return view;
+    }
+
+    /** @brief Allocate browser resources and assemble the view before native volume initialisation. */
+    private createView(chart: SVGSVGElement, mesh: MarsSurfaceMesh,
+                       saved: MarsSurfaceSnapshot | null, software: boolean): MarsSurfaceInitialView | null {
+        const resources = this.createDOM(chart, mesh, software);
+        if (!resources) return null;
+        const view = this.assembleView(chart, mesh, saved, resources);
+        resources.canvas.addEventListener('webglcontextlost', this.contextLost.bind(this, chart, resources.overlay));
+        return view;
+    }
+
+    /** @brief Create the overlay and drawing contexts; release GPU allocations if a required context is unavailable. */
+    private createDOM(chart: SVGSVGElement, mesh: MarsSurfaceMesh, software: boolean): MarsSurfaceResources | null {
         const width = chart.viewBox.baseVal.width, height = chart.viewBox.baseVal.height;
         // Keep composited canvases out of SVG foreignObject: mobile engines can
         // position those layers outside the fitted SVG when they first appear.
-        const host = chart.closest<HTMLElement>('.rendered');
-        if (!host) return null;
+        const host = chart.closest('.rendered');
+        if (!marsTransportIsDOM(host, 'HTMLElement')) return null;
         const overlay = document.createElement('div');
         overlay.dataset.surfaceOverlay = '';
         overlay.style.cssText = `position:absolute;left:0;top:0;width:${width}px;height:${height}px;` +
@@ -333,9 +380,9 @@ class MarsSurfacePreview {
         holder.style.cssText = `position:relative;width:${width}px;height:${height}px;` +
             'transform-origin:0 0;pointer-events:none';
         let canvas = document.createElement('canvas');
-        const vertices = new Float32Array(data);
-        const renderer = software ? null : MarsSurfaceGPU.create(canvas, vertices, segments);
-        if (!renderer) canvas = document.createElement('canvas');
+        const vertices = new Float32Array(mesh.vertices);
+        const gpu = software ? null : MarsSurfaceGPU.create(canvas, vertices, chart.dataset.segments === 'true');
+        if (!gpu) canvas = document.createElement('canvas');
         const labels = document.createElement('canvas');
         for (const layer of [canvas, labels]) {
             // Allocate the backing stores from their displayed size on the first draw.
@@ -344,56 +391,96 @@ class MarsSurfacePreview {
             layer.style.cssText = `position:absolute;left:0;top:0;width:${width}px;height:${height}px`;
             holder.appendChild(layer);
         }
-        const context = renderer ? null : canvas.getContext('2d');
+        const context = gpu ? null : canvas.getContext('2d');
         const ink = labels.getContext('2d');
-        if ((!renderer && !context) || !ink) { renderer?.dispose(); return null; }
+        if ((!gpu && !context) || !ink) { gpu?.dispose(); return null; }
         overlay.appendChild(holder);
         host.appendChild(overlay);
-        const ticks = [...chart.querySelectorAll<SVGElement>('[data-tick-fraction]')].map(node => ({
-            axis: Number(node.dataset.plotTick), fraction: Number(node.dataset.tickFraction),
-            label: node.nextElementSibling?.tagName === 'text' ? (node.nextElementSibling.textContent ?? '') : ''
-        }));
-        const names = [0, 1, 2].map(axis => chart.querySelector(`[data-axis-name="${axis}"]`)?.textContent || '');
-        const observer = new MutationObserver(() => { if (!chart.isConnected) this.dispose(); });
-        const rendered = document.getElementById('plotRendered');
-        if (rendered) observer.observe(rendered, {childList: true, subtree: true});
-        const view: MarsSurfaceInitialView = {
+        return {host, overlay, holder, canvas, vertices, width, height, gpu, context, ink};
+    }
+
+    /** @brief Combine browser resources, native geometry and compatible camera state without starting observers. */
+    private assembleView(chart: SVGSVGElement, mesh: MarsSurfaceMesh, saved: MarsSurfaceSnapshot | null,
+                         resources: MarsSurfaceResources): MarsSurfaceInitialView {
+        const {host, overlay, holder, vertices, width, height, gpu, context, ink} = resources;
+        const names: string[] = [];
+        for (let axis = 0; axis < 3; ++axis) {
+            names.push(chart.querySelector(`[data-axis-name="${axis}"]`)?.textContent || '');
+        }
+        return {
             frame: 0, settled: null, orientation: [0, 0, 0, 1],
-            chart, host, holder, primitives, vertices, units, width, height, overlay, gpu: renderer, context, ink,
-            ticks, names, observer, hidden: [],
+            chart, host, holder, primitives: mesh.primitives, vertices, units: mesh.units,
+            width, height, overlay, gpu, context, ink, ticks: this.readTicks(chart), names,
+            observer: new MutationObserver(this.chartMutated.bind(this, chart)), hidden: [],
             camera: saved && (saved.key === this.signature(chart) || saved.refining) ?
                 {...saved.camera} : {scale: 1, x: 0, y: 0},
-            angles: ['Azimuth', 'Elevation', 'Roll'].map(key =>
-                Number((document.getElementById('plot' + key) as HTMLInputElement | null)?.value ?? 0))
+            angles: this.readAngles()
         };
+    }
+
+    private readTicks(chart: SVGSVGElement): MarsSurfaceTick[] {
+        const ticks: MarsSurfaceTick[] = [];
+        for (const node of chart.querySelectorAll('[data-tick-fraction]')) {
+            if (!marsTransportIsDOM(node, 'SVGElement')) continue;
+            ticks.push({axis: Number(node.dataset.plotTick), fraction: Number(node.dataset.tickFraction),
+                label: node.nextElementSibling?.tagName === 'text' ? (node.nextElementSibling.textContent ?? '') : ''});
+        }
+        return ticks;
+    }
+
+    private readAngles(): MarsSurfaceAngles {
+        const azimuth = document.getElementById('plotAzimuth') as HTMLInputElement | null;
+        const elevation = document.getElementById('plotElevation') as HTMLInputElement | null;
+        const roll = document.getElementById('plotRoll') as HTMLInputElement | null;
+        return [Number(azimuth?.value ?? 0), Number(elevation?.value ?? 0), Number(roll?.value ?? 0)];
+    }
+
+    private anglesMatch(left: MarsSurfaceAngles, right: MarsSurfaceAngles, tolerance: number): boolean {
+        for (let i = 0; i < left.length; ++i) {
+            if (!(Math.abs(left[i] - right[i]) <= tolerance)) return false;
+        }
+        return true;
+    }
+
+    private restoreOrientation(view: MarsSurfaceInitialView, saved: MarsSurfaceSnapshot | null): void {
         const preserveOrientation = saved?.orientation && (saved.refining ||
-            (saved.identity === this.identity(chart) &&
-                view.angles.every((value, i) => Math.abs(value - saved.angles[i]) <= 0.51)));
+            (saved.identity === this.identity(view.chart) && this.anglesMatch(view.angles, saved.angles, 0.51)));
         view.orientation = preserveOrientation ?
             [...saved.orientation] : this.host.camera.fromAngles(view.angles);
         if (preserveOrientation) view.angles = [...saved.angles];
-        this.host.volume.initialise(view, saved, saved?.key === this.signature(chart));
-        this.current = view;
-        canvas.addEventListener('webglcontextlost', event => {
-            event.preventDefault();
-            if (this.current?.overlay !== overlay) return;
-            const savedView = this.snapshot();
-            this.dispose();
-            const fallback = this.prepare(chart, savedView, true);
-            if (fallback) this.draw(chart, fallback.angles);
-        });
+    }
+
+    private chartMutated(chart: SVGSVGElement): void {
+        if (!chart.isConnected) this.dispose();
+    }
+
+    private contextLost(chart: SVGSVGElement, overlay: HTMLDivElement, event: Event): void {
+        event.preventDefault();
+        if (this.current?.overlay !== overlay) return;
+        const savedView = this.snapshot();
+        this.dispose();
+        const fallback = this.prepare(chart, savedView, true);
+        if (fallback) this.draw(chart, fallback.angles);
+    }
+
+    private observeView(view: MarsSurfaceView): void {
+        // Activate observers only after native initialisation has supplied view.volume.
+        const rendered = document.getElementById('plotRendered');
+        if (rendered) view.observer.observe(rendered, {childList: true, subtree: true});
         if (window.ResizeObserver) {
-            view.resizeObserver = new ResizeObserver(() => {
-                if (this.current !== view || view.frame) return;
-                view.frame = requestAnimationFrame(() => {
-                    view.frame = 0;
-                    if (this.current === view && chart.isConnected) this.draw(chart, view.angles);
-                });
-            });
-            view.resizeObserver.observe(host);
+            view.resizeObserver = new ResizeObserver(this.viewResized.bind(this, view));
+            view.resizeObserver.observe(view.host);
         }
-        this.syncZoom(this.current);
-        return this.current;
+    }
+
+    private viewResized(view: MarsSurfaceView): void {
+        if (this.current !== view || view.frame) return;
+        view.frame = requestAnimationFrame(this.redrawView.bind(this, view));
+    }
+
+    private redrawView(view: MarsSurfaceView): void {
+        view.frame = 0;
+        if (this.current === view && view.chart.isConnected) this.draw(view.chart, view.angles);
     }
 
     // Browser pixel sizing only: geometry and camera calculations remain native.
@@ -415,23 +502,19 @@ class MarsSurfacePreview {
         view.ink.setTransform(width / view.width, 0, 0, height / view.height, 0, 0);
     }
 
-    /**
-     * @brief Render a native-projected frame and synchronise its axes, overlay and zoom metadata.
-     * Uses device-pixel-sized backing stores and falls back to canvas after GPU failure.
-     * Returns false when the chart, angles or native frame cannot be used; line views settle
-     * to SVG after interaction ends without discarding their retained geometry.
-     */
-    draw(chart: SVGSVGElement, angles: MarsSurfaceAngles, bounds: number[] | null = null): boolean {
-        this.hover?.hide();
-        const view = this.prepare(chart);
-        if (!view || !angles.every(Number.isFinite)) return false;
-        this.removeSettled(view);
-        if (angles.some((value, i) => Math.abs(value - view.angles[i]) > 1e-9))
-            view.orientation = this.host.camera.fromAngles(angles);
-        view.angles = [...angles];
+    private projectedPolygons(view: MarsSurfaceView, frame: MarsSurfaceFrame): MarsSurfaceDrawing[] {
+        if (!view.drawing) {
+            const segments = view.chart.dataset.segments === 'true';
+            view.drawing = this.host.native.call('lab_surface_polygons', frame,
+                                                view.primitives, Number(segments)) as MarsSurfaceDrawing[];
+        }
+        return view.drawing;
+    }
+
+    private positionOverlay(view: MarsSurfaceView): boolean {
         // Map the native chart's coordinate system into the HTML scroll content,
         // including nested SVG headings, mobile fitting, borders and scroll offsets.
-        const screen = chart.getScreenCTM(), box = view.host.getBoundingClientRect();
+        const screen = view.chart.getScreenCTM(), box = view.host.getBoundingClientRect();
         if (!screen) return false;
         this.resizeBacking(view, screen);
         const tx = screen.e - box.left - view.host.clientLeft + view.host.scrollLeft;
@@ -449,61 +532,111 @@ class MarsSurfacePreview {
         });
         view.holder.style.transform =
             `matrix(${screen.a},${screen.b},${screen.c},${screen.d},${-overlayLeft},${-overlayTop})`;
-        const {width, height, vertices} = view;
-        const frame = this.host.native.call<MarsSurfaceFrame | null>('lab_surface_frame', view, bounds);
+        return true;
+    }
+
+    private projectPoint(frame: MarsSurfaceFrame, point: MarsSurfacePoint3): MarsSurfacePoint2 {
+        return this.host.native.call('lab_surface_project', frame, point) as MarsSurfacePoint2;
+    }
+
+    /**
+     * @brief Render a native frame and synchronise axes, overlays and zoom metadata.
+     * Uses device-pixel backing stores and falls back to Canvas after GPU failure.
+     * Returns false when the chart, angles or native frame cannot be used.
+     */
+    draw(chart: SVGSVGElement, angles: MarsSurfaceAngles, bounds: number[] | null = null): boolean {
+        // 1. Prepare the view, validate angles and update orientation.
+        this.hover?.invalidate(chart);
+        const view = this.prepare(chart);
+        if (!view) return false;
+        for (const angle of angles) {
+            if (!Number.isFinite(angle)) return false;
+        }
+        this.removeSettled(view);
+        if (!this.anglesMatch(angles, view.angles, 1e-9)) {
+            view.orientation = this.host.camera.fromAngles(angles);
+        }
+        view.angles = [...angles];
+        // 2. Position the overlay and resize its backing stores.
+        if (!this.positionOverlay(view)) return false;
+
+        // 3. Obtain the native frame and install its projection callbacks.
+        const frame = this.host.native.call('lab_surface_frame', view, bounds) as MarsSurfaceFrame | null;
         if (!frame) return false;
         view.framePlan = frame;
-        view.project = point => this.host.native.call<MarsSurfacePoint2>('lab_surface_project', frame, point);
-        view.polygon = points => this.host.native.call<MarsSurfacePolygon>('lab_surface_polygon', frame, points);
-        const {scaling, offset} = frame;
-        const matrix = new Float32Array(frame.matrix);
+        view.project = this.projectPoint.bind(this, frame);
+        view.drawing = undefined;
+        view.polygons = this.projectedPolygons.bind(this, view, frame);
+
+        // 4. Render with WebGL, or retry with Canvas if the GPU fails.
         if (view.gpu) {
-            if (!view.gpu.draw(matrix, scaling, offset, frame.drawMesh)) {
+            if (!view.gpu.draw(new Float32Array(frame.matrix), frame.scaling, frame.offset, frame.drawMesh)) {
                 const savedView = this.snapshot();
                 this.dispose();
                 const fallback = this.prepare(chart, savedView, true);
                 return fallback ? this.draw(chart, fallback.angles, bounds) : false;
             }
-        } else {
-            const ctx = view.context;
-            if (!ctx) return false;
-            ctx.clearRect(0, 0, width, height);
-            const triangles = (frame.drawMesh ? view.primitives : []).map(triangle => ({
-                ...this.host.native.call<MarsSurfacePolygon>('lab_surface_polygon', frame, triangle.points), colour: triangle.colour
-            })).filter(triangle => triangle.points.length >= (chart.dataset.segments === 'true' ? 2 : 3));
-            triangles.sort((a, b) => b.depth - a.depth);
-            ctx.strokeStyle = '#193d4659';
-            ctx.lineWidth = 0.45;
-            for (const triangle of triangles) {
-                ctx.beginPath();
-                triangle.points.forEach((p, i) => { i ? ctx.lineTo(...p) : ctx.moveTo(...p); });
-                if (chart.dataset.segments === 'true') {
-                    ctx.strokeStyle = triangle.colour;
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    continue;
-                }
-                ctx.closePath();
-                ctx.fillStyle = triangle.colour;
-                ctx.fill(); ctx.stroke();
-            }
+        } else if (!this.drawCanvas(view)) {
+            return false;
         }
-        view.paintAxes = ctx => {
-            ctx.clearRect(0, 0, width, height);
-            ctx.strokeStyle = '#94b8b1'; ctx.fillStyle = '#b8ccc5'; ctx.lineWidth = 1.2;
-            ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-            for (const path of frame.paths) {
-                ctx.beginPath();
-                ctx.moveTo(path[0], path[1]);
-                for (let i = 2; i < path.length; i += 2) ctx.lineTo(path[i], path[i + 1]);
-                ctx.stroke();
-            }
-            for (const text of frame.texts) {
-                ctx.textAlign = text.align;
-                ctx.fillText(text.text, text.x, text.y);
-            }
-        };
+        // 5. Paint axes, reveal the overlay, synchronise zoom and schedule settling.
+        view.paintAxes = this.paintAxes.bind(this, frame);
         view.paintAxes(view.ink);
+        this.showView(view);
+        this.syncZoom(view);
+        this.scheduleSettled(view);
+        this.hover?.refresh(chart);
+        return true;
+    }
+
+    private drawCanvas(view: MarsSurfaceView): boolean {
+        const ctx = view.context;
+        if (!ctx || !view.polygons) return false;
+        ctx.clearRect(0, 0, view.width, view.height);
+        const triangles = view.polygons();
+        ctx.strokeStyle = '#193d4659';
+        ctx.lineWidth = 0.45;
+        for (const triangle of triangles) {
+            ctx.beginPath();
+            for (let i = 0; i < triangle.points.length; ++i) {
+                const point = triangle.points[i];
+                if (i) ctx.lineTo(...point);
+                else ctx.moveTo(...point);
+            }
+            if (view.chart.dataset.segments === 'true') {
+                ctx.strokeStyle = triangle.colour;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                continue;
+            }
+            ctx.closePath();
+            ctx.fillStyle = triangle.colour;
+            ctx.fill(); ctx.stroke();
+        }
+        return true;
+    }
+
+    private paintAxes(frame: MarsSurfaceFrame, ctx: MarsSurfaceAxisContext): void {
+        ctx.clearRect(0, 0, frame.width, frame.height);
+        ctx.strokeStyle = '#94b8b1'; ctx.fillStyle = '#b8ccc5'; ctx.lineWidth = 1.2;
+        ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+        for (const path of frame.paths) {
+            ctx.beginPath();
+            ctx.moveTo(path[0], path[1]);
+            for (let i = 2; i < path.length; i += 2) ctx.lineTo(path[i], path[i + 1]);
+            ctx.stroke();
+        }
+        for (const text of frame.texts) {
+            ctx.textAlign = text.align;
+            ctx.fillText(text.text, text.x, text.y);
+        }
+    }
+
+    private showView(view: MarsSurfaceView): void {
+        const chart = view.chart;
+        // Save original g/path visibility once per overlay cycle; clear(true) restores it.
+        // Native base geometry stays fixed until chart replacement. The separately owned
+        // settled SVG layer is removed before drawing, so it never enters this list.
         if (!view.hidden.length) {
             for (const child of chart.children) {
                 if (marsTransportIsDOM(child, 'SVGElement') && (child.tagName === 'g' || child.tagName === 'path')) {
@@ -514,13 +647,10 @@ class MarsSurfacePreview {
         }
         view.overlay.style.display = '';
         chart.dataset.localRenderer = view.gpu ? 'webgl' : 'canvas';
-        chart.dataset.localCamera = angles.join(',');
+        chart.dataset.localCamera = view.angles.join(',');
         chart.dataset.cameraZoom = String(view.camera.scale);
         chart.dataset.volumeBounds = view.volume.bounds.join(',');
         chart.dataset.cameraQuaternion = view.orientation.join(',');
-        this.syncZoom(view);
-        this.scheduleSettled(view);
-        return true;
     }
 
     /**
@@ -540,12 +670,14 @@ class MarsSurfacePreview {
             this.host.camera.drag(state.rotationStart, [state.x, state.y],
                 [state.touchX, state.touchY], state.rotationBox ?? chart.getBoundingClientRect(), state.rollOnly);
         view.angles = this.host.camera.angles(view.orientation, view.angles);
-        ['plotAzimuth', 'plotElevation', 'plotRoll'].forEach((id, i) => {
+        const controls = ['plotAzimuth', 'plotElevation', 'plotRoll'];
+        for (let i = 0; i < controls.length; ++i) {
+            const id = controls[i];
             const control = document.getElementById(id) as HTMLInputElement | null, value = view.angles[i];
             if (control) control.value = String(value);
             const output = document.getElementById(id + 'Value');
             if (output) output.textContent = String(Math.round(value)) + '°';
-        });
+        }
         return this.draw(chart, view.angles);
     }
 
@@ -557,10 +689,7 @@ class MarsSurfacePreview {
     zoom(chart: SVGSVGElement, factor: number, _x: number, _y: number, reset = false): boolean {
         const view = this.prepare(chart);
         if (!view || !this.host.volume.set(view, factor, reset)) return false;
-        if (!view.frame) view.frame = requestAnimationFrame(() => {
-            view.frame = 0;
-            if (this.current === view && chart.isConnected) this.draw(chart, view.angles);
-        });
+        if (!view.frame) view.frame = requestAnimationFrame(this.redrawView.bind(this, view));
         return true;
     }
 
@@ -578,32 +707,42 @@ class MarsSurfacePreview {
         return this.host.exporter.svg(this.current);
     }
 
-    /** Release page-lifetime subscriptions and all retained view resources. */
+    /** @brief Release page-lifetime subscriptions and all retained view resources. */
     public close(): void {
         this.closed = true;
         this.events.removeEventListener('pointermove', this.onHover);
+        this.events.removeEventListener('pointerover', this.onHover);
         this.hover?.dispose();
         this.events.removeEventListener('pagehide', this.onPageHide);
         this.events.removeEventListener('resize', this.onResize);
-        cancelAnimationFrame(this.resize_frame);
-        this.resize_frame = 0;
-        cancelAnimationFrame(this.restoration_frame);
-        this.restoration_frame = 0;
+        cancelAnimationFrame(this.resizeFrame);
+        this.resizeFrame = 0;
+        cancelAnimationFrame(this.restorationFrame);
+        this.restorationFrame = 0;
         this.dispose();
     }
 
-    private readonly onPageHide = (): void => { this.dispose(); };
-    private readonly onResize = (): void => {
+    private onPageHide(): void {
+        this.dispose();
+    }
+
+    private onResize(): void {
         if (this.closed) return;
-        cancelAnimationFrame(this.resize_frame);
-        this.resize_frame = requestAnimationFrame(() => {
-            this.resize_frame = requestAnimationFrame(() => {
-                this.resize_frame = 0;
-                if (this.current?.chart.isConnected) this.draw(this.current.chart, this.current.angles);
-            });
-        });
-    };
+        cancelAnimationFrame(this.resizeFrame);
+        this.resizeFrame = requestAnimationFrame(this.deferResize.bind(this));
+    }
+
+    private deferResize(): void {
+        this.resizeFrame = requestAnimationFrame(this.finishResize.bind(this));
+    }
+
+    private finishResize(): void {
+        this.resizeFrame = 0;
+        if (this.current?.chart.isConnected) this.draw(this.current.chart, this.current.angles);
+    }
 }
+
+/** @brief Shared retained renderer with lazily resolved camera, volume and export capabilities. */
 const labSurfacePreview: MarsSurfacePreview = new MarsSurfacePreview({
     native: labDOM,
     get volume() { return labSurfaceVolume; },

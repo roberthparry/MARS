@@ -4,9 +4,11 @@
  *
  * Applies mode and precision policy, help selection, result-card visibility,
  * busy-state ownership, conditional editor sizing and calculus action markup.
+ * Calculus labels use the shared binding formatter, with temporary handles released per name.
  * Captures and restores opaque DOM snapshots without interpreting mathematical
  * text. Browser values and nodes are borrowed only within a synchronous call;
  * returned snapshot objects belong to the host and no handles are retained.
+ * Decoded snapshot validation preserves state identity and uses the supplied mode catalogue.
  * Result restoration normalises opaque metadata, clones variable lists and
  * projects reusable input before returning globals for calculus-control refresh.
  * Request lifetimes and asynchronous browser callbacks remain with their adapters.
@@ -14,8 +16,23 @@
  * Used by the freestanding browser modules and the versioned JavaScript host ABI.
  * This is not an installed MARS library interface; calls run synchronously on the browser thread.
  */
+#ifndef MARS_LAB_WORKSPACE_DOM_INTERNAL_ACCESS
+#error "Private Lab workspace DOM interface"
+#endif
 #ifndef LAB_WASM_WORKSPACE_DOM_H
 #define LAB_WASM_WORKSPACE_DOM_H
+
+/**
+ * @brief Validate a decoded worksheet snapshot and return its original state through lab_dom_return.
+ * @param envelope Decoded non-null object with a state property; arrays with that property are accepted.
+ * @param mode_names Caller-supplied array of at most seven permitted mode strings, compared exactly.
+ * @details Returns the same state object when mode and text are strings and the mode is permitted.
+ * Explicit state:null returns null. Returns numeric -1 for an invalid envelope and -2 for invalid state,
+ * including state:undefined or a non-array or oversized mode catalogue. Property presence includes
+ * inherited properties. Inputs are decoded data, not functions, accessors or other executable values.
+ * No input is mutated, no exception is requested, and no handle survives this synchronous call.
+ */
+void lab_workspace_snapshot_validate(int envelope, int mode_names);
 
 /**
  * @brief Return named browser control references for startup through lab_dom_return.
@@ -146,6 +163,15 @@ void lab_workspace_dom_editor_resize(int editors, double viewport);
  * @param differentiable Non-zero creates derivative and integral buttons; zero leaves the panel empty.
  */
 void lab_workspace_dom_derivatives(int names, int labels, int differentiable);
+
+/** @brief Derive native binding labels and render calculus controls through lab_workspace_dom_derivatives.
+ * @param names Scoped array of exact variable-name strings in discovery order; it is not modified.
+ * @param differentiable Non-zero creates derivative and integral buttons; zero leaves the panel empty.
+ * @details Visible plot controls receive the same names and labels regardless of differentiability.
+ * The shared lab_binding_label_value formatter removes only outer display brackets. Temporary handles
+ * are released per name and all handles created here are released before returning; no handle is retained.
+ */
+void lab_workspace_dom_calculus(int names, int differentiable);
 
 /** @brief Return a node snapshot; button selects button-specific fields.
  * @param node Scoped node to capture.

@@ -12,10 +12,14 @@
  * control metadata retains actual browser values, never integer handles.
  * Rendering and metadata copying visit every entry with bounded temporary
  * storage. Constant ordering uses a stable merge sort rather than repeated scans.
+ * Binding cards and workspace calculus controls share the scoped identifier-label formatter.
  *
  * Used by the freestanding browser modules and the versioned JavaScript host ABI.
  * This is not an installed MARS library interface; calls run synchronously on the browser thread.
  */
+#ifndef MARS_LAB_BINDING_INTERNAL_ACCESS
+#error "Private Lab binding interface"
+#endif
 #ifndef LAB_WASM_BINDING_H
 #define LAB_WASM_BINDING_H
 
@@ -29,6 +33,13 @@ int lab_binding_compare(int arguments);
  * @param arguments Scoped array whose first item is the identifier to display.
  */
 void lab_binding_label(int arguments);
+
+/** @brief Format an identifier within the caller's existing synchronous handle scope.
+ * @param name Scoped identifier value, using the same truthy fallback and outer-bracket removal as lab_binding_label.
+ * @return Scoped display-string handle; the caller releases it and any temporary handles after use.
+ * @details Preserves whitespace, Unicode and inner brackets without interpreting mathematical text.
+ */
+int lab_binding_label_value(int name);
 
 /** @brief Recognise UI unset sentinels without interpreting mathematical expressions.
  * @param arguments Scoped array whose first item is the candidate binding value.

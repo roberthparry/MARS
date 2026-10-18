@@ -5,15 +5,27 @@
  * Checks visibility and action dispatch against the native bridge while keeping server-produced presentation markup opaque.
  */
 
-/** Native almanac event plans and live subscriptions; exact server markup remains opaque. */
+/** @brief Mutable fixture registry assembled before it is frozen for native dispatch. */
+interface LabAlmanacEventSpies {
+    [name: string]: MarsTransportService;
+}
+
+/** @brief Check native almanac event plans and live subscriptions with opaque server markup. */
 window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Almanac events: ' + message);
-    };
-    const names = (plan: LabWorksheetTestPlan) => plan.calls.map(call => call.service).join(',');
-    const dispatch = (action: number, button: HTMLElement | null, context: unknown = null) => labDOM.call<LabWorksheetTestPlan>(
-        'lab_almanac_events_dispatch', action, {currentTarget: button, target: button?.firstChild}, context);
+    }
+    /** @brief List native services in their original execution order. */
+    function names(plan: LabWorksheetTestPlan): string {
+        return plan.calls.map(call => call.service).join(',');
+    }
+
+    /** @brief Plan an action with the same current target and nested event target. */
+    function dispatch(action: number, button: HTMLElement | null, context: unknown = null): LabWorksheetTestPlan {
+        return labDOM.call<LabWorksheetTestPlan>(
+            'lab_almanac_events_dispatch', action, {currentTarget: button, target: button?.firstChild}, context);
+    }
     const target = document.createElement('div');
     const controls = '<button data-almanac-visibility="all"><span>All</span></button>' +
         '<button data-almanac-visibility="visible"><span>Visible</span></button>' +
@@ -40,17 +52,20 @@ window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
     const context = {target, state};
     const button = document.createElement('button');
     button.dataset.almanacVisibility = 'visible';
-    const savedVisibility = WorksheetContext.worksheetSession.calendar.almanacVisibilityMode, savedWorksheet = WorksheetContext.worksheetSession.calendar.almanacLastWorksheetData;
+    const savedVisibility = WorksheetContext.worksheetSession.calendar.almanacVisibilityMode;
+    const savedWorksheet = WorksheetContext.worksheetSession.calendar.almanacLastWorksheetData;
     const services = [
         'applyAlmanacTotalityAction', 'setAlmanacVisibility', 'saveLastAlmanacState', 'renderAlmanacWorksheet',
         'refreshAlmanacLandTotality', 'setStatus', 'evaluateAlmanac'
     ];
-    const calls: LabWorksheetTestEffect[] = [], reentryErrors: unknown[] = [];
+    const calls: LabWorksheetTestEffect[] = [];
+    const reentryErrors: unknown[] = [];
     let project = false;
-    const spies = Object.fromEntries(services.map(
-        service => [service, (...args: unknown[]) => {
+    const spies: LabAlmanacEventSpies = {};
+    for (const service of services) {
+        spies[service] = function recordService(...args: unknown[]): void {
             if (service === 'setAlmanacVisibility')
-                WorksheetResults.calendarResults.setAlmanacVisibility(...args as Parameters<typeof WorksheetResults.calendarResults.setAlmanacVisibility>);
+                WorksheetResults.calendarResults.setAlmanacVisibility(args[0] as string);
             calls.push({service, args, visibility: WorksheetContext.worksheetSession.calendar.almanacVisibilityMode});
             try {
                 check(dispatch(99, null).calls.length === 0, 'service can re-enter after the native scope ends');
@@ -58,15 +73,17 @@ window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
                 reentryErrors.push(error);
             }
             if (project && service === 'renderAlmanacWorksheet')
-                WorksheetResults.calendarResults.renderAlmanacWorksheet(...args as Parameters<typeof WorksheetResults.calendarResults.renderAlmanacWorksheet>);
-        }]));
+                WorksheetResults.calendarResults.renderAlmanacWorksheet(args[0] as HTMLElement, args[1]);
+        };
+    }
     const savedRegistry = labDOM.bindEvents(Object.freeze(spies));
-    const send = (node: Node, expected: unknown, bubbles = false) => {
+    /** @brief Dispatch a browser click and verify its default behaviour and service order. */
+    function send(node: Node, expected: unknown, bubbles = false): void {
         calls.length = 0;
         const event = new MouseEvent('click', {bubbles, cancelable: true});
         check(node.dispatchEvent(event) && !event.defaultPrevented, 'almanac actions preserve browser defaults');
         check(names({calls}) === expected, 'live ordered services: ' + names({calls}));
-    };
+    }
     try {
         check(
             savedRegistry && services.every(service => typeof savedRegistry[service] === 'function'),
@@ -135,7 +152,8 @@ window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
                  of [null, {}, {visibility: 'visible'},
                      {visibility: 'visible', almanac_presentation: {visible: {html: ' \n\t '}}},
                      {visibility: 'visible', almanac_presentation: {visible: {html: 42}}}]) {
-            const html = target.innerHTML, copy = target.dataset.copyText;
+            const html = target.innerHTML;
+            const copy = target.dataset.copyText;
             check(
                 labDOM.call('lab_almanac_events_render', target, invalid, state) === null,
                 'malformed native variant rejected');
@@ -169,7 +187,7 @@ window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
         });
         const add = EventTarget.prototype.addEventListener;
         let added = 0;
-        EventTarget.prototype.addEventListener = function(type, listener, options) {
+        EventTarget.prototype.addEventListener = function countListener(type, listener, options) {
             ++added;
             return add.call(this, type, listener, options);
         };

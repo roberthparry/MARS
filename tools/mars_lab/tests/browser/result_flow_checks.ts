@@ -7,11 +7,14 @@
 
 /** Native result-action continuations, edit supersession and clipboard failures. */
 window.checkLabResultFlows = async function checkLabResultFlows() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Result flow: ' + message);
-    };
-    const saved = new Map<string, unknown>(), events: unknown[][] = [], originalBindings = WorksheetWorkspace.presentation.state.resultInputBindings, originalEditor = WorksheetContext.expr.value;
+    }
+    const saved = new Map<string, unknown>();
+    const events: unknown[][] = [];
+    const originalBindings = WorksheetWorkspace.presentation.state.resultInputBindings;
+    const originalEditor = WorksheetContext.expr.value;
     const metadata = {name: '__proto__', value: 'π/7', extra: {native: true}};
     const sparse = [metadata, , null];
     const snapshot = labDOM.call<{name?: string; extra?: unknown}[]>('lab_result_binding_snapshot', sparse);
@@ -19,7 +22,9 @@ window.checkLabResultFlows = async function checkLabResultFlows() {
     check(snapshot[0] !== metadata && snapshot[0].extra === metadata.extra, 'metadata snapshot is a shallow copy');
     check(snapshot[0].name === '__proto__' && Object.keys(snapshot[2]).length === 0, 'safe metadata and null records');
     check(labDOM.call<unknown[]>('lab_result_binding_snapshot', {length: 2}).length === 0, 'non-array bindings are ignored');
-    const boot = (frame: object) => labDOM.call<ResultFlowFixturePlan>('lab_flow_step', 64, frame, {});
+    function boot(frame: object): ResultFlowFixturePlan {
+        return labDOM.call<ResultFlowFixturePlan>('lab_flow_step', 64, frame, {});
+    }
     const initial = boot({});
     check(initial.calls[0].args[0] === '/bootstrap' && initial.wait, 'bootstrap endpoint and await are native');
     for (const stage of [1, 5]) {
@@ -34,20 +39,32 @@ window.checkLabResultFlows = async function checkLabResultFlows() {
         'ABI mismatch retains the restart diagnostic');
     const scripts = boot({stage: 8, valid: true}).calls[0].args[0] as string[];
     check(scripts.join(',') === labApplication.definitionScripts.join(','), 'loaded definitions come from the native catalogue');
-    const widgets = labDOM.call<{calls: {args: [HTMLSelectElement, {searchPlaceholder?: string; placeholder?: string}]}[]}>('lab_bootstrap_widgets');
+    check(scripts.includes('bindings_controller') && scripts.includes('bindings'),
+          'binding controller and controls are both loaded before worksheet initialisation');
+    check(scripts.includes('workspace_controllers') && !scripts.includes('workspace'),
+          'workspace controller definitions load before the separate workspace initialisation stage');
+    check(scripts.indexOf('results') >= 0 && scripts.indexOf('results_services') > scripts.indexOf('results'),
+          'result services follow their controllers in the startup catalogue');
+    const widgets = labDOM.call<ResultFlowWidgetPlan>('lab_bootstrap_widgets');
     check(widgets.calls.length === 4 && widgets.calls.every(call => call.args[0].tagName === 'SELECT'),
           'only location dropdowns need native menu enhancement; plot settings are radio buttons');
     check(
         widgets.calls[0].args[1].searchPlaceholder === 'Search jurisdictions' &&
             widgets.calls[2].args[1].placeholder === 'Custom location',
         'native search-control labels');
-    const replace = <F extends (...args: never[]) => unknown>(name: string, callback: F) => {
+    function replace(name: string, callback: MarsTransportService): void {
         if (!saved.has(name))
             saved.set(name, Reflect.get(labTestModuleOwner(name), name));
         Reflect.set(labTestModuleOwner(name), name, callback);
-    };
-    let mode = 'expression', source = 'native result', blocked = false;
-    const record = (name: string) => (...args: unknown[]) => events.push([name, ...args]);
+    }
+    let mode = 'expression';
+    let source = 'native result';
+    let blocked = false;
+    function record(name: string): (...args: unknown[]) => number {
+        return function recordEvent(...args: unknown[]): number {
+            return events.push([name, ...args]);
+        };
+    }
     try {
         replace('currentMode', () => mode);
         replace('currentExpressionText', () => 'authored source');
@@ -60,18 +77,19 @@ window.checkLabResultFlows = async function checkLabResultFlows() {
                      'saveCurrentModeEditorState', 'updateHistoryButtons', 'setStatus', 'syncMatrixControls',
                      'syncRoundedSelect'])
             replace(name, record(name));
-        replace('applyMarsBindingExpression', async (...args: unknown[]) => {
+        replace('applyMarsBindingExpression', async function applyFixtureBindings(...args: unknown[]) {
             events.push(['binding', ...args]);
             return !blocked;
         });
         replace('compactExpressionForEditor', () => ({bindings: [{name: 'x', value: 'α'}]}));
-        replace('expressionWithBindings', async (text: string, bindings: WorksheetBinding[]) => {
+        replace('expressionWithBindings', async function assembleFixture(text: string, bindings: WorksheetBinding[]) {
             events.push(['assemble', text, bindings]);
             return 'native assembled';
         });
         replace('bindingsWithAuthoredValues', (bindings: WorksheetBinding[]) => bindings);
         WorksheetWorkspace.presentation.state.resultInputBindings = [];
-        const oldOperation = WorksheetContext.matrixOperation.value, oldOperand = WorksheetContext.matrixOperand.value;
+        const oldOperation = WorksheetContext.matrixOperation.value;
+        const oldOperand = WorksheetContext.matrixOperand.value;
         try {
             for (mode of ['expression', 'matrix', 'equation', 'diffequation']) {
                 events.length = 0;
@@ -105,7 +123,7 @@ window.checkLabResultFlows = async function checkLabResultFlows() {
         await WorksheetResults.reuse.sendResultExpressionToInput();
         check(events.length === 0, 'empty result is inert');
         source = 'native result';
-        replace('prepareLabEditor', async () => {
+        replace('prepareLabEditor', async function changeEditor() {
             WorksheetContext.expr.value = 'new edit';
         });
         events.length = 0;
@@ -113,7 +131,7 @@ window.checkLabResultFlows = async function checkLabResultFlows() {
         check(events.length === 0, 'intervening edit cancels transfer before history or editor mutation');
 
         WorksheetContext.expr.value = originalEditor;
-        replace('prepareLabEditor', async () => {
+        replace('prepareLabEditor', async function changeMode() {
             WorksheetRequests.labRequests.modeChanged('equation');
             WorksheetRequests.labRequests.modeChanged('expression');
         });
@@ -124,13 +142,13 @@ window.checkLabResultFlows = async function checkLabResultFlows() {
         replace('commitVisibleBindingInputs', async () => events.push(['commit']));
         replace('datetimeSummaryText', () => 'calendar source');
         replace('copyTextForTarget', (target: string) => target === 'empty' ? '' : 'native card source');
-        replace('writeClipboardText', async (text: string) => {
+        replace('writeClipboardText', async function writeClipboard(text: string) {
             events.push(['clipboard', text]);
             if (blocked)
                 throw new Error('clipboard fixture');
         });
         replace('flashCopyButton', record('flash'));
-        replace('setTimeout', (_callback: TimerHandler, delay: number) => {
+        replace('setTimeout', function recordTimer(_callback: TimerHandler, delay: number) {
             events.push(['timer', delay]);
             return 0;
         });

@@ -5,12 +5,43 @@
  * Exercises native syntax metadata and browser rendering after Lab readiness, including retired-script route checks.
  */
 
-/** Native Function/matrix metadata and DOM checks; run sequentially after Lab readiness. */
-window.checkLabSyntax = async function checkLabSyntax() {
-    const check: LabTestCheck = (condition, message) => {
+/** @brief Check native Function/matrix metadata and DOM sequentially after Lab readiness. */
+window.checkLabSyntax = async function checkLabSyntax(): Promise<void> {
+    /** @brief Report a failed syntax presentation assertion. */
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`Function syntax: ${message}`);
-    };
+    }
+
+    /** @brief Join every native span, optionally using its displayed matrix heading. */
+    function spanText(spans: SyntaxFixtureSpan[], displayHeadings: boolean): string {
+        let text = '';
+        for (const span of spans) {
+            const value = displayHeadings && span.kind === 'heading' ? span.display : span.text;
+            text += value ?? '';
+        }
+        return text;
+    }
+
+    /** @brief Count headings while visiting each span of one small native fixture. */
+    function headingCount(entry: SyntaxFixtureEntry): number {
+        let count = 0;
+        for (const span of entry.spans) {
+            if (span.kind === 'heading')
+                ++count;
+        }
+        return count;
+    }
+
+    /** @brief Select a heading-bearing entry from the small eigendecomposition fixture. */
+    function hasHeading(entry: SyntaxFixtureEntry): boolean {
+        return headingCount(entry) > 0;
+    }
+
+    /** @brief Retain a rejected preparation for its explicit stale-context assertion. */
+    function preparationError(error: unknown): unknown {
+        return error;
+    }
     const savedMode = WorksheetWorkspace.mode.currentMode();
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -25,16 +56,28 @@ window.checkLabSyntax = async function checkLabSyntax() {
         WorksheetWorkspace.mode.setMode('expression');
         WorksheetRequests.labRequests.modeChanged('expression');
         const originalFetch = labHttp.fetch;
-        const queued: ((response: MarsTransportResponse) => void)[] = [], preparations: Promise<unknown>[] = [];
+        const queued: ((response: MarsTransportResponse) => void)[] = [];
+        const preparations: Promise<unknown>[] = [];
         const fixture = 'editor context regression fixture';
-        const reply = () =>
-            Object.assign(new Response(), {labData: async () => ({ok: true, editor: {text: fixture, body: 'new context'}})});
+        /** @brief Return a fresh response whose payload is decoded asynchronously. */
+        function reply(): MarsTransportResponse {
+            return Object.assign(new Response(), {
+                /** @brief Supply the fixed editor metadata after transport completion. */
+                async labData() {
+                    return {ok: true, editor: {text: fixture, body: 'new context'}};
+                }
+            });
+        }
+
         try {
-            labHttp.fetch = (url) => {
+            /** @brief Hold presentation responses until the scenario chooses their order. */
+            labHttp.fetch = function fetchPresentation(url): Promise<MarsTransportResponse> {
                 check(url === '/presentation', 'unexpected request during editor fixture');
-                return new Promise(resolve => queued.push(resolve));
+                return new Promise(function queueResponse(resolve) {
+                    queued.push(resolve);
+                });
             };
-            const old = WorksheetRequests.presentation.prepareLabEditor(fixture).catch((error: unknown) => error);
+            const old = WorksheetRequests.presentation.prepareLabEditor(fixture).catch(preparationError);
             preparations.push(old);
             WorksheetWorkspace.mode.setMode('matrix');
             WorksheetWorkspace.mode.setMode('expression');
@@ -52,12 +95,14 @@ window.checkLabSyntax = async function checkLabSyntax() {
             check(first === second && first.body === 'new context', 'same-context preparation was not shared');
             check(!WorksheetRequests.presentation.pending.has(fixture), 'completed preparation retained its request');
         } finally {
-            queued.forEach(resolve => resolve(reply()));
+            for (const resolve of queued)
+                resolve(reply());
             await Promise.allSettled(preparations);
             labHttp.fetch = originalFetch;
             WorksheetResults.labEvaluationView.caches.editors.delete(fixture);
         }
-        await WorksheetRequests.labRequests.run('evaluate', 'expression', async request => {
+        /** @brief Check exact function text, native token coverage and installed markup. */
+        async function checkFunction(request: WorksheetRequests.MarsApiRequest): Promise<void> {
             const {response, data} = await WorksheetRequests.evaluationTransport.fetchEvaluation('{ x+2 | x = 3 }', '', '', '', '', request);
             check(WorksheetRequests.labRequests.outcome(request, response, data) === 2, 'native evaluation failed');
             const sources =
@@ -75,33 +120,36 @@ window.checkLabSyntax = async function checkLabSyntax() {
                     typeof entry.html === 'string' && host.innerHTML === entry.html,
                     'browser did not install the native Function markup');
                 check(
-                    entry.spans.map(span => span.text).join('') === source,
+                    spanText(entry.spans, false) === source,
                     'native spans do not cover the entire card');
             }
-        });
-        await WorksheetRequests.labRequests.run('evaluate', 'expression', async request => {
+        }
+        await WorksheetRequests.labRequests.run('evaluate', 'expression', checkFunction);
+
+        /** @brief Check native small-value notation without changing the source metadata. */
+        async function checkSmallValue(request: WorksheetRequests.MarsApiRequest): Promise<void> {
             const {response, data} = await WorksheetRequests.evaluationTransport.fetchEvaluation('exp(-20)', '', '', '', '', request);
             check(WorksheetRequests.labRequests.outcome(request, response, data) === 2, 'small-value evaluation failed');
             labDOM.call('lab_result_text_render', WorksheetResults.labEvaluationView.caches, host, data.value, 2);
             check(host.textContent.includes('×10⁻⁹'), 'Value card retained machine exponent notation');
             check(!/[eE][+-]?\d/.test(host.textContent), 'Value card contains an e/E exponent');
             check((WorksheetResults.labEvaluationView.caches.headings.get(data.value as string) as SyntaxFixtureEntry | undefined)?.source === data.value, 'raw numeric source was changed');
-        });
+        }
+        await WorksheetRequests.labRequests.run('evaluate', 'expression', checkSmallValue);
         const {response, data} = await WorksheetRequests.evaluationTransport.fetchMatrixEvaluation(
-            {matrixText: '(1,0;0,2)', operation: 'eigendecompose', operand: '', skipSave: true}) as {response: MarsTransportResponse; data: SyntaxFixtureData};
+            {matrixText: '(1,0;0,2)', operation: 'eigendecompose', operand: '', skipSave: true}) as SyntaxFixtureResult;
         check(response.ok && data.ok !== false, 'native matrix evaluation failed');
         const entries = data.presentation?.matrix_headings || [];
-        const headingEntry = entries.find(entry => entry.spans.some(span => span.kind === 'heading'))!;
+        const headingEntry = entries.find(hasHeading)!;
         check(headingEntry, 'native eigendecomposition lacks section heading metadata');
         for (const entry of entries) {
             labDOM.call('lab_result_text_render', WorksheetResults.labEvaluationView.caches, host, String(entry.source || ''), 2);
             check(
-                host.textContent ===
-                    entry.spans.map(span => span.kind === 'heading' ? span.display : span.text).join(''),
+                host.textContent === spanText(entry.spans, true),
                 'matrix DOM differs from native presentation spans');
             check(
                 host.querySelectorAll('.matrix-section-heading').length ===
-                    entry.spans.filter(span => span.kind === 'heading').length,
+                    headingCount(entry),
                 'matrix heading classes differ from native metadata');
         }
         const unknown = ' EIGENVALUES\n<em>not native metadata</em>';

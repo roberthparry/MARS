@@ -13,8 +13,13 @@
  */
 type WorksheetMode = 'expression' | 'equation' | 'diffequation' | 'matrix' | 'integrator' | 'datetime' | 'almanac';
 type WorksheetGuard = () => boolean;
-type WorksheetSourceKey = 'fullText' | 'displayText' | 'lastInput' | 'goalSource' | 'goalTarget';
-type WorksheetSources = Record<WorksheetSourceKey, string>;
+
+/** @brief Source keys share the native view's single ordered catalogue. */
+type WorksheetSourceKey = typeof WORKSHEET_SOURCE_NAMES[number];
+
+/** @brief Writable live source properties; assignment updates native storage. */
+type WorksheetSources = { [Key in WorksheetSourceKey]: string };
+
 interface WorksheetSaveOptions { keepalive?: boolean; debounce?: boolean; }
 interface WorksheetModeOptions { force?: boolean; }
 interface WorksheetEvaluationOptions { skipHistoryUpdate?: boolean; reuseLastInput?: boolean; }
@@ -90,10 +95,8 @@ interface WorksheetTownControls {
     elevationInput?: HTMLInputElement;
     resetOffsetTouched?: boolean;
 }
-interface WorksheetSelect extends HTMLSelectElement {
-    __marsRebuildRoundedSelect?: () => unknown;
-    __marsSyncRoundedSelect?: () => unknown;
-}
+/** @brief Native select element; enhancement controllers belong to the location registry. */
+type WorksheetSelect = HTMLSelectElement;
 interface WorksheetCopyButton extends HTMLButtonElement { copyResetTimer?: number; }
 interface WorksheetPickerState {
     input: HTMLInputElement | null;

@@ -9,7 +9,7 @@
  * Auto height grids zoom horizontally and accept a fresh native height range;
  * implicit meshes and other height policies retain three-axis volume clipping.
  * Space curves refine only their input interval, retaining output-axis controls
- * and fitting each accepted sample to its fresh native coordinate ranges.
+ * and the original coordinate-box proportions whilst adopting fresh output ranges.
  */
 #include "lab_dom.h"
 #include "lab_plot_controls.h"
@@ -27,6 +27,14 @@ static const char *const controls[] = {
 static double numeric(int object, const char *key)
 {
     return lab_dom_to_number(lab_dom_get(object, key));
+}
+
+/* New plots and explicit reset restore the same slider track as the initial page. */
+static void reset_slider_limits(void)
+{
+    int slider = lab_dom_id("plotZoom");
+    lab_dom_write(slider, 2, "min", lab_dom_string("-3"));
+    lab_dom_write(slider, 2, "max", lab_dom_string("6"));
 }
 
 static int read_bounds(int chart, const char *const names[6])
@@ -84,6 +92,7 @@ void lab_surface_volume_init(int view, int saved, unsigned same)
     int restore_height = !segments && volume && !refining && lab_dom_truth(lab_dom_get(volume, "started")) &&
                          ((!manual && !was_auto) || (was_auto && !automatic));
     if (!volume || (!same && !refining) || restore_height) {
+        reset_slider_limits();
         volume = lab_dom_object(5);
         lab_dom_set(volume, "base", read_bounds(chart, keys));
         lab_dom_set(volume, "bounds", read_bounds(chart, keys));
@@ -106,8 +115,8 @@ void lab_surface_volume_init(int view, int saved, unsigned same)
         if (segments) {
             /* Output ranges belong to the newly sampled curve, never to x zoom recipes. */
             lab_dom_set(volume, "bounds", read_bounds(chart, keys));
-            lab_dom_set(volume, "units", lab_dom_get(view, "units"));
             lab_dom_set(volume, "labelWidth", lab_dom_read(chart, 3, "labelWidth"));
+            /* Keep the original box proportions: the narrower interval fills the same x axis. */
             /* Even a reset keeps the original curve baseline: finite segment
              * extents can differ slightly from the requested input interval. */
         } else if (lab_dom_truth(lab_dom_get(volume, "autoHeight"))) {
@@ -136,6 +145,36 @@ void lab_surface_volume_init(int view, int saved, unsigned same)
     }
     lab_dom_set(view, "volume", volume);
     lab_dom_set(view, "units", lab_dom_get(volume, "units"));
+}
+
+/* Roll back display policy without evaluating coordinates or replacing accepted geometry. */
+static int rollback_volume(int view, unsigned restore_controls)
+{
+    int volume = lab_dom_get(view, "volume"), chart = lab_dom_get(view, "chart");
+    double exponent = numeric(volume, "sampleExponent");
+    if (!volume || (!lab_dom_truth(lab_dom_get(volume, "dirty")) && numeric(volume, "exponent") == exponent))
+        return 0;
+    int segments = lab_dom_equal(lab_dom_read(chart, 3, "segments"), lab_dom_string("true"));
+    lab_dom_set(volume, "bounds", read_bounds(chart, keys));
+    lab_dom_set(volume, "exponent", lab_dom_numeric(exponent));
+    lab_dom_set(volume, "dirty", lab_dom_scalar(1, 0));
+    lab_dom_set(volume, "started", lab_dom_scalar(1, exponent != 0));
+    lab_dom_set(lab_dom_get(view, "camera"), "scale", lab_dom_numeric(segments ? 1 : lab_surface_exp2(exponent)));
+    if (restore_controls) {
+        for (unsigned i = 0; i < (segments ? 2u : 6u); ++i) {
+            int control = lab_dom_id(controls[i]), text = lab_dom_read(chart, 3, label_keys[i]);
+            lab_dom_write(control, 5, "", text);
+            lab_dom_set(control, "marsZoomText", text);
+            lab_dom_set(control, "marsZoomValue", lab_dom_read(chart, 3, exact_keys[i]));
+        }
+        if (!segments) {
+            int policy = lab_dom_truth(lab_dom_get(volume, "autoHeight")) ? lab_dom_string("auto") :
+                         exponent != 0 ? lab_dom_string("manual") : lab_dom_item(lab_dom_get(volume, "original"), 6);
+            lab_dom_write(lab_dom_id("plotScale"), 5, "", policy);
+        }
+        lab_plot_controls_sync();
+    }
+    return 1;
 }
 
 static int append(int text, int addition, const char *suffix)
@@ -215,6 +254,8 @@ static void pinch_restore(int volume, int camera, int snapshot)
 /* Convert bounded gestures to a binary exponent, never to absolute coordinate differences. */
 int lab_surface_zoom(int view, unsigned kind, double value, int event, unsigned reset)
 {
+    if (kind == 4)
+        return rollback_volume(view, value != 0);
     int volume = lab_dom_get(view, "volume"), camera = lab_dom_get(view, "camera");
     double exponent = numeric(volume, "exponent");
     if (kind == 0) exponent += lab_surface_log2(value);
@@ -249,7 +290,10 @@ int lab_surface_zoom(int view, unsigned kind, double value, int event, unsigned 
         if (!start) { start = lab_dom_numeric(exponent); lab_dom_set(event, "surfaceExponent", start); }
         exponent = lab_dom_to_number(start) + lab_surface_log2(ratio);
     }
-    if (reset) exponent = 0;
+    if (reset) {
+        exponent = 0;
+        reset_slider_limits();
+    }
     int segments = lab_dom_equal(lab_dom_read(lab_dom_get(view, "chart"), 3, "segments"), lab_dom_string("true"));
     /* Native plotting has a 65,536-bit resource ceiling, not an f64 coordinate limit. */
     if (!__builtin_isfinite(exponent) || exponent > 32000 || exponent < -1024) {
@@ -315,7 +359,7 @@ int lab_surface_zoom(int view, unsigned kind, double value, int event, unsigned 
     return 1;
 }
 
-/* The slider follows the current exponent, allowing repeated microscopic zoom. */
+/* Extend the slider only for wheel/pinch values outside its track; never move the track under a held thumb. */
 void lab_surface_zoom_sync(int view)
 {
     double exponent = numeric(lab_dom_get(view, "volume"), "exponent");
@@ -324,8 +368,11 @@ void lab_surface_zoom_sync(int view)
     lab_dom_write(slider, 2, "title", lab_dom_string(segments ?
         "Zoom the input range and redraw the 3-D curve" :
         "Zoom the coordinate volume equally on all axes"));
-    lab_dom_write(slider, 2, "min", lab_dom_format(exponent < -3 ? (long)exponent-6 : -3, "", ""));
-    lab_dom_write(slider, 2, "max", lab_dom_format(exponent > 6 ? (long)exponent+6 : 6, "", ""));
+    double minimum = numeric(slider, "min"), maximum = numeric(slider, "max");
+    if (exponent < minimum)
+        lab_dom_write(slider, 2, "min", lab_dom_format(__builtin_floor(exponent)-6, "", ""));
+    if (exponent > maximum)
+        lab_dom_write(slider, 2, "max", lab_dom_format(__builtin_ceil(exponent)+6, "", ""));
     lab_dom_write(slider, 5, "", lab_dom_format(exponent, "", ""));
     int label;
     if (exponent < 20 && exponent > -10) {

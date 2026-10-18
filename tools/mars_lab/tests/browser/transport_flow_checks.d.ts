@@ -6,7 +6,12 @@
  * The declarations add no runtime behaviour and remain separate from production contracts.
  */
 
-interface Window { checkLabTransportFlows(): Promise<void>; }
+interface Window {
+    /** Run transport ordering, cancellation and cleanup regressions. */
+    checkLabTransportFlows(): Promise<void>;
+}
+
+/** Mutable continuation frame passed to the native transport fixture. */
 interface LabTransportTestFrame {
     operation?: string;
     callback?: (request: unknown) => unknown;
@@ -14,4 +19,10 @@ interface LabTransportTestFrame {
     payload?: object;
     fallback?: string;
     result?: unknown;
+}
+
+/** Response and decoded data returned by a completed fixture. */
+interface LabTransportTestResult {
+    response: unknown;
+    data: unknown;
 }

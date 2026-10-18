@@ -5,27 +5,58 @@
  * Uses real DOM controls and the scoped native bridge to verify restored locations, jurisdiction options and asynchronous ownership.
  */
 
+/** @brief Compile-time bootstrap and catalogue contracts; deliberately never invoked. */
+function checkApplicationTypeContracts(config: LabConfiguration): void {
+    const town: LabTown = {
+        name: 'Test town', latitude: '1.5', longitude: '-2.5', elevation: '12',
+        timezone: 'UTC', default: false, value: 'native key', detail: 'native detail'
+    };
+    const catalogue: LabCatalogue = {
+        available: true, options: [['GB', 'United Kingdom']], towns: {GB: [town]}
+    };
+    const unavailable: LabCatalogue = {available: false, options: [], towns: {}, error: 'Unavailable'};
+    const limit: number = config.DEFAULT_INTEGRATOR_INTERVAL_CAP;
+    const initial: Promise<void> = window.labInitialEvaluation;
+
+    // @ts-expect-error The native interval cap is numeric, not editor text.
+    const textLimit: string = config.DEFAULT_INTEGRATOR_INTERVAL_CAP;
+    // @ts-expect-error Town catalogue rows are named objects, not arrays of strings.
+    catalogue.towns.GB = [['Test town', '1.5', '-2.5']];
+    // @ts-expect-error Coordinates retain their exact native text representation.
+    town.latitude = 1.5;
+    // @ts-expect-error Jurisdiction options require both a code and a display label.
+    catalogue.options.push(['GB']);
+    // @ts-expect-error Default selection is a native boolean, not a string flag.
+    town.default = 'true';
+    void unavailable;
+    void limit;
+    void textLimit;
+    void initial;
+}
+
 /** Calendar location projection and asynchronous restoration checks against the real C/WASM bridge. */
 window.checkLabLocationDom = async function checkLabLocationDom() {
-    const check: LabTestCheck = (ok, message) => {
+    function check(ok: unknown, message: string): void {
         if (!ok)
             throw new Error('Location DOM: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) =>
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
         check(Object.is(actual, expected), message + ': ' + actual + ' != ' + expected);
+    }
     const savedContext = WorksheetLocations.calendar.calendarLocationContext();
     const savedControls = (['datetime', 'almanac'] as const).map(mode => [mode, WorksheetLocations.calendar.readCalendarControls(mode)] as const);
     const savedJurisdictions = [WorksheetContext.datetimeJurisdiction, WorksheetContext.almanacJurisdiction].map(
         select => ({select, children: Array.from(select.childNodes), disabled: select.disabled}));
-    const savedNotices = new Map(Array.from(
-        document.querySelectorAll<HTMLElement>('[data-jurisdiction-notice]'),
-        node => [node, {text: node.textContent, classes: node.className}]));
-    const savedTowns = WorksheetLocations.townSelection.townsForJurisdiction, savedRequest = WorksheetRequests.presentation.requestLabForms;
-    const input = (value: string) => {
+    const savedNotices = new Map<HTMLElement, LabWorksheetTestNoticeSnapshot>();
+    for (const node of document.querySelectorAll<HTMLElement>('[data-jurisdiction-notice]'))
+        savedNotices.set(node, {text: node.textContent, classes: node.className});
+    const savedTowns = WorksheetLocations.townSelection.townsForJurisdiction;
+    const savedRequest = WorksheetRequests.presentation.requestLabForms;
+    function input(value: string): HTMLInputElement {
         const node = document.createElement('input');
-        (node as LabWorksheetTestSnapshotElement).value = value;
+        node.value = value;
         return node;
-    };
+    }
     const towns = [
         {value: 'A|0|0|0', name: 'A <literal>', latitude: '0', longitude: '0', elevation: '0', detail: 'μ & σ'}, {
             value: 'B|1|2|3',
@@ -125,7 +156,8 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
         const owned = document.createElement('select');
         const addListener = owned.addEventListener;
         let changeListeners = 0;
-        owned.addEventListener = function(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) {
+        owned.addEventListener = function recordListener(
+            type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) {
             if (type === 'change')
                 ++changeListeners;
             return addListener.call(this, type, listener, options);
@@ -163,13 +195,15 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             'empty snapshots cannot cross select identities');
 
         // More than 4096 cumulative handles exercises per-row release and escaped return values.
-        const large = Array.from({length: 600}, (_, index) => ({
-                                                    value: 'town-' + index,
-                                                    name: 'Town ' + index,
-                                                    latitude: String(index),
-                                                    longitude: '0',
-                                                    detail: 'detail'
-                                                }));
+        const large = Array.from({length: 600}, function createOption(_, index) {
+            return {
+                value: 'town-' + index,
+                name: 'Town ' + index,
+                latitude: String(index),
+                longitude: '0',
+                detail: 'detail'
+            };
+        });
         labDOM.call('lab_location_populate', select, large, 1);
         equal(select.options.length, large.length, 'large catalogue projects within scoped handle capacity');
         const largeSnapshot = labDOM.call<LabWorksheetLocationSnapshot>('lab_location_snapshot', select);
@@ -289,13 +323,20 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
 
         // Resolve each delayed request explicitly; no timing assumptions or live requests.
         Reflect.set(WorksheetLocations.townSelection, 'townsForJurisdiction', () => towns);
-        let finish!: (value: {match_index: number}) => void;
+        let finish!: (value: LabWorksheetTestMatchResponse) => void;
         let entered: () => void = () => {};
-        const requestBoundary = () => new Promise<void>(resolve => { entered = resolve; });
-        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', () => new Promise<{match_index: number}>(resolve => {
-            finish = resolve;
-            entered();
-        }));
+        function requestBoundary(): Promise<void> {
+            return new Promise<void>(resolve => {
+                entered = resolve;
+            });
+        }
+        function deferMatch(): Promise<LabWorksheetTestMatchResponse> {
+            return new Promise<LabWorksheetTestMatchResponse>(resolve => {
+                finish = resolve;
+                entered();
+            });
+        }
+        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', deferMatch);
         let boundary = requestBoundary();
         const stale = WorksheetLocations.townSelection.restoreTownSelection(select, 'GB-WLS', 'old-town', '', '');
         await boundary;
@@ -335,7 +376,8 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
         equal(select.value, '', 'unmatched restoration leaves no named town');
 
         let requested!: {action?: string; value?: string; candidates: string[]};
-        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', (request: {value?: string; action?: string; candidates: string[]}) => {
+        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', function rejectMatch(
+            request: {value?: string; action?: string; candidates: string[]}) {
             requested = request;
             return Promise.resolve({match_index: -1});
         });
@@ -348,14 +390,14 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             requested.candidates.join(','), towns.map(town => town.value).join(','),
             'C supplies candidates in snapshotted order');
         equal(select.value, towns[2].value, 'coordinate fallback follows a failed saved-key match');
-        for (const match_index of [NaN, Infinity, -1, 0.5, 99, '0', null]) {
-            Reflect.set(WorksheetRequests.presentation, 'requestLabForms', () => Promise.resolve({match_index}));
+        for (const matchIndex of [NaN, Infinity, -1, 0.5, 99, '0', null]) {
+            Reflect.set(WorksheetRequests.presentation, 'requestLabForms', () => Promise.resolve({match_index: matchIndex}));
             equal(
                 await WorksheetLocations.townSelection.restoreTownSelection(select, 'GB-WLS', 'old-town', '', ''), false,
-                'invalid server match clears only after coordinate fallback: ' + match_index);
+                'invalid server match clears only after coordinate fallback: ' + matchIndex);
             equal(select.value, '', 'invalid server match leaves no named town');
         }
-        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', () => {
+        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', function unexpectedMatch() {
             throw new Error('Unexpected compatibility request');
         });
         equal(
@@ -368,11 +410,14 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             'already cancelled restoration does not populate or request');
         equal(select.value, towns[0].value, 'cancelled restoration preserves the selection');
 
-        const pending: ((value: {match_index: number}) => void)[] = [];
-        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', () => new Promise<{match_index: number}>(resolve => {
-            pending.push(resolve);
-            entered();
-        }));
+        const pending: ((value: LabWorksheetTestMatchResponse) => void)[] = [];
+        function queueMatch(): Promise<LabWorksheetTestMatchResponse> {
+            return new Promise<LabWorksheetTestMatchResponse>(resolve => {
+                pending.push(resolve);
+                entered();
+            });
+        }
+        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', queueMatch);
         boundary = requestBoundary();
         const older = WorksheetLocations.townSelection.restoreTownSelection(select, 'GB-WLS', 'old-town', '', '');
         await boundary;
@@ -468,7 +513,7 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             }
         }
         for (const [mode, values] of savedControls) {
-            const elements = WorksheetLocations.calendar.calendarElements(mode) as Record<string, HTMLInputElement & WorksheetSelect>;
+            const elements = WorksheetLocations.calendar.calendarElements(mode) as {[name: string]: HTMLInputElement & WorksheetSelect};
             for (const [key, value] of Object.entries(values))
                 if (elements[key])
                     elements[key].value = value as string;

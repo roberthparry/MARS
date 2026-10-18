@@ -11,6 +11,7 @@
  * JavaScript request boundary to preserve its diagnostic and recovery behaviour.
  */
 #include "lab_dom.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_layout.h"
 #include "lab_requests.h"

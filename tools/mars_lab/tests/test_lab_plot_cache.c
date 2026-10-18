@@ -20,13 +20,16 @@
 #include "test_harness.h"
 #include "test_lab_support.h"
 
+/* Match the plot cache's decoded-output limit. */
+static const size_t plot_output_limit = 8 * 1024 * 1024;
+
 static string_t *run(const char *const *args, unsigned timeout, double *seconds)
 {
     string_t *output = NULL;
     int status = -1;
     struct timespec start, end;
     clock_gettime(CLOCK_MONOTONIC, &start);
-    bool ok = lab_proc_run_worker(args, NULL, NULL, timeout, 4 * 1024 * 1024, &output, &status);
+    bool ok = lab_proc_run_worker(args, NULL, NULL, timeout, plot_output_limit, &output, &status);
     clock_gettime(CLOCK_MONOTONIC, &end);
     if (seconds)
         *seconds = end.tv_sec - start.tv_sec + (end.tv_nsec - start.tv_nsec) * 1e-9;
@@ -124,7 +127,7 @@ static bool cache_checks(const char *directory)
     setenv("MARS_LAB_WORK_LIMIT", "1", 1);
     output = NULL;
     status = -1;
-    bool limited = lab_proc_run_worker(args, NULL, NULL, 3000, 4 * 1024 * 1024, &output, &status);
+    bool limited = lab_proc_run_worker(args, NULL, NULL, 3000, plot_output_limit, &output, &status);
     ok = ok && !limited && errno == E2BIG;
     string_free(output);
     unsetenv("MARS_LAB_WORK_LIMIT");

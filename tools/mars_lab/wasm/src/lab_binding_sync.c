@@ -10,6 +10,7 @@
  * execute awaits and workspace persistence.
  */
 #include "lab_dom.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_binding_editor.h"
 #include "lab_binding_sync.h"

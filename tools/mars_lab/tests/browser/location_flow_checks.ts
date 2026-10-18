@@ -7,22 +7,30 @@
 
 /** Native location continuations, deferred services and stale browser ownership checks. */
 window.checkLabLocationFlow = async function checkLabLocationFlow() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Location flow: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const step = (kind: number, frame: object) => labDOM.call<LabWorksheetTestPlan>('lab_flow_step', kind, frame, {});
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    function step(kind: number, frame: object): LabWorksheetTestPlan {
+        return labDOM.call<LabWorksheetTestPlan>('lab_flow_step', kind, frame, {});
+    }
     const events: string[] = [];
-    const run = (kind: number, frame: object, services: NativeServiceRegistry) => labDOM.flow(kind, frame, {}, {
-        effects: plan => labDOM.services(plan, services),
-        native: (entry, ...args) => labDOM.call(entry, ...args),
-        ...services
-    });
+    function run(kind: number, frame: object, services: NativeServiceRegistry): Promise<unknown> {
+        return labDOM.flow(kind, frame, {}, {
+            effects: plan => labDOM.services(plan, services),
+            native: (entry, ...args) => labDOM.call(entry, ...args),
+            ...services
+        });
+    }
     const savedRequest = WorksheetRequests.presentation.requestLabForms;
-    let settle: ((value?: unknown) => void) | null = null, pending: Promise<unknown> | null = null;
+    let settle: ((value?: unknown) => void) | null = null;
+    let pending: Promise<unknown> | null = null;
     try {
-        const localCard = document.createElement('section'), localBody = document.createElement('div');
+        const localCard = document.createElement('section');
+        const localBody = document.createElement('div');
         const sections = Object.freeze([{name: 'opaque native calendar'}]);
         const localPlan = labDOM.call<LabWorksheetTestPlan>('lab_flow_location_local', {value: '  calendar text  '}, sections, localBody, localCard);
         equal(localPlan.calls.map(call => call.service).join(','), 'locRenderLocal,locLocalVisible',
@@ -35,8 +43,12 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
         let localCaught = null;
         try {
             labDOM.services(localPlan, {
-                locRenderLocal: () => { throw localFailure; },
-                locLocalVisible: () => { throw new Error('visibility ran after render failure'); }
+                locRenderLocal() {
+                    throw localFailure;
+                },
+                locLocalVisible() {
+                    throw new Error('visibility ran after render failure');
+                }
             });
         } catch (error) {
             localCaught = error;
@@ -50,7 +62,7 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
         check(localCard.classList.contains('hidden'), 'local calendar hidden outside DateTime');
         labDOM.call('lab_flow_location_visibility', localCard, 'datetime');
         check(!localCard.classList.contains('hidden'), 'local calendar shown in DateTime');
-        const select = document.createElement('select') as WorksheetSelect;
+        const select = document.createElement('select');
         const methods = {
             get rebuild() { return true; },
             get sync() { throw new Error('fallback getter read despite rebuild'); }
@@ -61,18 +73,35 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
             get rebuild() { throw new Error('absent select queried'); }
         });
         equal((absent.calls || []).length, 0, 'absent select never probes method capabilities');
+        const fallback = labDOM.call<LabWorksheetTestPlan>('lab_flow_location_select', select, {rebuild: false, sync: true});
+        equal(fallback.calls[0].service, 'locSelectSync', 'native plan retains selection-only fallback');
         const selectOrder: string[] = [];
-        select.__marsRebuildRoundedSelect = function() {
-            equal(this, select, 'rounded-select method receiver preserved');
-            labDOM.call<LabWorksheetTestPlan>('lab_flow_location_picker', 0);
-            selectOrder.push('rebuild');
-        };
-        select.__marsSyncRoundedSelect = () => selectOrder.push('sync');
-        WorksheetLocations.selects.sync(select);
-        delete select.__marsRebuildRoundedSelect;
-        WorksheetLocations.selects.sync(select);
-        WorksheetLocations.selects.sync(null as unknown as WorksheetSelect);
-        equal(selectOrder.join(','), 'rebuild,sync', 'actual select wrappers execute outside native scopes');
+        function nativeSelects() { return labDOM; }
+        function selectDocument() { return document; }
+        const registry = new WorksheetLocations.RoundedSelectRegistry(nativeSelects, selectDocument);
+        const selectRoot = document.createElement('div');
+        selectRoot.appendChild(select);
+        document.body.appendChild(selectRoot);
+        try {
+            const controller = registry.enhance(select);
+            if (!controller) throw new Error('Location flow: isolated enhancement failed');
+            controller.rebuild = function rebuild() {
+                equal(this, controller, 'registry dispatch preserves controller receiver');
+                labDOM.call('lab_flow_location_picker', 0);
+                selectOrder.push('rebuild');
+            };
+            controller.sync = function sync() {
+                equal(this, controller, 'selection dispatch preserves controller receiver');
+                selectOrder.push('sync');
+            };
+            registry.sync(select);
+            registry.syncSelection(select);
+            registry.sync(null as unknown as WorksheetSelect);
+            equal(selectOrder.join(','), 'rebuild,sync', 'isolated registry dispatches its own controllers outside native scopes');
+        } finally {
+            registry.dispose();
+            selectRoot.remove();
+        }
         equal((labDOM.call<LabWorksheetTestPlan>('lab_flow_location_picker', 0).calls || []).length, 0, 'unchanged picker move is inert');
         equal(labDOM.call<LabWorksheetTestPlan>('lab_flow_location_picker', 1).calls[0].service, 'locRenderPicker', 'changed picker redraw');
 
@@ -93,7 +122,8 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
             equal(result.value, index === 0, 'native matching requires numeric zero');
         }
         const requests: {value?: string; action?: string}[] = [];
-        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', async (request: {value?: string; action?: string}) => {
+        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', async function readFixture(
+            request: {value?: string; action?: string}) {
             requests.push(request);
             return {text: '12:34:56', town: option, match_index: 0};
         });
@@ -105,16 +135,18 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
         equal(requests[0].action, 'time', 'time payload action');
         equal(requests[1].action, 'town', 'town payload action');
 
-        const gate = new Promise(resolve => settle = resolve);
+        const gate = new Promise<unknown>(resolve => {
+            settle = resolve;
+        });
         pending = run(33, {mode: 'datetime', options: {refreshJurisdiction: true, refreshCoordinates: false}}, {
             currentMode: () => 'datetime',
-            locRefreshDatetime: (options: Record<string, unknown>) => {
+            locRefreshDatetime(options: {updateCoordinates?: boolean}) {
                 equal(options.updateCoordinates, false, 'auto-refresh retains authored coordinates');
                 events.push('refresh');
                 return gate;
             },
             locSaveDatetime: () => events.push('save'),
-            locEvaluateDatetime: (options: Record<string, unknown>) => {
+            locEvaluateDatetime(options: {skipHistoryUpdate?: boolean}) {
                 equal(options.skipHistoryUpdate, true, 'auto-evaluation owns final history update');
                 events.push('evaluate');
             },
@@ -134,15 +166,16 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
 
         const input = document.createElement('input');
         input.value = '123456';
-        const context = {}, main = {};
+        const context = {};
+        const main = {};
         const timeServices = {
             locTimeSnapshot: () => ({element: input, authored: input.value, context, main}),
             locFormatTime: async () => '12:34:56',
             requestContext: () => context,
             locLatestMain: () => main,
-            locTimeApply: (element: HTMLInputElement, value: string) => {
+            locTimeApply(element: HTMLInputElement, value: string) {
                 equal(element, input, 'formatting retains control identity');
-                (element as LabWorksheetTestSnapshotElement).value = value;
+                element.value = value;
                 events.push('apply');
             },
             locStatus: (error: string) => events.push(error)
@@ -157,22 +190,37 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
         await run(34, {}, timeServices);
         equal(input.value, '12:34:56', 'current formatted value is published');
         events.length = 0;
-        await run(34, {}, {...timeServices, locFormatTime: async () => { throw null; }});
+        await run(34, {}, {
+            ...timeServices,
+            async locFormatTime() {
+                throw null;
+            }
+        });
         equal(events.join(','), 'null', 'even a null exception follows current-error recovery');
         events.length = 0;
         await run(34, {}, {
             ...timeServices,
-            locFormatTime: async () => { throw new Error('old request'); },
+            async locFormatTime() {
+                throw new Error('old request');
+            },
             requestContext: () => ({})
         });
         equal(events.length, 0, 'stale formatting errors cannot change status');
 
-        const request = {}, town = document.createElement('select');
+        const request = {};
+        const town = document.createElement('select');
         const state = {jurisdiction: 'GB-ENG', date: '2030-01-02'};
         const refreshServices = {
-            locElements: () => ({town, jurisdiction: {value: 'GB-ENG'}, latitude: {value: '1'}, longitude: {value: '2'}}),
+            locElements() {
+                return {
+                    town,
+                    jurisdiction: {value: 'GB-ENG'},
+                    latitude: {value: '1'},
+                    longitude: {value: '2'}
+                };
+            },
             locControls: () => ({}),
-            locBegin: (operation: string, mode: WorksheetMode) => {
+            locBegin(operation: string, mode: WorksheetMode) {
                 equal(operation, 'datetimeLocation', 'refresh request operation');
                 equal(mode, 'datetime', 'refresh request ownership');
                 events.push('begin');
@@ -181,11 +229,11 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
             locRead: () => state,
             locState: () => state,
             locPopulate: async () => events.push('populate'),
-            requestCurrent: (owner: unknown) => {
+            requestCurrent(owner: unknown) {
                 equal(owner, request, 'freshness checks retain request identity');
                 return false;
             },
-            locFinish: (owner: unknown) => {
+            locFinish(owner: unknown) {
                 equal(owner, request, 'cleanup retains request identity');
                 events.push('finish');
             }
@@ -195,14 +243,16 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
         events.length = 0;
         await run(32, {mode: 'datetime', updateCoordinates: true}, {
             ...refreshServices,
-            locPopulate: async () => { throw new Error('location unavailable'); }
+            async locPopulate() {
+                throw new Error('location unavailable');
+            }
         });
         equal(events.join(','), 'begin,finish', 'refresh failure is quiet and still releases ownership');
         events.length = 0;
         await run(32, {mode: 'datetime', updateCoordinates: false}, {
             ...refreshServices,
             locApplyTown: () => events.push('town'),
-            post: async (owner: unknown, payload: {action: string; jurisdiction: string; date: string}) => {
+            async post(owner: unknown, payload: {action: string; jurisdiction: string; date: string}) {
                 equal(owner, request, 'post retains request');
                 equal(payload.jurisdiction, state.jurisdiction, 'post jurisdiction');
                 equal(payload.date, state.date, 'post date');
@@ -211,14 +261,14 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
             },
             requestCurrent: () => true,
             locContext: () => context,
-            locResponse: (mode: WorksheetMode, data: unknown, owner: unknown, update: boolean, applied: boolean) => {
+            locResponse(mode: WorksheetMode, data: unknown, owner: unknown, update: boolean, applied: boolean) {
                 equal(mode, 'datetime', 'response projection mode');
                 equal(owner, context, 'response projection retains context');
                 equal(update, false, 'response respects coordinate preservation');
                 check(!applied, 'preserve-coordinate path does not report a selected replacement town');
                 events.push('response');
             },
-            locAcceptContext: (owner: unknown) => {
+            locAcceptContext(owner: unknown) {
                 equal(owner, context, 'updated context is committed after projection');
                 events.push('accept');
             }
@@ -229,12 +279,12 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
         await run(31, {button: {}}, {
             locBegin: () => request,
             locContext: () => context,
-            native: (entry: string) => {
+            native(entry: string) {
                 equal(entry, 'lab_location_totality_prepare', 'stale totality never reaches finishing projection');
                 return state;
             },
             locRestoreTotality: async () => null,
-            locFinish: (owner: unknown) => {
+            locFinish(owner: unknown) {
                 equal(owner, request, 'totality releases its original request');
                 events.push('finish');
             }
@@ -246,12 +296,18 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
         try {
             await run(31, {button: {}}, {
                 locBegin: () => request,
-                locContext: () => { throw new Error('preparation failed'); },
+                locContext() {
+                    throw new Error('preparation failed');
+                },
                 requestCurrent: () => true,
                 locStatus: (status: string) => events.push(status),
-                locError: () => { throw failure; },
+                locError() {
+                    throw failure;
+                },
                 locFinish: () => events.push('finish'),
-                rethrow: (error: unknown) => { throw error; }
+                rethrow(error: unknown) {
+                    throw error;
+                }
             });
         } catch (error) {
             caught = error;

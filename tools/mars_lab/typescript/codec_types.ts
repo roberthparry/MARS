@@ -4,12 +4,22 @@
  *
  * Defines JSON values, native exports and worker messages shared by the codec and
  * job controller. Validation rejects malformed boundary data before it reaches native code.
+ * Each JSON check owns an iterative traversal: data descriptors are inspected without
+ * invoking property getters, cycles are rejected and completed aliases are accepted.
  */
 /** Shared transport types and validation for the browser codec and its dedicated worker. */
 export type JsonValue = null | boolean | number | string | JsonValue[] | JsonObject;
+
+/** @brief JSON object whose string-named members contain validated JSON values. */
 export interface JsonObject { [key: string]: JsonValue; }
+
+/** @brief Unvalidated non-array object at a browser message boundary. */
+export interface UnknownRecord { [key: string]: unknown; }
+
+/** @brief Non-shared binary input or a view over non-shared memory. */
 export type CodecBuffer = ArrayBuffer | ArrayBufferView<ArrayBuffer>;
 
+/** @brief Native codec operations and memory borrowed by the browser adapter. */
 export interface CodecExports extends WebAssembly.Exports, JobsExports {
     memory: WebAssembly.Memory;
 
@@ -34,6 +44,12 @@ export interface CodecExports extends WebAssembly.Exports, JobsExports {
     /** @brief Decode the staged native input and return its host-value handle, or a negative result on rejection. */
     lab_browser_decode(length: number): number;
 
+    /** @brief Encode a host record as base64 in the input buffer; return its length, or zero on rejection. */
+    lab_browser_storage_encode(handle: number): number;
+
+    /** @brief Validate and decode staged base64/Protobuf; return a host handle, or a negative result on rejection. */
+    lab_browser_storage_decode(length: number): number;
+
     /** @brief Return the address of the borrowed native input region used for one bounded decode. */
     lab_browser_input_buffer(): number;
 
@@ -47,6 +63,7 @@ export interface CodecExports extends WebAssembly.Exports, JobsExports {
     lab_browser_intervals(value: number, fallback: number): number;
 }
 
+/** @brief Native admission, accounting and worker lifecycle operations. */
 export interface JobsExports {
 
     /** @brief Advance the native worker lifecycle and return its packed phase and browser-effect plan. */
@@ -80,93 +97,151 @@ export interface JobsExports {
     lab_jobs_bytes(): number;
 }
 
-export type WorkerRequest = { type: 'init'; url: string } |
-    { type: 'decode'; token: number; bytes: Uint8Array<ArrayBuffer> };
-export type WorkerResponse = { type: 'ready' } |
-    { type: 'result'; token: number; value: JsonValue } |
-    { type: 'error'; token: number; message: string };
+/** @brief Initialise an isolated worker codec from the supplied module URL. */
+export interface WorkerInitialiseRequest {
+    type: 'init';
+    url: string;
+}
+
+/** @brief Decode an owned binary message for a positive native job token. */
+export interface WorkerDecodeRequest {
+    type: 'decode';
+    token: number;
+    bytes: Uint8Array<ArrayBuffer>;
+}
+
+/** @brief Announce successful worker initialisation. */
+export interface WorkerReadyResponse {
+    type: 'ready';
+}
+
+/** @brief Complete a native job with validated JSON data. */
+export interface WorkerResultResponse {
+    type: 'result';
+    token: number;
+    value: JsonValue;
+}
+
+/** @brief Report a job failure; token zero identifies a worker initialisation failure. */
+export interface WorkerErrorResponse {
+    type: 'error';
+    token: number;
+    message: string;
+}
+
+/** @brief Requests admitted by the isolated codec worker. */
+export type WorkerRequest = WorkerInitialiseRequest | WorkerDecodeRequest;
+
+/** @brief Replies admitted by the browser job controller. */
+export type WorkerResponse = WorkerReadyResponse | WorkerResultResponse | WorkerErrorResponse;
 
 /** @brief Narrow non-null, non-array objects without requiring a particular prototype or inspecting their properties. */
-export function is_record(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is UnknownRecord {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function is_token(value: unknown, allow_zero = false): value is number {
-    return typeof value === 'number' && Number.isInteger(value) && value >= (allow_zero ? 0 : 1) &&
+function isToken(value: unknown, allowZero = false): value is number {
+    return typeof value === 'number' && Number.isInteger(value) && value >= (allowZero ? 0 : 1) &&
         value <= 0xffffffff;
 }
 
-/** Iterative validation rejects cycles, but permits aliases to fully validated noncyclic containers. */
-export function is_json_value(value: unknown): value is JsonValue {
-    const pending: ({value: unknown} | {completed: object})[] = [{value}];
-    const active = new Set<object>();
-    const completed = new Set<object>();
-    while (pending.length) {
-        const frame = pending.pop();
-        if (!frame)
-            break;
-        if ('completed' in frame) {
-            active.delete(frame.completed);
-            completed.add(frame.completed);
-            continue;
-        }
-        const item = frame.value;
-        if (item === null || typeof item === 'boolean' || typeof item === 'string')
-            continue;
-        if (typeof item === 'number') {
-            if (!Number.isFinite(item))
+/** A value awaiting descriptor-based validation. */
+interface JsonPendingValue { value: unknown; }
+
+/** Marks completion only after all descendants have been validated. */
+interface JsonCompletedValue { completed: object; }
+
+/** String-named descriptors; symbol members retain the existing ignored semantics. */
+interface JsonDescriptors { [key: string]: PropertyDescriptor; }
+
+/** Owns one depth-first traversal without consuming the JavaScript call stack. */
+class JsonValueValidator {
+    private readonly pending: (JsonPendingValue | JsonCompletedValue)[] = [];
+    private readonly active = new Set<object>();
+    private readonly completed = new Set<object>();
+
+    /** @brief Validate one input graph using fresh, invocation-local traversal state. */
+    validate(value: unknown): boolean {
+        this.pending.push({value});
+        while (this.pending.length) {
+            const frame = this.pending.pop();
+            if (!frame) break;
+            if ('completed' in frame) {
+                this.active.delete(frame.completed);
+                this.completed.add(frame.completed);
+            } else if (!this.visit(frame.value)) {
                 return false;
-            continue;
+            }
         }
-        if (typeof item !== 'object' || item === null || active.has(item))
+        return true;
+    }
+
+    private visit(item: unknown): boolean {
+        if (item === null || typeof item === 'boolean' || typeof item === 'string')
+            return true;
+        if (typeof item === 'number')
+            return Number.isFinite(item);
+        if (typeof item !== 'object' || item === null || this.active.has(item))
             return false;
-        if (completed.has(item))
-            continue;
+        if (this.completed.has(item))
+            return true;
         if (!Array.isArray(item) && Object.getPrototypeOf(item) !== Object.prototype &&
             Object.getPrototypeOf(item) !== null)
             return false;
         const descriptors = Object.getOwnPropertyDescriptors(item);
-        active.add(item);
-        pending.push({completed: item});
-        if (Array.isArray(item)) {
-            for (let index = 0; index < item.length; ++index) {
-                const descriptor = descriptors[String(index)];
-                if (!descriptor || !Object.hasOwn(descriptor, 'value'))
-                    return false;
-                pending.push({value: descriptor.value});
-            }
-        } else {
-            for (const descriptor of Object.values(descriptors)) {
-                if (!descriptor.enumerable)
-                    continue;
-                if (!Object.hasOwn(descriptor, 'value'))
-                    return false;
-                pending.push({value: descriptor.value});
-            }
-        }
+        this.active.add(item);
+        this.pending.push({completed: item});
+        if (Array.isArray(item))
+            return this.queueArray(item, descriptors);
+        return this.queueObject(descriptors);
     }
-    return true;
+
+    private queueArray(item: unknown[], descriptors: JsonDescriptors): boolean {
+        for (let index = 0; index < item.length; ++index) {
+            if (!this.queueDescriptor(descriptors[String(index)])) return false;
+        }
+        return true;
+    }
+
+    private queueObject(descriptors: JsonDescriptors): boolean {
+        for (const descriptor of Object.values(descriptors)) {
+            if (!descriptor.enumerable) continue;
+            if (!this.queueDescriptor(descriptor)) return false;
+        }
+        return true;
+    }
+
+    private queueDescriptor(descriptor: PropertyDescriptor | undefined): boolean {
+        if (!descriptor || !Object.hasOwn(descriptor, 'value')) return false;
+        this.pending.push({value: descriptor.value});
+        return true;
+    }
+}
+
+/** @brief Reject cycles and sparse arrays without invoking getters; permit completed noncyclic aliases. */
+export function isJsonValue(value: unknown): value is JsonValue {
+    return new JsonValueValidator().validate(value);
 }
 
 /** @brief Validate initialisation or decode messages, requiring a positive native token and non-shared byte array for decoding. */
-export function is_worker_request(value: unknown): value is WorkerRequest {
-    if (!is_record(value))
+export function isWorkerRequest(value: unknown): value is WorkerRequest {
+    if (!isRecord(value))
         return false;
     return (value.type === 'init' && typeof value.url === 'string') ||
-        (value.type === 'decode' && is_token(value.token) && value.bytes instanceof Uint8Array &&
+        (value.type === 'decode' && isToken(value.token) && value.bytes instanceof Uint8Array &&
             value.bytes.buffer instanceof ArrayBuffer);
 }
 
 /** @brief Validate worker reply tags and tokens, checking decoded results before the main thread accepts them. */
-export function is_worker_response(value: unknown): value is WorkerResponse {
-    if (!is_record(value))
+export function isWorkerResponse(value: unknown): value is WorkerResponse {
+    if (!isRecord(value))
         return false;
     return (value.type === 'ready' && (value.token === undefined || value.token === 0)) ||
-        (value.type === 'result' && is_token(value.token) && is_json_value(value.value)) ||
-        (value.type === 'error' && is_token(value.token, true) && typeof value.message === 'string');
+        (value.type === 'result' && isToken(value.token) && isJsonValue(value.value)) ||
+        (value.type === 'error' && isToken(value.token, true) && typeof value.message === 'string');
 }
 
 /** @brief Extract an Error diagnostic or stringify another thrown value for the worker protocol. */
-export function error_message(error: unknown): string {
+export function errorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }

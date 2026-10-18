@@ -5,8 +5,12 @@
  * Inputs are normalised vertices and a quaternion; no absolute plot coordinate
  * is converted here. Frame plans drive WebGL uniforms, Canvas and vector export.
  * Surface projected-box fitting preserves coordinate units; space curves use a
- * fixed enclosing-sphere fit for stable rotation, with input-only zoom previews.
+ * fixed coordinate box and enclosing-sphere fit for stable rotation and input-only
+ * zoom previews. Narrower curve intervals fill the original box rather than shrinking its x axis.
  * Clipping has at most six planes and nine polygon vertices per input triangle.
+ * Software and vector output share one native projection pass and stable depth
+ * ordering. Temporary browser handles are released after each primitive or merge
+ * step, so handle usage does not grow with the supplied geometry.
  */
 #include "lab_dom.h"
 #include "lab_plot_pointer.h"
@@ -126,27 +130,88 @@ void lab_surface_project(int frame, int point)
     lab_dom_return(vector(out, 2));
 }
 
-/* Shared geometry for Canvas and on-demand SVG; GPU clipping uses the same transform. */
-void lab_surface_polygon(int frame, int points)
+static int projected_polygon(const frame_t *f, int points)
 {
-    frame_t f;
-    read_frame(frame, &f);
     double polygon[12][3], depth = 0;
     unsigned count = lab_dom_count(points);
     if (count > 3) count = 0;
     for (unsigned i = 0; i < count; ++i) {
         read_vector(lab_dom_item(points, i), polygon[i], 3);
-        for (unsigned j = 0; j < 3; ++j) polygon[i][j] = (polygon[i][j]-0.5)*f.scale[j]+f.offset[j]+0.5;
+        for (unsigned j = 0; j < 3; ++j) polygon[i][j] = (polygon[i][j]-0.5)*f->scale[j]+f->offset[j]+0.5;
     }
     count = clip(polygon, count);
     int out = lab_dom_object(5), vertices = lab_dom_object(4);
     for (unsigned i = 0; i < count; ++i) {
-        double p[3]; project(&f, polygon[i], p); depth += p[2];
+        double p[3]; project(f, polygon[i], p); depth += p[2];
         lab_dom_push(vertices, vector(p, 2));
     }
     lab_dom_set(out, "points", vertices);
     lab_dom_set(out, "depth", lab_dom_numeric(count ? depth/count : 0));
-    lab_dom_return(out);
+    return out;
+}
+
+/* Shared geometry for Canvas and on-demand SVG; GPU clipping uses the same transform. */
+void lab_surface_polygon(int frame, int points)
+{
+    frame_t f;
+    read_frame(frame, &f);
+    lab_dom_return(projected_polygon(&f, points));
+}
+
+static int depth_order(int source)
+{
+    unsigned count = lab_dom_count(source);
+    int target = lab_dom_object(4);
+    unsigned mark = lab_dom_mark();
+    /* Stable bottom-up merge sort: equal-depth primitives retain their input order. */
+    for (unsigned width = 1; width < count;) {
+        for (unsigned begin = 0; begin < count;) {
+            unsigned middle = count - begin < width ? count : begin + width;
+            unsigned end = count - middle < width ? count : middle + width;
+            unsigned left = begin, right = middle;
+            for (unsigned next = begin; next < end; ++next) {
+                int take_left = right == end;
+                if (left < middle && right < end)
+                    take_left = numeric(lab_dom_item(source, left), "depth") >=
+                                numeric(lab_dom_item(source, right), "depth");
+                unsigned selected = take_left ? left++ : right++;
+                lab_dom_key_set(target, lab_dom_format(next, "", ""), lab_dom_item(source, selected));
+                lab_dom_release(mark);
+            }
+            begin = end;
+        }
+        int swap = source;
+        source = target;
+        target = swap;
+        if (width > count / 2) break;
+        width *= 2;
+    }
+    return source;
+}
+
+/* Read the camera once, project every primitive and return a shared painter-order plan. */
+void lab_surface_polygons(int frame, int primitives, int segments)
+{
+    int result = lab_dom_object(4);
+    if (!lab_dom_truth(lab_dom_get(frame, "drawMesh"))) {
+        lab_dom_return(result);
+        return;
+    }
+    frame_t f;
+    read_frame(frame, &f);
+    unsigned count = lab_dom_count(primitives), minimum = segments ? 2 : 3;
+    unsigned mark = lab_dom_mark();
+    /* Visiting each primitive is necessary for clipping and projection; sorting is O(n log n). */
+    for (unsigned i = 0; i < count; ++i) {
+        int primitive = lab_dom_item(primitives, i);
+        int polygon = projected_polygon(&f, lab_dom_get(primitive, "points"));
+        if (lab_dom_count(lab_dom_get(polygon, "points")) >= minimum) {
+            lab_dom_set(polygon, "colour", lab_dom_get(primitive, "colour"));
+            lab_dom_push(result, polygon);
+        }
+        lab_dom_release(mark);
+    }
+    lab_dom_return(depth_order(result));
 }
 
 static void axis_point(const frame_t *f, unsigned axis, double fraction, double ca, double sa, double p[3])
@@ -209,23 +274,45 @@ static void axes(const frame_t *f, int view, int out)
     lab_dom_set(out, "paths", paths); lab_dom_set(out, "texts", texts);
 }
 
+/* Finite segments need not reach the requested endpoints, particularly beside singularities or domain gaps. */
+static void curve_input_transform(int volume, double *scale, double *offset)
+{
+    if (!lab_dom_truth(lab_dom_get(volume, "dirty")))
+        return;
+    int bounds = lab_dom_get(volume, "bounds"), sampled = lab_dom_get(volume, "sampled");
+    double low = lab_dom_to_number(lab_dom_item(bounds, 0)), high = lab_dom_to_number(lab_dom_item(bounds, 1));
+    double first = lab_dom_to_number(lab_dom_item(sampled, 0)), last = lab_dom_to_number(lab_dom_item(sampled, 1));
+    double span = high-low, sampled_span = last-first;
+    double magnitude = __builtin_fabs(low) + __builtin_fabs(high) + __builtin_fabs(first) + __builtin_fabs(last);
+    /* At microscopic scales retain the exact exponent transform, not rounded absolute coordinates. */
+    if (!__builtin_isfinite(span) || !__builtin_isfinite(sampled_span) ||
+        !(span > magnitude*1e-12) || !(sampled_span > magnitude*1e-12))
+        return;
+    *scale = sampled_span/span;
+    *offset = ((first-low)/2 + (last-high)/2)/span;
+}
+
 /* Ratios of zoom exponents are safe even when absolute endpoints coincide as doubles. */
 void lab_surface_frame(int view, int override_bounds)
 {
     frame_t f = {0};
     int volume = lab_dom_get(view, "volume"), out = lab_dom_object(5);
+    int segments = lab_dom_equal(lab_dom_read(lab_dom_get(view, "chart"), 3, "segments"), lab_dom_string("true"));
     f.width = numeric(view, "width"); f.height = numeric(view, "height");
-    double units[3]; read_vector(lab_dom_get(view, "units"), units, 3);
+    double units[3]; read_vector(lab_dom_get(segments ? volume : view, "units"), units, 3);
     lab_surface_rotation(lab_dom_get(view, "orientation"), f.rows);
     double relative = numeric(volume, "exponent") - numeric(volume, "sampleExponent");
     int auto_height = lab_dom_truth(lab_dom_get(volume, "autoHeight"));
-    int segments = lab_dom_equal(lab_dom_read(lab_dom_get(view, "chart"), 3, "segments"), lab_dom_string("true"));
     double limited = relative > 60 ? 60 : relative < -60 ? -60 : relative;
-    if (segments || auto_height) {
-        /* Horizontal zoom changes the box proportions, not the physical length of a coordinate unit. */
-        double factor = lab_surface_exp2(-limited);
+    for (unsigned i = 0; i < 3; ++i)
+        f.scale[i] = (segments ? i != 0 : auto_height && i == 2) ? 1 : lab_surface_exp2(limited);
+    if (segments)
+        curve_input_transform(volume, &f.scale[0], &f.offset[0]);
+    if (!segments && auto_height) {
+        /* Auto-height surfaces retain physical units; curves instead fill their stable coordinate box. */
+        double factor = 1/f.scale[0];
         units[0] *= factor;
-        if (!segments) units[1] *= factor;
+        units[1] *= factor;
         double longest = units[0] > units[1] ? units[0] : units[1];
         if (units[2] > longest) longest = units[2];
         for (unsigned i = 0; i < 3; ++i) units[i] /= longest;
@@ -233,7 +320,6 @@ void lab_surface_frame(int view, int override_bounds)
     lab_dom_set(out, "drawMesh", lab_dom_scalar(1, override_bounds || (relative >= -60 && relative <= 60)));
     for (unsigned i = 0; i < 3; ++i) {
         f.radius += units[i]*units[i];
-        f.scale[i] = (segments ? i != 0 : auto_height && i == 2) ? 1 : lab_surface_exp2(limited);
         for (unsigned row = 0; row < 3; ++row) f.rows[row*3+i] *= units[i];
     }
     /* Explicit normalised-frame overrides are diagnostic only, never sampling bounds. */

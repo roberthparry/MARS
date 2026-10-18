@@ -247,6 +247,13 @@ rendering. DOM checks use the actual WASM imports and browser geometry to verify
 card projection, accessible expansion, calendar boundary cells, delegated clicks
 and recovery after failed or oversized capability calls. Retired script routes
 must return 404, and no loader may request them.
+Test fixtures use named scenario helpers, explicit record interfaces and ordinary
+loops for setup and cleanup. `test_support.ts` provides small timer, paint and
+manually completed response helpers; the tests do not need a generic fixture
+framework. `native_adapters.ts` maps historical fixture names to owner paths in a
+plain table and resolves owners lazily, preserving startup order and temporary
+service replacements. Compile-time checks deliberately retain the few generic
+contracts needed to detect lost controller types and match the native bridge.
 It never uses the running Lab or the user's browser profile. Like the C suite,
 it uses `tests/test_config.json`; the browser test has its own source-path entry.
 
@@ -397,13 +404,224 @@ behaviour without adding a bundler or framework. Maintained source boundaries ar
 
 - `transport.ts`: browser value/network bridge to the bounded C Protobuf codec and scoped DOM capabilities for C.
 - `api.ts`: network resources and callback capabilities for C-owned request workflows.
-- `state.ts` and `workspace.ts`: storage and DOM adapters for C-owned history, modes and precision.
-- `bindings.ts`: authored input, native editor-state views and binding controls.
-- `results.ts`: native result installation, tooltips and entry-point adapters to C-owned card layout.
+- `state.ts`: storage adapters for C-owned history and persistence.
+- `workspace.ts`: page-instance wiring, browser references and ordered worksheet initialisation.
+- `workspace_controllers.ts`: mode, integrator, precision and presentation owners with explicit contracts in `workspace_controller_types.d.ts`.
+- `bindings.ts`: native editor views, binding controls and delegated card events.
+- `bindings_controller.ts`: input commit sequencing, refresh ownership and native binding service callbacks.
+- `results.ts`: result-card controllers, tooltips, clipboard feedback and fitting lifetimes.
+- `results_services.ts`: named browser service adapters for C-owned result and evaluation workflows.
 - `locations.ts`: browser location, clock and date-control conversion adapters.
 - `surface*.ts`: retained plot resources, camera adapters, refinement scheduling and SVG export.
 - `codec.ts`, `jobs.ts`, `codec_worker.ts` and `codec_types.ts`: codec instances, worker lifecycle and validated messages.
 - `api.ts` also applies native private-network access metadata; the separate `mobile.js` adapter is removed.
+
+TypeScript functions, methods, parameters, local variables and browser-owned fields
+use camelCase; classes and types use PascalCase. Named uppercase constants retain
+their existing spelling. C/WASM import and export names, native callback keys and
+wire-format fields retain their exact native spelling, including snake_case.
+An import table can therefore map a snake_case native key to a camelCase browser
+method without changing the ABI. Source filenames and module URLs remain unchanged.
+
+`bindings_types.d.ts` describes explicit browser capabilities and the three native
+event payload shapes: binding cards, integrator inputs and integrator row edits.
+Common native calls, binding controls and panel values are declared once; each
+owner's dependency list names only the additional capabilities it uses. Data
+members have short inline descriptions, while callable APIs retain Doxygen comments.
+Binding controllers use named callback methods and workflow identifiers. Per-request
+callbacks retain the admitted text and request; refresh and feedback work remains
+cancellable by its owner. Each file creates its own page instances with lazy
+dependencies, allowing concurrent definition loading before worksheet initialisation.
+Mathematical interpretation and binding policy stay in C/WASM.
+
+Workspace controller definitions load before `workspace.ts` creates the page owners.
+The contracts name each borrowed capability directly, and asynchronous operations use
+named workflow identifiers. Browser code retains result snapshots, event subscriptions
+and animation frames. A single native `lab_workspace_dom_calculus` call formats the
+variable labels and renders their calculus controls, reusing the same C binding-label
+formatter as individual labels. This replaces one browser/WASM round trip per label;
+the existing explicit-label rendering entry remains available. Calculus clicks use one
+owned handler per presenter and resolve the current request methods when clicked.
+
+`application_types.ts` groups bootstrap fields by responsibility and describes the
+native catalogue without reshaping it: jurisdiction options are code/label pairs,
+and towns are named objects grouped by jurisdiction. Coordinates remain exact
+text; the integrator interval cap is a number. Startup promises carry completion,
+not result data. These contracts and their compile-time regression checks introduce
+no browser behaviour or additional WebAssembly work.
+
+`results_types.d.ts` gives result controllers explicit capability contracts rather
+than selecting methods from global implementations. Native response records are
+named at their consuming boundary, and result workflow IDs have readable enum
+names. `results.ts` keeps page-instance wiring together, with lazy owner lookups
+so bootstrap does not access the workspace before it is ready. Frame completion
+releases its callback before invoking it; clipboard feedback and status timers
+remain owned and cancellable. Native service names and argument ordering are
+unchanged by the split into `results_services.ts`. Mathematics, card selection
+and workflow policy remain in C/WASM. Forwarding adapters use named argument
+tuples where omitted optional arguments must remain omitted at the receiving owner.
+
+`api_types.ts` describes request dependencies as explicit inputs and operations,
+not selections from application globals. Each request controller has its own
+service contract, checked where its capabilities are assembled. Continuation
+frames are plain records crossing the C/browser boundary: the browser captures
+inputs, C selects and advances the workflow, and browser callbacks supply I/O
+results. Their comments identify the native consumer and when later fields become
+available. They do not implement a second workflow in TypeScript.
+
+Runtime services are separated into request ownership, native execution and error
+propagation contracts. Their checked service groups are assembled into the flat
+registry consumed by C. Evaluation uses one `fetch` operation with a named mode
+and mode-specific inputs; C selects the mode and continues to own sequencing.
+Request `run` and `runUI` use one type parameter to preserve the callback's result
+type, including asynchronous results and `undefined` when admission is refused.
+Opaque native results, effects and thrown values remain `unknown`: the browser
+must not invent a shape or reinterpret values owned by those boundaries.
+
+The request composition root uses compact, signature-checked callback tables.
+Already available services are passed directly; callbacks defer access to worksheet
+controllers loaded by later scripts and retain their receivers. Getters are kept
+only for late-created state and forward references. Constructors list detachable
+public methods for a shared binding helper, without inspecting or binding private
+methods. Plot dragging separates local preview, remote sampling and native
+completion, retaining revision checks and request cleanup around asynchronous work.
+
+`state.ts` uses named methods for persistence, save timers, restoration and history
+cursors. Its native execution contracts use explicit operation signatures rather
+than generic result-type calculations. Methods passed as callbacks retain their
+owner, while service tables resolve the current application owners when invoked.
+Each capability group has responsibility-based sections. Stateless helpers live
+in a plain callback object; delayed save and location callbacks receive their
+runtime explicitly. The runtime's operation guide summarises the checked
+operation/frame overloads without replacing their compile-time checks.
+`state_types.d.ts` retains implementation-linked types for complete forwarding
+capabilities, with briefs spelling out their inputs and results. Narrow wrappers
+declare their actual signatures explicitly rather than advertising optional
+arguments they do not forward. The declaration file also includes the runtime's
+operation/frame guide and emits no runtime code.
+Local fallback storage uses `Codec.encodeStored()` and `Codec.decodeStored()`;
+`lab_browser_storage.c` owns both base64 conversion and Protobuf validation.
+Existing padded base64 records remain compatible. Missing, corrupt, oversized or
+inaccessible records return no fallback. Conversion reuses bounded native buffers,
+without browser base64 calls, byte-to-string loops or spread-argument chunks.
+Write and encoding errors remain visible to callers, while asynchronous server
+publication failures remain non-fatal. C owns saved-record selection, recovery
+ordering, stale-save rejection and history contents.
+Plain history-cursor pushes use flags zero. Recorded snapshot pushes use flags
+three: deduplicate adjacent snapshots and clear forward history, including when
+the new snapshot is blank or a duplicate. These operations are not interchangeable.
+
+The redraw scheduler in `surface_volume.ts` uses named methods and concrete data
+records rather than generic utility types or nested callbacks. Its control flow
+is `schedule()` → `redrawWhenReady()` → `finishRedraw()`: capture the request
+context, wait until interaction ends, then await native sampling. Browser event
+handlers are bound once so disposal can remove the same listeners. Native C
+continues to own range calculations and clipping.
+
+`surface_hover.ts` follows the same style. `inspect()` captures the pointer,
+`updateHover()` checks the chart, `findPoint()` asks native C for the nearest
+sample, and `showPoint()` displays the marker and tooltip. Tooltip placement
+uses explicit boundary checks. `hide()` cancels queued inspection and removes
+both overlays; `dispose()` also removes the inspector's event subscriptions.
+
+`surface_camera.ts` uses a plain native interface and named operation numbers
+matching the C camera entry point. Each method forwards its arguments and identifies
+the native result type; camera mathematics and per-plot orientation remain unchanged.
+
+`surface_types.ts` groups documented geometry records, retained view state and
+controller dependencies. Camera angles are a fixed three-number tuple ordered
+azimuth, elevation and roll. Initial views have an optional volume; ready views extend
+that interface with a required volume after native initialisation. Drawing callbacks,
+cached plans, resize observers and settle timers retain their separate optional lifetimes.
+Named text and tick records avoid inline
+object declarations, and renderer dependencies name their controller classes directly.
+These declarations add no runtime state or mathematical processing.
+
+`surface.ts` keeps browser resource ownership separate from native geometry.
+View creation separates DOM and drawing-resource allocation from assembling the
+retained view; observers become active only after native volume initialisation.
+The draw method labels its five stages, from preparation through rendering to
+presentation and settling. Original SVG geometry is hidden once per overlay
+cycle and its saved visibility is restored when that cycle ends; the settled SVG
+layer is managed separately.
+Named methods handle hover, deferred drawing, idle SVG replacement, resize and
+context-loss recovery; bound event handlers can be removed during shutdown.
+Snapshot capture restores the retained overlay even if capture fails. WebGL
+allocation, Canvas drawing and browser pixel sizing stay in TypeScript, while
+projection, clipping, mesh preparation and painter ordering use the native APIs
+described below.
+
+`workspace_native.ts` uses plain capability interfaces and a descriptor factory
+for live editor, precision and source properties. The factory selects the field
+kind once; reads and writes borrow the current native exports without caching
+another copy of those values. The frozen source-name tuple also defines the
+writable TypeScript source keys; regression checks verify its native ABI order.
+The mode overloads retain precise editor-string and precision-number types.
+Workspace and request controllers share the transport callback-binding helper,
+with explicit public method lists rather than binding every prototype member.
+Zero-length snapshots return null before reading native memory; negative native
+lengths remain errors.
+`lab_workspace_snapshot_validate()` validates decoded snapshot envelopes, required
+fields and exact membership in the supplied catalogue of at most seven modes.
+It returns the original state object (including opaque extra fields), null for an
+explicitly empty state, or a distinct envelope/state error code. TypeScript keeps
+UTF-8 transfer and error reporting, without interpreting mathematical text.
+
+`jobs.ts` uses named callbacks for queue submission, worker messages, cancellation
+and deadlines. Each pending job owns its copied bytes, timer and abort subscription;
+retirement releases those resources before resolving or rejecting its promise.
+The native queue continues to own admission limits, FIFO selection, token validation
+and worker lifecycle transitions. Browser code owns the Worker, promises and event
+subscriptions. Ordinary typed Promise, Map and byte-array declarations remain;
+there are no custom generic helpers or nested arrow callbacks in this adapter.
+
+`codec_worker.ts` separates message receipt, codec startup, decoding, error replies
+and input cleanup into named methods. Its message contracts have named interfaces.
+Boundary validation remains in TypeScript because messages can arrive before the
+worker's WebAssembly instance exists. A per-call JSON validator uses an explicit
+stack, rejects cycles and accessor properties without invoking getters, and accepts
+shared noncyclic data without repeatedly walking it. Binary parsing and decoding
+continue to run in C/WebAssembly.
+
+`codec.ts` binds named browser capability methods to the native imports. Explicit
+container-snapshot helpers preserve enumerable data properties without invoking
+getters or accepting sparse arrays. Native decoding validates the complete message,
+including node types, finite numbers and depth limits, while host callbacks create
+fresh JSON containers and check UTF-8 and duplicate keys. The browser therefore
+checks the returned root without repeating a full-tree validation pass. Worker
+replies retain their separate validation because they cross a message boundary.
+
+`app.ts` separates each script load into its own resource owner, with named handlers
+for success, failure and cancellation. The application registers named startup
+capabilities and releases its subscriptions and controllers in reverse ownership
+order. Native bootstrap still selects assets and controls startup ordering; script
+elements, promises, observers and page-lifetime events remain browser resources.
+
+Retained geometry preparation and painter ordering run in C/WebAssembly. Native
+code decodes the renderer's normalised SVG coordinates, validates units, expands
+colours and triangulates polygon fans before returning browser-owned vertex arrays.
+This reads display metadata only; it does not parse mathematical expressions.
+`lab_surface_polygons()` reads a projection frame once, clips the primitives and
+returns stable far-to-near drawing order. Canvas fallback and SVG export share
+this plan, computed lazily and invalidated when the camera frame changes; WebGL
+interaction continues to use its depth buffer without requesting a software plan.
+Temporary bridge handles are released per primitive and sorting step rather than
+retained for the whole scene.
+
+Curve inspection likewise submits the retained geometry in one native call.
+`lab_surface_hover()` owns traversal, clipping and nearest-point selection, with
+a 65,536-primitive admission limit and bounded temporary handle usage. TypeScript
+retains pointer scheduling and DOM overlays, not sampling or distance decisions.
+
+`surface_export.ts` creates and serialises SVG elements from a native vector plan.
+`lab_surface_svg_plan()` constructs path commands, closes mesh faces and batches
+only adjacent curve primitives of the same colour. Each segment starts a new
+subpath, so batching cannot bridge domain gaps or change painter order. Axis path
+commands also come from C; browser code applies literal attributes and labels,
+clones the figure and strips internal metadata. Fragment arrays are joined once
+per completed path through a browser string capability, with temporary handles
+released throughout construction. The TypeScript exporter uses plain interfaces
+and named methods, without generic helpers or nested callbacks.
 
 `evaluation.js` and its route are removed. Its evaluation, goal-seek and auxiliary
 workflows are C continuations, not JavaScript workflows relocated into another
@@ -556,10 +774,14 @@ they still reject oversized input before copying it into WebAssembly memory.
 The codec also supplies host container and temporary-handle bounds through
 `lab_browser_member_limit()` and `lab_browser_handle_capacity()`. Saved-state
 admission uses `lab_browser_base64_limit()`, derived from the encoded message
-bound including base64 padding. Host checks remain before container copying and
-base64 decoding; the native codec independently validates the resulting message.
+bound including base64 padding. Host checks reject oversized text before staging;
+native code independently checks the base64 alphabet, padding, decoded byte limit
+and Protobuf envelope. Non-canonical padding, whitespace and unpadded text are
+rejected; saved records have always used canonical padded base64. The shared input
+buffer accommodates the base64 expansion, while binary messages remain limited
+to 8 MiB. The adapter clears staged storage data after success or failure.
 
-The browser ABI is version 36; mismatched assets require a rebuild/restart
+The browser ABI is version 43; mismatched assets require a rebuild/restart
 rather than falling back to old JavaScript policy.
 The native `/bootstrap` response also carries its compiled browser ABI. Startup
 checks that it matches WASM before loading worksheet code. This catches an old
@@ -704,6 +926,30 @@ text, partial results and integration raw-error precedence remain distinct.
 Native continuations select request-ownership checks at asynchronous boundaries;
 the host executes those checks against the native request controller.
 
+`transport.ts` groups its native imports by responsibility. Named field and
+measurement indices label the numeric dispatch tables and match the ABI documented
+in `wasm/include/lab_dom.h`. Synchronous and asynchronous runners repeatedly ask C
+for a plan, dispatch its services, save the final result when requested and stop
+at a completion plan. Only plans marked for waiting await their service result;
+cancellation prevents later dispatch or publication. Declared failure stages let
+C choose recovery without retaining scoped handles.
+
+`transport_types.ts` groups the numeric ABI, browser service plans, lazy module
+contracts and DOM capabilities into separate sections. Plain lookup declarations
+replace nested utility types; each service call has a named record and each plan
+field documents its role. The service registry accepts callbacks with different
+parameter lists, but only the checked dispatcher supplies their native-selected
+arguments. Module aliases retain the codec and job controllers' own contracts
+without loading them or adding a runtime module wrapper.
+
+Deferred DOM effects capture browser nodes, not native handle numbers. A failed
+native call discards its effects; successful calls release their handle scope
+before executing them. An effect's event handler may therefore start a fresh
+native call. Calling back into the bridge while a native scope is still active
+remains forbidden. Effect exceptions propagate after cleanup and stop the rest
+of that effect queue. The shared DOM and wire instances use lazy constructor
+callbacks so neither accesses the other before both have been initialised.
+
 `wasm/src/lab_evaluation_setup.c` also owns request preparation stages. Visible
 bindings are captured before their commit; editor text is captured afterwards.
 Only after binding assembly completes does C choose between the authored source
@@ -846,6 +1092,20 @@ input day where possible, clamps leap days and saturates at the supported year
 limits. Invalid navigation leaves state unchanged; closed pickers reject edits.
 The former `date_picker.js` and `worksheet.js` scripts and their HTTP routes are
 removed. `locations.js` retains browser input conversion and clock access;
+its TypeScript source, `locations.ts`, uses named service methods and explicit
+calendar records. Controller methods retain their owner when passed as callbacks,
+and browser dependencies are resolved when an action runs, not during script
+loading. Stateless host providers and ownership guards use plain objects, and
+the location service table is sectioned by responsibility. The calendar host port
+exposes only calendar flags, not editor or result session state.
+Rounded-select registries index controllers by element in a `WeakMap`, without
+attaching callback properties to DOM elements. Each registry dispatches native
+rebuild/synchronisation plans to its own controllers; individual disposal removes
+that controller's registration, while registry disposal closes its remaining menus.
+Browser number inputs deliberately perform form-value conversion so blank or
+invalid text remains `NaN`, rather than becoming zero through `Number()`.
+Browser `Intl` supplies time-zone and daylight-saving data; C continues
+to own date validation, arithmetic, town matching and picker policy.
 `workspace.js` retains browser references and read-only views of the native
 year/month. `lab_workspace_dom_references` supplies the control catalogue as
 browser-owned references and array snapshots without changing worksheet state.
@@ -1189,8 +1449,15 @@ For 3-D curves, zoom narrows or widens the sampled input interval about its
 centre and requests fresh native samples. For example, 200% selects half the
 original input span; it does not magnify and crop the existing image. The real
 and imaginary ranges are fitted to the new samples, preserving the camera
-orientation. Only the 3-D card is replaced; the other projections retain their
+orientation and the coordinate box's original proportions. Narrowing the input
+interval spreads the selected section across the x-axis rather than shortening
+that axis. Only the 3-D card is replaced; the other projections retain their
 views. Reset restores the input range from before zooming.
+The zoom slider retains its track while the thumb moves; wheel or pinch gestures
+can extend it, and Reset restores the original track. During refinement, the preview
+uses the actual sampled interval, including offsets caused by missing finite samples.
+Failed or superseded refinement restores the last accepted curve and zoom setting;
+it does not leave an unrefined preview or overwrite a sibling plot's newer controls.
 An interval containing only real values remains a 3-D curve with zero imaginary
 component; zooming does not switch that card to a different plot type.
 Rotation uses a fixed enclosing-sphere fit to avoid changes of apparent scale
@@ -1201,6 +1468,14 @@ Hover near a space-curve segment to show a marker and its approximate input,
 real and imaginary coordinates. Inspection interpolates the displayed native
 samples, never across a domain gap, and follows the current camera projection.
 The marker and tooltip disappear during gestures and are not included in copied SVG.
+The cursor changes from a dragging hand to a crosshair on a curve hit. The outlined
+marker stays above both the canvas and tooltip, including while the plot settles
+back to SVG; moving between the figure and its curve paths does not dismiss it.
+Pointer entry also restores inspection when a replacement SVG arrives beneath
+a stationary mouse, without requiring an extra mouse movement.
+Retained 3-D viewports clip overlays instead of creating scrollbars, so inspection
+cannot resize the plot repeatedly. Idle redraws re-pick the stationary pointer;
+leaving the plot or starting a gesture clears that pointer state.
 
 Real-only samples retain the existing real-curve presentation. Distributional
 Fourier results retain their components and labelled impulse weights, with an
@@ -1327,9 +1602,10 @@ silently omitting sheets. Other expressions and high-precision local frames reta
 residual sampling; finite sampling cannot guarantee discovery of every component.
 Plot settings use compact button-style radio choices, not dropdowns. Choosing
 **Auto** for the range clears explicit bounds and hides all bound-entry fields
-in Expression, Equation and Differential Equation plots. Axis choices remain
-available when there are multiple variables. **Fit all** reveals horizontal
-bounds; **Manual limits** also reveals vertical bounds. Blank horizontal bounds
+in Expression, Equation and Differential Equation plots. For a single variable,
+the whole range panel, including its heading and border, is hidden until **Manual**
+is selected. Axis choices remain available when there are multiple variables.
+The separate **Manual limits** setting reveals vertical bounds. Blank horizontal bounds
 remain automatic. Manual vertical limits wait until both fields are filled.
 Delayed edits are discarded after a worksheet change or newer explicit request.
 Incomplete or invalid live bounds leave the last valid plot visible and show

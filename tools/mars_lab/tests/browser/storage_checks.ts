@@ -5,18 +5,32 @@
  * Exercises control validation and asynchronous history restoration against the storage controller, including superseded ownership guards.
  */
 
-/** Saved-state policies and guarded restoration against the C/WASM storage controller. */
+/** @brief Native editor restoration result. */
+interface LabStorageEditor {
+    text: string;
+    flags: number;
+}
+
+/** @brief Native recovery choice and its saved timestamp. */
+interface LabStorageRecovery {
+    text: string;
+    updatedAt: number;
+}
+
+/** @brief Stored fields accessed by native restoration and recovery. */
+interface LabStorageRecord {
+    [field: string]: unknown;
+}
+
+/** @brief Check saved-state policies and guarded restoration against the C/WASM storage controller. */
 window.checkLabStorage = async function checkLabStorage() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Storage: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const deferred = () => {
-        let resolve!: () => void;
-        const promise = new Promise<void>(accept => resolve = accept);
-        return {promise, resolve};
-    };
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
     const native = labWire.exports();
     const existingEquationControl = document.getElementById('equationVariable') as HTMLInputElement | null;
     const equationControl = existingEquationControl || document.createElement('input');
@@ -24,9 +38,12 @@ window.checkLabStorage = async function checkLabStorage() {
         equationControl.id = 'equationVariable';
         equationControl.hidden = true;
     }
-    const controls = [equationControl, WorksheetContext.matrixOperation, WorksheetContext.matrixOperand, WorksheetContext.integratorIntervalCap, WorksheetContext.expr];
+    const controls = [
+        equationControl, WorksheetContext.matrixOperation, WorksheetContext.matrixOperand,
+        WorksheetContext.integratorIntervalCap, WorksheetContext.expr
+    ];
     const saved = {
-        values: controls.map(node => (node as LabWorksheetTestSnapshotElement).value),
+        values: controls.map(node => node.value),
         precision: WorksheetWorkspace.WORKSPACE_MODE_NAMES.map((_, index) => native.lab_workspace_precision(index)),
         prepare: WorksheetRequests.presentation.prepareLabEditor,
         bounds: WorksheetWorkspace.integrator.restoreIntegratorBoundsText,
@@ -38,8 +55,10 @@ window.checkLabStorage = async function checkLabStorage() {
     const option = document.createElement('option');
     option.value = 'storage-fixture';
     WorksheetContext.matrixOperation.appendChild(option);
-    const control = (field: number, value: unknown, local = false) =>
-        labDOM.call('lab_storage_control', field, [value], Number(local), labApplication.configuration);
+    /** @brief Apply one native storage field using either local or server policy. */
+    function control(field: number, value: unknown, local = false) {
+        return labDOM.call('lab_storage_control', field, [value], Number(local), labApplication.configuration);
+    }
     try {
         if (!existingEquationControl)
             document.body.appendChild(equationControl);
@@ -87,17 +106,17 @@ window.checkLabStorage = async function checkLabStorage() {
         equal(WorksheetContext.integratorIntervalCap.value, '500', 'missing local budget preserves current value');
 
         for (let mode = 0; mode < 5; ++mode) {
-            const server = labDOM.call<{text: string; flags: number}>('lab_storage_editor', mode, ['  opaque μ  '], 0);
-            const local = labDOM.call<{text: string; flags: number}>('lab_storage_editor', mode, ['  opaque μ  '], 1);
+            const server = labDOM.call<LabStorageEditor>('lab_storage_editor', mode, ['  opaque μ  '], 0);
+            const local = labDOM.call<LabStorageEditor>('lab_storage_editor', mode, ['  opaque μ  '], 1);
             equal(server.text, 'opaque μ', 'server editor outer whitespace is trimmed');
             equal(local.text, '  opaque μ  ', 'local editor whitespace is retained');
             equal(server.flags, native.lab_persist_restore(mode, 1, 0, 0), 'existing native restore flags retained');
             equal(local.flags, native.lab_persist_restore(mode, 1, 0, 1), 'local restore flags retained');
-            equal(labDOM.call<{text: string; flags: number}>('lab_storage_editor', mode, ['partial...'], 0).flags !== 0, mode < 2,
+            equal(labDOM.call<LabStorageEditor>('lab_storage_editor', mode, ['partial...'], 0).flags !== 0, mode < 2,
                   'abbreviated non-binding editor copies remain rejected');
         }
-        equal(labDOM.call<{text: string; flags: number}>('lab_storage_editor', 0, [' '], 0).flags, 0, 'empty trimmed server editor is ignored');
-        check(labDOM.call<{text: string; flags: number}>('lab_storage_editor', 0, [' '], 1).flags !== 0, 'local whitespace-only editor remains present');
+        equal(labDOM.call<LabStorageEditor>('lab_storage_editor', 0, [' '], 0).flags, 0, 'empty trimmed server editor is ignored');
+        check(labDOM.call<LabStorageEditor>('lab_storage_editor', 0, [' '], 1).flags !== 0, 'local whitespace-only editor remains present');
 
         labDOM.call('lab_storage_precisions', {precision_bits: {expression: '17', equation: ' 106 bits',
                                                               matrix: '2000000', unknown: '999'}});
@@ -113,8 +132,11 @@ window.checkLabStorage = async function checkLabStorage() {
         labDOM.call('lab_storage_precisions', {});
         equal(native.lab_workspace_precision(0), 53, 'absent saved precision leaves state unchanged');
 
-        const recover = (mode: number, server: Record<string, unknown>, text: string, stamp: unknown) =>
-            labDOM.call<{text: string; updatedAt: number}>('lab_storage_recovery', mode, server, [text, stamp], labApplication.configuration);
+        /** @brief Ask native policy whether the local editor should replace the server copy. */
+        function recover(mode: number, server: LabStorageRecord, text: string, stamp: unknown): LabStorageRecovery {
+            return labDOM.call<LabStorageRecovery>(
+                'lab_storage_recovery', mode, server, [text, stamp], labApplication.configuration);
+        }
         equal(recover(0, {expression: 'server', expression_updated_at: 200}, 'local', '100'), null,
               'older local copy cannot replace a populated server copy');
         equal(recover(0, {expression: 'server', expression_updated_at: 200}, ' ', '300'), null,
@@ -122,27 +144,37 @@ window.checkLabStorage = async function checkLabStorage() {
         const recovery = recover(0, {expression: 'server', expression_updated_at: 200}, '  exact local μ  ', '300');
         equal(recovery.text, 'exact local μ', 'newer recovery preserves opaque trimmed source');
         equal(recovery.updatedAt, 300, 'saved timestamp is numeric');
-        const patch = labDOM.call<Record<string, unknown>>('lab_storage_recovered', 0, recovery, [recovery.text], 999);
+        const patch = labDOM.call<LabStorageRecord>('lab_storage_recovered', 0, recovery, [recovery.text], 999);
         equal(patch.expression, recovery.text, 'recovery patch owns the selected expression');
         equal(patch.expression_updated_at, 300, 'valid local timestamp wins over clock fallback');
         const missing = recover(1, {equation: WorksheetContext.DEFAULT_EQUATION_TEXT}, 'native equation', '0');
         check(missing, 'local equation can replace an undated server placeholder');
-        const equationPatch = labDOM.call<Record<string, unknown>>('lab_storage_recovered', 1, missing, ['native canonical equation'], 999);
+        const equationPatch = labDOM.call<LabStorageRecord>('lab_storage_recovered', 1, missing, ['native canonical equation'], 999);
         equal(equationPatch.equation, 'native canonical equation', 'recovery uses prepared native text');
         equal(equationPatch.equation_updated_at, 999, 'missing local timestamp uses supplied clock');
         equal(recover(4, {}, 'integrator', '300'), null, 'local timestamp recovery is restricted to its two modes');
 
-        const pendingBounds = deferred(), enteredBounds = deferred(), readKeys: string[] = [];
-        Reflect.set(WorksheetWorkspace.integrator, 'restoreIntegratorBoundsText', async (text: string) => {
+        const pendingBounds = LabTestBrowser.signal();
+        const enteredBounds = LabTestBrowser.signal();
+        const readKeys: string[] = [];
+        Reflect.set(WorksheetWorkspace.integrator, 'restoreIntegratorBoundsText', async function restoreBounds(text: string) {
             equal(text, 'opaque bounds', 'asynchronous restore receives C-normalised bounds');
             enteredBounds.resolve();
             await pendingBounds.promise;
         });
         WorksheetContext.integratorIntervalCap.value = '500';
-        const pendingControls = WorksheetPersistence.restoration.restoreControls(key => {
+        const storedControls: LabStorageRecord = {
+            integrator_bounds: ' opaque bounds ',
+            integrator_interval_cap: '5000'
+        };
+
+        /** @brief Record storage reads so their order across the bounds await remains visible. */
+        function readControl(key: string): unknown {
             readKeys.push(key);
-            return {integrator_bounds: ' opaque bounds ', integrator_interval_cap: '5000'}[key];
-        });
+            return storedControls[key];
+        }
+
+        const pendingControls = WorksheetPersistence.restoration.restoreControls(readControl);
         await enteredBounds.promise;
         equal(WorksheetContext.integratorIntervalCap.value, '500', 'later controls are not projected across a pending bounds request');
         check(!readKeys.includes('integrator_interval_cap'), 'later storage reads also remain after the bounds await');
@@ -150,25 +182,38 @@ window.checkLabStorage = async function checkLabStorage() {
         await pendingControls;
         equal(WorksheetContext.integratorIntervalCap.value, '5000', 'budget projection follows completed bounds preparation');
 
-        const preparation = deferred();
-        let owned = true, updates = 0;
+        const preparation = LabTestBrowser.signal();
+        let owned = true;
+        let updates = 0;
+
+        /** @brief Resolve history ownership when the asynchronous controller checks it. */
+        function ownsHistory(): boolean {
+            return owned;
+        }
         Reflect.set(WorksheetRequests.presentation, 'prepareLabEditor', () => preparation.promise);
         Reflect.set(WorksheetBindings.controller, 'applyUpdatedBindingExpression', () => ++updates);
         WorksheetContext.matrixOperand.value = 'current operand';
         const stale = WorksheetPersistence.navigation.restore({mode: 'matrix', text: 'old', operation: 'eval', operand: 'old operand'},
-                                          () => owned);
+                                          ownsHistory);
         owned = false;
         preparation.resolve();
         equal(await stale, false, 'history ownership is checked after editor preparation');
         equal(WorksheetContext.matrixOperand.value, 'current operand', 'stale preparation cannot project historical controls');
         equal(updates, 0, 'stale preparation cannot publish historical editor text');
 
-        const calendarWait = deferred(), calendarEntered = deferred();
+        const calendarWait = LabTestBrowser.signal();
+        const calendarEntered = LabTestBrowser.signal();
         let cleared = 0;
-        const clear = () => ++cleared;
+
+        /** @brief Count deferred source and binding resets. */
+        function clear(): number {
+            return ++cleared;
+        }
         Reflect.set(WorksheetBindings.controller, 'clearExpressionSource', clear);
         Reflect.set(WorksheetBindings.panel, 'clearVariableValues', clear);
-        Reflect.set(WorksheetLocations.calendarActions, 'restoreCalendarHistory', async (mode: WorksheetMode, state: WorksheetSnapshot, guard: WorksheetGuard) => {
+        Reflect.set(WorksheetLocations.calendarActions, 'restoreCalendarHistory', async function restoreCalendar(
+            mode: WorksheetMode, state: WorksheetSnapshot, guard: WorksheetGuard
+        ) {
             equal(mode, 'almanac', 'calendar mode is retained');
             equal(state.marker, 'native', 'calendar history retains its native record');
             check(guard(), 'calendar restoration receives ownership guard');
@@ -177,7 +222,8 @@ window.checkLabStorage = async function checkLabStorage() {
         });
         owned = true;
         WorksheetContext.expr.value = 'current editor';
-        const staleCalendar = WorksheetPersistence.navigation.restore({mode: 'almanac', almanac: {marker: 'native'}} as unknown as WorksheetSnapshot, () => owned);
+        const staleCalendar = WorksheetPersistence.navigation.restore(
+            {mode: 'almanac', almanac: {marker: 'native'}} as unknown as WorksheetSnapshot, ownsHistory);
         await calendarEntered.promise;
         owned = false;
         calendarWait.resolve();
@@ -196,10 +242,14 @@ window.checkLabStorage = async function checkLabStorage() {
         Reflect.set(WorksheetBindings.controller, 'clearExpressionSource', saved.source);
         Reflect.set(WorksheetBindings.panel, 'clearVariableValues', saved.bindings);
         option.remove();
-        controls.forEach((node, index) => (node as LabWorksheetTestSnapshotElement).value = saved.values[index]);
+        for (let index = 0; index < controls.length; ++index) {
+            controls[index].value = saved.values[index];
+        }
         if (!existingEquationControl)
             equationControl.remove();
-        saved.precision.forEach((bits, index) => native.lab_workspace_precision_set(index, bits));
+        for (let index = 0; index < saved.precision.length; ++index) {
+            native.lab_workspace_precision_set(index, saved.precision[index]);
+        }
     }
     return true;
 };

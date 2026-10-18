@@ -6,4 +6,7 @@
  * The declarations add no runtime behaviour and remain separate from production contracts.
  */
 
-interface Window { checkLabRequestFlows(): Promise<void>; }
+interface Window {
+    /** Run continuation ordering and failure-recovery regressions. */
+    checkLabRequestFlows(): Promise<void>;
+}

@@ -5,26 +5,39 @@
  * Snapshots picker and result elements while exercising scoped browser capabilities, restoring their original state afterwards.
  */
 
+/** @brief Options retained from the picker close service. */
+interface BindingWidgetCloseCall {
+    restoreFocus?: boolean;
+}
+
 /** Real DOM projection checks for C-owned widgets and scoped host capabilities. */
 window.checkLabWidgets = function checkLabWidgets() {
-    const check: LabTestCheck = (ok, message) => {
+    function check(ok: unknown, message: string): void {
         if (!ok)
             throw new Error('C DOM widgets: ' + message);
-    };
-    const snapshots = [
-        WorksheetContext.marsDatePickerGrid, WorksheetContext.marsDatePickerWeekdays, WorksheetContext.marsDatePickerMonth, WorksheetContext.marsDatePickerYear, WorksheetContext.marsDatePicker, WorksheetContext.rendered
-    ].map(element => ({
-              element,
-              children: [...element.childNodes],
-              attrs: [...element.attributes].map(attr => [attr.name, attr.value] as const),
-              value: (element as LabWorksheetTestSnapshotElement).value
-          }));
+    }
+    const snapshots: BindingElementSnapshot[] = [];
+    const elements = [
+        WorksheetContext.marsDatePickerGrid, WorksheetContext.marsDatePickerWeekdays,
+        WorksheetContext.marsDatePickerMonth, WorksheetContext.marsDatePickerYear,
+        WorksheetContext.marsDatePicker, WorksheetContext.rendered
+    ];
+    for (const element of elements) {
+        const children = [...element.childNodes];
+        const attributes: [string, string][] = [];
+        for (const attribute of element.attributes)
+            attributes.push([attribute.name, attribute.value]);
+        const value = (element as LabWorksheetTestSnapshotElement).value;
+        snapshots.push({element, children, attributes, value});
+    }
     const savedInput = WorksheetContext.marsDatePickerState.input;
     let savedServices = null;
     const native = labWire.exports();
-    const calls: ([unknown, unknown] | {restoreFocus?: boolean})[] = [];
+    const calls: ([unknown, unknown] | BindingWidgetCloseCall)[] = [];
     try {
-        const render = (...args: unknown[]) => labDOM.call('lab_widgets_picker', ...args);
+        function render(...args: unknown[]) {
+            return labDOM.call('lab_widgets_picker', ...args);
+        }
         check(render(2024, 2, 2024, 2, 29, 2024, 2, 29) === 1, 'leap month rendered');
         check(
             WorksheetContext.marsDatePickerMonth.options.length === 12 && WorksheetContext.marsDatePickerMonth.value === '2',
@@ -42,13 +55,20 @@ window.checkLabWidgets = function checkLabWidgets() {
         savedServices = labDOM.bindEvents({});
         labDOM.bindEvents({
             ...savedServices,
-            commitMarsDateValue: (input, value) => calls.push([input, value]),
-            closeMarsDatePicker: options => calls.push(options)
+            commitMarsDateValue(input: unknown, value: unknown) {
+                return calls.push([input, value]);
+            },
+            closeMarsDatePicker(options: BindingWidgetCloseCall) {
+                return calls.push(options);
+            }
         });
         WorksheetContext.marsDatePickerState.input = WorksheetContext.datetimeDate;
         leap.click();
+        const committed = calls[0] as [unknown, unknown];
+        const closed = calls[1] as BindingWidgetCloseCall;
         check(
-            calls.length === 2 && (calls[0] as [unknown, unknown])[0] === WorksheetContext.datetimeDate && (calls[0] as [unknown, unknown])[1] === '2024-02-29' && (calls[1] as {restoreFocus?: boolean}).restoreFocus,
+            calls.length === 2 && committed[0] === WorksheetContext.datetimeDate &&
+                committed[1] === '2024-02-29' && closed.restoreFocus,
             'one delegated event commits and restores focus');
         render(1, 1, 1, 1, 1, 0, 0, 0);
         check(WorksheetContext.marsDatePickerYear.value === '0001', 'early year padded');
@@ -76,9 +96,13 @@ window.checkLabWidgets = function checkLabWidgets() {
             'CSS supplies unchanged error colour');
         WorksheetResults.cards.clearRenderedError();
         check(!WorksheetContext.rendered.classList.contains('error'), 'C clears error state');
-        for (const action
-                 of [() => labDOM.call('missing_export'),
-                    () => labDOM.call('lab_layout_more', ...Array(4096).fill(button))]) {
+        function callMissingExport() {
+            return labDOM.call('missing_export');
+        }
+        function callWithTooManyHandles() {
+            return labDOM.call('lab_layout_more', ...Array(4096).fill(button));
+        }
+        for (const action of [callMissingExport, callWithTooManyHandles]) {
             let failed = false;
             try {
                 action();
@@ -96,12 +120,14 @@ window.checkLabWidgets = function checkLabWidgets() {
         if (savedServices)
             labDOM.bindEvents(savedServices);
         WorksheetContext.marsDatePickerState.input = savedInput;
-        for (const {element, children, attrs, value} of snapshots) {
-            for (const attribute of [...element.attributes]) element.removeAttribute(attribute.name);
-            for (const [name, content] of attrs) element.setAttribute(name, content);
+        for (const {element, children, attributes, value} of snapshots) {
+            for (const attribute of [...element.attributes])
+                element.removeAttribute(attribute.name);
+            for (const [name, content] of attributes)
+                element.setAttribute(name, content);
             element.replaceChildren(...children);
             if (value !== undefined)
-                (element as LabWorksheetTestSnapshotElement).value = value;
+                element.value = value;
         }
     }
 };

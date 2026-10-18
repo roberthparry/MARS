@@ -146,6 +146,8 @@ void lab_plot_controls_sync(void)
     int multiple = lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) > 1;
     int automatic = !lab_dom_equal(value("plotInputRange"), lab_dom_string("manual"));
     lab_dom_class(lab_dom_closest(lab_dom_id("plotFirstGroup"), ".plot-ranges"), "hidden", 0);
+    /* A single-variable group has only a range heading and bounds; retain actual variable choices. */
+    lab_dom_class(lab_dom_id("plotFirstGroup"), "hidden", automatic && !multiple);
     lab_dom_class(lab_dom_query(lab_dom_id("plotFirstGroup"), ".plot-bound-pair"), "hidden", automatic);
     lab_dom_class(lab_dom_query(lab_dom_id("plotSecondGroup"), ".plot-bound-pair"), "hidden", automatic);
     lab_dom_class(lab_dom_id("plotSecondGroup"), "hidden", complex || curve || (!surface && !multiple));

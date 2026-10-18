@@ -570,7 +570,9 @@ static int lab_flow_request_holidays_status(struct lab_flow_request_holidays_con
 static int lab_flow_request_holidays_fetch(struct lab_flow_request_holidays_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_holidays_stage_error_current));
-    return lab_flow_call(ctx->frame, flow_request_holidays_stage_current, "fetchDatetime", "result", 1, 2, 0,
+    int fetch = lab_dom_object(5);
+    lab_dom_set(fetch, "kind", lab_dom_string("datetime"));
+    return lab_flow_call(ctx->frame, flow_request_holidays_stage_current, "fetch", "result", 1, 2, fetch,
                          ctx->request);
 }
 

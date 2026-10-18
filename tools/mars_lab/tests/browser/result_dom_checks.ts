@@ -5,18 +5,90 @@
  * Supplies native presentation metadata to the real scoped bridge and verifies DOM changes without parsing mathematics in the tests.
  */
 
+/** @brief Exercise replaceable clipboard feedback using owned timers and detached public callbacks. */
+async function checkResultClipboardLifetime(check: LabTestCheck): Promise<void> {
+    const timers = new Map<number, () => void>();
+    const cancelled: number[] = [];
+    const writes: string[] = [];
+    let timer = 0;
+    const first = document.createElement('button');
+    const second = document.createElement('button');
+    first.textContent = 'Copy first';
+    second.textContent = 'Copy second';
+    function createClipboard() {
+        return {
+            async writeText(text: string): Promise<void> {
+                writes.push(text);
+            }
+        };
+    }
+    const owner = new WorksheetResults.WorksheetClipboardController({
+        native() { return labDOM; },
+        document() { return document; },
+        clipboard: createClipboard,
+        secure() { return true; },
+        schedule(callback, delay) {
+            check(delay === 1200, 'copy feedback retains its expiry interval');
+            timers.set(++timer, callback);
+            return timer;
+        },
+        cancel(id) {
+            cancelled.push(id);
+            timers.delete(id);
+        },
+        surface() { return '<svg>fixture</svg>'; },
+        lastTeX() { return ''; }
+    });
+    const {flash, write, copyTextForTarget, dispose} = owner;
+    try {
+        check(copyTextForTarget('plot') === '<svg>fixture</svg>', 'detached copy-source callback retains its surface provider');
+        await write('authored text');
+        check(writes.join(',') === 'authored text', 'detached clipboard write uses the injected owner');
+        flash(first, true);
+        const replaced = timer;
+        flash(second, true);
+        const other = timer;
+        flash(first, false);
+        const replacement = timer;
+        check(!timers.has(replaced) && timers.has(other) && timers.has(replacement) &&
+              cancelled.join(',') === String(replaced), 'replacement cancels only that button\'s previous feedback');
+        check(first.textContent === 'Failed' && second.textContent === 'Copied', 'feedback remains independent per button');
+        const expire = timers.get(replacement);
+        if (!expire) throw new Error('Clipboard fixture: missing expiry');
+        timers.delete(replacement);
+        expire();
+        check(first.textContent === 'Copy first' && second.textContent === 'Copied',
+              'expiry restores the original label without resetting another button');
+        first.textContent = 'After expiry';
+        dispose();
+        check(timers.size === 0 && second.textContent === 'Copy second' && first.textContent === 'After expiry',
+              'disposal restores pending feedback but no longer owns expired feedback');
+        const cancellations = cancelled.length;
+        dispose();
+        check(cancelled.length === cancellations && !cancelled.includes(replacement),
+              'completed feedback is retired and repeated disposal is inert');
+    } finally {
+        dispose();
+    }
+}
+
 /**
  * Result-card C/WASM projection and asynchronous ownership regressions.
  * The parent runs checkLabResultDom sequentially after Lab readiness. Fixtures
  * contain native presentation metadata; these checks never parse mathematics.
  */
 window.checkLabResultDom = async function checkLabResultDom() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`Result DOM: ${message}`);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const call = (name: string, ...args: unknown[]) => labDOM.call('lab_result_' + name, ...args);
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    await checkResultClipboardLifetime(check);
+    function call(name: string, ...args: unknown[]): unknown {
+        return labDOM.call('lab_result_' + name, ...args);
+    }
     const caches = {
         numeric: new Map<string, boolean>(),
         solver: new Map<string, string>(),
@@ -43,34 +115,41 @@ window.checkLabResultDom = async function checkLabResultDom() {
         WorksheetContext.parsed, WorksheetContext.functionStyle, WorksheetContext.value, WorksheetContext.rendered, WorksheetContext.parsedMore, WorksheetContext.functionMore, WorksheetContext.valueMore, WorksheetContext.renderedMore, WorksheetContext.resultUseInput,
         WorksheetContext.valueNote, WorksheetContext.valueNoteCard, WorksheetContext.valueTitle, WorksheetContext.mobileUrl, WorksheetContext.value.closest<HTMLElement>('.result-card')!
     ].filter((node): node is HTMLElement => node !== null);
-    const snapshots =
-        nodes.map(node => ({
-                      node,
-                      attributes: [...node.attributes].map(attribute => [attribute.name, attribute.value] as const),
-                      children: [...node.childNodes],
-                      disabled: (node as HTMLElement & {disabled?: boolean}).disabled,
-                      matrixRequest: Object.getOwnPropertyDescriptor(node, 'labMatrixPresentationRequest'),
-                      renderRequest: Object.getOwnPropertyDescriptor(node, 'labResultRenderRequest')
-                  }));
+    const snapshots: ResultDomSnapshot[] = [];
+    for (const node of nodes) {
+        const attributes: ResultDomSnapshot['attributes'] = [];
+        for (const attribute of node.attributes)
+            attributes.push({name: attribute.name, value: attribute.value});
+        snapshots.push({
+            node,
+            attributes,
+            children: [...node.childNodes],
+            disabled: (node as ResultDomElement).disabled,
+            matrixRequest: Object.getOwnPropertyDescriptor(node, 'labMatrixPresentationRequest'),
+            renderRequest: Object.getOwnPropertyDescriptor(node, 'labResultRenderRequest')
+        });
+    }
     const tasks: Promise<unknown>[] = [];
-    const pending: {source: string; resolve: (value: {svg: string}) => void; reject: (reason?: unknown) => void}[] = [];
-    const matrixRequests: ((value: {html?: string}) => void)[] = [];
+    const pending: ResultDomRenderRequest[] = [];
+    const matrixRequests: ((value: ResultDomPresentationResponse) => void)[] = [];
     const statuses: string[] = [];
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20"><text>native</text></svg>';
     const fullSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="20"><text>full</text></svg>';
-    const result = (source = 'native TeX') => ({
-        tex: source,
-        display_TeX: 'short TeX',
-        full_display_TeX: 'full TeX',
-        svg,
-        display_expression: 'native expression',
-        presentation: {responsive_fit: true}
-    });
-    const startDigits = () => {
+    function result(source = 'native TeX') {
+        return {
+            tex: source,
+            display_TeX: 'short TeX',
+            full_display_TeX: 'full TeX',
+            svg,
+            display_expression: 'native expression',
+            presentation: {responsive_fit: true}
+        };
+    }
+    function startDigits() {
         const task = WorksheetResults.actions.toggleRenderedDigits();
         tasks.push(task);
         return task;
-    };
+    }
     try {
         window.requestAnimationFrame = () => 0;
         WorksheetResults.renderedFit.schedule = () => {};
@@ -251,7 +330,11 @@ window.checkLabResultDom = async function checkLabResultDom() {
         call('copy_flash', button, 0);
         equal(button.textContent, 'Copy', 'copy feedback restores original label');
 
-        WorksheetResults.actions.renderTexSvg = source => new Promise((resolve, reject) => pending.push({source, resolve, reject}));
+        WorksheetResults.actions.renderTexSvg = function deferRender(source: string): Promise<ResultDomRenderResponse> {
+            return new Promise<ResultDomRenderResponse>((resolve, reject) => {
+                pending.push({source, resolve, reject});
+            });
+        };
         WorksheetResults.cards.setRenderedResult(result('first'));
         const old = startDigits();
         equal(pending[0].source, 'full TeX', 'digit renderer requests full native source');
@@ -289,7 +372,11 @@ window.checkLabResultDom = async function checkLabResultDom() {
         check(!WorksheetContext.rendered.dataset.fullTex && !WorksheetContext.parsed.dataset.fullText, 'clear removes stale source metadata');
         equal(call('input_get', 'matrix'), '', 'clear removes reusable source');
 
-        WorksheetRequests.presentation.requestLabPresentation = () => new Promise(resolve => matrixRequests.push(resolve));
+        WorksheetRequests.presentation.requestLabPresentation = function deferPresentation(): Promise<ResultDomPresentationResponse> {
+            return new Promise<ResultDomPresentationResponse>(resolve => {
+                matrixRequests.push(resolve);
+            });
+        };
         const firstMatrix = WorksheetResults.cards.setMatrixPrettyResult('same source', 'same display', host, button);
         const secondMatrix = WorksheetResults.cards.setMatrixPrettyResult('same source', 'same display', host, button);
         tasks.push(firstMatrix, secondMatrix);
@@ -323,10 +410,10 @@ window.checkLabResultDom = async function checkLabResultDom() {
         WorksheetWorkspace.presentation.state.resultInputBindings = saved.resultInputBindings;
         for (const {node, attributes, children, disabled, matrixRequest, renderRequest} of snapshots) {
             for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
-            for (const [name, value] of attributes) node.setAttribute(name, value);
+            for (const {name, value} of attributes) node.setAttribute(name, value);
             node.replaceChildren(...children);
             if (disabled !== undefined)
-                (node as HTMLElement & {disabled: boolean}).disabled = disabled;
+                (node as ResultDomElement).disabled = disabled;
             for (const [key, descriptor] of [
                      ['labMatrixPresentationRequest', matrixRequest], ['labResultRenderRequest', renderRequest]] as const) {
                 if (descriptor)

@@ -138,9 +138,9 @@ static int lab_bootstrap_step_fail_7(struct lab_bootstrap_step_context *ctx)
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "valid")))
         return lab_flow_call(ctx->frame, 13, "fail", 0, 0, 1, lab_dom_string("The Lab catalogue is invalid"));
     int scripts = lab_dom_object(4);
-    static const char *const names[] = {"api",    "bindings",       "locations",      "results",
-                                        "state",  "surface_camera", "surface_export", "surface_hover", "surface_volume",
-                                        "surface", "workspace_native"};
+    static const char *const names[] = {"api", "bindings_controller", "bindings", "locations", "results", "results_services",
+                                       "state", "surface_camera", "surface_export", "surface_hover", "surface_volume",
+                                       "surface", "workspace_native", "workspace_controllers"};
     for (unsigned i = 0; i < sizeof names / sizeof *names; ++i)
         lab_dom_push(scripts, lab_dom_string(names[i]));
     return lab_flow_call(ctx->frame, 9, "definitions", 0, 1, 1, scripts);

@@ -20,7 +20,7 @@ enum {
 };
 /* At most two open messages per value depth, plus envelope/text, reserve four
  * excess length bytes each. Scratch headroom is not part of the wire budget. */
-static unsigned char lab_browser_input[lab_browser_limit], lab_browser_output[lab_browser_scratch];
+static unsigned char lab_browser_input[lab_browser_storage_limit], lab_browser_output[lab_browser_scratch];
 static uint32_t lab_browser_used, lab_browser_count;
 static int lab_browser_failed;
 
@@ -289,7 +289,7 @@ unsigned char *lab_browser_input_buffer(void)
 /* Identify the complete browser ABI independently of the stable wire schema. */
 unsigned lab_browser_abi_version(void)
 {
-    return 37;
+    return 43;
 }
 
 /* Share the codec's staging bound with browser stream and buffer admission. */
@@ -313,7 +313,7 @@ unsigned lab_browser_handle_capacity(void)
 /* A padded base64 group carries three message bytes in four characters. */
 unsigned lab_browser_base64_limit(void)
 {
-    return ((lab_browser_limit + 2) / 3) * 4;
+    return lab_browser_storage_limit;
 }
 
 /* Borrow encoded output until the next call. */

@@ -49,15 +49,27 @@
   touch-action: none;
 }
 
-.rendered:has([data-surface]) svg,
-.rendered:has([data-plot-chart][data-x-min]) svg {
+/* Keep the base affordance below hit and drag state, including mixed plot grids. */
+.rendered:where(:has([data-surface]), :has([data-plot-chart][data-x-min])) svg {
   cursor: grab;
   user-select: none;
   touch-action: none;
 }
 
+.rendered svg[data-surface-hover="true"],
+.rendered svg:has([data-surface-hover="true"]) {
+  cursor: crosshair;
+}
+
 .rendered.plot-dragging svg {
   cursor: grabbing;
+}
+
+/* Two-dimensional plots use a crosshair for hovering; the active-drag rule
+ * above still supplies a grabbing hand. Leave the 3-D card and buttons unchanged. */
+.rendered:where(:has([data-plot-chart][data-x-min]):not(:has([data-surface]))),
+.rendered:where(:has([data-plot-chart][data-x-min]):not(:has([data-surface]))) svg {
+  cursor: crosshair;
 }
 
 .card-title {
@@ -478,6 +490,17 @@ pre {
   z-index: 2;
 }
 
+/* Keep retained canvases below inspection, including their transformed holder. */
+.rendered:has(> [data-surface-overlay]) {
+  /* Fractional canvas extents and transient tips must not create scrollbars which
+     resize the SVG, trigger another redraw and move the point being inspected. */
+  overflow: hidden;
+}
+
+.rendered > [data-surface-overlay] {
+  z-index: 1;
+}
+
 #plotRendered [data-x-min]:has(.plot-curve-active) [data-series]:not(.plot-curve-active) {
   opacity: 0.18;
 }
@@ -507,6 +530,11 @@ pre {
   border-radius: 50%;
   background: #142921;
   transform: translate(-50%, -50%);
+}
+
+/* A constrained tooltip must never paint over its selected curve point. */
+.surface-pointer-marker {
+  z-index: 3;
 }
 
 .plot-pointer-tip,

@@ -8,9 +8,17 @@
 
 /** Entry points for these browser regressions. */
 interface Window {
+    /** Run installation order and asynchronous completion regressions. */
     checkLabEvaluationInstall(): Promise<void>;
 }
 
+/** One ordered service call returned by a native fixture. */
+interface EvaluationInstallFixtureCall {
+    service: string;
+    args: unknown[];
+}
+
+/** Ordered service calls for one installation phase. */
 interface EvaluationInstallFixturePlan {
-    calls: {service: string; args: unknown[]}[];
+    calls: EvaluationInstallFixtureCall[];
 }

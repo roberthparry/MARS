@@ -7,16 +7,29 @@
 
 /** Accepted binding commit and kind-toggle plans, cache projection and asynchronous ownership checks. */
 window.checkLabBindingCommit = async function checkLabBindingCommit() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Binding commit: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const names = (plan: BindingTestPlan) => plan.calls.map(call => call.service).join(',');
-    const request = (mode: number, source: string, snapshot: readonly unknown[]) => labDOM.call<BindingCommitPayload>('lab_binding_commit_request', mode, source, snapshot);
-    const plan = (mode: number, operation: number, source: string, updated: unknown, context: object) =>
-        labDOM.call<BindingTestPlan>('lab_binding_commit_plan', mode, operation, source, updated, context);
-    const source = '  opaque native { μ = π/7 }  ', updated = '  changed native { μ = ? }  ';
+    }
+
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+
+    function names(plan: BindingTestPlan): string {
+        return plan.calls.map(call => call.service).join(',');
+    }
+
+    function request(mode: number, source: string, snapshot: readonly unknown[]): BindingCommitPayload {
+        return labDOM.call<BindingCommitPayload>('lab_binding_commit_request', mode, source, snapshot);
+    }
+
+    function plan(mode: number, operation: number, source: string, updated: unknown, context: object): BindingTestPlan {
+        return labDOM.call<BindingTestPlan>('lab_binding_commit_plan', mode, operation, source, updated, context);
+    }
+
+    const source = '  opaque native { μ = π/7 }  ';
+    const updated = '  changed native { μ = ? }  ';
     const first = Object.freeze({name: 'μ', kind: 'variable', value: 'π/7'});
     const second = Object.freeze({name: '__proto__', kind: 'constant', value: '?'});
     const snapshot = Object.freeze(
@@ -41,7 +54,8 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
     sparse[4] = snapshot[1];
     const mapped = request(0, source, sparse).bindings;
     equal(mapped.length, 5, 'sparse mapping retains array length');
-    for (let index = 0; index < 5; ++index) equal(index in mapped, index in sparse, 'sparse mapping retains holes');
+    for (let index = 0; index < 5; ++index)
+        equal(index in mapped, index in sparse, 'sparse mapping retains holes');
     equal(mapped[1], first, 'sparse binding identity retained');
     const inherited = new Array(2), prototype = Object.create(Array.prototype);
     Object.defineProperty(prototype, '1', {value: snapshot[1]});
@@ -69,11 +83,15 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
     for (let mode = 0; mode < 7; ++mode) {
         for (const operation of [0, 1]) {
             const accepted = plan(mode, operation, source, updated, context);
-            const expected = mode === 0 ?
-                operation === 0 ? 'source,cache,updateHistoryButtons,saveCurrentModeEditorState' :
-                                  'applyMarsBindingExpression' :
-                'applyUpdatedBindingExpression,refreshVariableValuesFromEditor,updateHistoryButtons,' +
+            let expected: string;
+            if (mode !== 0) {
+                expected = 'applyUpdatedBindingExpression,refreshVariableValuesFromEditor,updateHistoryButtons,' +
                     'saveCurrentModeEditorState';
+            } else if (operation === 0) {
+                expected = 'source,cache,updateHistoryButtons,saveCurrentModeEditorState';
+            } else {
+                expected = 'applyMarsBindingExpression';
+            }
             equal(names(accepted), expected, 'accepted mode/operation service order');
             equal(accepted.result, true, 'accepted change reports true');
             equal(accepted.wait, mode === 0 && operation === 1, 'only Expression kind projection is awaited');
@@ -124,10 +142,10 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
     let caught;
     try {
         labDOM.services(plan(0, 0, source, updated, context), {
-            source: (value: unknown) => {
+            source(value: unknown) {
                 effects.push(value);
             },
-            cache: () => {
+            cache() {
                 throw failure;
             },
             updateHistoryButtons: () => effects.push('history'),
@@ -141,19 +159,19 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
     equal(effects[0], updated, 'source effect precedes cache projection');
 
     // Detached controls avoid changing the real worksheet or triggering browser input events.
-    const entry = (name: string, value: string) => {
+    function entry(name: string, value: string) {
         const input = document.createElement('input');
         input.value = 'not yet normalised';
         input.title = 'old title';
         return Object.freeze({input, binding: Object.freeze({name, value})});
-    };
+    }
     const committed = Object.freeze([
         entry('μ', 'π/7'), entry('unset', '?'), entry('__proto__', 'exact'), entry('μ', 'later duplicate'),
         entry(' spaced ', 'opaque value')
     ]);
     const cache = new Map([['unset', 'old'], ['unrelated', 'retain'], ['spaced', 'different exact key']]);
     const writes: string[] = [];
-    const observe = (name: string) => {
+    function observe(name: string): void {
         equal(editor.dataset.bindingRefreshValid, 'true', 'refresh flag precedes cache writes');
         for (const item of committed) {
             equal(
@@ -162,12 +180,12 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
             equal(item.input.title, item.binding.value, 'every tooltip is projected before cache mutation');
         }
         writes.push(name);
-    };
-    cache.set = (name, value) => {
+    }
+    cache.set = function recordCacheWrite(name, value) {
         observe(name);
         return Map.prototype.set.call(cache, name, value);
     };
-    cache.delete = name => {
+    cache.delete = function recordCacheDeletion(name) {
         observe(name);
         return Map.prototype.delete.call(cache, name);
     };
@@ -181,14 +199,20 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
     equal(cache.get('unrelated'), 'retain', 'unrelated cache entries remain');
     const legacy = committed.map(item => entry(item.binding.name, item.binding.value));
     const pairs = labDOM.call<[string, string | null][]>('lab_binding_committed', legacy);
-    legacy.forEach((item, index) => {
+    for (let index = 0; index < legacy.length; ++index) {
+        const item = legacy[index];
         equal(item.input.value, committed[index].input.value, 'legacy and cache exports share input projection');
         equal(item.input.title, committed[index].input.title, 'legacy and cache exports share tooltip projection');
         equal(pairs[index][0], item.binding.name, 'legacy export retains exact cache name');
         equal(pairs[index][1], item.binding.value === '?' ? null : item.binding.value, 'legacy unset representation');
-    });
-    const many = Object.freeze(Array.from({length: 1600}, (_, index) => entry('p' + index, index % 2 ? '?' : 'π/7')));
-    const manyCache = new Map(many.map(item => [item.binding.name, 'old']));
+    }
+    const manyEntries = [];
+    for (let index = 0; index < 1600; ++index)
+        manyEntries.push(entry('p' + index, index % 2 ? '?' : 'π/7'));
+    const many = Object.freeze(manyEntries);
+    const manyCache = new Map<string, string>();
+    for (const item of many)
+        manyCache.set(item.binding.name, 'old');
     const largeRequest = request(4, source, many);
     equal(largeRequest.bindings.length, 1600, 'large request releases temporary handles');
     labDOM.call('lab_binding_committed_cache', many, editor, manyCache);
@@ -198,28 +222,36 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
     equal(largeRequest.bindings[1599], many[1599].binding, 'request records survive later handle-table reuse');
 
     // Exercise the actual kind-toggle adapter, retaining its asynchronous ownership guards.
-    const savedBody = WorksheetContext.expr.value, originals = new Map<string, unknown>(), events: {name: string; args: unknown[]}[] = [];
-    const replace = (name: string, callback: (...args: never[]) => unknown) => {
+    const savedBody = WorksheetContext.expr.value;
+    const originals = new Map<string, unknown>();
+    const events: {name: string; args: unknown[]}[] = [];
+    function replace(name: string, callback: MarsTransportService): void {
         if (!originals.has(name))
             originals.set(name, Reflect.get(labTestModuleOwner(name), name));
         Reflect.set(labTestModuleOwner(name), name, callback);
-    };
-    const deferred = () => {
+    }
+
+    function deferred(): BindingCommitGate {
         let resolve!: (value?: string) => void;
-        const promise = new Promise<string | undefined>(accept => {
+        const promise = new Promise<string | undefined>(function captureCompletion(accept) {
             resolve = accept;
         });
         return {promise, resolve};
-    };
+    }
     let mode = 'matrix', liveSource = source;
-    const pending = [];
+    const pending: {gate: BindingCommitGate; task: Promise<unknown>}[] = [];
     try {
         replace('currentMode', () => mode);
         replace('currentExpressionText', () => liveSource);
-        for (const name
-                 of ['applyUpdatedBindingExpression', 'refreshVariableValuesFromEditor', 'updateHistoryButtons',
-                     'saveCurrentModeEditorState'])
-            replace(name, (...args: unknown[]) => events.push({name, args}));
+        const serviceNames = [
+            'applyUpdatedBindingExpression', 'refreshVariableValuesFromEditor', 'updateHistoryButtons',
+            'saveCurrentModeEditorState'
+        ];
+        for (const name of serviceNames) {
+            replace(name, function recordEffect(...args: unknown[]) {
+                return events.push({name, args});
+            });
+        }
         replace('replaceBindingKindInExpression', async () => updated);
         WorksheetContext.expr.value = '  visible body  ';
         await WorksheetBindings.controller.toggleBindingKind(first);
@@ -252,23 +284,24 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
         liveSource = source;
         WorksheetContext.expr.value = '  visible body  ';
         replace('replaceBindingKindInExpression', async () => '');
-        const gate = deferred(), entered = deferred();
-        replace('applyMarsBindingExpression', (...args: unknown[]) => {
+        const gate = deferred();
+        const entered = deferred();
+        replace('applyMarsBindingExpression', function deferProjection(...args: unknown[]) {
             events.push({name: 'applyMarsBindingExpression', args});
             entered.resolve();
             return gate.promise;
         });
         events.length = 0;
         let finished = false;
-        const task = WorksheetBindings.controller.toggleBindingKind(first).then(() => {
+        function markFinished(): void {
             finished = true;
-        });
+        }
+        function rejectSkippedProjection(): never {
+            throw new Error('Binding commit: Expression toggle skipped its projection');
+        }
+        const task = WorksheetBindings.controller.toggleBindingKind(first).then(markFinished);
         pending.push({gate, task});
-        await Promise.race([
-            entered.promise, task.then(() => {
-                throw new Error('Binding commit: Expression toggle skipped its projection');
-            })
-        ]);
+        await Promise.race([entered.promise, task.then(rejectSkippedProjection)]);
         equal(finished, false, 'Expression toggle awaits accepted projection');
         equal(events[0].args[0], '', 'changed empty kind update reaches real adapter');
         equal(events[0].args[1], 'visible body', 'Expression toggle captures trimmed editor body');
@@ -283,7 +316,8 @@ window.checkLabBindingCommit = async function checkLabBindingCommit() {
             } catch (_) { /* Preserve the original assertion during fixture cleanup. */
             }
         }
-        for (const [name, callback] of originals) Reflect.set(labTestModuleOwner(name), name, callback);
+        for (const [name, callback] of originals)
+            Reflect.set(labTestModuleOwner(name), name, callback);
         WorksheetContext.expr.value = savedBody;
     }
 };

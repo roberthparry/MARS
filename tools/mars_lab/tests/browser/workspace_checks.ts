@@ -7,10 +7,10 @@
 
 /** Isolated real-WASM workspace checks; parent invokes labWorkspaceChecks after loading this script. */
 window.labWorkspaceChecks = async function labWorkspaceChecks() {
-    const check: LabTestCheck = (ok, message) => {
+    function check(ok: unknown, message: string): void {
         if (!ok)
             throw new Error(`Workspace: ${message}`);
-    };
+    }
     const response = await fetch('/wasm/lab_browser.wasm', {cache: 'no-store'});
     check(response.ok, 'could not load the native module');
     const module = await WebAssembly.compile(await response.arrayBuffer());
@@ -21,11 +21,13 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
         check(
             entry.module === 'env' && /^(lab_host_|lab_dom_)/.test(entry.name),
             `unexpected runtime import ${entry.module}.${entry.name}`);
-        (imports[entry.module] ||= {})[entry.name] = () => {
+        if (!imports[entry.module])
+            imports[entry.module] = {};
+        imports[entry.module][entry.name] = function unexpectedHostImport() {
             throw new Error(`Workspace unexpectedly called host import ${entry.name}`);
         };
     }
-    const native = (await WebAssembly.instantiate(module, imports)).exports as LabWorksheetTestNative;
+    const native = (await WebAssembly.instantiate(module, imports)).exports as unknown as LabWorksheetTestNative;
     for (const [value, span, digits] of [
         [-8.325073956455189, 16.57, 3], [-227.25178866731676, 550, 4],
         [1.234567891234, 1e-8, 12], [1e12, 0.01, 17],
@@ -40,7 +42,8 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
     for (const name of ['memset', 'memcpy', 'memmove', 'memcmp'] as const)
         check(typeof native[name] === 'function', `missing native ${name}`);
     for (const length of [0, 1, 3, 31, 256, 4096]) {
-        const source = buffer + 1, target = buffer + 8193;
+        const source = buffer + 1;
+        const target = buffer + 8193;
         memory.fill(0x5a, buffer, target + length + 1);
         check(native.memset(source, 0x1ab, length) === source, 'memset return pointer');
         check(memory.subarray(source, source + length).every(byte => byte === 0xab), 'memset byte conversion');
@@ -74,19 +77,22 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
     check(native.memcmp(end, end, 0) === 0, 'zero-length memcmp accessed memory');
     const encoder = new TextEncoder();
     const decoder = new TextDecoder('utf-8', {fatal: true, ignoreBOM: true});
-    const stage = (text: string | Uint8Array, index = 0) => {
+    function stage(text: string | Uint8Array, index = 0): number {
         const bytes = typeof text === 'string' ? encoder.encode(text) : text;
         check(bytes.length <= native.lab_workspace_capacity(), 'test input exceeds staging bound');
         new Uint8Array(native.memory.buffer, native.lab_workspace_input(index), bytes.length).set(bytes);
         return bytes.length;
-    };
-    const read = (length: number) => {
+    }
+    function read(length: number): string {
         check(length >= 0, 'native read failed');
         return decoder.decode(new Uint8Array(native.memory.buffer, native.lab_workspace_output(), length));
-    };
-    const push = (mode: number, side: number, text: string | Uint8Array, flags = 0, hasText = true) =>
-        native.lab_workspace_history_push(mode, side, stage(text), Number(hasText), flags);
-    const pop = (mode: number, side: number) => read(native.lab_workspace_history_pop(mode, side));
+    }
+    function push(mode: number, side: number, text: string | Uint8Array, flags = 0, hasText = true): number {
+        return native.lab_workspace_history_push(mode, side, stage(text), Number(hasText), flags);
+    }
+    function pop(mode: number, side: number): string {
+        return read(native.lab_workspace_history_pop(mode, side));
+    }
 
     native.lab_workspace_reset();
     const names = ['expression', 'equation', 'diffequation', 'matrix', 'integrator', 'datetime', 'almanac'];
@@ -220,13 +226,11 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
     for (let mode = 1; mode < 7; ++mode) native.lab_workspace_editor_set(mode, 0);
 
     const sourceFields = ['full μ\u0000', 'display σ', 'last 🪐', 'goal α', '1/3'];
-    sourceFields.forEach((text, field) => {
-        check(native.lab_workspace_source_set(field, stage(text)), 'source field set');
-    });
+    for (let field = 0; field < sourceFields.length; ++field)
+        check(native.lab_workspace_source_set(field, stage(sourceFields[field])), 'source field set');
     native.lab_workspace_editor_set(0, stage('shorter editor'));
-    sourceFields.forEach((text, field) => {
-        check(read(native.lab_workspace_source_get(field)) === text, 'source survived arena compaction');
-    });
+    for (let field = 0; field < sourceFields.length; ++field)
+        check(read(native.lab_workspace_source_get(field)) === sourceFields[field], 'source survived arena compaction');
     check(
         read(native.lab_workspace_source_resolve(stage(sourceFields[1]), 0)) === sourceFields[0],
         'full source resolve');
@@ -246,7 +250,8 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
     check(
         native.lab_workspace_source_matches(0) && !native.lab_workspace_source_resolve(0, 0),
         'empty display matches but cannot restore full source');
-    sourceFields.forEach((_text, field) => native.lab_workspace_source_set(field, 0));
+    for (let field = 0; field < sourceFields.length; ++field)
+        native.lab_workspace_source_set(field, 0);
     native.lab_workspace_editor_set(0, stage(unicode));
 
     const a = stage('first', 0), b = stage('first', 1);
@@ -477,10 +482,15 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
     try {
         let release!: () => void;
         let owned = true;
-        const guard = () => owned;
-        Reflect.set(WorksheetRequests.presentation, 'prepareLabEditor', () => new Promise<void>(resolve => {
-            release = resolve;
-        }));
+        function guard(): boolean {
+            return owned;
+        }
+        function prepareEditor(): Promise<void> {
+            return new Promise<void>(resolve => {
+                release = resolve;
+            });
+        }
+        Reflect.set(WorksheetRequests.presentation, 'prepareLabEditor', prepareEditor);
         const pending =
             WorksheetPersistence.navigation.restore({mode: 'matrix', text: 'stale', operation: 'multiply', operand: 'old'}, guard);
         owned = false;
@@ -499,13 +509,14 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
             entered = resolve;
         });
         Reflect.set(WorksheetRequests.presentation, 'prepareLabEditor', async () => {});
-        Reflect.set(WorksheetWorkspace.integrator, 'restoreIntegratorBoundsText', (_text: string, isCurrent: WorksheetGuard) => {
+        function restoreBounds(_text: string, isCurrent: WorksheetGuard): Promise<void> {
             forwardedGuard = isCurrent;
             return new Promise<void>(resolve => {
                 release = resolve;
                 entered();
             });
-        });
+        }
+        Reflect.set(WorksheetWorkspace.integrator, 'restoreIntegratorBoundsText', restoreBounds);
         owned = true;
         const boundsPending =
             WorksheetPersistence.navigation.restore({mode: 'integrator', text: 'stale', bounds: 'x:0:1', intervalCap: '5000'}, guard);

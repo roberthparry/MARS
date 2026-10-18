@@ -5,30 +5,50 @@
  * Exercises native presentation plans against live controls, including editing and projection while restoring replaced browser services.
  */
 
+/** @brief Editor fields inspected after native binding selection. */
+interface BindingEditorSelectionFixture {
+    fullText: string;
+    displayText: string;
+    bindings: WorksheetBinding[];
+    refresh: boolean;
+}
+
+/** @brief Browser element retaining the native binding card fixture. */
+interface BindingCardElement extends HTMLElement {
+    labBindingCard: WorksheetBindingCard;
+}
+
 /** Binding and integrator DOM regressions against the C/WASM presentation controller. */
 window.checkLabBindingDom = async function checkLabBindingDom() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Binding DOM: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const deferred = () => {
+    }
+
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+
+    function deferred(): BindingDomGate {
         let resolve!: (value?: unknown) => void;
-        const promise = new Promise<unknown>(accept => resolve = accept);
+        const promise = new Promise<unknown>(function captureCompletion(accept) {
+            resolve = accept;
+        });
         return {promise, resolve};
-    };
+    }
     const fixture = document.createElement('div');
     fixture.style.cssText = 'position:fixed;left:0;top:0;z-index:10000;width:450px';
-    const root = document.createElement('div'), rows = document.createElement('div');
+    const root = document.createElement('div');
+    const rows = document.createElement('div');
     const fallback = document.createElement('input');
     fixture.append(root, rows, fallback);
     document.body.appendChild(fixture);
     const savedFunctions = new Map<string, unknown>();
-    const replace = (name: string, implementation: (...args: never[]) => unknown) => {
+    function replace(name: string, implementation: MarsTransportService): void {
         if (!savedFunctions.has(name))
             savedFunctions.set(name, Reflect.get(labTestModuleOwner(name), name));
         Reflect.set(labTestModuleOwner(name), name, implementation);
-    };
+    }
     const saved = {
         nodes: Array.from(WorksheetContext.variableValues.childNodes),
         parent: WorksheetContext.variableValues.parentNode,
@@ -51,12 +71,15 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         timeout: window.setTimeout,
         active: document.activeElement
     };
-    const nativeEvent = (target: EventTarget | null, type: string, extra: object = {}) => labDOM.call<WorksheetCardEvent>('lab_binding_event', root, {target, type, ...extra});
-    const keys = (target: EventTarget, key: string, extra: KeyboardEventInit = {}) => {
+    function nativeEvent(target: EventTarget | null, type: string, extra: object = {}): WorksheetCardEvent {
+        return labDOM.call<WorksheetCardEvent>('lab_binding_event', root, {target, type, ...extra});
+    }
+
+    function keys(target: EventTarget, key: string, extra: KeyboardEventInit = {}): boolean {
         const event = new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true, ...extra});
         target.dispatchEvent(event);
         return event.defaultPrevented;
-    };
+    }
     try {
         const catalogue = labDOM.call<string[]>('lab_binding_row_names');
         equal(catalogue.length, 108, 'C owns the complete row-name catalogue');
@@ -151,20 +174,25 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
             ready: null
         };
         for (let mode = 0; mode < 7; ++mode) {
-            const selection = labDOM.call<{fullText: string; displayText: string; bindings: WorksheetBinding[]; refresh: boolean}>('lab_binding_editor', mode, editorInputs, new Set(['x']));
+            const selection = labDOM.call<BindingEditorSelectionFixture>('lab_binding_editor', mode, editorInputs, new Set(['x']));
             equal(selection.fullText, 'opaque full source', 'editor retains trimmed opaque source');
             equal(selection.displayText, 'native body', 'editor uses native body metadata');
-            equal(selection.bindings.length, mode === 0 ? 0 : mode === 4 ? 2 : 3, 'per-mode binding selection');
+            let expectedBindings = 3;
+            if (mode === 0)
+                expectedBindings = 0;
+            else if (mode === 4)
+                expectedBindings = 2;
+            equal(selection.bindings.length, expectedBindings, 'per-mode binding selection');
             equal(selection.refresh, mode === 0, 'only expression mode requests missing readiness analysis');
         }
-        const explicitEditor = labDOM.call<{fullText: string; displayText: string; bindings: WorksheetBinding[]; refresh: boolean}>(
+        const explicitEditor = labDOM.call<BindingEditorSelectionFixture>(
             'lab_binding_editor', 0,
             {...editorInputs, bindings: [], body: '', bodyMetadata: {body: ''}, ready: ' YES '}, null);
         equal(explicitEditor.bindings.length, 0, 'explicit empty evaluated bindings override native bindings');
         equal(explicitEditor.displayText, '', 'explicit empty body does not revive native body');
         equal(explicitEditor.refresh, false, 'provided readiness avoids a second analysis');
         equal(WorksheetContext.expr.dataset.evaluationReady, 'true', 'readiness normalisation belongs to C');
-        labDOM.call<{fullText: string; displayText: string; bindings: WorksheetBinding[]; refresh: boolean}>('lab_binding_editor', 0, editorInputs, null);
+        labDOM.call<BindingEditorSelectionFixture>('lab_binding_editor', 0, editorInputs, null);
         check(!WorksheetContext.expr.hasAttribute('data-evaluation-ready'), 'absent readiness clears stale DOM metadata');
 
         const goalSource = {
@@ -182,7 +210,7 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         };
         const starts = {x: 'provided x', y: 'provided y', u: 'keep unset', c: 'keep constant', missing: 'keep missing'};
         const cache = new Map([['x', 'authored x'], ['c', 'cached constant']]);
-        const goal = labDOM.call<Record<string, unknown>>('lab_binding_goal_starts', goalSource, solved, starts, cache);
+        const goal = labDOM.call<LabTestRecord>('lab_binding_goal_starts', goalSource, solved, starts, cache);
         equal(goal.x, 'authored x', 'cached authored value wins over solved and supplied starts');
         equal(goal.y, 'π/7', 'last solved binding wins over supplied start');
         equal(goal.u, 'keep unset', 'unset solved binding does not replace supplied start');
@@ -191,10 +219,10 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         check(Object.hasOwn(goal, '__proto__') && goal.__proto__ === 'symbolic', 'goal names are safe own data keys');
         equal(Object.getPrototypeOf(goal), Object.prototype, 'goal identifiers cannot change the result prototype');
         equal(starts.x, 'provided x', 'goal precedence does not mutate supplied starts');
-        const withoutMetadata = labDOM.call<Record<string, unknown>>('lab_binding_goal_starts', null, solved, starts, cache);
+        const withoutMetadata = labDOM.call<LabTestRecord>('lab_binding_goal_starts', null, solved, starts, cache);
         equal(withoutMetadata.x, starts.x, 'missing source metadata preserves supplied starts');
         check(withoutMetadata !== starts, 'goal starts are copied');
-        const goalDefaults = labDOM.call<{expression: string; start: Record<string, unknown>}>(
+        const goalDefaults = labDOM.call<{expression: string; start: LabTestRecord}>(
             'lab_binding_goal_prepare', {
                 goal_expression: 'opaque native goal',
                 starts: {x: 'native x', zero: 'native zero', blank: 'native blank'}
@@ -213,10 +241,11 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
             {name: 'É2', kind: 'constant', value: '2'}, {name: 'e2', kind: 'constant', value: '3'},
             {name: 'c2', kind: 'constant', value: '4'}
         ];
-        const compare = (left: unknown, right: unknown) => {
-            const a = String(Reflect.get(Object(left), 'name') || left || ''), b = String(Reflect.get(Object(right), 'name') || right || '');
+        function compare(left: unknown, right: unknown): number {
+            const a = String(Reflect.get(Object(left), 'name') || left || '');
+            const b = String(Reflect.get(Object(right), 'name') || right || '');
             return a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}) || a.localeCompare(b);
-        };
+        }
         const expected = [bindings[1], bindings[3], ...bindings.filter(item => item.kind === 'constant').sort(compare)];
         const rendered = labDOM.call<{values: [string,string][]; kinds: [string,string][]}>('lab_binding_render', root, bindings);
         const inputs = Array.from(root.querySelectorAll<HTMLInputElement>('.binding-value-input'));
@@ -293,7 +322,7 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         equal(overlay[1].value, 'exact', 'visible authored values take precedence');
         equal(overlay[2], untouched, 'unmatched discovered object identity preserved');
 
-        const original = inputs[0].closest<HTMLElement & {labBindingCard: WorksheetBindingCard}>('.variable-value-box')!.labBindingCard;
+        const original = inputs[0].closest<BindingCardElement>('.variable-value-box')!.labBindingCard;
         inputs[0].focus();
         inputs[0].value = 'discard this';
         equal(nativeEvent(inputs[0], 'keydown', {key: 'Escape'}).prevent, 1, 'Escape suppresses browser default');
@@ -345,16 +374,17 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         check(rows.querySelector<HTMLButtonElement>('.integrator-bound-remove')!.disabled, 'sole bound cannot be removed');
         check(rows.children[1].querySelector<HTMLInputElement>('[data-integrator-lower]')!.disabled, 'free lower bound is disabled');
         check(!rows.children[1].querySelector<HTMLButtonElement>('.integrator-bound-remove')!.disabled, 'free row can be removed');
-        const lower = rows.querySelector<HTMLInputElement>('[data-integrator-lower]')!,
-              upper = rows.querySelector<HTMLInputElement>('[data-integrator-upper]')!;
+        const lower = rows.querySelector<HTMLInputElement>('[data-integrator-lower]')!;
+        const upper = rows.querySelector<HTMLInputElement>('[data-integrator-upper]')!;
         upper.focus();
         upper.value = 'latest upper';
         labDOM.call('lab_binding_integrator_update', rows, [{name: '[β]', lo: 'normalised lower', hi: 'stale upper'}]);
         equal(lower.value, 'normalised lower', 'inactive prepared field updated in place');
         equal(upper.value, 'latest upper', 'focused field protected from blur response');
         equal(document.activeElement, upper, 'preparation preserves focus');
-        const rowEvent = (target: EventTarget | null, type: string, extra: object = {}) =>
-            labDOM.call<WorksheetRowEvent>('lab_binding_integrator_event', rows, {target, type, ...extra});
+        function rowEvent(target: EventTarget | null, type: string, extra: object = {}): WorksheetRowEvent {
+            return labDOM.call<WorksheetRowEvent>('lab_binding_integrator_event', rows, {target, type, ...extra});
+        }
         equal(rowEvent(upper, 'keydown', {key: 'Escape'}).prevent, 1, 'integrator Escape handled in C');
         equal(upper.value, 'a-b', 'integrator Escape restores original authored bound');
         equal(rowEvent(lower, 'keydown', {key: 'Enter', ctrlKey: true}).action, '', 'integrator Ctrl+Enter only blurs');
@@ -370,18 +400,24 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         let history = 0, evaluations = 0, copied = '', status = '', source = 'source', mode = 'expression';
         replace('updateHistoryButtons', () => ++history);
         const evaluated = deferred();
-        replace('evaluateFromKeyboard', () => { ++evaluations; evaluated.resolve(true); });
+        replace('evaluateFromKeyboard', function recordEvaluation() {
+            ++evaluations;
+            evaluated.resolve(true);
+        });
         replace('setStatus', (text: string) => status = text);
         replace('flashCopyButton', () => {});
         replace('saveCurrentModeEditorState', () => {});
         replace('currentMode', () => mode);
         replace('currentExpressionText', () => source);
-        replace('writeClipboardText', async (text: string) => copied = text);
+        replace('writeClipboardText', async function copyText(text: string) {
+            copied = text;
+            return text;
+        });
         window.setTimeout = () => 0;
         fixture.append(WorksheetContext.variableValues, WorksheetContext.integratorBoundStack);
         WorksheetBindings.panel.renderVariableValues([{name: '[μ]', kind: 'variable', value: 'π/7'}]);
         const input = WorksheetContext.variableValues.querySelector<HTMLInputElement>('input')!;
-        const card = input.closest<HTMLElement & {labBindingCard: WorksheetBindingCard}>('.variable-value-box')!.labBindingCard;
+        const card = input.closest<BindingCardElement>('.variable-value-box')!.labBindingCard;
         input.dispatchEvent(new Event('input'));
         equal(history, 1, 'thin host adapter handles even non-bubbling input events');
         const evaluationCommit = deferred();
@@ -396,7 +432,7 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         await WorksheetBindings.panel.actions.copy({card} as WorksheetCardEvent); // Direct handler fixture intentionally omits dispatcher fields.
         equal(copied, 'fresh clipboard text', 'clipboard reads current input rather than rendered cache');
         equal(status, 'Copied μ', 'clipboard completion uses native status text');
-        replace('writeClipboardText', async () => {
+        replace('writeClipboardText', async function rejectClipboard() {
             throw new Error('clipboard rejected');
         });
         await WorksheetBindings.panel.actions.copy({card} as WorksheetCardEvent); // Direct handler fixture intentionally omits dispatcher fields.
@@ -416,8 +452,13 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
             'async clear focuses rerendered replacement');
 
         // Control each response explicitly; no network timing or timers are needed.
-        Reflect.set(WorksheetRequests.labRequests, 'run', async (_operation: string, _mode: string, callback: (request: object) => unknown) => callback({}));
-        let requestCurrent = true, callbackCurrent = true, response: ReturnType<typeof deferred>;
+        async function runRequest(_operation: string, _mode: string, callback: (request: object) => unknown) {
+            return callback({});
+        }
+        Reflect.set(WorksheetRequests.labRequests, 'run', runRequest);
+        let requestCurrent = true;
+        let callbackCurrent = true;
+        let response: BindingDomGate;
         WorksheetRequests.labRequests.current = () => requestCurrent;
         replace('requestLabPresentation', () => response.promise);
         for (const reason of ['typing', 'editor', 'source', 'request', 'callback']) {
@@ -465,7 +506,7 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         equal(queuedCommits, 0, 'stale queued mode makes no commit');
         mode = 'expression';
         const disconnected = queue(committing);
-        committing.closest<HTMLElement & {labBindingCard: WorksheetBindingCard}>('.variable-value-box')!.remove();
+        committing.closest<BindingCardElement>('.variable-value-box')!.remove();
         equal(await disconnected, false, 'queued commit stops after input disconnects');
         equal(queuedCommits, 0, 'disconnected queued input makes no commit');
 
@@ -493,7 +534,8 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
         await editing;
         equal(WorksheetContext.integratorBoundStack.children.length, 1, 'detached row edit stops after awaited commit');
     } finally {
-        for (const [name, implementation] of savedFunctions) Reflect.set(labTestModuleOwner(name), name, implementation);
+        for (const [name, implementation] of savedFunctions)
+            Reflect.set(labTestModuleOwner(name), name, implementation);
         WorksheetRequests.labRequests.run = saved.run;
         WorksheetRequests.labRequests.current = saved.current;
         window.setTimeout = saved.timeout;
@@ -526,12 +568,18 @@ window.checkLabBindingDom = async function checkLabBindingDom() {
 
 /** Integrator response policy uses native metadata only and defers state accessors beyond the DOM scope. */
 function checkLabIntegratorBindingState() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Integrator binding state: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const names = (plan: BindingTestPlan) => plan.calls.map(call => call.service).join(',');
+    }
+
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+
+    function names(plan: BindingTestPlan): string {
+        return plan.calls.map(call => call.service).join(',');
+    }
     const authored = 'integrator binding fixture authored';
     const canonical = ' { native body | const c = π/7 } ';
     const editors = new Map([
@@ -548,14 +596,23 @@ function checkLabIntegratorBindingState() {
     ]);
     const response = Object.freeze(
         {binding_expression: '  ' + authored + '\n', expression: ' native body ', binding_values: bindings});
-    const prepare = (data: unknown, fallback = '', cache: Map<string, unknown> = editors, excluded = bound) =>
-        labDOM.call<BindingTestPlan>('lab_binding_integrator_state', data, fallback, cache, excluded);
+    function prepare(data: unknown, fallback = '', cache: Map<string, unknown> = editors, excluded = bound): BindingTestPlan {
+        return labDOM.call<BindingTestPlan>('lab_binding_integrator_state', data, fallback, cache, excluded);
+    }
     const savedEditor = WorksheetContext.expr.value, savedModeText = WorksheetContext.modeEditorText.integrator;
     const serviceNames =
         ['setExpressionEditor', 'renderVariableValues', 'clearVariableValues', 'currentIntegratorBoundNames'];
-    const savedServices = new Map(serviceNames.map(name => [name, Reflect.get(labTestModuleOwner(name), name)]));
-    const savedCache = new Map([...editors.keys()].map(
-        key => [key, {present: WorksheetResults.labEvaluationView.caches.editors.has(key), value: WorksheetResults.labEvaluationView.caches.editors.get(key)}]));
+    const savedServices = new Map<string, unknown>();
+    for (const name of serviceNames)
+        savedServices.set(name, Reflect.get(labTestModuleOwner(name), name));
+    const savedCache: BindingEditorCacheEntry[] = [];
+    for (const key of editors.keys()) {
+        savedCache.push({
+            key,
+            present: WorksheetResults.labEvaluationView.caches.editors.has(key),
+            value: WorksheetResults.labEvaluationView.caches.editors.get(key)
+        });
+    }
     try {
         WorksheetContext.expr.value = '  authored body fallback  ';
         let plan = prepare(response);
@@ -622,13 +679,16 @@ function checkLabIntegratorBindingState() {
         // globally.
         const calls: {name: string; args: unknown[]; modeText: string}[] = [];
         for (const name of serviceNames.slice(0, 3)) {
-            Reflect.set(labTestModuleOwner(name), name, (...args: unknown[]) => {
+            Reflect.set(labTestModuleOwner(name), name, function recordService(...args: unknown[]) {
                 prepare(null);
                 calls.push({name, args, modeText: WorksheetContext.modeEditorText.integrator});
             });
         }
         WorksheetWorkspace.integrator.currentIntegratorBoundNames = () => bound;
-        for (const [key, value] of editors) WorksheetResults.labEvaluationView.caches.editors.set(key, value as unknown as WorksheetEditorMetadata); // Minimal native metadata fixture.
+        for (const [key, value] of editors) {
+            // Minimal native metadata fixture.
+            WorksheetResults.labEvaluationView.caches.editors.set(key, value as unknown as WorksheetEditorMetadata);
+        }
         WorksheetContext.modeEditorText.integrator = 'previous integrator source';
         equal(WorksheetBindings.integratorPanel.applyIntegratorBindingState(response), undefined, 'public wrapper remains a synchronous void helper');
         equal(
@@ -655,7 +715,7 @@ function checkLabIntegratorBindingState() {
         calls.length = 0;
         WorksheetBindings.integratorPanel.applyIntegratorBindingState(null);
         equal(calls[0].name, 'clearVariableValues', 'empty response clears only binding controls');
-        WorksheetBindings.controller.setExpressionEditor = () => {
+        WorksheetBindings.controller.setExpressionEditor = function rejectEditor() {
             throw new Error('fixture editor failure');
         };
         let failed = false;
@@ -668,12 +728,13 @@ function checkLabIntegratorBindingState() {
             failed && WorksheetContext.modeEditorText.integrator === 'keep unrecognised source',
             'failed editor projection cannot proceed to source storage');
     } finally {
-        for (const [name, service] of savedServices) Reflect.set(labTestModuleOwner(name), name, service);
-        for (const [key, entry] of savedCache) {
+        for (const [name, service] of savedServices)
+            Reflect.set(labTestModuleOwner(name), name, service);
+        for (const entry of savedCache) {
             if (entry.present)
-                WorksheetResults.labEvaluationView.caches.editors.set(key, entry.value!);
+                WorksheetResults.labEvaluationView.caches.editors.set(entry.key, entry.value!);
             else
-                WorksheetResults.labEvaluationView.caches.editors.delete(key);
+                WorksheetResults.labEvaluationView.caches.editors.delete(entry.key);
         }
         WorksheetContext.expr.value = savedEditor;
         WorksheetContext.modeEditorText.integrator = savedModeText;

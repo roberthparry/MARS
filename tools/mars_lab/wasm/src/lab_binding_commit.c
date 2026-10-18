@@ -8,6 +8,7 @@
  * a payload, with temporary handles released per entry. No handle survives a call.
  */
 #include "lab_dom.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_binding_commit.h"
 

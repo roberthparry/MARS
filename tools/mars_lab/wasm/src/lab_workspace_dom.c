@@ -4,22 +4,68 @@
  *
  * Applies mode and precision policy, help selection, result-card visibility,
  * busy-state ownership, conditional editor sizing and calculus action markup.
+ * Calculus labels use the shared binding formatter, with temporary handles released per name.
  * Captures and restores opaque DOM snapshots without interpreting mathematical
  * text. Browser values and nodes are borrowed only within a synchronous call;
  * returned snapshot objects belong to the host and no handles are retained.
+ * Decoded snapshot validation preserves state identity and uses the supplied mode catalogue.
  * Result restoration normalises opaque metadata, clones variable lists and
  * projects reusable input before returning globals for calculus-control refresh.
  * Request lifetimes and asynchronous browser callbacks remain with their adapters.
  */
 #include "lab_dom.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
+#include "lab_binding.h"
 #include "lab_layout.h"
 #include "lab_plot_controls.h"
 #include "lab_plot_slices.h"
+#include "lab_precision.h"
 #include "lab_result.h"
 #include "lab_view.h"
 #include "lab_workspace.h"
+#define MARS_LAB_WORKSPACE_DOM_INTERNAL_ACCESS
 #include "lab_workspace_dom.h"
-#include "lab_precision.h"
+
+/* Validate decoded data without cloning state or substituting the application's default mode catalogue. */
+void lab_workspace_snapshot_validate(int envelope, int mode_names)
+{
+    unsigned kind = lab_dom_type(envelope);
+    if ((kind != 4 && kind != 5) || !lab_dom_property_present(envelope, "state")) {
+        lab_dom_return(lab_dom_numeric(-1));
+        return;
+    }
+    int state = lab_dom_get(envelope, "state");
+    if (!state) {
+        /* Property reads collapse null and undefined handles; compare the original property instead. */
+        int reference = lab_dom_object(5);
+        lab_dom_set(reference, "state", 0);
+        lab_dom_return(lab_dom_properties_equal(envelope, "state", reference, "state") ? 0 : lab_dom_numeric(-2));
+        return;
+    }
+    kind = lab_dom_type(state);
+    if ((kind != 4 && kind != 5) || !lab_dom_property_present(state, "mode") ||
+        !lab_dom_property_present(state, "text")) {
+        lab_dom_return(lab_dom_numeric(-2));
+        return;
+    }
+    int mode = lab_dom_get(state, "mode");
+    unsigned count = lab_dom_type(mode_names) == 4 ? lab_dom_count(mode_names) : 0;
+    if (lab_dom_type(mode) != 3 || lab_dom_type(lab_dom_get(state, "text")) != 3 || count > 7) {
+        lab_dom_return(lab_dom_numeric(-2));
+        return;
+    }
+    /* The caller supplies at most seven names; exact membership requires no fixed native mode mapping. */
+    unsigned mark = lab_dom_mark();
+    for (unsigned i = 0; i < count; ++i) {
+        int matches = lab_dom_equal(mode, lab_dom_item(mode_names, i));
+        lab_dom_release(mark);
+        if (matches) {
+            lab_dom_return(state);
+            return;
+        }
+    }
+    lab_dom_return(lab_dom_numeric(-2));
+}
 
 /* Resolve the fixed control catalogue once; browser values outlive only their scoped integer handles. */
 void lab_workspace_dom_references(void)
@@ -531,6 +577,20 @@ void lab_workspace_dom_derivatives(int names, int labels, int differentiable)
     }
     if (plots)
         lab_plot_controls_sync();
+}
+
+/* Reuse native binding labels and the existing calculus renderer with bounded temporary handles. */
+void lab_workspace_dom_calculus(int names, int differentiable)
+{
+    unsigned scope = lab_dom_mark();
+    int labels = lab_dom_object(4);
+    unsigned mark = lab_dom_mark();
+    for (unsigned i = 0; i < lab_dom_count(names); ++i) {
+        lab_dom_push(labels, lab_binding_label_value(lab_dom_item(names, i)));
+        lab_dom_release(mark);
+    }
+    lab_workspace_dom_derivatives(names, labels, differentiable);
+    lab_dom_release(scope);
 }
 
 static int lab_workspace_dom_copy_object(int source)

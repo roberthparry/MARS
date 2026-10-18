@@ -8,11 +8,29 @@
 
 /** Entry points for these browser regressions. */
 interface Window {
+    /** @brief Check native editor metadata, source selection and lazy getter boundaries. */
     checkLabEditor(): void;
 }
 
-/** Metadata fields deliberately accept malformed native-fixture values. */
+/** @brief Metadata fields deliberately accept malformed native-fixture values. */
 interface EditorFixtureMetadata {
-    expression?: unknown; text?: unknown; body?: unknown; display?: unknown; wrapped?: unknown; bindings?: unknown;
+    expression?: unknown;
+    text?: unknown;
+    body?: unknown;
+    display?: unknown;
+    wrapped?: unknown;
+    bindings?: unknown;
 }
-interface EditorFixtureCompact { display: unknown; shortened: boolean; bindings: unknown; }
+
+/** @brief Compact metadata preserves raw display and binding values for validation. */
+interface EditorFixtureCompact {
+    display: unknown;
+    shortened: boolean;
+    bindings: unknown;
+}
+
+/** @brief One independent metadata projection used as the fixture oracle. */
+interface EditorFixtureProjection {
+    /** @brief Select the expected value without calling production metadata helpers. */
+    (value: unknown, editors: Map<string, EditorFixtureMetadata>): unknown;
+}

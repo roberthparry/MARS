@@ -3,7 +3,7 @@
  * @brief Protobuf transport buffers and scalar limits for the freestanding browser.
  *
  * Defines the browser codec ABI for proto/lab.proto, together with precision and
- * interval-budget validation. The JavaScript adapter stages or copies bytes in
+ * interval-budget validation and base64 storage envelopes. The JavaScript adapter stages or copies bytes in
  * bounded WASM memory. Buffers are borrowed until the next synchronous codec call;
  * callers must copy results before awaiting browser work. No mathematics is parsed.
  * Other browser responsibilities have their own headers in this private directory.
@@ -15,6 +15,9 @@
 
 /** @brief Maximum encoded message size shared by the codec and worker admission. */
 enum { lab_browser_limit = 8 * 1024 * 1024 };
+
+/** @brief Padded base64 capacity for one message; also the shared input buffer capacity. */
+enum { lab_browser_storage_limit = ((lab_browser_limit + 2) / 3) * 4 };
 
 /** @brief Return the maximum encoded message size in bytes for host-side admission. */
 unsigned lab_browser_message_limit(void);
@@ -30,7 +33,8 @@ unsigned lab_browser_base64_limit(void);
 
 /**
  * @brief Borrow the codec's fixed input staging buffer.
- * @return Writable region of 8 MiB, valid for the module lifetime.
+ * @return Writable region of lab_browser_storage_limit bytes, valid for the module lifetime.
+ * Binary messages remain limited to 8 MiB; only base64 text may use the extra capacity.
  */
 unsigned char *lab_browser_input_buffer(void);
 
@@ -59,6 +63,22 @@ uint32_t lab_browser_encode(int root);
  * @return Decoded host object handle, or -1 for invalid data or exceeded limits.
  */
 int lab_browser_decode(uint32_t size);
+
+/**
+ * @brief Encode a host object as a padded base64 Protobuf storage record.
+ * @param root Borrowed host handle for an object, not an array or scalar.
+ * @return Character count in the input buffer, or zero for invalid or oversized data.
+ * Copy the result before another codec operation; the saved-record format is unchanged.
+ */
+uint32_t lab_browser_storage_encode(int root);
+
+/**
+ * @brief Decode a canonical padded base64 record staged in the input buffer.
+ * @param size ASCII character count, at most lab_browser_storage_limit.
+ * @return Decoded host object handle, or -1 for malformed base64, Protobuf or exceeded limits.
+ * Decodes in place; the caller must clear the staged region after consuming the result.
+ */
+int lab_browser_storage_decode(uint32_t size);
 
 /**
  * @brief Clamp finite precision to the supported saved-value range.

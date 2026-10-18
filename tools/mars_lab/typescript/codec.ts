@@ -4,13 +4,21 @@
  *
  * Owns a WebAssembly codec instance and transient host-value handles. Binary parsing
  * remains in C; this ES module supplies bounded browser capabilities to the codec.
+ * Container snapshots inspect data descriptors without invoking getters. Named host
+ * callbacks retain their owning instance, and each operation releases its handle scope.
  */
 /** Instance-local host-value bridge; all Protobuf parsing remains in the bounded C codec. */
-import {is_json_value, is_record} from './codec_types.js';
-import type {CodecBuffer, CodecExports, JsonValue} from './codec_types.js';
+import {isRecord} from './codec_types.js';
+import type {CodecBuffer, CodecExports, JsonObject, JsonValue, UnknownRecord} from './codec_types.js';
 export type {CodecBuffer, CodecExports, JsonValue} from './codec_types.js';
 
+/** @brief Additional native imports supplied alongside the codec's own host capabilities. */
 export type CodecEnvironment = WebAssembly.ModuleImports;
+
+/** Own-property descriptors used to copy container members without evaluating getters. */
+interface CodecDescriptors {
+    [key: string]: PropertyDescriptor;
+}
 
 /** Owns one WASM instance and the ephemeral handles used during a single codec operation. */
 export class Codec {
@@ -31,6 +39,8 @@ export class Codec {
         this.bytes = this.bytes.bind(this);
         this.encode = this.encode.bind(this);
         this.decode = this.decode.bind(this);
+        this.encodeStored = this.encodeStored.bind(this);
+        this.decodeStored = this.decodeStored.bind(this);
         this.text = this.text.bind(this);
         this.precision = this.precision.bind(this);
         this.intervals = this.intervals.bind(this);
@@ -49,11 +59,11 @@ export class Codec {
             throw new Error('Lab codec is busy');
         this.starting = true;
         try {
-            const imports = {env: this.host_imports()};
+            const imports = {env: this.hostImports()};
             const instance = bytes instanceof WebAssembly.Module ? await WebAssembly.instantiate(bytes, imports) :
                 (await WebAssembly.instantiate(bytes, imports)).instance;
             const exports = instance.exports;
-            if (!this.valid_exports(exports))
+            if (!this.validExports(exports))
                 throw new Error('The Lab codec ABI is incompatible; rebuild and restart');
             this.wasm = exports;
         } finally {
@@ -61,15 +71,18 @@ export class Codec {
         }
     }
 
-    private valid_exports(exports: WebAssembly.Exports): exports is CodecExports {
+    private validExports(exports: WebAssembly.Exports): exports is CodecExports {
         const functions = ['lab_browser_abi_version', 'lab_browser_handle_capacity', 'lab_browser_member_limit',
             'lab_browser_message_limit', 'lab_browser_encode', 'lab_browser_decode', 'lab_browser_input_buffer',
             'lab_browser_output_buffer', 'lab_browser_precision', 'lab_browser_intervals', 'lab_browser_base64_limit',
+            'lab_browser_storage_encode', 'lab_browser_storage_decode',
             'lab_jobs_worker_step', 'lab_jobs_worker_accepts', 'lab_jobs_finish', 'lab_jobs_take', 'lab_jobs_submit',
             'lab_jobs_threshold', 'lab_jobs_capacity', 'lab_jobs_timeout', 'lab_jobs_count', 'lab_jobs_bytes'] as const;
-        return exports.memory instanceof WebAssembly.Memory &&
-            functions.every(name => typeof exports[name] === 'function') &&
-            exports.lab_browser_abi_version instanceof Function && exports.lab_browser_abi_version() === 37;
+        if (!(exports.memory instanceof WebAssembly.Memory)) return false;
+        for (const name of functions) {
+            if (typeof exports[name] !== 'function') return false;
+        }
+        return exports.lab_browser_abi_version instanceof Function && exports.lab_browser_abi_version() === 43;
     }
 
     /** @brief Borrow the exact byte range of a non-shared buffer or view, rejecting inputs above the native message limit. */
@@ -116,11 +129,49 @@ export class Codec {
             new Uint8Array(wasm.memory.buffer, wasm.lab_browser_input_buffer(), length).set(bytes);
             const id = wasm.lab_browser_decode(length);
             const value = this.values[id];
-            if (id < 0 || !is_json_value(value))
+            // Native decoding validates the tree; host callbacks only construct JSON data.
+            if (id < 0 || this.types[id] !== 5 || !isRecord(value))
                 throw new Error('Malformed or incompatible Lab Protobuf response');
-            return value;
+            return value as JsonObject;
         } finally {
             new Uint8Array(wasm.memory.buffer, wasm.lab_browser_input_buffer(), length).fill(0);
+            this.leave();
+        }
+    }
+
+    /** @brief Encode a saved record entirely in native C, returning the existing padded base64 format. */
+    encodeStored(value: unknown): string {
+        const wasm = this.exports();
+        this.enter();
+        let length = 0;
+        try {
+            length = wasm.lab_browser_storage_encode(this.add(value));
+            if (!length) throw new Error('Invalid or oversized Lab storage record');
+            return this.decoder.decode(new Uint8Array(wasm.memory.buffer, wasm.lab_browser_input_buffer(), length));
+        } finally {
+            new Uint8Array(wasm.memory.buffer, wasm.lab_browser_input_buffer(), length).fill(0);
+            this.leave();
+        }
+    }
+
+    /** @brief Stage bounded ASCII storage text; C validates base64 and Protobuf before returning the record. */
+    decodeStored(text: string): JsonValue {
+        const wasm = this.exports();
+        if (!text.length || text.length > wasm.lab_browser_base64_limit())
+            throw new Error('Invalid or oversized Lab storage record');
+        this.enter();
+        const bytes = new Uint8Array(wasm.memory.buffer, wasm.lab_browser_input_buffer(), text.length);
+        try {
+            const staged = this.encoder.encodeInto(text, bytes);
+            if (staged.read !== text.length || staged.written !== text.length)
+                throw new Error('Lab storage records require ASCII text');
+            const id = wasm.lab_browser_storage_decode(text.length);
+            const value = this.values[id];
+            if (id < 0 || this.types[id] !== 5 || !isRecord(value))
+                throw new Error('Malformed or incompatible Lab storage record');
+            return value as JsonObject;
+        } finally {
+            bytes.fill(0);
             this.leave();
         }
     }
@@ -155,33 +206,63 @@ export class Codec {
         return this.values.length - 1;
     }
 
-    private add(value: unknown): number {
-        const type = value === null ? 0 : typeof value === 'boolean' ? 1 : typeof value === 'number' ? 2 :
-            typeof value === 'string' ? 3 : Array.isArray(value) ? 4 :
-            is_record(value) && (Object.getPrototypeOf(value) === Object.prototype ||
-                Object.getPrototypeOf(value) === null) ? 5 : -1;
-        let names: string[] | null = null;
-        if (Array.isArray(value) || (type === 5 && is_record(value))) {
-            const descriptors = Object.getOwnPropertyDescriptors(value);
-            const length = Array.isArray(value) ? value.length : 0;
-            names = type === 4 ? null : Object.keys(descriptors).filter(key => descriptors[key]?.enumerable);
-            if ((names ? names.length : length) > this.exports().lab_browser_member_limit())
-                throw new Error('Lab container has too many members');
-            const copy: unknown[] | Record<string, unknown> = type === 4 ? [] : Object.create(null);
-            const members = names ?? Array.from({length}, (_, index) => String(index));
-            for (const name of members) {
-                const descriptor = descriptors[name];
-                if (!descriptor || !Object.hasOwn(descriptor, 'value'))
-                    throw new Error('Lab messages require data properties, not getters or sparse arrays');
-                Object.defineProperty(copy, name,
-                    {value: descriptor.value, enumerable: true, writable: true, configurable: true});
-            }
-            value = copy;
-        }
-        return this.remember(value, type, names);
+    private classify(value: unknown): number {
+        if (value === null) return 0;
+        if (typeof value === 'boolean') return 1;
+        if (typeof value === 'number') return 2;
+        if (typeof value === 'string') return 3;
+        if (Array.isArray(value)) return 4;
+        if (isRecord(value) && (Object.getPrototypeOf(value) === Object.prototype ||
+            Object.getPrototypeOf(value) === null)) return 5;
+        return -1;
     }
 
-    private write_text(value: unknown, pointer: number, capacity: number): number {
+    private add(value: unknown): number {
+        const type = this.classify(value);
+        if (Array.isArray(value)) return this.snapshotArray(value);
+        if (type === 5 && isRecord(value)) return this.snapshotObject(value);
+        return this.remember(value, type);
+    }
+
+    private checkMemberCount(count: number): void {
+        if (count > this.exports().lab_browser_member_limit())
+            throw new Error('Lab container has too many members');
+    }
+
+    private copyMember(copy: unknown[] | UnknownRecord, name: string, descriptor: PropertyDescriptor | undefined): void {
+        if (!descriptor || !Object.hasOwn(descriptor, 'value'))
+            throw new Error('Lab messages require data properties, not getters or sparse arrays');
+        Object.defineProperty(copy, name,
+            {value: descriptor.value, enumerable: true, writable: true, configurable: true});
+    }
+
+    private snapshotArray(value: unknown[]): number {
+        const descriptors: CodecDescriptors = Object.getOwnPropertyDescriptors(value);
+        const length = value.length;
+        this.checkMemberCount(length);
+        const copy: unknown[] = [];
+        for (let index = 0; index < length; ++index) {
+            const name = String(index);
+            this.copyMember(copy, name, descriptors[name]);
+        }
+        return this.remember(copy, 4);
+    }
+
+    private snapshotObject(value: UnknownRecord): number {
+        const descriptors: CodecDescriptors = Object.getOwnPropertyDescriptors(value);
+        const names: string[] = [];
+        for (const name of Object.keys(descriptors)) {
+            if (descriptors[name]?.enumerable) names.push(name);
+        }
+        this.checkMemberCount(names.length);
+        const copy: UnknownRecord = Object.create(null);
+        for (const name of names) {
+            this.copyMember(copy, name, descriptors[name]);
+        }
+        return this.remember(copy, 5, names);
+    }
+
+    private writeText(value: unknown, pointer: number, capacity: number): number {
         if (typeof value !== 'string' || value.length > capacity)
             return -1;
         const target = new Uint8Array(this.exports().memory.buffer, pointer, capacity);
@@ -191,35 +272,54 @@ export class Codec {
         return written;
     }
 
-    private host_imports(): WebAssembly.ModuleImports {
+    private hostImports(): WebAssembly.ModuleImports {
         return {
             ...this.environment,
-            lab_host_kind: (id: number) => this.types[id] ?? -1,
-            lab_host_number: (id: number) => Number(this.values[id]),
-            lab_host_count: (id: number) => {
-                const value = this.values[id];
-                return Array.isArray(value) ? value.length : (this.keys[id]?.length ?? 0);
-            },
-            lab_host_child_info: (id: number, index: number) => {
-                const value = this.values[id];
-                const key = this.keys[id]?.[index];
-                const child = this.add(Array.isArray(value) ? value[index] :
-                    is_record(value) && key !== undefined ? value[key] : undefined);
-                const type = this.types[child] ?? -1;
-                return type < 0 ? -1 : (child << 3) | type;
-            },
-            lab_host_key_text: (id: number, index: number, pointer: number, capacity: number) =>
-                this.write_text(this.keys[id]?.[index], pointer, capacity),
-            lab_host_text: (id: number, pointer: number, capacity: number) =>
-                this.write_text(this.values[id], pointer, capacity),
-            lab_host_value: (type: number, number: number, pointer: number, length: number,
-                parent: number, key_pointer: number, key_length: number) =>
-                this.receive_value(type, number, pointer, length, parent, key_pointer, key_length)
+            lab_host_kind: this.hostKind.bind(this),
+            lab_host_number: this.hostNumber.bind(this),
+            lab_host_count: this.hostCount.bind(this),
+            lab_host_child_info: this.hostChildInfo.bind(this),
+            lab_host_key_text: this.hostKeyText.bind(this),
+            lab_host_text: this.hostText.bind(this),
+            lab_host_value: this.receiveValue.bind(this)
         };
     }
 
-    private receive_value(type: number, number: number, pointer: number, length: number,
-        parent: number, key_pointer: number, key_length: number): number {
+    private hostKind(id: number): number {
+        return this.types[id] ?? -1;
+    }
+
+    private hostNumber(id: number): number {
+        return Number(this.values[id]);
+    }
+
+    private hostCount(id: number): number {
+        const value = this.values[id];
+        if (Array.isArray(value)) return value.length;
+        return this.keys[id]?.length ?? 0;
+    }
+
+    private hostChildInfo(id: number, index: number): number {
+        const value = this.values[id];
+        const key = this.keys[id]?.[index];
+        let member: unknown;
+        if (Array.isArray(value)) member = value[index];
+        else if (isRecord(value) && key !== undefined) member = value[key];
+        const child = this.add(member);
+        const type = this.types[child] ?? -1;
+        return type < 0 ? -1 : (child << 3) | type;
+    }
+
+    private hostKeyText(id: number, index: number, pointer: number, capacity: number): number {
+        return this.writeText(this.keys[id]?.[index], pointer, capacity);
+    }
+
+    private hostText(id: number, pointer: number, capacity: number): number {
+        return this.writeText(this.values[id], pointer, capacity);
+    }
+
+    private receiveValue(type: number, number: number, pointer: number, length: number,
+        parent: number, keyPointer: number, keyLength: number): number {
         let value: JsonValue;
         if (type === 0)
             value = null;
@@ -239,8 +339,8 @@ export class Codec {
             const owner = this.values[parent];
             if (Array.isArray(owner))
                 owner.push(value);
-            else if (is_record(owner)) {
-                const key = this.decoder.decode(new Uint8Array(this.exports().memory.buffer, key_pointer, key_length));
+            else if (isRecord(owner)) {
+                const key = this.decoder.decode(new Uint8Array(this.exports().memory.buffer, keyPointer, keyLength));
                 if (Object.hasOwn(owner, key))
                     return -1;
                 Object.defineProperty(owner, key, {value, enumerable: true, writable: true, configurable: true});

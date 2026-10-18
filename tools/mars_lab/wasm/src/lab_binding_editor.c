@@ -9,6 +9,7 @@
  * scoped to a synchronous call; name indexes retain exact native identities.
  */
 #include "lab_dom.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_binding_editor.h"
 

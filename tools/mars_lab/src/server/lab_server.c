@@ -138,8 +138,10 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/api.js", "tools/mars_lab/build/typescript/api.js", "text/javascript; charset=utf-8"},
     {"/js/app.js", "tools/mars_lab/build/typescript/app.js", "text/javascript; charset=utf-8"},
     {"/js/bindings.js", "tools/mars_lab/build/typescript/bindings.js", "text/javascript; charset=utf-8"},
+    {"/js/bindings_controller.js", "tools/mars_lab/build/typescript/bindings_controller.js", "text/javascript; charset=utf-8"},
     {"/js/locations.js", "tools/mars_lab/build/typescript/locations.js", "text/javascript; charset=utf-8"},
     {"/js/results.js", "tools/mars_lab/build/typescript/results.js", "text/javascript; charset=utf-8"},
+    {"/js/results_services.js", "tools/mars_lab/build/typescript/results_services.js", "text/javascript; charset=utf-8"},
     {"/js/surface.js", "tools/mars_lab/build/typescript/surface.js", "text/javascript; charset=utf-8"},
     {"/js/surface_camera.js", "tools/mars_lab/build/typescript/surface_camera.js", "text/javascript; charset=utf-8"},
     {"/js/surface_export.js", "tools/mars_lab/build/typescript/surface_export.js", "text/javascript; charset=utf-8"},
@@ -147,6 +149,7 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/surface_volume.js", "tools/mars_lab/build/typescript/surface_volume.js", "text/javascript; charset=utf-8"},
     {"/js/state.js", "tools/mars_lab/build/typescript/state.js", "text/javascript; charset=utf-8"},
     {"/js/workspace.js", "tools/mars_lab/build/typescript/workspace.js", "text/javascript; charset=utf-8"},
+    {"/js/workspace_controllers.js", "tools/mars_lab/build/typescript/workspace_controllers.js", "text/javascript; charset=utf-8"},
     {"/js/workspace_native.js", "tools/mars_lab/build/typescript/workspace_native.js", "text/javascript; charset=utf-8"},
 };
 

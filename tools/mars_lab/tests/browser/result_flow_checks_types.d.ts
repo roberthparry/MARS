@@ -8,10 +8,28 @@
 
 /** Entry points for these browser regressions. */
 interface Window {
+    /** Check native action sequencing and failure recovery. */
     checkLabResultFlows(): Promise<void>;
 }
 
+/** Native continuation effects inspected without executing them. */
 interface ResultFlowFixturePlan {
     calls: {service: string; args: unknown[]}[];
     wait: boolean;
+}
+
+/** Native widget plan with the control and labels used by these checks. */
+interface ResultFlowWidgetPlan {
+    calls: ResultFlowWidgetCall[];
+}
+
+/** Arguments passed to one native-selected control enhancement. */
+interface ResultFlowWidgetCall {
+    args: [HTMLSelectElement, ResultFlowWidgetOptions];
+}
+
+/** Optional labels inspected by the widget bootstrap check. */
+interface ResultFlowWidgetOptions {
+    searchPlaceholder?: string;
+    placeholder?: string;
 }

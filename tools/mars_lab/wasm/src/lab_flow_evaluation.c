@@ -7,6 +7,8 @@
  * native presentation plans remain authoritative; the browser only executes their
  * capabilities. A request-local frame preserves values across awaits without
  * retaining scoped handles or sharing mutable state between concurrent requests.
+ * All evaluation modes use one fetch capability with a native-selected kind;
+ * only expression evaluation passes captured text to that capability.
  */
 #include "lab_dom.h"
 #include "lab_plot_slices.h"
@@ -176,13 +178,16 @@ static int lab_flow_evaluation_guard(struct lab_flow_evaluation_context *ctx)
 
 static int lab_flow_evaluation_fetch(struct lab_flow_evaluation_context *ctx)
 {
-    static const char *const fetchers[] = {"fetchExpression", "fetchEquation", "fetchDiffequation", "fetchMatrix",
-                                           "fetchIntegrator", "fetchDatetime", "fetchAlmanac"};
+    static const char *const kinds[] = {"expression", "equation", "diffequation", "matrix",
+                                       "integrator", "datetime", "almanac"};
     unsigned index = (unsigned)lab_dom_number(ctx->mode);
     if (index > 6)
         return lab_flow_done(0);
-    return lab_flow_call(ctx->frame, lab_flow_eval_outcome, fetchers[index], "response", 1, 2, ctx->context,
-                         ctx->request);
+    int fetch = lab_dom_object(5);
+    lab_dom_set(fetch, "kind", lab_dom_string(kinds[index]));
+    if (!index)
+        lab_dom_set(fetch, "text", lab_dom_get(ctx->context, "text"));
+    return lab_flow_call(ctx->frame, lab_flow_eval_outcome, "fetch", "response", 1, 2, fetch, ctx->request);
 }
 
 static int lab_flow_evaluation_outcome(struct lab_flow_evaluation_context *ctx)

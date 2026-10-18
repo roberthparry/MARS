@@ -8,12 +8,36 @@
 /** Evaluation lifecycle regressions using real C/WASM policy and request ownership. */
 window.checkLabEvaluation = async function checkLabEvaluation() {
     const native = labWire.exports();
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Evaluation: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
     const modes = ['expression', 'equation', 'diffequation', 'matrix', 'integrator', 'datetime', 'almanac'];
+    for (let mode = 0; mode < modes.length; ++mode) {
+        const request = {token: 17};
+        const context = {text: 'captured expression'};
+        const frame = {mode, stage: 12, context, request};
+        const plan = labDOM.call<EvaluationFixturePlan>('lab_flow_step', 0, frame, {});
+        equal(plan.calls[0].service, 'fetch', 'all evaluation modes use the common fetch service');
+        const fetchContext = plan.calls[0].args[0] as WorksheetRequests.MarsApiFetchContext;
+        equal(fetchContext.kind, modes[mode], 'native fetch context identifies its mode');
+        if (fetchContext.kind === 'expression')
+            equal(fetchContext.text, context.text, 'expression fetch retains captured text');
+        else
+            equal(Object.hasOwn(fetchContext, 'text'), false, 'other modes do not copy expression text');
+        equal(plan.calls[0].args[1], request, 'fetch preserves request identity');
+        equal(plan.wait, true, 'fetch awaits transport');
+        equal(plan.save, 'response', 'fetch saves the decoded response');
+        equal(frame.context, context, 'fetch does not replace the evaluation context');
+    }
+    const holidayRequest = {token: 18};
+    const holidayPlan = labDOM.call<EvaluationFixturePlan>('lab_flow_step', 10, {stage: 3, request: holidayRequest}, {});
+    equal(holidayPlan.calls[0].service, 'fetch', 'holiday refresh uses the common fetch service');
+    equal((holidayPlan.calls[0].args[0] as WorksheetRequests.MarsApiFetchContext).kind, 'datetime', 'holiday refresh selects calendar input');
+    equal(holidayPlan.calls[0].args[1], holidayRequest, 'holiday refresh preserves request identity');
     for (const kind of [-1, 6, 0x7fffffff])
         equal(labDOM.call<EvaluationFixturePlan>('lab_flow_begin', kind, {mode: 0}), null, 'invalid flow kind has no request plan');
     for (const mode of [-1, -0.5, 0.5, 7, 0x7fffffff, Infinity]) {
@@ -132,21 +156,33 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
     const successes = [1, 13, 141, 13, 13, 269, 13];
     const rejected = [6, 6, 6, 38, 70, 22, 6];
     const preparationNames = ['bindings', 'expression', 'input', 'trim', 'datetime', 'almanac', 'history'];
-    const planResponse = (mode: number, outcome: number, data: unknown = {}, error: unknown = null) =>
-        labDOM.call<EvaluationFixturePlan>('lab_evaluation_response', mode, outcome, data, {text: 'authored μ'}, error);
-    const recoveryNames =
-        (flags: number) => [flags & 32 ? 'clearMatrixScalar' : '', flags & 2 ? 'setRenderedError,resetRenderedDigits' : '',
-                  flags & 16 ? 'setDatetimeLocalText' : '', flags & 4 ? 'clearResultDetails' : '',
-                  flags & 8 ? 'clearRenderedError' : '',
-                  flags & 64 ? 'applyIntegratorBindingState,applyIntegratorResultBound,saveWorksheetState' : '']
-                     .filter(Boolean)
-                     .join(',');
+    function planResponse(mode: number, outcome: number, data: unknown = {}, error: unknown = null): EvaluationFixturePlan {
+        return labDOM.call<EvaluationFixturePlan>('lab_evaluation_response', mode, outcome, data, {text: 'authored μ'}, error);
+    }
+    function recoveryNames(flags: number): string {
+        const names: string[] = [];
+        if (flags & 32)
+            names.push('clearMatrixScalar');
+        if (flags & 2)
+            names.push('setRenderedError', 'resetRenderedDigits');
+        if (flags & 16)
+            names.push('setDatetimeLocalText');
+        if (flags & 4)
+            names.push('clearResultDetails');
+        if (flags & 8)
+            names.push('clearRenderedError');
+        if (flags & 64)
+            names.push('applyIntegratorBindingState', 'applyIntegratorResultBound', 'saveWorksheetState');
+        return names.join(',');
+    }
     for (let mode = 0; mode < modes.length; ++mode) {
         for (const skip of [0, 1]) {
             const plan = labDOM.call<EvaluationFixturePlan>('lab_evaluation_prepare_plan', mode, skip);
             const bits = preparations[mode] | (skip ? 0 : 64);
-            preparationNames.forEach(
-                (name, bit) => equal(plan[name], !!(bits & (1 << bit)), 'named preparation ' + name));
+            for (let bit = 0; bit < preparationNames.length; ++bit) {
+                const name = preparationNames[bit];
+                equal(plan[name], !!(bits & (1 << bit)), 'named preparation ' + name);
+            }
             equal(plan.label, working[mode], 'preparation carries the native status');
         }
         for (const outcome of [0, 1, 2, 3, 4]) {
@@ -221,8 +257,10 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
         equal(native.lab_evaluation_status(0, outcome, 1, 1), 6, 'invalid/stale outcome status');
     }
 
-    const diagnostic = (mode: number, data: unknown, error: unknown = null) =>
-        planResponse(mode, 1, data, error).calls.find(call => call.service === 'setRenderedError')!.args[0];
+    function diagnostic(mode: number, data: unknown, error: unknown = null): unknown {
+        const plan = planResponse(mode, 1, data, error);
+        return plan.calls.find(call => call.service === 'setRenderedError')!.args[0];
+    }
     equal(
         diagnostic(4, {error: ' Integration failed ', raw_error: ' raw μ '}), 'raw μ',
         'generic error uses raw diagnostic');
@@ -234,7 +272,7 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
     equal(diagnostic(0, {error: 'ignored'}, 'exception'), 'exception', 'explicit exception takes precedence');
     const ordered: unknown[] = [];
     const registry = Object.freeze({
-        first: (value: unknown) => {
+        first(value: unknown) {
             ordered.push(value);
             equal(evaluationLabel(0, 0), working[0], 'services re-enter WASM after scope release');
         },
@@ -253,9 +291,14 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
     const savedMode = WorksheetWorkspace.mode.currentMode();
     const savedFunctions = new Map<string, unknown>();
     const savedInstall = WorksheetRequests.evaluation.installEvaluationResult;
-    const savedInstallers = modes.map(
-        (_, index) => (data: unknown, context: WorksheetRequests.MarsApiEvaluationContext, outcome: number, request?: WorksheetRequests.MarsApiRequest | null) =>
-            savedInstall(index, data, context, outcome, request));
+    const savedInstallers: EvaluationFixtureInstaller[] = [];
+    for (let index = 0; index < modes.length; ++index) {
+        function installSaved(data: unknown, context: WorksheetRequests.MarsApiEvaluationContext, outcome: number,
+                              request?: WorksheetRequests.MarsApiRequest | null): unknown {
+            return savedInstall(index, data, context, outcome, request);
+        }
+        savedInstallers.push(installSaved);
+    }
     const installers: EvaluationFixtureInstaller[] = [...savedInstallers];
     const savedScalar = WorksheetWorkspace.presentation.state.lastMatrixScalarExpression;
     const savedLastInput = WorksheetContext.labEditorState.lastInput;
@@ -270,69 +313,90 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
     const plotRange = document.getElementById('plotRange')!;
     const savedPlotNames: unknown = Reflect.get(plotRange, 'marsPlotNames');
     const nodes = [WorksheetContext.rendered, WorksheetContext.renderedTitle, WorksheetContext.renderedMore, WorksheetContext.functionStyle, WorksheetContext.valueNote, WorksheetContext.valueNoteCard, WorksheetContext.valueTitle];
-    const savedNodes =
-        nodes.map(node => ({
-                      children: Array.from(node.childNodes),
-                      attributes: Array.from(node.attributes, attribute => [attribute.name, attribute.value] as const)
-                  }));
+    const savedNodes: EvaluationFixtureNodeSnapshot[] = [];
+    for (const node of nodes) {
+        const attributes: [string, string][] = [];
+        for (const attribute of node.attributes)
+            attributes.push([attribute.name, attribute.value]);
+        savedNodes.push({children: Array.from(node.childNodes), attributes});
+    }
     const events: [string, ...unknown[]][] = [];
     let mode = 'expression', text = 'authored input';
     let reply: EvaluationFixtureReply = {ok: false}, transportError: unknown = null;
-    const setEditorSource = (source: string) => {
+    function setEditorSource(source: string): void {
         WorksheetContext.expr.value = source ? 'evaluation compact fixture' : '';
         WorksheetContext.labEditorState.displayText = WorksheetContext.expr.value;
         WorksheetContext.labEditorState.fullText = source;
-    };
-    const replace = <F extends (...args: never[]) => unknown>(name: string, callback: F) => {
+    }
+    function replace(name: string, callback: (...args: never[]) => unknown): void {
         if (!savedFunctions.has(name)) {
             check(typeof Reflect.get(labTestModuleOwner(name), name) === 'function', 'writable browser service ' + name);
             savedFunctions.set(name, Reflect.get(labTestModuleOwner(name), name));
         }
         Reflect.set(labTestModuleOwner(name), name, callback);
-    };
-    const record = (name: string) => (...args: unknown[]) => events.push([name, ...args]);
-    const calls = (name: string) => events.filter(event => event[0] === name);
-    const deferred = <T = unknown>(): LabTestDeferred<T> => {
-        let resolve!: LabTestDeferred<T>['resolve'], reject!: LabTestDeferred<T>['reject'];
-        const promise = new Promise<T>((accept, fail) => {
+    }
+    function record(name: string): (...args: unknown[]) => number {
+        return function recordCall(...args: unknown[]): number {
+            return events.push([name, ...args]);
+        };
+    }
+    function calls(name: string): [string, ...unknown[]][] {
+        return events.filter(event => event[0] === name);
+    }
+    // Retain an opaque result for fixtures that complete with different payload shapes.
+    function createValueGate(): EvaluationFixtureGate {
+        let resolve!: (value: unknown) => void;
+        let reject!: (reason: unknown) => void;
+        const promise = new Promise<unknown>(function retainCompletion(accept, fail) {
             resolve = accept;
             reject = fail;
         });
         return {promise, resolve, reject};
-    };
-    const fetchResult = async () => {
+    }
+    async function fetchResult() {
         events.push(['fetch', mode]);
         if (transportError)
             throw transportError;
         return {response: {ok: true}, data: reply};
-    };
-    const commitBindings = async () => events.push(['bindings']);
-    const assertNoCompletion = () => {
+    }
+    async function commitBindings(): Promise<number> {
+        return events.push(['bindings']);
+    }
+    async function retainSource(source: string): Promise<string> {
+        return source;
+    }
+    function assertNoCompletion(): void {
         for (const name of ['install', 'setRenderedError', 'commitModeState', 'updateHistoryButtons', 'setStatus'])
             equal(calls(name).length, 0, 'stale request cannot perform ' + name);
-    };
+    }
     try {
         // Observe presentation at the DOM boundary; its real projection has a dedicated card suite.
-        const layoutServices: Record<string, (...args: unknown[]) => number> = {
-            lab_layout_error: (message: unknown, enabled: unknown) =>
-                events.push([enabled ? 'setRenderedError' : 'clearRenderedError', message]),
+        const layoutServices: {[name: string]: (...args: unknown[]) => number} = {
+            lab_layout_error(message: unknown, enabled: unknown) {
+                return events.push([enabled ? 'setRenderedError' : 'clearRenderedError', message]);
+            },
             lab_layout_more: record('resetMoreDigitsButton'),
             lab_layout_content: record('setRenderedContent'),
             lab_layout_solver_install: record('installSolverTexSvg'),
             lab_evaluation_cards_present: record('presentEvaluationCards')
         };
-        labDOM.call = <T = unknown>(name: string, ...args: unknown[]): T =>
-            Object.hasOwn(layoutServices, name) ? layoutServices[name](...args) as T : savedDOMCall<T>(name, ...args);
+        // Preserve the production bridge's generic result contract at this fixture boundary.
+        labDOM.call = function callFixture<T = unknown>(name: string, ...args: unknown[]): T {
+            if (Object.hasOwn(layoutServices, name))
+                return layoutServices[name](...args) as T;
+            return savedDOMCall<T>(name, ...args);
+        };
         replace('currentMode', () => mode);
         setEditorSource(text);
         replace('visibleBindingValues', () => ({x: '1/3'}));
         replace('commitVisibleBindingInputs', commitBindings);
-        replace('expressionWithVisibleBindings', async (source: string) => source);
+        replace('expressionWithVisibleBindings', retainSource);
         replace('historyStateForMode', (selected: string, source: string) => ({mode: selected, text: source}));
-        replace('previousModeStateForHistory', (next: {mode: string}) => {
+        function previousState(next: {mode: string}) {
             events.push(['previous', next]);
             return {mode: next.mode, text: 'previous input'};
-        });
+        }
+        replace('previousModeStateForHistory', previousState);
         replace('currentDatetimeState', () => ({date: '2000-01-01', latitude: '1', longitude: '2'}));
         replace('datetimeSummaryText', () => 'date snapshot');
         replace('currentAlmanacState', () => ({}));
@@ -344,17 +408,17 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
                      'refreshDatetimeWeather', 'scheduleRenderedTeXFit', 'setExpandableText', 'setResultInputText',
                      'scheduleSolverTexFit', 'scheduleAutomaticPlot'])
             replace(name, record(name));
-        for (const suffix
-                 of ['Expression', 'Equation', 'Diffequation', 'Matrix', 'Integrator', 'Datetime', 'Almanac']) {
-            const name = suffix === 'Expression' ? 'fetchEvaluation' : 'fetch' + suffix + 'Evaluation';
-            replace(name, fetchResult);
+        replace('fetch', fetchResult);
+        for (let index = 0; index < modes.length; ++index) {
+            installers[index] = function recordInstall(data: unknown): number {
+                return events.push(['install', modes[index], data]);
+            };
         }
-        for (let index = 0; index < modes.length; ++index)
-            installers[index] = data => events.push(['install', modes[index], data]);
-        replace(
-            'installEvaluationResult',
-            (mode: number, data: unknown, context: WorksheetRequests.MarsApiEvaluationContext, outcome: number, request?: WorksheetRequests.MarsApiRequest | null) =>
-                installers[mode](data, context, outcome, request));
+        function installResult(mode: number, data: unknown, context: WorksheetRequests.MarsApiEvaluationContext,
+                               outcome: number, request?: WorksheetRequests.MarsApiRequest | null): unknown {
+            return installers[mode](data, context, outcome, request);
+        }
+        replace('installEvaluationResult', installResult);
 
         // Each mode reaches the same native-directed adapter through its public entry point.
         Reflect.set(plotRange, 'marsPlotNames', ['x']);
@@ -483,17 +547,18 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
 
         mode = 'matrix';
         events.length = 0;
-        replace(
-            'fetchMatrixEvaluation',
-            async () => ({response: {ok: false}, data: {ok: true, error: 'HTTP fixture failure'}}));
+        async function failedResponse() {
+            return {response: {ok: false}, data: {ok: true, error: 'HTTP fixture failure'}};
+        }
+        replace('fetch', failedResponse);
         await WorksheetRequests.evaluation.evaluateMatrix();
         equal(calls('install').length, 0, 'HTTP failure cannot install a successful-looking payload');
         equal(calls('setRenderedError')[0][1], 'HTTP fixture failure', 'HTTP failure retains native diagnostic');
-        replace('fetchMatrixEvaluation', fetchResult);
+        replace('fetch', fetchResult);
         events.length = 0;
         reply = {ok: true};
         const matrixInstaller = installers[3];
-        installers[3] = async () => {
+        installers[3] = async function failInstall() {
             throw new Error('installer fixture failure');
         };
         await WorksheetRequests.evaluation.evaluateMatrix();
@@ -505,9 +570,10 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
 
         mode = 'expression';
         events.length = 0;
-        replace('commitVisibleBindingInputs', async () => {
+        async function failCommit(): Promise<never> {
             throw new Error('binding setup failed');
-        });
+        }
+        replace('commitVisibleBindingInputs', failCommit);
         await WorksheetRequests.evaluation.evaluateExpression();
         equal(calls('setRenderedError')[0][1], 'Error: binding setup failed', 'setup failure reaches outer UI guard');
         equal(calls('commitModeState').length + calls('updateHistoryButtons').length, 0, 'setup failure keeps history');
@@ -569,11 +635,13 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
 
         // Supersession at either awaited preparation boundary must prevent fetch and history writes.
         for (const boundary of ['commitVisibleBindingInputs', 'expressionWithVisibleBindings']) {
-            const gate = deferred(), entered = deferred<void>();
-            replace(boundary, () => {
+            const gate = createValueGate();
+            const entered = LabTestBrowser.signal();
+            function awaitPreparation(): Promise<unknown> {
                 entered.resolve();
                 return gate.promise;
-            });
+            }
+            replace(boundary, awaitPreparation);
             const pending = WorksheetRequests.evaluation.evaluateExpression();
             await entered.promise;
             const newer = WorksheetRequests.labRequests.begin('evaluate', mode);
@@ -586,16 +654,18 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
                 'stale preparation performs no writes');
             check(WorksheetRequests.labRequests.busy(), 'stale preparation finaliser retains newer busy state');
             WorksheetRequests.labRequests.finish(newer);
-            replace(boundary, boundary === 'commitVisibleBindingInputs' ? commitBindings : async (source: string) => source);
+            replace(boundary, boundary === 'commitVisibleBindingInputs' ? commitBindings : retainSource);
         }
 
         // A late success or rejection, including switching away and back, must be invisible.
         for (const scenario of ['success', 'rejection', 'mode change']) {
-            const gate = deferred(), entered = deferred<void>();
-            replace('fetchEvaluation', () => {
+            const gate = createValueGate();
+            const entered = LabTestBrowser.signal();
+            function awaitFetch(): Promise<unknown> {
                 entered.resolve();
                 return gate.promise;
-            });
+            }
+            replace('fetch', awaitFetch);
             const pending = WorksheetRequests.evaluation.evaluateExpression();
             await entered.promise;
             if (scenario === 'mode change') {
@@ -617,11 +687,13 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
         }
 
         // Exercise the real differential-equation installer and binary solver-render transport.
+        replace('fetch', fetchResult);
         mode = 'diffequation';
         installers[2] = savedInstallers[2];
         reply = {ok: true, status: 'solved', steps: 'native derivation', steps_left_TeX: 'x = 1'};
-        const solver = deferred<Response>(), solverEntered = deferred<void>();
-        window.fetch = (url, options) => {
+        const solver = LabTestBrowser.responseGate();
+        const solverEntered = LabTestBrowser.signal();
+        window.fetch = function awaitRender(url, options) {
             equal(String(url), '/render_TeX', 'solver render uses native endpoint');
             equal((labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {tex: string}).tex, 'x = 1', 'solver mathematics passed through unchanged');
             solverEntered.resolve();
@@ -654,11 +726,12 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
         WorksheetBindings.panel.currentVariables = savedVariables;
         WorksheetBindings.panel.currentDifferentiable = savedDifferentiable;
         WorksheetContext.expr.value = savedInput;
-        nodes.forEach((node, index) => {
+        for (let index = 0; index < nodes.length; ++index) {
+            const node = nodes[index];
             node.replaceChildren(...savedNodes[index].children);
             for (const attribute of Array.from(node.attributes)) node.removeAttribute(attribute.name);
             for (const [name, value] of savedNodes[index].attributes) node.setAttribute(name, value);
-        });
+        }
         WorksheetRequests.labRequests.modeChanged(savedMode);
     }
 };

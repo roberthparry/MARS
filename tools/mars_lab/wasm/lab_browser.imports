@@ -18,6 +18,7 @@ lab_dom_equal
 lab_dom_format
 lab_dom_precision
 lab_dom_get
+lab_dom_property_present
 lab_dom_has
 lab_dom_has_class
 lab_dom_id
@@ -25,6 +26,7 @@ lab_dom_index_present
 lab_dom_is_disabled
 lab_dom_item
 lab_dom_join
+lab_dom_join_array
 lab_dom_key_delete
 lab_dom_key_get
 lab_dom_key_set

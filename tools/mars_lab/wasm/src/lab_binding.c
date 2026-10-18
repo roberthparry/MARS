@@ -12,9 +12,11 @@
  * control metadata retains actual browser values, never integer handles.
  * Rendering and metadata copying visit every entry with bounded temporary
  * storage. Constant ordering uses a stable merge sort rather than repeated scans.
+ * Binding cards and workspace calculus controls share the scoped identifier-label formatter.
  */
 #include "lab_dom.h"
 #include "lab_forms.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 
 /* Compare exact browser values with a literal without interpreting binding text. */
@@ -78,7 +80,8 @@ int lab_binding_compare(int arguments)
     return lab_binding_compare_values(lab_dom_item(arguments, 0), lab_dom_item(arguments, 1));
 }
 
-static int lab_binding_label_value(int name)
+/* Share the exact display-label policy within the caller's synchronous handle scope. */
+int lab_binding_label_value(int name)
 {
     int text = lab_dom_text(lab_binding_or(name, ""));
     unsigned length = lab_dom_length(text);

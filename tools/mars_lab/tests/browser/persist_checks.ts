@@ -5,14 +5,33 @@
  * Uses the real native planner with isolated browser storage and timers to check field mappings, save publication and stale callback handling.
  */
 
-/** Worksheet persistence schemas, browser adapters and stale timers against real C/WASM. */
+/** @brief Stored fields inspected by the persistence fixture. */
+interface LabPersistRecord {
+    [field: string]: unknown;
+}
+
+/** @brief Server publication captured with its original save options. */
+interface LabPersistPublication {
+    patch: LabPersistRecord;
+    options: WorksheetSaveOptions;
+}
+
+/** @brief Browser timer retained for explicit current and stale callback checks. */
+interface LabPersistTimer {
+    callback(): void;
+    delay: number | undefined;
+}
+
+/** @brief Check worksheet persistence schemas, browser adapters and stale timers against real C/WASM. */
 window.checkLabPersistence = async function checkLabPersistence() {
     const native = labWire.exports();
-    const check: LabTestCheck = (ok, message) => {
+    function check(ok: unknown, message: string): void {
         if (!ok)
             throw new Error('Persistence: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
     const saved = {
         store: WorksheetPersistence.persistence.publish,
         text: WorksheetBindings.editor.currentExpressionText,
@@ -32,10 +51,14 @@ window.checkLabPersistence = async function checkLabPersistence() {
         integratorSource: WorksheetContext.expr.dataset.savedIntegratorExpression
     };
     const local = new Map<string, string>();
-    const sent: {patch: Record<string, unknown>; options: WorksheetSaveOptions}[] = [];
-    const timers = new Map<number, {callback: () => void; delay: number | undefined}>();
+    const sent: LabPersistPublication[] = [];
+    const timers = new Map<number, LabPersistTimer>();
     const cancelled: (number | undefined)[] = [];
-    let text = 'μ + σ', tick = 1000, next = 1, canonicalCalls = 0, storageFails = false;
+    let text = 'μ + σ';
+    let tick = 1000;
+    let next = 1;
+    let canonicalCalls = 0;
+    let storageFails = false;
     const expected = [
         ['expression', 'expression_updated_at'], ['equation', 'equation_updated_at'], ['diffequation'],
         ['matrix', 'matrix_operation', 'matrix_operand'],
@@ -47,7 +70,9 @@ window.checkLabPersistence = async function checkLabPersistence() {
         ['lastIntegratorExpression', 'lastIntegratorBounds', 'lastIntegratorIntervalCap']
     ];
     try {
-        for (const timer of WorksheetPersistence.persistence.scheduler.timers.values()) clearTimeout(timer);
+        for (const timer of WorksheetPersistence.persistence.scheduler.timers.values()) {
+            clearTimeout(timer);
+        }
         WorksheetPersistence.persistence.scheduler.timers.clear();
         for (const mode of [5, 6, 7, -1]) {
             equal(native.lab_persist_count(mode), 0, 'invalid/calendar mode has no save schema');
@@ -72,7 +97,8 @@ window.checkLabPersistence = async function checkLabPersistence() {
         }
         equal(native.lab_persist_local(4, 1, 0), 0, 'blank bounds retained locally');
         equal(native.lab_persist_local(3, 2, 0), 1, 'blank operand clears locally');
-        const first = native.lab_persist_begin(0, 1), second = native.lab_persist_begin(0, 1);
+        const first = native.lab_persist_begin(0, 1);
+        const second = native.lab_persist_begin(0, 1);
         const equation = native.lab_persist_begin(1, 0);
         equal(native.lab_persist_take(0, first), 0, 'superseded snapshot rejected');
         equal(native.lab_persist_take(1, second), 0, 'cross-mode token rejected');
@@ -86,11 +112,12 @@ window.checkLabPersistence = async function checkLabPersistence() {
                 native.lab_persist_restore(mode, 1, 1, 0) !== 0, mode < 2,
                 'partial editor copies rejected except expression/equation');
         }
-        const prepared: string[] = [], displayed: string[] = [];
+        const prepared: string[] = [];
+        const displayed: string[] = [];
         Reflect.set(WorksheetRequests.presentation, 'prepareLabEditor', async (value: string) => prepared.push(value));
         Reflect.set(WorksheetBindings.controller, 'setExpressionEditor', (value: string) => displayed.push(value));
         Reflect.set(WorksheetBindings.editor, 'expressionWithSortedConstants', (value: string) => value);
-        const restored: Record<string, string | number> = {
+        const restored: LabPersistRecord = {
             expression: '  μ + σ  ',
             expression_updated_at: 1234,
             equation: '  x = 1  ',
@@ -106,8 +133,13 @@ window.checkLabPersistence = async function checkLabPersistence() {
         equal(WorksheetContext.modeEditorText.diffequation, 'retained', 'partial editor does not overwrite useful text');
         equal(WorksheetContext.modeEditorText.matrix, 'complete matrix', 'complete matrix restored');
         equal(WorksheetContext.expr.dataset.savedIntegratorExpression, 'exp(x)', 'server integrator source retained');
-        const localRestored = Object.fromEntries([0, 1, 2, 3, 4].flatMap(
-            mode => (WorksheetPersistence.statePolicy.schema(mode) as LabWorksheetTestField[]).map(field => [field.local, restored[field.server]])));
+        const localRestored: LabPersistRecord = {};
+        for (let mode = 0; mode < 5; ++mode) {
+            const fields = WorksheetPersistence.statePolicy.schema(mode) as LabWorksheetTestField[];
+            for (const field of fields) {
+                localRestored[field.local] = restored[field.server];
+            }
+        }
         localRestored['mars.exprLab.lastIntegratorExpression'] = '  local source  ';
         await WorksheetPersistence.restoration.restoreEditors(key => localRestored[key], true);
         equal(displayed.at(-1), '  μ + σ  ', 'local editor whitespace retained');
@@ -117,22 +149,29 @@ window.checkLabPersistence = async function checkLabPersistence() {
         Reflect.set(WorksheetRequests.presentation, 'prepareLabEditor', saved.prepare);
         Reflect.set(WorksheetBindings.controller, 'setExpressionEditor', saved.display);
 
-        Reflect.set(WorksheetPersistence.persistence, 'publish', (patch: Record<string, unknown>, options: WorksheetSaveOptions) => sent.push({patch, options}));
+        /** @brief Capture each server publication with the supplied options. */
+        function recordPublication(patch: LabPersistRecord, options: WorksheetSaveOptions): number {
+            return sent.push({patch, options});
+        }
+
+        Reflect.set(WorksheetPersistence.persistence, 'publish', recordPublication);
         Reflect.set(WorksheetBindings.editor, 'currentExpressionText', () => text);
-        Reflect.set(WorksheetBindings.editor, 'expressionWithSortedConstants', (value: string) => {
+        Reflect.set(WorksheetBindings.editor, 'expressionWithSortedConstants', function canonicalText(value: string) {
             ++canonicalCalls;
             return value;
         });
         Reflect.set(WorksheetWorkspace.integrator, 'currentIntegratorBoundsText', () => 'x = 0 .. 1');
         Reflect.set(WorksheetWorkspace.integrator, 'requestedIntegratorIntervalCap', () => 20000);
         Reflect.set(WorksheetPersistence.statePolicy, 'matrixOperation', () => 'inverse');
-        Date.now = () => ++tick;
-        Storage.prototype.setItem = function(key, value) {
+        Date.now = function nextTimestamp() {
+            return ++tick;
+        };
+        Storage.prototype.setItem = function recordLocalValue(key, value) {
             if (storageFails)
                 throw new Error('Storage disabled');
             local.set(key, value);
         };
-        window.setTimeout = (callback, delay) => {
+        window.setTimeout = function captureTimer(callback, delay) {
             const id = next++;
             timers.set(id, {callback: callback as () => void, delay});
             return id;
@@ -147,7 +186,8 @@ window.checkLabPersistence = async function checkLabPersistence() {
         equal(local.get(EXPRESSION_TIMESTAMP_STORAGE_KEY), '1001', 'local expression timestamp');
         equal(WorksheetContext.worksheetSession.editor.lastExpressionUpdatedAt, 1001, 'evaluation timestamp updated');
         WorksheetPersistence.persistence.saveWorksheet('expression', 'new', {debounce: true});
-        const currentId = WorksheetPersistence.persistence.scheduler.timers.get(0), current = timers.get(currentId!)!;
+        const currentId = WorksheetPersistence.persistence.scheduler.timers.get(0);
+        const current = timers.get(currentId!)!;
         old.callback();
         equal(sent.length, 0, 'stale timer cannot publish');
         equal(WorksheetPersistence.persistence.scheduler.timers.get(0), currentId, 'stale callback cannot remove current timer');
@@ -215,7 +255,10 @@ window.checkLabPersistence = async function checkLabPersistence() {
         window.clearTimeout = saved.clear;
         WorksheetPersistence.persistence.scheduler.timers.clear();
         WorksheetContext.worksheetSession.editor.lastExpressionUpdatedAt = saved.timestamp;
-        WorksheetWorkspace.WORKSPACE_MODE_NAMES.forEach((mode, index) => WorksheetContext.modeEditorText[mode] = saved.editors[index]);
+        for (let index = 0; index < WorksheetWorkspace.WORKSPACE_MODE_NAMES.length; ++index) {
+            const mode = WorksheetWorkspace.WORKSPACE_MODE_NAMES[index];
+            WorksheetContext.modeEditorText[mode] = saved.editors[index];
+        }
         WorksheetContext.matrixOperand.value = saved.operand;
         Reflect.set(WorksheetRequests.presentation, 'prepareLabEditor', saved.prepare);
         Reflect.set(WorksheetBindings.controller, 'setExpressionEditor', saved.display);

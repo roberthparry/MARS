@@ -14,6 +14,7 @@
 #include "lab_layout.h"
 #include "lab_result.h"
 #include "lab_select.h"
+#define MARS_LAB_WORKSPACE_DOM_INTERNAL_ACCESS
 #include "lab_workspace_dom.h"
 #include "lab_evaluation_cards.h"
 

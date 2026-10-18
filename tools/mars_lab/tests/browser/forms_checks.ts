@@ -5,15 +5,22 @@
  * Exercises WebAssembly form operations after Lab readiness, including date-picker navigation and closed-state behaviour.
  */
 
+/** @brief Row fixture carrying the native reference-analysis result. */
+interface BindingReferencedRow extends WorksheetIntegratorRow {
+    referenced: boolean;
+}
+
 /** Structured C/WASM form regressions; the parent invokes this after labReady. */
 window.checkLabForms = async function checkLabForms() {
     const forms = labWire.exports();
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`C forms: ${message}`);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) =>
+    }
+
+    function equal(actual: unknown, expected: unknown, message: string): void {
         check(Object.is(actual, expected), `${message}: ${actual} != ${expected}`);
+    }
 
     const previousPickerDate = forms.lab_forms_picker_date();
     try {
@@ -62,11 +69,11 @@ window.checkLabForms = async function checkLabForms() {
     equal(forms.lab_forms_calendar_cell(9999, 12, 41), 0, 'out-of-range grid cell disabled');
     equal(forms.lab_forms_calendar_cell(2024, 2, 42), 0, 'grid slot bound');
     equal(forms.lab_forms_calendar_cell(2024, 2, NaN), 0, 'invalid grid slot');
-    const grid = (...args: number[]) => {
+    function grid(...args: number[]): Uint32Array {
         const pointer = forms.lab_forms_calendar_grid(...args);
         check(pointer !== 0, 'valid grid buffer');
         return new Uint32Array(forms.memory.buffer, pointer, 168).slice();
-    };
+    }
     const leapGrid = grid(2024, 2, 2024, 2, 29, 2024, 2, 29);
     equal(leapGrid.slice(0, 4).join(','), '2024,1,29,3', 'leading outside-month cell');
     equal(leapGrid.slice(124, 128).join(','), '2024,2,29,13', 'today and selected flags coexist');
@@ -125,14 +132,22 @@ window.checkLabForms = async function checkLabForms() {
     for (const free of [false, true]) {
         for (const lo of ['', 'a + μ']) {
             for (const hi of ['', 'a - μ']) {
-                const expected = free ? 'free [α]' : hi ? lo ? `[α] = ${lo} .. ${hi}` : `[α] = ${hi}` : '[α]';
+                let expected = '[α]';
+                if (free)
+                    expected = 'free [α]';
+                else if (hi && lo)
+                    expected = `[α] = ${lo} .. ${hi}`;
+                else if (hi)
+                    expected = `[α] = ${hi}`;
                 equal(
                     integratorRowText({kind: free ? 'free' : 'bound', name: '[α]', lo, hi}), expected,
                     'native row formatting preserves structured authored fields');
             }
         }
     }
-    const batchText = (rows: unknown) => labDOM.call<string>('lab_binding_rows_text', rows);
+    function batchText(rows: unknown): string {
+        return labDOM.call<string>('lab_binding_rows_text', rows);
+    }
     equal(batchText(null), '', 'absent row array is empty');
     equal(batchText(new Array(2)), '', 'sparse array holes do not manufacture rows');
     equal(batchText([{name: 'x'}, {name: []}]), 'x', 'empty formatted rows do not add separators');
@@ -190,29 +205,35 @@ window.checkLabForms = async function checkLabForms() {
     equal(forms.lab_forms_row_removable(0, 2, 1), 0, 'last integration variable protected');
     equal(forms.lab_forms_row_removable(1, 2, 1), 1, 'free parameter removable');
     equal(forms.lab_forms_row_removable(1, 1, 0), 0, 'last row protected');
-    const stageRows = (flags: number[]) => new Uint32Array(forms.memory.buffer, forms.lab_rows_input(), flags.length).set(flags);
-    const selectRows = (flags: number[]) => {
+    function stageRows(flags: number[]): void {
+        const input = new Uint32Array(forms.memory.buffer, forms.lab_rows_input(), flags.length);
+        input.set(flags);
+    }
+
+    function selectRows(flags: number[]): number[] {
         stageRows(flags);
         const pointer = forms.lab_rows_select(flags.length);
         check(pointer !== 0, 'valid active-row plan');
         const [bounds, active] = new Uint32Array(forms.memory.buffer, pointer, 2);
         return Array.from(new Uint32Array(forms.memory.buffer, pointer, 2 + bounds + active));
-    };
-    const mergeRows = (flags: number[], bounds: number) => {
+    }
+
+    function mergeRows(flags: number[], bounds: number): number[] {
         stageRows(flags);
         const pointer = forms.lab_rows_merge(flags.length, bounds);
         check(pointer !== 0, 'valid reconciled-row plan');
         const count = new Uint32Array(forms.memory.buffer, pointer, 1)[0];
         return Array.from(new Uint32Array(forms.memory.buffer, pointer + 4, count));
-    };
-    const editRows = (flags: number[], index: number, operation: number) => {
+    }
+
+    function editRows(flags: number[], index: number, operation: number): number[] | null {
         stageRows(flags);
         const pointer = forms.lab_rows_edit(flags.length, index, operation);
         if (!pointer)
             return null;
         const count = new Uint32Array(forms.memory.buffer, pointer, 1)[0];
         return Array.from(new Uint32Array(forms.memory.buffer, pointer + 4, count * 2));
-    };
+    }
     for (let length = 1; length <= 3; ++length) {
         for (let encoded = 0; encoded < 16 ** length; ++encoded) {
             const flags = Array.from({length}, (_, i) => (encoded >>> (4 * i)) & 15);
@@ -267,8 +288,10 @@ window.checkLabForms = async function checkLabForms() {
         for (let packed = 0; packed < 16 ** length; ++packed) {
             const flags = Array.from({length}, (_, index) => (packed >>> (4 * index)) & 15);
             const boundCount = flags.filter(flag => !(flag & 1)).length;
-            const bounds = [], active = [];
-            flags.forEach((flag, index) => {
+            const bounds: number[] = [];
+            const active: number[] = [];
+            for (let index = 0; index < flags.length; ++index) {
+                const flag = flags[index];
                 if (flag & 1) {
                     if (flag & 8)
                         active.push(index);
@@ -276,7 +299,7 @@ window.checkLabForms = async function checkLabForms() {
                     bounds.push(index);
                     active.push(index);
                 }
-            });
+            }
             if (!bounds.length)
                 bounds.push(256);
             if (!active.length)
@@ -285,15 +308,17 @@ window.checkLabForms = async function checkLabForms() {
                 selectRows(flags).join(','), [bounds.length, active.length, ...bounds, ...active].join(','),
                 'batched selection preserves bound and free-row policy');
             for (let returned = 0; returned <= 4; ++returned) {
-                const expected = [];
+                const expected: number[] = [];
                 let next = 0;
-                flags.forEach((flag, index) => {
+                for (let index = 0; index < flags.length; ++index) {
+                    const flag = flags[index];
                     if (!returned || ((flag & 1) && (flag & 8)))
                         expected.push(index);
                     else if (!(flag & 1) && next < returned)
                         expected.push(256 + next++);
-                });
-                while (next < returned) expected.push(256 + next++);
+                }
+                while (next < returned)
+                    expected.push(256 + next++);
                 equal(
                     mergeRows(flags, returned).join(','), expected.join(','), 'batched reconciliation preserves order');
             }
@@ -330,12 +355,41 @@ window.checkLabForms = async function checkLabForms() {
     equal(validDateText('2023-02-29', 'fallback'), 'fallback', 'form invalid date fallback');
     equal(forms.lab_forms_clamp(WorksheetLocations.dates.marsFormNumber('13'), 1, 12, 1), 12, 'month input passes through C clamp');
     equal(forms.lab_forms_clamp(WorksheetLocations.dates.marsFormNumber('junk'), 1, 12, 1), 1, 'malformed numeric input falls back');
+    equal(WorksheetLocations.dates.marsFormNumber('  '), NaN, 'blank number input is not coerced to zero');
+    equal(WorksheetLocations.dates.marsFormNumber('0x10'), NaN, 'number inputs reject JavaScript hexadecimal syntax');
+    equal(WorksheetLocations.dates.marsFormNumber(' -3.5 '), -3.5, 'trimmed form numbers preserve their sign and fraction');
     equal(numbersNearlyEqual('', '0'), false, 'blank coordinate does not match zero');
     equal(numbersNearlyEqual('51.5', '51.5000001'), true, 'coordinate input adapter');
     equal(WorksheetLocations.dates.formatOffsetHours(-3.5), '-3.5', 'offset formatting adapter');
     equal(WorksheetLocations.dates.timeZoneOffsetHours('UTC', '2024-02-29'), 0, 'browser timezone with C arithmetic');
     equal(WorksheetLocations.dates.timeZoneOffsetHours('Asia/Kathmandu', '2024-02-29'), 5.75, 'fractional timezone with C arithmetic');
     equal(WorksheetLocations.dates.timeZoneOffsetHours('Invalid/Zone', '2024-02-29'), null, 'unsupported timezone fallback');
+    const dateFixture = {
+        wire() { return labWire; },
+        document() { return document; },
+        clock() { return new Date('2024-02-29T03:04:05Z'); },
+        dateTimeFormat: Intl.DateTimeFormat
+    };
+    const dateAdapter = new WorksheetLocations.BrowserDateAdapter(dateFixture);
+    const readMoment = dateAdapter.marsCurrentGmtMoment;
+    const readToday = dateAdapter.marsTodayIsoDate;
+    const readOffset = dateAdapter.timeZoneOffsetHours;
+    const parseDate = dateAdapter.parseMarsIsoDate;
+    equal(readMoment().date, '2024-02-29', 'detached UTC clock uses the injected clock');
+    equal(readMoment().time, '03:04:05', 'UTC clock retains zero-padded components');
+    equal(readMoment(new Date('0001-01-02T00:00:09Z')).date, '0001-01-02', 'UTC date retains four-digit early years');
+    equal(readMoment(new Date('9999-12-31T23:59:59Z')).time, '23:59:59', 'explicit clock overrides injected time');
+    const localToday = parseDate(readToday());
+    const localClock = dateFixture.clock();
+    check(localToday !== null && localToday.year === localClock.getFullYear() &&
+        localToday.month === localClock.getMonth() + 1 && localToday.day === localClock.getDate(),
+        'local date uses local clock components rather than UTC components');
+    equal(readOffset('Europe/London', '2024-01-15'), 0, 'winter timezone offset remains native arithmetic');
+    equal(readOffset('Europe/London', '2024-07-15'), 1, 'summer timezone offset uses browser daylight-saving data');
+    equal(readOffset(undefined, '2024-02-29'), null, 'absent timezone has no offset');
+    equal(readOffset('UTC', '2023-02-29'), null, 'invalid date has no timezone offset');
+    equal(dateAdapter.formatOffsetHours(null), '', 'absent offset has no display text');
+    equal(dateAdapter.formatOffsetHours(Infinity), '', 'non-finite offset has no display text');
     equal(integratorDefaultVariableName([{name: 'x'}, {name: ' y '}, {name: 'x'}]), 'z', 'name occupancy adapter');
     equal(
         integratorDefaultVariableName(integratorCandidateNames.map(name => ({name}))), 'x', 'name exhaustion adapter');
@@ -358,7 +412,7 @@ window.checkLabForms = async function checkLabForms() {
     const wasHidden = WorksheetContext.marsDatePicker.classList.contains('hidden');
     const savedRequest = WorksheetRequests.presentation.requestLabForms;
     try {
-        const rowInputs: (WorksheetIntegratorRow & {referenced: boolean})[] = [
+        const rowInputs: BindingReferencedRow[] = [
             {kind: 'bound', name: 'x', lo: '', hi: '', referenced: false},
             {kind: 'free', name: 'a', lo: '', hi: '', referenced: true},
             {kind: 'bound', name: 'y', lo: 'f(a,b)', hi: 'a-b', referenced: false}
@@ -383,7 +437,7 @@ window.checkLabForms = async function checkLabForms() {
         equal(WorksheetContext.integratorBoundStack.innerHTML, beforeEmptyResult, 'empty result leaves DOM unchanged');
         WorksheetWorkspace.integrator.forms.metadata = savedReferences;
         let detailCalls = 0;
-        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', async () => {
+        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', async function rejectUnexpectedPreparation() {
             ++detailCalls;
             throw new Error('Catalogue display must not require form preparation');
         });
@@ -411,9 +465,13 @@ window.checkLabForms = async function checkLabForms() {
             'free-row bounds remain disabled');
         // Resolve controlled requests explicitly: no sleeps or live network timing assumptions.
         let finishPreparation!: (value: unknown) => void;
-        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', () => new Promise<unknown>(resolve => {
+        function capturePreparation(resolve: (value: unknown) => void): void {
             finishPreparation = resolve;
-        }));
+        }
+        function deferPreparation(): Promise<unknown> {
+            return new Promise<unknown>(capturePreparation);
+        }
+        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', deferPreparation);
         const preparation = WorksheetWorkspace.integrator.refreshIntegratorForms();
         const nameInput = WorksheetContext.integratorBoundStack.querySelector<HTMLInputElement>('[data-integrator-name]')!;
         nameInput.value = 'newer';

@@ -7,18 +7,33 @@
 
 /** Native binding request normalisation and accepted-edit projection; invoked sequentially after labReady. */
 window.checkLabBindingSync = async function checkLabBindingSync() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`Binding sync: ${message}`);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const plan = (body: unknown, bindings: unknown) => labDOM.call<BindingSyncPlan>('lab_binding_sync_request', {body, bindings});
-    const originalRecords = (bindings: unknown[]) => bindings.map(binding => ({
-                                                         name: String(Reflect.get(Object(binding), 'name') || ''),
-                                                         kind: Reflect.get(Object(binding), 'kind') || 'variable',
-                                                         value: String(Reflect.get(Object(binding), 'value') ?? Reflect.get(Object(binding), 'display') ?? '?')
-                                                     }));
-    const sameRecords = (actual: BindingSyncRecord[], expected: BindingSyncRecord[], label: string) => {
+    }
+
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+
+    function plan(body: unknown, bindings: unknown): BindingSyncPlan {
+        return labDOM.call<BindingSyncPlan>('lab_binding_sync_request', {body, bindings});
+    }
+
+    function originalRecord(binding: unknown): BindingSyncRecord {
+        return {
+            name: String(Reflect.get(Object(binding), 'name') || ''),
+            kind: Reflect.get(Object(binding), 'kind') || 'variable',
+            value: String(Reflect.get(Object(binding), 'value') ?? Reflect.get(Object(binding), 'display') ?? '?')
+        };
+    }
+
+    function originalRecords(bindings: unknown[]): BindingSyncRecord[] {
+        // Array.map preserves holes and includes populated inherited indices.
+        return bindings.map(originalRecord);
+    }
+
+    function sameRecords(actual: BindingSyncRecord[], expected: BindingSyncRecord[], label: string): void {
         equal(actual.length, expected.length, `${label}: length`);
         for (let index = 0; index < expected.length; ++index) {
             equal(Object.hasOwn(actual, index), Object.hasOwn(expected, index), `${label}: hole ${index}`);
@@ -27,24 +42,24 @@ window.checkLabBindingSync = async function checkLabBindingSync() {
             for (const field of ['name', 'kind', 'value'] as const)
                 equal(actual[index][field], expected[index][field], `${label}: ${field} ${index}`);
         }
-    };
-    const deferred = () => {
-        let resolve!: (value: {editor: {expression: string}}) => void;
+    }
+
+    function deferred(): BindingSyncGate {
+        let resolve!: (value: BindingEditorResponse) => void;
         let reject!: (error?: unknown) => void;
-        const promise = new Promise<{editor: {expression: string}}>((accept, fail) => {
+        const promise = new Promise<BindingEditorResponse>(function captureCompletion(accept, fail) {
             resolve = accept;
             reject = fail;
         });
-        const result: LabTestDeferred<{editor: {expression: string}}> & {request?: BindingSyncRequest} =
-            {promise, resolve, reject};
-        return result;
-    };
+        return {promise, resolve, reject};
+    }
+
     const savedFunctions = new Map<string, unknown>();
-    const replace = (name: string, implementation: (...args: never[]) => unknown) => {
+    function replace(name: string, implementation: MarsTransportService): void {
         if (!savedFunctions.has(name))
             savedFunctions.set(name, Reflect.get(labTestModuleOwner(name), name));
         Reflect.set(labTestModuleOwner(name), name, implementation);
-    };
+    }
     const saved = {
         fullText: WorksheetContext.labEditorState.fullText,
         displayText: WorksheetContext.labEditorState.displayText,
@@ -55,9 +70,18 @@ window.checkLabBindingSync = async function checkLabBindingSync() {
         differentiable: WorksheetBindings.panel.currentDifferentiable,
         current: WorksheetRequests.labRequests.current
     };
-    const edited = '__binding_sync_α + c__', source = '__binding_sync_authored__';
-    const cached = [edited, source].map(key => [key, WorksheetResults.labEvaluationView.caches.editors.has(key), WorksheetResults.labEvaluationView.caches.editors.get(key)] as const);
-    const pending: ReturnType<typeof deferred>[] = [], tasks: Promise<unknown>[] = [];
+    const edited = '__binding_sync_α + c__';
+    const source = '__binding_sync_authored__';
+    const cached: BindingEditorCacheEntry[] = [];
+    for (const key of [edited, source]) {
+        cached.push({
+            key,
+            present: WorksheetResults.labEvaluationView.caches.editors.has(key),
+            value: WorksheetResults.labEvaluationView.caches.editors.get(key)
+        });
+    }
+    const pending: BindingSyncGate[] = [];
+    const tasks: Promise<unknown>[] = [];
     try {
         for (const body of [undefined, null, false, 0, NaN, '', ' \u00a0\n ']) {
             const empty = plan(body, [null]);
@@ -147,11 +171,11 @@ window.checkLabBindingSync = async function checkLabBindingSync() {
 
         const prepared: string[] = [], requested: BindingSyncRequest[] = [], renderedBindings: unknown[] = [];
         const derivativeCalls: {variables: string[]; differentiable: boolean}[] = [];
-        const persisted: Parameters<typeof WorksheetPersistence.persistence.saveWorksheet>[] = [];
-        replace('prepareLabEditor', async (text: string) => {
+        const persisted: [mode: WorksheetMode, text?: string, options?: WorksheetSaveOptions][] = [];
+        replace('prepareLabEditor', async function recordPreparation(text: string) {
             prepared.push(text);
         });
-        replace('requestLabPresentation', async (request: BindingSyncRequest) => {
+        replace('requestLabPresentation', async function assembleExpression(request: BindingSyncRequest) {
             requested.push(request);
             return {editor: {expression: 'native assembled expression'}};
         });
@@ -172,16 +196,18 @@ window.checkLabBindingSync = async function checkLabBindingSync() {
         }
         equal(requested.length, 1, 'invalid records never reach the service');
 
-        replace('renderVariableValues', (values: unknown) => {
+        replace('renderVariableValues', function recordBindings(values: unknown) {
             renderedBindings.push(values);
         });
-        replace('renderDerivativeButtons', (variables: string[]) => {
+        replace('renderDerivativeButtons', function recordControls(variables: string[]) {
             derivativeCalls.push({variables, differentiable: WorksheetBindings.panel.currentDifferentiable});
         });
-        replace('saveWorksheetState', (...args: Parameters<typeof WorksheetPersistence.persistence.saveWorksheet>) => {
+        replace('saveWorksheetState', function recordPersistence(
+            ...args: [mode: WorksheetMode, text?: string, options?: WorksheetSaveOptions]
+        ) {
             persisted.push(args);
         });
-        replace('requestLabPresentation', (request: BindingSyncRequest) => {
+        replace('requestLabPresentation', function deferPresentation(request: BindingSyncRequest) {
             const wait = deferred();
             wait.request = request;
             pending.push(wait);
@@ -193,11 +219,11 @@ window.checkLabBindingSync = async function checkLabBindingSync() {
         const owner = {} as WorksheetRequests.MarsApiRequest; // Only reference identity is consumed by this mock.
         WorksheetRequests.labRequests.current = request => request === owner && live;
         const data = {binding_values: bindings, evaluation_ready: ' YES ', differentiable: ' no '};
-        const start = () => {
+        function start() {
             const task = WorksheetBindings.controller.applyMarsBindingsToEditedExpression(edited, source, data as unknown as WorksheetEvaluationData, owner);
             tasks.push(task);
             return {task, wait: pending[pending.length - 1]};
-        };
+        }
         WorksheetContext.expr.value = `  ${edited}\n`;
         const accepted = start();
         equal(accepted.wait.request!.bindings[4].value, 'π/7', 'authored values remain selected by existing helpers');
@@ -248,15 +274,17 @@ window.checkLabBindingSync = async function checkLabBindingSync() {
         equal(persisted.length, 2, 'failed service does not project or persist');
     } finally {
         WorksheetRequests.labRequests.current = () => false;
-        for (const wait of pending) wait.resolve({editor: {expression: ''}});
+        for (const wait of pending)
+            wait.resolve({editor: {expression: ''}});
         await Promise.allSettled(tasks);
-        for (const [name, original] of savedFunctions) Reflect.set(labTestModuleOwner(name), name, original);
+        for (const [name, original] of savedFunctions)
+            Reflect.set(labTestModuleOwner(name), name, original);
         WorksheetRequests.labRequests.current = saved.current;
-        for (const [key, present, value] of cached) {
-            if (present)
-                WorksheetResults.labEvaluationView.caches.editors.set(key, value!);
+        for (const entry of cached) {
+            if (entry.present)
+                WorksheetResults.labEvaluationView.caches.editors.set(entry.key, entry.value!);
             else
-                WorksheetResults.labEvaluationView.caches.editors.delete(key);
+                WorksheetResults.labEvaluationView.caches.editors.delete(entry.key);
         }
         WorksheetContext.labEditorState.fullText = saved.fullText;
         WorksheetContext.labEditorState.displayText = saved.displayText;

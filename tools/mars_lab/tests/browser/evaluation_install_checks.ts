@@ -7,14 +7,19 @@
 
 /** Ordered native installer plans and browser completion boundaries; run after Lab readiness. */
 window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Evaluation install: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const names = (plan: EvaluationInstallFixturePlan) => plan.calls.map(call => call.service).join(',');
-    const service = <T extends unknown[] = unknown[]>(plan: EvaluationInstallFixturePlan, name: string) =>
-        plan.calls.find(call => call.service === name)! as {service: string; args: T};
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    function names(plan: EvaluationInstallFixturePlan): string {
+        return plan.calls.map(call => call.service).join(',');
+    }
+    function service(plan: EvaluationInstallFixturePlan, name: string): EvaluationInstallFixtureCall {
+        return plan.calls.find(call => call.service === name)!;
+    }
     const modes = ['expression', 'equation', 'diffequation', 'matrix', 'integrator', 'datetime', 'almanac'] as const;
     const bindings = Object.freeze([
         Object.freeze({name: ' x ', value: 'π/7'}), Object.freeze({name: 'c', kind: 'constant', value: '?'}),
@@ -22,6 +27,9 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
     ]);
     const data = Object.freeze({expression: 'native expression', binding_values: bindings, evaluation_ready: false});
     const context = Object.freeze({text: 'authored source', editorText: 'authored source', editorBodyText: 'body'});
+    const calendar: {readonly text: string}[] = [];
+    for (let index = 0; index < 4; ++index)
+        calendar.push(Object.freeze({text: 'calendar ' + index}));
     const cards = Object.freeze({
         expression: 'expression card',
         function: 'function card',
@@ -30,7 +38,7 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
         differentiable: true,
         expandable: true,
         scalar: 'native scalar',
-        calendar: Object.freeze(Array.from({length: 4}, (_, index) => Object.freeze({text: 'calendar ' + index})))
+        calendar: Object.freeze(calendar)
     });
     let fullText = 'before editor', expressionText = 'before matrix', fullReads = 0, expressionReads = 0;
     const view = Object.freeze({
@@ -44,8 +52,11 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
             return expressionText;
         }
     });
-    const plan = (mode: number, phase: number, response: unknown = data, captured: unknown = context, outcome = 2) =>
-        labDOM.call<EvaluationInstallFixturePlan>('lab_evaluation_install', mode, phase, outcome, response, captured, cards, view);
+    function plan(mode: number, phase: number, response: unknown = data, captured: unknown = context,
+                  outcome = 2): EvaluationInstallFixturePlan {
+        return labDOM.call<EvaluationInstallFixturePlan>(
+            'lab_evaluation_install', mode, phase, outcome, response, captured, cards, view);
+    }
     const expected = [
         [
             'setRenderedResult,setExpressionEditor',
@@ -86,10 +97,10 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
     equal(service(plan(0, 0), 'setRenderedResult').args[0], data, 'native payload identity retained');
     equal(service(plan(0, 0), 'setExpressionEditor').args[3], false, 'false readiness is not defaulted');
     equal(service(plan(0, 1), 'installEvaluationTextCards').args[0], cards, 'card record identity retained');
-    equal(service<[string[]]>(plan(0, 1), 'variables').args[0].join(','), 'x,__proto__', 'constants excluded without special keys');
+    equal((service(plan(0, 1), 'variables').args[0] as string[]).join(','), 'x,__proto__', 'constants excluded without special keys');
     equal(service(plan(1, 0), 'render').args[2], true, 'equation expansion is retained');
     for (const mode of [1, 2]) {
-        equal(service<[string[]]>(plan(mode, 1), 'variables').args[0].join(','), 'x,__proto__', 'solver axes retain native metadata');
+        equal((service(plan(mode, 1), 'variables').args[0] as string[]).join(','), 'x,__proto__', 'solver axes retain native metadata');
         equal(service(plan(mode, 1), 'variables').args[1], false, 'solver plots do not enable expression calculus');
     }
     equal(service(plan(2, 1), 'setValueCardVisible').args[0], true, 'solver value card is explicitly visible');
@@ -99,10 +110,11 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
     const authored = {name: 'x', value: 'authored π/5', display: 'authored display'};
     const visible = {name: 'x', value: 'visible α + β', display: 'visible display'};
     const editorView = {editors: new Map([[context.text, {bindings: [authored]}]])};
-    const overlay = (captured: object) =>
-        service<[unknown, WorksheetBinding[]]>(
-            labDOM.call<EvaluationInstallFixturePlan>('lab_evaluation_install', 0, 0, 2, data, captured, cards, editorView), 'setExpressionEditor')
-            .args[1];
+    function overlay(captured: object): WorksheetBinding[] {
+        const result = labDOM.call<EvaluationInstallFixturePlan>(
+            'lab_evaluation_install', 0, 0, 2, data, captured, cards, editorView);
+        return service(result, 'setExpressionEditor').args[1] as WorksheetBinding[];
+    }
     equal(overlay(context)[0].value, authored.value, 'cached authored value overrides native discovery value');
     const visibleOverlay = overlay({...context, enteredBindings: [visible]});
     equal(visibleOverlay[0].value, visible.value, 'visible authored value has final precedence');
@@ -149,11 +161,13 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
     equal(service(plan(3, 1), 'modeSource').args[1], expressionText, 'matrix completion reads current editor text');
     equal(expressionReads, 1, 'matrix completion reads editor text once');
 
-    const large =
-        Object.freeze(Array.from({length: 1600}, (_, index) => Object.freeze({name: 'p' + index, value: '?'})));
+    const largeEntries: WorksheetBinding[] = [];
+    for (let index = 0; index < 1600; ++index)
+        largeEntries.push(Object.freeze({name: 'p' + index, value: '?'}));
+    const large = Object.freeze(largeEntries);
     const largeResponse = Object.freeze({expression: 'native', binding_values: large});
-    const selected = service<[unknown, WorksheetBinding[]]>(plan(0, 0, largeResponse), 'setExpressionEditor').args[1];
-    const variables = service<[string[]]>(plan(0, 1, largeResponse), 'variables').args[0];
+    const selected = service(plan(0, 0, largeResponse), 'setExpressionEditor').args[1] as WorksheetBinding[];
+    const variables = service(plan(0, 1, largeResponse), 'variables').args[0] as string[];
     equal(selected.length, 1600, 'large binding overlay releases temporary handles');
     equal(variables.length, 1600, 'large variable selection releases temporary handles');
     plan(6, 0);
@@ -164,7 +178,7 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
     let thrown;
     try {
         labDOM.services(plan(6, 0), {
-            almanacRender: () => {
+            almanacRender() {
                 executed.push('render');
                 throw sentinel;
             },
@@ -177,6 +191,9 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
     equal(executed.join(','), 'render', 'service failure prevents later effects');
 
     // Real installer adapters, with browser effects observed rather than committed to the active worksheet.
+    const modeText: {[mode: string]: string} = {};
+    for (const mode of modes)
+        modeText[mode] = WorksheetContext.modeEditorText[mode];
     const saved = {
         call: labDOM.call,
         fetch: window.fetch,
@@ -191,32 +208,32 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
         currentVariables: WorksheetBindings.panel.currentVariables,
         currentDifferentiable: WorksheetBindings.panel.currentDifferentiable,
         almanacLastWorksheetData: WorksheetContext.worksheetSession.calendar.almanacLastWorksheetData,
-        modeText: Object.fromEntries(modes.map(mode => [mode, WorksheetContext.modeEditorText[mode]]))
+        modeText
     };
     const originals = new Map<string, unknown>();
     const originalCalendarSave = WorksheetPersistence.persistence.saveCalendar;
     const events: {name: string; args: unknown[]}[] = [];
-    const replace = <F extends (...args: never[]) => unknown>(name: string, callback: F) => {
+    function replace(name: string, callback: (...args: never[]) => unknown): void {
         if (!originals.has(name))
             originals.set(name, Reflect.get(labTestModuleOwner(name), name));
         Reflect.set(labTestModuleOwner(name), name, callback);
-    };
-    const record = (name: string) => (...args: unknown[]) => events.push({name, args});
-    const calls = (name: string) => events.filter(event => event.name === name);
-    const deferred = <T = void>() => {
-        let resolve!: (value: T | PromiseLike<T>) => void;
-        const promise = new Promise<T>(accept => {
-            resolve = accept;
-        });
-        return {promise, resolve};
-    };
+    }
+    function record(name: string): (...args: unknown[]) => number {
+        return function recordCall(...args: unknown[]): number {
+            return events.push({name, args});
+        };
+    }
+    function calls(name: string): {name: string; args: unknown[]}[] {
+        return events.filter(event => event.name === name);
+    }
     let mode = 'expression', liveText = 'old live text';
     const requests: (WorksheetRequests.MarsApiRequest | null)[] = [];
-    const pending: {task: Promise<unknown>; gate: {resolve: (response: Response) => void}}[] = [];
+    const pending: {task: Promise<unknown>; gate: LabTestResponseGate}[] = [];
     try {
-        Reflect.set(WorksheetPersistence.persistence, 'saveCalendar', (calendarMode: WorksheetMode) => {
+        function recordSave(calendarMode: WorksheetMode): void {
             events.push({name: calendarMode === 'datetime' ? 'saveLastDatetimeState' : 'saveLastAlmanacState', args: []});
-        });
+        }
+        Reflect.set(WorksheetPersistence.persistence, 'saveCalendar', recordSave);
         for (const name
                  of ['setRenderedResult', 'setExpressionEditor', 'renderVariableValues', 'clearVariableValues',
                      'setExpandableText', 'setResultInputText', 'setValueText', 'setValueCardVisible',
@@ -229,20 +246,22 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
         replace('currentMode', () => mode);
         WorksheetContext.expr.value = liveText;
         WorksheetContext.labEditorState.displayText = '';
-        labDOM.call = <T = unknown>(name: string, ...args: unknown[]): T => {
+        // Preserve the production bridge's generic result contract at this fixture boundary.
+        labDOM.call = function callFixture<T = unknown>(name: string, ...args: unknown[]): T {
             if (['lab_evaluation_render', 'lab_evaluation_cards_present', 'lab_evaluation_solver'].includes(name)) {
                 events.push({name, args});
                 return (name === 'lab_evaluation_render' ? 'native TeX' : undefined) as T;
             }
             return saved.call<T>(name, ...args);
         };
-        replace('setExpressionEditor', (...args: unknown[]) => {
-            record('setExpressionEditor')(...args);
+        function installEditor(...args: unknown[]): void {
+            events.push({name: 'setExpressionEditor', args});
             WorksheetContext.labEditorState.fullText = 'installed full text';
             liveText = 'installed matrix text';
             WorksheetContext.expr.value = liveText;
             WorksheetContext.labEditorState.displayText = '';
-        });
+        }
+        replace('setExpressionEditor', installEditor);
         await WorksheetRequests.evaluation.installEvaluationResult(0, data, {text: 'authored source'}, 2);
         equal(calls('saveWorksheetState')[0].args[1], 'installed full text', 'real wrapper defers full-text getter');
         equal(WorksheetContext.labEditorState.lastInput, 'authored source', 'source setter updates native owner');
@@ -258,9 +277,10 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
         mode = 'almanac';
         events.length = 0;
         const previousAlmanac = WorksheetContext.worksheetSession.calendar.almanacLastWorksheetData;
-        replace('renderAlmanacWorksheet', () => {
+        function failRender(): never {
             throw sentinel;
-        });
+        }
+        replace('renderAlmanacWorksheet', failRender);
         thrown = null;
         try {
             await WorksheetRequests.evaluation.installEvaluationResult(6, data, context, 2);
@@ -275,15 +295,20 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
 
         mode = 'diffequation';
         WorksheetRequests.labRequests.modeChanged(mode);
-        const response = (payload: unknown) =>
-            new Response(labWire.encode(payload), {headers: {'Content-Type': 'application/x-protobuf'}});
+        function response(payload: unknown): Response {
+            return new Response(labWire.encode(payload), {headers: {'Content-Type': 'application/x-protobuf'}});
+        }
+        function failEarlyCompletion(): never {
+            throw new Error('Evaluation install: solver installer completed without requesting a render');
+        }
         for (const scenario of ['failure', 'no SVG', 'SVG', 'stale success', 'stale failure']) {
-            const gate = deferred<Response>(), entered = deferred();
+            const gate = LabTestBrowser.responseGate();
+            const entered = LabTestBrowser.signal();
             const request = WorksheetRequests.labRequests.begin('evaluate', mode);
             requests.push(request);
             check(request, 'solver fixture owns a main request');
             events.length = 0;
-            window.fetch = (url, options) => {
+            window.fetch = function awaitResponse(url, options) {
                 entered.resolve();
                 equal(String(url), '/render_TeX', 'solver request uses the native renderer');
                 equal((labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {tex: string}).tex, 'native solver source', 'opaque solver source is unchanged');
@@ -298,11 +323,7 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
             };
             const task = WorksheetRequests.evaluation.installEvaluationResult(2, payload, context, 2, request);
             pending.push({task, gate});
-            await Promise.race([
-                entered.promise, task.then(() => {
-                    throw new Error('Evaluation install: solver installer completed without requesting a render');
-                })
-            ]);
+            await Promise.race([entered.promise, task.then(failEarlyCompletion)]);
             equal(calls('setExpandableText').length, 2, 'problem and derivation installed before render wait');
             equal(
                 calls('setValueText').length + calls('saveWorksheetState').length, 0,
@@ -314,10 +335,14 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
             }
             events.length = 0;
             const failed = scenario.endsWith('failure');
-            gate.resolve(response(
-                failed                    ? {ok: false, error: 'fixture render failure'} :
-                    scenario === 'no SVG' ? {ok: true} :
-                                            {ok: true, svg: '<svg/>'}));
+            let payloadResponse: {ok: boolean; error?: string; svg?: string};
+            if (failed)
+                payloadResponse = {ok: false, error: 'fixture render failure'};
+            else if (scenario === 'no SVG')
+                payloadResponse = {ok: true};
+            else
+                payloadResponse = {ok: true, svg: '<svg/>'};
+            gate.resolve(response(payloadResponse));
             await task;
             if (newer) {
                 equal(

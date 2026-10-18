@@ -6,24 +6,83 @@
  */
 
 /** Real-browser regressions injected only into a private test copy of the page. */
-(() => {
+(function installBrowserChecks() {
     const failures: string[] = [];
     const nativeFetch = window.fetch.bind(window);
     const nativeSetTimeout = window.setTimeout.bind(window);
     const nativeClearTimeout = window.clearTimeout.bind(window);
 
-    /** Bound each fixture group so an unresolved mocked promise identifies its owning regression. */
+    /** @brief Check native batch projection, clipping, stable depth order and temporary-handle lifetime. */
+    function checkSurfaceProjectionPlan(): void {
+        function check(condition: boolean, message: string): void {
+            if (!condition) throw new Error('Surface projection plan: ' + message);
+        }
+        const frame = {
+            width: 100, height: 100, fit: 100, drawMesh: true,
+            rows: [1, 0, 0, 0, 1, 0, 0, 0, 1], scaling: [1, 1, 1], offset: [0, 0, 0]
+        };
+        const primitives: MarsSurfacePrimitive[] = [];
+        const heights = [0.2, 0.8, 0.8];
+        for (let i = 0; i < heights.length; ++i) {
+            const z = heights[i];
+            primitives.push({points: [[0, 0, z], [1, 0, z], [0, 1, z]], colour: String(i), depth: 0});
+        }
+        primitives.push({points: [[2, 2, 0], [3, 2, 0], [2, 3, 0]], colour: 'outside', depth: 0});
+        const original = JSON.stringify(primitives);
+        const plan = labDOM.call('lab_surface_polygons', frame, primitives, 0) as MarsSurfaceDrawing[];
+        check(plan.length === 3 && plan[0].colour === '1' && plan[1].colour === '2' && plan[2].colour === '0',
+              'far-to-near order is stable and excludes clipped primitives');
+        for (const polygon of plan) {
+            const source = primitives[Number(polygon.colour)];
+            const single = labDOM.call('lab_surface_polygon', frame, source.points) as MarsSurfacePolygon;
+            check(JSON.stringify(polygon.points) === JSON.stringify(single.points) && polygon.depth === single.depth,
+                  'batch coordinates and depth match the individual projection');
+        }
+        check(JSON.stringify(primitives) === original, 'projection and sorting leave source geometry unchanged');
+        const segments: MarsSurfacePrimitive[] = [
+            {points: [[-1, 0.5, 0.5], [2, 0.5, 0.5]], colour: 'line', depth: 0},
+            {points: [[0, 2, 0], [1, 2, 0]], colour: 'outside', depth: 0}
+        ];
+        const lines = labDOM.call('lab_surface_polygons', frame, segments, 1) as MarsSurfaceDrawing[];
+        check(lines.length === 1 && lines[0].points[0][0] === 0 && lines[0].points[1][0] === 100,
+              'segment clipping retains only the visible interval');
+        const empty = labDOM.call('lab_surface_polygons', frame, [], 0) as MarsSurfaceDrawing[];
+        check(empty.length === 0, 'empty geometry has an empty drawing plan');
+        frame.drawMesh = false;
+        const hidden = labDOM.call('lab_surface_polygons', frame, primitives, 0) as MarsSurfaceDrawing[];
+        check(hidden.length === 0, 'hidden geometry has an empty drawing plan');
+        frame.drawMesh = true;
+        const many: MarsSurfacePrimitive[] = [];
+        for (let i = 0; i < 2049; ++i) many.push(primitives[i % 3]);
+        for (let repeat = 0; repeat < 2; ++repeat) {
+            const result = labDOM.call('lab_surface_polygons', frame, many, 0) as MarsSurfaceDrawing[];
+            check(result.length === many.length, 'large repeated projections stay within bridge handle capacity');
+            for (let i = 1; i < result.length; ++i)
+                check(result[i - 1].depth >= result[i].depth, 'large odd-sized plans remain depth ordered');
+        }
+    }
+
+    /** @brief Bound each group so an unresolved mock identifies its owning regression. */
     async function runBrowserGroup(name: string, run: () => unknown): Promise<void> {
         let timer = 0;
-        const deadline = new Promise<never>((_resolve, reject) => {
-            timer = nativeSetTimeout(() => reject(new Error(`Browser group ${name} did not finish within 60 seconds`)), 60000);
+        const deadline = new Promise(function startDeadline(_resolve, reject) {
+            function timedOut(): void {
+                reject(new Error(`Browser group ${name} did not finish within 60 seconds`));
+            }
+            timer = nativeSetTimeout(timedOut, 60000);
         });
-        try { await Promise.race([Promise.resolve().then(run), deadline]); }
-        finally { nativeClearTimeout(timer); }
+        try {
+            await Promise.race([Promise.resolve().then(run), deadline]);
+        } finally {
+            nativeClearTimeout(timer);
+        }
     }
+
     const failureCase = new URLSearchParams(location.search).get('failure');
-    window.addEventListener('error', event => failures.push(event.message || 'Resource load failed'), true);
-    window.addEventListener('unhandledrejection', event => {
+    window.addEventListener('error', function recordError(event) {
+        failures.push(event.message || 'Resource load failed');
+    }, true);
+    window.addEventListener('unhandledrejection', function recordRejection(event) {
         if (!failureCase)
             failures.push(String(event.reason));
     });
@@ -45,7 +104,7 @@
             const response = await nativeFetch(url, options);
             if (String(url) !== '/bootstrap')
                 return response;
-            const config = labWire.decode(await response.arrayBuffer()) as Record<string, unknown>;
+            const config = labWire.decode(await response.arrayBuffer()) as LabTestRecord;
             if (failureCase === 'server-missing')
                 delete config.BROWSER_ABI_VERSION;
             else
@@ -75,21 +134,38 @@
         check(WorksheetContext.rendered.querySelector('svg')! && !WorksheetContext.rendered.classList.contains('error'),
               'Separated ordinary part and impulse render as mathematical TeX');
     }
+
+    /** @brief Use crosshairs over 2-D plots, reserving the grabbing hand for active drags. */
+    function checkFlatPlotCursor(panel: HTMLElement, dragging = false): void {
+        const body = panel.querySelector<HTMLElement>('.rendered')!;
+        check(getComputedStyle(body).cursor === 'crosshair',
+              panel.dataset.complexPanel + ' plot whitespace uses a crosshair');
+        for (const target of body.querySelectorAll('.rendered-zoom-frame, svg, path')) {
+            const expected = dragging && target.closest('svg') ? 'grabbing' : 'crosshair';
+            check(getComputedStyle(target).cursor === expected,
+                  panel.dataset.complexPanel + ' uses ' + expected + ' over ' + target.tagName);
+        }
+        check(getComputedStyle(panel.querySelector('button')!).cursor === 'pointer',
+              'The plot cursor does not change the Expand/Collapse button');
+    }
+
     async function checkComplexGrid() {
         WorksheetBindings.controller.setExpressionEditor('exp(i*x)');
         await WorksheetRequests.evaluation.evaluateExpression();
         const host = (document.getElementById('plotRendered')! as LabTestPlotHost);
         const deadline = performance.now() + 20000;
         while (!host.querySelector<HTMLElement>('.complex-grid')! && performance.now() < deadline)
-            await new Promise(resolve => setTimeout(resolve, 30));
+            await LabTestBrowser.wait(30);
         const panels = host.querySelectorAll<HTMLElement>('.complex-panel');
-        const assertFits = async () => {
+        async function assertFits() {
             // Retained WebGL canvases follow the SVG through ResizeObserver and animation frames.
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await LabTestBrowser.paint();
             for (const panel of panels) {
                 const body = panel.querySelector<HTMLElement>('.rendered')!;
                 if (!panel.getClientRects().length)
                     continue;
+                if (panel.dataset.complexPanel !== 'svg')
+                    checkFlatPlotCursor(panel);
                 check(body.scrollWidth <= body.clientWidth + 1,
                       `Complex projection ${panel.dataset.complexPanel} must fit: ` +
                       `scroll=${body.scrollWidth}, width=${body.clientWidth}, host=${host.clientWidth}, ` +
@@ -98,7 +174,7 @@
                 check(svg.getBoundingClientRect().width <= body.clientWidth + 1,
                       'The complete SVG fits inside each complex projection');
             }
-        };
+        }
         check(panels.length === 4 && panels[0].querySelector<HTMLElement>('[data-segment]')!,
               'Complex output must show four native projections, including a true 3-D line');
         await window.checkLabSurfaceHoverDOM(panels[0].querySelector<SVGSVGElement>('svg[data-segments="true"]')!);
@@ -110,10 +186,10 @@
         const cameraControls = document.getElementById('plotCamera')!;
         check(cameraControls.parentElement === panels[0] && document.querySelectorAll<HTMLElement>('#plotCamera').length === 1,
               'The original camera controls belong to the 3-D curve card, not below the four-view grid');
-        const figureTitle = (panel: HTMLElement) => {
+        function figureTitle(panel: HTMLElement) {
             const figure = panel.querySelector<HTMLElement>('[data-plot-figure]')!;
             return figure.querySelector<HTMLElement>(':scope > title')!.textContent || figure.getAttribute('aria-label');
-        };
+        }
         const formula = figureTitle(panels[0]);
         check(formula && Array.from(panels).every(panel => panel.querySelector<SVGTextElement>('[data-plot-title]')! &&
               figureTitle(panel) === formula),
@@ -133,6 +209,8 @@
         check(document.getElementById('plotVertical')!.classList.contains('hidden') &&
               !document.getElementById('plotInputRangeGroup')!.closest<HTMLElement>('.plot-ranges')!.classList.contains('hidden'),
               'Complex projections expose an input-range policy, not misleading common output limits');
+        check(!document.getElementById('plotFirstGroup')!.getClientRects().length,
+              'Automatic complex plots hide the entire single-variable range panel');
         const chart = panels[0].querySelector<SVGSVGElement>('[data-surface]')!;
         check(labSurfacePreview.draw(chart, [225, 30, 0]),
               'The space curve supports the retained local renderer');
@@ -145,7 +223,7 @@
         check(panels[0].clientWidth >= host.querySelector<HTMLElement>('.complex-grid')!.clientWidth - 24,
               'The expanded projection fills the parent plot width');
         await assertFits();
-        const assertSharp = () => {
+        function assertSharp() {
             const layers = panels[0].querySelectorAll<HTMLCanvasElement>('[data-surface-overlay] canvas');
             check(layers.length === 2, 'The 3-D plot has separate geometry and label canvases');
             for (const layer of layers) {
@@ -154,7 +232,7 @@
                       layer.height >= Math.ceil(rect.height * window.devicePixelRatio) - 1,
                       'Expanded geometry and labels render at displayed device-pixel resolution');
             }
-        };
+        }
         assertSharp();
         check(cameraControls.getBoundingClientRect().top >= panels[0].querySelector<HTMLElement>('.rendered')!.getBoundingClientRect().bottom &&
               panels[0].getBoundingClientRect().height <= window.innerHeight,
@@ -173,18 +251,18 @@
             else Reflect.deleteProperty(window, 'devicePixelRatio');
             labSurfacePreview.draw(chart, [225, 30, 0]);
         }
-        const waitForVector = async () => {
+        async function waitForVector() {
             const deadline = performance.now() + 5000;
             while (chart.dataset.localRenderer !== 'svg' && performance.now() < deadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             const drawing = chart.querySelector<SVGSVGElement>('[data-surface-settled]')!;
             check(chart.dataset.localRenderer === 'svg' && drawing?.querySelector('path')! &&
                   drawing.textContent.includes('ℜ') && drawing.textContent.includes('ℑ') &&
                   getComputedStyle(panels[0].querySelector<SVGSVGElement>('[data-surface-overlay]')!).display === 'none',
                   'Idle space curves display vector geometry and Gothic axis labels, not a canvas');
-        };
+        }
         await waitForVector();
-        const angleControls = ['plotAzimuth', 'plotElevation', 'plotRoll'].map(id => (document.getElementById(id)! as LabTestPlotInput) as HTMLInputElement);
+        const angleControls = ['plotAzimuth', 'plotElevation', 'plotRoll'].map(id => document.getElementById(id)! as HTMLInputElement);
         const savedAngles = angleControls.map(control => control.value);
         const rect = chart.getBoundingClientRect(), quaternion = chart.dataset.cameraQuaternion;
         const sendCurve = (target: EventTarget, type: string, offset: number) => target.dispatchEvent(new PointerEvent(type, {
@@ -194,7 +272,7 @@
         }));
         sendCurve(chart, 'pointerdown', 0);
         sendCurve(window, 'pointermove', 35);
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await LabTestBrowser.paint();
         check(!chart.querySelector<SVGSVGElement>('[data-surface-settled]')! && chart.dataset.localRenderer !== 'svg' &&
               chart.dataset.cameraQuaternion !== quaternion,
               'Dragging an idle SVG curve immediately resumes the retained camera preview');
@@ -204,7 +282,7 @@
             control.value = savedAngles[i];
             document.getElementById(control.id + 'Value')!.textContent = savedAngles[i] + '°';
         });
-        labSurfacePreview.draw(chart, savedAngles.map(Number));
+        labSurfacePreview.draw(chart, [Number(savedAngles[0]), Number(savedAngles[1]), Number(savedAngles[2])]);
         button.click();
         check(!panels[0].classList.contains('complex-expanded'), 'Projection collapse restores the grid');
         check(Array.from(panels).every(panel => panel.getClientRects().length),
@@ -261,13 +339,13 @@
                 if (projection !== 'svg') {
                     while ((chart.isConnected || host.marsPlotZoom?.busy || host.marsPlotZoom?.wheel) &&
                            performance.now() < deadline)
-                        await new Promise(resolve => setTimeout(resolve, 25));
+                        await LabTestBrowser.wait(25);
                     check(!chart.isConnected && !host.marsPlotZoom?.busy && !host.marsPlotZoom?.wheel,
                           projection + ' finishes each wheel burst and accepts the next');
                 } else {
                     while ((chart.isConnected || WorksheetRequests.labRequests.busy() ||
                             labSurfacePreview.snapshot()?.volume.dirty) && performance.now() < deadline)
-                        await new Promise(resolve => setTimeout(resolve, 25));
+                        await LabTestBrowser.wait(25);
                     const next = host.querySelector<SVGSVGElement>('[data-complex-panel="svg"] [data-surface]')!;
                     const nextSpan = Number(next.dataset.xMax) - Number(next.dataset.xMin);
                     check(!chart.isConnected && next?.isConnected && !WorksheetRequests.labRequests.busy() &&
@@ -293,7 +371,7 @@
         const host = (document.getElementById('plotRendered')! as LabTestPlotHost);
         const panel = () => host.querySelector<HTMLElement>('[data-complex-panel="svg"]')!;
         const chart = () => panel().querySelector<SVGSVGElement>('[data-surface]')!;
-        const frame = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const frame = LabTestBrowser.paint;
         for (const expanded of [false, true]) {
             if (expanded) panel().querySelector('button')!.click();
             await frame();
@@ -334,13 +412,13 @@
                     const node = entry.querySelector<SVGSVGElement>('[data-plot-chart]')!;
                     return {node, bounds: ['xMin', 'xMax', 'yMin', 'yMax'].map(key => node.dataset[key]).join(',')};
                 });
-            const waitForCurve = async (previous: SVGSVGElement) => {
+            async function waitForCurve(previous: SVGSVGElement) {
                 const deadline = performance.now() + 25000;
                 while ((previous.isConnected || WorksheetRequests.labRequests.busy() ||
                         labSurfacePreview.snapshot()?.volume.dirty || !chart() ||
                         chart()?.dataset.plotQuality === 'preview' || chart()?.dataset.localRenderer !== 'svg') &&
                        performance.now() < deadline)
-                    await new Promise(resolve => setTimeout(resolve, 25));
+                    await LabTestBrowser.wait(25);
                 check(!previous.isConnected && !WorksheetRequests.labRequests.busy() &&
                       !labSurfacePreview.snapshot()?.volume.dirty && chart()?.dataset.localRenderer === 'svg' &&
                       chart()?.dataset.plotQuality !== 'preview', 'Curve range zoom completes a settled native SVG redraw');
@@ -351,7 +429,7 @@
                 check(siblings.every(({node, bounds}) => node.isConnected &&
                       ['xMin', 'xMax', 'yMin', 'yMax'].map(key => node.dataset[key]).join(',') === bounds),
                       'Curve range zoom leaves every sibling chart and its bounds untouched');
-            };
+            }
             for (const exponent of [1, 2, 0]) {
                 const previous = chart();
                 zoom.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, button: 0, isPrimary: true}));
@@ -421,9 +499,268 @@
         slider.dispatchEvent(new Event('change', {bubbles: true}));
         const deadline = performance.now() + 25000;
         while (chart()?.dataset.plotQuality !== 'full' && performance.now() < deadline)
-            await new Promise(resolve => setTimeout(resolve, 25));
+            await LabTestBrowser.wait(25);
         check(chart()?.dataset.plotQuality === 'full' && !chart().querySelector<HTMLElement>('[data-preview-notice]')!,
               'Releasing the camera replaces coarse samples and removes their preview notice');
+    }
+
+    /** @brief Check curve transforms when finite samples stop short of the requested interval. */
+    function checkCurveSampleFrame(view: MarsSurfaceView): void {
+        const originalFrame = labDOM.call('lab_surface_frame', view, null) as MarsSurfaceFrame;
+        const volume = labSurfaceVolume.clone(view.volume);
+        volume.base[0] = -8;
+        volume.base[1] = 8;
+        volume.sampled[0] = -4;
+        volume.sampled[1] = 2;
+        volume.bounds[0] = -2;
+        volume.bounds[1] = 2;
+        volume.sampleExponent = 1;
+        volume.exponent = 2;
+        volume.dirty = true;
+        const preview = {...view, volume};
+        const frame = labDOM.call('lab_surface_frame', preview, null) as MarsSurfaceFrame;
+        check(frame.scaling[0] === 1.5 && frame.offset[0] === -0.25 &&
+              frame.scaling[1] === 1 && frame.scaling[2] === 1 && frame.offset[1] === 0 && frame.offset[2] === 0,
+              'Curve previews map actual finite x samples into the selected interval without magnifying output axes');
+        check(frame.rows.every((value, index) => value === originalFrame.rows[index]) && frame.fit === originalFrame.fit,
+              'Input zoom stretches selected curve samples into the original box instead of shortening its x axis');
+        const first = (1 / 3 - 0.5) * frame.scaling[0] + frame.offset[0] + 0.5;
+        const last = (1 - 0.5) * frame.scaling[0] + frame.offset[0] + 0.5;
+        check(Math.abs(first) < 1e-12 && Math.abs(last - 1) < 1e-12,
+              'An asymmetric finite sample clips at the requested endpoints, not the sampled midpoint');
+        volume.bounds[0] = volume.bounds[1] = volume.sampled[0] = volume.sampled[1] = 1;
+        volume.exponent = 80;
+        volume.sampleExponent = 79;
+        const deep = labDOM.call('lab_surface_frame', preview, null) as MarsSurfaceFrame;
+        check(deep.drawMesh && deep.scaling[0] === 2 && deep.offset[0] === 0,
+              'Microscopic curve zoom retains the exponent transform when double endpoints coincide');
+    }
+
+    /** @brief Keep the zoom slider track fixed while moving within an already extended range. */
+    function checkCurveSliderTrack(view: MarsSurfaceView): void {
+        const slider = document.getElementById('plotZoom')! as HTMLInputElement;
+        const minimum = slider.min, maximum = slider.max;
+        const volume = labSurfaceVolume.clone(view.volume);
+        const preview = {...view, volume};
+        try {
+            for (const direction of [-1, 1]) {
+                volume.exponent = direction < 0 ? -3.25 : 7.25;
+                labDOM.call('lab_surface_zoom_sync', preview);
+                const low = slider.min, high = slider.max;
+                volume.exponent += direction;
+                labDOM.call('lab_surface_zoom_sync', preview);
+                check(slider.min === low && slider.max === high && Number(slider.value) === volume.exponent,
+                      'Moving within an extended zoom track never shifts the limits beneath the pointer');
+                volume.exponent = 0;
+                labDOM.call('lab_surface_zoom_sync', preview);
+                check(slider.min === low && slider.max === high && slider.value === '0',
+                      'Passing through 100% does not collapse the slider track during a gesture');
+            }
+        } finally {
+            slider.min = minimum;
+            slider.max = maximum;
+            labDOM.call('lab_surface_zoom_sync', view);
+        }
+    }
+
+    /** @brief Regress logarithmic curve zoom, refinement ownership and independent sibling plots. */
+    async function checkLogarithmicCurveZoom(): Promise<void> {
+        WorksheetBindings.controller.setExpressionEditor('ln(-x^3)');
+        await WorksheetRequests.evaluation.evaluateExpression();
+        await waitForAutomaticPlot();
+        const host = document.getElementById('plotRendered')!;
+        const zoom = document.getElementById('plotZoom')! as HTMLInputElement;
+        function curve(): SVGSVGElement {
+            return host.querySelector<SVGSVGElement>('[data-complex-panel="svg"] [data-surface]')!;
+        }
+        async function waitForCurve(previous: SVGSVGElement | null): Promise<void> {
+            const deadline = performance.now() + 25000;
+            while ((previous?.isConnected || !curve() || WorksheetRequests.labRequests.busy() ||
+                    labSurfacePreview.snapshot()?.volume.dirty || curve()?.dataset.localRenderer !== 'svg') &&
+                   performance.now() < deadline)
+                await LabTestBrowser.wait(25);
+            check(!previous?.isConnected && !!curve() && !WorksheetRequests.labRequests.busy() &&
+                  !labSurfacePreview.snapshot()?.volume.dirty && curve().dataset.localRenderer === 'svg',
+                  'Logarithmic curve zoom finishes with settled geometry, not a stale preview');
+        }
+        await waitForCurve(null);
+        await window.checkLabVisibleCurveHover(curve());
+        const initial = labSurfacePreview.prepare(curve())!;
+        const baseline = [...initial.volume.base];
+        const orientation = [...initial.orientation];
+        const baselineUnits = [...initial.volume.units];
+        const baselineRows = [...initial.framePlan!.rows];
+        const siblings = [...host.querySelectorAll<SVGSVGElement>('[data-complex-panel]:not([data-complex-panel="svg"]) [data-plot-chart]')];
+        const siblingContent: string[] = [];
+        for (const sibling of siblings) siblingContent.push(sibling.outerHTML);
+        checkCurveSampleFrame(initial);
+        checkCurveSliderTrack(initial);
+        try {
+            for (const exponent of [1, 2, -1, 0]) {
+                const previous = curve();
+                const generation = WorksheetRequests.labRequests.latestMain();
+                zoom.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, button: 0, isPrimary: true}));
+                zoom.value = String(exponent);
+                zoom.dispatchEvent(new Event('input', {bubbles: true}));
+                const preview = labSurfacePreview.prepare(previous)!;
+                check(preview.framePlan!.rows.every((value, index) => Math.abs(value - baselineRows[index]) < 1e-10),
+                      'Every logarithmic zoom preview retains the original coordinate-box proportions');
+                if (exponent === 1) {
+                    await LabTestBrowser.wait(450);
+                    check(previous.isConnected && WorksheetRequests.labRequests.latestMain() === generation,
+                          'Holding logarithmic curve zoom previews the range without premature sampling');
+                }
+                zoom.dispatchEvent(new Event('change', {bubbles: true}));
+                await waitForCurve(previous);
+                await window.checkLabVisibleCurveHover(curve());
+                const view = labSurfacePreview.prepare(curve())!;
+                const span = (baseline[1] - baseline[0]) / 2 ** exponent;
+                check(Math.abs(view.volume.sampled[1] - view.volume.sampled[0] - span) < span * 1e-8 &&
+                      Math.abs(view.volume.sampled[0] + view.volume.sampled[1] - baseline[0] - baseline[1]) < span * 1e-8,
+                      'Logarithmic zoom samples the requested centred x-range and restores the full range at 100%');
+                check(view.camera.scale === 1 && view.framePlan!.scaling.every(value => value === 1) &&
+                      orientation.every((value, index) => Math.abs(value - view.orientation[index]) < 1e-8) &&
+                      !view.framePlan!.texts.some(text => text.text.includes('Preview')),
+                      'Accepted logarithmic samples have no camera magnification, rotation jump or stale preview notice');
+                check(view.volume.units.every((value, index) => value === baselineUnits[index]) &&
+                      view.framePlan!.rows.every((value, index) => Math.abs(value - baselineRows[index]) < 1e-10),
+                      'Refinement retains the preview box: the x axis does not collapse as the interval narrows');
+                for (let i = 0; i < siblings.length; ++i)
+                    check(siblings[i].isConnected && siblings[i].outerHTML === siblingContent[i],
+                          'Logarithmic curve zoom leaves sibling geometry and bounds unchanged');
+            }
+            const fetchBefore = WorksheetRequests.evaluationTransport.fetchEvaluation;
+            let release: ((result: WorksheetRequests.MarsApiPostResult) => void) | undefined;
+            const previous = curve();
+            try {
+                WorksheetRequests.evaluationTransport.fetchEvaluation = function (...args) {
+                    if (args[2] !== 'plot') return fetchBefore(...args);
+                    return new Promise(resolve => { release = resolve; });
+                };
+                zoom.value = '1';
+                zoom.dispatchEvent(new Event('input', {bubbles: true}));
+                const deadline = performance.now() + 5000;
+                while (!release && performance.now() < deadline)
+                    await LabTestBrowser.wait(25);
+                check(!!release, 'Hold an older logarithmic range refinement in flight');
+                zoom.value = '2';
+                zoom.dispatchEvent(new Event('input', {bubbles: true}));
+                const staleData = {ok: false, error: 'Obsolete logarithmic range'};
+                release!({response: Object.assign(new Response(), {labData: async () => staleData}), data: staleData});
+                WorksheetRequests.evaluationTransport.fetchEvaluation = fetchBefore;
+                await waitForCurve(previous);
+                await window.checkLabVisibleCurveHover(curve());
+                const volume = labSurfacePreview.snapshot()!.volume;
+                check(volume.exponent === 2 && volume.sampleExponent === 2 &&
+                      !host.textContent.includes('Obsolete logarithmic range'),
+                      'A cancelled logarithmic refinement cannot restore old bounds or leave a stale preview');
+            } finally {
+                WorksheetRequests.evaluationTransport.fetchEvaluation = fetchBefore;
+            }
+            const zoomed = curve();
+            host.closest<HTMLElement>('.result-card')!.querySelector<HTMLElement>('[data-zoom-reset]')!.click();
+            await waitForCurve(zoomed);
+            await window.checkLabVisibleCurveHover(curve());
+            check(zoom.value === '0' && zoom.min === '-3' && zoom.max === '6' &&
+                  Number(curve().dataset.xMin) === baseline[0] && Number(curve().dataset.xMax) === baseline[1],
+                  'Reset restores the full original logarithmic curve and default zoom track');
+            const frame = labSurfacePreview.prepare(curve())!.framePlan!;
+            for (const x of [0, 1]) for (const y of [0, 1]) for (const z of [0, 1]) {
+                const point = labDOM.call('lab_surface_project', frame, [x, y, z]) as MarsSurfacePoint2;
+                check(point[0] >= 0 && point[0] <= frame.width && point[1] >= 0 && point[1] <= frame.height,
+                      'At 100% the complete logarithmic curve bounding box fits inside its card');
+            }
+            await checkCurveZoomRollback();
+        } finally {
+            // Programmatic evaluation does not perform the Evaluate button's plot reset.
+            // Remove this fixture's authored ranges, exact-value metadata and Argand viewport.
+            WorksheetRequests.labRequests.cancel('plot');
+            labSurfaceVolume.cancel();
+            labSurfacePreview.dispose();
+            labDOM.call('lab_plot_controls_reset');
+            WorksheetBindings.controller.setExpressionEditor('exp(i*x)');
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await waitForAutomaticPlot();
+            for (const id of ['plotLower', 'plotUpper', 'plotSecondLower', 'plotSecondUpper', 'plotYLower', 'plotYUpper']) {
+                const input = document.getElementById(id)! as LabTestPlotInput;
+                check(input.value === '' && input.marsZoomText === undefined && input.marsZoomValue === undefined,
+                      'Logarithmic zoom fixtures do not leak ranges or exact-coordinate metadata into subsequent plots');
+            }
+            check(!(host as LabTestPlotHost).marsComplexPlaneBounds,
+                  'Logarithmic zoom fixtures do not leak their Argand viewport into subsequent plots');
+        }
+    }
+
+    /** @brief Failed and superseded curve previews restore accepted samples without changing sibling controls. */
+    async function checkCurveZoomRollback(): Promise<void> {
+        const host = document.getElementById('plotRendered')! as LabTestPlotHost;
+        const chart = host.querySelector<SVGSVGElement>('[data-complex-panel="svg"] [data-surface]')!;
+        const view = labSurfacePreview.prepare(chart)!;
+        const zoom = document.getElementById('plotZoom')! as HTMLInputElement;
+        const original = labSurfacePreview.snapshot()!;
+        function changeZoom(): void {
+            zoom.value = String(original.volume.exponent + 1);
+            zoom.dispatchEvent(new Event('input', {bubbles: true}));
+            zoom.dispatchEvent(new Event('change', {bubbles: true}));
+        }
+        async function waitForRollback(): Promise<void> {
+            const deadline = performance.now() + 15000;
+            while ((view.volume.dirty || WorksheetRequests.labRequests.busy() || chart.dataset.localRenderer !== 'svg') &&
+                   performance.now() < deadline)
+                await LabTestBrowser.wait(25);
+            check(chart.isConnected && !view.volume.dirty && !WorksheetRequests.labRequests.busy() &&
+                  chart.dataset.localRenderer === 'svg' && view.volume.exponent === original.volume.sampleExponent &&
+                  view.camera.scale === 1 && view.volume.bounds.every((value, index) => value === view.volume.sampled[index]) &&
+                  !view.framePlan!.texts.some(text => text.text.includes('Preview')),
+                  'An abandoned curve preview returns to the accepted samples, slider value and settled drawing');
+            await window.checkLabVisibleCurveHover(chart);
+        }
+        const fetchBefore = WorksheetRequests.evaluationTransport.fetchEvaluation;
+        let requests = 0;
+        try {
+            WorksheetRequests.evaluationTransport.fetchEvaluation = async function (...args) {
+                if (args[2] !== 'plot') return fetchBefore(...args);
+                ++requests;
+                const data = {ok: false, error: 'Deliberate curve refinement failure'};
+                return {response: Object.assign(new Response(null, {status: 422}), {labData: async () => data}), data};
+            };
+            changeZoom();
+            await waitForRollback();
+            check(requests === 1 && document.getElementById('plotFeedback')!.textContent.includes('Deliberate curve refinement failure'),
+                  'Failed native refinement keeps its diagnostic without repeatedly retrying or leaving a refining notice');
+            for (const [id, key] of [['plotLower', 'exactXMin'], ['plotUpper', 'exactXMax']])
+                check((document.getElementById(id)! as LabTestPlotInput).marsZoomValue === chart.dataset[key],
+                      'Failure restores the curve\'s exact accepted input endpoints');
+        } finally {
+            WorksheetRequests.evaluationTransport.fetchEvaluation = fetchBefore;
+        }
+
+        // Change plots before the curve's debounce fires, exercising the real shared-request cancellation path.
+        changeZoom();
+        const plane = host.querySelector<SVGSVGElement>('[data-complex-panel="complex_plane"] [data-plot-chart]')!;
+        const planeBox = plane.getBoundingClientRect();
+        plane.dispatchEvent(new WheelEvent('wheel', {ctrlKey: true, bubbles: true, cancelable: true, deltaY: -100,
+            clientX: planeBox.left + planeBox.width / 2, clientY: planeBox.top + planeBox.height / 2}));
+        const deadline = performance.now() + 25000;
+        while ((plane.isConnected || host.marsPlotZoom?.busy || host.marsPlotZoom?.wheel || WorksheetRequests.labRequests.busy()) &&
+               performance.now() < deadline)
+            await LabTestBrowser.wait(25);
+        check(!plane.isConnected && !host.marsPlotZoom?.busy && !host.marsPlotZoom?.wheel,
+              'The sibling plot completes its own wheel zoom after interrupting curve refinement');
+        await waitForRollback();
+
+        // A newer authored range owns shared controls even when cancelling a dirty curve.
+        changeZoom();
+        const lower = document.getElementById('plotLower')! as LabTestPlotInput;
+        const upper = document.getElementById('plotUpper')! as LabTestPlotInput;
+        lower.value = '7';
+        upper.value = '9';
+        lower.marsZoomValue = lower.marsZoomText = '7';
+        upper.marsZoomValue = upper.marsZoomText = '9';
+        labSurfaceVolume.cancel(true);
+        await waitForRollback();
+        check(lower.value === '7' && upper.value === '9' && lower.marsZoomValue === '7' && upper.marsZoomValue === '9',
+              'Cancellation restores the curve without overwriting newer shared range controls');
     }
 
     async function checkEvaluatePlotReset() {
@@ -446,7 +783,7 @@
         const deadline = performance.now() + 20000;
         while ((!host.querySelector<SVGSVGElement>('[data-plot-chart]')! || host.querySelector<SVGSVGElement>('[data-plot-chart]')! === before) &&
                performance.now() < deadline)
-            await new Promise(resolve => setTimeout(resolve, 25));
+            await LabTestBrowser.wait(25);
         await waitForAutomaticPlot();
         check(limits.every(id => (document.getElementById(id)! as LabTestPlotInput).value === '' &&
                                 (document.getElementById(id)! as LabTestPlotInput).marsZoomValue === undefined) &&
@@ -475,7 +812,7 @@
             const chart = () => host.querySelector<SVGSVGElement>(`[data-complex-panel="${projection}"] [data-plot-chart]`)!;
             const initial = chart();
             initial.closest<HTMLElement>('.complex-panel')!.querySelector('button')!.click();
-            await new Promise(resolve => requestAnimationFrame(resolve));
+            await LabTestBrowser.nextFrame();
             const matrix = initial.getScreenCTM()!;
             const x = matrix.e + (Number(initial.dataset.plotLeft) + Number(initial.dataset.plotWidth) * 0.75) * matrix.a;
             const y = matrix.f + (Number(initial.dataset.plotTop) + Number(initial.dataset.plotHeight) * 0.9) * matrix.d;
@@ -486,7 +823,7 @@
                 }));
             const deadline = performance.now() + 20000;
             while ((chart() === initial || host.marsPlotDrag.busy || host.marsPlotDrag.wheel) && performance.now() < deadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             check(chart() !== initial && (document.getElementById('plotScale')! as HTMLInputElement).value !== 'manual' &&
                   Number(chart().dataset.xMax) - Number(chart().dataset.xMin) < span / 2 &&
                   chart().querySelector<SVGPathElement>('[data-series] path')!,
@@ -507,7 +844,7 @@
         const chart = () => host.querySelector<SVGSVGElement>(`[data-complex-panel="${projection}"] [data-plot-chart]`)!;
         const plane = projection === 'complex_plane';
         const controls = ['plotLower', 'plotUpper', 'plotYLower', 'plotYUpper', 'plotScale']
-            .map(id => (document.getElementById(id)! as LabTestPlotInput) as HTMLInputElement);
+            .map(id => document.getElementById(id)! as HTMLInputElement);
         const saved = controls.map(control => control.value);
         for (const pointerType of ['mouse', 'touch']) {
             const initial = chart(), panel = initial.closest<HTMLElement>('.complex-panel')!;
@@ -528,7 +865,7 @@
                       'The complex-plane card ends with its chart rather than stretching to the camera card');
             }
             panel.querySelector('button')!.click();
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await LabTestBrowser.paint();
             const figure = panel.querySelector<HTMLElement>('.rendered-zoom-frame > svg')!;
             const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
             check(figure.getBoundingClientRect().height <= Math.max(12 * rem, innerHeight - 18 * rem) + 1,
@@ -583,6 +920,7 @@
                 clientX: x + dx, clientY: y + dy, bubbles: true, cancelable: true
             }));
             check(!send(initial, 'pointerdown', 0, 0), projection + ' captures a ' + pointerType + ' drag');
+            checkFlatPlotCursor(panel, true);
             const paths = [...initial.querySelectorAll<LabTestHoverPath>('[data-series] > path')];
             const hoverCache = paths.map(path => path.marsHoverSegment);
             send(initial, 'pointermove', 35, 20);
@@ -600,7 +938,7 @@
                 return Math.abs(transform.e - (vertical ? 0 : shift)) < 0.001 &&
                        Math.abs(transform.f - (vertical ? shift : 0)) < 0.001;
             }), projection + ' ticks, labels, grids and zero guides track the curve during panning');
-            await new Promise(resolve => setTimeout(resolve, 200));
+            await LabTestBrowser.wait(200);
             check(chart() === initial && !host.marsPlotDrag.busy,
                   projection + ' retains full-detail SVG without asynchronous replacements during dragging');
             send(window, 'pointermove', 40, 25);
@@ -608,13 +946,14 @@
             send(window, 'pointerup', 35, 20);
             const deadline = performance.now() + 20000;
             while ((host.marsPlotDrag.busy || chart() === initial) && performance.now() < deadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             check(chart() !== initial && !host.marsPlotDrag.busy &&
                   Math.abs(Number(chart().dataset.xMin) - (x0 - 35 * spanX / pw)) < 1e-8 &&
                   Math.abs(Number(chart().dataset.yMin) - (y0 + 20 * spanY / ph)) < 1e-8,
                   projection + ' retains the completed ' + pointerType + ' pan');
             check(siblings.every(chart => chart.isConnected),
                   projection + ' pan leaves every sibling chart intact');
+            checkFlatPlotCursor(chart().closest<HTMLElement>('.complex-panel')!);
             if (plane) {
                 check(controls.every((control, i) => control.value === saved[i]),
                       'Argand panning does not change sampling or component bounds');
@@ -625,7 +964,7 @@
                 document.querySelector<HTMLElement>('#plotCard [data-zoom-reset]')!.click();
                 const resetDeadline = performance.now() + 20000;
                 while (chart() === after && performance.now() < resetDeadline)
-                    await new Promise(resolve => setTimeout(resolve, 25));
+                    await LabTestBrowser.wait(25);
                 check(chart() !== after && Math.abs(Number(chart().dataset.xMin) - x0) < 1e-8 &&
                       Math.abs(Number(chart().dataset.yMin) - y0) < 1e-8,
                       'Reset restores the Argand viewport independently');
@@ -650,7 +989,7 @@
             WorksheetBindings.controller.setExpressionEditor('sin(x)');
             await WorksheetRequests.evaluation.evaluateExpression();
             for (let i = 0; i < 100 && !started; ++i)
-                await new Promise(resolve => setTimeout(resolve, 10));
+                await LabTestBrowser.wait(10);
             check(started && !WorksheetRequests.labRequests.busy(), 'Evaluate must finish before the plot response');
             check(WorksheetContext.rendered.querySelector('svg')! && WorksheetContext.parsed.textContent && WorksheetContext.functionStyle.textContent,
                   'Mathematical cards appear while the plot is pending');
@@ -664,7 +1003,7 @@
             started = false;
             await WorksheetRequests.evaluation.evaluateExpression();
             for (let i = 0; i < 100 && !started; ++i)
-                await new Promise(resolve => setTimeout(resolve, 10));
+                await LabTestBrowser.wait(10);
             check(started, 'A fresh evaluation starts a fresh plot');
             WorksheetWorkspace.presentation.saveCurrentModeResultState();
             WorksheetWorkspace.mode.setMode('matrix');
@@ -672,7 +1011,7 @@
             const previous = (document.getElementById('plotRendered')! as LabTestPlotHost).innerHTML;
             release!({response: Object.assign(new Response(), {labData: async () => ({ok: false, error: 'Obsolete plot fixture'})}),
                       data: {ok: false, error: 'Obsolete plot fixture'}});
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await LabTestBrowser.wait(50);
             check((document.getElementById('plotRendered')! as LabTestPlotHost).innerHTML === previous,
                   'A late plot must not publish after switching modes');
             WorksheetWorkspace.mode.setMode('expression');
@@ -693,7 +1032,7 @@
         if (document.getElementById('plotCard')!.classList.contains('hidden')) return;
         const node = (document.getElementById('plotRendered')! as LabTestPlotHost);
         for (let i = 0; i < 1200 && (!node.textContent || node.textContent.includes('Generating plot')); ++i)
-            await new Promise(resolve => setTimeout(resolve, 25));
+            await LabTestBrowser.wait(25);
         check(!node.textContent.includes('Generating plot'), 'Automatic plot must finish');
     }
     function checkPlotLabelSpacing() {
@@ -741,6 +1080,10 @@
                                   'Vertical Auto clears only vertical limits');
                     }
                     if (id === 'plotInputRange') {
+                        const multiple = document.querySelectorAll('#plotFirstChoices input').length > 1;
+                        const hidden = radio.value === 'auto' && !multiple;
+                        check((document.getElementById('plotFirstGroup')!.getClientRects().length === 0) === hidden,
+                              'Input Auto hides the single-variable range panel but retains multiple-variable choices');
                         check([...document.querySelectorAll<HTMLElement>('.plot-ranges .plot-bound-pair')].every(pair =>
                                   pair.classList.contains('hidden') === (radio.value === 'auto')),
                               'Input Auto hides both variable bound pairs independently of vertical scale');
@@ -751,7 +1094,7 @@
                             }), 'Input Auto clears authored and exact cached variable bounds');
                     }
                 }
-                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                await LabTestBrowser.paint();
                 const card = group.closest<HTMLElement>('.result-card')!.getBoundingClientRect();
                 for (const label of group.querySelectorAll('label')) {
                     if (label.classList.contains('hidden'))
@@ -783,13 +1126,16 @@
         const saved = [lower.value, upper.value];
         const savedScale = (document.getElementById('plotScale')! as HTMLInputElement).value;
         document.querySelector<HTMLInputElement>('#plotScaleChoices input[value="all"]')!.click();
-        const waitFor = async (predicate: () => boolean) => {
+        // Finish setup redraws before retaining the SVG that an invalid edit must preserve.
+        await WorksheetRequests.plots.takePlot((document.getElementById('plotFirst')! as HTMLInputElement).value);
+        async function waitFor(predicate: () => boolean) {
             const deadline = performance.now() + 15000;
             while (!predicate() && performance.now() < deadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             check(predicate(), 'Live range edit must complete without an Update button');
-        };
+        }
         const before = rendered.querySelector<HTMLElement>('[data-series]')!;
+        check(before && !rendered.classList.contains('error'), 'Live range checks start from a valid completed plot');
         lower.value = '-';
         lower.dispatchEvent(new Event('input', {bubbles: true}));
         await waitFor(() => !document.getElementById('plotFeedback')!.classList.contains('hidden'));
@@ -887,16 +1233,24 @@
     async function waitForVolume() {
         const deadline = performance.now() + 25000;
         while ((labSurfacePreview.snapshot()!?.volume.dirty || WorksheetRequests.labRequests.busy()) && performance.now() < deadline)
-            await new Promise(resolve => setTimeout(resolve, 25));
+            await LabTestBrowser.wait(25);
         check(!labSurfacePreview.snapshot()!?.volume.dirty && !WorksheetRequests.labRequests.busy(),
               'Native volume refinement must finish without losing the interactive chart');
     }
+    /** @brief Compare orientations while treating opposite quaternion signs as equivalent. */
+    function quaternionAgreement(left: MarsSurfaceQuaternion, right: MarsSurfaceQuaternion): number {
+        let product = 0;
+        for (let coordinate = 0; coordinate < 4; ++coordinate)
+            product += left[coordinate] * right[coordinate];
+        return Math.abs(product);
+    }
+
     async function checkPlotDrag() {
         const rendered = (document.getElementById('plotRendered')! as LabTestPlotHost);
-        const controls = ['plotAzimuth', 'plotElevation', 'plotRoll'].map(id => (document.getElementById(id)! as LabTestPlotInput) as HTMLInputElement);
+        const controls = ['plotAzimuth', 'plotElevation', 'plotRoll'].map(id => document.getElementById(id)! as HTMLInputElement);
         const retained = rendered.querySelector<SVGSVGElement>('[data-surface]')!;
         const generation = WorksheetRequests.labRequests.latestMain();
-        const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const settle = LabTestBrowser.paint;
         const pointer = (target: EventTarget, type: string, x: number, y: number, extras: PointerEventInit = {}) => target.dispatchEvent(new PointerEvent(type, {
             pointerId: 91, pointerType: 'touch', isPrimary: true, button: 0,
             buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y,
@@ -933,14 +1287,30 @@
             check(Math.abs(Math.hypot(...quaternion()) - 1) < 1e-12,
                   'Repeated trackball rotations retain a normalised quaternion');
         }
+        const identityCamera: MarsSurfaceQuaternion = [0, 0, 0, 1];
+        const rotationRows = labSurfaceCamera.rows(identityCamera);
+        check(rotationRows.length === 3, 'Camera rotation returns three rows');
+        for (let row = 0; row < 3; ++row) {
+            check(rotationRows[row].length === 3, 'Each camera rotation row has three coordinates');
+            for (let column = 0; column < 3; ++column) {
+                const expected = row === column ? 1 : 0;
+                check(Math.abs(rotationRows[row][column] - expected) < 1e-12,
+                      'Identity camera returns the identity rotation matrix');
+            }
+        }
+        const composedCamera = labSurfaceCamera.multiply(identityCamera, identityCamera);
+        for (let coordinate = 0; coordinate < 4; ++coordinate) {
+            check(Math.abs(composedCamera[coordinate] - identityCamera[coordinate]) < 1e-12,
+                  'Camera multiplication preserves the identity orientation');
+        }
         for (const elevation of [-90, -89.999, 0, 89.999, 90]) {
             const q = labSurfaceCamera.fromAngles([37, elevation, 123]);
             const decoded = labSurfaceCamera.angles(q, [37, elevation, 123]);
             const restored = labSurfaceCamera.fromAngles(decoded);
-            check(Math.abs(q.reduce((sum, v, i) => sum + v * restored[i], 0)) > 1 - 1e-9,
+            check(quaternionAgreement(q, restored) > 1 - 1e-9,
                   'Euler readouts reconstruct orientation even at either pole');
             const moved = labSurfaceCamera.drag(q, [cx, cy], [cx + 20, cy + 10], box, false);
-            check(moved.every(Number.isFinite) && Math.abs(q.reduce((sum, v, i) => sum + v * moved[i], 0)) < 0.99999,
+            check(moved.every(Number.isFinite) && quaternionAgreement(q, moved) < 0.99999,
                   'Trackball remains responsive at the Euler singularities');
         }
         const exported = new DOMParser().parseFromString(WorksheetResults.clipboard.copyTextForTarget('plot'), 'image/svg+xml');
@@ -949,12 +1319,14 @@
               'Copy exports current mesh and axes as standalone SVG');
         const exportedBefore = WorksheetResults.clipboard.copyTextForTarget('plot');
         retained.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, altKey: true, bubbles: true, cancelable: true}));
-        await new Promise(resolve => setTimeout(resolve, 450));
+        await LabTestBrowser.wait(450);
         check(retained.isConnected && retained.dataset.localRenderer && WorksheetRequests.labRequests.latestMain() === generation &&
               exportedBefore !== WorksheetResults.clipboard.copyTextForTarget('plot'),
               'Wheel rotation stays local and SVG export follows the latest camera');
         const chart = rendered.querySelector<SVGSVGElement>('[data-surface]')!;
-        const angles = ['azimuth', 'elevation', 'roll'].map(key => Number(chart.dataset[key]));
+        const angles: MarsSurfaceAngles = [
+            Number(chart.dataset.azimuth), Number(chart.dataset.elevation), Number(chart.dataset.roll)
+        ];
         const frame = chart.closest<HTMLElement>('.rendered-zoom-frame')!, figure = frame.querySelector('svg')!;
         const savedFigure = figure.style.cssText, savedFrame = frame.style.cssText;
         try {
@@ -1009,6 +1381,10 @@
         labSurfacePreview.dispose();
         const getContext = HTMLCanvasElement.prototype.getContext;
         try {
+            HTMLCanvasElement.prototype.getContext = function unavailableContext() { return null; } as typeof getContext;
+            check(labSurfacePreview.prepare(chart) === null &&
+                  !rendered.querySelector('[data-surface-overlay]') && !chart.dataset.localRenderer,
+                  'Unavailable canvas contexts reject preparation without attaching an overlay or claiming renderer ownership');
             HTMLCanvasElement.prototype.getContext = function(this: HTMLCanvasElement, type: string, ...args: unknown[]) {
                 return type === 'webgl' ? null : getContext.call(this, type, ...args);
             } as typeof getContext;
@@ -1019,6 +1395,80 @@
             let painted = false;
             for (let i = 3; i < pixels.length; i += 64) painted ||= pixels[i] !== 0;
             check(painted, 'Canvas fallback actually paints the retained triangles');
+            const softwareView = labSurfacePreview.prepare(chart)!;
+            labSurfacePreview.clear(true);
+            const nativeLayers: SVGElement[] = [];
+            const originalVisibility: string[] = [];
+            for (const child of chart.children) {
+                if (child instanceof SVGElement && (child.tagName === 'g' || child.tagName === 'path')) {
+                    nativeLayers.push(child);
+                    originalVisibility.push(child.style.visibility);
+                }
+            }
+            check(nativeLayers.length >= 2, 'Visibility fixture retains multiple native SVG layers');
+            try {
+                nativeLayers[0].style.visibility = 'visible';
+                nativeLayers[1].style.visibility = 'collapse';
+                const expectedVisibility = nativeLayers.map(function visibility(node) { return node.style.visibility; });
+                for (let cycle = 0; cycle < 2; ++cycle) {
+                    check(labSurfacePreview.draw(chart, angles) && labSurfacePreview.draw(chart, angles),
+                          'Repeated redraws preserve the retained surface');
+                    for (const node of nativeLayers)
+                        check(node.style.visibility === 'hidden', 'Interactive renderer hides each native base layer');
+                    labSurfacePreview.clear(true);
+                    for (let index = 0; index < nativeLayers.length; ++index)
+                        check(nativeLayers[index].style.visibility === expectedVisibility[index],
+                              'Forced clear restores original visibility after repeated redraws and reuse');
+                    check(softwareView.overlay.style.display === 'none' && !chart.dataset.localRenderer,
+                          'Forced clear hides the overlay and clears renderer ownership');
+                }
+            } finally {
+                labSurfacePreview.clear(true);
+                for (let index = 0; index < nativeLayers.length; ++index)
+                    nativeLayers[index].style.visibility = originalVisibility[index];
+            }
+            check(labSurfacePreview.draw(chart, angles) && labSurfacePreview.prepare(chart) === softwareView,
+                  'Redrawing after forced clear reuses the retained view');
+            const softwarePlan = softwareView.polygons!();
+            check(softwarePlan === softwareView.polygons!(), 'One frame reuses its native drawing plan');
+            const vectorLayer = labSurfaceExport.layer(softwareView)!;
+            const vectorPaths = vectorLayer.querySelectorAll('[data-series] path');
+            check(vectorPaths.length === softwarePlan.length && softwareView.polygons!() === softwarePlan,
+                  'SVG export reuses the Canvas plan and preserves its primitive count');
+            for (let i = 0; i < vectorPaths.length; ++i) {
+                const polygon = softwarePlan[i];
+                check(vectorPaths[i].getAttribute('fill') === polygon.colour,
+                      'SVG and Canvas use identical native painter order');
+            }
+            check(labSurfacePreview.draw(chart, angles), 'Redrawing a software frame succeeds');
+            check(softwareView.polygons!() !== softwarePlan,
+                  'A new frame invalidates the previous native drawing plan');
+            function captureFailure(): never {
+                check(!softwareView.overlay.isConnected && !chart.dataset.localRenderer,
+                      'Snapshot capture temporarily removes the local renderer');
+                throw new Error('Snapshot fixture failure');
+            }
+            let captureError = '';
+            try {
+                labSurfacePreview.captureResult(captureFailure);
+            } catch (error) {
+                if (error instanceof Error) captureError = error.message;
+            }
+            check(captureError === 'Snapshot fixture failure' && softwareView.overlay.isConnected &&
+                  chart.dataset.localRenderer === 'canvas' && labSurfacePreview.prepare(chart) === softwareView,
+                  'Failed snapshot capture restores the same retained view and propagates the error');
+            function captureEmpty(): null { return null; }
+            check(labSurfacePreview.captureResult(captureEmpty) === null && softwareView.overlay.isConnected,
+                  'Empty snapshot capture restores the overlay without inventing result state');
+            const capturedState: WorksheetResultSnapshot = {
+                lastTex: '', lastDerivativeExpression: '', currentVariables: [],
+                currentDifferentiable: false, resultInputBindings: []
+            };
+            function captureState(): WorksheetResultSnapshot { return capturedState; }
+            check(labSurfacePreview.captureResult(captureState) === capturedState &&
+                  capturedState.surfaceView?.key === labSurfacePreview.snapshot()!.key &&
+                  softwareView.overlay.isConnected,
+                  'Successful snapshot capture annotates the original result and restores its overlay');
         } finally {
             HTMLCanvasElement.prototype.getContext = getContext;
             labSurfacePreview.dispose();
@@ -1043,7 +1493,7 @@
             loss.loseContext();
             const deadline = performance.now() + 3000;
             while (refreshed.dataset.localRenderer !== 'canvas' && performance.now() < deadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             check(refreshed.dataset.localRenderer === 'canvas' &&
                   labSurfacePreview.snapshot()!.orientation.every((v, i) => Math.abs(v - beforeLoss.orientation[i]) < 1e-10),
                   'Context loss switches to canvas without losing the quaternion camera');
@@ -1056,9 +1506,9 @@
         const send = (target: EventTarget, type: string, id: number, x: number) => target.dispatchEvent(new PointerEvent(type,
             {pointerId: id, pointerType: 'touch', isPrimary: id === 71, button: 0,
              buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: cy, bubbles: true, cancelable: true}));
-        const settle = async () => {
-            for (let i = 0; i < 2; ++i) await new Promise(resolve => requestAnimationFrame(resolve));
-        };
+        async function settle() {
+            for (let i = 0; i < 2; ++i) await LabTestBrowser.nextFrame();
+        }
         const generation = WorksheetRequests.labRequests.latestMain();
         for (const cancelled of [false, true]) {
             const initial = labSurfacePreview.snapshot()!.camera;
@@ -1094,13 +1544,13 @@
                                          ['xMin', 'xMax', 'yMin', 'yMax'];
         const original = coordinateKeys.map(key => Number(chart().dataset[key]));
         const card = rendered.closest<HTMLElement>('.result-card')!;
-        const wait = async (previous: SVGSVGElement) => {
+        async function wait(previous: SVGSVGElement) {
             const deadline = performance.now() + 20000;
             while (((rendered as LabTestPlotHost).marsPlotDrag.busy || chart() === previous) && performance.now() < deadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             check(!(rendered as LabTestPlotHost).marsPlotDrag.busy && chart() !== previous, 'Pinch finishes with a native redraw');
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        };
+            await LabTestBrowser.paint();
+        }
         for (const factor of [0.5, 2]) {
             const before = chart(), matrix = before.getScreenCTM()!, view = before.viewBox.baseVal;
             const camera = ['azimuth', 'elevation', 'roll'].map(key => before.dataset[key]);
@@ -1124,7 +1574,7 @@
             send(window, 'pointermove', 72, cx + 30 / factor);
             if (surface) {
                 const generation = WorksheetRequests.labRequests.latestMain();
-                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                await LabTestBrowser.paint();
                 check(chart() === before && !!before.dataset.localRenderer && WorksheetRequests.labRequests.latestMain() === generation,
                       'Held surface pinch projects retained geometry without a native sampling request');
             }
@@ -1172,7 +1622,7 @@
     }
     async function checkCurvePointerView() {
         const rendered = (document.getElementById('plotRendered')! as LabTestPlotHost);
-        const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const settle = LabTestBrowser.paint;
         await settle();
         const card = rendered.closest<HTMLElement>('.result-card')!;
         const chart = () => rendered.querySelector<SVGSVGElement>('[data-plot-chart][data-x-min]:not([data-surface])')!;
@@ -1189,13 +1639,15 @@
         rendered.dispatchEvent(new PointerEvent('pointermove', {clientX, clientY, bubbles: true}));
         const tip = rendered.querySelector<HTMLElement>('.plot-pointer-tip')!, line = rendered.querySelector<HTMLElement>('.plot-pointer-line')!;
         const hoverX = Number(before.dataset.plotLeft) + Number(before.dataset.plotWidth) * 0.25;
-        const crossings = [...before.querySelectorAll<LabTestHoverPath>('[data-series] > path')].flatMap(path => {
+        const crossings: number[] = [];
+        for (const path of before.querySelectorAll('[data-series] > path')) {
             const p = path.getAttribute('d')!.split(' ');
             const ax = Number(p[1]), ay = Number(p[2]), bx = Number(p[4]), by = Number(p[5]);
-            if (p.length !== 6 || ax === bx || hoverX < Math.min(ax, bx) || hoverX > Math.max(ax, bx)) return [];
+            if (p.length !== 6 || ax === bx || hoverX < Math.min(ax, bx) || hoverX > Math.max(ax, bx))
+                continue;
             const height = ay + (hoverX - ax) * (by - ay) / (bx - ax);
-            return [y1 + (height - Number(before.dataset.plotTop)) / Number(before.dataset.plotHeight) * (y0 - y1)];
-        });
+            crossings.push(y1 + (height - Number(before.dataset.plotTop)) / Number(before.dataset.plotHeight) * (y0 - y1));
+        }
         const reportedY = Number(tip.textContent.split('\n')[1]?.replace('y ≈ ', ''));
         const horizontal = rendered.querySelector<HTMLElement>('.plot-pointer-horizontal')!;
         check(horizontal && !horizontal.classList.contains('hidden') &&
@@ -1244,13 +1696,13 @@
         check(tip.classList.contains('hidden') && line.classList.contains('hidden') &&
               horizontal.classList.contains('hidden') && marker.classList.contains('hidden'),
               'Leaving hides both hover guides and the curve marker');
-        const waitChart = async (previous: SVGSVGElement) => {
+        async function waitChart(previous: SVGSVGElement) {
             const deadline = performance.now() + 15000;
             while ((!chart() || chart() === previous) && performance.now() < deadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             check(chart() && chart() !== previous, 'Viewport zoom requests a newly sampled plot');
             await settle();
-        };
+        }
         const zoomEvent = new WheelEvent('wheel',
               {clientX, clientY, deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true});
         const wheelFraction = (zoomEvent.clientX - left) / plotWidth;
@@ -1302,7 +1754,7 @@
             event(window, 'pointerup', cx + 40, cy + 25);
             const deadline = performance.now() + 20000;
             while (((rendered as LabTestPlotHost).marsPlotDrag.busy || chart() === initial) && performance.now() < deadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             check(!(rendered as LabTestPlotHost).marsPlotDrag.busy && !(rendered as LabTestPlotHost).marsPlotDrag.active &&
                   Math.abs(Number(chart().dataset.xMin) - (x0 - 40 * (x1 - x0) / pw)) < 1e-8 &&
                   Math.abs(Number(chart().dataset.yMin) - (y0 + 25 * (y1 - y0) / ph)) < 1e-8 &&
@@ -1327,7 +1779,7 @@
         document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
         const cancelDeadline = performance.now() + 20000;
         while ((rendered as LabTestPlotHost).marsPlotDrag.busy && performance.now() < cancelDeadline)
-            await new Promise(resolve => setTimeout(resolve, 25));
+            await LabTestBrowser.wait(25);
         check(!(rendered as LabTestPlotHost).marsPlotDrag.busy && !(rendered as LabTestPlotHost).marsPlotDrag.active &&
               Math.abs(Number(chart().dataset.xMin) - x0) < 1e-8 &&
               Math.abs(Number(chart().dataset.yMin) - y0) < 1e-8,
@@ -1336,7 +1788,7 @@
     }
     async function checkPlotWheelZoom() {
         const rendered = (document.getElementById('plotRendered')! as LabTestPlotHost);
-        const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const settle = LabTestBrowser.paint;
         await settle();
         if (rendered.querySelector<SVGSVGElement>('[data-plot-chart][data-x-min]:not([data-surface])')!) {
             await runBrowserGroup('checkCurvePointerView', checkCurvePointerView);
@@ -1361,8 +1813,13 @@
               sampledUnits.every((v, i) => Math.abs(v / sampledSpans[i] - unitScale) < 1e-10),
               'Native sampled surfaces preserve equal coordinate units, including unequal height ranges: ' +
               JSON.stringify({units: sampledUnits, sampledSpans, displayBounds: initial.volume.bounds}));
-        const projected = [0, 1].map(row =>
-            frame.rows.slice(row*3, row*3+3).reduce((sum, v) => sum + Math.abs(v), 0) * frame.fit);
+        const projected: number[] = [];
+        for (let row = 0; row < 2; ++row) {
+            let span = 0;
+            for (let column = 0; column < 3; ++column)
+                span += Math.abs(frame.rows[row * 3 + column]);
+            projected.push(span * frame.fit);
+        }
         const margin = Math.min(Math.max(Number(initial.volume.labelWidth) + 25, 45), (frame.width - 80)/2);
         check(projected[0] <= frame.width - 2*margin + 1e-7 &&
               projected[1] <= frame.height - 100 + 1e-7 &&
@@ -1373,7 +1830,7 @@
         const lowBefore = lowControl.value, highBefore = highControl.value;
         lowControl.value = 'pi-1'; highControl.value = 'pi+1';
         const symbolicView = {chart: before, units: [...view.units]} as
-            Pick<MarsSurfaceView, 'chart' | 'units' | 'volume'>;
+            LabTestSurfaceVolumeFixture;
         labDOM.call('lab_surface_volume_init', symbolicView, null, 0);
         lowControl.value = lowBefore; highControl.value = highBefore;
         check(symbolicView.volume.exact[0] === 'pi-1' && symbolicView.volume.exact[1] === 'pi+1',
@@ -1455,7 +1912,7 @@
         for (const policy of ['auto', 'all']) {
             (document.getElementById('plotScale')! as HTMLInputElement).value = policy;
             const restoredView = {chart: before, units: [...view.units], camera: {...zoomed.camera}} as
-                Pick<MarsSurfaceView, 'chart' | 'units' | 'camera' | 'volume'>;
+                LabTestSurfaceCameraFixture;
             labDOM.call('lab_surface_volume_init', restoredView, zoomed, 1);
             check(restoredView.volume.exponent === 0 && restoredView.camera.scale === 1 &&
                   restoredView.volume.bounds.every((value, i) => value === initial.volume.base[i]) &&
@@ -1465,7 +1922,7 @@
         }
         (document.getElementById('plotScale')! as HTMLInputElement).value = 'manual';
         const refiningView = {chart: before, units: [...view.units], camera: {...zoomed.camera}} as
-            Pick<MarsSurfaceView, 'chart' | 'units' | 'camera' | 'volume'>;
+            LabTestSurfaceCameraFixture;
         labDOM.call('lab_surface_volume_init', refiningView,
                     {...zoomed, volume: labSurfaceVolume.clone(zoomed.volume), refining: true}, 1);
         check(refiningView.volume.exponent === zoomed.volume.exponent &&
@@ -1507,7 +1964,7 @@
                 new Promise(resolve => release = resolve) : fetchBefore(...args);
             card.querySelector<HTMLElement>('[data-zoom-step="1"]')!.click();
             const deadline = performance.now() + 5000;
-            while (!release && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
+            while (!release && performance.now() < deadline) await LabTestBrowser.wait(25);
             check(!!release, 'Hold one native volume refinement in flight');
             card.querySelector<HTMLElement>('[data-zoom-step="-1"]')!.click();
             await settle();
@@ -1579,7 +2036,7 @@
         }
     }
     async function checkRenderedGlyphs() {
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await LabTestBrowser.paint();
         const svg = WorksheetContext.rendered.querySelector('svg')!;
         check(svg, 'Native TeX SVG missing');
         const bounds = svg.getBoundingClientRect();
@@ -1598,15 +2055,15 @@
     }
 
     async function checkWire() {
-        const record = (value: unknown): Record<string, unknown> => {
+        function record(value: unknown): LabTestRecord {
             if (value === null || typeof value !== 'object' || Array.isArray(value))
                 throw new Error('Expected a decoded record');
-            return value as Record<string, unknown>;
-        };
+            return value as LabTestRecord;
+        }
         check(!document.getElementById('lab-config')!, 'JSON configuration is still embedded in the page');
         const bootstrap = await labHttp.fetch('/bootstrap');
         check(bootstrap.headers.get('Content-Type') === 'application/x-protobuf', 'Bootstrap did not use Protobuf');
-        const config = await bootstrap.labData() as LabConfiguration & {BROWSER_ABI_VERSION: string};
+        const config = await bootstrap.labData() as LabConfiguration;
         check(
             config.BROWSER_ABI_VERSION === String(labWire.exports().lab_browser_abi_version()),
             'Running native server and WASM ABI differ');
@@ -1645,26 +2102,17 @@
                 localStorage.setItem(`${storageKey}.protobuf`, invalid);
                 check(WorksheetPersistence.persistence.readLocal(storageKey) === null, 'damaged, JSON or oversized fallback was accepted');
             }
-            const getStoredItem = Storage.prototype.getItem;
-            const decode_base64 = window.atob;
-            const storage_limit = labWire.exports().lab_browser_base64_limit();
-            let stored_length = storage_limit, decode_calls = 0;
+            const decodeBase64 = window.atob, encodeBase64 = window.btoa;
             try {
-                Storage.prototype.getItem = function(key) {
-                    return key === `${storageKey}.protobuf` ? 'A'.repeat(stored_length) : getStoredItem.call(this, key);
+                window.atob = window.btoa = function browserBase64Forbidden(): never {
+                    throw new Error('Storage must use native base64');
                 };
-                window.atob = () => {
-                    ++decode_calls;
-                    throw new Error('Boundary probe reached base64 decoding');
-                };
-                check(WorksheetPersistence.persistence.readLocal(storageKey) === null && decode_calls === 1,
-                    'exact native storage bound reaches decoding and retains error recovery');
-                ++stored_length;
-                check(WorksheetPersistence.persistence.readLocal(storageKey) === null && decode_calls === 1,
-                    'oversized fallback was not rejected before decoding');
+                WorksheetPersistence.persistence.writeLocal(storageKey, source);
+                check(JSON.stringify(WorksheetPersistence.persistence.readLocal(storageKey)) === JSON.stringify(source),
+                    'fallback persistence still depends on browser base64 conversion');
             } finally {
-                Storage.prototype.getItem = getStoredItem;
-                window.atob = decode_base64;
+                window.atob = decodeBase64;
+                window.btoa = encodeBase64;
             }
             WorksheetPersistence.persistence.writeLocal(storageKey, {town: 'Shrewsbury'});
             check(record(WorksheetPersistence.persistence.readLocal(storageKey)).town === 'Shrewsbury', 'fallback did not recover after corruption');
@@ -1674,14 +2122,14 @@
             else
                 localStorage.setItem(`${storageKey}.protobuf`, storedBefore);
         }
-        const rejects = (action: () => unknown) => {
+        function rejects(action: () => unknown) {
             try {
                 action();
                 return false;
             } catch (_) {
                 return true;
             }
-        };
+        }
         const padded = new Uint8Array(empty.length + 4);
         padded.set(empty, 2);
         check(
@@ -1710,6 +2158,21 @@
             }
         };
         check(rejects(() => labWire.encode(accessor)) && !getterCalled, 'Codec invoked an accessor');
+        const arrayAccessor = [0];
+        Object.defineProperty(arrayAccessor, '0', {get: function readArrayElement(): number {
+            getterCalled = true;
+            return 1;
+        }});
+        check(rejects(() => labWire.encode({array: arrayAccessor})) && !getterCalled,
+              'Container snapshotting rejects array accessors without invoking them');
+        check(rejects(() => labWire.encode({array: new Array(2)})), 'Container snapshotting rejects sparse arrays');
+        const hiddenAccessor = {visible: 'kept'};
+        Object.defineProperty(hiddenAccessor, 'hidden', {get: function readHidden(): never {
+            throw new Error('Non-enumerable getter must not run');
+        }});
+        const visibleOnly = record(labWire.decode(labWire.encode(hiddenAccessor)));
+        check(visibleOnly.visible === 'kept' && !Object.hasOwn(visibleOnly, 'hidden'),
+              'Container snapshots retain enumerable data without inspecting hidden accessors');
         const recursive = new Proxy({}, {
             ownKeys() {
                 labWire.encode({});
@@ -1739,8 +2202,14 @@
                 'Malformed schema payload accepted');
         }
         check(rejects(() => labWire.encode({number: Infinity})), 'Infinite number accepted');
-        const member_limit = labWire.exports().lab_browser_member_limit();
-        for (const count of [member_limit, member_limit + 1]) {
+        for (const ending of [[240, 127], [240, 255], [248, 127]]) {
+            // Version-one object containing x = positive infinity, negative infinity or NaN.
+            const node = [8, 5, 50, 16, 10, 1, 120, 18, 11, 8, 2, 25, 0, 0, 0, 0, 0, 0, ...ending];
+            check(rejects(() => labWire.decode(new Uint8Array([8, 1, 18, node.length, ...node]))),
+                  'Native decoding rejects non-finite binary64 values without a second browser tree walk');
+        }
+        const memberLimit = labWire.exports().lab_browser_member_limit();
+        for (const count of [memberLimit, memberLimit + 1]) {
             let message = '';
             try {
                 labWire.encode({list: new Array(count).fill(null)});
@@ -1748,7 +2217,7 @@
             const error = caught as Error;
                 message = error.message;
             }
-            check(message.includes(count === member_limit ? 'Invalid or oversized' : 'too many members'),
+            check(message.includes(count === memberLimit ? 'Invalid or oversized' : 'too many members'),
                 'host member admission preserves the exact native boundary');
         }
         check(record(labWire.decode(labWire.encode({valid: true}))).valid, 'codec recovers after member rejection');
@@ -1757,7 +2226,7 @@
         let deep = {};
         for (let i = 0; i < 34; ++i) deep = {deep};
         check(rejects(() => labWire.encode(deep)), 'Excessive nesting accepted');
-        const malicious: Record<string, unknown> = Object.create(null);
+        const malicious: LabTestRecord = Object.create(null);
         malicious.__proto__ = {polluted: true};
         const safe = labWire.decode(labWire.encode(malicious).buffer);
         check(Object.hasOwn(record(safe), '__proto__') && !Reflect.get({}, 'polluted'), 'Protobuf key changed an object prototype');
@@ -1790,10 +2259,10 @@
                 check(rejected, `Oversized ${type} response was not bounded`);
             }
             let cancelled = false;
-            const message_limit = labWire.exports().lab_browser_message_limit();
+            const messageLimit = labWire.exports().lab_browser_message_limit();
             window.fetch = async () => new Response(new ReadableStream({
                 start(controller) {
-                    controller.enqueue(new Uint8Array(message_limit));
+                    controller.enqueue(new Uint8Array(messageLimit));
                     controller.enqueue(new Uint8Array(1));
                 },
                 cancel() {
@@ -1840,7 +2309,7 @@
             frame.contentDocument!.body.appendChild(workspace);
             for (const width of [1920, 900, 390]) {
                 frame.style.width = `${width}px`;
-                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                await LabTestBrowser.paint();
                 const panel = workspace.querySelector<HTMLElement>('#resultWorkspacePanel')!.getBoundingClientRect();
                 const bar = workspace.querySelector<HTMLElement>('.lab-topbar')!.getBoundingClientRect();
                 check(Math.abs(panel.left - bar.left) < 2 && Math.abs(panel.right - bar.right) < 2,
@@ -1983,7 +2452,7 @@
             for (const [viewport, card] of [[1920, 860], [1920, 1700], [320, 290], [390, 350], [430, 390]]) {
                 frame.style.width = `${viewport}px`;
                 target.style.width = `${card}px`;
-                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                await LabTestBrowser.paint();
                 for (const icon of target.querySelectorAll<HTMLElement>('.almanac-body-symbol, .almanac-eclipse-symbol')) {
                     const style = frame.contentWindow!.getComputedStyle(icon);
                     check(style.filter === 'none' && style.transform === 'none',
@@ -2092,7 +2561,7 @@
             WorksheetContext.worksheetSession.calendar.almanacVisibilityMode = visibility;
         }
     }
-    window.addEventListener('load', async () => {
+    window.addEventListener('load', async function runBrowserChecks() {
         try {
             check(window.labReady instanceof Promise, 'Startup promise missing');
             if (failureCase === 'database') {
@@ -2139,7 +2608,7 @@
                 return;
             }
             await window.labReady;
-            initialise_lab_test_adapters();
+            initialiseLabTestAdapters();
             if (labProfile.enabled) {
                 await report('PASS: PROFILE ' + JSON.stringify(await labProfile.run()));
                 return;
@@ -2155,47 +2624,50 @@
                     !labApplication.definitionScripts.includes('evaluation') &&
                     !document.querySelector<HTMLElement>('script[src="/js/evaluation.js"]')!,
                 'Retired evaluation script remains served or loaded');
-            await runBrowserGroup('labWorkspaceChecks', () => window.labWorkspaceChecks());
-            await runBrowserGroup('checkLabRequests', () => window.checkLabRequests());
-            await runBrowserGroup('checkLabEvaluation', () => window.checkLabEvaluation());
-            await runBrowserGroup('checkLabEvaluationCards', () => window.checkLabEvaluationCards());
-            await runBrowserGroup('checkLabResultFlows', () => window.checkLabResultFlows());
-            await runBrowserGroup('checkLabBindingFlows', () => window.checkLabBindingFlows());
-            await runBrowserGroup('checkLabLocationFlow', () => window.checkLabLocationFlow());
-            await runBrowserGroup('checkLabRequestFlows', () => window.checkLabRequestFlows());
-            await runBrowserGroup('checkLabStateFlow', () => window.checkLabStateFlow());
-            await runBrowserGroup('checkLabSurfaceHover', () => window.checkLabSurfaceHover());
-            await runBrowserGroup('checkLabTransportFlows', () => window.checkLabTransportFlows());
+            await runBrowserGroup('labWorkspaceChecks', window.labWorkspaceChecks);
+            await runBrowserGroup('checkLabRequests', window.checkLabRequests);
+            await runBrowserGroup('checkLabEvaluation', window.checkLabEvaluation);
+            await runBrowserGroup('checkLabEvaluationCards', window.checkLabEvaluationCards);
+            await runBrowserGroup('checkLabResultFlows', window.checkLabResultFlows);
+            await runBrowserGroup('checkLabBindingFlows', window.checkLabBindingFlows);
+            await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
+            await runBrowserGroup('checkLabRequestFlows', window.checkLabRequestFlows);
+            await runBrowserGroup('checkLabStateFlow', window.checkLabStateFlow);
+            await runBrowserGroup('checkSurfaceProjectionPlan', checkSurfaceProjectionPlan);
+            await runBrowserGroup('checkLabSurfaceMesh', window.checkLabSurfaceMesh);
+            await runBrowserGroup('checkLabSurfaceSVG', window.checkLabSurfaceSVG);
+            await runBrowserGroup('checkLabSurfaceHover', window.checkLabSurfaceHover);
+            await runBrowserGroup('checkLabTransportFlows', window.checkLabTransportFlows);
             window.checkLabEditor();
             await runBrowserGroup('checkRenderedGlyphs', checkRenderedGlyphs);
-            await runBrowserGroup('checkLabForms', () => window.checkLabForms());
-            await runBrowserGroup('checkLabCalendarState', () => window.checkLabCalendarState());
-            await runBrowserGroup('checkLabPersistence', () => window.checkLabPersistence());
-            await runBrowserGroup('checkLabStorage', () => window.checkLabStorage());
+            await runBrowserGroup('checkLabForms', window.checkLabForms);
+            await runBrowserGroup('checkLabCalendarState', window.checkLabCalendarState);
+            await runBrowserGroup('checkLabPersistence', window.checkLabPersistence);
+            await runBrowserGroup('checkLabStorage', window.checkLabStorage);
             window.checkLabWidgets();
-            await runBrowserGroup('checkLabSelects', () => window.checkLabSelects());
-            await runBrowserGroup('checkLabSelectEvents', () => window.checkLabSelectEvents());
-            await runBrowserGroup('checkLabLayout', () => window.checkLabLayout());
-            await runBrowserGroup('checkLabSyntax', () => window.checkLabSyntax());
-            await runBrowserGroup('checkLabProjection', () => window.checkLabProjection());
+            await runBrowserGroup('checkLabSelects', window.checkLabSelects);
+            await runBrowserGroup('checkLabSelectEvents', window.checkLabSelectEvents);
+            await runBrowserGroup('checkLabLayout', window.checkLabLayout);
+            await runBrowserGroup('checkLabSyntax', window.checkLabSyntax);
+            await runBrowserGroup('checkLabProjection', window.checkLabProjection);
             await runBrowserGroup('checkRenderedGlyphs', checkRenderedGlyphs);
-            await runBrowserGroup('checkLabWorkspaceDom', () => window.checkLabWorkspaceDom());
+            await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
             await runBrowserGroup('checkRenderedGlyphs', checkRenderedGlyphs);
-            await runBrowserGroup('checkLabLocationDom', () => window.checkLabLocationDom());
-            await runBrowserGroup('checkLabResultDom', () => window.checkLabResultDom());
-            await runBrowserGroup('checkLabBindingDom', () => window.checkLabBindingDom());
-            await runBrowserGroup('checkLabBindingSync', () => window.checkLabBindingSync());
-            await runBrowserGroup('checkLabBindingCommit', () => window.checkLabBindingCommit());
-            await runBrowserGroup('checkLabFunction', () => window.checkLabFunction());
-            await runBrowserGroup('checkLabEvaluationInstall', () => window.checkLabEvaluationInstall());
-            await runBrowserGroup('checkLabGoal', () => window.checkLabGoal());
-            await runBrowserGroup('checkLabEvaluationSetup', () => window.checkLabEvaluationSetup());
-            await runBrowserGroup('checkLabWeather', () => window.checkLabWeather());
-            await runBrowserGroup('checkLabPayload', () => window.checkLabPayload());
-            await runBrowserGroup('checkLabPickerDom', () => window.checkLabPickerDom());
-            await runBrowserGroup('checkLabEvents', () => window.checkLabEvents());
-            await runBrowserGroup('checkLabWidgetEvents', () => window.checkLabWidgetEvents());
-            await runBrowserGroup('checkLabAlmanacEvents', () => window.checkLabAlmanacEvents());
+            await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
+            await runBrowserGroup('checkLabResultDom', window.checkLabResultDom);
+            await runBrowserGroup('checkLabBindingDom', window.checkLabBindingDom);
+            await runBrowserGroup('checkLabBindingSync', window.checkLabBindingSync);
+            await runBrowserGroup('checkLabBindingCommit', window.checkLabBindingCommit);
+            await runBrowserGroup('checkLabFunction', window.checkLabFunction);
+            await runBrowserGroup('checkLabEvaluationInstall', window.checkLabEvaluationInstall);
+            await runBrowserGroup('checkLabGoal', window.checkLabGoal);
+            await runBrowserGroup('checkLabEvaluationSetup', window.checkLabEvaluationSetup);
+            await runBrowserGroup('checkLabWeather', window.checkLabWeather);
+            await runBrowserGroup('checkLabPayload', window.checkLabPayload);
+            await runBrowserGroup('checkLabPickerDom', window.checkLabPickerDom);
+            await runBrowserGroup('checkLabEvents', window.checkLabEvents);
+            await runBrowserGroup('checkLabWidgetEvents', window.checkLabWidgetEvents);
+            await runBrowserGroup('checkLabAlmanacEvents', window.checkLabAlmanacEvents);
             check(!failures.length, failures.join('; '));
             check(WorksheetWorkspace.mode.currentMode() === 'expression', 'Initial expression mode not restored');
             await runBrowserGroup('checkAlmanacLayout', checkAlmanacLayout);
@@ -2254,11 +2726,11 @@
                 check(slice.querySelector<HTMLElement>('.slice-auto')!.matches(':checked') &&
                       getComputedStyle(slice.querySelector<HTMLElement>('.slice-limits')!).display === 'none',
                       'Evaluate defaults to Auto with no visible From/To fields');
-                const waitForSlice = async (predicate: () => unknown) => {
+                async function waitForSlice(predicate: () => unknown) {
                     for (let n = 0; n < 600 && !predicate(); ++n)
-                        await new Promise(resolve => setTimeout(resolve, 25));
+                        await LabTestBrowser.wait(25);
                     check(predicate(), 'Slice response must settle: ' + WorksheetContext.statusEl.textContent);
-                };
+                }
                 sliceSlider.value = '625';
                 sliceSlider.dispatchEvent(new Event('input', {bubbles: true}));
                 await waitForSlice(() => plotRendered.querySelector<HTMLElement>('[data-plot-quality="preview"]')! &&
@@ -2290,7 +2762,7 @@
                       'Auto restores native limits and preserves a valid exact slice value');
                 const stage = document.getElementById('plotStage')!;
                 stage.style.width = '360px';
-                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                await LabTestBrowser.paint();
                 const chartBox = plotRendered.getBoundingClientRect(), panelBox = slicePanel.getBoundingClientRect();
                 check(panelBox.left >= chartBox.right - 1 && panelBox.width <= 73 &&
                       getComputedStyle(sliceSlider).writingMode === 'vertical-lr',
@@ -2368,7 +2840,7 @@
                 for (let attempt = 0; attempt < 400; ++attempt) {
                     if (WorksheetRequests.labRequests.latestMain() !== request &&
                         !WorksheetRequests.labRequests.busy()) break;
-                    await new Promise(resolve => setTimeout(resolve, 25));
+                    await LabTestBrowser.wait(25);
                 }
                 check(WorksheetWorkspace.precision.requestedPrecisionBits() === bits &&
                       WorksheetRequests.labRequests.latestMain() !== request &&
@@ -2382,10 +2854,10 @@
                 const toggle = document.getElementById('precisionCustomToggle')! as HTMLButtonElement;
                 const input = document.getElementById('precisionCustomInput')! as HTMLInputElement;
                 const apply = document.getElementById('precisionCustomApply')! as HTMLButtonElement;
-                const edit = (value: string) => {
+                function edit(value: string) {
                     input.value = value;
                     input.dispatchEvent(new Event('input', {bubbles: true}));
-                };
+                }
                 toggle.click();
                 check(!panel.classList.contains('hidden') && document.activeElement === input,
                       'ellipsis opens the custom precision editor and focuses its input');
@@ -2421,7 +2893,7 @@
                 input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
                 for (let attempt = 0; attempt < 400; ++attempt) {
                     if (WorksheetRequests.labRequests.latestMain() !== request && !WorksheetRequests.labRequests.busy()) break;
-                    await new Promise(resolve => setTimeout(resolve, 25));
+                    await LabTestBrowser.wait(25);
                 }
                 check(panel.classList.contains('hidden') &&
                       WorksheetWorkspace.precision.requestedPrecisionBits() === 33220 &&
@@ -2456,6 +2928,7 @@
             check(WorksheetContext.rendered.dataset.fullTex!.length > 0, 'Integral TeX metadata missing');
             await runBrowserGroup('checkDistributionPlot', checkDistributionPlot);
             await runBrowserGroup('checkComplexGrid', checkComplexGrid);
+            await runBrowserGroup('checkLogarithmicCurveZoom', checkLogarithmicCurveZoom);
             await runBrowserGroup('checkAsynchronousPlot', checkAsynchronousPlot);
             const plotRendered = (document.getElementById('plotRendered')! as LabTestPlotHost);
             WorksheetBindings.controller.setExpressionEditor('asin(x)');
@@ -2472,7 +2945,8 @@
             (document.getElementById('plotLower')! as HTMLInputElement).value = '-@pi';
             (document.getElementById('plotUpper')! as HTMLInputElement).value = '@pi';
             await WorksheetRequests.plots.takePlot('x');
-            check(!plotRendered.classList.contains('error'), 'Native plot request failed');
+            check(!plotRendered.classList.contains('error'), 'Native plot request failed: ' +
+                  plotRendered.textContent + ' / ' + document.getElementById('plotFeedback')!.textContent);
             check(!!plotRendered.querySelector<HTMLElement>('svg [data-series="0"]')!, 'Plot SVG was not displayed');
             check(document.querySelector<HTMLElement>('#plotCard .card-title > span')!.textContent === 'Plot', 'Plot card title missing');
             check(!!plotRendered.querySelector<SVGTextElement>('svg [data-plot-title] use')! && plotRendered.dataset.displayTex!.includes('\\sin'),
@@ -2483,7 +2957,7 @@
                   'Plot copy and mathematical rendering belong to independent cards');
             const plotCard = plotRendered.closest<HTMLElement>('.result-card')!;
             const plotExpand = plotCard.querySelector<HTMLElement>('[data-expand-card]')!;
-            const nextLayout = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            const nextLayout = () => LabTestBrowser.paint();
             setResultZoom(plotCard, 3);
             await nextLayout();
             await runBrowserGroup('checkPlotWheelZoom', checkPlotWheelZoom);
@@ -2666,7 +3140,7 @@
                       'Initial horizontal ticks must increase left to right and height ticks bottom to top');
             }
             const plotControls = document.getElementById('plotRange')!;
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await LabTestBrowser.paint();
             const manualRadio = document.querySelector<HTMLInputElement>('#plotScaleChoices input[value="manual"]')!;
             manualRadio.click();
             check(document.getElementById('plotVertical')!.getClientRects().length > 0 &&
@@ -2699,12 +3173,17 @@
                 const slider = (document.getElementById(id)! as LabTestPlotInput);
                 const field = slider.closest<HTMLElement>('.plot-field')!;
                 check(Math.abs(slider.getBoundingClientRect().width - field.getBoundingClientRect().width) < 1 &&
-                      slider.getBoundingClientRect().height >= (matchMedia('(pointer: coarse)').matches ? 36 : 28) &&
+                      slider.getBoundingClientRect().height + 0.01 >= (matchMedia('(pointer: coarse)').matches ? 36 : 28) &&
                       Math.abs(field.querySelector('output')!.getBoundingClientRect().top -
                           field.querySelector('label')!.getBoundingClientRect().top) < 1 &&
                       field.querySelector('label')!.getBoundingClientRect().bottom <=
-                          slider.getBoundingClientRect().top,
-                      'Camera values sit beside labels above full-width sliders with touch-sized targets');
+                          slider.getBoundingClientRect().top + 0.01,
+                      'Camera values sit beside labels above full-width sliders with touch-sized targets: ' +
+                      JSON.stringify({id, slider: slider.getBoundingClientRect(), field: field.getBoundingClientRect(),
+                          output: field.querySelector('output')!.getBoundingClientRect(),
+                          label: field.querySelector('label')!.getBoundingClientRect(),
+                          camera: document.getElementById('plotCamera')!.className,
+                          plot: plotRendered.className, feedback: document.getElementById('plotFeedback')!.textContent}));
             }
             const savedCardWidth = plotCard.style.width;
             plotCard.style.width = '360px';
@@ -2720,7 +3199,7 @@
             check(document.getElementById('plotCamera')!.classList.contains('plot-options-card') &&
                   plotControls.firstElementChild!.id === 'plotCamera' &&
                   document.getElementById('plotCamera')!.getBoundingClientRect().bottom <=
-                      document.getElementById('plotVertical')!.getBoundingClientRect().top &&
+                      document.getElementById('plotVertical')!.getBoundingClientRect().top + 0.01 &&
                   !document.querySelector<HTMLElement>('#plotCamera .plot-hint')!,
                   'Compact camera controls come first below the chart, with gestures in Help');
             const zoomSlider = (document.getElementById('plotZoom')! as HTMLInputElement);
@@ -2728,8 +3207,8 @@
             zoomSlider.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, button: 0, isPrimary: true}));
             zoomSlider.value = '1';
             zoomSlider.dispatchEvent(new Event('input', {bubbles: true}));
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            await new Promise(resolve => setTimeout(resolve, 450));
+            await LabTestBrowser.paint();
+            await LabTestBrowser.wait(450);
             check(Number(plotRendered.querySelector<SVGSVGElement>('[data-surface]')!.dataset.cameraZoom) === 2 &&
                   document.getElementById('plotZoomValue')!.textContent === '200%' &&
                   WorksheetRequests.labRequests.latestMain() === zoomToken,
@@ -2737,7 +3216,7 @@
             zoomSlider.dispatchEvent(new Event('change', {bubbles: true}));
             await waitForVolume();
             plotCard.querySelector<HTMLElement>('[data-zoom-reset]')!.click();
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await LabTestBrowser.paint();
             check(zoomSlider.value === '0' && document.getElementById('plotZoomValue')!.textContent === '100%',
                   'Camera reset synchronises the zoom slider and readout');
             await waitForVolume();
@@ -2769,7 +3248,7 @@
                   'Slider readouts must follow input before committing a redraw');
             check(plotRendered.querySelector<HTMLElement>('[data-series]')!.innerHTML === initialMesh,
                   'Slider input alone must not launch repeated native requests');
-            await new Promise(resolve => setTimeout(resolve, 450));
+            await LabTestBrowser.wait(450);
             check(plotRendered.querySelector<HTMLElement>('[data-local-camera="120,40,90"]')! &&
                   WorksheetRequests.labRequests.latestMain() === sliderRequest &&
                   plotRendered.querySelector<HTMLElement>('[data-series]')!.innerHTML === initialMesh,
@@ -2778,7 +3257,7 @@
             const rotationDeadline = performance.now() + 15000;
             while (plotRendered.marsPlotDrag.busy &&
                    performance.now() < rotationDeadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             check(!!plotRendered.querySelector<HTMLElement>('[data-local-camera="120,40,90"]')! &&
                   WorksheetRequests.labRequests.latestMain() === sliderRequest,
                   'Committing camera sliders keeps the local camera without native sampling');
@@ -2815,7 +3294,7 @@
             (document.getElementById('plotAzimuth')! as HTMLInputElement).dispatchEvent(new Event('change', {bubbles: true}));
             const updateDeadline = performance.now() + 15000;
             while (plotRendered.marsPlotDrag.busy && performance.now() < updateDeadline)
-                await new Promise(resolve => setTimeout(resolve, 25));
+                await LabTestBrowser.wait(25);
             check(Number(plotRendered.querySelector<SVGSVGElement>('[data-local-camera]')?.dataset.localCamera!.split(',')[0]) === 75 &&
                   WorksheetContext.labWorkspace.classList.contains('result-card-expanded'),
                   'Live plotting must work without leaving the expanded card');
@@ -2913,7 +3392,7 @@
                     send(window, 'pointermove', 140, 110);
                     const deadline = performance.now() + 20000;
                     while (!plotRendered.querySelector<HTMLElement>('[data-local-renderer]')! && performance.now() < deadline)
-                        await new Promise(resolve => setTimeout(resolve, 25));
+                        await LabTestBrowser.wait(25);
                     const preview = plotRendered.querySelector<SVGSVGElement>('[data-local-renderer]')!;
                     check(preview === initialChart && WorksheetRequests.labRequests.latestMain() === initialRequest &&
                           plotRendered.marsPlotDrag.active && plotRendered.querySelector<HTMLCanvasElement>('[data-surface-overlay] canvas')!,
@@ -2922,7 +3401,7 @@
                     const finish = performance.now() + 20000;
                     while ((plotRendered.marsPlotDrag.busy ||
                             !plotRendered.querySelector<HTMLElement>('[data-plot-quality="full"]')!) && performance.now() < finish)
-                        await new Promise(resolve => setTimeout(resolve, 25));
+                        await LabTestBrowser.wait(25);
                     const full = plotRendered.querySelector<SVGSVGElement>('[data-plot-quality="full"]')!;
                     check(full === initialChart && plotRendered.querySelector<HTMLElement>('[data-local-renderer]')! &&
                           WorksheetRequests.labRequests.latestMain() === initialRequest && !plotRendered.marsPlotDrag.busy &&
@@ -2932,7 +3411,7 @@
                     initialChart.dispatchEvent(new WheelEvent('wheel', {
                         deltaY: 100, altKey: true, bubbles: true, cancelable: true
                     }));
-                    await new Promise(resolve => setTimeout(resolve, 450));
+                    await LabTestBrowser.wait(450);
                     check(WorksheetRequests.labRequests.latestMain() === initialRequest &&
                           labSurfacePreview.snapshot()!.orientation.some((v, i) => Math.abs(v - orientation[i]) > 0.001),
                           'Equation-mode wheel rotation uses the same persistent camera as expression mode');
@@ -2942,7 +3421,7 @@
                     const retained = plotRendered.querySelector<SVGSVGElement>('[data-surface]')!;
                     const generation = WorksheetRequests.labRequests.latestMain();
                     for (let step = 0; step < 5; step++) card.querySelector<HTMLElement>('[data-zoom-step="1"]')!.click();
-                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    await LabTestBrowser.paint();
                     check(retained.isConnected && retained.querySelector<HTMLElement>('[data-uv]')! &&
                           Number(retained.dataset.cameraZoom) > 3 && WorksheetRequests.labRequests.latestMain() === generation,
                           'Volume preview stays interactive even when the selected sphere interior is empty');
@@ -2952,14 +3431,14 @@
                           'Native sampling of the empty sphere interior retains interactive axes');
                     labDOM.call('lab_layout_plot', null, 'Plot request timed out');
                     for (let step = 0; step < 5; step++) card.querySelector<HTMLElement>('[data-zoom-step="-1"]')!.click();
-                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    await LabTestBrowser.paint();
                     check(empty.isConnected && Math.abs(Number(empty.dataset.cameraZoom) - 1) < 1e-10,
                           'A retained surface can still zoom back out after a failed redraw');
                     await waitForVolume();
                     check(plotRendered.querySelector<SVGSVGElement>('[data-surface] [data-uv]')!,
                           'Zooming out of an empty volume samples the sphere again');
                     card.querySelector<HTMLElement>('[data-zoom-reset]')!.click();
-                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    await LabTestBrowser.paint();
                     check((document.getElementById('plotScale')! as HTMLInputElement).value === 'auto',
                           'Volume reset restores automatic mathematical bounds');
                     await waitForVolume();
@@ -3094,7 +3573,7 @@
                         plotRendered.querySelector<HTMLElement>('[data-series]')! !== beforeUpdate &&
                         plotRendered.querySelector<HTMLElement>('[data-plot-label="1"]')!;
                     while (!updated() && performance.now() < deadline)
-                        await new Promise(resolve => setTimeout(resolve, 25));
+                        await LabTestBrowser.wait(25);
                     const ticks = [...plotRendered.querySelectorAll<HTMLElement>('[data-plot-label="1"]')].map(t => Number(t.textContent));
                     check(plotRendered.querySelector<HTMLElement>('[data-series]')! !== beforeUpdate && ticks.includes(-1) &&
                           ticks.includes(1) && ticks.every(t => t >= -2 && t <= 2),
@@ -3284,7 +3763,7 @@
             // request/evaluation/installation path; do not mock the result installer.
             const beforeCalendarFetch = window.fetch;
             const [almanacFixture] = window.labAlmanacFixtures();
-            let almanacReply: Partial<LabTestAlmanacFixture> & {ok: boolean} = {...almanacFixture, ok: true};
+            let almanacReply: LabTestAlmanacReply = {...almanacFixture, ok: true};
             window.fetch = (url, options) => String(url) === '/almanac-eval' ?
                 Promise.resolve(
                     new Response(labWire.encode(almanacReply), {headers: {'Content-Type': 'application/x-protobuf'}})) :

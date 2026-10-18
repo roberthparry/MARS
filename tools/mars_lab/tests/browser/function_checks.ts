@@ -6,44 +6,66 @@
  */
 
 /// <reference path="./function_checks.d.ts" />
-/** Function-card native projection and asynchronous execution ownership regressions. */
+/** @brief Check function-card native projection and asynchronous execution ownership. */
 window.checkLabFunction = async function checkLabFunction() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Function: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const native = labWire.exports(), savedMode = WorksheetWorkspace.mode.currentMode();
-    const savedFetch = window.fetch, savedPost = WorksheetRequests.labRequests.post;
-    const nodes = [WorksheetContext.functionTitle, WorksheetContext.functionStyle, WorksheetContext.functionRun, WorksheetContext.functionRunResult, WorksheetContext.functionRunOutput];
-    const savedNodes = nodes.map(
-        node => ({node, children: [...node.childNodes], attributes: [...node.attributes].map(a => [a.name, a.value])}));
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    const native = labWire.exports();
+    const savedMode = WorksheetWorkspace.mode.currentMode();
+    const savedFetch = window.fetch;
+    const savedPost = WorksheetRequests.labRequests.post;
+    const nodes = [
+        WorksheetContext.functionTitle, WorksheetContext.functionStyle, WorksheetContext.functionRun,
+        WorksheetContext.functionRunResult, WorksheetContext.functionRunOutput
+    ];
+    const savedNodes: LabFunctionNodeSnapshot[] = [];
+    for (const node of nodes) {
+        const children = [...node.childNodes];
+        const attributes: LabFunctionAttribute[] = [];
+        for (const attribute of node.attributes) {
+            attributes.push({name: attribute.name, value: attribute.value});
+        }
+        savedNodes.push({node, children, attributes});
+    }
     const originals = new Map<string, unknown>();
     const requests: (WorksheetRequests.MarsApiRequest | null | undefined)[] = [];
-    const pending: {task: Promise<unknown>; gate: LabTestDeferred<Response>}[] = [];
+    const pending: LabFunctionPendingRequest[] = [];
     const events: [unknown, unknown][] = [];
-    const replace = (name: string, callback: unknown) => {
+    /** @brief Replace a fixture service while retaining its first implementation for cleanup. */
+    function replace(name: string, callback: unknown): void {
         if (!originals.has(name))
             originals.set(name, Reflect.get(labTestModuleOwner(name), name));
         Reflect.set(labTestModuleOwner(name), name, callback);
-    };
-    const deferred = <T>(): LabTestDeferred<T> => {
-        let resolve!: LabTestDeferred<T>['resolve'], reject!: LabTestDeferred<T>['reject'];
-        const promise = new Promise<T>((accept, fail) => {
-            resolve = accept;
-            reject = fail;
-        });
-        return {promise, resolve, reject};
-    };
-    const response = (data: unknown, status = 200) =>
-        new Response(labWire.encode(data), {status, headers: {'Content-Type': 'application/x-protobuf'}});
-    const complete = (outcome: number, data: unknown = {}, timeout = false, error: unknown = null) =>
-        labDOM.call('lab_function_complete', outcome, Number(timeout), data, error);
-    const messageView = (error: {message: unknown}) => ({
-        get message() {
-            return String(error.message);
-        }
-    });
+    }
+
+    /** @brief Encode a fixture reply using the production wire format. */
+    function response(data: unknown, status = 200): Response {
+        return new Response(labWire.encode(data), {status, headers: {'Content-Type': 'application/x-protobuf'}});
+    }
+
+    /** @brief Project a completion through the native function-card policy. */
+    function complete(outcome: number, data: unknown = {}, timeout = false, error: unknown = null) {
+        return labDOM.call('lab_function_complete', outcome, Number(timeout), data, error);
+    }
+
+    /** @brief Defer browser message conversion until the native policy reads it. */
+    function messageView(error: {message: unknown}) {
+        return {
+            get message() {
+                return String(error.message);
+            }
+        };
+    }
+
+    /** @brief Reject a wrapper that completes before entering its fetch adapter. */
+    function requestDidNotStart(): never {
+        throw new Error('Function: request was not started');
+    }
     let mode = 'expression';
     try {
         WorksheetContext.functionRun.disabled = false;
@@ -101,11 +123,14 @@ window.checkLabFunction = async function checkLabFunction() {
         for (const output of ['', ' \n', '  partial μ\n']) {
             for (const error of ['', ' \t ', ' native diagnostic \n']) {
                 complete(1, {output, error});
+                const partialOutput = String(output || '').trimEnd();
+                const diagnostic = String(error || '').trim() || 'Programme execution failed.';
+                let expected = diagnostic;
+                if (partialOutput) {
+                    expected = partialOutput + '\n\n' + diagnostic;
+                }
                 equal(
-                    WorksheetContext.functionRunOutput.textContent,
-                    [String(output || '').trimEnd(), String(error || '').trim() || 'Programme execution failed.']
-                        .filter(Boolean)
-                        .join('\n\n'),
+                    WorksheetContext.functionRunOutput.textContent, expected,
                     'failed output and diagnostic composition');
             }
         }
@@ -125,11 +150,14 @@ window.checkLabFunction = async function checkLabFunction() {
                     },
                     timeout);
                 equal(reads.join(','), 'output,error', 'both fields read in order, even on timeout or success');
+                let expected = '  text\n\ndiagnostic';
+                if (outcome === 2) {
+                    expected = '  text';
+                } else if (timeout) {
+                    expected = 'Execution request timed out.';
+                }
                 equal(
-                    WorksheetContext.functionRunOutput.textContent,
-                    outcome === 2 ? '  text' :
-                        timeout   ? 'Execution request timed out.' :
-                                    '  text\n\ndiagnostic',
+                    WorksheetContext.functionRunOutput.textContent, expected,
                     'timeout precedence');
             }
         }
@@ -150,7 +178,7 @@ window.checkLabFunction = async function checkLabFunction() {
         replace('currentMode', () => mode);
         replace('setBusy', () => {});
         replace('setActionRunning', (button: unknown, running: unknown) => events.push([button, running]));
-        WorksheetRequests.labRequests.post = (request, ...args) => {
+        WorksheetRequests.labRequests.post = function captureRequest(request, ...args) {
             requests.push(request);
             return savedPost(request, ...args);
         };
@@ -159,7 +187,7 @@ window.checkLabFunction = async function checkLabFunction() {
         WorksheetContext.functionStyle.dataset.fullText = ' \nexact full programme μ\n ';
         const source = WorksheetContext.functionStyle.dataset.fullText.trim();
         let fetches = 0;
-        window.fetch = () => {
+        window.fetch = function rejectIneligibleFetch() {
             ++fetches;
             throw new Error('ineligible card cannot fetch');
         };
@@ -181,15 +209,18 @@ window.checkLabFunction = async function checkLabFunction() {
                  of ['success', 'empty success', 'native failure', 'HTTP failure', 'network failure',
                      'undefined message', 'null message', 'timeout response', 'timeout catch', 'stale success',
                      'stale failure', 'stale catch']) {
-            const gate = deferred<Response>(), entered = deferred<void>();
+            const gate = LabTestBrowser.responseGate();
+            const entered = LabTestBrowser.signal();
             let signal: AbortSignal | null = null;
             WorksheetContext.functionRun.disabled = false;
             WorksheetContext.functionTitle.textContent = 'Function';
-            window.fetch = (url, options) => {
+            window.fetch = function captureFunctionFetch(url, options) {
                 entered.resolve();
                 ++fetches;
                 equal(String(url), '/function-run', 'native programme endpoint');
-                if (!(options?.body instanceof Uint8Array) || !options.signal) throw new Error('Missing binary request or signal');
+                if (!(options?.body instanceof Uint8Array) || !options.signal) {
+                    throw new Error('Missing binary request or signal');
+                }
                 const payload = labWire.decode(options.body as Uint8Array<ArrayBuffer>) as {source: string};
                 equal(payload.source, source, 'executes full source, not abbreviated visible text');
                 signal = options.signal;
@@ -197,14 +228,12 @@ window.checkLabFunction = async function checkLabFunction() {
             };
             const task = WorksheetRequests.functionCard.runFunctionCard();
             pending.push({task, gate});
-            await Promise.race([
-                entered.promise, task.then(() => {
-                    throw new Error('Function: request was not started');
-                })
-            ]);
+            await Promise.race([entered.promise, task.then(requestDidNotStart)]);
             const request = requests.at(-1);
             check(request, 'real wrapper creates a native request');
-            if (!request) throw new Error('Missing native request');
+            if (!request) {
+                throw new Error('Missing native request');
+            }
             equal(WorksheetContext.functionRunOutput.textContent, 'Running…', 'real wrapper projects running status');
             equal(WorksheetContext.functionRun.disabled, true, 'real wrapper disables button during request');
             check(!WorksheetContext.functionRunResult.classList.contains('hidden'), 'real wrapper reveals output');
@@ -238,7 +267,7 @@ window.checkLabFunction = async function checkLabFunction() {
                 equal(WorksheetContext.functionRun.disabled, true, 'stale finaliser cannot enable a newer button');
                 check(WorksheetRequests.labRequests.busy(), 'stale finaliser preserves replacement evaluation ownership');
             } else {
-                const expected: Record<string, string> = {
+                const expected: LabFunctionExpectedOutputs = {
                     success: '  native output μ',
                     'empty success': 'Programme completed without output.',
                     'native failure': '  native output μ\n\nnative failure detail',
@@ -258,7 +287,7 @@ window.checkLabFunction = async function checkLabFunction() {
         }
         // A diagnostic getter may itself fail; the native continuation must still run the original finaliser.
         const diagnosticFailure = new Error('diagnostic getter failure');
-        window.fetch = async () => {
+        window.fetch = async function rejectDiagnosticFetch() {
             throw {
                 get message() {
                     throw diagnosticFailure;
@@ -287,16 +316,24 @@ window.checkLabFunction = async function checkLabFunction() {
                 // Preserve the original assertion while releasing suspended fixtures.
             }
         }
-        for (const request of requests)
-            if (request)
+        for (const request of requests) {
+            if (request) {
                 WorksheetRequests.labRequests.finish(request);
+            }
+        }
         window.fetch = savedFetch;
         WorksheetRequests.labRequests.post = savedPost;
-        for (const [name, callback] of originals) Reflect.set(labTestModuleOwner(name), name, callback);
+        for (const [name, callback] of originals) {
+            Reflect.set(labTestModuleOwner(name), name, callback);
+        }
         WorksheetRequests.labRequests.modeChanged(savedMode);
         for (const {node, children, attributes} of savedNodes) {
-            for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
-            for (const [name, value] of attributes) node.setAttribute(name, value);
+            for (const attribute of [...node.attributes]) {
+                node.removeAttribute(attribute.name);
+            }
+            for (const attribute of attributes) {
+                node.setAttribute(attribute.name, attribute.value);
+            }
             node.replaceChildren(...children);
         }
     }

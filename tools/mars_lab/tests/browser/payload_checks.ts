@@ -5,29 +5,82 @@
  * Checks exact wire fields through the real codec and scoped bridge, including background application and ownership guards.
  */
 
-/** Payload construction and guarded background application through the real scoped C/WASM bridge. */
+/** @brief Wire fields inspected individually by the payload assertions. */
+interface LabPayloadRecord {
+    [field: string]: unknown;
+}
+
+/** @brief Native ownership fields required by the payload builder. */
+interface LabPayloadRequest {
+    channel: number;
+    token: number;
+    plotKind?: string;
+}
+
+/** @brief Native payload with an ordered list of event identifiers. */
+interface LabPayloadLandResult extends LabPayloadRecord {
+    events: {jd: string}[];
+}
+
+/** @brief Mobile panel descendants and classes retained for restoration. */
+interface LabPayloadMobileSnapshot {
+    node: HTMLElement;
+    children: ChildNode[];
+    className: string;
+}
+
+/** @brief Request observed by the evaluation transport fixture. */
+interface LabPayloadSentRequest {
+    request: unknown;
+    payload: LabPayloadRecord;
+    endpoint: string;
+    signal?: AbortSignal;
+}
+
+/** @brief Check payload construction and guarded background application through the real C/WASM bridge. */
 window.checkLabPayload = async function checkLabPayload() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Native payload: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const decodeRecord = (buffer: MarsTransportBuffer): Record<string, unknown> => {
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    /** @brief Decode a payload and require the same non-array object shape as the wire checks. */
+    function decodeRecord(buffer: MarsTransportBuffer): LabPayloadRecord {
         const value = labWire.decode(buffer);
-        const isRecord = (item: unknown): item is Record<string, unknown> =>
-            typeof item === 'object' && item !== null && !Array.isArray(item);
-        if (!isRecord(value)) throw new Error('Expected a decoded payload record');
-        return value;
-    };
-    const build = (kind: number, inputs: unknown[], request: {channel: number; token: number; plotKind?: string} | null = null) =>
-        labDOM.call<Record<string, unknown>>('lab_payload_build', kind, inputs, request, 256, 1700000000123);
-    const shape = (record: object, keys: string[]) => equal(Object.keys(record).sort().join(), keys.sort().join(), 'exact wire fields');
-    const controls =
-        [WorksheetContext.expr, WorksheetContext.matrixOperation, WorksheetContext.matrixOperand, WorksheetContext.almanacJurisdiction, WorksheetContext.almanacZone, WorksheetContext.almanacLatitude, WorksheetContext.almanacLongitude];
+        if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+            throw new Error('Expected a decoded payload record');
+        }
+        return value as LabPayloadRecord;
+    }
+
+    /** @brief Build a native payload with fixed precision and timestamp fixtures. */
+    function build(kind: number, inputs: unknown[], request: LabPayloadRequest | null = null): LabPayloadRecord {
+        return labDOM.call<LabPayloadRecord>('lab_payload_build', kind, inputs, request, 256, 1700000000123);
+    }
+
+    /** @brief Compare all wire keys, including the absence of additional fields. */
+    function shape(record: object, keys: string[]): void {
+        equal(Object.keys(record).sort().join(), keys.sort().join(), 'exact wire fields');
+    }
+
+    const controls = [
+        WorksheetContext.expr, WorksheetContext.matrixOperation, WorksheetContext.matrixOperand,
+        WorksheetContext.almanacJurisdiction, WorksheetContext.almanacZone,
+        WorksheetContext.almanacLatitude, WorksheetContext.almanacLongitude
+    ];
     const savedValues = controls.map(node => node?.value);
-    const mobileNodes = [WorksheetContext.mobileAccess, WorksheetContext.mobileTitle, WorksheetContext.mobileHint, WorksheetContext.mobileUrl, WorksheetContext.mobileQr].filter(Boolean);
-    const mobileSaved =
-        mobileNodes.map(node => ({node, children: Array.from(node.childNodes), className: node.className}));
+    const mobileNodes = [
+        WorksheetContext.mobileAccess, WorksheetContext.mobileTitle, WorksheetContext.mobileHint,
+        WorksheetContext.mobileUrl, WorksheetContext.mobileQr
+    ];
+    const mobileSaved: LabPayloadMobileSnapshot[] = [];
+    for (const node of mobileNodes) {
+        if (node) {
+            mobileSaved.push({node, children: Array.from(node.childNodes), className: node.className});
+        }
+    }
     const native = labWire.exports();
     try {
         equal(build(99, []), null, 'unknown builder rejected');
@@ -163,11 +216,12 @@ window.checkLabPayload = async function checkLabPayload() {
         equal(weather.latitude, '0', 'coordinate string is not numerically reinterpreted');
         equal(weather.longitude, '-0', 'signed coordinate text retained');
 
-        const cell = (jd: string) => {
+        /** @brief Create one detached destination for a native event result. */
+        function cell(jd: string): HTMLSpanElement {
             const node = document.createElement('span');
             node.dataset.almanacLandTotality = jd;
             return node;
-        };
+        }
         const cells = [' 2450000.5 ', '__proto__', 'constructor', 'missing', 'empty'].map(cell);
         const fields = {
             event_year: '2027',
@@ -176,7 +230,8 @@ window.checkLabPayload = async function checkLabPayload() {
             latitude: ' 0 ',
             longitude: ' -0 '
         };
-        const land = labDOM.call<Record<string, unknown> & {events: {jd: string}[]}>('lab_payload_land', {event_year: '2028', fields}, cells, labApplication.configuration);
+        const land = labDOM.call<LabPayloadLandResult>(
+            'lab_payload_land', {event_year: '2028', fields}, cells, labApplication.configuration);
         shape(land, ['event_year', 'jurisdiction', 'zone', 'latitude', 'longitude', 'events']);
         equal(land.event_year, '2028', 'top-level event year precedence');
         equal(land.latitude, fields.latitude, 'native request field whitespace preserved');
@@ -184,12 +239,13 @@ window.checkLabPayload = async function checkLabPayload() {
         equal(land.jurisdiction, fields.jurisdiction, 'native jurisdiction precedence');
         equal(land.zone, fields.zone, 'native zone precedence');
         equal(land.events[0].jd, '2450000.5', 'event identifier boundary whitespace trimmed');
-        equal(labDOM.call<Record<string, unknown> & {events: {jd: string}[]}>('lab_payload_land', {fields}, [], labApplication.configuration).event_year, '2027', 'nested year fallback');
+        equal(labDOM.call<LabPayloadLandResult>('lab_payload_land', {fields}, [], labApplication.configuration).event_year,
+              '2027', 'nested year fallback');
         for (const node of [WorksheetContext.almanacJurisdiction, WorksheetContext.almanacZone, WorksheetContext.almanacLatitude, WorksheetContext.almanacLongitude]) {
             if (node)
                 node.value = '';
         }
-        const defaults = labDOM.call<Record<string, unknown> & {events: {jd: string}[]}>('lab_payload_land', {}, [], labApplication.configuration);
+        const defaults = labDOM.call<LabPayloadLandResult>('lab_payload_land', {}, [], labApplication.configuration);
         equal(defaults.event_year, '', 'absent event year');
         equal(defaults.jurisdiction, WorksheetContext.DEFAULT_DATETIME_JURISDICTION, 'bootstrap jurisdiction fallback');
         equal(defaults.zone, WorksheetContext.DEFAULT_ALMANAC_ZONE, 'bootstrap zone fallback');
@@ -197,7 +253,8 @@ window.checkLabPayload = async function checkLabPayload() {
         equal(defaults.longitude, WorksheetContext.DEFAULT_ALMANAC_LONGITUDE, 'bootstrap longitude fallback');
         WorksheetContext.almanacLatitude.value = ' 51.5 ';
         equal(
-            labDOM.call<Record<string, unknown> & {events: {jd: string}[]}>('lab_payload_land', {}, [], labApplication.configuration).latitude, WorksheetContext.almanacLatitude.value,
+            labDOM.call<LabPayloadLandResult>('lab_payload_land', {}, [], labApplication.configuration).latitude,
+            WorksheetContext.almanacLatitude.value,
             'control fallback is passed through verbatim');
 
         const items = [
@@ -217,12 +274,17 @@ window.checkLabPayload = async function checkLabPayload() {
             labDOM.call('lab_payload_land_apply', cells, {items}, failure);
             equal(cells[0].textContent, expected, 'failed request cannot install result markup');
         }
-        const many = Array.from({length: 1200}, (_, index) => cell(String(index)));
-        const manyPayload = labDOM.call<Record<string, unknown> & {events: {jd: string}[]}>('lab_payload_land', {}, many, labApplication.configuration);
+        const many: HTMLSpanElement[] = [];
+        for (let index = 0; index < 1200; ++index) {
+            many.push(cell(String(index)));
+        }
+        const manyPayload = labDOM.call<LabPayloadLandResult>('lab_payload_land', {}, many, labApplication.configuration);
         equal(manyPayload.events.length, many.length, 'payload handle scopes support long event lists');
-        labDOM.call(
-            'lab_payload_land_apply', many,
-            {items: many.map((node, index) => ({jd: String(index), html: `<b>${index}</b>`}))}, 0);
+        const manyItems: {jd: string; html: string}[] = [];
+        for (let index = 0; index < many.length; ++index) {
+            manyItems.push({jd: String(index), html: `<b>${index}</b>`});
+        }
+        labDOM.call('lab_payload_land_apply', many, {items: manyItems}, 0);
         equal(many[1199].innerHTML, '<b>1199</b>', 'reply handle scopes support long event lists');
 
         if (WorksheetContext.mobileAccess && WorksheetContext.mobileUrl && WorksheetContext.mobileQr) {
@@ -241,15 +303,18 @@ window.checkLabPayload = async function checkLabPayload() {
             equal(WorksheetContext.mobileQr.innerHTML, '', 'absent QR cleared');
         }
     } finally {
-        controls.forEach((node, index) => {
-            if (node)
+        for (let index = 0; index < controls.length; ++index) {
+            const node = controls[index];
+            if (node) {
                 node.value = savedValues[index]!;
-        });
+            }
+        }
         // Restore descendants before their parent so original node identities survive.
-        mobileSaved.reverse().forEach(({node, children, className}) => {
-            node.replaceChildren(...children);
-            node.className = className;
-        });
+        for (let index = mobileSaved.length - 1; index >= 0; --index) {
+            const snapshot = mobileSaved[index];
+            snapshot.node.replaceChildren(...snapshot.children);
+            snapshot.node.className = snapshot.className;
+        }
         WorksheetRequests.labRequests.modeChanged(WorksheetWorkspace.mode.currentMode());
     }
 
@@ -265,9 +330,12 @@ window.checkLabPayload = async function checkLabPayload() {
     const savedRefresh = WorksheetWorkspace.integrator.refreshIntegratorForms;
     const savedChildren = Array.from(WorksheetContext.rendered.childNodes);
     try {
-        const sent: {request: unknown; payload: Record<string, unknown>; endpoint: string; signal?: AbortSignal}[] = [], savedModes: string[] = [];
+        const sent: LabPayloadSentRequest[] = [];
+        const savedModes: string[] = [];
         const nativeResult = {ok: true, presentation: {unknown_native_metadata: ['opaque']}};
-        Reflect.set(WorksheetRequests.labRequests, 'post', async (request: unknown, payload: Record<string, unknown>, endpoint: string, signal?: AbortSignal) => {
+        Reflect.set(WorksheetRequests.labRequests, 'post', async function recordPost(
+            request: unknown, payload: LabPayloadRecord, endpoint: string, signal?: AbortSignal
+        ) {
             sent.push({request, payload, endpoint, signal});
             return {response: {ok: true}, data: nativeResult};
         });
@@ -286,17 +354,34 @@ window.checkLabPayload = async function checkLabPayload() {
         await WorksheetRequests.evaluationTransport.fetchDatetimeWeather({date: '2026-10-10', latitude: '0', longitude: '0'}, controller.signal);
         equal(sent.at(-1)!.signal, controller.signal, 'weather retains host cancellation signal');
 
-        let context = 1, cancelled = '';
+        let context = 1;
+        let cancelled = '';
         let releaseRows!: (value: unknown) => void;
         const request = {} as WorksheetRequests.MarsApiRequest; // Ownership-only mock; no resource fields are consumed.
         WorksheetRequests.labRequests.context = () => context;
         WorksheetRequests.labRequests.current = () => true;
         WorksheetRequests.labRequests.cancel = operation => cancelled = operation;
-        Reflect.set(WorksheetWorkspace.integrator, 'refreshIntegratorForms', () => new Promise<unknown>(resolve => {
-            releaseRows = resolve;
-        }));
+        /** @brief Suspend row preparation at the same point as the request mock. */
+        function prepareRows(): Promise<unknown> {
+            return new Promise(function captureRows(resolve) {
+                releaseRows = resolve;
+            });
+        }
+
+        /** @brief Mark an unexpected successful stale preparation as a failed cancellation. */
+        function preparationCompleted(): boolean {
+            return false;
+        }
+
+        /** @brief Retain the existing cancellation diagnostic check. */
+        function preparationAborted(error: Error): boolean {
+            return error.name === 'AbortError';
+        }
+
+        Reflect.set(WorksheetWorkspace.integrator, 'refreshIntegratorForms', prepareRows);
         const before = sent.length;
-        const preparation = WorksheetRequests.evaluationTransport.fetchIntegratorEvaluation(request).then(() => false, error => error.name === 'AbortError');
+        const preparation = WorksheetRequests.evaluationTransport.fetchIntegratorEvaluation(request)
+            .then(preparationCompleted, preparationAborted);
         ++context;
         releaseRows([]);
         check(await preparation, 'integrator rechecks context after awaited form preparation');
@@ -307,17 +392,23 @@ window.checkLabPayload = async function checkLabPayload() {
         target.dataset.almanacLandTotality = '2450000.5';
         target.textContent = 'retained';
         WorksheetContext.rendered.replaceChildren(target);
-        let current = true, finished = 0;
+        let current = true;
+        let finished = 0;
         let releaseLand!: (value: unknown) => void;
         WorksheetRequests.labRequests.begin = () => request;
         WorksheetRequests.labRequests.current = () => current;
-        WorksheetRequests.labRequests.finish = owner => {
+        WorksheetRequests.labRequests.finish = function finishBackgroundRequest(owner) {
             equal(owner, request, 'background request ownership retained');
             ++finished;
         };
-        Reflect.set(WorksheetRequests.labRequests, 'post', () => new Promise<unknown>(resolve => {
-            releaseLand = resolve;
-        }));
+        /** @brief Suspend the complete background reply without changing its response shape. */
+        function postBackgroundRequest(): Promise<unknown> {
+            return new Promise(function captureReply(resolve) {
+                releaseLand = resolve;
+            });
+        }
+
+        Reflect.set(WorksheetRequests.labRequests, 'post', postBackgroundRequest);
         const pending = WorksheetRequests.calendarRequests.refreshAlmanacLandTotality({event_year: '2026'});
         current = false;
         releaseLand({response: {ok: true}, data: {ok: true, items: [{jd: '2450000.5', html: '<b>obsolete</b>'}]}});

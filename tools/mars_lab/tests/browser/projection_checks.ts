@@ -5,18 +5,27 @@
  * Exercises presentation through the real scoped WebAssembly bridge, keeping native-produced records distinct from browser effects.
  */
 
-/** Solver-card and persistence projection through the real scoped C/WASM bridge. */
-window.checkLabProjection = async function checkLabProjection() {
-    const check: LabTestCheck = (condition, message) => {
+/** @brief Check solver-card and persistence projection through the real scoped C/WASM bridge. */
+window.checkLabProjection = async function checkLabProjection(): Promise<void> {
+    /** @brief Report a failed projection assertion. */
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Native projection: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
+    }
+
+    /** @brief Compare projected values without coercion. */
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+
     const nodes = [WorksheetContext.rendered, WorksheetContext.renderedTitle, WorksheetContext.renderedMore, WorksheetContext.functionStyle, WorksheetContext.valueNote, WorksheetContext.valueNoteCard, WorksheetContext.valueTitle];
-    const saved = nodes.map(node => ({
-                                html: node.innerHTML,
-                                attributes: Array.from(node.attributes, attribute => [attribute.name, attribute.value] as const)
-                            }));
+    const saved: ProjectionFixtureElement[] = [];
+    for (const node of nodes) {
+        const attributes: [string, string][] = [];
+        for (const attribute of node.attributes)
+            attributes.push([attribute.name, attribute.value]);
+        saved.push({node, html: node.innerHTML, attributes});
+    }
     const equationField = WorksheetContext.equationVariable || document.createElement('input');
     if (!WorksheetContext.equationVariable) {
         equationField.id = 'equationVariable';
@@ -105,22 +114,25 @@ window.checkLabProjection = async function checkLabProjection() {
         check(WorksheetContext.valueNoteCard.classList.contains('hidden'), 'absent note hidden');
 
         const precision = {expression: 256};
-        const records = labDOM.call<{server: Record<string, unknown>; local: Record<string, unknown>}>('lab_persist_records', 4, ['source', 1000, '', '', '', 20000], precision);
+        const records = labDOM.call<ProjectionFixtureRecords>(
+            'lab_persist_records', 4, ['source', 1000, '', '', '', 20000], precision);
         equal(records.server.integrator_interval_cap, 20000, 'server cap is numeric');
         equal(records.local['mars.exprLab.lastIntegratorIntervalCap'], 20000, 'local source preserves scalar type');
         check(!Object.hasOwn(records.local, 'mars.exprLab.lastIntegratorBounds'), 'empty local bounds omitted');
         equal(records.server.integrator_bounds, '', 'server receives empty bounds');
         equal(records.server.precision_bits, precision, 'trusted precision view passed through');
         equal(
-            (labWire.decode(labWire.encode(records.server)) as Record<string, unknown>).integrator_interval_cap, 20000, 'record is valid Protobuf');
+            (labWire.decode(labWire.encode(records.server)) as ProjectionFixtureServer).integrator_interval_cap, 20000,
+            'record is valid Protobuf');
         equationField.value = '   ';
-        const history = labDOM.call<{variable: string; text: string; mode: string}>('lab_persist_history', 1, ' exact source ', null, '', '', labApplication.configuration);
+        const history = labDOM.call<ProjectionFixtureHistory>(
+            'lab_persist_history', 1, ' exact source ', null, '', '', labApplication.configuration);
         equal(history.variable, DEFAULT_EQUATION_VARIABLE_TEXT, 'history variable default');
         equal(history.text, 'exact source', 'history trims boundary whitespace only');
         equal(history.mode, 'equation', 'history mode from native index');
         equal(labDOM.call('lab_persist_history', -1, '', null, '', '', labApplication.configuration), null, 'invalid history mode');
         const calendar = {date: '2026-10-10', latitude: '52', zone: '1'};
-        const patch = labDOM.call<Record<string, unknown>>('lab_persist_calendar', 6, calendar, precision);
+        const patch = labDOM.call<ProjectionFixtureCalendar>('lab_persist_calendar', 6, calendar, precision);
         equal(patch.almanac_date, calendar.date, 'calendar prefix');
         equal(patch.almanac_zone, '1', 'calendar schema field');
         check(!Object.hasOwn(patch, 'almanac_gmt_offset'), 'calendar-specific schema');
@@ -129,12 +141,14 @@ window.checkLabProjection = async function checkLabProjection() {
             Object.defineProperty(WorksheetContext.rendered, 'clientWidth', savedWidth);
         else
             Reflect.deleteProperty(WorksheetContext.rendered, 'clientWidth');
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        nodes.forEach((node, index) => {
-            node.innerHTML = saved[index].html;
-            for (const attribute of Array.from(node.attributes)) node.removeAttribute(attribute.name);
-            for (const [name, value] of saved[index].attributes) node.setAttribute(name, value);
-        });
+        await LabTestBrowser.nextFrame();
+        for (const snapshot of saved) {
+            snapshot.node.innerHTML = snapshot.html;
+            for (const attribute of Array.from(snapshot.node.attributes))
+                snapshot.node.removeAttribute(attribute.name);
+            for (const [name, value] of snapshot.attributes)
+                snapshot.node.setAttribute(name, value);
+        }
         equationField.value = equationName;
         if (!WorksheetContext.equationVariable)
             equationField.remove();

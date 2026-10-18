@@ -9,6 +9,7 @@
  * Existing browser services retain asynchronous preparation and live-state accessors.
  */
 #include "lab_dom.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_binding_integrator_state.h"
 

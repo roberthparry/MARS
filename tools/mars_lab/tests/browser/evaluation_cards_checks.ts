@@ -7,26 +7,36 @@
 
 /** Native evaluation-card selection and real DOM projection checks; run sequentially after Lab readiness. */
 window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`Evaluation cards: ${message}`);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
     const caches = {
         editors: new Map([['native full', {display: 'native compact'}]]),
         expansions: new Map([['short TeX', new Map([['full TeX', true]])]]),
         solver: new Map([['solver: native solver\nstatus: reduced\nreason', 'cached solver TeX']])
     };
-    const plan = (mode: number, data: unknown = {}, text = '') => labDOM.call<EvaluationCardsFixture>('lab_evaluation_cards', mode, data, text, caches);
+    function plan(mode: number, data: unknown = {}, text = ''): EvaluationCardsFixture {
+        return labDOM.call<EvaluationCardsFixture>('lab_evaluation_cards', mode, data, text, caches);
+    }
     const selectors = [
         '#rendered', '#renderedMore', '#parsed', '#parsedMore', '#functionStyle', '#functionMore', '#value',
         '#valueMore', '#valueCard', '#valueTitle', '#valueNote', '#valueNoteCard', '#resultUseInput', '#targetRow',
         '#goalTarget', '#goalSeek', '#resultPane', '#helpPane', '#rightPaneTitle', '#help', '#status'
     ];
-    const snapshots = selectors.map(selector => document.querySelector<HTMLElement & {value?: string}>(selector)).filter(node => node !== null).map(node => ({
-        node, children: [...node.childNodes], value: node.value,
-        attributes: [...node.attributes].map(attribute => [attribute.name, attribute.value] as const)
-    }));
+    const snapshots: EvaluationCardsSnapshot[] = [];
+    for (const selector of selectors) {
+        const node = document.querySelector<HTMLElement & {value?: string}>(selector);
+        if (node === null)
+            continue;
+        const attributes: [string, string][] = [];
+        for (const attribute of node.attributes)
+            attributes.push([attribute.name, attribute.value]);
+        snapshots.push({node, children: [...node.childNodes], value: node.value, attributes});
+    }
     const saved = {
         lastTex: WorksheetWorkspace.presentation.state.lastTex, resultInputBindings: WorksheetWorkspace.presentation.state.resultInputBindings, clearFunctionRun: WorksheetRequests.functionCard.clearFunctionRun, scheduleRenderedTeXFit: WorksheetResults.renderedFit.schedule,
         requestAnimationFrame: window.requestAnimationFrame, focus: document.activeElement,
@@ -142,7 +152,7 @@ window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
         }
         check(failed, 'weather merging retains the strong native-markup guard');
         const state = {date: 'old', latitude: '1', longitude: '2', zone: 'retained'};
-        const request = labDOM.call<Record<string, string>>('lab_evaluation_weather_state', state, {fields: {
+        const request = labDOM.call<LabTestTextFields>('lab_evaluation_weather_state', state, {fields: {
             date: 'new', latitude: '0', longitude: ''
         }});
         equal(request.date, 'new', 'weather date uses evaluated field');
@@ -154,10 +164,12 @@ window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
         cards = plan(7, {expression: ' native full ', full_display_expression: 'reusable goal'}, 'native full');
         equal(cards.unchanged, true, 'goal status compares trimmed opaque native source');
         equal(cards.input, 'reusable goal', 'goal reuse selects full displayed source');
-        const goals: Parameters<typeof WorksheetRequests.goals.runGoalSeek>[] = [];
+        const goals: EvaluationCardsInvocation[] = [];
         WorksheetWorkspace.mode.currentMode = () => 'matrix';
         WorksheetBindings.editor.currentExpressionText = () => 'native source';
-        WorksheetRequests.goals.runGoalSeek = async (...args) => { goals.push(args); };
+        WorksheetRequests.goals.runGoalSeek = async function captureCardAction(source, target, start, options) {
+            goals.push({source, target, start, options});
+        };
         await WorksheetRequests.goals.startGoalSeekFromEvent();
         equal(goals.length, 0, 'goal event is inactive outside Expression mode');
         WorksheetWorkspace.mode.currentMode = () => 'expression';
@@ -167,9 +179,9 @@ window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
         check(!WorksheetContext.targetRow.classList.contains('hidden'), 'native goal preparation reveals target entry');
         WorksheetContext.goalTarget.value = '   ';
         await WorksheetRequests.goals.startGoalSeekFromEvent();
-        equal(goals[0][0], 'native source', 'goal event retains source');
-        equal(goals[0][1], '0', 'blank target defaults to zero');
-        equal(goals[0][3]!.commitBindings, true, 'goal event requests binding commit');
+        equal(goals[0].source, 'native source', 'goal event retains source');
+        equal(goals[0].target, '0', 'blank target defaults to zero');
+        equal(goals[0].options!.commitBindings, true, 'goal event requests binding commit');
         WorksheetBindings.editor.currentExpressionText = () => '';
         await WorksheetRequests.goals.startGoalSeekFromEvent();
         equal(goals.length, 1, 'empty source cannot start goal seeking');

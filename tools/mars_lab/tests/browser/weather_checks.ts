@@ -5,14 +5,32 @@
  * Uses native completion plans and real request wrappers with controlled services to check stale results and asynchronous ownership.
  */
 
-/** Native weather completion policy and real request-wrapper ownership regressions. */
+/** @brief Suspended weather request released during fixture cleanup. */
+interface LabWeatherPendingRequest {
+    task: Promise<unknown>;
+    gate: LabTestResponseGate;
+}
+
+/** @brief Wire fields captured by the weather fetch adapter. */
+interface LabWeatherRequestPayload {
+    date: string;
+    latitude: string;
+    longitude: string;
+}
+
+/** @brief Check native weather completion policy and real request-wrapper ownership. */
 window.checkLabWeather = async function checkLabWeather() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Weather: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const policy = (outcome: number, overview: unknown, data: unknown) => labDOM.call<LabWorksheetTestPlan>('lab_evaluation_weather_response', outcome, overview, data);
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    /** @brief Build a completion plan without applying its deferred services. */
+    function policy(outcome: number, overview: unknown, data: unknown): LabWorksheetTestPlan {
+        return labDOM.call<LabWorksheetTestPlan>('lab_evaluation_weather_response', outcome, overview, data);
+    }
     let reads = 0;
     const unread = new Proxy({}, {
         get() {
@@ -45,7 +63,7 @@ window.checkLabWeather = async function checkLabWeather() {
 
     const ordered: string[] = [];
     labDOM.services(success, {
-        installWeather: (overview, data) => {
+        installWeather(overview, data) {
             equal(overview, unread, 'deferred overview identity');
             equal(data, unread, 'deferred response identity');
             equal(policy(0, null, null), null, 'services execute outside the native scope');
@@ -55,44 +73,55 @@ window.checkLabWeather = async function checkLabWeather() {
     });
     equal(ordered.join(','), 'install,Ready', 'service execution order');
 
-    const savedMode = WorksheetWorkspace.mode.currentMode(), savedFetch = window.fetch;
+    const savedMode = WorksheetWorkspace.mode.currentMode();
+    const savedFetch = window.fetch;
     const originals = new Map<string, unknown>();
     const events: LabWorksheetWeatherEvent[] = [];
     const requests: (WorksheetRequests.MarsApiRequest | null)[] = [];
-    const pending: {task: Promise<unknown>; gate: LabTestDeferred<Response>}[] = [];
-    const replace = (name: string, callback: (...args: never[]) => unknown) => {
+    const pending: LabWeatherPendingRequest[] = [];
+
+    /** @brief Replace a service and retain its original implementation for cleanup. */
+    function replace(name: string, callback: unknown): void {
         if (!originals.has(name))
             originals.set(name, Reflect.get(labTestModuleOwner(name), name));
         Reflect.set(labTestModuleOwner(name), name, callback);
-    };
-    function named(name: 'status'): Extract<LabWorksheetWeatherEvent, ['status', string]>[];
-    function named(name: 'render'): Extract<LabWorksheetWeatherEvent, ['render', ...unknown[]]>[];
+    }
+
+    /** @brief Collect recorded status changes. */
+    function named(name: 'status'): ['status', string][];
+
+    /** @brief Collect recorded render calls. */
+    function named(name: 'render'): ['render', HTMLElement, null, LabWorksheetWeatherSection[], string][];
+
+    /** @brief Keep only events of the requested kind, retaining their order. */
     function named(name: 'status' | 'render'): LabWorksheetWeatherEvent[] {
         return events.filter(event => event[0] === name);
     }
-    const deferred = <T = void>(): LabTestDeferred<T> => {
-        let resolve!: (value: T | PromiseLike<T>) => void, reject!: (reason?: unknown) => void;
-        const promise = new Promise<T>((accept, fail) => {
-            resolve = accept;
-            reject = fail;
-        });
-        return {promise, resolve, reject};
-    };
-    const response = (data: unknown, status = 200) =>
-        new Response(labWire.encode(data), {status, headers: {'Content-Type': 'application/x-protobuf'}});
+    /** @brief Encode a reply using the production wire format. */
+    function response(data: unknown, status = 200): Response {
+        return new Response(labWire.encode(data), {status, headers: {'Content-Type': 'application/x-protobuf'}});
+    }
+
+    /** @brief Reject completion before the request enters the fetch adapter. */
+    function requestDidNotStart(): never {
+        throw new Error('Weather: wrapper completed without making the weather request');
+    }
     const state = Object.freeze({date: '2026-10-10', latitude: '52.7077', longitude: '-2.7541'});
     const calendar = Object.freeze({title: 'Calendar', html: '<p>Native calendar</p>'});
     const overview = Object.freeze({
         overview: 'original overview',
         overview_sections: Object.freeze([calendar, Object.freeze({title: 'Weather', html: '<p>Old weather</p>'})])
     });
-    let mode = 'datetime', markupError = false;
+    let mode = 'datetime';
+    let markupError = false;
     try {
         replace('currentMode', () => mode);
         replace('setStatus', (status: string) => events.push(['status', status]));
         replace('setBusy', () => {});
         replace('setActionRunning', () => {});
-        replace('renderDatetimeSections', (...args: [HTMLElement, null, LabWorksheetWeatherSection[], string]) => {
+        replace('renderDatetimeSections', function recordRender(
+            ...args: [HTMLElement, null, LabWorksheetWeatherSection[], string]
+        ): void {
             events.push(['render', ...args]);
             if (markupError)
                 throw new Error('Native weather markup unavailable');
@@ -108,12 +137,13 @@ window.checkLabWeather = async function checkLabWeather() {
             check(parent, 'fixture creates a parent DateTime evaluation');
             // Background weather remains valid after the parent evaluation has completed.
             WorksheetRequests.labRequests.finish(parent);
-            const gate = deferred<Response>(), entered = deferred();
+            const gate = LabTestBrowser.responseGate();
+            const entered = LabTestBrowser.signal();
             let signal!: AbortSignal;
-            window.fetch = (url, options) => {
+            window.fetch = function captureWeatherFetch(url, options) {
                 entered.resolve();
                 equal(String(url), '/datetime-weather', 'wrapper uses the weather route');
-                const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {date: string; latitude: string; longitude: string};
+                const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as LabWeatherRequestPayload;
                 equal(payload.date, state.date, 'captured weather date');
                 equal(payload.latitude, state.latitude, 'captured weather latitude');
                 equal(payload.longitude, state.longitude, 'captured weather longitude');
@@ -124,11 +154,7 @@ window.checkLabWeather = async function checkLabWeather() {
             events.length = 0;
             const task = WorksheetRequests.calendarRequests.refreshDatetimeWeather(parent!.token, state, overview)!;
             pending.push({task, gate});
-            await Promise.race([
-                entered.promise, task.then(() => {
-                    throw new Error('Weather: wrapper completed without making the weather request');
-                })
-            ]);
+            await Promise.race([entered.promise, task.then(requestDidNotStart)]);
             equal(
                 named('status').map(event => event[1]).join(','), 'Loading weather...',
                 'loading status precedes the asynchronous response');
@@ -197,11 +223,15 @@ window.checkLabWeather = async function checkLabWeather() {
                 // Restore host functions without masking the original assertion.
             }
         }
-        for (const request of requests)
-            if (request)
+        for (const request of requests) {
+            if (request) {
                 WorksheetRequests.labRequests.finish(request);
+            }
+        }
         window.fetch = savedFetch;
-        for (const [name, callback] of originals) Reflect.set(labTestModuleOwner(name), name, callback);
+        for (const [name, callback] of originals) {
+            Reflect.set(labTestModuleOwner(name), name, callback);
+        }
         WorksheetRequests.labRequests.modeChanged(savedMode);
     }
 };

@@ -7,32 +7,49 @@
 
 /** Workspace projection regressions against the live C/WASM controller and scoped DOM bridge. */
 window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
-    const check: LabTestCheck = (ok, message) => {
+    function check(ok: unknown, message: string): void {
         if (!ok)
             throw new Error('C workspace DOM: ' + message);
-    };
-    const hidden = (node: HTMLElement) => node.classList.contains('hidden');
+    }
+    function hidden(node: HTMLElement): boolean {
+        return node.classList.contains('hidden');
+    }
     const native = labWire.exports();
     const savedMode = native.lab_workspace_mode();
     const savedPrecision = native.lab_workspace_precision(savedMode);
     const savedExpansion = native.lab_view_card_expanded();
-    const savedDerivative = WorksheetRequests.plots.takeDerivative, savedIntegral = WorksheetRequests.plots.takeIntegral, savedPlot = WorksheetRequests.plots.takePlot;
+    const savedDerivative = WorksheetRequests.plots.takeDerivative;
+    const savedIntegral = WorksheetRequests.plots.takeIntegral;
+    const savedPlot = WorksheetRequests.plots.takePlot;
     const savedDifferentiable = WorksheetBindings.panel.currentDifferentiable;
-    const savedMetadata = {lastTex: WorksheetWorkspace.presentation.state.lastTex, lastDerivativeExpression: WorksheetWorkspace.presentation.state.lastDerivativeExpression, currentVariables: WorksheetBindings.panel.currentVariables, resultInputBindings: WorksheetWorkspace.presentation.state.resultInputBindings};
+    const savedMetadata = {
+        lastTex: WorksheetWorkspace.presentation.state.lastTex,
+        lastDerivativeExpression: WorksheetWorkspace.presentation.state.lastDerivativeExpression,
+        currentVariables: WorksheetBindings.panel.currentVariables,
+        resultInputBindings: WorksheetWorkspace.presentation.state.resultInputBindings
+    };
     const savedFocus = document.activeElement;
     const savedEditors = WorksheetContext.labTextareas.slice();
-    const savedSelection = [WorksheetContext.goalTarget.selectionStart, WorksheetContext.goalTarget.selectionEnd, WorksheetContext.goalTarget.selectionDirection];
+    const savedSelection = {
+        start: WorksheetContext.goalTarget.selectionStart,
+        end: WorksheetContext.goalTarget.selectionEnd,
+        direction: WorksheetContext.goalTarget.selectionDirection
+    };
     const savedEditorFrame = WorksheetWorkspace.layout.editorResizeFrame;
     const savedResultState = WorksheetWorkspace.presentation.resultStates[WorksheetWorkspace.mode.currentMode()];
-    const snapshots = [document.body, ...document.body.querySelectorAll<HTMLElement>('*')].map(
-        node => ({
+    const snapshots: LabWorksheetTestNodeSnapshot[] = [];
+    for (const node of [document.body, ...document.body.querySelectorAll<HTMLElement>('*')]) {
+        const attributes: LabWorksheetTestNodeSnapshot['attributes'] = [];
+        for (const attribute of node.attributes)
+            attributes.push({namespace: attribute.namespaceURI, name: attribute.name, value: attribute.value});
+        snapshots.push({
             node,
-            attributes:
-                [...node.attributes].map(attribute => [attribute.namespaceURI, attribute.name, attribute.value] as const),
+            attributes,
             children: [...node.childNodes],
             value: node.matches('input, select, textarea') ? (node as LabWorksheetTestSnapshotElement).value : undefined,
             selected: node.tagName === 'OPTION' ? (node as HTMLOptionElement).selected : undefined
-        }));
+        });
+    }
     try {
         const panels = [
             null, WorksheetContext.equationControls, WorksheetContext.diffequationControls, WorksheetContext.matrixControls, WorksheetContext.integratorControls, WorksheetContext.datetimeControls,
@@ -91,13 +108,15 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         check(hidden(WorksheetContext.datetimeLocal), 'Unicode-whitespace local data is empty');
 
         const tags = ['', ' , \u2003, ', ' expression , matrix ', 'diffequation', 'express', 'Expression'];
-        const cards = tags.map(text => {
+        const cards: HTMLElement[] = [];
+        for (const text of tags) {
             const card = document.createElement('section');
             card.dataset.helpModes = text;
-            return card;
-        });
+            cards.push(card);
+        }
         labDOM.call('lab_workspace_dom_help_cards', cards, 'expression');
-        cards.forEach((card, index) => check(hidden(card) === (index > 2), 'help tags match exact trimmed tokens'));
+        for (let index = 0; index < cards.length; ++index)
+            check(hidden(cards[index]) === (index > 2), 'help tags match exact trimmed tokens');
         cards[0].dataset.helpModes = Array(1500).fill('unknown').join(',') + ', expression';
         labDOM.call('lab_workspace_dom_help_cards', cards, 'expression');
         check(!hidden(cards[0]), 'long help metadata releases temporary handles');
@@ -160,24 +179,26 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             WorksheetContext.goalSeek.title.includes('variable binding') && !WorksheetContext.precisionSlider.disabled,
             'precision remains adjustable at its endpoints');
 
-        const enabled = document.createElement('input'), disabled = document.createElement('input');
+        const enabled = document.createElement('input');
+        const disabled = document.createElement('input');
         disabled.disabled = true;
         WorksheetContext.integratorBoundStack.append(enabled, disabled);
         const detachedCopy = document.createElement('button');
         labDOM.call('lab_workspace_dom_busy', 1, null, [detachedCopy], []);
-        const busy_mutations = new MutationObserver(() => {});
-        busy_mutations.observe(WorksheetContext.integratorBoundStack, {subtree: true, attributes: true, attributeFilter: ['disabled']});
-        busy_mutations.observe(detachedCopy, {attributes: true, attributeFilter: ['disabled']});
+        const busyMutations = new MutationObserver(() => {});
+        busyMutations.observe(
+            WorksheetContext.integratorBoundStack, {subtree: true, attributes: true, attributeFilter: ['disabled']});
+        busyMutations.observe(detachedCopy, {attributes: true, attributeFilter: ['disabled']});
         try {
             labDOM.call('lab_workspace_dom_busy', 1, null, [detachedCopy], []);
-            check(busy_mutations.takeRecords().length === 0, 'repeated busy projection avoids disabled mutations');
+            check(busyMutations.takeRecords().length === 0, 'repeated busy projection avoids disabled mutations');
             const inserted = document.createElement('input');
             WorksheetContext.integratorBoundStack.append(inserted);
             labDOM.call('lab_workspace_dom_busy', 1, null, [detachedCopy], []);
             check(inserted.disabled, 'unchanged busy state still disables newly inserted controls');
             inserted.remove();
         } finally {
-            busy_mutations.disconnect();
+            busyMutations.disconnect();
         }
         check(enabled.disabled && disabled.disabled && detachedCopy.disabled, 'busy is idempotent for repeated starts');
         check(
@@ -300,13 +321,13 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         check(
             WorksheetContext.resultUseInput.dataset.inputText === 'saved input' && !WorksheetContext.resultUseInput.disabled && !hidden(WorksheetContext.resultUseInput),
             'native restore projects reusable input before returning metadata');
-        const initialResults = labDOM.call<Record<WorksheetMode, LabWorksheetResultSnapshot | null>>('lab_workspace_dom_result_states');
+        const initialResults = labDOM.call<LabWorksheetResultTable>('lab_workspace_dom_result_states');
         check(
             Object.keys(initialResults).join(',') === WorksheetWorkspace.WORKSPACE_MODE_NAMES.join(',') &&
                 Object.values(initialResults).every(state => state === null),
             'native result table initialises exactly the seven absent mode snapshots');
         initialResults.expression = saved;
-        check(labDOM.call<Record<WorksheetMode, LabWorksheetResultSnapshot | null>>('lab_workspace_dom_result_states').expression === null, 'mode result tables are independent');
+        check(labDOM.call<LabWorksheetResultTable>('lab_workspace_dom_result_states').expression === null, 'mode result tables are independent');
 
         for (const differentiable of [undefined, null, 0, '', 'false', true, false]) {
             const legacy = labDOM.call<WorksheetResultValues>('lab_workspace_dom_result_restore', {
@@ -341,12 +362,17 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             'capture and restoration share metadata defaults');
 
         const lifecycle: string[] = [];
-        const savedLifecycle =
-            {clearFunctionRun: WorksheetRequests.functionCard.clearFunctionRun, clearResultPane: WorksheetResults.reset.clearResultPane, renderDerivativeButtons: WorksheetWorkspace.presentation.renderDerivativeButtons, scheduleRenderedTeXFit: WorksheetResults.renderedFit.schedule, scheduleSolverTexFit: WorksheetResults.solverFit.schedule};
+        const savedLifecycle = {
+            clearFunctionRun: WorksheetRequests.functionCard.clearFunctionRun,
+            clearResultPane: WorksheetResults.reset.clearResultPane,
+            renderDerivativeButtons: WorksheetWorkspace.presentation.renderDerivativeButtons,
+            scheduleRenderedTeXFit: WorksheetResults.renderedFit.schedule,
+            scheduleSolverTexFit: WorksheetResults.solverFit.schedule
+        };
         try {
             Reflect.set(WorksheetRequests.functionCard, 'clearFunctionRun', () => lifecycle.push('cancel'));
             Reflect.set(WorksheetResults.reset, 'clearResultPane', () => lifecycle.push('clear'));
-            Reflect.set(WorksheetWorkspace.presentation, 'renderDerivativeButtons', (names: string[]) => {
+            Reflect.set(WorksheetWorkspace.presentation, 'renderDerivativeButtons', function refreshActions(names: string[]) {
                 lifecycle.push('derivatives');
                 check(
                     names === WorksheetBindings.panel.currentVariables && names !== WorksheetWorkspace.presentation.resultStates[WorksheetWorkspace.mode.currentMode()]!.currentVariables &&
@@ -358,7 +384,7 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
                     'cards and reusable input are restored before derivative refresh');
                 savedLifecycle.renderDerivativeButtons(names);
             });
-            Reflect.set(WorksheetResults.renderedFit, 'schedule', () => {
+            Reflect.set(WorksheetResults.renderedFit, 'schedule', function scheduleFit() {
                 lifecycle.push('rendered-fit');
                 check(!WorksheetContext.derivativeButtons.children.length, 'calculus is refreshed before fitting');
             });
@@ -393,7 +419,8 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         WorksheetContext.rendered.innerHTML = '<svg></svg>';
         check(!!labDOM.call('lab_workspace_dom_has_result'), 'rendered markup is content even without text');
 
-        let measuredHeight = 120, scrollHeight = 300;
+        let measuredHeight = 120;
+        let scrollHeight = 300;
         const editor = document.createElement('textarea');
         Object.defineProperties(editor, {clientHeight: {get: () => 100}, scrollHeight: {get: () => scrollHeight}});
         editor.getClientRects = () => [{}] as unknown as DOMRectList;
@@ -446,7 +473,8 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             'calculus ordering');
         check(
             buttons[1].dataset.variable === names[1] && !buttons[1].querySelector<HTMLElement>('literal')!, 'names stay opaque text');
-        buttons.forEach(button => button.click());
+        for (const button of buttons)
+            button.click();
         check(
             calls.length === 4 && calls[0][0] === 'derivative' && calls[0][1] === names[0] &&
                 calls[3][0] === 'integral' && calls[3][1] === names[1] && calls[3][2] === buttons[3],
@@ -457,6 +485,52 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         WorksheetWorkspace.presentation.renderDerivativeButtons(['x']);
         WorksheetContext.derivativeButtons.querySelector<HTMLButtonElement>('button')!.click();
         check(calls.length === 5, 'rerender does not duplicate event callbacks');
+        buttons[0].querySelector<HTMLElement>('span')!.click();
+        check(calls.length === 5, 'rerender removes listeners from detached calculus buttons');
+
+        const nestedNames = ['[ψ]', '["quoted" & <literal>]'];
+        WorksheetWorkspace.presentation.renderDerivativeButtons(nestedNames);
+        const nestedButtons = [...WorksheetContext.derivativeButtons.querySelectorAll<HTMLButtonElement>('button')];
+        Reflect.set(WorksheetRequests.plots, 'takeDerivative', function replacementDerivative(
+            this: WorksheetRequests.PlotRequestController, name: string, button: HTMLButtonElement | null) {
+            check(this === WorksheetRequests.plots, 'replacement derivative retains its controller receiver');
+            calls.push(['replacement derivative', name, button]);
+        });
+        Reflect.set(WorksheetRequests.plots, 'takeIntegral', function replacementIntegral(
+            this: WorksheetRequests.PlotRequestController, name: string, button: HTMLButtonElement | null) {
+            check(this === WorksheetRequests.plots, 'replacement integral retains its controller receiver');
+            calls.push(['replacement integral', name, button]);
+        });
+        nestedButtons[1].querySelector<HTMLElement>('span')!.click();
+        nestedButtons[2].querySelector<HTMLElement>('span')!.click();
+        check(
+            calls.length === 7 && calls[5][0] === 'replacement derivative' && calls[5][1] === nestedNames[1] &&
+                calls[5][2] === nestedButtons[1] && calls[6][0] === 'replacement integral' &&
+                calls[6][1] === nestedNames[0] && calls[6][2] === nestedButtons[2],
+            'nested span clicks use the owning button metadata and methods replaced after render');
+
+        let unrelatedClicks = 0;
+        const unrelatedListener = () => ++unrelatedClicks;
+        const unrelatedButton = document.createElement('button');
+        unrelatedButton.type = 'button';
+        nestedButtons[1].addEventListener('click', unrelatedListener);
+        unrelatedButton.addEventListener('click', unrelatedListener);
+        WorksheetContext.derivativeButtons.append(unrelatedButton);
+        document.body.append(nestedButtons[1]);
+        try {
+            WorksheetWorkspace.presentation.dispose();
+            WorksheetWorkspace.presentation.dispose();
+            nestedButtons[1].querySelector<HTMLElement>('span')!.click();
+            nestedButtons[2].querySelector<HTMLElement>('span')!.click();
+            unrelatedButton.click();
+            check(calls.length === 7 && unrelatedClicks === 2,
+                'disposal removes only owned listeners, including on moved buttons, and preserves unrelated listeners');
+        } finally {
+            nestedButtons[1].removeEventListener('click', unrelatedListener);
+            unrelatedButton.removeEventListener('click', unrelatedListener);
+            nestedButtons[1].remove();
+            unrelatedButton.remove();
+        }
         WorksheetBindings.panel.currentDifferentiable = false;
         WorksheetWorkspace.presentation.renderDerivativeButtons(names);
         check(WorksheetContext.derivativeButtons.children.length === 0,
@@ -469,12 +543,113 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         document.getElementById('plotRange')!.classList.add('hidden');
         labDOM.call('lab_workspace_dom_derivatives', ['x'], ['x'], 1);
         check(WorksheetContext.derivativeButtons.children.length === 2, 'other modes retain only calculus actions');
+
+        const labelCases = [
+            ['x', 'x'], ['[μ]', 'μ'], ['[𐐀😀]', '𐐀😀'], ['[e\u0301]', 'e\u0301'],
+            ['["quoted" & <literal>]', '"quoted" & <literal>'], ["['apostrophe']", "'apostrophe'"],
+            ['', ''], ['[]', ''], ['[[x]]', '[x]'], ['[x', '[x'], ['x]', 'x]'], [' [x] ', ' [x] ']
+        ];
+        const exactNames = labelCases.map(([name]) => name);
+        const nativeLabels = exactNames.map(name => labDOM.call<string>('lab_binding_label', [name]));
+        check(nativeLabels.every((label, index) => label === labelCases[index][1]),
+            'shared native labels preserve quotes, Unicode, empty names, whitespace and unmatched or inner brackets');
+        const plotRange = document.getElementById('plotRange')!;
+        const firstChoices = document.getElementById('plotFirstChoices')!;
+        const secondChoices = document.getElementById('plotSecondChoices')!;
+        const firstAxis = document.getElementById('plotFirst') as HTMLInputElement;
+        const secondAxis = document.getElementById('plotSecond') as HTMLInputElement;
+        function matchesChoice(radio: HTMLInputElement, index: number): boolean {
+            return radio.value === exactNames[index] && radio.nextElementSibling!.textContent === nativeLabels[index];
+        }
+        function calculusSnapshot(): string {
+            return JSON.stringify({
+                buttons: WorksheetContext.derivativeButtons.innerHTML,
+                plots: plotRange.innerHTML,
+                first: firstAxis.value,
+                second: secondAxis.value,
+                checked: [...plotRange.querySelectorAll<HTMLInputElement>('input[type="radio"]')].map(radio => radio.checked)
+            });
+        }
+        for (const plotsVisible of [false, true]) {
+            plotRange.classList.toggle('hidden', !plotsVisible);
+            for (const differentiable of [0, 1]) {
+                firstAxis.value = exactNames[1];
+                secondAxis.value = exactNames[2];
+                labDOM.call('lab_workspace_dom_derivatives', exactNames, nativeLabels, differentiable);
+                const legacy = calculusSnapshot();
+                const previousPlots = plotRange.innerHTML;
+                labDOM.call('lab_workspace_dom_calculus', exactNames, differentiable);
+                check(calculusSnapshot() === legacy,
+                    'native calculus entry matches the existing derivatives API for each plot and differentiability state');
+                const controls = [...WorksheetContext.derivativeButtons.querySelectorAll<HTMLButtonElement>('button')];
+                check(controls.length === differentiable * exactNames.length * 2,
+                    'native calculus entry preserves differentiability and ordered action counts');
+                for (let index = 0; index < controls.length; ++index) {
+                    const button = controls[index];
+                    const variable = index % exactNames.length;
+                    check(button.dataset.variable === exactNames[variable] &&
+                        button.dataset.calculusAction === String(Math.floor(index / exactNames.length)) &&
+                        button.querySelector<HTMLElement>('i')!.textContent === nativeLabels[variable],
+                        'native calculus buttons retain exact identifiers, shared labels and action metadata');
+                }
+                check(!WorksheetContext.derivativeButtons.querySelector('literal'), 'native labels remain text in calculus buttons');
+                if (plotsVisible) {
+                    const radios = [...firstChoices.querySelectorAll<HTMLInputElement>('input')];
+                    check(radios.length === exactNames.length && radios.every(matchesChoice),
+                        'visible plot choices use the same opaque names and labels even without calculus actions');
+                    check(firstAxis.value === exactNames[1] && secondAxis.value === exactNames[2],
+                        'native calculus entry retains valid plot selections');
+                    check(!firstChoices.querySelector('literal') && !secondChoices.querySelector('literal'),
+                        'quoted plot labels cannot create markup');
+                } else {
+                    check(plotRange.innerHTML === previousPlots, 'hidden plot controls remain untouched');
+                }
+            }
+            labDOM.call('lab_workspace_dom_calculus', [], 1);
+            check(WorksheetContext.derivativeButtons.childElementCount === 0,
+                'native calculus entry clears previous actions for an empty name list');
+            if (plotsVisible) {
+                check(firstChoices.childElementCount === 0 && secondChoices.childElementCount === 1 &&
+                    firstAxis.value === '' && secondAxis.value === '',
+                    'empty native names clear plot variables and retain the automatic second-axis choice');
+            }
+        }
+        check(JSON.stringify(exactNames) === JSON.stringify(labelCases.map(([name]) => name)),
+            'native calculus rendering does not mutate the supplied variable array');
+
+        // Bracketed labels require enough temporary handles to exceed the 4096-handle table without per-name release.
+        const boundedNames = Array.from({length: 768}, (_, index) => `[μ${index} "quoted"]`);
+        function matchesBoundedButton(button: HTMLButtonElement, index: number): boolean {
+            const variable = index % boundedNames.length;
+            return button.dataset.variable === boundedNames[variable] &&
+                button.querySelector<HTMLElement>('i')!.textContent === `μ${variable} "quoted"`;
+        }
+        function matchesBoundedChoice(radio: HTMLInputElement, index: number): boolean {
+            return radio.value === boundedNames[index] &&
+                radio.nextElementSibling!.textContent === `μ${index} "quoted"`;
+        }
+        labDOM.call('lab_workspace_dom_calculus', boundedNames, 1);
+        labDOM.call('lab_binding_label', ['[recycled]']);
+        const boundedButtons = [...WorksheetContext.derivativeButtons.querySelectorAll<HTMLButtonElement>('button')];
+        check(boundedButtons.length === boundedNames.length * 2 && boundedButtons.every(matchesBoundedButton),
+            'large native calculus lists release temporary handles and retain labels after handle reuse');
+        const boundedRadios = [...firstChoices.querySelectorAll<HTMLInputElement>('input')];
+        check(boundedRadios.length === boundedNames.length && boundedRadios.every(matchesBoundedChoice),
+            'large plot lists retain shared native labels after handle reuse');
+        labDOM.call('lab_workspace_dom_calculus', ['[final]'], 0);
+        check(WorksheetContext.derivativeButtons.childElementCount === 0 &&
+            firstChoices.querySelector<HTMLElement>('span')!.textContent === 'final range',
+            'later non-differentiable calls clear large action lists and preserve single-variable plot labels');
     } finally {
+        WorksheetWorkspace.presentation.dispose();
         Reflect.set(WorksheetRequests.plots, 'takeDerivative', savedDerivative);
         Reflect.set(WorksheetRequests.plots, 'takeIntegral', savedIntegral);
         Reflect.set(WorksheetRequests.plots, 'takePlot', savedPlot);
         WorksheetBindings.panel.currentDifferentiable = savedDifferentiable;
-        ({lastTex: WorksheetWorkspace.presentation.state.lastTex, lastDerivativeExpression: WorksheetWorkspace.presentation.state.lastDerivativeExpression, currentVariables: WorksheetBindings.panel.currentVariables, resultInputBindings: WorksheetWorkspace.presentation.state.resultInputBindings} = savedMetadata);
+        WorksheetWorkspace.presentation.state.lastTex = savedMetadata.lastTex;
+        WorksheetWorkspace.presentation.state.lastDerivativeExpression = savedMetadata.lastDerivativeExpression;
+        WorksheetBindings.panel.currentVariables = savedMetadata.currentVariables;
+        WorksheetWorkspace.presentation.state.resultInputBindings = savedMetadata.resultInputBindings;
         native.lab_workspace_select(savedMode);
         native.lab_workspace_precision_set(savedMode, savedPrecision);
         WorksheetWorkspace.presentation.resultStates[WorksheetWorkspace.mode.currentMode()] = savedResultState;
@@ -488,7 +663,7 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             native.lab_view_card_toggle(savedExpansion);
         for (const {node, attributes, children} of snapshots) {
             for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
-            for (const [namespace, name, value] of attributes) node.setAttributeNS(namespace, name, value);
+            for (const {namespace, name, value} of attributes) node.setAttributeNS(namespace, name, value);
             node.replaceChildren(...children);
         }
         for (const {node, value: savedValue, selected} of snapshots) {
@@ -497,7 +672,8 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             if (selected !== undefined)
                 (node as HTMLOptionElement).selected = selected;
         }
-        WorksheetContext.goalTarget.setSelectionRange(...savedSelection as [number, number, "forward" | "backward" | "none"]);
+        WorksheetContext.goalTarget.setSelectionRange(
+            savedSelection.start, savedSelection.end, savedSelection.direction ?? undefined);
         (savedFocus as HTMLElement | null)?.focus();
     }
 };

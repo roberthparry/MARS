@@ -5,15 +5,24 @@
  * Exercises native completion plans and request services while retaining native ownership of mathematical results.
  */
 
-/** Goal-seek C/WASM completion plans and asynchronous host-boundary regressions. */
+/** @brief Response fields supplied by the goal fixture, including deferred getters. */
+interface LabGoalResponse {
+    [field: string]: unknown;
+}
+
+/** @brief Check goal-seek C/WASM completion plans and asynchronous host boundaries. */
 window.checkLabGoal = async function checkLabGoal() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Goal: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const complete = (outcome: number, data: unknown = {}, context: unknown = {}, error: unknown = null) =>
-        labDOM.call<BindingTestPlan>('lab_goal_complete', outcome, data, context, error);
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    /** @brief Request the native completion plan without executing its services. */
+    function complete(outcome: number, data: unknown = {}, context: unknown = {}, error: unknown = null): BindingTestPlan {
+        return labDOM.call<BindingTestPlan>('lab_goal_complete', outcome, data, context, error);
+    }
     const failureServices = 'setRenderedError,resetRenderedDigits,clearResultDetails,setStatus';
     const successServices = 'captureHistory,setRenderedResult,setEditor,installCards,setLastInput,clearDerivative,' +
         'setVariables,setDifferentiable,renderDerivatives,setSource,setTarget,hideTargetEntry,setSuccessStatus';
@@ -76,46 +85,69 @@ window.checkLabGoal = async function checkLabGoal() {
         differentiable: WorksheetBindings.panel.currentDifferentiable
     };
     const events: unknown[][] = [];
-    let live = true, outcome = 2, postError: Error | null = null, editorResult = 'bound native μ', data: Record<string, unknown> = {}, cards = {};
+    let live = true;
+    let outcome = 2;
+    let postError: Error | null = null;
+    let editorResult = 'bound native μ';
+    let data: LabGoalResponse = {};
+    let cards = {};
     const request = {};
-    const replace = (name: string, callback: (...args: never[]) => unknown) => {
+    /** @brief Replace a host service and retain its first implementation for cleanup. */
+    function replace(name: string, callback: unknown): void {
         if (!savedFunctions.has(name))
             savedFunctions.set(name, Reflect.get(labTestModuleOwner(name), name));
         Reflect.set(labTestModuleOwner(name), name, callback);
-    };
-    const record = (name: string) => (...args: unknown[]) => {
-        events.push([name, ...args]);
-    };
-    const named = (name: string) => events.filter(event => event[0] === name);
+    }
+
+    /** @brief Create a service recorder that retains the supplied arguments unchanged. */
+    function record(name: string): (...args: unknown[]) => void {
+        function recordEvent(...args: unknown[]): void {
+            events.push([name, ...args]);
+        }
+        return recordEvent;
+    }
+
+    /** @brief Select recorded effects of one kind without changing their order. */
+    function named(name: string): unknown[][] {
+        return events.filter(event => event[0] === name);
+    }
     try {
-        Reflect.set(WorksheetRequests.labRequests, 'runUI', async (operation: string, mode: string, callback: (request: object) => unknown) => {
+        Reflect.set(WorksheetRequests.labRequests, 'runUI', async function runRequest(
+            operation: string, mode: string, callback: (request: object) => unknown
+        ) {
             equal(operation, 'goal', 'goal request channel');
             equal(mode, 'expression', 'goal request mode');
             return callback(request);
         });
-        WorksheetRequests.labRequests.current = value => {
+        WorksheetRequests.labRequests.current = function requestIsCurrent(value) {
             equal(value, request, 'request identity');
             return live;
         };
-        WorksheetRequests.labRequests.input = (_, source) => {
+        WorksheetRequests.labRequests.input = function recordInput(_, source) {
             events.push(['input', source]);
             return !!source;
         };
         WorksheetRequests.labRequests.outcome = () => live ? outcome : 0;
-        Reflect.set(WorksheetRequests.labRequests, 'post', async (_: unknown, payload: unknown, route: string) => {
+        Reflect.set(WorksheetRequests.labRequests, 'post', async function recordPost(
+            _: unknown, payload: unknown, route: string
+        ) {
             events.push(['post', payload, route]);
             if (postError)
                 throw postError;
             return {response: {ok: true}, data};
         });
-        Reflect.set(labDOM, 'call', (name: string, ...args: unknown[]) => {
+        Reflect.set(labDOM, 'call', function interceptNativeCall(name: string, ...args: unknown[]) {
             if (name === 'lab_evaluation_cards')
                 return cards;
             // These presentation adapters are lexical constants, not replaceable window functions.
-            if (name === 'lab_layout_error')
-                return record('setRenderedError')(args[0]);
-            if (name === 'lab_layout_more')
-                return record('resetMoreDigitsButton')(...args);
+            if (name === 'lab_layout_error') {
+                events.push(['setRenderedError', args[0]]);
+                return;
+            }
+            if (name === 'lab_layout_more') {
+                events.push(['resetMoreDigitsButton', ...args]);
+                return;
+            }
             return savedCall(name, ...args);
         });
         for (const name
@@ -123,28 +155,31 @@ window.checkLabGoal = async function checkLabGoal() {
                      'setExpressionEditor', 'installEvaluationTextCards', 'hideTargetEntry'])
             replace(name, record(name));
         replace('commitVisibleBindingInputs', async () => events.push(['commit']));
-        replace('currentExpressionText', () => {
+        replace('currentExpressionText', function currentText() {
             events.push(['currentText']);
             return 'current authored α';
         });
         replace('goalSeekExpressionAndStarts', async (text: string, start: unknown) => ({expression: text, start}));
         for (const input of [null, undefined, false, 0, '', '  opaque α\u0000β  '])
-            equal(WorksheetBindings.expression_text_or_empty(input as string), String(input || ''), 'shared text conversion preserves authored text');
+            equal(WorksheetBindings.expressionTextOrEmpty(input as string), String(input || ''), 'shared text conversion preserves authored text');
         replace('requestedValuePrecision', () => 53);
-        replace('expressionBodyForEditor', (text: string) => {
+        replace('expressionBodyForEditor', function editorBody(text: string) {
             events.push(['body', text]);
             return 'body ' + text;
         });
-        replace('expressionWithBindings', async (body: string, bindings: unknown) => {
+        replace('expressionWithBindings', async function bindExpression(body: string, bindings: unknown) {
             events.push(['bind', body, bindings]);
             return editorResult;
         });
-        replace('variableNamesFromBindings', (bindings: unknown) => {
+        replace('variableNamesFromBindings', function bindingNames(bindings: unknown) {
             events.push(['variables', bindings]);
             return ['μ'];
         });
-        replace('renderDerivativeButtons', (variables: unknown) => {
-            events.push(['derivatives', variables, WorksheetWorkspace.presentation.state.lastDerivativeExpression, WorksheetBindings.panel.currentDifferentiable]);
+        replace('renderDerivativeButtons', function recordDerivatives(variables: unknown) {
+            events.push([
+                'derivatives', variables, WorksheetWorkspace.presentation.state.lastDerivativeExpression,
+                WorksheetBindings.panel.currentDifferentiable
+            ]);
         });
         const bindings = [{name: 'μ', value: '1/3'}];
         data = {
@@ -216,7 +251,7 @@ window.checkLabGoal = async function checkLabGoal() {
         postError = null;
         outcome = 2;
         events.length = 0;
-        replace('expressionWithBindings', async () => {
+        replace('expressionWithBindings', async function finishStaleBinding() {
             live = false;
             return 'late result';
         });
@@ -228,13 +263,15 @@ window.checkLabGoal = async function checkLabGoal() {
 
         live = true;
         events.length = 0;
-        replace('commitVisibleBindingInputs', async () => {
+        replace('commitVisibleBindingInputs', async function invalidateBindingCommit() {
             live = false;
         });
         equal(await WorksheetRequests.goals.runGoalSeek('source', '0'), false, 'stale binding commit is rejected');
         equal(named('post').length, 0, 'stale binding commit never sends a request');
     } finally {
-        for (const [name, callback] of savedFunctions) Reflect.set(labTestModuleOwner(name), name, callback);
+        for (const [name, callback] of savedFunctions) {
+            Reflect.set(labTestModuleOwner(name), name, callback);
+        }
         Object.assign(WorksheetRequests.labRequests, savedRequests);
         Reflect.set(labDOM, 'call', savedCall);
         WorksheetContext.labEditorState.lastInput = saved.lastInput;

@@ -12,6 +12,7 @@
 #include "lab_layout.h"
 #include "lab_profile.h"
 #include "lab_view.h"
+#define MARS_LAB_WORKSPACE_DOM_INTERNAL_ACCESS
 #include "lab_workspace_dom.h"
 #include "lab_workspace.h"
 #include "lab_plot_drag.h"

@@ -13,6 +13,7 @@
 
 #include "lab_dom.h"
 #include "lab_editor.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_binding_editor.h"
 #include "lab_evaluation_install.h"

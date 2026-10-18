@@ -11,6 +11,7 @@
 #include "lab_dom.h"
 #include "lab_forms.h"
 #include "lab_binding_editor.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_rows.h"
 #include "lab_workspace.h"

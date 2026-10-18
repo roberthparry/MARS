@@ -7,18 +7,22 @@
 
 /** Native select subscriptions and browser-event dispatch checks; the parent runs these sequentially. */
 window.checkLabSelectEvents = function checkLabSelectEvents() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`Select events: ${message}`);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
+    }
+
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
     const focus = document.activeElement;
     const root = document.createElement('div');
     root.style.cssText = 'position:fixed;left:0;top:0;z-index:10000;width:400px';
     document.body.appendChild(root);
-    const fixtures: ReturnType<typeof create>[] = [];
-    const create = (id: string, searchable: boolean): BindingSelectFixture => {
-        const label = document.createElement('label'), select = document.createElement('select');
+    const fixtures: BindingSelectFixture[] = [];
+    function create(id: string, searchable: boolean): BindingSelectFixture {
+        const label = document.createElement('label');
+        const select = document.createElement('select');
         select.id = id;
         label.htmlFor = id;
         label.id = id + 'Label';
@@ -35,26 +39,35 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
         const options = {searchable, details: true};
         equal(labDOM.call('lab_select_enhance', select, options, document), 1, 'native enhancement');
         const shell = select.closest<HTMLElement>('.select-shell')!;
-        const fixture = {
+        const fixture: BindingSelectFixture = {
             select, shell, label, options,
-            button: shell.querySelector<HTMLButtonElement>('.select-button')!, menu: shell.querySelector<HTMLElement>('.select-menu')!,
-            search: shell.querySelector<HTMLInputElement>('.select-search')!, items: () => [...shell.querySelectorAll<HTMLButtonElement>('.select-option')]
+            button: shell.querySelector<HTMLButtonElement>('.select-button')!,
+            menu: shell.querySelector<HTMLElement>('.select-menu')!,
+            search: shell.querySelector<HTMLInputElement>('.select-search')!,
+            items() {
+                return [...shell.querySelectorAll<HTMLButtonElement>('.select-option')];
+            }
         };
         fixtures.push(fixture);
         return fixture;
-    };
-    const key = (node: EventTarget, name: string) => {
+    }
+
+    function key(node: EventTarget, name: string): KeyboardEvent {
         const event = new KeyboardEvent('keydown', {key: name, bubbles: true, cancelable: true});
         node.dispatchEvent(event);
         return event;
-    };
-    const open = (fixture: ReturnType<typeof create>) => labDOM.call('lab_select_event', fixture.select, 0, 0, null);
+    }
+
+    function open(fixture: BindingSelectFixture) {
+        return labDOM.call('lab_select_event', fixture.select, 0, 0, null);
+    }
     try {
         equal(labDOM.call('lab_select_enhance', null, {}, document), 0, 'missing select is inert');
         equal(labDOM.call('lab_select_register', null), 0, 'missing registration is inert');
         const detached = document.createElement('select');
         equal(labDOM.call('lab_select_register', detached), 0, 'unbuilt select cannot register');
-        const first = create('selectEventFirst', true), second = create('selectEventSecond', false);
+        const first = create('selectEventFirst', true);
+        const second = create('selectEventSecond', false);
         equal(first.button.getAttribute('aria-labelledby'), first.label.id, 'native label association');
         equal(first.items()[2].querySelector('.select-option-detail')!.textContent, 'native coordinates',
               'initial native enhancement includes detail projection');
@@ -102,7 +115,7 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
         first.search.value = '';
         first.search.dispatchEvent(new Event('input', {bubbles: true}));
         let changes = 0;
-        first.select.addEventListener('change', () => {
+        first.select.addEventListener('change', function recordSelection() {
             ++changes;
             // A queued change must reach the browser only after the original native scope closes.
             labDOM.call('lab_select_sync', first.select);

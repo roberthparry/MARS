@@ -5,24 +5,86 @@
  * Checks service ordering and argument identity while isolating browser effects and restoring replaced capabilities.
  */
 
-/** Native event-plan and live subscription regressions; browser services are isolated and restored. */
-window.checkLabEvents = function checkLabEvents() {
-    const check: LabTestCheck = (condition, message) => {
+/** @brief Ordered service calls inspected both before and after live event dispatch. */
+interface EventFixtureCalls {
+    calls: MarsTransportServiceCall[];
+}
+
+/** @brief Mutable service registry assembled for this isolated event fixture. */
+interface EventFixtureServices {
+    [name: string]: MarsTransportService;
+}
+
+/** @brief Browser state restored after the live event fixture. */
+interface EventFixtureSnapshot {
+    node: Element;
+    attributes: [string | null, string, string][];
+    children: ChildNode[];
+    value: string | undefined;
+    selected: boolean | undefined;
+}
+
+/** @brief Saved enumerable source or mode properties, retaining their original values. */
+interface EventFixtureProperties {
+    [name: string]: unknown;
+}
+
+/** @brief Independently specified event policy for each field in one calendar schema. */
+interface EventFixtureCalendarFlags {
+    [field: string]: number;
+}
+
+/** @brief One installed listener with its exact browser options. */
+interface EventFixtureSubscription {
+    target: EventTarget;
+    type: string;
+    options?: boolean | AddEventListenerOptions;
+}
+
+/** @brief Check native event plans and live subscriptions with isolated, restored browser services. */
+window.checkLabEvents = function checkLabEvents(): boolean {
+    /** @brief Report a failed event assertion. */
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Events: ' + message);
-    };
+    }
     const native = labWire.exports();
-    const plan = (action: number, event: object = {}) => labDOM.call<BindingTestPlan>('lab_events_dispatch', action, event);
-    const names = (result: Pick<BindingTestPlan, 'calls'>) => result.calls.map(call => call.service).join(',');
-    const expect = (action: number, event: object, services: string, args: unknown[] = []) => {
+
+    /** @brief Read the ordered native plan for one event action. */
+    function plan(action: number, event: object = {}): BindingTestPlan {
+        return labDOM.call('lab_events_dispatch', action, event);
+    }
+
+    /** @brief Describe service order without changing the recorded calls. */
+    function names(result: EventFixtureCalls): string {
+        const services: string[] = [];
+        for (const call of result.calls)
+            services.push(call.service);
+        return services.join(',');
+    }
+
+    /** @brief Compare the strict argument identity used by live subscription assertions. */
+    function sameArguments(actual: unknown[], expected: unknown[]): boolean {
+        if (actual.length !== expected.length)
+            return false;
+        for (let index = 0; index < expected.length; ++index) {
+            if (actual[index] !== expected[index])
+                return false;
+        }
+        return true;
+    }
+
+    /** @brief Check service order and exact argument identity for a single-service plan. */
+    function expect(action: number, event: object, services: string, args: unknown[] = []): BindingTestPlan {
         const result = plan(action, event);
         check(names(result) === services, 'service order for action ' + action);
         if (services && !services.includes(',')) {
             check(result.calls[0].args.length === args.length, 'argument count for action ' + action);
-            args.forEach((arg, index) => check(Object.is(result.calls[0].args[index], arg), 'argument identity'));
+            for (let index = 0; index < args.length; ++index)
+                check(Object.is(result.calls[0].args[index], args[index]), 'argument identity');
         }
         return result;
-    };
+    }
     const services = [
         'clearForwardHistory',
         'clearGoalSeekRequest',
@@ -52,59 +114,99 @@ window.checkLabEvents = function checkLabEvents() {
         'copyInputFromEvent',
         'scheduleEditorResizeGrip'
     ];
-    const calls: {service: string; args: unknown[]}[] = [], reentryErrors: unknown[] = [];
-    const registry = Object.fromEntries(
-        services.map(service => [service, (...args: unknown[]) => {
-                         calls.push({service, args});
-                         // Every host service must run after the native handle scope has been released.
-                         try {
-                             check(plan(255).calls.length === 0, 'service can re-enter the DOM bridge');
-                         } catch (error) {
-                             reentryErrors.push(error);
-                         }
-                     }]));
+    const calls: MarsTransportServiceCall[] = [];
+    const reentryErrors: unknown[] = [];
+
+    /** @brief Bind a service name while retaining re-entry checks for every invocation. */
+    function serviceRecorder(service: string): MarsTransportService {
+        /** @brief Record exact arguments after the native handle scope has been released. */
+        return function recordService(...args: unknown[]): void {
+            calls.push({service, args});
+            try {
+                check(plan(255).calls.length === 0, 'service can re-enter the DOM bridge');
+            } catch (error) {
+                reentryErrors.push(error);
+            }
+        };
+    }
+
+    const registry: EventFixtureServices = {};
+    for (const service of services)
+        registry[service] = serviceRecorder(service);
     const savedMode = native.lab_workspace_mode();
     const savedExpansion = native.lab_view_card_expanded();
-    const savedZoom = WorksheetContext.resultCards.map(card => {
+    const savedZoom: {id: number; zoom: number}[] = [];
+    for (const card of WorksheetContext.resultCards) {
         const id = WorksheetContext.resultCardIds.get(card)!;
-        return [id, native.lab_view_card_zoom(id)] as const;
-    });
+        savedZoom.push({id, zoom: native.lab_view_card_zoom(id)});
+    }
     const savedRequestFrame = window.requestAnimationFrame, savedCancelFrame = window.cancelAnimationFrame;
     const savedFrame = WorksheetWorkspace.layout.editorResizeFrame;
-    const snapshots = [document.body, ...document.body.querySelectorAll('*')].map(
-        node => ({
+    const snapshots: EventFixtureSnapshot[] = [];
+    for (const node of [document.body, ...document.body.querySelectorAll('*')]) {
+        const attributes: [string | null, string, string][] = [];
+        for (const attribute of node.attributes)
+            attributes.push([attribute.namespaceURI, attribute.name, attribute.value]);
+        let value: string | undefined;
+        if (node instanceof HTMLInputElement || node instanceof HTMLSelectElement || node instanceof HTMLTextAreaElement)
+            value = node.value;
+        snapshots.push({
             node,
-            attributes:
-                [...node.attributes].map(attribute => [attribute.namespaceURI, attribute.name, attribute.value] as const),
+            attributes,
             children: [...node.childNodes],
-            value: (node instanceof HTMLInputElement || node instanceof HTMLSelectElement || node instanceof HTMLTextAreaElement) ? node.value : undefined,
+            value,
             selected: node instanceof HTMLOptionElement ? node.selected : undefined
-        }));
+        });
+    }
     const fixture = document.createElement('div');
     fixture.innerHTML = '<textarea></textarea><button class="mode-tab" data-mode="matrix"><span>tab</span></button>';
     // Exercise nested tab bubbling without invoking unrelated document picker/tooltip handlers.
-    fixture.addEventListener('click', event => event.stopPropagation());
-    const send = (target: EventTarget | null, event: Event, expected: string) => {
+    /** @brief Stop fixture clicks before unrelated document picker and tooltip handlers. */
+    function stopFixtureClick(event: Event): void {
+        event.stopPropagation();
+    }
+    fixture.addEventListener('click', stopFixtureClick);
+
+    /** @brief Dispatch a real event and check the service sequence produced by its subscription. */
+    function send(target: EventTarget | null, event: Event, expected: string): boolean {
         check(!!target, 'registered target exists');
         calls.length = 0;
-        if (!target) throw new Error('Registered target missing');
+        if (!target)
+            throw new Error('Registered target missing');
         const accepted = target.dispatchEvent(event);
         check(names({calls}) === expected, 'live ' + event.type + ' routing: ' + names({calls}));
         return accepted;
-    };
-    const click = () => new MouseEvent('click', {cancelable: true});
-    const key = (options: KeyboardEventInit) => new KeyboardEvent('keydown', {cancelable: true, ...options});
+    }
+
+    /** @brief Create a cancellable button click. */
+    function click(): MouseEvent {
+        return new MouseEvent('click', {cancelable: true});
+    }
+
+    /** @brief Create a cancellable key event with the scenario's exact modifiers. */
+    function key(options: KeyboardEventInit): KeyboardEvent {
+        return new KeyboardEvent('keydown', {cancelable: true, ...options});
+    }
+
+    /** @brief Keep frame requests inert while this fixture dispatches synchronously. */
+    function ignoreFrame(): number { return 0; }
+
+    /** @brief Suppress unrelated browser presentation while inspecting event plans. */
+    function ignorePresentation(): void {}
+
     const savedRegistry = labDOM.bindEvents(Object.freeze(registry));
     try {
-        window.requestAnimationFrame = () => 0;
-        window.cancelAnimationFrame = () => {};
+        window.requestAnimationFrame = ignoreFrame;
+        window.cancelAnimationFrame = ignorePresentation;
         const refreshEditor = document.createElement('textarea');
         refreshEditor.value = '  opaque μ {x = ?}  ';
         refreshEditor.dataset.bindingRefreshValid = 'pending';
         refreshEditor.dataset.evaluationReady = 'keep';
-        const refreshPlan = (mode: number, bound: boolean, unchanged: boolean) => labDOM.call<BindingTestPlan>(
-            'lab_events_refresh', mode, Number(bound), Number(unchanged),
-            {editor: refreshEditor, defaultDatetimeText: 'calendar default'});
+        /** @brief Plan an input refresh without applying any browser service effects. */
+        function refreshPlan(mode: number, bound: boolean, unchanged: boolean): BindingTestPlan {
+            return labDOM.call('lab_events_refresh', mode, Number(bound), Number(unchanged),
+                {editor: refreshEditor, defaultDatetimeText: 'calendar default'});
+        }
         const expectedRefresh = [
             'saveState,clearGoalSeekRequest,setSource,scheduleEditedExpressionBindingRefresh',
             'refreshVariableValuesFromEditor,saveState,updateHistoryButtons',
@@ -122,19 +224,28 @@ window.checkLabEvents = function checkLabEvents() {
                     if (!bound && [1, 3, 4].includes(mode))
                         expected = 'setSource,setSource,' + expected;
                     check(names(refresh) === expected, 'native refresh service order for mode ' + mode);
-                    const save = refresh.calls.find(call => call.service === 'saveState');
+                    let save: MarsTransportServiceCall | undefined;
+                    const source: MarsTransportServiceCall[] = [];
+                    // Each short ordered plan is visited once to find its save and source effects.
+                    for (const call of refresh.calls) {
+                        if (!save && call.service === 'saveState')
+                            save = call;
+                        if (call.service === 'setSource')
+                            source.push(call);
+                    }
                     if (save) {
                         check(save.args[0] === WorksheetWorkspace.WORKSPACE_MODE_NAMES[mode], 'save uses the exact mode token');
-                        check(Reflect.get(Object(Reflect.get(Object(save.args[1]), 'options')), 'debounce') === true, 'native save policy requests debounce');
+                        const saveRecord = Object(save.args[1]);
+                        const saveOptions = Object(Reflect.get(saveRecord, 'options'));
+                        check(Reflect.get(saveOptions, 'debounce') === true, 'native save policy requests debounce');
                         check(
-                            mode ? !Object.hasOwn(Object(save.args[1]), 'text') : Reflect.get(Object(save.args[1]), 'text') === 'opaque μ {x = ?}',
+                            mode ? !Object.hasOwn(saveRecord, 'text') : Reflect.get(saveRecord, 'text') === 'opaque μ {x = ?}',
                             'expression saves trimmed text; equation preserves its live default');
                     }
-                    const source = refresh.calls.filter(call => call.service === 'setSource');
                     if (source.length === 2)
                         check(
                             source[0].args[0] === 'fullText' && source[1].args[0] === 'displayText' &&
-                                source.every(call => call.args[1] === 'opaque μ {x = ?}'),
+                                source[0].args[1] === 'opaque μ {x = ?}' && source[1].args[1] === 'opaque μ {x = ?}',
                             'native source writes remain ordered and opaque');
                     check(
                         refreshEditor.dataset.bindingRefreshValid === 'pending',
@@ -155,6 +266,12 @@ window.checkLabEvents = function checkLabEvents() {
             refreshEditor.dataset.bindingRefreshValid === 'true' && refreshEditor.dataset.evaluationReady === 'keep',
             'native reuse projection changes only binding validity');
 
+        const savedSource: EventFixtureProperties = {};
+        for (const key of Object.keys(WorksheetContext.labEditorState))
+            savedSource[key] = Reflect.get(WorksheetContext.labEditorState, key);
+        const savedEditors: EventFixtureProperties = {};
+        for (const mode of WorksheetWorkspace.WORKSPACE_MODE_NAMES)
+            savedEditors[mode] = WorksheetContext.modeEditorText[mode];
         const refreshSaved = {
             cancel: WorksheetRequests.labRequests.cancel,
             clearTimeout: window.clearTimeout,
@@ -164,49 +281,60 @@ window.checkLabEvents = function checkLabEvents() {
             clearGoalSeekRequest: WorksheetBindings.goal.clearGoalSeekRequest,
             scheduleEditedExpressionBindingRefresh: WorksheetBindings.controller.scheduleEditedExpressionBindingRefresh,
             updateHistoryButtons: WorksheetWorkspace.presentation.updateHistoryButtons,
-            source: Object.fromEntries(Object.keys(WorksheetContext.labEditorState).map(key => [key, Reflect.get(WorksheetContext.labEditorState, key)])),
-            editors: Object.fromEntries(WorksheetWorkspace.WORKSPACE_MODE_NAMES.map(mode => [mode, WorksheetContext.modeEditorText[mode]]))
+            source: savedSource,
+            editors: savedEditors
         };
         const refreshCalls: string[] = [];
         const sourceDescriptor = Object.getOwnPropertyDescriptor(WorksheetContext.labEditorState, 'fullText')!;
         const modeDescriptor = Object.getOwnPropertyDescriptor(WorksheetContext.modeEditorText, 'datetime')!;
         let refreshBound = false;
         try {
-            WorksheetRequests.labRequests.cancel = operation => refreshCalls.push('cancel:' + operation);
-            Reflect.set(WorksheetBindings.editor, 'bindingParts', () => {
+            /** @brief Record request cancellation before binding flags are read. */
+            WorksheetRequests.labRequests.cancel = function cancel(operation) {
+                return refreshCalls.push('cancel:' + operation);
+            };
+            /** @brief Check cancellation order before exposing the fixture's bound flag. */
+            Reflect.set(WorksheetBindings.editor, 'bindingParts', function bindingParts() {
                 check(
                     refreshCalls.join(',') === 'cancel:evaluate,cancel:bindings',
                     'requests cancel before flag discovery');
                 return refreshBound ? {} : null;
             });
-            Reflect.set(WorksheetBindings.controller, 'refreshVariableValuesFromEditor', () => {
+            /** @brief Check that native source setters precede binding refresh. */
+            Reflect.set(WorksheetBindings.controller, 'refreshVariableValuesFromEditor', function refreshBindings() {
                 refreshCalls.push('bindings');
                 check(
                     WorksheetContext.labEditorState.fullText === (refreshBound ? 'previous full' : 'opaque input'),
                     'source setter precedes binding refresh without redefining its view');
             });
-            Reflect.set(WorksheetPersistence.persistence, 'saveWorksheet', (mode: string, text: string | undefined, options: {debounce: boolean}) => {
+            /** @brief Check save arguments before native reuse is projected. */
+            Reflect.set(WorksheetPersistence.persistence, 'saveWorksheet', function saveWorksheet(
+                mode: string, text: string | undefined, options: {debounce: boolean}) {
                 refreshCalls.push('save');
                 check(
                     options.debounce === true && text === (mode === 'expression' ? 'opaque input' : undefined),
                     'host adapter preserves omitted save text and native debounce policy');
                 check(WorksheetContext.expr.dataset.bindingRefreshValid === 'pending', 'save precedes reuse projection');
             });
-            Reflect.set(WorksheetBindings.goal, 'clearGoalSeekRequest', () => {
+            /** @brief Check goal reset order against the retained last input. */
+            Reflect.set(WorksheetBindings.goal, 'clearGoalSeekRequest', function clearGoal() {
                 refreshCalls.push('goal');
                 check(WorksheetContext.labEditorState.lastInput === 'previous input', 'goal reset precedes last-input reset');
             });
-            Reflect.set(WorksheetBindings.controller, 'scheduleEditedExpressionBindingRefresh', () => {
+            /** @brief Check that the last input resets before a new refresh is scheduled. */
+            Reflect.set(WorksheetBindings.controller, 'scheduleEditedExpressionBindingRefresh', function scheduleRefresh() {
                 refreshCalls.push('schedule');
                 check(WorksheetContext.labEditorState.lastInput === '', 'last input resets before the binding timer is scheduled');
             });
-            window.clearTimeout = timer => {
+            /** @brief Check that the old refresh timer is cancelled before reuse is projected. */
+            window.clearTimeout = function clearRefreshTimer(timer): void {
                 refreshCalls.push('timer');
                 check(
                     timer === WorksheetBindings.controller.expressionBindingRefreshTimer && WorksheetContext.expr.dataset.bindingRefreshValid === 'pending',
                     'pending refresh timer is cancelled before native reuse projection');
             };
-            Reflect.set(WorksheetWorkspace.presentation, 'updateHistoryButtons', () => {
+            /** @brief Check reuse projection and native scope release before history refresh. */
+            Reflect.set(WorksheetWorkspace.presentation, 'updateHistoryButtons', function updateHistory() {
                 refreshCalls.push('history');
                 check(
                     labDOM.call<BindingTestPlan>('lab_events_refresh', 99, 0, 0, {}).calls.length === 0,
@@ -254,16 +382,24 @@ window.checkLabEvents = function checkLabEvents() {
         } finally {
             WorksheetRequests.labRequests.cancel = refreshSaved.cancel;
             window.clearTimeout = refreshSaved.clearTimeout;
-            for (const name of ['bindingParts', 'refreshVariableValuesFromEditor', 'saveWorksheetState',
-                'clearGoalSeekRequest', 'scheduleEditedExpressionBindingRefresh', 'updateHistoryButtons'] as const)
-                Reflect.set(labTestModuleOwner(name), name, refreshSaved[name]);
-            for (const [key, text] of Object.entries(refreshSaved.source)) Reflect.set(WorksheetContext.labEditorState, key, text);
-            for (const [mode, text] of Object.entries(refreshSaved.editors)) Reflect.set(WorksheetContext.modeEditorText, mode, text);
+            WorksheetBindings.editor.bindingParts = refreshSaved.bindingParts;
+            WorksheetBindings.controller.refreshVariableValuesFromEditor = refreshSaved.refreshVariableValuesFromEditor;
+            WorksheetPersistence.persistence.saveWorksheet = refreshSaved.saveWorksheetState;
+            WorksheetBindings.goal.clearGoalSeekRequest = refreshSaved.clearGoalSeekRequest;
+            WorksheetBindings.controller.scheduleEditedExpressionBindingRefresh = refreshSaved.scheduleEditedExpressionBindingRefresh;
+            WorksheetWorkspace.presentation.updateHistoryButtons = refreshSaved.updateHistoryButtons;
+            for (const [key, text] of Object.entries(refreshSaved.source))
+                Reflect.set(WorksheetContext.labEditorState, key, text);
+            for (const [mode, text] of Object.entries(refreshSaved.editors))
+                Reflect.set(WorksheetContext.modeEditorText, mode, text);
             native.lab_workspace_select(savedMode);
         }
-        check(
-            savedRegistry && services.every(service => typeof savedRegistry[service] === 'function'),
-            'bootstrap supplies every native service');
+        let registryComplete = savedRegistry !== null;
+        for (const service of services) {
+            if (typeof savedRegistry?.[service] !== 'function')
+                registryComplete = false;
+        }
+        check(registryComplete, 'bootstrap supplies every native service');
         native.lab_workspace_select(0);
         const runServices = 'resetPlotPreview,clearForwardHistory,clearGoalSeekRequest,hideTargetEntry,evaluateCurrentMode';
         expect(0, {}, runServices);
@@ -290,13 +426,19 @@ window.checkLabEvents = function checkLabEvents() {
         }
         expect(1, {}, 'navigateHistoryFromEvent', [0]);
         expect(2, {}, 'navigateHistoryFromEvent', [1]);
-        for (let action = 9; action <= 11; ++action) expect(action, {}, 'normaliseWorksheetControl', [action - 9]);
+        for (let action = 9; action <= 11; ++action)
+            expect(action, {}, 'normaliseWorksheetControl', [action - 9]);
         // Equation variable is intentionally not a DOM control; its native action remains valid.
         expect(10, {currentTarget: null}, 'normaliseWorksheetControl', [1]);
         expect(14, {}, '');
         expect(15, {}, '');
         const slider = WorksheetContext.precisionSlider;
-        check(['value', 'min', 'max', 'step'].every(name => !Object.hasOwn(slider, name)),
+        let nativeRangeProperties = true;
+        for (const name of ['value', 'min', 'max', 'step']) {
+            if (Object.hasOwn(slider, name))
+                nativeRangeProperties = false;
+        }
+        check(nativeRangeProperties,
               'precision slider must use native range properties rather than shadowing them');
         const originalPrecision = native.lab_workspace_requested_precision(native.lab_workspace_mode());
         const sliderPosition = originalPrecision === 384 ? 4 : 3;
@@ -307,8 +449,13 @@ window.checkLabEvents = function checkLabEvents() {
         let previewValueWrites = 0;
         Object.defineProperty(slider, 'value', {
             configurable: true,
+            /** @brief Preserve native range reads while observing preview writes. */
             get() { return valueDescriptor.get!.call(this); },
-            set(value: string) { ++previewValueWrites; valueDescriptor.set!.call(this, value); }
+            /** @brief Count writes before forwarding to the native input setter. */
+            set(value: string) {
+                ++previewValueWrites;
+                valueDescriptor.set!.call(this, value);
+            }
         });
         try {
             send(slider, new Event('input'), '');
@@ -357,18 +504,21 @@ window.checkLabEvents = function checkLabEvents() {
             expect(action, {currentTarget: target}, service, args);
             send(target, new Event(type, {cancelable: true}), service);
             check(
-                calls[0].args.length === args.length && args.every((arg, index) => calls[0].args[index] === arg),
+                sameArguments(calls[0].args, args),
                 'live service arguments for ' + id);
         }
         {
             const rect = slider.getBoundingClientRect();
             check(rect.width > 16, 'precision track has measurable width');
-            const press = (clientX: number) => new PointerEvent('pointerdown', {
-                button: 0, clientX, clientY: rect.top + rect.height / 2, cancelable: true
-            });
+            /** @brief Press the precision track at the requested horizontal coordinate. */
+            function press(clientX: number): PointerEvent {
+                return new PointerEvent('pointerdown', {
+                    button: 0, clientX, clientY: rect.top + rect.height / 2, cancelable: true
+                });
+            }
             // The isolated event registry does not include document tooltip services triggered by focus.
             const focus = slider.focus;
-            slider.focus = () => {};
+            slider.focus = ignorePresentation;
             try {
                 slider.value = '0';
                 check(!send(slider, press(rect.right - 1), 'setWorksheetPrecision') && calls[0].args[0] === 106,
@@ -394,7 +544,7 @@ window.checkLabEvents = function checkLabEvents() {
         send(copyButton, click(), 'copyResultFromEvent');
         check(calls[0].args[0] === copyButton, 'copy button identity survives native return');
 
-        const calendarFlags: Record<string, Record<string, number>> = {
+        const calendarFlags: {datetime: EventFixtureCalendarFlags; almanac: EventFixtureCalendarFlags} = {
             datetime: {
                 date: 19,
                 jdn: 0,
@@ -425,7 +575,8 @@ window.checkLabEvents = function checkLabEvents() {
                 const target = field.element ? document.getElementById(field.element) : null;
                 check(Object.hasOwn(flags, field.key), 'calendar field has independent expected policy');
                 check(typeof field.id === 'number' && typeof field.field === 'number', 'numeric calendar route');
-                if (typeof field.id !== 'number' || typeof field.field !== 'number') throw new Error('Invalid calendar route');
+                if (typeof field.id !== 'number' || typeof field.field !== 'number')
+                    throw new Error('Invalid calendar route');
                 const action = (field.id << 8) | field.field;
                 if (target)
                     expect(
@@ -451,7 +602,10 @@ window.checkLabEvents = function checkLabEvents() {
                 expect(action, {type: 'keydown', key: 'Enter', currentTarget: document.createElement('input')}, '');
             }
         }
-        const dateField = calendarSchema('datetime').find(field => field.key === 'date')!;
+        /** @brief Find the date entry in the small native calendar schema. */
+        const dateField = calendarSchema('datetime').find(function isDateField(field) {
+            return field.key === 'date';
+        })!;
         const dateInput = document.querySelector<HTMLInputElement>('#' + dateField.element)!;
         dateInput.value = '2031-02-03';
         send(dateInput, new Event('change'), 'applyCalendarControlEvent');
@@ -466,9 +620,10 @@ window.checkLabEvents = function checkLabEvents() {
         document.body.append(fixture);
         const testDocument: EventTarget & {visibilityState?: DocumentVisibilityState} = new EventTarget();
         const testWindow = new EventTarget();
-        const subscriptions: {target: EventTarget; type: string; options?: boolean | AddEventListenerOptions}[] = [];
+        const subscriptions: EventFixtureSubscription[] = [];
         const add = EventTarget.prototype.addEventListener;
-        EventTarget.prototype.addEventListener = function(type, listener, options) {
+        /** @brief Observe listener options while retaining the real browser subscription. */
+        EventTarget.prototype.addEventListener = function recordSubscription(type, listener, options) {
             subscriptions.push({target: this, type, options});
             return add.call(this, type, listener, options);
         };
@@ -481,11 +636,17 @@ window.checkLabEvents = function checkLabEvents() {
         } finally {
             EventTarget.prototype.addEventListener = add;
         }
-        const scroll = subscriptions.find(entry => entry.target === testWindow && entry.type === 'scroll');
+        /** @brief Select the window scroll subscription from this fixture's bounded listener list. */
+        const scroll = subscriptions.find(function isWindowScroll(entry) {
+            return entry.target === testWindow && entry.type === 'scroll';
+        });
         check(typeof scroll?.options === 'object' && scroll.options.passive === true, 'scroll listener is passive');
-        check(
-            subscriptions.filter(entry => entry !== scroll).every(entry => typeof entry.options === 'object' && entry.options.passive === false),
-            'cancellable listeners explicitly remain non-passive');
+        let cancellableListeners = true;
+        for (const entry of subscriptions) {
+            if (entry !== scroll && !(typeof entry.options === 'object' && entry.options.passive === false))
+                cancellableListeners = false;
+        }
+        check(cancellableListeners, 'cancellable listeners explicitly remain non-passive');
         send(fixture.querySelector('textarea'), new Event('input'), 'scheduleEditorResizeGrip');
         send(fixture.querySelector('span'), new MouseEvent('click', {bubbles: true}), 'selectWorksheetMode');
         check(calls[0].args[0] === 'matrix', 'tab uses currentTarget rather than nested clicked element');
@@ -498,9 +659,11 @@ window.checkLabEvents = function checkLabEvents() {
         send(testDocument, new Event('visibilitychange'), 'flushWorksheetState');
         send(document.getElementById('run'), click(), runServices);
 
-        const card = WorksheetContext.resultCards.find(
-            candidate => candidate.querySelector('[data-expand-card]') && candidate.querySelector('[data-zoom-step]') &&
-                candidate.querySelector('[data-zoom-reset]'))!;
+        /** @brief Find a registered card that exposes every control needed by this event fixture. */
+        const card = WorksheetContext.resultCards.find(function hasCardControls(candidate) {
+            return candidate.querySelector('[data-expand-card]') && candidate.querySelector('[data-zoom-step]') &&
+                candidate.querySelector('[data-zoom-reset]');
+        })!;
         check(!!card, 'a registered card has expansion and zoom controls');
         const cardId = WorksheetContext.resultCardIds.get(card)!, initialZoom = native.lab_view_zoom_index(NaN);
         native.lab_view_card_set_zoom(cardId, initialZoom);
@@ -517,9 +680,10 @@ window.checkLabEvents = function checkLabEvents() {
         const zoom = card.querySelector('[data-zoom-step]'), reset = card.querySelector('[data-zoom-reset]');
         check(zoom && reset, 'zoom controls are present');
         let bubbled = false;
-        const observe = () => {
+        /** @brief Record whether a zoom click escapes to its ancestor card. */
+        function observe(): void {
             bubbled = true;
-        };
+        }
         card.addEventListener('click', observe);
         try {
             check(!send(zoom, new MouseEvent('click', {bubbles: true, cancelable: true}), ''), 'zoom cancels click');
@@ -536,7 +700,8 @@ window.checkLabEvents = function checkLabEvents() {
             native.lab_view_card_expanded() === cardId && expand.getAttribute('aria-expanded') === 'true',
             'expand subscription projects native state');
         let addedWhileExpanded = 0;
-        EventTarget.prototype.addEventListener = function(type, listener, options) {
+        /** @brief Count attempted subscriptions while expansion is already active. */
+        EventTarget.prototype.addEventListener = function countSubscription(type, listener, options) {
             ++addedWhileExpanded;
             return add.call(this, type, listener, options);
         };
@@ -562,13 +727,16 @@ window.checkLabEvents = function checkLabEvents() {
     } finally {
         fixture.remove();
         native.lab_workspace_select(savedMode);
-        for (const [id, zoom] of savedZoom) native.lab_view_card_set_zoom(id, zoom);
+        for (const {id, zoom} of savedZoom)
+            native.lab_view_card_set_zoom(id, zoom);
         native.lab_view_cards_collapse();
         if (savedExpansion >= 0)
             native.lab_view_card_toggle(savedExpansion);
         for (const {node, attributes, children} of snapshots) {
-            for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
-            for (const [namespace, name, text] of attributes) node.setAttributeNS(namespace, name, text);
+            for (const attribute of [...node.attributes])
+                node.removeAttribute(attribute.name);
+            for (const [namespace, name, text] of attributes)
+                node.setAttributeNS(namespace, name, text);
             node.replaceChildren(...children);
         }
         for (const {node, value: savedValue, selected} of snapshots) {

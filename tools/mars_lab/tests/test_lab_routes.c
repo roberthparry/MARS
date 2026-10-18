@@ -282,8 +282,10 @@ static bool route_contracts(const char *directory)
     ok = response && http_response_status(response) == 404 && ok;
     http_response_free(response);
     static const char *const scripts[] = {"codec", "codec_types", "jobs", "codec_worker", "transport",
-                                         "api", "app", "bindings", "locations", "results", "state", "surface",
-                                         "surface_camera", "surface_export", "surface_hover", "surface_volume", "workspace", "workspace_native"};
+                                         "api", "app", "bindings", "bindings_controller", "locations", "results",
+                                         "results_services", "state", "surface", "surface_camera", "surface_export",
+                                         "surface_hover", "surface_volume", "workspace", "workspace_native",
+                                         "workspace_controllers"};
     for (size_t i = 0; i < sizeof scripts / sizeof *scripts; ++i) {
         string_t *url = string_sprintf("/js/%s.js", scripts[i]);
         string_t *path = string_sprintf("tools/mars_lab/build/typescript/%s.js", scripts[i]);

@@ -5,23 +5,44 @@
  * Inventories visible cards before resizing an isolated iframe running production CSS, so mobile layout cannot silently hide desktop content.
  */
 
-/** Responsive geometry checks using snapshots of the live, native-populated worksheet.
+/** @brief Check responsive geometry using snapshots of the live, native-populated worksheet.
  * Every result/help card is inventoried before resizing; mobile CSS may not hide
  * a desktop-visible card. The iframe runs production CSS without a second app.
  */
-window.checkLabMobileLayout = async function checkLabMobileLayout(state: string) {
-    const check: LabTestCheck = (condition, message) => {
+window.checkLabMobileLayout = async function checkLabMobileLayout(state: string): Promise<void> {
+    /** @brief Report a layout failure with the captured worksheet state. */
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`Mobile layout (${state}): ${message}`);
-    };
-    const visible = (node: Element | null): node is Element => node!.getClientRects().length > 0;
+    }
+
+    /** @brief Read layout visibility without changing the fixture's DOM. */
+    function visible(node: Element): boolean {
+        return node.getClientRects().length > 0;
+    }
+
+    /** @brief Identify the button stylesheet in the production stylesheet's small import list. */
+    function isButtonStylesheet(rule: CSSRule): boolean {
+        return (rule as CSSImportRule).href?.endsWith('/buttons.css') === true;
+    }
+
+    /** @brief Identify the production touch rule without depending on the runner's pointer hardware. */
+    function isTouchRule(rule: CSSRule): boolean {
+        return (rule as CSSMediaRule).conditionText?.includes('hover: none') === true;
+    }
+
     const selectors = '.result-card, .help-card, #datetimeLocal, .datetime-section, #functionRunResult';
     const originals = [...document.querySelectorAll<HTMLElement>(selectors)];
     const expected = originals.map(visible);
     const frame = document.createElement('iframe');
     frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:390px;height:844px;border:0';
     try {
-        const loaded = new Promise(resolve => { frame.onload = resolve; });
+        const loaded = new Promise<void>(function waitForLoad(resolve) {
+            /** @brief Release the fixture after its production CSS has loaded. */
+            frame.onload = function frameLoaded(): void {
+                resolve();
+            };
+        });
         frame.srcdoc = '<!doctype html><html><head><meta name="viewport" ' +
             'content="width=device-width, initial-scale=1"><link rel="stylesheet" href="/index.css">' +
             '</head><body></body></html>';
@@ -33,22 +54,31 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
             doc.body.appendChild(source.cloneNode(true));
         const cards = [...doc.querySelectorAll<HTMLElement>(selectors)];
         check(cards.length === originals.length, 'complete card inventory copied');
-        for (const [width, height] of [[320, 568], [390, 844], [430, 932], [768, 1024], [844, 390]]) {
+        const viewports: MobileLayoutViewport[] = [
+            {width: 320, height: 568},
+            {width: 390, height: 844},
+            {width: 430, height: 932},
+            {width: 768, height: 1024},
+            {width: 844, height: 390}
+        ];
+        for (const {width, height} of viewports) {
             frame.style.width = width + 'px';
             frame.style.height = height + 'px';
             const viewport = doc.documentElement.clientWidth;
-            const inside = (node: Element, name: string) => {
+            /** @brief Check horizontal bounds against this viewport, retaining the measured coordinates. */
+            function inside(node: Element, name: string): void {
                 const box = node.getBoundingClientRect();
                 check(box.left >= -1 && box.right <= viewport + 1,
                       `${width}px: ${name} outside viewport (${box.left}, ${box.right}; ${viewport})`);
-            };
+            }
             check(doc.documentElement.scrollWidth <= viewport + 1, `${width}px: page scrolls sideways`);
-            cards.forEach((card, i) => {
+            for (let i = 0; i < cards.length; ++i) {
+                const card = cards[i];
                 check(visible(card) === expected[i], `${width}px: visibility changed for card ${i} ` +
                       (card.querySelector<HTMLElement>('.card-title, .help-kicker')?.textContent?.trim() || card.id));
                 if (visible(card))
                     inside(card, `card ${i}`);
-            });
+            }
             for (const node of doc.querySelectorAll<HTMLElement>('.datetime-row, .datetime-row-value')) {
                 if (visible(node))
                     inside(node, node.className);
@@ -94,7 +124,14 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
                     const compact = width <= 560 && !node.matches('.mars-date-button');
                     const precision = compact && node.closest('.precision-toolbar')!;
                     const worksheet = compact && node.matches('.controls button');
-                    check(node.getBoundingClientRect().height >= (precision ? 27 : worksheet ? 31 : compact ? 35 : 43),
+                    let minimumHeight = 43;
+                    if (precision)
+                        minimumHeight = 27;
+                    else if (worksheet)
+                        minimumHeight = 31;
+                    else if (compact)
+                        minimumHeight = 35;
+                    check(node.getBoundingClientRect().height >= minimumHeight,
                           `${width}px: small touch target ${node.id}`);
                     if (compact && node.matches('.controls button, .panel-head button, .variable-value-actions button'))
                         check(node.getBoundingClientRect().height <= (worksheet ? 33 : 38),
@@ -104,8 +141,12 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
                     check(parseFloat(frame.contentWindow!.getComputedStyle(node).fontSize) >= 16,
                           `${width}px: small editor font ${node.id}`);
             }
-            check([...doc.querySelectorAll<HTMLElement>('.mode-tab')].filter(visible).length === 7,
-                  `${width}px: a mode is missing`);
+            let visibleModes = 0;
+            for (const tab of doc.querySelectorAll<HTMLElement>('.mode-tab')) {
+                if (visible(tab))
+                    ++visibleModes;
+            }
+            check(visibleModes === 7, `${width}px: a mode is missing`);
             if (width <= 560) {
                 const tabs = [...doc.querySelectorAll<HTMLElement>('.mode-tab')];
                 const tabWidth = tabs[0].getBoundingClientRect().width;
@@ -244,9 +285,15 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
                       Math.abs((precision.top + precision.bottom) - (expressionTab.top + expressionTab.bottom)) < 2,
                       `${width}px: precision controls should sit to the left of Expression on the first row`);
                 const otherTabs = [...doc.querySelectorAll<HTMLElement>('.mode-tab')].slice(1);
-                const rowTops = new Set(otherTabs.map(tab => Math.round(tab.getBoundingClientRect().top)));
-                check(rowTops.size === 2 && otherTabs.every(tab =>
-                          tab.getBoundingClientRect().top >= expressionTab.bottom),
+                const rowTops = new Set<number>();
+                let belowExpression = true;
+                for (const tab of otherTabs) {
+                    const top = tab.getBoundingClientRect().top;
+                    rowTops.add(Math.round(top));
+                    if (!(top >= expressionTab.bottom))
+                        belowExpression = false;
+                }
+                check(rowTops.size === 2 && belowExpression,
                       `${width}px: remaining modes should form two rows below Expression`);
                 check(track.width >= precision.width - 2 && track.height <= 24 && precision.height <= 52,
                       `${width}px: precision slider fills its compact two-column slot`);
@@ -263,7 +310,10 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
             }
             const almanac = doc.getElementById('almanacControls')!;
             if (visible(almanac)) {
-                const bounds = (id: string) => doc.getElementById(id)!.getBoundingClientRect();
+                /** @brief Measure one Almanac control within the isolated document. */
+                function bounds(id: string): DOMRect {
+                    return doc.getElementById(id)!.getBoundingClientRect();
+                }
                 const date = bounds('almanacDate'), time = bounds('almanacTime'), zone = bounds('almanacZone');
                 check(Math.abs(time.top - zone.top) < 1 && time.right < zone.left && date.bottom <= time.top,
                       `${width}px: GMT time and zone should share a row below the date`);
@@ -295,11 +345,14 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
         if (state === 'all calendar result cards') {
             // Exercise the production touch rule even when the runner has a mouse.
             const imports = [...doc.styleSheets[0].cssRules];
-            const buttons = (imports.find(rule => (rule as CSSImportRule).href?.endsWith('/buttons.css')) as CSSImportRule).styleSheet!;
-            const touch = [...buttons.cssRules].find(rule => (rule as CSSMediaRule).conditionText?.includes('hover: none')) as CSSMediaRule;
+            const buttons = (imports.find(isButtonStylesheet) as CSSImportRule).styleSheet!;
+            const touch = [...buttons.cssRules].find(isTouchRule) as CSSMediaRule;
             check(touch?.conditionText.includes('pointer: coarse'), 'touch tooltip media rule missing');
             const style = doc.createElement('style');
-            style.textContent = [...touch.cssRules].map(rule => rule.cssText).join('\n');
+            const touchRules: string[] = [];
+            for (const rule of touch.cssRules)
+                touchRules.push(rule.cssText);
+            style.textContent = touchRules.join('\n');
             doc.head.appendChild(style);
             const tooltip = doc.createElement('div');
             tooltip.className = 'mars-button-tooltip visible';

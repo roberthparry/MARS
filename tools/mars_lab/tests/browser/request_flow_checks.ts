@@ -8,19 +8,21 @@
 /// <reference path="./request_flow_checks.d.ts" />
 /** Native request continuations: exact transport order, freshness and recovery boundaries. */
 window.checkLabRequestFlows = async function checkLabRequestFlows() {
-    const check: LabTestCheck = (condition: unknown, message: unknown) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Request flow: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
     const events: string[] = [];
-    const fail = (message: string) => {
+    function fail(message: string): never {
         throw new Error(message);
-    };
-    const abort = (message: string) => {
+    }
+    function abort(message: string): never {
         throw new DOMException(message, 'AbortError');
-    };
-    const rejected = async (promise: Promise<unknown>, name: string, message: string) => {
+    }
+    async function rejected(promise: Promise<unknown>, name: string, message: string): Promise<void> {
         let error: unknown;
         try {
             await promise;
@@ -29,8 +31,10 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
         }
         equal(error instanceof Error ? error.name : undefined, name, 'error class');
         equal(error instanceof Error ? error.message : undefined, message, 'error diagnostic');
-    };
-    const advance = (kind: number, frame: object, services: object, view: object = {}) => labDOM.flow(kind, frame, view, services as unknown as MarsTransportServices);
+    }
+    function advance(kind: number, frame: object, services: object, view: object = {}): Promise<unknown> {
+        return labDOM.flow(kind, frame, view, services as unknown as MarsTransportServices);
+    }
 
     // Forms decode failures propagate without being mistaken for native preparation errors.
     for (const [status, ok, diagnostic] of ([[200, true, ''], [200, false, 'native forms'], [503, true, '']] as const)) {
@@ -38,14 +42,14 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
         const data = {ok, error: diagnostic, rows: [{name: 'α'}]}, signal = {};
         const response = {ok: status === 200, status};
         const task = advance(12, {payload: {action: 'integrator'}, options: {signal}}, {
-            rawPost: (url: unknown, payload: {action: string}, sentSignal: unknown) => {
+            rawPost(url: unknown, payload: {action: string}, sentSignal: unknown) {
                 events.push('post');
                 equal(url, '/forms', 'forms endpoint');
                 equal(payload.action, 'integrator', 'forms payload is opaque');
                 equal(sentSignal, signal, 'borrowed abort signal');
                 return response;
             },
-            responseData: (supplied: unknown) => {
+            responseData(supplied: unknown) {
                 equal(supplied, response, 'same response decoded');
                 events.push('decode');
                 return data;
@@ -68,17 +72,17 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
             const data = {ok: true, editor: {expression: 'opaque μ'}};
             const task = advance(13, {payload: {action: 'editor'}, request}, {
                 requestContext: () => context,
-                requestCurrent: (supplied: unknown) => {
+                requestCurrent(supplied: unknown) {
                     equal(supplied, request, 'presentation checks the owned request');
                     return current;
                 },
-                rawPost: (url: unknown, _payload: unknown, signal: unknown) => {
+                rawPost(url: unknown, _payload: unknown, signal: unknown) {
                     equal(url, '/presentation', 'presentation endpoint');
                     equal(signal, request?.controller.signal ?? null, 'presentation signal selection');
                     events.push('post');
                     return {ok: true};
                 },
-                responseData: () => {
+                responseData() {
                     events.push('decode');
                     if (stale) {
                         ++context;
@@ -86,7 +90,7 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
                     }
                     return data;
                 },
-                installPresentation: (supplied: unknown) => {
+                installPresentation(supplied: unknown) {
                     equal(supplied, data, 'only native metadata is installed');
                     events.push('install');
                 },
@@ -115,7 +119,7 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
                 requestContext: () => 7,
                 editorRequests: () => requests,
                 awaitValue: (promise: unknown) => promise,
-                editorPromise: (source: unknown, next: {context: number}, payload: {operation: string; text: string}) => {
+                editorPromise(source: unknown, next: {context: number}, payload: {operation: string; text: string}) {
                     ++starts;
                     equal(source, 'μ', 'deduplicated exact source');
                     equal(next.context, 7, 'replacement owns current context');
@@ -137,48 +141,48 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
         const bounds = [{name: 'x', lower: '0', upper: '1'}], payload = {}, result = {};
         const services = {
             integratorSnapshot: () => snapshot,
-            refreshIntegratorForms: (supplied: unknown, text: unknown) => {
+            refreshIntegratorForms(supplied: unknown, text: unknown) {
                 equal(supplied, rows, 'preparation sees the captured rows');
                 equal(text, snapshot.text, 'preparation sees the captured source');
                 events.push('prepare');
                 return staleAt === 'prepared' ? null : rows;
             },
-            requestContext: () => {
+            requestContext() {
                 events.push('context');
                 return staleAt === 'context' ? 10 : 9;
             },
-            requestCurrent: () => {
+            requestCurrent() {
                 events.push('current');
                 return staleAt !== 'request';
             },
-            integratorText: () => {
+            integratorText() {
                 events.push('text');
                 return staleAt === 'text' ? 'other' : snapshot.text;
             },
-            integratorRowsText: () => {
+            integratorRowsText() {
                 events.push('rows');
                 return staleAt === 'rows' ? 'other' : snapshot.rowsText;
             },
-            requestCancel: (operation: unknown) => {
+            requestCancel(operation: unknown) {
                 equal(operation, 'evaluate', 'only evaluation is cancelled');
                 events.push('cancel');
             },
             activeIntegratorRows: () => ({rows, bounds}),
-            renderIntegratorRows: (supplied: unknown) => {
+            renderIntegratorRows(supplied: unknown) {
                 equal(supplied, rows, 'accepted rows rendered');
                 events.push('render');
             },
-            native: (name: unknown, supplied: unknown) => {
+            native(name: unknown, supplied: unknown) {
                 equal(name, 'lab_payload_bounds_error', 'native bounds validation');
                 equal(supplied, bounds, 'selected bounds are validated');
                 return '';
             },
-            saveWorksheetState: (mode: unknown) => {
+            saveWorksheetState(mode: unknown) {
                 equal(mode, 'integrator', 'accepted worksheet saved');
                 events.push('save');
             },
             integratorPayload: () => payload,
-            post: (supplied: unknown, body: unknown, endpoint: unknown) => {
+            post(supplied: unknown, body: unknown, endpoint: unknown) {
                 equal(supplied, request, 'integrator request ownership');
                 equal(body, payload, 'integrator payload unchanged');
                 equal(endpoint, '/integrator-eval', 'integrator endpoint');
@@ -219,9 +223,10 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
         let current = true;
         const request = {}, variables = ['retained'];
         const services = {
-            calculusInitial: () =>
-                ({mode: matrix ? 'matrix' : 'expression', scalar: variant === 'scalar' ? 'scalar source' : ''}),
-            runRequestFlow: (kind: number, frame: object, stage: unknown, operation: unknown, mode: unknown, options: {scalar: boolean}) => {
+            calculusInitial() {
+                return {mode: matrix ? 'matrix' : 'expression', scalar: variant === 'scalar' ? 'scalar source' : ''};
+            },
+            runRequestFlow(kind: number, frame: object, stage: unknown, operation: unknown, mode: unknown, options: {scalar: boolean}) {
                 equal(operation, 'derivative', 'calculus operation owns request');
                 equal(mode, matrix ? 'matrix' : 'expression', 'calculus mode');
                 equal(options.scalar, variant === 'scalar', 'native scalar request flag');
@@ -232,11 +237,11 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
             requestCurrent: () => current,
             matrixScalar: () => 'scalar source',
             expressionText: () => 'authored source',
-            expressionWithVisibleBindings: (text: unknown) => {
+            expressionWithVisibleBindings(text: unknown) {
                 events.push('assemble');
                 return text;
             },
-            requestInput: (_request: unknown, source: unknown, wrt: unknown) => {
+            requestInput(_request: unknown, source: unknown, wrt: unknown) {
                 equal(source, variant === 'scalar' ? 'scalar source' : 'authored source', 'source chosen after commit');
                 equal(wrt, 'x', 'exact calculus variable');
                 return true;
@@ -244,26 +249,30 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
             showResults: () => events.push('show'),
             calculusTitle: (text: unknown) => equal(text, 'x derivative RESULT', 'native calculus title'),
             setStatus: (text: string) => events.push(text),
-            requestPresentation: (payload: {calculus: string}, owner: unknown) => {
+            requestPresentation(payload: {calculus: string}, owner: unknown) {
                 equal(owner, request, 'matrix preparation is owned');
                 equal(payload.calculus, 'derivative', 'matrix preparation operation');
                 events.push('prepare matrix');
                 return {editor: {expression: 'native matrix'}};
             },
-            fetchMatrixOptions: (options: {matrixText: string; skipSave: boolean}) => {
+            fetchMatrixOptions(options: {matrixText: string; skipSave: boolean}) {
                 equal(options.matrixText, 'native matrix', 'native matrix source used');
                 equal(options.skipSave, true, 'transient calculus matrix does not replace worksheet');
                 return {response: {ok: true}, data};
             },
-            fetchCalculus: () => {
+            fetchCalculus() {
                 if (variant === 'stale')
                     current = false;
                 return {response: {ok: true}, data};
             },
-            requestOutcome: () => !current ? 0 :
-                variant === 'failure'      ? 1 :
-                                             2,
-            clearResultDetails: (options: {keepBindings: boolean}) => {
+            requestOutcome() {
+                if (!current)
+                    return 0;
+                if (variant === 'failure')
+                    return 1;
+                return 2;
+            },
+            clearResultDetails(options: {keepBindings: boolean}) {
                 equal(options.keepBindings, true, 'calculus retains binding editor');
                 events.push('clear');
             },
@@ -271,7 +280,7 @@ window.checkLabRequestFlows = async function checkLabRequestFlows() {
             displayMatrixResult: (supplied: unknown) => equal(supplied, data, 'whole matrix native result'),
             displayCalculusResult: (supplied: unknown) => equal(supplied, calculus, 'native expression result'),
             valueTitle: (text: unknown) => equal(text, 'Summary', 'matrix without value has summary title'),
-            setMatrixPrettyResult: (text: unknown, pretty: unknown) => {
+            setMatrixPrettyResult(text: unknown, pretty: unknown) {
                 equal(text, calculus.expression, 'scalar result source');
                 equal(pretty, '', 'scalar result requests native pretty form');
                 events.push('pretty scalar');

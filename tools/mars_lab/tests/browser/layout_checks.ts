@@ -5,19 +5,55 @@
  * Uses controlled transport completion after Lab readiness to verify browser layout independently of native request-policy checks.
  */
 
+/** @brief Capture DOM identity, exact attributes and any shadowed width for later restoration. */
+function layoutSnapshot(element: LayoutFixtureResultElement): LayoutFixtureElementSnapshot {
+    const attributes: [string, string][] = [];
+    for (const attribute of element.attributes)
+        attributes.push([attribute.name, attribute.value]);
+    return {
+        element,
+        attributes,
+        children: [...element.childNodes],
+        disabled: element.disabled,
+        clientWidth: Object.getOwnPropertyDescriptor(element, 'clientWidth')
+    };
+}
+
+/** @brief Restore original nodes and properties after all deferred rendering has drained. */
+function layoutRestore(snapshot: LayoutFixtureElementSnapshot): void {
+    const {element, attributes, children, disabled, clientWidth} = snapshot;
+    for (const attribute of [...element.attributes])
+        element.removeAttribute(attribute.name);
+    for (const [name, value] of attributes)
+        element.setAttribute(name, value);
+    element.replaceChildren(...children);
+    if (disabled !== undefined)
+        element.disabled = disabled;
+    if (clientWidth)
+        Object.defineProperty(element, 'clientWidth', clientWidth);
+    else
+        Reflect.deleteProperty(element, 'clientWidth');
+}
+
 /**
- * Browser-only result geometry and deferred-render regressions.
+ * @brief Check browser-only result geometry and deferred rendering.
  * The parent invokes checkLabLayout after labReady, with no live requests.
  * Mock transport controls completion order; native request-policy checks remain
  * in request_checks.js. No mathematical expressions are interpreted here.
  */
-window.checkLabLayout = async function checkLabLayout() {
-    const check: LabTestCheck = (condition, message) => {
+window.checkLabLayout = async function checkLabLayout(): Promise<void> {
+    /** @brief Report a failed layout assertion. */
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`Result layout: ${message}`);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const view = labWire.exports() as LayoutFixtureNativeExports;
+    }
+
+    /** @brief Compare native and browser values without coercion. */
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+
+    const view = labWire.exports() as unknown as LayoutFixtureNativeExports;
     const hints = document.createElement('section');
     hints.className = 'result-card';
     const heading = document.createElement('div');
@@ -27,19 +63,22 @@ window.checkLabLayout = async function checkLabLayout() {
     heading.appendChild(title);
     hints.appendChild(heading);
     document.body.appendChild(hints);
-    const makeButton = (text = '') => {
+    /** @brief Append a control owned solely by the tooltip fixture. */
+    function makeButton(text = ''): HTMLButtonElement {
         const button = document.createElement('button');
         button.textContent = text;
         hints.appendChild(button);
         return button;
-    };
-    const hint = (button: HTMLButtonElement) => {
+    }
+
+    /** @brief Show the real tooltip and check its visible accessibility projection. */
+    function hint(button: HTMLButtonElement): string {
         WorksheetResults.tooltip.show(button);
         const node = document.getElementById('marsButtonTooltip')!;
         check(node && node.classList.contains('visible'), 'tooltip visible');
         equal(node.getAttribute('role'), 'tooltip', 'tooltip role');
         return node.textContent;
-    };
+    }
     try {
         WorksheetResults.tooltip.hide();
         const button = makeButton('  Choose\n\t something  ');
@@ -102,9 +141,12 @@ window.checkLabLayout = async function checkLabLayout() {
             button.setAttribute('aria-describedby', description);
             hint(button);
             hint(button);
-            equal(
-                button.getAttribute('aria-describedby')!.split(/\s+/).filter(x => x === 'marsButtonTooltip').length, 1,
-                'description token appears once');
+            let tooltipTokens = 0;
+            for (const token of button.getAttribute('aria-describedby')!.split(/\s+/)) {
+                if (token === 'marsButtonTooltip')
+                    ++tooltipTokens;
+            }
+            equal(tooltipTokens, 1, 'description token appears once');
             WorksheetResults.tooltip.hide();
             equal(button.getAttribute('aria-describedby'), description, 'description restored byte-for-byte');
             check(!button.hasAttribute('data-mars-tooltip-description'), 'saved description released');
@@ -134,12 +176,15 @@ window.checkLabLayout = async function checkLabLayout() {
     const retired = await labHttp.fetch('/js/result_layout.js');
     check(
         retired.status === 404 && !labApplication.definitionScripts.includes('result_layout'), 'retired layout script unavailable');
-    const savedCardZooms = WorksheetContext.resultCards.map(card => resultZoomIndex(card));
-    const savedCardHidden = WorksheetContext.resultCards.map(card => card.classList.contains('hidden'));
+    const savedCardZooms = WorksheetContext.resultCards.map(resultZoomIndex);
+    const savedCardHidden: boolean[] = [];
+    for (const card of WorksheetContext.resultCards)
+        savedCardHidden.push(card.classList.contains('hidden'));
     const savedExpanded = view.lab_view_card_expanded();
     try {
         equal(view.lab_view_cards_reset(64), 1, 'maximum card registration');
-        for (let card = 0; card < 64; ++card) equal(view.lab_view_card_zoom(card), 3, 'registered cards start at 100%');
+        for (let card = 0; card < 64; ++card)
+            equal(view.lab_view_card_zoom(card), 3, 'registered cards start at 100%');
         equal(view.lab_view_card_set_zoom(63, 10), 10, 'last card owns zoom');
         equal(view.lab_view_card_zoom(0), 3, 'card zoom isolation');
         equal(view.lab_view_card_step_zoom(63, 1), 10, 'upper zoom bound');
@@ -175,7 +220,9 @@ window.checkLabLayout = async function checkLabLayout() {
         equal(resultZoomIndex(first), 6, 'DOM zoom adapter changes native state');
         equal(resultZoomIndex(second), 3, 'DOM zoom adapter preserves other cards');
         equal(first.style.getPropertyValue('--result-zoom'), '2', 'DOM applies native zoom');
-        const style_mutations = new MutationObserver(() => {});
+        /** @brief Leave mutation delivery inert; assertions consume the records synchronously. */
+        function ignoreMutations(): void {}
+        const style_mutations = new MutationObserver(ignoreMutations);
         style_mutations.observe(first, {attributes: true, attributeFilter: ['style']});
         try {
             applyResultZoom(first);
@@ -203,18 +250,22 @@ window.checkLabLayout = async function checkLabLayout() {
         equal(resultZoomIndex(first), 6, 'DOM collapse retains native zoom');
     } finally {
         view.lab_view_cards_reset(WorksheetContext.resultCards.length);
-        savedCardZooms.forEach((zoom, card) => view.lab_view_card_set_zoom(card, zoom));
+        for (let card = 0; card < savedCardZooms.length; ++card)
+            view.lab_view_card_set_zoom(card, savedCardZooms[card]);
         if (savedExpanded >= 0)
             view.lab_view_card_toggle(savedExpanded);
         renderResultCardExpansion();
-        WorksheetContext.resultCards.forEach((card, index) => card.classList.toggle('hidden', savedCardHidden[index]));
-        WorksheetContext.resultCards.forEach(card => applyResultZoom(card));
+        for (let index = 0; index < WorksheetContext.resultCards.length; ++index)
+            WorksheetContext.resultCards[index].classList.toggle('hidden', savedCardHidden[index]);
+        for (const card of WorksheetContext.resultCards)
+            applyResultZoom(card);
     }
-    const resize = (...args: (number | boolean)[]) => {
+    /** @brief Copy borrowed editor geometry before any later native call can replace it. */
+    function resize(...args: (number | boolean)[]): string {
         const pointer = view.lab_view_editor_resize(...args);
         check(pointer !== 0, 'valid editor geometry');
         return new Float64Array(view.memory.buffer, pointer, 3).slice().join(',');
-    };
+    }
     equal(resize(800, 2, 300, 100, 120, 0, false), '3,120,260', 'overflow enables resizing and shares budget');
     equal(resize(800, 2, 101, 100, 120, 0, false), '0,120,260', 'one-pixel overflow tolerance');
     equal(resize(800, 2, 100, 100, 122, 120, true), '0,120,260', 'two-pixel manual tolerance resets');
@@ -234,11 +285,12 @@ window.checkLabLayout = async function checkLabLayout() {
                 'invalid editor measurement leaves result unchanged');
         }
     }
-    const tooltip = (...args: number[]) => {
+    /** @brief Copy borrowed tooltip geometry for an exact coordinate comparison. */
+    function tooltip(...args: number[]): string {
         const pointer = view.lab_view_tooltip_rect(...args);
         check(pointer !== 0, 'valid tooltip geometry');
         return new Float64Array(view.memory.buffer, pointer, 2).slice().join(',');
-    };
+    }
     equal(tooltip(1000, 800, 100, 100, 100, 130, 80, 20), '110,138', 'tooltip centred below');
     equal(tooltip(1000, 800, 980, 760, 20, 780, 80, 20), '912,732', 'tooltip right clamp and above placement');
     equal(tooltip(100, 10, -50, 0, 20, 10, 200, 30), '8,8', 'oversized tooltip keeps minimum margins');
@@ -258,9 +310,24 @@ window.checkLabLayout = async function checkLabLayout() {
     const testEditor = document.createElement('textarea');
     let contentHeight = 300;
     let measuredHeight = 120;
-    Object.defineProperties(testEditor, {clientHeight: {get: () => 100}, scrollHeight: {get: () => contentHeight}});
-    testEditor.getBoundingClientRect = () => ({height: measuredHeight} as DOMRect);
-    testEditor.getClientRects = () => [{}] as unknown as DOMRectList;
+    Object.defineProperties(testEditor, {
+        clientHeight: {
+            /** @brief Keep the editor's available height fixed during overflow checks. */
+            get(): number { return 100; }
+        },
+        scrollHeight: {
+            /** @brief Expose the scenario's current content height. */
+            get(): number { return contentHeight; }
+        }
+    });
+    /** @brief Expose the scenario's current manual height. */
+    testEditor.getBoundingClientRect = function editorRect(): DOMRect {
+        return {height: measuredHeight} as DOMRect;
+    };
+    /** @brief Keep the detached-measurement fixture visible to the layout adapter. */
+    testEditor.getClientRects = function editorRects(): DOMRectList {
+        return [{}] as unknown as DOMRectList;
+    };
     document.body.appendChild(testEditor);
     WorksheetContext.labTextareas.splice(0, WorksheetContext.labTextareas.length, testEditor);
     try {
@@ -281,11 +348,12 @@ window.checkLabLayout = async function checkLabLayout() {
         WorksheetContext.labTextareas.splice(0, WorksheetContext.labTextareas.length, ...savedEditors);
         testEditor.remove();
     }
-    const pickerRect = (...args: number[]) => {
+    /** @brief Copy borrowed picker geometry before the next native measurement. */
+    function pickerRect(...args: number[]): string {
         const pointer = view.lab_view_picker_rect(...args);
         check(pointer !== 0, 'valid picker geometry');
         return new Float64Array(view.memory.buffer, pointer, 4).slice().join(',');
-    };
+    }
     equal(pickerRect(1000, 800, 100, 200, 100), '448,100,108,680', 'desktop picker minimum width');
     equal(pickerRect(320, 600, 250, 200, 100), '296,12,108,480', 'mobile picker fits viewport');
     equal(pickerRect(1000, 800, -100, 500, 790), '500,12,798,8', 'offscreen anchor clamps');
@@ -302,7 +370,8 @@ window.checkLabLayout = async function checkLabLayout() {
     }
     const scales = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
     equal(view.lab_view_zoom_count(), scales.length, 'C owns every zoom level');
-    scales.forEach((scale, index) => equal(view.lab_view_zoom(index), scale, `zoom ${index}`));
+    for (let index = 0; index < scales.length; ++index)
+        equal(view.lab_view_zoom(index), scales[index], `zoom ${index}`);
     for (const invalid of [NaN, Infinity, -Infinity]) {
         equal(view.lab_view_zoom_index(invalid), 3, 'invalid zoom selects 100%');
         equal(view.lab_view_wrapped(invalid, 1, 100, true), 0, 'invalid width cannot request wrapping');
@@ -321,8 +390,9 @@ window.checkLabLayout = async function checkLabLayout() {
     equal(view.lab_view_wrapped(102, 1, 100, false), 0, 'missing variant cannot wrap');
     equal(view.lab_view_mode_flags(0, false), 29, 'empty expression value hidden');
     equal(view.lab_view_mode_flags(0, true), 31, 'expression value shown when supplied');
-    [29, 3, 3, 9, 3, 3, 0].forEach(
-        (flags, mode) => equal(view.lab_view_mode_flags(mode, false), flags, `mode ${mode} card policy`));
+    const modeFlags = [29, 3, 3, 9, 3, 3, 0];
+    for (let mode = 0; mode < modeFlags.length; ++mode)
+        equal(view.lab_view_mode_flags(mode, false), modeFlags[mode], `mode ${mode} card policy`);
     equal(labDOM.call<string[]>('lab_workspace_dom_labels', 2)[0], 'Differential Equation', 'mode title from C');
     equal(labDOM.call<string[]>('lab_workspace_dom_labels', 4)[4], 'Exact result', 'integrator card label from C');
     equal(view.lab_view_text_length(0, 99), 0, 'invalid label is empty');
@@ -346,45 +416,52 @@ window.checkLabLayout = async function checkLabLayout() {
         zoom: resultZoomIndex(WorksheetContext.rendered.closest<HTMLElement>('.result-card')!),
         renderScale: WorksheetContext.rendered.closest<HTMLElement>('.result-card')!.style.getPropertyValue('--render-base-scale')
     };
-    const elements = [WorksheetContext.functionStyle, WorksheetContext.rendered].map(
-        element => ({
-            element,
-            attributes: [...element.attributes].map(attribute => [attribute.name, attribute.value] as const),
-            children: [...element.childNodes],
-            clientWidth: Object.getOwnPropertyDescriptor(element, 'clientWidth')
-        }));
+    const elements = [WorksheetContext.functionStyle, WorksheetContext.rendered].map(layoutSnapshot);
     const compact = '<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="20"></svg>';
     const wrapped = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40"></svg>';
     const other = '<svg xmlns="http://www.w3.org/2000/svg" width="2100" height="20"></svg>';
     let mode: WorksheetMode = 'diffequation';
     let width = 300;
     let epoch = 1;
-    let active: (WorksheetRequests.MarsApiRequest & {epoch: number}) | null = null;
+    let active: LayoutFixtureRequest | null = null;
     let allowBegin = true;
-    const shown = () => WorksheetContext.rendered.querySelector<HTMLElement>('.rendered-zoom-frame')?.innerHTML || '';
+    /** @brief Read the exact SVG currently installed by the renderer. */
+    function shown(): string {
+        return WorksheetContext.rendered.querySelector<HTMLElement>('.rendered-zoom-frame')?.innerHTML || '';
+    }
     const posts: LayoutFixturePost[] = [];
     const finished: (WorksheetRequests.MarsApiRequest | null | undefined)[] = [];
     const tasks: Promise<unknown>[] = [];
-    const start = () => {
+    /** @brief Retain every started continuation so cleanup can drain it before restoring services. */
+    function start(): Promise<unknown> {
         const task = WorksheetRequests.solver.fitSolverTexToCard();
         tasks.push(task);
         return task;
-    };
-    const startPending = (step: string) => {
+    }
+
+    /** @brief Start one render and check that it acquired exactly one transport. */
+    function startPending(step: string): LayoutFixturePending {
         const count = posts.length;
         const task = start();
         check(posts.length === count + 1, `${step}: expected one new pending transport request`);
         const post = posts[count];
         check(WorksheetRequests.solver.pending?.request === post.request, `${step}: pending layout request owns transport`);
         return {task, post};
-    };
-    const complete = (post: LayoutFixturePost, svg = wrapped, ok = true, httpOk = true) => {
+    }
+
+    /** @brief Complete a chosen transport while independently controlling HTTP and native success. */
+    function complete(post: LayoutFixturePost, svg = wrapped, ok = true, httpOk = true): void {
         check(post && typeof post.resolve === 'function', 'completion requires a pending transport request');
         const data = {ok, svg};
-        const response = Object.assign(new Response(null, {status: httpOk ? 200 : 500}), {labData: async () => data});
+        const response = Object.assign(new Response(null, {status: httpOk ? 200 : 500}), {
+            /** @brief Decode the selected fixture payload asynchronously. */
+            async labData() { return data; }
+        });
         post.resolve({response, data});
-    };
-    const card = (svg = compact, text = 'wrapped-A') => {
+    }
+
+    /** @brief Install a compact solver card owned by the current fixture epoch. */
+    function card(svg = compact, text = 'wrapped-A'): void {
         WorksheetContext.functionStyle.classList.add('equation-function');
         WorksheetContext.functionStyle.dataset.solverCompactSvg = svg;
         WorksheetContext.functionStyle.dataset.solverCompactTex = 'compact-source';
@@ -393,18 +470,25 @@ window.checkLabLayout = async function checkLabLayout() {
         WorksheetContext.functionStyle.dataset.solverParentToken = String(epoch);
         delete WorksheetContext.functionStyle.dataset.solverVariant;
         installSolverTexSvg(svg, 'compact');
-    };
+    }
     try {
-        WorksheetWorkspace.mode.currentMode = () => mode;
+        /** @brief Read the fixture mode at the moment the production adapter asks for it. */
+        WorksheetWorkspace.mode.currentMode = function currentMode(): WorksheetMode { return mode; };
         for (const element of [WorksheetContext.functionStyle, WorksheetContext.rendered])
-            Object.defineProperty(element, 'clientWidth', {configurable: true, get: () => width});
+            Object.defineProperty(element, 'clientWidth', {
+                configurable: true,
+                /** @brief Measure the current simulated viewport width. */
+                get(): number { return width; }
+            });
         WorksheetContext.functionStyle.style.setProperty('--solver-tex-scale', '1');
         const renderCard = WorksheetContext.rendered.closest<HTMLElement>('.result-card')!;
         renderCard.style.setProperty('--render-base-scale', '1');
         view.lab_view_card_set_zoom(WorksheetContext.resultCardIds.get(renderCard)!, 3);
         WorksheetContext.rendered.replaceChildren();
-        WorksheetRequests.labRequests.latestMain = () => epoch;
-        WorksheetRequests.labRequests.begin = (operation, requestedMode, options) => {
+        /** @brief Read the current evaluation identity without capturing an earlier epoch. */
+        WorksheetRequests.labRequests.latestMain = function latestMain(): number { return epoch; };
+        /** @brief Admit a wrapping request only for the currently displayed solver result. */
+        WorksheetRequests.labRequests.begin = function begin(operation, requestedMode, options) {
             equal(operation, 'solverRender', 'uses a separate solver-render operation');
             equal(requestedMode, 'diffequation', 'solver request mode');
             equal(
@@ -413,17 +497,24 @@ window.checkLabLayout = async function checkLabLayout() {
             equal(options!.input, true, 'nonempty wrapped source is supplied');
             if (!allowBegin || !options!.parent || options!.parent !== epoch)
                 return null;
-            active = {epoch} as unknown as WorksheetRequests.MarsApiRequest & {epoch: number};
+            active = {epoch} as LayoutFixtureRequest;
             return active;
         };
-        WorksheetRequests.labRequests.current = request =>
-            !!request && request === active && (request as WorksheetRequests.MarsApiRequest & {epoch: number}).epoch === epoch && mode === 'diffequation';
-        WorksheetRequests.labRequests.post = (request, payload, endpoint) => new Promise((resolve, reject) => {
-            equal(endpoint, '/render_TeX', 'render endpoint');
-            equal((payload as {tex: string}).tex, WorksheetContext.functionStyle.dataset.solverWrappedTex, 'native TeX forwarded unchanged');
-            posts.push({request, resolve, reject});
-        });
-        WorksheetRequests.labRequests.finish = request => {
+        /** @brief Require both request identity and the current mode and epoch. */
+        WorksheetRequests.labRequests.current = function current(request): boolean {
+            return active !== null && request === active && active.epoch === epoch && mode === 'diffequation';
+        };
+        /** @brief Capture a deferred response, keeping validation failures as promise rejections. */
+        WorksheetRequests.labRequests.post = function post(request, payload, endpoint) {
+            return new Promise<WorksheetRequests.MarsApiPostResult>(function queuePost(resolve, reject) {
+                equal(endpoint, '/render_TeX', 'render endpoint');
+                equal((payload as {tex: string}).tex, WorksheetContext.functionStyle.dataset.solverWrappedTex,
+                    'native TeX forwarded unchanged');
+                posts.push({request, resolve, reject});
+            });
+        };
+        /** @brief Record every finaliser while preserving ownership of a newer request. */
+        WorksheetRequests.labRequests.finish = function finish(request): void {
             finished.push(request);
             if (active === request)
                 active = null;
@@ -462,14 +553,26 @@ window.checkLabLayout = async function checkLabLayout() {
         mode = 'diffequation';
         // Native preparation returns ordinary snapshot values and performs every freshness decision.
         card();
-        const prepare = (pending: LayoutFixtureSnapshot | null = null, live = 0, owner: object | null = null) =>
-            labDOM.call<LayoutFixtureSnapshot>('lab_solver_view_prepare', mode, pending, live, owner);
-        const current = (snapshot: LayoutFixtureSnapshot, active = snapshot, live = 1, owner: object | null = null) =>
-            labDOM.call('lab_solver_view_current', mode, snapshot, active, live, owner);
-        const publish = (snapshot: LayoutFixtureSnapshot, active = snapshot, live = 1, owner: object | null = null, failed = 0) => labDOM.call(
-            'lab_solver_view_publish', mode, snapshot, active, live, owner, {ok: true}, {ok: true, svg: wrapped},
-            failed);
-        const snapshot = Object.freeze(prepare());
+        /** @brief Ask native code to prepare wrapping with the current pending request and restored owner. */
+        function prepare(pending: LayoutFixtureSnapshot | null = null, live = 0,
+                         owner: object | null = null): LayoutFixtureSnapshot | null {
+            return labDOM.call('lab_solver_view_prepare', mode, pending, live, owner);
+        }
+
+        /** @brief Ask native code whether the saved solver snapshot still owns publication. */
+        function current(snapshot: LayoutFixtureSnapshot, active: LayoutFixtureSnapshot | null = snapshot,
+                         live = 1, owner: object | null = null): number {
+            return labDOM.call('lab_solver_view_current', mode, snapshot, active, live, owner);
+        }
+
+        /** @brief Publish or reject a completion using native freshness checks. */
+        function publish(snapshot: LayoutFixtureSnapshot, active: LayoutFixtureSnapshot | null = snapshot,
+                         live = 1, owner: object | null = null, failed = 0): number {
+            return labDOM.call('lab_solver_view_publish', mode, snapshot, active, live, owner,
+                {ok: true}, {ok: true, svg: wrapped}, failed);
+        }
+
+        const snapshot = Object.freeze(prepare()!);
         equal(snapshot.node, WorksheetContext.functionStyle, 'snapshot stores the actual solver card');
         equal(snapshot.compactSvg, compact, 'snapshot preserves exact compact SVG');
         equal(snapshot.wrappedTex, 'wrapped-A', 'snapshot preserves exact wrapped TeX');
@@ -510,7 +613,7 @@ window.checkLabLayout = async function checkLabLayout() {
             (duplicate as Element).remove();
         }
         const restoredOwner = Object.freeze({context: 91});
-        const restoredSnapshot = Object.freeze(prepare(null, 0, restoredOwner));
+        const restoredSnapshot = Object.freeze(prepare(null, 0, restoredOwner)!);
         equal(restoredSnapshot.operation, 'solverRestoreRender', 'native preparation selects restored operation');
         equal(restoredSnapshot.options!.parent, 0, 'restored owner does not borrow a main token');
         equal(restoredSnapshot.restoredOwner, restoredOwner, 'restored snapshot retains actual owner identity');
@@ -657,7 +760,8 @@ window.checkLabLayout = async function checkLabLayout() {
     } finally {
         // Drain all deferred continuations before restoring real request methods.
         ++epoch;
-        for (const post of posts) complete(post);
+        for (const post of posts)
+            complete(post);
         await Promise.allSettled(tasks);
         Object.assign(WorksheetRequests.labRequests, saved.requests);
         WorksheetWorkspace.mode.currentMode = saved.currentMode;
@@ -667,70 +771,85 @@ window.checkLabLayout = async function checkLabLayout() {
         WorksheetContext.rightPaneTitle.textContent = saved.title;
         WorksheetContext.rendered.closest<HTMLElement>('.result-card')!.style.setProperty('--render-base-scale', saved.renderScale);
         view.lab_view_card_set_zoom(WorksheetContext.resultCardIds.get(WorksheetContext.rendered.closest<HTMLElement>('.result-card')!)!, saved.zoom);
-        for (const {element, attributes, children, clientWidth} of elements) {
-            for (const attribute of [...element.attributes]) element.removeAttribute(attribute.name);
-            for (const [name, value] of attributes) element.setAttribute(name, value);
-            element.replaceChildren(...children);
-            if (clientWidth)
-                Object.defineProperty(element, 'clientWidth', clientWidth);
-            else
-                Reflect.deleteProperty(element, 'clientWidth');
-        }
+        for (const snapshot of elements)
+            layoutRestore(snapshot);
     }
     await checkLabRestoredSolverOwnership();
 };
 
-/** Exercise restored cards with real native request ownership and deferred transport. */
-async function checkLabRestoredSolverOwnership() {
-    const check: LabTestCheck = (condition, message) => {
+/** @brief Exercise restored cards with real native request ownership and deferred transport. */
+async function checkLabRestoredSolverOwnership(): Promise<void> {
+    /** @brief Report a failed restored-ownership assertion. */
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error(`Restored solver: ${message}`);
-    };
+    }
     const native = labWire.exports();
     const saved = {currentMode: WorksheetWorkspace.mode.currentMode, labFetch: labHttp.fetch, setBusy: WorksheetWorkspace.presentation.setBusy, setActionRunning: WorksheetWorkspace.presentation.setActionRunning, mode: native.lab_workspace_mode()};
     const ids =
         ['rendered', 'parsed', 'functionStyle', 'value', 'renderedMore', 'parsedMore', 'functionMore', 'valueMore'];
-    const elements = ids.map(id => {
-        const element = document.getElementById(id)!;
-        return {
-            element,
-            attributes: [...element.attributes].map(attribute => [attribute.name, attribute.value] as const),
-            children: [...element.childNodes],
-            disabled: (element as HTMLElement & {disabled?: boolean}).disabled,
-            clientWidth: Object.getOwnPropertyDescriptor(element, 'clientWidth')
-        };
-    });
+    const elements: LayoutFixtureElementSnapshot[] = [];
+    for (const id of ids)
+        elements.push(layoutSnapshot(document.getElementById(id)!));
     const oldOwner = (WorksheetContext.functionStyle as LayoutFixtureResultElement).labSolverRestoreOwner;
     const oldRenderOwner = (WorksheetContext.rendered as LayoutFixtureResultElement).labResultRenderRequest;
     const compact = '<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="20"></svg>';
     const wrapped = '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="40"></svg>';
-    const posts: LayoutFixtureFetch[] = [], tasks: Promise<unknown>[] = [];
-    let width = 3000, mode: WorksheetMode = 'diffequation';
-    const select = (id: number) => {
+    const posts: LayoutFixtureFetch[] = [];
+    const tasks: Promise<unknown>[] = [];
+    let width = 3000;
+    let mode: WorksheetMode = 'diffequation';
+    /** @brief Select a real native mode and synchronise request ownership. */
+    function select(id: number): void {
         mode = id === 2 ? 'diffequation' : 'expression';
         native.lab_workspace_select(id);
         WorksheetRequests.labRequests.modeChanged(mode);
-    };
-    const start = () => {
+    }
+
+    /** @brief Start one native-owned render and retain its transport and continuation for cleanup. */
+    function start(): LayoutFixtureRestoredPending {
         const count = posts.length;
         const task = WorksheetRequests.solver.fitSolverTexToCard();
         tasks.push(task);
         check(posts.length === count + 1, 'one pending fetch expected');
         return {task, post: posts[count], pending: WorksheetRequests.solver.pending!};
-    };
-    const complete = (pending: {post: LayoutFixtureFetch}) =>
-        pending.post.resolve(Object.assign(new Response(), {labData: async () => ({ok: true, svg: wrapped})}));
-    try {
-        WorksheetWorkspace.mode.currentMode = () => mode;
-        WorksheetWorkspace.presentation.setBusy = () => {};
-        WorksheetWorkspace.presentation.setActionRunning = () => {};
-        labHttp.fetch = (url, options) => new Promise(resolve => {
-            check(url === '/render_TeX', 'native render endpoint');
-            posts.push({resolve, signal: options!.signal!});
+    }
+
+    /** @brief Create a fresh response with asynchronous decoding of the fixed wrapped SVG. */
+    function response(): MarsTransportResponse {
+        return Object.assign(new Response(), {
+            /** @brief Decode the native wrapping fixture. */
+            async labData() { return {ok: true, svg: wrapped}; }
         });
+    }
+
+    /** @brief Complete one chosen render without changing its native ownership. */
+    function complete(pending: LayoutFixtureRestoredPending): void {
+        pending.post.resolve(response());
+    }
+
+    /** @brief Suppress unrelated busy and action presentation while native requests remain active. */
+    function ignorePresentation(): void {}
+
+    try {
+        /** @brief Expose the currently selected fixture mode. */
+        WorksheetWorkspace.mode.currentMode = function currentMode(): WorksheetMode { return mode; };
+        WorksheetWorkspace.presentation.setBusy = ignorePresentation;
+        WorksheetWorkspace.presentation.setActionRunning = ignorePresentation;
+        /** @brief Capture each fetch without moving validation outside its promise executor. */
+        labHttp.fetch = function fetchWrapping(url, options): Promise<MarsTransportResponse> {
+            return new Promise(function queueFetch(resolve) {
+                check(url === '/render_TeX', 'native render endpoint');
+                posts.push({resolve, signal: options!.signal!});
+            });
+        };
         select(2);
         labDOM.call('lab_result_solver_invalidate');
-        Object.defineProperty(WorksheetContext.functionStyle, 'clientWidth', {configurable: true, get: () => width});
+        Object.defineProperty(WorksheetContext.functionStyle, 'clientWidth', {
+            configurable: true,
+            /** @brief Measure the latest simulated viewport width. */
+            get(): number { return width; }
+        });
         WorksheetContext.functionStyle.style.setProperty('--solver-tex-scale', '1');
         const main = WorksheetRequests.labRequests.begin('evaluate', mode);
         check(main, 'initial evaluation starts');
@@ -746,7 +865,10 @@ async function checkLabRestoredSolverOwnership() {
         installSolverTexSvg(compact, 'compact');
         WorksheetRequests.labRequests.finish(main);
         const snapshot = labDOM.call('lab_workspace_dom_result_save', {currentVariables: []});
-        const restore = () => labDOM.call('lab_workspace_dom_result_restore', snapshot);
+        /** @brief Restore the same saved native result while acquiring a fresh browser owner. */
+        function restore(): unknown {
+            return labDOM.call('lab_workspace_dom_result_restore', snapshot);
+        }
 
         // An original live-parent request must also lose ownership on same-mode restoration.
         width = 300;
@@ -834,7 +956,7 @@ async function checkLabRestoredSolverOwnership() {
     } finally {
         WorksheetRequests.labRequests.cancel('evaluate');
         for (const post of posts)
-            post.resolve(Object.assign(new Response(), {labData: async () => ({ok: true, svg: wrapped})}));
+            post.resolve(response());
         await Promise.allSettled(tasks);
         WorksheetRequests.solver.pending = null;
         native.lab_workspace_select(saved.mode);
@@ -844,17 +966,8 @@ async function checkLabRestoredSolverOwnership() {
         WorksheetWorkspace.presentation.setBusy = saved.setBusy;
         WorksheetWorkspace.presentation.setActionRunning = saved.setActionRunning;
         WorksheetResults.solverFit.dispose();
-        for (const {element, attributes, children, disabled, clientWidth} of elements) {
-            for (const attribute of [...element.attributes]) element.removeAttribute(attribute.name);
-            for (const [name, value] of attributes) element.setAttribute(name, value);
-            element.replaceChildren(...children);
-            if (disabled !== undefined)
-                (element as HTMLElement & {disabled: boolean}).disabled = disabled;
-            if (clientWidth)
-                Object.defineProperty(element, 'clientWidth', clientWidth);
-            else
-                Reflect.deleteProperty(element, 'clientWidth');
-        }
+        for (const snapshot of elements)
+            layoutRestore(snapshot);
         if (oldOwner === undefined)
             delete (WorksheetContext.functionStyle as LayoutFixtureResultElement).labSolverRestoreOwner;
         else

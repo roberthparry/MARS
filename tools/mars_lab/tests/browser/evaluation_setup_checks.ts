@@ -7,14 +7,20 @@
 
 /** Native setup phases, lazy editor snapshots and asynchronous request ownership regressions. */
 window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('Evaluation setup: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const names = (plan: EvaluationSetupFixturePlan) => plan.calls.map(call => call.service).join(',');
-    const plan = (mode: number, phase: number, context: object, options: object = {}, view: object = {}) =>
-        labDOM.call<EvaluationSetupFixturePlan>('lab_evaluation_setup', mode, phase, context, options, view);
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    function names(plan: EvaluationSetupFixturePlan): string {
+        return plan.calls.map(call => call.service).join(',');
+    }
+    function plan(mode: number, phase: number, context: object, options: object = {},
+                  view: object = {}): EvaluationSetupFixturePlan {
+        return labDOM.call<EvaluationSetupFixturePlan>('lab_evaluation_setup', mode, phase, context, options, view);
+    }
     const forbidden = Object.freeze({
         get expressionText() {
             throw new Error('Unexpected expressionText read');
@@ -26,10 +32,10 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
             throw new Error('Unexpected lastInput read');
         }
     });
-    const watched = (values: Record<string, unknown>) => {
+    function watched(values: EvaluationSetupFixtureValues) {
         const reads: string[] = [];
         const view = {};
-        for (const key of ['expressionText', 'bodyText', 'lastInput']) {
+        for (const key of ['expressionText', 'bodyText', 'lastInput'] as const) {
             Object.defineProperty(view, key, {
                 enumerable: true,
                 get() {
@@ -40,7 +46,7 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
             });
         }
         return {view: Object.freeze(view), reads};
-    };
+    }
     const initialNames =
         ['captureBindings,commitBindings', 'commitBindings', '', 'commitBindings', 'commitBindings', '', ''];
     const beforeEditor = WorksheetContext.expr.value, beforeRendered = WorksheetContext.rendered.innerHTML;
@@ -63,7 +69,7 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
 
     const enteredBindings = Object.freeze([{name: 'μ', value: 'π/7'}]);
     const source = '  ∫ opaque native mathematics { μ = π/7 }  ';
-    const captured: Record<string, unknown> = {enteredBindings, unrelated: 'retained'};
+    const captured: EvaluationSetupFixtureContext = {enteredBindings, unrelated: 'retained'};
     const editor = watched({expressionText: source, bodyText: '\u00a0 body \n'});
     const assembly = plan(0, 1, captured, {}, editor.view);
     equal(captured.editorText, source, 'Expression retains authored source bytes');
@@ -77,14 +83,14 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
     equal(assembly.done, false, 'Expression requires final phase');
     equal(editor.reads.join(','), 'expressionText,bodyText', 'Expression reads only its current editor snapshot');
     for (const body of [undefined, null, false, 0, '', 42]) {
-        const context: Record<string, unknown> = {};
+        const context: EvaluationSetupFixtureContext = {};
         plan(0, 1, context, {}, watched({expressionText: source, bodyText: body}).view);
         equal(context.editorBodyText, String(body || '').trim(), 'body snapshot follows String/falsey semantics');
     }
 
     for (const mode of [1, 2, 3, 4]) {
         for (const expression of [source, 42]) {
-            const context: Record<string, unknown> = {unrelated: 'retained'};
+            const context: EvaluationSetupFixtureContext = {unrelated: 'retained'};
             const snapshot = watched({expressionText: expression});
             const result = plan(mode, 1, context, {}, snapshot.view);
             equal(
@@ -97,13 +103,13 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
             equal(context.unrelated, 'retained', 'mathematical snapshot preserves unrelated context');
         }
         for (const expression of [undefined, null, false, 0, '']) {
-            const context: Record<string, unknown> = {};
+            const context: EvaluationSetupFixtureContext = {};
             const snapshot = watched({expressionText: expression, bodyText: '  fallback μ \n'});
             plan(mode, 1, context, {}, snapshot.view);
             equal(context.text, 'fallback μ', 'falsey source falls back to trimmed body');
             equal(snapshot.reads.join(','), 'expressionText,bodyText', 'fallback getter read order');
         }
-        const context: Record<string, unknown> = {};
+        const context: EvaluationSetupFixtureContext = {};
         plan(mode, 1, context, {}, watched({expressionText: '   '}).view);
         equal(context.text, mode <= 2 ? '' : '   ', 'truthy whitespace never selects fallback body');
     }
@@ -117,7 +123,7 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
         equal(Object.keys(context).join(','), 'sentinel', 'calendar plan defers context mutation to its service');
     }
     for (const entered of ['', undefined, '  exact assembled source  ']) {
-        const context: Record<string, unknown> = {editorText: source, entered};
+        const context: EvaluationSetupFixtureContext = {editorText: source, entered};
         const result = plan(0, 2, context, {}, forbidden);
         equal(context.text, entered || source, 'final input uses assembled text then authored source');
         equal(names(result), 'saveWorksheetState', 'final phase requests one persistence operation');
@@ -127,7 +133,7 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
         equal(result.done, true, 'phase two completes Expression setup');
     }
     for (const lastInput of ['', undefined, '  previous native request  ']) {
-        const context: Record<string, unknown> = {editorText: '', entered: 'assembled'};
+        const context: EvaluationSetupFixtureContext = {editorText: '', entered: 'assembled'};
         const snapshot = watched({lastInput});
         const result = plan(0, 2, context, {reuseLastInput: true}, snapshot.view);
         equal(context.text, lastInput || 'assembled', 'reuse requires a truthy previous input');
@@ -136,7 +142,7 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
             snapshot.reads.every(key => key === 'lastInput') && snapshot.reads.length > 0,
             'reuse reads only the last-input getter');
     }
-    const lazyContext: Record<string, unknown> = {editorText: 'author'};
+    const lazyContext: EvaluationSetupFixtureContext = {editorText: 'author'};
     Object.defineProperty(lazyContext, 'entered', {
         get() {
             throw new Error('Unexpected assembled-input read');
@@ -150,7 +156,11 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
     // Exercise the production getter inside a DOM scope: source resolution uses direct workspace exports,
     // not a nested labDOM.call. Matching compact text deliberately selects native-owned full source.
     const sourceFields = ['fullText', 'displayText', 'lastInput'] as const;
-    const savedSources = Object.fromEntries(sourceFields.map(field => [field, WorksheetContext.labEditorState[field]]));
+    const savedSources = {
+        fullText: WorksheetContext.labEditorState.fullText,
+        displayText: WorksheetContext.labEditorState.displayText,
+        lastInput: WorksheetContext.labEditorState.lastInput
+    };
     const savedBody = WorksheetContext.expr.value;
     try {
         const compact = 'setup fixture compact μ';
@@ -159,7 +169,7 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
         WorksheetContext.labEditorState.fullText = full;
         WorksheetContext.labEditorState.lastInput = 'previous exact native request';
         WorksheetContext.expr.value = '  ' + compact + '  ';
-        const context: Record<string, unknown> = {};
+        const context: EvaluationSetupFixtureContext = {};
         equal(
             names(plan(0, 0, context, {}, WorksheetResults.labEvaluationView)), 'captureBindings,commitBindings',
             'real live view is accepted without eager setup reads');
@@ -168,7 +178,7 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
         equal(context.editorBodyText, compact, 'production body getter independently snapshots visible text');
         equal(WorksheetContext.expr.value, '  ' + compact + '  ', 'real getter does not rewrite the editor');
         WorksheetContext.labEditorState.fullText = 'updated native-owned source';
-        const updated: Record<string, unknown> = {};
+        const updated: EvaluationSetupFixtureContext = {};
         plan(0, 1, updated, {}, WorksheetResults.labEvaluationView);
         equal(updated.editorText, 'updated native-owned source', 'production getter is live rather than cached');
         plan(0, 2, updated, {reuseLastInput: true}, WorksheetResults.labEvaluationView);
@@ -180,17 +190,17 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
 
     // The generic executor is synchronous: it returns, but does not unwrap, the last service promise.
     let resolveCommit!: (value: string) => void;
-    const commitment = new Promise<string>(resolve => {
+    const commitment = new Promise<string>(function retainCommit(resolve) {
         resolveCommit = resolve;
     });
-    const sequence: string[] = [], context: Record<string, unknown> = {};
+    const sequence: string[] = [], context: EvaluationSetupFixtureContext = {};
     const registry = {
-        captureBindings: (target: Record<string, unknown>) => {
+        captureBindings(target: EvaluationSetupFixtureContext) {
             sequence.push('capture');
             target.enteredBindings = enteredBindings;
             return 'not the final return value';
         },
-        commitBindings: () => {
+        commitBindings() {
             sequence.push('commit');
             return commitment;
         }
@@ -209,10 +219,10 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
     let caught, committed = false;
     try {
         labDOM.services(plan(0, 0, {}, {}, forbidden), {
-            captureBindings: () => {
+            captureBindings() {
                 throw failure;
             },
-            commitBindings: () => {
+            commitBindings() {
                 committed = true;
             }
         });
@@ -225,12 +235,16 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
     // Real adapter setup failures and stale assembly must not advance to request/history/persistence.
     const originalMode = WorksheetWorkspace.mode.currentMode(), originals = new Map<string, unknown>();
     const events: {name: string; args?: unknown[]}[] = [];
-    const record = (name: string) => (...args: unknown[]) => events.push({name, args});
-    const replace = <F extends (...args: never[]) => unknown>(name: string, callback: F) => {
+    function record(name: string): (...args: unknown[]) => number {
+        return function recordCall(...args: unknown[]): number {
+            return events.push({name, args});
+        };
+    }
+    function replace(name: string, callback: (...args: never[]) => unknown): void {
         if (!originals.has(name))
             originals.set(name, Reflect.get(labTestModuleOwner(name), name));
         Reflect.set(labTestModuleOwner(name), name, callback);
-    };
+    }
     const oldCall = labDOM.call;
     const adapterEditor = {
         body: WorksheetContext.expr.value,
@@ -252,11 +266,13 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
                      'updateHistoryButtons', 'showResults', 'setStatus', 'clearResultDetails', 'setBusy',
                      'setActionRunning'])
             replace(name, record(name));
-        replace('fetchEvaluation', async () => {
+        async function fetchResult() {
             events.push({name: 'fetch'});
             return {response: {ok: true}, data: {}};
-        });
-        labDOM.call = <T = unknown>(name: string, ...args: unknown[]): T => {
+        }
+        replace('fetchEvaluation', fetchResult);
+        // Preserve the production bridge's generic result contract at this fixture boundary.
+        labDOM.call = function callFixture<T = unknown>(name: string, ...args: unknown[]): T {
             if (name === 'lab_result_solver_invalidate')
                 return undefined as T;
             if (name === 'lab_layout_error' || name === 'lab_layout_more') {
@@ -266,9 +282,10 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
             return oldCall<T>(name, ...args);
         };
         WorksheetRequests.labRequests.modeChanged('expression');
-        replace('expressionWithVisibleBindings', async () => {
+        async function failAssembly(): Promise<never> {
             throw failure;
-        });
+        }
+        replace('expressionWithVisibleBindings', failAssembly);
         await WorksheetRequests.evaluation.evaluateExpression();
         equal(
             events.find(event => event.name === 'lab_layout_error')?.args![0], String(failure),
@@ -283,35 +300,31 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
         check(!WorksheetRequests.labRequests.busy(), 'rejected assembly releases its busy owner');
 
         events.length = 0;
-        let entered!: () => void;
-        const reached = new Promise<void>(resolve => {
-            entered = resolve;
-        });
-        const gate = new Promise<string>(resolve => {
+        const reached = LabTestBrowser.signal();
+        const gate = new Promise<string>(function retainAssembly(resolve) {
             gateState.release = resolve;
         });
-        replace('expressionWithVisibleBindings', () => {
-            entered();
+        function awaitAssembly(): Promise<string> {
+            reached.resolve();
             return gate;
-        });
+        }
+        function failEarlyCompletion(): never {
+            throw new Error('Evaluation setup: adapter completed before entering assembly');
+        }
+        replace('expressionWithVisibleBindings', awaitAssembly);
         pending = WorksheetRequests.evaluation.evaluateExpression()!;
-        await Promise.race([
-            reached, pending.then(() => {
-                throw new Error('Evaluation setup: adapter completed before entering assembly');
-            })
-        ]);
+        await Promise.race([reached.promise, pending.then(failEarlyCompletion)]);
         newer = WorksheetRequests.labRequests.begin('evaluate', 'expression');
         check(newer, 'replacement evaluation owns the worksheet');
         events.length = 0;
         gateState.release!('obsolete assembled input');
         await pending;
-        equal(
-            events
-                .filter(
-                    event =>
-                        downstream.has(event.name) || event.name === 'setStatus' || event.name === 'lab_layout_error')
-                .length,
-            0, 'stale assembly completion cannot publish or persist');
+        let completionCount = 0;
+        for (const event of events) {
+            if (downstream.has(event.name) || event.name === 'setStatus' || event.name === 'lab_layout_error')
+                ++completionCount;
+        }
+        equal(completionCount, 0, 'stale assembly completion cannot publish or persist');
         check(WorksheetRequests.labRequests.busy(), 'stale finaliser preserves replacement busy state');
     } finally {
         if (gateState.release)

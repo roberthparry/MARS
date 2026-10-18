@@ -43,7 +43,7 @@ static bool lab_browser_prepare(const char *directory)
     file_t *page = lab_browser_file(directory, "index.html");
     string_t *html = source ? file_read_all_text(source) : NULL;
     string_t *script = checks ? file_read_all_text(checks) : NULL;
-    static const char *const modules[] = {"native_adapters.js",
+    static const char *const modules[] = {"test_support.js",          "native_adapters.js",
                                           "profile_checks.js",        "workspace_checks.js",
                                           "request_checks.js",        "forms_checks.js",
                                           "layout_checks.js",         "syntax_checks.js",
@@ -64,7 +64,8 @@ static bool lab_browser_prepare(const char *directory)
                                           "request_flow_checks.js",   "state_flow_checks.js",
                                           "transport_flow_checks.js", "editor_checks.js",
                                           "worker_checks.js",         "mobile_layout_checks.js",
-                                          "surface_hover_checks.js"};
+                                          "surface_hover_checks.js",   "surface_mesh_checks.js",
+                                          "surface_export_checks.js"};
     for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {
         file_t *module = lab_browser_file("tools/mars_lab/build/typescript_checks/tests/browser", modules[i]);
         string_t *text = module ? file_read_all_text(module) : NULL;

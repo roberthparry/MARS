@@ -28,12 +28,12 @@ namespace WorksheetRequests {
             public readonly token: number,
             public readonly button: HTMLButtonElement | null,
             public readonly disableButton: boolean,
-            private readonly set_running: (button: HTMLButtonElement, running: boolean) => void
+            private readonly setRunning: (button: HTMLButtonElement, running: boolean) => void
         ) {}
 
         /** @brief Acquire the button indicator and arm the native-selected deadline. */
         public activate(deadline: () => number, expire: () => boolean): void {
-            if (this.button) this.set_running(this.button, true);
+            if (this.button) this.setRunning(this.button, true);
             if (this.disableButton && this.button) this.button.disabled = true;
             const milliseconds = deadline();
             if (milliseconds) this.timer = setTimeout(() => {
@@ -45,7 +45,7 @@ namespace WorksheetRequests {
         public release(): void {
             clearTimeout(this.timer);
             this.controller.abort();
-            if (this.button) this.set_running(this.button, false);
+            if (this.button) this.setRunning(this.button, false);
             if (this.disableButton && this.button) this.button.disabled = false;
         }
     }
@@ -61,7 +61,7 @@ namespace WorksheetRequests {
         /** Project a request's button lease. */
         running(button: HTMLButtonElement, value: boolean): void;
         /** Invalidate the current solver presentation under native admission policy. */
-        invalidate_solver(): void;
+        invalidateSolver(): void;
         /** Resolve the default evaluation button when a request is admitted. */
         button(): HTMLElement | null;
         /** Encode a native request payload without interpreting its mathematics. */
@@ -69,7 +69,8 @@ namespace WorksheetRequests {
         /** Send a native request, preserving cancellation and response status. */
         fetch(url: string, options: RequestInit): Promise<MarsTransportResponse>;
         /** Execute transport continuations with the manager's own service table. */
-        flow: LabDOMBridge['flow'];
+        flow(kind: number, frame: object, view: unknown, registry: NativeServiceRegistry,
+             signal?: AbortSignal): Promise<unknown>;
         /** Install native-produced presentation metadata. */
         presentation(value: MarsApiData): void;
         /** Install native-produced function syntax metadata. */
@@ -77,9 +78,9 @@ namespace WorksheetRequests {
         /** Display a native request failure. */
         error(message: string): void;
         /** Reset the rendered result's precision control. */
-        reset_digits(): void;
+        resetDigits(): void;
         /** Clear result cards under native recovery policy. */
-        clear_results(options: Parameters<typeof WorksheetResults.reset.clearResultDetails>[0]): void;
+        clearResults(options: MarsApiResultResetOptions): void;
         /** Display the native-selected worksheet status. */
         status(message: string): void;
     }
@@ -99,23 +100,10 @@ namespace WorksheetRequests {
         /** @brief Load the native operation catalogue and bind detachable public capabilities. */
         public constructor(private readonly host: RequestManagerHost) {
             // Retain detachable, enumerable public capabilities used by host adapters and snapshots.
-            this.begin = this.begin.bind(this);
-            this.current = this.current.bind(this);
-            this.finish = this.finish.bind(this);
-            this.cancel = this.cancel.bind(this);
-            this.modeChanged = this.modeChanged.bind(this);
-            this.busy = this.busy.bind(this);
-            this.post = this.post.bind(this);
-            this.run = this.run.bind(this);
-            this.runUI = this.runUI.bind(this);
-            this.outcome = this.outcome.bind(this);
-            this.context = this.context.bind(this);
-            this.latestMain = this.latestMain.bind(this);
-            this.action = this.action.bind(this);
-            this.flags = this.flags.bind(this);
-            this.timedOut = this.timedOut.bind(this);
-            this.input = this.input.bind(this);
-            this.dispose = this.dispose.bind(this);
+            marsBindCallbacks(this, [
+                'begin', 'current', 'finish', 'cancel', 'modeChanged', 'busy', 'post', 'run', 'runUI', 'outcome',
+                'context', 'latestMain', 'action', 'flags', 'timedOut', 'input', 'dispose'
+            ]);
             this.operationCount = this.native().lab_request_operation_count();
             this.operations = new Map(Array.from({length: this.operationCount},
                 (_, index) => [this.catalogueText(0, index), index]));
@@ -176,7 +164,7 @@ namespace WorksheetRequests {
                 Number(Boolean(options.scalar)), options.parent || 0) >>> 0;
             if (!token) return null;
             const policy = this.native().lab_transport_policy(action, channel, this.mainChannel);
-            if (policy & 2) this.host.invalidate_solver();
+            if (policy & 2) this.host.invalidateSolver();
             this.reap();
             const button = options.button || (policy & 1 ? this.host.button() : null);
             if (button && !(marsTransportIsDOM(button, 'HTMLButtonElement'))) throw new TypeError('Expected a request button');
@@ -200,7 +188,7 @@ namespace WorksheetRequests {
             const channel = this.native().lab_request_channel(this.operations.get(operation) ?? this.operationCount);
             this.native().lab_request_cancel(channel);
             if (this.native().lab_transport_policy(this.operationCount, channel, this.mainChannel) & 2)
-                this.host.invalidate_solver();
+                this.host.invalidateSolver();
             this.reap();
             this.host.busy(this.busy());
         }
@@ -212,7 +200,7 @@ namespace WorksheetRequests {
         }
 
         /** @brief Ask native C to classify the response against the current request. */
-        public outcome(request: MarsApiRequest | null, response: Pick<Response, 'ok'> | null,
+        public outcome(request: MarsApiRequest | null, response: MarsApiResponseStatus | null,
                        data: MarsApiData | null, result = true): number {
             if (!request || !this.current(request)) return 0;
             return this.native().lab_request_accept(request.channel, request.token, Number(Boolean(response?.ok)),
@@ -223,8 +211,8 @@ namespace WorksheetRequests {
             assertCurrent: (request: MarsApiRequest | null) => this.assertCurrent(request),
             current: (request: MarsApiRequest | null) => this.current(request),
             finish: (request: MarsApiRequest | null) => this.finish(request),
-            begin: (frame: MarsApiRunFrame<unknown>) => this.begin(frame.operation, frame.mode, frame.options),
-            callback: (frame: MarsApiRunFrame<unknown>) => {
+            begin: (frame: MarsApiRunFrame) => this.begin(frame.operation, frame.mode, frame.options),
+            callback: (frame: MarsApiRunFrame) => {
                 if (!frame.request) throw new Error('Missing native request');
                 return frame.callback(frame.request);
             },
@@ -241,12 +229,12 @@ namespace WorksheetRequests {
             invalidEndpoint: () => { throw new Error('Invalid native request endpoint'); },
             rethrow: (frame: {exception: unknown}) => { throw frame.exception; },
             renderError: (error: string) => this.host.error(error),
-            resetDigits: () => this.host.reset_digits(),
-            clearResults: (options: Parameters<typeof WorksheetResults.reset.clearResultDetails>[0]) => this.host.clear_results(options),
+            resetDigits: () => this.host.resetDigits(),
+            clearResults: (options: MarsApiResultResetOptions) => this.host.clearResults(options),
             status: (text: string) => this.host.status(text)
         } satisfies MarsApiTransportServices);
 
-        private async advance<T>(kind: number, frame: object & {result?: T}): Promise<T | undefined> {
+        private async advance(kind: number, frame: {result?: unknown}): Promise<unknown> {
             await this.host.flow(kind, frame, null, this.transportServices, this.lifetime.signal);
             return frame.result;
         }
@@ -255,23 +243,23 @@ namespace WorksheetRequests {
         public async post(request: MarsApiRequest | null, payload: unknown, fallback: string,
                           signal?: AbortSignal): Promise<MarsApiPostResult> {
             const frame: MarsApiPostFrame = {request, payload, fallback, signal};
-            const result = await this.advance<MarsApiPostResult>(65, frame);
+            const result = await this.advance(65, frame) as MarsApiPostResult | undefined;
             if (!result) throw new Error('Native request did not return a response');
             return result;
         }
 
-        /** @brief Run a callback with native-controlled request admission and cleanup. */
-        public run<T>(operation: string, mode: string, callback: (request: MarsApiRequest) => T | Promise<T>,
+        /** @brief Run an admitted action with native cleanup, preserving its resolved result type. */
+        public run<T>(operation: string, mode: string, callback: MarsApiRequestAction<T>,
                       options: MarsApiOptions = {}): Promise<T | undefined> {
-            const frame: MarsApiRunFrame<T> = {operation, mode, callback, options};
-            return this.advance<T>(66, frame);
+            const frame: MarsApiRunFrame = {operation, mode, callback, options};
+            return this.advance(66, frame) as Promise<T | undefined>;
         }
 
         /** @brief Run an owned callback with native-selected UI error recovery. */
-        public runUI<T>(operation: string, mode: string, callback: (request: MarsApiRequest) => T | Promise<T>,
+        public runUI<T>(operation: string, mode: string, callback: MarsApiRequestAction<T>,
                         options: MarsApiOptions = {}): Promise<T | undefined> {
-            const frame: MarsApiRunFrame<T> = {operation, mode, callback, options};
-            return this.advance<T>(67, frame);
+            const frame: MarsApiRunFrame = {operation, mode, callback, options};
+            return this.advance(67, frame) as Promise<T | undefined>;
         }
 
         /** @brief Read the current unsigned native worksheet context identifier. */
@@ -304,30 +292,28 @@ namespace WorksheetRequests {
     export class EditorPresentationController {
         /** @brief Retain explicit capabilities without invoking definition-time dependencies. */
         public constructor(private readonly dependencies: MarsApiEditorPresentationControllerDependencies) {
-            this.requestLabForms = this.requestLabForms.bind(this);
-            this.requestLabPresentation = this.requestLabPresentation.bind(this);
-            this.prepareLabEditor = this.prepareLabEditor.bind(this);
-            this.dispose = this.dispose.bind(this);
-            this.capabilities = this.capabilities.bind(this);
+            marsBindCallbacks(this, [
+                'requestLabForms', 'requestLabPresentation', 'prepareLabEditor', 'dispose', 'capabilities'
+            ]);
         }
 
         /** Native text preparation; callers retain transport errors and can await edit boundaries. */
         public requestLabForms<T = unknown>(payload: unknown, options: MarsApiFormsOptions = {}): Promise<T> {
             const frame: MarsApiFormsFrame = {payload, options};
-            return this.dependencies.flow.continue<T>(12, frame);
+            return this.dependencies.flow.continue(12, frame) as Promise<T>;
         }
 
         /** @brief Request presentation metadata without interpreting the supplied native payload. */
         public requestLabPresentation(
-            payload: unknown, request: MarsApiRequest | null = null): Promise<Partial<WorksheetEvaluationData>> {
+            payload: unknown, request: MarsApiRequest | null = null): Promise<MarsApiData> {
             const frame: MarsApiPresentationFrame = {payload, request};
-            return this.dependencies.flow.continue<Partial<WorksheetEvaluationData>>(13, frame);
+            return this.dependencies.flow.continue(13, frame) as Promise<MarsApiData>;
         }
 
         /** @brief Prepare editor metadata through the native cache and context-freshness workflow. */
         public prepareLabEditor(text: string): Promise<WorksheetEditorMetadata> {
             const frame: MarsApiPresentationFrame = {editor: true, text};
-            return this.dependencies.flow.continue<WorksheetEditorMetadata>(13, frame);
+            return this.dependencies.flow.continue(13, frame) as Promise<WorksheetEditorMetadata>;
         }
 
         /** @brief Pending editor promises; C decides cache eligibility and freshness. */
@@ -354,28 +340,28 @@ namespace WorksheetRequests {
         /** @brief Expose atomic browser operations; native C selects their execution order. */
         public capabilities() {
             return {
-                installPresentation: (data: Partial<WorksheetEvaluationData>) => this.dependencies.results.installLabPresentationData(data),
-                requestPresentation: (...args: Parameters<typeof this.requestLabPresentation>) => this.requestLabPresentation(...args),
+                installPresentation: (data: unknown) => this.dependencies.results.installLabPresentationData(data),
+                requestPresentation: (payload: unknown, request?: MarsApiRequest | null) =>
+                    this.requestLabPresentation(payload, request),
                 editorRequests: () => this.pending,
                 editorPromise: (source: string, pending: MarsApiEditorPending, payload: MarsApiEditorPayload) => this.start(source, pending, payload)
-            };
+            } satisfies MarsApiPresentationServices;
         }
 
     }
 
     /** @brief Capture worksheet payload inputs and transport native evaluation replies. */
     export class EvaluationTransport {
+        /** Native fetch-continuation selectors for modes without extra captured inputs. */
+        private static readonly worksheetFetchModes = {equation: 1, diffequation: 2, datetime: 3, almanac: 4} as const;
+
         /** @brief Retain explicit capabilities without invoking definition-time dependencies. */
         public constructor(private readonly dependencies: MarsApiEvaluationTransportDependencies) {
-            this.fetchEvaluation = this.fetchEvaluation.bind(this);
-            this.fetchMatrixEvaluation = this.fetchMatrixEvaluation.bind(this);
-            this.fetchEquationEvaluation = this.fetchEquationEvaluation.bind(this);
-            this.fetchDiffequationEvaluation = this.fetchDiffequationEvaluation.bind(this);
-            this.fetchIntegratorEvaluation = this.fetchIntegratorEvaluation.bind(this);
-            this.fetchDatetimeEvaluation = this.fetchDatetimeEvaluation.bind(this);
-            this.fetchDatetimeWeather = this.fetchDatetimeWeather.bind(this);
-            this.fetchAlmanacEvaluation = this.fetchAlmanacEvaluation.bind(this);
-            this.capabilities = this.capabilities.bind(this);
+            marsBindCallbacks(this, [
+                'fetch', 'fetchEvaluation', 'fetchMatrixEvaluation', 'fetchEquationEvaluation',
+                'fetchDiffequationEvaluation', 'fetchIntegratorEvaluation', 'fetchDatetimeEvaluation',
+                'fetchDatetimeWeather', 'fetchAlmanacEvaluation', 'capabilities'
+            ]);
         }
 
         /** @brief Build and post an expression or calculus payload using native request formatting. */
@@ -390,34 +376,45 @@ namespace WorksheetRequests {
                 '/eval');
         }
 
+        /** @brief Execute the native-selected fetch while preserving its mode-specific capture boundary. */
+        public fetch(context: MarsApiFetchContext, request: MarsApiRequest | null): Promise<MarsApiPostResult> {
+            if (context.kind === 'expression')
+                return this.fetchEvaluation(context.text, '', '', '', '', request);
+            if (context.kind === 'integrator')
+                return this.dependencies.flow.continue(8, {request}) as Promise<MarsApiPostResult>;
+
+            let frame: MarsApiFetchFrame;
+            if (context.kind === 'matrix') {
+                frame = {mode: 0, options: context.options ?? {}, request};
+            } else {
+                frame = {mode: EvaluationTransport.worksheetFetchModes[context.kind], request};
+            }
+            return this.dependencies.flow.continue(15, frame) as Promise<MarsApiPostResult>;
+        }
+
         /** @brief Fetch a matrix result using explicit matrix options and native persistence policy. */
         public fetchMatrixEvaluation(options: MarsApiMatrixOptions = {}): Promise<MarsApiPostResult> {
-            const frame: MarsApiFetchFrame = {mode: 0, options, request: options.request || null};
-            return this.dependencies.flow.continue<MarsApiPostResult>(15, frame);
+            return this.fetch({kind: 'matrix', options}, options.request || null);
         }
 
         /** @brief Fetch the current equation result through its native continuation. */
         public fetchEquationEvaluation(request: MarsApiRequest | null = null): Promise<MarsApiPostResult> {
-            const frame: MarsApiFetchFrame = {mode: 1, request};
-            return this.dependencies.flow.continue<MarsApiPostResult>(15, frame);
+            return this.fetch({kind: 'equation'}, request);
         }
 
         /** @brief Fetch the current differential-equation result through its native continuation. */
         public fetchDiffequationEvaluation(request: MarsApiRequest | null = null): Promise<MarsApiPostResult> {
-            const frame: MarsApiFetchFrame = {mode: 2, request};
-            return this.dependencies.flow.continue<MarsApiPostResult>(15, frame);
+            return this.fetch({kind: 'diffequation'}, request);
         }
 
         /** @brief Prepare integral bounds and fetch the native numerical integration result. */
         public fetchIntegratorEvaluation(request: MarsApiRequest | null = null): Promise<MarsApiPostResult> {
-            const frame: MarsApiIntegratorFrame = {request};
-            return this.dependencies.flow.continue<MarsApiPostResult>(8, frame);
+            return this.fetch({kind: 'integrator'}, request);
         }
 
         /** @brief Fetch the native datetime result within the supplied request lifetime. */
         public fetchDatetimeEvaluation(request: MarsApiRequest | null = null): Promise<MarsApiPostResult> {
-            const frame: MarsApiFetchFrame = {mode: 3, request};
-            return this.dependencies.flow.continue<MarsApiPostResult>(15, frame);
+            return this.fetch({kind: 'datetime'}, request);
         }
 
         /** @brief Fetch weather for the captured calendar state with optional cancellation. */
@@ -429,8 +426,7 @@ namespace WorksheetRequests {
 
         /** @brief Fetch the native almanac result within the supplied request lifetime. */
         public fetchAlmanacEvaluation(request: MarsApiRequest | null = null): Promise<MarsApiPostResult> {
-            const frame: MarsApiFetchFrame = {mode: 4, request};
-            return this.dependencies.flow.continue<MarsApiPostResult>(15, frame);
+            return this.fetch({kind: 'almanac'}, request);
         }
 
         /** @brief Capture browser inputs for the native request workflow. */
@@ -468,8 +464,10 @@ namespace WorksheetRequests {
                 },
                 integratorText: () => this.dependencies.bindings.currentExpressionText() || this.dependencies.context.expr.value.trim(),
                 integratorRowsText: () => this.dependencies.workspace.integratorBoundsTextFromRows(this.dependencies.workspace.currentIntegratorRows()),
-                refreshIntegratorForms: (...args: Parameters<typeof this.dependencies.workspace.refreshIntegratorForms>) => this.dependencies.workspace.refreshIntegratorForms(...args),
-                activeIntegratorRows: (...args: Parameters<typeof this.dependencies.workspace.activeIntegratorRowPlan>) => this.dependencies.workspace.activeIntegratorRowPlan(...args),
+                refreshIntegratorForms: (rows?: WorksheetIntegratorRow[], expression?: string) =>
+                    this.dependencies.workspace.refreshIntegratorForms(rows, expression),
+                activeIntegratorRows: (rows?: WorksheetIntegratorRow[], expression?: string) =>
+                    this.dependencies.workspace.activeIntegratorRowPlan(rows, expression),
                 renderIntegratorRows: (rows: WorksheetIntegratorRow[]) => this.dependencies.bindings.renderIntegratorRows(rows),
                 integratorPayload: (text: string, bounds: WorksheetIntegratorRow[], request: MarsApiRequest | null) => this.dependencies.native.call(
                     'lab_payload_build', 4, [text, bounds, this.dependencies.workspace.requestedIntegratorIntervalCap()], request,
@@ -477,15 +475,14 @@ namespace WorksheetRequests {
                 fetchPayload: (frame: MarsApiFetchFrame) => this.labApiFetchPayload(frame),
                 fetchCalculus: (text: string, wrt: string, action: string, request: MarsApiRequest | null, preview: boolean) => this.fetchEvaluation(text, wrt, action, '', '', request, preview),
                 fetchMatrixOptions: (options: MarsApiMatrixOptions) => this.fetchMatrixEvaluation(options),
-                fetchExpression: (context: MarsApiEvaluationContext, request: MarsApiRequest | null) => this.fetchEvaluation(context.text, '', '', '', '', request),
-                fetchEquation: (_context: unknown, request: MarsApiRequest | null) => this.fetchEquationEvaluation(request),
-                fetchDiffequation: (_context: unknown, request: MarsApiRequest | null) => this.fetchDiffequationEvaluation(request),
-                fetchMatrix: (_context: unknown, request: MarsApiRequest | null) => this.fetchMatrixEvaluation({request}),
-                fetchIntegrator: (_context: unknown, request: MarsApiRequest | null) => this.fetchIntegratorEvaluation(request),
-                fetchDatetime: (_context: unknown, request: MarsApiRequest | null) => this.fetchDatetimeEvaluation(request),
-                fetchAlmanac: (_context: unknown, request: MarsApiRequest | null) => this.fetchAlmanacEvaluation(request),
+                fetch: this.fetchCurrent.bind(this),
                 fetchWeather: (state: WorksheetCalendarState, request: MarsApiRequest | null) => this.fetchDatetimeWeather(state, undefined, request)
-            };
+            } satisfies MarsApiEvaluationTransportServices;
+        }
+
+        /** @brief Resolve the current fetch adapter when the retained native service is invoked. */
+        private fetchCurrent(context: MarsApiFetchContext, request: MarsApiRequest | null): Promise<MarsApiPostResult> {
+            return this.fetch(context, request);
         }
 
     }
@@ -494,9 +491,7 @@ namespace WorksheetRequests {
     export class FunctionCardController {
         /** @brief Retain explicit capabilities without invoking definition-time dependencies. */
         public constructor(private readonly dependencies: MarsApiFunctionCardControllerDependencies) {
-            this.clearFunctionRun = this.clearFunctionRun.bind(this);
-            this.runFunctionCard = this.runFunctionCard.bind(this);
-            this.capabilities = this.capabilities.bind(this);
+            marsBindCallbacks(this, ['clearFunctionRun', 'runFunctionCard', 'capabilities']);
         }
 
         /** @brief Cancel function-card work and clear its native presentation and busy indicator. */
@@ -528,7 +523,7 @@ namespace WorksheetRequests {
                             return String(message);
                         }
                     })
-            };
+            } satisfies MarsApiFunctionServices;
         }
 
     }
@@ -537,23 +532,12 @@ namespace WorksheetRequests {
     export class PlotRequestController {
         /** @brief Retain explicit capabilities without invoking definition-time dependencies. */
         public constructor(private readonly dependencies: MarsApiPlotRequestControllerDependencies) {
-            this.cancelScheduledControls = this.cancelScheduledControls.bind(this);
-            this.dispose = this.dispose.bind(this);
-            this.schedulePlotSlice = this.schedulePlotSlice.bind(this);
-            this.takeCalculus = this.takeCalculus.bind(this);
-            this.takeDerivative = this.takeDerivative.bind(this);
-            this.takeIntegral = this.takeIntegral.bind(this);
-            this.takePlot = this.takePlot.bind(this);
-            this.schedulePlotControls = this.schedulePlotControls.bind(this);
-            this.schedulePlotWheelEnd = this.schedulePlotWheelEnd.bind(this);
-            this.interruptPlotDrag = this.interruptPlotDrag.bind(this);
-            this.pauseSurfaceSampling = this.pauseSurfaceSampling.bind(this);
-            this.setSurfaceZoom = this.setSurfaceZoom.bind(this);
-            this.zoomSurface = this.zoomSurface.bind(this);
-            this.redrawPlotDrag = this.redrawPlotDrag.bind(this);
-            this.scheduleAutomaticPlot = this.scheduleAutomaticPlot.bind(this);
-            this.refineSurfacePlot = this.refineSurfacePlot.bind(this);
-            this.capabilities = this.capabilities.bind(this);
+            marsBindCallbacks(this, [
+                'cancelScheduledControls', 'dispose', 'schedulePlotSlice', 'takeCalculus', 'takeDerivative',
+                'takeIntegral', 'takePlot', 'schedulePlotControls', 'schedulePlotWheelEnd', 'interruptPlotDrag',
+                'pauseSurfaceSampling', 'setSurfaceZoom', 'zoomSurface', 'redrawPlotDrag',
+                'scheduleAutomaticPlot', 'refineSurfacePlot', 'capabilities'
+            ]);
         }
 
         /** @brief Debounce handle shared with native surface-volume cancellation. */
@@ -614,7 +598,7 @@ namespace WorksheetRequests {
             this.slicePending = null;
             this.sliceRunning = true;
             try {
-                await this.dependencies.native.services(this.dependencies.native.call<NativeServicePlan>('lab_plot_controls_dispatch', 2, null, state), {
+                await this.dependencies.native.services(this.dependencies.native.call('lab_plot_controls_dispatch', 2, null, state) as NativeServicePlan, {
                     takePlot: (wrt: string, preview: boolean) =>
                         this.takeCalculus(wrt, 'plot', null, Boolean(preview), true)
                 } satisfies MarsApiSliceServices);
@@ -655,7 +639,7 @@ namespace WorksheetRequests {
             clearTimeout(this.controlsTimer);
             this.controlsTimer = setTimeout(() => {
                 this.controlsTimer = undefined;
-                this.dependencies.native.services(this.dependencies.native.call<NativeServicePlan>('lab_plot_controls_dispatch', 2, null, state),
+                this.dependencies.native.services(this.dependencies.native.call('lab_plot_controls_dispatch', 2, null, state) as NativeServicePlan,
                                 {takePlot: (wrt: string) => this.takeCalculus(wrt, 'plot', null, false, true)});
             }, delay);
         }
@@ -666,7 +650,7 @@ namespace WorksheetRequests {
             clearTimeout(this.wheelTimers.get(state));
             this.wheelTimers.set(state, setTimeout(() => {
                 this.wheelTimers.delete(state);
-                const plan = this.dependencies.native.call<NativeServicePlan>('lab_plot_drag_dispatch', 6, revision, state);
+                const plan = this.dependencies.native.call('lab_plot_drag_dispatch', 6, revision, state) as NativeServicePlan;
                 this.dependencies.native.services(plan, {redrawPlotDrag: (...args: MarsApiRedrawArguments) => this.redrawPlotDrag(...args)});
             }, delay));
         }
@@ -713,7 +697,7 @@ namespace WorksheetRequests {
             finally { if (targeted) this.gestureTargets.delete(token); }
         }
 
-        /** Await native plotting; the C gesture controller owns coalescing and continuation decisions. */
+        /** @brief Await native plotting; C owns gesture coalescing and continuation decisions. */
         public async redrawPlotDrag(state: MarsApiGesture, variable: string, preview: boolean, refine = false): Promise<void> {
             let next: MarsApiRedrawArguments | null = [state, variable, preview, refine];
             while (next && !this.disposed) {
@@ -724,51 +708,80 @@ namespace WorksheetRequests {
                 try {
                     const generation = this.dependencies.requests.latestMain();
                     const chart = this.dependencies.document.querySelector<SVGSVGElement>('#plotRendered [data-surface]');
-                    const bounds = record.rangeWheel ?
-                        ['plotLower', 'plotUpper', 'plotSecondLower', 'plotSecondUpper', 'plotYLower', 'plotYUpper']
-                            .map(id => Number(this.marsApiInputValue(id))) : null;
-                    let local = false;
-                    if (chart && !record.pan) {
-                        try {
-                            const angles = ['plotAzimuth', 'plotElevation', 'plotRoll']
-                                .map(id => Number(this.marsApiInputValue(id)));
-                            local = record.pinch ? this.dependencies.preview.pinch(chart, record, angles) :
-                                this.dependencies.preview.rotate(chart, record, angles);
-                        } catch (_) {
-                            this.dependencies.preview.dispose();
-                        }
-                    }
-                    if ((local && !refinePreview) || (coarse && bounds && chart && !record.pan)) {
-                        // Yield once per frame so the native controller coalesces pointer events.
-                        // A deep/unavailable zoom preview retains the last view until release,
-                        // rather than starting native sampling in the middle of the gesture.
+                    if (this.previewPlotDrag(record, chart, coarse, refinePreview)) {
+                        // Keep the single frame yield here so native coalescing gains no extra promise boundary.
                         await this.nextFrame();
                         accepted = !!chart?.isConnected && generation === this.dependencies.requests.latestMain();
                     } else {
-                        if (coarse && !record.pan) this.dependencies.preview.clear();
-                        const pending = this.takeCalculus(wrt, 'plot', null, coarse);
-                        const token = this.dependencies.requests.latestMain();
-                        record.pendingToken = token;
-                        if (record.pan && record.panProjection) this.gestureTargets.set(token, record.panProjection);
-                        try { await pending; }
-                        finally { this.gestureTargets.delete(token); }
+                        const request = this.requestPlotDrag(record, wrt, coarse);
+                        try { await request.pending; }
+                        finally { this.gestureTargets.delete(request.token); }
                         if (this.disposed || revision !== (record.revision || 0)) return;
                         delete record.pendingToken;
-                        accepted = token !== 0 && this.dependencies.requests.latestMain() === token;
+                        accepted = request.token !== 0 && this.dependencies.requests.latestMain() === request.token;
                         if (!record.pan) this.dependencies.preview.clear();
                     }
                 } finally {
-                    if (!this.disposed && revision === (record.revision || 0)) {
-                        if ((!coarse || !accepted) && !record.pan) this.dependencies.preview.clear();
-                        const plan = this.dependencies.native.call<NativeServicePlan>('lab_plot_drag_complete', record, Number(accepted));
-                        this.dependencies.native.services(plan, {redrawPlotDrag: (...args: MarsApiRedrawArguments) => next = args});
-                        if (!record.active && !record.wheel && !record.pan) {
-                            const view = this.dependencies.preview.prepare(this.dependencies.document.querySelector<SVGSVGElement>('#plotRendered [data-surface]'));
-                            if (view) this.dependencies.volume.schedule(view);
-                        }
-                    }
+                    next = this.completePlotDrag(record, revision, coarse, accepted);
                 }
             }
+        }
+
+        /** @brief Attempt local rotation or pinch, retaining deep zoom previews until native refinement is due. */
+        private previewPlotDrag(record: MarsApiGesture, chart: SVGSVGElement | null,
+                                  coarse: boolean, refinePreview: boolean | undefined): boolean {
+            // Read all range controls before preview error recovery, preserving validation failures.
+            let bounds: number[] | null = null;
+            if (record.rangeWheel) {
+                bounds = [];
+                for (const id of ['plotLower', 'plotUpper', 'plotSecondLower', 'plotSecondUpper', 'plotYLower', 'plotYUpper'])
+                    bounds.push(Number(this.marsApiInputValue(id)));
+            }
+            let local = false;
+            if (chart && !record.pan) {
+                try {
+                    const angles: MarsSurfaceAngles = [
+                        Number(this.marsApiInputValue('plotAzimuth')),
+                        Number(this.marsApiInputValue('plotElevation')),
+                        Number(this.marsApiInputValue('plotRoll'))
+                    ];
+                    local = record.pinch ? this.dependencies.preview.pinch(chart, record, angles) :
+                        this.dependencies.preview.rotate(chart, record, angles);
+                } catch (_) {
+                    this.dependencies.preview.dispose();
+                }
+            }
+            return (local && !refinePreview) || !!(coarse && bounds && chart && !record.pan);
+        }
+
+        /** @brief Start remote plotting and retain the token used for gesture-specific result projection. */
+        private requestPlotDrag(record: MarsApiGesture, variable: string, coarse: boolean):
+            {pending: Promise<unknown>; token: number} {
+            if (coarse && !record.pan) this.dependencies.preview.clear();
+            const pending = this.takeCalculus(variable, 'plot', null, coarse);
+            const token = this.dependencies.requests.latestMain();
+            record.pendingToken = token;
+            if (record.pan && record.panProjection) this.gestureTargets.set(token, record.panProjection);
+            return {pending, token};
+        }
+
+        /** @brief Complete only the current gesture revision, capturing the last native-requested redraw. */
+        private completePlotDrag(record: MarsApiGesture, revision: number, coarse: boolean,
+                                   accepted: boolean): MarsApiRedrawArguments | null {
+            if (this.disposed || revision !== (record.revision || 0)) return null;
+            if ((!coarse || !accepted) && !record.pan) this.dependencies.preview.clear();
+            const plan = this.dependencies.native.call('lab_plot_drag_complete', record, Number(accepted)) as NativeServicePlan;
+            let next: MarsApiRedrawArguments | null = null;
+            this.dependencies.native.services(plan, {
+                /** @brief Retain the last coalesced redraw without recursively entering plotting. */
+                redrawPlotDrag: (...args: MarsApiRedrawArguments) => next = args
+            });
+            if (!record.active && !record.wheel && !record.pan) {
+                const chart = this.dependencies.document.querySelector<SVGSVGElement>('#plotRendered [data-surface]');
+                const view = this.dependencies.preview.prepare(chart);
+                if (view) this.dependencies.volume.schedule(view);
+            }
+            return next;
         }
 
         /** Start independent background work without extending the evaluation's busy lifetime. */
@@ -797,7 +810,8 @@ namespace WorksheetRequests {
                     differentiable: this.dependencies.bindingState.currentDifferentiable
                 }),
                 matrixScalar: () => this.dependencies.presentationState.lastMatrixScalarExpression,
-                expressionWithVisibleBindings: (...args: Parameters<typeof this.dependencies.bindings.expressionWithVisibleBindings>) => this.dependencies.bindings.expressionWithVisibleBindings(...args),
+                expressionWithVisibleBindings: (source: string, bindings: WorksheetBinding[]) =>
+                    this.dependencies.bindings.expressionWithVisibleBindings(source, bindings),
                 calculusTitle: (text: string) => this.dependencies.context.rightPaneTitle.textContent = text,
                 displayPlot: (result: Record<string, unknown>) => {
                     const projection = this.gestureTargets.get(this.dependencies.requests.latestMain());
@@ -822,13 +836,15 @@ namespace WorksheetRequests {
                 plotError: (error: unknown) => this.dependencies.native.call('lab_layout_plot', null, error),
                 automaticPlot: (parent: MarsApiRequest) => this.scheduleAutomaticPlot(parent),
                 valueTitle: (text: string) => this.dependencies.context.valueTitle.textContent = text,
-                displayCalculusResult: (result: Parameters<typeof this.dependencies.results.displayCalculusResult>[0]) => this.dependencies.results.displayCalculusResult(result),
-                setMatrixPrettyResult: (...args: Parameters<typeof this.dependencies.results.setMatrixPrettyResult>) => this.dependencies.results.setMatrixPrettyResult(...args),
+                displayCalculusResult: (result: MarsApiData) =>
+                    this.dependencies.results.displayCalculusResult(result),
+                setMatrixPrettyResult: (result: string, pretty: string, element?: HTMLElement, moreButton?: WorksheetCopyButton) =>
+                    this.dependencies.results.setMatrixPrettyResult(result, pretty, element, moreButton),
                 calculusVariables: (variables: string[]) => this.dependencies.bindingState.currentVariables = variables,
                 calculusBindingVariables: (bindings: WorksheetBinding[] | null) => this.dependencies.bindingState.currentVariables = this.dependencies.workspace.variableNamesFromBindings(bindings || []),
                 calculusDifferentiable: (enabled: boolean) => this.dependencies.bindingState.currentDifferentiable = enabled,
                 calculusButtons: () => this.dependencies.workspace.renderDerivativeButtons(this.dependencies.bindingState.currentVariables)
-            };
+            } satisfies MarsApiPlotServices;
         }
 
     }
@@ -837,9 +853,7 @@ namespace WorksheetRequests {
     export class SolverRenderController {
         /** @brief Retain explicit capabilities without invoking definition-time dependencies. */
         public constructor(private readonly dependencies: MarsApiSolverRenderControllerDependencies) {
-            this.fitSolverTexToCard = this.fitSolverTexToCard.bind(this);
-            this.dispose = this.dispose.bind(this);
-            this.capabilities = this.capabilities.bind(this);
+            marsBindCallbacks(this, ['fitSolverTexToCard', 'dispose', 'capabilities']);
         }
 
         /** @brief Live native render snapshot; publishing and release check identity. */
@@ -858,9 +872,9 @@ namespace WorksheetRequests {
         /** @brief Expose atomic browser operations; native C selects their execution order. */
         public capabilities() {
             return {
-                solverPrepare: () => this.dependencies.native.call<MarsApiSolverSnapshot | null>(
+                solverPrepare: () => this.dependencies.native.call(
                     'lab_solver_view_prepare', this.dependencies.workspace.currentMode(), this.pending,
-                    Number(this.pending && this.dependencies.requests.current(this.pending.request)), this.dependencies.native.call('lab_result_solver_owner')),
+                    Number(this.pending && this.dependencies.requests.current(this.pending.request)), this.dependencies.native.call('lab_result_solver_owner')) as MarsApiSolverSnapshot | null,
                 solverPending: (pending: MarsApiSolverSnapshot, request: MarsApiRequest) => {
                     const owned: MarsApiSolverPending = Object.assign(pending, {request});
                     this.pending = owned;
@@ -880,7 +894,7 @@ namespace WorksheetRequests {
                     this.dependencies.native.call('lab_evaluation_solver', ...args);
                     this.dependencies.results.scheduleSolverTexFit();
                 }
-            };
+            } satisfies MarsApiSolverServices;
         }
 
     }
@@ -889,10 +903,9 @@ namespace WorksheetRequests {
     export class CalendarRequestController {
         /** @brief Retain explicit capabilities without invoking definition-time dependencies. */
         public constructor(private readonly dependencies: MarsApiCalendarRequestControllerDependencies) {
-            this.refreshMobileAccess = this.refreshMobileAccess.bind(this);
-            this.refreshAlmanacLandTotality = this.refreshAlmanacLandTotality.bind(this);
-            this.refreshDatetimeWeather = this.refreshDatetimeWeather.bind(this);
-            this.capabilities = this.capabilities.bind(this);
+            marsBindCallbacks(this, [
+                'refreshMobileAccess', 'refreshAlmanacLandTotality', 'refreshDatetimeWeather', 'capabilities'
+            ]);
         }
 
         /** @brief Refresh native mobile-access information when its controls are available. */
@@ -917,11 +930,11 @@ namespace WorksheetRequests {
                     '/mobile-access', {cache: 'no-store', headers: this.dependencies.context.controlToken ? {'X-Dval-Lab-Control': this.dependencies.context.controlToken} : {}}),
                 landPayload: (data: unknown, cells: unknown) => this.dependencies.native.call('lab_payload_land', data, cells, this.dependencies.application.configuration),
                 bindAlmanacTotalityActions: (node: HTMLElement) => this.dependencies.results.bindAlmanacTotalityActions(node),
-                refreshWeather: (...args: Parameters<typeof this.refreshDatetimeWeather>) => {
-                    void this.refreshDatetimeWeather(...args);
+                refreshWeather: (parent: number, state: WorksheetCalendarState, overview: unknown) => {
+                    void this.refreshDatetimeWeather(parent, state, overview);
                 },
                 refreshLocation: () => this.dependencies.locations.refreshDatetimeJurisdictionLocation()
-            };
+            } satisfies MarsApiCalendarServices;
         }
 
     }
@@ -930,17 +943,11 @@ namespace WorksheetRequests {
     export class EvaluationController {
         /** @brief Retain explicit capabilities without invoking definition-time dependencies. */
         public constructor(private readonly dependencies: MarsApiEvaluationControllerDependencies) {
-            this.evaluateLabMode = this.evaluateLabMode.bind(this);
-            this.installEvaluationResult = this.installEvaluationResult.bind(this);
-            this.evaluateActiveModeOnLoad = this.evaluateActiveModeOnLoad.bind(this);
-            this.evaluateExpression = this.evaluateExpression.bind(this);
-            this.evaluateEquation = this.evaluateEquation.bind(this);
-            this.evaluateDiffequation = this.evaluateDiffequation.bind(this);
-            this.evaluateMatrix = this.evaluateMatrix.bind(this);
-            this.evaluateIntegrator = this.evaluateIntegrator.bind(this);
-            this.evaluateDatetime = this.evaluateDatetime.bind(this);
-            this.evaluateAlmanac = this.evaluateAlmanac.bind(this);
-            this.capabilities = this.capabilities.bind(this);
+            marsBindCallbacks(this, [
+                'evaluateLabMode', 'installEvaluationResult', 'evaluateActiveModeOnLoad', 'evaluateExpression',
+                'evaluateEquation', 'evaluateDiffequation', 'evaluateMatrix', 'evaluateIntegrator',
+                'evaluateDatetime', 'evaluateAlmanac', 'capabilities'
+            ]);
         }
 
         /** @brief Begin native evaluation for a worksheet mode and explicit history/reuse options. */
@@ -950,7 +957,7 @@ namespace WorksheetRequests {
         }
 
         /** @brief Install an opaque native result using the supplied mode and evaluation context. */
-        public installEvaluationResult(mode: number, data: unknown, context: Partial<MarsApiEvaluationContext> = {},
+        public installEvaluationResult(mode: number, data: unknown, context: MarsApiInstallContext = {},
                                          outcome = 2, request?: MarsApiRequest | null): Promise<unknown> {
             const frame: MarsApiInstallFrame = {mode, data, context, outcome, request};
             return this.dependencies.flow.continue(5, frame);
@@ -1007,7 +1014,9 @@ namespace WorksheetRequests {
                 showResults: () => this.dependencies.workspace.showResults(),
                 commitModeState: () => this.dependencies.persistence.commitModeState(),
                 updateHistoryButtons: () => this.dependencies.workspace.updateHistoryButtons(),
-                installEvaluation: (...args: Parameters<typeof this.installEvaluationResult>) => this.installEvaluationResult(...args),
+                installEvaluation: (mode: number, data: unknown, context?: MarsApiInstallContext,
+                                    outcome?: number, request?: MarsApiRequest | null) =>
+                    this.installEvaluationResult(mode, data, context, outcome, request),
                 evaluate: (mode: WorksheetMode) => this.evaluateLabMode(mode),
                 precision: () => this.dependencies.workspace.requestedValuePrecision(),
                 captureBindings: (context: MarsApiEvaluationContext) => context.enteredBindings = this.dependencies.bindings.visibleBindingValues(),
@@ -1019,7 +1028,7 @@ namespace WorksheetRequests {
                 captureAlmanac: (context: MarsApiEvaluationContext) => context.text = this.dependencies.locations.almanacSummaryText(this.dependencies.locations.currentAlmanacState()),
                 assemble: async (context: MarsApiEvaluationContext) => context.entered =
                     await this.dependencies.bindings.expressionWithVisibleBindings(context.editorText, context.enteredBindings)
-            };
+            } satisfies MarsApiEvaluationServices;
         }
 
     }
@@ -1028,14 +1037,12 @@ namespace WorksheetRequests {
     export class GoalSeekController {
         /** @brief Retain explicit capabilities without invoking definition-time dependencies. */
         public constructor(private readonly dependencies: MarsApiGoalSeekControllerDependencies) {
-            this.startGoalSeekFromEvent = this.startGoalSeekFromEvent.bind(this);
-            this.runGoalSeek = this.runGoalSeek.bind(this);
-            this.capabilities = this.capabilities.bind(this);
+            marsBindCallbacks(this, ['startGoalSeekFromEvent', 'runGoalSeek', 'capabilities']);
         }
 
         /** @brief Capture the native goal-start plan and request binding commitment before solving. */
         public async startGoalSeekFromEvent(): Promise<void> {
-            const goal = this.dependencies.native.call<{text: string; target: string} | null>('lab_evaluation_goal_start', this.dependencies.workspace.workspaceModeId(this.dependencies.workspace.currentMode()), this.dependencies.bindings.currentExpressionText());
+            const goal = this.dependencies.native.call('lab_evaluation_goal_start', this.dependencies.workspace.workspaceModeId(this.dependencies.workspace.currentMode()), this.dependencies.bindings.currentExpressionText()) as {text: string; target: string} | null;
             if (goal)
                 await this.runGoalSeek(goal.text, goal.target, {}, {commitBindings: true});
         }
@@ -1050,11 +1057,13 @@ namespace WorksheetRequests {
         /** @brief Expose atomic browser operations; native C selects their execution order. */
         public capabilities() {
             return {
-                goalPrepare: (...args: Parameters<typeof this.dependencies.bindings.goalSeekExpressionAndStarts>) => this.dependencies.bindings.goalSeekExpressionAndStarts(...args),
+                goalPrepare: (source: string, start?: MarsApiStartValues) =>
+                    this.dependencies.bindings.goalSeekExpressionAndStarts(source, start),
                 goalEditorBody: (text: string) => this.dependencies.bindings.expressionBodyForEditor(text),
-                expressionWithBindings: (...args: Parameters<typeof this.dependencies.bindings.expressionWithBindings>) => this.dependencies.bindings.expressionWithBindings(...args),
-                goalExpression: (text: string) => this.dependencies.bindings.expression_text_or_empty(text)
-            };
+                expressionWithBindings: (body: string, bindings: WorksheetBinding[]) =>
+                    this.dependencies.bindings.expressionWithBindings(body, bindings),
+                goalExpression: (text: string) => this.dependencies.bindings.expressionTextOrEmpty(text)
+            } satisfies MarsApiGoalServices;
         }
 
     }
@@ -1063,12 +1072,7 @@ namespace WorksheetRequests {
     export class NativeFlowRuntime {
         /** @brief Retain explicit capabilities without invoking definition-time dependencies. */
         public constructor(private readonly dependencies: MarsApiNativeFlowRuntimeDependencies) {
-            this.bind = this.bind.bind(this);
-            this.dispose = this.dispose.bind(this);
-            this.getRegistry = this.getRegistry.bind(this);
-            this.continue = this.continue.bind(this);
-            this.run = this.run.bind(this);
-            this.capabilities = this.capabilities.bind(this);
+            marsBindCallbacks(this, ['bind', 'dispose', 'getRegistry', 'continue', 'run', 'capabilities']);
         }
 
         private registry: NativeServiceRegistry | undefined;
@@ -1110,47 +1114,142 @@ namespace WorksheetRequests {
 
         /** @brief Execute a native continuation with browser-owned promises and exceptions. */
         public continue<T = unknown>(kind: number, frame: object): Promise<T> {
-            return this.dependencies.native.flow<T>(kind, frame, this.dependencies.results.labEvaluationView, this.getRegistry(), this.lifetime.signal);
+            return this.dependencies.native.flow(kind, frame, this.dependencies.results.labEvaluationView, this.getRegistry(), this.lifetime.signal) as Promise<T>;
         }
 
         /** @brief Ask C for admission policy, then run its continuation under request ownership. */
         public run(kind: number, frame: object): Promise<unknown> | undefined {
-            const plan = this.dependencies.native.call<MarsApiFlowPlan | null>('lab_flow_begin', kind, frame);
+            const plan = this.dependencies.native.call('lab_flow_begin', kind, frame) as MarsApiFlowPlan | null;
             if (!plan) return;
             const advance = (request: MarsApiRequest) => this.continue(kind, Object.assign(frame, {request}));
             return plan.operation ? this.dependencies.requests[plan.ui ? 'runUI' : 'run'](
                 plan.operation, plan.mode, advance, plan.options) : this.continue(kind, frame);
         }
 
-        /** @brief Expose atomic browser operations; native C selects their execution order. */
+        /** @brief Compose own-property service groups under the unchanged native ABI names. */
         public capabilities() {
             return {
-                requestBegin: (...args: Parameters<LabRequestManager['begin']>) => this.dependencies.requests.begin(...args),
-                requestBeginCurrent: (operation: string, options: MarsApiOptions) => this.dependencies.requests.begin(operation, this.dependencies.workspace.currentMode(), options),
-                requestFinish: (request: MarsApiRequest | null) => this.dependencies.requests.finish(request),
-                requestCancel: (operation: string) => this.dependencies.requests.cancel(operation),
-                requestLatestMain: () => this.dependencies.requests.latestMain(),
-                runRequestFlow: (kind: number, frame: object, stage: number, operation: string, mode: WorksheetMode, options: MarsApiOptions) =>
-                    this.dependencies.requests.runUI(operation, mode, request => this.continue(kind, {...frame, stage, request}), options),
-                awaitValue: (value: unknown) => value,
-                abort: (message: string) => {
-                    throw new DOMException(message, 'AbortError');
-                },
-                native: (entry: string, ...args: unknown[]) => this.dependencies.native.call(entry, ...args),
-                effects: (plan: NativeServicePlan) => this.dependencies.native.services(plan, this.getRegistry()),
-                requestCurrent: (request: MarsApiRequest | null) => this.dependencies.requests.current(request),
-                requestOutcome: (...args: Parameters<LabRequestManager['outcome']>) => this.dependencies.requests.outcome(...args),
-                requestInput: (...args: Parameters<LabRequestManager['input']>) => this.dependencies.requests.input(...args),
-                post: (...args: Parameters<LabRequestManager['post']>) => this.dependencies.requests.post(...args),
-                requestContext: () => this.dependencies.requests.context(),
-                modeChanged: (mode: WorksheetMode) => this.dependencies.requests.modeChanged(mode),
-                fail: (message: string) => {
-                    throw new Error(message);
-                },
-                rethrow: (error: unknown) => {
-                    throw error;
-                }
+                ...this.requestServices(),
+                ...this.nativeServices(),
+                ...this.errorServices()
             };
+        }
+
+        /** @brief Bind request lifetime and transport services without capturing a stale request owner. */
+        private requestServices() {
+            return {
+                requestBegin: this.requestBegin.bind(this),
+                requestBeginCurrent: this.requestBeginCurrent.bind(this),
+                requestFinish: this.requestFinish.bind(this),
+                requestCancel: this.requestCancel.bind(this),
+                requestLatestMain: this.requestLatestMain.bind(this),
+                runRequestFlow: this.runRequestFlow.bind(this),
+                requestCurrent: this.requestCurrent.bind(this),
+                requestOutcome: this.requestOutcome.bind(this),
+                requestInput: this.requestInput.bind(this),
+                post: this.postRequest.bind(this),
+                requestContext: this.requestContext.bind(this),
+                modeChanged: this.modeChanged.bind(this)
+            } satisfies MarsApiRequestServices;
+        }
+
+        /** @brief Bind native dispatch and opaque-value forwarding independently of request admission. */
+        private nativeServices() {
+            return {
+                native: this.callNative.bind(this),
+                effects: this.applyEffects.bind(this),
+                awaitValue: this.awaitValue.bind(this)
+            } satisfies MarsApiNativeServices;
+        }
+
+        /** @brief Bind cancellation and failure propagation without changing exception identity. */
+        private errorServices() {
+            return {
+                abort: this.abortRequest.bind(this),
+                fail: this.failRequest.bind(this),
+                rethrow: this.rethrowError.bind(this)
+            } satisfies MarsApiErrorServices;
+        }
+
+        private requestBegin(operation: string, mode?: string, options?: MarsApiOptions): MarsApiRequest | null {
+            return this.dependencies.requests.begin(operation, mode, options);
+        }
+
+        private requestBeginCurrent(operation: string, options: MarsApiOptions): MarsApiRequest | null {
+            return this.dependencies.requests.begin(operation, this.dependencies.workspace.currentMode(), options);
+        }
+
+        private requestFinish(request: MarsApiRequest | null | undefined): void {
+            return this.dependencies.requests.finish(request);
+        }
+
+        private requestCancel(operation: string): void {
+            return this.dependencies.requests.cancel(operation);
+        }
+
+        private requestLatestMain(): number {
+            return this.dependencies.requests.latestMain();
+        }
+
+        private runRequestFlow(kind: number, frame: object, stage: number, operation: string,
+                                 mode: WorksheetMode, options: MarsApiOptions): Promise<unknown> {
+            return this.dependencies.requests.runUI(
+                operation, mode, this.advanceRequest.bind(this, kind, frame, stage), options);
+        }
+
+        /** @brief Copy the captured inputs only after admission attaches the request and continuation stage. */
+        private advanceRequest(kind: number, frame: object, stage: number, request: MarsApiRequest): Promise<unknown> {
+            return this.continue(kind, {...frame, stage, request});
+        }
+
+        private requestCurrent(request: MarsApiRequest | null): boolean {
+            return this.dependencies.requests.current(request);
+        }
+
+        private requestOutcome(request: MarsApiRequest | null, response: MarsApiResponseStatus | null,
+                                data: MarsApiData | null, result?: boolean): number {
+            return this.dependencies.requests.outcome(request, response, data, result);
+        }
+
+        private requestInput(request: MarsApiRequest, text: unknown, variable?: boolean): boolean {
+            return this.dependencies.requests.input(request, text, variable);
+        }
+
+        private postRequest(request: MarsApiRequest | null, payload: unknown, fallback: string,
+                             signal?: AbortSignal): Promise<MarsApiPostResult> {
+            return this.dependencies.requests.post(request, payload, fallback, signal);
+        }
+
+        private requestContext(): number {
+            return this.dependencies.requests.context();
+        }
+
+        private modeChanged(mode: WorksheetMode): void {
+            return this.dependencies.requests.modeChanged(mode);
+        }
+
+        private callNative(entry: string, ...args: unknown[]): unknown {
+            return this.dependencies.native.call(entry, ...args);
+        }
+
+        private applyEffects(plan: NativeServicePlan): unknown {
+            return this.dependencies.native.services(plan, this.getRegistry());
+        }
+
+        private awaitValue(value: unknown): unknown {
+            return value;
+        }
+
+        private abortRequest(message: string): never {
+            throw new DOMException(message, 'AbortError');
+        }
+
+        private failRequest(message: string): never {
+            throw new Error(message);
+        }
+
+        private rethrowError(error: unknown): never {
+            throw error;
         }
 
     }
@@ -1161,7 +1260,7 @@ namespace WorksheetRequests {
         mode: () => WorksheetWorkspace.mode.currentMode(),
         busy: value => WorksheetWorkspace.presentation.setBusy(value),
         running: (button, value) => WorksheetWorkspace.presentation.setActionRunning(button, value),
-        invalidate_solver: () => labDOM.call('lab_result_solver_invalidate'),
+        invalidateSolver: () => labDOM.call('lab_result_solver_invalidate'),
         button: () => document.getElementById('run'),
         encode: value => labWire.encode(value),
         fetch: (url, options) => labHttp.fetch(url, options),
@@ -1169,209 +1268,178 @@ namespace WorksheetRequests {
         presentation: value => WorksheetResults.caches.install(value),
         syntax: value => WorksheetResults.caches.installSyntax(value),
         error: message => WorksheetResults.cards.setRenderedError(message),
-        reset_digits: () => WorksheetResults.cards.resetMoreDigitsButton(WorksheetContext.renderedMore, false),
-        clear_results: options => WorksheetResults.reset.clearResultDetails(options),
+        resetDigits: () => WorksheetResults.cards.resetMoreDigitsButton(WorksheetContext.renderedMore, false),
+        clearResults: options => WorksheetResults.reset.clearResultDetails(options),
         status: message => WorksheetWorkspace.presentation.setStatus(message)
     });
 
+    // Definition scripts load after api.ts. These small forwarding callbacks resolve
+    // their current owners at invocation; only actual state and forward references need getters.
+
     /** @brief Application-owned presentation controller. */
     export const presentation: EditorPresentationController = new EditorPresentationController({
-        get results() {
-            return {
-                installLabPresentationData: (...args: Parameters<typeof WorksheetResults.caches.install>): ReturnType<typeof WorksheetResults.caches.install> => WorksheetResults.caches.install(...args)
-            };
+        results: {
+            installLabPresentationData: (data) => WorksheetResults.caches.install(data)
         },
         get flow(): MarsApiFlowPort { return runtime; }
     });
 
     /** @brief Application-owned evaluationTransport controller. */
     export const evaluationTransport: EvaluationTransport = new EvaluationTransport({
-        get workspace() {
-            return {
-                currentMode: (...args: Parameters<typeof WorksheetWorkspace.mode.currentMode>): ReturnType<typeof WorksheetWorkspace.mode.currentMode> => WorksheetWorkspace.mode.currentMode(...args),
-                currentIntegratorBoundRows: (...args: Parameters<typeof WorksheetWorkspace.integrator.activeIntegratorBoundRows>): ReturnType<typeof WorksheetWorkspace.integrator.activeIntegratorBoundRows> => WorksheetWorkspace.integrator.activeIntegratorBoundRows(...args),
-                requestedValuePrecision: (...args: Parameters<typeof WorksheetWorkspace.precision.requestedValuePrecision>): ReturnType<typeof WorksheetWorkspace.precision.requestedValuePrecision> => WorksheetWorkspace.precision.requestedValuePrecision(...args),
-                currentIntegratorRows: (...args: Parameters<typeof WorksheetWorkspace.integrator.currentIntegratorRows>): ReturnType<typeof WorksheetWorkspace.integrator.currentIntegratorRows> => WorksheetWorkspace.integrator.currentIntegratorRows(...args),
-                integratorBoundsTextFromRows: (...args: Parameters<typeof WorksheetWorkspace.integrator.forms.text>): ReturnType<typeof WorksheetWorkspace.integrator.forms.text> => WorksheetWorkspace.integrator.forms.text(...args),
-                refreshIntegratorForms: (...args: Parameters<typeof WorksheetWorkspace.integrator.refreshIntegratorForms>): ReturnType<typeof WorksheetWorkspace.integrator.refreshIntegratorForms> => WorksheetWorkspace.integrator.refreshIntegratorForms(...args),
-                activeIntegratorRowPlan: (...args: Parameters<typeof WorksheetWorkspace.integrator.activeIntegratorRowPlan>): ReturnType<typeof WorksheetWorkspace.integrator.activeIntegratorRowPlan> => WorksheetWorkspace.integrator.activeIntegratorRowPlan(...args),
-                requestedIntegratorIntervalCap: (...args: Parameters<typeof WorksheetWorkspace.integrator.requestedIntegratorIntervalCap>): ReturnType<typeof WorksheetWorkspace.integrator.requestedIntegratorIntervalCap> => WorksheetWorkspace.integrator.requestedIntegratorIntervalCap(...args)
-            };
+        workspace: {
+            currentMode: () => WorksheetWorkspace.mode.currentMode(),
+            currentIntegratorBoundRows: (rows, expressionText) =>
+                WorksheetWorkspace.integrator.activeIntegratorBoundRows(rows, expressionText),
+            requestedValuePrecision: () => WorksheetWorkspace.precision.requestedValuePrecision(),
+            currentIntegratorRows: () => WorksheetWorkspace.integrator.currentIntegratorRows(),
+            integratorBoundsTextFromRows: (rows) => WorksheetWorkspace.integrator.forms.text(rows),
+            refreshIntegratorForms: (rows, expression) => WorksheetWorkspace.integrator.refreshIntegratorForms(rows, expression),
+            activeIntegratorRowPlan: (rows, expressionText) => WorksheetWorkspace.integrator.activeIntegratorRowPlan(rows, expressionText),
+            requestedIntegratorIntervalCap: () => WorksheetWorkspace.integrator.requestedIntegratorIntervalCap()
         },
-        get bindings() {
-            return {
-                currentExpressionText: (...args: Parameters<typeof WorksheetBindings.editor.currentExpressionText>): ReturnType<typeof WorksheetBindings.editor.currentExpressionText> => WorksheetBindings.editor.currentExpressionText(...args),
-                renderIntegratorRows: (...args: Parameters<typeof WorksheetBindings.integratorPanel.renderIntegratorRows>): ReturnType<typeof WorksheetBindings.integratorPanel.renderIntegratorRows> => WorksheetBindings.integratorPanel.renderIntegratorRows(...args)
-            };
+        bindings: {
+            currentExpressionText: () => WorksheetBindings.editor.currentExpressionText(),
+            renderIntegratorRows: (rows) => WorksheetBindings.integratorPanel.renderIntegratorRows(rows)
         },
-        get locations() {
-            return {
-                currentDatetimeState: (...args: Parameters<typeof WorksheetLocations.calendar.currentDatetimeState>): ReturnType<typeof WorksheetLocations.calendar.currentDatetimeState> => WorksheetLocations.calendar.currentDatetimeState(...args),
-                currentAlmanacState: (...args: Parameters<typeof WorksheetLocations.calendar.currentAlmanacState>): ReturnType<typeof WorksheetLocations.calendar.currentAlmanacState> => WorksheetLocations.calendar.currentAlmanacState(...args)
-            };
+        locations: {
+            currentDatetimeState: () => WorksheetLocations.calendar.currentDatetimeState(),
+            currentAlmanacState: () => WorksheetLocations.calendar.currentAlmanacState()
         },
         get context() { return WorksheetContext; },
-        get native() { return labDOM; },
-        get http() { return labHttp; },
-        get wire() { return labWire; },
+        native: labDOM,
+        http: labHttp,
+        wire: labWire,
         get flow(): MarsApiFlowPort { return runtime; },
-        get requests() { return labRequests; }
+        requests: labRequests
     });
 
     /** @brief Application-owned functionCard controller. */
     export const functionCard: FunctionCardController = new FunctionCardController({
-        get workspace() {
-            return {
-                setActionRunning: (...args: Parameters<typeof WorksheetWorkspace.presentation.setActionRunning>): ReturnType<typeof WorksheetWorkspace.presentation.setActionRunning> => WorksheetWorkspace.presentation.setActionRunning(...args)
-            };
+        workspace: {
+            setActionRunning: (button, running) => WorksheetWorkspace.presentation.setActionRunning(button, running)
         },
         get context() { return WorksheetContext; },
-        get native() { return labDOM; },
+        native: labDOM,
         get flow(): MarsApiFlowPort { return runtime; },
-        get requests() { return labRequests; }
+        requests: labRequests
     });
 
     /** @brief Application-owned plots controller. */
     export const plots: PlotRequestController = new PlotRequestController({
-        get workspace() {
-            return {
-                currentMode: (...args: Parameters<typeof WorksheetWorkspace.mode.currentMode>): ReturnType<typeof WorksheetWorkspace.mode.currentMode> => WorksheetWorkspace.mode.currentMode(...args),
-                variableNamesFromBindings: (...args: Parameters<typeof WorksheetWorkspace.bindingSelection.variableNamesFromBindings>): ReturnType<typeof WorksheetWorkspace.bindingSelection.variableNamesFromBindings> => WorksheetWorkspace.bindingSelection.variableNamesFromBindings(...args),
-                renderDerivativeButtons: (...args: Parameters<typeof WorksheetWorkspace.presentation.renderDerivativeButtons>): ReturnType<typeof WorksheetWorkspace.presentation.renderDerivativeButtons> => WorksheetWorkspace.presentation.renderDerivativeButtons(...args)
-            };
+        workspace: {
+            currentMode: () => WorksheetWorkspace.mode.currentMode(),
+            variableNamesFromBindings: (bindings) => WorksheetWorkspace.bindingSelection.variableNamesFromBindings(bindings),
+            renderDerivativeButtons: (variables) => WorksheetWorkspace.presentation.renderDerivativeButtons(variables)
         },
-        get bindings() {
-            return {
-                visibleBindingValues: (...args: Parameters<typeof WorksheetBindings.panel.visibleBindingValues>): ReturnType<typeof WorksheetBindings.panel.visibleBindingValues> => WorksheetBindings.panel.visibleBindingValues(...args),
-                expressionWithVisibleBindings: (...args: Parameters<typeof WorksheetBindings.editor.expressionWithVisibleBindings>): ReturnType<typeof WorksheetBindings.editor.expressionWithVisibleBindings> => WorksheetBindings.editor.expressionWithVisibleBindings(...args)
-            };
+        bindings: {
+            visibleBindingValues: () => WorksheetBindings.panel.visibleBindingValues(),
+            expressionWithVisibleBindings: (sourceExpression, visibleBindings) =>
+                WorksheetBindings.editor.expressionWithVisibleBindings(sourceExpression, visibleBindings)
         },
-        get results() {
-            return {
-                displayCalculusResult: (...args: Parameters<typeof WorksheetResults.cards.displayCalculusResult>): ReturnType<typeof WorksheetResults.cards.displayCalculusResult> => WorksheetResults.cards.displayCalculusResult(...args),
-                setMatrixPrettyResult: (...args: Parameters<typeof WorksheetResults.cards.setMatrixPrettyResult>): ReturnType<typeof WorksheetResults.cards.setMatrixPrettyResult> => WorksheetResults.cards.setMatrixPrettyResult(...args)
-            };
+        results: {
+            displayCalculusResult: (result) => WorksheetResults.cards.displayCalculusResult(result),
+            setMatrixPrettyResult: (resultText, prettyText, element, moreButton) =>
+                WorksheetResults.cards.setMatrixPrettyResult(resultText, prettyText, element, moreButton)
         },
         get context() { return WorksheetContext; },
-        get native() { return labDOM; },
+        native: labDOM,
         get presentationState() { return WorksheetWorkspace.presentation.state; },
         get bindingState() { return WorksheetBindings.panel; },
         get volume() { return labSurfaceVolume; },
         get preview() { return labSurfacePreview; },
-        get document() { return document; },
+        document,
         get flow(): MarsApiFlowPort { return runtime; },
-        get requests() { return labRequests; }
+        requests: labRequests
     });
 
     /** @brief Application-owned solver controller. */
     export const solver: SolverRenderController = new SolverRenderController({
-        get workspace() {
-            return {
-                currentMode: (...args: Parameters<typeof WorksheetWorkspace.mode.currentMode>): ReturnType<typeof WorksheetWorkspace.mode.currentMode> => WorksheetWorkspace.mode.currentMode(...args)
-            };
+        workspace: {
+            currentMode: () => WorksheetWorkspace.mode.currentMode()
         },
-        get results() {
-            return {
-                scheduleSolverTexFit: (...args: Parameters<typeof WorksheetResults.solverFit.schedule>): ReturnType<typeof WorksheetResults.solverFit.schedule> => WorksheetResults.solverFit.schedule(...args)
-            };
+        results: {
+            scheduleSolverTexFit: (callback) => WorksheetResults.solverFit.schedule(callback)
         },
-        get native() { return labDOM; },
+        native: labDOM,
         get flow(): MarsApiFlowPort { return runtime; },
-        get requests() { return labRequests; }
+        requests: labRequests
     });
 
     /** @brief Application-owned calendarRequests controller. */
     export const calendarRequests: CalendarRequestController = new CalendarRequestController({
-        get locations() {
-            return {
-                refreshDatetimeJurisdictionLocation: (...args: Parameters<typeof WorksheetLocations.calendarActions.refreshDatetimeJurisdictionLocation>): ReturnType<typeof WorksheetLocations.calendarActions.refreshDatetimeJurisdictionLocation> => WorksheetLocations.calendarActions.refreshDatetimeJurisdictionLocation(...args)
-            };
+        locations: {
+            refreshDatetimeJurisdictionLocation: (options) =>
+                WorksheetLocations.calendarActions.refreshDatetimeJurisdictionLocation(options)
         },
-        get results() {
-            return {
-                bindAlmanacTotalityActions: (...args: Parameters<typeof WorksheetResults.calendarResults.bindAlmanacTotalityActions>): ReturnType<typeof WorksheetResults.calendarResults.bindAlmanacTotalityActions> => WorksheetResults.calendarResults.bindAlmanacTotalityActions(...args)
-            };
+        results: {
+            bindAlmanacTotalityActions: (node) => WorksheetResults.calendarResults.bindAlmanacTotalityActions(node)
         },
         get context() { return WorksheetContext; },
-        get native() { return labDOM; },
-        get http() { return labHttp; },
-        get application() { return labApplication; },
+        native: labDOM,
+        http: labHttp,
+        application: labApplication,
         get flow(): MarsApiFlowPort { return runtime; }
     });
 
     /** @brief Application-owned evaluation controller. */
     export const evaluation: EvaluationController = new EvaluationController({
-        get workspace() {
-            return {
-                workspaceModeId: (...args: Parameters<typeof WorksheetWorkspace.mode.workspaceModeId>): ReturnType<typeof WorksheetWorkspace.mode.workspaceModeId> => WorksheetWorkspace.mode.workspaceModeId(...args),
-                currentMode: (...args: Parameters<typeof WorksheetWorkspace.mode.currentMode>): ReturnType<typeof WorksheetWorkspace.mode.currentMode> => WorksheetWorkspace.mode.currentMode(...args),
-                pushExpressionHistory: (...args: Parameters<typeof WorksheetWorkspace.history.pushExpressionHistory>): ReturnType<typeof WorksheetWorkspace.history.pushExpressionHistory> => WorksheetWorkspace.history.pushExpressionHistory(...args),
-                showResults: (...args: Parameters<typeof WorksheetWorkspace.presentation.showResults>): ReturnType<typeof WorksheetWorkspace.presentation.showResults> => WorksheetWorkspace.presentation.showResults(...args),
-                updateHistoryButtons: (...args: Parameters<typeof WorksheetWorkspace.presentation.updateHistoryButtons>): ReturnType<typeof WorksheetWorkspace.presentation.updateHistoryButtons> => WorksheetWorkspace.presentation.updateHistoryButtons(...args),
-                requestedValuePrecision: (...args: Parameters<typeof WorksheetWorkspace.precision.requestedValuePrecision>): ReturnType<typeof WorksheetWorkspace.precision.requestedValuePrecision> => WorksheetWorkspace.precision.requestedValuePrecision(...args)
-            };
+        workspace: {
+            workspaceModeId: (mode) => WorksheetWorkspace.mode.workspaceModeId(mode),
+            currentMode: () => WorksheetWorkspace.mode.currentMode(),
+            pushExpressionHistory: (entry) => WorksheetWorkspace.history.pushExpressionHistory(entry),
+            showResults: () => WorksheetWorkspace.presentation.showResults(),
+            updateHistoryButtons: () => WorksheetWorkspace.presentation.updateHistoryButtons(),
+            requestedValuePrecision: () => WorksheetWorkspace.precision.requestedValuePrecision()
         },
-        get bindings() {
-            return {
-                currentExpressionText: (...args: Parameters<typeof WorksheetBindings.editor.currentExpressionText>): ReturnType<typeof WorksheetBindings.editor.currentExpressionText> => WorksheetBindings.editor.currentExpressionText(...args),
-                visibleBindingValues: (...args: Parameters<typeof WorksheetBindings.panel.visibleBindingValues>): ReturnType<typeof WorksheetBindings.panel.visibleBindingValues> => WorksheetBindings.panel.visibleBindingValues(...args),
-                commitVisibleBindingInputs: (...args: Parameters<typeof WorksheetBindings.controller.commitVisibleBindingInputs>): ReturnType<typeof WorksheetBindings.controller.commitVisibleBindingInputs> => WorksheetBindings.controller.commitVisibleBindingInputs(...args),
-                expressionWithVisibleBindings: (...args: Parameters<typeof WorksheetBindings.editor.expressionWithVisibleBindings>): ReturnType<typeof WorksheetBindings.editor.expressionWithVisibleBindings> => WorksheetBindings.editor.expressionWithVisibleBindings(...args)
-            };
+        bindings: {
+            currentExpressionText: () => WorksheetBindings.editor.currentExpressionText(),
+            visibleBindingValues: () => WorksheetBindings.panel.visibleBindingValues(),
+            commitVisibleBindingInputs: (isCurrent) => WorksheetBindings.controller.commitVisibleBindingInputs(isCurrent),
+            expressionWithVisibleBindings: (sourceExpression, visibleBindings) =>
+                WorksheetBindings.editor.expressionWithVisibleBindings(sourceExpression, visibleBindings)
         },
-        get locations() {
-            return {
-                currentDatetimeState: (...args: Parameters<typeof WorksheetLocations.calendar.currentDatetimeState>): ReturnType<typeof WorksheetLocations.calendar.currentDatetimeState> => WorksheetLocations.calendar.currentDatetimeState(...args),
-                datetimeSummaryText: (...args: Parameters<typeof WorksheetLocations.calendar.datetimeSummaryText>): ReturnType<typeof WorksheetLocations.calendar.datetimeSummaryText> => WorksheetLocations.calendar.datetimeSummaryText(...args),
-                almanacSummaryText: (...args: Parameters<typeof WorksheetLocations.calendar.almanacSummaryText>): ReturnType<typeof WorksheetLocations.calendar.almanacSummaryText> => WorksheetLocations.calendar.almanacSummaryText(...args),
-                currentAlmanacState: (...args: Parameters<typeof WorksheetLocations.calendar.currentAlmanacState>): ReturnType<typeof WorksheetLocations.calendar.currentAlmanacState> => WorksheetLocations.calendar.currentAlmanacState(...args)
-            };
+        locations: {
+            currentDatetimeState: () => WorksheetLocations.calendar.currentDatetimeState(),
+            datetimeSummaryText: (state) => WorksheetLocations.calendar.datetimeSummaryText(state),
+            almanacSummaryText: (state) => WorksheetLocations.calendar.almanacSummaryText(state),
+            currentAlmanacState: () => WorksheetLocations.calendar.currentAlmanacState()
         },
-        get persistence() {
-            return {
-                historyStateForMode: (...args: Parameters<typeof WorksheetPersistence.history.snapshot>): ReturnType<typeof WorksheetPersistence.history.snapshot> => WorksheetPersistence.history.snapshot(...args),
-                previousModeStateForHistory: (...args: Parameters<typeof WorksheetPersistence.history.previous>): ReturnType<typeof WorksheetPersistence.history.previous> => WorksheetPersistence.history.previous(...args),
-                commitModeState: (...args: Parameters<typeof WorksheetPersistence.history.commit>): ReturnType<typeof WorksheetPersistence.history.commit> => WorksheetPersistence.history.commit(...args)
-            };
+        persistence: {
+            historyStateForMode: (mode, textOverride) => WorksheetPersistence.history.snapshot(mode, textOverride),
+            previousModeStateForHistory: (nextState) => WorksheetPersistence.history.previous(nextState),
+            commitModeState: (mode, textOverride) => WorksheetPersistence.history.commit(mode, textOverride)
         },
         get flow(): MarsApiFlowPort { return runtime; }
     });
 
     /** @brief Application-owned goals controller. */
     export const goals: GoalSeekController = new GoalSeekController({
-        get workspace() {
-            return {
-                workspaceModeId: (...args: Parameters<typeof WorksheetWorkspace.mode.workspaceModeId>): ReturnType<typeof WorksheetWorkspace.mode.workspaceModeId> => WorksheetWorkspace.mode.workspaceModeId(...args),
-                currentMode: (...args: Parameters<typeof WorksheetWorkspace.mode.currentMode>): ReturnType<typeof WorksheetWorkspace.mode.currentMode> => WorksheetWorkspace.mode.currentMode(...args)
-            };
+        workspace: {
+            workspaceModeId: (mode) => WorksheetWorkspace.mode.workspaceModeId(mode),
+            currentMode: () => WorksheetWorkspace.mode.currentMode()
         },
-        get bindings() {
-            return {
-                currentExpressionText: (...args: Parameters<typeof WorksheetBindings.editor.currentExpressionText>): ReturnType<typeof WorksheetBindings.editor.currentExpressionText> => WorksheetBindings.editor.currentExpressionText(...args),
-                goalSeekExpressionAndStarts: (...args: Parameters<typeof WorksheetBindings.goal.goalSeekExpressionAndStarts>): ReturnType<typeof WorksheetBindings.goal.goalSeekExpressionAndStarts> => WorksheetBindings.goal.goalSeekExpressionAndStarts(...args),
-                expressionBodyForEditor: (...args: Parameters<typeof WorksheetBindings.editor.expressionBodyForEditor>): ReturnType<typeof WorksheetBindings.editor.expressionBodyForEditor> => WorksheetBindings.editor.expressionBodyForEditor(...args),
-                expressionWithBindings: (...args: Parameters<typeof WorksheetBindings.editor.expressionWithBindings>): ReturnType<typeof WorksheetBindings.editor.expressionWithBindings> => WorksheetBindings.editor.expressionWithBindings(...args),
-                expression_text_or_empty: (...args: Parameters<typeof WorksheetBindings.expression_text_or_empty>): ReturnType<typeof WorksheetBindings.expression_text_or_empty> => WorksheetBindings.expression_text_or_empty(...args)
-            };
+        bindings: {
+            currentExpressionText: () => WorksheetBindings.editor.currentExpressionText(),
+            goalSeekExpressionAndStarts: (sourceExpression, providedStart) =>
+                WorksheetBindings.goal.goalSeekExpressionAndStarts(sourceExpression, providedStart),
+            expressionBodyForEditor: (text) => WorksheetBindings.editor.expressionBodyForEditor(text),
+            expressionWithBindings: (bodyText, bindings) => WorksheetBindings.editor.expressionWithBindings(bodyText, bindings),
+            expressionTextOrEmpty: (text) => WorksheetBindings.expressionTextOrEmpty(text)
         },
-        get native() { return labDOM; },
+        native: labDOM,
         get flow(): MarsApiFlowPort { return runtime; }
     });
 
     /** @brief Application-owned runtime controller. */
     export const runtime: NativeFlowRuntime = new NativeFlowRuntime({
-        get workspace() {
-            return {
-                currentMode: (...args: Parameters<typeof WorksheetWorkspace.mode.currentMode>): ReturnType<typeof WorksheetWorkspace.mode.currentMode> => WorksheetWorkspace.mode.currentMode(...args)
-            };
+        workspace: {
+            currentMode: () => WorksheetWorkspace.mode.currentMode()
         },
-        get results() {
-            return {
-                get labEvaluationView() { return WorksheetResults.labEvaluationView; }
-            };
+        results: {
+            get labEvaluationView() { return WorksheetResults.labEvaluationView; }
         },
-        get native() { return labDOM; },
-        get requests() { return labRequests; }
+        native: labDOM,
+        requests: labRequests
     });
 
     // Existing result providers share some ABI names. Select their established owner
@@ -1398,15 +1466,15 @@ namespace WorksheetRequests {
         () => WorksheetLocations.locationServices,
         () => WorksheetBindings.controller.labBindingFlowServices(),
         () => WorksheetResults.resultServices,
-        () => presentation.capabilities(),
-        () => evaluationTransport.capabilities(),
-        () => functionCard.capabilities(),
-        () => plots.capabilities(),
-        () => solver.capabilities(),
-        () => calendarRequests.capabilities(),
-        () => evaluation.capabilities(),
-        () => goals.capabilities(),
-        () => runtime.capabilities()
+        presentation.capabilities,
+        evaluationTransport.capabilities,
+        functionCard.capabilities,
+        plots.capabilities,
+        solver.capabilities,
+        calendarRequests.capabilities,
+        evaluation.capabilities,
+        goals.capabilities,
+        runtime.capabilities
     ]);
 
 }

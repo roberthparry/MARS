@@ -5,38 +5,55 @@
  * Checks isolated continuation frames, recovery boundaries, awaited cleanup and namespace-owned persistence and history resources.
  */
 
+/** Create an opaque deferred value without adding a timer or continuation. */
+function labStateDeferred(): LabWorksheetTestDeferred {
+    let resolve!: (value?: unknown) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<unknown>(function captureSettlement(accept, fail) {
+        resolve = accept;
+        reject = fail;
+    });
+    return {promise, resolve, reject};
+}
+
 /** Native state continuations: isolated frames, recovery boundaries and awaited cleanup. */
 window.checkLabStateFlow = async function checkLabStateFlow() {
-    const check: LabTestCheck = (condition, message) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('State flow: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const saved = new Map<string, unknown>();
-    const targets = new Map<string, readonly [object, string]>();
-    const replace = (target: string | readonly [object, string], callback: (...args: never[]) => unknown) => {
-        const [owner, key] = typeof target === 'string' ? [labTestModuleOwner(target), target] as const : target;
-        const name = typeof target === 'string' ? target : 'owned:' + key;
-        if (!saved.has(name)) {
-            targets.set(name, [owner, key]);
-            saved.set(name, Reflect.get(owner, key));
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    const saved = new Map<string, LabWorksheetTestReplacement>();
+    function replace(target: string | readonly [object, string], callback: MarsTransportService): void {
+        let owner: object;
+        let key: string;
+        let name: string;
+        if (typeof target === 'string') {
+            owner = labTestModuleOwner(target);
+            key = target;
+            name = target;
+        } else {
+            [owner, key] = target;
+            name = 'owned:' + key;
         }
+        if (!saved.has(name))
+            saved.set(name, {owner, key, callback: Reflect.get(owner, key)});
         Reflect.set(owner, key, callback);
-    };
-    const deferred = (): LabWorksheetTestDeferred => {
-        let resolve!: (value?: unknown) => void, reject!: (reason?: unknown) => void;
-        const promise = new Promise((accept, fail) => {
-            resolve = accept;
-            reject = fail;
-        });
-        return {promise, resolve, reject};
-    };
-    const step = (kind: number, frame: object) => labDOM.call<LabWorksheetTestPlan>('lab_flow_step', kind, frame, {});
-    const sync = (kind: number, frame: object) => labDOM.call<LabWorksheetTestPlan>('lab_state_sync', kind, frame);
-    const bootstrap = (phase: number, context: unknown) => labDOM.call<LabWorksheetTestPlan>('lab_bootstrap_workspace', phase, context);
-    const unread = () => {
+    }
+    function step(kind: number, frame: object): LabWorksheetTestPlan {
+        return labDOM.call<LabWorksheetTestPlan>('lab_flow_step', kind, frame, {});
+    }
+    function sync(kind: number, frame: object): LabWorksheetTestPlan {
+        return labDOM.call<LabWorksheetTestPlan>('lab_state_sync', kind, frame);
+    }
+    function bootstrap(phase: number, context: unknown): LabWorksheetTestPlan {
+        return labDOM.call<LabWorksheetTestPlan>('lab_bootstrap_workspace', phase, context);
+    }
+    function unread(): never {
         throw new Error('inactive bootstrap getter was read');
-    };
+    }
     equal(
         bootstrap(0, {
             token: '',
@@ -151,8 +168,10 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
     equal(
         sync(8, {stage: 3, index: 6}).calls[0].service, 'stateEvaluateExpression',
         'keyboard fallback retains previous almanac behaviour');
-    const first: LabWorksheetTestEditorFrame = {read: (key: string) => key, local: false}, second: LabWorksheetTestEditorFrame = {read: (key: string) => key, local: true};
-    const firstPlan = step(16, first), secondPlan = step(16, second);
+    const first: LabWorksheetTestEditorFrame = {read: key => key, local: false};
+    const second: LabWorksheetTestEditorFrame = {read: key => key, local: true};
+    const firstPlan = step(16, first);
+    const secondPlan = step(16, second);
     equal(firstPlan.calls[0].service, 'stateRead', 'server editors begin with a lazy read');
     equal(firstPlan.calls[0].args[1], 'expression', 'server schema remains native');
     equal(secondPlan.calls[0].args[1], 'mars.exprLab.lastExpression', 'local schema remains native');
@@ -192,22 +211,29 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
     const getItem = Storage.prototype.getItem;
     const originalMode = WorksheetWorkspace.mode.currentMode();
     try {
-        replace([labHttp, 'fetch'], async () => ({labData: async () => ({marker: 'server'})}));
+        async function fetchFixture() {
+            return {
+                async labData() {
+                    return {marker: 'server'};
+                }
+            };
+        }
+        replace([labHttp, 'fetch'], fetchFixture);
         replace([WorksheetPersistence.restoration, 'applySaved'], async (data: {marker: string}) => events.push('server:' + data.marker));
-        replace([WorksheetPersistence.restoration, 'recoverLocalEditors'], async () => {
+        replace([WorksheetPersistence.restoration, 'recoverLocalEditors'], async function rejectRecovery() {
             events.push('recovery');
             throw new Error('locked local storage');
         });
         replace([WorksheetPersistence.restoration, 'restoreEditors'], async (_read: (key: string) => unknown, local: boolean) => events.push('editors:' + local));
         replace([WorksheetPersistence.restoration, 'restoreControls'], async (_read: (key: string) => unknown, local: boolean) => events.push('controls:' + local));
-        replace([WorksheetPersistence.persistence, 'readLocal'], (key: string) => {
+        replace([WorksheetPersistence.persistence, 'readLocal'], function readLocal(key: string) {
             events.push(key);
             return null;
         });
         replace('syncTownSelectors', async () => events.push('towns'));
         replace('restoreTownSelection', async () => events.push('town'));
         replace('applyLabMode', async (mode: WorksheetMode) => events.push('mode:' + mode));
-        Storage.prototype.getItem = function(key) {
+        Storage.prototype.getItem = function readFixtureStorage(key) {
             if (key === WorksheetContext.LAB_MODE_STORAGE_KEY) {
                 events.push('local-mode');
                 return null;
@@ -218,7 +244,7 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
         equal(events.join(','), 'server:server,recovery', 'local recovery failure must not trigger fallback');
 
         events.length = 0;
-        replace([WorksheetPersistence.restoration, 'applySaved'], async () => {
+        replace([WorksheetPersistence.restoration, 'applySaved'], async function rejectInstallation() {
             events.push('server-failed');
             throw new Error('cannot install server copy');
         });
@@ -229,19 +255,20 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
             'server installation failure restores local controls and towns without inventing a saved mode');
 
         events.length = 0;
-        replace([labHttp, 'fetch'], async () => {
+        replace([labHttp, 'fetch'], async function rejectFetch() {
             throw new Error('offline');
         });
-        replace([WorksheetPersistence.restoration, 'restoreEditors'], async () => {
+        replace([WorksheetPersistence.restoration, 'restoreEditors'], async function rejectRestoration() {
             events.push('local-failed');
             throw new Error('storage denied');
         });
         await WorksheetPersistence.restoration.load();
         equal(events.join(','), 'local-failed', 'local failure terminates fallback without later reads');
 
-        const commit = deferred(), commitEntered = deferred();
+        const commit = labStateDeferred();
+        const commitEntered = labStateDeferred();
         let owned = true;
-        replace('commitVisibleBindingInputs', async (guard: WorksheetGuard) => {
+        replace('commitVisibleBindingInputs', async function commitInputs(guard: WorksheetGuard) {
             check(guard(), 'capture supplies its ownership guard to binding commit');
             commitEntered.resolve();
             await commit.promise;
@@ -255,7 +282,7 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
         // Exercise the real wrapper: finally must wait for and retain a rejected evaluation.
         events.length = 0;
         let appliedPrecision = 0;
-        replace('setRequestedPrecisionBits', (bits: number) => {
+        replace('setRequestedPrecisionBits', function recordPrecision(bits: number) {
             appliedPrecision = bits;
             events.push('precision');
         });
@@ -264,8 +291,9 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
         replace('currentMode', () => 'matrix');
         replace('currentGoalSeekSource', () => '');
         replace('updateHistoryButtons', () => events.push('buttons'));
-        const pending = deferred(), entered = deferred();
-        replace('evaluateCurrentMode', async () => {
+        const pending = labStateDeferred();
+        const entered = labStateDeferred();
+        replace('evaluateCurrentMode', async function deferEvaluation() {
             events.push('evaluate');
             entered.resolve();
             await pending.promise;
@@ -284,22 +312,23 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
         equal(selectedPrecision, error, 'slider uses the same guarded evaluation workflow');
         equal(events.join(','), 'precision,save,Precision changed,evaluate,buttons', 'slider persists and evaluates exactly once');
 
-        Reflect.set(WorksheetWorkspace.mode, 'evaluateCurrentMode', saved.get('evaluateCurrentMode'));
-        const evaluated = deferred(), requestedOptions = {skipHistoryUpdate: true};
-        replace('evaluateLabMode', (mode: WorksheetMode, options: Record<string, unknown>) => {
+        Reflect.set(WorksheetWorkspace.mode, 'evaluateCurrentMode', saved.get('evaluateCurrentMode')!.callback);
+        const evaluated = labStateDeferred();
+        const requestedOptions = {skipHistoryUpdate: true};
+        replace('evaluateLabMode', function evaluateMode(mode: WorksheetMode, options: {skipHistoryUpdate?: boolean}) {
             equal(mode, 'matrix', 'current-mode wrapper forwards its selected mode to native evaluation');
             equal(options, requestedOptions, 'current-mode wrapper preserves the options object');
             return evaluated.promise;
         });
         let finished = false;
-        const delegated = WorksheetWorkspace.mode.evaluateCurrentMode(requestedOptions).then(value => {
+        const delegated = WorksheetWorkspace.mode.evaluateCurrentMode(requestedOptions).then(function markFinished(value) {
             finished = true;
             return value;
         });
         equal(finished, false, 'current-mode wrapper waits for native evaluation');
         evaluated.resolve('ignored result');
         equal(await delegated, undefined, 'current-mode wrapper preserves discarded return semantics');
-        replace('evaluateLabMode', async () => {
+        replace('evaluateLabMode', async function rejectEvaluation() {
             throw error;
         });
         equal(
@@ -307,67 +336,71 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
             'current-mode wrapper propagates native evaluation errors');
     } finally {
         Storage.prototype.getItem = getItem;
-        for (const [name, callback] of saved) {
-            const [owner, key] = targets.get(name)!;
+        for (const {owner, key, callback} of saved.values()) {
             Reflect.set(owner, key, callback);
         }
     }
     equal(WorksheetWorkspace.mode.currentMode(), originalMode, 'flow fixtures leave the selected worksheet unchanged');
     await labStateFormsChecks();
-    labStateResourceChecks();
+    await labStateResourceChecks();
     return true;
 };
 
 /** Exercise the real wrappers with controlled browser-resource services and pending forms requests. */
 async function labStateFormsChecks() {
-    const check = (condition: unknown, message: string) => {
+    function check(condition: unknown, message: string): void {
         if (!condition)
             throw new Error('State forms: ' + message);
-    };
-    const equal = (actual: unknown, expected: unknown, message: string) => check(Object.is(actual, expected), message);
-    const saved = new Map<string, unknown>();
-    const targets = new Map<string, readonly [object, string]>();
-    const replace = (target: string | readonly [object, string], callback: (...args: never[]) => unknown) => {
-        const [owner, key] = typeof target === 'string' ? [labTestModuleOwner(target), target] as const : target;
-        const name = typeof target === 'string' ? target : 'owned:' + key;
-        if (!saved.has(name)) {
-            targets.set(name, [owner, key]);
-            saved.set(name, Reflect.get(owner, key));
+    }
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        check(Object.is(actual, expected), message);
+    }
+    const saved = new Map<string, LabWorksheetTestReplacement>();
+    function replace(target: string | readonly [object, string], callback: MarsTransportService): void {
+        let owner: object;
+        let key: string;
+        let name: string;
+        if (typeof target === 'string') {
+            owner = labTestModuleOwner(target);
+            key = target;
+            name = target;
+        } else {
+            [owner, key] = target;
+            name = 'owned:' + key;
         }
+        if (!saved.has(name))
+            saved.set(name, {owner, key, callback: Reflect.get(owner, key)});
         Reflect.set(owner, key, callback);
-    };
-    const deferred = (): LabWorksheetTestDeferred => {
-        let resolve!: (value?: unknown) => void, reject!: (reason?: unknown) => void;
-        const promise = new Promise((accept, fail) => {
-            resolve = accept;
-            reject = fail;
-        });
-        return {promise, resolve, reject};
-    };
-    const events: string[] = [], registry = WorksheetRequests.runtime.getRegistry();
-    let reset = 1, historicalText = 'previous';
+    }
+    const events: string[] = [];
+    const registry = WorksheetRequests.runtime.getRegistry();
+    let reset = 1;
+    let historicalText = 'previous';
     let capture: LabWorksheetTestDeferred;
     try {
         // Isolate browser cancellation/request acquisition while retaining the actual clear continuation and wrapper.
-        replace('labFlowCapabilities', () => ({
-                                           ...registry,
-                                           stateClearPrelude: () => events.push('cancel'),
-                                           stateClearOwned: () => {
-                                               events.push('request');
-                                               return WorksheetRequests.runtime.continue(72, {stage: 3, request: {fixture: true}});
-                                           },
-                                           stateClearProjection: () => {
-                                               events.push('reset');
-                                               return reset;
-                                           },
-                                           stateFocusEditor: () => events.push('focus')
-                                       }));
+        function fixtureCapabilities(): NativeServiceRegistry {
+            return {
+                ...registry,
+                stateClearPrelude: () => events.push('cancel'),
+                stateClearOwned() {
+                    events.push('request');
+                    return WorksheetRequests.runtime.continue(72, {stage: 3, request: {fixture: true}});
+                },
+                stateClearProjection() {
+                    events.push('reset');
+                    return reset;
+                },
+                stateFocusEditor: () => events.push('focus')
+            };
+        }
+        replace('labFlowCapabilities', fixtureCapabilities);
         replace([WorksheetPersistence.history, 'snapshot'], () => ({text: historicalText}));
         replace('pushExpressionHistory', () => events.push('history'));
         replace([WorksheetPersistence.history, 'clearForward'], () => events.push('forward'));
         replace('resetIntegratorBoundsToBlank', () => events.push('blank'));
         replace('applyCalendarState', (_mode: WorksheetMode, _data: unknown, phase: number) => events.push('calendar:' + phase));
-        replace('captureCurrentModeEditor', () => {
+        replace('captureCurrentModeEditor', function captureEditor() {
             events.push('capture');
             return capture.promise;
         });
@@ -379,7 +412,7 @@ async function labStateFormsChecks() {
             replace(name, () => events.push(label));
         replace('setStatus', (text: string) => events.push(text));
 
-        capture = deferred();
+        capture = labStateDeferred();
         const stale = WorksheetWorkspace.mode.clearWorksheetFromEvent();
         equal(
             events.join(','), 'cancel,request,history,forward,reset,blank,capture',
@@ -389,7 +422,7 @@ async function labStateFormsChecks() {
         equal(events.at(-1), 'capture', 'stale capture suppresses every clear completion effect');
 
         events.length = 0;
-        capture = deferred();
+        capture = labStateDeferred();
         const failure = new Error('capture failed');
         const rejected = WorksheetWorkspace.mode.clearWorksheetFromEvent().then(() => null, error => error);
         capture.reject(failure);
@@ -399,7 +432,7 @@ async function labStateFormsChecks() {
         events.length = 0;
         historicalText = '';
         reset = 2;
-        capture = deferred();
+        capture = labStateDeferred();
         const success = WorksheetWorkspace.mode.clearWorksheetFromEvent();
         capture.resolve(true);
         await success;
@@ -410,27 +443,31 @@ async function labStateFormsChecks() {
 
         // Forms services resolve native-backed expression state only outside a DOM handle scope.
         events.length = 0;
-        let expression = 'opaque expression', reads = 0, requests = 0;
-        let pending: LabWorksheetTestDeferred, payload!: {text: string; expression?: string};
-        replace('integratorFormsExpression', () => {
+        let expression = 'opaque expression';
+        let reads = 0;
+        let requests = 0;
+        let pending: LabWorksheetTestDeferred;
+        let payload!: {text: string; expression?: string};
+        replace('integratorFormsExpression', function readSource() {
             ++reads;
             return expression;
         });
-        replace('requestLabForms', (input: {text: string; expression?: string}) => {
+        replace('requestLabForms', function requestForms(input: {text: string; expression?: string}) {
             ++requests;
             payload = input;
             return pending.promise;
         });
         replace('installIntegratorReferenceMetadata', () => events.push('metadata'));
         replace('renderIntegratorRows', () => events.push('render'));
-        const native = labWire.exports(), revision = WorksheetWorkspace.integrator.forms.nextRevision();
+        const native = labWire.exports();
+        const revision = WorksheetWorkspace.integrator.forms.nextRevision();
         equal(await WorksheetWorkspace.integrator.restoreIntegratorBoundsText('x = 0 .. 1', () => false), false, 'initial guard rejects bounds');
         equal(requests, 0, 'initially stale restoration sends no request');
         equal(reads, 0, 'initially stale restoration does not inspect expression state');
         equal(
             native.lab_rows_revision_accept(revision, 1), 1, 'initially stale restoration does not consume a revision');
 
-        pending = deferred();
+        pending = labStateDeferred();
         let owned = true;
         const restored = WorksheetWorkspace.integrator.restoreIntegratorBoundsText('', () => owned);
         equal(payload.text, WorksheetContext.DEFAULT_INTEGRATOR_BOUNDS_TEXT, 'empty restoration selects configured bounds');
@@ -445,7 +482,7 @@ async function labStateFormsChecks() {
         equal(reads, 1, 'failed post-await guard short-circuits the second expression read');
         equal(events.length, 0, 'stale bounds install neither metadata nor rows');
 
-        pending = deferred();
+        pending = labStateDeferred();
         const refreshed = WorksheetWorkspace.integrator.refreshIntegratorForms([], expression);
         WorksheetWorkspace.integrator.forms.nextRevision();
         pending.resolve({
@@ -456,14 +493,14 @@ async function labStateFormsChecks() {
         equal(await refreshed, null, 'superseded forms refresh returns null, not undefined');
         equal(events.length, 0, 'superseded refresh does not publish metadata');
 
-        pending = deferred();
+        pending = labStateDeferred();
         const changed = WorksheetWorkspace.integrator.refreshIntegratorForms([], expression);
         expression = 'newer source';
         pending.resolve({rows: []});
         equal(await changed, null, 'changed source rejects otherwise current revision');
 
         events.length = 0;
-        pending = deferred();
+        pending = labStateDeferred();
         const accepted = WorksheetWorkspace.integrator.restoreIntegratorBoundsText(' x = a+b .. a-b ');
         equal(payload.text, ' x = a+b .. a-b ', 'authored bounds are not trimmed or mathematically interpreted');
         pending.resolve({
@@ -475,11 +512,18 @@ async function labStateFormsChecks() {
         equal(await accepted, true, 'current bounds restoration succeeds');
         equal(events.join(','), 'metadata,rows,render', 'metadata precedes one row read and rendering');
 
-        for (const operation
-                 of [() => WorksheetWorkspace.integrator.refreshIntegratorForms([], expression), () => WorksheetWorkspace.integrator.restoreIntegratorBoundsText('x = 0 .. 1'),
-                    () => parseIntegratorBoundsText('x = 0 .. 1')]) {
+        function refreshForms() {
+            return WorksheetWorkspace.integrator.refreshIntegratorForms([], expression);
+        }
+        function restoreBounds() {
+            return WorksheetWorkspace.integrator.restoreIntegratorBoundsText('x = 0 .. 1');
+        }
+        function parseBounds() {
+            return parseIntegratorBoundsText('x = 0 .. 1');
+        }
+        for (const operation of [refreshForms, restoreBounds, parseBounds]) {
             events.length = 0;
-            pending = deferred();
+            pending = labStateDeferred();
             const error = new Error('forms transport failed');
             const completion = operation().then(() => null, (reason: unknown) => reason);
             pending.reject(error);
@@ -487,7 +531,7 @@ async function labStateFormsChecks() {
             equal(events.length, 0, 'failed transport performs no metadata/DOM projection');
         }
         for (const value of [null, undefined, []]) {
-            pending = deferred();
+            pending = labStateDeferred();
             const parsed = parseIntegratorBoundsText(null);
             equal(payload.text, '', 'parse-only empty input has no restoration default');
             check(!Object.hasOwn(payload, 'expression'), 'parse-only request does not acquire an expression');
@@ -496,9 +540,9 @@ async function labStateFormsChecks() {
         }
 
         events.length = 0;
-        pending = deferred();
+        pending = labStateDeferred();
         const metadataError = new Error('metadata projection failed');
-        replace('installIntegratorReferenceMetadata', () => {
+        replace('installIntegratorReferenceMetadata', function rejectMetadata() {
             throw metadataError;
         });
         const broken = WorksheetWorkspace.integrator.restoreIntegratorBoundsText('x = 0 .. 1').then(() => null, error => error);
@@ -511,40 +555,153 @@ async function labStateFormsChecks() {
         equal(await broken, metadataError, 'metadata failure propagates unchanged');
         equal(events.length, 0, 'metadata failure prevents row read and rendering');
     } finally {
-        for (const [name, callback] of saved) {
-            const [owner, key] = targets.get(name)!;
+        for (const {owner, key, callback} of saved.values()) {
             Reflect.set(owner, key, callback);
         }
     }
 }
 
+/** @brief Check lazy record readers and callbacks that resume the registered runtime after browser work. */
+async function labStateCallbackChecks(): Promise<void> {
+    function equal(actual: unknown, expected: unknown, message: string): void {
+        if (!Object.is(actual, expected))
+            throw new Error('State callbacks: ' + message);
+    }
+    const restoration = WorksheetPersistence.restoration;
+    const runtime = WorksheetPersistence.stateRuntime;
+    const calendar = WorksheetLocations.calendarActions;
+    const savedEditors = restoration.restoreEditors;
+    const savedControls = restoration.restoreControls;
+    const savedRefresh = calendar.refreshDatetimeJurisdictionLocation;
+    const savedSync = runtime.sync;
+    const savedTimeout = window.setTimeout;
+    const readers: WorksheetStateReader[] = [];
+    let reads = 0;
+    let value: unknown = 'initial';
+    const record: WorksheetStateRecord = {};
+    Object.defineProperty(record, 'fixture', {
+        enumerable: true,
+        get() {
+            ++reads;
+            return value;
+        }
+    });
+    function retainReader(read: WorksheetStateReader): Promise<void> {
+        readers.push(read);
+        return Promise.resolve();
+    }
+    let finishRefresh!: () => void;
+    const pending = new Promise<void>(resolve => {
+        finishRefresh = resolve;
+    });
+    const continuations: {kind: number; frame: {save?: WorksheetSavePlan}}[] = [];
+    function resumed(this: WorksheetStateRuntimePort, kind: number, frame: {save?: WorksheetSavePlan}): void {
+        equal(this, runtime, 'callbacks preserve the registered runtime receiver');
+        continuations.push({kind, frame});
+    }
+    let timerCallback: (() => void) | undefined;
+    const save: WorksheetSavePlan = {index: 2147483647, delay: 27, token: 41, patch: {expression: 'queued'}};
+    try {
+        Reflect.set(restoration, 'restoreEditors', retainReader);
+        Reflect.set(restoration, 'restoreControls', retainReader);
+        const {stateServerEditors, stateServerControls, stateRead} = WorksheetPersistence.restorationCapabilities;
+        await stateServerEditors(record);
+        await stateServerControls(record);
+        equal(reads, 0, 'registering server readers does not inspect record fields');
+        equal(readers.length, 2, 'editor and control restoration each receive a reader');
+        for (const read of readers) {
+            value = {reader: reads};
+            equal(stateRead(read, 'fixture'), value, 'detached reader observes the current field without copying');
+            value = 'changed';
+            equal(stateRead(read, 'fixture'), value, 'reader does not cache a prior field value');
+            equal(stateRead(read, 'absent'), undefined, 'missing record fields remain undefined');
+        }
+        equal(reads, 4, 'only explicit field reads invoke the record getter');
+
+        Reflect.set(calendar, 'refreshDatetimeJurisdictionLocation', function refresh() { return pending; });
+        Reflect.set(runtime, 'sync', function premature() { throw new Error('Refresh resumed before completion'); });
+        const refresh = WorksheetPersistence.workspaceCapabilities.stateRefreshLocation;
+        equal(refresh(), undefined, 'location refresh starts without returning a continuation promise');
+        await Promise.resolve();
+        equal(continuations.length, 0, 'unresolved location refresh does not resume native projection');
+        Reflect.set(runtime, 'sync', resumed);
+        finishRefresh();
+        await Promise.resolve();
+        equal(continuations.length, 1, 'location refresh resumes once after settlement');
+        equal(continuations[0].kind, 13, 'refresh completion selects the native projection operation');
+        equal(Object.keys(continuations[0].frame).length, 0, 'refresh completion supplies an empty projection frame');
+
+        Reflect.set(window, 'setTimeout', function captureTimer(callback: () => void, delay: number): number {
+            equal(delay, save.delay, 'application save callback retains the native delay');
+            timerCallback = callback;
+            return 2147483647;
+        });
+        WorksheetPersistence.persistence.scheduler.schedule(save);
+        Reflect.set(window, 'setTimeout', savedTimeout);
+        equal(continuations.length, 1, 'save registration does not publish before its timer');
+        if (!timerCallback) throw new Error('State callbacks: missing save timer');
+        timerCallback();
+        equal(continuations.length, 2, 'save timer resumes the runtime once');
+        equal(continuations[1].kind, 1, 'save callback selects native publication');
+        equal(continuations[1].frame.save, save, 'application callback retains the exact native save plan');
+    } finally {
+        Reflect.set(restoration, 'restoreEditors', savedEditors);
+        Reflect.set(restoration, 'restoreControls', savedControls);
+        Reflect.set(calendar, 'refreshDatetimeJurisdictionLocation', savedRefresh);
+        Reflect.set(runtime, 'sync', savedSync);
+        Reflect.set(window, 'setTimeout', savedTimeout);
+        WorksheetPersistence.persistence.scheduler.forget(save.index);
+    }
+}
+
 /** Resource adapters retain callback ownership without moving native history policy into the browser. */
-function labStateResourceChecks(): void {
-    const equal = (actual: unknown, expected: unknown, message: string): void => {
+async function labStateResourceChecks(): Promise<void> {
+    function equal(actual: unknown, expected: unknown, message: string): void {
         if (!Object.is(actual, expected))
             throw new Error('State resources: ' + message);
-    };
+    }
+    await labStateCallbackChecks();
     for (const name of ['saveLabState', 'loadLastState', 'restoreHistoryState', 'WorksheetHistoryCursor'])
         equal(Object.hasOwn(window, name), false, 'state API has no global alias: ' + name);
 
-    const timers = new Map<number, () => void>(), published: WorksheetSavePlan[] = [];
+    const timers = new Map<number, () => void>();
+    const published: WorksheetSavePlan[] = [];
     let timerId = 0;
     const clock: WorksheetSaveTimerPort = {
-        schedule: callback => { timers.set(++timerId, callback); return timerId; },
-        cancel: handle => { if (handle !== undefined) timers.delete(handle); }
+        schedule(callback) {
+            timers.set(++timerId, callback);
+            return timerId;
+        },
+        cancel(handle) {
+            if (handle !== undefined)
+                timers.delete(handle);
+        }
     };
     const unusedRuntime: WorksheetStateRuntimePort = {
-        sync: () => { throw new Error('Unexpected native sync operation'); },
-        restore: () => { throw new Error('Unexpected native restore operation'); }
+        sync() {
+            throw new Error('Unexpected native sync operation');
+        },
+        restore() {
+            throw new Error('Unexpected native restore operation');
+        }
     };
-    const local = new Map<string, string>(), precision = {...WorksheetContext.modePrecisionBits};
+    const local = new Map<string, string>();
+    const precision = {...WorksheetContext.modePrecisionBits};
     const snapshot: WorksheetSnapshot = {mode: 'expression', text: 'x'};
     const io: WorksheetPersistenceIO = {
         read: key => local.get(key) ?? null,
-        write: (key, value) => { local.set(key, value); },
+        write(key, value) {
+            local.set(key, value);
+        },
         encode: () => new Uint8Array([1, 2, 3]),
-        decode: () => snapshot,
-        base64Limit: () => 64,
+        encodeStored(value) {
+            equal(value, snapshot, 'local encoding forwards the record unchanged');
+            return 'AQID';
+        },
+        decodeStored(text) {
+            if (text !== 'AQID') throw new Error('Invalid storage record');
+            return snapshot;
+        },
         post: async () => undefined
     };
     const inputs: WorksheetPersistenceInputs = {
@@ -568,10 +725,66 @@ function labStateResourceChecks(): void {
     equal(readLocal('absent'), null, 'missing fallback remains null');
     local.set('fixture.protobuf', '*');
     equal(readLocal('fixture'), null, 'malformed base64 cannot escape the fallback boundary');
+    local.set('fixture.protobuf', 'A'.repeat(65));
+    equal(readLocal('fixture'), null, 'native codec rejection remains a recoverable fallback failure');
+
+    // Binary publication stays separate from the text-only local storage seam.
+    const binary = new Uint8Array(16387);
+    for (let index = 0; index < binary.length; ++index)
+        binary[index] = index % 256;
+    writeLocal('binary', snapshot);
+    equal(readLocal('binary'), snapshot, 'native fallback preserves decoded identity');
+    const storageFailure = new Error('storage unavailable');
+    io.read = function inaccessibleStorage() { throw storageFailure; };
+    equal(readLocal('binary'), null, 'inaccessible local storage is a recoverable fallback failure');
+    io.write = function fullStorage() { throw storageFailure; };
+    let writeFailure: unknown;
+    try {
+        writeLocal('binary', snapshot);
+    } catch (error) {
+        writeFailure = error;
+    }
+    equal(writeFailure, storageFailure, 'local write errors still propagate to the caller');
+
+    let captured: unknown;
+    let keepalive = false;
+    io.encode = function capturePublication(value: unknown) {
+        captured = value;
+        return binary;
+    };
+    io.post = async function rejectPublication(bytes: Uint8Array<ArrayBuffer>, keep: boolean) {
+        equal(bytes, binary, 'publication forwards the encoded bytes unchanged');
+        keepalive = keep;
+        throw new Error('offline');
+    };
+    const patch = {precision_bits: precision, text: 'authored'};
+    const publish = first.publish;
+    publish(patch, {keepalive: true});
+    await Promise.resolve();
+    const payload = captured as {precision_bits: typeof precision; text: string};
+    equal(payload === patch, false, 'publication snapshots the supplied record');
+    equal(payload.precision_bits === precision, false, 'publication snapshots the live precision view');
+    equal(payload.precision_bits.expression, precision.expression, 'precision snapshot retains its value');
+    equal(patch.precision_bits, precision, 'publication leaves the caller record unchanged');
+    equal(keepalive, true, 'publication preserves unload-safe delivery');
+    const explicitPrecision = {...precision};
+    publish({precision_bits: explicitPrecision});
+    await Promise.resolve();
+    equal((captured as {precision_bits: typeof precision}).precision_bits, explicitPrecision,
+          'an explicit precision record retains its identity');
+    io.encode = function failedEncoding() { throw storageFailure; };
+    let encodeFailure: unknown;
+    try {
+        publish({text: 'authored'});
+    } catch (error) {
+        encodeFailure = error;
+    }
+    equal(encodeFailure, storageFailure, 'synchronous publication encoding errors are not swallowed');
 
     const firstSave: WorksheetSavePlan = {index: 0, delay: 10};
     const secondSave: WorksheetSavePlan = {index: 0, delay: 20};
-    first.scheduler.schedule(firstSave);
+    const scheduleFirst = first.scheduler.schedule;
+    scheduleFirst(firstSave);
     const firstHandle = timerId;
     second.scheduler.schedule(secondSave);
     const secondHandle = timerId;
@@ -582,17 +795,43 @@ function labStateResourceChecks(): void {
     equal(published[0], secondSave, 'scheduler publishes the native save object unchanged');
     second.dispose();
 
+    const scheduleSecond = second.scheduler.schedule;
+    const cancelSecond = second.scheduler.cancel;
+    const forgetSecond = second.scheduler.forget;
+    scheduleSecond(secondSave);
+    const cancelledHandle = timerId;
+    cancelSecond(secondSave.index);
+    equal(timers.has(cancelledHandle), false, 'detached cancellation releases its timer');
+    equal(second.scheduler.timers.size, 0, 'detached cancellation releases its registry entry');
+    scheduleSecond(secondSave);
+    const completedHandle = timerId;
+    timers.delete(completedHandle);
+    equal(forgetSecond(secondSave.index), true, 'detached forget retires a completed registry entry');
+    equal(forgetSecond(secondSave.index), false, 'forget remains idempotent');
+
     const calls: string[] = [];
     let count = 2;
-    const port: Pick<WorksheetHistoryPort, 'count' | 'push' | 'pop' | 'stage' | 'read'> = {
-        count: (index, store) => { calls.push(`count:${index}:${store}`); return count; },
-        push: (index, store, length, text, flags) => {
+    const port: WorksheetHistoryCursorPort = {
+        count(index, store) {
+            calls.push(`count:${index}:${store}`);
+            return count;
+        },
+        push(index, store, length, text, flags) {
             calls.push(`push:${index}:${store}:${length}:${text}:${flags}`);
             return count;
         },
-        pop: (index, store) => { calls.push(`pop:${index}:${store}`); return 17; },
-        stage: value => { equal(value, snapshot, 'push stages the original snapshot'); return 17; },
-        read: length => { equal(length, 17, 'pop forwards native length'); return snapshot; }
+        pop(index, store) {
+            calls.push(`pop:${index}:${store}`);
+            return 17;
+        },
+        stage(value) {
+            equal(value, snapshot, 'push stages the original snapshot');
+            return 17;
+        },
+        read(length) {
+            equal(length, 17, 'pop forwards native length');
+            return snapshot;
+        }
     };
     const cursor = new WorksheetPersistence.WorksheetHistoryCursor(3, 1, port);
     const {push, pop} = cursor;
@@ -604,6 +843,47 @@ function labStateResourceChecks(): void {
     equal(calls.join(','), 'count:3:1,count:3:1,push:3:1:17:1:0,pop:3:1', 'cursor preserves native ABI');
     count = -1;
     let failure: unknown;
-    try { push(snapshot); } catch (error) { failure = error; }
+    try {
+        push(snapshot);
+    } catch (error) {
+        failure = error;
+    }
     equal(failure instanceof Error && failure.message, 'Could not retain worksheet history', 'native failure propagates');
+
+    const savedMode = WorksheetWorkspace.mode.currentMode;
+    const savedContext = WorksheetRequests.labRequests.context;
+    const savedMain = WorksheetRequests.labRequests.latestMain;
+    let mode: WorksheetMode = 'expression';
+    let context = 17;
+    let main = 23;
+    let owned = true;
+    function currentMode(): WorksheetMode { return mode; }
+    function currentContext(): number { return context; }
+    function currentMain(): number { return main; }
+    function currentOwner(): boolean { return owned; }
+    try {
+        Reflect.set(WorksheetWorkspace.mode, 'currentMode', currentMode);
+        Reflect.set(WorksheetRequests.labRequests, 'context', currentContext);
+        Reflect.set(WorksheetRequests.labRequests, 'latestMain', currentMain);
+        const capture = WorksheetPersistence.editorCapabilities.stateCaptureGuard(currentOwner);
+        const selection = WorksheetPersistence.workspaceCapabilities.stateSelectionGuard();
+        equal(capture(), true, 'capture guard initially owns its context');
+        equal(selection(), true, 'selection guard initially owns its context');
+        mode = 'matrix';
+        equal(capture(), false, 'capture guard rejects a changed mode');
+        mode = 'expression';
+        owned = false;
+        equal(capture(), false, 'capture guard preserves its supplied ownership callback');
+        owned = true;
+        ++main;
+        equal(selection(), false, 'selection guard rejects a newer main request');
+        --main;
+        ++context;
+        equal(capture(), false, 'capture guard rejects a newer context');
+        equal(selection(), false, 'selection guard rejects a newer context');
+    } finally {
+        Reflect.set(WorksheetWorkspace.mode, 'currentMode', savedMode);
+        Reflect.set(WorksheetRequests.labRequests, 'context', savedContext);
+        Reflect.set(WorksheetRequests.labRequests, 'latestMain', savedMain);
+    }
 }

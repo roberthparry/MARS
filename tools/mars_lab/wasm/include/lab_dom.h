@@ -31,6 +31,13 @@ void lab_dom_listen(int node, const char *type, unsigned action, unsigned passiv
  * @return Scoped property handle, or zero when absent. */
 int lab_dom_get(int object, const char *key);
 
+/** @brief Test an object's property presence, including inherited properties.
+ * @param object Scoped non-null object; other values return false.
+ * @param key Static property name; presence does not invoke the property's getter.
+ * @return Non-zero when the property exists, even when its value is undefined.
+ */
+int lab_dom_property_present(int object, const char *key);
+
 /** @brief Read a property using an opaque key. @param object Scoped value. @param key Scoped string.
  * @return Scoped property handle, or zero when absent. */
 int lab_dom_key_get(int object, int key);
@@ -203,6 +210,9 @@ int lab_dom_precision(double value, unsigned digits);
 /** @brief Join opaque text. @param left First handle. @param right Second handle. @param suffix Literal suffix.
  * @return Scoped string. */
 int lab_dom_join(int left, int right, const char *suffix);
+
+/** @brief Join browser-owned text fragments with a literal separator, returning a scoped string. */
+int lab_dom_join_array(int array, const char *separator);
 
 /** @brief Find one DOM node. @param parent Root handle, or zero for document. @param selector Static selector.
  * @return Scoped node handle, or zero. */

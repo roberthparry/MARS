@@ -475,8 +475,20 @@ static void test_lab_extra_plot_stepped_ranges(void)
                     200u, "plot_svg", "data-surface");
     unsigned status = 0;
     json_t *fields = request("/eval", "{\"expression\":\"sqrt(-x^2-1)\",\"action\":\"plot\"}", &status);
-    bool ok = status == 422 && contains(fields, "error", "Automatic range selection failed") &&
-              contains(fields, "error", "trial windows") && !contains(fields, "error", "bind any remaining");
+    bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-segment=") &&
+              contains(fields, "plot_complex_plane", "data-series=") &&
+              contains(fields, "plot_components", "Imaginary") && contains(fields, "plot_amplitude", "data-series=");
+    if (!ok)
+        show_failure(fields);
+    json_free(fields);
+    TEST_ASSERT_TRUE(ok, "automatic range selection supports a curve with purely imaginary values");
+
+    /* A real-height surface still requires finite real samples in its trial windows. */
+    fields = request("/eval", "{\"expression\":\"sqrt(-1-x^2-y^2)\",\"action\":\"plot\","
+                             "\"plot_kind\":\"surface\",\"wrt\":\"x\",\"plot_second\":\"y\"}", &status);
+    ok = status == 422 && test_lab_ok(fields, false) &&
+         contains(fields, "error", "Automatic range selection failed") &&
+         contains(fields, "error", "trial windows") && !contains(fields, "error", "bind any remaining");
     if (!ok)
         show_failure(fields);
     json_free(fields);

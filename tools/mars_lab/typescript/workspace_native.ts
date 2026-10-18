@@ -2,11 +2,65 @@
  * @file workspace_native.ts
  * @brief Native worksheet buffers, state views and browser session owners.
  *
- * Provides validated UTF-8 transfer, snapshot reading and typed views of C-owned state.
+ * Provides validated UTF-8 transfer, snapshot reading and concrete views of C-owned state.
+ * Native C validates snapshot envelopes and their mode catalogue. Property descriptors
+ * connect browser properties directly to native storage, selecting their field kind once.
  * Separate classes own presentation, editor and calendar resources; no mathematical
  * expression parsing or simplification is performed in the browser.
  */
-/** Native worksheet capabilities. Definitions load before workspace state is initialised. */
+
+/** @brief Source keys in lab_workspace_source_get/set ABI order; also defines WorksheetSources. */
+const WORKSHEET_SOURCE_NAMES = Object.freeze(['fullText', 'displayText', 'lastInput', 'goalSource', 'goalTarget'] as const);
+
+/** Native operations used by worksheet form and snapshot adapters. */
+interface WorksheetNativeCalls {
+    /** @brief Invoke a native operation within one scoped browser-handle lifetime. */
+    call(name: string, ...args: unknown[]): unknown;
+}
+
+/** Access to native worksheet memory and state exports. */
+interface WorksheetNativeExports {
+    /** @brief Borrow the initialised native module's exports. */
+    exports(): MarsTransportExports;
+}
+
+/** Binary codec capabilities required by the worksheet buffer owner. */
+interface WorksheetNativeCodec extends WorksheetNativeExports {
+    /** @brief Encode a browser value into independently owned bytes. */
+    encode(value: unknown): Uint8Array<ArrayBuffer>;
+    /** @brief Decode a copied binary message. */
+    decode(buffer: import('./codec_types.js').CodecBuffer): unknown;
+}
+
+/** Native text transfer used by live state accessors. */
+interface WorksheetNativeText {
+    /** @brief Copy and decode native output. */
+    readText(length: number): string;
+    /** @brief Validate and stage text in a native input buffer. */
+    stageText(text: string, index?: number): number;
+}
+
+/** Live precision values for the seven worksheet modes. */
+interface WorksheetModePrecisions {
+    expression: number;
+    equation: number;
+    diffequation: number;
+    matrix: number;
+    integrator: number;
+    datetime: number;
+    almanac: number;
+}
+
+/** Live editor text for the seven worksheet modes. */
+interface WorksheetModeEditors {
+    expression: string;
+    equation: string;
+    diffequation: string;
+    matrix: string;
+    integrator: string;
+    datetime: string;
+    almanac: string;
+}
 
 /** Browser-only presentation state. Algebra and plot state remain native-owned. */
 class WorksheetPresentationState {
@@ -39,15 +93,10 @@ class WorksheetSession {
 class WorksheetIntegratorForms {
     /** Retain native capabilities; row policy and revision storage remain native-owned. */
     public constructor(
-        private readonly dom: Pick<typeof labDOM, 'call'> = labDOM,
-        private readonly wire: Pick<typeof labWire, 'exports'> = labWire
+        private readonly dom: WorksheetNativeCalls = labDOM,
+        private readonly wire: WorksheetNativeExports = labWire
     ) {
-        // Preserve the detachable callback contract of the former namespace functions.
-        this.nextRevision = this.nextRevision.bind(this);
-        this.install = this.install.bind(this);
-        this.text = this.text.bind(this);
-        this.plan = this.plan.bind(this);
-        this.edit = this.edit.bind(this);
+        marsBindCallbacks(this, ['nextRevision', 'install', 'text', 'plan', 'edit']);
     }
 
     public metadata: WorksheetRowsMetadata | null = null;
@@ -62,12 +111,12 @@ class WorksheetIntegratorForms {
 
     /** Replace cached reference metadata with the native interpretation of an evaluation. */
     public install(expression: unknown, result: WorksheetEvaluationData): void {
-        this.metadata = this.dom.call<WorksheetRowsMetadata | null>('lab_binding_rows_metadata', expression, result);
+        this.metadata = this.dom.call('lab_binding_rows_metadata', expression, result) as WorksheetRowsMetadata | null;
     }
 
     /** Obtain native row text, rejecting invalid Unicode or native capacity overflow. */
     public text(rows: WorksheetIntegratorRow[]): string {
-        const text = this.dom.call<string | null>('lab_binding_rows_text', rows);
+        const text = this.dom.call('lab_binding_rows_text', rows) as string | null;
         if (text === null)
             throw new Error('Integrator rows exceed the native limits or contain invalid Unicode');
         return text;
@@ -75,7 +124,7 @@ class WorksheetIntegratorForms {
 
     /** Plan rows against the installed metadata; reject a native validation failure. */
     public plan(rows: WorksheetIntegratorRow[], expression: string): WorksheetRowPlan {
-        const plan = this.dom.call<WorksheetRowPlan | null>('lab_binding_rows_plan', rows, this.metadata, expression);
+        const plan = this.dom.call('lab_binding_rows_plan', rows, this.metadata, expression) as WorksheetRowPlan | null;
         if (!plan)
             throw new Error('Invalid integrator row plan');
         return plan;
@@ -83,27 +132,22 @@ class WorksheetIntegratorForms {
 
     /** Request a native row edit, preserving the minimum-bound and maximum-row constraints. */
     public edit(rows: WorksheetIntegratorRow[], index: number, operation: number): WorksheetIntegratorRow[] {
-        const plan = this.dom.call<WorksheetIntegratorRow[] | null>('lab_binding_rows_edit', rows, index, operation);
+        const plan = this.dom.call('lab_binding_rows_edit', rows, index, operation) as WorksheetIntegratorRow[] | null;
         if (!plan)
             throw new Error('This edit would remove the last bound or exceed the 256-row form limit');
         return plan;
     }
 }
 
-/** Owns UTF-8 transfer buffers and validates the native snapshot envelope. */
+/** Owns UTF-8 transfer buffers and submits decoded snapshots for native validation. */
 class WorksheetNativeBuffer {
     /** Retain the native transport; copied outputs never alias its growable memory. */
     public constructor(
-        private readonly wire: Pick<typeof labWire, 'exports' | 'encode' | 'decode'> = labWire,
-        private readonly modeNames: readonly WorksheetMode[] = WorksheetWorkspace.WORKSPACE_MODE_NAMES
+        private readonly wire: WorksheetNativeCodec = labWire,
+        private readonly modeNames: readonly WorksheetMode[] = WorksheetWorkspace.WORKSPACE_MODE_NAMES,
+        private readonly native: WorksheetNativeCalls = labDOM
     ) {
-        // Preserve the detachable callback contract of the former namespace functions.
-        this.stageSnapshot = this.stageSnapshot.bind(this);
-        this.stage = this.stage.bind(this);
-        this.stageText = this.stageText.bind(this);
-        this.readBytes = this.readBytes.bind(this);
-        this.readText = this.readText.bind(this);
-        this.readSnapshot = this.readSnapshot.bind(this);
+        marsBindCallbacks(this, ['stageSnapshot', 'stage', 'stageText', 'readBytes', 'readText', 'readSnapshot']);
     }
 
     private readonly encoder = new TextEncoder();
@@ -147,79 +191,90 @@ class WorksheetNativeBuffer {
 
     /** Decode a snapshot and validate its envelope and mode; empty or null state returns null. */
     public readSnapshot(length: number): WorksheetSnapshot | null {
+        if (length === 0) return null;
         const bytes = this.readBytes(length);
-        if (!length) return null;
         const envelope = this.wire.decode(bytes.buffer);
-        if (!envelope || typeof envelope !== 'object' || !('state' in envelope))
+        const state = this.native.call('lab_workspace_snapshot_validate', envelope, this.modeNames);
+        if (state === -1)
             throw new Error('Invalid native worksheet snapshot envelope');
-        const state = envelope.state;
-        if (state === null) return null;
-        if (!state || typeof state !== 'object' || !('mode' in state) || !('text' in state) ||
-            typeof state.mode !== 'string' || typeof state.text !== 'string' ||
-            !this.modeNames.some(mode => mode === state.mode))
+        if (state === -2)
             throw new Error('Invalid native worksheet snapshot');
-        return state as WorksheetSnapshot;
+        return state as WorksheetSnapshot | null;
     }
+}
+
+/**
+ * @brief Create one enumerable, non-configurable accessor onto native state.
+ * Select the field kind once; every access borrows the current exports, without caching
+ * native values or functions. Text writes preserve staging validation and native errors.
+ */
+function worksheetNativeFieldDescriptor(wire: WorksheetNativeExports, buffer: WorksheetNativeText,
+                                           kind: 'precision' | 'editor' | 'source', index: number): PropertyDescriptor {
+    if (kind === 'precision') {
+        return {
+            enumerable: true,
+            get(): number { return wire.exports().lab_workspace_precision(index); },
+            set(value: unknown): void { wire.exports().lab_workspace_precision_set(index, Number(value)); }
+        };
+    }
+    if (kind === 'editor') {
+        return {
+            enumerable: true,
+            get(): string { return buffer.readText(wire.exports().lab_workspace_editor_get(index)); },
+            set(value: unknown): void {
+                const native = wire.exports();
+                const length = buffer.stageText(String(value));
+                if (!native.lab_workspace_editor_set(index, length))
+                    throw new Error('Could not retain worksheet editor text');
+            }
+        };
+    }
+    return {
+        enumerable: true,
+        get(): string { return buffer.readText(wire.exports().lab_workspace_source_get(index)); },
+        set(value: unknown): void {
+            const native = wire.exports();
+            const length = buffer.stageText(String(value));
+            if (!native.lab_workspace_source_set(index, length))
+                throw new Error('Could not retain editor source text');
+        }
+    };
 }
 
 /** Typed accessors onto C-owned state; no duplicate JavaScript worksheet model. */
 class WorksheetNativeViews {
     /** Retain native state capabilities and a stable mode catalogue, without creating duplicate state. */
     public constructor(
-        private readonly wire: Pick<typeof labWire, 'exports'>,
-        private readonly buffer: Pick<WorksheetNativeBuffer, 'readText' | 'stageText'>,
+        private readonly wire: WorksheetNativeExports,
+        private readonly buffer: WorksheetNativeText,
         private readonly modeNames: readonly WorksheetMode[]
     ) {
-        // Preserve the detachable callback contract of the former namespace functions.
-        this.mode = this.mode.bind(this);
-        this.sources = this.sources.bind(this);
+        marsBindCallbacks(this, ['mode', 'sources']);
     }
 
     /** Create a live per-mode precision view whose reads and writes access native state. */
-    public mode(kind: 'precision'): Record<WorksheetMode, number>;
+    public mode(kind: 'precision'): WorksheetModePrecisions;
+
     /** Create a live per-mode editor-text view; failed native text writes throw. */
-    public mode(kind: 'editor'): Record<WorksheetMode, string>;
+    public mode(kind: 'editor'): WorksheetModeEditors;
+
     /** Build non-extensible accessors without retaining a duplicate of native worksheet state. */
-    public mode(kind: 'precision' | 'editor'): Record<WorksheetMode, string | number> {
-        const wire = this.wire, buffer = this.buffer;
-        const view = Object.create(null) as Record<WorksheetMode, string | number>;
-        this.modeNames.forEach((mode, index) => {
-            Object.defineProperty(view, mode, {
-                enumerable: true,
-                get() {
-                    const native = wire.exports();
-                    if (kind === 'precision')
-                        return native.lab_workspace_precision(index);
-                    return buffer.readText(native.lab_workspace_editor_get(index));
-                },
-                set(value: unknown) {
-                    const native = wire.exports();
-                    if (kind === 'precision')
-                        native.lab_workspace_precision_set(index, Number(value));
-                    else if (!native.lab_workspace_editor_set(index, buffer.stageText(String(value))))
-                        throw new Error('Could not retain worksheet editor text');
-                }
-            });
-        });
+    public mode(kind: 'precision' | 'editor'): WorksheetModePrecisions | WorksheetModeEditors {
+        const view = Object.create(null) as WorksheetModePrecisions | WorksheetModeEditors;
+        for (let index = 0; index < this.modeNames.length; ++index) {
+            Object.defineProperty(view, this.modeNames[index],
+                worksheetNativeFieldDescriptor(this.wire, this.buffer, kind, index));
+        }
         return Object.preventExtensions(view);
     }
 
     /** Create live source-text accessors; native storage owns their values and validates writes. */
     public sources(): WorksheetSources {
-        const wire = this.wire, buffer = this.buffer;
         const view = Object.create(null) as WorksheetSources;
-        ['fullText', 'displayText', 'lastInput', 'goalSource', 'goalTarget'].forEach((name, field) => {
-            Object.defineProperty(view, name, {
-                enumerable: true,
-                get() {
-                    return buffer.readText(wire.exports().lab_workspace_source_get(field));
-                },
-                set(value: unknown) {
-                    if (!wire.exports().lab_workspace_source_set(field, buffer.stageText(String(value))))
-                        throw new Error('Could not retain editor source text');
-                }
-            });
-        });
+        for (let index = 0; index < WORKSHEET_SOURCE_NAMES.length; ++index) {
+            Object.defineProperty(view, WORKSHEET_SOURCE_NAMES[index],
+                worksheetNativeFieldDescriptor(this.wire, this.buffer, 'source', index));
+        }
         return Object.preventExtensions(view);
     }
 
