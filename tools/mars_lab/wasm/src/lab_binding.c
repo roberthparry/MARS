@@ -22,23 +22,23 @@
 #include "lab_binding_internal.h"
 
 /* Compare exact browser values with a literal without interpreting binding text. */
-bool lab_binding_is(browser_handle value, const char *text)
+bool lab_binding_is(browser_jsref value, const char *text)
 {
     return lab_dom_equal(value, lab_dom_string(text));
 }
 
 /* Retain the existing truthy-value fallback shared by binding policies. */
-browser_handle lab_binding_or(browser_handle value, const char *fallback)
+browser_jsref lab_binding_or(browser_jsref value, const char *fallback)
 {
     return lab_dom_truth(value) ? value : lab_dom_string(fallback);
 }
 
-static void lab_binding_text(node_handle node, lab_dom_accessor_t kind, const char *key, const char *text)
+static void lab_binding_text(node_jsref node, lab_dom_accessor_t kind, const char *key, const char *text)
 {
     lab_dom_write(node, kind, key, lab_dom_string(text));
 }
 
-static browser_handle lab_binding_child(browser_handle parent, const char *tag, const char *classes)
+static browser_jsref lab_binding_child(browser_jsref parent, const char *tag, const char *classes)
 {
     int node = lab_dom_create(tag);
     lab_binding_text(node, LAB_DOM_ATTRIBUTE, "class", classes);
@@ -46,30 +46,30 @@ static browser_handle lab_binding_child(browser_handle parent, const char *tag, 
     return node;
 }
 
-static browser_handle lab_binding_caption(const char *prefix, browser_handle name, const char *suffix)
+static browser_jsref lab_binding_caption(const char *prefix, browser_jsref name, const char *suffix)
 {
     return lab_dom_join(lab_dom_string(prefix), name, suffix);
 }
 
-static browser_handle lab_binding_key(browser_handle name)
+static browser_jsref lab_binding_key(browser_jsref name)
 {
     /* Prefix keys so inherited Object properties can never impersonate bindings. */
     return lab_binding_caption("#", lab_dom_text(name), "");
 }
 
 /* Return the trimmed opaque name shared by presentation and reconciliation. */
-browser_handle lab_binding_name(browser_handle binding)
+browser_jsref lab_binding_name(browser_jsref binding)
 {
     return lab_dom_clean(lab_binding_or(lab_dom_get(binding, "name"), ""), LAB_DOM_CLEAN_TRIM);
 }
 
-static browser_handle lab_binding_name_text(browser_handle binding)
+static browser_jsref lab_binding_name_text(browser_jsref binding)
 {
     int name = lab_dom_get(binding, "name");
     return lab_dom_text(lab_dom_truth(name) ? name : lab_binding_or(binding, ""));
 }
 
-static int lab_binding_compare_values(browser_handle left, browser_handle right)
+static int lab_binding_compare_values(browser_jsref left, browser_jsref right)
 {
     int a = lab_binding_name_text(left), b = lab_binding_name_text(right);
     int compared = lab_dom_locale_compare(a, b, 1);
@@ -77,13 +77,13 @@ static int lab_binding_compare_values(browser_handle left, browser_handle right)
 }
 
 /* Preserve numeric, case-insensitive browser ordering with its original tie-break. */
-int lab_binding_compare(browser_handle arguments)
+int lab_binding_compare(browser_jsref arguments)
 {
     return lab_binding_compare_values(lab_dom_item(arguments, 0), lab_dom_item(arguments, 1));
 }
 
 /* Share the exact display-label policy within the caller's synchronous handle scope. */
-browser_handle lab_binding_label_value(browser_handle name)
+browser_jsref lab_binding_label_value(browser_jsref name)
 {
     int text = lab_dom_text(lab_binding_or(name, ""));
     unsigned length = lab_dom_length(text);
@@ -94,24 +94,24 @@ browser_handle lab_binding_label_value(browser_handle name)
 }
 
 /* Remove only the identifier's outer display brackets, retaining its exact identity elsewhere. */
-void lab_binding_label(browser_handle arguments)
+void lab_binding_label(browser_jsref arguments)
 {
     lab_dom_return(lab_binding_label_value(lab_dom_item(arguments, 0)));
 }
 
-static bool lab_binding_is_unset(browser_handle value)
+static bool lab_binding_is_unset(browser_jsref value)
 {
     int text = lab_dom_clean(value, LAB_DOM_CLEAN_LOWER);
     return !lab_dom_length(text) || lab_binding_is(text, "?") || lab_binding_is(text, "nan");
 }
 
 /* Recognise UI unset sentinels without interpreting mathematical expressions. */
-bool lab_binding_unset(browser_handle arguments)
+bool lab_binding_unset(browser_jsref arguments)
 {
     return lab_binding_is_unset(lab_dom_item(arguments, 0));
 }
 
-static browser_handle lab_binding_value_text(browser_handle binding)
+static browser_jsref lab_binding_value_text(browser_jsref binding)
 {
     int value = lab_dom_get(binding, "value");
     if (!lab_dom_truth(value))
@@ -121,23 +121,23 @@ static browser_handle lab_binding_value_text(browser_handle binding)
 }
 
 /* Select the complete authored value; abbreviations are not reconstructed in the browser. */
-void lab_binding_value(browser_handle binding)
+void lab_binding_value(browser_jsref binding)
 {
     lab_dom_return(lab_binding_value_text(binding));
 }
 
-static browser_handle lab_binding_input_value(browser_handle input)
+static browser_jsref lab_binding_input_value(browser_jsref input)
 {
     return lab_binding_or(lab_dom_clean(lab_dom_read(input, LAB_DOM_VALUE, ""), LAB_DOM_CLEAN_TRIM), "?");
 }
 
 /* Only an empty input becomes a question mark; exact symbolic input remains opaque. */
-void lab_binding_normalised(browser_handle input)
+void lab_binding_normalised(browser_jsref input)
 {
     lab_dom_return(lab_binding_input_value(input));
 }
 
-static browser_handle lab_binding_input(browser_handle input, bool trim)
+static browser_jsref lab_binding_input(browser_jsref input, bool trim)
 {
     int binding = lab_dom_object(LAB_VALUE_OBJECT);
     int name = lab_dom_read(input, LAB_DOM_DATASET, "bindingName");
@@ -149,7 +149,7 @@ static browser_handle lab_binding_input(browser_handle input, bool trim)
 }
 
 /* Capture visible values with the same trimmed names and exact authored expressions. */
-void lab_binding_visible(browser_handle root)
+void lab_binding_visible(browser_jsref root)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY), inputs = lab_dom_all(root, ".binding-value-input");
     unsigned count = lab_dom_count(inputs), mark = lab_dom_mark();
@@ -164,7 +164,7 @@ void lab_binding_visible(browser_handle root)
 }
 
 /* Copy own metadata fields without allowing identifiers to mutate object prototypes. */
-browser_handle lab_binding_copy(browser_handle source)
+browser_jsref lab_binding_copy(browser_jsref source)
 {
     int copy = lab_dom_object(LAB_VALUE_OBJECT), keys = lab_dom_keys(source);
     unsigned count = lab_dom_count(keys), mark = lab_dom_mark();
@@ -177,12 +177,12 @@ browser_handle lab_binding_copy(browser_handle source)
 }
 
 /* Count only structured arrays for binding and row policy consumers. */
-unsigned lab_binding_array_count(browser_handle array)
+unsigned lab_binding_array_count(browser_jsref array)
 {
     return lab_dom_type(array) == LAB_VALUE_ARRAY ? lab_dom_count(array) : 0;
 }
 
-static void lab_binding_index(browser_handle index, browser_handle bindings)
+static void lab_binding_index(browser_jsref index, browser_jsref bindings)
 {
     unsigned count = lab_dom_type(bindings) == LAB_VALUE_ARRAY ? lab_dom_count(bindings) : 0, mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
@@ -193,7 +193,7 @@ static void lab_binding_index(browser_handle index, browser_handle bindings)
 }
 
 /* Overlay visible then native-authored values, preserving discovered metadata and unmatched object identity. */
-browser_handle lab_binding_authored_values(browser_handle bindings, browser_handle authored, browser_handle visible)
+browser_jsref lab_binding_authored_values(browser_jsref bindings, browser_jsref authored, browser_jsref visible)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY), index = lab_dom_object(LAB_VALUE_OBJECT);
     lab_binding_index(index, authored);
@@ -214,13 +214,13 @@ browser_handle lab_binding_authored_values(browser_handle bindings, browser_hand
 }
 
 /* Publish the shared authored-value overlay for a browser call. */
-void lab_binding_authored(browser_handle bindings, browser_handle authored, browser_handle visible)
+void lab_binding_authored(browser_jsref bindings, browser_jsref authored, browser_jsref visible)
 {
     lab_dom_return(lab_binding_authored_values(bindings, authored, visible));
 }
 
 /* Snapshot input identity and untrimmed text for the asynchronous commit ownership checks. */
-void lab_binding_snapshot(browser_handle inputs)
+void lab_binding_snapshot(browser_jsref inputs)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned count = lab_dom_count(inputs), mark = lab_dom_mark();
@@ -236,7 +236,7 @@ void lab_binding_snapshot(browser_handle inputs)
 }
 
 /* Recheck exact input bytes after an await; connectivity is deliberately not an additional commit condition. */
-bool lab_binding_snapshot_current(snapshot_handle snapshot)
+bool lab_binding_snapshot_current(snapshot_jsref snapshot)
 {
     unsigned count = lab_dom_count(snapshot), mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
@@ -249,7 +249,7 @@ bool lab_binding_snapshot_current(snapshot_handle snapshot)
     return true;
 }
 
-static void lab_binding_pair(browser_handle array, browser_handle key, browser_handle value)
+static void lab_binding_pair(browser_jsref array, browser_jsref key, browser_jsref value)
 {
     int pair = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(pair, key);
@@ -257,7 +257,7 @@ static void lab_binding_pair(browser_handle array, browser_handle key, browser_h
     lab_dom_push(array, pair);
 }
 
-static browser_handle lab_binding_committed_values(snapshot_handle snapshot)
+static browser_jsref lab_binding_committed_values(snapshot_jsref snapshot)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned count = lab_dom_count(snapshot), mark = lab_dom_mark();
@@ -274,13 +274,13 @@ static browser_handle lab_binding_committed_values(snapshot_handle snapshot)
 }
 
 /* Apply an accepted commit and return cache additions/deletions for the shared host state. */
-void lab_binding_committed(snapshot_handle snapshot)
+void lab_binding_committed(snapshot_jsref snapshot)
 {
     lab_dom_return(lab_binding_committed_values(snapshot));
 }
 
 /* Normalise every accepted control before updating the exact-name authored cache, as in the host path. */
-void lab_binding_committed_cache(snapshot_handle snapshot, browser_handle editor, browser_handle cache)
+void lab_binding_committed_cache(snapshot_jsref snapshot, browser_jsref editor, browser_jsref cache)
 {
     lab_dom_write(editor, LAB_DOM_DATASET, "bindingRefreshValid", lab_dom_string("true"));
     int values = lab_binding_committed_values(snapshot);
@@ -297,7 +297,7 @@ void lab_binding_committed_cache(snapshot_handle snapshot, browser_handle editor
 }
 
 /* Select the requested kind without changing the native binding identity. */
-void lab_binding_toggle(browser_handle binding)
+void lab_binding_toggle(browser_jsref binding)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT), name = lab_binding_name(binding);
     int kind = lab_dom_clean(lab_binding_or(lab_dom_get(binding, "kind"), "variable"), LAB_DOM_CLEAN_TRIM);
@@ -306,7 +306,7 @@ void lab_binding_toggle(browser_handle binding)
     lab_dom_return(result);
 }
 
-static browser_handle lab_binding_sort(browser_handle source)
+static browser_jsref lab_binding_sort(browser_jsref source)
 {
     unsigned count = lab_dom_count(source);
     int target = lab_dom_object(LAB_VALUE_ARRAY);
@@ -333,7 +333,7 @@ static browser_handle lab_binding_sort(browser_handle source)
     return source;
 }
 
-static browser_handle lab_binding_button(browser_handle parent, const char *classes, const char *caption)
+static browser_jsref lab_binding_button(browser_jsref parent, const char *classes, const char *caption)
 {
     int button = lab_binding_child(parent, "button", classes);
     lab_binding_text(button, LAB_DOM_ATTRIBUTE, "type", "button");
@@ -341,8 +341,8 @@ static browser_handle lab_binding_button(browser_handle parent, const char *clas
     return button;
 }
 
-static void lab_binding_card(browser_handle root, browser_handle binding, browser_handle values, browser_handle kinds,
-                             browser_handle index)
+static void lab_binding_card(browser_jsref root, browser_jsref binding, browser_jsref values, browser_jsref kinds,
+                             browser_jsref index)
 {
     int raw_name = lab_dom_get(binding, "name"), label = lab_binding_label_value(raw_name);
     int kind = lab_binding_or(lab_dom_get(binding, "kind"), "variable"), value = lab_binding_value_text(binding);
@@ -396,7 +396,7 @@ static void lab_binding_card(browser_handle root, browser_handle binding, browse
 }
 
 /* Clear controls without discarding the separate authored-value cache. */
-void lab_binding_clear(browser_handle root)
+void lab_binding_clear(browser_jsref root)
 {
     lab_binding_text(root, LAB_DOM_TEXT, "", "");
     lab_dom_class(root, "hidden", 1);
@@ -404,7 +404,7 @@ void lab_binding_clear(browser_handle root)
 }
 
 /* Build variable cards in discovery order, followed by stably collated constants. */
-void lab_binding_render(browser_handle root, browser_handle bindings)
+void lab_binding_render(browser_jsref root, browser_jsref bindings)
 {
     lab_binding_clear(root);
     int result = lab_dom_object(LAB_VALUE_OBJECT), values = lab_dom_object(LAB_VALUE_ARRAY),
@@ -433,7 +433,7 @@ void lab_binding_render(browser_handle root, browser_handle bindings)
     lab_dom_return(result);
 }
 
-static browser_handle lab_binding_action(const char *name, browser_handle card, bool prevent)
+static browser_jsref lab_binding_action(const char *name, browser_jsref card, bool prevent)
 {
     int action = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(action, "action", lab_dom_string(name));
@@ -442,8 +442,8 @@ static browser_handle lab_binding_action(const char *name, browser_handle card, 
     return action;
 }
 
-static browser_handle lab_binding_key_event(event_handle event, browser_handle input, browser_handle original,
-                                browser_handle card, bool evaluate)
+static browser_jsref lab_binding_key_event(event_jsref event, browser_jsref input, browser_jsref original,
+                                browser_jsref card, bool evaluate)
 {
     int key = lab_dom_get(event, "key");
     if (lab_binding_is(key, "Enter")) {
@@ -461,7 +461,7 @@ static browser_handle lab_binding_key_event(event_handle event, browser_handle i
 }
 
 /* Decide keyboard and click policy; the returned action only schedules host promise work. */
-void lab_binding_event(browser_handle root, event_handle event)
+void lab_binding_event(browser_jsref root, event_jsref event)
 {
     int target = lab_dom_get(event, "target"), box = lab_dom_closest(target, ".variable-value-box");
     int card = lab_dom_get(box, "labBindingCard"), action = 0;
@@ -495,7 +495,7 @@ void lab_binding_event(browser_handle root, event_handle event)
 }
 
 /* Restore focus by exact native name and kind after a commit may have replaced all controls. */
-void lab_binding_refocus(browser_handle root, browser_handle card, browser_handle editor)
+void lab_binding_refocus(browser_jsref root, browser_jsref card, browser_jsref editor)
 {
     int name = lab_dom_get(card, "name"), kind = lab_dom_get(card, "kind"), input = 0;
     if (lab_dom_type(name) == LAB_VALUE_STRING && lab_dom_type(kind) == LAB_VALUE_STRING) {
@@ -506,7 +506,7 @@ void lab_binding_refocus(browser_handle root, browser_handle card, browser_handl
     lab_dom_effect(input ? input : editor, LAB_DOM_EFFECT_FOCUS);
 }
 
-static void lab_binding_integrator_field(browser_handle item, const char *label, browser_handle value, const char *key, int bound,
+static void lab_binding_integrator_field(browser_jsref item, const char *label, browser_jsref value, const char *key, int bound,
                                          int disabled)
 {
     int field = lab_binding_child(item, "div", disabled ? "integrator-bound-field disabled" : "integrator-bound-field");
@@ -522,7 +522,7 @@ static void lab_binding_integrator_field(browser_handle item, const char *label,
 }
 
 /* Construct integrator rows from sanitised native fields; row-removal policy remains in lab_forms. */
-void lab_binding_integrator_render(browser_handle root, browser_handle rows)
+void lab_binding_integrator_render(browser_jsref root, browser_jsref rows)
 {
     lab_binding_text(root, LAB_DOM_TEXT, "", "");
     unsigned count = lab_dom_count(rows), bounds = 0, mark = lab_dom_mark();
@@ -553,7 +553,7 @@ void lab_binding_integrator_render(browser_handle root, browser_handle rows)
 }
 
 /* Route integrator keyboard, invalidation and row-edit actions through native policy. */
-void lab_binding_integrator_event(browser_handle root, event_handle event)
+void lab_binding_integrator_event(browser_jsref root, event_jsref event)
 {
     int target = lab_dom_get(event, "target"), item = lab_dom_closest(target, ".integrator-bound-row"), action = 0;
     if (!item || !lab_dom_equal(lab_dom_get(item, "parentNode"), root)) {
@@ -591,7 +591,7 @@ void lab_binding_integrator_event(browser_handle root, event_handle event)
 }
 
 /* Update inactive prepared fields in place so a blur response cannot discard the next field's focus. */
-void lab_binding_integrator_update(browser_handle root, browser_handle prepared)
+void lab_binding_integrator_update(browser_jsref root, browser_jsref prepared)
 {
     static const char *const selectors[] = {"[data-integrator-name]", "[data-integrator-lower]",
                                             "[data-integrator-upper]"};

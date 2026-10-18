@@ -228,7 +228,6 @@
   }
 
   .plot-range {
-    grid-template-columns: 1fr;
     padding-top: 0.75rem;
   }
 

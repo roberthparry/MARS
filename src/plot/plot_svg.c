@@ -26,6 +26,9 @@ typedef struct {
     number_t *bounds;
     number_t spans[2];
     double left, top, width, height;
+    double legend_top;
+    size_t legend_rows;
+    bool schematic_impulses;
 } svg_view_t;
 
 bool plot_escape(string_t *out, const string_t *text)
@@ -57,7 +60,9 @@ static bool boxed_legend(svg_view_t *view, const plot_t *plot)
     /* The scene's bounded series list supplies both box dimensions and ordered entries. */
     for (size_t i = 0; i < plot->count; ++i) {
         size_t length = string_length(plot->series[i].name);
-        if (length && 18.0 * (count + 1) + 16 <= view->height) {
+        bool fits = plot->options.legend_above ? count < view->legend_rows :
+                    18.0 * (count + 1) + 16 <= view->height;
+        if (length && fits) {
             ++count;
             if (length > longest)
                 longest = length;
@@ -67,6 +72,8 @@ static bool boxed_legend(svg_view_t *view, const plot_t *plot)
         return true;
     double width = 48 + 7.5 * longest, height = 18 * count + 12;
     double x = fmax(view->left + 4, view->left + view->width - width - 8), y = view->top + 8;
+    if (plot->options.legend_above)
+        y = view->legend_top;
     if (string_append_format(view->out,
         "<g data-plot-legend=\"true\" font-family=\"sans-serif\" font-size=\"12\">"
         "<rect x=\"%.3f\" y=\"%.3f\" width=\"%.3f\" height=\"%.3f\" rx=\"5\" "
@@ -80,10 +87,18 @@ static bool boxed_legend(svg_view_t *view, const plot_t *plot)
         if (!string_length(series->name))
             continue;
         double baseline = y + 18 + 18 * row++;
+        bool impulse = series->style == PLOT_IMPULSES;
+        const char *sample = impulse ? "m 10 5 v -7" : "h 20";
         if (string_append_format(view->out,
-            "<path d=\"M %.3f %.3f h 20\" stroke=\"#%06x\" stroke-width=\"2\"/>"
-            "<g fill=\"#%06x\">", x + 8, baseline - 4, (unsigned)series->colour,
-            (unsigned)series->colour) < 0 ||
+            "<path d=\"M %.3f %.3f %s\" fill=\"none\" stroke=\"#%06x\" stroke-width=\"%s\"/>",
+            x + 8, baseline - 4, sample, (unsigned)series->colour, impulse ? "0.7" : "2") < 0)
+            return false;
+        if (impulse && string_append_format(view->out,
+            "<path data-impulse-key=\"true\" d=\"M %.3f %.3f v -5\" fill=\"none\" stroke=\"#%06x\" "
+            "stroke-width=\"0.7\" stroke-linecap=\"round\" stroke-dasharray=\"1 4\"/>",
+            x + 18, baseline - 6, (unsigned)series->colour) < 0)
+            return false;
+        if (string_append_format(view->out, "<g fill=\"#%06x\">", (unsigned)series->colour) < 0 ||
             !text(view, x + 36, baseline, "start", series->name) || string_append_cstr(view->out, "</g>"))
             return false;
     }
@@ -218,6 +233,8 @@ static bool axes(svg_view_t *view, const plot_t *plot)
               text(view, view->left - plot_tick_width(view->bounds[2], view->bounds[3], 12) - 24,
                    view->top + view->height / 2 + 4, "end", plot->y_label);
     for (unsigned axis = 0; ok && axis < 2; ++axis) {
+        if (axis && plot->options.schematic_impulses)
+            continue;
         number_t ticks[12];
         size_t count = plot_ticks(view->bounds[2 * axis], view->bounds[2 * axis + 1], ticks);
         ok = count > 0;
@@ -261,7 +278,11 @@ static bool axes(svg_view_t *view, const plot_t *plot)
                                     (unsigned)plot->options.axis_colour) < 0)
         return false;
     ok = line(view, view->left, view->top + view->height, view->left + view->width, view->top + view->height) &&
-         line(view, view->left, view->top, view->left, view->top + view->height);
+         (plot->options.schematic_impulses && num_lt(view->bounds[0], NUM_ZERO) &&
+          num_gt(view->bounds[1], NUM_ZERO) ? true :
+          plot->options.schematic_impulses && num_is_zero(view->bounds[1]) ?
+          line(view, view->left + view->width, view->top, view->left + view->width, view->top + view->height) :
+          line(view, view->left, view->top, view->left, view->top + view->height));
     for (unsigned axis = 0; ok && axis < 2; ++axis) {
         /* Boundary axes already exist; keep zero guides inside the open top/right edges. */
         if (num_lt(view->bounds[2 * axis], NUM_ZERO) && num_gt(view->bounds[2 * axis + 1], NUM_ZERO)) {
@@ -282,7 +303,7 @@ static bool axes(svg_view_t *view, const plot_t *plot)
     return ok && string_append_cstr(view->out, "</g>\n") == 0;
 }
 
-/* Arrow lengths encode signed weights, never finite values of the Dirac distribution. */
+/* Thin impulse stems have dotted tips; optional equal heights leave weights solely in the titles. */
 static bool draw_impulses(svg_view_t *view, const plot_series_t *series)
 {
     for (size_t i = 0; i < series->count; ++i) {
@@ -296,17 +317,34 @@ static bool draw_impulses(svg_view_t *view, const plot_series_t *series)
         x = view->left + x * view->width;
         y = view->top + (1 - y) * view->height;
         by = view->top + (1 - by) * view->height;
+        if (view->schematic_impulses) {
+            double top = view->top + view->height * 0.06;
+            double split = view->top + view->height * 0.32;
+            string_t *weight = num_sprintf_text("%n", p->y);
+            string_t *coordinate = num_sprintf_text("%n", p->x);
+            bool ok = weight && coordinate && !string_append_cstr(view->out,
+                "<g data-impulse=\"true\" data-schematic-impulse=\"true\" stroke-width=\"0.7\"><title>Coordinate: ") &&
+                plot_escape(view->out, coordinate) && !string_append_cstr(view->out, "; impulse weight: ") &&
+                plot_escape(view->out, weight) && !string_append_cstr(view->out, "</title>") &&
+                line(view, x, by, x, split) &&
+                !string_append_cstr(view->out, "<g stroke-dasharray=\"1 4\">") && line(view, x, split, x, top) &&
+                !string_append_cstr(view->out, "</g></g>");
+            string_free(coordinate);
+            string_free(weight);
+            if (!ok)
+                return false;
+            continue;
+        }
         double length = fabs(by - y);
         if (length < 0.75)
             continue;
-        double wing = copysign(fmin(6, length * 0.6), by - y);
-        double spread = fmin(4, length * 0.4);
+        double split = by + (y - by) * 0.72;
         string_t *weight = num_sprintf_text("%.6n", p->y);
-        bool ok = weight && !string_append_cstr(view->out, "<g data-impulse=\"true\"><title>Impulse weight: ") &&
+        bool ok = weight && !string_append_cstr(view->out,
+            "<g data-impulse=\"true\" stroke-width=\"0.7\"><title>Impulse weight: ") &&
             plot_escape(view->out, weight) && !string_append_cstr(view->out, "</title>") &&
-            line(view, x, by, x, y) && line(view, x - spread, y + wing, x, y) &&
-            line(view, x + spread, y + wing, x, y) &&
-            !string_append_cstr(view->out, "</g>");
+            line(view, x, by, x, split) && !string_append_cstr(view->out, "<g stroke-dasharray=\"1 4\">") &&
+            line(view, x, split, x, y) && !string_append_cstr(view->out, "</g></g>");
         string_free(weight);
         if (!ok)
             return false;
@@ -336,6 +374,7 @@ static double axis_title_width(const string_t *label)
 
 static bool render(svg_view_t *view, const plot_t *plot)
 {
+    view->schematic_impulses = plot->options.schematic_impulses;
     static bool (*const drawers[])(svg_view_t *, const plot_series_t *) = {draw_lines, draw_points, draw_impulses};
     double label_width = plot_tick_width(view->bounds[2], view->bounds[3], 12);
     double x_width = plot_tick_width(view->bounds[0], view->bounds[1], 12);
@@ -351,6 +390,18 @@ static bool render(svg_view_t *view, const plot_t *plot)
     if (plot->options.equal_units)
         right = view->left;
     view->width = plot->options.width - view->left - right;
+    if (plot->options.legend && plot->options.legend_box && plot->options.legend_above) {
+        /* Keep the legend outside the data rectangle and retain at least half the plot height. */
+        view->legend_top = view->top;
+        for (size_t i = 0; i < plot->count; ++i)
+            if (string_length(plot->series[i].name) && 18.0 * (view->legend_rows + 1) + 24 <= view->height / 2)
+                ++view->legend_rows;
+        if (view->legend_rows) {
+            double space = 18 * view->legend_rows + 24;
+            view->top += space;
+            view->height -= space;
+        }
+    }
     if (plot->options.equal_units) {
         number_t ratio = num_div(view->spans[0], view->spans[1]);
         double aspect = num_to_double(ratio);

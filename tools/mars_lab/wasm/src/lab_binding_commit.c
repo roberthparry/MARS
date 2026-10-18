@@ -12,8 +12,8 @@
 #include "lab_binding.h"
 #include "lab_binding_commit.h"
 
-static void lab_binding_commit_emit(browser_handle calls, const char *service, unsigned count, browser_handle first,
-                                browser_handle second)
+static void lab_binding_commit_emit(browser_jsref calls, const char *service, unsigned count, browser_jsref first,
+                                browser_jsref second)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     if (count)
@@ -26,7 +26,7 @@ static void lab_binding_commit_emit(browser_handle calls, const char *service, u
 }
 
 /* Build the request only; input controls and their captured binding records remain unchanged. */
-void lab_binding_commit_request(lab_mode_t mode, browser_handle source, snapshot_handle snapshot)
+void lab_binding_commit_request(lab_mode_t mode, browser_jsref source, snapshot_jsref snapshot)
 {
     unsigned count = lab_binding_array_count(snapshot);
     if ((unsigned)mode > LAB_MODE_ALMANAC || !count) {
@@ -54,8 +54,8 @@ void lab_binding_commit_request(lab_mode_t mode, browser_handle source, snapshot
 }
 
 /* Order accepted updates without executing callbacks or rewriting getter-backed workspace views. */
-void lab_binding_commit_plan(lab_mode_t mode, lab_binding_commit_operation_t operation, browser_handle source,
-                             browser_handle updated, browser_handle context)
+void lab_binding_commit_plan(lab_mode_t mode, lab_binding_commit_operation_t operation, browser_jsref source,
+                             browser_jsref updated, browser_jsref context)
 {
     if ((unsigned)mode > LAB_MODE_ALMANAC || (unsigned)operation > LAB_BINDING_COMMIT_KIND) {
         lab_dom_return(0);

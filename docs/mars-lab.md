@@ -851,14 +851,15 @@ Handles referring to boolean values remain integer handles, not C `bool`. Counts
 and action masks keep their numeric or enum types wherever more than two values
 have distinct meanings.
 
-The WASM APIs, their helpers and callback tables use named handle types rather
-than plain integers for borrowed browser objects. `browser_handle` accepts any
-scoped browser value; `node_handle`, `event_handle`, `chart_handle`,
-`gesture_handle`, `frame_handle`, `view_handle` and `snapshot_handle` identify
-more specific roles. `quaternion_handle` denotes a browser quaternion array in
-`[x, y, z, w]` order. Handle-returning functions use these types too.
+The WASM APIs, their helpers and callback tables use named `_jsref` types rather
+than plain integers for borrowed browser objects. `browser_jsref` accepts any
+scoped browser value; `node_jsref`, `event_jsref`, `chart_jsref`,
+`gesture_jsref`, `frame_jsref`, `view_jsref` and `snapshot_jsref` identify
+more specific roles. `quaternion_jsref` denotes a browser quaternion array in
+`[x, y, z, w]` order. Reference-returning functions use these types too.
+The `_jsref` suffix denotes an opaque integer reference to a JavaScript value, not a callback or pointer.
 
-The Protobuf bridge uses `codec_handle` for its separate host-value table.
+The Protobuf bridge uses `codec_jsref` for its separate host-value table.
 DOM and codec handles must not be exchanged, retained between synchronous calls,
 or treated as pointers into WebAssembly memory. The aliases preserve the existing
 `i32` ABI; C typedefs document roles but do not enforce distinct integer types.
@@ -1592,21 +1593,36 @@ amplitude view; they are not passed to the ordinary complex-function sampler.
 Plotting just the non-impulse curve in those views would omit part of the result.
 
 Supported Fourier distributions use real and imaginary curves for the regular
-part and signed arrows for Dirac impulse weights. An arrow is not a finite
-function value. Legend entries distinguish curves from impulse weights, and the
-vertical axis reads **Value / weight**. A short spectrum title keeps the full formula in the result card;
+part and thin dotted-tip stems for Dirac impulse weights. A stem is not a finite
+function value. A boxed legend pairs curve lines and matching impulse stems with their
+labels, using separate colours for all four component/series combinations. It sits
+in a reserved strip above the axes, without covering curves or impulses. The
+vertical axis reads **Value / weight**. The spectrum title displays the authored transform;
 identically zero sampled components do not add duplicate curves or legend entries.
+The explanatory caption sits beneath the figure, aligned with the vertical axis.
+Distribution spectra hide the plot-type selector because ordinary curve/surface
+selection does not apply to them; input and vertical range controls remain available.
 
 The native transform display retains one complete identity, including its Dirac
 impulses. Principal-value and finite-part qualifications remain explicit; the compact
-TeX operator `Fp₁` denotes a half-line finite part with unit cutoff. Curve-only
+TeX operator `Fp` denotes the Hadamard finite part; the half-line case uses a unit cutoff. Curve-only
 pointwise exclusions are not appended to this distributional identity.
 The complete distribution remains in the copyable Expression and Function output;
 it is not replaced internally by a punctured ordinary function. Unsupported or
 infinite-series forms retain their complete distribution notation.
-The default frequency window is −10 to 10, with editable bounds;
+For mixed curve-and-impulse spectra the default frequency window is −10 to 10, with editable bounds;
 automatic height limits retain impulse weights as well as the regular curves.
-Infinite impulse sums are explicitly labelled previews of their first 32 terms.
+Infinite impulse sums show the first 100 terms, with no term count in the title.
+Spectrum titles retain the authored mathematical transform rather than replacing it with the impulse sum.
+Pure impulse spectra use uniformly thin, equal-height stems with dotted upper
+sections and no arrowheads. Their heights are schematic; hover titles give the
+coordinates and weights. Only horizontal-range controls apply, including zoom.
+Installing a spectrum clears retained surface and second-variable selections;
+zoom changes only its frequency interval, and Reset restores the preceding view.
+Automatic bounds include zero and fit the preview's support. These conventions
+give two-sided spectra a small margin beyond both endpoint impulses; the zero
+axis then lies inside the chart rather than at its right edge. They
+apply to all pure impulse spectra, not just the zeta transform.
 The complete series remains in the symbolic result. Delta derivatives and
 nonlinear products of distributions are not approximated as narrow peaks.
 

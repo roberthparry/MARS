@@ -36,7 +36,7 @@ typedef enum {
  * Invalid modes/phases and phase 2 outside Expression publish null. The context must
  * not be shared with another request. Browser getters must not open a nested DOM scope.
  */
-void lab_evaluation_setup(lab_mode_t mode, lab_evaluation_setup_phase_t phase, browser_handle context,
-                          browser_handle options, view_handle view);
+void lab_evaluation_setup(lab_mode_t mode, lab_evaluation_setup_phase_t phase, browser_jsref context,
+                          browser_jsref options, view_jsref view);
 
 #endif

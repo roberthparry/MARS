@@ -12,8 +12,8 @@
 #include "lab_forms.h"
 #include "lab_widget_events.h"
 
-static void lab_widget_events_emit(browser_handle calls, const char *service, unsigned count, browser_handle first,
-                                browser_handle second, browser_handle third)
+static void lab_widget_events_emit(browser_jsref calls, const char *service, unsigned count, browser_jsref first,
+                                browser_jsref second, browser_jsref third)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     const int values[] = {first, second, third};
@@ -30,7 +30,7 @@ static int lab_widget_events_visible(void)
     return picker && !lab_dom_has_class(picker, "hidden");
 }
 
-static void lab_widget_events_close(browser_handle calls, int focus)
+static void lab_widget_events_close(browser_jsref calls, int focus)
 {
     int options = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(options, "restoreFocus", lab_dom_scalar(LAB_VALUE_BOOLEAN, focus));
@@ -38,8 +38,8 @@ static void lab_widget_events_close(browser_handle calls, int focus)
 }
 
 /* Toggle the picker attached to the authored target. */
-static void lab_widget_events_open(lab_widget_event_action_t action, event_handle event, browser_handle state,
-                                browser_handle plan, browser_handle calls)
+static void lab_widget_events_open(lab_widget_event_action_t action, event_jsref event, browser_jsref state,
+                                browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)plan;
@@ -56,8 +56,8 @@ static void lab_widget_events_open(lab_widget_event_action_t action, event_handl
 }
 
 /* Commit an enabled day before restoring focus. */
-static void lab_widget_events_grid(lab_widget_event_action_t action, event_handle event, browser_handle state,
-                                browser_handle plan, browser_handle calls)
+static void lab_widget_events_grid(lab_widget_event_action_t action, event_jsref event, browser_jsref state,
+                                browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)plan;
@@ -71,8 +71,8 @@ static void lab_widget_events_grid(lab_widget_event_action_t action, event_handl
 }
 
 /* Select the navigation service and direction before applying year modifiers. */
-static void lab_widget_events_navigation(lab_widget_event_action_t action, event_handle event, browser_handle state,
-                                browser_handle plan, browser_handle calls)
+static void lab_widget_events_navigation(lab_widget_event_action_t action, event_jsref event, browser_jsref state,
+                                browser_jsref plan, browser_jsref calls)
 {
     (void)state;
     (void)plan;
@@ -95,8 +95,8 @@ static void lab_widget_events_navigation(lab_widget_event_action_t action, event
 }
 
 /* Validate year keystrokes before reading and committing the edited date fields. */
-static void lab_widget_events_date(lab_widget_event_action_t action, event_handle event, browser_handle state,
-                                browser_handle plan, browser_handle calls)
+static void lab_widget_events_date(lab_widget_event_action_t action, event_jsref event, browser_jsref state,
+                                browser_jsref plan, browser_jsref calls)
 {
     if (action == LAB_WIDGET_EVENT_YEAR_KEY) {
         if (!lab_dom_equal(lab_dom_get(event, "key"), lab_dom_string("Enter")))
@@ -113,8 +113,8 @@ static void lab_widget_events_date(lab_widget_event_action_t action, event_handl
 }
 
 /* Dismiss a visible picker only when the pointer is outside its controls. */
-static void lab_widget_events_outside(lab_widget_event_action_t action, event_handle event, browser_handle state,
-                                browser_handle plan, browser_handle calls)
+static void lab_widget_events_outside(lab_widget_event_action_t action, event_jsref event, browser_jsref state,
+                                browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)state;
@@ -127,8 +127,8 @@ static void lab_widget_events_outside(lab_widget_event_action_t action, event_ha
 }
 
 /* Validate pointer boundaries and Escape before emitting the selected tooltip service. */
-static void lab_widget_events_tooltip(lab_widget_event_action_t action, event_handle event, browser_handle state,
-                                browser_handle plan, browser_handle calls)
+static void lab_widget_events_tooltip(lab_widget_event_action_t action, event_jsref event, browser_jsref state,
+                                browser_jsref plan, browser_jsref calls)
 {
     (void)state;
     (void)plan;
@@ -156,8 +156,8 @@ static void lab_widget_events_tooltip(lab_widget_event_action_t action, event_ha
 }
 
 /* Commit today's value only when an input is attached, then restore focus. */
-static void lab_widget_events_today(lab_widget_event_action_t action, event_handle event, browser_handle state,
-                                browser_handle plan, browser_handle calls)
+static void lab_widget_events_today(lab_widget_event_action_t action, event_jsref event, browser_jsref state,
+                                browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)event;
@@ -170,8 +170,8 @@ static void lab_widget_events_today(lab_widget_event_action_t action, event_hand
 }
 
 /* Explicit close actions restore focus to the opener. */
-static void lab_widget_events_dismiss(lab_widget_event_action_t action, event_handle event, browser_handle state,
-                                browser_handle plan, browser_handle calls)
+static void lab_widget_events_dismiss(lab_widget_event_action_t action, event_jsref event, browser_jsref state,
+                                browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)event;
@@ -181,8 +181,8 @@ static void lab_widget_events_dismiss(lab_widget_event_action_t action, event_ha
 }
 
 /* Reposition only a visible picker, preserving the conditional state read. */
-static void lab_widget_events_reposition(lab_widget_event_action_t action, event_handle event, browser_handle state,
-                                browser_handle plan, browser_handle calls)
+static void lab_widget_events_reposition(lab_widget_event_action_t action, event_jsref event, browser_jsref state,
+                                browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)event;
@@ -192,11 +192,11 @@ static void lab_widget_events_reposition(lab_widget_event_action_t action, event
 }
 
 /* Return ordered services; browser effects cannot re-enter this scoped dispatch. */
-void lab_widget_events_dispatch(lab_widget_event_action_t action, event_handle event, browser_handle state)
+void lab_widget_events_dispatch(lab_widget_event_action_t action, event_jsref event, browser_jsref state)
 {
     /** @brief Widget action implementation using the current event and deferred service plan. */
-    typedef void (*lab_widget_event_handler_t)(lab_widget_event_action_t action, event_handle event,
-                                               browser_handle state, browser_handle plan, browser_handle calls);
+    typedef void (*lab_widget_event_handler_t)(lab_widget_event_action_t action, event_jsref event,
+                                               browser_jsref state, browser_jsref plan, browser_jsref calls);
     static const lab_widget_event_handler_t handlers[LAB_WIDGET_EVENT_OFFSET_TOUCHED + 1] = {
         [LAB_WIDGET_EVENT_OPEN]           = lab_widget_events_open,
         [LAB_WIDGET_EVENT_GRID_DAY]       = lab_widget_events_grid,
@@ -232,7 +232,7 @@ void lab_widget_events_dispatch(lab_widget_event_action_t action, event_handle e
 }
 
 /* Subscribe fixed controls and document/window lifecycle once per picker context. */
-void lab_widget_events_install(browser_handle document, browser_handle window, browser_handle state)
+void lab_widget_events_install(browser_jsref document, browser_jsref window, browser_jsref state)
 {
     static const struct {
         const char *selector, *type;

@@ -24,13 +24,13 @@
  * @post Publishes calls and a boolean result through lab_dom_return; invalid or stale outcomes publish null.
  * History precedes editor replacement. No browser state is changed while producing the plan.
  */
-void lab_goal_complete(lab_request_outcome_t outcome, browser_handle data, browser_handle completion, browser_handle error);
+void lab_goal_complete(lab_request_outcome_t outcome, browser_jsref data, browser_jsref completion, browser_jsref error);
 
 /**
  * @brief Publish the successful completion label through lab_dom_return.
  * @param cards Scoped browser handle to the native card projection whose unchanged property is read at execution time.
  * @post Publishes Goal already reached through lab_dom_return when unchanged is truthy, otherwise Goal reached.
  */
-void lab_goal_status(browser_handle cards);
+void lab_goal_status(browser_jsref cards);
 
 #endif

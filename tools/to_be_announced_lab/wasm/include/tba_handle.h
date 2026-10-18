@@ -1,7 +1,8 @@
 /**
  * @file tba_handle.h
- * @brief Borrowed browser and codec handles for the private Lab bridge.
+ * @brief Borrowed JavaScript-value references for the private Lab bridge.
  *
+ * The _jsref suffix denotes an opaque integer reference to a JavaScript value.
  * These integer aliases identify values in host-owned tables during one
  * synchronous call. They are not linear-memory pointers and cannot be retained
  * between calls. The DOM and codec tables are independent; C aliases describe
@@ -12,15 +13,15 @@
 #define TBA_HANDLE_H
 
 /** @brief Scoped DOM-bridge value; zero denotes absence where documented. */
-typedef int browser_handle;
+typedef int browser_jsref;
 
 /** @brief Scoped browser node or event target. */
-typedef browser_handle node_handle;
+typedef browser_jsref node_jsref;
 
 /** @brief Scoped browser event. */
-typedef browser_handle event_handle;
+typedef browser_jsref event_jsref;
 
 /** @brief Scoped codec-table value; codec APIs document their -1 error sentinel. */
-typedef int codec_handle;
+typedef int codec_jsref;
 
 #endif

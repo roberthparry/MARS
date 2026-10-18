@@ -948,6 +948,8 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_addsub(f)) {
+        if (expr_emit_complex_shift(f, b, parent_prec, style_LATEX))
+            return;
         if (expr_emit_conjugate_sum(f, b, parent_prec, style_LATEX))
             return;
         int need = PREC_ADD < parent_prec;

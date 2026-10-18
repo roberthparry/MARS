@@ -22,13 +22,13 @@
  * @param binding Scoped native binding record; absent kind means variable.
  * @return Scoped non-empty trimmed name, or zero for constants and unnamed records.
  */
-browser_handle lab_binding_variable_name(browser_handle binding);
+browser_jsref lab_binding_variable_name(browser_jsref binding);
 
 /**
  * @brief Publish non-empty variable names in native discovery order through lab_dom_return.
  * @param bindings Scoped native binding array; constants are excluded.
  */
-void lab_binding_variables(browser_handle bindings);
+void lab_binding_variables(browser_jsref bindings);
 
 /**
  * @brief Select editable bindings without changing native binding records.
@@ -38,7 +38,7 @@ void lab_binding_variables(browser_handle bindings);
  * @param bound_names Scoped Set of exact integration-bound names, or zero outside integrator mode.
  * @post The selected array is published through lab_dom_return.
  */
-void lab_binding_select(lab_mode_t mode, browser_handle bindings, browser_handle bound_names);
+void lab_binding_select(lab_mode_t mode, browser_jsref bindings, browser_jsref bound_names);
 
 /**
  * @brief Select native editor metadata and project editor text and readiness.
@@ -49,7 +49,7 @@ void lab_binding_select(lab_mode_t mode, browser_handle bindings, browser_handle
  * @post Publishes fullText, displayText, bindings and refresh through lab_dom_return.
  * The caller retains source ownership.
  */
-void lab_binding_editor(lab_mode_t mode, browser_handle inputs, browser_handle bound_names);
+void lab_binding_editor(lab_mode_t mode, browser_jsref inputs, browser_jsref bound_names);
 
 /**
  * @brief Prefer authored cached then solved values over supplied starts, excluding source constants.
@@ -60,7 +60,7 @@ void lab_binding_editor(lab_mode_t mode, browser_handle inputs, browser_handle b
  * @post Publishes the independent start record through lab_dom_return; absent source or solved metadata leaves
  * the supplied starts unchanged.
  */
-void lab_binding_goal_starts(browser_handle source, browser_handle solved, browser_handle provided, browser_handle cache);
+void lab_binding_goal_starts(browser_jsref source, browser_jsref solved, browser_jsref provided, browser_jsref cache);
 
 /**
  * @brief Fill falsey supplied starts from native goal metadata without interpreting expressions.
@@ -68,6 +68,6 @@ void lab_binding_goal_starts(browser_handle source, browser_handle solved, brows
  * @param provided Scoped supplied start record; this record is never mutated.
  * @post Publishes an expression/start record through lab_dom_return for asynchronous preparation by the caller.
  */
-void lab_binding_goal_prepare(browser_handle editor, browser_handle provided);
+void lab_binding_goal_prepare(browser_jsref editor, browser_jsref provided);
 
 #endif

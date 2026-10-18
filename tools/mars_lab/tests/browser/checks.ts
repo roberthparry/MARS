@@ -139,11 +139,20 @@
         check(WorksheetContext.rendered.querySelector('svg') && !WorksheetContext.rendered.classList.contains('error'),
               'The compact finite-part transform identity renders as mathematical TeX');
         const identity = WorksheetContext.rendered.dataset.displayTex!;
-        check(identity.includes('\\operatorname{Fp}_{1}') && identity.includes('\\delta') && identity.includes(' = ') &&
+        check(identity.includes('\\operatorname{Fp}\\!\\left[') && identity.includes('\\delta') && identity.includes(' = ') &&
               !identity.includes('NAN') && !identity.includes('\\underbrace') && !identity.includes('Curve values'),
               'The transform remains one complete identity without invalid coordinates or prose annotations');
         check(host.textContent.includes('Imaginary curve') && host.textContent.includes('Imaginary impulse weight'),
               'Distribution legends distinguish the sampled curve from the impulse weight');
+        const legend = host.querySelector('[data-plot-legend]');
+        check(legend && legend.querySelector('rect') &&
+              legend.querySelector('path[stroke="#78d8cb"]') &&
+              legend.querySelector('path[stroke="#b5a0ef"]'),
+              'The boxed spectrum legend uses distinct curve and impulse colours');
+        const legendBox = legend.querySelector('rect')!.getBoundingClientRect();
+        const plotArea = host.querySelector('[data-series]')!.closest('svg')!.getBoundingClientRect();
+        check(legendBox.bottom < plotArea.top,
+              'The spectrum legend occupies a separate strip above the plot lines');
         let axisLabel: SVGTextElement | null = null;
         for (const label of host.querySelectorAll('text')) {
             if (label.textContent === 'Value / weight')
@@ -153,10 +162,110 @@
               'The complete distribution axis title fits inside the SVG');
         check(axisLabel && axisLabel.getBBox().x <= 32,
               'The distribution plot does not waste space to the left of its axis title');
-        check(document.getElementById('plotFeedback')!.textContent.includes('no pointwise 3-D, complex-plane or amplitude view'),
+        const caption = host.querySelector<HTMLElement>('.plot-figure-caption');
+        check(caption && caption.textContent.includes('no pointwise 3-D, complex-plane or amplitude view'),
               'Distribution plots explain why ordinary complex projections are absent');
+        const captionBox = caption.getBoundingClientRect();
+        check(captionBox.top >= plotArea.bottom && Math.abs(captionBox.left - plotArea.left) < 2,
+              'The spectrum caption sits below the plot and aligns with its vertical axis');
         check(!host.querySelector('.complex-grid') && host.querySelector('[data-impulse]'),
               'The distribution is retained instead of fabricating ordinary complex projections');
+        const controls = document.getElementById('plotRange')!;
+        const savedWidth = controls.style.width;
+        controls.style.width = '60rem';
+        await LabTestBrowser.paint();
+        check(!document.getElementById('plotKindGroup')!.getClientRects().length &&
+              host.querySelector('[data-distribution-spectrum]'),
+              'Distribution spectra hide the inapplicable plot type selector');
+        const input = document.getElementById('plotInputRangeGroup')!.getBoundingClientRect();
+        const vertical = document.getElementById('plotVertical')!.getBoundingClientRect();
+        check(Math.abs(input.top - vertical.top) < 1 && input.right < vertical.left,
+              'Distribution input range and vertical range share one compact row');
+        controls.style.width = '20rem';
+        await LabTestBrowser.paint();
+        const compact = controls.getBoundingClientRect();
+        for (const id of ['plotInputRangeGroup', 'plotVertical']) {
+            const bounds = document.getElementById(id)!.getBoundingClientRect();
+            check(bounds.left >= compact.left && bounds.right <= compact.right + 1,
+                  'Plot option cards wrap within a narrow panel');
+        }
+        controls.style.width = savedWidth;
+        await LabTestBrowser.paint();
+        WorksheetBindings.controller.setExpressionEditor('@F{zeta(sigma+it)}');
+        await WorksheetRequests.evaluation.evaluateExpression();
+        for (let attempt = 0; attempt < 1200 && !host.querySelector('[data-spectrum-pending]'); ++attempt)
+            await LabTestBrowser.wait(25);
+        await LabTestBrowser.paint();
+        check(host.querySelector('[data-spectrum-pending]') &&
+              host.textContent.includes('Set numerical values') && !controls.getClientRects().length,
+              'An unset spectrum parameter prompts for values without irrelevant range controls');
+        const sigma = WorksheetContext.variableValues.querySelector<HTMLInputElement>('[data-binding-name="σ"]')!;
+        check(sigma, 'The spectrum exposes its sigma parameter');
+        sigma.value = '2';
+        sigma.dispatchEvent(new Event('input', {bubbles: true}));
+        (document.getElementById('plotSecond')! as HTMLInputElement).value = 'σ';
+        (document.getElementById('plotKind')! as HTMLInputElement).value = 'surface';
+        await WorksheetRequests.evaluation.evaluateExpression();
+        for (let attempt = 0; attempt < 1200 && !host.querySelector('[data-impulse]'); ++attempt)
+            await LabTestBrowser.wait(25);
+        await LabTestBrowser.paint();
+        check(host.querySelector('[data-impulse]') && !host.querySelector('[data-spectrum-pending]') &&
+              controls.getClientRects().length,
+              'Binding sigma produces an impulse preview and restores its range controls: ' +
+              host.textContent + '; controls=' + controls.className + '; result=' +
+              WorksheetContext.rendered.dataset.displayTex + '; source=' + WorksheetContext.expr.value +
+              '; range=' + controls.innerText);
+        for (const id of ['plotKindGroup', 'plotSecondGroup', 'plotCamera', 'plotFirstChoices', 'plotVertical']) {
+            check(!document.getElementById(id)!.getClientRects().length,
+                  'Impulse spectra hide inapplicable controls: ' + id);
+        }
+        check((document.getElementById('plotSecond')! as HTMLInputElement).value === '' &&
+              (document.getElementById('plotKind')! as HTMLInputElement).value === 'auto',
+              'Installing a spectrum clears retained surface and second-variable selections');
+        const spectrum = host.querySelector<SVGSVGElement>('[data-plot-chart][data-x-min]')!;
+        check(spectrum && Number(spectrum.dataset.xMax) === 0 &&
+              host.querySelectorAll('[data-schematic-impulse]').length === 100 &&
+              Math.abs(Number(spectrum.dataset.xMin) + Math.log(100)) < 1e-10 &&
+              host.querySelector('[data-schematic-impulse] [stroke-dasharray="1 4"]'),
+              'A hundred equal-height stems have dotted tips and bounds from the last term to zero');
+        check(!host.querySelector('.plot-figure-caption'),
+              'Pure impulse spectra do not add an explanatory caption');
+        const initialSpan = Number(spectrum.dataset.xMax) - Number(spectrum.dataset.xMin);
+        document.querySelector<HTMLElement>('#plotCard [data-zoom-step="1"]')!.click();
+        let zoomedSpan = initialSpan;
+        for (let attempt = 0; attempt < 1200 && zoomedSpan >= initialSpan; ++attempt) {
+            await LabTestBrowser.wait(25);
+            const chart = host.querySelector<SVGSVGElement>('[data-plot-chart][data-x-min]');
+            if (chart)
+                zoomedSpan = Number(chart.dataset.xMax) - Number(chart.dataset.xMin);
+        }
+        check(zoomedSpan < initialSpan, 'Spectrum zoom narrows the frequency range and redraws');
+        document.querySelector<HTMLElement>('#plotCard [data-zoom-reset]')!.click();
+        for (let attempt = 0; attempt < 1200 && Math.abs(zoomedSpan - initialSpan) > 1e-10; ++attempt) {
+            await LabTestBrowser.wait(25);
+            const chart = host.querySelector<SVGSVGElement>('[data-plot-chart][data-x-min]');
+            if (chart)
+                zoomedSpan = Number(chart.dataset.xMax) - Number(chart.dataset.xMin);
+        }
+        check(Math.abs(zoomedSpan - initialSpan) < 1e-10, 'Reset restores the complete displayed spectrum');
+        WorksheetBindings.controller.setExpressionEditor('@F{sin(t)}');
+        await WorksheetRequests.evaluation.evaluateExpression();
+        for (let attempt = 0; attempt < 1200 && host.querySelectorAll('[data-impulse]').length !== 2; ++attempt)
+            await LabTestBrowser.wait(25);
+        const sineSpectrum = host.querySelector<SVGSVGElement>('[data-plot-chart][data-x-min]')!;
+        check(sineSpectrum && Number(sineSpectrum.dataset.xMin) < -1 && Number(sineSpectrum.dataset.xMax) > 1,
+              'Switching from one-sided zeta to sine fits both impulses with endpoint clearance');
+        for (const stem of host.querySelectorAll<SVGGraphicsElement>('[data-impulse]')) {
+            const bounds = stem.getBoundingClientRect();
+            const viewport = stem.closest('svg')!.getBoundingClientRect();
+            check(bounds.left > viewport.left + 2 && bounds.right < viewport.right - 2,
+                  'Both signed-frequency impulses are visibly inside the chart, not clipped by its frame');
+        }
+        WorksheetBindings.controller.setExpressionEditor('x^2');
+        await WorksheetRequests.evaluation.evaluateExpression();
+        await waitForAutomaticPlot();
+        check(document.getElementById('plotKindGroup')!.getClientRects().length > 0,
+              'Ordinary plots restore the plot type selector');
     }
 
     /** @brief Use crosshairs over 2-D plots, reserving the grabbing hand for active drags. */
@@ -1122,11 +1231,11 @@
                 if (id === 'plotInputRange') {
                     const selector = document.getElementById('plotInputRangeGroup')!.getBoundingClientRect();
                     const bounds = document.getElementById('plotFirstGroup')!.getBoundingClientRect();
-                    const ranges = document.querySelector<HTMLElement>('.plot-ranges')!.getBoundingClientRect();
+                    const ranges = document.getElementById('plotRange')!.getBoundingClientRect();
                     const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-                    if (ranges.width >= 30 * rem) {
-                        check(Math.abs(selector.top - bounds.top) < 1 && selector.right < bounds.left,
-                              'Input range selector and bounds share a row when there is room');
+                    if (Math.abs(selector.top - bounds.top) < 1) {
+                        check(selector.right < bounds.left,
+                              'Input range selector and bounds do not overlap on a shared row');
                         check(selector.width <= 11 * rem + 1 && bounds.width > selector.width,
                               'The compact input range selector leaves more space for bounds');
                     } else {
@@ -3248,7 +3357,7 @@
             }
             const savedCardWidth = plotCard.style.width;
             plotCard.style.width = '360px';
-            check(getComputedStyle(plotControls).gridTemplateColumns.split(' ').length === 1 &&
+            check(getComputedStyle(plotControls).display === 'flex' &&
                   plotControls.scrollWidth <= plotControls.clientWidth + 1 &&
                   getComputedStyle(document.getElementById('plotCamera')!).gridTemplateColumns.split(' ').length === 2 &&
                   (document.getElementById('plotAzimuth')! as HTMLInputElement).getBoundingClientRect().width > 100,

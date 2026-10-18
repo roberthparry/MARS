@@ -137,7 +137,21 @@ static void test_plot_impulses(void)
     xml_free(document);
     string_free(svg);
     plot_free(plot);
-    TEST_ASSERT_TRUE(ok, "signed impulse arrows render as valid SVG with explicit weight labels");
+    TEST_ASSERT_TRUE(ok, "signed impulse stems render as valid SVG with explicit weight labels");
+    options.schematic_impulses = true;
+    plot = plot_new(&options);
+    ok = plot && plot_add_points(plot, points, 2, "Impulse locations", PLOT_IMPULSES, 0xd6aa55) &&
+         plot_set_bounds(plot, NUM_NEG_ONE, NUM_ONE, NUM_ZERO, NUM_ONE);
+    svg = ok ? plot_to_svg(plot) : NULL;
+    document = svg ? xml_from_text(svg) : NULL;
+    ok = document && strstr(string_c_str(svg), "data-schematic-impulse") &&
+         strstr(string_c_str(svg), "stroke-dasharray=\"1 4\"") &&
+         strstr(string_c_str(svg), "impulse weight: -1") &&
+         !strstr(string_c_str(svg), "data-plot-tick=\"1\"");
+    xml_free(document);
+    string_free(svg);
+    plot_free(plot);
+    TEST_ASSERT_TRUE(ok, "schematic stems retain signed weights without numerical height ticks");
 }
 
 static void test_plot_svg(void)
@@ -159,16 +173,21 @@ static void test_plot_svg(void)
     TEST_ASSERT_TRUE(ok, "valid independently owned SVG with axes and series colour");
     plot_options_t boxed = plot_options_default();
     boxed.legend_box = true;
+    boxed.legend_above = true;
     boxed.legend_background = 0x10241d;
     plot = plot_new(&boxed);
     plot_point_t line_points[] = {{NUM_ZERO, NUM_ZERO, false}, {NUM_ONE, NUM_ONE, false}};
     ok = plot && plot_add_points(plot, line_points, 2, "Real & exact", PLOT_LINES, 0xd6aa55) &&
-         plot_add_points(plot, line_points, 2, "Imaginary", PLOT_LINES, 0x78d8cb);
+         plot_add_points(plot, line_points, 2, "Imaginary", PLOT_LINES, 0x78d8cb) &&
+         plot_add_points(plot, line_points, 2, "Impulse weight", PLOT_IMPULSES, 0xb5a0ef);
     svg = ok ? plot_to_svg(plot) : NULL;
     document = svg ? xml_from_text(svg) : NULL;
     const char *legend = svg ? strstr(string_c_str(svg), "data-plot-legend") : NULL;
     ok = document && legend && strstr(legend, "<rect") && strstr(legend, "#10241d") &&
+         strstr(string_c_str(svg), "data-plot-top=\"126.000\"") && strstr(legend, "y=\"48.000\"") &&
          strstr(legend, "#d6aa55") && strstr(legend, "#78d8cb") && strstr(legend, "Real &amp; exact") &&
+         strstr(legend, "#b5a0ef") && strstr(legend, "data-impulse-key=\"true\"") &&
+         strstr(legend, "stroke-width=\"0.7\"") && strstr(legend, "stroke-dasharray=\"1 4\"") &&
          !strstr(legend, "data-series=");
     xml_free(document);
     string_free(svg);

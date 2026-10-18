@@ -184,8 +184,8 @@ void lab_evaluation_prepare_plan(lab_mode_t mode, bool skip_history)
     lab_dom_return(plan);
 }
 
-static void lab_evaluation_emit(browser_handle calls, const char *service, unsigned count, browser_handle first,
-                                browser_handle second)
+static void lab_evaluation_emit(browser_jsref calls, const char *service, unsigned count, browser_jsref first,
+                                browser_jsref second)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     if (count)
@@ -198,8 +198,8 @@ static void lab_evaluation_emit(browser_handle calls, const char *service, unsig
 }
 
 /* Return ordered recovery services and outcome metadata; no side effects occur inside this scope. */
-void lab_evaluation_response(lab_mode_t mode, lab_request_outcome_t outcome, browser_handle data,
-                             browser_handle context, browser_handle error)
+void lab_evaluation_response(lab_mode_t mode, lab_request_outcome_t outcome, browser_jsref data,
+                             browser_jsref context, browser_jsref error)
 {
     unsigned flags = lab_evaluation_actions(mode, outcome);
     if (!flags) {

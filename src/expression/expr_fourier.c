@@ -255,6 +255,9 @@ static expr_t *formula(fourier_context_t *c, const expr_t *f, const expr_t *x, c
     expr_t *gamma_pair = expr_fourier_gamma_pair(c, f, x, w);
     if (gamma_pair)
         return gamma_pair;
+    expr_t *zeta_pair = expr_fourier_zeta_pair(c, f, x, w);
+    if (zeta_pair)
+        return zeta_pair;
     if (f->ops == &ops_beta || f->ops == &ops_add || f->ops == &ops_sub) {
         expr_t *pair = expr_fourier_beta_pair(c, f, x, w);
         if (pair)
@@ -709,11 +712,44 @@ expr_t *expr_fourier_result(const expr_t *transform)
     return result;
 }
 
+/* A non-zero real affine argument traverses both the zeta pole and its growing real tail. */
+static const char *zeta_value_note(const expr_t *transform)
+{
+    if (transform->a->ops != &ops_zeta || transform->b->a->ops == &ops_imag_coordinate)
+        return NULL;
+    expr_t *specialised = expr_transform_bound_constants(transform);
+    const expr_t *current = specialised ? specialised : transform;
+    fourier_context_t c = {0};
+    expr_t *rate = NULL, *offset = NULL;
+    bool divergent = false;
+    if (current->a->ops == &ops_zeta &&
+        expr_fourier_affine(&c, current->a->a, current->b->a, &rate, &offset)) {
+        number_t slope = NUM_NAN, shift = NUM_NAN;
+        divergent = expr_fourier_literal_value(rate, &slope) && expr_fourier_literal_value(offset, &shift) &&
+                    num_is_finite(slope) && num_is_real(slope) && !num_is_zero(slope) &&
+                    num_is_finite(shift) && num_is_real(shift);
+        num_destroy(&slope);
+        num_destroy(&shift);
+    }
+    for (size_t i = 0; i < c.count; ++i)
+        expr_free(c.nodes[i]);
+    free(c.nodes);
+    expr_free(specialised);
+    return divergent ? "The ordinary real-axis Fourier integral of this zeta function does not converge: "
+                       "its argument crosses the pole at 1, and its oscillations have factorial-scale growth "
+                       "towards negative real arguments. Taking a principal value at the pole does not fix "
+                       "the growing tail. The transform is left symbolic; a regularised interpretation must "
+                       "be specified explicitly. This is not a vertical-line transform of zeta(sigma+i*t)." : NULL;
+}
+
 /* Keep convergence diagnostics in the native engine, using the same family matcher as the formula builder. */
 const char *expr_fourier_value_note(const expr_t *transform)
 {
     if (!transform || (transform->ops != &ops_fourier && transform->ops != &ops_inverse_fourier))
         return NULL;
+    const char *zeta_note = zeta_value_note(transform);
+    if (zeta_note)
+        return zeta_note;
     const char *sgn_note = expr_fourier_sgn_note(transform);
     if (sgn_note)
         return sgn_note;

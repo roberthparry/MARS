@@ -3396,7 +3396,8 @@
   "tools/mars_lab/tests/test_lab_math_fourier_periodic.c": {
     "readme_examples": {
       "enabled": true,
-      "test_readme_tangent_pair": true
+      "test_readme_tangent_pair": true,
+      "test_readme_vertical_zeta": true
     },
     "tests": {
       "enabled": true,
@@ -3410,11 +3411,13 @@
       "test_nonzero_condition_syntax_round_trips": true,
       "test_parameter_pole_conditions_are_retained": true,
       "test_principal_value_diagnostic": true,
+      "test_real_axis_zeta_diagnostic": true,
       "test_series_dummy_does_not_capture_a_parameter": true,
       "test_spatial_coordinates_round_trip_with_inferred_and_explicit_inverse": true,
       "test_symbolic_free_binding_is_not_substituted": true,
       "test_symbolic_numeric_quotient_keeps_denominator_grouping": true,
-      "test_symbolic_real_scale_and_shift": true
+      "test_symbolic_real_scale_and_shift": true,
+      "test_vertical_zeta_pair": true
     }
   },
   "tools/mars_lab/tests/test_lab_math_fourier_tanh.c": {

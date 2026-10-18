@@ -2026,7 +2026,7 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
         {
             "{ (sqrt(2)/2*sqrt(sqrt(x^2+y^2)+x)+i*sqrt(2)/2*y*sqrt(sqrt(x^2+y^2)-x)/abs(y))^2 | "
             "x = ?, y = ? }",
-            "{ x + iy | x = ?, y = ? }",
+            "{ x + i·y | x = ?, y = ? }",
             "square of the Cartesian principal complex root simplifies to its argument",
         },
         {
@@ -4173,7 +4173,7 @@ static void test_symbolic_complex_square_root_beautifies_to_cartesian_form(void)
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
-                       "√(½·(√(x² + y²) + x)) + y/|y|·√(½·(√(x² + y²) - x))·i");
+                       "√(½·(√(x² + y²) + x)) + i·y/|y|·√(½·(√(x² + y²) - x))");
 
     free(text);
     expr_free(beautified);
@@ -4230,7 +4230,7 @@ static void test_exact_complex_square_root_beautifies_to_cartesian_surds(void)
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "√(½·(√(13) + 2)) + √(½·(√(13) - 2))·i");
+    TEST_ASSERT_STR_EQ(text, "√(½·(√(13) + 2)) + i·√(½·(√(13) - 2))");
 
     free(text);
     expr_free(beautified);
@@ -4247,7 +4247,7 @@ static void test_unit_complex_square_root_keeps_conjugate_surds_together(void)
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "√(½·(√(2) + 1)) + √(½·(√(2) - 1))·i");
+    TEST_ASSERT_STR_EQ(text, "√(½·(√(2) + 1)) + i·√(½·(√(2) - 1))");
 
     free(text);
     expr_free(beautified);
@@ -4264,7 +4264,7 @@ static void test_unit_complex_cube_root_beautifies_to_cartesian_surds(void)
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "1/(2·³√(2))·(√(3) + 1 + (√(3) - 1)·i)");
+    TEST_ASSERT_STR_EQ(text, "1/(2·³√(2))·(√(3) + 1 + i·(√(3) - 1))");
 
     free(text);
     expr_free(beautified);
@@ -4281,7 +4281,7 @@ static void test_conjugate_unit_complex_cube_root_keeps_cartesian_surd_symmetry(
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "1/(2·³√(2))·(√(3) + 1 - (√(3) - 1)·i)");
+    TEST_ASSERT_STR_EQ(text, "1/(2·³√(2))·(√(3) + 1 - i·(√(3) - 1))");
 
     free(text);
     expr_free(beautified);
@@ -4298,7 +4298,7 @@ static void test_root_order_three_uses_the_principal_cube_root_beautification(vo
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "1/(2·³√(2))·(√(3) + 1 + (√(3) - 1)·i)");
+    TEST_ASSERT_STR_EQ(text, "1/(2·³√(2))·(√(3) + 1 + i·(√(3) - 1))");
 
     free(text);
     expr_free(beautified);
@@ -4317,7 +4317,7 @@ static void test_unit_complex_fourth_root_beautifies_to_cartesian_surds(void)
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
                        "√(1/2)·(√(⁴√(2) + √((√(2) + 1)/2)) + "
-                       "√(⁴√(2) - √((√(2) + 1)/2))·i)");
+                       "i·√(⁴√(2) - √((√(2) + 1)/2)))");
 
     free(text);
     expr_free(beautified);
@@ -4336,7 +4336,7 @@ static void test_conjugate_unit_complex_fourth_root_keeps_cartesian_surd_symmetr
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
                        "√(1/2)·(√(⁴√(2) + √((√(2) + 1)/2)) - "
-                       "√(⁴√(2) - √((√(2) + 1)/2))·i)");
+                       "i·√(⁴√(2) - √((√(2) + 1)/2)))");
 
     free(text);
     expr_free(beautified);
@@ -4557,7 +4557,7 @@ static void test_symbolic_complex_square_expands_to_cartesian_form(void)
 
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
-    TEST_ASSERT_STR_EQ(text, "a² - b² + 2ab·i");
+    TEST_ASSERT_STR_EQ(text, "a² - b² + i·2ab");
 
     free(text);
     expr_free(beautified);

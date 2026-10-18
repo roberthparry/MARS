@@ -420,6 +420,13 @@ char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result);
  */
 char *expr_formal_transform_TeX(const expr_t *source, const expr_t *result);
 
+/**
+ * @brief Render authored mathematical operations without replacing them by their evaluated results.
+ * @param expr Borrowed expression whose operation notation is retained.
+ * @return An owned TeX body to release with free(), or NULL on failure.
+ */
+char *expr_to_TeX_operation_body(const expr_t *expr);
+
 /** Return a borrowed convergence, unsupported-transform or distribution explanation, or NULL. */
 const char *expr_transform_value_note(const expr_t *expr);
 

@@ -169,6 +169,16 @@ bool expr_fourier_periodic_pole_condition(const expr_t *body, const expr_t *cond
 /** Match periodic functions and their impulse series, before inverse normalisation. */
 expr_t *expr_fourier_periodic_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
 
+/**
+ * @brief Match vertical-line zeta functions and their logarithmic impulse series.
+ * @param c Temporary ownership and transform-direction context; accumulates convergence conditions.
+ * @param f Borrowed source expression.
+ * @param x Borrowed integration coordinate.
+ * @param w Borrowed output coordinate.
+ * @return Arena-owned unnormalised transform, or NULL when this pair does not apply.
+ */
+expr_t *expr_fourier_zeta_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
+
 /** Match real affine odd hyperbolic Fourier pairs, before inverse normalisation. */
 expr_t *expr_fourier_odd_hyperbolic_pair(fourier_context_t *c, const expr_t *f, const expr_t *x, const expr_t *w);
 

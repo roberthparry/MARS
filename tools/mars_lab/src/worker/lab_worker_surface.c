@@ -344,6 +344,13 @@ int lab_worker_plot_request(const char *source, const expr_t *expression, expr_b
         return 1;
     }
     bool force_complex = !strcmp(kind, "complex_curve");
+    /* Distributions have impulse supports, not a second sampled surface coordinate. */
+    int distribution = lab_worker_distribution_plot(source, expression, variable, argc > 5 ? argv[5] : "",
+                                                    argc > 6 ? argv[6] : "", argc > 7 ? argv[7] : "auto",
+                                                    argc > 8 ? argv[8] : "", argc > 9 ? argv[9] : "",
+                                                    !strcmp(quality, "preview"));
+    if (distribution >= 0)
+        return distribution;
     bool curve = force_complex || !strcmp(kind, "curve");
     if (strcmp(kind, "auto") && !curve && strcmp(kind, "surface")) {
         printf("error       Select Automatic, 2-D curve or 3-D surface.\n");

@@ -42,7 +42,7 @@ void lab_function_start(bool available)
 }
 
 /* Retain output indentation and the established response-versus-exception diagnostic precedence. */
-void lab_function_complete(lab_request_outcome_t outcome, bool timed_out, browser_handle data, browser_handle error)
+void lab_function_complete(lab_request_outcome_t outcome, bool timed_out, browser_jsref data, browser_jsref error)
 {
     if (outcome != LAB_REQUEST_OUTCOME_FAILURE && outcome != LAB_REQUEST_OUTCOME_SUCCESS &&
         outcome != LAB_REQUEST_OUTCOME_EXCEPTION)

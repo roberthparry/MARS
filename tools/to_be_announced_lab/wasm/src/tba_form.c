@@ -23,7 +23,7 @@ static const char *const tba_form_fields[] = {
 static const char *const tba_form_models[] = {"regression", "arima", "arimax", "sarima", "sarimax", "auto-arima"};
 static const char *const tba_form_labels[] = {"Regression", "ARIMA", "ARIMAX", "SARIMA", "SARIMAX", "Auto-ARIMA"};
 
-static unsigned tba_form_code(const char *group, browser_handle key)
+static unsigned tba_form_code(const char *group, browser_jsref key)
 {
     return (unsigned)tba_dom_number(tba_dom_key_get(tba_ui_state(group), tba_dom_clean(key, 1)));
 }
@@ -45,7 +45,7 @@ static unsigned tba_form_mask(void)
     return mask;
 }
 
-static void tba_form_option(browser_handle parts, browser_handle value, browser_handle label, int selected)
+static void tba_form_option(browser_jsref parts, browser_jsref value, browser_jsref label, int selected)
 {
     tba_ui_add(parts, "<option value=\"");
     tba_ui_escaped(parts, value);
@@ -54,7 +54,7 @@ static void tba_form_option(browser_handle parts, browser_handle value, browser_
     tba_ui_add(parts, "</option>");
 }
 
-static void tba_form_select(const char *field, browser_handle columns, browser_handle fallback, const char *empty)
+static void tba_form_select(const char *field, browser_jsref columns, browser_jsref fallback, const char *empty)
 {
     int node = tba_ui_field(field), selected = tba_ui_value(field), parts = tba_dom_object(1);
     if (!tba_dom_truth(selected))
@@ -172,8 +172,8 @@ static void tba_form_sync(unsigned kind)
     }
 }
 
-static void tba_form_checkbox(browser_handle parts, const char *name, browser_handle value, browser_handle label,
-                              browser_handle title, int selected, int usable)
+static void tba_form_checkbox(browser_jsref parts, const char *name, browser_jsref value, browser_jsref label,
+                              browser_jsref title, int selected, int usable)
 {
     tba_ui_add(parts, usable ? "<label class=\"multi-select-item\" title=\"" :
                               "<label class=\"multi-select-item is-disabled\" title=\"");
@@ -192,7 +192,7 @@ static void tba_form_checkbox(browser_handle parts, const char *name, browser_ha
     tba_ui_add(parts, "</span></label>");
 }
 
-static void tba_form_outliers(browser_handle outliers)
+static void tba_form_outliers(browser_jsref outliers)
 {
     int set = tba_ui_selection(tba_ui_value("outlier_dates")), parts = tba_dom_object(1);
     int all = !tba_dom_count(tba_dom_keys(set));
@@ -226,7 +226,7 @@ static void tba_form_outliers(browser_handle outliers)
 }
 
 /* Refresh target options or the indexed driver checkbox list. */
-void tba_form_columns(browser_handle columns, int driver)
+void tba_form_columns(browser_jsref columns, int driver)
 {
     if (!driver) {
         tba_form_select("target_value_column", columns, 0, "Choose a column");
@@ -253,7 +253,7 @@ void tba_form_columns(browser_handle columns, int driver)
 }
 
 /* Local selection markers and display names never resolve server paths. */
-void tba_form_upload(browser_handle path, browser_handle name, int driver)
+void tba_form_upload(browser_jsref path, browser_jsref name, int driver)
 {
     tba_ui_set(driver ? "xreg_display_name" : "target_display_name", name);
     if (!tba_dom_truth(name)) {
@@ -267,7 +267,7 @@ void tba_form_upload(browser_handle path, browser_handle name, int driver)
     tba_ui_write(driver ? "xreg-path-readout" : "target-path-readout", "title", name);
 }
 
-static void tba_form_meta_line(browser_handle parts, const char *label, browser_handle value)
+static void tba_form_meta_line(browser_jsref parts, const char *label, browser_jsref value)
 {
     tba_ui_add(parts, "<div><strong>");
     tba_ui_add(parts, label);
@@ -277,7 +277,7 @@ static void tba_form_meta_line(browser_handle parts, const char *label, browser_
 }
 
 /* Store metadata as values and render all user text through escaping primitives. */
-void tba_form_meta(browser_handle data, int driver)
+void tba_form_meta(browser_jsref data, int driver)
 {
     tba_ui_store(driver ? "driver_meta" : "target_meta", data);
     int parts = tba_dom_object(1);
@@ -381,7 +381,7 @@ void tba_form_suggest(int force)
 }
 
 /* Collect recognised scalar fields only; unchecked checkboxes never overwrite selections. */
-browser_handle tba_form_collect(void)
+browser_jsref tba_form_collect(void)
 {
     tba_form_sync(0);
     tba_form_sync(1);
@@ -396,7 +396,7 @@ browser_handle tba_form_collect(void)
 }
 
 /* Event names determine which dependent native controls need refreshing. */
-void tba_form_change(event_handle event)
+void tba_form_change(event_jsref event)
 {
     int target = tba_dom_get(event, "target"), name = tba_dom_get(target, "name");
     int id = tba_dom_get(target, "id");
@@ -439,7 +439,7 @@ static void tba_form_index(const char *key, const char *const *names, unsigned c
 }
 
 /* Bootstrap exactly once from typed server configuration. */
-void tba_form_init(browser_handle config)
+void tba_form_init(browser_jsref config)
 {
     static const char *const frequencies[] = {"daily", "monthly", "quarterly", "yearly"};
     static const char *const strengths[] = {"none", "weak", "moderate", "strong", "very strong"};

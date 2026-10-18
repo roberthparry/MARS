@@ -19,7 +19,7 @@
  * Borrows the array for the current synchronous bridge call; it is not a pointer
  * into WebAssembly memory. This alias documents the role without changing the i32 ABI.
  */
-typedef browser_handle quaternion_handle;
+typedef browser_jsref quaternion_jsref;
 
 /** @brief Camera geometry operations; numeric values are fixed by the browser ABI. */
 typedef enum {
@@ -64,14 +64,14 @@ double lab_surface_log2(double value);
  * @details Publishes a quaternion, three row arrays (action 1), or three degree angles (action 2) through
  * lab_dom_return. Unknown action codes publish a four-zero array; no scoped handle is retained.
  */
-void lab_surface_camera(lab_surface_camera_action_t action, browser_handle first, browser_handle second,
-                        browser_handle third, browser_handle box, bool roll);
+void lab_surface_camera(lab_surface_camera_action_t action, browser_jsref first, browser_jsref second,
+                        browser_jsref third, browser_jsref box, bool roll);
 
 /**
  * @brief Read and normalise a scoped quaternion into a fixed display rotation.
  * @param quaternion Scoped browser [x, y, z, w] quaternion array.
  * @param[out] matrix Caller-owned storage for nine doubles, written in row-major order.
  */
-void lab_surface_rotation(quaternion_handle quaternion, double matrix[9]);
+void lab_surface_rotation(quaternion_jsref quaternion, double matrix[9]);
 
 #endif

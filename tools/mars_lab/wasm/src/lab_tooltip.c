@@ -29,7 +29,7 @@ static const struct {
     {"run", "Evaluate the current input"},
 };
 
-static browser_handle lab_tooltip_label(browser_handle button)
+static browser_jsref lab_tooltip_label(browser_jsref button)
 {
     int id = lab_dom_read(button, LAB_DOM_ATTRIBUTE, "id");
     unsigned low = 0, high = sizeof(lab_tooltip_labels) / sizeof(*lab_tooltip_labels);
@@ -46,7 +46,7 @@ static browser_handle lab_tooltip_label(browser_handle button)
     return 0;
 }
 
-static browser_handle lab_tooltip_card(browser_handle button)
+static browser_jsref lab_tooltip_card(browser_jsref button)
 {
     int card = lab_dom_closest(button, ".result-card");
     int title = card ? lab_dom_query(card, ".card-title > span:first-child") : 0;
@@ -54,7 +54,7 @@ static browser_handle lab_tooltip_card(browser_handle button)
     return lab_dom_length(text) ? text : lab_dom_string("result");
 }
 
-static browser_handle lab_tooltip_text(browser_handle button)
+static browser_jsref lab_tooltip_text(browser_jsref button)
 {
     int title = lab_dom_clean(lab_dom_read(button, LAB_DOM_ATTRIBUTE, "title"), LAB_DOM_CLEAN_TRIM);
     if (lab_dom_has(button, "title")) {
@@ -91,7 +91,7 @@ static browser_handle lab_tooltip_text(browser_handle button)
     return lab_dom_length(text) ? text : lab_dom_string("Activate this control");
 }
 
-static browser_handle lab_tooltip_node(void)
+static browser_jsref lab_tooltip_node(void)
 {
     int node = lab_dom_query(0, "#marsButtonTooltip");
     if (!node) {
@@ -105,7 +105,7 @@ static browser_handle lab_tooltip_node(void)
 }
 
 /* Restore exact original spelling, whitespace and absent/empty attribute distinction. */
-void lab_tooltip_hide(browser_handle button)
+void lab_tooltip_hide(browser_jsref button)
 {
     if (lab_dom_has(button, "data-mars-tooltip-description")) {
         if (lab_dom_has(button, "data-mars-tooltip-described"))
@@ -120,7 +120,7 @@ void lab_tooltip_hide(browser_handle button)
 }
 
 /* Refresh repeated hover/focus without replacing the saved original description. */
-bool lab_tooltip_show(browser_handle button, browser_handle previous, double width, double height)
+bool lab_tooltip_show(browser_jsref button, browser_jsref previous, double width, double height)
 {
     if (!button || lab_dom_closest(button, ".hidden"))
         return false;

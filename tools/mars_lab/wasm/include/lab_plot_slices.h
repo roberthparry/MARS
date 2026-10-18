@@ -23,7 +23,7 @@ typedef enum {
  * @return Scoped browser string handle with one tab-separated name, lower limit, upper limit,
  *         exact value and slider position per line; an empty string when there are no slices.
  */
-browser_handle lab_plot_slices_payload(void);
+browser_jsref lab_plot_slices_payload(void);
 
 /**
  * @brief Apply native slice metadata only while the controls still match the request snapshot.
@@ -32,7 +32,7 @@ browser_handle lab_plot_slices_payload(void);
  * @param expected Scoped browser string handle holding the payload captured before the request;
  *                 a mismatch with the current controls discards the reply.
  */
-void lab_plot_slices_apply(browser_handle records, browser_handle expected);
+void lab_plot_slices_apply(browser_jsref records, browser_jsref expected);
 
 /** @brief Clear plot-local slices when the authored source changes. */
 void lab_plot_slices_clear(void);
@@ -46,6 +46,6 @@ void lab_plot_slices_auto(void);
  * @param target Scoped browser handle of the event's target element, used to locate its slice row.
  * @return Whether the event is unrelated, requires fresh samples or only changes controls.
  */
-lab_plot_slice_edit_t lab_plot_slices_edit(lab_plot_control_action_t action, browser_handle target);
+lab_plot_slice_edit_t lab_plot_slices_edit(lab_plot_control_action_t action, browser_jsref target);
 
 #endif

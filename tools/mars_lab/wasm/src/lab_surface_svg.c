@@ -13,7 +13,7 @@
 #include "lab_dom.h"
 #include "lab_surface_svg.h"
 
-static int coordinate(browser_handle value, double *number)
+static int coordinate(browser_jsref value, double *number)
 {
     if (lab_dom_type(value) != LAB_VALUE_NUMBER)
         return 0;
@@ -21,7 +21,7 @@ static int coordinate(browser_handle value, double *number)
     return isfinite(*number);
 }
 
-static browser_handle commands(browser_handle points, int flat, int close)
+static browser_jsref commands(browser_jsref points, int flat, int close)
 {
     if (lab_dom_type(points) != LAB_VALUE_ARRAY)
         return 0;
@@ -56,7 +56,7 @@ static browser_handle commands(browser_handle points, int flat, int close)
     return lab_dom_join_array(pieces, "");
 }
 
-static void collect(browser_handle polygons, browser_handle groups, lab_surface_primitive_t kind)
+static void collect(browser_jsref polygons, browser_jsref groups, lab_surface_primitive_t kind)
 {
     unsigned count = lab_dom_type(polygons) == LAB_VALUE_ARRAY ? lab_dom_count(polygons) : 0;
     unsigned mark = lab_dom_mark();
@@ -87,7 +87,7 @@ static void collect(browser_handle polygons, browser_handle groups, lab_surface_
 }
 
 /* Return browser-owned path strings; no SVG nodes or host handles are retained natively. */
-void lab_surface_svg_plan(browser_handle polygons, browser_handle paths, lab_surface_primitive_t kind)
+void lab_surface_svg_plan(browser_jsref polygons, browser_jsref paths, lab_surface_primitive_t kind)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT), series = lab_dom_object(LAB_VALUE_ARRAY),
         axes = lab_dom_object(LAB_VALUE_ARRAY);

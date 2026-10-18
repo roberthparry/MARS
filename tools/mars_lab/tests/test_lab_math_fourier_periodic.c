@@ -1,6 +1,6 @@
 /**
  * @file test_lab_math_fourier_periodic.c
- * @brief Native periodic principal-value Fourier regression port.
+ * @brief Native periodic Fourier and real-axis convergence regressions.
  *
  * Preserves every original case, parameter grid, reference calculation and
  * tolerance. README examples are registered separately after ordinary tests.
@@ -248,6 +248,83 @@ static void test_principal_value_diagnostic(void)
     }
 }
 
+static void test_real_axis_zeta_diagnostic(void)
+{
+    const char *sources[] = {"@F{zeta(t)}", "Fourier(zeta(x),x,k)", "Fourier(zeta(2-3*x),x,k)",
+                             "InverseFourier(zeta(x),x,k)"};
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        const json_t *result = math_fourier_fields(sources[i], i ? "k" : "ω");
+        const char *note = math_fourier_text(result, "value_note");
+        lab_math_contains(note, "does not converge", true);
+        lab_math_contains(note, "pole at 1", true);
+        lab_math_contains(note, "factorial-scale growth", true);
+        lab_math_contains(note, "principal value", true);
+        lab_math_contains(note, "no supported closed form", false);
+        lab_math_contains(math_fourier_text(result, "function"), "fourier(", true);
+    }
+    const char *other[] = {"Fourier(zeta(2+i*t),t,k)", "Fourier(zeta(t+i),t,k)",
+                           "Fourier(zeta(t^2+2),t,k)", "Fourier(zeta(2),t,k)",
+                           "Fourier(zeta(a+i*t),t,k)"};
+    for (size_t i = 0; i < sizeof other / sizeof *other; ++i) {
+        const json_t *result = math_fourier_fields(other[i], "k");
+        lab_math_contains(math_fourier_text(result, "value_note"), "factorial-scale growth", false);
+    }
+}
+
+static void test_vertical_zeta_pair(void)
+{
+    const json_t *spectrum = math_fourier_fields("Fourier(zeta(sigma+i*t),t,w)", "w");
+    lab_math_contains(math_fourier_text(spectrum, "function"), "fourier(", false);
+    lab_math_contains(math_fourier_text(spectrum, "tex"), "\\sum", true);
+    lab_math_contains(math_fourier_text(spectrum, "expression"), "δ(w + ln(n))", true);
+    lab_math_contains(math_fourier_text(spectrum, "expression"), "Re(σ - 1) > 0", true);
+    const json_t *inverse = math_fourier_fields(lab_math_format("InverseFourier(%s,w,t)",
+                                                               lab_math_algebra(spectrum)), "t");
+    lab_math_contains(math_fourier_text(inverse, "function"), "fourier(", false);
+    lab_math_contains(math_fourier_text(inverse, "function"), "zeta(", true);
+    lab_math_contains(math_fourier_text(inverse, "expression"), "σ + i·t", true);
+    lab_math_contains(math_fourier_text(inverse, "function"), "@sigma + i.t", true);
+    lab_math_contains(math_fourier_text(inverse, "tex"), "\\sigma + i\\,t", true);
+    const json_t *numeric = math_fourier_fields(
+        "{InverseFourier(2*@pi*sum(j,1,@inf,delta(w+ln(j))/j^2),w,t) | t=0}", "t");
+    lab_math_close(math_fourier_number(numeric), acos(-1.0) * acos(-1.0) / 6, 1e-12);
+    const json_t *scaled = math_fourier_fields(
+        "{InverseFourier(2*@pi*sum(j,1,@inf,delta(w+2*ln(j))/j^3),w,t) | t=1/2}", "t");
+    double complex reference = 0;
+    /* Independent Dirichlet sum; the omitted absolute tail is below 1/(2*8192^2). */
+    for (unsigned n = 1; n <= 8192; ++n)
+        reference += cexp(-(3 + I) * log(n));
+    lab_math_close(math_fourier_number(scaled), reference, 2e-8);
+    const char *sources[] = {"Fourier(zeta(2+2*i*t),t,w)", "Fourier(zeta(2-3*i*t),t,w)",
+                             "Fourier(zeta(2+i+i*t),t,w)", "@F{zeta(sigma+it)}"};
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        const json_t *result = math_fourier_fields(sources[i], i == 3 ? "ω" : "w");
+        lab_math_contains(math_fourier_text(result, "function"), "fourier(", false);
+        lab_math_contains(math_fourier_text(result, "tex"), "\\sum", true);
+    }
+    const char *unsupported[] = {"Fourier(zeta(1+i*t),t,w)", "Fourier(zeta(1/2+i*t),t,w)",
+                                 "Fourier(zeta(2+(1+i)*t),t,w)",
+                                 "InverseFourier(sum(j,2,@inf,delta(w+ln(j))/j^2),w,t)",
+                                 "InverseFourier(sum(j,1,4,delta(w+ln(j))/j^2),w,t)",
+                                 "InverseFourier(sum(j,1,@inf,delta(w+ln(j))^2/j^2),w,t)"};
+    for (size_t i = 0; i < sizeof unsupported / sizeof *unsupported; ++i) {
+        const json_t *result = math_fourier_fields(unsupported[i], i < 3 ? "w" : "t");
+        if (i < 3)
+            lab_math_contains(math_fourier_text(result, "function"), "fourier(", true);
+        else
+            lab_math_contains(math_fourier_text(result, "function"), "zeta(", false);
+    }
+}
+
+static void test_readme_vertical_zeta(void)
+{
+    /* README example: docs/expression.md, the vertical-line zeta impulse spectrum. */
+    const json_t *result = math_fourier_fields("@F{zeta(sigma+it)}", "ω");
+    lab_math_contains(math_fourier_text(result, "expression"), "δ(ω + ln(n))", true);
+    lab_math_contains(math_fourier_text(result, "expression"), "Re(σ - 1) > 0", true);
+    lab_math_contains(math_fourier_text(result, "function"), "fourier(", false);
+}
+
 static void test_nonreal_rates_do_not_use_real_pole_prescription(void)
 {
     const char *sources[] = {"tan((1+i)*t)", "cot(t+i)"};
@@ -307,6 +384,9 @@ void test_lab_math_fourier_periodic_cases(void)
     TEST_RUN_IN_GROUP(test_series_dummy_does_not_capture_a_parameter, tests, NULL);
     lab_math_reset();
     TEST_RUN_IN_GROUP(test_principal_value_diagnostic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_real_axis_zeta_diagnostic, tests, NULL);
+    lab_math_reset();
+    TEST_RUN_IN_GROUP(test_vertical_zeta_pair, tests, NULL);
     lab_math_reset();
     TEST_RUN_IN_GROUP(test_nonreal_rates_do_not_use_real_pole_prescription, tests, NULL);
     lab_math_reset();
@@ -315,6 +395,8 @@ void test_lab_math_fourier_periodic_cases(void)
 /* Register README examples last. */
 void test_lab_math_fourier_periodic_readme_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_readme_vertical_zeta, readme_examples, "readme,output");
+    lab_math_reset();
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(test_readme_tangent_pair, readme_examples, "math,readme,output");
     lab_math_reset();
 }

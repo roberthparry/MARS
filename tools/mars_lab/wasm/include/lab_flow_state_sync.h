@@ -50,6 +50,6 @@ typedef enum {
  * @param frame Scoped browser handle to the mutable continuation frame storing stage, inputs and service results.
  * @details Publishes a continuation plan through lab_dom_return; unsupported kinds publish an inert completion.
  */
-void lab_state_sync(lab_state_sync_kind_t kind, frame_handle frame);
+void lab_state_sync(lab_state_sync_kind_t kind, frame_jsref frame);
 
 #endif

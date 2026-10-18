@@ -27,7 +27,7 @@ typedef enum {
  * @param view Reserved scoped browser capability-view handle; unused by this request-local workflow.
  * @return Scoped browser handle to a continuation plan. The host reads frame.result after successful completion.
  */
-browser_handle lab_flow_transport(lab_flow_transport_kind_t kind, frame_handle frame, view_handle view);
+browser_jsref lab_flow_transport(lab_flow_transport_kind_t kind, frame_jsref frame, view_jsref view);
 
 /** @brief Select synchronous browser effects when beginning or cancelling a request.
  * @param action Native request operation; LAB_REQUEST_EVALUATE selects Evaluate, all others suppress that button effect.

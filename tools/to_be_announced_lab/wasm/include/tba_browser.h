@@ -52,13 +52,13 @@ unsigned char *tba_browser_output_buffer(void);
  * @param root Borrowed host handle for an object, not an array or scalar.
  * @return Encoded byte count, or zero for invalid, excessively deep or oversized data.
  */
-uint32_t tba_browser_encode(codec_handle root);
+uint32_t tba_browser_encode(codec_jsref root);
 
 /**
  * @brief Decode a complete version-one envelope from the input staging buffer.
  * @param size Staged byte count, at most 8 MiB.
  * @return Decoded host object handle, or -1 for invalid data or exceeded limits.
  */
-codec_handle tba_browser_decode(uint32_t size);
+codec_jsref tba_browser_decode(uint32_t size);
 
 #endif

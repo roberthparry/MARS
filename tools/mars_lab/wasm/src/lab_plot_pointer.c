@@ -17,17 +17,17 @@
 #include "lab_plot_drag.h"
 #include "lab_plot_pointer.h"
 
-static double number(node_handle node, const char *key)
+static double number(node_jsref node, const char *key)
 {
     return lab_dom_to_number(lab_dom_get(node, key));
 }
 
-static double data(node_handle node, const char *key)
+static double data(node_jsref node, const char *key)
 {
     return lab_dom_to_number(lab_dom_read(node, LAB_DOM_DATASET, key));
 }
 
-static browser_handle label_text(browser_handle title)
+static browser_jsref label_text(browser_jsref title)
 {
     int saved = lab_dom_get(title, "marsPlotLabel");
     if (lab_dom_truth(saved))
@@ -37,16 +37,23 @@ static browser_handle label_text(browser_handle title)
 }
 
 /* Modify only the live DOM; native SVG retained in the result record remains copyable with its labels. */
-void lab_plot_pointer_prepare(browser_handle rendered)
+void lab_plot_pointer_prepare(browser_jsref rendered)
 {
     if (!lab_dom_query(rendered, "[data-plot-chart][data-x-min]:not([data-surface])"))
         return;
     int titles = lab_dom_all(rendered, "svg title");
     for (unsigned i = 0; i < lab_dom_count(titles); ++i) {
+        unsigned mark = lab_dom_mark();
         int title = lab_dom_item(titles, i), text = label_text(title);
+        /* Impulse titles carry weights, not heights inferred from the drawn stem. */
+        if (lab_dom_closest(title, "[data-impulse]")) {
+            lab_dom_release(mark);
+            continue;
+        }
         lab_dom_set(title, "marsPlotLabel", text);
         lab_dom_write(lab_dom_get(title, "parentNode"), LAB_DOM_ATTRIBUTE, "aria-label", text);
         lab_dom_write(title, LAB_DOM_TEXT, "", lab_dom_string(""));
+        lab_dom_release(mark);
     }
 }
 
@@ -78,7 +85,7 @@ unsigned lab_plot_bound_digits(double value, double span)
 }
 
 /* Keep about four significant digits of the span, retaining exact gesture bounds separately. */
-void lab_plot_write_bound(browser_handle control, double value, double span)
+void lab_plot_write_bound(browser_jsref control, double value, double span)
 {
     int text = lab_dom_precision(value, lab_plot_bound_digits(value, span));
     lab_dom_set(control, "marsZoomText", text);
@@ -87,7 +94,7 @@ void lab_plot_write_bound(browser_handle control, double value, double span)
 }
 
 /* Use the same interval-aware presentation for all three surface axes. */
-void lab_plot_volume_bounds(browser_handle bounds)
+void lab_plot_volume_bounds(browser_jsref bounds)
 {
     static const char *const ids[] = {
         "plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper", "plotYLower", "plotYUpper"
@@ -100,7 +107,7 @@ void lab_plot_volume_bounds(browser_handle bounds)
     }
 }
 
-static int frame(chart_handle chart, double box[4], double bounds[4])
+static int frame(chart_jsref chart, double box[4], double bounds[4])
 {
     /* A nested SVG's bounding rectangle describes its artwork, not its coordinate viewport. */
     double sx = lab_dom_measure(chart, LAB_DOM_MEASURE_CTM_A), sy = lab_dom_measure(chart, LAB_DOM_MEASURE_CTM_D);
@@ -121,15 +128,17 @@ static int frame(chart_handle chart, double box[4], double bounds[4])
 }
 
 /* Resolve a projection by its native card identifier, not by its mathematical labels. */
-bool lab_plot_is_plane(chart_handle chart)
+bool lab_plot_is_plane(chart_jsref chart)
 {
     return lab_dom_equal(lab_dom_read(lab_dom_closest(chart, ".complex-panel"), LAB_DOM_DATASET, "complexPanel"),
                          lab_dom_string("complex_plane"));
 }
 
 /* Preserve native automatic height for complex scalar projections during zoom. */
-bool lab_plot_auto_height(chart_handle chart)
+bool lab_plot_auto_height(chart_jsref chart)
 {
+    if (lab_dom_has(chart, "data-schematic-spectrum") || lab_dom_query(chart, "[data-schematic-impulse]"))
+        return true;
     int projection = lab_dom_read(lab_dom_closest(chart, ".complex-panel"), LAB_DOM_DATASET, "complexPanel");
     return !lab_dom_equal(lab_dom_read(lab_dom_id("plotScale"), LAB_DOM_VALUE, ""), lab_dom_string("manual")) &&
            (lab_dom_equal(projection, lab_dom_string("components")) ||
@@ -145,7 +154,7 @@ void lab_plot_plane_bounds(const double bounds[4])
     lab_dom_set(lab_dom_id("plotRendered"), "marsComplexPlaneBounds", values);
 }
 
-static browser_handle overlay(browser_handle rendered, const char *selector, const char *class_name)
+static browser_jsref overlay(browser_jsref rendered, const char *selector, const char *class_name)
 {
     int node = lab_dom_query(rendered, selector);
     if (!node) {
@@ -157,12 +166,12 @@ static browser_handle overlay(browser_handle rendered, const char *selector, con
     return node;
 }
 
-static void pixels(node_handle node, const char *key, double value)
+static void pixels(node_jsref node, const char *key, double value)
 {
     lab_dom_write(node, LAB_DOM_STYLE, key, lab_dom_format(value, "", "px"));
 }
 
-static void focus_curve(browser_handle rendered, chart_handle chart, browser_handle target)
+static void focus_curve(browser_jsref rendered, chart_jsref chart, browser_jsref target)
 {
     int active = 0;
     if (chart && target && lab_workspace_mode() == LAB_MODE_DIFFERENTIAL_EQUATION &&
@@ -182,7 +191,7 @@ static void focus_curve(browser_handle rendered, chart_handle chart, browser_han
 
 /* Inspect only rendered line segments, never expressions or gaps. Multiple crossings
  * require a bounded scan of the displayed samples; select the closest visible branch. */
-static int curve_height(chart_handle chart, double x, double pointer_y, double *height)
+static int curve_height(chart_jsref chart, double x, double pointer_y, double *height)
 {
     int active = lab_dom_query(chart, ".plot-curve-active");
     int paths = lab_dom_all(active ? active : chart, active ? ":scope > path" : "[data-series] > path");
@@ -223,7 +232,7 @@ static int curve_height(chart_handle chart, double x, double pointer_y, double *
 }
 
 /* The guide is transient UI and is not inserted into the copyable SVG. */
-void lab_plot_pointer_dispatch(lab_plot_pointer_action_t action, event_handle event, browser_handle context)
+void lab_plot_pointer_dispatch(lab_plot_pointer_action_t action, event_jsref event, browser_jsref context)
 {
     (void)context;
     lab_dom_return(lab_dom_object(LAB_VALUE_OBJECT));
@@ -236,7 +245,7 @@ void lab_plot_pointer_dispatch(lab_plot_pointer_action_t action, event_handle ev
     double box[4], bounds[4], x = number(event, "clientX"), y = number(event, "clientY");
     int dragging = lab_dom_truth(lab_dom_get(lab_dom_get(rendered, "marsPlotDrag"), "active"));
     if (action != LAB_PLOT_POINTER_INSPECT || dragging || number(event, "buttons") != 0 ||
-        !chart || !frame(chart, box, bounds) ||
+        !chart || lab_dom_query(chart, "[data-schematic-impulse]") || !frame(chart, box, bounds) ||
         x < box[0] || x > box[0] + box[2] ||
         y < box[1] || y > box[1] + box[3]) {
         lab_dom_class(line, "hidden", 1);
@@ -312,7 +321,7 @@ void lab_plot_pointer_install(void)
 }
 
 /* Capture immutable screen and range coordinates before asynchronous redraws replace the chart. */
-bool lab_plot_pan_start(gesture_handle state, chart_handle chart, event_handle event)
+bool lab_plot_pan_start(gesture_jsref state, chart_jsref chart, event_jsref event)
 {
     double box[4], bounds[4];
     if (!frame(chart, box, bounds))
@@ -345,7 +354,7 @@ bool lab_plot_pan_start(gesture_handle state, chart_handle chart, event_handle e
 }
 
 /* Translate both axes without changing their spans; the existing gesture queue resamples the result. */
-bool lab_plot_pan_move(gesture_handle state, double dx, double dy)
+bool lab_plot_pan_move(gesture_jsref state, double dx, double dy)
 {
     int geometry = lab_dom_get(state, "panGeometry");
     double values[4], offsets[] = {-dx * lab_dom_to_number(lab_dom_item(geometry, 4)),
@@ -385,7 +394,7 @@ bool lab_plot_pan_move(gesture_handle state, double dx, double dy)
 }
 
 /* This is a temporary geometric translation, never a substitute for fresh native samples. */
-void lab_plot_pan_preview(gesture_handle state)
+void lab_plot_pan_preview(gesture_jsref state)
 {
     int chart = lab_dom_get(state, "surface");
     int geometry = lab_dom_get(state, "panGeometry");
@@ -418,7 +427,7 @@ void lab_plot_pan_preview(gesture_handle state)
 }
 
 /* Cancellation restores authored strings as well as the precise coordinates behind rounded labels. */
-void lab_plot_pan_cancel(gesture_handle state)
+void lab_plot_pan_cancel(gesture_jsref state)
 {
     if (lab_dom_truth(lab_dom_get(state, "panPlane"))) {
         lab_dom_set(lab_dom_id("plotRendered"), "marsComplexPlaneBounds", lab_dom_get(state, "panPlaneSnapshot"));
@@ -436,7 +445,7 @@ void lab_plot_pan_cancel(gesture_handle state)
     lab_plot_controls_sync();
 }
 
-static void redraw_curve(chart_handle chart, browser_handle calls, int wheel)
+static void redraw_curve(chart_jsref chart, browser_jsref calls, int wheel)
 {
     if (wheel) {
         lab_plot_wheel_zoom(chart, calls);
@@ -450,7 +459,7 @@ static void redraw_curve(chart_handle chart, browser_handle calls, int wheel)
 }
 
 /* Keep surface-camera magnification separate from native curve-domain resampling. */
-bool lab_plot_pointer_zoom(browser_handle card, event_handle event, browser_handle calls, bool reset, double direction,
+bool lab_plot_pointer_zoom(browser_jsref card, event_jsref event, browser_jsref calls, bool reset, double direction,
                            bool wheel)
 {
     int panel = lab_dom_closest(lab_dom_get(event, "target"), ".complex-panel");
@@ -527,6 +536,9 @@ bool lab_plot_pointer_zoom(browser_handle card, event_handle event, browser_hand
             lab_dom_delete(lab_dom_id(ids[i]), "marsZoomValue");
             lab_dom_write(lab_dom_id(ids[i]), LAB_DOM_VALUE, "", lab_dom_item(original, i));
         }
+        lab_dom_write(lab_dom_id("plotInputRange"), LAB_DOM_VALUE, "",
+                      lab_dom_string(lab_dom_length(lab_dom_item(original, 0)) ||
+                                     lab_dom_length(lab_dom_item(original, 1)) ? "manual" : "auto"));
         lab_dom_delete(range, "marsZoomOriginal");
         lab_dom_delete(range, "marsZoomChart");
     } else {

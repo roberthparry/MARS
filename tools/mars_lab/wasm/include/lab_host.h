@@ -20,21 +20,21 @@
  * @param id Scoped codec handle to the browser value being classified; not a DOM handle or linear-memory pointer.
  * @return Kind: null 0, boolean 1, number 2, string 3, array 4 or object 5; -1 for an unsupported or invalid handle.
  */
-lab_value_kind_t lab_host_kind(codec_handle id);
+lab_value_kind_t lab_host_kind(codec_jsref id);
 
 /**
  * @brief Read a number or boolean.
  * @param id Scoped codec handle to a numeric or boolean browser value.
  * @return Numeric value; booleans become zero or one.
  */
-double lab_host_number(codec_handle id);
+double lab_host_number(codec_jsref id);
 
 /**
  * @brief Count a container's entries.
  * @param id Scoped codec handle to a browser array or snapshotted object.
  * @return Array length or captured enumerable-key count; zero when no container entries are available.
  */
-int lab_host_count(codec_handle id);
+int lab_host_count(codec_jsref id);
 
 /**
  * @brief Obtain a child's handle and kind in one host call.
@@ -42,7 +42,7 @@ int lab_host_count(codec_handle id);
  * @param index Zero-based array element index or index in the object's captured enumerable-key list.
  * @return Scoped child handle shifted left by three bits, with its kind in the low bits; -1 for an unsupported child.
  */
-int lab_host_child_info(codec_handle id, int index);
+int lab_host_child_info(codec_jsref id, int index);
 
 /**
  * @brief Copy an object key as UTF-8.
@@ -53,7 +53,7 @@ int lab_host_child_info(codec_handle id, int index);
  * @return UTF-8 byte count, or -1 if the key is absent, cannot fit or cannot round-trip through UTF-8.
  * A failed copy may leave partial bytes in target.
  */
-int lab_host_key_text(codec_handle id, int index, unsigned char *target, uint32_t capacity);
+int lab_host_key_text(codec_jsref id, int index, unsigned char *target, uint32_t capacity);
 
 /**
  * @brief Copy a string value as UTF-8.
@@ -63,7 +63,7 @@ int lab_host_key_text(codec_handle id, int index, unsigned char *target, uint32_
  * @return UTF-8 byte count, or -1 for a non-string value, insufficient capacity or a failed UTF-8 round-trip;
  * a failed copy may leave partial bytes in target.
  */
-int lab_host_text(codec_handle id, unsigned char *target, uint32_t capacity);
+int lab_host_text(codec_jsref id, unsigned char *target, uint32_t capacity);
 
 /**
  * @brief Create a decoded value and attach it to its parent.
@@ -76,7 +76,7 @@ int lab_host_text(codec_handle id, unsigned char *target, uint32_t capacity);
  * @param key_length Object key byte count, excluding any terminator; ignored for a root or array element.
  * @return New scoped codec handle, or -1 for an invalid kind, invalid parent or duplicate object key.
  */
-codec_handle lab_host_value(lab_value_kind_t kind, double number, const unsigned char *text, uint32_t length, codec_handle parent,
+codec_jsref lab_host_value(lab_value_kind_t kind, double number, const unsigned char *text, uint32_t length, codec_jsref parent,
                    const unsigned char *key, uint32_t key_length);
 
 #endif

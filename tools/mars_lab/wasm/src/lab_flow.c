@@ -24,7 +24,7 @@
 #include "lab_flow.h"
 
 /* Arguments are the bounded capability signature, not a searched catalogue. */
-browser_handle lab_flow_call(frame_handle frame, unsigned next, const char *service, const char *save, bool wait,
+browser_jsref lab_flow_call(frame_jsref frame, unsigned next, const char *service, const char *save, bool wait,
                              unsigned count, ...)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY),
@@ -32,7 +32,7 @@ browser_handle lab_flow_call(frame_handle frame, unsigned next, const char *serv
     va_list values;
     va_start(values, count);
     for (unsigned i = 0; i < count; ++i)
-        lab_dom_push(args, va_arg(values, browser_handle));
+        lab_dom_push(args, va_arg(values, browser_jsref));
     va_end(values);
     lab_dom_set(frame, "stage", lab_dom_numeric(next));
     lab_dom_set(call, "service", lab_dom_string(service));
@@ -46,13 +46,13 @@ browser_handle lab_flow_call(frame_handle frame, unsigned next, const char *serv
 }
 
 /* Existing planners keep their metadata; only their ordered effects are executed. */
-browser_handle lab_flow_effects(frame_handle frame, unsigned next, browser_handle plan)
+browser_jsref lab_flow_effects(frame_jsref frame, unsigned next, browser_jsref plan)
 {
     return lab_flow_call(frame, next, "effects", 0, lab_dom_truth(lab_dom_get(plan, "wait")), 1, plan);
 }
 
 /* Absence and an explicit false result remain distinct to callers. */
-browser_handle lab_flow_done(browser_handle value)
+browser_jsref lab_flow_done(browser_jsref value)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(plan, "done", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
@@ -62,7 +62,7 @@ browser_handle lab_flow_done(browser_handle value)
 }
 
 /* Request operations and mode ownership are policy, rather than browser branches. */
-void lab_flow_begin(lab_flow_kind_t kind, frame_handle frame)
+void lab_flow_begin(lab_flow_kind_t kind, frame_jsref frame)
 {
     static const struct {
         const char *operation;
@@ -100,58 +100,58 @@ void lab_flow_begin(lab_flow_kind_t kind, frame_handle frame)
 }
 
 /* Translate the public workflow selector into the request module's local selector. */
-static browser_handle dispatch_request(lab_flow_kind_t kind, frame_handle frame, view_handle view)
+static browser_jsref dispatch_request(lab_flow_kind_t kind, frame_jsref frame, view_jsref view)
 {
     return lab_flow_request((lab_flow_request_kind_t)(kind - LAB_FLOW_KIND_REQUEST_FUNCTION), frame, view);
 }
 
 /* Translate the public workflow selector into the state module's local selector. */
-static browser_handle dispatch_state(lab_flow_kind_t kind, frame_handle frame, view_handle view)
+static browser_jsref dispatch_state(lab_flow_kind_t kind, frame_jsref frame, view_jsref view)
 {
     return lab_flow_state((lab_flow_state_kind_t)(kind - LAB_FLOW_KIND_STATE_EDITORS), frame, view);
 }
 
 /* Translate the public workflow selector into the location module's local selector. */
-static browser_handle dispatch_location(lab_flow_kind_t kind, frame_handle frame, view_handle view)
+static browser_jsref dispatch_location(lab_flow_kind_t kind, frame_jsref frame, view_jsref view)
 {
     return lab_flow_location((lab_flow_location_kind_t)(kind - LAB_FLOW_KIND_LOCATION_FORMS), frame, view);
 }
 
 /* Translate the public workflow selector into the binding module's local selector. */
-static browser_handle dispatch_binding(lab_flow_kind_t kind, frame_handle frame, view_handle view)
+static browser_jsref dispatch_binding(lab_flow_kind_t kind, frame_jsref frame, view_jsref view)
 {
     return lab_flow_binding((lab_flow_binding_kind_t)(kind - LAB_FLOW_KIND_BINDING_SYNC), frame, view);
 }
 
 /* Translate the public workflow selector into the result module's local selector. */
-static browser_handle dispatch_result(lab_flow_kind_t kind, frame_handle frame, view_handle view)
+static browser_jsref dispatch_result(lab_flow_kind_t kind, frame_jsref frame, view_jsref view)
 {
     return lab_flow_result((lab_flow_result_kind_t)(kind - LAB_FLOW_KIND_RESULT_TRANSFER), frame, view);
 }
 
 /* Translate the public workflow selector into the transport module's local selector. */
-static browser_handle dispatch_transport(lab_flow_kind_t kind, frame_handle frame, view_handle view)
+static browser_jsref dispatch_transport(lab_flow_kind_t kind, frame_jsref frame, view_jsref view)
 {
     return lab_flow_transport((lab_flow_transport_kind_t)(kind - LAB_FLOW_KIND_TRANSPORT_POST), frame, view);
 }
 
 /* Translate the public workflow selector into the forms module's local selector. */
-static browser_handle dispatch_forms(lab_flow_kind_t kind, frame_handle frame, view_handle view)
+static browser_jsref dispatch_forms(lab_flow_kind_t kind, frame_jsref frame, view_jsref view)
 {
     return lab_flow_state_forms((lab_flow_state_forms_kind_t)(kind - LAB_FLOW_KIND_STATE_FORMS_CLEAR), frame, view);
 }
 
 /* Bootstrap has no local workflow selector. */
-static browser_handle dispatch_bootstrap(lab_flow_kind_t kind, frame_handle frame, view_handle view)
+static browser_jsref dispatch_bootstrap(lab_flow_kind_t kind, frame_jsref frame, view_jsref view)
 {
     (void)kind;
     return lab_bootstrap_step(frame, view);
 }
 
 /* Fixed dispatch tables keep independent workflows in their owning C modules; holes finish without a value. */
-void lab_flow_step(lab_flow_kind_t kind, frame_handle frame, view_handle view)
+void lab_flow_step(lab_flow_kind_t kind, frame_jsref frame, view_jsref view)
 {
-    static browser_handle (*const handlers[])(browser_handle, browser_handle) = {
+    static browser_jsref (*const handlers[])(browser_jsref, browser_jsref) = {
         [LAB_FLOW_KIND_EVALUATE] = lab_flow_evaluation,
         [LAB_FLOW_KIND_GOAL]     = lab_flow_goal,
         [LAB_FLOW_KIND_WEATHER]  = lab_flow_weather,
@@ -167,7 +167,7 @@ void lab_flow_step(lab_flow_kind_t kind, frame_handle frame, view_handle view)
         lab_dom_return(lab_flow_done(0));
         return;
     }
-    static browser_handle (*const routes[])(lab_flow_kind_t, browser_handle, browser_handle) = {
+    static browser_jsref (*const routes[])(lab_flow_kind_t, browser_jsref, browser_jsref) = {
         [LAB_FLOW_KIND_REQUEST_FUNCTION]           = dispatch_request,
         [LAB_FLOW_KIND_REQUEST_CALCULUS]           = dispatch_request,
         [LAB_FLOW_KIND_REQUEST_INTEGRATOR]         = dispatch_request,

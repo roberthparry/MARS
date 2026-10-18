@@ -49,6 +49,6 @@ void lab_function_start(bool available);
  * Failure reads both response fields even when timed out; a timed-out exception never reads its message.
  * Only output text changes: the host retains final button re-enabling and request cleanup.
  */
-void lab_function_complete(lab_request_outcome_t outcome, bool timed_out, browser_handle data, browser_handle error);
+void lab_function_complete(lab_request_outcome_t outcome, bool timed_out, browser_jsref data, browser_jsref error);
 
 #endif

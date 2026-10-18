@@ -42,7 +42,7 @@ typedef enum {
  * @param window Scoped browser Window.
  * @param state Scoped picker context containing input, button and shell nodes and native date accessors.
  */
-void lab_widget_events_install(browser_handle document, browser_handle window, browser_handle state);
+void lab_widget_events_install(browser_jsref document, browser_jsref window, browser_jsref state);
 
 /**
  * @brief Select actions for a delivered browser event.
@@ -55,6 +55,6 @@ void lab_widget_events_install(browser_handle document, browser_handle window, b
  * @details Publishes a browser event plan via lab_dom_return. Service arguments are browser values copied out
  * of the handle scope. Date text remains opaque; focus/commit services execute only after dispatch returns.
  */
-void lab_widget_events_dispatch(lab_widget_event_action_t action, event_handle event, browser_handle state);
+void lab_widget_events_dispatch(lab_widget_event_action_t action, event_jsref event, browser_jsref state);
 
 #endif

@@ -18,7 +18,7 @@
 #define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding_internal.h"
 
-static browser_handle lab_binding_row_name(unsigned index)
+static browser_jsref lab_binding_row_name(unsigned index)
 {
     static const char *const names[] = {"x", "y", "z", "t", "u", "v", "w", "r", "s"};
     return index < 9 ? lab_dom_string(names[index]) : lab_dom_format(index - 8, "x", "");
@@ -36,7 +36,7 @@ void lab_binding_row_names(void)
     lab_dom_return(names);
 }
 
-static browser_handle lab_binding_row_index(void)
+static browser_jsref lab_binding_row_index(void)
 {
     int index = lab_dom_map_new();
     unsigned mark = lab_dom_mark();
@@ -47,7 +47,7 @@ static browser_handle lab_binding_row_index(void)
     return index;
 }
 
-static void lab_binding_row_occupy(browser_handle row, browser_handle index, uint32_t occupied[4])
+static void lab_binding_row_occupy(browser_jsref row, browser_jsref index, uint32_t occupied[4])
 {
     int entry = lab_dom_map_get(index, lab_binding_name(row));
     if (entry) {
@@ -56,12 +56,12 @@ static void lab_binding_row_occupy(browser_handle row, browser_handle index, uin
     }
 }
 
-static browser_handle lab_binding_row_available(const uint32_t occupied[4])
+static browser_jsref lab_binding_row_available(const uint32_t occupied[4])
 {
     return lab_binding_row_name(lab_forms_name_candidate(occupied[0], occupied[1], occupied[2], occupied[3]));
 }
 
-static browser_handle lab_binding_row_next(browser_handle rows)
+static browser_jsref lab_binding_row_next(browser_jsref rows)
 {
     int index = lab_binding_row_index();
     uint32_t occupied[4] = {0};
@@ -74,12 +74,12 @@ static browser_handle lab_binding_row_next(browser_handle rows)
 }
 
 /* Resolve an exact candidate name without parsing identifiers or retaining browser handles. */
-void lab_binding_rows_name(browser_handle rows)
+void lab_binding_rows_name(browser_jsref rows)
 {
     lab_dom_return(lab_binding_row_next(rows));
 }
 
-static browser_handle lab_binding_row_clean(browser_handle row, browser_handle fallback)
+static browser_jsref lab_binding_row_clean(browser_jsref row, browser_jsref fallback)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT), name = lab_dom_get(row, "name");
     lab_dom_set(result, "kind", lab_dom_string(lab_binding_is(lab_dom_get(row, "kind"), "free") ? "free" : "bound"));
@@ -90,13 +90,13 @@ static browser_handle lab_binding_row_clean(browser_handle row, browser_handle f
 }
 
 /* Normalise structured row fields while preserving authored whitespace and opaque expressions. */
-void lab_binding_row_normalise(browser_handle row, browser_handle fallback)
+void lab_binding_row_normalise(browser_jsref row, browser_jsref fallback)
 {
     lab_dom_return(lab_binding_row_clean(row, fallback));
 }
 
 /* Serialise a bounded structured batch in C; publish no partial result on invalid Unicode or overflow. */
-void lab_binding_rows_text(browser_handle rows)
+void lab_binding_rows_text(browser_jsref rows)
 {
     unsigned count = lab_binding_array_count(rows), capacity = lab_workspace_capacity();
     if (count > 256) {
@@ -133,7 +133,7 @@ void lab_binding_rows_text(browser_handle rows)
     lab_dom_return(lab_dom_utf8_string(lab_workspace_input(LAB_WORKSPACE_ALTERNATE), output));
 }
 
-static browser_handle lab_binding_row_default(bool blank)
+static browser_jsref lab_binding_row_default(bool blank)
 {
     int row = lab_binding_row_clean(0, lab_dom_string("x"));
     if (!blank) {
@@ -152,7 +152,7 @@ void lab_binding_rows_default(bool blank)
 }
 
 /* Normalise render input in one pass over preceding authored names, avoiding repeated prefix scans. */
-void lab_binding_rows_prepare(browser_handle rows)
+void lab_binding_rows_prepare(browser_jsref rows)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY), index = lab_binding_row_index();
     uint32_t occupied[4] = {0};
@@ -170,7 +170,7 @@ void lab_binding_rows_prepare(browser_handle rows)
 }
 
 /* Capture every visible structured row, retaining the established fallback for an empty stack. */
-void lab_binding_rows_read(browser_handle root)
+void lab_binding_rows_read(browser_jsref root)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY), nodes = root ? lab_dom_all(root, ".integrator-bound-row") : 0;
     unsigned mark = lab_dom_mark();
@@ -189,7 +189,7 @@ void lab_binding_rows_read(browser_handle root)
 }
 
 /* Index native reference metadata by exact name, retaining the source identity alongside it. */
-void lab_binding_rows_metadata(browser_handle expression, browser_handle response)
+void lab_binding_rows_metadata(browser_jsref expression, browser_jsref response)
 {
     int metadata = lab_dom_object(LAB_VALUE_OBJECT), names = lab_dom_map_new(), rows = lab_dom_get(response, "rows");
     lab_dom_set(metadata, "expression", expression);
@@ -205,7 +205,7 @@ void lab_binding_rows_metadata(browser_handle expression, browser_handle respons
 }
 
 /* Unknown, invalid and stale metadata retain rows rather than guessing mathematical references. */
-bool lab_binding_rows_reference(browser_handle metadata, browser_handle expression, browser_handle name)
+bool lab_binding_rows_reference(browser_jsref metadata, browser_jsref expression, browser_jsref name)
 {
     if (!lab_dom_truth(metadata) || !lab_dom_truth(lab_dom_get(metadata, "valid")) ||
         !lab_dom_equal(expression, lab_dom_get(metadata, "expression")))
@@ -214,7 +214,7 @@ bool lab_binding_rows_reference(browser_handle metadata, browser_handle expressi
     return !lab_dom_type(referenced) || lab_dom_truth(referenced);
 }
 
-static void lab_binding_rows_flags(browser_handle rows)
+static void lab_binding_rows_flags(browser_jsref rows)
 {
     uint32_t *flags = lab_rows_input();
     unsigned mark = lab_dom_mark();
@@ -228,7 +228,7 @@ static void lab_binding_rows_flags(browser_handle rows)
 }
 
 /* Resolve the native row plan to opaque records, including its single fallback bound. */
-void lab_binding_rows_plan(browser_handle rows, browser_handle metadata, browser_handle expression)
+void lab_binding_rows_plan(browser_jsref rows, browser_jsref metadata, browser_jsref expression)
 {
     unsigned count = lab_binding_array_count(rows);
     if (count > 256) {
@@ -258,7 +258,7 @@ void lab_binding_rows_plan(browser_handle rows, browser_handle metadata, browser
 }
 
 /* Apply row edits atomically, retaining metadata on existing rows and clearing disabled bounds. */
-void lab_binding_rows_edit(browser_handle rows, unsigned index, lab_row_operation_t operation)
+void lab_binding_rows_edit(browser_jsref rows, unsigned index, lab_row_operation_t operation)
 {
     unsigned count = lab_binding_array_count(rows);
     if (count > 256) {
@@ -288,7 +288,7 @@ void lab_binding_rows_edit(browser_handle rows, unsigned index, lab_row_operatio
 }
 
 /* Merge native result bounds while retaining only free rows reported as variable parameters. */
-void lab_binding_rows_merge(browser_handle rows, browser_handle response)
+void lab_binding_rows_merge(browser_jsref rows, browser_jsref response)
 {
     int bounds = lab_dom_get(response, "bounds"), bindings = lab_dom_get(response, "binding_values");
     unsigned count = lab_binding_array_count(rows), bound_count = lab_binding_array_count(bounds);

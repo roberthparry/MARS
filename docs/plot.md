@@ -14,12 +14,18 @@ the client hide groups outside the drawing rectangle without parsing tick text.
 
 ## API
 
+`schematic_impulses` optionally draws uniformly thin, equal-height stems with
+dotted tips. It omits numerical vertical ticks; coordinates and
+weights remain in hover titles. Callers provide
+a zero-to-one vertical viewport. This is suitable for pure impulse spectra, not
+plots comparing weights against an ordinary curve.
+
 `PLOT_IMPULSES` interprets each point as a support coordinate and signed impulse
-weight. It draws an arrow from zero, with a weight tooltip; this is not a finite
+weight. It draws a thin stem from zero with a dotted tip and a weight tooltip; this is not a finite
 height assigned to a Dirac delta. Automatic bounds include zero and every finite
 impulse weight even when robust curve scaling is enabled. Manual bounds still
-clip the arrows. Automatic impulse ranges include a small vertical margin so
-arrowheads remain inside the frame. Arrowheads shrink with short stems;
+clip the stems. Automatic impulse ranges include a small vertical margin so
+tips remain inside the frame;
 sub-pixel stems are omitted from drawing, without changing the stored weights.
 Use separate series for real and imaginary weights.
 
@@ -160,9 +166,12 @@ intersection; explicit sampler gaps are never joined.
 Each curve series carries its XML-escaped name in an SVG `title`, providing a
 native hover tooltip even when the visible legend is disabled.
 Set `plot_options_t.legend_box` to enclose the legend in a background panel with
-coloured line samples. `legend_background` specifies its 24-bit RGB background
+coloured line samples (thin dotted-tip stems for impulse series). `legend_background` specifies its 24-bit RGB background
 (white by default). The boxed legend is drawn after the curves so they do not
 obscure its labels; unboxed legends remain the default.
+Enable `legend_above` together with `legend_box` to reserve a separate strip above
+the data rectangle instead. This keeps the legend clear of curves and impulses;
+entries are bounded to retain at least half the available plotting height.
 Curve SVG viewports also carry `data-x-min`, `data-x-max`, `data-y-min` and
 `data-y-max` attributes for UI coordinate inspection. These are double-precision
 approximations of the native bounds, not a replacement for native numerical data.

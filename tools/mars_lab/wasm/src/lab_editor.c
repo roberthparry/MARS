@@ -13,49 +13,49 @@
 #include "lab_workspace.h"
 #include "lab_editor.h"
 
-static browser_handle lab_editor_text(browser_handle value)
+static browser_jsref lab_editor_text(browser_jsref value)
 {
     return lab_dom_truth(value) ? lab_dom_text(value) : lab_dom_string("");
 }
 
-static browser_handle lab_editor_trim(browser_handle value)
+static browser_jsref lab_editor_trim(browser_jsref value)
 {
     return lab_dom_clean(lab_editor_text(value), LAB_DOM_CLEAN_TRIM);
 }
 
 /* Only complete native source/display keys can resolve metadata. */
-browser_handle lab_editor_lookup(browser_handle text, browser_handle editors)
+browser_jsref lab_editor_lookup(browser_jsref text, browser_jsref editors)
 {
     int metadata = lab_dom_map_get(editors, lab_editor_trim(text));
     return lab_dom_truth(metadata) ? metadata : 0;
 }
 
-static browser_handle lab_editor_expression(browser_handle text, browser_handle editors)
+static browser_jsref lab_editor_expression(browser_jsref text, browser_jsref editors)
 {
     int value = lab_dom_get(lab_editor_lookup(text, editors), "expression");
     return lab_dom_truth(value) ? value : lab_editor_trim(text);
 }
 
-static browser_handle lab_editor_restore(browser_handle text, browser_handle editors)
+static browser_jsref lab_editor_restore(browser_jsref text, browser_jsref editors)
 {
     int source = lab_editor_trim(text);
     int value = lab_dom_get(lab_editor_lookup(source, editors), "text");
     return lab_dom_truth(value) ? value : source;
 }
 
-static browser_handle lab_editor_body(browser_handle text, browser_handle editors)
+static browser_jsref lab_editor_body(browser_jsref text, browser_jsref editors)
 {
     int value = lab_dom_get(lab_editor_lookup(text, editors), "body");
     return value ? value : lab_editor_trim(text);
 }
 
-static browser_handle lab_editor_bindings(browser_handle text, browser_handle editors)
+static browser_jsref lab_editor_bindings(browser_jsref text, browser_jsref editors)
 {
     int editor = lab_editor_lookup(text, editors);
     return lab_dom_truth(lab_dom_get(editor, "wrapped")) ? editor : 0;
 }
 
-static browser_handle lab_editor_compact(browser_handle text, browser_handle editors)
+static browser_jsref lab_editor_compact(browser_jsref text, browser_jsref editors)
 {
     int source = lab_editor_text(text), editor = lab_editor_lookup(source, editors);
     int compact = lab_dom_object(LAB_VALUE_OBJECT);
@@ -74,7 +74,7 @@ static browser_handle lab_editor_compact(browser_handle text, browser_handle edi
 }
 
 /* Resolve staged source before accessing other getters that might reuse workspace buffers. */
-browser_handle lab_editor_current_value(view_handle view)
+browser_jsref lab_editor_current_value(view_jsref view)
 {
     int raw = lab_dom_get(view, "rawEditor");
     if (!raw)
@@ -89,9 +89,9 @@ browser_handle lab_editor_current_value(view_handle view)
 }
 
 /* Boxed input values prevent numeric browser values being mistaken for scoped handles. */
-void lab_editor_metadata(lab_editor_metadata_t kind, browser_handle inputs, browser_handle editors)
+void lab_editor_metadata(lab_editor_metadata_t kind, browser_jsref inputs, browser_jsref editors)
 {
-    static browser_handle (*const projections[])(browser_handle, browser_handle) = {
+    static browser_jsref (*const projections[])(browser_jsref, browser_jsref) = {
         [LAB_EDITOR_LOOKUP]     = lab_editor_lookup,
         [LAB_EDITOR_EXPRESSION] = lab_editor_expression,
         [LAB_EDITOR_RESTORE]    = lab_editor_restore,
@@ -104,13 +104,13 @@ void lab_editor_metadata(lab_editor_metadata_t kind, browser_handle inputs, brow
 }
 
 /* Share the exact same selection policy with setup and installation consumers inside C. */
-void lab_editor_current(view_handle view)
+void lab_editor_current(view_jsref view)
 {
     lab_dom_return(lab_editor_current_value(view));
 }
 
 /* Structured worksheets do not inspect or validate the mathematical editor. */
-void lab_editor_ready(browser_handle inputs, view_handle view)
+void lab_editor_ready(browser_jsref inputs, view_jsref view)
 {
     int ready = !lab_dom_equal(lab_dom_item(inputs, 0), lab_dom_string("expression")) ||
                 lab_dom_truth(lab_editor_current_value(view));

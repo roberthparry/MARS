@@ -308,7 +308,8 @@ static void check_folded_spectrum(const char *source, spectrum_fixture_t *fixtur
     bool preview = false;
     expr_t *regular = expr_distribution_decompose(result, expr_bindings_get(bindings, "k"),
                                                    check_spectral_weight, fixture, &preview);
-    lab_math_check(regular && preview && fixture->count == (fixture->sign < 0 ? 65u : 64u),
+    /* Each signed harmonic sum contributes 100 terms; acos also contributes its constant impulse. */
+    lab_math_check(regular && preview && fixture->count == (fixture->sign < 0 ? 201u : 200u),
                    "folded Fourier spectra retain every signed odd harmonic in the bounded preview");
     expr_free(regular);
     expr_free(result);

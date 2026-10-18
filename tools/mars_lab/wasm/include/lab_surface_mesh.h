@@ -19,6 +19,6 @@
  * Polygon fans preserve input ordering. Temporary handles are released per SVG record.
  * Empty geometry is accepted only when the chart explicitly carries data-empty="true".
  */
-void lab_surface_mesh(chart_handle chart);
+void lab_surface_mesh(chart_jsref chart);
 
 #endif

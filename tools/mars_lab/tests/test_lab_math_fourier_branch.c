@@ -74,7 +74,7 @@ static void test_full_distribution_and_mathematical_notation(void)
             for (size_t i = 0; i < 4; ++i)
                 lab_math_contains(math_fourier_text(r, cards[c]), forbidden[i], false);
         if (f) {
-            lab_math_contains(math_fourier_text(r, "tex"), "\\operatorname{Fp}_{1}", true);
+            lab_math_contains(math_fourier_text(r, "tex"), "\\operatorname{Fp}\\!\\left[", true);
             lab_math_contains(math_fourier_text(r, "tex"), "\\underbrace", false);
             lab_math_contains(math_fourier_text(r, "expression"), "step(k)/k", true);
             lab_math_contains(math_fourier_text(r, "expression"), "Dk(", false);
@@ -92,7 +92,7 @@ static void test_full_distribution_and_mathematical_notation(void)
         const char *identity = math_fourier_text(r, "transform_identity_TeX");
         lab_math_contains(identity, "\\omega", true);
         lab_math_contains(identity, "\\delta", true);
-        lab_math_contains(identity, "\\operatorname{Fp}_{1}", true);
+        lab_math_contains(identity, "\\operatorname{Fp}\\!\\left[", true);
         lab_math_contains(identity, " = ", true);
         lab_math_contains(identity, "NAN", false);
         lab_math_contains(identity, "\\ne 0", false);
@@ -302,7 +302,7 @@ static void test_readme_gamma_fourier_pair(void)
 {
     /* README examples: docs/expression.md, inverse-function and gamma pairs. */
     lab_math_equal(lab_math_algebra(math_fourier_fields("@F{gamma(1+i*x)}", "k")), "2π·exp(k - exp(k))");
-    lab_math_equal(lab_math_algebra(math_fourier_fields("@Finv{2*@pi*exp(k-exp(k))}", "x")), "Γ(ix + 1)");
+    lab_math_equal(lab_math_algebra(math_fourier_fields("@Finv{2*@pi*exp(k-exp(k))}", "x")), "Γ(1 + i·x)");
     const json_t *r = math_fourier_fields("Fourier(gamma(x),x,k)", "k");
     lab_math_equal(math_fourier_text(r, "value"), "NAN");
     lab_math_contains(math_fourier_text(r, "value_note"), "no ordinary or tempered-distribution", true);

@@ -37,7 +37,7 @@ typedef enum {
  * exponent recipe. The segment baseline comes only from its chart, never shared controls that a sibling
  * plot may have changed; reset retains it. Browser objects own retained state, not the scoped handle integers.
  */
-void lab_surface_volume_init(view_handle view, browser_handle saved, bool same);
+void lab_surface_volume_init(view_jsref view, browser_jsref saved, bool same);
 
 /**
  * @brief Change the displayed volume from a gesture or restore the last accepted sample.
@@ -57,13 +57,13 @@ void lab_surface_volume_init(view_handle view, browser_handle saved, bool same);
  * controls and dirty state; invalid pinch distances leave state unchanged. Rollback restores sampled bounds,
  * exponent and camera scale without resampling, leaving baseline, curve proportions and orientation unchanged.
  */
-bool lab_surface_zoom(view_handle view, lab_surface_zoom_kind_t kind, double value, event_handle event, bool reset);
+bool lab_surface_zoom(view_jsref view, lab_surface_zoom_kind_t kind, double value, event_jsref event, bool reset);
 
 /**
  * @brief Update the zoom slider and accessible readout from the binary exponent.
  * @param view Scoped prepared view record; volume.exponent controls the readout and chart type selects its hint.
  */
-void lab_surface_zoom_sync(view_handle view);
+void lab_surface_zoom_sync(view_jsref view);
 
 /**
  * @brief Borrow a scoped preview label, retaining native text for accepted samples.
@@ -72,6 +72,6 @@ void lab_surface_zoom_sync(view_handle view);
  * @return Scoped browser string handle: the original label for a clean volume, an approximate preview otherwise,
  * or an empty string for invalid bounds. The handle is valid only within the current browser bridge scope.
  */
-browser_handle lab_surface_tick_label(browser_handle volume, browser_handle tick);
+browser_jsref lab_surface_tick_label(browser_jsref volume, browser_jsref tick);
 
 #endif

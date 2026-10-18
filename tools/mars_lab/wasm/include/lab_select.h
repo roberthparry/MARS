@@ -64,21 +64,21 @@ typedef enum {
  * @param search_placeholder Scoped search-input placeholder and accessible-label string.
  * @return True when the menu was created; false for an absent or already enhanced select.
  */
-bool lab_select_create(node_handle select, browser_handle label, bool searchable, browser_handle placeholder,
-                       browser_handle empty, browser_handle search_placeholder);
+bool lab_select_create(node_jsref select, browser_jsref label, bool searchable, browser_jsref placeholder,
+                       browser_jsref empty, browser_jsref search_placeholder);
 
 /**
  * @brief Rebuild menu options with bounded temporary handles.
  * @param select Scoped native select-node handle whose options supply values, labels and disabled state.
  * @param details True includes each option's dataset.detail in a second column; false omits details.
  */
-void lab_select_rebuild(node_handle select, bool details);
+void lab_select_rebuild(node_jsref select, bool details);
 
 /**
  * @brief Project the native selection, disabled state and current search filter.
  * @param select Scoped enhanced select-node handle; no action when its surrounding menu is absent.
  */
-void lab_select_sync(node_handle select);
+void lab_select_sync(node_jsref select);
 
 /**
  * @brief Apply selection-menu interaction policy.
@@ -89,7 +89,7 @@ void lab_select_sync(node_handle select);
  * @return True when the caller must suppress the key's browser default and propagation; false otherwise,
  * including invalid selectors and ordinary pointer selection.
  */
-bool lab_select_event(node_handle select, lab_select_source_t source, lab_select_key_t key, browser_handle target);
+bool lab_select_event(node_jsref select, lab_select_source_t source, lab_select_key_t key, browser_jsref target);
 
 /**
  * @brief Create, register and initially project an accessible selection menu.
@@ -102,7 +102,7 @@ bool lab_select_event(node_handle select, lab_select_source_t source, lab_select
  * JavaScript factory may retain sync/close closures and the existing __mars callback
  * properties, but performs no listener registration or event policy itself.
  */
-bool lab_select_enhance(node_handle select, browser_handle options, browser_handle document);
+bool lab_select_enhance(node_jsref select, browser_jsref options, browser_jsref document);
 
 /**
  * @brief Rebuild a menu using its current opaque presentation options.
@@ -112,7 +112,7 @@ bool lab_select_enhance(node_handle select, browser_handle options, browser_hand
  * @details The browser may capture the original options object in a rebuild closure; C reads its current
  * values on every call, so later option changes remain effective.
  */
-void lab_select_refresh(node_handle select, browser_handle options);
+void lab_select_refresh(node_jsref select, browser_jsref options);
 
 /**
  * @brief Subscribe the controls of an existing native-built menu once.
@@ -123,7 +123,7 @@ void lab_select_refresh(node_handle select, browser_handle options);
  * select object as its browser-owned context; no opaque handle is retained. A marker
  * on the select prevents repeated registration from duplicating any listener.
  */
-bool lab_select_register(node_handle select);
+bool lab_select_register(node_jsref select);
 
 /**
  * @brief Dispatch a browser event registered by the select module.
@@ -137,6 +137,6 @@ bool lab_select_register(node_handle select);
  * lab_select_event. Focus and change effects execute only after the handle scope
  * closes, permitting event listeners to enter the bridge again safely.
  */
-void lab_select_dispatch(lab_select_action_t action, event_handle event, node_handle select);
+void lab_select_dispatch(lab_select_action_t action, event_jsref event, node_jsref select);
 
 #endif

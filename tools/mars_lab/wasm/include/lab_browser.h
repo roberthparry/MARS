@@ -69,14 +69,14 @@ unsigned char *lab_browser_output_buffer(void);
  * @param root Borrowed codec-table handle for a browser object, not an array or scalar; valid for this codec call.
  * @return Encoded byte count, or zero for invalid, excessively deep or oversized data.
  */
-uint32_t lab_browser_encode(codec_handle root);
+uint32_t lab_browser_encode(codec_jsref root);
 
 /**
  * @brief Decode a complete version-one envelope from the input staging buffer.
  * @param size Staged byte count, at most 8 MiB.
  * @return Decoded object handle in the current codec table, or -1 for invalid data or exceeded limits.
  */
-codec_handle lab_browser_decode(uint32_t size);
+codec_jsref lab_browser_decode(uint32_t size);
 
 /**
  * @brief Encode a host object as a padded base64 Protobuf storage record.
@@ -84,7 +84,7 @@ codec_handle lab_browser_decode(uint32_t size);
  * @return Character count in lab_browser_input_buffer without a NUL terminator, or zero for invalid or oversized data.
  * Copy the result before another codec operation; the saved-record format is unchanged.
  */
-uint32_t lab_browser_storage_encode(codec_handle root);
+uint32_t lab_browser_storage_encode(codec_jsref root);
 
 /**
  * @brief Decode a canonical padded base64 record staged in the input buffer.
@@ -92,7 +92,7 @@ uint32_t lab_browser_storage_encode(codec_handle root);
  * @return Decoded object handle in the current codec table, or -1 for malformed base64, Protobuf or exceeded limits.
  * Decodes in place; the caller must clear the staged region after consuming the result.
  */
-codec_handle lab_browser_storage_decode(uint32_t size);
+codec_jsref lab_browser_storage_decode(uint32_t size);
 
 /**
  * @brief Clamp finite precision to the supported saved-value range.

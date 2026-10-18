@@ -35,7 +35,7 @@
 /** @brief Opaque mutable scene; release with plot_free(). */
 typedef struct _plot_t plot_t;
 
-/** @brief Line, point or signed impulse-weight arrow rendering, selected by direct function dispatch. */
+/** @brief Line, point or dotted-tip impulse-stem rendering, selected by direct function dispatch. */
 typedef enum { PLOT_LINES, PLOT_POINTS, PLOT_IMPULSES } plot_style_t;
 
 /** @brief Borrowed input coordinate; non-real/non-finite values mark a gap. */
@@ -55,7 +55,9 @@ typedef struct {
     bool smart_y; /**< Opt-in robust curve Y or surface height range; no visible clipping annotation. */
     bool guard_gaps; /**< Use robust Y bounds for discontinuous line series even in Fit all; manual bounds win. */
     bool equal_units; /**< Preserve equal physical coordinate units in two-dimensional projections. */
-    bool legend_box; /**< Enclose the series legend in a background box with coloured line samples. */
+    bool legend_box; /**< Enclose the legend in a box with coloured line or dotted-tip impulse samples. */
+    bool legend_above; /**< Reserve space above the axes for a boxed legend; requires legend and legend_box. */
+    bool schematic_impulses; /**< Draw equal-height thin stems with dotted tips; weights remain in hover titles. */
     uint32_t legend_background; /**< 24-bit RGB background for a boxed legend. */
     uint32_t axis_colour, grid_colour, label_colour; /**< 24-bit RGB colours for axes, grid and tick/axis labels. */
 } plot_options_t;

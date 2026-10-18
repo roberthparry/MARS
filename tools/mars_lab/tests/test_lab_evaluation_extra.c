@@ -791,6 +791,22 @@ static void test_lab_extra_complex_domain_gaps(void)
 
 static void test_lab_extra_distribution_plot(void)
 {
+    expect_response("/eval", "{\"expression\":\"@F{sin(t)}\",\"action\":\"plot\",\"wrt\":\"ω\"}",
+                    200u, "plot_svg", "data-x-min=\"-1.1");
+    expect_response("/eval", "{\"expression\":\"@F{sin(t)}\",\"action\":\"plot\",\"wrt\":\"ω\"}",
+                    200u, "plot_svg", "data-x-max=\"1.1");
+    expect_response("/eval", "{\"expression\":\"@F{zeta(sigma+it)}\",\"action\":\"plot\",\"wrt\":\"ω\"}",
+                    200u, "plot_svg", "data-spectrum-pending");
+    expect_response("/eval", "{\"expression\":\"{@F{zeta(sigma+it)} | sigma=2}\",\"action\":\"plot\",\"wrt\":\"ω\"}",
+                    200u, "plot_svg", "data-impulse");
+    expect_response("/eval", "{\"expression\":\"{@F{zeta(sigma+it)} | sigma=2+i}\",\"action\":\"plot\",\"wrt\":\"ω\"}",
+                    200u, "plot_title", "Fourier spectrum");
+    expect_response("/eval", "{\"expression\":\"{@F{zeta(sigma+it)} | sigma=2}\",\"action\":\"plot\",\"wrt\":\"ω\"}",
+                    200u, "plot_svg", "data-schematic-impulse");
+    expect_response("/eval", "{\"expression\":\"{@F{zeta(sigma+it)} | sigma=2}\",\"action\":\"plot\",\"wrt\":\"ω\"}",
+                    200u, "plot_title_TeX", "\\mathcal{F}");
+    expect_response("/eval", "{\"expression\":\"{@F{zeta(sigma+it)} | sigma=2}\",\"action\":\"plot\",\"wrt\":\"ω\"}",
+                    200u, "plot_title_TeX", "\\sigma + i\\,t");
     const char *sources[] = {"@F{step(t)}", "@F{acos(sin(pi-x))}", "@F{step(x)}", "@F{asin(t)}"};
     const char *variables[] = {"ω", "k", "k", "ω"};
     for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
@@ -801,15 +817,22 @@ static void test_lab_extra_distribution_plot(void)
         bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-impulse") &&
                   contains(fields, "plot_svg", "Imaginary") && !contains(fields, "function", "fourier(") &&
                   (i == 1 || contains(fields, "plot_svg", "Imaginary curve")) &&
-                  contains(fields, "plot_svg", "impulse weight") && contains(fields, "plot_svg", "Value / weight") &&
-                  contains(fields, "plot_notice", "not point values") &&
-                  contains(fields, "plot_notice", "no pointwise 3-D, complex-plane or amplitude view") &&
+                  contains(fields, "plot_svg", "impulse weight") &&
+                  (i == 1 || contains(fields, "plot_svg", "Value / weight")) &&
+                  contains(fields, "plot_svg", "data-plot-legend=\"true\"") &&
+                  contains(fields, "plot_svg", "data-distribution-spectrum=\"true\"") &&
+                  (i != 3 || contains(fields, "plot_svg", "#b5a0ef")) &&
+                  (i == 1 ? contains(fields, "plot_svg", "data-schematic-impulse") :
+                            contains(fields, "plot_svg", "data-impulse-key=\"true\"")) &&
+                  (i == 1 ? !*lab_eval_text(fields, "plot_notice") :
+                            contains(fields, "plot_notice", "not point values")) &&
                   !*lab_eval_text(fields, "plot_complex_plane") && !*lab_eval_text(fields, "plot_amplitude");
         const char *svg = lab_eval_text(fields, "plot_svg");
         const char *curve = svg ? strstr(svg, "data-series=\"0\"") : NULL;
         const char *end = curve ? strstr(curve, "</g>") : NULL;
         const char *path = curve ? strstr(curve, "<path") : NULL;
-        ok = ok && curve && end && path && path < end && contains(fields, "plot_svg", "data-x-min=\"-10\"");
+        ok = ok && curve && end && path && path < end &&
+             (i == 1 || contains(fields, "plot_svg", "data-x-min=\"-10\""));
         if (!ok)
             show_failure(fields);
         json_free(fields);
@@ -827,7 +850,7 @@ static void test_lab_extra_distribution_plot(void)
                  !contains(fields, "transform_identity_TeX", "Non-impulse part") &&
                  !contains(fields, "transform_identity_TeX", "Curve values only where") &&
                  !contains(fields, "transform_identity_TeX", "\\ne 0") &&
-                 contains(fields, "transform_identity_TeX", i == 3 ? "\\operatorname{Fp}_{1}" : "principal value");
+                 contains(fields, "transform_identity_TeX", i == 3 ? "\\operatorname{Fp}" : "principal value");
         if (!ok)
             show_failure(fields);
         json_free(fields);

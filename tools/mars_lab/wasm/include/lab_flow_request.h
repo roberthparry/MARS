@@ -33,6 +33,6 @@ typedef enum {
  * @param view Scoped browser handle to the application capability view used for presentation; ignored by other kinds.
  * @return Scoped browser handle to a continuation plan for the host interpreter; an inert completion for invalid kinds.
  */
-browser_handle lab_flow_request(lab_flow_request_kind_t kind, frame_handle frame, view_handle view);
+browser_jsref lab_flow_request(lab_flow_request_kind_t kind, frame_jsref frame, view_jsref view);
 
 #endif

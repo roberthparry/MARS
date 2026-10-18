@@ -37,13 +37,13 @@ typedef enum {
  * @param markup Scoped browser handle to the SVG markup string to parse in a temporary element.
  * @return Intrinsic width in CSS pixels, falling back to view-box width; zero when no SVG is present.
  */
-double lab_layout_markup_width(browser_handle markup);
+double lab_layout_markup_width(browser_jsref markup);
 
 /**
  * @brief Project a registered card's native zoom into CSS, SVG dimensions and toolbar controls.
  * @param card Scoped browser handle to a registered result-card node; zero or an unregistered card is ignored.
  */
-void lab_layout_zoom(browser_handle card);
+void lab_layout_zoom(browser_jsref card);
 
 /**
  * @brief Change a card's native zoom, project it and schedule responsive fitting.
@@ -54,7 +54,7 @@ void lab_layout_zoom(browser_handle card);
  * @param operation Absolute entry selection or a relative step.
  * Other non-zero values retain step behaviour for ABI compatibility.
  */
-void lab_layout_set_zoom(browser_handle card, double index, lab_layout_zoom_operation_t operation);
+void lab_layout_set_zoom(browser_jsref card, double index, lab_layout_zoom_operation_t operation);
 
 /**
  * @brief Project exclusive result-card or complex-panel expansion.
@@ -62,14 +62,14 @@ void lab_layout_set_zoom(browser_handle card, double index, lab_layout_zoom_oper
  * @param operation Render current expansion 0, toggle the selected card/panel 1 or collapse cards 2;
  * other operations do nothing.
  */
-void lab_layout_expand(browser_handle card, lab_layout_expansion_t operation);
+void lab_layout_expand(browser_jsref card, lab_layout_expansion_t operation);
 
 /**
  * @brief Install native rendered output in the main rendered-result region.
  * @param svg Scoped browser handle to native SVG markup; empty text selects fallback.
  * @param fallback Scoped browser handle to plain text displayed when svg is empty.
  */
-void lab_layout_content(browser_handle svg, browser_handle fallback);
+void lab_layout_content(browser_jsref svg, browser_jsref fallback);
 
 /**
  * @brief Install a standalone plot without changing the evaluation cards.
@@ -78,7 +78,7 @@ void lab_layout_content(browser_handle svg, browser_handle fallback);
  * @param error Scoped browser handle to a diagnostic string, or zero for success; a diagnostic retains an
  * existing coordinate-bearing chart. Both result and error zero display pending work.
  */
-void lab_layout_plot(browser_handle result, browser_handle error);
+void lab_layout_plot(browser_jsref result, browser_jsref error);
 
 /**
  * @brief Move live camera controls beside their curve, or home before replacing or saving plot markup.
@@ -103,14 +103,14 @@ bool lab_layout_solver_wrapped(void);
  * @param variant Scoped browser handle to the variant name, normally compact or wrapped; an unchanged name
  * suppresses replacement of the existing markup.
  */
-void lab_layout_solver_install(browser_handle markup, browser_handle variant);
+void lab_layout_solver_install(browser_jsref markup, browser_jsref variant);
 
 /**
  * @brief Reset a digit-expansion button to its collapsed label and visibility.
  * @param button Scoped browser handle to the Show more digits button.
  * @param enabled True shows the button because native metadata permits expansion; false hides it.
  */
-void lab_layout_more(browser_handle button, bool enabled);
+void lab_layout_more(browser_jsref button, bool enabled);
 
 /**
  * @brief Set or clear rendered-result error presentation.
@@ -118,6 +118,6 @@ void lab_layout_more(browser_handle button, bool enabled);
  * Ignored when clearing error presentation.
  * @param error True invalidates rendered metadata and installs the diagnostic; false removes error styling.
  */
-void lab_layout_error(browser_handle message, bool error);
+void lab_layout_error(browser_jsref message, bool error);
 
 #endif

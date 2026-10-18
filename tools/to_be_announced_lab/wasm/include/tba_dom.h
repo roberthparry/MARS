@@ -15,14 +15,14 @@
  * @brief Borrow the browser-owned application context.
  * @return Scoped context handle.
  */
-browser_handle tba_dom_root(void);
+browser_jsref tba_dom_root(void);
 
 /**
  * @brief Find a DOM element by exact ID.
  * @param id Borrowed static UTF-8 ID.
  * @return Scoped node or zero.
  */
-node_handle tba_dom_id(const char *id);
+node_jsref tba_dom_id(const char *id);
 
 /**
  * @brief Find a descendant or document node.
@@ -30,7 +30,7 @@ node_handle tba_dom_id(const char *id);
  * @param selector Static CSS selector.
  * @return Scoped node or zero.
  */
-node_handle tba_dom_query(node_handle node, const char *selector);
+node_jsref tba_dom_query(node_jsref node, const char *selector);
 
 /**
  * @brief Snapshot matching descendants.
@@ -38,7 +38,7 @@ node_handle tba_dom_query(node_handle node, const char *selector);
  * @param selector Static selector.
  * @return Scoped list.
  */
-browser_handle tba_dom_all(node_handle node, const char *selector);
+browser_jsref tba_dom_all(node_jsref node, const char *selector);
 
 /**
  * @brief Read a property.
@@ -46,7 +46,7 @@ browser_handle tba_dom_all(node_handle node, const char *selector);
  * @param key Static property name.
  * @return Scoped value or zero.
  */
-browser_handle tba_dom_get(browser_handle object, const char *key);
+browser_jsref tba_dom_get(browser_jsref object, const char *key);
 
 /**
  * @brief Read a property using opaque text.
@@ -54,7 +54,7 @@ browser_handle tba_dom_get(browser_handle object, const char *key);
  * @param key Scoped string.
  * @return Scoped value.
  */
-browser_handle tba_dom_key_get(browser_handle object, browser_handle key);
+browser_jsref tba_dom_key_get(browser_jsref object, browser_jsref key);
 
 /**
  * @brief Store an own data property.
@@ -62,7 +62,7 @@ browser_handle tba_dom_key_get(browser_handle object, browser_handle key);
  * @param key Static name.
  * @param value Scoped value.
  */
-void tba_dom_set(browser_handle object, const char *key, browser_handle value);
+void tba_dom_set(browser_jsref object, const char *key, browser_jsref value);
 
 /**
  * @brief Store an own data property with an opaque key.
@@ -70,7 +70,7 @@ void tba_dom_set(browser_handle object, const char *key, browser_handle value);
  * @param key Scoped name.
  * @param value Scoped value.
  */
-void tba_dom_key_set(browser_handle object, browser_handle key, browser_handle value);
+void tba_dom_key_set(browser_jsref object, browser_jsref key, browser_jsref value);
 
 /**
  * @brief Read an indexed value.
@@ -78,58 +78,58 @@ void tba_dom_key_set(browser_handle object, browser_handle key, browser_handle v
  * @param index Zero-based position.
  * @return Scoped value.
  */
-browser_handle tba_dom_item(browser_handle list, unsigned index);
+browser_jsref tba_dom_item(browser_jsref list, unsigned index);
 
 /**
  * @brief Count array or collection members.
  * @param list Scoped array or collection.
  * @return Member count.
  */
-unsigned tba_dom_count(browser_handle list);
+unsigned tba_dom_count(browser_jsref list);
 
 /**
  * @brief Create a temporary container.
  * @param array Non-zero for an array; zero for a null-prototype object.
  * @return Scoped container.
  */
-browser_handle tba_dom_object(unsigned array);
+browser_jsref tba_dom_object(unsigned array);
 
 /**
  * @brief Append to a temporary array.
  * @param array Scoped array.
  * @param value Scoped value.
  */
-void tba_dom_push(browser_handle array, browser_handle value);
+void tba_dom_push(browser_jsref array, browser_jsref value);
 
 /**
  * @brief List enumerable property names.
  * @param object Scoped object.
  * @return Scoped key array.
  */
-browser_handle tba_dom_keys(browser_handle object);
+browser_jsref tba_dom_keys(browser_jsref object);
 
 /**
  * @brief Copy a static UTF-8 literal.
  * @param text NUL-terminated text.
  * @return Scoped string.
  */
-browser_handle tba_dom_string(const char *text);
+browser_jsref tba_dom_string(const char *text);
 
 /**
  * @brief Convert a value to text without changing its meaning.
  * @param value Scoped value; absent becomes empty.
  * @return Scoped string.
  */
-browser_handle tba_dom_text(browser_handle value);
+browser_jsref tba_dom_text(browser_jsref value);
 
 /** @brief Count browser string code units. @param text Scoped text. @return Length. */
-unsigned tba_dom_length(browser_handle text);
+unsigned tba_dom_length(browser_jsref text);
 
 /** @brief Read a browser string code unit. @param text Scoped text. @param index Position. @return Code unit or zero. */
-unsigned tba_dom_char(browser_handle text, unsigned index);
+unsigned tba_dom_char(browser_jsref text, unsigned index);
 
 /** @brief Slice opaque text. @param text Scoped text. @param begin Start. @param end Exclusive end. @return Scoped text. */
-browser_handle tba_dom_slice(browser_handle text, unsigned begin, unsigned end);
+browser_jsref tba_dom_slice(browser_jsref text, unsigned begin, unsigned end);
 
 /**
  * @brief Trim Unicode text and optionally lowercase.
@@ -137,7 +137,7 @@ browser_handle tba_dom_slice(browser_handle text, unsigned begin, unsigned end);
  * @param lower Non-zero to lowercase.
  * @return Scoped string.
  */
-browser_handle tba_dom_clean(browser_handle value, unsigned lower);
+browser_jsref tba_dom_clean(browser_jsref value, unsigned lower);
 
 /**
  * @brief Split opaque text at a literal separator.
@@ -145,7 +145,7 @@ browser_handle tba_dom_clean(browser_handle value, unsigned lower);
  * @param separator Static separator.
  * @return Scoped array.
  */
-browser_handle tba_dom_split(browser_handle text, const char *separator);
+browser_jsref tba_dom_split(browser_jsref text, const char *separator);
 
 /**
  * @brief Join opaque text fragments.
@@ -153,7 +153,7 @@ browser_handle tba_dom_split(browser_handle text, const char *separator);
  * @param separator Static separator.
  * @return Scoped string.
  */
-browser_handle tba_dom_join(browser_handle array, const char *separator);
+browser_jsref tba_dom_join(browser_jsref array, const char *separator);
 
 /**
  * @brief Compare opaque values strictly.
@@ -161,35 +161,35 @@ browser_handle tba_dom_join(browser_handle array, const char *separator);
  * @param right Second scoped value.
  * @return Equality flag.
  */
-int tba_dom_equal(browser_handle left, browser_handle right);
+int tba_dom_equal(browser_jsref left, browser_jsref right);
 
 /**
  * @brief Read browser truthiness.
  * @param value Scoped value.
  * @return Boolean coercion.
  */
-int tba_dom_truth(browser_handle value);
+int tba_dom_truth(browser_jsref value);
 
 /**
  * @brief Classify a scoped value.
  * @param value Scoped value.
  * @return Null 0, boolean 1, number 2, string 3, array 4, object 5.
  */
-unsigned tba_dom_type(browser_handle value);
+unsigned tba_dom_type(browser_jsref value);
 
 /**
  * @brief Convert an opaque numeric control value.
  * @param value Scoped value.
  * @return Number, including NaN.
  */
-double tba_dom_number(browser_handle value);
+double tba_dom_number(browser_jsref value);
 
 /**
  * @brief Wrap a numeric value.
  * @param value Number.
  * @return Scoped number.
  */
-browser_handle tba_dom_numeric(double value);
+browser_jsref tba_dom_numeric(double value);
 
 /**
  * @brief Format numeric presentation using browser formatting.
@@ -197,14 +197,14 @@ browser_handle tba_dom_numeric(double value);
  * @param digits Fixed decimals, -1 for plain, or -(decimals + 2) for localised text.
  * @return Scoped string.
  */
-browser_handle tba_dom_format(double value, int digits);
+browser_jsref tba_dom_format(double value, int digits);
 
 /**
  * @brief Escape text for insertion into HTML or an attribute.
  * @param text Scoped text.
  * @return Scoped escaped string.
  */
-browser_handle tba_dom_escape(browser_handle text);
+browser_jsref tba_dom_escape(browser_jsref text);
 
 /**
  * @brief Read browser text.
@@ -213,7 +213,7 @@ browser_handle tba_dom_escape(browser_handle text);
  * @param key Static field name.
  * @return Scoped string.
  */
-browser_handle tba_dom_read(node_handle node, unsigned kind, const char *key);
+browser_jsref tba_dom_read(node_jsref node, unsigned kind, const char *key);
 
 /**
  * @brief Write browser text.
@@ -222,7 +222,7 @@ browser_handle tba_dom_read(node_handle node, unsigned kind, const char *key);
  * @param key Static field.
  * @param value Scoped text.
  */
-void tba_dom_write(node_handle node, unsigned kind, const char *key, browser_handle value);
+void tba_dom_write(node_jsref node, unsigned kind, const char *key, browser_jsref value);
 
 /**
  * @brief Set a boolean DOM property.
@@ -230,7 +230,7 @@ void tba_dom_write(node_handle node, unsigned kind, const char *key, browser_han
  * @param key Static property.
  * @param flag Desired value.
  */
-void tba_dom_flag(node_handle node, const char *key, int flag);
+void tba_dom_flag(node_jsref node, const char *key, int flag);
 
 /**
  * @brief Toggle a CSS class.
@@ -238,7 +238,7 @@ void tba_dom_flag(node_handle node, const char *key, int flag);
  * @param name Static class.
  * @param enabled Desired state.
  */
-void tba_dom_class(node_handle node, const char *name, int enabled);
+void tba_dom_class(node_jsref node, const char *name, int enabled);
 
 /**
  * @brief Query a CSS class.
@@ -246,7 +246,7 @@ void tba_dom_class(node_handle node, const char *name, int enabled);
  * @param name Static class.
  * @return Membership flag.
  */
-int tba_dom_has_class(node_handle node, const char *name);
+int tba_dom_has_class(node_jsref node, const char *name);
 
 /**
  * @brief Find an ancestor matching a selector.
@@ -254,13 +254,13 @@ int tba_dom_has_class(node_handle node, const char *name);
  * @param selector Static selector.
  * @return Scoped node.
  */
-node_handle tba_dom_closest(node_handle node, const char *selector);
+node_jsref tba_dom_closest(node_jsref node, const char *selector);
 
 /**
  * @brief Prevent the default browser event action.
  * @param event Scoped event.
  */
-void tba_dom_prevent(event_handle event);
+void tba_dom_prevent(event_jsref event);
 
 /**
  * @brief Register native event dispatch.
@@ -268,7 +268,7 @@ void tba_dom_prevent(event_handle event);
  * @param type Static event name.
  * @param action Native action index.
  */
-void tba_dom_listen(node_handle node, const char *type, unsigned action);
+void tba_dom_listen(node_jsref node, const char *type, unsigned action);
 
 /**
  * @brief Replace an action's timer after returning from C.
@@ -286,7 +286,7 @@ void tba_dom_timer(unsigned action, int delay);
  * @param action Native completion index.
  * @param serial Request generation.
  */
-void tba_dom_request(browser_handle url, unsigned kind, browser_handle body, browser_handle headers, unsigned action,
+void tba_dom_request(browser_jsref url, unsigned kind, browser_jsref body, browser_jsref headers, unsigned action,
                      unsigned serial);
 
 /**
@@ -295,14 +295,14 @@ void tba_dom_request(browser_handle url, unsigned kind, browser_handle body, bro
  * @param text Scoped contents.
  * @param mime Static MIME type.
  */
-void tba_dom_download(browser_handle filename, browser_handle text, const char *mime);
+void tba_dom_download(browser_jsref filename, browser_jsref text, const char *mime);
 
 /**
  * @brief Copy text and dispatch its completion.
  * @param text Scoped text.
  * @param action Native completion index.
  */
-void tba_dom_clipboard(browser_handle text, unsigned action);
+void tba_dom_clipboard(browser_jsref text, unsigned action);
 
 /**
  * @brief Read element geometry.
@@ -310,7 +310,7 @@ void tba_dom_clipboard(browser_handle text, unsigned action);
  * @param kind Left 0, top 1, width 2, height 3.
  * @return CSS pixel measurement.
  */
-double tba_dom_measure(node_handle node, unsigned kind);
+double tba_dom_measure(node_jsref node, unsigned kind);
 
 /**
  * @brief Transform a pointer position into SVG coordinates.
@@ -319,7 +319,7 @@ double tba_dom_measure(node_handle node, unsigned kind);
  * @param axis X 0 or Y 1.
  * @return Coordinate or NaN.
  */
-double tba_dom_cursor(browser_handle svg, event_handle event, unsigned axis);
+double tba_dom_cursor(browser_jsref svg, event_jsref event, unsigned axis);
 
 /**
  * @brief Use browser date formatting without forecast arithmetic.
@@ -327,7 +327,7 @@ double tba_dom_cursor(browser_handle svg, event_handle event, unsigned axis);
  * @param mode Parse to YYYYMMDD 0, ISO 1, UK 2, timestamp to UK 3.
  * @return Scoped date number or text; invalid input gives zero or empty.
  */
-browser_handle tba_dom_date(browser_handle value, unsigned mode);
+browser_jsref tba_dom_date(browser_jsref value, unsigned mode);
 
 /**
  * @brief Mark a temporary handle scope.

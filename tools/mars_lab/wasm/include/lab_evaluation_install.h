@@ -40,6 +40,6 @@ typedef enum {
  * does not change the DOM or redefine the host's live state properties.
  */
 void lab_evaluation_install(lab_mode_t mode, lab_evaluation_install_phase_t phase, lab_request_outcome_t outcome,
-                            browser_handle data, browser_handle context, browser_handle cards, view_handle view);
+                            browser_jsref data, browser_jsref context, browser_jsref cards, view_jsref view);
 
 #endif

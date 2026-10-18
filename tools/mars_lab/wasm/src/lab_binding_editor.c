@@ -16,7 +16,7 @@
 #include "lab_binding_internal.h"
 
 /* Share the exact native variable-kind and trimmed-name policy with row reconciliation. */
-browser_handle lab_binding_variable_name(browser_handle binding)
+browser_jsref lab_binding_variable_name(browser_jsref binding)
 {
     int name = lab_binding_name(binding);
     if (lab_binding_is(lab_dom_text(lab_binding_or(lab_dom_get(binding, "kind"), "variable")), "constant"))
@@ -25,7 +25,7 @@ browser_handle lab_binding_variable_name(browser_handle binding)
 }
 
 /* Select variable identities in native discovery order; constants do not become calculus arguments. */
-void lab_binding_variables(browser_handle bindings)
+void lab_binding_variables(browser_jsref bindings)
 {
     int names = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
@@ -38,7 +38,7 @@ void lab_binding_variables(browser_handle bindings)
     lab_dom_return(names);
 }
 
-static browser_handle lab_binding_selection(lab_mode_t mode, browser_handle bindings, browser_handle bound_names)
+static browser_jsref lab_binding_selection(lab_mode_t mode, browser_jsref bindings, browser_jsref bound_names)
 {
     int selected = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
@@ -52,19 +52,19 @@ static browser_handle lab_binding_selection(lab_mode_t mode, browser_handle bind
 }
 
 /* Hide integration-bound names from editable parameters without changing native binding records. */
-void lab_binding_select(lab_mode_t mode, browser_handle bindings, browser_handle bound_names)
+void lab_binding_select(lab_mode_t mode, browser_jsref bindings, browser_jsref bound_names)
 {
     lab_dom_return(lab_binding_selection(mode, bindings, bound_names));
 }
 
-static browser_handle lab_binding_editor_body(browser_handle text, browser_handle metadata)
+static browser_jsref lab_binding_editor_body(browser_jsref text, browser_jsref metadata)
 {
     int body = lab_dom_get(metadata, "body");
     return lab_dom_type(body) ? body : lab_dom_clean(lab_binding_or(text, ""), LAB_DOM_CLEAN_TRIM);
 }
 
 /* Select and project editor metadata; return opaque source/display bytes for the native workspace owner. */
-void lab_binding_editor(lab_mode_t mode, browser_handle inputs, browser_handle bound_names)
+void lab_binding_editor(lab_mode_t mode, browser_jsref inputs, browser_jsref bound_names)
 {
     int metadata = lab_dom_get(inputs, "metadata"), text = lab_dom_get(inputs, "text");
     int body_text = lab_dom_get(inputs, "body"), ready = lab_dom_get(inputs, "ready");
@@ -90,7 +90,7 @@ void lab_binding_editor(lab_mode_t mode, browser_handle inputs, browser_handle b
 }
 
 /* Choose cached authored then solved values over supplied starts, excluding source constants. */
-void lab_binding_goal_starts(browser_handle source, browser_handle solved, browser_handle provided, browser_handle cache)
+void lab_binding_goal_starts(browser_jsref source, browser_jsref solved, browser_jsref provided, browser_jsref cache)
 {
     int result = lab_binding_copy(provided);
     if (!lab_dom_truth(source) || !lab_dom_truth(solved)) {
@@ -120,7 +120,7 @@ void lab_binding_goal_starts(browser_handle source, browser_handle solved, brows
 }
 
 /* Fill only falsey supplied starts from native goal metadata, preserving exact symbolic values. */
-void lab_binding_goal_prepare(browser_handle editor, browser_handle provided)
+void lab_binding_goal_prepare(browser_jsref editor, browser_jsref provided)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT), start = lab_binding_copy(provided);
     int defaults = lab_dom_get(editor, "starts"), keys = lab_dom_keys(defaults);

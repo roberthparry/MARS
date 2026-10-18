@@ -24,18 +24,18 @@ typedef struct {
     double rows[9], scale[3], offset[3], width, height, fit, radius;
 } frame_t;
 
-static double numeric(browser_handle object, const char *key)
+static double numeric(browser_jsref object, const char *key)
 {
     return lab_dom_to_number(lab_dom_get(object, key));
 }
 
-static void read_vector(browser_handle value, double *out, unsigned count)
+static void read_vector(browser_jsref value, double *out, unsigned count)
 {
     for (unsigned i = 0; i < count; ++i)
         out[i] = lab_dom_to_number(lab_dom_item(value, i));
 }
 
-static browser_handle vector(const double *values, unsigned count)
+static browser_jsref vector(const double *values, unsigned count)
 {
     int out = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < count; ++i)
@@ -54,7 +54,7 @@ static void project(const frame_t *f, const double p[3], double out[3])
     out[2] = q[2];
 }
 
-static void read_frame(browser_handle handle, frame_t *frame)
+static void read_frame(browser_jsref handle, frame_t *frame)
 {
     frame->width = numeric(handle, "width");
     frame->height = numeric(handle, "height");
@@ -124,7 +124,7 @@ static unsigned clip(double polygon[12][3], unsigned count)
 }
 
 /* A bounded clipping primitive also supports the browser regression fixture. */
-void lab_surface_clip(browser_handle points)
+void lab_surface_clip(browser_jsref points)
 {
     unsigned count = lab_dom_count(points);
     int result = lab_dom_object(LAB_VALUE_ARRAY);
@@ -140,7 +140,7 @@ void lab_surface_clip(browser_handle points)
 }
 
 /* Host code transports the projected numbers without recalculating them. */
-void lab_surface_project(frame_handle frame, browser_handle point)
+void lab_surface_project(frame_jsref frame, browser_jsref point)
 {
     frame_t f;
     double p[3], out[3];
@@ -150,7 +150,7 @@ void lab_surface_project(frame_handle frame, browser_handle point)
     lab_dom_return(vector(out, 2));
 }
 
-static browser_handle projected_polygon(const frame_t *f, browser_handle points)
+static browser_jsref projected_polygon(const frame_t *f, browser_jsref points)
 {
     double polygon[12][3], depth = 0;
     unsigned count = lab_dom_count(points);
@@ -175,14 +175,14 @@ static browser_handle projected_polygon(const frame_t *f, browser_handle points)
 }
 
 /* Shared geometry for Canvas and on-demand SVG; GPU clipping uses the same transform. */
-void lab_surface_polygon(frame_handle frame, browser_handle points)
+void lab_surface_polygon(frame_jsref frame, browser_jsref points)
 {
     frame_t f;
     read_frame(frame, &f);
     lab_dom_return(projected_polygon(&f, points));
 }
 
-static browser_handle depth_order(browser_handle source)
+static browser_jsref depth_order(browser_jsref source)
 {
     unsigned count = lab_dom_count(source);
     int target = lab_dom_object(LAB_VALUE_ARRAY);
@@ -215,7 +215,7 @@ static browser_handle depth_order(browser_handle source)
 }
 
 /* Read the camera once, project every primitive and return a shared painter-order plan. */
-void lab_surface_polygons(frame_handle frame, browser_handle primitives, lab_surface_primitive_t kind)
+void lab_surface_polygons(frame_jsref frame, browser_jsref primitives, lab_surface_primitive_t kind)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY);
     if (!lab_dom_truth(lab_dom_get(frame, "drawMesh"))) {
@@ -250,12 +250,12 @@ static void axis_point(const frame_t *f, unsigned axis, double fraction, double 
     project(f, point, p);
 }
 
-static void line(browser_handle paths, const double *values, unsigned count)
+static void line(browser_jsref paths, const double *values, unsigned count)
 {
     lab_dom_push(paths, vector(values, count));
 }
 
-static void text(browser_handle texts, browser_handle label, double x, double y, const char *align)
+static void text(browser_jsref texts, browser_jsref label, double x, double y, const char *align)
 {
     int item = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(item, "text", label);
@@ -265,7 +265,7 @@ static void text(browser_handle texts, browser_handle label, double x, double y,
     lab_dom_push(texts, item);
 }
 
-static void axes(const frame_t *f, view_handle view, browser_handle out)
+static void axes(const frame_t *f, view_jsref view, browser_jsref out)
 {
     int paths = lab_dom_object(LAB_VALUE_ARRAY), texts = lab_dom_object(LAB_VALUE_ARRAY),
         ticks = lab_dom_get(view, "ticks");
@@ -320,7 +320,7 @@ static void axes(const frame_t *f, view_handle view, browser_handle out)
 }
 
 /* Finite segments need not reach the requested endpoints, particularly beside singularities or domain gaps. */
-static void curve_input_transform(browser_handle volume, double *scale, double *offset)
+static void curve_input_transform(browser_jsref volume, double *scale, double *offset)
 {
     if (!lab_dom_truth(lab_dom_get(volume, "dirty")))
         return;
@@ -338,7 +338,7 @@ static void curve_input_transform(browser_handle volume, double *scale, double *
 }
 
 /* Ratios of zoom exponents are safe even when absolute endpoints coincide as doubles. */
-void lab_surface_frame(view_handle view, browser_handle override_bounds)
+void lab_surface_frame(view_jsref view, browser_jsref override_bounds)
 {
     frame_t f = {0};
     int volume = lab_dom_get(view, "volume"), out = lab_dom_object(LAB_VALUE_OBJECT);

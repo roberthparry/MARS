@@ -12,7 +12,7 @@
 #include "lab_result.h"
 #include "lab_almanac_events.h"
 
-static browser_handle lab_almanac_events_visibility(browser_handle value, browser_handle fallback)
+static browser_jsref lab_almanac_events_visibility(browser_jsref value, browser_jsref fallback)
 {
     int text = lab_dom_clean(value, LAB_DOM_CLEAN_LOWER);
     return lab_dom_equal(text, lab_dom_string("all")) || lab_dom_equal(text, lab_dom_string("visible"))
@@ -20,8 +20,8 @@ static browser_handle lab_almanac_events_visibility(browser_handle value, browse
                : fallback;
 }
 
-static void lab_almanac_events_emit(browser_handle calls, const char *service, unsigned count, browser_handle first,
-                                browser_handle second)
+static void lab_almanac_events_emit(browser_jsref calls, const char *service, unsigned count, browser_jsref first,
+                                browser_jsref second)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     if (count)
@@ -33,7 +33,7 @@ static void lab_almanac_events_emit(browser_handle calls, const char *service, u
     lab_dom_push(calls, call);
 }
 
-static browser_handle lab_almanac_events_response(browser_handle data, browser_handle visibility)
+static browser_jsref lab_almanac_events_response(browser_jsref data, browser_jsref visibility)
 {
     int copy = lab_dom_object(LAB_VALUE_OBJECT), keys = lab_dom_keys(data);
     unsigned mark = lab_dom_mark();
@@ -47,7 +47,7 @@ static browser_handle lab_almanac_events_response(browser_handle data, browser_h
 }
 
 /* Register each button once, retaining ordinary browser context objects for live state access. */
-void lab_almanac_events_install(browser_handle root, browser_handle state)
+void lab_almanac_events_install(browser_jsref root, browser_jsref state)
 {
     int context = 0;
     if (root && state) {
@@ -78,7 +78,7 @@ void lab_almanac_events_install(browser_handle root, browser_handle state)
 }
 
 /* Project validated markup and return visibility for the browser to commit after the scope closes. */
-void lab_almanac_events_render(browser_handle target, browser_handle data, browser_handle state)
+void lab_almanac_events_render(browser_jsref target, browser_jsref data, browser_jsref state)
 {
     int visibility = lab_almanac_events_visibility(lab_dom_get(data, "visibility"), lab_dom_get(state, "visibility"));
     int accepted = target && state && lab_result_almanac_variant(data, visibility);
@@ -91,14 +91,14 @@ void lab_almanac_events_render(browser_handle target, browser_handle data, brows
 }
 
 /* Forward the authored action button to the existing service. */
-static void lab_almanac_events_totality(browser_handle button, browser_handle context, browser_handle calls)
+static void lab_almanac_events_totality(browser_jsref button, browser_jsref context, browser_jsref calls)
 {
     (void)context;
     lab_almanac_events_emit(calls, "applyAlmanacTotalityAction", 1, button, 0);
 }
 
 /* Save changed visibility before rendering cached data or requesting a fresh result. */
-static void lab_almanac_events_change_visibility(browser_handle button, browser_handle context, browser_handle calls)
+static void lab_almanac_events_change_visibility(browser_jsref button, browser_jsref context, browser_jsref calls)
 {
     if (!context)
         return;
@@ -122,10 +122,10 @@ static void lab_almanac_events_change_visibility(browser_handle button, browser_
 }
 
 /* Select deferred services without assigning to the browser's getter-only live state. */
-void lab_almanac_events_dispatch(lab_almanac_event_action_t action, event_handle event, browser_handle context)
+void lab_almanac_events_dispatch(lab_almanac_event_action_t action, event_jsref event, browser_jsref context)
 {
     /** @brief Action implementation receiving the button, live context and deferred calls. */
-    typedef void (*lab_almanac_event_handler_t)(browser_handle, browser_handle, browser_handle);
+    typedef void (*lab_almanac_event_handler_t)(browser_jsref, browser_jsref, browser_jsref);
     static const lab_almanac_event_handler_t handlers[] = {
         [LAB_ALMANAC_EVENT_TOTALITY]   = lab_almanac_events_totality,
         [LAB_ALMANAC_EVENT_VISIBILITY] = lab_almanac_events_change_visibility,

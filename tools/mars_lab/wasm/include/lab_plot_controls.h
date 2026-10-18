@@ -24,7 +24,7 @@ typedef enum {
  * @param names Scoped browser array handle containing opaque native variable names.
  * @param labels Scoped browser array handle containing corresponding display labels.
  */
-void lab_plot_controls_variables(browser_handle names, browser_handle labels);
+void lab_plot_controls_variables(browser_jsref names, browser_jsref labels);
 
 /** @brief Synchronise choices and dimensional controls with the selected type and rendered plot. */
 void lab_plot_controls_sync(void);
@@ -36,7 +36,7 @@ void lab_plot_controls_reset(void);
  * @brief Select the first axis for a direct plot action and synchronise its controls.
  * @param variable Scoped browser string handle containing the opaque native variable name.
  */
-void lab_plot_controls_prepare(browser_handle variable);
+void lab_plot_controls_prepare(browser_jsref variable);
 
 /**
  * @brief Handle plot setting changes and delayed redraws.
@@ -45,6 +45,6 @@ void lab_plot_controls_prepare(browser_handle variable);
  * @param context Scoped timer snapshot handle containing mode, request, source and optional slicePreview;
  *                unused for browser events. Stale timer snapshots are ignored.
  */
-void lab_plot_controls_dispatch(lab_plot_control_action_t action, event_handle event, browser_handle context);
+void lab_plot_controls_dispatch(lab_plot_control_action_t action, event_jsref event, browser_jsref context);
 
 #endif

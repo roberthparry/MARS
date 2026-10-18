@@ -14,7 +14,7 @@
 #include "lab_plot_slices.h"
 #include "lab_plot_controls.h"
 
-static browser_handle value(const char *id)
+static browser_jsref value(const char *id)
 {
     return lab_dom_read(lab_dom_id(id), LAB_DOM_VALUE, "");
 }
@@ -88,7 +88,7 @@ void lab_plot_controls_reset(void)
     lab_plot_controls_sync();
 }
 
-static lab_plot_group_t control_index(browser_handle name)
+static lab_plot_group_t control_index(browser_jsref name)
 {
     /* Five fixed UI groups; mathematical symbol lookup remains with native binding metadata. */
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i)
@@ -98,7 +98,7 @@ static lab_plot_group_t control_index(browser_handle name)
 }
 
 /* Index authored binding values once; plotting names come from the native catalogue. */
-static int curve_available(browser_handle first)
+static int curve_available(browser_jsref first)
 {
     int fixed = lab_dom_object(LAB_VALUE_OBJECT);
     int inputs = lab_dom_all(lab_dom_id("variableValues"), ".binding-value-input");
@@ -129,8 +129,17 @@ void lab_plot_controls_sync(void)
                  lab_workspace_mode() == LAB_MODE_DIFFERENTIAL_EQUATION ||
                  lab_workspace_mode() == LAB_MODE_INTEGRATOR;
     int complex = !!lab_dom_query(0, "#plotRendered .complex-grid");
-    lab_dom_class(lab_dom_id("plotKindGroup"), "hidden", solver || complex);
+    bool distribution = !!lab_dom_query(0, "#plotRendered [data-distribution-spectrum], #plotRendered [data-impulse]");
+    bool pending = !!lab_dom_query(0, "#plotRendered [data-spectrum-pending]");
+    bool schematic = !!lab_dom_query(0, "#plotRendered [data-schematic-spectrum], #plotRendered [data-schematic-impulse]");
+    lab_dom_class(lab_dom_id("plotKindGroup"), "hidden", solver || complex || distribution);
     int first = value("plotFirst"), second = value("plotSecond");
+    if (distribution) {
+        /* A returned spectrum supersedes any retained surface selection. */
+        second = lab_dom_string("");
+        lab_dom_write(lab_dom_id("plotSecond"), LAB_DOM_VALUE, "", second);
+        lab_dom_write(lab_dom_id("plotKind"), LAB_DOM_VALUE, "", lab_dom_string("auto"));
+    }
     int curve_allowed = solver || curve_available(first);
     int curve_option = lab_dom_query(0, "#plotKindChoices input[value='curve']");
     lab_dom_class(lab_dom_closest(curve_option, "label"), "hidden", !curve_allowed);
@@ -166,6 +175,13 @@ void lab_plot_controls_sync(void)
     if (!curve && !surface)
         surface = lab_dom_truth(lab_dom_get(range, "marsPlotSurface")) || lab_dom_length(second);
     int multiple = lab_dom_to_number(lab_dom_get(range, "marsPlotVariables")) > 1;
+    if (distribution) {
+        surface = 0;
+        curve = 1;
+        multiple = 0;
+    }
+    lab_dom_class(range, "hidden", pending);
+    lab_dom_class(lab_dom_id("plotFirstChoices"), "hidden", distribution);
     int automatic = !lab_dom_equal(value("plotInputRange"), lab_dom_string("manual"));
     lab_dom_class(lab_dom_closest(lab_dom_id("plotFirstGroup"), ".plot-ranges"), "hidden", 0);
     /* A single-variable group has only a range heading and bounds; retain actual variable choices. */
@@ -174,13 +190,13 @@ void lab_plot_controls_sync(void)
     lab_dom_class(lab_dom_query(lab_dom_id("plotSecondGroup"), ".plot-bound-pair"), "hidden", automatic);
     lab_dom_class(lab_dom_id("plotSecondGroup"), "hidden", complex || curve || (!surface && !multiple));
     lab_dom_class(lab_dom_id("plotCamera"), "hidden", !surface);
-    lab_dom_class(lab_dom_id("plotVertical"), "hidden", complex);
+    lab_dom_class(lab_dom_id("plotVertical"), "hidden", complex || schematic);
     lab_dom_write(lab_dom_id("plotVerticalTitle"), LAB_DOM_TEXT, "",
                   lab_dom_string(surface ? "Height range" : "Vertical range"));
     lab_dom_class(lab_dom_id("plotManual"), "hidden", !lab_dom_equal(value("plotScale"), lab_dom_string("manual")));
 }
 
-static void choice(browser_handle group, const char *name, browser_handle key, browser_handle label)
+static void choice(browser_jsref group, const char *name, browser_jsref key, browser_jsref label)
 {
     int wrapper = lab_dom_create("label"), radio = lab_dom_create("input"), text = lab_dom_create("span");
     lab_dom_write(radio, LAB_DOM_ATTRIBUTE, "type", lab_dom_string("radio"));
@@ -193,7 +209,7 @@ static void choice(browser_handle group, const char *name, browser_handle key, b
 }
 
 /* Build accessible native radio groups, preserving selections only while their variables exist. */
-void lab_plot_controls_variables(browser_handle names, browser_handle labels)
+void lab_plot_controls_variables(browser_jsref names, browser_jsref labels)
 {
     lab_dom_set(lab_dom_id("plotRange"), "marsPlotNames", names);
     int groups[] = {lab_dom_id("plotFirstChoices"), lab_dom_id("plotSecondChoices")};
@@ -225,19 +241,19 @@ void lab_plot_controls_variables(browser_handle names, browser_handle labels)
 }
 
 /* Automatic plotting and live redraws share the card's selected first-axis value. */
-void lab_plot_controls_prepare(browser_handle variable)
+void lab_plot_controls_prepare(browser_jsref variable)
 {
     lab_dom_write(lab_dom_id("plotFirst"), LAB_DOM_VALUE, "", variable);
     lab_plot_controls_sync();
 }
 
-static browser_handle current_source(void)
+static browser_jsref current_source(void)
 {
     int length = lab_workspace_source_get(LAB_WORKSPACE_FULL_TEXT);
     return length > 0 ? lab_dom_utf8_string(lab_workspace_output(), (unsigned)length) : lab_dom_string("");
 }
 
-static void emit(browser_handle calls, const char *service, browser_handle first, browser_handle second, unsigned count)
+static void emit(browser_jsref calls, const char *service, browser_jsref first, browser_jsref second, unsigned count)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(args, first);
@@ -249,7 +265,7 @@ static void emit(browser_handle calls, const char *service, browser_handle first
 }
 
 /* Coalesce edits; never replay an old worksheet or interrupt a newer explicit request. */
-void lab_plot_controls_dispatch(lab_plot_control_action_t action, event_handle event, browser_handle context)
+void lab_plot_controls_dispatch(lab_plot_control_action_t action, event_jsref event, browser_jsref context)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(plan, "calls", calls);

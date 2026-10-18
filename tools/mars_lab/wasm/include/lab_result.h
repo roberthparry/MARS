@@ -47,7 +47,7 @@ typedef enum {
  * @param editor Scoped native editor metadata with text and optional expression strings.
  * @details The browser Map retains metadata objects; no integer handle survives the call.
  */
-void lab_result_editor_install(browser_handle cache, browser_handle editor);
+void lab_result_editor_install(browser_jsref cache, browser_jsref editor);
 
 /**
  * @brief Install native presentation metadata with bounded cache eviction.
@@ -56,7 +56,7 @@ void lab_result_editor_install(browser_handle cache, browser_handle editor);
  * @param data Scoped native response with editor and presentation records, including expansion permissions,
  * editor aliases, numeric solution lines, compact text and solver TeX mappings.
  */
-void lab_result_presentation_install(browser_handle caches, browser_handle data);
+void lab_result_presentation_install(browser_jsref caches, browser_jsref data);
 
 /**
  * @brief Cache exact-source Function and matrix markup.
@@ -65,7 +65,7 @@ void lab_result_presentation_install(browser_handle caches, browser_handle data)
  * @param data Scoped native response whose presentation.function_syntax and presentation.matrix_headings
  * arrays contain source-keyed metadata records.
  */
-void lab_result_syntax_install(browser_handle caches, browser_handle data);
+void lab_result_syntax_install(browser_jsref caches, browser_jsref data);
 
 /**
  * @brief Test native permission for an exact display/full-text pair.
@@ -74,7 +74,7 @@ void lab_result_syntax_install(browser_handle caches, browser_handle data);
  * @param full Scoped full-text string used as the inner cache key.
  * @return True only when the matching native can_expand flag is Boolean true; false for missing or false entries.
  */
-bool lab_result_can_expand(browser_handle cache, browser_handle display, browser_handle full);
+bool lab_result_can_expand(browser_jsref cache, browser_jsref display, browser_jsref full);
 
 /**
  * @brief Read native Function classification for an exact source.
@@ -82,7 +82,7 @@ bool lab_result_can_expand(browser_handle cache, browser_handle display, browser
  * @param source Scoped source string to look up without parsing or normalisation.
  * @return True only when the matching metadata's is_function field is Boolean true; false otherwise.
  */
-bool lab_result_is_function(browser_handle cache, browser_handle source);
+bool lab_result_is_function(browser_jsref cache, browser_jsref source);
 
 /**
  * @brief Install matching native markup, otherwise literal source text.
@@ -90,7 +90,7 @@ bool lab_result_is_function(browser_handle cache, browser_handle source);
  * @param source Scoped exact source string used for metadata matching and literal fallback.
  * @param metadata Scoped native syntax record with source and html fields, or zero when no metadata exists.
  */
-void lab_result_native_text(browser_handle element, browser_handle source, browser_handle metadata);
+void lab_result_native_text(browser_jsref element, browser_jsref source, browser_jsref metadata);
 
 /**
  * @brief Select native syntax metadata and render a text card.
@@ -100,7 +100,7 @@ void lab_result_native_text(browser_handle element, browser_handle source, brows
  * @param source Scoped exact source string used as the cache key and fallback text.
  * @param kind Automatic classification 0, force Function metadata 1 or force matrix-heading metadata 2.
  */
-void lab_result_text_render(browser_handle caches, browser_handle element, browser_handle source, lab_result_text_kind_t kind);
+void lab_result_text_render(browser_jsref caches, browser_jsref element, browser_jsref source, lab_result_text_kind_t kind);
 
 /**
  * @brief Install compact/full text and reset its metadata-controlled expansion button.
@@ -112,8 +112,8 @@ void lab_result_text_render(browser_handle caches, browser_handle element, brows
  * @param full Scoped complete native text string retained for expansion and copying.
  * @return True if element is the Function card node, false otherwise; this is not an expansion-availability flag.
  */
-bool lab_result_expandable(browser_handle caches, browser_handle element, browser_handle button, browser_handle display,
-                           browser_handle full);
+bool lab_result_expandable(browser_jsref caches, browser_jsref element, browser_jsref button, browser_jsref display,
+                           browser_jsref full);
 
 /**
  * @brief Install numerical text and clear its explanatory note.
@@ -121,7 +121,7 @@ bool lab_result_expandable(browser_handle caches, browser_handle element, browse
  * numeric, compact and solver); only the maps required by this operation are consulted.
  * @param full Scoped complete native numerical text string; used for both compact and full variants.
  */
-void lab_result_value(browser_handle caches, browser_handle full);
+void lab_result_value(browser_jsref caches, browser_jsref full);
 
 /**
  * @brief Validate all DateTime sections before replacing the destination card.
@@ -131,7 +131,7 @@ void lab_result_value(browser_handle caches, browser_handle full);
  * @param fallback Scoped plain-text fallback/copy source, trimmed before storage.
  * @return True after projection, false without mutation if a section with rows lacks nonblank native HTML.
  */
-bool lab_result_datetime(browser_handle element, browser_handle button, browser_handle sections, browser_handle fallback);
+bool lab_result_datetime(browser_jsref element, browser_jsref button, browser_jsref sections, browser_jsref fallback);
 
 /**
  * @brief Project native matrix expression representations.
@@ -140,7 +140,7 @@ bool lab_result_datetime(browser_handle element, browser_handle button, browser_
  * @param data Scoped native matrix response with expression_pretty, display_expression_pretty, expression
  * and result text; the most specific available representation is selected.
  */
-void lab_result_matrix_expression(browser_handle caches, browser_handle data);
+void lab_result_matrix_expression(browser_jsref caches, browser_jsref data);
 
 /**
  * @brief Project native matrix values and optional SVG.
@@ -148,7 +148,7 @@ void lab_result_matrix_expression(browser_handle caches, browser_handle data);
  * numeric, compact and solver); only the maps required by this operation are consulted.
  * @param data Scoped native matrix response with value text and optional value_svg markup.
  */
-void lab_result_matrix_value(browser_handle caches, browser_handle data);
+void lab_result_matrix_value(browser_jsref caches, browser_jsref data);
 
 /** @brief Invalidate pending full-digit rendering and release its button.
  */
@@ -177,7 +177,7 @@ void lab_result_solver_owner(void);
  * @param kind Expression 0, Matrix 1 or Calculus 2; other values publish null without rendering.
  * @details The copy source is returned through lab_dom_return, not as a C return value.
  */
-void lab_result_rendered(browser_handle caches, browser_handle data, lab_result_kind_t kind);
+void lab_result_rendered(browser_jsref caches, browser_jsref data, lab_result_kind_t kind);
 
 /**
  * @brief Project Matrix or Calculus result cards and publish their transfer metadata.
@@ -188,7 +188,7 @@ void lab_result_rendered(browser_handle caches, browser_handle data, lab_result_
  * @param kind Matrix 1 or Calculus 2; other values publish null without projecting cards.
  * @details lab_dom_return supplies a record containing TeX and copied bindings.
  */
-void lab_result_display(browser_handle caches, browser_handle data, lab_result_kind_t kind);
+void lab_result_display(browser_jsref caches, browser_jsref data, lab_result_kind_t kind);
 
 /**
  * @brief Toggle a card's exact native text representations and accessible button state.
@@ -197,7 +197,7 @@ void lab_result_display(browser_handle caches, browser_handle data, lab_result_k
  * @param element Scoped text-card node with displayText and fullText dataset entries.
  * @param button Scoped more-digits control whose expanded dataset flag selects the next variant.
  */
-void lab_result_text_digits(browser_handle caches, browser_handle element, browser_handle button);
+void lab_result_text_digits(browser_jsref caches, browser_jsref element, browser_jsref button);
 
 /**
  * @brief Apply a cached digit toggle or publish an owned full-digit render request.
@@ -205,7 +205,7 @@ void lab_result_text_digits(browser_handle caches, browser_handle element, brows
  * @details lab_dom_return supplies a request object with TeX and retained browser identity, or null when
  * no fetch is needed. The pending request disables the more-digits button until completed or invalidated.
  */
-void lab_result_digits_begin(browser_handle last_TeX);
+void lab_result_digits_begin(browser_jsref last_TeX);
 
 /**
  * @brief Complete a matching full-digit request without overwriting a newer card.
@@ -214,7 +214,7 @@ void lab_result_digits_begin(browser_handle last_TeX);
  * @param error Scoped transport-error text, or a false-like value to use data.render_error.
  * @return True when the owned completion was projected; false for an absent or obsolete request.
  */
-bool lab_result_digits_finish(browser_handle request, browser_handle data, browser_handle error);
+bool lab_result_digits_finish(browser_jsref request, browser_jsref data, browser_jsref error);
 
 /**
  * @brief Publish the selected target's copy representation through lab_dom_return.
@@ -222,13 +222,13 @@ bool lab_result_digits_finish(browser_handle request, browser_handle data, brows
  * @param last_TeX Scoped latest TeX copy-source string, used for a non-error Rendered card.
  * @details Unknown targets and mobile URLs without an HTTP(S) scheme publish an empty string.
  */
-void lab_result_copy(browser_handle target, browser_handle last_TeX);
+void lab_result_copy(browser_jsref target, browser_jsref last_TeX);
 
 /**
  * @brief Project reusable expression text and button availability.
  * @param text Scoped native result text, trimmed for storage; blank text hides and disables Use as input.
  */
-void lab_result_input_set(browser_handle text);
+void lab_result_input_set(browser_jsref text);
 
 /**
  * @brief Publish reusable expression text for the supplied mode.
@@ -236,14 +236,14 @@ void lab_result_input_set(browser_handle text);
  * modes prefer the explicit reusable source when present.
  * @details Publishes trimmed opaque text through lab_dom_return.
  */
-void lab_result_input_get(browser_handle mode);
+void lab_result_input_get(browser_jsref mode);
 
 /**
  * @brief Project temporary copy feedback while retaining the original button label.
  * @param button Scoped copy-control node whose original label is retained in its dataset.
  * @param state Reset original label 0, success 1 or failure 2; the browser owns the reset timer.
  */
-void lab_result_copy_flash(browser_handle button, lab_copy_state_t state);
+void lab_result_copy_flash(browser_jsref button, lab_copy_state_t state);
 
 /**
  * @brief Project matrix fallback text and publish an owned presentation request.
@@ -255,8 +255,8 @@ void lab_result_copy_flash(browser_handle button, lab_copy_state_t state);
  * @param pretty Scoped preferred native pretty-text string, or a false-like value to use result.
  * @details lab_dom_return supplies a request record with text; the same browser object identifies completion.
  */
-void lab_result_pretty_begin(browser_handle caches, browser_handle element, browser_handle button,
-                             browser_handle result, browser_handle pretty);
+void lab_result_pretty_begin(browser_jsref caches, browser_jsref element, browser_jsref button,
+                             browser_jsref result, browser_jsref pretty);
 
 /**
  * @brief Install matrix markup only while the request and displayed source still match.
@@ -264,7 +264,7 @@ void lab_result_pretty_begin(browser_handle caches, browser_handle element, brow
  * @param request Scoped request object returned by lab_result_pretty_begin; identity and text must still match.
  * @param data Scoped native response whose non-empty html string is installed for a current request.
  */
-void lab_result_pretty_finish(browser_handle element, browser_handle request, browser_handle data);
+void lab_result_pretty_finish(browser_jsref element, browser_jsref request, browser_jsref data);
 
 /** @brief Clear rendered content, expansion and pending digit rendering.
  */
@@ -275,7 +275,7 @@ void lab_result_pane_clear(void);
  * @param caches Scoped browser presentation-cache record, used when resetting the numerical Value card.
  * @param mode Scoped worksheet mode-name string; expression mode additionally hides the empty Value card.
  */
-void lab_result_details_clear(browser_handle caches, browser_handle mode);
+void lab_result_details_clear(browser_jsref caches, browser_jsref mode);
 
 /**
  * @brief Clear result cards and publish reset metadata with optional binding-clear effects.
@@ -286,7 +286,7 @@ void lab_result_details_clear(browser_handle caches, browser_handle mode);
  * @details lab_dom_return supplies cleared result metadata and a calls array, including clearVariableValues
  * unless keepBindings was requested.
  */
-void lab_result_reset(browser_handle caches, browser_handle mode, browser_handle options);
+void lab_result_reset(browser_jsref caches, browser_jsref mode, browser_jsref options);
 
 /**
  * @brief Copy native result bindings for a later editor transfer.
@@ -294,7 +294,7 @@ void lab_result_reset(browser_handle caches, browser_handle mode, browser_handle
  * @details lab_dom_return supplies a new array, copying each present record's own string-keyed metadata
  * and preserving sparse array holes. Copied browser values, not scoped handle integers, survive the call.
  */
-void lab_result_binding_snapshot(browser_handle bindings);
+void lab_result_binding_snapshot(browser_jsref bindings);
 
 /**
  * @brief Validate and publish a native Almanac presentation variant.
@@ -303,13 +303,13 @@ void lab_result_binding_snapshot(browser_handle bindings);
  * @return True when the selected variant has nonblank HTML, false otherwise.
  * @details lab_dom_return separately publishes the validated variant object, or null when validation fails.
  */
-bool lab_result_almanac_variant(browser_handle data, browser_handle visibility);
+bool lab_result_almanac_variant(browser_jsref data, browser_jsref visibility);
 
 /**
  * @brief Project validated Almanac markup and its copy source.
  * @param target Scoped destination card node; the Rendered card also invalidates pending digit rendering.
  * @param variant Scoped previously validated presentation record with html and copy_text strings.
  */
-void lab_result_almanac_render(browser_handle target, browser_handle variant);
+void lab_result_almanac_render(browser_jsref target, browser_jsref variant);
 
 #endif

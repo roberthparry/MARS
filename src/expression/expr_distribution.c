@@ -3,7 +3,7 @@
  * @brief Native regular-part and impulse decomposition for distribution plots.
  *
  * Supports linear combinations, regular multipliers and affine Dirac supports.
- * A bounded sum preview contains its first 32 terms and reports that limitation.
+ * A bounded sum preview contains its first 100 terms and reports that limitation.
  * Products of distributions and derivatives of impulses are not silently sampled.
  * Plot decomposition leaves the complete symbolic distribution and its qualifications unchanged.
  */
@@ -99,7 +99,7 @@ static expr_t *parts(fourier_context_t *c, const expr_t *f, const expr_t *w, con
         }
         expr_t *out = expr_const_zero();
         unsigned i = 0;
-        for (; out && i < 32 && (infinite || !num_gt(low, high)); ++i) {
+        for (; out && i < 100 && (infinite || !num_gt(low, high)); ++i) {
             expr_t *index = expr_new_const(low), *term = expr_substitute(f->a, f->b->a, index);
             expr_t *regular = parts(c, term, w, scale, emit, context, preview, depth + 1);
             expr_t *next = regular ? expr_add(out, regular) : NULL;

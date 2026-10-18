@@ -18,32 +18,32 @@
 #include "lab_workspace.h"
 #include "lab_result.h"
 
-static browser_handle lab_result_or(browser_handle first, browser_handle second)
+static browser_jsref lab_result_or(browser_jsref first, browser_jsref second)
 {
     return lab_dom_truth(first) ? first : second;
 }
 
-static browser_handle lab_result_field(browser_handle object, const char *key)
+static browser_jsref lab_result_field(browser_jsref object, const char *key)
 {
     return lab_result_or(lab_dom_get(object, key), lab_dom_string(""));
 }
 
-static browser_handle lab_result_data(node_handle node, const char *key)
+static browser_jsref lab_result_data(node_jsref node, const char *key)
 {
     return lab_dom_read(node, LAB_DOM_DATASET, key);
 }
 
-static int lab_result_true(browser_handle value)
+static int lab_result_true(browser_jsref value)
 {
     return lab_dom_type(value) == LAB_VALUE_BOOLEAN && lab_dom_truth(value);
 }
 
-static void lab_result_text(node_handle node, const char *text)
+static void lab_result_text(node_jsref node, const char *text)
 {
     lab_dom_write(node, LAB_DOM_TEXT, "", lab_dom_string(text));
 }
 
-static void lab_result_limit(browser_handle map, unsigned limit)
+static void lab_result_limit(browser_jsref map, unsigned limit)
 {
     while (lab_dom_map_size(map) > limit) {
         unsigned mark = lab_dom_mark();
@@ -52,7 +52,7 @@ static void lab_result_limit(browser_handle map, unsigned limit)
     }
 }
 
-static void lab_result_editor(browser_handle cache, browser_handle editor)
+static void lab_result_editor(browser_jsref cache, browser_jsref editor)
 {
     int text = lab_dom_get(editor, "text");
     if (lab_dom_type(text) != LAB_VALUE_STRING)
@@ -65,12 +65,12 @@ static void lab_result_editor(browser_handle cache, browser_handle editor)
 }
 
 /* Install an editor's exact native aliases with insertion-order eviction. */
-void lab_result_editor_install(browser_handle cache, browser_handle editor)
+void lab_result_editor_install(browser_jsref cache, browser_jsref editor)
 {
     lab_result_editor(cache, editor);
 }
 
-static void lab_result_entries(browser_handle cache, browser_handle entries, const char *key, const char *value, unsigned limit)
+static void lab_result_entries(browser_jsref cache, browser_jsref entries, const char *key, const char *value, unsigned limit)
 {
     if (lab_dom_type(entries) != LAB_VALUE_ARRAY)
         return;
@@ -85,7 +85,7 @@ static void lab_result_entries(browser_handle cache, browser_handle entries, con
 }
 
 /* Cache native presentation metadata; malformed collection types never become iterators. */
-void lab_result_presentation_install(browser_handle caches, browser_handle data)
+void lab_result_presentation_install(browser_jsref caches, browser_jsref data)
 {
     int editors = lab_dom_get(caches, "editors");
     lab_result_editor(editors, lab_dom_get(data, "editor"));
@@ -129,7 +129,7 @@ void lab_result_presentation_install(browser_handle caches, browser_handle data)
 }
 
 /* Retain exact-source lexical markup, never a browser-derived classification. */
-void lab_result_syntax_install(browser_handle caches, browser_handle data)
+void lab_result_syntax_install(browser_jsref caches, browser_jsref data)
 {
     int metadata = lab_dom_get(data, "presentation");
     lab_result_entries(lab_dom_get(caches, "functions"), lab_dom_get(metadata, "function_syntax"), "source", 0, 64);
@@ -137,20 +137,20 @@ void lab_result_syntax_install(browser_handle caches, browser_handle data)
 }
 
 /* Require the native Boolean flag for this exact display/full pair. */
-bool lab_result_can_expand(browser_handle cache, browser_handle display, browser_handle full)
+bool lab_result_can_expand(browser_jsref cache, browser_jsref display, browser_jsref full)
 {
     int variants = lab_dom_map_get(cache, display);
     return variants && lab_result_true(lab_dom_map_get(variants, full));
 }
 
 /* Function classification is supplied by native metadata only. */
-bool lab_result_is_function(browser_handle cache, browser_handle source)
+bool lab_result_is_function(browser_jsref cache, browser_jsref source)
 {
     return lab_result_true(lab_dom_get(lab_dom_map_get(cache, source), "is_function"));
 }
 
 /* Reject mismatched markup and safely display the unmodified source as text. */
-void lab_result_native_text(browser_handle element, browser_handle source, browser_handle metadata)
+void lab_result_native_text(browser_jsref element, browser_jsref source, browser_jsref metadata)
 {
     int html = lab_dom_get(metadata, "html");
     int use_html = lab_dom_equal(lab_dom_get(metadata, "source"), source) && lab_dom_type(html) == LAB_VALUE_STRING;
@@ -158,7 +158,7 @@ void lab_result_native_text(browser_handle element, browser_handle source, brows
 }
 
 /* Choose Function or matrix metadata for a card; explicit Function/heading choices bypass card identity. */
-void lab_result_text_render(browser_handle caches, browser_handle element, browser_handle source, lab_result_text_kind_t kind)
+void lab_result_text_render(browser_jsref caches, browser_jsref element, browser_jsref source, lab_result_text_kind_t kind)
 {
     int functions = lab_dom_get(caches, "functions");
     int function = kind == LAB_RESULT_TEXT_FUNCTION ||
@@ -169,8 +169,8 @@ void lab_result_text_render(browser_handle caches, browser_handle element, brows
 }
 
 /* Install both exact representations and reset the native-metadata-controlled expansion button. */
-bool lab_result_expandable(browser_handle caches, browser_handle element, browser_handle button, browser_handle display,
-                           browser_handle full)
+bool lab_result_expandable(browser_jsref caches, browser_jsref element, browser_jsref button, browser_jsref display,
+                           browser_jsref full)
 {
     lab_dom_delete(element, "labMatrixPresentationRequest");
     lab_result_text_render(caches, element, lab_result_or(display, full), LAB_RESULT_TEXT_AUTO);
@@ -183,7 +183,7 @@ bool lab_result_expandable(browser_handle caches, browser_handle element, browse
 }
 
 /* Value text clears the explanatory note and retains the complete native numerical source. */
-void lab_result_value(browser_handle caches, browser_handle full)
+void lab_result_value(browser_jsref caches, browser_jsref full)
 {
     lab_result_text(lab_dom_query(0, "#valueNote"), "");
     lab_dom_class(lab_dom_query(0, "#valueNoteCard"), "hidden", 1);
@@ -191,7 +191,7 @@ void lab_result_value(browser_handle caches, browser_handle full)
 }
 
 /* Validate every populated section before replacing the card, preserving recovery on missing metadata. */
-bool lab_result_datetime(browser_handle element, browser_handle button, browser_handle sections, browser_handle fallback)
+bool lab_result_datetime(browser_jsref element, browser_jsref button, browser_jsref sections, browser_jsref fallback)
 {
     unsigned count = lab_dom_type(sections) == LAB_VALUE_ARRAY ? lab_dom_count(sections) : 0;
     for (unsigned i = 0; i < count; ++i) {
@@ -232,7 +232,7 @@ bool lab_result_datetime(browser_handle element, browser_handle button, browser_
 }
 
 /* Use the native pretty expression without interpreting matrix syntax. */
-void lab_result_matrix_expression(browser_handle caches, browser_handle data)
+void lab_result_matrix_expression(browser_jsref caches, browser_jsref data)
 {
     int full = lab_result_or(lab_dom_get(data, "expression_pretty"),
                              lab_result_or(lab_dom_get(data, "expression"), lab_result_field(data, "result")));
@@ -245,7 +245,7 @@ void lab_result_matrix_expression(browser_handle caches, browser_handle data)
 }
 
 /* Render a matrix value's native SVG, retaining plain text for copying. */
-void lab_result_matrix_value(browser_handle caches, browser_handle data)
+void lab_result_matrix_value(browser_jsref caches, browser_jsref data)
 {
     int full = lab_result_field(data, "value"), svg = lab_result_field(data, "value_svg");
     int value = lab_dom_query(0, "#value");
@@ -302,7 +302,7 @@ void lab_result_solver_owner(void)
 }
 
 /* Project a validated result family while preserving metadata getter and rendering order. */
-static browser_handle lab_result_render(browser_handle caches, browser_handle data, lab_result_kind_t kind)
+static browser_jsref lab_result_render(browser_jsref caches, browser_jsref data, lab_result_kind_t kind)
 {
     /** @brief Native source and optional expansion fields for each supported result family. */
     static const struct {
@@ -374,7 +374,7 @@ static browser_handle lab_result_render(browser_handle caches, browser_handle da
 }
 
 /* Project Expression (0), Matrix (1) or Calculus (2) rendered metadata and return its copy source. */
-void lab_result_rendered(browser_handle caches, browser_handle data, lab_result_kind_t kind)
+void lab_result_rendered(browser_jsref caches, browser_jsref data, lab_result_kind_t kind)
 {
     lab_dom_return((unsigned)kind <= LAB_RESULT_CALCULUS ? lab_result_render(caches, data, kind) : 0);
 }
@@ -394,7 +394,7 @@ static void lab_result_value_visible(int visible)
     lab_dom_write(card, LAB_DOM_STYLE, "display", lab_dom_string(""));
 }
 
-static browser_handle lab_result_bindings_copy(browser_handle bindings)
+static browser_jsref lab_result_bindings_copy(browser_jsref bindings)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY);
     if (lab_dom_type(bindings) != LAB_VALUE_ARRAY)
@@ -415,7 +415,7 @@ static browser_handle lab_result_bindings_copy(browser_handle bindings)
 }
 
 /* Install complete Matrix (1) or Calculus (2) cards and return the host's legacy state values. */
-void lab_result_display(browser_handle caches, browser_handle data, lab_result_kind_t kind)
+void lab_result_display(browser_jsref caches, browser_jsref data, lab_result_kind_t kind)
 {
     /** @brief Source and function representations for complete result-card families. */
     static const struct {
@@ -453,7 +453,7 @@ void lab_result_display(browser_handle caches, browser_handle data, lab_result_k
 }
 
 /* Toggle exact native text representations and the matching accessible label. */
-void lab_result_text_digits(browser_handle caches, browser_handle element, browser_handle button)
+void lab_result_text_digits(browser_jsref caches, browser_jsref element, browser_jsref button)
 {
     int expanded = lab_dom_equal(lab_result_data(button, "expanded"), lab_dom_string("true"));
     int text =
@@ -463,7 +463,7 @@ void lab_result_text_digits(browser_handle caches, browser_handle element, brows
     lab_dom_write(button, LAB_DOM_DATASET, "expanded", lab_dom_string(expanded ? "false" : "true"));
 }
 
-static void lab_result_digits_show(browser_handle rendered, browser_handle button, int expanded)
+static void lab_result_digits_show(browser_jsref rendered, browser_jsref button, int expanded)
 {
     int svg = lab_result_data(rendered, expanded ? "fullSvg" : "displaySvg");
     int fallback = lab_result_data(rendered, expanded ? "fullRenderError" : "renderError");
@@ -475,7 +475,7 @@ static void lab_result_digits_show(browser_handle rendered, browser_handle butto
 }
 
 /* Apply a cached toggle, or return an opaque request object for asynchronous SVG fetching. */
-void lab_result_digits_begin(browser_handle last_TeX)
+void lab_result_digits_begin(browser_jsref last_TeX)
 {
     int rendered = lab_dom_query(0, "#rendered"), button = lab_dom_query(0, "#renderedMore");
     lab_dom_return(0);
@@ -497,7 +497,7 @@ void lab_result_digits_begin(browser_handle last_TeX)
 }
 
 /* Reject stale completions before changing the new card or its pending control state. */
-bool lab_result_digits_finish(browser_handle request, browser_handle data, browser_handle error)
+bool lab_result_digits_finish(browser_jsref request, browser_jsref data, browser_jsref error)
 {
     int rendered = lab_dom_query(0, "#rendered"), button = lab_dom_query(0, "#renderedMore");
     if (!request || !lab_dom_equal(lab_dom_get(rendered, "labResultRenderRequest"), request))
@@ -510,7 +510,7 @@ bool lab_result_digits_finish(browser_handle request, browser_handle data, brows
     return true;
 }
 
-static browser_handle lab_result_parsed(void)
+static browser_jsref lab_result_parsed(void)
 {
     int parsed = lab_dom_query(0, "#parsed");
     return lab_dom_clean(
@@ -520,7 +520,7 @@ static browser_handle lab_result_parsed(void)
 }
 
 /* Select a copy representation by target; unknown targets and non-HTTP mobile links are empty. */
-void lab_result_copy(browser_handle target, browser_handle last_TeX)
+void lab_result_copy(browser_jsref target, browser_jsref last_TeX)
 {
     int text = lab_dom_string("");
     if (lab_dom_equal(target, lab_dom_string("rendered"))) {
@@ -543,7 +543,7 @@ void lab_result_copy(browser_handle target, browser_handle last_TeX)
 }
 
 /* Project availability of the reusable native expression; bindings remain owned by evaluation. */
-void lab_result_input_set(browser_handle text)
+void lab_result_input_set(browser_jsref text)
 {
     int node = lab_dom_query(0, "#resultUseInput"), trimmed = lab_dom_clean(text, LAB_DOM_CLEAN_TRIM);
     int present = lab_dom_length(trimmed) != 0;
@@ -555,7 +555,7 @@ void lab_result_input_set(browser_handle text)
 }
 
 /* Equation reuse always follows the displayed result; other modes prefer their explicit source. */
-void lab_result_input_get(browser_handle mode)
+void lab_result_input_get(browser_jsref mode)
 {
     int text = lab_result_parsed();
     if (!lab_dom_equal(mode, lab_dom_string("equation")))
@@ -564,7 +564,7 @@ void lab_result_input_get(browser_handle mode)
 }
 
 /* Project copy feedback; the host owns only the reset timer. */
-void lab_result_copy_flash(browser_handle button, lab_copy_state_t state)
+void lab_result_copy_flash(browser_jsref button, lab_copy_state_t state)
 {
     /** @brief Labels for non-reset feedback; unknown states retain the failure label. */
     static const char *const labels[] = {
@@ -584,8 +584,8 @@ void lab_result_copy_flash(browser_handle button, lab_copy_state_t state)
 }
 
 /* Begin a native matrix-layout fetch with a host object identity and exact displayed source. */
-void lab_result_pretty_begin(browser_handle caches, browser_handle element, browser_handle button,
-                             browser_handle result, browser_handle pretty)
+void lab_result_pretty_begin(browser_jsref caches, browser_jsref element, browser_jsref button,
+                             browser_jsref result, browser_jsref pretty)
 {
     int text = lab_result_or(pretty, result), request = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(request, "text", text);
@@ -599,7 +599,7 @@ void lab_result_pretty_begin(browser_handle caches, browser_handle element, brow
 }
 
 /* Install only the matching asynchronous native matrix presentation. */
-void lab_result_pretty_finish(browser_handle element, browser_handle request, browser_handle data)
+void lab_result_pretty_finish(browser_jsref element, browser_jsref request, browser_jsref data)
 {
     if (!lab_dom_equal(lab_dom_get(element, "labMatrixPresentationRequest"), request) ||
         !lab_dom_has_class(element, "matrix-pretty") ||
@@ -625,7 +625,7 @@ void lab_result_pane_clear(void)
 }
 
 /* Clear card metadata and pending identities together; no stale copy source survives. */
-void lab_result_details_clear(browser_handle caches, browser_handle mode)
+void lab_result_details_clear(browser_jsref caches, browser_jsref mode)
 {
     lab_layout_plot_camera(1);
     lab_dom_write(lab_dom_id("plotRendered"), LAB_DOM_TEXT, "", lab_dom_string(""));
@@ -665,7 +665,7 @@ void lab_result_details_clear(browser_handle caches, browser_handle mode)
 }
 
 /* Reset browser-owned references from one native record, preserving the binding-retention policy. */
-void lab_result_reset(browser_handle caches, browser_handle mode, browser_handle options)
+void lab_result_reset(browser_jsref caches, browser_jsref mode, browser_jsref options)
 {
     lab_result_details_clear(caches, mode);
     int state = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
@@ -685,7 +685,7 @@ void lab_result_reset(browser_handle caches, browser_handle mode, browser_handle
 }
 
 /* Each binding is visited once; temporary metadata handles are released before the next record. */
-void lab_result_binding_snapshot(browser_handle bindings)
+void lab_result_binding_snapshot(browser_jsref bindings)
 {
     int copy = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
@@ -702,7 +702,7 @@ void lab_result_binding_snapshot(browser_handle bindings)
 }
 
 /* Preserve the strong native almanac HTML guard before copy or worksheet projection. */
-bool lab_result_almanac_variant(browser_handle data, browser_handle visibility)
+bool lab_result_almanac_variant(browser_jsref data, browser_jsref visibility)
 {
     int variant = lab_dom_key_get(lab_dom_get(data, "almanac_presentation"), visibility);
     int html = lab_dom_get(variant, "html");
@@ -715,7 +715,7 @@ bool lab_result_almanac_variant(browser_handle data, browser_handle visibility)
 }
 
 /* Project only an already validated native worksheet variant. */
-void lab_result_almanac_render(browser_handle target, browser_handle variant)
+void lab_result_almanac_render(browser_jsref target, browser_jsref variant)
 {
     if (lab_dom_equal(target, lab_dom_query(0, "#rendered")))
         lab_result_render_invalidate();

@@ -97,7 +97,7 @@ typedef enum {
  * @param ... Ordered scoped handles passed as capability arguments; zero denotes null.
  * @return Scoped calls/wait/save plan retaining browser values, not handle numbers.
  */
-browser_handle lab_flow_call(frame_handle frame, unsigned next, const char *service, const char *save, bool wait,
+browser_jsref lab_flow_call(frame_jsref frame, unsigned next, const char *service, const char *save, bool wait,
                              unsigned count, ...);
 
 /**
@@ -107,14 +107,14 @@ browser_handle lab_flow_call(frame_handle frame, unsigned next, const char *serv
  * @param plan Scoped ordered service plan with calls and optional wait, or zero for no plan.
  * @return Scoped effects-capability plan preserving the supplied wait flag, but not its done flag.
  */
-browser_handle lab_flow_effects(frame_handle frame, unsigned next, browser_handle plan);
+browser_jsref lab_flow_effects(frame_jsref frame, unsigned next, browser_jsref plan);
 
 /**
  * @brief Finish a workflow with an optional browser result.
  * @param value Scoped result handle; zero omits the value property. A handle containing false preserves explicit false.
  * @return Scoped completion record with done set to true.
  */
-browser_handle lab_flow_done(browser_handle value);
+browser_jsref lab_flow_done(browser_jsref value);
 
 /**
  * @brief Select request ownership before starting a native workflow.
@@ -123,7 +123,7 @@ browser_handle lab_flow_done(browser_handle value);
  * @post Publishes operation, mode, options and ui for kinds 0..3, an empty plan for 4/5,
  * or null for invalid kinds or an invalid evaluation mode, through lab_dom_return.
  */
-void lab_flow_begin(lab_flow_kind_t kind, frame_handle frame);
+void lab_flow_begin(lab_flow_kind_t kind, frame_jsref frame);
 
 /**
  * @brief Advance one native continuation without retaining scoped handles.
@@ -136,7 +136,7 @@ void lab_flow_begin(lab_flow_kind_t kind, frame_handle frame);
  * @param view Scoped read-only browser view supplying the selected workflow's live getters and caches.
  * @post Publishes the selected continuation plan through lab_dom_return; invalid stage/mode finishes without a value.
  */
-void lab_flow_step(lab_flow_kind_t kind, frame_handle frame, view_handle view);
+void lab_flow_step(lab_flow_kind_t kind, frame_jsref frame, view_jsref view);
 
 /**
  * @brief Advance evaluation preparation, transport and completion.
@@ -146,7 +146,7 @@ void lab_flow_step(lab_flow_kind_t kind, frame_handle frame, view_handle view);
  * and installation; getters must not start a nested DOM scope.
  * @return Scoped continuation or completion plan for the browser interpreter.
  */
-browser_handle lab_flow_evaluation(frame_handle frame, view_handle view);
+browser_jsref lab_flow_evaluation(frame_jsref frame, view_jsref view);
 
 /**
  * @brief Advance two-phase result installation and optional solver rendering.
@@ -155,6 +155,6 @@ browser_handle lab_flow_evaluation(frame_handle frame, view_handle view);
  * @param view Scoped browser view supplying presentation caches and live editor/source getters.
  * @return Scoped continuation or completion plan; asynchronous solver work retains the parent-request ownership checks.
  */
-browser_handle lab_flow_install(frame_handle frame, view_handle view);
+browser_jsref lab_flow_install(frame_jsref frame, view_jsref view);
 
 #endif

@@ -15,30 +15,30 @@
 #include "lab_flow.h"
 #include "lab_flow_state_sync.h"
 
-static unsigned lab_state_sync_stage(frame_handle frame)
+static unsigned lab_state_sync_stage(frame_jsref frame)
 {
     return (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
 }
 
-static unsigned lab_state_sync_index(frame_handle frame)
+static unsigned lab_state_sync_index(frame_jsref frame)
 {
     return (unsigned)lab_dom_number(lab_dom_get(frame, "index"));
 }
 
-static browser_handle lab_state_sync_or(browser_handle value, browser_handle fallback)
+static browser_jsref lab_state_sync_or(browser_jsref value, browser_jsref fallback)
 {
     return lab_dom_truth(value) ? value : fallback;
 }
 
-static browser_handle lab_state_sync_next(frame_handle frame, unsigned next, const char *service)
+static browser_jsref lab_state_sync_next(frame_jsref frame, unsigned next, const char *service)
 {
     return lab_flow_call(frame, next, service, 0, 0, 0);
 }
 
 struct lab_state_sync_save_context {
-    frame_handle frame;
+    frame_jsref frame;
     lab_mode_t index;
-    browser_handle text;
+    browser_jsref text;
 };
 
 /**
@@ -46,14 +46,14 @@ struct lab_state_sync_save_context {
  * @param ctx Save state whose frame receives updatedAt after any text canonicalisation.
  * @return Scoped clock-read plan resuming at stage 2.
  */
-static browser_handle lab_state_sync_save_state_now(struct lab_state_sync_save_context *ctx);
+static browser_jsref lab_state_sync_save_state_now(struct lab_state_sync_save_context *ctx);
 
 /**
  * @brief Retain the canonical text for the worksheet being saved.
  * @param ctx Save state carrying the editor-mode index, prepared text and continuation frame.
  * @return Scoped text-retention plan resuming at stage 4.
  */
-static browser_handle lab_state_sync_save_state_retain_text(struct lab_state_sync_save_context *ctx);
+static browser_jsref lab_state_sync_save_state_retain_text(struct lab_state_sync_save_context *ctx);
 
 /**
  * @brief Build local and server records from the captured worksheet fields.
@@ -61,9 +61,9 @@ static browser_handle lab_state_sync_save_state_retain_text(struct lab_state_syn
  *   cap.
  * @return Scoped record-building plan saving records in the frame before stage 8.
  */
-static browser_handle lab_state_sync_save_state_records(struct lab_state_sync_save_context *ctx);
+static browser_jsref lab_state_sync_save_state_records(struct lab_state_sync_save_context *ctx);
 
-static browser_handle lab_state_sync_save_state_canonical(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_canonical(struct lab_state_sync_save_context *ctx)
 {
     if (!lab_persist_count(ctx->index))
         return lab_flow_done(0);
@@ -75,12 +75,12 @@ static browser_handle lab_state_sync_save_state_canonical(struct lab_state_sync_
     return lab_state_sync_save_state_now(ctx);
 }
 
-static browser_handle lab_state_sync_save_state_now(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_now(struct lab_state_sync_save_context *ctx)
 {
     return lab_flow_call(ctx->frame, 2, "stateNow", "updatedAt", 0, 0);
 }
 
-static browser_handle lab_state_sync_save_state_timestamp(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_timestamp(struct lab_state_sync_save_context *ctx)
 {
     if (ctx->index == LAB_MODE_EXPRESSION)
         return lab_flow_call(ctx->frame, 3, "stateTimestamp", 0, 0, 1, lab_dom_get(ctx->frame, "updatedAt"));
@@ -88,12 +88,12 @@ static browser_handle lab_state_sync_save_state_timestamp(struct lab_state_sync_
     return lab_state_sync_save_state_retain_text(ctx);
 }
 
-static browser_handle lab_state_sync_save_state_retain_text(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_retain_text(struct lab_state_sync_save_context *ctx)
 {
     return lab_flow_call(ctx->frame, 4, "stateRetainText", 0, 0, 2, lab_dom_numeric(ctx->index), ctx->text);
 }
 
-static browser_handle lab_state_sync_save_state_matrix_operation(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_matrix_operation(struct lab_state_sync_save_context *ctx)
 {
     if (ctx->index == LAB_MODE_MATRIX)
         return lab_flow_call(ctx->frame, 5, "stateMatrixOperation", "operation", 0, 0);
@@ -102,17 +102,17 @@ static browser_handle lab_state_sync_save_state_matrix_operation(struct lab_stat
     return lab_state_sync_save_state_records(ctx);
 }
 
-static browser_handle lab_state_sync_save_state_matrix_operand(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_matrix_operand(struct lab_state_sync_save_context *ctx)
 {
     return lab_flow_call(ctx->frame, 7, "stateMatrixOperand", "operand", 0, 0);
 }
 
-static browser_handle lab_state_sync_save_state_interval_cap(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_interval_cap(struct lab_state_sync_save_context *ctx)
 {
     return lab_flow_call(ctx->frame, 7, "stateIntervalCap", "cap", 0, 0);
 }
 
-static browser_handle lab_state_sync_save_state_records(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_records(struct lab_state_sync_save_context *ctx)
 {
     int values = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(values, ctx->text);
@@ -124,14 +124,14 @@ static browser_handle lab_state_sync_save_state_records(struct lab_state_sync_sa
     return lab_flow_call(ctx->frame, 8, "stateRecords", "records", 0, 2, lab_dom_numeric(ctx->index), values);
 }
 
-static browser_handle lab_state_sync_save_state_local_records(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_local_records(struct lab_state_sync_save_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(9));
     return lab_flow_call(ctx->frame, 9, "stateLocalRecords", 0, 0, 1,
                          lab_dom_get(lab_dom_get(ctx->frame, "records"), "local"));
 }
 
-static browser_handle lab_state_sync_save_state_cancel_save_timer(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_state_cancel_save_timer(struct lab_state_sync_save_context *ctx)
 {
     lab_dom_delete(ctx->frame, "failed");
     unsigned token = lab_persist_begin(ctx->index, lab_dom_truth(ctx->text));
@@ -142,7 +142,7 @@ static browser_handle lab_state_sync_save_state_cancel_save_timer(struct lab_sta
     return lab_flow_call(ctx->frame, 10, "stateCancelSaveTimer", 0, 0, 1, lab_dom_numeric(ctx->index));
 }
 
-static browser_handle lab_state_sync_save_schedule(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_schedule(struct lab_state_sync_save_context *ctx)
 {
     unsigned delay =
         lab_persist_delay(ctx->index, lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "options"), "debounce")));
@@ -150,13 +150,13 @@ static browser_handle lab_state_sync_save_schedule(struct lab_state_sync_save_co
     return lab_flow_call(ctx->frame, 11, delay ? "stateScheduleSave" : "statePublishSave", 0, 0, 1, ctx->frame);
 }
 
-static browser_handle lab_state_sync_save_otherwise(struct lab_state_sync_save_context *ctx)
+static browser_jsref lab_state_sync_save_otherwise(struct lab_state_sync_save_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_save(frame_handle frame)
+static browser_jsref lab_state_sync_save(frame_jsref frame)
 {
     lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     int text = lab_dom_get(frame, "text");
@@ -165,7 +165,7 @@ static browser_handle lab_state_sync_save(frame_handle frame)
         .index = index,
         .text = text,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_save_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_save_context *) = {
         [0]  = lab_state_sync_save_state_canonical,
         [1]  = lab_state_sync_save_state_now,
         [2]  = lab_state_sync_save_state_timestamp,
@@ -184,19 +184,19 @@ static browser_handle lab_state_sync_save(frame_handle frame)
 }
 
 struct lab_state_sync_publish_context {
-    frame_handle frame;
-    browser_handle save;
+    frame_jsref frame;
+    browser_jsref save;
     lab_mode_t index;
 };
 
-static browser_handle lab_state_sync_publish_state_forget_save_timer(struct lab_state_sync_publish_context *ctx)
+static browser_jsref lab_state_sync_publish_state_forget_save_timer(struct lab_state_sync_publish_context *ctx)
 {
     if (!lab_persist_take(ctx->index, (unsigned)lab_dom_number(lab_dom_get(ctx->save, "token"))))
         return lab_flow_done(0);
     return lab_flow_call(ctx->frame, 1, "stateForgetSaveTimer", 0, 0, 1, lab_dom_numeric(ctx->index));
 }
 
-static browser_handle lab_state_sync_publish_state_save(struct lab_state_sync_publish_context *ctx)
+static browser_jsref lab_state_sync_publish_state_save(struct lab_state_sync_publish_context *ctx)
 {
     int options = lab_dom_object(LAB_VALUE_OBJECT);
     int keepalive = !lab_dom_truth(lab_dom_get(ctx->save, "delay")) &&
@@ -205,13 +205,13 @@ static browser_handle lab_state_sync_publish_state_save(struct lab_state_sync_pu
     return lab_flow_call(ctx->frame, 2, "stateSave", 0, 0, 2, lab_dom_get(ctx->save, "patch"), options);
 }
 
-static browser_handle lab_state_sync_publish_otherwise(struct lab_state_sync_publish_context *ctx)
+static browser_jsref lab_state_sync_publish_otherwise(struct lab_state_sync_publish_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_publish(frame_handle frame)
+static browser_jsref lab_state_sync_publish(frame_jsref frame)
 {
     int save = lab_dom_get(frame, "save");
     lab_mode_t index = (lab_mode_t)lab_state_sync_index(save);
@@ -220,7 +220,7 @@ static browser_handle lab_state_sync_publish(frame_handle frame)
         .save = save,
         .index = index,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_publish_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_publish_context *) = {
         [0] = lab_state_sync_publish_state_forget_save_timer,
         [1] = lab_state_sync_publish_state_save,
     };
@@ -230,24 +230,24 @@ static browser_handle lab_state_sync_publish(frame_handle frame)
 }
 
 struct lab_state_sync_calendar_context {
-    frame_handle frame;
-    browser_handle mode;
-    browser_handle state;
+    frame_jsref frame;
+    browser_jsref mode;
+    browser_jsref state;
     int datetime;
 };
 
-static browser_handle lab_state_sync_calendar_capture(struct lab_state_sync_calendar_context *ctx)
+static browser_jsref lab_state_sync_calendar_capture(struct lab_state_sync_calendar_context *ctx)
 {
     return lab_flow_call(ctx->frame, 1, ctx->datetime ? "stateDatetime" : "stateAlmanac", "state", 0, 0);
 }
 
-static browser_handle lab_state_sync_calendar_state_default_editor(struct lab_state_sync_calendar_context *ctx)
+static browser_jsref lab_state_sync_calendar_state_default_editor(struct lab_state_sync_calendar_context *ctx)
 {
     return lab_flow_call(ctx->frame, 2, "stateDefaultEditor", 0, 0, 2, ctx->mode,
                          lab_dom_numeric(ctx->datetime ? 5 : 6));
 }
 
-static browser_handle lab_state_sync_calendar_state_write_calendar(struct lab_state_sync_calendar_context *ctx)
+static browser_jsref lab_state_sync_calendar_state_write_calendar(struct lab_state_sync_calendar_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(3));
     return lab_flow_call(
@@ -255,24 +255,24 @@ static browser_handle lab_state_sync_calendar_state_write_calendar(struct lab_st
         lab_dom_string(ctx->datetime ? "mars.exprLab.lastDatetimeState" : "mars.exprLab.lastAlmanacState"), ctx->state);
 }
 
-static browser_handle lab_state_sync_calendar_state_calendar_patch(struct lab_state_sync_calendar_context *ctx)
+static browser_jsref lab_state_sync_calendar_state_calendar_patch(struct lab_state_sync_calendar_context *ctx)
 {
     lab_dom_delete(ctx->frame, "failed");
     return lab_flow_call(ctx->frame, 4, "stateCalendarPatch", "patch", 0, 2, ctx->mode, ctx->state);
 }
 
-static browser_handle lab_state_sync_calendar_state_save(struct lab_state_sync_calendar_context *ctx)
+static browser_jsref lab_state_sync_calendar_state_save(struct lab_state_sync_calendar_context *ctx)
 {
     return lab_flow_call(ctx->frame, 5, "stateSave", 0, 0, 1, lab_dom_get(ctx->frame, "patch"));
 }
 
-static browser_handle lab_state_sync_calendar_otherwise(struct lab_state_sync_calendar_context *ctx)
+static browser_jsref lab_state_sync_calendar_otherwise(struct lab_state_sync_calendar_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_calendar(frame_handle frame)
+static browser_jsref lab_state_sync_calendar(frame_jsref frame)
 {
     int mode = lab_dom_get(frame, "mode"), state = lab_dom_get(frame, "state");
     int datetime = lab_dom_equal(mode, lab_dom_string("datetime"));
@@ -282,7 +282,7 @@ static browser_handle lab_state_sync_calendar(frame_handle frame)
         .state = state,
         .datetime = datetime,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_calendar_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_calendar_context *) = {
         [0] = lab_state_sync_calendar_capture,
         [1] = lab_state_sync_calendar_state_default_editor,
         [2] = lab_state_sync_calendar_state_write_calendar,
@@ -295,18 +295,18 @@ static browser_handle lab_state_sync_calendar(frame_handle frame)
                : lab_state_sync_calendar_otherwise(&ctx);
 }
 
-static browser_handle lab_state_sync_mode_save_state_mode(frame_handle frame)
+static browser_jsref lab_state_sync_mode_save_state_mode(frame_jsref frame)
 {
     return lab_flow_call(frame, 1, "stateMode", "selected", 0, 1, lab_dom_get(frame, "mode"));
 }
 
-static browser_handle lab_state_sync_mode_save_state_write_mode(frame_handle frame)
+static browser_jsref lab_state_sync_mode_save_state_write_mode(frame_jsref frame)
 {
     lab_dom_set(frame, "failed", lab_dom_numeric(2));
     return lab_flow_call(frame, 2, "stateWriteMode", 0, 0, 1, lab_dom_get(frame, "selected"));
 }
 
-static browser_handle lab_state_sync_mode_save_state_save(frame_handle frame)
+static browser_jsref lab_state_sync_mode_save_state_save(frame_jsref frame)
 {
     lab_dom_delete(frame, "failed");
     int patch = lab_dom_object(LAB_VALUE_OBJECT);
@@ -314,15 +314,15 @@ static browser_handle lab_state_sync_mode_save_state_save(frame_handle frame)
     return lab_flow_call(frame, 3, "stateSave", 0, 0, 1, patch);
 }
 
-static browser_handle lab_state_sync_mode_save_otherwise(frame_handle frame)
+static browser_jsref lab_state_sync_mode_save_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_mode_save(frame_handle frame)
+static browser_jsref lab_state_sync_mode_save(frame_jsref frame)
 {
-    static browser_handle (*const handlers[])(browser_handle) = {
+    static browser_jsref (*const handlers[])(browser_jsref) = {
         [0] = lab_state_sync_mode_save_state_mode,
         [1] = lab_state_sync_mode_save_state_write_mode,
         [2] = lab_state_sync_mode_save_state_save,
@@ -334,22 +334,22 @@ static browser_handle lab_state_sync_mode_save(frame_handle frame)
 }
 
 struct lab_state_sync_editor_context {
-    frame_handle frame;
+    frame_jsref frame;
     lab_mode_t index;
-    browser_handle text;
+    browser_jsref text;
 };
 
-static browser_handle lab_state_sync_editor_state_restored_text(struct lab_state_sync_editor_context *ctx)
+static browser_jsref lab_state_sync_editor_state_restored_text(struct lab_state_sync_editor_context *ctx)
 {
     return lab_flow_call(ctx->frame, 1, "stateRestoredText", "text", 0, 1, lab_dom_numeric(ctx->index));
 }
 
-static browser_handle lab_state_sync_editor_state_binding_parts(struct lab_state_sync_editor_context *ctx)
+static browser_jsref lab_state_sync_editor_state_binding_parts(struct lab_state_sync_editor_context *ctx)
 {
     return lab_flow_call(ctx->frame, 2, "stateBindingParts", "bound", 0, 1, ctx->text);
 }
 
-static browser_handle lab_state_sync_editor_state_set_expression(struct lab_state_sync_editor_context *ctx)
+static browser_jsref lab_state_sync_editor_state_set_expression(struct lab_state_sync_editor_context *ctx)
 {
     if (lab_workspace_editor_bound(ctx->index, lab_dom_truth(lab_dom_get(ctx->frame, "bound"))))
         return lab_flow_call(ctx->frame, 5, "stateSetExpression", 0, 0, 1, ctx->text);
@@ -357,18 +357,18 @@ static browser_handle lab_state_sync_editor_state_set_expression(struct lab_stat
     return lab_state_sync_next(ctx->frame, 3, "stateClearSource");
 }
 
-static browser_handle lab_state_sync_editor_state_clear_bindings(struct lab_state_sync_editor_context *ctx)
+static browser_jsref lab_state_sync_editor_state_clear_bindings(struct lab_state_sync_editor_context *ctx)
 {
     return lab_state_sync_next(ctx->frame, 5, "stateClearBindings");
 }
 
-static browser_handle lab_state_sync_editor_otherwise(struct lab_state_sync_editor_context *ctx)
+static browser_jsref lab_state_sync_editor_otherwise(struct lab_state_sync_editor_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_editor(frame_handle frame)
+static browser_jsref lab_state_sync_editor(frame_jsref frame)
 {
     lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     int text = lab_dom_get(frame, "text");
@@ -377,7 +377,7 @@ static browser_handle lab_state_sync_editor(frame_handle frame)
         .index = index,
         .text = text,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_editor_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_editor_context *) = {
         [0] = lab_state_sync_editor_state_restored_text,
         [1] = lab_state_sync_editor_state_binding_parts,
         [2] = lab_state_sync_editor_state_set_expression,
@@ -388,47 +388,47 @@ static browser_handle lab_state_sync_editor(frame_handle frame)
                                                                                : lab_state_sync_editor_otherwise(&ctx);
 }
 
-static browser_handle lab_state_sync_result_state_clear_function(frame_handle frame)
+static browser_jsref lab_state_sync_result_state_clear_function(frame_jsref frame)
 {
     return lab_state_sync_next(frame, 1, "stateClearFunction");
 }
 
-static browser_handle lab_state_sync_result_state_result_projection(frame_handle frame)
+static browser_jsref lab_state_sync_result_state_result_projection(frame_jsref frame)
 {
     return lab_flow_call(frame, 2, "stateResultProjection", "result", 0, 1, lab_dom_get(frame, "mode"));
 }
 
-static browser_handle lab_state_sync_result_state_result_values(frame_handle frame)
+static browser_jsref lab_state_sync_result_state_result_values(frame_jsref frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "result")))
         return lab_state_sync_next(frame, 6, "stateClearResult");
     return lab_flow_call(frame, 3, "stateResultValues", 0, 0, 1, lab_dom_get(frame, "result"));
 }
 
-static browser_handle lab_state_sync_result_state_derivative_buttons(frame_handle frame)
+static browser_jsref lab_state_sync_result_state_derivative_buttons(frame_jsref frame)
 {
     return lab_state_sync_next(frame, 4, "stateDerivativeButtons");
 }
 
-static browser_handle lab_state_sync_result_state_rendered_fit(frame_handle frame)
+static browser_jsref lab_state_sync_result_state_rendered_fit(frame_jsref frame)
 {
     return lab_state_sync_next(frame, 5, "stateRenderedFit");
 }
 
-static browser_handle lab_state_sync_result_state_solver_fit(frame_handle frame)
+static browser_jsref lab_state_sync_result_state_solver_fit(frame_jsref frame)
 {
     return lab_state_sync_next(frame, 6, "stateSolverFit");
 }
 
-static browser_handle lab_state_sync_result_otherwise(frame_handle frame)
+static browser_jsref lab_state_sync_result_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_result(frame_handle frame)
+static browser_jsref lab_state_sync_result(frame_jsref frame)
 {
-    static browser_handle (*const handlers[])(browser_handle) = {
+    static browser_jsref (*const handlers[])(browser_jsref) = {
         [0] = lab_state_sync_result_state_clear_function,
         [1] = lab_state_sync_result_state_result_projection,
         [2] = lab_state_sync_result_state_result_values,
@@ -442,7 +442,7 @@ static browser_handle lab_state_sync_result(frame_handle frame)
 }
 
 struct lab_state_sync_select_context {
-    frame_handle frame;
+    frame_jsref frame;
     int changed;
 };
 
@@ -451,9 +451,9 @@ struct lab_state_sync_select_context {
  * @param ctx Selection state whose frame resumes at stage 3 to return the changed-or-forced result.
  * @return Scoped tab-synchronisation plan.
  */
-static browser_handle lab_state_sync_select_state_sync_tabs(struct lab_state_sync_select_context *ctx);
+static browser_jsref lab_state_sync_select_state_sync_tabs(struct lab_state_sync_select_context *ctx);
 
-static browser_handle lab_state_sync_select_state_notify_mode(struct lab_state_sync_select_context *ctx)
+static browser_jsref lab_state_sync_select_state_notify_mode(struct lab_state_sync_select_context *ctx)
 {
     ctx->changed = lab_workspace_select((lab_mode_t)lab_state_sync_index(ctx->frame));
     lab_dom_set(ctx->frame, "changed", lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->changed));
@@ -462,30 +462,30 @@ static browser_handle lab_state_sync_select_state_notify_mode(struct lab_state_s
     return lab_state_sync_select_state_sync_tabs(ctx);
 }
 
-static browser_handle lab_state_sync_select_state_reset_editor_size(struct lab_state_sync_select_context *ctx)
+static browser_jsref lab_state_sync_select_state_reset_editor_size(struct lab_state_sync_select_context *ctx)
 {
     return lab_state_sync_next(ctx->frame, 2, "stateResetEditorSize");
 }
 
-static browser_handle lab_state_sync_select_state_sync_tabs(struct lab_state_sync_select_context *ctx)
+static browser_jsref lab_state_sync_select_state_sync_tabs(struct lab_state_sync_select_context *ctx)
 {
     return lab_state_sync_next(ctx->frame, 3, "stateSyncTabs");
 }
 
-static browser_handle lab_state_sync_select_otherwise(struct lab_state_sync_select_context *ctx)
+static browser_jsref lab_state_sync_select_otherwise(struct lab_state_sync_select_context *ctx)
 {
     return lab_flow_done(lab_dom_scalar(
         LAB_VALUE_BOOLEAN, ctx->changed || lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "options"), "force"))));
 }
 
-static browser_handle lab_state_sync_select(frame_handle frame)
+static browser_jsref lab_state_sync_select(frame_jsref frame)
 {
     int changed = lab_dom_truth(lab_dom_get(frame, "changed"));
     struct lab_state_sync_select_context ctx = {
         .frame = frame,
         .changed = changed,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_select_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_select_context *) = {
         [0] = lab_state_sync_select_state_notify_mode,
         [1] = lab_state_sync_select_state_reset_editor_size,
         [2] = lab_state_sync_select_state_sync_tabs,
@@ -496,7 +496,7 @@ static browser_handle lab_state_sync_select(frame_handle frame)
 }
 
 struct lab_state_sync_apply_context {
-    frame_handle frame;
+    frame_jsref frame;
     lab_mode_t index;
 };
 
@@ -505,52 +505,52 @@ struct lab_state_sync_apply_context {
  * @param ctx Mode-application state whose frame receives index after optional integrator-row rendering.
  * @return Scoped mode-index query plan resuming at stage 5.
  */
-static browser_handle lab_state_sync_apply_state_mode_index_4(struct lab_state_sync_apply_context *ctx);
+static browser_jsref lab_state_sync_apply_state_mode_index_4(struct lab_state_sync_apply_context *ctx);
 
 /**
  * @brief Read the active mode before deciding whether to initialise almanac controls.
  * @param ctx Mode-application state whose frame receives index after optional datetime location refresh.
  * @return Scoped mode-index query plan resuming at stage 8.
  */
-static browser_handle lab_state_sync_apply_state_mode_index_7(struct lab_state_sync_apply_context *ctx);
+static browser_jsref lab_state_sync_apply_state_mode_index_7(struct lab_state_sync_apply_context *ctx);
 
 /**
  * @brief Synchronise the worksheet UI after calendar-specific initialisation.
  * @param ctx Mode-application state whose frame advances past calendar defaults and saves.
  * @return Scoped UI-synchronisation plan resuming at stage 11.
  */
-static browser_handle lab_state_sync_apply_state_sync_ui(struct lab_state_sync_apply_context *ctx);
+static browser_jsref lab_state_sync_apply_state_sync_ui(struct lab_state_sync_apply_context *ctx);
 
 /**
  * @brief Read the active mode before normalising the integrator interval cap.
  * @param ctx Mode-application state whose frame receives index after optional default-bounds reset.
  * @return Scoped mode-index query plan resuming at stage 15.
  */
-static browser_handle lab_state_sync_apply_state_mode_index_14(struct lab_state_sync_apply_context *ctx);
+static browser_jsref lab_state_sync_apply_state_mode_index_14(struct lab_state_sync_apply_context *ctx);
 
 /**
  * @brief Finish mode application without further control changes.
  * @param ctx Mode-application state; unused at this terminal stage.
  * @return Scoped completion plan with no value.
  */
-static browser_handle lab_state_sync_apply_otherwise(struct lab_state_sync_apply_context *ctx);
+static browser_jsref lab_state_sync_apply_otherwise(struct lab_state_sync_apply_context *ctx);
 
-static browser_handle lab_state_sync_apply_state_force_mode(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_force_mode(struct lab_state_sync_apply_context *ctx)
 {
     return lab_flow_call(ctx->frame, 1, "stateForceMode", 0, 0, 1, lab_dom_get(ctx->frame, "mode"));
 }
 
-static browser_handle lab_state_sync_apply_state_restore_current_editor(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_restore_current_editor(struct lab_state_sync_apply_context *ctx)
 {
     return lab_state_sync_next(ctx->frame, 2, "stateRestoreCurrentEditor");
 }
 
-static browser_handle lab_state_sync_apply_state_mode_index(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_mode_index(struct lab_state_sync_apply_context *ctx)
 {
     return lab_flow_call(ctx->frame, 3, "stateModeIndex", "index", 0, 0);
 }
 
-static browser_handle lab_state_sync_apply_state_render_active_rows(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_render_active_rows(struct lab_state_sync_apply_context *ctx)
 {
     if (ctx->index == LAB_MODE_INTEGRATOR)
         return lab_state_sync_next(ctx->frame, 4, "stateRenderActiveRows");
@@ -558,58 +558,58 @@ static browser_handle lab_state_sync_apply_state_render_active_rows(struct lab_s
     return lab_state_sync_apply_state_mode_index_4(ctx);
 }
 
-static browser_handle lab_state_sync_apply_state_mode_index_4(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_mode_index_4(struct lab_state_sync_apply_context *ctx)
 {
     return lab_flow_call(ctx->frame, 5, "stateModeIndex", "index", 0, 0);
 }
 
-static browser_handle lab_state_sync_apply_state_datetime_defaults(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_datetime_defaults(struct lab_state_sync_apply_context *ctx)
 {
     if (ctx->index == LAB_MODE_DATETIME)
         return lab_state_sync_next(ctx->frame, 6, "stateDatetimeDefaults");
     return lab_state_sync_apply_state_mode_index_7(ctx);
 }
 
-static browser_handle lab_state_sync_apply_state_refresh_location(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_refresh_location(struct lab_state_sync_apply_context *ctx)
 {
     return lab_state_sync_next(ctx->frame, 7, "stateRefreshLocation");
 }
 
-static browser_handle lab_state_sync_apply_state_mode_index_7(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_mode_index_7(struct lab_state_sync_apply_context *ctx)
 {
     return lab_flow_call(ctx->frame, 8, "stateModeIndex", "index", 0, 0);
 }
 
-static browser_handle lab_state_sync_apply_state_almanac_defaults(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_almanac_defaults(struct lab_state_sync_apply_context *ctx)
 {
     if (ctx->index == LAB_MODE_ALMANAC)
         return lab_state_sync_next(ctx->frame, 9, "stateAlmanacDefaults");
     return lab_state_sync_apply_state_sync_ui(ctx);
 }
 
-static browser_handle lab_state_sync_apply_state_save_almanac(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_save_almanac(struct lab_state_sync_apply_context *ctx)
 {
     return lab_state_sync_next(ctx->frame, 10, "stateSaveAlmanac");
 }
 
-static browser_handle lab_state_sync_apply_state_sync_ui(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_sync_ui(struct lab_state_sync_apply_context *ctx)
 {
     return lab_state_sync_next(ctx->frame, 11, "stateSyncUI");
 }
 
-static browser_handle lab_state_sync_apply_state_mode_index_11(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_mode_index_11(struct lab_state_sync_apply_context *ctx)
 {
     return lab_flow_call(ctx->frame, 12, "stateModeIndex", "index", 0, 0);
 }
 
-static browser_handle lab_state_sync_apply_state_bound_count(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_bound_count(struct lab_state_sync_apply_context *ctx)
 {
     if (ctx->index == LAB_MODE_INTEGRATOR)
         return lab_flow_call(ctx->frame, 13, "stateBoundCount", "count", 0, 0);
     return lab_state_sync_apply_state_mode_index_14(ctx);
 }
 
-static browser_handle lab_state_sync_apply_state_reset_bounds(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_reset_bounds(struct lab_state_sync_apply_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "count")))
         return lab_state_sync_next(ctx->frame, 14, "stateResetBounds");
@@ -617,12 +617,12 @@ static browser_handle lab_state_sync_apply_state_reset_bounds(struct lab_state_s
     return lab_state_sync_apply_state_mode_index_14(ctx);
 }
 
-static browser_handle lab_state_sync_apply_state_mode_index_14(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_mode_index_14(struct lab_state_sync_apply_context *ctx)
 {
     return lab_flow_call(ctx->frame, 15, "stateModeIndex", "index", 0, 0);
 }
 
-static browser_handle lab_state_sync_apply_state_normalise_cap(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_state_normalise_cap(struct lab_state_sync_apply_context *ctx)
 {
     if (ctx->index == LAB_MODE_INTEGRATOR)
         return lab_state_sync_next(ctx->frame, 16, "stateNormaliseCap");
@@ -630,20 +630,20 @@ static browser_handle lab_state_sync_apply_state_normalise_cap(struct lab_state_
     return lab_state_sync_apply_otherwise(ctx);
 }
 
-static browser_handle lab_state_sync_apply_otherwise(struct lab_state_sync_apply_context *ctx)
+static browser_jsref lab_state_sync_apply_otherwise(struct lab_state_sync_apply_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_apply(frame_handle frame)
+static browser_jsref lab_state_sync_apply(frame_jsref frame)
 {
     lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     struct lab_state_sync_apply_context ctx = {
         .frame = frame,
         .index = index,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_apply_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_apply_context *) = {
         [0]  = lab_state_sync_apply_state_force_mode,
         [1]  = lab_state_sync_apply_state_restore_current_editor,
         [2]  = lab_state_sync_apply_state_mode_index,
@@ -666,24 +666,24 @@ static browser_handle lab_state_sync_apply(frame_handle frame)
                                                                                : lab_state_sync_apply_otherwise(&ctx);
 }
 
-static browser_handle lab_state_sync_keyboard_state_ready(frame_handle frame)
+static browser_jsref lab_state_sync_keyboard_state_ready(frame_jsref frame)
 {
     return lab_flow_call(frame, 1, "stateReady", "ready", 0, 0);
 }
 
-static browser_handle lab_state_sync_keyboard_state_history_buttons(frame_handle frame)
+static browser_jsref lab_state_sync_keyboard_state_history_buttons(frame_jsref frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "ready")))
         return lab_state_sync_next(frame, 5, "stateHistoryButtons");
     return lab_state_sync_next(frame, 2, "stateClearForward");
 }
 
-static browser_handle lab_state_sync_keyboard_state_mode_index(frame_handle frame)
+static browser_jsref lab_state_sync_keyboard_state_mode_index(frame_jsref frame)
 {
     return lab_flow_call(frame, 3, "stateModeIndex", "index", 0, 0);
 }
 
-static browser_handle lab_state_sync_keyboard_evaluate(frame_handle frame)
+static browser_jsref lab_state_sync_keyboard_evaluate(frame_jsref frame)
 {
     static const char *const services[] = {
         "stateEvaluateExpression", "stateEvaluateEquation", "stateEvaluateDiffequation", "stateEvaluateMatrix",
@@ -692,15 +692,15 @@ static browser_handle lab_state_sync_keyboard_evaluate(frame_handle frame)
     return lab_state_sync_next(frame, 5, services[(unsigned)index < LAB_MODE_COUNT ? index : LAB_MODE_EXPRESSION]);
 }
 
-static browser_handle lab_state_sync_keyboard_otherwise(frame_handle frame)
+static browser_jsref lab_state_sync_keyboard_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_keyboard(frame_handle frame)
+static browser_jsref lab_state_sync_keyboard(frame_jsref frame)
 {
-    static browser_handle (*const handlers[])(browser_handle) = {
+    static browser_jsref (*const handlers[])(browser_jsref) = {
         [0] = lab_state_sync_keyboard_state_ready,
         [1] = lab_state_sync_keyboard_state_history_buttons,
         [2] = lab_state_sync_keyboard_state_mode_index,
@@ -713,7 +713,7 @@ static browser_handle lab_state_sync_keyboard(frame_handle frame)
 }
 
 struct lab_state_sync_history_context {
-    frame_handle frame;
+    frame_jsref frame;
     lab_mode_t index;
 };
 
@@ -722,23 +722,23 @@ struct lab_state_sync_history_context {
  * @param ctx History state with mode index and a frame containing optional textOverride and captured calendar state.
  * @return Scoped text-capture plan, or the bounds/record plan when an override is already available.
  */
-static browser_handle lab_state_sync_history_capture_text(struct lab_state_sync_history_context *ctx);
+static browser_jsref lab_state_sync_history_capture_text(struct lab_state_sync_history_context *ctx);
 
 /**
  * @brief Capture integrator bounds when constructing a history entry.
  * @param ctx History state whose mode index selects integrator bounds and whose frame receives them.
  * @return Scoped bounds-read plan for the integrator, otherwise a history-record plan.
  */
-static browser_handle lab_state_sync_history_state_current_bounds(struct lab_state_sync_history_context *ctx);
+static browser_jsref lab_state_sync_history_state_current_bounds(struct lab_state_sync_history_context *ctx);
 
 /**
  * @brief Construct a history record from captured worksheet values.
  * @param ctx History state with mode index and frame-held text, calendar state and optional integrator bounds and cap.
  * @return Scoped record-building plan saving record in the frame before stage 5.
  */
-static browser_handle lab_state_sync_history_state_history_record(struct lab_state_sync_history_context *ctx);
+static browser_jsref lab_state_sync_history_state_history_record(struct lab_state_sync_history_context *ctx);
 
-static browser_handle lab_state_sync_history_capture_calendar(struct lab_state_sync_history_context *ctx)
+static browser_jsref lab_state_sync_history_capture_calendar(struct lab_state_sync_history_context *ctx)
 {
     if (ctx->index == LAB_MODE_DATETIME || ctx->index == LAB_MODE_ALMANAC)
         return lab_flow_call(ctx->frame, 1, ctx->index == LAB_MODE_DATETIME ? "stateDatetime" : "stateAlmanac", "calendar", 0, 0);
@@ -746,7 +746,7 @@ static browser_handle lab_state_sync_history_capture_calendar(struct lab_state_s
     return lab_state_sync_history_capture_text(ctx);
 }
 
-static browser_handle lab_state_sync_history_capture_text(struct lab_state_sync_history_context *ctx)
+static browser_jsref lab_state_sync_history_capture_text(struct lab_state_sync_history_context *ctx)
 {
     if (lab_dom_type(lab_dom_get(ctx->frame, "textOverride"))) {
         lab_dom_set(ctx->frame, "text", lab_dom_get(ctx->frame, "textOverride"));
@@ -759,19 +759,19 @@ static browser_handle lab_state_sync_history_capture_text(struct lab_state_sync_
                          "text", 0, 1, lab_dom_get(ctx->frame, "calendar"));
 }
 
-static browser_handle lab_state_sync_history_state_current_bounds(struct lab_state_sync_history_context *ctx)
+static browser_jsref lab_state_sync_history_state_current_bounds(struct lab_state_sync_history_context *ctx)
 {
     if (ctx->index == LAB_MODE_INTEGRATOR)
         return lab_flow_call(ctx->frame, 3, "stateCurrentBounds", "bounds", 0, 0);
     return lab_state_sync_history_state_history_record(ctx);
 }
 
-static browser_handle lab_state_sync_history_state_history_cap(struct lab_state_sync_history_context *ctx)
+static browser_jsref lab_state_sync_history_state_history_cap(struct lab_state_sync_history_context *ctx)
 {
     return lab_flow_call(ctx->frame, 4, "stateHistoryCap", "cap", 0, 0);
 }
 
-static browser_handle lab_state_sync_history_state_history_record(struct lab_state_sync_history_context *ctx)
+static browser_jsref lab_state_sync_history_state_history_record(struct lab_state_sync_history_context *ctx)
 {
     return lab_flow_call(ctx->frame, 5, "stateHistoryRecord", "record", 0, 5, lab_dom_numeric(ctx->index),
                          lab_dom_get(ctx->frame, "text"), lab_dom_get(ctx->frame, "calendar"),
@@ -779,19 +779,19 @@ static browser_handle lab_state_sync_history_state_history_record(struct lab_sta
                          ctx->index == LAB_MODE_INTEGRATOR ? lab_dom_get(ctx->frame, "cap") : lab_dom_string(""));
 }
 
-static browser_handle lab_state_sync_history_otherwise(struct lab_state_sync_history_context *ctx)
+static browser_jsref lab_state_sync_history_otherwise(struct lab_state_sync_history_context *ctx)
 {
     return lab_flow_done(lab_dom_get(ctx->frame, "record"));
 }
 
-static browser_handle lab_state_sync_history(frame_handle frame)
+static browser_jsref lab_state_sync_history(frame_jsref frame)
 {
     lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     struct lab_state_sync_history_context ctx = {
         .frame = frame,
         .index = index,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_history_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_history_context *) = {
         [0] = lab_state_sync_history_capture_calendar,
         [1] = lab_state_sync_history_capture_text,
         [2] = lab_state_sync_history_state_current_bounds,
@@ -804,8 +804,8 @@ static browser_handle lab_state_sync_history(frame_handle frame)
 }
 
 struct lab_state_sync_push_context {
-    frame_handle frame;
-    browser_handle entry;
+    frame_jsref frame;
+    browser_jsref entry;
 };
 
 /**
@@ -813,9 +813,9 @@ struct lab_state_sync_push_context {
  * @param ctx History-push state whose frame contains the supplied or newly captured snapshot.
  * @return Scoped snapshot-push plan resuming at stage 2.
  */
-static browser_handle lab_state_sync_push_state_push_snapshot(struct lab_state_sync_push_context *ctx);
+static browser_jsref lab_state_sync_push_state_push_snapshot(struct lab_state_sync_push_context *ctx);
 
-static browser_handle lab_state_sync_push_state_current_history(struct lab_state_sync_push_context *ctx)
+static browser_jsref lab_state_sync_push_state_current_history(struct lab_state_sync_push_context *ctx)
 {
     if (lab_dom_type(ctx->entry) == LAB_VALUE_STRING)
         return lab_flow_call(ctx->frame, 1, "stateCurrentHistory", "snapshot", 0, 1, ctx->entry);
@@ -826,30 +826,30 @@ static browser_handle lab_state_sync_push_state_current_history(struct lab_state
     return lab_state_sync_push_state_push_snapshot(ctx);
 }
 
-static browser_handle lab_state_sync_push_state_push_snapshot(struct lab_state_sync_push_context *ctx)
+static browser_jsref lab_state_sync_push_state_push_snapshot(struct lab_state_sync_push_context *ctx)
 {
     return lab_flow_call(ctx->frame, 2, "statePushSnapshot", 0, 0, 1, lab_dom_get(ctx->frame, "snapshot"));
 }
 
-static browser_handle lab_state_sync_push_state_history_buttons(struct lab_state_sync_push_context *ctx)
+static browser_jsref lab_state_sync_push_state_history_buttons(struct lab_state_sync_push_context *ctx)
 {
     return lab_state_sync_next(ctx->frame, 3, "stateHistoryButtons");
 }
 
-static browser_handle lab_state_sync_push_otherwise(struct lab_state_sync_push_context *ctx)
+static browser_jsref lab_state_sync_push_otherwise(struct lab_state_sync_push_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_push(frame_handle frame)
+static browser_jsref lab_state_sync_push(frame_jsref frame)
 {
     int entry = lab_dom_get(frame, "entry");
     struct lab_state_sync_push_context ctx = {
         .frame = frame,
         .entry = entry,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_push_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_push_context *) = {
         [0] = lab_state_sync_push_state_current_history,
         [1] = lab_state_sync_push_state_push_snapshot,
         [2] = lab_state_sync_push_state_history_buttons,
@@ -862,9 +862,9 @@ static browser_handle lab_state_sync_push(frame_handle frame)
 static const char *const lab_state_sync_control_modes[] = {"matrix", "equation", "integrator"};
 
 struct lab_state_sync_control_context {
-    frame_handle frame;
+    frame_jsref frame;
     lab_state_control_kind_t index;
-    node_handle node;
+    node_jsref node;
 };
 
 /**
@@ -873,23 +873,23 @@ struct lab_state_sync_control_context {
  *   operation.
  * @return Scoped matrix-UI synchronisation plan or active-mode query plan.
  */
-static browser_handle lab_state_sync_control_state_sync_matrix(struct lab_state_sync_control_context *ctx);
+static browser_jsref lab_state_sync_control_state_sync_matrix(struct lab_state_sync_control_context *ctx);
 
 /**
  * @brief Read the current mode before saving a changed worksheet control.
  * @param ctx Control state whose frame receives mode for comparison with the control's owning worksheet.
  * @return Scoped active-mode query plan resuming at stage 3.
  */
-static browser_handle lab_state_sync_control_current_mode(struct lab_state_sync_control_context *ctx);
+static browser_jsref lab_state_sync_control_current_mode(struct lab_state_sync_control_context *ctx);
 
 /**
  * @brief Finish a control update without saving another worksheet's state.
  * @param ctx Control-update state; unused at this terminal stage.
  * @return Scoped completion plan with no value.
  */
-static browser_handle lab_state_sync_control_otherwise(struct lab_state_sync_control_context *ctx);
+static browser_jsref lab_state_sync_control_otherwise(struct lab_state_sync_control_context *ctx);
 
-static browser_handle lab_state_sync_control_validate(struct lab_state_sync_control_context *ctx)
+static browser_jsref lab_state_sync_control_validate(struct lab_state_sync_control_context *ctx)
 {
     {
         if (!ctx->node)
@@ -907,7 +907,7 @@ static browser_handle lab_state_sync_control_validate(struct lab_state_sync_cont
     return lab_state_sync_control_state_sync_matrix(ctx);
 }
 
-static browser_handle lab_state_sync_control_state_sync_matrix(struct lab_state_sync_control_context *ctx)
+static browser_jsref lab_state_sync_control_state_sync_matrix(struct lab_state_sync_control_context *ctx)
 {
     lab_dom_write(ctx->node, LAB_DOM_VALUE, "", lab_dom_get(ctx->frame, "value"));
     if (ctx->index == LAB_STATE_CONTROL_MATRIX_OPERATION)
@@ -916,12 +916,12 @@ static browser_handle lab_state_sync_control_state_sync_matrix(struct lab_state_
     return lab_state_sync_control_current_mode(ctx);
 }
 
-static browser_handle lab_state_sync_control_current_mode(struct lab_state_sync_control_context *ctx)
+static browser_jsref lab_state_sync_control_current_mode(struct lab_state_sync_control_context *ctx)
 {
     return lab_flow_call(ctx->frame, 3, "currentMode", "mode", 0, 0);
 }
 
-static browser_handle lab_state_sync_control_state_save_worksheet(struct lab_state_sync_control_context *ctx)
+static browser_jsref lab_state_sync_control_state_save_worksheet(struct lab_state_sync_control_context *ctx)
 {
     if (lab_dom_equal(lab_dom_get(ctx->frame, "mode"), lab_dom_string(lab_state_sync_control_modes[ctx->index])))
         return lab_flow_call(ctx->frame, 4, "stateSaveWorksheet", 0, 0, 1,
@@ -930,13 +930,13 @@ static browser_handle lab_state_sync_control_state_save_worksheet(struct lab_sta
     return lab_state_sync_control_otherwise(ctx);
 }
 
-static browser_handle lab_state_sync_control_otherwise(struct lab_state_sync_control_context *ctx)
+static browser_jsref lab_state_sync_control_otherwise(struct lab_state_sync_control_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_control(frame_handle frame)
+static browser_jsref lab_state_sync_control(frame_jsref frame)
 {
     lab_state_control_kind_t index = (lab_state_control_kind_t)lab_state_sync_index(frame);
 
@@ -948,7 +948,7 @@ static browser_handle lab_state_sync_control(frame_handle frame)
         .index = index,
         .node = node,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_control_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_control_context *) = {
         [0] = lab_state_sync_control_validate,
         [1] = lab_state_sync_control_state_sync_matrix,
         [2] = lab_state_sync_control_current_mode,
@@ -964,19 +964,19 @@ static browser_handle lab_state_sync_control(frame_handle frame)
  * @param frame Save-flush continuation frame; unused when complete or when the mode needs no flush.
  * @return Scoped completion plan with no value.
  */
-static browser_handle lab_state_sync_flush_otherwise(frame_handle frame);
+static browser_jsref lab_state_sync_flush_otherwise(frame_jsref frame);
 
-static browser_handle lab_state_sync_flush_current_mode(frame_handle frame)
+static browser_jsref lab_state_sync_flush_current_mode(frame_jsref frame)
 {
     return lab_flow_call(frame, 1, "currentMode", "mode", 0, 0);
 }
 
-static browser_handle lab_state_sync_flush_state_named_index(frame_handle frame)
+static browser_jsref lab_state_sync_flush_state_named_index(frame_jsref frame)
 {
     return lab_flow_call(frame, 2, "stateNamedIndex", "index", 0, 1, lab_dom_get(frame, "mode"));
 }
 
-static browser_handle lab_state_sync_flush_state_flush_save(frame_handle frame)
+static browser_jsref lab_state_sync_flush_state_flush_save(frame_jsref frame)
 {
     if (lab_events_flush((lab_mode_t)lab_state_sync_index(frame)))
         return lab_flow_call(frame, 3, "stateFlushSave", 0, 0, 1, lab_dom_get(frame, "mode"));
@@ -984,15 +984,15 @@ static browser_handle lab_state_sync_flush_state_flush_save(frame_handle frame)
     return lab_state_sync_flush_otherwise(frame);
 }
 
-static browser_handle lab_state_sync_flush_otherwise(frame_handle frame)
+static browser_jsref lab_state_sync_flush_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_flush(frame_handle frame)
+static browser_jsref lab_state_sync_flush(frame_jsref frame)
 {
-    static browser_handle (*const handlers[])(browser_handle) = {
+    static browser_jsref (*const handlers[])(browser_jsref) = {
         [0] = lab_state_sync_flush_current_mode,
         [1] = lab_state_sync_flush_state_named_index,
         [2] = lab_state_sync_flush_state_flush_save,
@@ -1007,14 +1007,14 @@ static browser_handle lab_state_sync_flush(frame_handle frame)
  * @param frame Location-save continuation frame; unused after the datetime save or when another mode is active.
  * @return Scoped completion plan with no value.
  */
-static browser_handle lab_state_sync_location_otherwise(frame_handle frame);
+static browser_jsref lab_state_sync_location_otherwise(frame_jsref frame);
 
-static browser_handle lab_state_sync_location_state_mode_index(frame_handle frame)
+static browser_jsref lab_state_sync_location_state_mode_index(frame_jsref frame)
 {
     return lab_flow_call(frame, 1, "stateModeIndex", "index", 0, 0);
 }
 
-static browser_handle lab_state_sync_location_state_save_datetime(frame_handle frame)
+static browser_jsref lab_state_sync_location_state_save_datetime(frame_jsref frame)
 {
     if (lab_state_sync_index(frame) == LAB_MODE_DATETIME)
         return lab_state_sync_next(frame, 2, "stateSaveDatetime");
@@ -1022,15 +1022,15 @@ static browser_handle lab_state_sync_location_state_save_datetime(frame_handle f
     return lab_state_sync_location_otherwise(frame);
 }
 
-static browser_handle lab_state_sync_location_otherwise(frame_handle frame)
+static browser_jsref lab_state_sync_location_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_location(frame_handle frame)
+static browser_jsref lab_state_sync_location(frame_jsref frame)
 {
-    static browser_handle (*const handlers[])(browser_handle) = {
+    static browser_jsref (*const handlers[])(browser_jsref) = {
         [0] = lab_state_sync_location_state_mode_index,
         [1] = lab_state_sync_location_state_save_datetime,
     };
@@ -1041,8 +1041,8 @@ static browser_handle lab_state_sync_location(frame_handle frame)
 }
 
 struct lab_state_sync_integrator_result_context {
-    frame_handle frame;
-    browser_handle rows;
+    frame_jsref frame;
+    browser_jsref rows;
 };
 
 /**
@@ -1050,14 +1050,14 @@ struct lab_state_sync_integrator_result_context {
  * @param ctx Integrator-result state carrying frame and merged rows; unused at completion or when no update exists.
  * @return Scoped completion plan with no value.
  */
-static browser_handle lab_state_sync_integrator_result_otherwise(struct lab_state_sync_integrator_result_context *ctx);
+static browser_jsref lab_state_sync_integrator_result_otherwise(struct lab_state_sync_integrator_result_context *ctx);
 
-static browser_handle lab_state_sync_integrator_result_state_merge_rows(struct lab_state_sync_integrator_result_context *ctx)
+static browser_jsref lab_state_sync_integrator_result_state_merge_rows(struct lab_state_sync_integrator_result_context *ctx)
 {
     return lab_flow_call(ctx->frame, 1, "stateMergeRows", "rows", 0, 1, lab_dom_get(ctx->frame, "data"));
 }
 
-static browser_handle lab_state_sync_integrator_result_fail(struct lab_state_sync_integrator_result_context *ctx)
+static browser_jsref lab_state_sync_integrator_result_fail(struct lab_state_sync_integrator_result_context *ctx)
 {
     if (lab_dom_type(ctx->rows) == LAB_VALUE_BOOLEAN && !lab_dom_truth(ctx->rows))
         return lab_flow_call(ctx->frame, 2, "fail", 0, 0, 1,
@@ -1068,20 +1068,20 @@ static browser_handle lab_state_sync_integrator_result_fail(struct lab_state_syn
     return lab_state_sync_integrator_result_otherwise(ctx);
 }
 
-static browser_handle lab_state_sync_integrator_result_otherwise(struct lab_state_sync_integrator_result_context *ctx)
+static browser_jsref lab_state_sync_integrator_result_otherwise(struct lab_state_sync_integrator_result_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_integrator_result(frame_handle frame)
+static browser_jsref lab_state_sync_integrator_result(frame_jsref frame)
 {
     int rows = lab_dom_get(frame, "rows");
     struct lab_state_sync_integrator_result_context ctx = {
         .frame = frame,
         .rows = rows,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_integrator_result_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_integrator_result_context *) = {
         [0] = lab_state_sync_integrator_result_state_merge_rows,
         [1] = lab_state_sync_integrator_result_fail,
     };
@@ -1092,37 +1092,37 @@ static browser_handle lab_state_sync_integrator_result(frame_handle frame)
 }
 
 struct lab_state_sync_capture_save_context {
-    frame_handle frame;
+    frame_jsref frame;
     lab_mode_t index;
 };
 
-static browser_handle lab_state_sync_capture_save_state_expression_saved_text(struct lab_state_sync_capture_save_context *ctx)
+static browser_jsref lab_state_sync_capture_save_state_expression_saved_text(struct lab_state_sync_capture_save_context *ctx)
 {
     if (ctx->index == LAB_MODE_EXPRESSION)
         return lab_flow_call(ctx->frame, 1, "stateExpressionSavedText", "text", 0, 0);
     return lab_flow_call(ctx->frame, 2, "stateSaveNamedEditor", 0, 0, 1, lab_dom_numeric(ctx->index));
 }
 
-static browser_handle lab_state_sync_capture_save_state_save_worksheet(struct lab_state_sync_capture_save_context *ctx)
+static browser_jsref lab_state_sync_capture_save_state_save_worksheet(struct lab_state_sync_capture_save_context *ctx)
 {
     return lab_flow_call(ctx->frame, 2, "stateSaveWorksheet", 0, 0, 2, lab_dom_string("expression"),
                          lab_dom_get(ctx->frame, "text"));
 }
 
-static browser_handle lab_state_sync_capture_save_otherwise(struct lab_state_sync_capture_save_context *ctx)
+static browser_jsref lab_state_sync_capture_save_otherwise(struct lab_state_sync_capture_save_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_handle lab_state_sync_capture_save(frame_handle frame)
+static browser_jsref lab_state_sync_capture_save(frame_jsref frame)
 {
     lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     struct lab_state_sync_capture_save_context ctx = {
         .frame = frame,
         .index = index,
     };
-    static browser_handle (*const handlers[])(struct lab_state_sync_capture_save_context *) = {
+    static browser_jsref (*const handlers[])(struct lab_state_sync_capture_save_context *) = {
         [0] = lab_state_sync_capture_save_state_expression_saved_text,
         [1] = lab_state_sync_capture_save_state_save_worksheet,
     };
@@ -1132,26 +1132,26 @@ static browser_handle lab_state_sync_capture_save(frame_handle frame)
                : lab_state_sync_capture_save_otherwise(&ctx);
 }
 
-static browser_handle lab_state_sync_needs_bounds_state_mode_index(frame_handle frame)
+static browser_jsref lab_state_sync_needs_bounds_state_mode_index(frame_jsref frame)
 {
     return lab_flow_call(frame, 1, "stateModeIndex", "index", 0, 0);
 }
 
-static browser_handle lab_state_sync_needs_bounds_state_bound_count(frame_handle frame)
+static browser_jsref lab_state_sync_needs_bounds_state_bound_count(frame_jsref frame)
 {
     if (lab_state_sync_index(frame) != LAB_MODE_INTEGRATOR)
         return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(frame, 2, "stateBoundCount", "count", 0, 0);
 }
 
-static browser_handle lab_state_sync_needs_bounds_otherwise(frame_handle frame)
+static browser_jsref lab_state_sync_needs_bounds_otherwise(frame_jsref frame)
 {
     return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, lab_dom_number(lab_dom_get(frame, "count")) == 0));
 }
 
-static browser_handle lab_state_sync_needs_bounds(frame_handle frame)
+static browser_jsref lab_state_sync_needs_bounds(frame_jsref frame)
 {
-    static browser_handle (*const handlers[])(browser_handle) = {
+    static browser_jsref (*const handlers[])(browser_jsref) = {
         [0] = lab_state_sync_needs_bounds_state_mode_index,
         [1] = lab_state_sync_needs_bounds_state_bound_count,
     };
@@ -1162,9 +1162,9 @@ static browser_handle lab_state_sync_needs_bounds(frame_handle frame)
 }
 
 /* Browser callbacks retain resources, while this fixed dispatch owns synchronous decisions. */
-void lab_state_sync(lab_state_sync_kind_t kind, frame_handle frame)
+void lab_state_sync(lab_state_sync_kind_t kind, frame_jsref frame)
 {
-    static browser_handle (*const handlers[])(browser_handle) = {
+    static browser_jsref (*const handlers[])(browser_jsref) = {
         [LAB_STATE_SYNC_SAVE]              = lab_state_sync_save,
         [LAB_STATE_SYNC_PUBLISH]           = lab_state_sync_publish,
         [LAB_STATE_SYNC_CALENDAR]          = lab_state_sync_calendar,

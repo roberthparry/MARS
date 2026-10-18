@@ -33,6 +33,6 @@ typedef enum {
  * @param view Scoped browser handle to the workspace capability view used for current state and snapshots.
  * @return Scoped browser handle to the next continuation plan; unsupported kinds produce an inert completion.
  */
-browser_handle lab_flow_state(lab_flow_state_kind_t kind, frame_handle frame, view_handle view);
+browser_jsref lab_flow_state(lab_flow_state_kind_t kind, frame_jsref frame, view_jsref view);
 
 #endif

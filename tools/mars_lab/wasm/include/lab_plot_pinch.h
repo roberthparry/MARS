@@ -19,7 +19,7 @@
  * @return True after capturing the second touch; false for an ineligible target, invalid geometry or separation
  * below eight CSS pixels. Pointer IDs, including false, are compared without numeric conversion.
  */
-bool lab_plot_pinch_start(gesture_handle state, event_handle event);
+bool lab_plot_pinch_start(gesture_jsref state, event_jsref event);
 
 /**
  * @brief Update a tracked touch and request a curve-range or retained surface-gesture update.
@@ -28,12 +28,12 @@ bool lab_plot_pinch_start(gesture_handle state, event_handle event);
  * @return True for a usable update, including surface coordinates without changed bounds; false for separation
  * below eight CSS pixels, non-finite geometry or unrepresentable curve bounds.
  */
-bool lab_plot_pinch_move(gesture_handle state, event_handle event);
+bool lab_plot_pinch_move(gesture_jsref state, event_jsref event);
 
 /**
  * @brief Restore captured curve bounds or mark a surface gesture for retained-volume cancellation.
  * @param state Scoped handle to the mutable browser gesture record containing the initial range snapshots.
  */
-void lab_plot_pinch_cancel(gesture_handle state);
+void lab_plot_pinch_cancel(gesture_jsref state);
 
 #endif

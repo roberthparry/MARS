@@ -115,19 +115,16 @@
 }
 
 .plot-range {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
-  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
   padding-top: 1rem;
   border-top: 1px solid var(--line);
   flex: 0 0 auto;
 }
 
 .plot-ranges {
-  display: flex;
-  flex-wrap: wrap;
-  grid-column: 1 / -1;
-  min-width: 0;
-  gap: 1rem;
+  display: contents;
 }
 
 #plotRendered:has(> .complex-grid) {
@@ -334,6 +331,7 @@
 }
 
 .plot-options-card {
+  flex: 1 1 18rem;
   width: auto;
   max-width: 100%;
   box-sizing: border-box;
@@ -371,13 +369,17 @@
 #plotKindGroup,
 #plotCamera,
 #plotFeedback {
-  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 #plotKindGroup {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  column-gap: 1rem;
+  align-content: start;
+  flex-basis: 18rem;
+}
+
+#plotCamera,
+#plotFeedback {
+  flex-basis: 100%;
 }
 
 #plotCamera {
@@ -577,6 +579,15 @@
   margin: 0;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.plot-figure-caption {
+  display: block;
+  flex: none;
+  max-width: none;
+  margin-top: 0.5rem;
+  text-align: left;
+  white-space: normal;
 }
 
 .result-card:not(.plot-card) .plot-range {

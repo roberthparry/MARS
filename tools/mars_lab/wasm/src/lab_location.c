@@ -29,22 +29,22 @@ static const struct {
     [LAB_MODE_ALMANAC]  = {4, 2},
 };
 
-static browser_handle lab_location_text(browser_handle value)
+static browser_jsref lab_location_text(browser_jsref value)
 {
     return lab_dom_join(0, value, "");
 }
 
-static browser_handle lab_location_value(node_handle node)
+static browser_jsref lab_location_value(node_jsref node)
 {
     return lab_dom_read(node, LAB_DOM_VALUE, "");
 }
 
-static int lab_location_is(browser_handle value, const char *text)
+static int lab_location_is(browser_jsref value, const char *text)
 {
     return lab_dom_equal(value, lab_dom_string(text));
 }
 
-static browser_handle lab_location_element(lab_mode_t mode, unsigned field)
+static browser_jsref lab_location_element(lab_mode_t mode, unsigned field)
 {
     const char *name = lab_profile_text(mode, field, LAB_PROFILE_ELEMENT);
     char selector[80] = {'#'};
@@ -55,14 +55,14 @@ static browser_handle lab_location_element(lab_mode_t mode, unsigned field)
     return lab_dom_query(0, selector);
 }
 
-static void lab_location_write(node_handle node, browser_handle text)
+static void lab_location_write(node_jsref node, browser_jsref text)
 {
     lab_dom_write(node, LAB_DOM_VALUE, "", text);
     if (node && lab_location_is(lab_dom_get(node, "tagName"), "SELECT"))
         lab_select_sync(node);
 }
 
-static int lab_location_valid(lab_profile_kind_t kind, browser_handle text, browser_handle jurisdictions)
+static int lab_location_valid(lab_profile_kind_t kind, browser_jsref text, browser_jsref jurisdictions)
 {
     if (kind == LAB_PROFILE_DATE) {
         int input = lab_dom_create("input");
@@ -79,20 +79,20 @@ static int lab_location_valid(lab_profile_kind_t kind, browser_handle text, brow
     return 1;
 }
 
-static browser_handle lab_location_validated(lab_profile_kind_t kind, browser_handle value, browser_handle fallback,
-                                browser_handle jurisdictions)
+static browser_jsref lab_location_validated(lab_profile_kind_t kind, browser_jsref value, browser_jsref fallback,
+                                browser_jsref jurisdictions)
 {
     int text = lab_dom_clean(value, kind == LAB_PROFILE_VISIBILITY ? LAB_DOM_CLEAN_LOWER : LAB_DOM_CLEAN_TRIM);
     return lab_location_valid(kind, text, jurisdictions) ? text : fallback;
 }
 
 /* Validate an opaque form value using browser conversion and native calendar policy. */
-void lab_location_validate(lab_profile_kind_t kind, browser_handle boxed, browser_handle fallback, browser_handle jurisdictions)
+void lab_location_validate(lab_profile_kind_t kind, browser_jsref boxed, browser_jsref fallback, browser_jsref jurisdictions)
 {
     lab_dom_return(lab_location_validated(kind, lab_dom_get(boxed, "value"), fallback, jurisdictions));
 }
 
-static browser_handle lab_location_town_list(browser_handle context, browser_handle value)
+static browser_jsref lab_location_town_list(browser_jsref context, browser_jsref value)
 {
     int config = lab_dom_get(context, "config");
     int code = lab_location_validated(LAB_PROFILE_JURISDICTION, value, lab_dom_get(config, "DEFAULT_DATETIME_JURISDICTION"),
@@ -105,7 +105,7 @@ static browser_handle lab_location_town_list(browser_handle context, browser_han
 }
 
 /* Validate bootstrap data before projecting both jurisdiction menus and database availability. */
-bool lab_location_catalogue(browser_handle catalogue)
+bool lab_location_catalogue(browser_jsref catalogue)
 {
     int options = lab_dom_get(catalogue, "options"), towns = lab_dom_get(catalogue, "towns");
     int selects[] = {lab_location_element(LAB_MODE_DATETIME, 5), lab_location_element(LAB_MODE_ALMANAC, 3)};
@@ -157,19 +157,19 @@ bool lab_location_catalogue(browser_handle catalogue)
 }
 
 /* Resolve a jurisdiction catalogue, retaining the country-level fallback. */
-void lab_location_towns(browser_handle context, browser_handle boxed)
+void lab_location_towns(browser_jsref context, browser_jsref boxed)
 {
     lab_dom_return(lab_location_town_list(context, lab_dom_get(boxed, "value")));
 }
 
 /* Expose a native town key as opaque text. */
-void lab_location_option_value(browser_handle town)
+void lab_location_option_value(browser_jsref town)
 {
     lab_dom_return(lab_location_text(lab_dom_get(town, "value")));
 }
 
 /* Build town options and select the default or surviving previous value. */
-void lab_location_populate(node_handle select, browser_handle towns, bool select_default)
+void lab_location_populate(node_jsref select, browser_jsref towns, bool select_default)
 {
     if (!select)
         return;
@@ -213,7 +213,7 @@ void lab_location_populate(node_handle select, browser_handle towns, bool select
 }
 
 /* Invalidate pending restoration on change without preventing other selection listeners. */
-void lab_location_dispatch(lab_location_action_t action, event_handle event, node_handle select)
+void lab_location_dispatch(lab_location_action_t action, event_jsref event, node_jsref select)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(plan, "calls", lab_dom_object(LAB_VALUE_ARRAY));
@@ -222,18 +222,18 @@ void lab_location_dispatch(lab_location_action_t action, event_handle event, nod
     lab_dom_return(plan);
 }
 
-static browser_handle lab_location_selected_option(node_handle select)
+static browser_jsref lab_location_selected_option(node_jsref select)
 {
     return select && lab_dom_length(lab_location_value(select)) ? lab_dom_selected(select) : 0;
 }
 
 /* Borrow the native select's chosen option without scanning its children. */
-void lab_location_selected(node_handle select)
+void lab_location_selected(node_jsref select)
 {
     lab_dom_return(lab_location_selected_option(select));
 }
 
-static double lab_location_number(browser_handle value)
+static double lab_location_number(browser_jsref value)
 {
     if (lab_dom_type(value) == LAB_VALUE_NUMBER)
         return lab_dom_to_number(value);
@@ -244,7 +244,7 @@ static double lab_location_number(browser_handle value)
 }
 
 /* Find a coordinate pair with native tolerance policy and reject absent/non-finite numbers. */
-bool lab_location_coordinates(node_handle select, browser_handle coordinates)
+bool lab_location_coordinates(node_jsref select, browser_jsref coordinates)
 {
     if (!select)
         return false;
@@ -267,7 +267,7 @@ bool lab_location_coordinates(node_handle select, browser_handle coordinates)
 }
 
 /* Clear named-town selection only when edited coordinates no longer describe that town. */
-void lab_location_clear_custom(node_handle select, browser_handle latitude, browser_handle longitude, browser_handle elevation)
+void lab_location_clear_custom(node_jsref select, browser_jsref latitude, browser_jsref longitude, browser_jsref elevation)
 {
     int option = lab_location_selected_option(select);
     if (!option)
@@ -285,7 +285,7 @@ void lab_location_clear_custom(node_handle select, browser_handle latitude, brow
 }
 
 /* Snapshot real node identities and candidate values for asynchronous restoration guards. */
-void lab_location_snapshot(node_handle select)
+void lab_location_snapshot(node_jsref select)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT),
         options = select ? lab_dom_all(select, "option") : lab_dom_object(LAB_VALUE_ARRAY);
@@ -304,7 +304,7 @@ void lab_location_snapshot(node_handle select)
 }
 
 /* Reject replaced/reordered options even when the count and selected value are unchanged. */
-bool lab_location_unchanged(node_handle select, snapshot_handle snapshot)
+bool lab_location_unchanged(node_jsref select, snapshot_jsref snapshot)
 {
     if (!select || !lab_dom_equal(select, lab_dom_get(snapshot, "select")) ||
         !lab_dom_equal(lab_dom_get(select, "labTownGeneration"), lab_dom_get(snapshot, "generation")))
@@ -327,7 +327,7 @@ bool lab_location_unchanged(node_handle select, snapshot_handle snapshot)
 }
 
 /* Select an exact saved key or a native compatibility-match index without changing failed selections. */
-bool lab_location_choose(node_handle select, browser_handle selection)
+bool lab_location_choose(node_jsref select, browser_jsref selection)
 {
     if (!select)
         return false;
@@ -354,14 +354,14 @@ bool lab_location_choose(node_handle select, browser_handle selection)
     return true;
 }
 
-static void lab_location_reset_offset(browser_handle context, browser_handle offset)
+static void lab_location_reset_offset(browser_jsref context, browser_jsref offset)
 {
     lab_dom_set(context, "automaticOffset", lab_dom_clean(lab_location_value(offset), LAB_DOM_CLEAN_TRIM));
     lab_dom_set(context, "offsetTouched", lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
 /* Copy selected coordinates and the browser-computed timezone offset into their controls. */
-bool lab_location_apply_town(browser_handle controls, browser_handle offset, browser_handle context)
+bool lab_location_apply_town(browser_jsref controls, browser_jsref offset, browser_jsref context)
 {
     int select = lab_dom_get(controls, "townSelect"), option = lab_location_selected_option(select);
     if (!option)
@@ -402,7 +402,7 @@ void lab_location_schema(lab_mode_t mode)
     lab_dom_return(schema);
 }
 
-static browser_handle lab_location_read_controls(lab_mode_t mode, browser_handle context)
+static browser_jsref lab_location_read_controls(lab_mode_t mode, browser_jsref context)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT);
     unsigned count = lab_profile_count(mode), mark = lab_dom_mark();
@@ -417,13 +417,13 @@ static browser_handle lab_location_read_controls(lab_mode_t mode, browser_handle
 }
 
 /* Read calendar controls in the native schema order. */
-void lab_location_read(lab_mode_t mode, browser_handle context)
+void lab_location_read(lab_mode_t mode, browser_jsref context)
 {
     lab_dom_return(lab_location_read_controls(mode, context));
 }
 
-static browser_handle lab_location_resolve(lab_mode_t mode, lab_calendar_operation_t operation, browser_handle source,
-                                browser_handle prefix, browser_handle context)
+static browser_jsref lab_location_resolve(lab_mode_t mode, lab_calendar_operation_t operation, browser_jsref source,
+                                browser_jsref prefix, browser_jsref context)
 {
     if (!lab_profile_count(mode) || (unsigned)operation > LAB_CALENDAR_RESET)
         return 0;
@@ -465,8 +465,8 @@ static browser_handle lab_location_resolve(lab_mode_t mode, lab_calendar_operati
     return result;
 }
 
-static void lab_location_project(lab_mode_t mode, lab_calendar_operation_t operation, browser_handle state,
-                                browser_handle context)
+static void lab_location_project(lab_mode_t mode, lab_calendar_operation_t operation, browser_jsref state,
+                                browser_jsref context)
 {
     if (!state)
         return;
@@ -486,8 +486,8 @@ static void lab_location_project(lab_mode_t mode, lab_calendar_operation_t opera
 }
 
 /* Resolve or apply state with native restore/capture/fill/reset policy; invalid operations return null. */
-void lab_location_state(lab_mode_t mode, lab_calendar_operation_t operation, browser_handle source,
-                        browser_handle prefix, browser_handle context, bool apply)
+void lab_location_state(lab_mode_t mode, lab_calendar_operation_t operation, browser_jsref source,
+                        browser_jsref prefix, browser_jsref context, bool apply)
 {
     int state = lab_location_resolve(mode, operation, source, prefix, context);
     if (apply)
@@ -507,7 +507,7 @@ void lab_location_elements(lab_mode_t mode)
     lab_dom_return(result);
 }
 
-static browser_handle lab_location_control_nodes(lab_mode_t mode, int coordinates)
+static browser_jsref lab_location_control_nodes(lab_mode_t mode, int coordinates)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT);
     if (mode == LAB_MODE_DATETIME || mode == LAB_MODE_ALMANAC) {
@@ -532,8 +532,8 @@ void lab_location_controls(lab_mode_t mode, bool coordinates)
 }
 
 /* Resolve restoration precedence and return only required asynchronous or timezone work to the host. */
-void lab_location_restore(lab_location_restore_stage_t stage, node_handle select, snapshot_handle snapshot,
-                          browser_handle selection, browser_handle response)
+void lab_location_restore(lab_location_restore_stage_t stage, node_jsref select, snapshot_jsref snapshot,
+                          browser_jsref selection, browser_jsref response)
 {
     if ((unsigned)stage > LAB_LOCATION_RESTORE_RESPONSE) {
         lab_dom_return(0);
@@ -577,7 +577,7 @@ void lab_location_restore(lab_location_restore_stage_t stage, node_handle select
 }
 
 /* Fill blank defaults, then capture values with automatic DateTime offsets omitted. */
-void lab_location_current(lab_mode_t mode, browser_handle context)
+void lab_location_current(lab_mode_t mode, browser_jsref context)
 {
     int empty = lab_dom_string("");
     int state = lab_location_resolve(mode, LAB_CALENDAR_FILL, lab_location_read_controls(mode, context), empty, context);
@@ -589,13 +589,13 @@ void lab_location_current(lab_mode_t mode, browser_handle context)
     lab_dom_return(state);
 }
 
-static browser_handle lab_location_summary_line(browser_handle text, const char *label, browser_handle value, const char *suffix)
+static browser_jsref lab_location_summary_line(browser_jsref text, const char *label, browser_jsref value, const char *suffix)
 {
     return lab_dom_join(lab_dom_join(text, lab_dom_string(label), ""), value, suffix);
 }
 
 /* Format calendar summaries from already resolved opaque values. */
-void lab_location_summary(lab_mode_t mode, browser_handle state, browser_handle title)
+void lab_location_summary(lab_mode_t mode, browser_jsref state, browser_jsref title)
 {
     int text = mode == LAB_MODE_DATETIME ? lab_dom_string("MARS datetime observation") : title;
     text = lab_location_summary_line(text, "\nDate: ", lab_dom_get(state, "date"), "");
@@ -629,7 +629,7 @@ void lab_location_summary(lab_mode_t mode, browser_handle state, browser_handle 
 }
 
 /* Apply a current location response, preserving selected towns and manually edited offsets. */
-void lab_location_response(lab_mode_t mode, browser_handle data, browser_handle context, bool update_coordinates,
+void lab_location_response(lab_mode_t mode, browser_jsref data, browser_jsref context, bool update_coordinates,
                            bool town_applied)
 {
     if (mode != LAB_MODE_DATETIME && mode != LAB_MODE_ALMANAC)
@@ -658,7 +658,7 @@ void lab_location_response(lab_mode_t mode, browser_handle data, browser_handle 
 }
 
 /* Prepare an eclipse action before its guarded asynchronous town restoration. */
-void lab_location_totality_prepare(browser_handle button, browser_handle context)
+void lab_location_totality_prepare(browser_jsref button, browser_jsref context)
 {
     int state = lab_dom_object(LAB_VALUE_OBJECT), config = lab_dom_get(context, "config");
     for (unsigned field = 0; field < 8; ++field) {
@@ -677,7 +677,7 @@ void lab_location_totality_prepare(browser_handle button, browser_handle context
 }
 
 /* Complete a still-current eclipse action, using its explicit coordinates when supplied. */
-void lab_location_totality_finish(browser_handle state, bool restored)
+void lab_location_totality_finish(browser_jsref state, bool restored)
 {
     if (!restored)
         lab_location_write(lab_location_element(LAB_MODE_ALMANAC, 4), lab_dom_string(""));
@@ -689,7 +689,7 @@ void lab_location_totality_finish(browser_handle state, bool restored)
 }
 
 /* Project evaluation metadata while retaining authored offsets and fallback guards. */
-void lab_location_evaluation(lab_mode_t mode, browser_handle data, browser_handle context)
+void lab_location_evaluation(lab_mode_t mode, browser_jsref data, browser_jsref context)
 {
     int fields = lab_dom_get(data, "fields"), config = lab_dom_get(context, "config");
     if (!lab_dom_truth(fields))

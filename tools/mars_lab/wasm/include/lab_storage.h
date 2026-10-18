@@ -46,7 +46,7 @@ typedef enum {
  * @param values Scoped two-item array containing the saved value and numeric fallback.
  * @return Parsed precision clamped to 17..262144 bits, or the fallback when parsing is non-finite.
  */
-double lab_storage_precision(browser_handle values);
+double lab_storage_precision(browser_jsref values);
 
 /**
  * @brief Select an offered integrator work budget from a saved setting.
@@ -54,14 +54,14 @@ double lab_storage_precision(browser_handle values);
  * @param config Scoped configuration record containing DEFAULT_INTEGRATOR_INTERVAL_CAP.
  * @return Parsed budget when it is 500, 5000, 20000, 50000 or 100000; otherwise the configured fallback.
  */
-double lab_storage_intervals(browser_handle values, browser_handle config);
+double lab_storage_intervals(browser_jsref values, browser_jsref config);
 
 /**
  * @brief Validate a saved matrix operation against the current browser select options.
  * @param values Scoped one-item array containing the saved operation.
  * @post publishes the trimmed recognised operation, or "eval", through lab_dom_return.
  */
-void lab_storage_operation(browser_handle values);
+void lab_storage_operation(browser_jsref values);
 
 /**
  * @brief Prepare saved editor text and its native restoration actions.
@@ -76,7 +76,7 @@ void lab_storage_operation(browser_handle values);
  * canonical text 4, display expression and restore its timestamp 8, and retain the
  * server integrator source 16. Empty or rejected copies and invalid modes have zero flags.
  */
-void lab_storage_editor(lab_mode_t mode, browser_handle values, lab_persist_origin_t origin);
+void lab_storage_editor(lab_mode_t mode, browser_jsref values, lab_persist_origin_t origin);
 
 /**
  * @brief Describe control restoration in its established storage-read order.
@@ -103,7 +103,7 @@ void lab_storage_fields(lab_persist_origin_t origin);
  * values preserve current controls, except a present empty operand clears its
  * control. Invalid field identifiers do nothing and publish null.
  */
-void lab_storage_control(lab_storage_control_t field, browser_handle values, lab_persist_origin_t origin, browser_handle config);
+void lab_storage_control(lab_storage_control_t field, browser_jsref values, lab_persist_origin_t origin, browser_jsref config);
 
 /**
  * @brief Restore recognised saved precision settings into native workspace ownership.
@@ -114,7 +114,7 @@ void lab_storage_control(lab_storage_control_t field, browser_handle values, lab
  * for the seven known modes; unknown or inherited fields cannot overwrite state.
  * Missing and non-finite values retain the existing precision.
  */
-void lab_storage_precisions(browser_handle data);
+void lab_storage_precisions(browser_jsref data);
 
 /**
  * @brief Select a local editor copy using native timestamp and placeholder precedence.
@@ -127,7 +127,7 @@ void lab_storage_precisions(browser_handle data);
  * Text is trimmed without mathematical interpretation. A non-empty local copy
  * wins when newer, or when the server copy is empty or its configured placeholder.
  */
-void lab_storage_recovery(lab_mode_t mode, browser_handle server, browser_handle local, browser_handle config);
+void lab_storage_recovery(lab_mode_t mode, browser_jsref server, browser_jsref local, browser_jsref config);
 
 /**
  * @brief Assemble a recovered server patch after native editor preparation.
@@ -140,7 +140,7 @@ void lab_storage_recovery(lab_mode_t mode, browser_handle server, browser_handle
  * The host uses the patch timestamp for both expression ownership and persistence,
  * ensuring a single coherent fallback reading. This function performs no storage I/O.
  */
-void lab_storage_recovered(lab_mode_t mode, browser_handle recovery, browser_handle values, double now);
+void lab_storage_recovered(lab_mode_t mode, browser_jsref recovery, browser_jsref values, double now);
 
 /**
  * @brief Plan or project history restoration at explicit asynchronous ownership boundaries.
@@ -155,6 +155,6 @@ void lab_storage_recovered(lab_mode_t mode, browser_handle recovery, browser_han
  * Only controls relevant to the snapshot's exact mode are changed; unsupported
  * phases do nothing. Source and binding cleanup remain separately sequenced by the host.
  */
-void lab_storage_history(lab_storage_history_phase_t phase, browser_handle state, browser_handle config);
+void lab_storage_history(lab_storage_history_phase_t phase, browser_jsref state, browser_jsref config);
 
 #endif

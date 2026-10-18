@@ -62,6 +62,16 @@ int expr_set_number_precision_local(int precision);
  */
 bool expr_emit_conjugate_sum(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style);
 
+/**
+ * @brief Emit a symbolic complex shift with its centre first and i before its displacement.
+ * @param expr Borrowed candidate sum or difference.
+ * @param buffer Destination text buffer.
+ * @param parent_prec Enclosing precedence used for parentheses.
+ * @param style Expression, Function or TeX output style.
+ * @return True when the expression was recognised and emitted.
+ */
+bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style);
+
 /* Recognise opposite shifts in paired function arguments or definite-integral bounds, without rewriting the DAG. */
 const expr_t *expr_display_symmetric_shift_centre(const expr_t *expr);
 bool expr_display_centred_shift_parts(const expr_t *expr, const expr_t *centre,

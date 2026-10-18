@@ -799,8 +799,9 @@ $\quad\begin{array}{l}\displaystyle \pi^2\delta(k)+4i\sum_{n=0}^{\infty}\frac{(-
 Native output simplifies exact quarter-turn phases to real or imaginary
 alternating coefficients; other phases retain equivalent complex exponentials.
 MARS Lab plots real and imaginary impulse weights separately from the regular
-part. Arrow lengths encode weights, never finite delta values. Infinite series
-plots currently show the first 32 terms of each sum, explicitly labelled as a
+part. Mixed spectra use thin dotted-tip stem lengths for weights, never finite delta values;
+pure impulse spectra use equal-height thin stems with dotted tips and weight tooltips. Infinite series
+plots currently show the first 100 terms of each sum as a finite
 preview; the symbolic result retains the complete series. Delta derivatives,
 non-affine supports and nonlinear products of distributions are not plotted by
 this decomposition. They are rejected rather than passed to an ordinary
@@ -1270,6 +1271,44 @@ that growth. This diagnostic also covers real non-zero affine gamma arguments
 when the integration coordinate is on the real axis.
 No analytic continuation into a different transform framework is implied.
 
+For the real-axis Fourier transform of the Riemann zeta function, the native
+evaluation note identifies both the pole at argument one and factorial-scale
+growth towards negative real arguments. A principal value at the pole does not
+resolve the growing tail. The result remains symbolic, without silently choosing
+a regularisation or replacing the request with a vertical-line transform.
+This diagnostic also covers finite, real, non-zero affine argument rates with
+finite real offsets. It is not applied to complex arguments, nonlinear arguments,
+constant arguments. Existing scaling rules may first reduce a symbolic affine
+argument to the direct case while retaining their real, non-zero parameter conditions.
+
+### Vertical-line zeta Fourier spectrum
+
+The absolutely convergent Dirichlet series gives the native distributional pair
+
+| Input | Output |
+| --- | --- |
+| `@F{zeta(sigma+it)}` | $2\pi\displaystyle\sum_{n=1}^{\infty} n^{-\sigma}\delta(\omega+\ln n)$, $\omega\in\mathbb R$, $\operatorname{Re}(\sigma)>1$ |
+
+For real sigma the condition is simply sigma greater than one. MARS retains the
+condition for symbolic parameters, and supports finite complex offsets in this
+half-plane and non-zero real scaling of the imaginary coordinate. The inverse
+recognises the copied spectrum, including its normalisation and convergence
+condition. Finite sums and sums with different starting indices are not replaced
+by the full zeta function. This rule makes no claim about other convergence strips.
+The Lab can show a 100-term impulse preview when the weights are numerically
+specified; it does not assign finite point values to Dirac impulses.
+Unset parameters produce a request for numerical values satisfying the displayed
+conditions, rather than an automatic-range error. An impulse preview offers only
+horizontal-range controls, not surface or camera controls. Pure impulse spectra
+use equal-height thin stems with dotted tips and no explanatory caption; hover
+titles retain the numerical coordinates and weights. No vertical scale is shown.
+Automatic bounds fit the preview and include zero, so a wholly non-positive
+spectrum places zero at the right edge. Horizontal range zoom remains available.
+
+Symbolic complex shifts are displayed centre-first, with the imaginary unit before
+the displacement, consistently in Expression, Function and TeX output. This is a
+general presentation rule, not a change to the algebra or a special case for zeta.
+
 ### Periodic functions with real poles
 
 The Fourier transforms of `tan` and `cot` use symmetric Cauchy principal values
@@ -1444,7 +1483,7 @@ General principal-value integration remains symbolic.
 
 Native transform presentation keeps the complete distribution in one identity,
 including Dirac impulses and principal-value or finite-part qualifications.
-In TeX, the compact operator `Fp₁` denotes the half-line finite part with unit cutoff.
+In TeX, the upright operator `Fp` denotes the Hadamard finite part. The half-line finite part uses a unit cutoff.
 Pointwise exclusions used when sampling curves do not restrict the identity or
 remove impulse supports. The copyable representation also retains the complete distribution.
 

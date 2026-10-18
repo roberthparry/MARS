@@ -24,7 +24,7 @@
 #include "lab_precision.h"
 #include "lab_event_dom.h"
 
-static void lab_event_emit(browser_handle calls, const char *service, browser_handle first, browser_handle second, unsigned count)
+static void lab_event_emit(browser_jsref calls, const char *service, browser_jsref first, browser_jsref second, unsigned count)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(call, "service", lab_dom_string(service));
@@ -36,24 +36,24 @@ static void lab_event_emit(browser_handle calls, const char *service, browser_ha
     lab_dom_push(calls, call);
 }
 
-static bool lab_event_key(event_handle event, const char *key)
+static bool lab_event_key(event_jsref event, const char *key)
 {
     return lab_dom_equal(lab_dom_get(event, "key"), lab_dom_string(key));
 }
 
-static bool lab_event_modifier(event_handle event)
+static bool lab_event_modifier(event_jsref event)
 {
     return lab_dom_truth(lab_dom_get(event, "ctrlKey")) || lab_dom_truth(lab_dom_get(event, "metaKey"));
 }
 
-static void lab_event_prevent(browser_handle plan, bool stop)
+static void lab_event_prevent(browser_jsref plan, bool stop)
 {
     lab_dom_set(plan, "prevent", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     if (stop)
         lab_dom_set(plan, "stop", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
-static void lab_event_run(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_run(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)event;
@@ -70,14 +70,14 @@ static void lab_event_run(lab_event_action_t action, event_handle event, browser
     lab_event_emit(calls, "evaluateCurrentMode", 0, 0, 0);
 }
 
-static void lab_event_history(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_history(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)event;
     (void)plan;
     lab_event_emit(calls, "navigateHistoryFromEvent", lab_dom_numeric(action - LAB_EVENT_HISTORY_BACK), 0, 1);
 }
 
-static void lab_event_editor_key(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_editor_key(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     if (lab_event_modifier(event) && lab_event_key(event, "Enter")) {
@@ -92,7 +92,7 @@ static void lab_event_editor_key(lab_event_action_t action, event_handle event, 
     }
 }
 
-static void lab_event_tab(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_tab(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)plan;
@@ -100,14 +100,14 @@ static void lab_event_tab(lab_event_action_t action, event_handle event, browser
                    lab_dom_read(lab_dom_get(event, "currentTarget"), LAB_DOM_DATASET, "mode"), 0, 1);
 }
 
-static void lab_event_control(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_control(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)event;
     (void)plan;
     lab_event_emit(calls, "normaliseWorksheetControl", lab_dom_numeric(action - LAB_EVENT_MATRIX_CONTROL), 0, 1);
 }
 
-static void lab_event_goal_key(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_goal_key(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     if (lab_event_key(event, "Enter")) {
@@ -121,7 +121,7 @@ static void lab_event_goal_key(lab_event_action_t action, event_handle event, br
     }
 }
 
-static void lab_event_precision(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_precision(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)plan;
     int slider = lab_dom_get(event, "currentTarget");
@@ -133,7 +133,7 @@ static void lab_event_precision(lab_event_action_t action, event_handle event, b
         lab_event_emit(calls, "setWorksheetPrecision", lab_dom_numeric(bits), 0, 1);
 }
 
-static void lab_event_precision_track(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_precision_track(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     int slider = lab_dom_get(event, "currentTarget");
@@ -161,7 +161,7 @@ static void lab_event_precision_track(lab_event_action_t action, event_handle ev
 }
 
 /* Select the result text through the bounded dispatcher's three digit actions. */
-static void lab_event_digits(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_digits(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)plan;
     static const char *const selectors[] = {
@@ -173,14 +173,14 @@ static void lab_event_digits(lab_event_action_t action, event_handle event, brow
                    lab_dom_get(event, "currentTarget"), 2);
 }
 
-static void lab_event_copy(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_copy(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)plan;
     lab_event_emit(calls, "copyResultFromEvent", lab_dom_get(event, "currentTarget"), 0, 1);
 }
 
-static void lab_event_zoom(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_zoom(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)calls;
     double delta = 0;
@@ -214,7 +214,7 @@ static void lab_event_zoom(lab_event_action_t action, event_handle event, browse
     }
 }
 
-static void lab_event_visibility(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_visibility(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)plan;
@@ -222,7 +222,7 @@ static void lab_event_visibility(lab_event_action_t action, event_handle event, 
         lab_event_emit(calls, "flushWorksheetState", 0, 0, 0);
 }
 
-static void lab_event_resize(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_resize(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)event;
@@ -236,7 +236,7 @@ static void lab_event_resize(lab_event_action_t action, event_handle event, brow
     lab_event_emit(calls, "scheduleWorkspacePanelFit", 0, 0, 0);
 }
 
-static void lab_event_expand(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_expand(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)plan;
@@ -245,7 +245,7 @@ static void lab_event_expand(lab_event_action_t action, event_handle event, brow
                       LAB_LAYOUT_EXPANSION_TOGGLE);
 }
 
-static void lab_event_rotate(lab_event_action_t action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_rotate(lab_event_action_t action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     (void)action;
     (void)plan;
@@ -256,7 +256,7 @@ static void lab_event_rotate(lab_event_action_t action, event_handle event, brow
                   lab_dom_join(lab_dom_read(control, LAB_DOM_VALUE, ""), lab_dom_string("°"), ""));
 }
 
-static void lab_event_calendar(unsigned action, event_handle event, browser_handle plan, browser_handle calls)
+static void lab_event_calendar(unsigned action, event_jsref event, browser_jsref plan, browser_jsref calls)
 {
     lab_mode_t mode = (lab_mode_t)(action >> 8);
     unsigned field = action & 255;
@@ -292,11 +292,11 @@ static void lab_event_calendar(unsigned action, event_handle event, browser_hand
 }
 
 /* Return deferred service calls after native synchronous policy has completed. */
-void lab_events_dispatch(unsigned action, event_handle event)
+void lab_events_dispatch(unsigned action, event_jsref event)
 {
     /** @brief Worksheet action implementation receiving its event and deferred service plan. */
-    typedef void (*lab_event_handler_t)(lab_event_action_t action, event_handle event,
-                                       browser_handle plan, browser_handle calls);
+    typedef void (*lab_event_handler_t)(lab_event_action_t action, event_jsref event,
+                                       browser_jsref plan, browser_jsref calls);
     static const lab_event_handler_t handlers[LAB_EVENT_COUNT] = {
         [LAB_EVENT_RUN] = lab_event_run,
         [LAB_EVENT_HISTORY_BACK] = lab_event_history,
@@ -351,7 +351,7 @@ void lab_events_dispatch(unsigned action, event_handle event)
 }
 
 /* Visit each configured control once; browser listeners retain nodes, never transient handles. */
-void lab_events_install(browser_handle document, browser_handle window)
+void lab_events_install(browser_jsref document, browser_jsref window)
 {
     static const struct {
         const char *selector, *type;

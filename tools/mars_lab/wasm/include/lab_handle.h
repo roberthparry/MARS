@@ -1,8 +1,9 @@
 /**
  * @file lab_handle.h
- * @brief Borrowed browser-value handles used by the WebAssembly bridge.
+ * @brief Borrowed JavaScript-value references used by the WebAssembly bridge.
  *
- * A handle identifies a value in the browser's table for one synchronous bridge
+ * The _jsref suffix denotes an opaque integer reference to a JavaScript value.
+ * A reference identifies a value in the browser's table for one synchronous bridge
  * call. It is not a pointer into WebAssembly memory and must not be retained
  * beyond its scope. Zero denotes absence unless an API explicitly documents
  * another meaning. These integer aliases preserve the existing wasm32 i32 ABI;
@@ -12,28 +13,28 @@
 #define MARS_LAB_HANDLE_H
 
 /** @brief Borrowed browser value, array or object in the current bridge scope. */
-typedef int browser_handle;
+typedef int browser_jsref;
 
 /** @brief Borrowed DOM node or event target in the current browser bridge scope. */
-typedef browser_handle node_handle;
+typedef browser_jsref node_jsref;
 
 /** @brief Borrowed browser event in the current browser bridge scope. */
-typedef browser_handle event_handle;
+typedef browser_jsref event_jsref;
 
 /** @brief Borrowed SVG plot chart carrying native geometry metadata. */
-typedef node_handle chart_handle;
+typedef node_jsref chart_jsref;
 
 /** @brief Borrowed mutable browser record describing a plot gesture. */
-typedef browser_handle gesture_handle;
+typedef browser_jsref gesture_jsref;
 
 /** @brief Borrowed browser continuation or projection frame. */
-typedef browser_handle frame_handle;
+typedef browser_jsref frame_jsref;
 
 /** @brief Borrowed browser view supplying live state and presentation resources. */
-typedef browser_handle view_handle;
+typedef browser_jsref view_jsref;
 
 /** @brief Borrowed browser snapshot used for restoration or freshness checks. */
-typedef browser_handle snapshot_handle;
+typedef browser_jsref snapshot_jsref;
 
 /**
  * @brief Borrowed value in the codec's separate synchronous handle table.
@@ -41,6 +42,6 @@ typedef browser_handle snapshot_handle;
  * Not interchangeable with DOM-table handles. Codec APIs use -1 for an absent
  * parent or an error as documented by each operation; zero can be a valid value.
  */
-typedef int codec_handle;
+typedef int codec_jsref;
 
 #endif

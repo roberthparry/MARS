@@ -54,12 +54,12 @@ void lab_precision_close(bool focus);
  * @details Publishes a calls array and optional prevent/stop flags through lab_dom_return.
  * Apply requests setWorksheetPrecision only for a valid changed draft; no scoped handle is retained.
  */
-void lab_precision_dispatch(lab_precision_action_t action, event_handle event);
+void lab_precision_dispatch(lab_precision_action_t action, event_jsref event);
 
 /**
  * @brief Install the custom editor's control and document listeners once.
  * @param document Scoped browser Document handle for keyboard and outside-pointer subscriptions.
  */
-void lab_precision_install(browser_handle document);
+void lab_precision_install(browser_jsref document);
 
 #endif

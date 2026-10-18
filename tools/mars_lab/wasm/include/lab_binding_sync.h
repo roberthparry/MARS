@@ -25,7 +25,7 @@
  * the host raises as TypeError before calling a service. Array holes and inherited
  * indices retain Array.map semantics. Values remain opaque and inputs are not mutated.
  */
-void lab_binding_sync_request(browser_handle inputs);
+void lab_binding_sync_request(browser_jsref inputs);
 
 /**
  * @brief Project editor metadata after the host accepts an asynchronous binding edit.
@@ -37,6 +37,6 @@ void lab_binding_sync_request(browser_handle inputs);
  * truthy defaults and browser Unicode conversion. The caller must check request and
  * editor freshness before calling and retains source storage and subsequent services.
  */
-void lab_binding_sync_apply(browser_handle editor, browser_handle inputs);
+void lab_binding_sync_apply(browser_jsref editor, browser_jsref inputs);
 
 #endif

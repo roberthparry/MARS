@@ -263,6 +263,8 @@ void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    if (expr_emit_complex_shift(f, b, parent_prec, style_FUNCTION))
+        return;
     if (!preserve_function_operations && expr_emit_conjugate_sum(f, b, parent_prec, style_FUNCTION))
         return;
 

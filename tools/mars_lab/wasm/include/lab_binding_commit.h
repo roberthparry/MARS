@@ -29,7 +29,7 @@ typedef enum {
  * @details Publishes null for an empty snapshot or invalid mode. Binding identities,
  * array order and sparse positions are retained. No input, editor or cache is changed.
  */
-void lab_binding_commit_request(lab_mode_t mode, browser_handle source, snapshot_handle snapshot);
+void lab_binding_commit_request(lab_mode_t mode, browser_jsref source, snapshot_jsref snapshot);
 
 /**
  * @brief Publish ordered completion services for a current binding edit.
@@ -44,7 +44,7 @@ void lab_binding_commit_request(lab_mode_t mode, browser_handle source, snapshot
  * null. The caller must verify request, editor and input freshness first. Planning
  * has no effects; the service executor stops on an exception.
  */
-void lab_binding_commit_plan(lab_mode_t mode, lab_binding_commit_operation_t operation, browser_handle source,
-                             browser_handle updated, browser_handle context);
+void lab_binding_commit_plan(lab_mode_t mode, lab_binding_commit_operation_t operation, browser_jsref source,
+                             browser_jsref updated, browser_jsref context);
 
 #endif

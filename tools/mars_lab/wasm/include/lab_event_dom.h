@@ -70,7 +70,7 @@ typedef enum {
  * @param event Scoped browser Event with currentTarget, target, type and relevant key, modifier or pointer data.
  * @post Publishes a record containing calls and optional prevent/stop flags through lab_dom_return.
  */
-void lab_events_dispatch(unsigned action, event_handle event);
+void lab_events_dispatch(unsigned action, event_jsref event);
 
 /**
  * @brief Install worksheet control listeners and project initial card controls.
@@ -78,6 +78,6 @@ void lab_events_dispatch(unsigned action, event_handle event);
  * @param window Scoped browser Window used for resize, scroll, pagehide and plot gesture listeners.
  * @details Repeated subscriptions do not duplicate listeners. The browser retains targets, not integer handles.
  */
-void lab_events_install(browser_handle document, browser_handle window);
+void lab_events_install(browser_jsref document, browser_jsref window);
 
 #endif

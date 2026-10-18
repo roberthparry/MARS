@@ -3,11 +3,14 @@
  * @brief Centred presentation of symmetric shifts.
  *
  * Recognises arguments with a common centre and opposite offsets and emits that centre consistently first. The
- * structural rule applies independently of function names or variable spellings.
+ * structural rule applies independently of function names or variable spellings. Symbolic complex shifts
+ * likewise retain their centre first and place i before the symbolic displacement.
  *
  * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
+
+#include <string.h>
 
 /* Symmetric-shift presentation: retain a common centre in a+b and a-b. */
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -30,6 +33,51 @@ static bool display_shift_terms(const expr_t *expr, const expr_t **terms, bool *
         }
     }
     return terms[0] && terms[1];
+}
+
+static bool display_imaginary_unit(const expr_t *expr)
+{
+    return expr_is_const(expr) && (!expr_is_named_const(expr) || !strcmp(expr_symbol_name(expr), "i")) &&
+           num_eq(expr->c, NUM_I);
+}
+
+static bool display_contains_imaginary_unit(const expr_t *expr)
+{
+    return expr && (display_imaginary_unit(expr) || display_contains_imaginary_unit(expr->a) ||
+                   display_contains_imaginary_unit(expr->b));
+}
+
+/* Display a symbolic centre plus an explicit imaginary displacement without changing the expression tree. */
+bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style)
+{
+    const expr_t *terms[2];
+    bool negative[2];
+    if (!display_shift_terms(expr, terms, negative))
+        return false;
+    for (unsigned side = 0; side < 2; ++side) {
+        const expr_t *term = terms[side], *centre = terms[1 - side];
+        if (!expr_is_mul(term) || display_contains_imaginary_unit(centre))
+            continue;
+        const expr_t *coefficient = display_imaginary_unit(term->a) ? term->b :
+                                    display_imaginary_unit(term->b) ? term->a : NULL;
+        if (!coefficient || expr_is_const(coefficient) || display_contains_imaginary_unit(coefficient))
+            continue;
+        void (*emit)(const expr_t *, sbuf_t *, int) = style == style_LATEX ? emit_TeX_expr :
+                                                    style == style_FUNCTION ? emit_func : emit_expr;
+        bool bracketed = parent_prec > PREC_ADD;
+        if (bracketed)
+            sbuf_puts(buffer, style == style_LATEX ? "\\left(" : "(");
+        if (negative[1 - side])
+            sbuf_putc(buffer, '-');
+        emit(centre, buffer, negative[1 - side] ? PREC_MUL : PREC_ADD);
+        sbuf_puts(buffer, negative[side] ? " - i" : " + i");
+        sbuf_puts(buffer, style == style_LATEX ? "\\," : style == style_FUNCTION ? "." : "·");
+        emit(coefficient, buffer, PREC_MUL);
+        if (bracketed)
+            sbuf_puts(buffer, style == style_LATEX ? "\\right)" : ")");
+        return true;
+    }
+    return false;
 }
 
 /* Return the borrowed displacement and its sign when one summand is the supplied centre. */

@@ -10,7 +10,7 @@
 #include "tba_local.h"
 
 /* Parse browser-owned strings through scoped text capabilities. */
-browser_handle tba_local_parse(browser_handle text)
+browser_jsref tba_local_parse(browser_jsref text)
 {
     unsigned length = tba_dom_length(text);
     if (!length || length > 16u * 1024u * 1024u)
@@ -97,7 +97,7 @@ browser_handle tba_local_parse(browser_handle text)
 }
 
 /* Keep the local heading list independent from the reduced network projection. */
-browser_handle tba_local_columns(int driver)
+browser_jsref tba_local_columns(int driver)
 {
     int document = tba_ui_state(driver ? "local_driver" : "local_target");
     int headers = tba_dom_get(document, "headers"), result = tba_dom_object(1);
@@ -113,7 +113,7 @@ browser_handle tba_local_columns(int driver)
 }
 
 /* Project only the requested columns; headers and cells stay opaque until native validation. */
-browser_handle tba_local_project(int driver)
+browser_jsref tba_local_project(int driver)
 {
     int document = tba_ui_state(driver ? "local_driver" : "local_target");
     if (!document)
