@@ -36,33 +36,33 @@ enum {
     LAB_FLOW_GOAL_ERROR
 };
 
-static browser_jsref lab_flow_goal_start(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_start(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_GOAL_COMMIT, "setStatus", 0, 0, 1, lab_dom_string("Goal seeking..."));
 }
 
-static browser_jsref lab_flow_goal_commit(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_commit(frame_jsref frame, view_jsref view)
 {
     (void)view;
     lab_dom_set(frame, "failed", lab_dom_numeric(LAB_FLOW_GOAL_ERROR_CURRENT));
     return lab_flow_call(frame, LAB_FLOW_GOAL_COMMIT_CURRENT, "commitBindings", 0, 1, 0);
 }
 
-static browser_jsref lab_flow_goal_commit_current(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_commit_current(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_GOAL_SOURCE, "requestCurrent", "current", 0, 1, lab_dom_get(frame, "request"));
 }
 
-static browser_jsref lab_flow_goal_input(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_input(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_GOAL_PREPARE, "requestInput", "input", 0, 2, lab_dom_get(frame, "request"),
                          lab_dom_get(frame, "sourceText"));
 }
 
-static browser_jsref lab_flow_goal_source(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_source(frame_jsref frame, view_jsref view)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
         return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
@@ -71,7 +71,7 @@ static browser_jsref lab_flow_goal_source(frame_jsref frame, view_jsref view)
     return lab_flow_goal_input(frame, view);
 }
 
-static browser_jsref lab_flow_goal_prepare(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_prepare(frame_jsref frame, view_jsref view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "input")))
@@ -80,14 +80,14 @@ static browser_jsref lab_flow_goal_prepare(frame_jsref frame, view_jsref view)
                          lab_dom_get(frame, "sourceText"), lab_dom_get(frame, "start"));
 }
 
-static browser_jsref lab_flow_goal_prepare_current(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_prepare_current(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_GOAL_EXPRESSION, "requestCurrent", "current", 0, 1,
                          lab_dom_get(frame, "request"));
 }
 
-static browser_jsref lab_flow_goal_expression(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_expression(frame_jsref frame, view_jsref view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
@@ -96,7 +96,7 @@ static browser_jsref lab_flow_goal_expression(frame_jsref frame, view_jsref view
                          lab_dom_get(lab_dom_get(frame, "seek"), "expression"));
 }
 
-static browser_jsref lab_flow_goal_precision(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_precision(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int payload = lab_dom_object(LAB_VALUE_OBJECT);
@@ -107,7 +107,7 @@ static browser_jsref lab_flow_goal_precision(frame_jsref frame, view_jsref view)
     return lab_flow_call(frame, LAB_FLOW_GOAL_POST, "precision", "precision", 0, 0);
 }
 
-static browser_jsref lab_flow_goal_post(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_post(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int payload = lab_dom_get(frame, "payload");
@@ -116,7 +116,7 @@ static browser_jsref lab_flow_goal_post(frame_jsref frame, view_jsref view)
                          lab_dom_string("/goal_seek"));
 }
 
-static browser_jsref lab_flow_goal_outcome(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_outcome(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int result = lab_dom_get(frame, "result");
@@ -125,7 +125,7 @@ static browser_jsref lab_flow_goal_outcome(frame_jsref frame, view_jsref view)
                          lab_dom_get(frame, "request"), lab_dom_get(result, "response"), lab_dom_get(frame, "data"));
 }
 
-static browser_jsref lab_flow_goal_response(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_response(frame_jsref frame, view_jsref view)
 {
     int outcome = lab_dom_get(frame, "outcome");
     if (!lab_dom_truth(outcome))
@@ -138,14 +138,14 @@ static browser_jsref lab_flow_goal_response(frame_jsref frame, view_jsref view)
                          lab_dom_get(view, "caches"));
 }
 
-static browser_jsref lab_flow_goal_body(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_body(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_GOAL_ASSEMBLE, "goalEditorBody", "editorBody", 0, 1,
                          lab_dom_get(frame, "sourceText"));
 }
 
-static browser_jsref lab_flow_goal_assemble(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_assemble(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int bindings = lab_dom_get(lab_dom_get(frame, "data"), "binding_values");
@@ -155,7 +155,7 @@ static browser_jsref lab_flow_goal_assemble(frame_jsref frame, view_jsref view)
                          lab_dom_get(frame, "editorBody"), bindings);
 }
 
-static browser_jsref lab_flow_goal_assemble_current(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_assemble_current(frame_jsref frame, view_jsref view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "editorExpression")))
@@ -164,7 +164,7 @@ static browser_jsref lab_flow_goal_assemble_current(frame_jsref frame, view_jsre
                          lab_dom_get(frame, "request"));
 }
 
-static browser_jsref lab_flow_goal_complete(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_complete(frame_jsref frame, view_jsref view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
@@ -178,25 +178,25 @@ static browser_jsref lab_flow_goal_complete(frame_jsref frame, view_jsref view)
                          lab_dom_get(frame, "outcome"), lab_dom_get(frame, "data"), context, 0);
 }
 
-static browser_jsref lab_flow_goal_effects(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_effects(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_effects(frame, LAB_FLOW_GOAL_DONE, lab_dom_get(frame, "plan"));
 }
 
-static browser_jsref lab_flow_goal_done(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_done(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_done(lab_dom_get(lab_dom_get(frame, "plan"), "result"));
 }
 
-static browser_jsref lab_flow_goal_error_current(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_error_current(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_GOAL_ERROR, "requestCurrent", "current", 0, 1, lab_dom_get(frame, "request"));
 }
 
-static browser_jsref lab_flow_goal_error(frame_jsref frame, view_jsref view)
+static jsref lab_flow_goal_error(frame_jsref frame, view_jsref view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
@@ -206,9 +206,9 @@ static browser_jsref lab_flow_goal_error(frame_jsref frame, view_jsref view)
 }
 
 /* Advance one request-local goal continuation, without retaining handles between browser effects. */
-browser_jsref lab_flow_goal(frame_jsref frame, view_jsref view)
+jsref lab_flow_goal(frame_jsref frame, view_jsref view)
 {
-    static browser_jsref (*const stages[])(browser_jsref, browser_jsref) = {
+    static jsref (*const stages[])(jsref, jsref) = {
         [LAB_FLOW_GOAL_START]            = lab_flow_goal_start,
         [LAB_FLOW_GOAL_COMMIT]           = lab_flow_goal_commit,
         [LAB_FLOW_GOAL_COMMIT_CURRENT]   = lab_flow_goal_commit_current,

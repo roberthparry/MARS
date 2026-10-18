@@ -30,14 +30,14 @@
  * @param arguments Scoped two-item array of binding records or names to compare.
  * @return Negative, zero or positive according to name collation, with ordinary collation breaking numeric ties.
  */
-int lab_binding_compare(browser_jsref arguments);
+int lab_binding_compare(jsref arguments);
 
 /**
  * @brief Remove only the identifier's outer display brackets, retaining its exact identity elsewhere.
  * @param arguments Scoped array whose first item is the identifier to display.
  * @post Publishes the display string through lab_dom_return.
  */
-void lab_binding_label(browser_jsref arguments);
+void lab_binding_label(jsref arguments);
 
 /**
  * @brief Format an identifier within the caller's existing synchronous handle scope.
@@ -45,35 +45,35 @@ void lab_binding_label(browser_jsref arguments);
  * @return Scoped display-string handle; the caller releases it and any temporary handles after use.
  * @details Preserves whitespace, Unicode and inner brackets without interpreting mathematical text.
  */
-browser_jsref lab_binding_label_value(browser_jsref name);
+jsref lab_binding_label_value(jsref name);
 
 /**
  * @brief Recognise UI unset sentinels without interpreting mathematical expressions.
  * @param arguments Scoped array whose first item is the candidate binding value.
  * @return True for blank text, a question mark or case-insensitive NaN after trimming; false otherwise.
  */
-bool lab_binding_unset(browser_jsref arguments);
+bool lab_binding_unset(jsref arguments);
 
 /**
  * @brief Select the complete authored value; abbreviations are not reconstructed in the browser.
  * @param binding Scoped binding record; truthy value takes precedence over display.
  * @post Publishes trimmed text through lab_dom_return; blank, question-mark and NaN sentinels become empty text.
  */
-void lab_binding_value(browser_jsref binding);
+void lab_binding_value(jsref binding);
 
 /**
  * @brief Only an empty input becomes a question mark; exact symbolic input remains opaque.
  * @param input Scoped binding-value input node; its trimmed empty value becomes a question mark.
  * @post Publishes the normalised text through lab_dom_return without changing the input.
  */
-void lab_binding_normalised(browser_jsref input);
+void lab_binding_normalised(jsref input);
 
 /**
  * @brief Capture visible values with the same trimmed names and exact authored expressions.
  * @param root Scoped binding-card container node, or zero to query the document.
  * @post Publishes named records with name, kind, value and display through lab_dom_return.
  */
-void lab_binding_visible(browser_jsref root);
+void lab_binding_visible(jsref root);
 
 /**
  * @brief Overlay native-authored then visible values, preserving discovered metadata and unmatched object identity.
@@ -82,7 +82,7 @@ void lab_binding_visible(browser_jsref root);
  * @param visible Scoped array of visible values; these override authored values for the same name.
  * @post Publishes the independent overlay array through lab_dom_return.
  */
-void lab_binding_authored(browser_jsref bindings, browser_jsref authored, browser_jsref visible);
+void lab_binding_authored(jsref bindings, jsref authored, jsref visible);
 
 /**
  * @brief Build the authored-value overlay within a caller's existing synchronous scope.
@@ -91,14 +91,14 @@ void lab_binding_authored(browser_jsref bindings, browser_jsref authored, browse
  * @param visible Scoped visible records which take precedence over authored values.
  * @return Scoped independent array, using the same policy as lab_binding_authored.
  */
-browser_jsref lab_binding_authored_values(browser_jsref bindings, browser_jsref authored, browser_jsref visible);
+jsref lab_binding_authored_values(jsref bindings, jsref authored, jsref visible);
 
 /**
  * @brief Snapshot input identity and untrimmed text for the asynchronous commit ownership checks.
  * @param inputs Scoped array or NodeList of binding-value input nodes.
  * @post Publishes records containing input identity, untrimmed text and normalised binding fields.
  */
-void lab_binding_snapshot(browser_jsref inputs);
+void lab_binding_snapshot(jsref inputs);
 
 /**
  * @brief Recheck exact input bytes after an await; connectivity is deliberately not an additional commit condition.
@@ -122,20 +122,20 @@ void lab_binding_committed(snapshot_jsref snapshot);
  * @details Normalises all input values and titles before applying cache additions
  * and unset-value deletions in snapshot order. No mathematical values are evaluated.
  */
-void lab_binding_committed_cache(snapshot_jsref snapshot, browser_jsref editor, browser_jsref cache);
+void lab_binding_committed_cache(snapshot_jsref snapshot, jsref editor, jsref cache);
 
 /**
  * @brief Select the requested kind without changing the native binding identity.
  * @param binding Scoped binding record containing name and kind; missing kind defaults to variable.
  * @post Publishes trimmed name and nextKind through lab_dom_return; constant toggles to variable and vice versa.
  */
-void lab_binding_toggle(browser_jsref binding);
+void lab_binding_toggle(jsref binding);
 
 /**
  * @brief Clear controls without discarding the separate authored-value cache.
  * @param root Scoped binding-card container node to clear and hide.
  */
-void lab_binding_clear(browser_jsref root);
+void lab_binding_clear(jsref root);
 
 /**
  * @brief Build variable cards in discovery order, followed by stably collated constants.
@@ -143,7 +143,7 @@ void lab_binding_clear(browser_jsref root);
  * @param bindings Scoped array of native binding records with names, kinds and authored values.
  * @post Publishes values and kinds arrays of installed controls through lab_dom_return.
  */
-void lab_binding_render(browser_jsref root, browser_jsref bindings);
+void lab_binding_render(jsref root, jsref bindings);
 
 /**
  * @brief Decide keyboard and click policy; the returned action only schedules host promise work.
@@ -151,7 +151,7 @@ void lab_binding_render(browser_jsref root, browser_jsref bindings);
  * @param event Scoped browser event with type, target and keyboard/modifier properties.
  * @post Publishes an action/card/prevent record, or null for an unrelated or unhandled event.
  */
-void lab_binding_event(browser_jsref root, event_jsref event);
+void lab_binding_event(jsref root, event_jsref event);
 
 /**
  * @brief Restore focus by exact native name and kind after a commit may have replaced all controls.
@@ -159,14 +159,14 @@ void lab_binding_event(browser_jsref root, event_jsref event);
  * @param card Scoped previously focused card record containing name and kind.
  * @param editor Scoped fallback editor node when the binding input no longer exists.
  */
-void lab_binding_refocus(browser_jsref root, browser_jsref card, browser_jsref editor);
+void lab_binding_refocus(jsref root, jsref card, jsref editor);
 
 /**
  * @brief Construct integrator rows from sanitised native fields; row-removal policy remains in lab_forms.
  * @param root Scoped destination integrator-row container node.
  * @param rows Scoped array of sanitised rows containing kind, name, lo and hi.
  */
-void lab_binding_integrator_render(browser_jsref root, browser_jsref rows);
+void lab_binding_integrator_render(jsref root, jsref rows);
 
 /**
  * @brief Route integrator keyboard, invalidation and row-edit actions through native policy.
@@ -174,27 +174,27 @@ void lab_binding_integrator_render(browser_jsref root, browser_jsref rows);
  * @param event Scoped browser event with type, target and keyboard/modifier properties.
  * @post Publishes an action record or null; row edits include index and operation (toggle 1, insert 2, remove 3).
  */
-void lab_binding_integrator_event(browser_jsref root, event_jsref event);
+void lab_binding_integrator_event(jsref root, event_jsref event);
 
 /**
  * @brief Update inactive prepared fields in place so a blur response cannot discard the next field's focus.
  * @param root Scoped existing integrator-row container node.
  * @param prepared Scoped array of prepared name, lo and hi values aligned with the existing rows.
  */
-void lab_binding_integrator_update(browser_jsref root, browser_jsref prepared);
+void lab_binding_integrator_update(jsref root, jsref prepared);
 
 /**
  * @brief Shallow-copy own metadata fields using safe data keys.
  * @param source Scoped source record, or zero for an empty record.
  * @return Scoped independent record retaining the original field values.
  */
-browser_jsref lab_binding_copy(browser_jsref source);
+jsref lab_binding_copy(jsref source);
 
 /**
  * @brief Count only structured arrays supplied to binding policy modules.
  * @param array Scoped candidate array.
  * @return Array entry count, or zero for other value types.
  */
-unsigned lab_binding_array_count(browser_jsref array);
+unsigned lab_binding_array_count(jsref array);
 
 #endif

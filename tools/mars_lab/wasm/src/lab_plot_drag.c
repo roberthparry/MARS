@@ -39,7 +39,7 @@ static const char *const angles[] = {
     [LAB_PLOT_ANGLE_ROLL]      = "roll"
 };
 
-static double read_number(browser_jsref object, const char *key)
+static double read_number(jsref object, const char *key)
 {
     return lab_dom_to_number(lab_dom_get(object, key));
 }
@@ -63,7 +63,7 @@ static int current(gesture_jsref state)
            lab_dom_equal(lab_dom_get(state, "variable"), lab_dom_read(lab_dom_id("plotFirst"), LAB_DOM_VALUE, ""));
 }
 
-static void queue(gesture_jsref state, browser_jsref calls)
+static void queue(gesture_jsref state, jsref calls)
 {
     /* Keep a stable SVG during ordinary panning; resample once the pointer is released. */
     if (lab_dom_truth(lab_dom_get(state, "pan")) && lab_dom_truth(lab_dom_get(state, "active")) &&
@@ -108,7 +108,7 @@ static void stop(gesture_jsref state)
     lab_dom_class(lab_dom_id("plotRendered"), "plot-dragging", 0);
 }
 
-static void finish(gesture_jsref state, browser_jsref calls)
+static void finish(gesture_jsref state, jsref calls)
 {
     lab_dom_set(state, "active", lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     lab_dom_set(state, "wheel", lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
@@ -120,7 +120,7 @@ static void finish(gesture_jsref state, browser_jsref calls)
         stop(state);
 }
 
-static void cancel(gesture_jsref state, browser_jsref calls)
+static void cancel(gesture_jsref state, jsref calls)
 {
     if (!current(state)) {
         stop(state);
@@ -144,7 +144,7 @@ static void cancel(gesture_jsref state, browser_jsref calls)
     finish(state, calls);
 }
 
-static void interrupt(gesture_jsref state, browser_jsref calls)
+static void interrupt(gesture_jsref state, jsref calls)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     double revision = lab_dom_truth(lab_dom_get(state, "revision")) ? read_number(state, "revision") : 0;
@@ -156,7 +156,7 @@ static void interrupt(gesture_jsref state, browser_jsref calls)
     lab_dom_push(calls, call);
 }
 
-static void pause_sampling(browser_jsref calls)
+static void pause_sampling(jsref calls)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(call, "service", lab_dom_string("pauseSurfaceSampling"));
@@ -165,7 +165,7 @@ static void pause_sampling(browser_jsref calls)
 }
 
 /* Sliders use the same retained camera and revision ownership as direct rotation. */
-void lab_plot_slider(lab_plot_slider_action_t action, event_jsref event, browser_jsref calls)
+void lab_plot_slider(lab_plot_slider_action_t action, event_jsref event, jsref calls)
 {
     int rendered = lab_dom_id("plotRendered"), state = lab_dom_get(rendered, "marsPlotDrag");
     int surface = lab_dom_query(rendered, "[data-surface]");
@@ -206,7 +206,7 @@ void lab_plot_slider(lab_plot_slider_action_t action, event_jsref event, browser
     }
 }
 
-static int start(event_jsref event, gesture_jsref state, browser_jsref calls)
+static int start(event_jsref event, gesture_jsref state, jsref calls)
 {
     lab_plot_wheel_stop();
     int rendered = lab_dom_id("plotRendered");
@@ -277,7 +277,7 @@ static double limited(lab_plot_angle_t axis, double value)
     return axis == LAB_PLOT_ANGLE_ELEVATION ? (value < -90 ? -90 : value > 90 ? 90 : value) : wrapped(value);
 }
 
-static void schedule_wheel_end(gesture_jsref state, browser_jsref calls)
+static void schedule_wheel_end(gesture_jsref state, jsref calls)
 {
     double revision = lab_dom_truth(lab_dom_get(state, "wheelRevision")) ? read_number(state, "wheelRevision") : 0;
     lab_dom_set(state, "wheelRevision", lab_dom_numeric(revision + 1));
@@ -299,7 +299,7 @@ void lab_plot_wheel_stop(void)
 }
 
 /* Wheel movement replaces queued bounds rather than starting concurrent requests. */
-void lab_plot_wheel_zoom(chart_jsref chart, browser_jsref calls)
+void lab_plot_wheel_zoom(chart_jsref chart, jsref calls)
 {
     int rendered = lab_dom_id("plotRendered"), state = lab_dom_get(rendered, "marsPlotZoom");
     if (!state) {
@@ -319,7 +319,7 @@ void lab_plot_wheel_zoom(chart_jsref chart, browser_jsref calls)
     schedule_wheel_end(state, calls);
 }
 
-static int wheel(event_jsref event, gesture_jsref state, browser_jsref calls)
+static int wheel(event_jsref event, gesture_jsref state, jsref calls)
 {
     int rendered = lab_dom_id("plotRendered"), surface = lab_dom_query(rendered, "[data-surface]");
     int target = lab_dom_get(event, "target");
@@ -398,7 +398,7 @@ struct drag_event {
     lab_plot_drag_action_t action;
     int event; /**< Event handle, or numeric revision for LAB_PLOT_DRAG_WHEEL_IDLE. */
     gesture_jsref state;
-    browser_jsref plan, calls;
+    jsref plan, calls;
 };
 
 /* A timer may finish only the wheel revision that scheduled it. */
@@ -529,7 +529,7 @@ void lab_plot_drag_complete(gesture_jsref state, bool accepted)
 }
 
 /* Window subscriptions retain releases outside the plot; blur cancels releases outside the browser. */
-void lab_plot_drag_install(browser_jsref document, browser_jsref window)
+void lab_plot_drag_install(jsref document, jsref window)
 {
     int rendered = lab_dom_id("plotRendered");
     if (!rendered)

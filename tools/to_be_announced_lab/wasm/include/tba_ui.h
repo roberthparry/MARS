@@ -21,14 +21,14 @@ enum {
  * @brief Initialise the C application.
  * @param config Scoped decoded configuration.
  */
-void tba_ui_init(browser_jsref config);
+void tba_ui_init(jsref config);
 
 /**
  * @brief Dispatch a browser event.
  * @param action Scoped numeric action.
  * @param event Scoped browser event or zero.
  */
-void tba_ui_event(browser_jsref action, event_jsref event);
+void tba_ui_event(jsref action, event_jsref event);
 
 /**
  * @brief Dispatch an asynchronous completion.
@@ -37,7 +37,7 @@ void tba_ui_event(browser_jsref action, event_jsref event);
  * @param data Scoped result.
  * @param success Scoped HTTP-success boolean.
  */
-void tba_ui_response(browser_jsref action, browser_jsref serial, browser_jsref data, browser_jsref success);
+void tba_ui_response(jsref action, jsref serial, jsref data, jsref success);
 
 /**
  * @brief Borrow a form control.
@@ -51,28 +51,28 @@ node_jsref tba_ui_field(const char *name);
  * @param name Static control name.
  * @return Scoped text.
  */
-browser_jsref tba_ui_value(const char *name);
+jsref tba_ui_value(const char *name);
 
 /**
  * @brief Set a form value.
  * @param name Static control name.
  * @param value Scoped value.
  */
-void tba_ui_set(const char *name, browser_jsref value);
+void tba_ui_set(const char *name, jsref value);
 
 /**
  * @brief Read retained application data.
  * @param key Static key.
  * @return Scoped value.
  */
-browser_jsref tba_ui_state(const char *key);
+jsref tba_ui_state(const char *key);
 
 /**
  * @brief Retain an application value, never its handle.
  * @param key Static key.
  * @param value Scoped value.
  */
-void tba_ui_store(const char *key, browser_jsref value);
+void tba_ui_store(const char *key, jsref value);
 
 /**
  * @brief Compare text to a static token.
@@ -80,14 +80,14 @@ void tba_ui_store(const char *key, browser_jsref value);
  * @param text Static token.
  * @return Equality.
  */
-int tba_ui_is(browser_jsref value, const char *text);
+int tba_ui_is(jsref value, const char *text);
 
 /**
  * @brief Convert a control to a bounded integer.
  * @param value Scoped value.
  * @return Integer, or zero if invalid.
  */
-int tba_ui_integer(browser_jsref value);
+int tba_ui_integer(jsref value);
 
 /**
  * @brief Choose non-empty text or a literal.
@@ -95,7 +95,7 @@ int tba_ui_integer(browser_jsref value);
  * @param fallback Static default.
  * @return Scoped text.
  */
-browser_jsref tba_ui_or(browser_jsref value, const char *fallback);
+jsref tba_ui_or(jsref value, const char *fallback);
 
 /**
  * @brief Concatenate opaque text with literals.
@@ -104,28 +104,28 @@ browser_jsref tba_ui_or(browser_jsref value, const char *fallback);
  * @param after Static suffix.
  * @return Scoped text.
  */
-browser_jsref tba_ui_text(const char *before, browser_jsref value, const char *after);
+jsref tba_ui_text(const char *before, jsref value, const char *after);
 
 /**
  * @brief Append literal markup to a fragment array.
  * @param parts Scoped array.
  * @param text Static text.
  */
-void tba_ui_add(browser_jsref parts, const char *text);
+void tba_ui_add(jsref parts, const char *text);
 
 /**
  * @brief Append escaped text to a fragment array.
  * @param parts Scoped array.
  * @param value Scoped text.
  */
-void tba_ui_escaped(browser_jsref parts, browser_jsref value);
+void tba_ui_escaped(jsref parts, jsref value);
 
 /**
  * @brief Join a fragment array.
  * @param parts Scoped fragments.
  * @return Scoped text.
  */
-browser_jsref tba_ui_join(browser_jsref parts);
+jsref tba_ui_join(jsref parts);
 
 /**
  * @brief Write a node property.
@@ -133,14 +133,14 @@ browser_jsref tba_ui_join(browser_jsref parts);
  * @param key Property name.
  * @param value Scoped text.
  */
-void tba_ui_write(const char *id, const char *key, browser_jsref value);
+void tba_ui_write(const char *id, const char *key, jsref value);
 
 /**
  * @brief Publish status text.
  * @param text Scoped message.
  * @param kind Static class suffix.
  */
-void tba_ui_status(browser_jsref text, const char *kind);
+void tba_ui_status(jsref text, const char *kind);
 
 /**
  * @brief Display one main pane.
@@ -153,14 +153,14 @@ void tba_ui_pane(unsigned pane);
  * @param text Scoped text.
  * @return Scoped null-prototype index.
  */
-browser_jsref tba_ui_selection(browser_jsref text);
+jsref tba_ui_selection(jsref text);
 
 /**
  * @brief Collect checked values.
  * @param selector Static selector.
  * @return Scoped array.
  */
-browser_jsref tba_ui_checked(const char *selector);
+jsref tba_ui_checked(const char *selector);
 
 /**
  * @brief Queue a browser capability request.
@@ -170,5 +170,5 @@ browser_jsref tba_ui_checked(const char *selector);
  * @param action Completion action.
  * @param serial Request generation.
  */
-void tba_ui_request(const char *path, unsigned kind, browser_jsref body, unsigned action, unsigned serial);
+void tba_ui_request(const char *path, unsigned kind, jsref body, unsigned action, unsigned serial);
 #endif

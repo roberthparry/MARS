@@ -19,7 +19,7 @@
  * @param view Scoped browser view containing presentation caches.
  * @return Scoped continuation or completion plan; stale preparation returns explicit false.
  */
-browser_jsref lab_flow_goal(frame_jsref frame, view_jsref view);
+jsref lab_flow_goal(frame_jsref frame, view_jsref view);
 
 /**
  * @brief Advance background weather retrieval and overview publication.
@@ -28,7 +28,7 @@ browser_jsref lab_flow_goal(frame_jsref frame, view_jsref view);
  * @param view Scoped browser view, currently unused.
  * @return Scoped plan preserving parent-request freshness and weather-specific recovery.
  */
-browser_jsref lab_flow_weather(frame_jsref frame, view_jsref view);
+jsref lab_flow_weather(frame_jsref frame, view_jsref view);
 
 /**
  * @brief Advance native solver-source rendering without interpreting its mathematics.
@@ -36,7 +36,7 @@ browser_jsref lab_flow_weather(frame_jsref frame, view_jsref view);
  * @param view Scoped browser view, currently unused.
  * @return Scoped plan yielding native response data, or a failure capability on rejected rendering.
  */
-browser_jsref lab_flow_solver(frame_jsref frame, view_jsref view);
+jsref lab_flow_solver(frame_jsref frame, view_jsref view);
 
 /**
  * @brief Advance initial worksheet evaluation with guarded DateTime location refresh.
@@ -45,6 +45,6 @@ browser_jsref lab_flow_solver(frame_jsref frame, view_jsref view);
  * @param view Scoped browser view, currently unused.
  * @return Scoped plan retaining mode and request-context identity across the location await.
  */
-browser_jsref lab_flow_startup(frame_jsref frame, view_jsref view);
+jsref lab_flow_startup(frame_jsref frame, view_jsref view);
 
 #endif

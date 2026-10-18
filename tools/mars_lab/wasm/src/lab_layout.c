@@ -15,7 +15,7 @@
 #include "lab_plot_pointer.h"
 #include "lab_layout.h"
 
-static browser_jsref lab_layout_read(node_jsref node, const char *key)
+static jsref lab_layout_read(node_jsref node, const char *key)
 {
     return lab_dom_read(node, LAB_DOM_DATASET, key);
 }
@@ -30,7 +30,7 @@ static void lab_layout_number(node_jsref node, lab_dom_accessor_t kind, const ch
     lab_dom_write(node, kind, key, lab_dom_format(number, "", unit));
 }
 
-static double lab_layout_base(browser_jsref card, const char *key, double fallback)
+static double lab_layout_base(jsref card, const char *key, double fallback)
 {
     double value = lab_dom_css(card, key);
     return value ? value : fallback;
@@ -43,7 +43,7 @@ static double lab_layout_width(node_jsref node)
     return width > 0 ? width : 0;
 }
 
-static double lab_layout_intrinsic(browser_jsref svg, unsigned axis)
+static double lab_layout_intrinsic(jsref svg, unsigned axis)
 {
     double value = lab_dom_measure(svg, 1 + axis);
     if (!value)
@@ -54,7 +54,7 @@ static double lab_layout_intrinsic(browser_jsref svg, unsigned axis)
 }
 
 /* Ask the browser to parse SVG; read only intrinsic absolute length or view-box geometry. */
-double lab_layout_markup_width(browser_jsref markup)
+double lab_layout_markup_width(jsref markup)
 {
     int box = lab_dom_create("div");
     lab_dom_write(box, LAB_DOM_HTML, "", markup);
@@ -65,7 +65,7 @@ double lab_layout_markup_width(browser_jsref markup)
     return width > 0 ? width : lab_dom_measure(svg, LAB_DOM_MEASURE_VIEWBOX_WIDTH);
 }
 
-static void lab_layout_frame(browser_jsref card, double scale, double zoom)
+static void lab_layout_frame(jsref card, double scale, double zoom)
 {
     if (lab_dom_query(card, ".complex-grid")) {
         int buttons = lab_dom_all(card, ".complex-panel button");
@@ -124,7 +124,7 @@ static void lab_layout_frame(browser_jsref card, double scale, double zoom)
 }
 
 /* Project a card's C-owned zoom to CSS, SVG geometry and accessible controls. */
-void lab_layout_zoom(browser_jsref card)
+void lab_layout_zoom(jsref card)
 {
     if (!card)
         return;
@@ -164,7 +164,7 @@ void lab_layout_zoom(browser_jsref card)
 }
 
 /* Mutate native state before projecting; invalid/unregistered cards remain untouched. */
-void lab_layout_set_zoom(browser_jsref card, double index, lab_layout_zoom_operation_t operation)
+void lab_layout_set_zoom(jsref card, double index, lab_layout_zoom_operation_t operation)
 {
     int id = lab_dom_card_id(card);
     lab_view_zoom_direction_t direction = index < 0 ? LAB_VIEW_ZOOM_DECREASE : LAB_VIEW_ZOOM_INCREASE;
@@ -177,7 +177,7 @@ void lab_layout_set_zoom(browser_jsref card, double index, lab_layout_zoom_opera
 }
 
 /* Render, toggle or collapse exclusive expansion and its accessible button state. */
-void lab_layout_expand(browser_jsref card, lab_layout_expansion_t operation)
+void lab_layout_expand(jsref card, lab_layout_expansion_t operation)
 {
     if (operation == LAB_LAYOUT_EXPANSION_TOGGLE && lab_dom_has(card, "data-complex-panel")) {
         int expanded = !lab_dom_equal(lab_dom_read(card, LAB_DOM_DATASET, "expanded"), lab_dom_string("true"));
@@ -228,7 +228,7 @@ void lab_layout_expand(browser_jsref card, lab_layout_expansion_t operation)
 }
 
 /* Install only native markup, or an ordinary text fallback, and fit it on the next frame. */
-static void lab_layout_content_at(browser_jsref rendered, browser_jsref svg, browser_jsref fallback)
+static void lab_layout_content_at(jsref rendered, jsref svg, jsref fallback)
 {
     lab_layout_text(rendered, LAB_DOM_TEXT, "", "");
     if (lab_dom_length(svg)) {
@@ -249,12 +249,12 @@ static void lab_layout_content_at(browser_jsref rendered, browser_jsref svg, bro
 }
 
 /* Keep mathematical rendering independent of the optional plot card. */
-void lab_layout_content(browser_jsref svg, browser_jsref fallback)
+void lab_layout_content(jsref svg, jsref fallback)
 {
     lab_layout_content_at(lab_dom_id("rendered"), svg, fallback);
 }
 
-static void complex_grid(node_jsref node, browser_jsref result)
+static void complex_grid(node_jsref node, jsref result)
 {
     if (!lab_dom_length(lab_dom_get(result, "complex_plane")))
         return;
@@ -316,7 +316,7 @@ void lab_layout_plot_camera(bool home)
 }
 
 /* Only native plot output and diagnostics enter the standalone plot card. */
-void lab_layout_plot(browser_jsref result, browser_jsref error)
+void lab_layout_plot(jsref result, jsref error)
 {
     int node = lab_dom_id("plotRendered"), svg = lab_dom_get(result, "svg");
     int projection = lab_dom_get(result, "gestureProjection");
@@ -430,7 +430,7 @@ bool lab_layout_solver_wrapped(void)
 }
 
 /* Browser HTML/SVG parsing handles any XML preamble; C applies the selected solver variant. */
-void lab_layout_solver_install(browser_jsref markup, browser_jsref variant)
+void lab_layout_solver_install(jsref markup, jsref variant)
 {
     int node = lab_dom_query(0, "#functionStyle");
     if (!lab_dom_length(markup) || lab_dom_equal(lab_layout_read(node, "solverVariant"), variant))
@@ -448,7 +448,7 @@ void lab_layout_solver_install(browser_jsref markup, browser_jsref variant)
 }
 
 /* Abbreviation is supplied by native presentation metadata, never inferred from displayed text. */
-void lab_layout_more(browser_jsref button, bool enabled)
+void lab_layout_more(jsref button, bool enabled)
 {
     lab_dom_class(button, "hidden", !enabled);
     lab_layout_text(button, LAB_DOM_TEXT, "", "Show more digits");
@@ -456,7 +456,7 @@ void lab_layout_more(browser_jsref button, bool enabled)
 }
 
 /* CSS owns error colours; clearing also removes obsolete inline error styles. */
-void lab_layout_error(browser_jsref message, bool error)
+void lab_layout_error(jsref message, bool error)
 {
     int rendered = lab_dom_query(0, "#rendered");
     lab_dom_class(rendered, "error", error);

@@ -23,7 +23,7 @@
  * invalid dimensions and pointers outside the chart publish null regardless of previous. Selected markers
  * must also lie inside the chart. A valid frame with drawMesh false publishes previous without traversal.
  */
-void lab_surface_hover(view_jsref view, frame_jsref frame, browser_jsref screen,
-                       double mouse_x, double mouse_y, browser_jsref previous);
+void lab_surface_hover(view_jsref view, frame_jsref frame, jsref screen,
+                       double mouse_x, double mouse_y, jsref previous);
 
 #endif

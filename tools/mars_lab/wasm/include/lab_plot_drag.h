@@ -37,14 +37,14 @@ typedef enum {
  * @param document Scoped browser Document for cancellation events.
  * @param window Scoped browser Window for movement, release and loss of focus.
  */
-void lab_plot_drag_install(browser_jsref document, browser_jsref window);
+void lab_plot_drag_install(jsref document, jsref window);
 
 /**
  * @brief Coalesce wheel-range previews and request full detail after wheel inactivity.
  * @param chart Scoped browser handle to the chart whose already-edited bounds require resampling.
  * @param calls Scoped mutable browser array receiving redraw and wheel-inactivity service descriptors.
  */
-void lab_plot_wheel_zoom(chart_jsref chart, browser_jsref calls);
+void lab_plot_wheel_zoom(chart_jsref chart, jsref calls);
 
 /** @brief Stop queued wheel refinement when another viewport interaction takes over. */
 void lab_plot_wheel_stop(void);
@@ -55,7 +55,7 @@ void lab_plot_wheel_stop(void);
  * @param event Scoped browser event handle supplying pointerId when beginning a gesture; unused for commit.
  * @param calls Scoped mutable browser array receiving deferred preview, cancellation and redraw services.
  */
-void lab_plot_slider(lab_plot_slider_action_t action, event_jsref event, browser_jsref calls);
+void lab_plot_slider(lab_plot_slider_action_t action, event_jsref event, jsref calls);
 
 /** @brief Process a gesture and publish deferred host calls after releasing scoped handles.
  * @param action Gesture event from lab_plot_drag_action_t; other values, including negatives, do nothing.

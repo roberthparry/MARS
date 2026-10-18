@@ -14,19 +14,19 @@
 #include "lab_result.h"
 #include "lab_evaluation_dom.h"
 
-static browser_jsref lab_evaluation_field(browser_jsref data, const char *key, browser_jsref fallback)
+static jsref lab_evaluation_field(jsref data, const char *key, jsref fallback)
 {
     int value = lab_dom_get(data, key);
     return lab_dom_truth(value) ? value : fallback;
 }
 
-static void lab_evaluation_data(node_jsref node, const char *key, browser_jsref value)
+static void lab_evaluation_data(node_jsref node, const char *key, jsref value)
 {
     lab_dom_write(node, LAB_DOM_DATASET, key, value);
 }
 
 /* Install only native-provided renderings, retaining exact copies for digit toggles. */
-void lab_evaluation_render(lab_mode_t mode, browser_jsref data, bool expandable)
+void lab_evaluation_render(lab_mode_t mode, jsref data, bool expandable)
 {
     if (mode != LAB_MODE_EQUATION && mode != LAB_MODE_DIFFERENTIAL_EQUATION && mode != LAB_MODE_INTEGRATOR) {
         lab_dom_return(0);
@@ -82,7 +82,7 @@ void lab_evaluation_render(lab_mode_t mode, browser_jsref data, bool expandable)
 }
 
 /* Display native expression notes and return its explicit differentiability decision. */
-bool lab_evaluation_notes(browser_jsref data)
+bool lab_evaluation_notes(jsref data)
 {
     int note = lab_evaluation_field(data, "value_note", lab_dom_string(""));
     lab_dom_write(lab_dom_query(0, "#valueNote"), LAB_DOM_TEXT, "", note);
@@ -94,7 +94,7 @@ bool lab_evaluation_notes(browser_jsref data)
 }
 
 /* Retain the solver SVG and its request owner only after the host verifies freshness. */
-void lab_evaluation_solver(browser_jsref data, browser_jsref source, browser_jsref details, browser_jsref svg, double token)
+void lab_evaluation_solver(jsref data, jsref source, jsref details, jsref svg, double token)
 {
     int node = lab_dom_query(0, "#functionStyle"), empty = lab_dom_string("");
     lab_dom_class(node, "equation-function", 1);

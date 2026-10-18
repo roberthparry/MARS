@@ -24,13 +24,13 @@ enum {
     LAB_FLOW_WEATHER_ERROR
 };
 
-static browser_jsref lab_flow_weather_start(frame_jsref frame, view_jsref view)
+static jsref lab_flow_weather_start(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_WEATHER_FETCH, "setStatus", 0, 0, 1, lab_dom_string("Loading weather..."));
 }
 
-static browser_jsref lab_flow_weather_fetch(frame_jsref frame, view_jsref view)
+static jsref lab_flow_weather_fetch(frame_jsref frame, view_jsref view)
 {
     (void)view;
     lab_dom_set(frame, "failed", lab_dom_numeric(LAB_FLOW_WEATHER_ERROR_CURRENT));
@@ -38,7 +38,7 @@ static browser_jsref lab_flow_weather_fetch(frame_jsref frame, view_jsref view)
                          lab_dom_get(frame, "request"));
 }
 
-static browser_jsref lab_flow_weather_outcome(frame_jsref frame, view_jsref view)
+static jsref lab_flow_weather_outcome(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int result = lab_dom_get(frame, "result");
@@ -46,7 +46,7 @@ static browser_jsref lab_flow_weather_outcome(frame_jsref frame, view_jsref view
                          lab_dom_get(frame, "request"), lab_dom_get(result, "response"), lab_dom_get(result, "data"));
 }
 
-static browser_jsref lab_flow_weather_response(frame_jsref frame, view_jsref view)
+static jsref lab_flow_weather_response(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_WEATHER_EFFECTS, "native", "plan", 0, 4,
@@ -54,28 +54,28 @@ static browser_jsref lab_flow_weather_response(frame_jsref frame, view_jsref vie
                          lab_dom_get(frame, "overviewData"), lab_dom_get(lab_dom_get(frame, "result"), "data"));
 }
 
-static browser_jsref lab_flow_weather_effects(frame_jsref frame, view_jsref view)
+static jsref lab_flow_weather_effects(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int plan = lab_dom_get(frame, "plan");
     return lab_dom_truth(plan) ? lab_flow_effects(frame, LAB_FLOW_WEATHER_DONE, plan) : lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_weather_done(frame_jsref frame, view_jsref view)
+static jsref lab_flow_weather_done(frame_jsref frame, view_jsref view)
 {
     (void)frame;
     (void)view;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_weather_error_current(frame_jsref frame, view_jsref view)
+static jsref lab_flow_weather_error_current(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_WEATHER_ERROR, "requestCurrent", "current", 0, 1,
                          lab_dom_get(frame, "request"));
 }
 
-static browser_jsref lab_flow_weather_error(frame_jsref frame, view_jsref view)
+static jsref lab_flow_weather_error(frame_jsref frame, view_jsref view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
@@ -85,9 +85,9 @@ static browser_jsref lab_flow_weather_error(frame_jsref frame, view_jsref view)
 }
 
 /* Advance weather publication with stale-response suppression and a single recovery boundary. */
-browser_jsref lab_flow_weather(frame_jsref frame, view_jsref view)
+jsref lab_flow_weather(frame_jsref frame, view_jsref view)
 {
-    static browser_jsref (*const stages[])(browser_jsref, browser_jsref) = {
+    static jsref (*const stages[])(jsref, jsref) = {
         [LAB_FLOW_WEATHER_START]         = lab_flow_weather_start,
         [LAB_FLOW_WEATHER_FETCH]         = lab_flow_weather_fetch,
         [LAB_FLOW_WEATHER_OUTCOME]       = lab_flow_weather_outcome,
@@ -105,7 +105,7 @@ browser_jsref lab_flow_weather(frame_jsref frame, view_jsref view)
 
 enum { LAB_FLOW_SOLVER_POST, LAB_FLOW_SOLVER_OUTCOME, LAB_FLOW_SOLVER_RESPONSE, LAB_FLOW_SOLVER_DONE };
 
-static browser_jsref lab_flow_solver_post(frame_jsref frame, view_jsref view)
+static jsref lab_flow_solver_post(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int payload = lab_dom_object(LAB_VALUE_OBJECT);
@@ -114,7 +114,7 @@ static browser_jsref lab_flow_solver_post(frame_jsref frame, view_jsref view)
                          lab_dom_string("/render_TeX"));
 }
 
-static browser_jsref lab_flow_solver_outcome(frame_jsref frame, view_jsref view)
+static jsref lab_flow_solver_outcome(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int result = lab_dom_get(frame, "result");
@@ -122,7 +122,7 @@ static browser_jsref lab_flow_solver_outcome(frame_jsref frame, view_jsref view)
                          lab_dom_get(frame, "request"), lab_dom_get(result, "response"), lab_dom_get(result, "data"));
 }
 
-static browser_jsref lab_flow_solver_response(frame_jsref frame, view_jsref view)
+static jsref lab_flow_solver_response(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int data = lab_dom_get(lab_dom_get(frame, "result"), "data");
@@ -134,7 +134,7 @@ static browser_jsref lab_flow_solver_response(frame_jsref frame, view_jsref view
     return lab_flow_call(frame, LAB_FLOW_SOLVER_DONE, "fail", 0, 0, 1, message);
 }
 
-static browser_jsref lab_flow_solver_done(frame_jsref frame, view_jsref view)
+static jsref lab_flow_solver_done(frame_jsref frame, view_jsref view)
 {
     (void)frame;
     (void)view;
@@ -142,9 +142,9 @@ static browser_jsref lab_flow_solver_done(frame_jsref frame, view_jsref view)
 }
 
 /* Let the request runner and enclosing installer own rejection and stale-parent fallback. */
-browser_jsref lab_flow_solver(frame_jsref frame, view_jsref view)
+jsref lab_flow_solver(frame_jsref frame, view_jsref view)
 {
-    static browser_jsref (*const stages[])(browser_jsref, browser_jsref) = {
+    static jsref (*const stages[])(jsref, jsref) = {
         [LAB_FLOW_SOLVER_POST]     = lab_flow_solver_post,
         [LAB_FLOW_SOLVER_OUTCOME]  = lab_flow_solver_outcome,
         [LAB_FLOW_SOLVER_RESPONSE] = lab_flow_solver_response,
@@ -167,25 +167,25 @@ enum {
     LAB_FLOW_STARTUP_DONE
 };
 
-static browser_jsref lab_flow_startup_mode(frame_jsref frame, view_jsref view)
+static jsref lab_flow_startup_mode(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_STARTUP_MODE_CHANGED, "currentMode", "mode", 0, 0);
 }
 
-static browser_jsref lab_flow_startup_mode_changed(frame_jsref frame, view_jsref view)
+static jsref lab_flow_startup_mode_changed(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_STARTUP_CONTEXT, "modeChanged", 0, 0, 1, lab_dom_get(frame, "mode"));
 }
 
-static browser_jsref lab_flow_startup_context(frame_jsref frame, view_jsref view)
+static jsref lab_flow_startup_context(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_STARTUP_REFRESH, "requestContext", "context", 0, 0);
 }
 
-static browser_jsref lab_flow_startup_evaluate_mode(frame_jsref frame)
+static jsref lab_flow_startup_evaluate_mode(frame_jsref frame)
 {
     int mode = lab_dom_get(frame, "mode");
     /* This startup-only membership check has exactly seven fixed worksheet labels, never user-sized data. */
@@ -197,7 +197,7 @@ static browser_jsref lab_flow_startup_evaluate_mode(frame_jsref frame)
     return lab_flow_call(frame, LAB_FLOW_STARTUP_DONE, "evaluate", "result", 1, 1, lab_dom_string("expression"));
 }
 
-static browser_jsref lab_flow_startup_refresh(frame_jsref frame, view_jsref view)
+static jsref lab_flow_startup_refresh(frame_jsref frame, view_jsref view)
 {
     (void)view;
     if (lab_dom_equal(lab_dom_get(frame, "mode"), lab_dom_string("datetime")))
@@ -205,13 +205,13 @@ static browser_jsref lab_flow_startup_refresh(frame_jsref frame, view_jsref view
     return lab_flow_startup_evaluate_mode(frame);
 }
 
-static browser_jsref lab_flow_startup_current_context(frame_jsref frame, view_jsref view)
+static jsref lab_flow_startup_current_context(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_call(frame, LAB_FLOW_STARTUP_CURRENT_MODE, "requestContext", "currentContext", 0, 0);
 }
 
-static browser_jsref lab_flow_startup_current_mode(frame_jsref frame, view_jsref view)
+static jsref lab_flow_startup_current_mode(frame_jsref frame, view_jsref view)
 {
     (void)view;
     if (!lab_dom_equal(lab_dom_get(frame, "context"), lab_dom_get(frame, "currentContext")))
@@ -219,7 +219,7 @@ static browser_jsref lab_flow_startup_current_mode(frame_jsref frame, view_jsref
     return lab_flow_call(frame, LAB_FLOW_STARTUP_EVALUATE, "currentMode", "currentMode", 0, 0);
 }
 
-static browser_jsref lab_flow_startup_evaluate(frame_jsref frame, view_jsref view)
+static jsref lab_flow_startup_evaluate(frame_jsref frame, view_jsref view)
 {
     (void)view;
     if (!lab_dom_equal(lab_dom_get(frame, "currentMode"), lab_dom_string("datetime")))
@@ -227,16 +227,16 @@ static browser_jsref lab_flow_startup_evaluate(frame_jsref frame, view_jsref vie
     return lab_flow_startup_evaluate_mode(frame);
 }
 
-static browser_jsref lab_flow_startup_done(frame_jsref frame, view_jsref view)
+static jsref lab_flow_startup_done(frame_jsref frame, view_jsref view)
 {
     (void)view;
     return lab_flow_done(lab_dom_get(frame, "result"));
 }
 
 /* Preserve initial-mode identity across location refresh without introducing a request of our own. */
-browser_jsref lab_flow_startup(frame_jsref frame, view_jsref view)
+jsref lab_flow_startup(frame_jsref frame, view_jsref view)
 {
-    static browser_jsref (*const stages[])(browser_jsref, browser_jsref) = {
+    static jsref (*const stages[])(jsref, jsref) = {
         [LAB_FLOW_STARTUP_MODE]            = lab_flow_startup_mode,
         [LAB_FLOW_STARTUP_MODE_CHANGED]    = lab_flow_startup_mode_changed,
         [LAB_FLOW_STARTUP_CONTEXT]         = lab_flow_startup_context,

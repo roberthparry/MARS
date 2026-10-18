@@ -17,19 +17,19 @@ static unsigned lab_flow_state_forms_stage(frame_jsref frame)
     return (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
 }
 
-static browser_jsref lab_flow_state_forms_next(frame_jsref frame, unsigned next, const char *service)
+static jsref lab_flow_state_forms_next(frame_jsref frame, unsigned next, const char *service)
 {
     return lab_flow_call(frame, next, service, 0, 0, 0);
 }
 
-static browser_jsref lab_flow_state_forms_null(void)
+static jsref lab_flow_state_forms_null(void)
 {
     int plan = lab_flow_done(0);
     lab_dom_set(plan, "value", 0);
     return plan;
 }
 
-static browser_jsref lab_flow_state_forms_guard(frame_jsref frame, unsigned next)
+static jsref lab_flow_state_forms_guard(frame_jsref frame, unsigned next)
 {
     return lab_flow_call(frame, next, "stateGuard", "current", 0, 1, lab_dom_get(frame, "isCurrent"));
 }
@@ -41,21 +41,21 @@ static int lab_flow_state_forms_revision(frame_jsref frame)
     return revision != 0;
 }
 
-static browser_jsref lab_flow_state_forms_exhausted(frame_jsref frame)
+static jsref lab_flow_state_forms_exhausted(frame_jsref frame)
 {
     return lab_flow_call(frame, 100, "fail", 0, 0, 1,
                          lab_dom_string("Integrator form revision limit reached; reload the Lab"));
 }
 
-static browser_jsref lab_flow_state_forms_accept(frame_jsref frame)
+static jsref lab_flow_state_forms_accept(frame_jsref frame)
 {
     return lab_rows_revision_accept(
         (unsigned)lab_dom_number(lab_dom_get(frame, "generation")),
         lab_dom_equal(lab_dom_get(frame, "expression"), lab_dom_get(frame, "currentExpression")));
 }
 
-static browser_jsref lab_flow_state_forms_payload(frame_jsref frame, browser_jsref rows, browser_jsref expression,
-                                browser_jsref fallback)
+static jsref lab_flow_state_forms_payload(frame_jsref frame, jsref rows, jsref expression,
+                                jsref fallback)
 {
     int payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(payload, "action", lab_dom_string("integrator"));
@@ -75,37 +75,37 @@ static browser_jsref lab_flow_state_forms_payload(frame_jsref frame, browser_jsr
  * @param frame Borrowed clear-workflow frame advanced past history removal to stage 6.
  * @return Scoped plan calling the forward-history clear service.
  */
-static browser_jsref lab_flow_state_clear_state_clear_forward(frame_jsref frame);
+static jsref lab_flow_state_clear_state_clear_forward(frame_jsref frame);
 
 /**
  * @brief Capture the cleared worksheet under the owning request.
  * @param frame Borrowed clear-workflow frame holding request and receiving the captured flag.
  * @return Scoped capture plan awaited before clearing the retained source.
  */
-static browser_jsref lab_flow_state_clear_state_capture_request(frame_jsref frame);
+static jsref lab_flow_state_clear_state_capture_request(frame_jsref frame);
 
-static browser_jsref lab_flow_state_clear_state_clear_prelude(frame_jsref frame)
+static jsref lab_flow_state_clear_state_clear_prelude(frame_jsref frame)
 {
     return lab_flow_state_forms_next(frame, 1, "stateClearPrelude");
 }
 
-static browser_jsref lab_flow_state_clear_state_clear_owned(frame_jsref frame)
+static jsref lab_flow_state_clear_state_clear_owned(frame_jsref frame)
 {
     return lab_flow_call(frame, 2, "stateClearOwned", 0, 1, 0);
 }
 
-static browser_jsref lab_flow_state_clear_complete(frame_jsref frame)
+static jsref lab_flow_state_clear_complete(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_state_clear_state_current_history(frame_jsref frame)
+static jsref lab_flow_state_clear_state_current_history(frame_jsref frame)
 {
     return lab_flow_call(frame, 4, "stateCurrentHistory", "history", 0, 0);
 }
 
-static browser_jsref lab_flow_state_clear_push_history(frame_jsref frame)
+static jsref lab_flow_state_clear_push_history(frame_jsref frame)
 {
     if (lab_dom_truth(lab_dom_get(lab_dom_get(frame, "history"), "text")))
         return lab_flow_call(frame, 5, "pushHistory", 0, 0, 1, lab_dom_get(frame, "history"));
@@ -113,17 +113,17 @@ static browser_jsref lab_flow_state_clear_push_history(frame_jsref frame)
     return lab_flow_state_clear_state_clear_forward(frame);
 }
 
-static browser_jsref lab_flow_state_clear_state_clear_forward(frame_jsref frame)
+static jsref lab_flow_state_clear_state_clear_forward(frame_jsref frame)
 {
     return lab_flow_state_forms_next(frame, 6, "stateClearForward");
 }
 
-static browser_jsref lab_flow_state_clear_state_clear_projection(frame_jsref frame)
+static jsref lab_flow_state_clear_state_clear_projection(frame_jsref frame)
 {
     return lab_flow_call(frame, 7, "stateClearProjection", "reset", 0, 0);
 }
 
-static browser_jsref lab_flow_state_clear_state_blank_bounds(frame_jsref frame)
+static jsref lab_flow_state_clear_state_blank_bounds(frame_jsref frame)
 {
     {
         unsigned reset = (unsigned)lab_dom_number(lab_dom_get(frame, "reset"));
@@ -136,62 +136,62 @@ static browser_jsref lab_flow_state_clear_state_blank_bounds(frame_jsref frame)
     return lab_flow_state_clear_state_capture_request(frame);
 }
 
-static browser_jsref lab_flow_state_clear_state_capture_request(frame_jsref frame)
+static jsref lab_flow_state_clear_state_capture_request(frame_jsref frame)
 {
     return lab_flow_call(frame, 9, "stateCaptureRequest", "captured", 1, 1, lab_dom_get(frame, "request"));
 }
 
-static browser_jsref lab_flow_state_clear_state_clear_source(frame_jsref frame)
+static jsref lab_flow_state_clear_state_clear_source(frame_jsref frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "captured")))
         return lab_flow_done(0);
     return lab_flow_state_forms_next(frame, 10, "stateClearSource");
 }
 
-static browser_jsref lab_flow_state_clear_state_hide_target(frame_jsref frame)
+static jsref lab_flow_state_clear_state_hide_target(frame_jsref frame)
 {
     return lab_flow_state_forms_next(frame, 11, "stateHideTarget");
 }
 
-static browser_jsref lab_flow_state_clear_state_clear_result(frame_jsref frame)
+static jsref lab_flow_state_clear_state_clear_result(frame_jsref frame)
 {
     return lab_flow_state_forms_next(frame, 12, "stateClearResult");
 }
 
-static browser_jsref lab_flow_state_clear_state_save_result(frame_jsref frame)
+static jsref lab_flow_state_clear_state_save_result(frame_jsref frame)
 {
     return lab_flow_state_forms_next(frame, 13, "stateSaveResult");
 }
 
-static browser_jsref lab_flow_state_clear_commit_mode_state(frame_jsref frame)
+static jsref lab_flow_state_clear_commit_mode_state(frame_jsref frame)
 {
     return lab_flow_state_forms_next(frame, 14, "commitModeState");
 }
 
-static browser_jsref lab_flow_state_clear_state_history_buttons(frame_jsref frame)
+static jsref lab_flow_state_clear_state_history_buttons(frame_jsref frame)
 {
     return lab_flow_state_forms_next(frame, 15, "stateHistoryButtons");
 }
 
-static browser_jsref lab_flow_state_clear_state_status(frame_jsref frame)
+static jsref lab_flow_state_clear_state_status(frame_jsref frame)
 {
     return lab_flow_call(frame, 16, "stateStatus", 0, 0, 1, lab_dom_string("Ready"));
 }
 
-static browser_jsref lab_flow_state_clear_state_focus_editor(frame_jsref frame)
+static jsref lab_flow_state_clear_state_focus_editor(frame_jsref frame)
 {
     return lab_flow_state_forms_next(frame, 17, "stateFocusEditor");
 }
 
-static browser_jsref lab_flow_state_clear_otherwise(frame_jsref frame)
+static jsref lab_flow_state_clear_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_state_clear(frame_jsref frame)
+static jsref lab_flow_state_clear(frame_jsref frame)
 {
-    static browser_jsref (*const handlers[])(browser_jsref) = {
+    static jsref (*const handlers[])(jsref) = {
         [0]  = lab_flow_state_clear_state_clear_prelude,
         [1]  = lab_flow_state_clear_state_clear_owned,
         [2]  = lab_flow_state_clear_complete,
@@ -215,19 +215,19 @@ static browser_jsref lab_flow_state_clear(frame_jsref frame)
                                                                                : lab_flow_state_clear_otherwise(frame);
 }
 
-static browser_jsref lab_flow_state_forms_refresh_state_forms_request(frame_jsref frame)
+static jsref lab_flow_state_forms_refresh_state_forms_request(frame_jsref frame)
 {
     if (!lab_flow_state_forms_revision(frame))
         return lab_flow_state_forms_exhausted(frame);
     return lab_flow_call(frame, 1, "stateFormsRequest", "result", 1, 1, lab_flow_state_forms_payload(frame, 1, 1, 0));
 }
 
-static browser_jsref lab_flow_state_forms_refresh_state_forms_expression(frame_jsref frame)
+static jsref lab_flow_state_forms_refresh_state_forms_expression(frame_jsref frame)
 {
     return lab_flow_call(frame, 2, "stateFormsExpression", "currentExpression", 0, 0);
 }
 
-static browser_jsref lab_flow_state_forms_refresh_state_forms_metadata(frame_jsref frame)
+static jsref lab_flow_state_forms_refresh_state_forms_metadata(frame_jsref frame)
 {
     if (!lab_flow_state_forms_accept(frame))
         return lab_flow_state_forms_null();
@@ -235,27 +235,27 @@ static browser_jsref lab_flow_state_forms_refresh_state_forms_metadata(frame_jsr
                          lab_dom_get(frame, "result"));
 }
 
-static browser_jsref lab_flow_state_forms_refresh_state_forms_rows(frame_jsref frame)
+static jsref lab_flow_state_forms_refresh_state_forms_rows(frame_jsref frame)
 {
     return lab_flow_call(frame, 4, "stateFormsRows", "completion", 0, 1, lab_dom_get(frame, "result"));
 }
 
-static browser_jsref lab_flow_state_forms_refresh_complete(frame_jsref frame)
+static jsref lab_flow_state_forms_refresh_complete(frame_jsref frame)
 {
     int completion = lab_dom_get(frame, "completion");
     lab_dom_set(completion, "done", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return completion;
 }
 
-static browser_jsref lab_flow_state_forms_refresh_otherwise(frame_jsref frame)
+static jsref lab_flow_state_forms_refresh_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_state_forms_refresh(frame_jsref frame)
+static jsref lab_flow_state_forms_refresh(frame_jsref frame)
 {
-    static browser_jsref (*const handlers[])(browser_jsref) = {
+    static jsref (*const handlers[])(jsref) = {
         [0] = lab_flow_state_forms_refresh_state_forms_request,
         [1] = lab_flow_state_forms_refresh_state_forms_expression,
         [2] = lab_flow_state_forms_refresh_state_forms_metadata,
@@ -268,33 +268,33 @@ static browser_jsref lab_flow_state_forms_refresh(frame_jsref frame)
                : lab_flow_state_forms_refresh_otherwise(frame);
 }
 
-static browser_jsref lab_flow_state_forms_parse_state_forms_request(frame_jsref frame)
+static jsref lab_flow_state_forms_parse_state_forms_request(frame_jsref frame)
 {
     return lab_flow_call(frame, 1, "stateFormsRequest", "result", 1, 1,
                          lab_flow_state_forms_payload(frame, 0, 0, lab_dom_string("")));
 }
 
-static browser_jsref lab_flow_state_forms_parse_state_forms_rows(frame_jsref frame)
+static jsref lab_flow_state_forms_parse_state_forms_rows(frame_jsref frame)
 {
     return lab_flow_call(frame, 2, "stateFormsRows", "completion", 0, 1, lab_dom_get(frame, "result"));
 }
 
-static browser_jsref lab_flow_state_forms_parse_complete(frame_jsref frame)
+static jsref lab_flow_state_forms_parse_complete(frame_jsref frame)
 {
     int completion = lab_dom_get(frame, "completion");
     lab_dom_set(completion, "done", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return completion;
 }
 
-static browser_jsref lab_flow_state_forms_parse_otherwise(frame_jsref frame)
+static jsref lab_flow_state_forms_parse_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_state_forms_parse(frame_jsref frame)
+static jsref lab_flow_state_forms_parse(frame_jsref frame)
 {
-    static browser_jsref (*const handlers[])(browser_jsref) = {
+    static jsref (*const handlers[])(jsref) = {
         [0] = lab_flow_state_forms_parse_state_forms_request,
         [1] = lab_flow_state_forms_parse_state_forms_rows,
         [2] = lab_flow_state_forms_parse_complete,
@@ -305,12 +305,12 @@ static browser_jsref lab_flow_state_forms_parse(frame_jsref frame)
                : lab_flow_state_forms_parse_otherwise(frame);
 }
 
-static browser_jsref lab_flow_state_forms_restore_guard(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_guard(frame_jsref frame)
 {
     return lab_flow_state_forms_guard(frame, 1);
 }
 
-static browser_jsref lab_flow_state_forms_restore_state_forms_expression(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_state_forms_expression(frame_jsref frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
         return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
@@ -319,25 +319,25 @@ static browser_jsref lab_flow_state_forms_restore_state_forms_expression(frame_j
     return lab_flow_call(frame, 2, "stateFormsExpression", "expression", 0, 0);
 }
 
-static browser_jsref lab_flow_state_forms_restore_state_forms_request(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_state_forms_request(frame_jsref frame)
 {
     return lab_flow_call(frame, 3, "stateFormsRequest", "result", 1, 1,
                          lab_flow_state_forms_payload(frame, 0, 1, lab_dom_get(frame, "defaultBounds")));
 }
 
-static browser_jsref lab_flow_state_forms_restore_recheck(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_recheck(frame_jsref frame)
 {
     return lab_flow_state_forms_guard(frame, 4);
 }
 
-static browser_jsref lab_flow_state_forms_restore_state_forms_expression_4(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_state_forms_expression_4(frame_jsref frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
         return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(frame, 5, "stateFormsExpression", "currentExpression", 0, 0);
 }
 
-static browser_jsref lab_flow_state_forms_restore_state_forms_metadata(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_state_forms_metadata(frame_jsref frame)
 {
     if (!lab_flow_state_forms_accept(frame))
         return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
@@ -345,31 +345,31 @@ static browser_jsref lab_flow_state_forms_restore_state_forms_metadata(frame_jsr
                          lab_dom_get(frame, "result"));
 }
 
-static browser_jsref lab_flow_state_forms_restore_state_forms_rows(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_state_forms_rows(frame_jsref frame)
 {
     return lab_flow_call(frame, 7, "stateFormsRows", "rows", 0, 1, lab_dom_get(frame, "result"));
 }
 
-static browser_jsref lab_flow_state_forms_restore_state_forms_render(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_state_forms_render(frame_jsref frame)
 {
     return lab_flow_call(frame, 8, "stateFormsRender", 0, 0, 1, lab_dom_get(frame, "rows"));
 }
 
-static browser_jsref lab_flow_state_forms_restore_complete(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_complete(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
-static browser_jsref lab_flow_state_forms_restore_otherwise(frame_jsref frame)
+static jsref lab_flow_state_forms_restore_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_state_forms_restore(frame_jsref frame)
+static jsref lab_flow_state_forms_restore(frame_jsref frame)
 {
-    static browser_jsref (*const handlers[])(browser_jsref) = {
+    static jsref (*const handlers[])(jsref) = {
         [0] = lab_flow_state_forms_restore_guard,
         [1] = lab_flow_state_forms_restore_state_forms_expression,
         [2] = lab_flow_state_forms_restore_state_forms_request,
@@ -387,10 +387,10 @@ static browser_jsref lab_flow_state_forms_restore(frame_jsref frame)
 }
 
 /* Four distinct workflows share revision policy without retaining browser handles. */
-browser_jsref lab_flow_state_forms(lab_flow_state_forms_kind_t kind, frame_jsref frame, view_jsref view)
+jsref lab_flow_state_forms(lab_flow_state_forms_kind_t kind, frame_jsref frame, view_jsref view)
 {
     (void)view;
-    static browser_jsref (*const handlers[])(browser_jsref) = {
+    static jsref (*const handlers[])(jsref) = {
         [LAB_FLOW_STATE_FORMS_CLEAR]          = lab_flow_state_clear,
         [LAB_FLOW_STATE_FORMS_REFRESH]        = lab_flow_state_forms_refresh,
         [LAB_FLOW_STATE_FORMS_PARSE_BOUNDS]   = lab_flow_state_forms_parse,

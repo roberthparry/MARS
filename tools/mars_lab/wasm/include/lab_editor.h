@@ -29,7 +29,7 @@ typedef enum {
  * @param editors Scoped Map containing native editor metadata.
  * @return Scoped borrowed metadata handle, or zero for missing or falsey entries.
  */
-browser_jsref lab_editor_lookup(browser_jsref text, browser_jsref editors);
+jsref lab_editor_lookup(jsref text, jsref editors);
 
 /**
  * @brief Select the current source from a lazy production or custom evaluation view.
@@ -41,7 +41,7 @@ browser_jsref lab_editor_lookup(browser_jsref text, browser_jsref editors);
  * and must not open another DOM scope. The selected output is copied before further
  * workspace reads. No view property is overwritten.
  */
-browser_jsref lab_editor_current_value(view_jsref view);
+jsref lab_editor_current_value(view_jsref view);
 
 /**
  * @brief Publish one editor metadata projection without interpreting mathematics.
@@ -51,7 +51,7 @@ browser_jsref lab_editor_current_value(view_jsref view);
  * @param editors Scoped Map of native editor metadata keyed by trimmed source or display text.
  * @post Publishes the selected projection through lab_dom_return; invalid kinds publish null.
  */
-void lab_editor_metadata(lab_editor_metadata_t kind, browser_jsref inputs, browser_jsref editors);
+void lab_editor_metadata(lab_editor_metadata_t kind, jsref inputs, jsref editors);
 
 /**
  * @brief Publish current-source selection through the scoped browser bridge.
@@ -66,6 +66,6 @@ void lab_editor_current(view_jsref view);
  * @param view Scoped current-source view, inspected only for Expression mode.
  * @post Publishes a boolean through lab_dom_return, true for any mode other than Expression or a truthy source.
  */
-void lab_editor_ready(browser_jsref inputs, view_jsref view);
+void lab_editor_ready(jsref inputs, view_jsref view);
 
 #endif

@@ -27,7 +27,7 @@ static double data(node_jsref node, const char *key)
     return lab_dom_to_number(lab_dom_read(node, LAB_DOM_DATASET, key));
 }
 
-static browser_jsref label_text(browser_jsref title)
+static jsref label_text(jsref title)
 {
     int saved = lab_dom_get(title, "marsPlotLabel");
     if (lab_dom_truth(saved))
@@ -37,7 +37,7 @@ static browser_jsref label_text(browser_jsref title)
 }
 
 /* Modify only the live DOM; native SVG retained in the result record remains copyable with its labels. */
-void lab_plot_pointer_prepare(browser_jsref rendered)
+void lab_plot_pointer_prepare(jsref rendered)
 {
     if (!lab_dom_query(rendered, "[data-plot-chart][data-x-min]:not([data-surface])"))
         return;
@@ -85,7 +85,7 @@ unsigned lab_plot_bound_digits(double value, double span)
 }
 
 /* Keep about four significant digits of the span, retaining exact gesture bounds separately. */
-void lab_plot_write_bound(browser_jsref control, double value, double span)
+void lab_plot_write_bound(jsref control, double value, double span)
 {
     int text = lab_dom_precision(value, lab_plot_bound_digits(value, span));
     lab_dom_set(control, "marsZoomText", text);
@@ -94,7 +94,7 @@ void lab_plot_write_bound(browser_jsref control, double value, double span)
 }
 
 /* Use the same interval-aware presentation for all three surface axes. */
-void lab_plot_volume_bounds(browser_jsref bounds)
+void lab_plot_volume_bounds(jsref bounds)
 {
     static const char *const ids[] = {
         "plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper", "plotYLower", "plotYUpper"
@@ -154,7 +154,7 @@ void lab_plot_plane_bounds(const double bounds[4])
     lab_dom_set(lab_dom_id("plotRendered"), "marsComplexPlaneBounds", values);
 }
 
-static browser_jsref overlay(browser_jsref rendered, const char *selector, const char *class_name)
+static jsref overlay(jsref rendered, const char *selector, const char *class_name)
 {
     int node = lab_dom_query(rendered, selector);
     if (!node) {
@@ -171,7 +171,7 @@ static void pixels(node_jsref node, const char *key, double value)
     lab_dom_write(node, LAB_DOM_STYLE, key, lab_dom_format(value, "", "px"));
 }
 
-static void focus_curve(browser_jsref rendered, chart_jsref chart, browser_jsref target)
+static void focus_curve(jsref rendered, chart_jsref chart, jsref target)
 {
     int active = 0;
     if (chart && target && lab_workspace_mode() == LAB_MODE_DIFFERENTIAL_EQUATION &&
@@ -232,7 +232,7 @@ static int curve_height(chart_jsref chart, double x, double pointer_y, double *h
 }
 
 /* The guide is transient UI and is not inserted into the copyable SVG. */
-void lab_plot_pointer_dispatch(lab_plot_pointer_action_t action, event_jsref event, browser_jsref context)
+void lab_plot_pointer_dispatch(lab_plot_pointer_action_t action, event_jsref event, jsref context)
 {
     (void)context;
     lab_dom_return(lab_dom_object(LAB_VALUE_OBJECT));
@@ -445,7 +445,7 @@ void lab_plot_pan_cancel(gesture_jsref state)
     lab_plot_controls_sync();
 }
 
-static void redraw_curve(chart_jsref chart, browser_jsref calls, int wheel)
+static void redraw_curve(chart_jsref chart, jsref calls, int wheel)
 {
     if (wheel) {
         lab_plot_wheel_zoom(chart, calls);
@@ -459,7 +459,7 @@ static void redraw_curve(chart_jsref chart, browser_jsref calls, int wheel)
 }
 
 /* Keep surface-camera magnification separate from native curve-domain resampling. */
-bool lab_plot_pointer_zoom(browser_jsref card, event_jsref event, browser_jsref calls, bool reset, double direction,
+bool lab_plot_pointer_zoom(jsref card, event_jsref event, jsref calls, bool reset, double direction,
                            bool wheel)
 {
     int panel = lab_dom_closest(lab_dom_get(event, "target"), ".complex-panel");

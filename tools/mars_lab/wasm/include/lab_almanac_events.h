@@ -28,7 +28,7 @@ typedef enum {
  * @details Visibility subscriptions share a browser-owned context stored on the root.
  * Reinstallation updates its state reference without creating duplicate listeners.
  */
-void lab_almanac_events_install(browser_jsref root, browser_jsref state);
+void lab_almanac_events_install(jsref root, jsref state);
 
 /**
  * @brief Validate and project an exact server worksheet variant, then register its actions.
@@ -40,7 +40,7 @@ void lab_almanac_events_install(browser_jsref root, browser_jsref state);
  * this visibility after the call. Invalid presentation preserves the previous DOM and
  * visibility; the browser supplies the existing diagnostic. State is never written.
  */
-void lab_almanac_events_render(browser_jsref target, browser_jsref data, browser_jsref state);
+void lab_almanac_events_render(jsref target, jsref data, jsref state);
 
 /**
  * @brief Return ordered deferred services for a totality or visibility action.
@@ -52,6 +52,6 @@ void lab_almanac_events_render(browser_jsref target, browser_jsref data, browser
  * and then saving state before either
  * rerendering the last response and refreshing totality, or evaluating without history.
  */
-void lab_almanac_events_dispatch(lab_almanac_event_action_t action, event_jsref event, browser_jsref context);
+void lab_almanac_events_dispatch(lab_almanac_event_action_t action, event_jsref event, jsref context);
 
 #endif

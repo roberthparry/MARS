@@ -50,7 +50,7 @@ bool lab_widgets_picker(double year, double month, double selected_year, double 
  * @details lab_dom_return supplies left, right, top, bottom, width and height in client CSS pixels,
  * or null when neither the shell nor its date input/button provides a visible rectangle.
  */
-void lab_widgets_picker_anchor(browser_jsref shell);
+void lab_widgets_picker_anchor(jsref shell);
 
 /** @brief Select the anchor and project viewport-clamped popup geometry.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
@@ -58,20 +58,20 @@ void lab_widgets_picker_anchor(browser_jsref shell);
  * @param viewport_width Viewport width in CSS pixels; zero uses the document element's client width.
  * @param viewport_height Viewport height in CSS pixels; zero uses the document element's client height.
  */
-void lab_widgets_picker_place(browser_jsref state, browser_jsref shell, double viewport_width, double viewport_height);
+void lab_widgets_picker_place(jsref state, jsref shell, double viewport_width, double viewport_height);
 
 /** @brief Hide the popup and clear both native navigation and host references before any focus event.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
  * @param restore_focus True queues focus on the former opener after clearing picker ownership.
  */
-void lab_widgets_picker_close(browser_jsref state, bool restore_focus);
+void lab_widgets_picker_close(jsref state, bool restore_focus);
 
 /** @brief Write a date and dispatch one deferred bubbling change only when its authored value differs.
  * @param input Scoped destination date-input node, or zero for no action.
  * @param value Scoped authored date string to write without parsing.
  * @return True if the input text changed and a change event was queued; false if absent or unchanged.
  */
-bool lab_widgets_date_commit(browser_jsref input, browser_jsref value);
+bool lab_widgets_date_commit(jsref input, jsref value);
 
 /**
  * @brief Select the GMT date for the almanac and the local date for other inputs.
@@ -80,14 +80,14 @@ bool lab_widgets_date_commit(browser_jsref input, browser_jsref value);
  * @param utc_date Scoped current UTC calendar-date string.
  * @details Publishes the selected string unchanged through lab_dom_return; no input is committed.
  */
-void lab_widgets_picker_today_date(browser_jsref input, browser_jsref local_date, browser_jsref utc_date);
+void lab_widgets_picker_today_date(jsref input, jsref local_date, jsref utc_date);
 
 /** @brief Install the almanac GMT date and time together, emitting just one change for the complete moment.
  * @param input Scoped destination date-input node.
  * @param local_date Scoped local date string used for non-almanac inputs.
  * @param utc_moment Scoped record containing UTC date and time strings for the almanac controls.
  */
-void lab_widgets_picker_today(browser_jsref input, browser_jsref local_date, browser_jsref utc_moment);
+void lab_widgets_picker_today(jsref input, jsref local_date, jsref utc_moment);
 
 /** @brief Project the open native month and position it; a closed picker cannot be reopened by a stale render.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
@@ -96,7 +96,7 @@ void lab_widgets_picker_today(browser_jsref input, browser_jsref local_date, bro
  * @param viewport_width Viewport width in CSS pixels; zero uses the document element's client width.
  * @param viewport_height Viewport height in CSS pixels; zero uses the document element's client height.
  */
-void lab_widgets_picker_render(browser_jsref state, browser_jsref selected, browser_jsref today,
+void lab_widgets_picker_render(jsref state, jsref selected, jsref today,
                                double viewport_width, double viewport_height);
 
 /** @brief Choose the selected date or today's date, transfer popup ownership and project one complete calendar.
@@ -109,8 +109,8 @@ void lab_widgets_picker_render(browser_jsref state, browser_jsref selected, brow
  * @param viewport_width Viewport width in CSS pixels; zero uses the document element's client width.
  * @param viewport_height Viewport height in CSS pixels; zero uses the document element's client height.
  */
-void lab_widgets_picker_open(browser_jsref state, browser_jsref input, browser_jsref button, browser_jsref selected,
-                             browser_jsref today, double fallback_year, double viewport_width, double viewport_height);
+void lab_widgets_picker_open(jsref state, jsref input, jsref button, jsref selected,
+                             jsref today, double fallback_year, double viewport_width, double viewport_height);
 
 /** @brief Format an accepted native date for commit; return whether the caller should refresh the calendar.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
@@ -118,7 +118,7 @@ void lab_widgets_picker_open(browser_jsref state, browser_jsref input, browser_j
  * @param commit True writes the date to the input; false only reports whether it can be applied.
  * @return True for a valid date with an open picker and owned input; false otherwise, without committing.
  */
-bool lab_widgets_picker_apply(browser_jsref state, int packed, bool commit);
+bool lab_widgets_picker_apply(jsref state, int packed, bool commit);
 
 /** @brief Set a month/year (0), shift months (1) or shift years (2), preserving and clamping the selected day.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
@@ -130,7 +130,7 @@ bool lab_widgets_picker_apply(browser_jsref state, int packed, bool commit);
  * @param commit True commits the resulting date; false only moves the displayed calendar.
  * @return True when the resulting date can be applied; false for a closed picker or invalid request.
  */
-bool lab_widgets_picker_move(browser_jsref state, lab_picker_operation_t operation, double first, double second,
-                             browser_jsref selected, double fallback_year, bool commit);
+bool lab_widgets_picker_move(jsref state, lab_picker_operation_t operation, double first, double second,
+                             jsref selected, double fallback_year, bool commit);
 
 #endif

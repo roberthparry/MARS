@@ -78,6 +78,6 @@ void lab_events_dispatch(unsigned action, event_jsref event);
  * @param window Scoped browser Window used for resize, scroll, pagehide and plot gesture listeners.
  * @details Repeated subscriptions do not duplicate listeners. The browser retains targets, not integer handles.
  */
-void lab_events_install(browser_jsref document, browser_jsref window);
+void lab_events_install(jsref document, jsref window);
 
 #endif

@@ -102,7 +102,7 @@ void lab_dom_listen(node_jsref node, const char *type, unsigned action, bool pas
  * @param key Borrowed NUL-terminated property name.
  * @return Scoped property-value handle, or zero for null or undefined.
  */
-browser_jsref lab_dom_get(browser_jsref object, const char *key);
+jsref lab_dom_get(jsref object, const char *key);
 
 /**
  * @brief Test an object's property presence, including inherited properties.
@@ -110,7 +110,7 @@ browser_jsref lab_dom_get(browser_jsref object, const char *key);
  * @param key Static property name; presence does not invoke the property's getter.
  * @return True when the property exists, even when its value is undefined.
  */
-bool lab_dom_property_present(browser_jsref object, const char *key);
+bool lab_dom_property_present(jsref object, const char *key);
 
 /**
  * @brief Read an own property using a browser-owned key.
@@ -118,42 +118,42 @@ bool lab_dom_property_present(browser_jsref object, const char *key);
  * @param key Scoped property key, converted using browser property-key semantics.
  * @return Scoped own-property value, or zero for a missing or nullish value; inherited properties are excluded.
  */
-browser_jsref lab_dom_key_get(browser_jsref object, browser_jsref key);
+jsref lab_dom_key_get(jsref object, jsref key);
 
 /**
  * @brief Classify a scoped browser value without coercion.
  * @param value Scoped handle to classify; zero denotes null.
  * @return Corresponding LAB_VALUE kind; nullish values use LAB_VALUE_NULL, other browser values LAB_VALUE_OBJECT.
  */
-lab_value_kind_t lab_dom_type(browser_jsref value);
+lab_value_kind_t lab_dom_type(jsref value);
 
 /**
  * @brief Apply browser boolean coercion.
  * @param value Scoped browser value to inspect.
  * @return True for a truthy value; false for a falsey value.
  */
-bool lab_dom_truth(browser_jsref value);
+bool lab_dom_truth(jsref value);
 
 /**
  * @brief Create a browser-owned data container.
  * @param kind LAB_VALUE_ARRAY creates an array; any other selector creates a plain object.
  * @return Scoped handle to the new empty container.
  */
-browser_jsref lab_dom_object(lab_value_kind_t kind);
+jsref lab_dom_object(lab_value_kind_t kind);
 
 /**
  * @brief Wrap a native number in a browser-value handle.
  * @param value Scalar number to retain, including non-finite values; not a browser handle.
  * @return Scoped handle to the browser number.
  */
-browser_jsref lab_dom_numeric(double value);
+jsref lab_dom_numeric(double value);
 
 /**
  * @brief Append a browser value to an array.
  * @param array Scoped destination array handle.
  * @param value Scoped value handle; the array retains the browser value, not the handle.
  */
-void lab_dom_push(browser_jsref array, browser_jsref value);
+void lab_dom_push(jsref array, jsref value);
 
 /**
  * @brief Wrap a native scalar as a browser value.
@@ -161,21 +161,21 @@ void lab_dom_push(browser_jsref array, browser_jsref value);
  * @param value Scalar input; boolean conversion treats zero and NaN as false, and other numbers as true.
  * @return Scoped boolean or number handle, or zero for null.
  */
-browser_jsref lab_dom_scalar(lab_value_kind_t kind, double value);
+jsref lab_dom_scalar(lab_value_kind_t kind, double value);
 
 /**
  * @brief Apply browser String conversion without a falsey-value fallback.
  * @param value Scoped browser value to convert; zero converts to the text "null".
  * @return Scoped string handle.
  */
-browser_jsref lab_dom_text(browser_jsref value);
+jsref lab_dom_text(jsref value);
 
 /**
  * @brief Apply browser Number conversion without replacing NaN.
  * @param value Scoped browser value to convert; zero denotes null and converts to numeric zero.
  * @return Converted scalar number, including NaN or infinity when produced by the browser.
  */
-double lab_dom_to_number(browser_jsref value);
+double lab_dom_to_number(jsref value);
 
 /**
  * @brief Slice browser text by UTF-16 code-unit offsets.
@@ -184,7 +184,7 @@ double lab_dom_to_number(browser_jsref value);
  * @param end Exclusive offset; negative offsets count backwards from the end.
  * @return Scoped substring, using browser String.slice bounds handling.
  */
-browser_jsref lab_dom_slice(browser_jsref value, int start, int end);
+jsref lab_dom_slice(jsref value, int start, int end);
 
 /**
  * @brief Split browser text on a literal separator.
@@ -192,7 +192,7 @@ browser_jsref lab_dom_slice(browser_jsref value, int start, int end);
  * @param separator Borrowed NUL-terminated separator; empty text splits into UTF-16 code units.
  * @return Scoped array of string fragments.
  */
-browser_jsref lab_dom_split(browser_jsref value, const char *separator);
+jsref lab_dom_split(jsref value, const char *separator);
 
 /**
  * @brief Test a literal prefix using browser string semantics.
@@ -200,7 +200,7 @@ browser_jsref lab_dom_split(browser_jsref value, const char *separator);
  * @param prefix Borrowed NUL-terminated literal prefix, not a regular expression.
  * @return True when the text begins with the prefix; false otherwise.
  */
-bool lab_dom_starts_with(browser_jsref value, const char *prefix);
+bool lab_dom_starts_with(jsref value, const char *prefix);
 
 /**
  * @brief Compare opaque labels using the browser's current locale.
@@ -209,7 +209,7 @@ bool lab_dom_starts_with(browser_jsref value, const char *prefix);
  * @param numeric True selects numeric collation with base sensitivity; false uses default locale collation.
  * @return Negative, zero or positive according to the selected collation.
  */
-int lab_dom_locale_compare(browser_jsref left, browser_jsref right, bool numeric);
+int lab_dom_locale_compare(jsref left, jsref right, bool numeric);
 
 /**
  * @brief Test membership in a browser Set or Map.
@@ -217,27 +217,27 @@ int lab_dom_locale_compare(browser_jsref left, browser_jsref right, bool numeric
  * @param value Scoped element or Map key to look up using browser collection equality.
  * @return True when the element or key exists; false otherwise.
  */
-bool lab_dom_member(browser_jsref set, browser_jsref value);
+bool lab_dom_member(jsref set, jsref value);
 
 /**
  * @brief Delete a property by its native literal name.
  * @param object Scoped object whose own property is removed; falsey values are ignored.
  * @param key Borrowed NUL-terminated property name.
  */
-void lab_dom_delete(browser_jsref object, const char *key);
+void lab_dom_delete(jsref object, const char *key);
 
 /**
  * @brief Delete a property using a browser-owned key.
  * @param object Scoped object whose own property is removed; falsey values are ignored.
  * @param key Scoped key, converted using browser property-key semantics.
  */
-void lab_dom_key_delete(browser_jsref object, browser_jsref key);
+void lab_dom_key_delete(jsref object, jsref key);
 
 /**
  * @brief Create an empty browser-owned Map.
  * @return Scoped Map handle; stored keys and values are browser values, never native handle numbers.
  */
-browser_jsref lab_dom_map_new(void);
+jsref lab_dom_map_new(void);
 
 /**
  * @brief Read a browser Map entry.
@@ -245,7 +245,7 @@ browser_jsref lab_dom_map_new(void);
  * @param key Scoped lookup key, compared using browser Map equality.
  * @return Scoped stored-value handle, or zero for a missing map, key or nullish value.
  */
-browser_jsref lab_dom_map_get(browser_jsref map, browser_jsref key);
+jsref lab_dom_map_get(jsref map, jsref key);
 
 /**
  * @brief Insert or replace a browser Map entry.
@@ -253,35 +253,35 @@ browser_jsref lab_dom_map_get(browser_jsref map, browser_jsref key);
  * @param key Scoped entry key; its browser value is retained.
  * @param value Scoped entry value; its browser value is retained.
  */
-void lab_dom_map_set(browser_jsref map, browser_jsref key, browser_jsref value);
+void lab_dom_map_set(jsref map, jsref key, jsref value);
 
 /**
  * @brief Count browser Map entries.
  * @param map Scoped Map handle, or zero for no map.
  * @return Number of entries, or zero when the map is absent.
  */
-unsigned lab_dom_map_size(browser_jsref map);
+unsigned lab_dom_map_size(jsref map);
 
 /**
  * @brief Read the earliest remaining key in a browser Map.
  * @param map Scoped Map handle, or zero for no map.
  * @return Scoped first-key handle in insertion order, or zero for an empty map or a nullish key.
  */
-browser_jsref lab_dom_map_first(browser_jsref map);
+jsref lab_dom_map_first(jsref map);
 
 /**
  * @brief Remove a browser Map entry.
  * @param map Scoped Map handle; an absent map is ignored.
  * @param key Scoped key to remove, compared using browser Map equality.
  */
-void lab_dom_map_delete(browser_jsref map, browser_jsref key);
+void lab_dom_map_delete(jsref map, jsref key);
 
 /**
  * @brief Enumerate own enumerable string property names.
  * @param object Scoped browser value to enumerate; falsey values supply an empty object.
  * @return Scoped array of property-name strings, in browser Object.keys order.
  */
-browser_jsref lab_dom_keys(browser_jsref object);
+jsref lab_dom_keys(jsref object);
 
 /**
  * @brief Define an own writable, enumerable and configurable data property.
@@ -289,7 +289,7 @@ browser_jsref lab_dom_keys(browser_jsref object);
  * @param key Borrowed NUL-terminated property name; even "__proto__" is defined as ordinary data.
  * @param value Scoped value handle; the property retains the browser value by reference.
  */
-void lab_dom_set(browser_jsref object, const char *key, browser_jsref value);
+void lab_dom_set(jsref object, const char *key, jsref value);
 
 /**
  * @brief Copy a property without conflating undefined and null in the handle bridge.
@@ -298,7 +298,7 @@ void lab_dom_set(browser_jsref object, const char *key, browser_jsref value);
  * @param source Scoped source value; nullish sources supply undefined.
  * @param source_key Static source property name; its getter is read once.
  */
-void lab_dom_property_copy(browser_jsref target, const char *target_key, browser_jsref source, const char *source_key);
+void lab_dom_property_copy(jsref target, const char *target_key, jsref source, const char *source_key);
 
 /**
  * @brief Compare property values using browser strict equality, reading the left getter first.
@@ -308,7 +308,7 @@ void lab_dom_property_copy(browser_jsref target, const char *target_key, browser
  * @param right_key Static right property name.
  * @return True when the property values are strictly equal, including undefined versus undefined.
  */
-bool lab_dom_properties_equal(browser_jsref left, const char *left_key, browser_jsref right, const char *right_key);
+bool lab_dom_properties_equal(jsref left, const char *left_key, jsref right, const char *right_key);
 
 /**
  * @brief Define an own data property using a browser-owned key.
@@ -317,14 +317,14 @@ bool lab_dom_properties_equal(browser_jsref left, const char *left_key, browser_
  * @param value Scoped value handle; the property retains the browser value by reference.
  * @details The property is writable, enumerable and configurable, without invoking an inherited setter.
  */
-void lab_dom_key_set(browser_jsref object, browser_jsref key, browser_jsref value);
+void lab_dom_key_set(jsref object, jsref key, jsref value);
 
 /**
  * @brief Publish the browser result of the current labDOM.call.
  * @param value Scoped result handle, or zero to publish null.
  * @details The host retains the value before releasing the scope, never the integer handle.
  */
-void lab_dom_return(browser_jsref value);
+void lab_dom_return(jsref value);
 
 /**
  * @brief Release temporary handles without destroying the referenced browser resources.
@@ -338,7 +338,7 @@ void lab_dom_release(unsigned mark);
  * @param text Scoped text source; falsey values select empty text.
  * @return Scoped NFD text with U+0300 through U+036F removed, lower-cased and trimmed.
  */
-browser_jsref lab_dom_normalize(browser_jsref text);
+jsref lab_dom_normalize(jsref text);
 
 /**
  * @brief Search opaque strings without performing normalisation.
@@ -346,7 +346,7 @@ browser_jsref lab_dom_normalize(browser_jsref text);
  * @param query Scoped literal substring; falsey values select the empty substring.
  * @return True when the haystack contains the substring, including an empty substring; false otherwise.
  */
-bool lab_dom_contains(browser_jsref text, browser_jsref query);
+bool lab_dom_contains(jsref text, jsref query);
 
 /**
  * @brief Obtain a native select control's first selected option.
@@ -374,7 +374,7 @@ bool lab_dom_is_disabled(node_jsref node);
  * @param shell Scoped detached wrapper node to insert.
  * @details This operation does not move node into shell; append it separately if required.
  */
-void lab_dom_wrap(node_jsref node, browser_jsref shell);
+void lab_dom_wrap(node_jsref node, jsref shell);
 
 /**
  * @brief Queue a DOM effect until the synchronous native call releases its handles.
@@ -389,14 +389,14 @@ void lab_dom_effect(node_jsref node, lab_dom_effect_t action);
  * @param text Borrowed NUL-terminated UTF-8 text, bounded to 4095 bytes by the host literal reader.
  * @return Scoped string handle.
  */
-browser_jsref lab_dom_string(const char *text);
+jsref lab_dom_string(const char *text);
 
 /**
  * @brief Measure text using browser UTF-16 code units.
  * @param value Scoped text source; falsey values select empty text before string conversion.
  * @return Number of UTF-16 code units, not UTF-8 bytes or Unicode code points.
  */
-unsigned lab_dom_length(browser_jsref value);
+unsigned lab_dom_length(jsref value);
 
 /**
  * @brief Compare browser values using strict equality.
@@ -404,7 +404,7 @@ unsigned lab_dom_length(browser_jsref value);
  * @param right Scoped second browser value.
  * @return True for strict equality; false otherwise. Objects compare by identity and NaN is not equal to itself.
  */
-bool lab_dom_equal(browser_jsref left, browser_jsref right);
+bool lab_dom_equal(jsref left, jsref right);
 
 /**
  * @brief Order strings lexically, or other browser values numerically.
@@ -412,7 +412,7 @@ bool lab_dom_equal(browser_jsref left, browser_jsref right);
  * @param right Scoped second value; otherwise both operands undergo Number conversion.
  * @return Negative, zero or positive ordering; strings use UTF-16 code units and incomparable numbers yield zero.
  */
-int lab_dom_compare(browser_jsref left, browser_jsref right);
+int lab_dom_compare(jsref left, jsref right);
 
 /**
  * @brief Apply browser whitespace and case operations to opaque text.
@@ -420,7 +420,7 @@ int lab_dom_compare(browser_jsref left, browser_jsref right);
  * @param kind Trim both ends 0, trim and lower-case 1, trim and collapse whitespace 2, or trim trailing whitespace 3.
  * @return Scoped cleaned string; unknown selectors use ordinary trimming.
  */
-browser_jsref lab_dom_clean(browser_jsref text, lab_dom_clean_t kind);
+jsref lab_dom_clean(jsref text, lab_dom_clean_t kind);
 
 /**
  * @brief Test attribute presence, including empty attribute values.
@@ -442,7 +442,7 @@ void lab_dom_remove(node_jsref node, const char *key);
  * @param value Scoped browser value to convert using Number.
  * @return Converted scalar number; NaN and negative zero become positive zero, while infinities are preserved.
  */
-double lab_dom_number(browser_jsref value);
+double lab_dom_number(jsref value);
 
 /**
  * @brief Format a scalar number between literal text fragments.
@@ -451,7 +451,7 @@ double lab_dom_number(browser_jsref value);
  * @param suffix Borrowed NUL-terminated text following the number, such as a CSS unit.
  * @return Scoped concatenated string.
  */
-browser_jsref lab_dom_format(double value, const char *prefix, const char *suffix);
+jsref lab_dom_format(double value, const char *prefix, const char *suffix);
 
 /**
  * @brief Format a number to significant digits and remove redundant trailing zeroes.
@@ -459,7 +459,7 @@ browser_jsref lab_dom_format(double value, const char *prefix, const char *suffi
  * @param digits Requested significant decimal digits, 1 through 100; values outside this range raise a host exception.
  * @return Scoped string after converting the rounded decimal text back through Number.
  */
-browser_jsref lab_dom_precision(double value, unsigned digits);
+jsref lab_dom_precision(double value, unsigned digits);
 
 /**
  * @brief Concatenate two opaque browser values and a native suffix.
@@ -468,7 +468,7 @@ browser_jsref lab_dom_precision(double value, unsigned digits);
  * @param suffix Borrowed NUL-terminated literal suffix.
  * @return Scoped concatenated string.
  */
-browser_jsref lab_dom_join(browser_jsref left, browser_jsref right, const char *suffix);
+jsref lab_dom_join(jsref left, jsref right, const char *suffix);
 
 /**
  * @brief Join browser-owned text fragments with a literal separator.
@@ -476,7 +476,7 @@ browser_jsref lab_dom_join(browser_jsref left, browser_jsref right, const char *
  * @param separator Borrowed NUL-terminated separator inserted between adjacent fragments.
  * @return Scoped joined string; nullish entries and holes contribute empty fragments.
  */
-browser_jsref lab_dom_join_array(browser_jsref array, const char *separator);
+jsref lab_dom_join_array(jsref array, const char *separator);
 
 /**
  * @brief Find the first matching descendant of a browser query root.
@@ -484,7 +484,7 @@ browser_jsref lab_dom_join_array(browser_jsref array, const char *separator);
  * @param selector Borrowed NUL-terminated CSS selector; invalid selector syntax raises a browser exception.
  * @return Scoped matching node handle, or zero when no node matches.
  */
-node_jsref lab_dom_query(browser_jsref parent, const char *selector);
+node_jsref lab_dom_query(jsref parent, const char *selector);
 
 /**
  * @brief Snapshot all matching descendants of a browser query root.
@@ -492,14 +492,14 @@ node_jsref lab_dom_query(browser_jsref parent, const char *selector);
  * @param selector Borrowed NUL-terminated CSS selector; invalid selector syntax raises a browser exception.
  * @return Scoped static NodeList handle in document order.
  */
-browser_jsref lab_dom_all(browser_jsref parent, const char *selector);
+jsref lab_dom_all(jsref parent, const char *selector);
 
 /**
  * @brief Read the length of a browser collection.
  * @param list Scoped array, NodeList or other value with a numeric length property.
  * @return Length converted to a number, or zero for an absent or non-numeric length.
  */
-unsigned lab_dom_count(browser_jsref list);
+unsigned lab_dom_count(jsref list);
 
 /**
  * @brief Read an indexed browser collection member.
@@ -507,7 +507,7 @@ unsigned lab_dom_count(browser_jsref list);
  * @param index Zero-based property index to read.
  * @return Scoped member handle, or zero for a missing or nullish entry.
  */
-browser_jsref lab_dom_item(browser_jsref list, unsigned index);
+jsref lab_dom_item(jsref list, unsigned index);
 
 /**
  * @brief Test whether an array index exists, distinguishing holes from explicit null entries.
@@ -515,7 +515,7 @@ browser_jsref lab_dom_item(browser_jsref list, unsigned index);
  * @param index Zero-based index.
  * @return True for a present property, including an inherited index.
  */
-bool lab_dom_index_present(browser_jsref array, unsigned index);
+bool lab_dom_index_present(jsref array, unsigned index);
 
 /**
  * @brief Find the nearest matching element, starting with the supplied element.
@@ -537,14 +537,14 @@ node_jsref lab_dom_create(const char *tag);
  * @param parent Scoped destination parent-node handle.
  * @param child Scoped child-node handle to append.
  */
-void lab_dom_append(browser_jsref parent, browser_jsref child);
+void lab_dom_append(jsref parent, jsref child);
 
 /**
  * @brief Insert a node as an element's first child.
  * @param parent Scoped destination element handle; zero causes no action.
  * @param child Scoped child-node handle to insert, moving it from its previous parent if needed.
  */
-void lab_dom_prepend(browser_jsref parent, browser_jsref child);
+void lab_dom_prepend(jsref parent, jsref child);
 
 /**
  * @brief Read browser text through the selected DOM accessor.
@@ -553,7 +553,7 @@ void lab_dom_prepend(browser_jsref parent, browser_jsref child);
  * @param key Borrowed NUL-terminated attribute, dataset or CSS name; pass empty text for selectors 0, 1 and 5.
  * @return Scoped accessor result; absent or falsey results become empty text.
  */
-browser_jsref lab_dom_read(node_jsref node, lab_dom_accessor_t kind, const char *key);
+jsref lab_dom_read(node_jsref node, lab_dom_accessor_t kind, const char *key);
 
 /**
  * @brief Write browser text through the selected DOM setter.
@@ -562,7 +562,7 @@ browser_jsref lab_dom_read(node_jsref node, lab_dom_accessor_t kind, const char 
  * @param key Borrowed NUL-terminated attribute, dataset or CSS name; pass empty text for selectors 0, 1 and 5.
  * @param value Scoped text source; falsey values become empty text. HTML must come from native presentation only.
  */
-void lab_dom_write(node_jsref node, lab_dom_accessor_t kind, const char *key, browser_jsref value);
+void lab_dom_write(node_jsref node, lab_dom_accessor_t kind, const char *key, jsref value);
 
 /**
  * @brief Set membership of an element's CSS class list.
@@ -627,7 +627,7 @@ int lab_dom_card_id(node_jsref node);
  * @param card Scoped card-element handle for action 1; unused for action 0.
  * @details The browser retains the actual element until its callback, not the scoped handle.
  */
-void lab_dom_schedule(lab_dom_schedule_t action, browser_jsref card);
+void lab_dom_schedule(lab_dom_schedule_t action, jsref card);
 
 /**
  * @brief Apply the browser's integer-prefix conversion to a value.
@@ -635,7 +635,7 @@ void lab_dom_schedule(lab_dom_schedule_t action, browser_jsref card);
  * @param radix Base 2 through 36, or zero for browser prefix-based inference; other bases yield NaN.
  * @return Parsed scalar number, or NaN when no valid integer prefix is present.
  */
-double lab_dom_parse_int(browser_jsref value, unsigned radix);
+double lab_dom_parse_int(jsref value, unsigned radix);
 
 /**
  * @brief Subscribe a browser target to a named native dispatcher with a stable browser context.
@@ -648,7 +648,7 @@ double lab_dom_parse_int(browser_jsref value, unsigned radix);
  * @details Repeated registration of the same target, event, entry, action and context is ignored.
  * Dispatch returns an event plan; browser services run only after its synchronous handle scope ends.
  */
-void lab_dom_subscribe(node_jsref node, const char *type, const char *entry, unsigned action, browser_jsref context,
+void lab_dom_subscribe(node_jsref node, const char *type, const char *entry, unsigned action, jsref context,
                        bool passive);
 
 /**
@@ -657,14 +657,14 @@ void lab_dom_subscribe(node_jsref node, const char *type, const char *entry, uns
  * @param child Scoped child node, or zero.
  * @return True when both nodes exist and parent contains child; false otherwise.
  */
-bool lab_dom_node_contains(browser_jsref parent, browser_jsref child);
+bool lab_dom_node_contains(jsref parent, jsref child);
 
 /**
  * @brief Resolve an exact document ID supplied as a browser string.
  * @param id Scoped string handle; no selector syntax is interpreted.
  * @return Scoped matching node handle, or zero when absent.
  */
-node_jsref lab_dom_value_id(browser_jsref id);
+node_jsref lab_dom_value_id(jsref id);
 
 /**
  * @brief Copy an opaque browser string to a bounded UTF-8 buffer.
@@ -673,7 +673,7 @@ node_jsref lab_dom_value_id(browser_jsref id);
  * @param capacity Maximum number of UTF-8 bytes to copy; no NUL terminator is written.
  * @return Byte count, or -1 for overflow or an unpaired Unicode surrogate; no partial copy is published.
  */
-int lab_dom_utf8_copy(browser_jsref value, unsigned char *target, unsigned capacity);
+int lab_dom_utf8_copy(jsref value, unsigned char *target, unsigned capacity);
 
 /**
  * @brief Wrap length-delimited UTF-8 bytes in a scoped browser string.
@@ -681,6 +681,6 @@ int lab_dom_utf8_copy(browser_jsref value, unsigned char *target, unsigned capac
  * @param length Byte count.
  * @return Scoped string handle. Invalid UTF-8 raises a host exception.
  */
-browser_jsref lab_dom_utf8_string(const unsigned char *source, unsigned length);
+jsref lab_dom_utf8_string(const unsigned char *source, unsigned length);
 
 #endif

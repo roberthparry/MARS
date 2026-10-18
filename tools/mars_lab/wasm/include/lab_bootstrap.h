@@ -25,7 +25,7 @@ typedef enum {
  * @param view Reserved scoped browser context, currently unused.
  * @return Scoped continuation plan for the shared browser interpreter.
  */
-browser_jsref lab_bootstrap_step(frame_jsref frame, view_jsref view);
+jsref lab_bootstrap_step(frame_jsref frame, view_jsref view);
 
 /**
  * @brief Return native search-control configuration as ordered browser effects.
@@ -46,6 +46,6 @@ void lab_bootstrap_widgets(void);
  * value is read separately after executing jurisdiction effects, preserving initialisation
  * order and avoiding reads of native-backed getters during a DOM handle scope.
  */
-void lab_bootstrap_workspace(lab_bootstrap_workspace_phase_t phase, browser_jsref context);
+void lab_bootstrap_workspace(lab_bootstrap_workspace_phase_t phase, jsref context);
 
 #endif

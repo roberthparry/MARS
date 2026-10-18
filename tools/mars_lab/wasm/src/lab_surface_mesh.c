@@ -12,7 +12,7 @@
 #include "lab_dom.h"
 #include "lab_surface_mesh.h"
 
-static int coordinates(browser_jsref text, double *values, unsigned minimum, unsigned maximum)
+static int coordinates(jsref text, double *values, unsigned minimum, unsigned maximum)
 {
     int parts = lab_dom_split(text, " ");
     unsigned count = lab_dom_count(parts);
@@ -26,7 +26,7 @@ static int coordinates(browser_jsref text, double *values, unsigned minimum, uns
     return (int)count;
 }
 
-static browser_jsref vector(const double *values, unsigned count)
+static jsref vector(const double *values, unsigned count)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < count; ++i)
@@ -34,8 +34,8 @@ static browser_jsref vector(const double *values, unsigned count)
     return result;
 }
 
-static void primitive(browser_jsref primitives, browser_jsref vertices, const double *points, unsigned count,
-                      browser_jsref colour, const double rgb[3])
+static void primitive(jsref primitives, jsref vertices, const double *points, unsigned count,
+                      jsref colour, const double rgb[3])
 {
     int entry = lab_dom_object(LAB_VALUE_OBJECT), positions = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < count; ++i) {
@@ -53,7 +53,7 @@ static void primitive(browser_jsref primitives, browser_jsref vertices, const do
     lab_dom_push(primitives, entry);
 }
 
-static int records(chart_jsref chart, browser_jsref primitives, browser_jsref vertices, int segments)
+static int records(chart_jsref chart, jsref primitives, jsref vertices, int segments)
 {
     int paths = lab_dom_all(chart, segments ? "[data-segment]" : "[data-vertices]");
     unsigned count = lab_dom_count(paths), mark = lab_dom_mark();

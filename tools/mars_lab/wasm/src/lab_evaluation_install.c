@@ -19,7 +19,7 @@
 #include "lab_evaluation_install.h"
 
 typedef struct {
-    browser_jsref calls, data, context, cards;
+    jsref calls, data, context, cards;
     view_jsref view;
     lab_mode_t mode;
     lab_request_outcome_t outcome;
@@ -32,37 +32,37 @@ typedef struct {
  */
 typedef void (*lab_evaluation_install_handler_t)(const lab_evaluation_install_t *state);
 
-static void lab_evaluation_install_emit(browser_jsref calls, const char *service, unsigned count, ...)
+static void lab_evaluation_install_emit(jsref calls, const char *service, unsigned count, ...)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     va_list values;
     va_start(values, count);
     for (unsigned i = 0; i < count; ++i)
-        lab_dom_push(args, va_arg(values, browser_jsref));
+        lab_dom_push(args, va_arg(values, jsref));
     va_end(values);
     lab_dom_set(call, "service", lab_dom_string(service));
     lab_dom_set(call, "args", args);
     lab_dom_push(calls, call);
 }
 
-static browser_jsref lab_evaluation_install_or(browser_jsref value, browser_jsref fallback)
+static jsref lab_evaluation_install_or(jsref value, jsref fallback)
 {
     return lab_dom_truth(value) ? value : fallback;
 }
 
-static browser_jsref lab_evaluation_install_metadata(const lab_evaluation_install_t *state, browser_jsref text)
+static jsref lab_evaluation_install_metadata(const lab_evaluation_install_t *state, jsref text)
 {
     return lab_editor_lookup(text, lab_dom_get(state->view, "editors"));
 }
 
-static browser_jsref lab_evaluation_install_bindings(const lab_evaluation_install_t *state, browser_jsref text,
-                                browser_jsref visible)
+static jsref lab_evaluation_install_bindings(const lab_evaluation_install_t *state, jsref text,
+                                jsref visible)
 {
     return lab_binding_authored_values(lab_dom_get(state->data, "binding_values"),
                                        lab_dom_get(lab_evaluation_install_metadata(state, text), "bindings"), visible);
 }
 
-static browser_jsref lab_evaluation_install_variables(browser_jsref bindings)
+static jsref lab_evaluation_install_variables(jsref bindings)
 {
     int variables = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
@@ -247,7 +247,7 @@ static void lab_evaluation_install_almanac_begin(const lab_evaluation_install_t 
 
 /* Return a pure two-phase plan; all state mutation stays ordered outside the scoped bridge. */
 void lab_evaluation_install(lab_mode_t mode, lab_evaluation_install_phase_t phase, lab_request_outcome_t outcome,
-                            browser_jsref data, browser_jsref context, browser_jsref cards, view_jsref view)
+                            jsref data, jsref context, jsref cards, view_jsref view)
 {
     static const lab_evaluation_install_handler_t handlers[][LAB_MODE_COUNT] = {
         [LAB_EVALUATION_INSTALL_PROJECT][LAB_MODE_EXPRESSION]             = lab_evaluation_install_expression_begin,

@@ -13,13 +13,13 @@
 #define TBA_HANDLE_H
 
 /** @brief Scoped DOM-bridge value; zero denotes absence where documented. */
-typedef int browser_jsref;
+typedef int jsref;
 
 /** @brief Scoped browser node or event target. */
-typedef browser_jsref node_jsref;
+typedef jsref node_jsref;
 
 /** @brief Scoped browser event. */
-typedef browser_jsref event_jsref;
+typedef jsref event_jsref;
 
 /** @brief Scoped codec-table value; codec APIs document their -1 error sentinel. */
 typedef int codec_jsref;

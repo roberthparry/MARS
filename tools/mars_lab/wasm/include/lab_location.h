@@ -43,13 +43,13 @@ typedef enum {
  * @param jurisdictions Scoped Set of accepted jurisdiction codes; used only for kind 2.
  * @post Publishes the validated text or fallback through lab_dom_return.
  */
-void lab_location_validate(lab_profile_kind_t kind, browser_jsref boxed, browser_jsref fallback, browser_jsref jurisdictions);
+void lab_location_validate(lab_profile_kind_t kind, jsref boxed, jsref fallback, jsref jurisdictions);
 
 /** @brief Validate bootstrap data before projecting both jurisdiction menus and database availability.
  * @param catalogue Scoped bootstrap record with options, towns, available and optional error properties.
  * @return True after projection, including an unavailable database; false for invalid data or missing selects.
  */
-bool lab_location_catalogue(browser_jsref catalogue);
+bool lab_location_catalogue(jsref catalogue);
 
 /** @brief Resolve a jurisdiction catalogue, retaining the country-level fallback.
  * @param context Scoped record containing config, jurisdictions and the towns catalogue.
@@ -57,20 +57,20 @@ bool lab_location_catalogue(browser_jsref catalogue);
  * @post Publishes the jurisdiction's town array through lab_dom_return, falling back to its country array or an empty
  * one.
  */
-void lab_location_towns(browser_jsref context, browser_jsref boxed);
+void lab_location_towns(jsref context, jsref boxed);
 
 /** @brief Expose a native town key as opaque text.
  * @param town Scoped catalogue town record with an opaque value property.
  * @post Publishes the town key as text through lab_dom_return.
  */
-void lab_location_option_value(browser_jsref town);
+void lab_location_option_value(jsref town);
 
 /** @brief Build town options, invalidate pending restorations and register one native change listener.
  * @param select Scoped town-select node, or zero for no action.
  * @param towns Scoped array of catalogue town records in display order.
  * @param select_default True chooses the first marked default; false preserves a surviving selection.
  */
-void lab_location_populate(node_jsref select, browser_jsref towns, bool select_default);
+void lab_location_populate(node_jsref select, jsref towns, bool select_default);
 
 /** @brief Invalidate restoration on a select change without consuming the event.
  * @param action LAB_LOCATION_SELECTION_CHANGED invalidates restoration; unknown actions do nothing.
@@ -91,7 +91,7 @@ void lab_location_selected(node_jsref select);
  * @return True after selecting a coordinate match within 0.000001 degrees on each axis; false if absent,
  * invalid or unmatched.
  */
-bool lab_location_coordinates(node_jsref select, browser_jsref coordinates);
+bool lab_location_coordinates(node_jsref select, jsref coordinates);
 
 /** @brief Clear named-town selection only when edited coordinates no longer describe that town.
  * @param select Scoped town-select node.
@@ -100,7 +100,7 @@ bool lab_location_coordinates(node_jsref select, browser_jsref coordinates);
  * @param elevation Scoped browser handle to the elevation input in metres; compared within 0.01 metres.
  * Blank input or catalogue elevation does not invalidate a coordinate match.
  */
-void lab_location_clear_custom(node_jsref select, browser_jsref latitude, browser_jsref longitude, browser_jsref elevation);
+void lab_location_clear_custom(node_jsref select, jsref latitude, jsref longitude, jsref elevation);
 
 /** @brief Snapshot select identity, generation, option identities and values for restoration guards.
  * @param select Scoped town-select node whose option identities and values are captured.
@@ -120,7 +120,7 @@ bool lab_location_unchanged(node_jsref select, snapshot_jsref snapshot);
  * @param selection Scoped object with an exact value string or a zero-based numeric match index.
  * @return True after selection; false for an invalid or missing match, preserving the previous value.
  */
-bool lab_location_choose(node_jsref select, browser_jsref selection);
+bool lab_location_choose(node_jsref select, jsref selection);
 
 /** @brief Resolve exact-key, server-match, coordinate-fallback and empty restoration policy in order.
  * @param stage Initial selection or server compatibility response; other stages return null.
@@ -134,7 +134,7 @@ bool lab_location_choose(node_jsref select, browser_jsref selection);
  * external request-freshness predicate after each await before calling this synchronous projection.
  */
 void lab_location_restore(lab_location_restore_stage_t stage, node_jsref select, snapshot_jsref snapshot,
-                          browser_jsref selection, browser_jsref response);
+                          jsref selection, jsref response);
 
 /** @brief Copy selected coordinates and the browser-computed timezone offset into their controls.
  * @param controls Scoped town-control record returned by lab_location_controls.
@@ -142,7 +142,7 @@ void lab_location_restore(lab_location_restore_stage_t stage, node_jsref select,
  * @param context Scoped context record containing defaults, jurisdiction membership and mutable calendar ownership.
  * @return True when a selected town was applied; false when no town is selected.
  */
-bool lab_location_apply_town(browser_jsref controls, browser_jsref offset, browser_jsref context);
+bool lab_location_apply_town(jsref controls, jsref offset, jsref context);
 
 /** @brief Return schema metadata for existing persistence and event adapters.
  * @param mode DateTime mode 5 or almanac mode 6.
@@ -156,7 +156,7 @@ void lab_location_schema(lab_mode_t mode);
  * @param context Scoped record supplying visibility for the almanac's non-DOM field.
  * @post Publishes the captured field record through lab_dom_return.
  */
-void lab_location_read(lab_mode_t mode, browser_jsref context);
+void lab_location_read(lab_mode_t mode, jsref context);
 
 /** @brief Resolve or apply state with native restore/capture/fill/reset policy; invalid operations return null.
  * @param mode DateTime mode 5 or almanac mode 6.
@@ -167,8 +167,8 @@ void lab_location_read(lab_mode_t mode, browser_jsref context);
  * @param apply True projects resolved fields and updates context; false only returns the state.
  * @post Publishes resolved state through lab_dom_return, or null for an invalid mode or operation.
  */
-void lab_location_state(lab_mode_t mode, lab_calendar_operation_t operation, browser_jsref source,
-                        browser_jsref prefix, browser_jsref context, bool apply);
+void lab_location_state(lab_mode_t mode, lab_calendar_operation_t operation, jsref source,
+                        jsref prefix, jsref context, bool apply);
 
 /** @brief Return the current DOM nodes keyed by the native calendar schema.
  * @param mode DateTime mode 5 or almanac mode 6.
@@ -189,7 +189,7 @@ void lab_location_controls(lab_mode_t mode, bool coordinates);
  * @param context Scoped context record containing defaults, jurisdiction membership and mutable calendar ownership.
  * @post Publishes the captured calendar-state record through lab_dom_return.
  */
-void lab_location_current(lab_mode_t mode, browser_jsref context);
+void lab_location_current(lab_mode_t mode, jsref context);
 
 /** @brief Format calendar summaries from already resolved opaque values.
  * @param mode DateTime mode 5 or almanac mode 6.
@@ -197,7 +197,7 @@ void lab_location_current(lab_mode_t mode, browser_jsref context);
  * @param title Scoped almanac worksheet title; ignored for DateTime.
  * @post Publishes the formatted summary string through lab_dom_return.
  */
-void lab_location_summary(lab_mode_t mode, browser_jsref state, browser_jsref title);
+void lab_location_summary(lab_mode_t mode, jsref state, jsref title);
 
 /** @brief Apply a current location response, preserving selected towns and manually edited offsets.
  * @param mode DateTime mode 5 or almanac mode 6.
@@ -206,7 +206,7 @@ void lab_location_summary(lab_mode_t mode, browser_jsref state, browser_jsref ti
  * @param update_coordinates True permits coordinate updates when no selected town supplied them.
  * @param town_applied True preserves the coordinates and offset already supplied by a town.
  */
-void lab_location_response(lab_mode_t mode, browser_jsref data, browser_jsref context, bool update_coordinates,
+void lab_location_response(lab_mode_t mode, jsref data, jsref context, bool update_coordinates,
                            bool town_applied);
 
 /** @brief Prepare an eclipse action before its guarded asynchronous town restoration.
@@ -214,19 +214,19 @@ void lab_location_response(lab_mode_t mode, browser_jsref data, browser_jsref co
  * @param context Scoped record supplying defaults and jurisdiction membership.
  * @post Publishes the prepared state through lab_dom_return after projecting the date, time, zone and jurisdiction.
  */
-void lab_location_totality_prepare(browser_jsref button, browser_jsref context);
+void lab_location_totality_prepare(jsref button, jsref context);
 
 /** @brief Complete a still-current eclipse action, using its explicit coordinates when supplied.
  * @param state Scoped state returned by lab_location_totality_prepare.
  * @param restored True retains the restored town; false clears it before applying explicit coordinates.
  */
-void lab_location_totality_finish(browser_jsref state, bool restored);
+void lab_location_totality_finish(jsref state, bool restored);
 
 /** @brief Project evaluation metadata while retaining authored offsets and fallback guards.
  * @param mode DateTime mode 5 or almanac mode 6.
  * @param data Scoped evaluation response with an optional fields record.
  * @param context Scoped context record containing defaults, jurisdiction membership and mutable calendar ownership.
  */
-void lab_location_evaluation(lab_mode_t mode, browser_jsref data, browser_jsref context);
+void lab_location_evaluation(lab_mode_t mode, jsref data, jsref context);
 
 #endif

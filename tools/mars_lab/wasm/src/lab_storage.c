@@ -26,24 +26,24 @@ static const lab_storage_field_t lab_storage_fields_table[] = {
     {"integrator_bounds", "mars.exprLab.lastIntegratorBounds", ""},
     {"integrator_interval_cap", "mars.exprLab.lastIntegratorIntervalCap", "#integratorIntervalCap"}};
 
-static browser_jsref lab_storage_or(browser_jsref value, browser_jsref fallback)
+static jsref lab_storage_or(jsref value, jsref fallback)
 {
     return lab_dom_truth(value) ? value : fallback;
 }
 
-static browser_jsref lab_storage_text(browser_jsref value, int trim)
+static jsref lab_storage_text(jsref value, int trim)
 {
     int text = lab_dom_text(lab_storage_or(value, lab_dom_string("")));
     return trim ? lab_dom_clean(text, LAB_DOM_CLEAN_TRIM) : text;
 }
 
-static double lab_storage_cap(browser_jsref value, browser_jsref config)
+static double lab_storage_cap(jsref value, jsref config)
 {
     return lab_browser_intervals(lab_dom_parse_int(value, 10),
                                  lab_dom_to_number(lab_dom_get(config, "DEFAULT_INTEGRATOR_INTERVAL_CAP")));
 }
 
-static browser_jsref lab_storage_matrix_operation(browser_jsref value)
+static jsref lab_storage_matrix_operation(jsref value)
 {
     int operation = lab_storage_text(value, 1);
     int options = lab_dom_get(lab_dom_query(0, "#matrixOperation"), "options");
@@ -59,26 +59,26 @@ static browser_jsref lab_storage_matrix_operation(browser_jsref value)
 }
 
 /* Preserve decimal-prefix conversion and the existing finite precision clamp. */
-double lab_storage_precision(browser_jsref values)
+double lab_storage_precision(jsref values)
 {
     return lab_browser_precision(lab_dom_parse_int(lab_dom_item(values, 0), 10),
                                  lab_dom_to_number(lab_dom_item(values, 1)));
 }
 
 /* Select only an offered integrator budget, retaining the configured fallback. */
-double lab_storage_intervals(browser_jsref values, browser_jsref config)
+double lab_storage_intervals(jsref values, jsref config)
 {
     return lab_storage_cap(lab_dom_item(values, 0), config);
 }
 
 /* Validate an operation against the actual browser select, not a second application catalogue. */
-void lab_storage_operation(browser_jsref values)
+void lab_storage_operation(jsref values)
 {
     lab_dom_return(lab_storage_matrix_operation(lab_dom_item(values, 0)));
 }
 
 /* Server editors are trimmed; local editor bytes and native restoration flags are preserved. */
-void lab_storage_editor(lab_mode_t mode, browser_jsref values, lab_persist_origin_t origin)
+void lab_storage_editor(lab_mode_t mode, jsref values, lab_persist_origin_t origin)
 {
     int text = lab_storage_text(lab_dom_item(values, 0), origin == LAB_PERSIST_SERVER);
     int result = lab_dom_object(LAB_VALUE_OBJECT);
@@ -112,7 +112,7 @@ void lab_storage_fields(lab_persist_origin_t origin)
 }
 
 /* Keep local variable bytes while supplying the server's normalised default. */
-static browser_jsref lab_storage_variable(browser_jsref value, lab_persist_origin_t origin, browser_jsref config)
+static jsref lab_storage_variable(jsref value, lab_persist_origin_t origin, jsref config)
 {
     if (origin != LAB_PERSIST_SERVER)
         return value;
@@ -121,7 +121,7 @@ static browser_jsref lab_storage_variable(browser_jsref value, lab_persist_origi
 }
 
 /* Validate both storage origins against the live operation menu. */
-static browser_jsref lab_storage_operation_value(browser_jsref value, lab_persist_origin_t origin, browser_jsref config)
+static jsref lab_storage_operation_value(jsref value, lab_persist_origin_t origin, jsref config)
 {
     (void)origin;
     (void)config;
@@ -129,24 +129,24 @@ static browser_jsref lab_storage_operation_value(browser_jsref value, lab_persis
 }
 
 /* Preserve local operand bytes and normalise only server text. */
-static browser_jsref lab_storage_operand(browser_jsref value, lab_persist_origin_t origin, browser_jsref config)
+static jsref lab_storage_operand(jsref value, lab_persist_origin_t origin, jsref config)
 {
     (void)config;
     return origin == LAB_PERSIST_SERVER ? lab_storage_text(value, 1) : value;
 }
 
 /* Apply the interval budget policy to either storage origin. */
-static browser_jsref lab_storage_cap_value(browser_jsref value, lab_persist_origin_t origin, browser_jsref config)
+static jsref lab_storage_cap_value(jsref value, lab_persist_origin_t origin, jsref config)
 {
     (void)origin;
     return lab_dom_numeric(lab_storage_cap(value, config));
 }
 
 /* Project one restored control; only bounds return text requiring asynchronous native preparation. */
-void lab_storage_control(lab_storage_control_t field, browser_jsref values, lab_persist_origin_t origin, browser_jsref config)
+void lab_storage_control(lab_storage_control_t field, jsref values, lab_persist_origin_t origin, jsref config)
 {
     /** @brief Value normalisers for controls with synchronous DOM projection. */
-    static browser_jsref (*const normalise[])(browser_jsref, lab_persist_origin_t, browser_jsref) = {
+    static jsref (*const normalise[])(jsref, lab_persist_origin_t, jsref) = {
         [LAB_STORAGE_EQUATION_VARIABLE] = lab_storage_variable,
         [LAB_STORAGE_MATRIX_OPERATION]  = lab_storage_operation_value,
         [LAB_STORAGE_MATRIX_OPERAND]    = lab_storage_operand,
@@ -173,7 +173,7 @@ void lab_storage_control(lab_storage_control_t field, browser_jsref values, lab_
 }
 
 /* Restore recognised precision modes directly into their native owner, including legacy scalar saves. */
-void lab_storage_precisions(browser_jsref data)
+void lab_storage_precisions(jsref data)
 {
     int values = lab_dom_get(data, "precision_bits");
     lab_value_kind_t type = lab_dom_type(values);
@@ -196,7 +196,7 @@ void lab_storage_precisions(browser_jsref data)
 }
 
 /* Compare opaque local/server copies using the shared timestamp and default-placeholder policy. */
-void lab_storage_recovery(lab_mode_t mode, browser_jsref server, browser_jsref local, browser_jsref config)
+void lab_storage_recovery(lab_mode_t mode, jsref server, jsref local, jsref config)
 {
     if ((unsigned)mode > LAB_MODE_EQUATION) {
         lab_dom_return(0);
@@ -221,7 +221,7 @@ void lab_storage_recovery(lab_mode_t mode, browser_jsref server, browser_jsref l
 }
 
 /* Assemble a recovered server patch after editor preparation, using one coherent fallback timestamp. */
-void lab_storage_recovered(lab_mode_t mode, browser_jsref recovery, browser_jsref values, double now)
+void lab_storage_recovered(lab_mode_t mode, jsref recovery, jsref values, double now)
 {
     int patch = lab_dom_object(LAB_VALUE_OBJECT);
     if ((unsigned)mode <= LAB_MODE_EQUATION) {
@@ -233,7 +233,7 @@ void lab_storage_recovered(lab_mode_t mode, browser_jsref recovery, browser_jsre
 }
 
 /* Describe asynchronous restoration before any controls are changed. */
-static void lab_storage_history_plan(browser_jsref state, browser_jsref config, browser_jsref mode)
+static void lab_storage_history_plan(jsref state, jsref config, jsref mode)
 {
     int integrator = lab_dom_equal(mode, lab_dom_string("integrator"));
     int calendar = lab_dom_equal(mode, lab_dom_string("datetime")) || lab_dom_equal(mode, lab_dom_string("almanac"));
@@ -249,7 +249,7 @@ static void lab_storage_history_plan(browser_jsref state, browser_jsref config, 
 }
 
 /* Project only the scalar controls belonging to this restored worksheet. */
-static void lab_storage_history_controls(browser_jsref state, browser_jsref config, browser_jsref mode)
+static void lab_storage_history_controls(jsref state, jsref config, jsref mode)
 {
     if (lab_dom_equal(mode, lab_dom_string("equation"))) {
         int value = lab_storage_text(lab_dom_get(state, "variable"), 1);
@@ -263,7 +263,7 @@ static void lab_storage_history_controls(browser_jsref state, browser_jsref conf
 }
 
 /* Bounds preparation has completed before its interval budget is restored. */
-static void lab_storage_history_bounds(browser_jsref state, browser_jsref config, browser_jsref mode)
+static void lab_storage_history_bounds(jsref state, jsref config, jsref mode)
 {
     if (lab_dom_equal(mode, lab_dom_string("integrator")))
         lab_dom_write(lab_dom_query(0, "#integratorIntervalCap"), LAB_DOM_VALUE, "",
@@ -271,7 +271,7 @@ static void lab_storage_history_bounds(browser_jsref state, browser_jsref config
 }
 
 /* Calendar restoration finishes by projecting the configured editor text. */
-static void lab_storage_history_calendar(browser_jsref state, browser_jsref config, browser_jsref mode)
+static void lab_storage_history_calendar(jsref state, jsref config, jsref mode)
 {
     (void)state;
     int datetime = lab_dom_equal(mode, lab_dom_string("datetime"));
@@ -281,9 +281,9 @@ static void lab_storage_history_calendar(browser_jsref state, browser_jsref conf
 }
 
 /* Split restoration around awaits: plan, guarded controls, guarded bounds completion, then final editor. */
-void lab_storage_history(lab_storage_history_phase_t phase, browser_jsref state, browser_jsref config)
+void lab_storage_history(lab_storage_history_phase_t phase, jsref state, jsref config)
 {
-    static void (*const handlers[])(browser_jsref, browser_jsref, browser_jsref) = {
+    static void (*const handlers[])(jsref, jsref, jsref) = {
         [LAB_STORAGE_HISTORY_PLAN]     = lab_storage_history_plan,
         [LAB_STORAGE_HISTORY_CONTROLS] = lab_storage_history_controls,
         [LAB_STORAGE_HISTORY_BOUNDS]   = lab_storage_history_bounds,

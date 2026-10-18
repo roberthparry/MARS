@@ -44,7 +44,7 @@ typedef enum {
  * inherited properties. Inputs are decoded data, not functions, accessors or other executable values.
  * No input is mutated, no exception is requested, and no handle survives this synchronous call.
  */
-void lab_workspace_snapshot_validate(browser_jsref envelope, browser_jsref mode_names);
+void lab_workspace_snapshot_validate(jsref envelope, jsref mode_names);
 
 /**
  * @brief Return named browser control references for startup through lab_dom_return.
@@ -68,13 +68,13 @@ void lab_workspace_dom_labels(lab_mode_t mode);
 /** @brief Project status text with native precision.
  * @param text Scoped status text to precede the current precision.
  */
-void lab_workspace_dom_status(browser_jsref text);
+void lab_workspace_dom_status(jsref text);
 
 /** @brief Project tab selection using an exact mode token.
  * @param tabs Scoped list of registered mode-tab nodes.
  * @param mode Scoped exact mode-name string to match against each tab's dataset.
  */
-void lab_workspace_dom_tabs(browser_jsref tabs, browser_jsref mode);
+void lab_workspace_dom_tabs(jsref tabs, jsref mode);
 
 /** @brief Project result titles and Function execution visibility.
  * @param rendered Scoped Rendered card title string.
@@ -82,7 +82,7 @@ void lab_workspace_dom_tabs(browser_jsref tabs, browser_jsref mode);
  * @param function Scoped Function card title string; exactly "Function" enables its run control.
  * @param value Scoped Value card title string.
  */
-void lab_workspace_dom_titles(browser_jsref rendered, browser_jsref parsed, browser_jsref function, browser_jsref value);
+void lab_workspace_dom_titles(jsref rendered, jsref parsed, jsref function, jsref value);
 
 /** @brief Set auxiliary visibility and relinquish hidden card expansion.
  * @param visible True shows the controls; false hides them.
@@ -98,7 +98,7 @@ void lab_workspace_dom_value(bool visible);
  * @param mode Worksheet mode index, 0..6.
  * @param coverage Scoped almanac coverage text appended to its subtitle.
  */
-void lab_workspace_dom_mode(lab_mode_t mode, browser_jsref coverage);
+void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage);
 
 /** @brief Project matrix operand visibility.
  * @param mode Worksheet mode index, 0..6.
@@ -109,7 +109,7 @@ void lab_workspace_dom_matrix(lab_mode_t mode);
  * @param cards Scoped list of help-card nodes with comma-separated data-help-modes tags.
  * @param mode Scoped exact mode-name string to match after trimming each tag.
  */
-void lab_workspace_dom_help_cards(browser_jsref cards, browser_jsref mode);
+void lab_workspace_dom_help_cards(jsref cards, jsref mode);
 
 /** @brief Show results (0), help (1), or toggle (2).
  * @param action Show results 0, show help 1 or toggle 2; other values do nothing.
@@ -154,37 +154,37 @@ void lab_workspace_dom_precision_preview(unsigned bits);
  * @param copies Scoped list of copy-button nodes.
  * @param digits Scoped list of more-digits button nodes.
  */
-void lab_workspace_dom_busy(bool busy, browser_jsref equation_variable, browser_jsref copies, browser_jsref digits);
+void lab_workspace_dom_busy(bool busy, jsref equation_variable, jsref copies, jsref digits);
 
 /** @brief Project a button's running and accessibility state.
  * @param button Scoped action-button node.
  * @param running True applies running styling and aria-busy; false removes both.
  */
-void lab_workspace_dom_running(browser_jsref button, bool running);
+void lab_workspace_dom_running(jsref button, bool running);
 
 /** @brief Report connected positive-height editor layout.
  * @param editor Scoped editor node.
  * @return True for a connected editor with visible layout and positive client height; false otherwise.
  */
-bool lab_workspace_dom_editor_visible(browser_jsref editor);
+bool lab_workspace_dom_editor_visible(jsref editor);
 
 /** @brief Clear sizing state on all supplied editors.
  * @param editors Scoped list of editor nodes whose manual sizing is cleared.
  */
-void lab_workspace_dom_editor_reset(browser_jsref editors);
+void lab_workspace_dom_editor_reset(jsref editors);
 
 /** @brief Measure and resize editors within the viewport budget.
  * @param editors Scoped list of editor nodes sharing the available height budget.
  * @param viewport Viewport height in CSS pixels.
  */
-void lab_workspace_dom_editor_resize(browser_jsref editors, double viewport);
+void lab_workspace_dom_editor_resize(jsref editors, double viewport);
 
 /** @brief Build calculus controls from exact names and display labels.
  * @param names Scoped array of exact variable-name strings in discovery order.
  * @param labels Scoped array of display labels aligned with names.
  * @param differentiable True creates derivative and integral buttons; false leaves the panel empty.
  */
-void lab_workspace_dom_derivatives(browser_jsref names, browser_jsref labels, bool differentiable);
+void lab_workspace_dom_derivatives(jsref names, jsref labels, bool differentiable);
 
 /** @brief Derive native binding labels and render calculus controls through lab_workspace_dom_derivatives.
  * @param names Scoped array of exact variable-name strings in discovery order; it is not modified.
@@ -193,7 +193,7 @@ void lab_workspace_dom_derivatives(browser_jsref names, browser_jsref labels, bo
  * The shared lab_binding_label_value formatter removes only outer display brackets. Temporary handles
  * are released per name and all handles created here are released before returning; no handle is retained.
  */
-void lab_workspace_dom_calculus(browser_jsref names, bool differentiable);
+void lab_workspace_dom_calculus(jsref names, bool differentiable);
 
 /**
  * @brief Publish an opaque snapshot of a DOM node.
@@ -209,7 +209,7 @@ void lab_workspace_dom_snapshot(node_jsref node, bool button);
  * @param state Scoped snapshot returned by lab_workspace_dom_snapshot.
  * @param button True restores textContent and disabled; false restores innerHTML and inline style.
  */
-void lab_workspace_dom_restore(node_jsref node, browser_jsref state, bool button);
+void lab_workspace_dom_restore(node_jsref node, jsref state, bool button);
 
 /** @brief Report nonblank content in result cards.
  * @return True when rendered HTML or auxiliary result text is nonblank; false otherwise.
@@ -228,7 +228,7 @@ void lab_workspace_dom_result_states(void);
  * @post lab_dom_return supplies the snapshot with an independent variable array (empty for
  * non-array inputs), copied DOM datasets and the current reusable-input text, or null for blank cards.
  */
-void lab_workspace_dom_result_save(browser_jsref metadata);
+void lab_workspace_dom_result_save(jsref metadata);
 
 /** @brief Restore result cards and reusable input, returning normalised metadata for the host globals.
  * @param state Scoped result snapshot from lab_workspace_dom_result_save, or zero when absent.
@@ -238,6 +238,6 @@ void lab_workspace_dom_result_save(browser_jsref metadata);
  * before calling, assign the returned globals before refreshing derivative controls, then schedule rendered
  * and solver fitting. The function invalidates old render ownership before projecting any saved DOM.
  */
-void lab_workspace_dom_result_restore(browser_jsref state);
+void lab_workspace_dom_result_restore(jsref state);
 
 #endif

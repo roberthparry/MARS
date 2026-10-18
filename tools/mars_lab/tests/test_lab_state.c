@@ -139,6 +139,17 @@ static bool test_lab_help_content(const char *directory)
                             "Reading Equation Solutions", "Partial Differential Equations And Results",
                             "Matrix Operation Selector", "Transforms And Sums", "Roots And Complex Numbers",
                             "Datetime Workflow", "Almanac Workflow", "Work budget ceiling",
+                            "Eclipse Types And Shadows", "celestial latitude", "Greenwich hour angle",
+                            "right ascension", "24 hours = 360°", "not a clock time",
+                            "Unlike observer altitude in metres", "0° north, 90° east, 180° south, 270° west",
+                            "apparent angular radius", "apparent visual magnitude",
+                            "first contact (C1)", "last contact (C4)", "maximum eclipse",
+                            "this table uses P1", "this table uses P4", "U2/U3 bound lunar totality",
+                            "measures coverage along a diameter, not brightness", "measures area at Greatest",
+                            "exclude penumbral dimming", "A negative value means the Moon misses the umbra",
+                            "Partial lunar eclipse", "Total lunar eclipse", "<code>Penumbral</code>",
+                            "<code>Annular</code>", "<code>Hybrid</code>", "<code>Solar transit</code>",
+                            "not supplied, not zero",
                             "id=\"helpClose\"", "Return to worksheet", "2.5×10⁻⁵"};
     bool ok = page != NULL;
     for (size_t i = 0; page && i < sizeof(topics) / sizeof(*topics); ++i)

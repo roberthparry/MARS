@@ -23,14 +23,14 @@
  * @param request Scoped request-ownership record supplying action and persistence flags, or zero when absent.
  * @param updated_at Expression modification timestamp copied to expression_updated_at; unused by other builders.
  */
-typedef void (*lab_payload_builder_t)(browser_jsref payload, browser_jsref inputs, browser_jsref request, double updated_at);
+typedef void (*lab_payload_builder_t)(jsref payload, jsref inputs, jsref request, double updated_at);
 
-static browser_jsref lab_payload_or(browser_jsref value, browser_jsref fallback)
+static jsref lab_payload_or(jsref value, jsref fallback)
 {
     return lab_dom_truth(value) ? value : fallback;
 }
 
-static browser_jsref lab_payload_control(const char *selector)
+static jsref lab_payload_control(const char *selector)
 {
     int control = lab_dom_query(0, selector);
     int text = lab_dom_read(control, LAB_DOM_VALUE, "");
@@ -38,13 +38,13 @@ static browser_jsref lab_payload_control(const char *selector)
     return lab_dom_truth(exact) && lab_dom_equal(text, lab_dom_get(control, "marsZoomText")) ? exact : text;
 }
 
-static unsigned lab_payload_request_flags(browser_jsref request)
+static unsigned lab_payload_request_flags(jsref request)
 {
     return lab_request_flags((unsigned)lab_dom_number(lab_dom_get(request, "channel")),
                              (uint32_t)lab_dom_number(lab_dom_get(request, "token")));
 }
 
-static void lab_payload_expression(browser_jsref payload, browser_jsref inputs, browser_jsref request, double updated_at)
+static void lab_payload_expression(jsref payload, jsref inputs, jsref request, double updated_at)
 {
     lab_dom_set(payload, "expression", lab_dom_join(0, lab_dom_item(inputs, 0), ""));
     lab_dom_set(payload, "binding_source", lab_dom_join(0, lab_dom_item(inputs, 1), ""));
@@ -115,7 +115,7 @@ static void lab_payload_expression(browser_jsref payload, browser_jsref inputs, 
     lab_dom_set(payload, "persist_expression", lab_dom_scalar(LAB_VALUE_BOOLEAN, persist));
 }
 
-static void lab_payload_matrix(browser_jsref payload, browser_jsref inputs, browser_jsref request, double updated_at)
+static void lab_payload_matrix(jsref payload, jsref inputs, jsref request, double updated_at)
 {
     (void)updated_at;
     int options = lab_dom_item(inputs, 0);
@@ -133,26 +133,26 @@ static void lab_payload_matrix(browser_jsref payload, browser_jsref inputs, brow
     lab_dom_set(payload, "transient", lab_dom_scalar(LAB_VALUE_BOOLEAN, transient));
 }
 
-static browser_jsref lab_payload_editor_source(browser_jsref inputs)
+static jsref lab_payload_editor_source(jsref inputs)
 {
     return lab_payload_or(lab_dom_item(inputs, 0), lab_dom_clean(lab_payload_control("#expr"), LAB_DOM_CLEAN_TRIM));
 }
 
-static void lab_payload_equation(browser_jsref payload, browser_jsref inputs, browser_jsref request, double updated_at)
+static void lab_payload_equation(jsref payload, jsref inputs, jsref request, double updated_at)
 {
     (void)request;
     (void)updated_at;
     lab_dom_set(payload, "equation", lab_payload_editor_source(inputs));
 }
 
-static void lab_payload_diffequation(browser_jsref payload, browser_jsref inputs, browser_jsref request, double updated_at)
+static void lab_payload_diffequation(jsref payload, jsref inputs, jsref request, double updated_at)
 {
     (void)request;
     (void)updated_at;
     lab_dom_set(payload, "diffequation", lab_payload_editor_source(inputs));
 }
 
-static void lab_payload_integrator(browser_jsref payload, browser_jsref inputs, browser_jsref request, double updated_at)
+static void lab_payload_integrator(jsref payload, jsref inputs, jsref request, double updated_at)
 {
     (void)request;
     (void)updated_at;
@@ -161,14 +161,14 @@ static void lab_payload_integrator(browser_jsref payload, browser_jsref inputs, 
     lab_dom_set(payload, "max_intervals", lab_dom_item(inputs, 2));
 }
 
-static void lab_payload_function(browser_jsref payload, browser_jsref inputs, browser_jsref request, double updated_at)
+static void lab_payload_function(jsref payload, jsref inputs, jsref request, double updated_at)
 {
     (void)request;
     (void)updated_at;
     lab_dom_set(payload, "source", lab_dom_item(inputs, 0));
 }
 
-static void lab_payload_weather(browser_jsref payload, browser_jsref inputs, browser_jsref request, double updated_at)
+static void lab_payload_weather(jsref payload, jsref inputs, jsref request, double updated_at)
 {
     (void)request;
     (void)updated_at;
@@ -179,7 +179,7 @@ static void lab_payload_weather(browser_jsref payload, browser_jsref inputs, bro
 }
 
 /* Construct a wire record; positional inputs contain opaque caller values, including boxed numbers. */
-void lab_payload_build(lab_payload_kind_t kind, browser_jsref inputs, browser_jsref request, double precision,
+void lab_payload_build(lab_payload_kind_t kind, jsref inputs, jsref request, double precision,
                        double updated_at)
 {
     static const lab_payload_builder_t builders[] = {
@@ -203,7 +203,7 @@ void lab_payload_build(lab_payload_kind_t kind, browser_jsref inputs, browser_js
 }
 
 /* Check every active bound without parsing or rewriting its mathematical contents. */
-void lab_payload_bounds_error(browser_jsref bounds)
+void lab_payload_bounds_error(jsref bounds)
 {
     unsigned count = lab_dom_count(bounds), mark = lab_dom_mark();
     for (unsigned index = 0; index < count; ++index) {
@@ -221,7 +221,7 @@ void lab_payload_bounds_error(browser_jsref bounds)
 }
 
 /* Snapshot native event identifiers and resolve only request-field fallbacks. */
-void lab_payload_land(browser_jsref data, browser_jsref cells, browser_jsref config)
+void lab_payload_land(jsref data, jsref cells, jsref config)
 {
     static const struct {
         const char *key, *selector, *fallback;
@@ -255,7 +255,7 @@ void lab_payload_land(browser_jsref data, browser_jsref cells, browser_jsref con
 }
 
 /* Apply an already-current reply, indexing exact identifiers once and keeping native HTML intact. */
-void lab_payload_land_apply(browser_jsref cells, browser_jsref payload, unsigned failure)
+void lab_payload_land_apply(jsref cells, jsref payload, unsigned failure)
 {
     const char *fallback = failure == 2 ? "Nearest land totality unavailable"
                            : failure || lab_dom_truth(lab_dom_get(payload, "timed_out"))
@@ -282,7 +282,7 @@ void lab_payload_land_apply(browser_jsref cells, browser_jsref payload, unsigned
 }
 
 /* Project the server's access description and QR markup without interpreting either. */
-void lab_payload_mobile(browser_jsref data)
+void lab_payload_mobile(jsref data)
 {
     lab_dom_class(lab_dom_query(0, "#mobileAccess"), "hidden", 0);
     lab_dom_write(lab_dom_query(0, "#mobileTitle"), LAB_DOM_TEXT, "",

@@ -17,24 +17,24 @@ static unsigned lab_flow_location_stage(frame_jsref frame)
     return (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
 }
 
-static browser_jsref lab_flow_location_null(void)
+static jsref lab_flow_location_null(void)
 {
     int plan = lab_flow_done(0);
     lab_dom_set(plan, "value", 0);
     return plan;
 }
 
-static browser_jsref lab_flow_location_flag(browser_jsref value)
+static jsref lab_flow_location_flag(jsref value)
 {
     return lab_dom_numeric(lab_dom_truth(value));
 }
 
-static browser_jsref lab_flow_location_jump(frame_jsref frame, unsigned next)
+static jsref lab_flow_location_jump(frame_jsref frame, unsigned next)
 {
     return lab_flow_effects(frame, next, lab_dom_object(LAB_VALUE_OBJECT));
 }
 
-static browser_jsref lab_flow_location_forms(frame_jsref frame)
+static jsref lab_flow_location_forms(frame_jsref frame)
 {
     lab_flow_location_form_action_t action =
         (lab_flow_location_form_action_t)(unsigned)lab_dom_number(lab_dom_get(frame, "action"));
@@ -66,7 +66,7 @@ struct lab_flow_location_restore_context {
     frame_jsref frame;
     node_jsref select;
     snapshot_jsref snapshot;
-    browser_jsref plan;
+    jsref plan;
 };
 
 /**
@@ -74,14 +74,14 @@ struct lab_flow_location_restore_context {
  * @param ctx Restore state whose plan contains the restored result returned to the caller.
  * @return Scoped completion plan carrying the plan's restored value.
  */
-static browser_jsref lab_flow_location_restore_otherwise(struct lab_flow_location_restore_context *ctx);
+static jsref lab_flow_location_restore_otherwise(struct lab_flow_location_restore_context *ctx);
 
-static browser_jsref lab_flow_location_restore_loc_current(struct lab_flow_location_restore_context *ctx)
+static jsref lab_flow_location_restore_loc_current(struct lab_flow_location_restore_context *ctx)
 {
     return lab_flow_call(ctx->frame, 1, "locCurrent", "current", 0, 1, lab_dom_get(ctx->frame, "isCurrent"));
 }
 
-static browser_jsref lab_flow_location_restore_loc_populate(struct lab_flow_location_restore_context *ctx)
+static jsref lab_flow_location_restore_loc_populate(struct lab_flow_location_restore_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_location_null();
@@ -94,23 +94,23 @@ static browser_jsref lab_flow_location_restore_loc_populate(struct lab_flow_loca
                          lab_dom_get(ctx->frame, "jurisdiction"), options);
 }
 
-static browser_jsref lab_flow_location_restore_native(struct lab_flow_location_restore_context *ctx)
+static jsref lab_flow_location_restore_native(struct lab_flow_location_restore_context *ctx)
 {
     return lab_flow_call(ctx->frame, 3, "native", "snapshot", 0, 2, lab_dom_string("lab_location_snapshot"),
                          ctx->select);
 }
 
-static browser_jsref lab_flow_location_restore_loc_await(struct lab_flow_location_restore_context *ctx)
+static jsref lab_flow_location_restore_loc_await(struct lab_flow_location_restore_context *ctx)
 {
     return lab_flow_call(ctx->frame, 4, "locAwait", 0, 1, 1, lab_dom_get(ctx->frame, "preparation"));
 }
 
-static browser_jsref lab_flow_location_restore_loc_current_4(struct lab_flow_location_restore_context *ctx)
+static jsref lab_flow_location_restore_loc_current_4(struct lab_flow_location_restore_context *ctx)
 {
     return lab_flow_call(ctx->frame, 5, "locCurrent", "current", 0, 1, lab_dom_get(ctx->frame, "isCurrent"));
 }
 
-static browser_jsref lab_flow_location_restore_native_5(struct lab_flow_location_restore_context *ctx)
+static jsref lab_flow_location_restore_native_5(struct lab_flow_location_restore_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_location_null();
@@ -118,7 +118,7 @@ static browser_jsref lab_flow_location_restore_native_5(struct lab_flow_location
                          ctx->select, ctx->snapshot);
 }
 
-static browser_jsref lab_flow_location_restore_native_6(struct lab_flow_location_restore_context *ctx)
+static jsref lab_flow_location_restore_native_6(struct lab_flow_location_restore_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "unchanged")))
         return lab_flow_location_null();
@@ -127,7 +127,7 @@ static browser_jsref lab_flow_location_restore_native_6(struct lab_flow_location
                          ctx->snapshot, lab_dom_get(ctx->frame, "selection"), lab_dom_get(ctx->frame, "response"));
 }
 
-static browser_jsref lab_flow_location_restore_loc_forms(struct lab_flow_location_restore_context *ctx)
+static jsref lab_flow_location_restore_loc_forms(struct lab_flow_location_restore_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->plan, "request"))) {
         lab_dom_set(ctx->frame, "responded", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
@@ -139,12 +139,12 @@ static browser_jsref lab_flow_location_restore_loc_forms(struct lab_flow_locatio
     return lab_flow_location_restore_otherwise(ctx);
 }
 
-static browser_jsref lab_flow_location_restore_otherwise(struct lab_flow_location_restore_context *ctx)
+static jsref lab_flow_location_restore_otherwise(struct lab_flow_location_restore_context *ctx)
 {
     return lab_flow_done(lab_dom_get(ctx->plan, "restored"));
 }
 
-static browser_jsref lab_flow_location_restore(frame_jsref frame)
+static jsref lab_flow_location_restore(frame_jsref frame)
 {
     int select = lab_dom_get(frame, "select"), snapshot = lab_dom_get(frame, "snapshot");
     int plan = lab_dom_get(frame, "plan");
@@ -154,7 +154,7 @@ static browser_jsref lab_flow_location_restore(frame_jsref frame)
         .snapshot = snapshot,
         .plan = plan,
     };
-    static browser_jsref (*const handlers[])(struct lab_flow_location_restore_context *) = {
+    static jsref (*const handlers[])(struct lab_flow_location_restore_context *) = {
         [0] = lab_flow_location_restore_loc_current,
         [1] = lab_flow_location_restore_loc_populate,
         [2] = lab_flow_location_restore_native,
@@ -175,40 +175,40 @@ struct lab_flow_location_populate_context {
     node_jsref select;
 };
 
-static browser_jsref lab_flow_location_populate_loc_current(struct lab_flow_location_populate_context *ctx)
+static jsref lab_flow_location_populate_loc_current(struct lab_flow_location_populate_context *ctx)
 {
     if (!lab_dom_truth(ctx->select))
         return lab_flow_done(lab_dom_object(LAB_VALUE_ARRAY));
     return lab_flow_call(ctx->frame, 1, "locCurrent", "current", 0, 1, lab_dom_get(ctx->frame, "isCurrent"));
 }
 
-static browser_jsref lab_flow_location_populate_loc_towns(struct lab_flow_location_populate_context *ctx)
+static jsref lab_flow_location_populate_loc_towns(struct lab_flow_location_populate_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_done(lab_dom_object(LAB_VALUE_ARRAY));
     return lab_flow_call(ctx->frame, 2, "locTowns", "towns", 0, 1, lab_dom_get(ctx->frame, "jurisdiction"));
 }
 
-static browser_jsref lab_flow_location_populate_native(struct lab_flow_location_populate_context *ctx)
+static jsref lab_flow_location_populate_native(struct lab_flow_location_populate_context *ctx)
 {
     return lab_flow_call(ctx->frame, 3, "native", 0, 0, 4, lab_dom_string("lab_location_populate"), ctx->select,
                          lab_dom_get(ctx->frame, "towns"),
                          lab_flow_location_flag(lab_dom_get(ctx->frame, "selectDefault")));
 }
 
-static browser_jsref lab_flow_location_populate_otherwise(struct lab_flow_location_populate_context *ctx)
+static jsref lab_flow_location_populate_otherwise(struct lab_flow_location_populate_context *ctx)
 {
     return lab_flow_done(lab_dom_get(ctx->frame, "towns"));
 }
 
-static browser_jsref lab_flow_location_populate(frame_jsref frame)
+static jsref lab_flow_location_populate(frame_jsref frame)
 {
     int select = lab_dom_get(frame, "select");
     struct lab_flow_location_populate_context ctx = {
         .frame = frame,
         .select = select,
     };
-    static browser_jsref (*const handlers[])(struct lab_flow_location_populate_context *) = {
+    static jsref (*const handlers[])(struct lab_flow_location_populate_context *) = {
         [0] = lab_flow_location_populate_loc_current,
         [1] = lab_flow_location_populate_loc_towns,
         [2] = lab_flow_location_populate_native,
@@ -219,7 +219,7 @@ static browser_jsref lab_flow_location_populate(frame_jsref frame)
                : lab_flow_location_populate_otherwise(&ctx);
 }
 
-static browser_jsref lab_flow_location_sync(frame_jsref frame)
+static jsref lab_flow_location_sync(frame_jsref frame)
 {
     unsigned stage = lab_flow_location_stage(frame);
     if (stage == 0 || stage == 2)
@@ -234,18 +234,18 @@ static browser_jsref lab_flow_location_sync(frame_jsref frame)
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_location_history_loc_apply_state(frame_jsref frame)
+static jsref lab_flow_location_history_loc_apply_state(frame_jsref frame)
 {
     return lab_flow_call(frame, 1, "locApplyState", "state", 0, 2, lab_dom_get(frame, "mode"),
                          lab_dom_get(frame, "source"));
 }
 
-static browser_jsref lab_flow_location_history_loc_elements(frame_jsref frame)
+static jsref lab_flow_location_history_loc_elements(frame_jsref frame)
 {
     return lab_flow_call(frame, 2, "locElements", "elements", 0, 1, lab_dom_get(frame, "mode"));
 }
 
-static browser_jsref lab_flow_location_history_loc_restore(frame_jsref frame)
+static jsref lab_flow_location_history_loc_restore(frame_jsref frame)
 {
     int elements = lab_dom_get(frame, "elements");
     return lab_flow_call(frame, 3, "locRestore", 0, 1, 6, lab_dom_get(elements, "town"),
@@ -255,15 +255,15 @@ static browser_jsref lab_flow_location_history_loc_restore(frame_jsref frame)
                          lab_dom_get(lab_dom_get(elements, "longitude"), "value"), lab_dom_get(frame, "isCurrent"));
 }
 
-static browser_jsref lab_flow_location_history_otherwise(frame_jsref frame)
+static jsref lab_flow_location_history_otherwise(frame_jsref frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_location_history(frame_jsref frame)
+static jsref lab_flow_location_history(frame_jsref frame)
 {
-    static browser_jsref (*const handlers[])(browser_jsref) = {
+    static jsref (*const handlers[])(jsref) = {
         [0] = lab_flow_location_history_loc_apply_state,
         [1] = lab_flow_location_history_loc_elements,
         [2] = lab_flow_location_history_loc_restore,
@@ -294,11 +294,11 @@ enum {
 
 struct lab_flow_location_totality_context {
     frame_jsref frame;
-    browser_jsref request;
-    browser_jsref state;
+    jsref request;
+    jsref state;
 };
 
-static browser_jsref lab_flow_location_totality_loc_total_start(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_start(struct lab_flow_location_totality_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "button")))
         return lab_flow_done(0);
@@ -306,7 +306,7 @@ static browser_jsref lab_flow_location_totality_loc_total_start(struct lab_flow_
                          lab_dom_string("almanac"));
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_context(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_context(struct lab_flow_location_totality_context *ctx)
 {
     if (!lab_dom_truth(ctx->request))
         return lab_flow_done(0);
@@ -314,27 +314,27 @@ static browser_jsref lab_flow_location_totality_loc_total_context(struct lab_flo
     return lab_flow_call(ctx->frame, LOC_TOTAL_PREPARE, "locContext", "context", 0, 0);
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_prepare(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_prepare(struct lab_flow_location_totality_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_TOTAL_RESTORE, "native", "state", 0, 3,
                          lab_dom_string("lab_location_totality_prepare"), lab_dom_get(ctx->frame, "button"),
                          lab_dom_get(ctx->frame, "context"));
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_restore(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_restore(struct lab_flow_location_totality_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_TOTAL_CURRENT, "locRestoreTotality", "restored", 1, 2, ctx->state,
                          ctx->request);
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_current(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_current(struct lab_flow_location_totality_context *ctx)
 {
     if (!lab_dom_type(lab_dom_get(ctx->frame, "restored")))
         return lab_flow_location_jump(ctx->frame, LOC_TOTAL_FINISH);
     return lab_flow_call(ctx->frame, LOC_TOTAL_APPLY, "requestCurrent", "current", 0, 1, ctx->request);
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_apply(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_apply(struct lab_flow_location_totality_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_location_jump(ctx->frame, LOC_TOTAL_FINISH);
@@ -342,58 +342,58 @@ static browser_jsref lab_flow_location_totality_loc_total_apply(struct lab_flow_
                          ctx->state, lab_flow_location_flag(lab_dom_get(ctx->frame, "restored")));
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_save(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_save(struct lab_flow_location_totality_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_TOTAL_EVALUATE, "locSaveAlmanac", 0, 0, 0);
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_evaluate(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_evaluate(struct lab_flow_location_totality_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_TOTAL_FINISH, "locEvaluateCurrent", 0, 1, 0);
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_error_current(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_error_current(struct lab_flow_location_totality_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(LOC_TOTAL_RETHROW_FINISH));
     return lab_flow_call(ctx->frame, LOC_TOTAL_ERROR_STATUS, "requestCurrent", "current", 0, 1, ctx->request);
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_error_status(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_error_status(struct lab_flow_location_totality_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_location_jump(ctx->frame, LOC_TOTAL_FINISH);
     return lab_flow_call(ctx->frame, LOC_TOTAL_ERROR_RENDER, "locStatus", 0, 0, 1, lab_dom_string("Error"));
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_error_render(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_error_render(struct lab_flow_location_totality_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_TOTAL_FINISH, "locError", 0, 0, 1,
                          lab_dom_get(lab_dom_get(ctx->frame, "exception"), "message"));
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_finish(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_finish(struct lab_flow_location_totality_context *ctx)
 {
     lab_dom_delete(ctx->frame, "failed");
     return lab_flow_call(ctx->frame, LOC_TOTAL_DONE, "locFinish", 0, 0, 1, ctx->request);
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_rethrow_finish(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_rethrow_finish(struct lab_flow_location_totality_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_TOTAL_RETHROW, "locFinish", 0, 0, 1, ctx->request);
 }
 
-static browser_jsref lab_flow_location_totality_loc_total_rethrow(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_loc_total_rethrow(struct lab_flow_location_totality_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_TOTAL_DONE, "rethrow", 0, 0, 1, lab_dom_get(ctx->frame, "exception"));
 }
 
-static browser_jsref lab_flow_location_totality_otherwise(struct lab_flow_location_totality_context *ctx)
+static jsref lab_flow_location_totality_otherwise(struct lab_flow_location_totality_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_location_totality(frame_jsref frame)
+static jsref lab_flow_location_totality(frame_jsref frame)
 {
     int request = lab_dom_get(frame, "request"), state = lab_dom_get(frame, "state");
     struct lab_flow_location_totality_context ctx = {
@@ -401,7 +401,7 @@ static browser_jsref lab_flow_location_totality(frame_jsref frame)
         .request = request,
         .state = state,
     };
-    static browser_jsref (*const handlers[])(struct lab_flow_location_totality_context *) = {
+    static jsref (*const handlers[])(struct lab_flow_location_totality_context *) = {
         [LOC_TOTAL_START]          = lab_flow_location_totality_loc_total_start,
         [LOC_TOTAL_CONTEXT]        = lab_flow_location_totality_loc_total_context,
         [LOC_TOTAL_PREPARE]        = lab_flow_location_totality_loc_total_prepare,
@@ -447,10 +447,10 @@ enum {
 
 struct lab_flow_location_refresh_context {
     frame_jsref frame;
-    browser_jsref mode;
-    browser_jsref elements;
-    browser_jsref request;
-    browser_jsref state;
+    jsref mode;
+    jsref elements;
+    jsref request;
+    jsref state;
     int update;
 };
 
@@ -459,27 +459,27 @@ struct lab_flow_location_refresh_context {
  * @param ctx Refresh state borrowing the request handle and the frame that receives the current flag.
  * @return Scoped ownership-check plan resuming at LOC_REFRESH_APPLY.
  */
-static browser_jsref lab_flow_location_refresh_loc_refresh_second_current(struct lab_flow_location_refresh_context *ctx);
+static jsref lab_flow_location_refresh_loc_refresh_second_current(struct lab_flow_location_refresh_context *ctx);
 
 /**
  * @brief Post the captured jurisdiction and date for location refresh.
  * @param ctx Refresh state borrowing the request and a frame containing jurisdiction and date.
  * @return Scoped post plan awaiting result before the response-ownership check.
  */
-static browser_jsref lab_flow_location_refresh_loc_refresh_post(struct lab_flow_location_refresh_context *ctx);
+static jsref lab_flow_location_refresh_loc_refresh_post(struct lab_flow_location_refresh_context *ctx);
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_elements(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_elements(struct lab_flow_location_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_CONTROLS, "locElements", "elements", 0, 1, ctx->mode);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_controls(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_controls(struct lab_flow_location_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_BEGIN, "locControls", "controls", 0, 2, ctx->mode,
                          lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->update));
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_begin(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_begin(struct lab_flow_location_refresh_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->elements, "jurisdiction")))
         return lab_flow_done(0);
@@ -487,20 +487,20 @@ static browser_jsref lab_flow_location_refresh_loc_refresh_begin(struct lab_flow
                          lab_dom_join(ctx->mode, lab_dom_string("Location"), ""), ctx->mode);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_read(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_read(struct lab_flow_location_refresh_context *ctx)
 {
     if (!lab_dom_truth(ctx->request))
         return lab_flow_done(0);
     return lab_flow_call(ctx->frame, LOC_REFRESH_STATE, "locRead", "read", 0, 1, ctx->mode);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_state(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_state(struct lab_flow_location_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_POPULATE, "locState", "state", 0, 3, ctx->mode,
                          lab_dom_get(ctx->frame, "read"), lab_dom_numeric(1));
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_populate(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_populate(struct lab_flow_location_refresh_context *ctx)
 {
     lab_dom_set(ctx->frame, "jurisdiction", lab_dom_get(ctx->state, "jurisdiction"));
     lab_dom_set(ctx->frame, "date", lab_dom_get(ctx->state, "date"));
@@ -514,12 +514,12 @@ static browser_jsref lab_flow_location_refresh_loc_refresh_populate(struct lab_f
     return lab_flow_call(ctx->frame, LOC_REFRESH_STATUS, "locApplyTown", 0, 0, 1, lab_dom_get(ctx->frame, "controls"));
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_current(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_current(struct lab_flow_location_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_COORDINATES, "requestCurrent", "current", 0, 1, ctx->request);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_coordinates(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_coordinates(struct lab_flow_location_refresh_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_location_jump(ctx->frame, LOC_REFRESH_FINISH);
@@ -529,7 +529,7 @@ static browser_jsref lab_flow_location_refresh_loc_refresh_coordinates(struct la
                          lab_dom_get(lab_dom_get(ctx->elements, "longitude"), "value"));
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_default(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_default(struct lab_flow_location_refresh_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "matched"))) {
         int options = lab_dom_object(LAB_VALUE_OBJECT);
@@ -541,12 +541,12 @@ static browser_jsref lab_flow_location_refresh_loc_refresh_default(struct lab_fl
     return lab_flow_location_refresh_loc_refresh_second_current(ctx);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_second_current(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_second_current(struct lab_flow_location_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_APPLY, "requestCurrent", "current", 0, 1, ctx->request);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_apply(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_apply(struct lab_flow_location_refresh_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_location_jump(ctx->frame, LOC_REFRESH_FINISH);
@@ -554,7 +554,7 @@ static browser_jsref lab_flow_location_refresh_loc_refresh_apply(struct lab_flow
                          lab_dom_get(ctx->frame, "controls"));
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_status(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_status(struct lab_flow_location_refresh_context *ctx)
 {
     if (lab_dom_equal(ctx->mode, lab_dom_string("almanac")))
         return lab_flow_call(ctx->frame, LOC_REFRESH_POST, "locStatus", 0, 0, 1,
@@ -563,7 +563,7 @@ static browser_jsref lab_flow_location_refresh_loc_refresh_status(struct lab_flo
     return lab_flow_location_refresh_loc_refresh_post(ctx);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_post(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_post(struct lab_flow_location_refresh_context *ctx)
 {
     int payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(payload, "jurisdiction", lab_dom_get(ctx->frame, "jurisdiction"));
@@ -571,12 +571,12 @@ static browser_jsref lab_flow_location_refresh_loc_refresh_post(struct lab_flow_
     return lab_flow_call(ctx->frame, LOC_REFRESH_RESPONSE_CURRENT, "post", "result", 1, 2, ctx->request, payload);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_response_current(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_response_current(struct lab_flow_location_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_RESPONSE_CONTEXT, "requestCurrent", "current", 0, 1, ctx->request);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_response_context(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_response_context(struct lab_flow_location_refresh_context *ctx)
 {
     int result = lab_dom_get(ctx->frame, "result");
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")) ||
@@ -586,32 +586,32 @@ static browser_jsref lab_flow_location_refresh_loc_refresh_response_context(stru
     return lab_flow_call(ctx->frame, LOC_REFRESH_RESPONSE, "locContext", "context", 0, 0);
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_response(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_response(struct lab_flow_location_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_ACCEPT, "locResponse", 0, 0, 5, ctx->mode,
                          lab_dom_get(lab_dom_get(ctx->frame, "result"), "data"), lab_dom_get(ctx->frame, "context"),
                          lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->update), lab_dom_get(ctx->frame, "townApplied"));
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_accept(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_accept(struct lab_flow_location_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_FINISH, "locAcceptContext", 0, 0, 1,
                          lab_dom_get(ctx->frame, "context"));
 }
 
-static browser_jsref lab_flow_location_refresh_loc_refresh_finish(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_loc_refresh_finish(struct lab_flow_location_refresh_context *ctx)
 {
     lab_dom_delete(ctx->frame, "failed");
     return lab_flow_call(ctx->frame, LOC_REFRESH_DONE, "locFinish", 0, 0, 1, ctx->request);
 }
 
-static browser_jsref lab_flow_location_refresh_otherwise(struct lab_flow_location_refresh_context *ctx)
+static jsref lab_flow_location_refresh_otherwise(struct lab_flow_location_refresh_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_location_refresh(frame_jsref frame)
+static jsref lab_flow_location_refresh(frame_jsref frame)
 {
     int mode = lab_dom_get(frame, "mode"), elements = lab_dom_get(frame, "elements");
     int request = lab_dom_get(frame, "request"), state = lab_dom_get(frame, "state");
@@ -624,7 +624,7 @@ static browser_jsref lab_flow_location_refresh(frame_jsref frame)
         .state = state,
         .update = update,
     };
-    static browser_jsref (*const handlers[])(struct lab_flow_location_refresh_context *) = {
+    static jsref (*const handlers[])(struct lab_flow_location_refresh_context *) = {
         [LOC_REFRESH_ELEMENTS]         = lab_flow_location_refresh_loc_refresh_elements,
         [LOC_REFRESH_CONTROLS]         = lab_flow_location_refresh_loc_refresh_controls,
         [LOC_REFRESH_BEGIN]            = lab_flow_location_refresh_loc_refresh_begin,
@@ -652,8 +652,8 @@ static browser_jsref lab_flow_location_refresh(frame_jsref frame)
 
 struct lab_flow_location_auto_context {
     frame_jsref frame;
-    browser_jsref mode;
-    browser_jsref options;
+    jsref mode;
+    jsref options;
     int almanac;
 };
 
@@ -662,21 +662,21 @@ struct lab_flow_location_auto_context {
  * @param ctx Automatic-location state containing calendar selection and jurisdiction/coordinate refresh options.
  * @return Scoped refresh plan, or the calendar-save plan when refresh is disabled.
  */
-static browser_jsref lab_flow_location_auto_refresh(struct lab_flow_location_auto_context *ctx);
+static jsref lab_flow_location_auto_refresh(struct lab_flow_location_auto_context *ctx);
 
 /**
  * @brief Save the selected calendar's automatic-location settings.
  * @param ctx Automatic-location state whose almanac flag selects the calendar and whose frame advances to stage 4.
  * @return Scoped plan calling the selected calendar-save service.
  */
-static browser_jsref lab_flow_location_auto_save(struct lab_flow_location_auto_context *ctx);
+static jsref lab_flow_location_auto_save(struct lab_flow_location_auto_context *ctx);
 
-static browser_jsref lab_flow_location_auto_current_mode(struct lab_flow_location_auto_context *ctx)
+static jsref lab_flow_location_auto_current_mode(struct lab_flow_location_auto_context *ctx)
 {
     return lab_flow_call(ctx->frame, 1, "currentMode", "currentMode", 0, 0);
 }
 
-static browser_jsref lab_flow_location_auto_loc_clear_almanac(struct lab_flow_location_auto_context *ctx)
+static jsref lab_flow_location_auto_loc_clear_almanac(struct lab_flow_location_auto_context *ctx)
 {
     if (!lab_dom_equal(ctx->mode, lab_dom_get(ctx->frame, "currentMode")))
         return lab_flow_done(0);
@@ -686,7 +686,7 @@ static browser_jsref lab_flow_location_auto_loc_clear_almanac(struct lab_flow_lo
     return lab_flow_location_auto_refresh(ctx);
 }
 
-static browser_jsref lab_flow_location_auto_refresh(struct lab_flow_location_auto_context *ctx)
+static jsref lab_flow_location_auto_refresh(struct lab_flow_location_auto_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->options, "refreshJurisdiction"))) {
         int refresh = lab_dom_object(LAB_VALUE_OBJECT);
@@ -698,30 +698,30 @@ static browser_jsref lab_flow_location_auto_refresh(struct lab_flow_location_aut
     return lab_flow_location_auto_save(ctx);
 }
 
-static browser_jsref lab_flow_location_auto_save(struct lab_flow_location_auto_context *ctx)
+static jsref lab_flow_location_auto_save(struct lab_flow_location_auto_context *ctx)
 {
     return lab_flow_call(ctx->frame, 4, ctx->almanac ? "locSaveAlmanac" : "locSaveDatetime", 0, 0, 0);
 }
 
-static browser_jsref lab_flow_location_auto_evaluate(struct lab_flow_location_auto_context *ctx)
+static jsref lab_flow_location_auto_evaluate(struct lab_flow_location_auto_context *ctx)
 {
     int evaluate = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(evaluate, "skipHistoryUpdate", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return lab_flow_call(ctx->frame, 5, ctx->almanac ? "locEvaluateAlmanac" : "locEvaluateDatetime", 0, 1, 1, evaluate);
 }
 
-static browser_jsref lab_flow_location_auto_update_history_buttons(struct lab_flow_location_auto_context *ctx)
+static jsref lab_flow_location_auto_update_history_buttons(struct lab_flow_location_auto_context *ctx)
 {
     return lab_flow_call(ctx->frame, 6, "updateHistoryButtons", 0, 0, 0);
 }
 
-static browser_jsref lab_flow_location_auto_otherwise(struct lab_flow_location_auto_context *ctx)
+static jsref lab_flow_location_auto_otherwise(struct lab_flow_location_auto_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_location_auto(frame_jsref frame)
+static jsref lab_flow_location_auto(frame_jsref frame)
 {
     int mode = lab_dom_get(frame, "mode"), options = lab_dom_get(frame, "options");
     int almanac = lab_dom_equal(mode, lab_dom_string("almanac"));
@@ -731,7 +731,7 @@ static browser_jsref lab_flow_location_auto(frame_jsref frame)
         .options = options,
         .almanac = almanac,
     };
-    static browser_jsref (*const handlers[])(struct lab_flow_location_auto_context *) = {
+    static jsref (*const handlers[])(struct lab_flow_location_auto_context *) = {
         [0] = lab_flow_location_auto_current_mode,
         [1] = lab_flow_location_auto_loc_clear_almanac,
         [2] = lab_flow_location_auto_refresh,
@@ -754,39 +754,39 @@ struct lab_flow_location_time_context {
  * @param ctx Time-change state whose frame receives context and resumes at stage 3.
  * @return Scoped request-context capture plan.
  */
-static browser_jsref lab_flow_location_time_request_context(struct lab_flow_location_time_context *ctx);
+static jsref lab_flow_location_time_request_context(struct lab_flow_location_time_context *ctx);
 
-static browser_jsref lab_flow_location_time_loc_time_snapshot(struct lab_flow_location_time_context *ctx)
+static jsref lab_flow_location_time_loc_time_snapshot(struct lab_flow_location_time_context *ctx)
 {
     return lab_flow_call(ctx->frame, 1, "locTimeSnapshot", "snapshot", 0, 0);
 }
 
-static browser_jsref lab_flow_location_time_loc_format_time(struct lab_flow_location_time_context *ctx)
+static jsref lab_flow_location_time_loc_format_time(struct lab_flow_location_time_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(7));
     return lab_flow_call(ctx->frame, 2, "locFormatTime", "formatted", 1, 1, lab_dom_get(ctx->snapshot, "authored"));
 }
 
-static browser_jsref lab_flow_location_time_caught(struct lab_flow_location_time_context *ctx)
+static jsref lab_flow_location_time_caught(struct lab_flow_location_time_context *ctx)
 {
     lab_dom_set(ctx->frame, "caught", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     /* Continue: recovery checks the same request and authored-value ownership. */
     return lab_flow_location_time_request_context(ctx);
 }
 
-static browser_jsref lab_flow_location_time_request_context(struct lab_flow_location_time_context *ctx)
+static jsref lab_flow_location_time_request_context(struct lab_flow_location_time_context *ctx)
 {
     return lab_flow_call(ctx->frame, 3, "requestContext", "context", 0, 0);
 }
 
-static browser_jsref lab_flow_location_time_loc_latest_main(struct lab_flow_location_time_context *ctx)
+static jsref lab_flow_location_time_loc_latest_main(struct lab_flow_location_time_context *ctx)
 {
     if (!lab_dom_equal(lab_dom_get(ctx->snapshot, "context"), lab_dom_get(ctx->frame, "context")))
         return lab_flow_done(0);
     return lab_flow_call(ctx->frame, 4, "locLatestMain", "main", 0, 0);
 }
 
-static browser_jsref lab_flow_location_time_loc_status(struct lab_flow_location_time_context *ctx)
+static jsref lab_flow_location_time_loc_status(struct lab_flow_location_time_context *ctx)
 {
     if (!lab_dom_equal(lab_dom_get(ctx->snapshot, "main"), lab_dom_get(ctx->frame, "main")) ||
         !lab_dom_equal(lab_dom_get(ctx->snapshot, "authored"),
@@ -800,20 +800,20 @@ static browser_jsref lab_flow_location_time_loc_status(struct lab_flow_location_
                          lab_dom_get(ctx->frame, "formatted"));
 }
 
-static browser_jsref lab_flow_location_time_otherwise(struct lab_flow_location_time_context *ctx)
+static jsref lab_flow_location_time_otherwise(struct lab_flow_location_time_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_location_time(frame_jsref frame)
+static jsref lab_flow_location_time(frame_jsref frame)
 {
     int snapshot = lab_dom_get(frame, "snapshot");
     struct lab_flow_location_time_context ctx = {
         .frame = frame,
         .snapshot = snapshot,
     };
-    static browser_jsref (*const handlers[])(struct lab_flow_location_time_context *) = {
+    static jsref (*const handlers[])(struct lab_flow_location_time_context *) = {
         [0] = lab_flow_location_time_loc_time_snapshot,
         [1] = lab_flow_location_time_loc_format_time,
         [7] = lab_flow_location_time_caught,
@@ -828,7 +828,7 @@ static browser_jsref lab_flow_location_time(frame_jsref frame)
 
 struct lab_flow_location_control_context {
     frame_jsref frame;
-    browser_jsref mode;
+    jsref mode;
     unsigned int actions;
 };
 
@@ -837,26 +837,26 @@ struct lab_flow_location_control_context {
  * @param ctx Location-control state whose frame receives currentMode and resumes at stage 5.
  * @return Scoped plan querying the current worksheet mode.
  */
-static browser_jsref lab_flow_location_control_current_mode(struct lab_flow_location_control_context *ctx);
+static jsref lab_flow_location_control_current_mode(struct lab_flow_location_control_context *ctx);
 
-static browser_jsref lab_flow_location_control_loc_elements(struct lab_flow_location_control_context *ctx)
+static jsref lab_flow_location_control_loc_elements(struct lab_flow_location_control_context *ctx)
 {
     return lab_flow_call(ctx->frame, 1, "locElements", "elements", 0, 1, ctx->mode);
 }
 
-static browser_jsref lab_flow_location_control_loc_controls(struct lab_flow_location_control_context *ctx)
+static jsref lab_flow_location_control_loc_controls(struct lab_flow_location_control_context *ctx)
 {
     if (ctx->actions & 4)
         return lab_flow_call(ctx->frame, 2, "locControls", "controls", 0, 1, ctx->mode);
     return lab_flow_location_jump(ctx->frame, 3);
 }
 
-static browser_jsref lab_flow_location_control_loc_apply_town(struct lab_flow_location_control_context *ctx)
+static jsref lab_flow_location_control_loc_apply_town(struct lab_flow_location_control_context *ctx)
 {
     return lab_flow_call(ctx->frame, 3, "locApplyTown", 0, 0, 1, lab_dom_get(ctx->frame, "controls"));
 }
 
-static browser_jsref lab_flow_location_control_loc_clear_custom(struct lab_flow_location_control_context *ctx)
+static jsref lab_flow_location_control_loc_clear_custom(struct lab_flow_location_control_context *ctx)
 {
     if (ctx->actions & 8) {
         int elements = lab_dom_get(ctx->frame, "elements");
@@ -868,12 +868,12 @@ static browser_jsref lab_flow_location_control_loc_clear_custom(struct lab_flow_
     return lab_flow_location_control_current_mode(ctx);
 }
 
-static browser_jsref lab_flow_location_control_current_mode(struct lab_flow_location_control_context *ctx)
+static jsref lab_flow_location_control_current_mode(struct lab_flow_location_control_context *ctx)
 {
     return lab_flow_call(ctx->frame, 5, "currentMode", "currentMode", 0, 0);
 }
 
-static browser_jsref lab_flow_location_control_complete(struct lab_flow_location_control_context *ctx)
+static jsref lab_flow_location_control_complete(struct lab_flow_location_control_context *ctx)
 {
     if (!lab_dom_equal(ctx->mode, lab_dom_get(ctx->frame, "currentMode")))
         return lab_flow_done(0);
@@ -886,13 +886,13 @@ static browser_jsref lab_flow_location_control_complete(struct lab_flow_location
                          0, 0, 1, options);
 }
 
-static browser_jsref lab_flow_location_control_otherwise(struct lab_flow_location_control_context *ctx)
+static jsref lab_flow_location_control_otherwise(struct lab_flow_location_control_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_location_control(frame_jsref frame)
+static jsref lab_flow_location_control(frame_jsref frame)
 {
     int mode = lab_dom_get(frame, "mode");
     unsigned actions = (unsigned)lab_dom_number(lab_dom_get(frame, "actions"));
@@ -901,7 +901,7 @@ static browser_jsref lab_flow_location_control(frame_jsref frame)
         .mode = mode,
         .actions = actions,
     };
-    static browser_jsref (*const handlers[])(struct lab_flow_location_control_context *) = {
+    static jsref (*const handlers[])(struct lab_flow_location_control_context *) = {
         [0] = lab_flow_location_control_loc_elements,
         [1] = lab_flow_location_control_loc_controls,
         [2] = lab_flow_location_control_loc_apply_town,
@@ -916,7 +916,7 @@ static browser_jsref lab_flow_location_control(frame_jsref frame)
 }
 
 /* Keep these synchronous effects separate from asynchronous request continuations. */
-void lab_flow_location_local(browser_jsref text, browser_jsref sections, browser_jsref body, browser_jsref card)
+void lab_flow_location_local(jsref text, jsref sections, jsref body, jsref card)
 {
     int frame = lab_dom_object(LAB_VALUE_OBJECT), plan = lab_dom_object(LAB_VALUE_OBJECT),
         calls = lab_dom_object(LAB_VALUE_ARRAY);
@@ -936,13 +936,13 @@ void lab_flow_location_local(browser_jsref text, browser_jsref sections, browser
 }
 
 /* Read current mode only after rendering, leaving empty-card hiding independent of mode. */
-void lab_flow_location_visibility(browser_jsref card, browser_jsref mode)
+void lab_flow_location_visibility(jsref card, jsref mode)
 {
     lab_dom_class(card, "hidden", !lab_dom_equal(mode, lab_dom_string("datetime")));
 }
 
 /* Callable-method detection belongs to the browser; preference and fallbacks are native policy. */
-void lab_flow_location_select(node_jsref select, browser_jsref capabilities)
+void lab_flow_location_select(node_jsref select, jsref capabilities)
 {
     int frame = lab_dom_object(LAB_VALUE_OBJECT), plan = lab_dom_object(LAB_VALUE_OBJECT);
     if (lab_dom_truth(select)) {
@@ -964,10 +964,10 @@ void lab_flow_location_picker(bool changed)
 }
 
 /* Dispatch a fixed group of independent workflows, with all persistent values in the browser frame. */
-browser_jsref lab_flow_location(lab_flow_location_kind_t kind, frame_jsref frame, view_jsref view)
+jsref lab_flow_location(lab_flow_location_kind_t kind, frame_jsref frame, view_jsref view)
 {
     (void)view;
-    static browser_jsref (*const handlers[])(browser_jsref) = {
+    static jsref (*const handlers[])(jsref) = {
         [LAB_FLOW_LOCATION_FORMS]         = lab_flow_location_forms,
         [LAB_FLOW_LOCATION_RESTORE]       = lab_flow_location_restore,
         [LAB_FLOW_LOCATION_POPULATE]      = lab_flow_location_populate,

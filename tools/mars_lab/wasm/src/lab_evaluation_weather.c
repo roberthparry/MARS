@@ -11,8 +11,8 @@
 #include "lab_dom.h"
 #include "lab_evaluation_weather.h"
 
-static void lab_evaluation_weather_emit(browser_jsref calls, const char *service, unsigned count, browser_jsref first,
-                                browser_jsref second)
+static void lab_evaluation_weather_emit(jsref calls, const char *service, unsigned count, jsref first,
+                                jsref second)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(args, first);
@@ -24,7 +24,7 @@ static void lab_evaluation_weather_emit(browser_jsref calls, const char *service
 }
 
 /* Publish inert service descriptions; the host owns freshness checks and catches installation failures. */
-void lab_evaluation_weather_response(lab_request_outcome_t outcome, browser_jsref overview, browser_jsref data)
+void lab_evaluation_weather_response(lab_request_outcome_t outcome, jsref overview, jsref data)
 {
     if (outcome != LAB_REQUEST_OUTCOME_FAILURE && outcome != LAB_REQUEST_OUTCOME_SUCCESS &&
         outcome != LAB_REQUEST_OUTCOME_EXCEPTION) {

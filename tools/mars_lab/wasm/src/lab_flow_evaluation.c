@@ -54,14 +54,14 @@ enum {
     lab_flow_eval_rethrow
 };
 
-static browser_jsref lab_flow_eval_native(frame_jsref frame, unsigned next, const char *entry, browser_jsref mode,
-                                browser_jsref phase, browser_jsref context, browser_jsref options, view_jsref view)
+static jsref lab_flow_eval_native(frame_jsref frame, unsigned next, const char *entry, jsref mode,
+                                jsref phase, jsref context, jsref options, view_jsref view)
 {
     return lab_flow_call(frame, next, "native", "plan", 0, 6, lab_dom_string(entry), mode, phase, context, options,
                          view);
 }
 
-static browser_jsref lab_flow_eval_current(frame_jsref frame, unsigned next)
+static jsref lab_flow_eval_current(frame_jsref frame, unsigned next)
 {
     return lab_flow_call(frame, next, "requestCurrent", "current", 0, 1, lab_dom_get(frame, "request"));
 }
@@ -70,13 +70,13 @@ static browser_jsref lab_flow_eval_current(frame_jsref frame, unsigned next)
 struct lab_flow_evaluation_context {
     frame_jsref frame;
     view_jsref view;
-    browser_jsref mode;
-    browser_jsref options;
-    browser_jsref context;
-    browser_jsref request;
-    browser_jsref preparation;
-    browser_jsref plan;
-    browser_jsref data;
+    jsref mode;
+    jsref options;
+    jsref context;
+    jsref request;
+    jsref preparation;
+    jsref plan;
+    jsref data;
 };
 
 /**
@@ -84,37 +84,37 @@ struct lab_flow_evaluation_context {
  * @param ctx Evaluation state borrowing the frame phase, mode, captured input context, options and view.
  * @return Scoped operation-plan handle that stores the setup plan and resumes at setup application.
  */
-static browser_jsref lab_flow_evaluation_setup(struct lab_flow_evaluation_context *ctx);
+static jsref lab_flow_evaluation_setup(struct lab_flow_evaluation_context *ctx);
 
 /**
  * @brief Record accepted input when required, otherwise reveal the result cards.
  * @param ctx Evaluation state carrying preparation flags, request ownership and captured expression text.
  * @return Scoped plan for input acceptance or result visibility.
  */
-static browser_jsref lab_flow_evaluation_previous(struct lab_flow_evaluation_context *ctx);
+static jsref lab_flow_evaluation_previous(struct lab_flow_evaluation_context *ctx);
 
 /**
  * @brief Reveal the result cards before updating evaluation status.
  * @param ctx Evaluation state whose frame advances to the status stage.
  * @return Scoped plan calling the browser result-visibility service.
  */
-static browser_jsref lab_flow_evaluation_show(struct lab_flow_evaluation_context *ctx);
+static jsref lab_flow_evaluation_show(struct lab_flow_evaluation_context *ctx);
 
 /**
  * @brief Dispatch the mode-specific evaluation request.
  * @param ctx Evaluation state carrying the numeric mode, request handle and captured expression text.
  * @return Scoped fetch plan awaiting a response, or a completion plan for an invalid mode.
  */
-static browser_jsref lab_flow_evaluation_fetch(struct lab_flow_evaluation_context *ctx);
+static jsref lab_flow_evaluation_fetch(struct lab_flow_evaluation_context *ctx);
 
 /**
  * @brief Propagate the retained evaluation exception after recovery.
  * @param ctx Evaluation state whose frame holds the exception and advances to completion.
  * @return Scoped plan asking the host to rethrow the stored exception.
  */
-static browser_jsref lab_flow_evaluation_rethrow(struct lab_flow_evaluation_context *ctx);
+static jsref lab_flow_evaluation_rethrow(struct lab_flow_evaluation_context *ctx);
 
-static browser_jsref lab_flow_evaluation_start(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_start(struct lab_flow_evaluation_context *ctx)
 {
     lab_dom_set(ctx->frame, "context", lab_dom_object(LAB_VALUE_OBJECT));
     lab_dom_set(ctx->frame, "phase", lab_dom_numeric(LAB_EVALUATION_SETUP_BINDINGS));
@@ -123,7 +123,7 @@ static browser_jsref lab_flow_evaluation_start(struct lab_flow_evaluation_contex
                          lab_dom_numeric(lab_dom_truth(lab_dom_get(ctx->options, "skipHistoryUpdate"))));
 }
 
-static browser_jsref lab_flow_evaluation_prepare(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_prepare(struct lab_flow_evaluation_context *ctx)
 {
     if (!ctx->preparation)
         return lab_flow_done(0);
@@ -131,13 +131,13 @@ static browser_jsref lab_flow_evaluation_prepare(struct lab_flow_evaluation_cont
     return lab_flow_evaluation_setup(ctx);
 }
 
-static browser_jsref lab_flow_evaluation_setup(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_setup(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_eval_native(ctx->frame, lab_flow_eval_setup_apply, "lab_evaluation_setup", ctx->mode,
                                 lab_dom_get(ctx->frame, "phase"), ctx->context, ctx->options, ctx->view);
 }
 
-static browser_jsref lab_flow_evaluation_setup_apply(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_setup_apply(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_effects(ctx->frame,
                             lab_dom_truth(lab_dom_get(ctx->plan, "wait")) ? lab_flow_eval_setup_current
@@ -145,12 +145,12 @@ static browser_jsref lab_flow_evaluation_setup_apply(struct lab_flow_evaluation_
                             ctx->plan);
 }
 
-static browser_jsref lab_flow_evaluation_setup_current(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_setup_current(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_eval_current(ctx->frame, lab_flow_eval_setup_next);
 }
 
-static browser_jsref lab_flow_evaluation_setup_next(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_setup_next(struct lab_flow_evaluation_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->plan, "wait")) && !lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_done(0);
@@ -163,7 +163,7 @@ static browser_jsref lab_flow_evaluation_setup_next(struct lab_flow_evaluation_c
                          lab_dom_get(ctx->context, "text"));
 }
 
-static browser_jsref lab_flow_evaluation_history(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_history(struct lab_flow_evaluation_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->preparation, "history")))
         return lab_flow_call(ctx->frame, lab_flow_eval_previous, "previousHistory", "previousState", 0, 1,
@@ -172,7 +172,7 @@ static browser_jsref lab_flow_evaluation_history(struct lab_flow_evaluation_cont
     return lab_flow_evaluation_previous(ctx);
 }
 
-static browser_jsref lab_flow_evaluation_previous(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_previous(struct lab_flow_evaluation_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->preparation, "input")))
         return lab_flow_call(ctx->frame, lab_flow_eval_input, "requestInput", "accepted", 0, 2, ctx->request,
@@ -180,7 +180,7 @@ static browser_jsref lab_flow_evaluation_previous(struct lab_flow_evaluation_con
     return lab_flow_call(ctx->frame, lab_flow_eval_status, "showResults", 0, 0, 0);
 }
 
-static browser_jsref lab_flow_evaluation_input(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_input(struct lab_flow_evaluation_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "accepted")))
         return lab_flow_done(0);
@@ -188,17 +188,17 @@ static browser_jsref lab_flow_evaluation_input(struct lab_flow_evaluation_contex
     return lab_flow_evaluation_show(ctx);
 }
 
-static browser_jsref lab_flow_evaluation_show(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_show(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_call(ctx->frame, lab_flow_eval_status, "showResults", 0, 0, 0);
 }
 
-static browser_jsref lab_flow_evaluation_status(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_status(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_call(ctx->frame, lab_flow_eval_guard, "setStatus", 0, 0, 1, lab_dom_get(ctx->preparation, "label"));
 }
 
-static browser_jsref lab_flow_evaluation_guard(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_guard(struct lab_flow_evaluation_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(lab_flow_eval_catch));
     if (lab_dom_truth(lab_dom_get(ctx->frame, "previousState")))
@@ -208,7 +208,7 @@ static browser_jsref lab_flow_evaluation_guard(struct lab_flow_evaluation_contex
     return lab_flow_evaluation_fetch(ctx);
 }
 
-static browser_jsref lab_flow_evaluation_fetch(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_fetch(struct lab_flow_evaluation_context *ctx)
 {
     static const char *const kinds[] = {"expression", "equation", "diffequation", "matrix",
                                        "integrator", "datetime", "almanac"};
@@ -222,7 +222,7 @@ static browser_jsref lab_flow_evaluation_fetch(struct lab_flow_evaluation_contex
     return lab_flow_call(ctx->frame, lab_flow_eval_outcome, "fetch", "response", 1, 2, fetch, ctx->request);
 }
 
-static browser_jsref lab_flow_evaluation_outcome(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_outcome(struct lab_flow_evaluation_context *ctx)
 {
     int response = lab_dom_get(ctx->frame, "response");
     ctx->data = lab_dom_get(response, "data");
@@ -231,14 +231,14 @@ static browser_jsref lab_flow_evaluation_outcome(struct lab_flow_evaluation_cont
                          lab_dom_get(response, "response"), ctx->data);
 }
 
-static browser_jsref lab_flow_evaluation_response(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_response(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_call(ctx->frame, lab_flow_eval_recover, "native", "responsePlan", 0, 6,
                          lab_dom_string("lab_evaluation_response"), ctx->mode, lab_dom_get(ctx->frame, "outcome"),
                          ctx->data, ctx->context, 0);
 }
 
-static browser_jsref lab_flow_evaluation_recover(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_recover(struct lab_flow_evaluation_context *ctx)
 {
     ctx->plan = lab_dom_get(ctx->frame, "responsePlan");
     if (!ctx->plan)
@@ -246,7 +246,7 @@ static browser_jsref lab_flow_evaluation_recover(struct lab_flow_evaluation_cont
     return lab_flow_effects(ctx->frame, lab_flow_eval_install, ctx->plan);
 }
 
-static browser_jsref lab_flow_evaluation_install(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_install(struct lab_flow_evaluation_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "responsePlan"), "install")))
         return lab_flow_call(ctx->frame, lab_flow_eval_installed, "installEvaluation", 0, 1, 5, ctx->mode, ctx->data,
@@ -254,25 +254,25 @@ static browser_jsref lab_flow_evaluation_install(struct lab_flow_evaluation_cont
     return lab_flow_call(ctx->frame, lab_flow_eval_ready, "commitModeState", 0, 0, 0);
 }
 
-static browser_jsref lab_flow_evaluation_installed(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_installed(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_eval_current(ctx->frame, lab_flow_eval_commit);
 }
 
-static browser_jsref lab_flow_evaluation_commit(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_commit(struct lab_flow_evaluation_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
     return lab_flow_call(ctx->frame, lab_flow_eval_ready, "commitModeState", 0, 0, 0);
 }
 
-static browser_jsref lab_flow_evaluation_ready(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_ready(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_call(ctx->frame, lab_flow_eval_weather_state, "setStatus", 0, 0, 1,
                          lab_dom_get(lab_dom_get(ctx->frame, "responsePlan"), "status"));
 }
 
-static browser_jsref lab_flow_evaluation_weather_state(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_weather_state(struct lab_flow_evaluation_context *ctx)
 {
     if ((lab_dom_number(ctx->mode) <= 2 || lab_dom_number(ctx->mode) == 4) &&
         lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "responsePlan"), "install")) &&
@@ -324,23 +324,23 @@ static browser_jsref lab_flow_evaluation_weather_state(struct lab_flow_evaluatio
     return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
 }
 
-static browser_jsref lab_flow_evaluation_plot_scheduled(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_plot_scheduled(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
 }
 
-static browser_jsref lab_flow_evaluation_weather(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_weather(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_call(ctx->frame, lab_flow_eval_finally, "refreshWeather", 0, 0, 3,
                          lab_dom_get(ctx->request, "token"), lab_dom_get(ctx->frame, "weatherState"), ctx->data);
 }
 
-static browser_jsref lab_flow_evaluation_finally(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_finally(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
 }
 
-static browser_jsref lab_flow_evaluation_finish(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_finish(struct lab_flow_evaluation_context *ctx)
 {
     lab_dom_delete(ctx->frame, "failed");
     if (lab_dom_truth(lab_dom_get(ctx->frame, "current")) && lab_dom_truth(lab_dom_get(ctx->preparation, "history")))
@@ -348,13 +348,13 @@ static browser_jsref lab_flow_evaluation_finish(struct lab_flow_evaluation_conte
     return lab_flow_done(0);
 }
 
-static browser_jsref lab_flow_evaluation_catch(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_catch(struct lab_flow_evaluation_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(lab_flow_eval_rethrow_current));
     return lab_flow_eval_current(ctx->frame, lab_flow_eval_caught);
 }
 
-static browser_jsref lab_flow_evaluation_caught(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_caught(struct lab_flow_evaluation_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_eval_current(ctx->frame, lab_flow_eval_finish);
@@ -364,22 +364,22 @@ static browser_jsref lab_flow_evaluation_caught(struct lab_flow_evaluation_conte
                          ctx->context, lab_dom_get(ctx->frame, "error"));
 }
 
-static browser_jsref lab_flow_evaluation_error_plan(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_error_plan(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_effects(ctx->frame, lab_flow_eval_error_effects, lab_dom_get(ctx->frame, "responsePlan"));
 }
 
-static browser_jsref lab_flow_evaluation_error_effects(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_error_effects(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_call(ctx->frame, lab_flow_eval_ready, "commitModeState", 0, 0, 0);
 }
 
-static browser_jsref lab_flow_evaluation_rethrow_current(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_rethrow_current(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_eval_current(ctx->frame, lab_flow_eval_rethrow_history);
 }
 
-static browser_jsref lab_flow_evaluation_rethrow_history(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_rethrow_history(struct lab_flow_evaluation_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->frame, "current")) && lab_dom_truth(lab_dom_get(ctx->preparation, "history")))
         return lab_flow_call(ctx->frame, lab_flow_eval_rethrow, "updateHistoryButtons", 0, 0, 0);
@@ -387,19 +387,19 @@ static browser_jsref lab_flow_evaluation_rethrow_history(struct lab_flow_evaluat
     return lab_flow_evaluation_rethrow(ctx);
 }
 
-static browser_jsref lab_flow_evaluation_rethrow(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_rethrow(struct lab_flow_evaluation_context *ctx)
 {
     return lab_flow_call(ctx->frame, lab_flow_eval_done, "rethrow", 0, 0, 1, lab_dom_get(ctx->frame, "exception"));
 }
 
-static browser_jsref lab_flow_evaluation_otherwise(struct lab_flow_evaluation_context *ctx)
+static jsref lab_flow_evaluation_otherwise(struct lab_flow_evaluation_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
 /* Advance one evaluation stage using only this call's borrowed frame handles. */
-browser_jsref lab_flow_evaluation(frame_jsref frame, view_jsref view)
+jsref lab_flow_evaluation(frame_jsref frame, view_jsref view)
 {
     unsigned stage = (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
     int mode = lab_dom_get(frame, "mode"), options = lab_dom_get(frame, "options");
@@ -417,7 +417,7 @@ browser_jsref lab_flow_evaluation(frame_jsref frame, view_jsref view)
         .plan = plan,
         .data = data,
     };
-    static browser_jsref (*const handlers[])(struct lab_flow_evaluation_context *) = {
+    static jsref (*const handlers[])(struct lab_flow_evaluation_context *) = {
         [lab_flow_eval_start]           = lab_flow_evaluation_start,
         [lab_flow_eval_prepare]         = lab_flow_evaluation_prepare,
         [lab_flow_eval_setup]           = lab_flow_evaluation_setup,
@@ -460,20 +460,20 @@ browser_jsref lab_flow_evaluation(frame_jsref frame, view_jsref view)
 struct lab_flow_install_context {
     frame_jsref frame;
     view_jsref view;
-    browser_jsref mode;
-    browser_jsref data;
-    browser_jsref context;
-    browser_jsref cards;
-    browser_jsref request;
+    jsref mode;
+    jsref data;
+    jsref context;
+    jsref cards;
+    jsref request;
 };
 
-static browser_jsref lab_flow_install_native(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_native(struct lab_flow_install_context *ctx)
 {
     return lab_flow_call(ctx->frame, 1, "native", "cards", 0, 5, lab_dom_string("lab_evaluation_cards"), ctx->mode,
                          ctx->data, lab_dom_get(ctx->context, "text"), lab_dom_get(ctx->view, "caches"));
 }
 
-static browser_jsref lab_flow_install_native_1(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_native_1(struct lab_flow_install_context *ctx)
 {
     return lab_flow_call(ctx->frame, 2, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), ctx->mode,
                          lab_dom_numeric(LAB_EVALUATION_INSTALL_PROJECT), lab_dom_get(ctx->frame, "outcome"),
@@ -481,12 +481,12 @@ static browser_jsref lab_flow_install_native_1(struct lab_flow_install_context *
                          ctx->view);
 }
 
-static browser_jsref lab_flow_install_apply_initial(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_apply_initial(struct lab_flow_install_context *ctx)
 {
     return lab_flow_effects(ctx->frame, 3, lab_dom_get(ctx->frame, "plan"));
 }
 
-static browser_jsref lab_flow_install_render_solver(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_render_solver(struct lab_flow_install_context *ctx)
 {
     if (lab_dom_number(ctx->mode) == 2 && lab_dom_truth(lab_dom_get(ctx->cards, "solver_source"))) {
         lab_dom_set(ctx->frame, "failed", lab_dom_numeric(5));
@@ -499,18 +499,18 @@ static browser_jsref lab_flow_install_render_solver(struct lab_flow_install_cont
                          ctx->view);
 }
 
-static browser_jsref lab_flow_install_solver_current(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_solver_current(struct lab_flow_install_context *ctx)
 {
     return lab_flow_eval_current(ctx->frame, 6);
 }
 
-static browser_jsref lab_flow_install_solver_failed(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_solver_failed(struct lab_flow_install_context *ctx)
 {
     lab_dom_delete(ctx->frame, "solver");
     return lab_flow_eval_current(ctx->frame, 6);
 }
 
-static browser_jsref lab_flow_install_solver_svg(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_solver_svg(struct lab_flow_install_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_done(0);
@@ -525,7 +525,7 @@ static browser_jsref lab_flow_install_solver_svg(struct lab_flow_install_context
                          ctx->view);
 }
 
-static browser_jsref lab_flow_install_native_7(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_native_7(struct lab_flow_install_context *ctx)
 {
     lab_dom_delete(ctx->frame, "failed");
     return lab_flow_call(ctx->frame, 8, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), ctx->mode,
@@ -534,19 +534,19 @@ static browser_jsref lab_flow_install_native_7(struct lab_flow_install_context *
                          ctx->view);
 }
 
-static browser_jsref lab_flow_install_apply_final(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_apply_final(struct lab_flow_install_context *ctx)
 {
     return lab_flow_effects(ctx->frame, 9, lab_dom_get(ctx->frame, "plan"));
 }
 
-static browser_jsref lab_flow_install_otherwise(struct lab_flow_install_context *ctx)
+static jsref lab_flow_install_otherwise(struct lab_flow_install_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
 /* Select the next guarded installation stage for the current evaluation. */
-browser_jsref lab_flow_install(frame_jsref frame, view_jsref view)
+jsref lab_flow_install(frame_jsref frame, view_jsref view)
 {
     unsigned stage = (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
     int mode = lab_dom_get(frame, "mode"), data = lab_dom_get(frame, "data");
@@ -561,7 +561,7 @@ browser_jsref lab_flow_install(frame_jsref frame, view_jsref view)
         .cards = cards,
         .request = request,
     };
-    static browser_jsref (*const handlers[])(struct lab_flow_install_context *) = {
+    static jsref (*const handlers[])(struct lab_flow_install_context *) = {
         [0] = lab_flow_install_native,
         [1] = lab_flow_install_native_1,
         [2] = lab_flow_install_apply_initial,

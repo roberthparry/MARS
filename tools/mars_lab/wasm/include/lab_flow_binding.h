@@ -48,7 +48,7 @@ typedef enum {
  * @param view Reserved scoped browser capability-view handle; unused because callbacks supply snapshots separately.
  * @return Scoped browser handle to a continuation plan, or a completed inert plan for unsupported indices.
  */
-browser_jsref lab_flow_binding(lab_flow_binding_kind_t kind, frame_jsref frame, view_jsref view);
+jsref lab_flow_binding(lab_flow_binding_kind_t kind, frame_jsref frame, view_jsref view);
 
 /** @brief Closed workflow selectors for lab_flow_binding_edit; numeric values are browser ABI. */
 typedef enum {
@@ -63,6 +63,6 @@ typedef enum {
  * @param frame Scoped browser handle to the mutable continuation frame holding stage, inputs and service results.
  * @return Scoped browser handle to a continuation plan, or an inert completion plan for unsupported indices.
  */
-browser_jsref lab_flow_binding_edit(lab_flow_binding_edit_kind_t kind, frame_jsref frame);
+jsref lab_flow_binding_edit(lab_flow_binding_edit_kind_t kind, frame_jsref frame);
 
 #endif

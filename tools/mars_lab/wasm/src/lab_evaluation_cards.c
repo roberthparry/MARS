@@ -18,30 +18,30 @@
 #include "lab_workspace_dom.h"
 #include "lab_evaluation_cards.h"
 
-static browser_jsref lab_evaluation_cards_or(browser_jsref value, browser_jsref fallback)
+static jsref lab_evaluation_cards_or(jsref value, jsref fallback)
 {
     return lab_dom_truth(value) ? value : fallback;
 }
 
-static browser_jsref lab_evaluation_cards_field(browser_jsref data, const char *key)
+static jsref lab_evaluation_cards_field(jsref data, const char *key)
 {
     return lab_evaluation_cards_or(lab_dom_get(data, key), lab_dom_string(""));
 }
 
-static browser_jsref lab_evaluation_cards_compact(browser_jsref caches, browser_jsref source)
+static jsref lab_evaluation_cards_compact(jsref caches, jsref source)
 {
     int editor = lab_dom_map_get(lab_dom_get(caches, "editors"), lab_dom_clean(source, LAB_DOM_CLEAN_TRIM));
     return editor ? lab_dom_get(editor, "display") : source;
 }
 
-static void lab_evaluation_cards_pair(browser_jsref plan, const char *short_key, const char *full_key,
-                                browser_jsref short_text, browser_jsref full)
+static void lab_evaluation_cards_pair(jsref plan, const char *short_key, const char *full_key,
+                                jsref short_text, jsref full)
 {
     lab_dom_set(plan, short_key, short_text);
     lab_dom_set(plan, full_key, full);
 }
 
-static browser_jsref lab_evaluation_cards_join(browser_jsref first, browser_jsref second, const char *separator)
+static jsref lab_evaluation_cards_join(jsref first, jsref second, const char *separator)
 {
     if (!lab_dom_truth(first))
         return second;
@@ -50,14 +50,14 @@ static browser_jsref lab_evaluation_cards_join(browser_jsref first, browser_jsre
     return lab_dom_join(lab_dom_join(first, lab_dom_string(separator), ""), second, "");
 }
 
-static browser_jsref lab_evaluation_cards_label(browser_jsref data, const char *key, const char *label)
+static jsref lab_evaluation_cards_label(jsref data, const char *key, const char *label)
 {
     int value = lab_evaluation_cards_field(data, key);
     return lab_dom_truth(value) ? lab_dom_join(lab_dom_string(label), value, "") : value;
 }
 
-static void lab_evaluation_cards_expression(browser_jsref plan, browser_jsref data, browser_jsref text,
-                                browser_jsref caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_expression(jsref plan, jsref data, jsref text,
+                                jsref caches, lab_evaluation_card_kind_t kind)
 {
     int expression = lab_evaluation_cards_field(data, "expression");
     if (kind == LAB_EVALUATION_CARDS_GOAL)
@@ -88,8 +88,8 @@ static void lab_evaluation_cards_expression(browser_jsref plan, browser_jsref da
                                              lab_dom_clean(text, LAB_DOM_CLEAN_TRIM))));
 }
 
-static void lab_evaluation_cards_equation(browser_jsref plan, browser_jsref data, browser_jsref text,
-                                browser_jsref caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_equation(jsref plan, jsref data, jsref text,
+                                jsref caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)kind;
@@ -107,8 +107,8 @@ static void lab_evaluation_cards_equation(browser_jsref plan, browser_jsref data
     lab_dom_set(plan, "expandable", lab_dom_scalar(LAB_VALUE_BOOLEAN, expand));
 }
 
-static void lab_evaluation_cards_diffequation(browser_jsref plan, browser_jsref data, browser_jsref text,
-                                browser_jsref caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_diffequation(jsref plan, jsref data, jsref text,
+                                jsref caches, lab_evaluation_card_kind_t kind)
 {
     (void)kind;
     int problem = lab_evaluation_cards_or(lab_dom_get(data, "problem"), text);
@@ -133,8 +133,8 @@ static void lab_evaluation_cards_diffequation(browser_jsref plan, browser_jsref 
                                                                 lab_evaluation_cards_field(data, "status"))));
 }
 
-static void lab_evaluation_cards_matrix(browser_jsref plan, browser_jsref data, browser_jsref text,
-                                browser_jsref caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_matrix(jsref plan, jsref data, jsref text,
+                                jsref caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)caches;
@@ -144,8 +144,8 @@ static void lab_evaluation_cards_matrix(browser_jsref plan, browser_jsref data, 
                                                            : lab_dom_string(""));
 }
 
-static void lab_evaluation_cards_integrator(browser_jsref plan, browser_jsref data, browser_jsref text,
-                                browser_jsref caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_integrator(jsref plan, jsref data, jsref text,
+                                jsref caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)caches;
@@ -159,8 +159,8 @@ static void lab_evaluation_cards_integrator(browser_jsref plan, browser_jsref da
     lab_dom_set(plan, "value", lab_evaluation_cards_field(metadata, "value_text"));
 }
 
-static void lab_evaluation_cards_datetime(browser_jsref plan, browser_jsref data, browser_jsref text,
-                                browser_jsref caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_datetime(jsref plan, jsref data, jsref text,
+                                jsref caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)caches;
@@ -186,7 +186,7 @@ static void lab_evaluation_cards_datetime(browser_jsref plan, browser_jsref data
 }
 
 /* Return one native card plan; kind 7 denotes goal results, otherwise normal worksheet kind indices apply. */
-void lab_evaluation_cards(lab_evaluation_card_kind_t kind, browser_jsref data, browser_jsref text, browser_jsref caches)
+void lab_evaluation_cards(lab_evaluation_card_kind_t kind, jsref data, jsref text, jsref caches)
 {
     /**
      * @brief Populate a card plan for the selected presentation kind.
@@ -196,8 +196,8 @@ void lab_evaluation_cards(lab_evaluation_card_kind_t kind, browser_jsref data, b
      * @param caches Scoped native-text caches.
      * @param kind Worksheet-compatible presentation kind or LAB_EVALUATION_CARDS_GOAL.
      */
-    typedef void (*lab_evaluation_cards_handler_t)(browser_jsref plan, browser_jsref data, browser_jsref text,
-                                                  browser_jsref caches,
+    typedef void (*lab_evaluation_cards_handler_t)(jsref plan, jsref data, jsref text,
+                                                  jsref caches,
                                                   lab_evaluation_card_kind_t kind);
     static const lab_evaluation_cards_handler_t handlers[] = {
         [LAB_EVALUATION_CARDS_EXPRESSION]            = lab_evaluation_cards_expression,
@@ -224,7 +224,7 @@ void lab_evaluation_cards(lab_evaluation_card_kind_t kind, browser_jsref data, b
 }
 
 /* Update notes before deriving value-card visibility from the installed text. */
-static void lab_evaluation_cards_present_expression(browser_jsref data)
+static void lab_evaluation_cards_present_expression(jsref data)
 {
     lab_evaluation_notes(data);
     int value = lab_dom_read(lab_dom_query(0, "#value"), LAB_DOM_TEXT, "");
@@ -232,14 +232,14 @@ static void lab_evaluation_cards_present_expression(browser_jsref data)
 }
 
 /* Clear equation formatting on the differential-equation detail card. */
-static void lab_evaluation_cards_present_diffequation(browser_jsref data)
+static void lab_evaluation_cards_present_diffequation(jsref data)
 {
     (void)data;
     lab_dom_class(lab_dom_query(0, "#functionStyle"), "equation-function", 0);
 }
 
 /* Synchronise a supplied matrix operation after updating the value title. */
-static void lab_evaluation_cards_present_matrix(browser_jsref data)
+static void lab_evaluation_cards_present_matrix(jsref data)
 {
     lab_dom_write(lab_dom_query(0, "#valueTitle"), LAB_DOM_TEXT, "", lab_dom_string("Value"));
     int operation = lab_dom_get(data, "operation"), select = lab_dom_query(0, "#matrixOperation");
@@ -253,17 +253,17 @@ static void lab_evaluation_cards_present_matrix(browser_jsref data)
 }
 
 /* Calendar presentations do not expose a rendered-card expansion control. */
-static void lab_evaluation_cards_present_calendar(browser_jsref data)
+static void lab_evaluation_cards_present_calendar(jsref data)
 {
     (void)data;
     lab_layout_more(lab_dom_query(0, "#renderedMore"), 0);
 }
 
 /* Project mode-specific notes, controls and visibility after the text-card services have run. */
-void lab_evaluation_cards_present(lab_mode_t mode, browser_jsref data)
+void lab_evaluation_cards_present(lab_mode_t mode, jsref data)
 {
     /** @brief Optional presentation effects indexed by the worksheet ABI mode. */
-    static void (*const handlers[LAB_MODE_COUNT])(browser_jsref) = {
+    static void (*const handlers[LAB_MODE_COUNT])(jsref) = {
         [LAB_MODE_EXPRESSION]            = lab_evaluation_cards_present_expression,
         [LAB_MODE_EQUATION]              = 0,
         [LAB_MODE_DIFFERENTIAL_EQUATION] = lab_evaluation_cards_present_diffequation,
@@ -276,7 +276,7 @@ void lab_evaluation_cards_present(lab_mode_t mode, browser_jsref data)
         handlers[mode](data);
 }
 
-static browser_jsref lab_evaluation_cards_copy(browser_jsref source)
+static jsref lab_evaluation_cards_copy(jsref source)
 {
     int copy = lab_dom_object(LAB_VALUE_OBJECT), keys = lab_dom_keys(source);
     for (unsigned i = 0; i < lab_dom_count(keys); ++i) {
@@ -289,7 +289,7 @@ static browser_jsref lab_evaluation_cards_copy(browser_jsref source)
 }
 
 /* Return the weather request state with native-evaluation date/location precedence and string coercion. */
-void lab_evaluation_weather_state(browser_jsref state, browser_jsref data)
+void lab_evaluation_weather_state(jsref state, jsref data)
 {
     int copy = lab_evaluation_cards_copy(state), fields = lab_dom_get(data, "fields");
     static const char *const keys[] = {"date", "latitude", "longitude"};
@@ -301,7 +301,7 @@ void lab_evaluation_weather_state(browser_jsref state, browser_jsref data)
 }
 
 /* Replace exact Weather sections while preserving native order, markup and copy text. */
-void lab_evaluation_weather_cards(browser_jsref overview, browser_jsref weather)
+void lab_evaluation_weather_cards(jsref overview, jsref weather)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT), sections = lab_dom_object(LAB_VALUE_ARRAY);
     const int sources[] = {overview, weather};
@@ -327,7 +327,7 @@ void lab_evaluation_weather_cards(browser_jsref overview, browser_jsref weather)
 }
 
 /* Reveal an eligible goal target, or return the source/target pair for the browser's asynchronous request. */
-void lab_evaluation_goal_start(lab_mode_t mode, browser_jsref text)
+void lab_evaluation_goal_start(lab_mode_t mode, jsref text)
 {
     lab_dom_return(0);
     if (mode != LAB_MODE_EXPRESSION || !lab_dom_truth(text))

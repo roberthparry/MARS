@@ -9,7 +9,7 @@
 #include "tba_view.h"
 
 /* Publish one completed forecast and its downloadable result. */
-void tba_view_result(browser_jsref data)
+void tba_view_result(jsref data)
 {
     tba_ui_store("result", data);
     int multi = tba_dom_truth(tba_dom_get(data, "multi"));

@@ -32,7 +32,7 @@ typedef enum {
 } lab_workspace_calculus_action_t;
 
 /* Validate decoded data without cloning state or substituting the application's default mode catalogue. */
-void lab_workspace_snapshot_validate(browser_jsref envelope, browser_jsref mode_names)
+void lab_workspace_snapshot_validate(jsref envelope, jsref mode_names)
 {
     lab_value_kind_t kind = lab_dom_type(envelope);
     if ((kind != LAB_VALUE_ARRAY && kind != LAB_VALUE_OBJECT) || !lab_dom_property_present(envelope, "state")) {
@@ -219,7 +219,7 @@ void lab_workspace_dom_labels(lab_mode_t mode)
 }
 
 /* Compose a status label without exposing precision formatting policy to the host. */
-void lab_workspace_dom_status(browser_jsref text)
+void lab_workspace_dom_status(jsref text)
 {
     unsigned bits = lab_workspace_requested_precision(lab_workspace_mode());
     int digits = lab_dom_format(lab_workspace_digits(bits), " · ", " digits / ");
@@ -228,7 +228,7 @@ void lab_workspace_dom_status(browser_jsref text)
 }
 
 /* Apply one selected tab and its keyboard/accessibility state to the supplied registration list. */
-void lab_workspace_dom_tabs(browser_jsref tabs, browser_jsref mode)
+void lab_workspace_dom_tabs(jsref tabs, jsref mode)
 {
     for (unsigned i = 0; i < lab_dom_count(tabs); ++i) {
         unsigned mark = lab_dom_mark();
@@ -242,7 +242,7 @@ void lab_workspace_dom_tabs(browser_jsref tabs, browser_jsref mode)
 }
 
 /* Install the four titles and expose Function execution only for its native representation. */
-void lab_workspace_dom_titles(browser_jsref rendered, browser_jsref parsed, browser_jsref function, browser_jsref value)
+void lab_workspace_dom_titles(jsref rendered, jsref parsed, jsref function, jsref value)
 {
     lab_dom_write(lab_dom_query(0, "#renderedTitle"), LAB_DOM_TEXT, "", rendered);
     lab_dom_write(lab_dom_query(0, "#parsedTitle"), LAB_DOM_TEXT, "", parsed);
@@ -251,7 +251,7 @@ void lab_workspace_dom_titles(browser_jsref rendered, browser_jsref parsed, brow
     lab_workspace_dom_hidden("#functionRun", !lab_dom_equal(function, lab_dom_string("Function")));
 }
 
-static void lab_workspace_dom_card(browser_jsref card, int visible)
+static void lab_workspace_dom_card(jsref card, int visible)
 {
     if (!card)
         return;
@@ -285,7 +285,7 @@ void lab_workspace_dom_value(bool visible)
 }
 
 /* Project native mode policy and labels; supplied coverage text remains opaque catalogue data. */
-void lab_workspace_dom_mode(lab_mode_t mode, browser_jsref coverage)
+void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage)
 {
     lab_precision_close(0);
     if ((unsigned)mode >= LAB_MODE_COUNT)
@@ -342,7 +342,7 @@ void lab_workspace_dom_matrix(lab_mode_t mode)
 }
 
 /* Help tags are UI metadata, matched exactly after browser Unicode trimming. */
-void lab_workspace_dom_help_cards(browser_jsref cards, browser_jsref mode)
+void lab_workspace_dom_help_cards(jsref cards, jsref mode)
 {
     for (unsigned i = 0; i < lab_dom_count(cards); ++i) {
         unsigned mark = lab_dom_mark();
@@ -440,7 +440,7 @@ void lab_workspace_dom_controls(lab_mode_t mode, bool busy, bool ready, unsigned
     lab_workspace_dom_precision_slider(lab_workspace_requested_precision(mode));
 }
 
-static void lab_workspace_dom_disable_list(browser_jsref controls, int busy, int preserve)
+static void lab_workspace_dom_disable_list(jsref controls, int busy, int preserve)
 {
     for (unsigned i = 0; i < lab_dom_count(controls); ++i) {
         unsigned mark = lab_dom_mark();
@@ -460,7 +460,7 @@ static void lab_workspace_dom_disable_list(browser_jsref controls, int busy, int
 }
 
 /* Repeated busy notifications preserve the initial disabled state of calendar and bounds controls. */
-void lab_workspace_dom_busy(bool busy, browser_jsref equation_variable, browser_jsref copies, browser_jsref digits)
+void lab_workspace_dom_busy(bool busy, jsref equation_variable, jsref copies, jsref digits)
 {
     static const char *const retained[] = {"#integratorBoundStack", "#datetimeControls", "#almanacControls"};
     /* Scope each bounded control group so large result SVGs are never traversed. */
@@ -485,7 +485,7 @@ void lab_workspace_dom_busy(bool busy, browser_jsref equation_variable, browser_
 }
 
 /* Apply running styling without leaving a false aria-busy attribute behind. */
-void lab_workspace_dom_running(browser_jsref button, bool running)
+void lab_workspace_dom_running(jsref button, bool running)
 {
     lab_dom_class(button, "action-running", running);
     if (running)
@@ -495,12 +495,12 @@ void lab_workspace_dom_running(browser_jsref button, bool running)
 }
 
 /* Disconnected, collapsed and zero-height editors cannot acquire a manual resize grip. */
-bool lab_workspace_dom_editor_visible(browser_jsref editor)
+bool lab_workspace_dom_editor_visible(jsref editor)
 {
     return lab_dom_measure(editor, LAB_DOM_MEASURE_VISIBLE) != 0 && lab_dom_measure(editor, LAB_DOM_MEASURE_CLIENT_HEIGHT) > 0;
 }
 
-static void lab_workspace_dom_editor_clear(browser_jsref editor)
+static void lab_workspace_dom_editor_clear(jsref editor)
 {
     lab_dom_class(editor, "editor-manual-size", 0);
     lab_dom_class(editor, "editor-space-limited", 0);
@@ -510,7 +510,7 @@ static void lab_workspace_dom_editor_clear(browser_jsref editor)
 }
 
 /* Clear only editor sizing state, preserving all other authored inline styles. */
-void lab_workspace_dom_editor_reset(browser_jsref editors)
+void lab_workspace_dom_editor_reset(jsref editors)
 {
     for (unsigned i = 0; i < lab_dom_count(editors); ++i) {
         unsigned mark = lab_dom_mark();
@@ -520,7 +520,7 @@ void lab_workspace_dom_editor_reset(browser_jsref editors)
 }
 
 /* Measure the registered editors then apply one shared viewport budget to the visible set. */
-void lab_workspace_dom_editor_resize(browser_jsref editors, double viewport)
+void lab_workspace_dom_editor_resize(jsref editors, double viewport)
 {
     unsigned visible = 0;
     for (unsigned i = 0; i < lab_dom_count(editors); ++i) {
@@ -561,7 +561,7 @@ void lab_workspace_dom_editor_resize(browser_jsref editors, double viewport)
 }
 
 /* Build ordered calculus and expression-plot actions from opaque names and native display labels. */
-void lab_workspace_dom_derivatives(browser_jsref names, browser_jsref labels, bool differentiable)
+void lab_workspace_dom_derivatives(jsref names, jsref labels, bool differentiable)
 {
     int panel = lab_dom_query(0, "#derivativeButtons");
     lab_workspace_dom_text(panel, LAB_DOM_TEXT, "", "");
@@ -595,7 +595,7 @@ void lab_workspace_dom_derivatives(browser_jsref names, browser_jsref labels, bo
 }
 
 /* Reuse native binding labels and the existing calculus renderer with bounded temporary handles. */
-void lab_workspace_dom_calculus(browser_jsref names, bool differentiable)
+void lab_workspace_dom_calculus(jsref names, bool differentiable)
 {
     unsigned scope = lab_dom_mark();
     int labels = lab_dom_object(LAB_VALUE_ARRAY);
@@ -608,7 +608,7 @@ void lab_workspace_dom_calculus(browser_jsref names, bool differentiable)
     lab_dom_release(scope);
 }
 
-static browser_jsref lab_workspace_dom_copy_object(browser_jsref source)
+static jsref lab_workspace_dom_copy_object(jsref source)
 {
     int copy = lab_dom_object(LAB_VALUE_OBJECT), keys = lab_dom_keys(source);
     for (unsigned i = 0; i < lab_dom_count(keys); ++i) {
@@ -620,7 +620,7 @@ static browser_jsref lab_workspace_dom_copy_object(browser_jsref source)
     return copy;
 }
 
-static browser_jsref lab_workspace_dom_capture(node_jsref node, int button)
+static jsref lab_workspace_dom_capture(node_jsref node, int button)
 {
     int state = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(state, "className", lab_dom_get(node, "className"));
@@ -642,7 +642,7 @@ void lab_workspace_dom_snapshot(node_jsref node, bool button)
 }
 
 /* Remove obsolete dataset entries before restoring the captured, opaque native presentation. */
-void lab_workspace_dom_restore(node_jsref node, browser_jsref state, bool button)
+void lab_workspace_dom_restore(node_jsref node, jsref state, bool button)
 {
     lab_dom_write(node, LAB_DOM_ATTRIBUTE, "class", lab_dom_get(state, "className"));
     if (button) {
@@ -691,7 +691,7 @@ static const char *const lab_workspace_dom_result_titles[] = {
     "#rightPaneTitle", "#renderedTitle", "#parsedTitle", "#functionTitle", "#valueTitle"};
 
 /* Share the exact metadata defaults between snapshot capture and legacy snapshot restoration. */
-static browser_jsref lab_workspace_dom_result_metadata(browser_jsref source)
+static jsref lab_workspace_dom_result_metadata(jsref source)
 {
     int state = lab_dom_object(LAB_VALUE_OBJECT);
     static const char *const text_fields[] = {"lastTex", "lastDerivativeExpression"};
@@ -725,7 +725,7 @@ void lab_workspace_dom_result_states(void)
 }
 
 /* Assemble a complete mode result snapshot with normalised, independently owned metadata. */
-void lab_workspace_dom_result_save(browser_jsref metadata)
+void lab_workspace_dom_result_save(jsref metadata)
 {
     if (!lab_workspace_dom_has_result()) {
         lab_dom_return(0);
@@ -757,7 +757,7 @@ void lab_workspace_dom_result_save(browser_jsref metadata)
 }
 
 /* Restore cards and reusable input before returning fresh globals for calculus controls and fitting. */
-void lab_workspace_dom_result_restore(browser_jsref state)
+void lab_workspace_dom_result_restore(jsref state)
 {
     lab_layout_plot_camera(1);
     lab_plot_slices_clear();

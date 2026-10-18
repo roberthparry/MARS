@@ -38,7 +38,7 @@ bool lab_flow_request_truth(frame_jsref frame, const char *key);
  * @param fallback NUL-terminated text used when value is falsey.
  * @return The original handle when truthy, otherwise a scoped handle for the fallback string.
  */
-browser_jsref lab_flow_request_fallback(browser_jsref value, const char *fallback);
+jsref lab_flow_request_fallback(jsref value, const char *fallback);
 
 /**
  * @brief Schedule an ownership check before a request continuation.
@@ -46,21 +46,21 @@ browser_jsref lab_flow_request_fallback(browser_jsref value, const char *fallbac
  * @param next Continuation-stage index stored in frame for resumption after the ownership check.
  * @return Scoped operation-plan handle calling requestCurrent.
  */
-browser_jsref lab_flow_request_current(frame_jsref frame, unsigned next);
+jsref lab_flow_request_current(frame_jsref frame, unsigned next);
 
 /**
  * @brief Read the transport response from the retained request result.
  * @param frame Borrowed browser frame whose result object contains response.
  * @return Scoped handle for result.response, or the bridge's absent-value handle when missing.
  */
-browser_jsref lab_flow_request_response(frame_jsref frame);
+jsref lab_flow_request_response(frame_jsref frame);
 
 /**
  * @brief Read the decoded native payload from the retained request result.
  * @param frame Borrowed browser frame whose result object contains data.
  * @return Scoped handle for result.data, or the bridge's absent-value handle when missing.
  */
-browser_jsref lab_flow_request_data(frame_jsref frame);
+jsref lab_flow_request_data(frame_jsref frame);
 
 /**
  * @brief Advance the calculus or plot request through its continuation table.
@@ -68,6 +68,6 @@ browser_jsref lab_flow_request_data(frame_jsref frame);
  *   results.
  * @return Scoped operation or completion plan for the selected calculus/plot stage.
  */
-browser_jsref lab_flow_request_calculus(frame_jsref frame);
+jsref lab_flow_request_calculus(frame_jsref frame);
 
 #endif

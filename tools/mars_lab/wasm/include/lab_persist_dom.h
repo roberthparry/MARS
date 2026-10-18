@@ -31,7 +31,7 @@ void lab_persist_schema(lab_mode_t mode);
  * @param precision Scoped browser handle to the precision-in-bits value copied to server.precision_bits.
  * @details Publishes an object with local and server records; omitted local values preserve previous storage.
  */
-void lab_persist_records(lab_mode_t mode, browser_jsref sources, browser_jsref precision);
+void lab_persist_records(lab_mode_t mode, jsref sources, jsref precision);
 
 /**
  * @brief Publish a mode's history snapshot from current controls through lab_dom_return.
@@ -43,8 +43,8 @@ void lab_persist_records(lab_mode_t mode, browser_jsref sources, browser_jsref p
  * @param config Scoped bootstrap-defaults record handle supplying equation-variable and calendar-summary fallbacks.
  * @details Publishes null for an unsupported mode; the host owns the resulting snapshot across calls.
  */
-void lab_persist_history(lab_mode_t mode, browser_jsref text, browser_jsref calendar, browser_jsref bounds,
-                         browser_jsref cap, browser_jsref config);
+void lab_persist_history(lab_mode_t mode, jsref text, jsref calendar, jsref bounds,
+                         jsref cap, jsref config);
 
 /**
  * @brief Publish a calendar's server save record through lab_dom_return.
@@ -53,6 +53,6 @@ void lab_persist_history(lab_mode_t mode, browser_jsref text, browser_jsref cale
  * @param precision Scoped browser handle to the precision-in-bits value copied to precision_bits.
  * @details Calendar field names receive the datetime_ or almanac_ prefix; no storage or network write is performed.
  */
-void lab_persist_calendar(lab_mode_t mode, browser_jsref state, browser_jsref precision);
+void lab_persist_calendar(lab_mode_t mode, jsref state, jsref precision);
 
 #endif

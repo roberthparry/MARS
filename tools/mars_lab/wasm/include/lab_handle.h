@@ -13,28 +13,28 @@
 #define MARS_LAB_HANDLE_H
 
 /** @brief Borrowed browser value, array or object in the current bridge scope. */
-typedef int browser_jsref;
+typedef int jsref;
 
 /** @brief Borrowed DOM node or event target in the current browser bridge scope. */
-typedef browser_jsref node_jsref;
+typedef jsref node_jsref;
 
 /** @brief Borrowed browser event in the current browser bridge scope. */
-typedef browser_jsref event_jsref;
+typedef jsref event_jsref;
 
 /** @brief Borrowed SVG plot chart carrying native geometry metadata. */
 typedef node_jsref chart_jsref;
 
 /** @brief Borrowed mutable browser record describing a plot gesture. */
-typedef browser_jsref gesture_jsref;
+typedef jsref gesture_jsref;
 
 /** @brief Borrowed browser continuation or projection frame. */
-typedef browser_jsref frame_jsref;
+typedef jsref frame_jsref;
 
 /** @brief Borrowed browser view supplying live state and presentation resources. */
-typedef browser_jsref view_jsref;
+typedef jsref view_jsref;
 
 /** @brief Borrowed browser snapshot used for restoration or freshness checks. */
-typedef browser_jsref snapshot_jsref;
+typedef jsref snapshot_jsref;
 
 /**
  * @brief Borrowed value in the codec's separate synchronous handle table.

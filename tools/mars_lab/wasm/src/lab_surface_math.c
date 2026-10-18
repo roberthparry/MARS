@@ -44,13 +44,13 @@ double lab_surface_log2(double value)
     return log2(value);
 }
 
-static void read_vector(browser_jsref handle, double *values, unsigned count)
+static void read_vector(jsref handle, double *values, unsigned count)
 {
     for (unsigned i = 0; i < count; ++i)
         values[i] = lab_dom_to_number(lab_dom_item(handle, i));
 }
 
-static browser_jsref vector(const double *values, unsigned count)
+static jsref vector(const double *values, unsigned count)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < count; ++i)
@@ -144,7 +144,7 @@ static void to_angles(double q[4], const double previous[3], double out[3])
     out[2] = wrap(r);
 }
 
-static void ball(const double p[2], browser_jsref box, double out[3])
+static void ball(const double p[2], jsref box, double out[3])
 {
     double width = lab_dom_to_number(lab_dom_get(box, "width"));
     double height = lab_dom_to_number(lab_dom_get(box, "height"));
@@ -164,7 +164,7 @@ static void ball(const double p[2], browser_jsref box, double out[3])
 struct lab_surface_camera_context {
     double *first;
     double *result;
-    browser_jsref second, third, box;
+    jsref second, third, box;
     int roll;
 };
 
@@ -220,8 +220,8 @@ static void camera_drag(struct lab_surface_camera_context *ctx)
 }
 
 /* Bounded dispatch retains the first-operand reads and zero result for unknown actions. */
-void lab_surface_camera(lab_surface_camera_action_t action, browser_jsref first, browser_jsref second,
-                        browser_jsref third, browser_jsref box, bool roll)
+void lab_surface_camera(lab_surface_camera_action_t action, jsref first, jsref second,
+                        jsref third, jsref box, bool roll)
 {
     /** @brief Camera operation with first-operand and result sizes; nine results form three rows. */
     static const struct {

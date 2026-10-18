@@ -14,7 +14,7 @@
 #include "lab_plot_slices.h"
 #include "lab_plot_controls.h"
 
-static browser_jsref value(const char *id)
+static jsref value(const char *id)
 {
     return lab_dom_read(lab_dom_id(id), LAB_DOM_VALUE, "");
 }
@@ -88,7 +88,7 @@ void lab_plot_controls_reset(void)
     lab_plot_controls_sync();
 }
 
-static lab_plot_group_t control_index(browser_jsref name)
+static lab_plot_group_t control_index(jsref name)
 {
     /* Five fixed UI groups; mathematical symbol lookup remains with native binding metadata. */
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i)
@@ -98,7 +98,7 @@ static lab_plot_group_t control_index(browser_jsref name)
 }
 
 /* Index authored binding values once; plotting names come from the native catalogue. */
-static int curve_available(browser_jsref first)
+static int curve_available(jsref first)
 {
     int fixed = lab_dom_object(LAB_VALUE_OBJECT);
     int inputs = lab_dom_all(lab_dom_id("variableValues"), ".binding-value-input");
@@ -196,7 +196,7 @@ void lab_plot_controls_sync(void)
     lab_dom_class(lab_dom_id("plotManual"), "hidden", !lab_dom_equal(value("plotScale"), lab_dom_string("manual")));
 }
 
-static void choice(browser_jsref group, const char *name, browser_jsref key, browser_jsref label)
+static void choice(jsref group, const char *name, jsref key, jsref label)
 {
     int wrapper = lab_dom_create("label"), radio = lab_dom_create("input"), text = lab_dom_create("span");
     lab_dom_write(radio, LAB_DOM_ATTRIBUTE, "type", lab_dom_string("radio"));
@@ -209,7 +209,7 @@ static void choice(browser_jsref group, const char *name, browser_jsref key, bro
 }
 
 /* Build accessible native radio groups, preserving selections only while their variables exist. */
-void lab_plot_controls_variables(browser_jsref names, browser_jsref labels)
+void lab_plot_controls_variables(jsref names, jsref labels)
 {
     lab_dom_set(lab_dom_id("plotRange"), "marsPlotNames", names);
     int groups[] = {lab_dom_id("plotFirstChoices"), lab_dom_id("plotSecondChoices")};
@@ -241,19 +241,19 @@ void lab_plot_controls_variables(browser_jsref names, browser_jsref labels)
 }
 
 /* Automatic plotting and live redraws share the card's selected first-axis value. */
-void lab_plot_controls_prepare(browser_jsref variable)
+void lab_plot_controls_prepare(jsref variable)
 {
     lab_dom_write(lab_dom_id("plotFirst"), LAB_DOM_VALUE, "", variable);
     lab_plot_controls_sync();
 }
 
-static browser_jsref current_source(void)
+static jsref current_source(void)
 {
     int length = lab_workspace_source_get(LAB_WORKSPACE_FULL_TEXT);
     return length > 0 ? lab_dom_utf8_string(lab_workspace_output(), (unsigned)length) : lab_dom_string("");
 }
 
-static void emit(browser_jsref calls, const char *service, browser_jsref first, browser_jsref second, unsigned count)
+static void emit(jsref calls, const char *service, jsref first, jsref second, unsigned count)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(args, first);
@@ -265,7 +265,7 @@ static void emit(browser_jsref calls, const char *service, browser_jsref first, 
 }
 
 /* Coalesce edits; never replay an old worksheet or interrupt a newer explicit request. */
-void lab_plot_controls_dispatch(lab_plot_control_action_t action, event_jsref event, browser_jsref context)
+void lab_plot_controls_dispatch(lab_plot_control_action_t action, event_jsref event, jsref context)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(plan, "calls", calls);

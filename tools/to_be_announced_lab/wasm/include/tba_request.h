@@ -38,5 +38,5 @@ void tba_request_forecast(void);
  * @param data Scoped response.
  * @param success HTTP success.
  */
-void tba_request_complete(unsigned action, unsigned serial, browser_jsref data, int success);
+void tba_request_complete(unsigned action, unsigned serial, jsref data, int success);
 #endif

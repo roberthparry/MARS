@@ -27,7 +27,7 @@ void lab_plot_pointer_install(void);
  * @brief Retain native curve labels for custom tooltips and accessibility without duplicate SVG tooltips.
  * @param rendered Scoped browser handle to the rendered region containing the curve SVGs.
  */
-void lab_plot_pointer_prepare(browser_jsref rendered);
+void lab_plot_pointer_prepare(jsref rendered);
 
 /**
  * @brief Project a hover guide, point marker and solution-curve focus, or clear them.
@@ -37,7 +37,7 @@ void lab_plot_pointer_prepare(browser_jsref rendered);
  * @param context Reserved subscription-context handle; ignored and may be zero.
  * @details Publishes an empty event plan through lab_dom_return; DOM changes occur synchronously.
  */
-void lab_plot_pointer_dispatch(lab_plot_pointer_action_t action, event_jsref event, browser_jsref context);
+void lab_plot_pointer_dispatch(lab_plot_pointer_action_t action, event_jsref event, jsref context);
 
 /**
  * @brief Choose bound display precision relative to its interval span.
@@ -53,14 +53,14 @@ unsigned lab_plot_bound_digits(double value, double span);
  * @param value Coordinate in the plotted axis units, also stored as the input's precise sampling value.
  * @param span Positive interval width in the same units, used to select displayed significant digits.
  */
-void lab_plot_write_bound(browser_jsref control, double value, double span);
+void lab_plot_write_bound(jsref control, double value, double span);
 
 /**
  * @brief Format all six surface range controls, retaining precise bounds for sampling.
  * @param bounds Scoped browser array handle containing first-axis low/high, second-axis low/high and
  * height low/high coordinates, in each axis's native units.
  */
-void lab_plot_volume_bounds(browser_jsref bounds);
+void lab_plot_volume_bounds(jsref bounds);
 
 /**
  * @brief Identify the Argand projection, whose viewport is independent of the sampling variable.
@@ -123,7 +123,7 @@ void lab_plot_pan_preview(gesture_jsref state);
  * @param wheel True selects pointer-anchored, coalesced wheel zoom; false uses a centred toolbar action.
  * @return True when handled as a plot action, including ignored out-of-bounds gestures; false without an eligible chart.
  */
-bool lab_plot_pointer_zoom(browser_jsref card, event_jsref event, browser_jsref calls, bool reset, double direction,
+bool lab_plot_pointer_zoom(jsref card, event_jsref event, jsref calls, bool reset, double direction,
                            bool wheel);
 
 #endif

@@ -46,7 +46,7 @@ typedef enum {
  * @param view Reserved scoped browser-view handle; unused by these independent workflows.
  * @return Scoped browser handle to a continuation or completion plan, with explicit null for stale town restoration.
  */
-browser_jsref lab_flow_location(lab_flow_location_kind_t kind, frame_jsref frame, view_jsref view);
+jsref lab_flow_location(lab_flow_location_kind_t kind, frame_jsref frame, view_jsref view);
 
 /** @brief Plan synchronous local-calendar rendering before visibility changes.
  * @param text Scoped browser box handle with opaque fallback text in its value property; falsey values become empty.
@@ -55,14 +55,14 @@ browser_jsref lab_flow_location(lab_flow_location_kind_t kind, frame_jsref frame
  * @param card Scoped handle to the local-calendar card node, or zero to omit visibility updates.
  * @post Publishes an ordered host-services plan through lab_dom_return without changing either node.
  */
-void lab_flow_location_local(browser_jsref text, browser_jsref sections, browser_jsref body, browser_jsref card);
+void lab_flow_location_local(jsref text, jsref sections, jsref body, jsref card);
 
 /** @brief Apply visibility after successful non-empty local-calendar rendering.
  * @param card Scoped browser handle to the local-calendar card node whose hidden class is updated.
  * @param mode Scoped browser handle to the current mode string, captured after rendering; datetime shows the card,
  * all other strings hide it.
  */
-void lab_flow_location_visibility(browser_jsref card, browser_jsref mode);
+void lab_flow_location_visibility(jsref card, jsref mode);
 
 /** @brief Choose a rounded-select callback without invoking it inside a native scope.
  * @param select Scoped browser handle to an optional select node; zero produces an empty plan.
@@ -70,7 +70,7 @@ void lab_flow_location_visibility(browser_jsref card, browser_jsref mode);
  * whether the corresponding rounded-select methods are callable.
  * @post Publishes a service plan through lab_dom_return, preferring rebuild, or an empty plan if neither is callable.
  */
-void lab_flow_location_select(node_jsref select, browser_jsref capabilities);
+void lab_flow_location_select(node_jsref select, jsref capabilities);
 
 /** @brief Choose whether a completed date-picker move requires synchronous redraw.
  * @param changed True when the native movement policy changed the picker.

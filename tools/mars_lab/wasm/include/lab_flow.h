@@ -97,7 +97,7 @@ typedef enum {
  * @param ... Ordered scoped handles passed as capability arguments; zero denotes null.
  * @return Scoped calls/wait/save plan retaining browser values, not handle numbers.
  */
-browser_jsref lab_flow_call(frame_jsref frame, unsigned next, const char *service, const char *save, bool wait,
+jsref lab_flow_call(frame_jsref frame, unsigned next, const char *service, const char *save, bool wait,
                              unsigned count, ...);
 
 /**
@@ -107,14 +107,14 @@ browser_jsref lab_flow_call(frame_jsref frame, unsigned next, const char *servic
  * @param plan Scoped ordered service plan with calls and optional wait, or zero for no plan.
  * @return Scoped effects-capability plan preserving the supplied wait flag, but not its done flag.
  */
-browser_jsref lab_flow_effects(frame_jsref frame, unsigned next, browser_jsref plan);
+jsref lab_flow_effects(frame_jsref frame, unsigned next, jsref plan);
 
 /**
  * @brief Finish a workflow with an optional browser result.
  * @param value Scoped result handle; zero omits the value property. A handle containing false preserves explicit false.
  * @return Scoped completion record with done set to true.
  */
-browser_jsref lab_flow_done(browser_jsref value);
+jsref lab_flow_done(jsref value);
 
 /**
  * @brief Select request ownership before starting a native workflow.
@@ -146,7 +146,7 @@ void lab_flow_step(lab_flow_kind_t kind, frame_jsref frame, view_jsref view);
  * and installation; getters must not start a nested DOM scope.
  * @return Scoped continuation or completion plan for the browser interpreter.
  */
-browser_jsref lab_flow_evaluation(frame_jsref frame, view_jsref view);
+jsref lab_flow_evaluation(frame_jsref frame, view_jsref view);
 
 /**
  * @brief Advance two-phase result installation and optional solver rendering.
@@ -155,6 +155,6 @@ browser_jsref lab_flow_evaluation(frame_jsref frame, view_jsref view);
  * @param view Scoped browser view supplying presentation caches and live editor/source getters.
  * @return Scoped continuation or completion plan; asynchronous solver work retains the parent-request ownership checks.
  */
-browser_jsref lab_flow_install(frame_jsref frame, view_jsref view);
+jsref lab_flow_install(frame_jsref frame, view_jsref view);
 
 #endif

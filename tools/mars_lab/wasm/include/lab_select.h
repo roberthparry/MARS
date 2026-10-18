@@ -64,8 +64,8 @@ typedef enum {
  * @param search_placeholder Scoped search-input placeholder and accessible-label string.
  * @return True when the menu was created; false for an absent or already enhanced select.
  */
-bool lab_select_create(node_jsref select, browser_jsref label, bool searchable, browser_jsref placeholder,
-                       browser_jsref empty, browser_jsref search_placeholder);
+bool lab_select_create(node_jsref select, jsref label, bool searchable, jsref placeholder,
+                       jsref empty, jsref search_placeholder);
 
 /**
  * @brief Rebuild menu options with bounded temporary handles.
@@ -89,7 +89,7 @@ void lab_select_sync(node_jsref select);
  * @return True when the caller must suppress the key's browser default and propagation; false otherwise,
  * including invalid selectors and ordinary pointer selection.
  */
-bool lab_select_event(node_jsref select, lab_select_source_t source, lab_select_key_t key, browser_jsref target);
+bool lab_select_event(node_jsref select, lab_select_source_t source, lab_select_key_t key, jsref target);
 
 /**
  * @brief Create, register and initially project an accessible selection menu.
@@ -102,7 +102,7 @@ bool lab_select_event(node_jsref select, lab_select_source_t source, lab_select_
  * JavaScript factory may retain sync/close closures and the existing __mars callback
  * properties, but performs no listener registration or event policy itself.
  */
-bool lab_select_enhance(node_jsref select, browser_jsref options, browser_jsref document);
+bool lab_select_enhance(node_jsref select, jsref options, jsref document);
 
 /**
  * @brief Rebuild a menu using its current opaque presentation options.
@@ -112,7 +112,7 @@ bool lab_select_enhance(node_jsref select, browser_jsref options, browser_jsref 
  * @details The browser may capture the original options object in a rebuild closure; C reads its current
  * values on every call, so later option changes remain effective.
  */
-void lab_select_refresh(node_jsref select, browser_jsref options);
+void lab_select_refresh(node_jsref select, jsref options);
 
 /**
  * @brief Subscribe the controls of an existing native-built menu once.

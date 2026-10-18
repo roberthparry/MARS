@@ -37,7 +37,7 @@ typedef enum {
  * exponent recipe. The segment baseline comes only from its chart, never shared controls that a sibling
  * plot may have changed; reset retains it. Browser objects own retained state, not the scoped handle integers.
  */
-void lab_surface_volume_init(view_jsref view, browser_jsref saved, bool same);
+void lab_surface_volume_init(view_jsref view, jsref saved, bool same);
 
 /**
  * @brief Change the displayed volume from a gesture or restore the last accepted sample.
@@ -72,6 +72,6 @@ void lab_surface_zoom_sync(view_jsref view);
  * @return Scoped browser string handle: the original label for a clean volume, an approximate preview otherwise,
  * or an empty string for invalid bounds. The handle is valid only within the current browser bridge scope.
  */
-browser_jsref lab_surface_tick_label(browser_jsref volume, browser_jsref tick);
+jsref lab_surface_tick_label(jsref volume, jsref tick);
 
 #endif

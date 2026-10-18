@@ -13,12 +13,12 @@
 #include "lab_dom.h"
 #include "lab_surface_hover.h"
 
-static double number(browser_jsref object, const char *key)
+static double number(jsref object, const char *key)
 {
     return lab_dom_to_number(lab_dom_get(object, key));
 }
 
-static double item(browser_jsref array, unsigned index)
+static double item(jsref array, unsigned index)
 {
     return lab_dom_to_number(lab_dom_item(array, index));
 }
@@ -33,8 +33,8 @@ static int inside_chart(const double transform[6], double determinant, double wi
 }
 
 /* Return the nearest visible segment within ten CSS pixels, or null. */
-void lab_surface_hover(view_jsref view, frame_jsref frame, browser_jsref screen,
-                       double mouse_x, double mouse_y, browser_jsref previous)
+void lab_surface_hover(view_jsref view, frame_jsref frame, jsref screen,
+                       double mouse_x, double mouse_y, jsref previous)
 {
     int primitives = lab_dom_get(view, "primitives"), rows = lab_dom_get(frame, "rows");
     unsigned count = lab_dom_count(primitives);

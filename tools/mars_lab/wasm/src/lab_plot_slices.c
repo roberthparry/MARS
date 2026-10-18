@@ -13,7 +13,7 @@
 static const char *const fields[] = {".slice-lower", ".slice-upper", ".slice-value", ".slice-position"};
 
 /* Serialise opaque coordinate fields for native interpolation. */
-browser_jsref lab_plot_slices_payload(void)
+jsref lab_plot_slices_payload(void)
 {
     int rows = lab_dom_all(lab_dom_id("plotSlices"), ".plot-slice"), text = lab_dom_string("");
     for (unsigned i = 0; i < lab_dom_count(rows); ++i) {
@@ -40,7 +40,7 @@ void lab_plot_slices_clear(void)
     lab_dom_delete(lab_dom_id("plotSlices"), "marsSliceModes");
 }
 
-static void range_mode(browser_jsref row, int manual)
+static void range_mode(jsref row, int manual)
 {
     lab_dom_checked(lab_dom_query(row, ".slice-auto"), !manual);
     lab_dom_checked(lab_dom_query(row, ".slice-manual"), manual);
@@ -60,7 +60,7 @@ void lab_plot_slices_auto(void)
 }
 
 /* At most eight native parameters: keep one visible editor and retain every value. */
-static void select_slice(browser_jsref root, browser_jsref name)
+static void select_slice(jsref root, jsref name)
 {
     int rows = lab_dom_all(root, ".plot-slice"), radios = lab_dom_all(root, ".slice-choice");
     int selected = 0;
@@ -75,7 +75,7 @@ static void select_slice(browser_jsref root, browser_jsref name)
     lab_dom_set(root, "marsSliceSelected", lab_dom_read(lab_dom_item(rows, selected), LAB_DOM_DATASET, "name"));
 }
 
-static browser_jsref input(browser_jsref row, const char *class_name, const char *type, browser_jsref label)
+static jsref input(jsref row, const char *class_name, const char *type, jsref label)
 {
     int wrapper = lab_dom_create("label"), text = lab_dom_create("span"), node = lab_dom_create("input");
     lab_dom_write(text, LAB_DOM_TEXT, "", label);
@@ -89,7 +89,7 @@ static browser_jsref input(browser_jsref row, const char *class_name, const char
 }
 
 /* Install accepted metadata only while its input snapshot is still current. */
-void lab_plot_slices_apply(browser_jsref records, browser_jsref expected)
+void lab_plot_slices_apply(jsref records, jsref expected)
 {
     if (!lab_dom_equal(lab_plot_slices_payload(), expected))
         return;
@@ -168,7 +168,7 @@ void lab_plot_slices_apply(browser_jsref records, browser_jsref expected)
 }
 
 /* Distinguish handle movement from an exact-value or limit edit. */
-lab_plot_slice_edit_t lab_plot_slices_edit(lab_plot_control_action_t action, browser_jsref target)
+lab_plot_slice_edit_t lab_plot_slices_edit(lab_plot_control_action_t action, jsref target)
 {
     if (lab_dom_has_class(target, "slice-choice")) {
         if (action == LAB_PLOT_CONTROL_CHANGE || action == LAB_PLOT_CONTROL_INPUT)

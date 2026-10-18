@@ -49,12 +49,12 @@ void lab_bootstrap_widgets(void)
 
 /** @brief Scoped workspace inputs and the optional service selected by one startup phase. */
 struct lab_bootstrap_workspace_context {
-    browser_jsref context, result, args;
+    jsref context, result, args;
     const char *service;
 };
 
 /* Inspect URL components only when an authentication token is present. */
-static browser_jsref lab_bootstrap_workspace_token(struct lab_bootstrap_workspace_context *ctx)
+static jsref lab_bootstrap_workspace_token(struct lab_bootstrap_workspace_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->context, "token"))) {
         int search = lab_dom_get(ctx->context, "search");
@@ -70,7 +70,7 @@ static browser_jsref lab_bootstrap_workspace_token(struct lab_bootstrap_workspac
 }
 
 /* Supply the default only after observing an existing empty jurisdiction control. */
-static browser_jsref lab_bootstrap_workspace_jurisdiction(struct lab_bootstrap_workspace_context *ctx)
+static jsref lab_bootstrap_workspace_jurisdiction(struct lab_bootstrap_workspace_context *ctx)
 {
     int control = lab_dom_get(ctx->context, "control"), value = lab_dom_get(control, "value");
     if (control && !lab_dom_truth(value)) {
@@ -82,17 +82,17 @@ static browser_jsref lab_bootstrap_workspace_jurisdiction(struct lab_bootstrap_w
 }
 
 /* Read GMT separately after the jurisdiction effects have been executed by the host. */
-static browser_jsref lab_bootstrap_workspace_gmt(struct lab_bootstrap_workspace_context *ctx)
+static jsref lab_bootstrap_workspace_gmt(struct lab_bootstrap_workspace_context *ctx)
 {
     int control = lab_dom_get(ctx->context, "control"), value = lab_dom_get(control, "value");
     return lab_dom_text(lab_dom_truth(value) ? value : lab_dom_get(ctx->context, "fallback"));
 }
 
 /* Startup policy must not require the later workspace globals or the application service registry. */
-void lab_bootstrap_workspace(lab_bootstrap_workspace_phase_t phase, browser_jsref context)
+void lab_bootstrap_workspace(lab_bootstrap_workspace_phase_t phase, jsref context)
 {
     /** @brief Workspace phase handlers; unknown phases retain the empty calls plan. */
-    static browser_jsref (*const handlers[])(struct lab_bootstrap_workspace_context *) = {
+    static jsref (*const handlers[])(struct lab_bootstrap_workspace_context *) = {
         [LAB_BOOTSTRAP_WORKSPACE_TOKEN]        = lab_bootstrap_workspace_token,
         [LAB_BOOTSTRAP_WORKSPACE_JURISDICTION] = lab_bootstrap_workspace_jurisdiction,
         [LAB_BOOTSTRAP_WORKSPACE_GMT]          = lab_bootstrap_workspace_gmt,
@@ -133,16 +133,16 @@ typedef enum {
 struct lab_bootstrap_step_context {
     lab_bootstrap_stage_t stage;
     frame_jsref frame;
-    browser_jsref response;
+    jsref response;
 };
 
-static browser_jsref lab_bootstrap_step_fetch(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_fetch(struct lab_bootstrap_step_context *ctx)
 {
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_CHECK_CONFIG, "fetch", "response", 1, 1,
                          lab_dom_string("/bootstrap"));
 }
 
-static browser_jsref lab_bootstrap_step_fail(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_fail(struct lab_bootstrap_step_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->response, "ok"))) {
         int prefix = lab_dom_string(ctx->stage == LAB_BOOTSTRAP_CHECK_CONFIG
@@ -156,7 +156,7 @@ static browser_jsref lab_bootstrap_step_fail(struct lab_bootstrap_step_context *
     return lab_flow_call(ctx->frame, next, "decode", "data", 1, 1, ctx->response);
 }
 
-static browser_jsref lab_bootstrap_step_fail_3(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_fail_3(struct lab_bootstrap_step_context *ctx)
 {
     if (!lab_dom_equal(lab_dom_get(lab_dom_get(ctx->frame, "data"), "BROWSER_ABI_VERSION"),
                        lab_dom_text(lab_dom_numeric(lab_browser_abi_version()))))
@@ -166,25 +166,25 @@ static browser_jsref lab_bootstrap_step_fail_3(struct lab_bootstrap_step_context
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_FETCH_CATALOGUE, "config", 0, 0, 1, lab_dom_get(ctx->frame, "data"));
 }
 
-static browser_jsref lab_bootstrap_step_fetch_4(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_fetch_4(struct lab_bootstrap_step_context *ctx)
 {
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_CHECK_CATALOGUE, "fetch", "response", 1, 1,
                          lab_dom_string("/jurisdictions"));
 }
 
-static browser_jsref lab_bootstrap_step_catalogue(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_catalogue(struct lab_bootstrap_step_context *ctx)
 {
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_VALIDATE_CATALOGUE, "catalogue", 0, 0, 1,
                          lab_dom_get(ctx->frame, "data"));
 }
 
-static browser_jsref lab_bootstrap_step_native(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_native(struct lab_bootstrap_step_context *ctx)
 {
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_LOAD_DEFINITIONS, "native", "valid", 0, 2,
                          lab_dom_string("lab_location_catalogue"), lab_dom_get(ctx->frame, "data"));
 }
 
-static browser_jsref lab_bootstrap_step_fail_7(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_fail_7(struct lab_bootstrap_step_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "valid")))
         return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_FINISHED, "fail", 0, 0, 1,
@@ -198,35 +198,35 @@ static browser_jsref lab_bootstrap_step_fail_7(struct lab_bootstrap_step_context
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_LOAD_WORKSPACE, "definitions", 0, 1, 1, scripts);
 }
 
-static browser_jsref lab_bootstrap_step_script(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_script(struct lab_bootstrap_step_context *ctx)
 {
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_INSTALL_EVENTS, "script", 0, 1, 1,
                          lab_dom_string("/js/workspace.js"));
 }
 
-static browser_jsref lab_bootstrap_step_events(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_events(struct lab_bootstrap_step_context *ctx)
 {
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_INSTALL_WIDGETS, "events", 0, 0, 0);
 }
 
-static browser_jsref lab_bootstrap_step_widgets(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_widgets(struct lab_bootstrap_step_context *ctx)
 {
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_START_WORKSHEET, "widgets", 0, 0, 0);
 }
 
-static browser_jsref lab_bootstrap_step_worksheet(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_worksheet(struct lab_bootstrap_step_context *ctx)
 {
     return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_FINISHED, "worksheet", 0, 1, 0);
 }
 
-static browser_jsref lab_bootstrap_step_otherwise(struct lab_bootstrap_step_context *ctx)
+static jsref lab_bootstrap_step_otherwise(struct lab_bootstrap_step_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
 /* Advance startup through the bounded catalogue of browser capabilities. */
-browser_jsref lab_bootstrap_step(frame_jsref frame, view_jsref view)
+jsref lab_bootstrap_step(frame_jsref frame, view_jsref view)
 {
     (void)view;
     int response = lab_dom_get(frame, "response");
@@ -238,7 +238,7 @@ browser_jsref lab_bootstrap_step(frame_jsref frame, view_jsref view)
         .frame = frame,
         .response = response,
     };
-    static browser_jsref (*const handlers[])(struct lab_bootstrap_step_context *) = {
+    static jsref (*const handlers[])(struct lab_bootstrap_step_context *) = {
         [LAB_BOOTSTRAP_FETCH_CONFIG]       = lab_bootstrap_step_fetch,
         [LAB_BOOTSTRAP_CHECK_CONFIG]       = lab_bootstrap_step_fail,
         [LAB_BOOTSTRAP_INSTALL_CONFIG]     = lab_bootstrap_step_fail_3,

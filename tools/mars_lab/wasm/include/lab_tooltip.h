@@ -26,12 +26,12 @@
  * @param height Viewport height in CSS pixels.
  * @return True when accepted; false for an absent node or one within a hidden container, leaving the tooltip unchanged.
  */
-bool lab_tooltip_show(browser_jsref button, browser_jsref previous, double width, double height);
+bool lab_tooltip_show(jsref button, jsref previous, double width, double height);
 
 /**
  * @brief Hide the tooltip and restore original accessibility attributes exactly.
  * @param button Scoped active button-node handle, or zero when no control owns the tooltip.
  */
-void lab_tooltip_hide(browser_jsref button);
+void lab_tooltip_hide(jsref button);
 
 #endif

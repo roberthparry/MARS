@@ -15,7 +15,7 @@
  * @brief Borrow the browser-owned application context.
  * @return Scoped context handle.
  */
-browser_jsref tba_dom_root(void);
+jsref tba_dom_root(void);
 
 /**
  * @brief Find a DOM element by exact ID.
@@ -38,7 +38,7 @@ node_jsref tba_dom_query(node_jsref node, const char *selector);
  * @param selector Static selector.
  * @return Scoped list.
  */
-browser_jsref tba_dom_all(node_jsref node, const char *selector);
+jsref tba_dom_all(node_jsref node, const char *selector);
 
 /**
  * @brief Read a property.
@@ -46,7 +46,7 @@ browser_jsref tba_dom_all(node_jsref node, const char *selector);
  * @param key Static property name.
  * @return Scoped value or zero.
  */
-browser_jsref tba_dom_get(browser_jsref object, const char *key);
+jsref tba_dom_get(jsref object, const char *key);
 
 /**
  * @brief Read a property using opaque text.
@@ -54,7 +54,7 @@ browser_jsref tba_dom_get(browser_jsref object, const char *key);
  * @param key Scoped string.
  * @return Scoped value.
  */
-browser_jsref tba_dom_key_get(browser_jsref object, browser_jsref key);
+jsref tba_dom_key_get(jsref object, jsref key);
 
 /**
  * @brief Store an own data property.
@@ -62,7 +62,7 @@ browser_jsref tba_dom_key_get(browser_jsref object, browser_jsref key);
  * @param key Static name.
  * @param value Scoped value.
  */
-void tba_dom_set(browser_jsref object, const char *key, browser_jsref value);
+void tba_dom_set(jsref object, const char *key, jsref value);
 
 /**
  * @brief Store an own data property with an opaque key.
@@ -70,7 +70,7 @@ void tba_dom_set(browser_jsref object, const char *key, browser_jsref value);
  * @param key Scoped name.
  * @param value Scoped value.
  */
-void tba_dom_key_set(browser_jsref object, browser_jsref key, browser_jsref value);
+void tba_dom_key_set(jsref object, jsref key, jsref value);
 
 /**
  * @brief Read an indexed value.
@@ -78,58 +78,58 @@ void tba_dom_key_set(browser_jsref object, browser_jsref key, browser_jsref valu
  * @param index Zero-based position.
  * @return Scoped value.
  */
-browser_jsref tba_dom_item(browser_jsref list, unsigned index);
+jsref tba_dom_item(jsref list, unsigned index);
 
 /**
  * @brief Count array or collection members.
  * @param list Scoped array or collection.
  * @return Member count.
  */
-unsigned tba_dom_count(browser_jsref list);
+unsigned tba_dom_count(jsref list);
 
 /**
  * @brief Create a temporary container.
  * @param array Non-zero for an array; zero for a null-prototype object.
  * @return Scoped container.
  */
-browser_jsref tba_dom_object(unsigned array);
+jsref tba_dom_object(unsigned array);
 
 /**
  * @brief Append to a temporary array.
  * @param array Scoped array.
  * @param value Scoped value.
  */
-void tba_dom_push(browser_jsref array, browser_jsref value);
+void tba_dom_push(jsref array, jsref value);
 
 /**
  * @brief List enumerable property names.
  * @param object Scoped object.
  * @return Scoped key array.
  */
-browser_jsref tba_dom_keys(browser_jsref object);
+jsref tba_dom_keys(jsref object);
 
 /**
  * @brief Copy a static UTF-8 literal.
  * @param text NUL-terminated text.
  * @return Scoped string.
  */
-browser_jsref tba_dom_string(const char *text);
+jsref tba_dom_string(const char *text);
 
 /**
  * @brief Convert a value to text without changing its meaning.
  * @param value Scoped value; absent becomes empty.
  * @return Scoped string.
  */
-browser_jsref tba_dom_text(browser_jsref value);
+jsref tba_dom_text(jsref value);
 
 /** @brief Count browser string code units. @param text Scoped text. @return Length. */
-unsigned tba_dom_length(browser_jsref text);
+unsigned tba_dom_length(jsref text);
 
 /** @brief Read a browser string code unit. @param text Scoped text. @param index Position. @return Code unit or zero. */
-unsigned tba_dom_char(browser_jsref text, unsigned index);
+unsigned tba_dom_char(jsref text, unsigned index);
 
 /** @brief Slice opaque text. @param text Scoped text. @param begin Start. @param end Exclusive end. @return Scoped text. */
-browser_jsref tba_dom_slice(browser_jsref text, unsigned begin, unsigned end);
+jsref tba_dom_slice(jsref text, unsigned begin, unsigned end);
 
 /**
  * @brief Trim Unicode text and optionally lowercase.
@@ -137,7 +137,7 @@ browser_jsref tba_dom_slice(browser_jsref text, unsigned begin, unsigned end);
  * @param lower Non-zero to lowercase.
  * @return Scoped string.
  */
-browser_jsref tba_dom_clean(browser_jsref value, unsigned lower);
+jsref tba_dom_clean(jsref value, unsigned lower);
 
 /**
  * @brief Split opaque text at a literal separator.
@@ -145,7 +145,7 @@ browser_jsref tba_dom_clean(browser_jsref value, unsigned lower);
  * @param separator Static separator.
  * @return Scoped array.
  */
-browser_jsref tba_dom_split(browser_jsref text, const char *separator);
+jsref tba_dom_split(jsref text, const char *separator);
 
 /**
  * @brief Join opaque text fragments.
@@ -153,7 +153,7 @@ browser_jsref tba_dom_split(browser_jsref text, const char *separator);
  * @param separator Static separator.
  * @return Scoped string.
  */
-browser_jsref tba_dom_join(browser_jsref array, const char *separator);
+jsref tba_dom_join(jsref array, const char *separator);
 
 /**
  * @brief Compare opaque values strictly.
@@ -161,35 +161,35 @@ browser_jsref tba_dom_join(browser_jsref array, const char *separator);
  * @param right Second scoped value.
  * @return Equality flag.
  */
-int tba_dom_equal(browser_jsref left, browser_jsref right);
+int tba_dom_equal(jsref left, jsref right);
 
 /**
  * @brief Read browser truthiness.
  * @param value Scoped value.
  * @return Boolean coercion.
  */
-int tba_dom_truth(browser_jsref value);
+int tba_dom_truth(jsref value);
 
 /**
  * @brief Classify a scoped value.
  * @param value Scoped value.
  * @return Null 0, boolean 1, number 2, string 3, array 4, object 5.
  */
-unsigned tba_dom_type(browser_jsref value);
+unsigned tba_dom_type(jsref value);
 
 /**
  * @brief Convert an opaque numeric control value.
  * @param value Scoped value.
  * @return Number, including NaN.
  */
-double tba_dom_number(browser_jsref value);
+double tba_dom_number(jsref value);
 
 /**
  * @brief Wrap a numeric value.
  * @param value Number.
  * @return Scoped number.
  */
-browser_jsref tba_dom_numeric(double value);
+jsref tba_dom_numeric(double value);
 
 /**
  * @brief Format numeric presentation using browser formatting.
@@ -197,14 +197,14 @@ browser_jsref tba_dom_numeric(double value);
  * @param digits Fixed decimals, -1 for plain, or -(decimals + 2) for localised text.
  * @return Scoped string.
  */
-browser_jsref tba_dom_format(double value, int digits);
+jsref tba_dom_format(double value, int digits);
 
 /**
  * @brief Escape text for insertion into HTML or an attribute.
  * @param text Scoped text.
  * @return Scoped escaped string.
  */
-browser_jsref tba_dom_escape(browser_jsref text);
+jsref tba_dom_escape(jsref text);
 
 /**
  * @brief Read browser text.
@@ -213,7 +213,7 @@ browser_jsref tba_dom_escape(browser_jsref text);
  * @param key Static field name.
  * @return Scoped string.
  */
-browser_jsref tba_dom_read(node_jsref node, unsigned kind, const char *key);
+jsref tba_dom_read(node_jsref node, unsigned kind, const char *key);
 
 /**
  * @brief Write browser text.
@@ -222,7 +222,7 @@ browser_jsref tba_dom_read(node_jsref node, unsigned kind, const char *key);
  * @param key Static field.
  * @param value Scoped text.
  */
-void tba_dom_write(node_jsref node, unsigned kind, const char *key, browser_jsref value);
+void tba_dom_write(node_jsref node, unsigned kind, const char *key, jsref value);
 
 /**
  * @brief Set a boolean DOM property.
@@ -286,7 +286,7 @@ void tba_dom_timer(unsigned action, int delay);
  * @param action Native completion index.
  * @param serial Request generation.
  */
-void tba_dom_request(browser_jsref url, unsigned kind, browser_jsref body, browser_jsref headers, unsigned action,
+void tba_dom_request(jsref url, unsigned kind, jsref body, jsref headers, unsigned action,
                      unsigned serial);
 
 /**
@@ -295,14 +295,14 @@ void tba_dom_request(browser_jsref url, unsigned kind, browser_jsref body, brows
  * @param text Scoped contents.
  * @param mime Static MIME type.
  */
-void tba_dom_download(browser_jsref filename, browser_jsref text, const char *mime);
+void tba_dom_download(jsref filename, jsref text, const char *mime);
 
 /**
  * @brief Copy text and dispatch its completion.
  * @param text Scoped text.
  * @param action Native completion index.
  */
-void tba_dom_clipboard(browser_jsref text, unsigned action);
+void tba_dom_clipboard(jsref text, unsigned action);
 
 /**
  * @brief Read element geometry.
@@ -319,7 +319,7 @@ double tba_dom_measure(node_jsref node, unsigned kind);
  * @param axis X 0 or Y 1.
  * @return Coordinate or NaN.
  */
-double tba_dom_cursor(browser_jsref svg, event_jsref event, unsigned axis);
+double tba_dom_cursor(jsref svg, event_jsref event, unsigned axis);
 
 /**
  * @brief Use browser date formatting without forecast arithmetic.
@@ -327,7 +327,7 @@ double tba_dom_cursor(browser_jsref svg, event_jsref event, unsigned axis);
  * @param mode Parse to YYYYMMDD 0, ISO 1, UK 2, timestamp to UK 3.
  * @return Scoped date number or text; invalid input gives zero or empty.
  */
-browser_jsref tba_dom_date(browser_jsref value, unsigned mode);
+jsref tba_dom_date(jsref value, unsigned mode);
 
 /**
  * @brief Mark a temporary handle scope.

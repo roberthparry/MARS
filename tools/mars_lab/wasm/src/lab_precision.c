@@ -91,7 +91,7 @@ void lab_precision_close(bool focus)
         lab_dom_effect(lab_dom_id("precisionCustomToggle"), LAB_DOM_EFFECT_FOCUS);
 }
 
-static void draft_apply(browser_jsref calls)
+static void draft_apply(jsref calls)
 {
     unsigned bits = draft_bits();
     draft_preview();
@@ -110,7 +110,7 @@ static void draft_apply(browser_jsref calls)
 /** @brief Borrowed handles for one precision action; never retained after dispatch. */
 typedef struct {
     event_jsref event;
-    browser_jsref plan, calls, panel;
+    jsref plan, calls, panel;
 } lab_precision_context_t;
 
 /* Toggle visibility before applying the ordinary open-panel action guard. */
@@ -232,7 +232,7 @@ void lab_precision_dispatch(lab_precision_action_t action, event_jsref event)
 }
 
 /* Bounded control registration; the browser deduplicates subscriptions across restoration. */
-void lab_precision_install(browser_jsref document)
+void lab_precision_install(jsref document)
 {
     static const struct {
         const char *id, *event;

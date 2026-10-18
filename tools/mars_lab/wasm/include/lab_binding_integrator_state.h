@@ -27,7 +27,7 @@
  * bindings or clears them. The current editor supplies the body fallback. No supplied
  * record or live state is mutated; browser services execute after the call completes.
  */
-void lab_binding_integrator_state(browser_jsref data, browser_jsref fallback, browser_jsref editors,
-                                browser_jsref bound_names);
+void lab_binding_integrator_state(jsref data, jsref fallback, jsref editors,
+                                jsref bound_names);
 
 #endif

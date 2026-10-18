@@ -705,13 +705,17 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <ul>
             <li>Coloured SVG symbols identify ☉ Sun (gold), ☿ Mercury (purple), ♀ Venus (yellow), ♂ Mars (red), ♃ Jupiter (coral), ♄ Saturn (amber), ⛢ Uranus (cyan) and ♆ Neptune (violet) beside their names. The Moon's phase disc uses muted blue-grey illumination with grey shadow and outline.</li>
             <li>The Moon's shaded disc shows its phase and tilt for the selected GMT instant and location, with the local zenith upwards. This accounts for both hemispheres and the equator. Hover for illumination and orientation; unavailable local orientation is explicitly labelled, and a plain ☾ means phase data is unavailable.</li>
-            <li><code>Declination</code>, <code>RA</code>, and <code>GHA</code> are apparent body coordinates for the selected GMT moment.</li>
-            <li><code>Altitude</code> and <code>Azimuth</code> are observer-relative horizon coordinates for the selected latitude, longitude, and altitude.</li>
-            <li><code>s.d.</code> is the apparent semi-diameter in arcminutes where the body has a visible disc.</li>
-            <li><code>Vmag.</code> is visual magnitude. Lower numbers are brighter; negative values are very bright.</li>
+            <li><code>Declination</code>: celestial latitude, north (+) or south (−) of the celestial equator, which extends Earth's equator into the sky. The poles are +90° and −90°.</li>
+            <li><code>GHA</code> (Greenwich hour angle): angle measured westwards from the Greenwich meridian to the body's celestial meridian, from 0° to 360°. It changes as Earth rotates.</li>
+            <li><code>RA</code> (right ascension): angle measured eastwards along the celestial equator from the March equinox reference direction. It is shown in hours, minutes and seconds: 24 hours = 360°, so 1 hour = 15°. It is not a clock time.</li>
+            <li><code>Altitude</code>: angle above (+) or below (−) the horizon; 0° is the horizon and +90° is directly overhead (the zenith). Unlike observer altitude in metres, this is an angle.</li>
+            <li><code>Azimuth</code>: bearing around the horizon from true north: 0° north, 90° east, 180° south, 270° west; not magnetic north.</li>
+            <li><code>s.d.</code> (S.D., semi-diameter): apparent angular radius, from disc centre to edge, in arcminutes (1′ = 1/60°). Double it for the angular diameter.</li>
+            <li><code>Vmag.</code> (VMag, apparent visual magnitude): brightness as seen from Earth, not physical size or intrinsic luminosity. Smaller numbers mean brighter objects; negative values are brighter still. Five magnitudes correspond to a factor of 100 in brightness.</li>
             <li>Stars have SVG star shapes: brighter stars are larger, with size limits to keep every symbol readable. Hover for the magnitude. Missing magnitudes use a medium-sized symbol labelled unavailable; size does not represent the star's physical diameter.</li>
             <li><code>Visible</code> means the body is above the usable local horizon and passes the daylight/eclipse visibility checks.</li>
           </ul>
+          <p>Coordinates refer to the selected GMT instant; altitude and azimuth also depend on the observer's location. See the <a href="https://aa.usno.navy.mil/faq/asa_glossary" target="_blank" rel="noreferrer">USNO astronomical glossary</a> for further definitions.</p>
         </div>
         <div class="help-card" data-help-modes="almanac">
           <div class="help-kicker">Eclipses And Transits</div>
@@ -720,13 +724,30 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li>The event table starts at the selected GMT moment and covers one year ahead.
               An event already in progress remains listed until its final contact.</li>
             <li><code>Date</code> gives the local civil date of greatest eclipse or transit, so the row remains meaningful even if nearest totality cannot be found.</li>
-            <li><code>First</code>, <code>Greatest</code>, and <code>Fourth</code> are local civil progress times. Use <code>GMT</code> when comparing against the body table.</li>
-            <li><code>Mag.</code> is eclipse magnitude; <code>Obsc.</code> is obscuration or totality percentage.</li>
+            <li><code>First</code>: the event begins. For a solar eclipse this is first contact (C1), when the Moon first touches the Sun's disc. For a lunar eclipse this table uses P1, when the Moon begins entering Earth's penumbra.</li>
+            <li><code>Greatest</code>: the moment of maximum eclipse. Solar circumstances are for the selected observer. This is not necessarily halfway between First and Fourth.</li>
+            <li><code>Fourth</code>: the event ends. For a solar eclipse this is last contact (C4), when the Moon leaves the Sun's disc. For a lunar eclipse this table uses P4, when the Moon finally leaves the penumbra.</li>
+            <li>Second and third solar contacts (C2 and C3) bound totality or the annular phase; they do not occur in a purely partial eclipse and are not shown here. Lunar umbral contacts U1/U4 bound the dark-shadow phase; U2/U3 bound lunar totality. The displayed P1/P4 times include the faint penumbral stages, not just totality.</li>
+            <li>Contact times are local civil times in the selected zone. <code>GMT</code> gives Greatest in Greenwich time, for comparison with the body table; it is not a duration. Hover over a time for its full date and offset.</li>
+            <li><code>Mag.</code> (eclipse magnitude) measures coverage along a diameter, not brightness. For solar eclipses it describes how much of the Sun's diameter is covered; it can exceed 1 in totality. For lunar eclipses MARS shows umbral magnitude: the fraction of the Moon's diameter immersed in Earth's dark umbra. A negative value means the Moon misses the umbra.</li>
+            <li><code>Obsc.</code> (obscuration) measures area at Greatest: the percentage of the Sun's disc hidden by the Moon, or the percentage of the Moon's disc inside Earth's umbra. Lunar values marked <code>umbral</code> exclude penumbral dimming, so a penumbral eclipse can show 0% despite being an eclipse. This is not the percentage of daylight lost or an event's duration.</li>
             <li><code>Nearest totality</code> lists the nearest town or location where totality can be observed when the selected observer sees only a partial eclipse.</li>
             <li>Use the <code>Use</code> button on a nearest-totality result to jump the almanac to that town and moment.</li>
             <li>Wide tables scroll within the worksheet; use <code>Expand</code> for more space. Contact tooltips and copied worksheet text retain the full dates and GMT offsets, even when a cell shows only a compact time.</li>
             <li>The packaged ephemeris covers 1550–2649 GMT. Read the worksheet's coverage and accuracy notices; increasing mathematical precision cannot extend the ephemeris or make an event prediction a safety guarantee.</li>
           </ul>
+        </div>
+        <div class="help-card" data-help-modes="almanac">
+          <div class="help-kicker">Eclipse Types And Shadows</div>
+          <ul>
+            <li><code>Solar eclipse</code>: the Moon passes between Earth and the Sun. <code>Partial</code> means only part of the Sun's disc is covered; <code>total</code> means the whole disc is covered at the observer's location.</li>
+            <li><code>Annular</code>: the Moon appears smaller than the Sun, leaving a bright ring around it. It is not totality. <code>Hybrid</code> describes an eclipse that is total along some parts of its path and annular along others; this table reports the local kind instead.</li>
+            <li><code>Lunar eclipse</code>: the Moon passes through Earth's shadow. The <code>penumbra</code> is the outer shadow, where Earth blocks only part of the sunlight; the <code>umbra</code> is the darker inner shadow, where Earth blocks direct sunlight.</li>
+            <li><code>Penumbral</code>: the Moon enters only the penumbra. Dimming may be subtle, particularly near first and last contact.</li>
+            <li><code>Partial lunar eclipse</code>: part of the Moon enters the umbra. <code>Total lunar eclipse</code>: the entire Moon enters it; the Moon can remain visible with a reddish colour because Earth's atmosphere bends sunlight into the shadow.</li>
+            <li><code>Solar transit</code>: Mercury or Venus crosses the Sun's disc as a small dark spot, rather than covering it like the Moon. These catalogue rows give dates only; blank magnitude, obscuration and contact cells mean not supplied, not zero.</li>
+          </ul>
+          <p>Further reading: NASA's <a href="https://eclipse.gsfc.nasa.gov/help/SEglossary.html" target="_blank" rel="noreferrer">solar eclipse glossary</a> and <a href="https://eclipse.gsfc.nasa.gov/LEvis/LEviskey.html" target="_blank" rel="noreferrer">lunar eclipse contact guide</a>.</p>
         </div>
         <div class="help-card" data-help-modes="integrator">
           <div class="help-kicker">Integrator Workflow</div>

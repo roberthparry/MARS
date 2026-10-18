@@ -28,6 +28,6 @@ typedef enum {
  * @return Scoped browser handle to the next continuation plan, or an inert completion for invalid kinds.
  * Global dispatcher kinds are 72 through 75.
  */
-browser_jsref lab_flow_state_forms(lab_flow_state_forms_kind_t kind, frame_jsref frame, view_jsref view);
+jsref lab_flow_state_forms(lab_flow_state_forms_kind_t kind, frame_jsref frame, view_jsref view);
 
 #endif

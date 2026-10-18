@@ -13,13 +13,13 @@
  * @brief Display a structured successful forecast.
  * @param data Scoped Protobuf result.
  */
-void tba_view_result(browser_jsref data);
+void tba_view_result(jsref data);
 
 /**
  * @brief Draw a structured chart.
  * @param data Scoped chart object.
  */
-void tba_view_chart(browser_jsref data);
+void tba_view_chart(jsref data);
 
 /**
  * @brief Apply chart legend visibility.

@@ -17,7 +17,7 @@ static void lab_select_text(node_jsref node, lab_dom_accessor_t kind, const char
     lab_dom_write(node, kind, key, lab_dom_string(text));
 }
 
-static browser_jsref lab_select_child(browser_jsref parent, const char *tag, const char *class_name)
+static jsref lab_select_child(jsref parent, const char *tag, const char *class_name)
 {
     int node = lab_dom_create(tag);
     lab_dom_class(node, class_name, 1);
@@ -25,12 +25,12 @@ static browser_jsref lab_select_child(browser_jsref parent, const char *tag, con
     return node;
 }
 
-static browser_jsref lab_select_shell(node_jsref select)
+static jsref lab_select_shell(node_jsref select)
 {
     return lab_dom_closest(select, ".select-shell");
 }
 
-static void lab_select_close(browser_jsref shell)
+static void lab_select_close(jsref shell)
 {
     lab_dom_class(shell, "open", 0);
     lab_select_text(lab_dom_query(shell, ".select-button"), LAB_DOM_ATTRIBUTE, "aria-expanded", "false");
@@ -38,8 +38,8 @@ static void lab_select_close(browser_jsref shell)
 }
 
 /* Create the browser structure once, before native listener registration and option projection. */
-bool lab_select_create(node_jsref select, browser_jsref label, bool searchable, browser_jsref placeholder,
-                       browser_jsref empty, browser_jsref search_placeholder)
+bool lab_select_create(node_jsref select, jsref label, bool searchable, jsref placeholder,
+                       jsref empty, jsref search_placeholder)
 {
     if (!select || lab_select_shell(select))
         return false;
@@ -76,17 +76,17 @@ bool lab_select_create(node_jsref select, browser_jsref label, bool searchable, 
     return true;
 }
 
-static browser_jsref lab_select_visible(browser_jsref shell)
+static jsref lab_select_visible(jsref shell)
 {
     return lab_dom_all(shell, ".select-option:not(.hidden):not(:disabled)");
 }
 
-static browser_jsref lab_select_selected(browser_jsref shell)
+static jsref lab_select_selected(jsref shell)
 {
     return lab_dom_query(shell, ".select-option.selected:not(.hidden):not(:disabled)");
 }
 
-static void lab_select_filter(browser_jsref shell)
+static void lab_select_filter(jsref shell)
 {
     int query = lab_dom_normalize(lab_dom_read(lab_dom_query(shell, ".select-search"), LAB_DOM_VALUE, ""));
     int items = lab_dom_all(shell, ".select-option");
@@ -163,7 +163,7 @@ void lab_select_sync(node_jsref select)
     lab_select_filter(shell);
 }
 
-static void lab_select_open(node_jsref select, browser_jsref shell)
+static void lab_select_open(node_jsref select, jsref shell)
 {
     lab_select_text(lab_dom_query(shell, ".select-search"), LAB_DOM_VALUE, "", "");
     lab_select_sync(select);
@@ -173,7 +173,7 @@ static void lab_select_open(node_jsref select, browser_jsref shell)
     lab_dom_effect(lab_select_selected(shell), LAB_DOM_EFFECT_SCROLL);
 }
 
-static void lab_select_focus(browser_jsref shell, int step)
+static void lab_select_focus(jsref shell, int step)
 {
     int list = lab_select_visible(shell), selected = lab_select_selected(shell);
     unsigned count = lab_dom_count(list);
@@ -195,8 +195,8 @@ static void lab_select_focus(browser_jsref shell, int step)
 }
 
 /* Commit only an enabled option belonging to this menu, then queue focus and change. */
-static bool lab_select_option_event(node_jsref select, browser_jsref shell, browser_jsref button,
-                                lab_select_key_t key, browser_jsref target)
+static bool lab_select_option_event(node_jsref select, jsref shell, jsref button,
+                                lab_select_key_t key, jsref target)
 {
     if (key != LAB_SELECT_KEY_CLICK || !lab_dom_has_class(target, "select-option") ||
         lab_dom_has_class(target, "hidden") ||
@@ -214,8 +214,8 @@ static bool lab_select_option_event(node_jsref select, browser_jsref shell, brow
 }
 
 /* Open for recognised activation keys; only a click toggles an already open menu. */
-static bool lab_select_button_event(node_jsref select, browser_jsref shell, browser_jsref button,
-                                lab_select_key_t key, browser_jsref target)
+static bool lab_select_button_event(node_jsref select, jsref shell, jsref button,
+                                lab_select_key_t key, jsref target)
 {
     (void)button;
     (void)target;
@@ -243,8 +243,8 @@ static bool lab_select_button_event(node_jsref select, browser_jsref shell, brow
 }
 
 /* Keep search edits and initial keyboard focus as distinct ordered operations. */
-static bool lab_select_search_event(node_jsref select, browser_jsref shell, browser_jsref button,
-                                lab_select_key_t key, browser_jsref target)
+static bool lab_select_search_event(node_jsref select, jsref shell, jsref button,
+                                lab_select_key_t key, jsref target)
 {
     (void)select;
     (void)button;
@@ -260,8 +260,8 @@ static bool lab_select_search_event(node_jsref select, browser_jsref shell, brow
 }
 
 /* Use the validated key as a direct navigation-step index. */
-static bool lab_select_menu_event(node_jsref select, browser_jsref shell, browser_jsref button, lab_select_key_t key,
-                                browser_jsref target)
+static bool lab_select_menu_event(node_jsref select, jsref shell, jsref button, lab_select_key_t key,
+                                jsref target)
 {
     (void)select;
     (void)button;
@@ -277,7 +277,7 @@ static bool lab_select_menu_event(node_jsref select, browser_jsref shell, browse
 }
 
 /* Handle encoded browser events; focus/change effects run after scoped handles are released. */
-bool lab_select_event(node_jsref select, lab_select_source_t source, lab_select_key_t key, browser_jsref target)
+bool lab_select_event(node_jsref select, lab_select_source_t source, lab_select_key_t key, jsref target)
 {
     /** @brief Source-specific interaction after common selector and disabled-state validation. */
     typedef bool (*lab_select_event_handler_t)(node_jsref select, node_jsref shell, node_jsref button,
@@ -318,14 +318,14 @@ static lab_select_key_t lab_select_key(event_jsref event)
     return LAB_SELECT_KEY_CLICK;
 }
 
-static browser_jsref lab_select_event_target(event_jsref event)
+static jsref lab_select_event_target(event_jsref event)
 {
     int target = lab_dom_get(event, "target");
     return lab_dom_number(lab_dom_get(target, "nodeType")) == 1 ? target : lab_dom_get(target, "parentElement");
 }
 
 /* Decode recognised keys before forwarding them to their configured interaction source. */
-static bool lab_select_key_action(node_jsref select, event_jsref event, browser_jsref shell, lab_select_source_t source)
+static bool lab_select_key_action(node_jsref select, event_jsref event, jsref shell, lab_select_source_t source)
 {
     (void)shell;
     lab_select_key_t key = lab_select_key(event);
@@ -333,7 +333,7 @@ static bool lab_select_key_action(node_jsref select, event_jsref event, browser_
 }
 
 /* Resolve an option target only for menu clicks; button clicks need no event fields. */
-static bool lab_select_click_action(node_jsref select, event_jsref event, browser_jsref shell, lab_select_source_t source)
+static bool lab_select_click_action(node_jsref select, event_jsref event, jsref shell, lab_select_source_t source)
 {
     (void)shell;
     int option = source == LAB_SELECT_SOURCE_OPTION
@@ -343,7 +343,7 @@ static bool lab_select_click_action(node_jsref select, event_jsref event, browse
 }
 
 /* Forward a search edit without consuming its browser event. */
-static bool lab_select_input_action(node_jsref select, event_jsref event, browser_jsref shell, lab_select_source_t source)
+static bool lab_select_input_action(node_jsref select, event_jsref event, jsref shell, lab_select_source_t source)
 {
     (void)event;
     (void)shell;
@@ -352,7 +352,7 @@ static bool lab_select_input_action(node_jsref select, event_jsref event, browse
 }
 
 /* Redirect label focus to the accessible button and suppress only the default action. */
-static bool lab_select_label_action(node_jsref select, event_jsref event, browser_jsref shell, lab_select_source_t source)
+static bool lab_select_label_action(node_jsref select, event_jsref event, jsref shell, lab_select_source_t source)
 {
     (void)select;
     (void)event;
@@ -362,7 +362,7 @@ static bool lab_select_label_action(node_jsref select, event_jsref event, browse
 }
 
 /* Close only when the document click lies outside this selection menu. */
-static bool lab_select_document_action(node_jsref select, event_jsref event, browser_jsref shell, lab_select_source_t source)
+static bool lab_select_document_action(node_jsref select, event_jsref event, jsref shell, lab_select_source_t source)
 {
     if (!lab_dom_node_contains(shell, lab_dom_get(event, "target")))
         lab_select_event(select, source, LAB_SELECT_KEY_CLICK, 0);
@@ -370,7 +370,7 @@ static bool lab_select_document_action(node_jsref select, event_jsref event, bro
 }
 
 /* Project a native selection change without consuming the event. */
-static bool lab_select_change_action(node_jsref select, event_jsref event, browser_jsref shell, lab_select_source_t source)
+static bool lab_select_change_action(node_jsref select, event_jsref event, jsref shell, lab_select_source_t source)
 {
     (void)event;
     (void)shell;
@@ -413,7 +413,7 @@ void lab_select_dispatch(lab_select_action_t action, event_jsref event, node_jsr
         lab_dom_set(plan, "stop", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
-static int lab_select_subscribe(node_jsref select, browser_jsref document)
+static int lab_select_subscribe(node_jsref select, jsref document)
 {
     if (!select || lab_dom_truth(lab_dom_get(select, "labSelectEventsBound")))
         return 0;
@@ -449,14 +449,14 @@ bool lab_select_register(node_jsref select)
     return lab_select_subscribe(select, lab_dom_get(select, "ownerDocument"));
 }
 
-static browser_jsref lab_select_option_text(browser_jsref options, const char *key, const char *fallback)
+static jsref lab_select_option_text(jsref options, const char *key, const char *fallback)
 {
     int text = lab_dom_get(options, key);
     return lab_dom_truth(text) ? lab_dom_text(text) : lab_dom_string(fallback);
 }
 
 /* Create, subscribe and initially project a selection menu from its opaque browser options record. */
-bool lab_select_enhance(node_jsref select, browser_jsref options, browser_jsref document)
+bool lab_select_enhance(node_jsref select, jsref options, jsref document)
 {
     if (!select)
         return false;
@@ -472,7 +472,7 @@ bool lab_select_enhance(node_jsref select, browser_jsref options, browser_jsref 
 }
 
 /* Rebuild from the current options record, keeping presentation-option policy out of browser closures. */
-void lab_select_refresh(node_jsref select, browser_jsref options)
+void lab_select_refresh(node_jsref select, jsref options)
 {
     lab_select_rebuild(select, lab_dom_truth(lab_dom_get(options, "details")));
 }

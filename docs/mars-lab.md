@@ -852,7 +852,7 @@ and action masks keep their numeric or enum types wherever more than two values
 have distinct meanings.
 
 The WASM APIs, their helpers and callback tables use named `_jsref` types rather
-than plain integers for borrowed browser objects. `browser_jsref` accepts any
+than plain integers for borrowed browser objects. `jsref` accepts any
 scoped browser value; `node_jsref`, `event_jsref`, `chart_jsref`,
 `gesture_jsref`, `frame_jsref`, `view_jsref` and `snapshot_jsref` identify
 more specific roles. `quaternion_jsref` denotes a browser quaternion array in
@@ -3383,6 +3383,18 @@ offset, latitude, longitude and altitude. The packaged ephemeris covers
 1550–2649 GMT. Results include declination, Greenwich hour angle, right
 ascension and observer-relative altitude and azimuth for the navigational
 bodies.
+
+The Almanac Help screen explains every body-table coordinate and abbreviation:
+declination, GHA, RA, altitude, azimuth, semi-diameter and apparent visual magnitude.
+It gives angle units and reference directions, distinguishes RA hours from clock
+time and angular altitude from observer elevation, and explains the brightness scale.
+The event glossary distinguishes diameter-based eclipse magnitude from area-based
+obscuration, including negative lunar umbral magnitudes and penumbral eclipses with
+zero umbral obscuration. It explains First, Greatest and Fourth, the local/GMT time
+conventions, and the fact that lunar First/Fourth are P1/P4 rather than totality contacts.
+Solar and lunar partial/total phases, annular and hybrid eclipses, the umbra and
+penumbra, and date-only planetary transits are described separately, with links to
+USNO and NASA references.
 
 Wide worksheet tables scroll within their own keyboard-focusable areas rather
 than overflowing the result card. Event contacts show compact times; their full

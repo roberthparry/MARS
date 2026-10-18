@@ -15,7 +15,7 @@
 #include "lab_plot_pointer.h"
 #include "lab_plot_pinch.h"
 
-static double value(browser_jsref object, const char *key)
+static double value(jsref object, const char *key)
 {
     return lab_dom_to_number(lab_dom_get(object, key));
 }

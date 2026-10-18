@@ -26,7 +26,7 @@
  * @param text Null-terminated literal string.
  * @return True for an exact match; false otherwise.
  */
-bool lab_binding_is(browser_jsref value, const char *text);
+bool lab_binding_is(jsref value, const char *text);
 
 /**
  * @brief Share the binding modules' existing truthy-value fallback.
@@ -34,13 +34,13 @@ bool lab_binding_is(browser_jsref value, const char *text);
  * @param fallback Null-terminated fallback text.
  * @return The candidate handle when truthy, otherwise a scoped fallback string handle.
  */
-browser_jsref lab_binding_or(browser_jsref value, const char *fallback);
+jsref lab_binding_or(jsref value, const char *fallback);
 
 /**
  * @brief Obtain a trimmed opaque binding name for presentation and reconciliation.
  * @param binding Scoped binding or integrator-row record.
  * @return Scoped trimmed name, or a scoped empty string when absent.
  */
-browser_jsref lab_binding_name(browser_jsref binding);
+jsref lab_binding_name(jsref binding);
 
 #endif

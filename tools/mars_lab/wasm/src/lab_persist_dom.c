@@ -34,7 +34,7 @@ void lab_persist_schema(lab_mode_t mode)
 }
 
 /* Local omissions preserve useful previous text; the independent server record is complete. */
-void lab_persist_records(lab_mode_t mode, browser_jsref sources, browser_jsref precision)
+void lab_persist_records(lab_mode_t mode, jsref sources, jsref precision)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT), local = lab_dom_object(LAB_VALUE_OBJECT),
         server = lab_dom_object(LAB_VALUE_OBJECT);
@@ -52,7 +52,7 @@ void lab_persist_records(lab_mode_t mode, browser_jsref sources, browser_jsref p
     lab_dom_return(result);
 }
 
-static browser_jsref lab_persist_control(const char *selector, browser_jsref fallback, int trim)
+static jsref lab_persist_control(const char *selector, jsref fallback, int trim)
 {
     int text = lab_dom_read(lab_dom_query(0, selector), LAB_DOM_VALUE, "");
     if (trim)
@@ -63,11 +63,11 @@ static browser_jsref lab_persist_control(const char *selector, browser_jsref fal
 /** @brief Borrowed values shared by the mode-specific history capture handlers. */
 typedef struct {
     lab_mode_t mode; /**< Validated worksheet mode. */
-    browser_jsref empty, calendar, bounds, cap, config; /**< Synchronous DOM handles supplied by the caller. */
+    jsref empty, calendar, bounds, cap, config; /**< Synchronous DOM handles supplied by the caller. */
 } lab_persist_history_values_t;
 
 /* Capture a variable only while its control exists. */
-static void lab_persist_history_equation(browser_jsref state, const lab_persist_history_values_t *values)
+static void lab_persist_history_equation(jsref state, const lab_persist_history_values_t *values)
 {
     if (lab_dom_query(0, "#equationVariable")) {
         int fallback = lab_dom_get(values->config, "DEFAULT_EQUATION_VARIABLE");
@@ -76,21 +76,21 @@ static void lab_persist_history_equation(browser_jsref state, const lab_persist_
 }
 
 /* Capture operation before operand, preserving their distinct whitespace policies. */
-static void lab_persist_history_matrix(browser_jsref state, const lab_persist_history_values_t *values)
+static void lab_persist_history_matrix(jsref state, const lab_persist_history_values_t *values)
 {
     lab_dom_set(state, "operation", lab_persist_control("#matrixOperation", values->empty, 0));
     lab_dom_set(state, "operand", lab_persist_control("#matrixOperand", values->empty, 1));
 }
 
 /* Capture the already prepared bounds and interval budget. */
-static void lab_persist_history_integrator(browser_jsref state, const lab_persist_history_values_t *values)
+static void lab_persist_history_integrator(jsref state, const lab_persist_history_values_t *values)
 {
     lab_dom_set(state, "bounds", values->bounds);
     lab_dom_set(state, "intervalCap", values->cap);
 }
 
 /* Capture calendar state before resolving an empty editor's default. */
-static void lab_persist_history_calendar(browser_jsref state, const lab_persist_history_values_t *values)
+static void lab_persist_history_calendar(jsref state, const lab_persist_history_values_t *values)
 {
     /** @brief Calendar editor defaults indexed by the validated capture mode. */
     static const char *const defaults[LAB_MODE_COUNT] = {
@@ -103,11 +103,11 @@ static void lab_persist_history_calendar(browser_jsref state, const lab_persist_
 }
 
 /* Capture native history shape without asynchronous work or expression parsing. */
-void lab_persist_history(lab_mode_t mode, browser_jsref text, browser_jsref calendar, browser_jsref bounds,
-                         browser_jsref cap, browser_jsref config)
+void lab_persist_history(lab_mode_t mode, jsref text, jsref calendar, jsref bounds,
+                         jsref cap, jsref config)
 {
     /** @brief Additional history capture selected directly by the validated mode. */
-    static void (*const capture[LAB_MODE_COUNT])(browser_jsref, const lab_persist_history_values_t *) = {
+    static void (*const capture[LAB_MODE_COUNT])(jsref, const lab_persist_history_values_t *) = {
         [LAB_MODE_EQUATION]   = lab_persist_history_equation,
         [LAB_MODE_MATRIX]     = lab_persist_history_matrix,
         [LAB_MODE_INTEGRATOR] = lab_persist_history_integrator,
@@ -128,7 +128,7 @@ void lab_persist_history(lab_mode_t mode, browser_jsref text, browser_jsref cale
 }
 
 /* Calendar persistence uses exactly the same field order as the capture schema. */
-void lab_persist_calendar(lab_mode_t mode, browser_jsref state, browser_jsref precision)
+void lab_persist_calendar(lab_mode_t mode, jsref state, jsref precision)
 {
     int patch = lab_dom_object(LAB_VALUE_OBJECT);
     if (mode == LAB_MODE_DATETIME || mode == LAB_MODE_ALMANAC) {

@@ -60,6 +60,6 @@ void lab_precision_dispatch(lab_precision_action_t action, event_jsref event);
  * @brief Install the custom editor's control and document listeners once.
  * @param document Scoped browser Document handle for keyboard and outside-pointer subscriptions.
  */
-void lab_precision_install(browser_jsref document);
+void lab_precision_install(jsref document);
 
 #endif
