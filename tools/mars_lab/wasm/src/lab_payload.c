@@ -23,14 +23,14 @@
  * @param request Scoped request-ownership record supplying action and persistence flags, or zero when absent.
  * @param updated_at Expression modification timestamp copied to expression_updated_at; unused by other builders.
  */
-typedef void (*lab_payload_builder_t)(int payload, int inputs, int request, double updated_at);
+typedef void (*lab_payload_builder_t)(browser_handle payload, browser_handle inputs, browser_handle request, double updated_at);
 
-static int lab_payload_or(int value, int fallback)
+static browser_handle lab_payload_or(browser_handle value, browser_handle fallback)
 {
     return lab_dom_truth(value) ? value : fallback;
 }
 
-static int lab_payload_control(const char *selector)
+static browser_handle lab_payload_control(const char *selector)
 {
     int control = lab_dom_query(0, selector);
     int text = lab_dom_read(control, LAB_DOM_VALUE, "");
@@ -38,13 +38,13 @@ static int lab_payload_control(const char *selector)
     return lab_dom_truth(exact) && lab_dom_equal(text, lab_dom_get(control, "marsZoomText")) ? exact : text;
 }
 
-static unsigned lab_payload_request_flags(int request)
+static unsigned lab_payload_request_flags(browser_handle request)
 {
     return lab_request_flags((unsigned)lab_dom_number(lab_dom_get(request, "channel")),
                              (uint32_t)lab_dom_number(lab_dom_get(request, "token")));
 }
 
-static void lab_payload_expression(int payload, int inputs, int request, double updated_at)
+static void lab_payload_expression(browser_handle payload, browser_handle inputs, browser_handle request, double updated_at)
 {
     lab_dom_set(payload, "expression", lab_dom_join(0, lab_dom_item(inputs, 0), ""));
     lab_dom_set(payload, "binding_source", lab_dom_join(0, lab_dom_item(inputs, 1), ""));
@@ -115,7 +115,7 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
     lab_dom_set(payload, "persist_expression", lab_dom_scalar(LAB_VALUE_BOOLEAN, persist));
 }
 
-static void lab_payload_matrix(int payload, int inputs, int request, double updated_at)
+static void lab_payload_matrix(browser_handle payload, browser_handle inputs, browser_handle request, double updated_at)
 {
     (void)updated_at;
     int options = lab_dom_item(inputs, 0);
@@ -133,26 +133,26 @@ static void lab_payload_matrix(int payload, int inputs, int request, double upda
     lab_dom_set(payload, "transient", lab_dom_scalar(LAB_VALUE_BOOLEAN, transient));
 }
 
-static int lab_payload_editor_source(int inputs)
+static browser_handle lab_payload_editor_source(browser_handle inputs)
 {
     return lab_payload_or(lab_dom_item(inputs, 0), lab_dom_clean(lab_payload_control("#expr"), LAB_DOM_CLEAN_TRIM));
 }
 
-static void lab_payload_equation(int payload, int inputs, int request, double updated_at)
+static void lab_payload_equation(browser_handle payload, browser_handle inputs, browser_handle request, double updated_at)
 {
     (void)request;
     (void)updated_at;
     lab_dom_set(payload, "equation", lab_payload_editor_source(inputs));
 }
 
-static void lab_payload_diffequation(int payload, int inputs, int request, double updated_at)
+static void lab_payload_diffequation(browser_handle payload, browser_handle inputs, browser_handle request, double updated_at)
 {
     (void)request;
     (void)updated_at;
     lab_dom_set(payload, "diffequation", lab_payload_editor_source(inputs));
 }
 
-static void lab_payload_integrator(int payload, int inputs, int request, double updated_at)
+static void lab_payload_integrator(browser_handle payload, browser_handle inputs, browser_handle request, double updated_at)
 {
     (void)request;
     (void)updated_at;
@@ -161,14 +161,14 @@ static void lab_payload_integrator(int payload, int inputs, int request, double 
     lab_dom_set(payload, "max_intervals", lab_dom_item(inputs, 2));
 }
 
-static void lab_payload_function(int payload, int inputs, int request, double updated_at)
+static void lab_payload_function(browser_handle payload, browser_handle inputs, browser_handle request, double updated_at)
 {
     (void)request;
     (void)updated_at;
     lab_dom_set(payload, "source", lab_dom_item(inputs, 0));
 }
 
-static void lab_payload_weather(int payload, int inputs, int request, double updated_at)
+static void lab_payload_weather(browser_handle payload, browser_handle inputs, browser_handle request, double updated_at)
 {
     (void)request;
     (void)updated_at;
@@ -179,7 +179,8 @@ static void lab_payload_weather(int payload, int inputs, int request, double upd
 }
 
 /* Construct a wire record; positional inputs contain opaque caller values, including boxed numbers. */
-void lab_payload_build(lab_payload_kind_t kind, int inputs, int request, double precision, double updated_at)
+void lab_payload_build(lab_payload_kind_t kind, browser_handle inputs, browser_handle request, double precision,
+                       double updated_at)
 {
     static const lab_payload_builder_t builders[] = {
         [LAB_PAYLOAD_EXPRESSION]            = lab_payload_expression,
@@ -202,7 +203,7 @@ void lab_payload_build(lab_payload_kind_t kind, int inputs, int request, double 
 }
 
 /* Check every active bound without parsing or rewriting its mathematical contents. */
-void lab_payload_bounds_error(int bounds)
+void lab_payload_bounds_error(browser_handle bounds)
 {
     unsigned count = lab_dom_count(bounds), mark = lab_dom_mark();
     for (unsigned index = 0; index < count; ++index) {
@@ -220,7 +221,7 @@ void lab_payload_bounds_error(int bounds)
 }
 
 /* Snapshot native event identifiers and resolve only request-field fallbacks. */
-void lab_payload_land(int data, int cells, int config)
+void lab_payload_land(browser_handle data, browser_handle cells, browser_handle config)
 {
     static const struct {
         const char *key, *selector, *fallback;
@@ -254,7 +255,7 @@ void lab_payload_land(int data, int cells, int config)
 }
 
 /* Apply an already-current reply, indexing exact identifiers once and keeping native HTML intact. */
-void lab_payload_land_apply(int cells, int payload, unsigned failure)
+void lab_payload_land_apply(browser_handle cells, browser_handle payload, unsigned failure)
 {
     const char *fallback = failure == 2 ? "Nearest land totality unavailable"
                            : failure || lab_dom_truth(lab_dom_get(payload, "timed_out"))
@@ -281,7 +282,7 @@ void lab_payload_land_apply(int cells, int payload, unsigned failure)
 }
 
 /* Project the server's access description and QR markup without interpreting either. */
-void lab_payload_mobile(int data)
+void lab_payload_mobile(browser_handle data)
 {
     lab_dom_class(lab_dom_query(0, "#mobileAccess"), "hidden", 0);
     lab_dom_write(lab_dom_query(0, "#mobileTitle"), LAB_DOM_TEXT, "",

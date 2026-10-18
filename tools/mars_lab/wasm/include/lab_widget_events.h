@@ -11,6 +11,8 @@
 #ifndef LAB_WASM_WIDGET_EVENTS_H
 #define LAB_WASM_WIDGET_EVENTS_H
 
+#include "lab_handle.h"
+
 /** @brief Browser event selectors; numeric values are stable ABI identifiers. */
 typedef enum {
     LAB_WIDGET_EVENT_OPEN           =  0, /**< Toggle a date picker. */
@@ -40,7 +42,7 @@ typedef enum {
  * @param window Scoped browser Window.
  * @param state Scoped picker context containing input, button and shell nodes and native date accessors.
  */
-void lab_widget_events_install(int document, int window, int state);
+void lab_widget_events_install(browser_handle document, browser_handle window, browser_handle state);
 
 /**
  * @brief Select actions for a delivered browser event.
@@ -53,6 +55,6 @@ void lab_widget_events_install(int document, int window, int state);
  * @details Publishes a browser event plan via lab_dom_return. Service arguments are browser values copied out
  * of the handle scope. Date text remains opaque; focus/commit services execute only after dispatch returns.
  */
-void lab_widget_events_dispatch(lab_widget_event_action_t action, int event, int state);
+void lab_widget_events_dispatch(lab_widget_event_action_t action, event_handle event, browser_handle state);
 
 #endif

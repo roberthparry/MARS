@@ -9,6 +9,8 @@
 #ifndef MARS_LAB_SURFACE_MESH_H
 #define MARS_LAB_SURFACE_MESH_H
 
+#include "lab_handle.h"
+
 /**
  * @brief Decode native SVG display geometry into retained primitives and GPU attributes.
  * @param chart Scoped native-produced SVG chart node carrying geometry, bounds, units, axis and tick metadata.
@@ -17,6 +19,6 @@
  * Polygon fans preserve input ordering. Temporary handles are released per SVG record.
  * Empty geometry is accepted only when the chart explicitly carries data-empty="true".
  */
-void lab_surface_mesh(int chart);
+void lab_surface_mesh(chart_handle chart);
 
 #endif

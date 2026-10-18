@@ -10,6 +10,8 @@
 #ifndef LAB_FLOW_STATE_FORMS_H
 #define LAB_FLOW_STATE_FORMS_H
 
+#include "lab_handle.h"
+
 /** @brief Closed workflow selectors for lab_flow_state_forms; numeric values are browser ABI. */
 typedef enum {
     LAB_FLOW_STATE_FORMS_CLEAR          = 0, /**< Clear the current worksheet. */
@@ -26,6 +28,6 @@ typedef enum {
  * @return Scoped browser handle to the next continuation plan, or an inert completion for invalid kinds.
  * Global dispatcher kinds are 72 through 75.
  */
-int lab_flow_state_forms(lab_flow_state_forms_kind_t kind, int frame, int view);
+browser_handle lab_flow_state_forms(lab_flow_state_forms_kind_t kind, frame_handle frame, view_handle view);
 
 #endif

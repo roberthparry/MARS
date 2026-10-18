@@ -14,19 +14,19 @@
 #include "lab_result.h"
 #include "lab_evaluation_dom.h"
 
-static int lab_evaluation_field(int data, const char *key, int fallback)
+static browser_handle lab_evaluation_field(browser_handle data, const char *key, browser_handle fallback)
 {
     int value = lab_dom_get(data, key);
     return lab_dom_truth(value) ? value : fallback;
 }
 
-static void lab_evaluation_data(int node, const char *key, int value)
+static void lab_evaluation_data(node_handle node, const char *key, browser_handle value)
 {
     lab_dom_write(node, LAB_DOM_DATASET, key, value);
 }
 
 /* Install only native-provided renderings, retaining exact copies for digit toggles. */
-void lab_evaluation_render(lab_mode_t mode, int data, bool expandable)
+void lab_evaluation_render(lab_mode_t mode, browser_handle data, bool expandable)
 {
     if (mode != LAB_MODE_EQUATION && mode != LAB_MODE_DIFFERENTIAL_EQUATION && mode != LAB_MODE_INTEGRATOR) {
         lab_dom_return(0);
@@ -82,7 +82,7 @@ void lab_evaluation_render(lab_mode_t mode, int data, bool expandable)
 }
 
 /* Display native expression notes and return its explicit differentiability decision. */
-bool lab_evaluation_notes(int data)
+bool lab_evaluation_notes(browser_handle data)
 {
     int note = lab_evaluation_field(data, "value_note", lab_dom_string(""));
     lab_dom_write(lab_dom_query(0, "#valueNote"), LAB_DOM_TEXT, "", note);
@@ -94,7 +94,7 @@ bool lab_evaluation_notes(int data)
 }
 
 /* Retain the solver SVG and its request owner only after the host verifies freshness. */
-void lab_evaluation_solver(int data, int source, int details, int svg, double token)
+void lab_evaluation_solver(browser_handle data, browser_handle source, browser_handle details, browser_handle svg, double token)
 {
     int node = lab_dom_query(0, "#functionStyle"), empty = lab_dom_string("");
     lab_dom_class(node, "equation-function", 1);

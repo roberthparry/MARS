@@ -7,6 +7,8 @@
  */
 #ifndef TBA_REQUEST_H
 #define TBA_REQUEST_H
+
+#include "tba_handle.h"
 /**
  * @brief Load metadata for the current dataset.
  * @param driver Non-zero selects driver data.
@@ -36,5 +38,5 @@ void tba_request_forecast(void);
  * @param data Scoped response.
  * @param success HTTP success.
  */
-void tba_request_complete(unsigned action, unsigned serial, int data, int success);
+void tba_request_complete(unsigned action, unsigned serial, browser_handle data, int success);
 #endif

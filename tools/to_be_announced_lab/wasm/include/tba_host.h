@@ -12,26 +12,28 @@
 
 #include <stdint.h>
 
+#include "tba_handle.h"
+
 /**
  * @brief Classify a host value.
  * @param id Borrowed codec handle.
  * @return Kind: null 0, boolean 1, number 2, string 3, array 4 or object 5.
  */
-int tba_host_kind(int id);
+int tba_host_kind(codec_handle id);
 
 /**
  * @brief Read a number or boolean.
  * @param id Borrowed codec handle for a numeric or boolean value.
  * @return Numeric value; booleans become zero or one.
  */
-double tba_host_number(int id);
+double tba_host_number(codec_handle id);
 
 /**
  * @brief Count a container's entries.
  * @param id Borrowed array or object handle.
  * @return Number of entries.
  */
-int tba_host_count(int id);
+int tba_host_count(codec_handle id);
 
 /**
  * @brief Obtain a child's handle and kind in one host call.
@@ -39,7 +41,7 @@ int tba_host_count(int id);
  * @param index Zero-based entry index.
  * @return Child handle shifted left by three bits, with its kind in the low bits.
  */
-int tba_host_child_info(int id, int index);
+int tba_host_child_info(codec_handle id, int index);
 
 /**
  * @brief Copy an object key as UTF-8.
@@ -49,7 +51,7 @@ int tba_host_child_info(int id, int index);
  * @param capacity Destination capacity in bytes.
  * @return Byte length, or a negative result when the key cannot fit.
  */
-int tba_host_key_text(int id, int index, unsigned char *target, uint32_t capacity);
+int tba_host_key_text(codec_handle id, int index, unsigned char *target, uint32_t capacity);
 
 /**
  * @brief Copy a string value as UTF-8.
@@ -58,7 +60,7 @@ int tba_host_key_text(int id, int index, unsigned char *target, uint32_t capacit
  * @param capacity Destination capacity in bytes.
  * @return Byte length, or a negative result when the string cannot fit.
  */
-int tba_host_text(int id, unsigned char *target, uint32_t capacity);
+int tba_host_text(codec_handle id, unsigned char *target, uint32_t capacity);
 
 /**
  * @brief Create a decoded value and attach it to its parent.
@@ -71,7 +73,7 @@ int tba_host_text(int id, unsigned char *target, uint32_t capacity);
  * @param key_length Object key byte count.
  * @return New host handle, or a negative result on failure.
  */
-int tba_host_value(int kind, double number, const unsigned char *text, uint32_t length, int parent,
+codec_handle tba_host_value(int kind, double number, const unsigned char *text, uint32_t length, codec_handle parent,
                    const unsigned char *key, uint32_t key_length);
 
 #endif

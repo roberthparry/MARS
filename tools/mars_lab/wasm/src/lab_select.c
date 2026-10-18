@@ -12,12 +12,12 @@
 #include "lab_dom.h"
 #include "lab_select.h"
 
-static void lab_select_text(int node, lab_dom_accessor_t kind, const char *key, const char *text)
+static void lab_select_text(node_handle node, lab_dom_accessor_t kind, const char *key, const char *text)
 {
     lab_dom_write(node, kind, key, lab_dom_string(text));
 }
 
-static int lab_select_child(int parent, const char *tag, const char *class_name)
+static browser_handle lab_select_child(browser_handle parent, const char *tag, const char *class_name)
 {
     int node = lab_dom_create(tag);
     lab_dom_class(node, class_name, 1);
@@ -25,12 +25,12 @@ static int lab_select_child(int parent, const char *tag, const char *class_name)
     return node;
 }
 
-static int lab_select_shell(int select)
+static browser_handle lab_select_shell(node_handle select)
 {
     return lab_dom_closest(select, ".select-shell");
 }
 
-static void lab_select_close(int shell)
+static void lab_select_close(browser_handle shell)
 {
     lab_dom_class(shell, "open", 0);
     lab_select_text(lab_dom_query(shell, ".select-button"), LAB_DOM_ATTRIBUTE, "aria-expanded", "false");
@@ -38,7 +38,8 @@ static void lab_select_close(int shell)
 }
 
 /* Create the browser structure once, before native listener registration and option projection. */
-bool lab_select_create(int select, int label, bool searchable, int placeholder, int empty, int search_placeholder)
+bool lab_select_create(node_handle select, browser_handle label, bool searchable, browser_handle placeholder,
+                       browser_handle empty, browser_handle search_placeholder)
 {
     if (!select || lab_select_shell(select))
         return false;
@@ -75,17 +76,17 @@ bool lab_select_create(int select, int label, bool searchable, int placeholder, 
     return true;
 }
 
-static int lab_select_visible(int shell)
+static browser_handle lab_select_visible(browser_handle shell)
 {
     return lab_dom_all(shell, ".select-option:not(.hidden):not(:disabled)");
 }
 
-static int lab_select_selected(int shell)
+static browser_handle lab_select_selected(browser_handle shell)
 {
     return lab_dom_query(shell, ".select-option.selected:not(.hidden):not(:disabled)");
 }
 
-static void lab_select_filter(int shell)
+static void lab_select_filter(browser_handle shell)
 {
     int query = lab_dom_normalize(lab_dom_read(lab_dom_query(shell, ".select-search"), LAB_DOM_VALUE, ""));
     int items = lab_dom_all(shell, ".select-option");
@@ -103,7 +104,7 @@ static void lab_select_filter(int shell)
 }
 
 /* Rebuild from the actual select options, including disabled optgroups and town details. */
-void lab_select_rebuild(int select, bool details)
+void lab_select_rebuild(node_handle select, bool details)
 {
     int shell = lab_select_shell(select);
     if (!shell)
@@ -138,7 +139,7 @@ void lab_select_rebuild(int select, bool details)
 }
 
 /* Project selection and disabled state before applying the current search. */
-void lab_select_sync(int select)
+void lab_select_sync(node_handle select)
 {
     int shell = lab_select_shell(select);
     if (!shell)
@@ -162,7 +163,7 @@ void lab_select_sync(int select)
     lab_select_filter(shell);
 }
 
-static void lab_select_open(int select, int shell)
+static void lab_select_open(node_handle select, browser_handle shell)
 {
     lab_select_text(lab_dom_query(shell, ".select-search"), LAB_DOM_VALUE, "", "");
     lab_select_sync(select);
@@ -172,7 +173,7 @@ static void lab_select_open(int select, int shell)
     lab_dom_effect(lab_select_selected(shell), LAB_DOM_EFFECT_SCROLL);
 }
 
-static void lab_select_focus(int shell, int step)
+static void lab_select_focus(browser_handle shell, int step)
 {
     int list = lab_select_visible(shell), selected = lab_select_selected(shell);
     unsigned count = lab_dom_count(list);
@@ -194,7 +195,8 @@ static void lab_select_focus(int shell, int step)
 }
 
 /* Commit only an enabled option belonging to this menu, then queue focus and change. */
-static bool lab_select_option_event(int select, int shell, int button, lab_select_key_t key, int target)
+static bool lab_select_option_event(node_handle select, browser_handle shell, browser_handle button,
+                                lab_select_key_t key, browser_handle target)
 {
     if (key != LAB_SELECT_KEY_CLICK || !lab_dom_has_class(target, "select-option") ||
         lab_dom_has_class(target, "hidden") ||
@@ -212,7 +214,8 @@ static bool lab_select_option_event(int select, int shell, int button, lab_selec
 }
 
 /* Open for recognised activation keys; only a click toggles an already open menu. */
-static bool lab_select_button_event(int select, int shell, int button, lab_select_key_t key, int target)
+static bool lab_select_button_event(node_handle select, browser_handle shell, browser_handle button,
+                                lab_select_key_t key, browser_handle target)
 {
     (void)button;
     (void)target;
@@ -240,7 +243,8 @@ static bool lab_select_button_event(int select, int shell, int button, lab_selec
 }
 
 /* Keep search edits and initial keyboard focus as distinct ordered operations. */
-static bool lab_select_search_event(int select, int shell, int button, lab_select_key_t key, int target)
+static bool lab_select_search_event(node_handle select, browser_handle shell, browser_handle button,
+                                lab_select_key_t key, browser_handle target)
 {
     (void)select;
     (void)button;
@@ -256,7 +260,8 @@ static bool lab_select_search_event(int select, int shell, int button, lab_selec
 }
 
 /* Use the validated key as a direct navigation-step index. */
-static bool lab_select_menu_event(int select, int shell, int button, lab_select_key_t key, int target)
+static bool lab_select_menu_event(node_handle select, browser_handle shell, browser_handle button, lab_select_key_t key,
+                                browser_handle target)
 {
     (void)select;
     (void)button;
@@ -272,10 +277,11 @@ static bool lab_select_menu_event(int select, int shell, int button, lab_select_
 }
 
 /* Handle encoded browser events; focus/change effects run after scoped handles are released. */
-bool lab_select_event(int select, lab_select_source_t source, lab_select_key_t key, int target)
+bool lab_select_event(node_handle select, lab_select_source_t source, lab_select_key_t key, browser_handle target)
 {
     /** @brief Source-specific interaction after common selector and disabled-state validation. */
-    typedef bool (*lab_select_event_handler_t)(int, int, int, lab_select_key_t, int);
+    typedef bool (*lab_select_event_handler_t)(node_handle select, node_handle shell, node_handle button,
+                                               lab_select_key_t key, node_handle target);
     static const lab_select_event_handler_t handlers[LAB_SELECT_SOURCE_OPTION + 1] = {
         [LAB_SELECT_SOURCE_BUTTON] = lab_select_button_event,
         [LAB_SELECT_SOURCE_SEARCH] = lab_select_search_event,
@@ -300,7 +306,7 @@ bool lab_select_event(int select, lab_select_source_t source, lab_select_key_t k
     return handlers[source] ? handlers[source](select, shell, button, key, target) : false;
 }
 
-static lab_select_key_t lab_select_key(int event)
+static lab_select_key_t lab_select_key(event_handle event)
 {
     int key = lab_dom_get(event, "key");
     /* Five fixed browser key tokens have bounded cost; catalogue navigation uses direct indices. */
@@ -312,14 +318,14 @@ static lab_select_key_t lab_select_key(int event)
     return LAB_SELECT_KEY_CLICK;
 }
 
-static int lab_select_event_target(int event)
+static browser_handle lab_select_event_target(event_handle event)
 {
     int target = lab_dom_get(event, "target");
     return lab_dom_number(lab_dom_get(target, "nodeType")) == 1 ? target : lab_dom_get(target, "parentElement");
 }
 
 /* Decode recognised keys before forwarding them to their configured interaction source. */
-static bool lab_select_key_action(int select, int event, int shell, lab_select_source_t source)
+static bool lab_select_key_action(node_handle select, event_handle event, browser_handle shell, lab_select_source_t source)
 {
     (void)shell;
     lab_select_key_t key = lab_select_key(event);
@@ -327,7 +333,7 @@ static bool lab_select_key_action(int select, int event, int shell, lab_select_s
 }
 
 /* Resolve an option target only for menu clicks; button clicks need no event fields. */
-static bool lab_select_click_action(int select, int event, int shell, lab_select_source_t source)
+static bool lab_select_click_action(node_handle select, event_handle event, browser_handle shell, lab_select_source_t source)
 {
     (void)shell;
     int option = source == LAB_SELECT_SOURCE_OPTION
@@ -337,7 +343,7 @@ static bool lab_select_click_action(int select, int event, int shell, lab_select
 }
 
 /* Forward a search edit without consuming its browser event. */
-static bool lab_select_input_action(int select, int event, int shell, lab_select_source_t source)
+static bool lab_select_input_action(node_handle select, event_handle event, browser_handle shell, lab_select_source_t source)
 {
     (void)event;
     (void)shell;
@@ -346,7 +352,7 @@ static bool lab_select_input_action(int select, int event, int shell, lab_select
 }
 
 /* Redirect label focus to the accessible button and suppress only the default action. */
-static bool lab_select_label_action(int select, int event, int shell, lab_select_source_t source)
+static bool lab_select_label_action(node_handle select, event_handle event, browser_handle shell, lab_select_source_t source)
 {
     (void)select;
     (void)event;
@@ -356,7 +362,7 @@ static bool lab_select_label_action(int select, int event, int shell, lab_select
 }
 
 /* Close only when the document click lies outside this selection menu. */
-static bool lab_select_document_action(int select, int event, int shell, lab_select_source_t source)
+static bool lab_select_document_action(node_handle select, event_handle event, browser_handle shell, lab_select_source_t source)
 {
     if (!lab_dom_node_contains(shell, lab_dom_get(event, "target")))
         lab_select_event(select, source, LAB_SELECT_KEY_CLICK, 0);
@@ -364,7 +370,7 @@ static bool lab_select_document_action(int select, int event, int shell, lab_sel
 }
 
 /* Project a native selection change without consuming the event. */
-static bool lab_select_change_action(int select, int event, int shell, lab_select_source_t source)
+static bool lab_select_change_action(node_handle select, event_handle event, browser_handle shell, lab_select_source_t source)
 {
     (void)event;
     (void)shell;
@@ -374,10 +380,11 @@ static bool lab_select_change_action(int select, int event, int shell, lab_selec
 }
 
 /* Dispatch one subscribed event with only synchronous, borrowed handles and deferred browser effects. */
-void lab_select_dispatch(lab_select_action_t action, int event, int select)
+void lab_select_dispatch(lab_select_action_t action, event_handle event, node_handle select)
 {
     /** @brief Subscribed action returning whether to suppress the browser's default behaviour. */
-    typedef bool (*lab_select_action_handler_t)(int, int, int, lab_select_source_t);
+    typedef bool (*lab_select_action_handler_t)(node_handle select, event_handle event, node_handle shell,
+                                                lab_select_source_t source);
     static const struct {
         lab_select_action_handler_t handler;
         lab_select_source_t source;
@@ -406,7 +413,7 @@ void lab_select_dispatch(lab_select_action_t action, int event, int select)
         lab_dom_set(plan, "stop", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
-static int lab_select_subscribe(int select, int document)
+static int lab_select_subscribe(node_handle select, browser_handle document)
 {
     if (!select || lab_dom_truth(lab_dom_get(select, "labSelectEventsBound")))
         return 0;
@@ -437,19 +444,19 @@ static int lab_select_subscribe(int select, int document)
 }
 
 /* Subscribe once per select, including a distinct outside-click context on its owning document. */
-bool lab_select_register(int select)
+bool lab_select_register(node_handle select)
 {
     return lab_select_subscribe(select, lab_dom_get(select, "ownerDocument"));
 }
 
-static int lab_select_option_text(int options, const char *key, const char *fallback)
+static browser_handle lab_select_option_text(browser_handle options, const char *key, const char *fallback)
 {
     int text = lab_dom_get(options, key);
     return lab_dom_truth(text) ? lab_dom_text(text) : lab_dom_string(fallback);
 }
 
 /* Create, subscribe and initially project a selection menu from its opaque browser options record. */
-bool lab_select_enhance(int select, int options, int document)
+bool lab_select_enhance(node_handle select, browser_handle options, browser_handle document)
 {
     if (!select)
         return false;
@@ -465,7 +472,7 @@ bool lab_select_enhance(int select, int options, int document)
 }
 
 /* Rebuild from the current options record, keeping presentation-option policy out of browser closures. */
-void lab_select_refresh(int select, int options)
+void lab_select_refresh(node_handle select, browser_handle options)
 {
     lab_select_rebuild(select, lab_dom_truth(lab_dom_get(options, "details")));
 }

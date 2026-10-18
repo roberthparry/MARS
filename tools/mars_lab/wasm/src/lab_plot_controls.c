@@ -14,7 +14,7 @@
 #include "lab_plot_slices.h"
 #include "lab_plot_controls.h"
 
-static int value(const char *id)
+static browser_handle value(const char *id)
 {
     return lab_dom_read(lab_dom_id(id), LAB_DOM_VALUE, "");
 }
@@ -88,7 +88,7 @@ void lab_plot_controls_reset(void)
     lab_plot_controls_sync();
 }
 
-static lab_plot_group_t control_index(int name)
+static lab_plot_group_t control_index(browser_handle name)
 {
     /* Five fixed UI groups; mathematical symbol lookup remains with native binding metadata. */
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i)
@@ -98,7 +98,7 @@ static lab_plot_group_t control_index(int name)
 }
 
 /* Index authored binding values once; plotting names come from the native catalogue. */
-static int curve_available(int first)
+static int curve_available(browser_handle first)
 {
     int fixed = lab_dom_object(LAB_VALUE_OBJECT);
     int inputs = lab_dom_all(lab_dom_id("variableValues"), ".binding-value-input");
@@ -180,7 +180,7 @@ void lab_plot_controls_sync(void)
     lab_dom_class(lab_dom_id("plotManual"), "hidden", !lab_dom_equal(value("plotScale"), lab_dom_string("manual")));
 }
 
-static void choice(int group, const char *name, int key, int label)
+static void choice(browser_handle group, const char *name, browser_handle key, browser_handle label)
 {
     int wrapper = lab_dom_create("label"), radio = lab_dom_create("input"), text = lab_dom_create("span");
     lab_dom_write(radio, LAB_DOM_ATTRIBUTE, "type", lab_dom_string("radio"));
@@ -193,7 +193,7 @@ static void choice(int group, const char *name, int key, int label)
 }
 
 /* Build accessible native radio groups, preserving selections only while their variables exist. */
-void lab_plot_controls_variables(int names, int labels)
+void lab_plot_controls_variables(browser_handle names, browser_handle labels)
 {
     lab_dom_set(lab_dom_id("plotRange"), "marsPlotNames", names);
     int groups[] = {lab_dom_id("plotFirstChoices"), lab_dom_id("plotSecondChoices")};
@@ -225,19 +225,19 @@ void lab_plot_controls_variables(int names, int labels)
 }
 
 /* Automatic plotting and live redraws share the card's selected first-axis value. */
-void lab_plot_controls_prepare(int variable)
+void lab_plot_controls_prepare(browser_handle variable)
 {
     lab_dom_write(lab_dom_id("plotFirst"), LAB_DOM_VALUE, "", variable);
     lab_plot_controls_sync();
 }
 
-static int current_source(void)
+static browser_handle current_source(void)
 {
     int length = lab_workspace_source_get(LAB_WORKSPACE_FULL_TEXT);
     return length > 0 ? lab_dom_utf8_string(lab_workspace_output(), (unsigned)length) : lab_dom_string("");
 }
 
-static void emit(int calls, const char *service, int first, int second, unsigned count)
+static void emit(browser_handle calls, const char *service, browser_handle first, browser_handle second, unsigned count)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(args, first);
@@ -249,7 +249,7 @@ static void emit(int calls, const char *service, int first, int second, unsigned
 }
 
 /* Coalesce edits; never replay an old worksheet or interrupt a newer explicit request. */
-void lab_plot_controls_dispatch(lab_plot_control_action_t action, int event, int context)
+void lab_plot_controls_dispatch(lab_plot_control_action_t action, event_handle event, browser_handle context)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(plan, "calls", calls);

@@ -10,6 +10,7 @@
 #ifndef LAB_WASM_GOAL_H
 #define LAB_WASM_GOAL_H
 
+#include "lab_handle.h"
 #include "lab_requests.h"
 
 /**
@@ -23,13 +24,13 @@
  * @post Publishes calls and a boolean result through lab_dom_return; invalid or stale outcomes publish null.
  * History precedes editor replacement. No browser state is changed while producing the plan.
  */
-void lab_goal_complete(lab_request_outcome_t outcome, int data, int completion, int error);
+void lab_goal_complete(lab_request_outcome_t outcome, browser_handle data, browser_handle completion, browser_handle error);
 
 /**
  * @brief Publish the successful completion label through lab_dom_return.
  * @param cards Scoped browser handle to the native card projection whose unchanged property is read at execution time.
  * @post Publishes Goal already reached through lab_dom_return when unchanged is truthy, otherwise Goal reached.
  */
-void lab_goal_status(int cards);
+void lab_goal_status(browser_handle cards);
 
 #endif

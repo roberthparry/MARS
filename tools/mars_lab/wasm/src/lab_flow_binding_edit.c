@@ -11,19 +11,19 @@
 #include "lab_flow.h"
 #include "lab_flow_binding.h"
 
-static unsigned lab_flow_binding_edit_stage(int frame)
+static unsigned lab_flow_binding_edit_stage(frame_handle frame)
 {
     return (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
 }
 
-static int lab_flow_binding_edit_success(int frame)
+static int lab_flow_binding_edit_success(frame_handle frame)
 {
     int result = lab_dom_get(frame, "result");
     return lab_dom_truth(lab_dom_get(lab_dom_get(result, "response"), "ok")) &&
            lab_dom_truth(lab_dom_get(lab_dom_get(result, "data"), "ok"));
 }
 
-static int lab_flow_binding_edit_matches(int frame, int trimmed)
+static int lab_flow_binding_edit_matches(frame_handle frame, int trimmed)
 {
     int text = lab_dom_get(lab_dom_get(frame, "after"), "text");
     return lab_dom_equal(trimmed ? lab_dom_clean(text, LAB_DOM_CLEAN_TRIM) : text,
@@ -53,25 +53,25 @@ enum {
 };
 
 struct lab_flow_binding_edit_projection_context {
-    int frame;
-    int data;
+    frame_handle frame;
+    browser_handle data;
 };
 
 
-static int lab_flow_binding_edit_projection_status(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_status(struct lab_flow_binding_edit_projection_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_fetch, "setStatus", 0, 0, 1,
                          lab_dom_string("Updating bindings..."));
 }
 
-static int lab_flow_binding_edit_projection_fetch(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_fetch(struct lab_flow_binding_edit_projection_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_binding_edit_projection_stage_error_owner));
     return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_validate, "bindingFetch", "result", 1, 3,
                          lab_dom_get(ctx->frame, "updated"), lab_dom_string(""), lab_dom_get(ctx->frame, "request"));
 }
 
-static int lab_flow_binding_edit_projection_validate(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_validate(struct lab_flow_binding_edit_projection_context *ctx)
 {
     if (!lab_flow_binding_edit_success(ctx->frame)) {
         int error = lab_dom_get(ctx->data, "error");
@@ -82,7 +82,7 @@ static int lab_flow_binding_edit_projection_validate(struct lab_flow_binding_edi
                          lab_dom_get(ctx->frame, "updated"));
 }
 
-static int lab_flow_binding_edit_projection_body_owner(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_body_owner(struct lab_flow_binding_edit_projection_context *ctx)
 {
     return lab_flow_call(ctx->frame,
                          lab_flow_binding_edit_stage(ctx->frame) == flow_binding_edit_projection_stage_owner
@@ -91,7 +91,7 @@ static int lab_flow_binding_edit_projection_body_owner(struct lab_flow_binding_e
                          "requestCurrent", "current", 0, 1, lab_dom_get(ctx->frame, "request"));
 }
 
-static int lab_flow_binding_edit_projection_body_capture(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_body_capture(struct lab_flow_binding_edit_projection_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
@@ -102,7 +102,7 @@ static int lab_flow_binding_edit_projection_body_capture(struct lab_flow_binding
                          "bindingCapture", "after", 0, 0);
 }
 
-static int lab_flow_binding_edit_projection_bindings(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_bindings(struct lab_flow_binding_edit_projection_context *ctx)
 {
     if (!lab_flow_binding_edit_matches(ctx->frame, 0))
         return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
@@ -113,7 +113,7 @@ static int lab_flow_binding_edit_projection_bindings(struct lab_flow_binding_edi
                          2, bindings, lab_dom_get(ctx->frame, "updated"));
 }
 
-static int lab_flow_binding_edit_projection_body_select(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_body_select(struct lab_flow_binding_edit_projection_context *ctx)
 {
     if (lab_dom_get(ctx->frame, "editorBodyText"))
         return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_body, "bindingPrepare", 0, 1, 1,
@@ -123,19 +123,19 @@ static int lab_flow_binding_edit_projection_body_select(struct lab_flow_binding_
                          lab_dom_get(ctx->data, "evaluation_ready"));
 }
 
-static int lab_flow_binding_edit_projection_body(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_body(struct lab_flow_binding_edit_projection_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_assemble, "bindingBody", "editorBody", 0, 1,
                          lab_dom_get(ctx->frame, "editorBodyText"));
 }
 
-static int lab_flow_binding_edit_projection_assemble(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_assemble(struct lab_flow_binding_edit_projection_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_body_owner, "expressionWithBindings",
                          "assembled", 1, 2, lab_dom_get(ctx->frame, "editorBody"), lab_dom_get(ctx->frame, "bindings"));
 }
 
-static int lab_flow_binding_edit_projection_body_accept(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_body_accept(struct lab_flow_binding_edit_projection_context *ctx)
 {
     if (!lab_flow_binding_edit_matches(ctx->frame, 0))
         return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
@@ -147,35 +147,35 @@ static int lab_flow_binding_edit_projection_body_accept(struct lab_flow_binding_
                          lab_dom_get(ctx->data, "evaluation_ready"));
 }
 
-static int lab_flow_binding_edit_projection_history(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_history(struct lab_flow_binding_edit_projection_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_save, "updateHistoryButtons", 0, 0, 0);
 }
 
-static int lab_flow_binding_edit_projection_save(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_save(struct lab_flow_binding_edit_projection_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_ready, "bindingSaveMode", 0, 0, 0);
 }
 
-static int lab_flow_binding_edit_projection_ready(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_ready(struct lab_flow_binding_edit_projection_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_done, "setStatus", 0, 0, 1,
                          lab_dom_string("Ready"));
 }
 
-static int lab_flow_binding_edit_projection_done(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_done(struct lab_flow_binding_edit_projection_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
-static int lab_flow_binding_edit_projection_error_owner(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_error_owner(struct lab_flow_binding_edit_projection_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_error_report, "requestCurrent", "current", 0, 1,
                          lab_dom_get(ctx->frame, "request"));
 }
 
-static int lab_flow_binding_edit_projection_error_report(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_error_report(struct lab_flow_binding_edit_projection_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_failed, "setStatus", 0, 0, 1,
@@ -183,20 +183,20 @@ static int lab_flow_binding_edit_projection_error_report(struct lab_flow_binding
     return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
-static int lab_flow_binding_edit_projection_otherwise(struct lab_flow_binding_edit_projection_context *ctx)
+static browser_handle lab_flow_binding_edit_projection_otherwise(struct lab_flow_binding_edit_projection_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
-static int lab_flow_binding_edit_projection(int frame)
+static browser_handle lab_flow_binding_edit_projection(frame_handle frame)
 {
     int data = lab_dom_get(lab_dom_get(frame, "result"), "data");
     struct lab_flow_binding_edit_projection_context ctx = {
         .frame = frame,
         .data = data,
     };
-    static int (*const handlers[])(struct lab_flow_binding_edit_projection_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_binding_edit_projection_context *) = {
         [flow_binding_edit_projection_stage_status]       = lab_flow_binding_edit_projection_status,
         [flow_binding_edit_projection_stage_fetch]        = lab_flow_binding_edit_projection_fetch,
         [flow_binding_edit_projection_stage_validate]     = lab_flow_binding_edit_projection_validate,
@@ -232,13 +232,13 @@ enum {
     flow_binding_edit_apply_stage_done
 };
 
-static int lab_flow_binding_edit_apply_inspect(int frame)
+static browser_handle lab_flow_binding_edit_apply_inspect(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_edit_apply_stage_authored, "bindingInspectText", "inspected", 0, 1,
                          lab_dom_get(frame, "editedBody"));
 }
 
-static int lab_flow_binding_edit_apply_authored(int frame)
+static browser_handle lab_flow_binding_edit_apply_authored(frame_handle frame)
 {
     int inspected = lab_dom_get(frame, "inspected");
     int source = lab_dom_truth(lab_dom_get(inspected, "parts")) ? lab_dom_get(frame, "editedBody")
@@ -247,26 +247,26 @@ static int lab_flow_binding_edit_apply_authored(int frame)
                          lab_dom_get(lab_dom_get(frame, "data"), "binding_values"), source);
 }
 
-static int lab_flow_binding_edit_apply_assemble(int frame)
+static browser_handle lab_flow_binding_edit_apply_assemble(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_edit_apply_stage_owner, "expressionWithBindings", "assembled", 1, 2,
                          lab_dom_get(lab_dom_get(frame, "inspected"), "body"), lab_dom_get(frame, "bindings"));
 }
 
-static int lab_flow_binding_edit_apply_owner(int frame)
+static browser_handle lab_flow_binding_edit_apply_owner(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_edit_apply_stage_capture, "requestCurrent", "current", 0, 1,
                          lab_dom_get(frame, "request"));
 }
 
-static int lab_flow_binding_edit_apply_capture(int frame)
+static browser_handle lab_flow_binding_edit_apply_capture(frame_handle frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
         return lab_flow_done(0);
     return lab_flow_call(frame, flow_binding_edit_apply_stage_apply, "bindingCapture", "after", 0, 0);
 }
 
-static int lab_flow_binding_edit_apply_apply(int frame)
+static browser_handle lab_flow_binding_edit_apply_apply(frame_handle frame)
 {
     if (!lab_flow_binding_edit_matches(frame, 1))
         return lab_flow_done(0);
@@ -277,15 +277,15 @@ static int lab_flow_binding_edit_apply_apply(int frame)
                          lab_dom_get(frame, "bindings"), lab_dom_get(frame, "data"));
 }
 
-static int lab_flow_binding_edit_apply_otherwise(int frame)
+static browser_handle lab_flow_binding_edit_apply_otherwise(frame_handle frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_edit_apply(int frame)
+static browser_handle lab_flow_binding_edit_apply(frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [flow_binding_edit_apply_stage_inspect]  = lab_flow_binding_edit_apply_inspect,
         [flow_binding_edit_apply_stage_authored] = lab_flow_binding_edit_apply_authored,
         [flow_binding_edit_apply_stage_assemble] = lab_flow_binding_edit_apply_assemble,
@@ -316,12 +316,12 @@ enum {
 };
 
 struct lab_flow_binding_edit_refresh_context {
-    int frame;
+    frame_handle frame;
     unsigned int stage;
 };
 
 
-static int lab_flow_binding_edit_refresh_fetch(struct lab_flow_binding_edit_refresh_context *ctx)
+static browser_handle lab_flow_binding_edit_refresh_fetch(struct lab_flow_binding_edit_refresh_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_binding_edit_refresh_stage_error_owner));
     return lab_flow_call(ctx->frame, flow_binding_edit_refresh_stage_owner, "bindingFetch", "result", 1, 3,
@@ -329,7 +329,7 @@ static int lab_flow_binding_edit_refresh_fetch(struct lab_flow_binding_edit_refr
                          lab_dom_get(ctx->frame, "request"));
 }
 
-static int lab_flow_binding_edit_refresh_error_owner(struct lab_flow_binding_edit_refresh_context *ctx)
+static browser_handle lab_flow_binding_edit_refresh_error_owner(struct lab_flow_binding_edit_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame,
                          ctx->stage == flow_binding_edit_refresh_stage_owner ? flow_binding_edit_refresh_stage_capture
@@ -339,7 +339,7 @@ static int lab_flow_binding_edit_refresh_error_owner(struct lab_flow_binding_edi
                          "requestCurrent", "current", 0, 1, lab_dom_get(ctx->frame, "request"));
 }
 
-static int lab_flow_binding_edit_refresh_error_capture(struct lab_flow_binding_edit_refresh_context *ctx)
+static browser_handle lab_flow_binding_edit_refresh_error_capture(struct lab_flow_binding_edit_refresh_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_done(0);
@@ -351,7 +351,7 @@ static int lab_flow_binding_edit_refresh_error_capture(struct lab_flow_binding_e
         "bindingCapture", "after", 0, 0);
 }
 
-static int lab_flow_binding_edit_refresh_validate(struct lab_flow_binding_edit_refresh_context *ctx)
+static browser_handle lab_flow_binding_edit_refresh_validate(struct lab_flow_binding_edit_refresh_context *ctx)
 {
     if (!lab_flow_binding_edit_matches(ctx->frame, 1))
         return lab_flow_done(0);
@@ -361,13 +361,13 @@ static int lab_flow_binding_edit_refresh_validate(struct lab_flow_binding_edit_r
                          lab_dom_get(ctx->frame, "editedBody"));
 }
 
-static int lab_flow_binding_edit_refresh_prepare_source(struct lab_flow_binding_edit_refresh_context *ctx)
+static browser_handle lab_flow_binding_edit_refresh_prepare_source(struct lab_flow_binding_edit_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_edit_refresh_stage_recheck, "bindingPrepare", 0, 1, 1,
                          lab_dom_get(ctx->frame, "sourceExpression"));
 }
 
-static int lab_flow_binding_edit_refresh_apply(struct lab_flow_binding_edit_refresh_context *ctx)
+static browser_handle lab_flow_binding_edit_refresh_apply(struct lab_flow_binding_edit_refresh_context *ctx)
 {
     if (!lab_flow_binding_edit_matches(ctx->frame, 1))
         return lab_flow_done(0);
@@ -376,32 +376,32 @@ static int lab_flow_binding_edit_refresh_apply(struct lab_flow_binding_edit_refr
                          lab_dom_get(lab_dom_get(ctx->frame, "result"), "data"), lab_dom_get(ctx->frame, "request"));
 }
 
-static int lab_flow_binding_edit_refresh_error_mark(struct lab_flow_binding_edit_refresh_context *ctx)
+static browser_handle lab_flow_binding_edit_refresh_error_mark(struct lab_flow_binding_edit_refresh_context *ctx)
 {
     if (!lab_flow_binding_edit_matches(ctx->frame, 1))
         return lab_flow_done(0);
     return lab_flow_call(ctx->frame, flow_binding_edit_refresh_stage_history, "bindingMarkInvalid", 0, 0, 0);
 }
 
-static int lab_flow_binding_edit_refresh_history(struct lab_flow_binding_edit_refresh_context *ctx)
+static browser_handle lab_flow_binding_edit_refresh_history(struct lab_flow_binding_edit_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_edit_refresh_stage_done, "updateHistoryButtons", 0, 0, 0);
 }
 
-static int lab_flow_binding_edit_refresh_otherwise(struct lab_flow_binding_edit_refresh_context *ctx)
+static browser_handle lab_flow_binding_edit_refresh_otherwise(struct lab_flow_binding_edit_refresh_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_edit_refresh(int frame)
+static browser_handle lab_flow_binding_edit_refresh(frame_handle frame)
 {
     unsigned stage = lab_flow_binding_edit_stage(frame);
     struct lab_flow_binding_edit_refresh_context ctx = {
         .frame = frame,
         .stage = stage,
     };
-    static int (*const handlers[])(struct lab_flow_binding_edit_refresh_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_binding_edit_refresh_context *) = {
         [flow_binding_edit_refresh_stage_fetch]          = lab_flow_binding_edit_refresh_fetch,
         [flow_binding_edit_refresh_stage_owner]          = lab_flow_binding_edit_refresh_error_owner,
         [flow_binding_edit_refresh_stage_recheck]        = lab_flow_binding_edit_refresh_error_owner,
@@ -422,9 +422,9 @@ static int lab_flow_binding_edit_refresh(int frame)
 }
 
 /* Keep editor workflows separately readable while sharing the binding flow range. */
-int lab_flow_binding_edit(lab_flow_binding_edit_kind_t kind, int frame)
+browser_handle lab_flow_binding_edit(lab_flow_binding_edit_kind_t kind, frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [LAB_FLOW_BINDING_EDIT_PROJECT] = lab_flow_binding_edit_projection,
         [LAB_FLOW_BINDING_EDIT_APPLY]   = lab_flow_binding_edit_apply,
         [LAB_FLOW_BINDING_EDIT_REFRESH] = lab_flow_binding_edit_refresh,

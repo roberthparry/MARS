@@ -14,8 +14,8 @@
 #define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding_internal.h"
 
-static void lab_binding_integrator_state_emit(int calls, const char *service, unsigned count, int first, int second,
-                                              int third)
+static void lab_binding_integrator_state_emit(browser_handle calls, const char *service, unsigned count,
+                                browser_handle first, browser_handle second, browser_handle third)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     const int values[] = {first, second, third};
@@ -27,7 +27,8 @@ static void lab_binding_integrator_state_emit(int calls, const char *service, un
 }
 
 /* Select exact native metadata and defer stateful editor services beyond the scoped DOM call. */
-void lab_binding_integrator_state(int data, int fallback, int editors, int bound_names)
+void lab_binding_integrator_state(browser_handle data, browser_handle fallback, browser_handle editors,
+                                browser_handle bound_names)
 {
     int expression = lab_dom_get(data, "binding_expression");
     if (!lab_dom_truth(expression))

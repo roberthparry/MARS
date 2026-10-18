@@ -12,6 +12,7 @@
 #ifndef LAB_WASM_EVALUATION_INSTALL_H
 #define LAB_WASM_EVALUATION_INSTALL_H
 
+#include "lab_handle.h"
 #include "lab_mode.h"
 #include "lab_requests.h"
 
@@ -39,6 +40,6 @@ typedef enum {
  * does not change the DOM or redefine the host's live state properties.
  */
 void lab_evaluation_install(lab_mode_t mode, lab_evaluation_install_phase_t phase, lab_request_outcome_t outcome,
-                            int data, int context, int cards, int view);
+                            browser_handle data, browser_handle context, browser_handle cards, view_handle view);
 
 #endif

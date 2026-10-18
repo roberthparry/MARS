@@ -13,6 +13,8 @@
 #ifndef LAB_WASM_ALMANAC_EVENTS_H
 #define LAB_WASM_ALMANAC_EVENTS_H
 
+#include "lab_handle.h"
+
 /** @brief Browser event selectors; numeric values are stable ABI identifiers. */
 typedef enum {
     LAB_ALMANAC_EVENT_TOTALITY   = 0, /**< Apply the selected totality action. */
@@ -26,7 +28,7 @@ typedef enum {
  * @details Visibility subscriptions share a browser-owned context stored on the root.
  * Reinstallation updates its state reference without creating duplicate listeners.
  */
-void lab_almanac_events_install(int root, int state);
+void lab_almanac_events_install(browser_handle root, browser_handle state);
 
 /**
  * @brief Validate and project an exact server worksheet variant, then register its actions.
@@ -38,7 +40,7 @@ void lab_almanac_events_install(int root, int state);
  * this visibility after the call. Invalid presentation preserves the previous DOM and
  * visibility; the browser supplies the existing diagnostic. State is never written.
  */
-void lab_almanac_events_render(int target, int data, int state);
+void lab_almanac_events_render(browser_handle target, browser_handle data, browser_handle state);
 
 /**
  * @brief Return ordered deferred services for a totality or visibility action.
@@ -50,6 +52,6 @@ void lab_almanac_events_render(int target, int data, int state);
  * and then saving state before either
  * rerendering the last response and refreshing totality, or evaluating without history.
  */
-void lab_almanac_events_dispatch(lab_almanac_event_action_t action, int event, int context);
+void lab_almanac_events_dispatch(lab_almanac_event_action_t action, event_handle event, browser_handle context);
 
 #endif

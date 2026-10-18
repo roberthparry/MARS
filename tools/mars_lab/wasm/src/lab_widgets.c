@@ -96,7 +96,7 @@ typedef struct {
     double height;
 } lab_widgets_rect_t;
 
-static int lab_widgets_box(int node, lab_widgets_rect_t *rect)
+static int lab_widgets_box(node_handle node, lab_widgets_rect_t *rect)
 {
     if (!node)
         return 0;
@@ -109,7 +109,7 @@ static int lab_widgets_box(int node, lab_widgets_rect_t *rect)
     return 1;
 }
 
-static int lab_widgets_anchor(int shell, lab_widgets_rect_t *rect)
+static int lab_widgets_anchor(browser_handle shell, lab_widgets_rect_t *rect)
 {
     if (!shell)
         return 0;
@@ -143,7 +143,7 @@ static int lab_widgets_anchor(int shell, lab_widgets_rect_t *rect)
 }
 
 /* Return the shell's visible rectangle, or the union of its two child controls, through the host. */
-void lab_widgets_picker_anchor(int shell)
+void lab_widgets_picker_anchor(browser_handle shell)
 {
     lab_widgets_rect_t rect;
     if (!lab_widgets_anchor(shell, &rect)) {
@@ -161,7 +161,7 @@ void lab_widgets_picker_anchor(int shell)
 }
 
 /* Select the anchor and project viewport-clamped popup geometry. */
-void lab_widgets_picker_place(int state, int shell, double viewport_width, double viewport_height)
+void lab_widgets_picker_place(browser_handle state, browser_handle shell, double viewport_width, double viewport_height)
 {
     int picker = lab_dom_query(0, "#marsDatePicker");
     lab_widgets_rect_t anchor;
@@ -187,7 +187,7 @@ void lab_widgets_picker_place(int state, int shell, double viewport_width, doubl
 }
 
 /* Hide the popup and clear both native navigation and host references before any focus event. */
-void lab_widgets_picker_close(int state, bool restore_focus)
+void lab_widgets_picker_close(browser_handle state, bool restore_focus)
 {
     int picker = lab_dom_query(0, "#marsDatePicker");
     if (!picker)
@@ -204,7 +204,7 @@ void lab_widgets_picker_close(int state, bool restore_focus)
 }
 
 /* Write a date and dispatch one deferred bubbling change only when its authored value differs. */
-bool lab_widgets_date_commit(int input, int value)
+bool lab_widgets_date_commit(browser_handle input, browser_handle value)
 {
     if (!input)
         return false;
@@ -216,14 +216,14 @@ bool lab_widgets_date_commit(int input, int value)
 }
 
 /* Select GMT for the almanac date and the local calendar date for every other input. */
-void lab_widgets_picker_today_date(int input, int local_date, int utc_date)
+void lab_widgets_picker_today_date(browser_handle input, browser_handle local_date, browser_handle utc_date)
 {
     int utc = input && lab_dom_equal(input, lab_dom_query(0, "#almanacDate"));
     lab_dom_return(utc ? utc_date : local_date);
 }
 
 /* Install the almanac GMT date and time together, emitting just one change for the complete moment. */
-void lab_widgets_picker_today(int input, int local_date, int utc_moment)
+void lab_widgets_picker_today(browser_handle input, browser_handle local_date, browser_handle utc_moment)
 {
     int time = lab_dom_query(0, "#almanacTime");
     if (input && time && lab_dom_equal(input, lab_dom_query(0, "#almanacDate"))) {
@@ -237,12 +237,13 @@ void lab_widgets_picker_today(int input, int local_date, int utc_moment)
     lab_widgets_date_commit(input, local_date);
 }
 
-static double lab_widgets_part(int date, const char *part)
+static double lab_widgets_part(browser_handle date, const char *part)
 {
     return lab_dom_number(lab_dom_get(date, part));
 }
 
-static void lab_widgets_render(int state, int selected, int today, double viewport_width, double viewport_height)
+static void lab_widgets_render(browser_handle state, browser_handle selected, browser_handle today,
+                               double viewport_width, double viewport_height)
 {
     int packed = lab_forms_picker_date();
     if (!lab_dom_get(state, "input") || !packed)
@@ -255,14 +256,15 @@ static void lab_widgets_render(int state, int selected, int today, double viewpo
 }
 
 /* Project the open native month and position it; a closed picker cannot be reopened by a stale render. */
-void lab_widgets_picker_render(int state, int selected, int today, double viewport_width, double viewport_height)
+void lab_widgets_picker_render(browser_handle state, browser_handle selected, browser_handle today,
+                               double viewport_width, double viewport_height)
 {
     lab_widgets_render(state, selected, today, viewport_width, viewport_height);
 }
 
 /* Choose the selected date or today's date, transfer popup ownership and project one complete calendar. */
-void lab_widgets_picker_open(int state, int input, int button, int selected, int today, double fallback_year,
-                             double viewport_width, double viewport_height)
+void lab_widgets_picker_open(browser_handle state, browser_handle input, browser_handle button, browser_handle selected,
+                             browser_handle today, double fallback_year, double viewport_width, double viewport_height)
 {
     if (!input || !button || !lab_dom_query(0, "#marsDatePicker"))
         return;
@@ -282,7 +284,7 @@ void lab_widgets_picker_open(int state, int input, int button, int selected, int
 }
 
 /* Format an accepted native date for commit; return whether the caller should refresh the calendar. */
-bool lab_widgets_picker_apply(int state, int packed, bool commit)
+bool lab_widgets_picker_apply(browser_handle state, int packed, bool commit)
 {
     int input = lab_dom_get(state, "input");
     unsigned year = lab_forms_date_year(packed), month = lab_forms_date_month(packed), day = lab_forms_date_day(packed);
@@ -297,8 +299,8 @@ bool lab_widgets_picker_apply(int state, int packed, bool commit)
 }
 
 /* Apply the selected month/year navigation operation, preserving and clamping the selected day. */
-bool lab_widgets_picker_move(int state, lab_picker_operation_t operation, double first, double second, int selected,
-                             double fallback_year, bool commit)
+bool lab_widgets_picker_move(browser_handle state, lab_picker_operation_t operation, double first, double second,
+                             browser_handle selected, double fallback_year, bool commit)
 {
     if (!lab_dom_get(state, "input") || (unsigned)operation > LAB_PICKER_SHIFT_YEARS)
         return false;

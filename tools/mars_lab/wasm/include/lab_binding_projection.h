@@ -12,6 +12,7 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
 #include "lab_mode.h"
 
 /** @brief Stage of a delayed binding refresh, separated by browser request admission. */
@@ -36,7 +37,7 @@ void lab_binding_projection_clear(bool goal_only);
  * @param metadata Scoped native editor metadata; its wrapped flag selects full-editor projection.
  * @post Publishes an ordered calls plan through lab_dom_return.
  */
-void lab_binding_projection_update(lab_mode_t mode, int updated, int metadata);
+void lab_binding_projection_update(lab_mode_t mode, browser_handle updated, browser_handle metadata);
 
 /**
  * @brief Plan deferred metadata preparation only when the cache has no record.
@@ -44,14 +45,14 @@ void lab_binding_projection_update(lab_mode_t mode, int updated, int metadata);
  * @param metadata Scoped cached metadata, or zero when absent.
  * @post Publishes a calls plan through lab_dom_return; a truthy cache entry requires no deferred service.
  */
-void lab_binding_projection_prepare(int context, int metadata);
+void lab_binding_projection_prepare(browser_handle context, browser_handle metadata);
 
 /**
  * @brief Plan synchronous installation of selected editor metadata and refresh policy.
  * @param selected Scoped result from lab_binding_editor with fullText, displayText, bindings and refresh fields.
  * @post Publishes ordered source, control and optional refresh effects through lab_dom_return.
  */
-void lab_binding_projection_finish(int selected);
+void lab_binding_projection_finish(browser_handle selected);
 
 /**
  * @brief Plan request admission and scheduling for a delayed edited-binding refresh.
@@ -62,6 +63,6 @@ void lab_binding_projection_finish(int selected);
  * @post Publishes an ordered calls plan through lab_dom_return. Phase 1 schedules a 300-millisecond refresh
  * only when the request is truthy; request creation runs outside the native scope.
  */
-void lab_binding_projection_refresh(lab_binding_refresh_phase_t phase, int context);
+void lab_binding_projection_refresh(lab_binding_refresh_phase_t phase, browser_handle context);
 
 #endif

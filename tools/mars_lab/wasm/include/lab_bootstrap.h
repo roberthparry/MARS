@@ -9,6 +9,8 @@
 #ifndef LAB_BOOTSTRAP_H
 #define LAB_BOOTSTRAP_H
 
+#include "lab_handle.h"
+
 /** @brief Workspace default-selection phase before full application initialisation. */
 typedef enum {
     LAB_BOOTSTRAP_WORKSPACE_TOKEN = 0,        /**< Remove the authentication token from the displayed URL. */
@@ -23,7 +25,7 @@ typedef enum {
  * @param view Reserved scoped browser context, currently unused.
  * @return Scoped continuation plan for the shared browser interpreter.
  */
-int lab_bootstrap_step(int frame, int view);
+browser_handle lab_bootstrap_step(frame_handle frame, view_handle view);
 
 /**
  * @brief Return native search-control configuration as ordered browser effects.
@@ -44,6 +46,6 @@ void lab_bootstrap_widgets(void);
  * value is read separately after executing jurisdiction effects, preserving initialisation
  * order and avoiding reads of native-backed getters during a DOM handle scope.
  */
-void lab_bootstrap_workspace(lab_bootstrap_workspace_phase_t phase, int context);
+void lab_bootstrap_workspace(lab_bootstrap_workspace_phase_t phase, browser_handle context);
 
 #endif

@@ -7,23 +7,25 @@
  */
 #ifndef TBA_FORM_H
 #define TBA_FORM_H
+
+#include "tba_handle.h"
 /**
  * @brief Initialise worksheet controls.
  * @param config Scoped decoded configuration.
  */
-void tba_form_init(int config);
+void tba_form_init(browser_handle config);
 
 /**
  * @brief Gather recognised settings.
  * @return Scoped object for Protobuf.
  */
-int tba_form_collect(void);
+browser_handle tba_form_collect(void);
 
 /**
  * @brief Update dependent controls after an edit.
  * @param event Scoped event.
  */
-void tba_form_change(int event);
+void tba_form_change(event_handle event);
 
 /**
  * @brief Apply suggested settings.
@@ -36,14 +38,14 @@ void tba_form_suggest(int force);
  * @param data Scoped response.
  * @param driver Non-zero for driver data.
  */
-void tba_form_meta(int data, int driver);
+void tba_form_meta(browser_handle data, int driver);
 
 /**
  * @brief Refresh a variable picker.
  * @param columns Scoped list.
  * @param driver Non-zero for drivers.
  */
-void tba_form_columns(int columns, int driver);
+void tba_form_columns(browser_handle columns, int driver);
 
 /**
  * @brief Synchronise uploaded paths and filenames.
@@ -51,7 +53,7 @@ void tba_form_columns(int columns, int driver);
  * @param name Scoped filename.
  * @param driver Driver selector.
  */
-void tba_form_upload(int path, int name, int driver);
+void tba_form_upload(browser_handle path, browser_handle name, int driver);
 
 /**
  * @brief Update the seasonal advisory.

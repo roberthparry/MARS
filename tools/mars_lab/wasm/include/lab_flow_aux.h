@@ -10,6 +10,8 @@
 #ifndef LAB_FLOW_AUX_H
 #define LAB_FLOW_AUX_H
 
+#include "lab_handle.h"
+
 /**
  * @brief Advance goal preparation, reconstruction or ordered completion.
  * @param frame Scoped mutable browser goal frame with stage, sourceText, target, start, options and request;
@@ -17,7 +19,7 @@
  * @param view Scoped browser view containing presentation caches.
  * @return Scoped continuation or completion plan; stale preparation returns explicit false.
  */
-int lab_flow_goal(int frame, int view);
+browser_handle lab_flow_goal(frame_handle frame, view_handle view);
 
 /**
  * @brief Advance background weather retrieval and overview publication.
@@ -26,7 +28,7 @@ int lab_flow_goal(int frame, int view);
  * @param view Scoped browser view, currently unused.
  * @return Scoped plan preserving parent-request freshness and weather-specific recovery.
  */
-int lab_flow_weather(int frame, int view);
+browser_handle lab_flow_weather(frame_handle frame, view_handle view);
 
 /**
  * @brief Advance native solver-source rendering without interpreting its mathematics.
@@ -34,7 +36,7 @@ int lab_flow_weather(int frame, int view);
  * @param view Scoped browser view, currently unused.
  * @return Scoped plan yielding native response data, or a failure capability on rejected rendering.
  */
-int lab_flow_solver(int frame, int view);
+browser_handle lab_flow_solver(frame_handle frame, view_handle view);
 
 /**
  * @brief Advance initial worksheet evaluation with guarded DateTime location refresh.
@@ -43,6 +45,6 @@ int lab_flow_solver(int frame, int view);
  * @param view Scoped browser view, currently unused.
  * @return Scoped plan retaining mode and request-context identity across the location await.
  */
-int lab_flow_startup(int frame, int view);
+browser_handle lab_flow_startup(frame_handle frame, view_handle view);
 
 #endif

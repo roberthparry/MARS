@@ -17,6 +17,7 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
 #include "lab_rows.h"
 
 /**
@@ -32,7 +33,7 @@ void lab_binding_row_names(void);
  * @param fallback Scoped fallback name used when the authored name is falsey.
  * @post Publishes the independent normalised record through lab_dom_return.
  */
-void lab_binding_row_normalise(int row, int fallback);
+void lab_binding_row_normalise(browser_handle row, browser_handle fallback);
 
 /**
  * @brief Serialise a structured row array in one bounded call.
@@ -41,7 +42,7 @@ void lab_binding_row_normalise(int row, int fallback);
  * Publishes UTF-8 text through lab_dom_return, or null for invalid Unicode or a 4 MiB input/output overflow.
  * No partial text is published. Workspace transfer buffers are temporary scratch storage.
  */
-void lab_binding_rows_text(int rows);
+void lab_binding_rows_text(browser_handle rows);
 
 /**
  * @brief Publish an independent single-bound default row array through lab_dom_return.
@@ -54,21 +55,21 @@ void lab_binding_rows_default(bool blank);
  * @param rows Scoped authored row array; trimmed names determine occupancy.
  * @post Publishes the selected name through lab_dom_return; exhaustion falls back to x.
  */
-void lab_binding_rows_name(int rows);
+void lab_binding_rows_name(browser_handle rows);
 
 /**
  * @brief Normalise render rows using their original authored prefixes for fallback names.
  * @param rows Scoped authored row array; absent, empty or non-array input selects the standard single-bound default.
  * @post Publishes the independent row array through lab_dom_return.
  */
-void lab_binding_rows_prepare(int rows);
+void lab_binding_rows_prepare(browser_handle rows);
 
 /**
  * @brief Capture structured row controls without parsing their mathematical text.
  * @param root Scoped row container; zero or an empty container selects the standard default.
  * @post Publishes the captured row array through lab_dom_return.
  */
-void lab_binding_rows_read(int root);
+void lab_binding_rows_read(browser_handle root);
 
 /**
  * @brief Index native reference metadata by exact name and its source identity.
@@ -76,7 +77,7 @@ void lab_binding_rows_read(int root);
  * @param response Scoped native forms response containing rows and references_valid.
  * @post Publishes the metadata record through lab_dom_return.
  */
-void lab_binding_rows_metadata(int expression, int response);
+void lab_binding_rows_metadata(browser_handle expression, browser_handle response);
 
 /**
  * @brief Retain unknown references conservatively when native metadata is missing or stale.
@@ -85,7 +86,7 @@ void lab_binding_rows_metadata(int expression, int response);
  * @param name Scoped exact row name.
  * @return True for a referenced row or missing, invalid, stale or unknown metadata; false for an unreferenced row.
  */
-bool lab_binding_rows_reference(int metadata, int expression, int name);
+bool lab_binding_rows_reference(browser_handle metadata, browser_handle expression, browser_handle name);
 
 /**
  * @brief Resolve the native active-row plan to opaque records and its fallback bound.
@@ -94,7 +95,7 @@ bool lab_binding_rows_reference(int metadata, int expression, int name);
  * @param expression Scoped current source text used to reject stale metadata.
  * @post Publishes a bounds/rows record through lab_dom_return, or null when oversized.
  */
-void lab_binding_rows_plan(int rows, int metadata, int expression);
+void lab_binding_rows_plan(browser_handle rows, browser_handle metadata, browser_handle expression);
 
 /**
  * @brief Apply a native row edit atomically, preserving unrelated row metadata.
@@ -103,7 +104,7 @@ void lab_binding_rows_plan(int rows, int metadata, int expression);
  * @param operation LAB_ROW_TOGGLE (1), LAB_ROW_INSERT (2), or LAB_ROW_REMOVE (3).
  * @post Publishes the edited array through lab_dom_return, or null when the edit is forbidden.
  */
-void lab_binding_rows_edit(int rows, unsigned index, lab_row_operation_t operation);
+void lab_binding_rows_edit(browser_handle rows, unsigned index, lab_row_operation_t operation);
 
 /**
  * @brief Merge native result bounds with free rows retained by native variable bindings.
@@ -111,6 +112,6 @@ void lab_binding_rows_edit(int rows, unsigned index, lab_row_operation_t operati
  * @param response Scoped native result containing bounds and binding_values.
  * @post Publishes an array through lab_dom_return, null for no supplied bounds, or false on overflow.
  */
-void lab_binding_rows_merge(int rows, int response);
+void lab_binding_rows_merge(browser_handle rows, browser_handle response);
 
 #endif

@@ -16,6 +16,8 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
+
 /**
  * @brief Project tooltip text, accessibility and viewport placement.
  * @param button Scoped candidate button-node handle.
@@ -24,12 +26,12 @@
  * @param height Viewport height in CSS pixels.
  * @return True when accepted; false for an absent node or one within a hidden container, leaving the tooltip unchanged.
  */
-bool lab_tooltip_show(int button, int previous, double width, double height);
+bool lab_tooltip_show(browser_handle button, browser_handle previous, double width, double height);
 
 /**
  * @brief Hide the tooltip and restore original accessibility attributes exactly.
  * @param button Scoped active button-node handle, or zero when no control owns the tooltip.
  */
-void lab_tooltip_hide(int button);
+void lab_tooltip_hide(browser_handle button);
 
 #endif

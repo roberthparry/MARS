@@ -7,17 +7,19 @@
  */
 #ifndef TBA_VIEW_H
 #define TBA_VIEW_H
+
+#include "tba_handle.h"
 /**
  * @brief Display a structured successful forecast.
  * @param data Scoped Protobuf result.
  */
-void tba_view_result(int data);
+void tba_view_result(browser_handle data);
 
 /**
  * @brief Draw a structured chart.
  * @param data Scoped chart object.
  */
-void tba_view_chart(int data);
+void tba_view_chart(browser_handle data);
 
 /**
  * @brief Apply chart legend visibility.
@@ -28,7 +30,7 @@ void tba_view_visibility(void);
  * @brief Update a tooltip from a pointer event.
  * @param event Scoped event.
  */
-void tba_view_hover(int event);
+void tba_view_hover(event_handle event);
 
 /**
  * @brief Hide the current tooltip.
@@ -39,5 +41,5 @@ void tba_view_leave(void);
  * @brief Activate a comparison tab.
  * @param event Scoped click event.
  */
-void tba_view_tab(int event);
+void tba_view_tab(event_handle event);
 #endif

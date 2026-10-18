@@ -30,7 +30,7 @@ static int digit(unsigned char value)
 }
 
 /* Encode the existing Protobuf envelope, then copy its base64 representation into shared input storage. */
-uint32_t lab_browser_storage_encode(int root)
+uint32_t lab_browser_storage_encode(codec_handle root)
 {
     uint32_t size = lab_browser_encode(root);
     if (!size)
@@ -53,7 +53,7 @@ uint32_t lab_browser_storage_encode(int root)
 }
 
 /* Validate canonical base64 and its decoded size before allowing the Protobuf parser to consume it. */
-int lab_browser_storage_decode(uint32_t size)
+codec_handle lab_browser_storage_decode(uint32_t size)
 {
     if (!size || size > lab_browser_storage_limit || size % 4)
         return -1;

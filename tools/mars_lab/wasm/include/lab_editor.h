@@ -11,6 +11,8 @@
 #ifndef LAB_EDITOR_H
 #define LAB_EDITOR_H
 
+#include "lab_handle.h"
+
 /** @brief Exact metadata projection requested by an editor consumer. */
 typedef enum {
     LAB_EDITOR_LOOKUP = 0, /**< Complete native metadata record. */
@@ -27,7 +29,7 @@ typedef enum {
  * @param editors Scoped Map containing native editor metadata.
  * @return Scoped borrowed metadata handle, or zero for missing or falsey entries.
  */
-int lab_editor_lookup(int text, int editors);
+browser_handle lab_editor_lookup(browser_handle text, browser_handle editors);
 
 /**
  * @brief Select the current source from a lazy production or custom evaluation view.
@@ -39,7 +41,7 @@ int lab_editor_lookup(int text, int editors);
  * and must not open another DOM scope. The selected output is copied before further
  * workspace reads. No view property is overwritten.
  */
-int lab_editor_current_value(int view);
+browser_handle lab_editor_current_value(view_handle view);
 
 /**
  * @brief Publish one editor metadata projection without interpreting mathematics.
@@ -49,14 +51,14 @@ int lab_editor_current_value(int view);
  * @param editors Scoped Map of native editor metadata keyed by trimmed source or display text.
  * @post Publishes the selected projection through lab_dom_return; invalid kinds publish null.
  */
-void lab_editor_metadata(lab_editor_metadata_t kind, int inputs, int editors);
+void lab_editor_metadata(lab_editor_metadata_t kind, browser_handle inputs, browser_handle editors);
 
 /**
  * @brief Publish current-source selection through the scoped browser bridge.
  * @param view Scoped production or custom view as for lab_editor_current_value.
  * @post Publishes the selected source through lab_dom_return.
  */
-void lab_editor_current(int view);
+void lab_editor_current(view_handle view);
 
 /**
  * @brief Publish whether the selected worksheet has enough editor input to evaluate.
@@ -64,6 +66,6 @@ void lab_editor_current(int view);
  * @param view Scoped current-source view, inspected only for Expression mode.
  * @post Publishes a boolean through lab_dom_return, true for any mode other than Expression or a truthy source.
  */
-void lab_editor_ready(int inputs, int view);
+void lab_editor_ready(browser_handle inputs, view_handle view);
 
 #endif

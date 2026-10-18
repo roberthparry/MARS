@@ -62,7 +62,7 @@ static void tba_browser_end(uint32_t position)
     tba_browser_used += length;
 }
 
-static void tba_browser_text(int id, unsigned field, int key_index)
+static void tba_browser_text(codec_handle id, unsigned field, int key_index)
 {
     uint32_t position = tba_browser_begin(field);
     if (tba_browser_failed)
@@ -177,10 +177,10 @@ static int tba_browser_field(tba_browser_reader_t *reader, unsigned *field, unsi
     return 1;
 }
 
-static int tba_browser_read(tba_browser_reader_t reader, unsigned depth, int parent, const unsigned char *key,
+static codec_handle tba_browser_read(tba_browser_reader_t reader, unsigned depth, codec_handle parent, const unsigned char *key,
                             uint32_t key_length);
 
-static int tba_browser_entry(tba_browser_reader_t reader, int parent, unsigned depth)
+static int tba_browser_entry(tba_browser_reader_t reader, codec_handle parent, unsigned depth)
 {
     tba_browser_reader_t key = {0}, child = {0};
     unsigned seen = 0, fields = 0;
@@ -208,7 +208,7 @@ static int tba_browser_entry(tba_browser_reader_t reader, int parent, unsigned d
                             key.end - key.position) >= 0;
 }
 
-static int tba_browser_read(tba_browser_reader_t reader, unsigned depth, int owner, const unsigned char *key,
+static codec_handle tba_browser_read(tba_browser_reader_t reader, unsigned depth, codec_handle owner, const unsigned char *key,
                             uint32_t key_length)
 {
     if (depth > tba_browser_depth || ++tba_browser_count > tba_browser_nodes)
@@ -323,7 +323,7 @@ unsigned char *tba_browser_output_buffer(void)
 }
 
 /* Encode a host object as a version-one envelope; zero means invalid or too large. */
-uint32_t tba_browser_encode(int root)
+uint32_t tba_browser_encode(codec_handle root)
 {
     tba_browser_used = tba_browser_count = 0;
     tba_browser_failed = 0;
@@ -338,7 +338,7 @@ uint32_t tba_browser_encode(int root)
 }
 
 /* Validate the complete envelope before returning its host object handle. */
-int tba_browser_decode(uint32_t size)
+codec_handle tba_browser_decode(uint32_t size)
 {
     if (size > tba_browser_limit)
         return -1;

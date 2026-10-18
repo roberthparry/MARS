@@ -12,6 +12,8 @@
 #ifndef LAB_WASM_BINDING_INTEGRATOR_STATE_H
 #define LAB_WASM_BINDING_INTEGRATOR_STATE_H
 
+#include "lab_handle.h"
+
 /**
  * @brief Select editor and binding projections for an integrator response.
  * @param data Scoped native response with binding_expression, expression and binding_values fields.
@@ -25,6 +27,7 @@
  * bindings or clears them. The current editor supplies the body fallback. No supplied
  * record or live state is mutated; browser services execute after the call completes.
  */
-void lab_binding_integrator_state(int data, int fallback, int editors, int bound_names);
+void lab_binding_integrator_state(browser_handle data, browser_handle fallback, browser_handle editors,
+                                browser_handle bound_names);
 
 #endif

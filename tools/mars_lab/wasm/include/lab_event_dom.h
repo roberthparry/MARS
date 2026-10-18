@@ -14,6 +14,8 @@
 #ifndef LAB_WASM_EVENT_DOM_H
 #define LAB_WASM_EVENT_DOM_H
 
+#include "lab_handle.h"
+
 /** @brief Ordinary worksheet events; packed calendar selectors are not values of this enum. */
 typedef enum {
     LAB_EVENT_RUN                =  0, /**< Evaluate the worksheet. */
@@ -68,7 +70,7 @@ typedef enum {
  * @param event Scoped browser Event with currentTarget, target, type and relevant key, modifier or pointer data.
  * @post Publishes a record containing calls and optional prevent/stop flags through lab_dom_return.
  */
-void lab_events_dispatch(unsigned action, int event);
+void lab_events_dispatch(unsigned action, event_handle event);
 
 /**
  * @brief Install worksheet control listeners and project initial card controls.
@@ -76,6 +78,6 @@ void lab_events_dispatch(unsigned action, int event);
  * @param window Scoped browser Window used for resize, scroll, pagehide and plot gesture listeners.
  * @details Repeated subscriptions do not duplicate listeners. The browser retains targets, not integer handles.
  */
-void lab_events_install(int document, int window);
+void lab_events_install(browser_handle document, browser_handle window);
 
 #endif

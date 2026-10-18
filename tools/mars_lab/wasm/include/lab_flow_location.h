@@ -15,6 +15,8 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
+
 /** @brief Calendar forms operations carried in frame.action. */
 typedef enum {
     LAB_FLOW_LOCATION_FORMAT_TIME = 0, /**< Format authored time text. */
@@ -44,7 +46,7 @@ typedef enum {
  * @param view Reserved scoped browser-view handle; unused by these independent workflows.
  * @return Scoped browser handle to a continuation or completion plan, with explicit null for stale town restoration.
  */
-int lab_flow_location(lab_flow_location_kind_t kind, int frame, int view);
+browser_handle lab_flow_location(lab_flow_location_kind_t kind, frame_handle frame, view_handle view);
 
 /** @brief Plan synchronous local-calendar rendering before visibility changes.
  * @param text Scoped browser box handle with opaque fallback text in its value property; falsey values become empty.
@@ -53,14 +55,14 @@ int lab_flow_location(lab_flow_location_kind_t kind, int frame, int view);
  * @param card Scoped handle to the local-calendar card node, or zero to omit visibility updates.
  * @post Publishes an ordered host-services plan through lab_dom_return without changing either node.
  */
-void lab_flow_location_local(int text, int sections, int body, int card);
+void lab_flow_location_local(browser_handle text, browser_handle sections, browser_handle body, browser_handle card);
 
 /** @brief Apply visibility after successful non-empty local-calendar rendering.
  * @param card Scoped browser handle to the local-calendar card node whose hidden class is updated.
  * @param mode Scoped browser handle to the current mode string, captured after rendering; datetime shows the card,
  * all other strings hide it.
  */
-void lab_flow_location_visibility(int card, int mode);
+void lab_flow_location_visibility(browser_handle card, browser_handle mode);
 
 /** @brief Choose a rounded-select callback without invoking it inside a native scope.
  * @param select Scoped browser handle to an optional select node; zero produces an empty plan.
@@ -68,7 +70,7 @@ void lab_flow_location_visibility(int card, int mode);
  * whether the corresponding rounded-select methods are callable.
  * @post Publishes a service plan through lab_dom_return, preferring rebuild, or an empty plan if neither is callable.
  */
-void lab_flow_location_select(int select, int capabilities);
+void lab_flow_location_select(node_handle select, browser_handle capabilities);
 
 /** @brief Choose whether a completed date-picker move requires synchronous redraw.
  * @param changed True when the native movement policy changed the picker.

@@ -16,6 +16,8 @@
 #ifndef LAB_WASM_PAYLOAD_H
 #define LAB_WASM_PAYLOAD_H
 
+#include "lab_handle.h"
+
 /** @brief Native request payload builders; ordering differs from worksheet modes. */
 typedef enum {
     LAB_PAYLOAD_EXPRESSION = 0, /**< Expression request record. */
@@ -38,14 +40,15 @@ typedef enum {
  * @param updated_at Expression update timestamp in Unix milliseconds; ignored by other builders.
  * @post Publishes the wire record through lab_dom_return, or null for an unsupported builder kind.
  */
-void lab_payload_build(lab_payload_kind_t kind, int inputs, int request, double precision, double updated_at);
+void lab_payload_build(lab_payload_kind_t kind, browser_handle inputs, browser_handle request, double precision,
+                       double updated_at);
 
 /** @brief Check every active bound without parsing or rewriting its mathematical contents.
  * @param bounds Scoped array of active integration bounds with name, lo and hi properties.
  * @post Publishes a diagnostic through lab_dom_return for the first non-empty lower bound with an empty upper bound;
  * publishes null when no such invalid one-sided bound exists.
  */
-void lab_payload_bounds_error(int bounds);
+void lab_payload_bounds_error(browser_handle bounds);
 
 /** @brief Snapshot native event identifiers and resolve only request-field fallbacks.
  * @param data Scoped almanac response supplying event_year and optional location fields.
@@ -53,18 +56,18 @@ void lab_payload_bounds_error(int bounds);
  * @param config Scoped bootstrap defaults used when response fields and form controls are blank.
  * @post Publishes an event/location request record through lab_dom_return.
  */
-void lab_payload_land(int data, int cells, int config);
+void lab_payload_land(browser_handle data, browser_handle cells, browser_handle config);
 
 /** @brief Apply an already-current reply, indexing exact identifiers once and keeping native HTML intact.
  * @param cells Scoped list of destination land-totality cells.
  * @param payload Scoped current response with items and optional timed_out flag.
  * @param failure Successful reply 0, timeout/abort 1 or unavailable/error 2; non-zero ignores response items.
  */
-void lab_payload_land_apply(int cells, int payload, unsigned failure);
+void lab_payload_land_apply(browser_handle cells, browser_handle payload, unsigned failure);
 
 /** @brief Project the server's access description and QR markup without interpreting either.
  * @param data Scoped native mobile-access record containing title, hint, url and QR markup.
  */
-void lab_payload_mobile(int data);
+void lab_payload_mobile(browser_handle data);
 
 #endif

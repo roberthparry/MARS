@@ -91,7 +91,7 @@ void lab_precision_close(bool focus)
         lab_dom_effect(lab_dom_id("precisionCustomToggle"), LAB_DOM_EFFECT_FOCUS);
 }
 
-static void draft_apply(int calls)
+static void draft_apply(browser_handle calls)
 {
     unsigned bits = draft_bits();
     draft_preview();
@@ -109,7 +109,8 @@ static void draft_apply(int calls)
 
 /** @brief Borrowed handles for one precision action; never retained after dispatch. */
 typedef struct {
-    int event, plan, calls, panel;
+    event_handle event;
+    browser_handle plan, calls, panel;
 } lab_precision_context_t;
 
 /* Toggle visibility before applying the ordinary open-panel action guard. */
@@ -202,7 +203,7 @@ static void draft_outside(lab_precision_action_t action, const lab_precision_con
 }
 
 /* Only native-selected precision crosses into the existing asynchronous evaluation service. */
-void lab_precision_dispatch(lab_precision_action_t action, int event)
+void lab_precision_dispatch(lab_precision_action_t action, event_handle event)
 {
     /** @brief Precision action implementation sharing the current borrowed handles. */
     typedef void (*lab_precision_handler_t)(lab_precision_action_t, const lab_precision_context_t *);
@@ -231,7 +232,7 @@ void lab_precision_dispatch(lab_precision_action_t action, int event)
 }
 
 /* Bounded control registration; the browser deduplicates subscriptions across restoration. */
-void lab_precision_install(int document)
+void lab_precision_install(browser_handle document)
 {
     static const struct {
         const char *id, *event;

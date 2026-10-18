@@ -12,6 +12,8 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
+
 /** @brief Camera-slider gesture phase; values are fixed by the browser ABI. */
 typedef enum {
     LAB_PLOT_SLIDER_BEGIN = 0,  /**< Capture the camera at pointer-down. */
@@ -35,14 +37,14 @@ typedef enum {
  * @param document Scoped browser Document for cancellation events.
  * @param window Scoped browser Window for movement, release and loss of focus.
  */
-void lab_plot_drag_install(int document, int window);
+void lab_plot_drag_install(browser_handle document, browser_handle window);
 
 /**
  * @brief Coalesce wheel-range previews and request full detail after wheel inactivity.
  * @param chart Scoped browser handle to the chart whose already-edited bounds require resampling.
  * @param calls Scoped mutable browser array receiving redraw and wheel-inactivity service descriptors.
  */
-void lab_plot_wheel_zoom(int chart, int calls);
+void lab_plot_wheel_zoom(chart_handle chart, browser_handle calls);
 
 /** @brief Stop queued wheel refinement when another viewport interaction takes over. */
 void lab_plot_wheel_stop(void);
@@ -53,21 +55,22 @@ void lab_plot_wheel_stop(void);
  * @param event Scoped browser event handle supplying pointerId when beginning a gesture; unused for commit.
  * @param calls Scoped mutable browser array receiving deferred preview, cancellation and redraw services.
  */
-void lab_plot_slider(lab_plot_slider_action_t action, int event, int calls);
+void lab_plot_slider(lab_plot_slider_action_t action, event_handle event, browser_handle calls);
 
 /** @brief Process a gesture and publish deferred host calls after releasing scoped handles.
  * @param action Gesture event from lab_plot_drag_action_t; other values, including negatives, do nothing.
  * @param event Scoped browser event, or the scheduled revision number for wheel inactivity.
+ * This tagged operand remains int because LAB_PLOT_DRAG_WHEEL_IDLE supplies a number, not a handle.
  * @param state Scoped handle to the mutable browser-owned gesture record retained by the event subscriptions.
  * @details Publishes calls and an optional prevent flag through lab_dom_return; handles expire on return.
  */
-void lab_plot_drag_dispatch(lab_plot_drag_action_t action, int event, int state);
+void lab_plot_drag_dispatch(lab_plot_drag_action_t action, int event, gesture_handle state);
 
 /** @brief Complete one redraw, retaining only the newest pending camera position.
  * @param state Scoped handle to the mutable browser-owned gesture record for the completed redraw.
  * @param accepted True only if the completed request still owns the main request token.
  * Publishes at most one deferred redraw; failures or superseded requests stop the gesture.
  */
-void lab_plot_drag_complete(int state, bool accepted);
+void lab_plot_drag_complete(gesture_handle state, bool accepted);
 
 #endif

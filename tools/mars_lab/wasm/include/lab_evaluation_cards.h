@@ -17,6 +17,7 @@
 #ifndef LAB_WASM_EVALUATION_CARDS_H
 #define LAB_WASM_EVALUATION_CARDS_H
 
+#include "lab_handle.h"
 #include "lab_mode.h"
 
 /** @brief Result-card presentation kind; worksheet values share the lab_mode_t ABI. */
@@ -45,7 +46,7 @@ typedef enum {
  * matrix adds scalar; DateTime adds calendar records containing element, button,
  * sections and text. All source strings remain opaque native representations.
  */
-void lab_evaluation_cards(lab_evaluation_card_kind_t kind, int data, int text, int caches);
+void lab_evaluation_cards(lab_evaluation_card_kind_t kind, browser_handle data, browser_handle text, browser_handle caches);
 
 /**
  * @brief Project mode-specific notes, controls and visibility after installing card text.
@@ -59,7 +60,7 @@ void lab_evaluation_cards(lab_evaluation_card_kind_t kind, int data, int text, i
  * the installed numerical content. Solver markup is subsequently installed only
  * after the asynchronous owner checks request freshness.
  */
-void lab_evaluation_cards_present(lab_mode_t mode, int data);
+void lab_evaluation_cards_present(lab_mode_t mode, browser_handle data);
 
 /**
  * @brief Select date and location fields for a dependent weather request.
@@ -71,7 +72,7 @@ void lab_evaluation_cards_present(lab_mode_t mode, int data);
  * @details Truthy evaluation fields take precedence over the captured state, matching
  * the existing request contract. Unrelated state fields retain their values.
  */
-void lab_evaluation_weather_state(int state, int data);
+void lab_evaluation_weather_state(browser_handle state, browser_handle data);
 
 /**
  * @brief Merge native weather sections with the evaluated DateTime overview.
@@ -83,7 +84,7 @@ void lab_evaluation_weather_state(int state, int data);
  * Non-empty overview strings are joined by a newline. HTML validation remains the
  * calendar renderer's responsibility; missing markup is never fabricated here.
  */
-void lab_evaluation_weather_cards(int overview, int weather);
+void lab_evaluation_weather_cards(browser_handle overview, browser_handle weather);
 
 /**
  * @brief Prepare a goal-seek click or reveal its target entry.
@@ -95,6 +96,6 @@ void lab_evaluation_weather_cards(int overview, int weather);
  * browser then starts the asynchronous request and commits bindings. Focus and
  * selection effects occur after the scoped native call has finished.
  */
-void lab_evaluation_goal_start(lab_mode_t mode, int text);
+void lab_evaluation_goal_start(lab_mode_t mode, browser_handle text);
 
 #endif

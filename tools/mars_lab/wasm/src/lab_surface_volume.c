@@ -26,7 +26,7 @@ static const char *const controls[] = {
     "plotLower", "plotUpper", "plotSecondLower", "plotSecondUpper", "plotYLower", "plotYUpper", "plotScale"
 };
 
-static double numeric(int object, const char *key)
+static double numeric(browser_handle object, const char *key)
 {
     return lab_dom_to_number(lab_dom_get(object, key));
 }
@@ -39,7 +39,7 @@ static void reset_slider_limits(void)
     lab_dom_write(slider, LAB_DOM_ATTRIBUTE, "max", lab_dom_string("6"));
 }
 
-static int read_bounds(int chart, const char *const names[6])
+static browser_handle read_bounds(chart_handle chart, const char *const names[6])
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < 6; ++i) {
@@ -49,7 +49,7 @@ static int read_bounds(int chart, const char *const names[6])
     return result;
 }
 
-static int control_values(void)
+static browser_handle control_values(void)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < 7; ++i)
@@ -57,14 +57,14 @@ static int control_values(void)
     return result;
 }
 
-static int authored_bound(unsigned i)
+static browser_handle authored_bound(unsigned i)
 {
     int control = lab_dom_id(controls[i]), text = lab_dom_read(control, LAB_DOM_VALUE, "");
     int exact = lab_dom_get(control, "marsZoomValue");
     return exact && lab_dom_equal(text, lab_dom_get(control, "marsZoomText")) ? exact : text;
 }
 
-static int initial_exact(int chart)
+static browser_handle initial_exact(chart_handle chart)
 {
     /* A retained curve can coexist with sibling plots that edit the shared controls. */
     if (lab_dom_equal(lab_dom_read(chart, LAB_DOM_DATASET, "segments"), lab_dom_string("true")))
@@ -82,7 +82,7 @@ static int initial_exact(int chart)
 }
 
 /* Preserve exact native metadata, not the lossy compatibility coordinates. */
-void lab_surface_volume_init(int view, int saved, bool same)
+void lab_surface_volume_init(view_handle view, browser_handle saved, bool same)
 {
     int chart = lab_dom_get(view, "chart"), volume = lab_dom_get(saved, "volume");
     int segments = lab_dom_equal(lab_dom_read(chart, LAB_DOM_DATASET, "segments"), lab_dom_string("true"));
@@ -152,7 +152,7 @@ void lab_surface_volume_init(int view, int saved, bool same)
 }
 
 /* Roll back display policy without evaluating coordinates or replacing accepted geometry. */
-static int rollback_volume(int view, unsigned restore_controls)
+static int rollback_volume(view_handle view, unsigned restore_controls)
 {
     int volume = lab_dom_get(view, "volume"), chart = lab_dom_get(view, "chart");
     double exponent = numeric(volume, "sampleExponent");
@@ -181,13 +181,13 @@ static int rollback_volume(int view, unsigned restore_controls)
     return 1;
 }
 
-static int append(int text, int addition, const char *suffix)
+static browser_handle append(browser_handle text, browser_handle addition, const char *suffix)
 {
     return lab_dom_join(text, addition, suffix);
 }
 
 /* A constant-sized recipe preserves the centre even when its span is microscopic. */
-static int bound_recipe(int low, int high, double exponent, int upper)
+static browser_handle bound_recipe(browser_handle low, browser_handle high, double exponent, int upper)
 {
     int text = append(lab_dom_string("(("), low, ")+(");
     text = append(text, high, upper ? "))/2+((" : "))/2-((");
@@ -197,7 +197,7 @@ static int bound_recipe(int low, int high, double exponent, int upper)
 }
 
 /* Volume metadata is a small flat record; only its coordinate arrays need independent storage. */
-static int volume_copy(int source)
+static browser_handle volume_copy(browser_handle source)
 {
     int copy = lab_dom_object(LAB_VALUE_OBJECT), names = lab_dom_keys(source);
     for (unsigned i = 0; i < lab_dom_count(names); ++i) {
@@ -214,7 +214,7 @@ static int volume_copy(int source)
 }
 
 /* Keep DOM controls separate from the mathematical baseline, including absent exact-value metadata. */
-static int pinch_snapshot(int volume, int camera)
+static browser_handle pinch_snapshot(browser_handle volume, browser_handle camera)
 {
     int snapshot = lab_dom_object(LAB_VALUE_OBJECT), values = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(snapshot, "volume", volume_copy(volume));
@@ -232,7 +232,7 @@ static int pinch_snapshot(int volume, int camera)
 }
 
 /* Restore the full pre-gesture transaction without re-authoring bounds or requesting new samples. */
-static void pinch_restore(int volume, int camera, int snapshot)
+static void pinch_restore(browser_handle volume, browser_handle camera, snapshot_handle snapshot)
 {
     int names = lab_dom_keys(volume);
     for (unsigned i = 0; i < lab_dom_count(names); ++i)
@@ -264,7 +264,8 @@ typedef enum {
 
 /** @brief Borrowed gesture state and the mutable relative zoom exponent. */
 struct lab_surface_gesture_context {
-    int volume, camera, event;
+    browser_handle volume, camera;
+    event_handle event;
     double value, exponent;
 };
 
@@ -336,7 +337,7 @@ static lab_surface_gesture_result_t zoom_pinch(struct lab_surface_gesture_contex
 }
 
 /* Convert bounded gestures to a binary exponent, never to absolute coordinate differences. */
-bool lab_surface_zoom(int view, lab_surface_zoom_kind_t kind, double value, int event, bool reset)
+bool lab_surface_zoom(view_handle view, lab_surface_zoom_kind_t kind, double value, event_handle event, bool reset)
 {
     /** @brief Gesture handlers that run before shared reset and volume projection. */
     static lab_surface_gesture_result_t (*const handlers[])(struct lab_surface_gesture_context *) = {
@@ -429,7 +430,7 @@ bool lab_surface_zoom(int view, lab_surface_zoom_kind_t kind, double value, int 
 }
 
 /* Extend the slider only for wheel/pinch values outside its track; never move the track under a held thumb. */
-void lab_surface_zoom_sync(int view)
+void lab_surface_zoom_sync(view_handle view)
 {
     double exponent = numeric(lab_dom_get(view, "volume"), "exponent");
     int slider = lab_dom_id("plotZoom");
@@ -455,7 +456,7 @@ void lab_surface_zoom_sync(int view)
 }
 
 /* Preview labels are approximate only; deep views wait for native tick labels. */
-int lab_surface_tick_label(int volume, int tick)
+browser_handle lab_surface_tick_label(browser_handle volume, browser_handle tick)
 {
     if (!lab_dom_truth(lab_dom_get(volume, "dirty")))
         return lab_dom_get(tick, "label");

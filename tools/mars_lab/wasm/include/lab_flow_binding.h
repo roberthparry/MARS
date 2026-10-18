@@ -10,6 +10,8 @@
 #ifndef LAB_FLOW_BINDING_H
 #define LAB_FLOW_BINDING_H
 
+#include "lab_handle.h"
+
 /** @brief Binding-card operations carried in an action workflow's frame.operation property. */
 typedef enum {
     LAB_FLOW_BINDING_CARD_EVALUATE = 0, /**< Commit the binding and evaluate. */
@@ -46,7 +48,7 @@ typedef enum {
  * @param view Reserved scoped browser capability-view handle; unused because callbacks supply snapshots separately.
  * @return Scoped browser handle to a continuation plan, or a completed inert plan for unsupported indices.
  */
-int lab_flow_binding(lab_flow_binding_kind_t kind, int frame, int view);
+browser_handle lab_flow_binding(lab_flow_binding_kind_t kind, frame_handle frame, view_handle view);
 
 /** @brief Closed workflow selectors for lab_flow_binding_edit; numeric values are browser ABI. */
 typedef enum {
@@ -61,6 +63,6 @@ typedef enum {
  * @param frame Scoped browser handle to the mutable continuation frame holding stage, inputs and service results.
  * @return Scoped browser handle to a continuation plan, or an inert completion plan for unsupported indices.
  */
-int lab_flow_binding_edit(lab_flow_binding_edit_kind_t kind, int frame);
+browser_handle lab_flow_binding_edit(lab_flow_binding_edit_kind_t kind, frame_handle frame);
 
 #endif

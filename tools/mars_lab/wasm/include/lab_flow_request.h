@@ -9,6 +9,8 @@
 #ifndef LAB_FLOW_REQUEST_H
 #define LAB_FLOW_REQUEST_H
 
+#include "lab_handle.h"
+
 /** @brief Closed workflow selectors for lab_flow_request; numeric values are browser ABI. */
 typedef enum {
     LAB_FLOW_REQUEST_FUNCTION     = 0, /**< Run a Function programme. */
@@ -31,6 +33,6 @@ typedef enum {
  * @param view Scoped browser handle to the application capability view used for presentation; ignored by other kinds.
  * @return Scoped browser handle to a continuation plan for the host interpreter; an inert completion for invalid kinds.
  */
-int lab_flow_request(lab_flow_request_kind_t kind, int frame, int view);
+browser_handle lab_flow_request(lab_flow_request_kind_t kind, frame_handle frame, view_handle view);
 
 #endif

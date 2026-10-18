@@ -12,6 +12,8 @@
 
 #include <stdint.h>
 
+#include "tba_handle.h"
+
 /** @brief Maximum encoded message size shared by the codec and worker admission. */
 enum { tba_browser_limit = 8 * 1024 * 1024 };
 
@@ -50,13 +52,13 @@ unsigned char *tba_browser_output_buffer(void);
  * @param root Borrowed host handle for an object, not an array or scalar.
  * @return Encoded byte count, or zero for invalid, excessively deep or oversized data.
  */
-uint32_t tba_browser_encode(int root);
+uint32_t tba_browser_encode(codec_handle root);
 
 /**
  * @brief Decode a complete version-one envelope from the input staging buffer.
  * @param size Staged byte count, at most 8 MiB.
  * @return Decoded host object handle, or -1 for invalid data or exceeded limits.
  */
-int tba_browser_decode(uint32_t size);
+codec_handle tba_browser_decode(uint32_t size);
 
 #endif

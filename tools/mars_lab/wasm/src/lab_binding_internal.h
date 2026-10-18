@@ -18,13 +18,15 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
+
 /**
  * @brief Compare a scoped binding value with exact text for the binding policy modules.
  * @param value Scoped value to compare without mathematical interpretation.
  * @param text Null-terminated literal string.
  * @return True for an exact match; false otherwise.
  */
-bool lab_binding_is(int value, const char *text);
+bool lab_binding_is(browser_handle value, const char *text);
 
 /**
  * @brief Share the binding modules' existing truthy-value fallback.
@@ -32,13 +34,13 @@ bool lab_binding_is(int value, const char *text);
  * @param fallback Null-terminated fallback text.
  * @return The candidate handle when truthy, otherwise a scoped fallback string handle.
  */
-int lab_binding_or(int value, const char *fallback);
+browser_handle lab_binding_or(browser_handle value, const char *fallback);
 
 /**
  * @brief Obtain a trimmed opaque binding name for presentation and reconciliation.
  * @param binding Scoped binding or integrator-row record.
  * @return Scoped trimmed name, or a scoped empty string when absent.
  */
-int lab_binding_name(int binding);
+browser_handle lab_binding_name(browser_handle binding);
 
 #endif

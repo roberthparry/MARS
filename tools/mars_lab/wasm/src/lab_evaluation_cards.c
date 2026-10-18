@@ -18,29 +18,30 @@
 #include "lab_workspace_dom.h"
 #include "lab_evaluation_cards.h"
 
-static int lab_evaluation_cards_or(int value, int fallback)
+static browser_handle lab_evaluation_cards_or(browser_handle value, browser_handle fallback)
 {
     return lab_dom_truth(value) ? value : fallback;
 }
 
-static int lab_evaluation_cards_field(int data, const char *key)
+static browser_handle lab_evaluation_cards_field(browser_handle data, const char *key)
 {
     return lab_evaluation_cards_or(lab_dom_get(data, key), lab_dom_string(""));
 }
 
-static int lab_evaluation_cards_compact(int caches, int source)
+static browser_handle lab_evaluation_cards_compact(browser_handle caches, browser_handle source)
 {
     int editor = lab_dom_map_get(lab_dom_get(caches, "editors"), lab_dom_clean(source, LAB_DOM_CLEAN_TRIM));
     return editor ? lab_dom_get(editor, "display") : source;
 }
 
-static void lab_evaluation_cards_pair(int plan, const char *short_key, const char *full_key, int short_text, int full)
+static void lab_evaluation_cards_pair(browser_handle plan, const char *short_key, const char *full_key,
+                                browser_handle short_text, browser_handle full)
 {
     lab_dom_set(plan, short_key, short_text);
     lab_dom_set(plan, full_key, full);
 }
 
-static int lab_evaluation_cards_join(int first, int second, const char *separator)
+static browser_handle lab_evaluation_cards_join(browser_handle first, browser_handle second, const char *separator)
 {
     if (!lab_dom_truth(first))
         return second;
@@ -49,13 +50,14 @@ static int lab_evaluation_cards_join(int first, int second, const char *separato
     return lab_dom_join(lab_dom_join(first, lab_dom_string(separator), ""), second, "");
 }
 
-static int lab_evaluation_cards_label(int data, const char *key, const char *label)
+static browser_handle lab_evaluation_cards_label(browser_handle data, const char *key, const char *label)
 {
     int value = lab_evaluation_cards_field(data, key);
     return lab_dom_truth(value) ? lab_dom_join(lab_dom_string(label), value, "") : value;
 }
 
-static void lab_evaluation_cards_expression(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_expression(browser_handle plan, browser_handle data, browser_handle text,
+                                browser_handle caches, lab_evaluation_card_kind_t kind)
 {
     int expression = lab_evaluation_cards_field(data, "expression");
     if (kind == LAB_EVALUATION_CARDS_GOAL)
@@ -86,7 +88,8 @@ static void lab_evaluation_cards_expression(int plan, int data, int text, int ca
                                              lab_dom_clean(text, LAB_DOM_CLEAN_TRIM))));
 }
 
-static void lab_evaluation_cards_equation(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_equation(browser_handle plan, browser_handle data, browser_handle text,
+                                browser_handle caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)kind;
@@ -104,7 +107,8 @@ static void lab_evaluation_cards_equation(int plan, int data, int text, int cach
     lab_dom_set(plan, "expandable", lab_dom_scalar(LAB_VALUE_BOOLEAN, expand));
 }
 
-static void lab_evaluation_cards_diffequation(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_diffequation(browser_handle plan, browser_handle data, browser_handle text,
+                                browser_handle caches, lab_evaluation_card_kind_t kind)
 {
     (void)kind;
     int problem = lab_evaluation_cards_or(lab_dom_get(data, "problem"), text);
@@ -129,7 +133,8 @@ static void lab_evaluation_cards_diffequation(int plan, int data, int text, int 
                                                                 lab_evaluation_cards_field(data, "status"))));
 }
 
-static void lab_evaluation_cards_matrix(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_matrix(browser_handle plan, browser_handle data, browser_handle text,
+                                browser_handle caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)caches;
@@ -139,7 +144,8 @@ static void lab_evaluation_cards_matrix(int plan, int data, int text, int caches
                                                            : lab_dom_string(""));
 }
 
-static void lab_evaluation_cards_integrator(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_integrator(browser_handle plan, browser_handle data, browser_handle text,
+                                browser_handle caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)caches;
@@ -153,7 +159,8 @@ static void lab_evaluation_cards_integrator(int plan, int data, int text, int ca
     lab_dom_set(plan, "value", lab_evaluation_cards_field(metadata, "value_text"));
 }
 
-static void lab_evaluation_cards_datetime(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
+static void lab_evaluation_cards_datetime(browser_handle plan, browser_handle data, browser_handle text,
+                                browser_handle caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)caches;
@@ -179,7 +186,7 @@ static void lab_evaluation_cards_datetime(int plan, int data, int text, int cach
 }
 
 /* Return one native card plan; kind 7 denotes goal results, otherwise normal worksheet kind indices apply. */
-void lab_evaluation_cards(lab_evaluation_card_kind_t kind, int data, int text, int caches)
+void lab_evaluation_cards(lab_evaluation_card_kind_t kind, browser_handle data, browser_handle text, browser_handle caches)
 {
     /**
      * @brief Populate a card plan for the selected presentation kind.
@@ -189,7 +196,8 @@ void lab_evaluation_cards(lab_evaluation_card_kind_t kind, int data, int text, i
      * @param caches Scoped native-text caches.
      * @param kind Worksheet-compatible presentation kind or LAB_EVALUATION_CARDS_GOAL.
      */
-    typedef void (*lab_evaluation_cards_handler_t)(int plan, int data, int text, int caches,
+    typedef void (*lab_evaluation_cards_handler_t)(browser_handle plan, browser_handle data, browser_handle text,
+                                                  browser_handle caches,
                                                   lab_evaluation_card_kind_t kind);
     static const lab_evaluation_cards_handler_t handlers[] = {
         [LAB_EVALUATION_CARDS_EXPRESSION]            = lab_evaluation_cards_expression,
@@ -216,7 +224,7 @@ void lab_evaluation_cards(lab_evaluation_card_kind_t kind, int data, int text, i
 }
 
 /* Update notes before deriving value-card visibility from the installed text. */
-static void lab_evaluation_cards_present_expression(int data)
+static void lab_evaluation_cards_present_expression(browser_handle data)
 {
     lab_evaluation_notes(data);
     int value = lab_dom_read(lab_dom_query(0, "#value"), LAB_DOM_TEXT, "");
@@ -224,14 +232,14 @@ static void lab_evaluation_cards_present_expression(int data)
 }
 
 /* Clear equation formatting on the differential-equation detail card. */
-static void lab_evaluation_cards_present_diffequation(int data)
+static void lab_evaluation_cards_present_diffequation(browser_handle data)
 {
     (void)data;
     lab_dom_class(lab_dom_query(0, "#functionStyle"), "equation-function", 0);
 }
 
 /* Synchronise a supplied matrix operation after updating the value title. */
-static void lab_evaluation_cards_present_matrix(int data)
+static void lab_evaluation_cards_present_matrix(browser_handle data)
 {
     lab_dom_write(lab_dom_query(0, "#valueTitle"), LAB_DOM_TEXT, "", lab_dom_string("Value"));
     int operation = lab_dom_get(data, "operation"), select = lab_dom_query(0, "#matrixOperation");
@@ -245,17 +253,17 @@ static void lab_evaluation_cards_present_matrix(int data)
 }
 
 /* Calendar presentations do not expose a rendered-card expansion control. */
-static void lab_evaluation_cards_present_calendar(int data)
+static void lab_evaluation_cards_present_calendar(browser_handle data)
 {
     (void)data;
     lab_layout_more(lab_dom_query(0, "#renderedMore"), 0);
 }
 
 /* Project mode-specific notes, controls and visibility after the text-card services have run. */
-void lab_evaluation_cards_present(lab_mode_t mode, int data)
+void lab_evaluation_cards_present(lab_mode_t mode, browser_handle data)
 {
     /** @brief Optional presentation effects indexed by the worksheet ABI mode. */
-    static void (*const handlers[LAB_MODE_COUNT])(int) = {
+    static void (*const handlers[LAB_MODE_COUNT])(browser_handle) = {
         [LAB_MODE_EXPRESSION]            = lab_evaluation_cards_present_expression,
         [LAB_MODE_EQUATION]              = 0,
         [LAB_MODE_DIFFERENTIAL_EQUATION] = lab_evaluation_cards_present_diffequation,
@@ -268,7 +276,7 @@ void lab_evaluation_cards_present(lab_mode_t mode, int data)
         handlers[mode](data);
 }
 
-static int lab_evaluation_cards_copy(int source)
+static browser_handle lab_evaluation_cards_copy(browser_handle source)
 {
     int copy = lab_dom_object(LAB_VALUE_OBJECT), keys = lab_dom_keys(source);
     for (unsigned i = 0; i < lab_dom_count(keys); ++i) {
@@ -281,7 +289,7 @@ static int lab_evaluation_cards_copy(int source)
 }
 
 /* Return the weather request state with native-evaluation date/location precedence and string coercion. */
-void lab_evaluation_weather_state(int state, int data)
+void lab_evaluation_weather_state(browser_handle state, browser_handle data)
 {
     int copy = lab_evaluation_cards_copy(state), fields = lab_dom_get(data, "fields");
     static const char *const keys[] = {"date", "latitude", "longitude"};
@@ -293,7 +301,7 @@ void lab_evaluation_weather_state(int state, int data)
 }
 
 /* Replace exact Weather sections while preserving native order, markup and copy text. */
-void lab_evaluation_weather_cards(int overview, int weather)
+void lab_evaluation_weather_cards(browser_handle overview, browser_handle weather)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT), sections = lab_dom_object(LAB_VALUE_ARRAY);
     const int sources[] = {overview, weather};
@@ -319,7 +327,7 @@ void lab_evaluation_weather_cards(int overview, int weather)
 }
 
 /* Reveal an eligible goal target, or return the source/target pair for the browser's asynchronous request. */
-void lab_evaluation_goal_start(lab_mode_t mode, int text)
+void lab_evaluation_goal_start(lab_mode_t mode, browser_handle text)
 {
     lab_dom_return(0);
     if (mode != LAB_MODE_EXPRESSION || !lab_dom_truth(text))

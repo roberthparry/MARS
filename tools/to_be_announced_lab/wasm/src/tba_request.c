@@ -81,7 +81,7 @@ void tba_request_forecast(void)
     tba_ui_request("/stream", 3, payload, TBA_RESPONSE_FORECAST, 0);
 }
 
-static void tba_request_columns(int driver, int data)
+static void tba_request_columns(int driver, browser_handle data)
 {
     int columns = tba_local_columns(driver);
     int document = tba_ui_state(driver ? "local_driver" : "local_target");
@@ -90,7 +90,7 @@ static void tba_request_columns(int driver, int data)
     tba_form_meta(data, driver);
 }
 
-static void tba_request_mobile(int data, int success)
+static void tba_request_mobile(browser_handle data, int success)
 {
     tba_ui_write("mobile-status", "textContent", success ?
         tba_ui_or(tba_dom_get(data, "title"), "Phone access ready.") :
@@ -105,7 +105,7 @@ static void tba_request_mobile(int data, int success)
 }
 
 /* Validate completions before allowing them to replace current worksheet state. */
-void tba_request_complete(unsigned action, unsigned serial, int data, int success)
+void tba_request_complete(unsigned action, unsigned serial, browser_handle data, int success)
 {
     if (action == TBA_RESPONSE_MOBILE) {
         tba_request_mobile(data, success);

@@ -11,6 +11,7 @@
 #ifndef LAB_WASM_BINDING_COMMIT_H
 #define LAB_WASM_BINDING_COMMIT_H
 
+#include "lab_handle.h"
 #include "lab_mode.h"
 
 /** @brief Accepted binding edit whose completion services must be planned. */
@@ -28,7 +29,7 @@ typedef enum {
  * @details Publishes null for an empty snapshot or invalid mode. Binding identities,
  * array order and sparse positions are retained. No input, editor or cache is changed.
  */
-void lab_binding_commit_request(lab_mode_t mode, int source, int snapshot);
+void lab_binding_commit_request(lab_mode_t mode, browser_handle source, snapshot_handle snapshot);
 
 /**
  * @brief Publish ordered completion services for a current binding edit.
@@ -43,7 +44,7 @@ void lab_binding_commit_request(lab_mode_t mode, int source, int snapshot);
  * null. The caller must verify request, editor and input freshness first. Planning
  * has no effects; the service executor stops on an exception.
  */
-void lab_binding_commit_plan(lab_mode_t mode, lab_binding_commit_operation_t operation, int source, int updated,
-                             int context);
+void lab_binding_commit_plan(lab_mode_t mode, lab_binding_commit_operation_t operation, browser_handle source,
+                             browser_handle updated, browser_handle context);
 
 #endif

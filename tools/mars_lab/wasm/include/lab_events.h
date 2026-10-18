@@ -17,6 +17,7 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
 #include "lab_mode.h"
 
 /** @brief Additional reset work after scalar controls have been cleared. */
@@ -56,14 +57,14 @@ unsigned lab_events_input(lab_mode_t mode, bool bound, bool unchanged);
  * outside the DOM scope. State setters remain host adapters, preserving the property descriptors of native
  * storage views. Equation saves omit text to preserve their live default after binding refresh.
  */
-void lab_events_refresh(lab_mode_t mode, bool bound, bool unchanged, int context);
+void lab_events_refresh(lab_mode_t mode, bool bound, bool unchanged, browser_handle context);
 
 /**
  * @brief Mark reused bindings as current after the ordered timer-cancellation service has finished.
  * @param editor Scoped editor node whose bindingRefreshValid dataset field becomes "true".
  * @post Unrelated editor data remains unchanged.
  */
-void lab_events_refresh_mark(int editor);
+void lab_events_refresh_mark(browser_handle editor);
 
 /**
  * @brief Clear scalar controls and select additional structured reset work.
@@ -73,7 +74,7 @@ void lab_events_refresh_mark(int editor);
  * @return Additional reset action: none 0, integrator rows 1, or calendar profile 2.
  * Invalid modes return zero without changing controls.
  */
-lab_event_clear_action_t lab_events_clear(lab_mode_t mode, int config);
+lab_event_clear_action_t lab_events_clear(lab_mode_t mode, browser_handle config);
 
 /**
  * @brief Decide whether page inactivity should flush saved editor state.

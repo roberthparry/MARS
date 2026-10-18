@@ -20,6 +20,7 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
 #include "lab_mode.h"
 #include "lab_requests.h"
 
@@ -128,6 +129,7 @@ void lab_evaluation_prepare_plan(lab_mode_t mode, bool skip_history);
  * Invalid/stale outcomes publish null. Services run after the native call returns;
  * this function does not alter cards, bindings or browser state itself.
  */
-void lab_evaluation_response(lab_mode_t mode, lab_request_outcome_t outcome, int data, int context, int error);
+void lab_evaluation_response(lab_mode_t mode, lab_request_outcome_t outcome, browser_handle data,
+                             browser_handle context, browser_handle error);
 
 #endif

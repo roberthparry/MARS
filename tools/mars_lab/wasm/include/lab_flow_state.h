@@ -9,6 +9,8 @@
 #ifndef LAB_FLOW_STATE_H
 #define LAB_FLOW_STATE_H
 
+#include "lab_handle.h"
+
 /** @brief Closed workflow selectors for lab_flow_state; numeric values are browser ABI. */
 typedef enum {
     LAB_FLOW_STATE_EDITORS    = 0, /**< Restore saved editors. */
@@ -31,6 +33,6 @@ typedef enum {
  * @param view Scoped browser handle to the workspace capability view used for current state and snapshots.
  * @return Scoped browser handle to the next continuation plan; unsupported kinds produce an inert completion.
  */
-int lab_flow_state(lab_flow_state_kind_t kind, int frame, int view);
+browser_handle lab_flow_state(lab_flow_state_kind_t kind, frame_handle frame, view_handle view);
 
 #endif

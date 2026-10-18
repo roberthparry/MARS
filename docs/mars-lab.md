@@ -847,9 +847,24 @@ boundary these remain `i32` values: browser callers pass exactly `0` or `1` for
 boolean options, and predicate results arrive as numeric `0` or `1`. The scoped
 DOM bridge still boxes JavaScript booleans as value handles; a boolean option
 must therefore be converted explicitly with `Number(flag)` before `labDOM.call`.
-Handles referring to boolean values remain `int`. Counts, indices, status codes
+Handles referring to boolean values remain integer handles, not C `bool`. Counts, indices, status codes
 and action masks keep their numeric or enum types wherever more than two values
 have distinct meanings.
+
+The WASM APIs, their helpers and callback tables use named handle types rather
+than plain integers for borrowed browser objects. `browser_handle` accepts any
+scoped browser value; `node_handle`, `event_handle`, `chart_handle`,
+`gesture_handle`, `frame_handle`, `view_handle` and `snapshot_handle` identify
+more specific roles. `quaternion_handle` denotes a browser quaternion array in
+`[x, y, z, w]` order. Handle-returning functions use these types too.
+
+The Protobuf bridge uses `codec_handle` for its separate host-value table.
+DOM and codec handles must not be exchanged, retained between synchronous calls,
+or treated as pointers into WebAssembly memory. The aliases preserve the existing
+`i32` ABI; C typedefs document roles but do not enforce distinct integer types.
+Counts, byte lengths, comparison results and packed dates retain numeric types.
+The plot-drag dispatcher's event operand remains `int` because its action tag
+selects either an event handle or a numeric wheel-timer revision.
 
 The browser projection is split into native modules by responsibility:
 

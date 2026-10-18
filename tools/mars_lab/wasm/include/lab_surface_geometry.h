@@ -10,6 +10,8 @@
 #ifndef MARS_LAB_SURFACE_GEOMETRY_H
 #define MARS_LAB_SURFACE_GEOMETRY_H
 
+#include "lab_handle.h"
+
 /** @brief Primitive topology shared by projection and SVG export; values retain the browser ABI. */
 typedef enum {
     LAB_SURFACE_POLYGONS = 0, /**< Closed polygons with at least three projected vertices. */
@@ -23,7 +25,7 @@ typedef enum {
  * to use the volume's current zoom. These are display bounds, not exact mathematical sampling expressions.
  * @details Publishes the frame, GPU matrix and axis plan through lab_dom_return; invalid override spans publish null.
  */
-void lab_surface_frame(int view, int override_bounds);
+void lab_surface_frame(view_handle view, browser_handle override_bounds);
 
 /**
  * @brief Project a normalised point using a previously returned frame.
@@ -31,7 +33,7 @@ void lab_surface_frame(int view, int override_bounds);
  * @param point Scoped three-number unit-volume coordinate array; no clipping or volume transform is applied.
  * @details Publishes a two-number [x, y] array in the frame's SVG coordinate system through lab_dom_return.
  */
-void lab_surface_project(int frame, int point);
+void lab_surface_project(frame_handle frame, browser_handle point);
 
 /**
  * @brief Transform, clip and project one segment or triangle.
@@ -40,7 +42,7 @@ void lab_surface_project(int frame, int point);
  * @details Publishes a record with projected two-dimensional points and mean camera depth through lab_dom_return.
  * An entirely clipped primitive has an empty points array and zero depth.
  */
-void lab_surface_polygon(int frame, int points);
+void lab_surface_polygon(frame_handle frame, browser_handle points);
 
 /**
  * @brief Clip and project retained primitives in stable far-to-near order.
@@ -52,13 +54,13 @@ void lab_surface_polygon(int frame, int points);
  * Reads the frame once and releases temporary handles per primitive and merge step. Runtime is O(n log n),
  * with O(n) browser-owned output and sorting storage, and bounded native scratch space.
  */
-void lab_surface_polygons(int frame, int primitives, lab_surface_primitive_t kind);
+void lab_surface_polygons(frame_handle frame, browser_handle primitives, lab_surface_primitive_t kind);
 
 /**
  * @brief Clip a segment or triangle against the closed unit cube.
  * @param points Scoped array of at most three [x, y, z] coordinate arrays; larger arrays produce an empty result.
  * @details Publishes an array of clipped three-dimensional vertices through lab_dom_return without changing input.
  */
-void lab_surface_clip(int points);
+void lab_surface_clip(browser_handle points);
 
 #endif

@@ -24,14 +24,15 @@
 #include "lab_flow.h"
 
 /* Arguments are the bounded capability signature, not a searched catalogue. */
-int lab_flow_call(int frame, unsigned next, const char *service, const char *save, bool wait, unsigned count, ...)
+browser_handle lab_flow_call(frame_handle frame, unsigned next, const char *service, const char *save, bool wait,
+                             unsigned count, ...)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY),
         call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     va_list values;
     va_start(values, count);
     for (unsigned i = 0; i < count; ++i)
-        lab_dom_push(args, va_arg(values, int));
+        lab_dom_push(args, va_arg(values, browser_handle));
     va_end(values);
     lab_dom_set(frame, "stage", lab_dom_numeric(next));
     lab_dom_set(call, "service", lab_dom_string(service));
@@ -45,13 +46,13 @@ int lab_flow_call(int frame, unsigned next, const char *service, const char *sav
 }
 
 /* Existing planners keep their metadata; only their ordered effects are executed. */
-int lab_flow_effects(int frame, unsigned next, int plan)
+browser_handle lab_flow_effects(frame_handle frame, unsigned next, browser_handle plan)
 {
     return lab_flow_call(frame, next, "effects", 0, lab_dom_truth(lab_dom_get(plan, "wait")), 1, plan);
 }
 
 /* Absence and an explicit false result remain distinct to callers. */
-int lab_flow_done(int value)
+browser_handle lab_flow_done(browser_handle value)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(plan, "done", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
@@ -61,7 +62,7 @@ int lab_flow_done(int value)
 }
 
 /* Request operations and mode ownership are policy, rather than browser branches. */
-void lab_flow_begin(lab_flow_kind_t kind, int frame)
+void lab_flow_begin(lab_flow_kind_t kind, frame_handle frame)
 {
     static const struct {
         const char *operation;
@@ -99,58 +100,58 @@ void lab_flow_begin(lab_flow_kind_t kind, int frame)
 }
 
 /* Translate the public workflow selector into the request module's local selector. */
-static int dispatch_request(lab_flow_kind_t kind, int frame, int view)
+static browser_handle dispatch_request(lab_flow_kind_t kind, frame_handle frame, view_handle view)
 {
     return lab_flow_request((lab_flow_request_kind_t)(kind - LAB_FLOW_KIND_REQUEST_FUNCTION), frame, view);
 }
 
 /* Translate the public workflow selector into the state module's local selector. */
-static int dispatch_state(lab_flow_kind_t kind, int frame, int view)
+static browser_handle dispatch_state(lab_flow_kind_t kind, frame_handle frame, view_handle view)
 {
     return lab_flow_state((lab_flow_state_kind_t)(kind - LAB_FLOW_KIND_STATE_EDITORS), frame, view);
 }
 
 /* Translate the public workflow selector into the location module's local selector. */
-static int dispatch_location(lab_flow_kind_t kind, int frame, int view)
+static browser_handle dispatch_location(lab_flow_kind_t kind, frame_handle frame, view_handle view)
 {
     return lab_flow_location((lab_flow_location_kind_t)(kind - LAB_FLOW_KIND_LOCATION_FORMS), frame, view);
 }
 
 /* Translate the public workflow selector into the binding module's local selector. */
-static int dispatch_binding(lab_flow_kind_t kind, int frame, int view)
+static browser_handle dispatch_binding(lab_flow_kind_t kind, frame_handle frame, view_handle view)
 {
     return lab_flow_binding((lab_flow_binding_kind_t)(kind - LAB_FLOW_KIND_BINDING_SYNC), frame, view);
 }
 
 /* Translate the public workflow selector into the result module's local selector. */
-static int dispatch_result(lab_flow_kind_t kind, int frame, int view)
+static browser_handle dispatch_result(lab_flow_kind_t kind, frame_handle frame, view_handle view)
 {
     return lab_flow_result((lab_flow_result_kind_t)(kind - LAB_FLOW_KIND_RESULT_TRANSFER), frame, view);
 }
 
 /* Translate the public workflow selector into the transport module's local selector. */
-static int dispatch_transport(lab_flow_kind_t kind, int frame, int view)
+static browser_handle dispatch_transport(lab_flow_kind_t kind, frame_handle frame, view_handle view)
 {
     return lab_flow_transport((lab_flow_transport_kind_t)(kind - LAB_FLOW_KIND_TRANSPORT_POST), frame, view);
 }
 
 /* Translate the public workflow selector into the forms module's local selector. */
-static int dispatch_forms(lab_flow_kind_t kind, int frame, int view)
+static browser_handle dispatch_forms(lab_flow_kind_t kind, frame_handle frame, view_handle view)
 {
     return lab_flow_state_forms((lab_flow_state_forms_kind_t)(kind - LAB_FLOW_KIND_STATE_FORMS_CLEAR), frame, view);
 }
 
 /* Bootstrap has no local workflow selector. */
-static int dispatch_bootstrap(lab_flow_kind_t kind, int frame, int view)
+static browser_handle dispatch_bootstrap(lab_flow_kind_t kind, frame_handle frame, view_handle view)
 {
     (void)kind;
     return lab_bootstrap_step(frame, view);
 }
 
 /* Fixed dispatch tables keep independent workflows in their owning C modules; holes finish without a value. */
-void lab_flow_step(lab_flow_kind_t kind, int frame, int view)
+void lab_flow_step(lab_flow_kind_t kind, frame_handle frame, view_handle view)
 {
-    static int (*const handlers[])(int, int) = {
+    static browser_handle (*const handlers[])(browser_handle, browser_handle) = {
         [LAB_FLOW_KIND_EVALUATE] = lab_flow_evaluation,
         [LAB_FLOW_KIND_GOAL]     = lab_flow_goal,
         [LAB_FLOW_KIND_WEATHER]  = lab_flow_weather,
@@ -166,7 +167,7 @@ void lab_flow_step(lab_flow_kind_t kind, int frame, int view)
         lab_dom_return(lab_flow_done(0));
         return;
     }
-    static int (*const routes[])(lab_flow_kind_t, int, int) = {
+    static browser_handle (*const routes[])(lab_flow_kind_t, browser_handle, browser_handle) = {
         [LAB_FLOW_KIND_REQUEST_FUNCTION]           = dispatch_request,
         [LAB_FLOW_KIND_REQUEST_CALCULUS]           = dispatch_request,
         [LAB_FLOW_KIND_REQUEST_INTEGRATOR]         = dispatch_request,

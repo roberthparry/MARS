@@ -12,6 +12,8 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
+
 /** @brief Units for a custom precision request. */
 typedef enum {
     LAB_PRECISION_UNIT_BITS   = 0, /**< Binary significand bits. */
@@ -52,12 +54,12 @@ void lab_precision_close(bool focus);
  * @details Publishes a calls array and optional prevent/stop flags through lab_dom_return.
  * Apply requests setWorksheetPrecision only for a valid changed draft; no scoped handle is retained.
  */
-void lab_precision_dispatch(lab_precision_action_t action, int event);
+void lab_precision_dispatch(lab_precision_action_t action, event_handle event);
 
 /**
  * @brief Install the custom editor's control and document listeners once.
  * @param document Scoped browser Document handle for keyboard and outside-pointer subscriptions.
  */
-void lab_precision_install(int document);
+void lab_precision_install(browser_handle document);
 
 #endif

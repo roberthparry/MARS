@@ -15,25 +15,25 @@ static const char *const tba_chart_colours[] = {
 };
 static int tba_chart_hover_index = -1;
 
-static double tba_chart_value(int array, unsigned index)
+static double tba_chart_value(browser_handle array, unsigned index)
 {
     int value = tba_dom_item(array, index);
     return tba_dom_type(value) == 2 ? tba_dom_number(value) : __builtin_nan("");
 }
 
-static void tba_chart_number(int parts, double value)
+static void tba_chart_number(browser_handle parts, double value)
 {
     tba_dom_push(parts, tba_dom_format(value, 2));
 }
 
-static int tba_chart_label(double value)
+static browser_handle tba_chart_label(double value)
 {
     double magnitude = value < 0 ? -value : value;
     int decimals = magnitude >= 1000 ? 0 : magnitude >= 100 ? 1 : magnitude >= 10 ? 2 : 3;
     return tba_dom_format(value, -decimals - 2);
 }
 
-static void tba_chart_legend(int parts, int id, int label, const char *colour, int checked)
+static void tba_chart_legend(browser_handle parts, browser_handle id, browser_handle label, const char *colour, int checked)
 {
     tba_ui_add(parts, checked ? "<label class=\"chart-legend-item\">" :
                               "<label class=\"chart-legend-item is-off\">");
@@ -47,7 +47,7 @@ static void tba_chart_legend(int parts, int id, int label, const char *colour, i
     tba_ui_add(parts, "</label>");
 }
 
-static void tba_chart_attributes(int parts, int id, int parent, const char *kind)
+static void tba_chart_attributes(browser_handle parts, browser_handle id, browser_handle parent, const char *kind)
 {
     tba_ui_add(parts, " data-chart-series-id=\"");
     tba_ui_escaped(parts, id);
@@ -61,8 +61,9 @@ static void tba_chart_attributes(int parts, int id, int parent, const char *kind
     }
 }
 
-static void tba_chart_series(int parts, int hover, int labels, int values, int id, int label,
-                             const char *colour, int parent, const char *kind, const char *class_name)
+static void tba_chart_series(browser_handle parts, browser_handle hover, browser_handle labels, browser_handle values,
+                             browser_handle id, browser_handle label, const char *colour, browser_handle parent,
+                             const char *kind, const char *class_name)
 {
     int path = tba_dom_object(1), points = tba_dom_object(1), active = 0;
     unsigned count = tba_dom_count(values), limit = tba_dom_count(labels);
@@ -125,7 +126,7 @@ static void tba_chart_series(int parts, int hover, int labels, int values, int i
     }
 }
 
-static void tba_chart_x_tick(int parts, double x, int label, const char *anchor)
+static void tba_chart_x_tick(browser_handle parts, double x, browser_handle label, const char *anchor)
 {
     tba_ui_add(parts, "<line class=\"chart-grid-line\" y1=\"24\" y2=\"378\" x1=\"");
     tba_chart_number(parts, x);
@@ -140,7 +141,7 @@ static void tba_chart_x_tick(int parts, double x, int label, const char *anchor)
     tba_ui_add(parts, "</text>");
 }
 
-static void tba_chart_axes(int parts, int labels, int data)
+static void tba_chart_axes(browser_handle parts, browser_handle labels, browser_handle data)
 {
     for (unsigned i = 0; i < 5; ++i) {
         double value = tba_chart_y_tick(i), y = tba_chart_y(value);
@@ -179,7 +180,7 @@ static void tba_chart_axes(int parts, int labels, int data)
     tba_ui_add(parts, "<path class=\"chart-axis\" d=\"M68,24V378H1012\"></path>");
 }
 
-static void tba_chart_include_values(int values, unsigned count)
+static void tba_chart_include_values(browser_handle values, unsigned count)
 {
     double *buffer = tba_chart_buffer(1);
     for (unsigned i = 0; i < count; ++i) {
@@ -191,7 +192,7 @@ static void tba_chart_include_values(int values, unsigned count)
 }
 
 /* Render a bounded structured chart with shared scales and escaped labels. */
-void tba_view_chart(int data)
+void tba_view_chart(browser_handle data)
 {
     tba_chart_hover_index = -1;
     tba_ui_store("hover", 0);
@@ -308,7 +309,7 @@ static double tba_chart_clamp(double value, double minimum, double maximum)
 }
 
 /* Reuse numeric hover buffers until the pointer changes series. */
-void tba_view_hover(int event)
+void tba_view_hover(event_handle event)
 {
     int path = tba_dom_closest(tba_dom_get(event, "target"), ".chart-hover-path");
     if (!path) {

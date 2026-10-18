@@ -8,6 +8,8 @@
 #ifndef MARS_LAB_SURFACE_HOVER_H
 #define MARS_LAB_SURFACE_HOVER_H
 
+#include "lab_handle.h"
+
 /**
  * @brief Pick a visible independent segment within ten CSS pixels in one bounded call.
  * @param view Scoped retained-view record with chart metadata, names and at most 65536 primitives.
@@ -21,6 +23,7 @@
  * invalid dimensions and pointers outside the chart publish null regardless of previous. Selected markers
  * must also lie inside the chart. A valid frame with drawMesh false publishes previous without traversal.
  */
-void lab_surface_hover(int view, int frame, int screen, double mouse_x, double mouse_y, int previous);
+void lab_surface_hover(view_handle view, frame_handle frame, browser_handle screen,
+                       double mouse_x, double mouse_y, browser_handle previous);
 
 #endif

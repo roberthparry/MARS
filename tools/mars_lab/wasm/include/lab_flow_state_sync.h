@@ -10,6 +10,8 @@
 #ifndef LAB_FLOW_STATE_SYNC_H
 #define LAB_FLOW_STATE_SYNC_H
 
+#include "lab_handle.h"
+
 /** @brief Structured control choices carried in a normalisation frame's index property. */
 typedef enum {
     LAB_STATE_CONTROL_MATRIX_OPERATION  = 0,  /**< Matrix operation selector. */
@@ -48,6 +50,6 @@ typedef enum {
  * @param frame Scoped browser handle to the mutable continuation frame storing stage, inputs and service results.
  * @details Publishes a continuation plan through lab_dom_return; unsupported kinds publish an inert completion.
  */
-void lab_state_sync(lab_state_sync_kind_t kind, int frame);
+void lab_state_sync(lab_state_sync_kind_t kind, frame_handle frame);
 
 #endif

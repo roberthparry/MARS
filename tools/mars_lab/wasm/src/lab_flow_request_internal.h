@@ -15,12 +15,14 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
+
 /**
  * @brief Read the current continuation-stage index from a request frame.
  * @param frame Borrowed browser frame whose numeric stage property selects the next request handler.
  * @return The stage property converted to an unsigned index.
  */
-unsigned lab_flow_request_stage(int frame);
+unsigned lab_flow_request_stage(frame_handle frame);
 
 /**
  * @brief Read a request-frame property using browser truth-value conversion.
@@ -28,7 +30,7 @@ unsigned lab_flow_request_stage(int frame);
  * @param key NUL-terminated property name within the frame.
  * @return True when the named value is truthy; false otherwise.
  */
-bool lab_flow_request_truth(int frame, const char *key);
+bool lab_flow_request_truth(frame_handle frame, const char *key);
 
 /**
  * @brief Keep a truthy browser value or create a literal fallback string.
@@ -36,7 +38,7 @@ bool lab_flow_request_truth(int frame, const char *key);
  * @param fallback NUL-terminated text used when value is falsey.
  * @return The original handle when truthy, otherwise a scoped handle for the fallback string.
  */
-int lab_flow_request_fallback(int value, const char *fallback);
+browser_handle lab_flow_request_fallback(browser_handle value, const char *fallback);
 
 /**
  * @brief Schedule an ownership check before a request continuation.
@@ -44,21 +46,21 @@ int lab_flow_request_fallback(int value, const char *fallback);
  * @param next Continuation-stage index stored in frame for resumption after the ownership check.
  * @return Scoped operation-plan handle calling requestCurrent.
  */
-int lab_flow_request_current(int frame, unsigned next);
+browser_handle lab_flow_request_current(frame_handle frame, unsigned next);
 
 /**
  * @brief Read the transport response from the retained request result.
  * @param frame Borrowed browser frame whose result object contains response.
  * @return Scoped handle for result.response, or the bridge's absent-value handle when missing.
  */
-int lab_flow_request_response(int frame);
+browser_handle lab_flow_request_response(frame_handle frame);
 
 /**
  * @brief Read the decoded native payload from the retained request result.
  * @param frame Borrowed browser frame whose result object contains data.
  * @return Scoped handle for result.data, or the bridge's absent-value handle when missing.
  */
-int lab_flow_request_data(int frame);
+browser_handle lab_flow_request_data(frame_handle frame);
 
 /**
  * @brief Advance the calculus or plot request through its continuation table.
@@ -66,6 +68,6 @@ int lab_flow_request_data(int frame);
  *   results.
  * @return Scoped operation or completion plan for the selected calculus/plot stage.
  */
-int lab_flow_request_calculus(int frame);
+browser_handle lab_flow_request_calculus(frame_handle frame);
 
 #endif

@@ -50,7 +50,8 @@ unsigned lab_events_input(lab_mode_t mode, bool bound, bool unchanged)
     return result;
 }
 
-static void lab_events_emit(int calls, const char *service, unsigned count, int first, int second)
+static void lab_events_emit(browser_handle calls, const char *service, unsigned count, browser_handle first,
+                            browser_handle second)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(call, "service", lab_dom_string(service));
@@ -63,7 +64,7 @@ static void lab_events_emit(int calls, const char *service, unsigned count, int 
 }
 
 /* Decode input policy into ordered adapters without mutating getter-backed host views. */
-void lab_events_refresh(lab_mode_t mode, bool bound, bool unchanged, int context)
+void lab_events_refresh(lab_mode_t mode, bool bound, bool unchanged, browser_handle context)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(plan, "calls", calls);
@@ -107,18 +108,18 @@ void lab_events_refresh(lab_mode_t mode, bool bound, bool unchanged, int context
 }
 
 /* Mark reused binding metadata only when the host has cancelled its pending refresh timer. */
-void lab_events_refresh_mark(int editor)
+void lab_events_refresh_mark(browser_handle editor)
 {
     lab_dom_write(editor, LAB_DOM_DATASET, "bindingRefreshValid", lab_dom_string("true"));
 }
 
-static void lab_events_value(const char *selector, int text)
+static void lab_events_value(const char *selector, browser_handle text)
 {
     lab_dom_write(lab_dom_query(0, selector), LAB_DOM_VALUE, "", text);
 }
 
 /* Reset scalar controls; structured row/calendar reset is an explicit caller action. */
-lab_event_clear_action_t lab_events_clear(lab_mode_t mode, int config)
+lab_event_clear_action_t lab_events_clear(lab_mode_t mode, browser_handle config)
 {
     /** @brief Scalar reset targets and optional configured defaults. */
     static const struct {

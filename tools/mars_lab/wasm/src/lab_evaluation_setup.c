@@ -16,7 +16,8 @@
 #include "lab_evaluation.h"
 #include "lab_evaluation_setup.h"
 
-static void lab_evaluation_setup_emit(int calls, const char *name, unsigned count, int first, int second)
+static void lab_evaluation_setup_emit(browser_handle calls, const char *name, unsigned count, browser_handle first,
+                                browser_handle second)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     if (count)
@@ -28,7 +29,7 @@ static void lab_evaluation_setup_emit(int calls, const char *name, unsigned coun
     lab_dom_push(calls, call);
 }
 
-static int lab_evaluation_setup_input(lab_mode_t mode, int view)
+static browser_handle lab_evaluation_setup_input(lab_mode_t mode, view_handle view)
 {
     /** @brief Modes whose authored editor text is trimmed, selected only after mode validation. */
     static const unsigned trim[LAB_MODE_COUNT] = {
@@ -51,7 +52,9 @@ static int lab_evaluation_setup_input(lab_mode_t mode, int view)
 /** @brief Validated worksheet mode and scoped records borrowed by one preparation stage. */
 struct lab_evaluation_setup_context {
     lab_mode_t mode;
-    int context, options, view, calls;
+    browser_handle context, options;
+    view_handle view;
+    browser_handle calls;
 };
 
 /* Capture visible bindings before requesting their ordered commit. */
@@ -131,7 +134,8 @@ static bool lab_evaluation_setup_assembled(struct lab_evaluation_setup_context *
 }
 
 /* Each stage runs synchronously; only the published final service may require a browser await. */
-void lab_evaluation_setup(lab_mode_t mode, lab_evaluation_setup_phase_t phase, int context, int options, int view)
+void lab_evaluation_setup(lab_mode_t mode, lab_evaluation_setup_phase_t phase, browser_handle context,
+                          browser_handle options, view_handle view)
 {
     /** @brief Ordered preparation stages returning whether their final service must be awaited. */
     static bool (*const handlers[])(struct lab_evaluation_setup_context *) = {

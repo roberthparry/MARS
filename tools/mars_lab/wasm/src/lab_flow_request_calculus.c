@@ -55,24 +55,24 @@ enum {
 };
 
 struct lab_flow_request_calculus_context {
-    int frame;
-    int request;
-    int action;
-    int wrt;
+    frame_handle frame;
+    browser_handle request;
+    browser_handle action;
+    browser_handle wrt;
     int matrix;
     int scalar;
     int integral;
     int plot;
-    int data;
-    int result;
+    browser_handle data;
+    browser_handle result;
 };
 
-static int lab_flow_request_calculus_start(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_start(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_capture, "calculusInitial", "initial", 0, 0);
 }
 
-static int lab_flow_request_calculus_capture(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_capture(struct lab_flow_request_calculus_context *ctx)
 {
     int initial = lab_dom_get(ctx->frame, "initial"), mode = lab_dom_get(initial, "mode");
     ctx->matrix = lab_dom_equal(mode, lab_dom_string("matrix"));
@@ -95,23 +95,23 @@ static int lab_flow_request_calculus_capture(struct lab_flow_request_calculus_co
                          ctx->action, mode, options);
 }
 
-static int lab_flow_request_calculus_commit(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_commit(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_current, "calculusCapture", "snapshot", 0, 0);
 }
 
-static int lab_flow_request_calculus_current(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_current(struct lab_flow_request_calculus_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_calculus_stage_error_current));
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_source, "commitBindings", 0, 1, 0);
 }
 
-static int lab_flow_request_calculus_source(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_source(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_assemble);
 }
 
-static int lab_flow_request_calculus_assemble(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_assemble(struct lab_flow_request_calculus_context *ctx)
 {
     if (!lab_flow_request_truth(ctx->frame, "current"))
         return lab_flow_done(0);
@@ -119,7 +119,7 @@ static int lab_flow_request_calculus_assemble(struct lab_flow_request_calculus_c
                          ctx->scalar ? "matrixScalar" : "expressionText", "source", 0, 0);
 }
 
-static int lab_flow_request_calculus_assembled(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_assembled(struct lab_flow_request_calculus_context *ctx)
 {
     if (lab_flow_request_truth(ctx->frame, "solverPlot"))
         return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_input_accept);
@@ -130,12 +130,12 @@ static int lab_flow_request_calculus_assembled(struct lab_flow_request_calculus_
     return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_input_accept);
 }
 
-static int lab_flow_request_calculus_input(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_input(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_input_accept);
 }
 
-static int lab_flow_request_calculus_input_accept(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_input_accept(struct lab_flow_request_calculus_context *ctx)
 {
     if (!lab_flow_request_truth(ctx->frame, "current"))
         return lab_flow_done(0);
@@ -143,14 +143,14 @@ static int lab_flow_request_calculus_input_accept(struct lab_flow_request_calcul
                          lab_dom_get(ctx->frame, "source"), ctx->wrt);
 }
 
-static int lab_flow_request_calculus_show(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_show(struct lab_flow_request_calculus_context *ctx)
 {
     if (!lab_flow_request_truth(ctx->frame, "accepted"))
         return lab_flow_done(0);
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_title, "showResults", 0, 0, 0);
 }
 
-static int lab_flow_request_calculus_title(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_title(struct lab_flow_request_calculus_context *ctx)
 {
     if (ctx->plot)
         return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_fetch);
@@ -159,7 +159,7 @@ static int lab_flow_request_calculus_title(struct lab_flow_request_calculus_cont
                                       lab_dom_text(ctx->action), " RESULT"));
 }
 
-static int lab_flow_request_calculus_status(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_status(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_fetch, "setStatus", 0, 0, 1,
                          lab_dom_join(lab_dom_string(ctx->plot       ? "Plotting against "
@@ -168,7 +168,7 @@ static int lab_flow_request_calculus_status(struct lab_flow_request_calculus_con
                                       lab_dom_text(ctx->wrt), "..."));
 }
 
-static int lab_flow_request_calculus_fetch(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_fetch(struct lab_flow_request_calculus_context *ctx)
 {
     /* Representation belongs to this refinement request, never the shared Auto control. */
     if (ctx->plot && lab_dom_equal(lab_dom_get(ctx->frame, "plotKind"), lab_dom_string("complex_curve")))
@@ -191,12 +191,12 @@ static int lab_flow_request_calculus_fetch(struct lab_flow_request_calculus_cont
                          ctx->request, lab_dom_get(ctx->frame, "preview"));
 }
 
-static int lab_flow_request_calculus_prepared_current(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_prepared_current(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_matrix_fetch);
 }
 
-static int lab_flow_request_calculus_matrix_fetch(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_matrix_fetch(struct lab_flow_request_calculus_context *ctx)
 {
     if (!lab_flow_request_truth(ctx->frame, "current"))
         return lab_flow_done(0);
@@ -211,7 +211,7 @@ static int lab_flow_request_calculus_matrix_fetch(struct lab_flow_request_calcul
                          options);
 }
 
-static int lab_flow_request_calculus_outcome(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_outcome(struct lab_flow_request_calculus_context *ctx)
 {
     ctx->result = lab_dom_key_get(lab_dom_get(lab_dom_get(ctx->data, "presentation"), "calculus"), ctx->action);
     lab_dom_set(ctx->frame, "calculus", ctx->result);
@@ -222,7 +222,7 @@ static int lab_flow_request_calculus_outcome(struct lab_flow_request_calculus_co
                          ctx->request, lab_flow_request_response(ctx->frame), ctx->data, available);
 }
 
-static int lab_flow_request_calculus_accept(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_accept(struct lab_flow_request_calculus_context *ctx)
 {
     lab_request_outcome_t outcome = (lab_request_outcome_t)(unsigned)lab_dom_number(lab_dom_get(ctx->frame, "outcome"));
     if (outcome == LAB_REQUEST_OUTCOME_STALE)
@@ -253,20 +253,20 @@ static int lab_flow_request_calculus_accept(struct lab_flow_request_calculus_con
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_clear_error, "clearResultDetails", 0, 0, 1, options);
 }
 
-static int lab_flow_request_calculus_clear_error(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_clear_error(struct lab_flow_request_calculus_context *ctx)
 {
     lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 1);
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_display, "clearRenderedError", 0, 0, 0);
 }
 
-static int lab_flow_request_calculus_display(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_display(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_scalar,
                          ctx->matrix && !ctx->scalar ? "displayMatrixResult" : "displayCalculusResult", 0, 0, 1,
                          ctx->matrix && !ctx->scalar ? ctx->data : ctx->result);
 }
 
-static int lab_flow_request_calculus_scalar(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_scalar(struct lab_flow_request_calculus_context *ctx)
 {
     if (ctx->matrix && !ctx->scalar)
         return lab_flow_call(ctx->frame, flow_request_calculus_stage_post_current, "valueTitle", 0, 0, 1,
@@ -280,12 +280,12 @@ static int lab_flow_request_calculus_scalar(struct lab_flow_request_calculus_con
                              : lab_dom_string(""));
 }
 
-static int lab_flow_request_calculus_post_current(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_post_current(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_variables);
 }
 
-static int lab_flow_request_calculus_variables(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_variables(struct lab_flow_request_calculus_context *ctx)
 {
     if (!lab_flow_request_truth(ctx->frame, "current"))
         return lab_flow_done(0);
@@ -295,7 +295,7 @@ static int lab_flow_request_calculus_variables(struct lab_flow_request_calculus_
                                      : lab_dom_get(ctx->data, "binding_values"));
 }
 
-static int lab_flow_request_calculus_differentiable(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_differentiable(struct lab_flow_request_calculus_context *ctx)
 {
     int enabled =
         lab_flow_request_truth(ctx->frame, "solverPlot") ? lab_dom_scalar(LAB_VALUE_BOOLEAN, 0)
@@ -308,36 +308,36 @@ static int lab_flow_request_calculus_differentiable(struct lab_flow_request_calc
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_buttons, "calculusDifferentiable", 0, 0, 1, enabled);
 }
 
-static int lab_flow_request_calculus_buttons(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_buttons(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_commit_state, "calculusButtons", 0, 0, 0);
 }
 
-static int lab_flow_request_calculus_commit_state(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_commit_state(struct lab_flow_request_calculus_context *ctx)
 {
     if (ctx->matrix && !ctx->scalar)
         return lab_flow_call(ctx->frame, flow_request_calculus_stage_ready, "commitModeState", 0, 0, 0);
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_done, "setStatus", 0, 0, 1, lab_dom_string("Ready"));
 }
 
-static int lab_flow_request_calculus_ready(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_ready(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_done, "setStatus", 0, 0, 1, lab_dom_string("Ready"));
 }
 
-static int lab_flow_request_calculus_plot_commit(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_plot_commit(struct lab_flow_request_calculus_context *ctx)
 {
     if (lab_flow_request_truth(ctx->frame, "preview"))
         return lab_flow_done(0);
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_done, "commitModeState", 0, 0, 0);
 }
 
-static int lab_flow_request_calculus_error_current(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_error_current(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_request_current(ctx->frame, flow_request_calculus_stage_error_clear);
 }
 
-static int lab_flow_request_calculus_error_clear(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_error_clear(struct lab_flow_request_calculus_context *ctx)
 {
     if (!lab_flow_request_truth(ctx->frame, "current"))
         return lab_flow_done(0);
@@ -357,52 +357,52 @@ static int lab_flow_request_calculus_error_clear(struct lab_flow_request_calculu
                          "clearResultDetails", 0, 0, 1, options);
 }
 
-static int lab_flow_request_calculus_error_variables(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_error_variables(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_error_differentiable, "calculusVariables", 0, 0, 1,
                          lab_dom_get(lab_dom_get(ctx->frame, "snapshot"), "variables"));
 }
 
-static int lab_flow_request_calculus_error_differentiable(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_error_differentiable(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_error_buttons, "calculusDifferentiable", 0, 0, 1,
                          lab_dom_get(lab_dom_get(ctx->frame, "snapshot"), "differentiable"));
 }
 
-static int lab_flow_request_calculus_error_buttons(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_error_buttons(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_error_render, "calculusButtons", 0, 0, 0);
 }
 
-static int lab_flow_request_calculus_error_render(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_error_render(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_error_digits, "setRenderedError", 0, 0, 1,
                          lab_dom_get(ctx->frame, "error"));
 }
 
-static int lab_flow_request_calculus_error_digits(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_error_digits(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_error_status, "resetRenderedDigits", 0, 0, 0);
 }
 
-static int lab_flow_request_calculus_error_status(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_error_status(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_done, "setStatus", 0, 0, 1, lab_dom_string("Error"));
 }
 
-static int lab_flow_request_calculus_return(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_return(struct lab_flow_request_calculus_context *ctx)
 {
     return lab_flow_done(lab_dom_get(ctx->frame, "value"));
 }
 
-static int lab_flow_request_calculus_otherwise(struct lab_flow_request_calculus_context *ctx)
+static browser_handle lab_flow_request_calculus_otherwise(struct lab_flow_request_calculus_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
 /* Advance calculus and plot publication without retaining scoped handles. */
-int lab_flow_request_calculus(int frame)
+browser_handle lab_flow_request_calculus(frame_handle frame)
 {
     int request = lab_dom_get(frame, "request"), action = lab_dom_get(frame, "action"), wrt = lab_dom_get(frame, "wrt");
     int matrix = lab_flow_request_truth(frame, "matrix"), scalar = lab_flow_request_truth(frame, "scalar");
@@ -421,7 +421,7 @@ int lab_flow_request_calculus(int frame)
         .data = data,
         .result = result,
     };
-    static int (*const handlers[])(struct lab_flow_request_calculus_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_request_calculus_context *) = {
         [flow_request_calculus_stage_start]                = lab_flow_request_calculus_start,
         [flow_request_calculus_stage_capture]              = lab_flow_request_calculus_capture,
         [flow_request_calculus_stage_commit]               = lab_flow_request_calculus_commit,

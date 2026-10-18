@@ -13,20 +13,20 @@
 #include "lab_dom.h"
 #include "lab_binding_projection.h"
 
-static int lab_binding_projection_plan(void)
+static browser_handle lab_binding_projection_plan(void)
 {
     int plan = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(plan, "calls", lab_dom_object(LAB_VALUE_ARRAY));
     return plan;
 }
 
-static void lab_binding_projection_emit(int plan, const char *service, unsigned count, ...)
+static void lab_binding_projection_emit(browser_handle plan, const char *service, unsigned count, ...)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     va_list values;
     va_start(values, count);
     for (unsigned i = 0; i < count; ++i)
-        lab_dom_push(args, va_arg(values, int));
+        lab_dom_push(args, va_arg(values, browser_handle));
     va_end(values);
     lab_dom_set(call, "service", lab_dom_string(service));
     lab_dom_set(call, "args", args);
@@ -52,7 +52,7 @@ void lab_binding_projection_clear(bool goal_only)
 }
 
 /* Wrapped native metadata selects the full editor even outside the expression-like modes. */
-void lab_binding_projection_update(lab_mode_t mode, int updated, int metadata)
+void lab_binding_projection_update(lab_mode_t mode, browser_handle updated, browser_handle metadata)
 {
     int plan = lab_binding_projection_plan();
     if ((unsigned)mode <= LAB_MODE_DIFFERENTIAL_EQUATION || lab_dom_truth(lab_dom_get(metadata, "wrapped"))) {
@@ -67,7 +67,7 @@ void lab_binding_projection_update(lab_mode_t mode, int updated, int metadata)
 }
 
 /* The asynchronous metadata lookup starts before the immediate editor projection, as before. */
-void lab_binding_projection_prepare(int context, int metadata)
+void lab_binding_projection_prepare(browser_handle context, browser_handle metadata)
 {
     int plan = lab_binding_projection_plan();
     if (!lab_dom_truth(metadata))
@@ -76,7 +76,7 @@ void lab_binding_projection_prepare(int context, int metadata)
 }
 
 /* Browser callbacks apply source ownership and controls before scheduling any new refresh. */
-void lab_binding_projection_finish(int selected)
+void lab_binding_projection_finish(browser_handle selected)
 {
     int plan = lab_binding_projection_plan(), bindings = lab_dom_get(selected, "bindings");
     lab_binding_projection_emit(plan, "bindingSource", 2, lab_dom_string("fullText"),
@@ -93,7 +93,7 @@ void lab_binding_projection_finish(int selected)
 }
 
 /* Admission runs between scoped calls; rejected requests never mark or schedule a refresh. */
-void lab_binding_projection_refresh(lab_binding_refresh_phase_t phase, int context)
+void lab_binding_projection_refresh(lab_binding_refresh_phase_t phase, browser_handle context)
 {
     int plan = lab_binding_projection_plan();
     if (phase == LAB_BINDING_REFRESH_BEGIN) {

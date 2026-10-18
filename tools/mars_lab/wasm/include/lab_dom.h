@@ -14,6 +14,7 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
 #include "lab_value.h"
 
 /** @brief DOM text accessors shared by reads and writes. */
@@ -83,7 +84,7 @@ unsigned lab_dom_mark(void);
  * @param id Borrowed NUL-terminated UTF-8 control ID, without a selector prefix.
  * @return Scoped DOM node handle, or zero when absent.
  */
-int lab_dom_id(const char *id);
+node_handle lab_dom_id(const char *id);
 
 /**
  * @brief Subscribe once to lab_events_dispatch without retaining native handles.
@@ -93,7 +94,7 @@ int lab_dom_id(const char *id);
  * @param passive True requests passive delivery; false allows preventDefault.
  * @details The browser retains the target and suppresses duplicate subscriptions.
  */
-void lab_dom_listen(int node, const char *type, unsigned action, bool passive);
+void lab_dom_listen(node_handle node, const char *type, unsigned action, bool passive);
 
 /**
  * @brief Read a browser property, including inherited properties and getters.
@@ -101,7 +102,7 @@ void lab_dom_listen(int node, const char *type, unsigned action, bool passive);
  * @param key Borrowed NUL-terminated property name.
  * @return Scoped property-value handle, or zero for null or undefined.
  */
-int lab_dom_get(int object, const char *key);
+browser_handle lab_dom_get(browser_handle object, const char *key);
 
 /**
  * @brief Test an object's property presence, including inherited properties.
@@ -109,7 +110,7 @@ int lab_dom_get(int object, const char *key);
  * @param key Static property name; presence does not invoke the property's getter.
  * @return True when the property exists, even when its value is undefined.
  */
-bool lab_dom_property_present(int object, const char *key);
+bool lab_dom_property_present(browser_handle object, const char *key);
 
 /**
  * @brief Read an own property using a browser-owned key.
@@ -117,42 +118,42 @@ bool lab_dom_property_present(int object, const char *key);
  * @param key Scoped property key, converted using browser property-key semantics.
  * @return Scoped own-property value, or zero for a missing or nullish value; inherited properties are excluded.
  */
-int lab_dom_key_get(int object, int key);
+browser_handle lab_dom_key_get(browser_handle object, browser_handle key);
 
 /**
  * @brief Classify a scoped browser value without coercion.
  * @param value Scoped handle to classify; zero denotes null.
  * @return Corresponding LAB_VALUE kind; nullish values use LAB_VALUE_NULL, other browser values LAB_VALUE_OBJECT.
  */
-lab_value_kind_t lab_dom_type(int value);
+lab_value_kind_t lab_dom_type(browser_handle value);
 
 /**
  * @brief Apply browser boolean coercion.
  * @param value Scoped browser value to inspect.
  * @return True for a truthy value; false for a falsey value.
  */
-bool lab_dom_truth(int value);
+bool lab_dom_truth(browser_handle value);
 
 /**
  * @brief Create a browser-owned data container.
  * @param kind LAB_VALUE_ARRAY creates an array; any other selector creates a plain object.
  * @return Scoped handle to the new empty container.
  */
-int lab_dom_object(lab_value_kind_t kind);
+browser_handle lab_dom_object(lab_value_kind_t kind);
 
 /**
  * @brief Wrap a native number in a browser-value handle.
  * @param value Scalar number to retain, including non-finite values; not a browser handle.
  * @return Scoped handle to the browser number.
  */
-int lab_dom_numeric(double value);
+browser_handle lab_dom_numeric(double value);
 
 /**
  * @brief Append a browser value to an array.
  * @param array Scoped destination array handle.
  * @param value Scoped value handle; the array retains the browser value, not the handle.
  */
-void lab_dom_push(int array, int value);
+void lab_dom_push(browser_handle array, browser_handle value);
 
 /**
  * @brief Wrap a native scalar as a browser value.
@@ -160,21 +161,21 @@ void lab_dom_push(int array, int value);
  * @param value Scalar input; boolean conversion treats zero and NaN as false, and other numbers as true.
  * @return Scoped boolean or number handle, or zero for null.
  */
-int lab_dom_scalar(lab_value_kind_t kind, double value);
+browser_handle lab_dom_scalar(lab_value_kind_t kind, double value);
 
 /**
  * @brief Apply browser String conversion without a falsey-value fallback.
  * @param value Scoped browser value to convert; zero converts to the text "null".
  * @return Scoped string handle.
  */
-int lab_dom_text(int value);
+browser_handle lab_dom_text(browser_handle value);
 
 /**
  * @brief Apply browser Number conversion without replacing NaN.
  * @param value Scoped browser value to convert; zero denotes null and converts to numeric zero.
  * @return Converted scalar number, including NaN or infinity when produced by the browser.
  */
-double lab_dom_to_number(int value);
+double lab_dom_to_number(browser_handle value);
 
 /**
  * @brief Slice browser text by UTF-16 code-unit offsets.
@@ -183,7 +184,7 @@ double lab_dom_to_number(int value);
  * @param end Exclusive offset; negative offsets count backwards from the end.
  * @return Scoped substring, using browser String.slice bounds handling.
  */
-int lab_dom_slice(int value, int start, int end);
+browser_handle lab_dom_slice(browser_handle value, int start, int end);
 
 /**
  * @brief Split browser text on a literal separator.
@@ -191,7 +192,7 @@ int lab_dom_slice(int value, int start, int end);
  * @param separator Borrowed NUL-terminated separator; empty text splits into UTF-16 code units.
  * @return Scoped array of string fragments.
  */
-int lab_dom_split(int value, const char *separator);
+browser_handle lab_dom_split(browser_handle value, const char *separator);
 
 /**
  * @brief Test a literal prefix using browser string semantics.
@@ -199,7 +200,7 @@ int lab_dom_split(int value, const char *separator);
  * @param prefix Borrowed NUL-terminated literal prefix, not a regular expression.
  * @return True when the text begins with the prefix; false otherwise.
  */
-bool lab_dom_starts_with(int value, const char *prefix);
+bool lab_dom_starts_with(browser_handle value, const char *prefix);
 
 /**
  * @brief Compare opaque labels using the browser's current locale.
@@ -208,7 +209,7 @@ bool lab_dom_starts_with(int value, const char *prefix);
  * @param numeric True selects numeric collation with base sensitivity; false uses default locale collation.
  * @return Negative, zero or positive according to the selected collation.
  */
-int lab_dom_locale_compare(int left, int right, bool numeric);
+int lab_dom_locale_compare(browser_handle left, browser_handle right, bool numeric);
 
 /**
  * @brief Test membership in a browser Set or Map.
@@ -216,27 +217,27 @@ int lab_dom_locale_compare(int left, int right, bool numeric);
  * @param value Scoped element or Map key to look up using browser collection equality.
  * @return True when the element or key exists; false otherwise.
  */
-bool lab_dom_member(int set, int value);
+bool lab_dom_member(browser_handle set, browser_handle value);
 
 /**
  * @brief Delete a property by its native literal name.
  * @param object Scoped object whose own property is removed; falsey values are ignored.
  * @param key Borrowed NUL-terminated property name.
  */
-void lab_dom_delete(int object, const char *key);
+void lab_dom_delete(browser_handle object, const char *key);
 
 /**
  * @brief Delete a property using a browser-owned key.
  * @param object Scoped object whose own property is removed; falsey values are ignored.
  * @param key Scoped key, converted using browser property-key semantics.
  */
-void lab_dom_key_delete(int object, int key);
+void lab_dom_key_delete(browser_handle object, browser_handle key);
 
 /**
  * @brief Create an empty browser-owned Map.
  * @return Scoped Map handle; stored keys and values are browser values, never native handle numbers.
  */
-int lab_dom_map_new(void);
+browser_handle lab_dom_map_new(void);
 
 /**
  * @brief Read a browser Map entry.
@@ -244,7 +245,7 @@ int lab_dom_map_new(void);
  * @param key Scoped lookup key, compared using browser Map equality.
  * @return Scoped stored-value handle, or zero for a missing map, key or nullish value.
  */
-int lab_dom_map_get(int map, int key);
+browser_handle lab_dom_map_get(browser_handle map, browser_handle key);
 
 /**
  * @brief Insert or replace a browser Map entry.
@@ -252,35 +253,35 @@ int lab_dom_map_get(int map, int key);
  * @param key Scoped entry key; its browser value is retained.
  * @param value Scoped entry value; its browser value is retained.
  */
-void lab_dom_map_set(int map, int key, int value);
+void lab_dom_map_set(browser_handle map, browser_handle key, browser_handle value);
 
 /**
  * @brief Count browser Map entries.
  * @param map Scoped Map handle, or zero for no map.
  * @return Number of entries, or zero when the map is absent.
  */
-unsigned lab_dom_map_size(int map);
+unsigned lab_dom_map_size(browser_handle map);
 
 /**
  * @brief Read the earliest remaining key in a browser Map.
  * @param map Scoped Map handle, or zero for no map.
  * @return Scoped first-key handle in insertion order, or zero for an empty map or a nullish key.
  */
-int lab_dom_map_first(int map);
+browser_handle lab_dom_map_first(browser_handle map);
 
 /**
  * @brief Remove a browser Map entry.
  * @param map Scoped Map handle; an absent map is ignored.
  * @param key Scoped key to remove, compared using browser Map equality.
  */
-void lab_dom_map_delete(int map, int key);
+void lab_dom_map_delete(browser_handle map, browser_handle key);
 
 /**
  * @brief Enumerate own enumerable string property names.
  * @param object Scoped browser value to enumerate; falsey values supply an empty object.
  * @return Scoped array of property-name strings, in browser Object.keys order.
  */
-int lab_dom_keys(int object);
+browser_handle lab_dom_keys(browser_handle object);
 
 /**
  * @brief Define an own writable, enumerable and configurable data property.
@@ -288,7 +289,7 @@ int lab_dom_keys(int object);
  * @param key Borrowed NUL-terminated property name; even "__proto__" is defined as ordinary data.
  * @param value Scoped value handle; the property retains the browser value by reference.
  */
-void lab_dom_set(int object, const char *key, int value);
+void lab_dom_set(browser_handle object, const char *key, browser_handle value);
 
 /**
  * @brief Copy a property without conflating undefined and null in the handle bridge.
@@ -297,7 +298,7 @@ void lab_dom_set(int object, const char *key, int value);
  * @param source Scoped source value; nullish sources supply undefined.
  * @param source_key Static source property name; its getter is read once.
  */
-void lab_dom_property_copy(int target, const char *target_key, int source, const char *source_key);
+void lab_dom_property_copy(browser_handle target, const char *target_key, browser_handle source, const char *source_key);
 
 /**
  * @brief Compare property values using browser strict equality, reading the left getter first.
@@ -307,7 +308,7 @@ void lab_dom_property_copy(int target, const char *target_key, int source, const
  * @param right_key Static right property name.
  * @return True when the property values are strictly equal, including undefined versus undefined.
  */
-bool lab_dom_properties_equal(int left, const char *left_key, int right, const char *right_key);
+bool lab_dom_properties_equal(browser_handle left, const char *left_key, browser_handle right, const char *right_key);
 
 /**
  * @brief Define an own data property using a browser-owned key.
@@ -316,14 +317,14 @@ bool lab_dom_properties_equal(int left, const char *left_key, int right, const c
  * @param value Scoped value handle; the property retains the browser value by reference.
  * @details The property is writable, enumerable and configurable, without invoking an inherited setter.
  */
-void lab_dom_key_set(int object, int key, int value);
+void lab_dom_key_set(browser_handle object, browser_handle key, browser_handle value);
 
 /**
  * @brief Publish the browser result of the current labDOM.call.
  * @param value Scoped result handle, or zero to publish null.
  * @details The host retains the value before releasing the scope, never the integer handle.
  */
-void lab_dom_return(int value);
+void lab_dom_return(browser_handle value);
 
 /**
  * @brief Release temporary handles without destroying the referenced browser resources.
@@ -337,7 +338,7 @@ void lab_dom_release(unsigned mark);
  * @param text Scoped text source; falsey values select empty text.
  * @return Scoped NFD text with U+0300 through U+036F removed, lower-cased and trimmed.
  */
-int lab_dom_normalize(int text);
+browser_handle lab_dom_normalize(browser_handle text);
 
 /**
  * @brief Search opaque strings without performing normalisation.
@@ -345,27 +346,27 @@ int lab_dom_normalize(int text);
  * @param query Scoped literal substring; falsey values select the empty substring.
  * @return True when the haystack contains the substring, including an empty substring; false otherwise.
  */
-bool lab_dom_contains(int text, int query);
+bool lab_dom_contains(browser_handle text, browser_handle query);
 
 /**
  * @brief Obtain a native select control's first selected option.
  * @param select Scoped HTMLSelectElement handle; other value types have no selected option.
  * @return Scoped option handle, or zero when no option is selected.
  */
-int lab_dom_selected(int select);
+node_handle lab_dom_selected(node_handle select);
 
 /**
  * @brief Obtain the document's currently focused element.
  * @return Scoped document.activeElement handle, or zero when absent.
  */
-int lab_dom_active(void);
+node_handle lab_dom_active(void);
 
 /**
  * @brief Test the browser's effective disabled state.
  * @param node Scoped element handle, or zero; the browser applies the :disabled selector, including inherited rules.
  * @return True when the element matches :disabled; false otherwise.
  */
-bool lab_dom_is_disabled(int node);
+bool lab_dom_is_disabled(node_handle node);
 
 /**
  * @brief Insert a detached wrapper immediately before an existing node.
@@ -373,7 +374,7 @@ bool lab_dom_is_disabled(int node);
  * @param shell Scoped detached wrapper node to insert.
  * @details This operation does not move node into shell; append it separately if required.
  */
-void lab_dom_wrap(int node, int shell);
+void lab_dom_wrap(node_handle node, browser_handle shell);
 
 /**
  * @brief Queue a DOM effect until the synchronous native call releases its handles.
@@ -381,21 +382,21 @@ void lab_dom_wrap(int node, int shell);
  * @param action Focus 0, scroll into nearest view 1, bubbling change event 2, select input text 3, or blur 4.
  * @details Invalid actions raise a host exception. Failed calls discard their queued effects.
  */
-void lab_dom_effect(int node, lab_dom_effect_t action);
+void lab_dom_effect(node_handle node, lab_dom_effect_t action);
 
 /**
  * @brief Copy native UTF-8 text into a browser-owned string.
  * @param text Borrowed NUL-terminated UTF-8 text, bounded to 4095 bytes by the host literal reader.
  * @return Scoped string handle.
  */
-int lab_dom_string(const char *text);
+browser_handle lab_dom_string(const char *text);
 
 /**
  * @brief Measure text using browser UTF-16 code units.
  * @param value Scoped text source; falsey values select empty text before string conversion.
  * @return Number of UTF-16 code units, not UTF-8 bytes or Unicode code points.
  */
-unsigned lab_dom_length(int value);
+unsigned lab_dom_length(browser_handle value);
 
 /**
  * @brief Compare browser values using strict equality.
@@ -403,7 +404,7 @@ unsigned lab_dom_length(int value);
  * @param right Scoped second browser value.
  * @return True for strict equality; false otherwise. Objects compare by identity and NaN is not equal to itself.
  */
-bool lab_dom_equal(int left, int right);
+bool lab_dom_equal(browser_handle left, browser_handle right);
 
 /**
  * @brief Order strings lexically, or other browser values numerically.
@@ -411,7 +412,7 @@ bool lab_dom_equal(int left, int right);
  * @param right Scoped second value; otherwise both operands undergo Number conversion.
  * @return Negative, zero or positive ordering; strings use UTF-16 code units and incomparable numbers yield zero.
  */
-int lab_dom_compare(int left, int right);
+int lab_dom_compare(browser_handle left, browser_handle right);
 
 /**
  * @brief Apply browser whitespace and case operations to opaque text.
@@ -419,7 +420,7 @@ int lab_dom_compare(int left, int right);
  * @param kind Trim both ends 0, trim and lower-case 1, trim and collapse whitespace 2, or trim trailing whitespace 3.
  * @return Scoped cleaned string; unknown selectors use ordinary trimming.
  */
-int lab_dom_clean(int text, lab_dom_clean_t kind);
+browser_handle lab_dom_clean(browser_handle text, lab_dom_clean_t kind);
 
 /**
  * @brief Test attribute presence, including empty attribute values.
@@ -427,21 +428,21 @@ int lab_dom_clean(int text, lab_dom_clean_t kind);
  * @param key Borrowed NUL-terminated attribute name.
  * @return True when the attribute is present; false for a missing element or attribute.
  */
-bool lab_dom_has(int node, const char *key);
+bool lab_dom_has(node_handle node, const char *key);
 
 /**
  * @brief Remove an element attribute.
  * @param node Scoped element handle; zero causes no action.
  * @param key Borrowed NUL-terminated attribute name.
  */
-void lab_dom_remove(int node, const char *key);
+void lab_dom_remove(node_handle node, const char *key);
 
 /**
  * @brief Convert a browser value to a number with a zero fallback.
  * @param value Scoped browser value to convert using Number.
  * @return Converted scalar number; NaN and negative zero become positive zero, while infinities are preserved.
  */
-double lab_dom_number(int value);
+double lab_dom_number(browser_handle value);
 
 /**
  * @brief Format a scalar number between literal text fragments.
@@ -450,7 +451,7 @@ double lab_dom_number(int value);
  * @param suffix Borrowed NUL-terminated text following the number, such as a CSS unit.
  * @return Scoped concatenated string.
  */
-int lab_dom_format(double value, const char *prefix, const char *suffix);
+browser_handle lab_dom_format(double value, const char *prefix, const char *suffix);
 
 /**
  * @brief Format a number to significant digits and remove redundant trailing zeroes.
@@ -458,7 +459,7 @@ int lab_dom_format(double value, const char *prefix, const char *suffix);
  * @param digits Requested significant decimal digits, 1 through 100; values outside this range raise a host exception.
  * @return Scoped string after converting the rounded decimal text back through Number.
  */
-int lab_dom_precision(double value, unsigned digits);
+browser_handle lab_dom_precision(double value, unsigned digits);
 
 /**
  * @brief Concatenate two opaque browser values and a native suffix.
@@ -467,7 +468,7 @@ int lab_dom_precision(double value, unsigned digits);
  * @param suffix Borrowed NUL-terminated literal suffix.
  * @return Scoped concatenated string.
  */
-int lab_dom_join(int left, int right, const char *suffix);
+browser_handle lab_dom_join(browser_handle left, browser_handle right, const char *suffix);
 
 /**
  * @brief Join browser-owned text fragments with a literal separator.
@@ -475,7 +476,7 @@ int lab_dom_join(int left, int right, const char *suffix);
  * @param separator Borrowed NUL-terminated separator inserted between adjacent fragments.
  * @return Scoped joined string; nullish entries and holes contribute empty fragments.
  */
-int lab_dom_join_array(int array, const char *separator);
+browser_handle lab_dom_join_array(browser_handle array, const char *separator);
 
 /**
  * @brief Find the first matching descendant of a browser query root.
@@ -483,7 +484,7 @@ int lab_dom_join_array(int array, const char *separator);
  * @param selector Borrowed NUL-terminated CSS selector; invalid selector syntax raises a browser exception.
  * @return Scoped matching node handle, or zero when no node matches.
  */
-int lab_dom_query(int parent, const char *selector);
+node_handle lab_dom_query(browser_handle parent, const char *selector);
 
 /**
  * @brief Snapshot all matching descendants of a browser query root.
@@ -491,14 +492,14 @@ int lab_dom_query(int parent, const char *selector);
  * @param selector Borrowed NUL-terminated CSS selector; invalid selector syntax raises a browser exception.
  * @return Scoped static NodeList handle in document order.
  */
-int lab_dom_all(int parent, const char *selector);
+browser_handle lab_dom_all(browser_handle parent, const char *selector);
 
 /**
  * @brief Read the length of a browser collection.
  * @param list Scoped array, NodeList or other value with a numeric length property.
  * @return Length converted to a number, or zero for an absent or non-numeric length.
  */
-unsigned lab_dom_count(int list);
+unsigned lab_dom_count(browser_handle list);
 
 /**
  * @brief Read an indexed browser collection member.
@@ -506,7 +507,7 @@ unsigned lab_dom_count(int list);
  * @param index Zero-based property index to read.
  * @return Scoped member handle, or zero for a missing or nullish entry.
  */
-int lab_dom_item(int list, unsigned index);
+browser_handle lab_dom_item(browser_handle list, unsigned index);
 
 /**
  * @brief Test whether an array index exists, distinguishing holes from explicit null entries.
@@ -514,7 +515,7 @@ int lab_dom_item(int list, unsigned index);
  * @param index Zero-based index.
  * @return True for a present property, including an inherited index.
  */
-bool lab_dom_index_present(int array, unsigned index);
+bool lab_dom_index_present(browser_handle array, unsigned index);
 
 /**
  * @brief Find the nearest matching element, starting with the supplied element.
@@ -522,28 +523,28 @@ bool lab_dom_index_present(int array, unsigned index);
  * @param selector Borrowed NUL-terminated CSS selector applied to the element and its ancestors.
  * @return Scoped matching element handle, or zero when absent.
  */
-int lab_dom_closest(int node, const char *selector);
+node_handle lab_dom_closest(node_handle node, const char *selector);
 
 /**
  * @brief Create a detached HTML element in the current document.
  * @param tag Borrowed NUL-terminated HTML tag name; this is not an SVG namespace creation operation.
  * @return Scoped handle to the new detached element.
  */
-int lab_dom_create(const char *tag);
+node_handle lab_dom_create(const char *tag);
 
 /**
  * @brief Append a node, moving it from its previous parent if needed.
  * @param parent Scoped destination parent-node handle.
  * @param child Scoped child-node handle to append.
  */
-void lab_dom_append(int parent, int child);
+void lab_dom_append(browser_handle parent, browser_handle child);
 
 /**
  * @brief Insert a node as an element's first child.
  * @param parent Scoped destination element handle; zero causes no action.
  * @param child Scoped child-node handle to insert, moving it from its previous parent if needed.
  */
-void lab_dom_prepend(int parent, int child);
+void lab_dom_prepend(browser_handle parent, browser_handle child);
 
 /**
  * @brief Read browser text through the selected DOM accessor.
@@ -552,7 +553,7 @@ void lab_dom_prepend(int parent, int child);
  * @param key Borrowed NUL-terminated attribute, dataset or CSS name; pass empty text for selectors 0, 1 and 5.
  * @return Scoped accessor result; absent or falsey results become empty text.
  */
-int lab_dom_read(int node, lab_dom_accessor_t kind, const char *key);
+browser_handle lab_dom_read(node_handle node, lab_dom_accessor_t kind, const char *key);
 
 /**
  * @brief Write browser text through the selected DOM setter.
@@ -561,7 +562,7 @@ int lab_dom_read(int node, lab_dom_accessor_t kind, const char *key);
  * @param key Borrowed NUL-terminated attribute, dataset or CSS name; pass empty text for selectors 0, 1 and 5.
  * @param value Scoped text source; falsey values become empty text. HTML must come from native presentation only.
  */
-void lab_dom_write(int node, lab_dom_accessor_t kind, const char *key, int value);
+void lab_dom_write(node_handle node, lab_dom_accessor_t kind, const char *key, browser_handle value);
 
 /**
  * @brief Set membership of an element's CSS class list.
@@ -569,7 +570,7 @@ void lab_dom_write(int node, lab_dom_accessor_t kind, const char *key, int value
  * @param name Borrowed NUL-terminated single CSS class name.
  * @param enabled True adds the class; false removes it.
  */
-void lab_dom_class(int node, const char *name, bool enabled);
+void lab_dom_class(node_handle node, const char *name, bool enabled);
 
 /**
  * @brief Inspect an element's CSS class list.
@@ -577,21 +578,21 @@ void lab_dom_class(int node, const char *name, bool enabled);
  * @param name Borrowed NUL-terminated single CSS class name.
  * @return True when the class is present; false otherwise.
  */
-bool lab_dom_has_class(int node, const char *name);
+bool lab_dom_has_class(node_handle node, const char *name);
 
 /**
  * @brief Set a control's live disabled property when its state differs.
  * @param node Scoped control handle; zero causes no action.
  * @param disabled True disables the control; false enables it.
  */
-void lab_dom_disabled(int node, bool disabled);
+void lab_dom_disabled(node_handle node, bool disabled);
 
 /**
  * @brief Set a checkbox or radio control's live checked state through its browser setter.
  * @param node Scoped input-control handle; zero causes no action.
  * @param checked True checks the control; false clears it.
  */
-void lab_dom_checked(int node, bool checked);
+void lab_dom_checked(node_handle node, bool checked);
 
 /**
  * @brief Read a browser layout measurement or SVG screen-transform coefficient.
@@ -603,7 +604,7 @@ void lab_dom_checked(int node, bool checked);
  * Selectors 13..18 map SVG user coordinates to viewport CSS pixels; unavailable transforms yield NaN.
  * An absent node returns zero for every selector.
  */
-double lab_dom_measure(int node, lab_dom_measure_t kind);
+double lab_dom_measure(node_handle node, lab_dom_measure_t kind);
 
 /**
  * @brief Parse a numeric prefix from a computed CSS property.
@@ -611,14 +612,14 @@ double lab_dom_measure(int node, lab_dom_measure_t kind);
  * @param key Borrowed NUL-terminated CSS property name, in CSS hyphenated notation.
  * @return Parsed scalar prefix or zero when non-numeric; units are not converted.
  */
-double lab_dom_css(int node, const char *key);
+double lab_dom_css(node_handle node, const char *key);
 
 /**
  * @brief Resolve an element's registered result-card index.
  * @param node Scoped HTMLElement handle to look up in the presentation registry.
  * @return Stable registered card index, or -1 for an unregistered or non-HTML element.
  */
-int lab_dom_card_id(int node);
+int lab_dom_card_id(node_handle node);
 
 /**
  * @brief Schedule browser-owned layout work.
@@ -626,7 +627,7 @@ int lab_dom_card_id(int node);
  * @param card Scoped card-element handle for action 1; unused for action 0.
  * @details The browser retains the actual element until its callback, not the scoped handle.
  */
-void lab_dom_schedule(lab_dom_schedule_t action, int card);
+void lab_dom_schedule(lab_dom_schedule_t action, browser_handle card);
 
 /**
  * @brief Apply the browser's integer-prefix conversion to a value.
@@ -634,7 +635,7 @@ void lab_dom_schedule(lab_dom_schedule_t action, int card);
  * @param radix Base 2 through 36, or zero for browser prefix-based inference; other bases yield NaN.
  * @return Parsed scalar number, or NaN when no valid integer prefix is present.
  */
-double lab_dom_parse_int(int value, unsigned radix);
+double lab_dom_parse_int(browser_handle value, unsigned radix);
 
 /**
  * @brief Subscribe a browser target to a named native dispatcher with a stable browser context.
@@ -647,7 +648,8 @@ double lab_dom_parse_int(int value, unsigned radix);
  * @details Repeated registration of the same target, event, entry, action and context is ignored.
  * Dispatch returns an event plan; browser services run only after its synchronous handle scope ends.
  */
-void lab_dom_subscribe(int node, const char *type, const char *entry, unsigned action, int context, bool passive);
+void lab_dom_subscribe(node_handle node, const char *type, const char *entry, unsigned action, browser_handle context,
+                       bool passive);
 
 /**
  * @brief Check browser node containment, including equality.
@@ -655,14 +657,14 @@ void lab_dom_subscribe(int node, const char *type, const char *entry, unsigned a
  * @param child Scoped child node, or zero.
  * @return True when both nodes exist and parent contains child; false otherwise.
  */
-bool lab_dom_node_contains(int parent, int child);
+bool lab_dom_node_contains(browser_handle parent, browser_handle child);
 
 /**
  * @brief Resolve an exact document ID supplied as a browser string.
  * @param id Scoped string handle; no selector syntax is interpreted.
  * @return Scoped matching node handle, or zero when absent.
  */
-int lab_dom_value_id(int id);
+node_handle lab_dom_value_id(browser_handle id);
 
 /**
  * @brief Copy an opaque browser string to a bounded UTF-8 buffer.
@@ -671,7 +673,7 @@ int lab_dom_value_id(int id);
  * @param capacity Maximum number of UTF-8 bytes to copy; no NUL terminator is written.
  * @return Byte count, or -1 for overflow or an unpaired Unicode surrogate; no partial copy is published.
  */
-int lab_dom_utf8_copy(int value, unsigned char *target, unsigned capacity);
+int lab_dom_utf8_copy(browser_handle value, unsigned char *target, unsigned capacity);
 
 /**
  * @brief Wrap length-delimited UTF-8 bytes in a scoped browser string.
@@ -679,6 +681,6 @@ int lab_dom_utf8_copy(int value, unsigned char *target, unsigned capacity);
  * @param length Byte count.
  * @return Scoped string handle. Invalid UTF-8 raises a host exception.
  */
-int lab_dom_utf8_string(const unsigned char *source, unsigned length);
+browser_handle lab_dom_utf8_string(const unsigned char *source, unsigned length);
 
 #endif

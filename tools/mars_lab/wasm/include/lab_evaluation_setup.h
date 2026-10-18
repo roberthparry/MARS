@@ -11,6 +11,7 @@
 #ifndef LAB_WASM_EVALUATION_SETUP_H
 #define LAB_WASM_EVALUATION_SETUP_H
 
+#include "lab_handle.h"
 #include "lab_mode.h"
 
 /** @brief Preparation stage on either side of binding commit and expression assembly. */
@@ -35,6 +36,7 @@ typedef enum {
  * Invalid modes/phases and phase 2 outside Expression publish null. The context must
  * not be shared with another request. Browser getters must not open a nested DOM scope.
  */
-void lab_evaluation_setup(lab_mode_t mode, lab_evaluation_setup_phase_t phase, int context, int options, int view);
+void lab_evaluation_setup(lab_mode_t mode, lab_evaluation_setup_phase_t phase, browser_handle context,
+                          browser_handle options, view_handle view);
 
 #endif

@@ -19,7 +19,7 @@ unsigned lab_transport_policy(lab_request_operation_t action, lab_request_channe
     return (action == LAB_REQUEST_EVALUATE ? 1u : 0u) | (channel == main_channel ? 2u : 0u);
 }
 
-static unsigned lab_flow_transport_stage(int frame)
+static unsigned lab_flow_transport_stage(frame_handle frame)
 {
     return (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
 }
@@ -38,8 +38,8 @@ enum {
 };
 
 struct lab_flow_transport_post_context {
-    int frame;
-    int request;
+    frame_handle frame;
+    browser_handle request;
 };
 
 /**
@@ -47,14 +47,14 @@ struct lab_flow_transport_post_context {
  * @param frame Borrowed browser frame retaining the stage, request, payload and transport results.
  * @return Scoped operation or completion plan for the selected posting stage.
  */
-static int lab_flow_transport_post(int frame);
+static browser_handle lab_flow_transport_post(frame_handle frame);
 
-static int lab_flow_transport_post_assert_start(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_assert_start(struct lab_flow_transport_post_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_post_stage_endpoint, "assertCurrent", 0, 0, 1, ctx->request);
 }
 
-static int lab_flow_transport_post_endpoint(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_endpoint(struct lab_flow_transport_post_context *ctx)
 {
     if (lab_dom_truth(ctx->request))
         return lab_flow_call(ctx->frame, flow_transport_post_stage_fetch, "endpoint", "endpoint", 0, 1, ctx->request);
@@ -63,7 +63,7 @@ static int lab_flow_transport_post_endpoint(struct lab_flow_transport_post_conte
     return lab_flow_transport_post(ctx->frame);
 }
 
-static int lab_flow_transport_post_fetch(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_fetch(struct lab_flow_transport_post_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "endpoint")))
         return lab_flow_call(ctx->frame, flow_transport_post_stage_done, "invalidEndpoint", 0, 0, 0);
@@ -71,23 +71,23 @@ static int lab_flow_transport_post_fetch(struct lab_flow_transport_post_context 
                          lab_dom_get(ctx->frame, "endpoint"), ctx->frame);
 }
 
-static int lab_flow_transport_post_assert_response(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_assert_response(struct lab_flow_transport_post_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_post_stage_decode, "assertCurrent", 0, 0, 1, ctx->request);
 }
 
-static int lab_flow_transport_post_decode(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_decode(struct lab_flow_transport_post_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_post_stage_assert_data, "decode", "data", 1, 1,
                          lab_dom_get(ctx->frame, "response"));
 }
 
-static int lab_flow_transport_post_assert_data(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_assert_data(struct lab_flow_transport_post_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_post_stage_accept, "assertCurrent", 0, 0, 1, ctx->request);
 }
 
-static int lab_flow_transport_post_accept(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_accept(struct lab_flow_transport_post_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "response"), "ok"))) {
         int ok = lab_dom_get(lab_dom_get(ctx->frame, "data"), "ok");
@@ -98,30 +98,30 @@ static int lab_flow_transport_post_accept(struct lab_flow_transport_post_context
     return lab_flow_call(ctx->frame, flow_transport_post_stage_done, "result", "result", 0, 1, ctx->frame);
 }
 
-static int lab_flow_transport_post_syntax(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_syntax(struct lab_flow_transport_post_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_post_stage_result, "syntax", 0, 0, 1, ctx->frame);
 }
 
-static int lab_flow_transport_post_result(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_result(struct lab_flow_transport_post_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_post_stage_done, "result", "result", 0, 1, ctx->frame);
 }
 
-static int lab_flow_transport_post_otherwise(struct lab_flow_transport_post_context *ctx)
+static browser_handle lab_flow_transport_post_otherwise(struct lab_flow_transport_post_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static int lab_flow_transport_post(int frame)
+static browser_handle lab_flow_transport_post(frame_handle frame)
 {
     int request = lab_dom_get(frame, "request");
     struct lab_flow_transport_post_context ctx = {
         .frame = frame,
         .request = request,
     };
-    static int (*const handlers[])(struct lab_flow_transport_post_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_transport_post_context *) = {
         [flow_transport_post_stage_assert_start]    = lab_flow_transport_post_assert_start,
         [flow_transport_post_stage_endpoint]        = lab_flow_transport_post_endpoint,
         [flow_transport_post_stage_fetch]           = lab_flow_transport_post_fetch,
@@ -154,9 +154,9 @@ enum {
 };
 
 struct lab_flow_transport_run_context {
-    int frame;
+    frame_handle frame;
     int ui;
-    int request;
+    browser_handle request;
 };
 
 /**
@@ -165,14 +165,14 @@ struct lab_flow_transport_run_context {
  * @param ui Non-zero to render current-request errors in the UI before finalisation; zero for outer recovery only.
  * @return Scoped operation or completion plan for the selected runner stage.
  */
-static int lab_flow_transport_run(int frame, int ui);
+static browser_handle lab_flow_transport_run(frame_handle frame, int ui);
 
-static int lab_flow_transport_run_begin(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_begin(struct lab_flow_transport_run_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_run_stage_callback, "begin", "request", 0, 1, ctx->frame);
 }
 
-static int lab_flow_transport_run_callback(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_callback(struct lab_flow_transport_run_context *ctx)
 {
     if (!lab_dom_truth(ctx->request))
         return lab_flow_done(0);
@@ -182,7 +182,7 @@ static int lab_flow_transport_run_callback(struct lab_flow_transport_run_context
     return lab_flow_call(ctx->frame, flow_transport_run_stage_finish, "callback", "result", 1, 1, ctx->frame);
 }
 
-static int lab_flow_transport_run_finish(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_finish(struct lab_flow_transport_run_context *ctx)
 {
     /* A finaliser failure replaces any earlier callback/recovery failure, exactly like finally. */
     lab_dom_delete(ctx->frame, "failed");
@@ -192,7 +192,7 @@ static int lab_flow_transport_run_finish(struct lab_flow_transport_run_context *
                          "finish", 0, 0, 1, ctx->request);
 }
 
-static int lab_flow_transport_run_outer_current(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_outer_current(struct lab_flow_transport_run_context *ctx)
 {
     /* If the ownership check itself throws, its exception still passes through the finaliser. */
     lab_dom_set(ctx->frame, "rethrow", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
@@ -200,21 +200,21 @@ static int lab_flow_transport_run_outer_current(struct lab_flow_transport_run_co
     return lab_flow_call(ctx->frame, flow_transport_run_stage_outer_decide, "current", "current", 0, 1, ctx->request);
 }
 
-static int lab_flow_transport_run_outer_decide(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_outer_decide(struct lab_flow_transport_run_context *ctx)
 {
     lab_dom_set(ctx->frame, "rethrow", lab_dom_scalar(LAB_VALUE_BOOLEAN, lab_dom_truth(lab_dom_get(ctx->frame, "current"))));
     lab_dom_set(ctx->frame, "stage", lab_dom_numeric(flow_transport_run_stage_finish));
     return lab_flow_transport_run(ctx->frame, ctx->ui);
 }
 
-static int lab_flow_transport_run_ui_current(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_ui_current(struct lab_flow_transport_run_context *ctx)
 {
     /* UI recovery has the ordinary runner's enclosing catch and finally. */
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_transport_run_stage_outer_current));
     return lab_flow_call(ctx->frame, flow_transport_run_stage_ui_decide, "current", "current", 0, 1, ctx->request);
 }
 
-static int lab_flow_transport_run_ui_decide(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_ui_decide(struct lab_flow_transport_run_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current"))) {
         lab_dom_set(ctx->frame, "stage", lab_dom_numeric(flow_transport_run_stage_finish));
@@ -224,35 +224,35 @@ static int lab_flow_transport_run_ui_decide(struct lab_flow_transport_run_contex
                          lab_dom_get(ctx->frame, "error"));
 }
 
-static int lab_flow_transport_run_ui_digits(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_ui_digits(struct lab_flow_transport_run_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_run_stage_ui_clear, "resetDigits", 0, 0, 0);
 }
 
-static int lab_flow_transport_run_ui_clear(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_ui_clear(struct lab_flow_transport_run_context *ctx)
 {
     int options = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(options, "keepBindings", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return lab_flow_call(ctx->frame, flow_transport_run_stage_ui_status, "clearResults", 0, 0, 1, options);
 }
 
-static int lab_flow_transport_run_ui_status(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_ui_status(struct lab_flow_transport_run_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_run_stage_finish, "status", 0, 0, 1, lab_dom_string("Error"));
 }
 
-static int lab_flow_transport_run_rethrow(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_rethrow(struct lab_flow_transport_run_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_transport_run_stage_done, "rethrow", 0, 0, 1, ctx->frame);
 }
 
-static int lab_flow_transport_run_otherwise(struct lab_flow_transport_run_context *ctx)
+static browser_handle lab_flow_transport_run_otherwise(struct lab_flow_transport_run_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static int lab_flow_transport_run(int frame, int ui)
+static browser_handle lab_flow_transport_run(frame_handle frame, int ui)
 {
     int request = lab_dom_get(frame, "request");
     struct lab_flow_transport_run_context ctx = {
@@ -260,7 +260,7 @@ static int lab_flow_transport_run(int frame, int ui)
         .ui = ui,
         .request = request,
     };
-    static int (*const handlers[])(struct lab_flow_transport_run_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_transport_run_context *) = {
         [flow_transport_run_stage_begin]         = lab_flow_transport_run_begin,
         [flow_transport_run_stage_callback]      = lab_flow_transport_run_callback,
         [flow_transport_run_stage_finish]        = lab_flow_transport_run_finish,
@@ -279,7 +279,7 @@ static int lab_flow_transport_run(int frame, int ui)
 }
 
 /* The browser owns arbitrary result values; native plans never coerce null, undefined or thrown primitives. */
-int lab_flow_transport(lab_flow_transport_kind_t kind, int frame, int view)
+browser_handle lab_flow_transport(lab_flow_transport_kind_t kind, frame_handle frame, view_handle view)
 {
     (void)view;
     if (kind == LAB_FLOW_TRANSPORT_POST)

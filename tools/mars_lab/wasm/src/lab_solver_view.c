@@ -12,25 +12,26 @@
 #include "lab_layout.h"
 #include "lab_solver_view.h"
 
-static int lab_solver_view_text(int node, const char *key)
+static browser_handle lab_solver_view_text(node_handle node, const char *key)
 {
     int value = lab_dom_read(node, LAB_DOM_DATASET, key);
     return lab_dom_truth(value) ? value : lab_dom_string("");
 }
 
-static int lab_solver_view_enabled(int mode, int node)
+static int lab_solver_view_enabled(browser_handle mode, node_handle node)
 {
     return lab_dom_equal(mode, lab_dom_string("diffequation")) && node && lab_dom_has_class(node, "equation-function");
 }
 
-static void lab_solver_view_install(int compact, int wrapped)
+static void lab_solver_view_install(browser_handle compact, browser_handle wrapped)
 {
     int use_wrapped = lab_dom_truth(wrapped) && lab_layout_solver_wrapped();
     lab_layout_solver_install(use_wrapped ? wrapped : compact, lab_dom_string(use_wrapped ? "wrapped" : "compact"));
 }
 
 /* Compare the complete browser snapshot without interpreting source text or retaining its handles. */
-bool lab_solver_view_current(int mode, int snapshot, int active, bool live, int restored_owner)
+bool lab_solver_view_current(browser_handle mode, snapshot_handle snapshot, browser_handle active, bool live,
+                             browser_handle restored_owner)
 {
     if (!snapshot || !live || !lab_dom_equal(snapshot, active))
         return false;
@@ -43,7 +44,7 @@ bool lab_solver_view_current(int mode, int snapshot, int active, bool live, int 
 }
 
 /* Project cached variants immediately or return one request plan whose lifetime belongs to the browser. */
-void lab_solver_view_prepare(int mode, int pending, bool pending_live, int restored_owner)
+void lab_solver_view_prepare(browser_handle mode, browser_handle pending, bool pending_live, browser_handle restored_owner)
 {
     lab_dom_return(0);
     int node = lab_dom_query(0, "#functionStyle");
@@ -82,8 +83,8 @@ void lab_solver_view_prepare(int mode, int pending, bool pending_live, int resto
 }
 
 /* Reject stale replies before any cache or DOM write, then use current rather than captured geometry. */
-bool lab_solver_view_publish(int mode, int snapshot, int active, bool live, int restored_owner, int response,
-                             int data, bool failed)
+bool lab_solver_view_publish(browser_handle mode, snapshot_handle snapshot, browser_handle active, bool live,
+                             browser_handle restored_owner, browser_handle response, browser_handle data, bool failed)
 {
     if (!lab_solver_view_current(mode, snapshot, active, live, restored_owner))
         return false;

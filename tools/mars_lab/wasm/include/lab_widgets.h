@@ -19,6 +19,8 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
+
 /** @brief Date-picker navigation operations with stable browser ABI values. */
 typedef enum {
     LAB_PICKER_SET          = 0, /**< Set a year and month. */
@@ -48,7 +50,7 @@ bool lab_widgets_picker(double year, double month, double selected_year, double 
  * @details lab_dom_return supplies left, right, top, bottom, width and height in client CSS pixels,
  * or null when neither the shell nor its date input/button provides a visible rectangle.
  */
-void lab_widgets_picker_anchor(int shell);
+void lab_widgets_picker_anchor(browser_handle shell);
 
 /** @brief Select the anchor and project viewport-clamped popup geometry.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
@@ -56,20 +58,20 @@ void lab_widgets_picker_anchor(int shell);
  * @param viewport_width Viewport width in CSS pixels; zero uses the document element's client width.
  * @param viewport_height Viewport height in CSS pixels; zero uses the document element's client height.
  */
-void lab_widgets_picker_place(int state, int shell, double viewport_width, double viewport_height);
+void lab_widgets_picker_place(browser_handle state, browser_handle shell, double viewport_width, double viewport_height);
 
 /** @brief Hide the popup and clear both native navigation and host references before any focus event.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
  * @param restore_focus True queues focus on the former opener after clearing picker ownership.
  */
-void lab_widgets_picker_close(int state, bool restore_focus);
+void lab_widgets_picker_close(browser_handle state, bool restore_focus);
 
 /** @brief Write a date and dispatch one deferred bubbling change only when its authored value differs.
  * @param input Scoped destination date-input node, or zero for no action.
  * @param value Scoped authored date string to write without parsing.
  * @return True if the input text changed and a change event was queued; false if absent or unchanged.
  */
-bool lab_widgets_date_commit(int input, int value);
+bool lab_widgets_date_commit(browser_handle input, browser_handle value);
 
 /**
  * @brief Select the GMT date for the almanac and the local date for other inputs.
@@ -78,14 +80,14 @@ bool lab_widgets_date_commit(int input, int value);
  * @param utc_date Scoped current UTC calendar-date string.
  * @details Publishes the selected string unchanged through lab_dom_return; no input is committed.
  */
-void lab_widgets_picker_today_date(int input, int local_date, int utc_date);
+void lab_widgets_picker_today_date(browser_handle input, browser_handle local_date, browser_handle utc_date);
 
 /** @brief Install the almanac GMT date and time together, emitting just one change for the complete moment.
  * @param input Scoped destination date-input node.
  * @param local_date Scoped local date string used for non-almanac inputs.
  * @param utc_moment Scoped record containing UTC date and time strings for the almanac controls.
  */
-void lab_widgets_picker_today(int input, int local_date, int utc_moment);
+void lab_widgets_picker_today(browser_handle input, browser_handle local_date, browser_handle utc_moment);
 
 /** @brief Project the open native month and position it; a closed picker cannot be reopened by a stale render.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
@@ -94,7 +96,8 @@ void lab_widgets_picker_today(int input, int local_date, int utc_moment);
  * @param viewport_width Viewport width in CSS pixels; zero uses the document element's client width.
  * @param viewport_height Viewport height in CSS pixels; zero uses the document element's client height.
  */
-void lab_widgets_picker_render(int state, int selected, int today, double viewport_width, double viewport_height);
+void lab_widgets_picker_render(browser_handle state, browser_handle selected, browser_handle today,
+                               double viewport_width, double viewport_height);
 
 /** @brief Choose the selected date or today's date, transfer popup ownership and project one complete calendar.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
@@ -106,8 +109,8 @@ void lab_widgets_picker_render(int state, int selected, int today, double viewpo
  * @param viewport_width Viewport width in CSS pixels; zero uses the document element's client width.
  * @param viewport_height Viewport height in CSS pixels; zero uses the document element's client height.
  */
-void lab_widgets_picker_open(int state, int input, int button, int selected, int today, double fallback_year,
-                             double viewport_width, double viewport_height);
+void lab_widgets_picker_open(browser_handle state, browser_handle input, browser_handle button, browser_handle selected,
+                             browser_handle today, double fallback_year, double viewport_width, double viewport_height);
 
 /** @brief Format an accepted native date for commit; return whether the caller should refresh the calendar.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
@@ -115,7 +118,7 @@ void lab_widgets_picker_open(int state, int input, int button, int selected, int
  * @param commit True writes the date to the input; false only reports whether it can be applied.
  * @return True for a valid date with an open picker and owned input; false otherwise, without committing.
  */
-bool lab_widgets_picker_apply(int state, int packed, bool commit);
+bool lab_widgets_picker_apply(browser_handle state, int packed, bool commit);
 
 /** @brief Set a month/year (0), shift months (1) or shift years (2), preserving and clamping the selected day.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
@@ -127,7 +130,7 @@ bool lab_widgets_picker_apply(int state, int packed, bool commit);
  * @param commit True commits the resulting date; false only moves the displayed calendar.
  * @return True when the resulting date can be applied; false for a closed picker or invalid request.
  */
-bool lab_widgets_picker_move(int state, lab_picker_operation_t operation, double first, double second, int selected,
-                            double fallback_year, bool commit);
+bool lab_widgets_picker_move(browser_handle state, lab_picker_operation_t operation, double first, double second,
+                             browser_handle selected, double fallback_year, bool commit);
 
 #endif

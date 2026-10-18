@@ -9,6 +9,7 @@
 #ifndef MARS_LAB_SURFACE_SVG_H
 #define MARS_LAB_SURFACE_SVG_H
 
+#include "lab_handle.h"
 #include "lab_surface_geometry.h"
 
 /**
@@ -25,6 +26,6 @@
  * Array joins keep command construction linear in output size. Per-record and per-point scopes bound temporary
  * handles independently of list length; retained strings belong to browser-owned arrays.
  */
-void lab_surface_svg_plan(int polygons, int paths, lab_surface_primitive_t kind);
+void lab_surface_svg_plan(browser_handle polygons, browser_handle paths, lab_surface_primitive_t kind);
 
 #endif

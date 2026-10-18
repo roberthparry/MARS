@@ -12,7 +12,7 @@
 #include "lab_dom.h"
 #include "lab_surface_mesh.h"
 
-static int coordinates(int text, double *values, unsigned minimum, unsigned maximum)
+static int coordinates(browser_handle text, double *values, unsigned minimum, unsigned maximum)
 {
     int parts = lab_dom_split(text, " ");
     unsigned count = lab_dom_count(parts);
@@ -26,7 +26,7 @@ static int coordinates(int text, double *values, unsigned minimum, unsigned maxi
     return (int)count;
 }
 
-static int vector(const double *values, unsigned count)
+static browser_handle vector(const double *values, unsigned count)
 {
     int result = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < count; ++i)
@@ -34,8 +34,8 @@ static int vector(const double *values, unsigned count)
     return result;
 }
 
-static void primitive(int primitives, int vertices, const double *points, unsigned count, int colour,
-                      const double rgb[3])
+static void primitive(browser_handle primitives, browser_handle vertices, const double *points, unsigned count,
+                      browser_handle colour, const double rgb[3])
 {
     int entry = lab_dom_object(LAB_VALUE_OBJECT), positions = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < count; ++i) {
@@ -53,7 +53,7 @@ static void primitive(int primitives, int vertices, const double *points, unsign
     lab_dom_push(primitives, entry);
 }
 
-static int records(int chart, int primitives, int vertices, int segments)
+static int records(chart_handle chart, browser_handle primitives, browser_handle vertices, int segments)
 {
     int paths = lab_dom_all(chart, segments ? "[data-segment]" : "[data-vertices]");
     unsigned count = lab_dom_count(paths), mark = lab_dom_mark();
@@ -91,7 +91,7 @@ static int records(int chart, int primitives, int vertices, int segments)
 }
 
 /* Decode once at view creation; browser renderers consume the same prepared geometry. */
-void lab_surface_mesh(int chart)
+void lab_surface_mesh(chart_handle chart)
 {
     double units[3];
     if (!coordinates(lab_dom_read(chart, LAB_DOM_DATASET, "units"), units, 3, 3) ||

@@ -11,6 +11,7 @@
 #ifndef LAB_WASM_EVALUATION_WEATHER_H
 #define LAB_WASM_EVALUATION_WEATHER_H
 
+#include "lab_handle.h"
 #include "lab_requests.h"
 
 /**
@@ -23,6 +24,6 @@
  * before setting Ready; installation exceptions remain the host's responsibility.
  * Plans contain browser values, never retained handle numbers, and creation has no effects.
  */
-void lab_evaluation_weather_response(lab_request_outcome_t outcome, int overview, int data);
+void lab_evaluation_weather_response(lab_request_outcome_t outcome, browser_handle overview, browser_handle data);
 
 #endif

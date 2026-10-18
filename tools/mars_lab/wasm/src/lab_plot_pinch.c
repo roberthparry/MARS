@@ -15,7 +15,7 @@
 #include "lab_plot_pointer.h"
 #include "lab_plot_pinch.h"
 
-static double value(int object, const char *key)
+static double value(browser_handle object, const char *key)
 {
     return lab_dom_to_number(lab_dom_get(object, key));
 }
@@ -29,7 +29,7 @@ static const char *control_id(unsigned i, int curve)
 }
 
 /* Keep pointer IDs as opaque DOM values, including zero. */
-bool lab_plot_pinch_start(int state, int event)
+bool lab_plot_pinch_start(gesture_handle state, event_handle event)
 {
     if (!lab_dom_truth(lab_dom_get(state, "touch")) || lab_dom_truth(lab_dom_get(state, "pinch")) ||
         !lab_dom_equal(lab_dom_get(event, "pointerType"), lab_dom_string("touch")) ||
@@ -111,7 +111,7 @@ bool lab_plot_pinch_start(int state, int event)
 }
 
 /* Update surface gesture coordinates, or scale curve ranges from their original baseline. */
-bool lab_plot_pinch_move(int state, int event)
+bool lab_plot_pinch_move(gesture_handle state, event_handle event)
 {
     int first = lab_dom_equal(lab_dom_get(event, "pointerId"), lab_dom_get(state, "pointerId"));
     lab_dom_set(state, first ? "touchX" : "secondX", lab_dom_get(event, "clientX"));
@@ -175,7 +175,7 @@ bool lab_plot_pinch_move(int state, int event)
 }
 
 /* Cancellation restores authored controls as well as their unrounded coordinates. */
-void lab_plot_pinch_cancel(int state)
+void lab_plot_pinch_cancel(gesture_handle state)
 {
     if (lab_dom_truth(lab_dom_get(state, "panPlane"))) {
         lab_plot_pan_cancel(state);

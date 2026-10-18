@@ -23,6 +23,7 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
 #include "lab_mode.h"
 
 /** @brief Requested help/result pane visibility transition. */
@@ -43,7 +44,7 @@ typedef enum {
  * inherited properties. Inputs are decoded data, not functions, accessors or other executable values.
  * No input is mutated, no exception is requested, and no handle survives this synchronous call.
  */
-void lab_workspace_snapshot_validate(int envelope, int mode_names);
+void lab_workspace_snapshot_validate(browser_handle envelope, browser_handle mode_names);
 
 /**
  * @brief Return named browser control references for startup through lab_dom_return.
@@ -67,13 +68,13 @@ void lab_workspace_dom_labels(lab_mode_t mode);
 /** @brief Project status text with native precision.
  * @param text Scoped status text to precede the current precision.
  */
-void lab_workspace_dom_status(int text);
+void lab_workspace_dom_status(browser_handle text);
 
 /** @brief Project tab selection using an exact mode token.
  * @param tabs Scoped list of registered mode-tab nodes.
  * @param mode Scoped exact mode-name string to match against each tab's dataset.
  */
-void lab_workspace_dom_tabs(int tabs, int mode);
+void lab_workspace_dom_tabs(browser_handle tabs, browser_handle mode);
 
 /** @brief Project result titles and Function execution visibility.
  * @param rendered Scoped Rendered card title string.
@@ -81,7 +82,7 @@ void lab_workspace_dom_tabs(int tabs, int mode);
  * @param function Scoped Function card title string; exactly "Function" enables its run control.
  * @param value Scoped Value card title string.
  */
-void lab_workspace_dom_titles(int rendered, int parsed, int function, int value);
+void lab_workspace_dom_titles(browser_handle rendered, browser_handle parsed, browser_handle function, browser_handle value);
 
 /** @brief Set auxiliary visibility and relinquish hidden card expansion.
  * @param visible True shows the controls; false hides them.
@@ -97,7 +98,7 @@ void lab_workspace_dom_value(bool visible);
  * @param mode Worksheet mode index, 0..6.
  * @param coverage Scoped almanac coverage text appended to its subtitle.
  */
-void lab_workspace_dom_mode(lab_mode_t mode, int coverage);
+void lab_workspace_dom_mode(lab_mode_t mode, browser_handle coverage);
 
 /** @brief Project matrix operand visibility.
  * @param mode Worksheet mode index, 0..6.
@@ -108,7 +109,7 @@ void lab_workspace_dom_matrix(lab_mode_t mode);
  * @param cards Scoped list of help-card nodes with comma-separated data-help-modes tags.
  * @param mode Scoped exact mode-name string to match after trimming each tag.
  */
-void lab_workspace_dom_help_cards(int cards, int mode);
+void lab_workspace_dom_help_cards(browser_handle cards, browser_handle mode);
 
 /** @brief Show results (0), help (1), or toggle (2).
  * @param action Show results 0, show help 1 or toggle 2; other values do nothing.
@@ -153,37 +154,37 @@ void lab_workspace_dom_precision_preview(unsigned bits);
  * @param copies Scoped list of copy-button nodes.
  * @param digits Scoped list of more-digits button nodes.
  */
-void lab_workspace_dom_busy(bool busy, int equation_variable, int copies, int digits);
+void lab_workspace_dom_busy(bool busy, browser_handle equation_variable, browser_handle copies, browser_handle digits);
 
 /** @brief Project a button's running and accessibility state.
  * @param button Scoped action-button node.
  * @param running True applies running styling and aria-busy; false removes both.
  */
-void lab_workspace_dom_running(int button, bool running);
+void lab_workspace_dom_running(browser_handle button, bool running);
 
 /** @brief Report connected positive-height editor layout.
  * @param editor Scoped editor node.
  * @return True for a connected editor with visible layout and positive client height; false otherwise.
  */
-bool lab_workspace_dom_editor_visible(int editor);
+bool lab_workspace_dom_editor_visible(browser_handle editor);
 
 /** @brief Clear sizing state on all supplied editors.
  * @param editors Scoped list of editor nodes whose manual sizing is cleared.
  */
-void lab_workspace_dom_editor_reset(int editors);
+void lab_workspace_dom_editor_reset(browser_handle editors);
 
 /** @brief Measure and resize editors within the viewport budget.
  * @param editors Scoped list of editor nodes sharing the available height budget.
  * @param viewport Viewport height in CSS pixels.
  */
-void lab_workspace_dom_editor_resize(int editors, double viewport);
+void lab_workspace_dom_editor_resize(browser_handle editors, double viewport);
 
 /** @brief Build calculus controls from exact names and display labels.
  * @param names Scoped array of exact variable-name strings in discovery order.
  * @param labels Scoped array of display labels aligned with names.
  * @param differentiable True creates derivative and integral buttons; false leaves the panel empty.
  */
-void lab_workspace_dom_derivatives(int names, int labels, bool differentiable);
+void lab_workspace_dom_derivatives(browser_handle names, browser_handle labels, bool differentiable);
 
 /** @brief Derive native binding labels and render calculus controls through lab_workspace_dom_derivatives.
  * @param names Scoped array of exact variable-name strings in discovery order; it is not modified.
@@ -192,7 +193,7 @@ void lab_workspace_dom_derivatives(int names, int labels, bool differentiable);
  * The shared lab_binding_label_value formatter removes only outer display brackets. Temporary handles
  * are released per name and all handles created here are released before returning; no handle is retained.
  */
-void lab_workspace_dom_calculus(int names, bool differentiable);
+void lab_workspace_dom_calculus(browser_handle names, bool differentiable);
 
 /**
  * @brief Publish an opaque snapshot of a DOM node.
@@ -200,7 +201,7 @@ void lab_workspace_dom_calculus(int names, bool differentiable);
  * @param button True additionally captures textContent and disabled; false captures innerHTML and inline style.
  * @details lab_dom_return supplies the browser-owned snapshot used by lab_workspace_dom_restore.
  */
-void lab_workspace_dom_snapshot(int node, bool button);
+void lab_workspace_dom_snapshot(node_handle node, bool button);
 
 /**
  * @brief Restore a node snapshot and remove obsolete dataset fields.
@@ -208,7 +209,7 @@ void lab_workspace_dom_snapshot(int node, bool button);
  * @param state Scoped snapshot returned by lab_workspace_dom_snapshot.
  * @param button True restores textContent and disabled; false restores innerHTML and inline style.
  */
-void lab_workspace_dom_restore(int node, int state, bool button);
+void lab_workspace_dom_restore(node_handle node, browser_handle state, bool button);
 
 /** @brief Report nonblank content in result cards.
  * @return True when rendered HTML or auxiliary result text is nonblank; false otherwise.
@@ -227,7 +228,7 @@ void lab_workspace_dom_result_states(void);
  * @post lab_dom_return supplies the snapshot with an independent variable array (empty for
  * non-array inputs), copied DOM datasets and the current reusable-input text, or null for blank cards.
  */
-void lab_workspace_dom_result_save(int metadata);
+void lab_workspace_dom_result_save(browser_handle metadata);
 
 /** @brief Restore result cards and reusable input, returning normalised metadata for the host globals.
  * @param state Scoped result snapshot from lab_workspace_dom_result_save, or zero when absent.
@@ -237,6 +238,6 @@ void lab_workspace_dom_result_save(int metadata);
  * before calling, assign the returned globals before refreshing derivative controls, then schedule rendered
  * and solver fitting. The function invalidates old render ownership before projecting any saved DOM.
  */
-void lab_workspace_dom_result_restore(int state);
+void lab_workspace_dom_result_restore(browser_handle state);
 
 #endif

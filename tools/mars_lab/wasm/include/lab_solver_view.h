@@ -15,6 +15,8 @@
 
 #include <stdbool.h>
 
+#include "lab_handle.h"
+
 /**
  * @brief Select cached layout or prepare one deferred wrapping request.
  * @param mode Scoped current worksheet mode-name string; only diffequation enables solver wrapping.
@@ -26,7 +28,7 @@
  * wrappedTex, parentToken, node and restoredOwner values are ordinary browser values;
  * operation, mode, options, payload and endpoint describe the deferred request.
  */
-void lab_solver_view_prepare(int mode, int pending, bool pending_live, int restored_owner);
+void lab_solver_view_prepare(browser_handle mode, browser_handle pending, bool pending_live, browser_handle restored_owner);
 
 /**
  * @brief Check every solver snapshot guard without changing state or layout.
@@ -38,7 +40,8 @@ void lab_solver_view_prepare(int mode, int pending, bool pending_live, int resto
  * @return True only while mode, card identity/class, parent token, exact SVG/TeX inputs,
  * restored owner and active request identity still match the snapshot.
  */
-bool lab_solver_view_current(int mode, int snapshot, int active, bool live, int restored_owner);
+bool lab_solver_view_current(browser_handle mode, snapshot_handle snapshot, browser_handle active, bool live,
+                             browser_handle restored_owner);
 
 /**
  * @brief Publish a current render response using the latest viewport geometry.
@@ -54,7 +57,7 @@ bool lab_solver_view_current(int mode, int snapshot, int active, bool live, int 
  * @details HTTP/application failures clear the wrapped cache. Successful responses
  * retain their wrapped SVG even if the viewport has widened during the request.
  */
-bool lab_solver_view_publish(int mode, int snapshot, int active, bool live, int restored_owner, int response,
-                            int data, bool failed);
+bool lab_solver_view_publish(browser_handle mode, snapshot_handle snapshot, browser_handle active, bool live,
+                             browser_handle restored_owner, browser_handle response, browser_handle data, bool failed);
 
 #endif

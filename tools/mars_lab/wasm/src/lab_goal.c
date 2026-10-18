@@ -10,7 +10,7 @@
 #include "lab_dom.h"
 #include "lab_goal.h"
 
-static void lab_goal_emit(int calls, const char *service, unsigned count, int first, int second)
+static void lab_goal_emit(browser_handle calls, const char *service, unsigned count, browser_handle first, browser_handle second)
 {
     int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     if (count)
@@ -23,7 +23,7 @@ static void lab_goal_emit(int calls, const char *service, unsigned count, int fi
 }
 
 /* Select completion services without changing browser state or inspecting mathematical text. */
-void lab_goal_complete(lab_request_outcome_t outcome, int data, int completion, int error)
+void lab_goal_complete(lab_request_outcome_t outcome, browser_handle data, browser_handle completion, browser_handle error)
 {
     if (outcome == LAB_REQUEST_OUTCOME_STALE || (unsigned)outcome > LAB_REQUEST_OUTCOME_EXCEPTION) {
         lab_dom_return(0);
@@ -63,7 +63,7 @@ void lab_goal_complete(lab_request_outcome_t outcome, int data, int completion, 
 }
 
 /* Read completion status only when its ordered service executes. */
-void lab_goal_status(int cards)
+void lab_goal_status(browser_handle cards)
 {
     const char *status = lab_dom_truth(lab_dom_get(cards, "unchanged")) ? "Goal already reached" : "Goal reached";
     lab_dom_return(lab_dom_string(status));

@@ -19,7 +19,7 @@
 #include "lab_binding_internal.h"
 
 /* Prepare the complete service record, preserving Array.map holes and default semantics. */
-void lab_binding_sync_request(int inputs)
+void lab_binding_sync_request(browser_handle inputs)
 {
     int result = lab_dom_object(LAB_VALUE_OBJECT);
     int source = lab_dom_clean(lab_dom_text(lab_binding_or(lab_dom_get(inputs, "body"), "")), LAB_DOM_CLEAN_TRIM);
@@ -72,14 +72,14 @@ void lab_binding_sync_request(int inputs)
     lab_dom_return(result);
 }
 
-static bool lab_binding_sync_flag(int data, const char *field, const char *fallback, const char *expected)
+static bool lab_binding_sync_flag(browser_handle data, const char *field, const char *fallback, const char *expected)
 {
     int value = lab_dom_truth(data) ? lab_dom_get(data, field) : 0;
     return lab_binding_is(lab_dom_clean(lab_dom_text(lab_binding_or(value, fallback)), LAB_DOM_CLEAN_LOWER), expected);
 }
 
 /* Apply accepted editor presentation and derive metadata from the existing binding policies. */
-void lab_binding_sync_apply(int editor, int inputs)
+void lab_binding_sync_apply(browser_handle editor, browser_handle inputs)
 {
     int data = lab_dom_get(inputs, "data"), bindings = lab_dom_get(inputs, "bindings");
     lab_dom_write(editor, LAB_DOM_DATASET, "bindingRefreshValid", lab_dom_string("true"));

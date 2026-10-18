@@ -12,17 +12,17 @@
 #include "lab_flow.h"
 #include "lab_flow_binding.h"
 
-static unsigned lab_flow_binding_stage(int frame)
+static unsigned lab_flow_binding_stage(frame_handle frame)
 {
     return (unsigned)lab_dom_number(lab_dom_get(frame, "stage"));
 }
 
-static int lab_flow_binding_false(void)
+static browser_handle lab_flow_binding_false(void)
 {
     return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
-static int lab_flow_binding_same(int frame, int source)
+static int lab_flow_binding_same(frame_handle frame, int source)
 {
     int before = lab_dom_get(frame, "before"), after = lab_dom_get(frame, "after");
     return lab_dom_equal(lab_dom_get(before, "mode"), lab_dom_get(after, "mode")) &&
@@ -38,13 +38,13 @@ enum {
     flow_binding_sync_stage_done
 };
 
-static int lab_flow_binding_sync_plan(int frame)
+static browser_handle lab_flow_binding_sync_plan(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_sync_stage_select, "native", "plan", 0, 2,
                          lab_dom_string("lab_binding_sync_request"), frame);
 }
 
-static int lab_flow_binding_sync_select(int frame)
+static browser_handle lab_flow_binding_sync_select(frame_handle frame)
 {
     int plan = lab_dom_get(frame, "plan");
     if (lab_dom_truth(lab_dom_get(plan, "invalid")))
@@ -58,31 +58,31 @@ static int lab_flow_binding_sync_select(int frame)
     return lab_flow_done(source);
 }
 
-static int lab_flow_binding_sync_prepared(int frame)
+static browser_handle lab_flow_binding_sync_prepared(frame_handle frame)
 {
     return lab_flow_done(lab_dom_get(lab_dom_get(frame, "plan"), "source"));
 }
 
-static int lab_flow_binding_sync_assembled(int frame)
+static browser_handle lab_flow_binding_sync_assembled(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_sync_stage_done, "bindingExpression", "expression", 0, 1,
                          lab_dom_get(frame, "data"));
 }
 
-static int lab_flow_binding_sync_done(int frame)
+static browser_handle lab_flow_binding_sync_done(frame_handle frame)
 {
     return lab_flow_done(lab_dom_get(frame, "expression"));
 }
 
-static int lab_flow_binding_sync_otherwise(int frame)
+static browser_handle lab_flow_binding_sync_otherwise(frame_handle frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_sync(int frame)
+static browser_handle lab_flow_binding_sync(frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [flow_binding_sync_stage_plan]      = lab_flow_binding_sync_plan,
         [flow_binding_sync_stage_select]    = lab_flow_binding_sync_select,
         [flow_binding_sync_stage_prepared]  = lab_flow_binding_sync_prepared,
@@ -102,26 +102,26 @@ enum {
     flow_binding_visible_stage_done
 };
 
-static int lab_flow_binding_visible_check(int frame)
+static browser_handle lab_flow_binding_visible_check(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_visible_stage_wait, "bindingCurrent", "current", 0, 1,
                          lab_dom_get(frame, "isCurrent"));
 }
 
-static int lab_flow_binding_visible_wait(int frame)
+static browser_handle lab_flow_binding_visible_wait(frame_handle frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
         return lab_flow_binding_false();
     return lab_flow_call(frame, flow_binding_visible_stage_recheck, "bindingPending", 0, 1, 0);
 }
 
-static int lab_flow_binding_visible_recheck(int frame)
+static browser_handle lab_flow_binding_visible_recheck(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_visible_stage_commit, "bindingCurrent", "current", 0, 1,
                          lab_dom_get(frame, "isCurrent"));
 }
 
-static int lab_flow_binding_visible_commit(int frame)
+static browser_handle lab_flow_binding_visible_commit(frame_handle frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
         return lab_flow_binding_false();
@@ -129,20 +129,20 @@ static int lab_flow_binding_visible_commit(int frame)
                          lab_dom_get(frame, "isCurrent"));
 }
 
-static int lab_flow_binding_visible_done(int frame)
+static browser_handle lab_flow_binding_visible_done(frame_handle frame)
 {
     return lab_flow_done(lab_dom_get(frame, "result"));
 }
 
-static int lab_flow_binding_visible_otherwise(int frame)
+static browser_handle lab_flow_binding_visible_otherwise(frame_handle frame)
 {
     (void)frame;
     return lab_flow_binding_false();
 }
 
-static int lab_flow_binding_visible(int frame)
+static browser_handle lab_flow_binding_visible(frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [flow_binding_visible_stage_check]   = lab_flow_binding_visible_check,
         [flow_binding_visible_stage_wait]    = lab_flow_binding_visible_wait,
         [flow_binding_visible_stage_recheck] = lab_flow_binding_visible_recheck,
@@ -173,37 +173,37 @@ enum {
 };
 
 struct lab_flow_binding_commit_context {
-    int frame;
-    int before;
+    frame_handle frame;
+    browser_handle before;
 };
 
-static int lab_flow_binding_commit_check(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_check(struct lab_flow_binding_commit_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_commit_stage_capture, "bindingCurrent", "current", 0, 1,
                          lab_dom_get(ctx->frame, "isCurrent"));
 }
 
-static int lab_flow_binding_commit_capture(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_capture(struct lab_flow_binding_commit_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_binding_false();
     return lab_flow_call(ctx->frame, flow_binding_commit_stage_snapshot, "bindingCapture", "before", 0, 0);
 }
 
-static int lab_flow_binding_commit_snapshot(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_snapshot(struct lab_flow_binding_commit_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_commit_stage_payload, "native", "snapshot", 0, 2,
                          lab_dom_string("lab_binding_snapshot"), lab_dom_get(ctx->frame, "inputs"));
 }
 
-static int lab_flow_binding_commit_payload(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_payload(struct lab_flow_binding_commit_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_commit_stage_send, "native", "payload", 0, 4,
                          lab_dom_string("lab_binding_commit_request"), lab_dom_get(ctx->frame, "modeId"),
                          lab_dom_get(ctx->frame, "source"), lab_dom_get(ctx->frame, "snapshot"));
 }
 
-static int lab_flow_binding_commit_send(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_send(struct lab_flow_binding_commit_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "payload")))
         return lab_flow_call(ctx->frame, flow_binding_commit_stage_empty, "bindingPrepare", 0, 1, 1,
@@ -212,13 +212,13 @@ static int lab_flow_binding_commit_send(struct lab_flow_binding_commit_context *
                          lab_dom_get(ctx->frame, "payload"), lab_dom_get(ctx->frame, "request"));
 }
 
-static int lab_flow_binding_commit_callback(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_callback(struct lab_flow_binding_commit_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_commit_stage_owner, "bindingCurrent", "current", 0, 1,
                          lab_dom_get(ctx->frame, "isCurrent"));
 }
 
-static int lab_flow_binding_commit_owner(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_owner(struct lab_flow_binding_commit_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_binding_false();
@@ -226,14 +226,14 @@ static int lab_flow_binding_commit_owner(struct lab_flow_binding_commit_context 
                          lab_dom_get(ctx->frame, "request"));
 }
 
-static int lab_flow_binding_commit_capture_after(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_capture_after(struct lab_flow_binding_commit_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_binding_false();
     return lab_flow_call(ctx->frame, flow_binding_commit_stage_snapshot_current, "bindingCapture", "after", 0, 0);
 }
 
-static int lab_flow_binding_commit_snapshot_current(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_snapshot_current(struct lab_flow_binding_commit_context *ctx)
 {
     if (!lab_dom_equal(lab_dom_get(ctx->before, "text"), lab_dom_get(lab_dom_get(ctx->frame, "after"), "text")) ||
         !lab_dom_equal(lab_dom_get(ctx->frame, "source"), lab_dom_get(lab_dom_get(ctx->frame, "after"), "source")))
@@ -242,7 +242,7 @@ static int lab_flow_binding_commit_snapshot_current(struct lab_flow_binding_comm
                          lab_dom_string("lab_binding_snapshot_current"), lab_dom_get(ctx->frame, "snapshot"));
 }
 
-static int lab_flow_binding_commit_accept(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_accept(struct lab_flow_binding_commit_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_binding_false();
@@ -250,7 +250,7 @@ static int lab_flow_binding_commit_accept(struct lab_flow_binding_commit_context
                          lab_dom_get(ctx->frame, "data"));
 }
 
-static int lab_flow_binding_commit_extracted(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_extracted(struct lab_flow_binding_commit_context *ctx)
 {
     int context = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(context, "editor", lab_dom_get(ctx->before, "editor"));
@@ -262,31 +262,31 @@ static int lab_flow_binding_commit_extracted(struct lab_flow_binding_commit_cont
                          context);
 }
 
-static int lab_flow_binding_commit_effects(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_effects(struct lab_flow_binding_commit_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_commit_stage_done, "bindingEffects", 0, 0, 1,
                          lab_dom_get(ctx->frame, "plan"));
 }
 
-static int lab_flow_binding_commit_done(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_done(struct lab_flow_binding_commit_context *ctx)
 {
     return lab_flow_done(lab_dom_get(lab_dom_get(ctx->frame, "plan"), "result"));
 }
 
-static int lab_flow_binding_commit_otherwise(struct lab_flow_binding_commit_context *ctx)
+static browser_handle lab_flow_binding_commit_otherwise(struct lab_flow_binding_commit_context *ctx)
 {
     (void)ctx;
     return lab_flow_binding_false();
 }
 
-static int lab_flow_binding_commit(int frame)
+static browser_handle lab_flow_binding_commit(frame_handle frame)
 {
     int before = lab_dom_get(frame, "before");
     struct lab_flow_binding_commit_context ctx = {
         .frame = frame,
         .before = before,
     };
-    static int (*const handlers[])(struct lab_flow_binding_commit_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_binding_commit_context *) = {
         [flow_binding_commit_stage_check]            = lab_flow_binding_commit_check,
         [flow_binding_commit_stage_capture]          = lab_flow_binding_commit_capture,
         [flow_binding_commit_stage_snapshot]         = lab_flow_binding_commit_snapshot,
@@ -318,22 +318,22 @@ enum {
 };
 
 struct lab_flow_binding_toggle_context {
-    int frame;
-    int before;
+    frame_handle frame;
+    browser_handle before;
 };
 
-static int lab_flow_binding_toggle_capture(struct lab_flow_binding_toggle_context *ctx)
+static browser_handle lab_flow_binding_toggle_capture(struct lab_flow_binding_toggle_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_toggle_stage_toggle, "bindingCapture", "before", 0, 0);
 }
 
-static int lab_flow_binding_toggle_toggle(struct lab_flow_binding_toggle_context *ctx)
+static browser_handle lab_flow_binding_toggle_toggle(struct lab_flow_binding_toggle_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_toggle_stage_send, "native", "toggle", 0, 2,
                          lab_dom_string("lab_binding_toggle"), lab_dom_get(ctx->frame, "binding"));
 }
 
-static int lab_flow_binding_toggle_send(struct lab_flow_binding_toggle_context *ctx)
+static browser_handle lab_flow_binding_toggle_send(struct lab_flow_binding_toggle_context *ctx)
 {
     int toggle = lab_dom_get(ctx->frame, "toggle"), source = lab_dom_get(ctx->before, "source");
     if (!lab_dom_truth(source) || !lab_dom_truth(lab_dom_get(toggle, "name")))
@@ -342,12 +342,12 @@ static int lab_flow_binding_toggle_send(struct lab_flow_binding_toggle_context *
                          source, lab_dom_get(toggle, "name"), lab_dom_get(toggle, "nextKind"));
 }
 
-static int lab_flow_binding_toggle_capture_after(struct lab_flow_binding_toggle_context *ctx)
+static browser_handle lab_flow_binding_toggle_capture_after(struct lab_flow_binding_toggle_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_toggle_stage_accept, "bindingCapture", "after", 0, 0);
 }
 
-static int lab_flow_binding_toggle_accept(struct lab_flow_binding_toggle_context *ctx)
+static browser_handle lab_flow_binding_toggle_accept(struct lab_flow_binding_toggle_context *ctx)
 {
     if (!lab_flow_binding_same(ctx->frame, 1))
         return lab_flow_done(0);
@@ -359,27 +359,27 @@ static int lab_flow_binding_toggle_accept(struct lab_flow_binding_toggle_context
                          context);
 }
 
-static int lab_flow_binding_toggle_effects(struct lab_flow_binding_toggle_context *ctx)
+static browser_handle lab_flow_binding_toggle_effects(struct lab_flow_binding_toggle_context *ctx)
 {
     int plan = lab_dom_get(ctx->frame, "plan");
     return lab_flow_call(ctx->frame, flow_binding_toggle_stage_done, "bindingEffects", 0,
                          lab_dom_truth(lab_dom_get(plan, "wait")), 1, plan);
 }
 
-static int lab_flow_binding_toggle_otherwise(struct lab_flow_binding_toggle_context *ctx)
+static browser_handle lab_flow_binding_toggle_otherwise(struct lab_flow_binding_toggle_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_toggle(int frame)
+static browser_handle lab_flow_binding_toggle(frame_handle frame)
 {
     int before = lab_dom_get(frame, "before");
     struct lab_flow_binding_toggle_context ctx = {
         .frame = frame,
         .before = before,
     };
-    static int (*const handlers[])(struct lab_flow_binding_toggle_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_binding_toggle_context *) = {
         [flow_binding_toggle_stage_capture]       = lab_flow_binding_toggle_capture,
         [flow_binding_toggle_stage_toggle]        = lab_flow_binding_toggle_toggle,
         [flow_binding_toggle_stage_send]          = lab_flow_binding_toggle_send,
@@ -407,24 +407,24 @@ enum {
 };
 
 struct lab_flow_binding_refresh_context {
-    int frame;
-    int before;
+    frame_handle frame;
+    browser_handle before;
 };
 
-static int lab_flow_binding_refresh_check(struct lab_flow_binding_refresh_context *ctx)
+static browser_handle lab_flow_binding_refresh_check(struct lab_flow_binding_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_refresh_stage_capture, "bindingCurrent", "current", 0, 1,
                          lab_dom_get(ctx->frame, "isCurrent"));
 }
 
-static int lab_flow_binding_refresh_capture(struct lab_flow_binding_refresh_context *ctx)
+static browser_handle lab_flow_binding_refresh_capture(struct lab_flow_binding_refresh_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_done(0);
     return lab_flow_call(ctx->frame, flow_binding_refresh_stage_prepare, "bindingCapture", "before", 0, 0);
 }
 
-static int lab_flow_binding_refresh_prepare(struct lab_flow_binding_refresh_context *ctx)
+static browser_handle lab_flow_binding_refresh_prepare(struct lab_flow_binding_refresh_context *ctx)
 {
     if (lab_dom_number(lab_dom_get(ctx->before, "modeId")) == (double)LAB_MODE_EXPRESSION)
         return lab_flow_call(ctx->frame, flow_binding_refresh_stage_done, "bindingScheduleRefresh", 0, 0, 0);
@@ -433,14 +433,14 @@ static int lab_flow_binding_refresh_prepare(struct lab_flow_binding_refresh_cont
                          lab_dom_get(ctx->before, "source"));
 }
 
-static int lab_flow_binding_refresh_recheck(struct lab_flow_binding_refresh_context *ctx)
+static browser_handle lab_flow_binding_refresh_recheck(struct lab_flow_binding_refresh_context *ctx)
 {
     lab_dom_delete(ctx->frame, "failed");
     return lab_flow_call(ctx->frame, flow_binding_refresh_stage_capture_after, "bindingCurrent", "current", 0, 1,
                          lab_dom_get(ctx->frame, "isCurrent"));
 }
 
-static int lab_flow_binding_refresh_error_capture(struct lab_flow_binding_refresh_context *ctx)
+static browser_handle lab_flow_binding_refresh_error_capture(struct lab_flow_binding_refresh_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_done(0);
@@ -451,7 +451,7 @@ static int lab_flow_binding_refresh_error_capture(struct lab_flow_binding_refres
                          "bindingCapture", "after", 0, 0);
 }
 
-static int lab_flow_binding_refresh_accept(struct lab_flow_binding_refresh_context *ctx)
+static browser_handle lab_flow_binding_refresh_accept(struct lab_flow_binding_refresh_context *ctx)
 {
     if (!lab_flow_binding_same(ctx->frame, 1))
         return lab_flow_done(0);
@@ -459,13 +459,13 @@ static int lab_flow_binding_refresh_accept(struct lab_flow_binding_refresh_conte
                          lab_dom_get(ctx->before, "source"));
 }
 
-static int lab_flow_binding_refresh_error_check(struct lab_flow_binding_refresh_context *ctx)
+static browser_handle lab_flow_binding_refresh_error_check(struct lab_flow_binding_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_refresh_stage_error_capture, "bindingCurrent", "current", 0, 1,
                          lab_dom_get(ctx->frame, "isCurrent"));
 }
 
-static int lab_flow_binding_refresh_error_report(struct lab_flow_binding_refresh_context *ctx)
+static browser_handle lab_flow_binding_refresh_error_report(struct lab_flow_binding_refresh_context *ctx)
 {
     if (lab_flow_binding_same(ctx->frame, 0))
         return lab_flow_call(ctx->frame, flow_binding_refresh_stage_done, "setStatus", 0, 0, 1,
@@ -473,20 +473,20 @@ static int lab_flow_binding_refresh_error_report(struct lab_flow_binding_refresh
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_refresh_otherwise(struct lab_flow_binding_refresh_context *ctx)
+static browser_handle lab_flow_binding_refresh_otherwise(struct lab_flow_binding_refresh_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_refresh(int frame)
+static browser_handle lab_flow_binding_refresh(frame_handle frame)
 {
     int before = lab_dom_get(frame, "before");
     struct lab_flow_binding_refresh_context ctx = {
         .frame = frame,
         .before = before,
     };
-    static int (*const handlers[])(struct lab_flow_binding_refresh_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_binding_refresh_context *) = {
         [flow_binding_refresh_stage_check]         = lab_flow_binding_refresh_check,
         [flow_binding_refresh_stage_capture]       = lab_flow_binding_refresh_capture,
         [flow_binding_refresh_stage_prepare]       = lab_flow_binding_refresh_prepare,
@@ -505,12 +505,12 @@ static int lab_flow_binding_refresh(int frame)
 
 enum { flow_binding_queue_stage_mode, flow_binding_queue_stage_commit, flow_binding_queue_stage_done };
 
-static int lab_flow_binding_queue_mode(int frame)
+static browser_handle lab_flow_binding_queue_mode(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_queue_stage_commit, "currentMode", "currentMode", 0, 0);
 }
 
-static int lab_flow_binding_queue_commit(int frame)
+static browser_handle lab_flow_binding_queue_commit(frame_handle frame)
 {
     if (!lab_dom_equal(lab_dom_get(frame, "mode"), lab_dom_get(frame, "currentMode")) ||
         !lab_dom_truth(lab_dom_get(lab_dom_get(frame, "input"), "isConnected")))
@@ -519,20 +519,20 @@ static int lab_flow_binding_queue_commit(int frame)
                          lab_dom_get(frame, "input"));
 }
 
-static int lab_flow_binding_queue_done(int frame)
+static browser_handle lab_flow_binding_queue_done(frame_handle frame)
 {
     return lab_flow_done(lab_dom_get(frame, "result"));
 }
 
-static int lab_flow_binding_queue_otherwise(int frame)
+static browser_handle lab_flow_binding_queue_otherwise(frame_handle frame)
 {
     (void)frame;
     return lab_flow_binding_false();
 }
 
-static int lab_flow_binding_queue(int frame)
+static browser_handle lab_flow_binding_queue(frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [flow_binding_queue_stage_mode]   = lab_flow_binding_queue_mode,
         [flow_binding_queue_stage_commit] = lab_flow_binding_queue_commit,
         [flow_binding_queue_stage_done]   = lab_flow_binding_queue_done,
@@ -550,39 +550,39 @@ enum {
     flow_binding_goal_stage_done
 };
 
-static int lab_flow_binding_goal_prepare(int frame)
+static browser_handle lab_flow_binding_goal_prepare(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_goal_stage_starts, "bindingPrepare", "editor", 1, 1,
                          lab_dom_get(frame, "source"));
 }
 
-static int lab_flow_binding_goal_starts(int frame)
+static browser_handle lab_flow_binding_goal_starts(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_goal_stage_prepare_result, "native", "prepared", 0, 3,
                          lab_dom_string("lab_binding_goal_prepare"), lab_dom_get(frame, "editor"),
                          lab_dom_get(frame, "providedStart"));
 }
 
-static int lab_flow_binding_goal_prepare_result(int frame)
+static browser_handle lab_flow_binding_goal_prepare_result(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_goal_stage_done, "bindingPrepare", 0, 1, 1,
                          lab_dom_get(lab_dom_get(frame, "prepared"), "expression"));
 }
 
-static int lab_flow_binding_goal_done(int frame)
+static browser_handle lab_flow_binding_goal_done(frame_handle frame)
 {
     return lab_flow_done(lab_dom_get(frame, "prepared"));
 }
 
-static int lab_flow_binding_goal_otherwise(int frame)
+static browser_handle lab_flow_binding_goal_otherwise(frame_handle frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_goal(int frame)
+static browser_handle lab_flow_binding_goal(frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [flow_binding_goal_stage_prepare]        = lab_flow_binding_goal_prepare,
         [flow_binding_goal_stage_starts]         = lab_flow_binding_goal_starts,
         [flow_binding_goal_stage_prepare_result] = lab_flow_binding_goal_prepare_result,
@@ -606,17 +606,17 @@ enum {
 };
 
 struct lab_flow_binding_row_context {
-    int frame;
-    int item;
+    frame_handle frame;
+    browser_handle item;
 };
 
-static int lab_flow_binding_row_commit(struct lab_flow_binding_row_context *ctx)
+static browser_handle lab_flow_binding_row_commit(struct lab_flow_binding_row_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_binding_row_stage_error));
     return lab_flow_call(ctx->frame, flow_binding_row_stage_prepare, "commitBindings", 0, 1, 0);
 }
 
-static int lab_flow_binding_row_prepare(struct lab_flow_binding_row_context *ctx)
+static browser_handle lab_flow_binding_row_prepare(struct lab_flow_binding_row_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->item, "isConnected")))
         return lab_flow_done(0);
@@ -624,7 +624,7 @@ static int lab_flow_binding_row_prepare(struct lab_flow_binding_row_context *ctx
                          lab_dom_get(ctx->frame, "index"), lab_dom_get(ctx->frame, "operation"));
 }
 
-static int lab_flow_binding_row_render(struct lab_flow_binding_row_context *ctx)
+static browser_handle lab_flow_binding_row_render(struct lab_flow_binding_row_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "prepared")) || !lab_dom_truth(lab_dom_get(ctx->item, "isConnected")))
         return lab_flow_done(0);
@@ -632,22 +632,22 @@ static int lab_flow_binding_row_render(struct lab_flow_binding_row_context *ctx)
                          lab_dom_get(ctx->frame, "prepared"));
 }
 
-static int lab_flow_binding_row_refresh(struct lab_flow_binding_row_context *ctx)
+static browser_handle lab_flow_binding_row_refresh(struct lab_flow_binding_row_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_row_stage_history, "bindingRefresh", 0, 0, 0);
 }
 
-static int lab_flow_binding_row_history(struct lab_flow_binding_row_context *ctx)
+static browser_handle lab_flow_binding_row_history(struct lab_flow_binding_row_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_row_stage_mode, "updateHistoryButtons", 0, 0, 0);
 }
 
-static int lab_flow_binding_row_mode(struct lab_flow_binding_row_context *ctx)
+static browser_handle lab_flow_binding_row_mode(struct lab_flow_binding_row_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_row_stage_save, "currentMode", "mode", 0, 0);
 }
 
-static int lab_flow_binding_row_save(struct lab_flow_binding_row_context *ctx)
+static browser_handle lab_flow_binding_row_save(struct lab_flow_binding_row_context *ctx)
 {
     if (lab_dom_equal(lab_dom_get(ctx->frame, "mode"), lab_dom_string("integrator")))
         return lab_flow_call(ctx->frame, flow_binding_row_stage_done, "saveWorksheetState", 0, 0, 1,
@@ -655,7 +655,7 @@ static int lab_flow_binding_row_save(struct lab_flow_binding_row_context *ctx)
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_row_error(struct lab_flow_binding_row_context *ctx)
+static browser_handle lab_flow_binding_row_error(struct lab_flow_binding_row_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->item, "isConnected")))
         return lab_flow_call(ctx->frame, flow_binding_row_stage_done, "bindingRowError", 0, 0, 2, ctx->item,
@@ -663,20 +663,20 @@ static int lab_flow_binding_row_error(struct lab_flow_binding_row_context *ctx)
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_row_otherwise(struct lab_flow_binding_row_context *ctx)
+static browser_handle lab_flow_binding_row_otherwise(struct lab_flow_binding_row_context *ctx)
 {
     (void)ctx;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_row(int frame)
+static browser_handle lab_flow_binding_row(frame_handle frame)
 {
     int item = lab_dom_get(frame, "item");
     struct lab_flow_binding_row_context ctx = {
         .frame = frame,
         .item = item,
     };
-    static int (*const handlers[])(struct lab_flow_binding_row_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_binding_row_context *) = {
         [flow_binding_row_stage_commit]  = lab_flow_binding_row_commit,
         [flow_binding_row_stage_prepare] = lab_flow_binding_row_prepare,
         [flow_binding_row_stage_render]  = lab_flow_binding_row_render,
@@ -691,7 +691,7 @@ static int lab_flow_binding_row(int frame)
                                                                                : lab_flow_binding_row_otherwise(&ctx);
 }
 
-static int lab_flow_binding_input_current(int frame)
+static int lab_flow_binding_input_current(frame_handle frame)
 {
     int input = lab_dom_get(frame, "input");
     return lab_dom_truth(lab_dom_get(input, "isConnected")) &&
@@ -709,14 +709,14 @@ enum {
     flow_binding_prepare_input_stage_error
 };
 
-static int lab_flow_binding_prepare_input_prepare(int frame)
+static browser_handle lab_flow_binding_prepare_input_prepare(frame_handle frame)
 {
     lab_dom_set(frame, "authored", lab_dom_read(lab_dom_get(frame, "input"), LAB_DOM_VALUE, ""));
     lab_dom_set(frame, "failed", lab_dom_numeric(flow_binding_prepare_input_stage_error));
     return lab_flow_call(frame, flow_binding_prepare_input_stage_update, "bindingRefreshForms", "prepared", 1, 0);
 }
 
-static int lab_flow_binding_prepare_input_update(int frame)
+static browser_handle lab_flow_binding_prepare_input_update(frame_handle frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "prepared")) || !lab_flow_binding_input_current(frame))
         return lab_flow_done(0);
@@ -724,30 +724,30 @@ static int lab_flow_binding_prepare_input_update(int frame)
                          lab_dom_get(frame, "prepared"));
 }
 
-static int lab_flow_binding_prepare_input_mode(int frame)
+static browser_handle lab_flow_binding_prepare_input_mode(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_prepare_input_stage_refresh, "currentMode", "mode", 0, 0);
 }
 
-static int lab_flow_binding_prepare_input_refresh(int frame)
+static browser_handle lab_flow_binding_prepare_input_refresh(frame_handle frame)
 {
     if (!lab_dom_equal(lab_dom_get(frame, "mode"), lab_dom_string("integrator")))
         return lab_flow_done(0);
     return lab_flow_call(frame, flow_binding_prepare_input_stage_history, "bindingRefresh", 0, 0, 0);
 }
 
-static int lab_flow_binding_prepare_input_history(int frame)
+static browser_handle lab_flow_binding_prepare_input_history(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_prepare_input_stage_save, "updateHistoryButtons", 0, 0, 0);
 }
 
-static int lab_flow_binding_prepare_input_save(int frame)
+static browser_handle lab_flow_binding_prepare_input_save(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_prepare_input_stage_done, "saveWorksheetState", 0, 0, 1,
                          lab_dom_string("integrator"));
 }
 
-static int lab_flow_binding_prepare_input_error(int frame)
+static browser_handle lab_flow_binding_prepare_input_error(frame_handle frame)
 {
     if (lab_flow_binding_input_current(frame))
         return lab_flow_call(frame, flow_binding_prepare_input_stage_done, "bindingValidity", 0, 0, 2,
@@ -755,15 +755,15 @@ static int lab_flow_binding_prepare_input_error(int frame)
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_prepare_input_otherwise(int frame)
+static browser_handle lab_flow_binding_prepare_input_otherwise(frame_handle frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_prepare_input(int frame)
+static browser_handle lab_flow_binding_prepare_input(frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [flow_binding_prepare_input_stage_prepare] = lab_flow_binding_prepare_input_prepare,
         [flow_binding_prepare_input_stage_update]  = lab_flow_binding_prepare_input_update,
         [flow_binding_prepare_input_stage_mode]    = lab_flow_binding_prepare_input_mode,
@@ -792,11 +792,11 @@ enum {
 };
 
 struct lab_flow_binding_action_context {
-    int frame;
-    int card;
+    frame_handle frame;
+    browser_handle card;
 };
 
-static int lab_flow_binding_action_start(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_start(struct lab_flow_binding_action_context *ctx)
 {
     lab_flow_binding_card_action_t operation =
         (lab_flow_binding_card_action_t)(unsigned)lab_dom_number(lab_dom_get(ctx->frame, "operation"));
@@ -812,64 +812,64 @@ static int lab_flow_binding_action_start(struct lab_flow_binding_action_context 
                          lab_dom_read(lab_dom_get(ctx->card, "input"), LAB_DOM_VALUE, ""));
 }
 
-static int lab_flow_binding_action_clear_commit(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_clear_commit(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_clear_focus, "bindingQueue", 0, 1, 1,
                          lab_dom_get(ctx->card, "input"));
 }
 
-static int lab_flow_binding_action_clear_focus(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_clear_focus(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_done, "bindingRefocus", 0, 0, 1, ctx->card);
 }
 
-static int lab_flow_binding_action_evaluate(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_evaluate(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_done, "bindingEvaluate", "result", 1, 0);
 }
 
-static int lab_flow_binding_action_copy_ok(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_copy_ok(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_copy_status, "bindingFlash", 0, 0, 2,
                          lab_dom_get(ctx->card, "copy"), lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
-static int lab_flow_binding_action_copy_status(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_copy_status(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_copy_reset, "setStatus", 0, 0, 1,
                          lab_dom_get(ctx->card, "message"));
 }
 
-static int lab_flow_binding_action_copy_reset(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_copy_reset(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_done, "bindingReadyTimer", 0, 0, 0);
 }
 
-static int lab_flow_binding_action_copy_failed(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_copy_failed(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_copy_error, "bindingFlash", 0, 0, 2,
                          lab_dom_get(ctx->card, "copy"), lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
-static int lab_flow_binding_action_copy_error(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_copy_error(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_done, "setStatus", 0, 0, 1,
                          lab_dom_get(ctx->frame, "error"));
 }
 
-static int lab_flow_binding_action_otherwise(struct lab_flow_binding_action_context *ctx)
+static browser_handle lab_flow_binding_action_otherwise(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_done(lab_dom_get(ctx->frame, "result"));
 }
 
-static int lab_flow_binding_action(int frame)
+static browser_handle lab_flow_binding_action(frame_handle frame)
 {
     int card = lab_dom_get(frame, "card");
     struct lab_flow_binding_action_context ctx = {
         .frame = frame,
         .card = card,
     };
-    static int (*const handlers[])(struct lab_flow_binding_action_context *) = {
+    static browser_handle (*const handlers[])(struct lab_flow_binding_action_context *) = {
         [flow_binding_action_stage_start]        = lab_flow_binding_action_start,
         [flow_binding_action_stage_clear_commit] = lab_flow_binding_action_clear_commit,
         [flow_binding_action_stage_clear_focus]  = lab_flow_binding_action_clear_focus,
@@ -896,14 +896,14 @@ enum {
 };
 
 
-static int lab_flow_binding_deferred_prepare(int frame)
+static browser_handle lab_flow_binding_deferred_prepare(frame_handle frame)
 {
     lab_dom_set(frame, "failed", lab_dom_numeric(flow_binding_deferred_stage_error_capture));
     return lab_flow_call(frame, flow_binding_deferred_stage_capture, "bindingPrepare", 0, 1, 1,
                          lab_dom_get(frame, "fullText"));
 }
 
-static int lab_flow_binding_deferred_error_capture(int frame)
+static browser_handle lab_flow_binding_deferred_error_capture(frame_handle frame)
 {
     return lab_flow_call(frame,
                          lab_flow_binding_stage(frame) == flow_binding_deferred_stage_capture
@@ -912,7 +912,7 @@ static int lab_flow_binding_deferred_error_capture(int frame)
                          "bindingCapture", "after", 0, 0);
 }
 
-static int lab_flow_binding_deferred_error_report(int frame)
+static browser_handle lab_flow_binding_deferred_error_report(frame_handle frame)
 {
     {
         int after = lab_dom_get(frame, "after"), full = lab_dom_get(frame, "fullText");
@@ -929,15 +929,15 @@ static int lab_flow_binding_deferred_error_report(int frame)
     }
 }
 
-static int lab_flow_binding_deferred_otherwise(int frame)
+static browser_handle lab_flow_binding_deferred_otherwise(frame_handle frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_deferred(int frame)
+static browser_handle lab_flow_binding_deferred(frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [flow_binding_deferred_stage_prepare]       = lab_flow_binding_deferred_prepare,
         [flow_binding_deferred_stage_capture]       = lab_flow_binding_deferred_error_capture,
         [flow_binding_deferred_stage_error_capture] = lab_flow_binding_deferred_error_capture,
@@ -957,38 +957,38 @@ enum {
     flow_binding_begin_commit_stage_done
 };
 
-static int lab_flow_binding_begin_commit_check(int frame)
+static browser_handle lab_flow_binding_begin_commit_check(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_begin_commit_stage_capture, "bindingCurrent", "current", 0, 1,
                          lab_dom_get(frame, "isCurrent"));
 }
 
-static int lab_flow_binding_begin_commit_capture(int frame)
+static browser_handle lab_flow_binding_begin_commit_capture(frame_handle frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
         return lab_flow_binding_false();
     return lab_flow_call(frame, flow_binding_begin_commit_stage_run, "bindingCapture", "before", 0, 0);
 }
 
-static int lab_flow_binding_begin_commit_run(int frame)
+static browser_handle lab_flow_binding_begin_commit_run(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_begin_commit_stage_done, "bindingRunCommit", "result", 1, 1, frame);
 }
 
-static int lab_flow_binding_begin_commit_done(int frame)
+static browser_handle lab_flow_binding_begin_commit_done(frame_handle frame)
 {
     return lab_flow_done(lab_dom_get(frame, "result"));
 }
 
-static int lab_flow_binding_begin_commit_otherwise(int frame)
+static browser_handle lab_flow_binding_begin_commit_otherwise(frame_handle frame)
 {
     (void)frame;
     return lab_flow_binding_false();
 }
 
-static int lab_flow_binding_begin_commit(int frame)
+static browser_handle lab_flow_binding_begin_commit(frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [flow_binding_begin_commit_stage_check]   = lab_flow_binding_begin_commit_check,
         [flow_binding_begin_commit_stage_capture] = lab_flow_binding_begin_commit_capture,
         [flow_binding_begin_commit_stage_run]     = lab_flow_binding_begin_commit_run,
@@ -1006,7 +1006,7 @@ enum {
     flow_binding_kind_request_stage_done
 };
 
-static int lab_flow_binding_kind_request_request(int frame)
+static browser_handle lab_flow_binding_kind_request_request(frame_handle frame)
 {
     int request = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(request, "action", lab_dom_string("editor"));
@@ -1017,26 +1017,26 @@ static int lab_flow_binding_kind_request_request(int frame)
     return lab_flow_call(frame, flow_binding_kind_request_stage_extract, "bindingPresentation", "data", 1, 1, request);
 }
 
-static int lab_flow_binding_kind_request_extract(int frame)
+static browser_handle lab_flow_binding_kind_request_extract(frame_handle frame)
 {
     return lab_flow_call(frame, flow_binding_kind_request_stage_done, "bindingExpression", "expression", 0, 1,
                          lab_dom_get(frame, "data"));
 }
 
-static int lab_flow_binding_kind_request_done(int frame)
+static browser_handle lab_flow_binding_kind_request_done(frame_handle frame)
 {
     return lab_flow_done(lab_dom_get(frame, "expression"));
 }
 
-static int lab_flow_binding_kind_request_otherwise(int frame)
+static browser_handle lab_flow_binding_kind_request_otherwise(frame_handle frame)
 {
     (void)frame;
     return lab_flow_done(0);
 }
 
-static int lab_flow_binding_kind_request(int frame)
+static browser_handle lab_flow_binding_kind_request(frame_handle frame)
 {
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [flow_binding_kind_request_stage_request] = lab_flow_binding_kind_request_request,
         [flow_binding_kind_request_stage_extract] = lab_flow_binding_kind_request_extract,
         [flow_binding_kind_request_stage_done]    = lab_flow_binding_kind_request_done,
@@ -1048,10 +1048,10 @@ static int lab_flow_binding_kind_request(int frame)
 }
 
 /* Indexed workflow selection preserves module ownership without a growing name scan. */
-int lab_flow_binding(lab_flow_binding_kind_t kind, int frame, int view)
+browser_handle lab_flow_binding(lab_flow_binding_kind_t kind, frame_handle frame, view_handle view)
 {
     (void)view;
-    static int (*const handlers[])(int) = {
+    static browser_handle (*const handlers[])(browser_handle) = {
         [LAB_FLOW_BINDING_SYNC]          = lab_flow_binding_sync,
         [LAB_FLOW_BINDING_VISIBLE]       = lab_flow_binding_visible,
         [LAB_FLOW_BINDING_COMMIT]        = lab_flow_binding_commit,

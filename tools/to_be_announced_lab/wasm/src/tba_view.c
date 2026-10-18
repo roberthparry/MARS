@@ -9,7 +9,7 @@
 #include "tba_view.h"
 
 /* Publish one completed forecast and its downloadable result. */
-void tba_view_result(int data)
+void tba_view_result(browser_handle data)
 {
     tba_ui_store("result", data);
     int multi = tba_dom_truth(tba_dom_get(data, "multi"));
@@ -60,7 +60,7 @@ void tba_view_result(int data)
 }
 
 /* Delegate tab selection from the stable summary container. */
-void tba_view_tab(int event)
+void tba_view_tab(event_handle event)
 {
     int button = tba_dom_closest(tba_dom_get(event, "target"), ".comparison-tab");
     int tabs = tba_dom_closest(button, ".comparison-tabs");

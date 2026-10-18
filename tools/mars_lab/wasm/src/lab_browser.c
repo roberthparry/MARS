@@ -64,7 +64,7 @@ static void lab_browser_end(uint32_t position)
     lab_browser_used += length;
 }
 
-static void lab_browser_text(int id, unsigned field, int key_index)
+static void lab_browser_text(codec_handle id, unsigned field, int key_index)
 {
     uint32_t position = lab_browser_begin(field);
     if (lab_browser_failed)
@@ -85,29 +85,29 @@ static void lab_browser_text(int id, unsigned field, int key_index)
  * @brief Encode a host Boolean payload after its value-kind field.
  * @param id Host value identifier whose numeric truth value is read once.
  */
-static void lab_browser_write_boolean(int id);
+static void lab_browser_write_boolean(codec_handle id);
 
 /**
  * @brief Encode a finite binary64 payload after its value-kind field.
  * @param id Host value identifier; a non-finite number marks encoding as failed.
  */
-static void lab_browser_write_number(int id);
+static void lab_browser_write_number(codec_handle id);
 
 /**
  * @brief Encode a host string payload after its value-kind field.
  * @param id Host value identifier passed to the bounded text encoder.
  */
-static void lab_browser_write_string(int id);
+static void lab_browser_write_string(codec_handle id);
 
 /* Preserve Boolean field emission before reading the host's numeric value. */
-static void lab_browser_write_boolean(int id)
+static void lab_browser_write_boolean(codec_handle id)
 {
     lab_browser_varint(16);
     lab_browser_varint(lab_host_number(id) != 0);
 }
 
 /* Reject non-finite values before emitting their fixed-width payload. */
-static void lab_browser_write_number(int id)
+static void lab_browser_write_number(codec_handle id)
 {
     union {
         double number;
@@ -125,7 +125,7 @@ static void lab_browser_write_number(int id)
 }
 
 /* Retain the bounded text encoder's failure and buffer-update ordering. */
-static void lab_browser_write_string(int id)
+static void lab_browser_write_string(codec_handle id)
 {
     lab_browser_text(id, 4, -1);
 }
@@ -144,7 +144,7 @@ static void lab_browser_write(int info, unsigned depth)
     }
     lab_browser_varint(8);
     lab_browser_varint((unsigned)kind);
-    static void (*const scalar_writers[LAB_VALUE_OBJECT + 1])(int) = {
+    static void (*const scalar_writers[LAB_VALUE_OBJECT + 1])(codec_handle) = {
         [LAB_VALUE_BOOLEAN] = lab_browser_write_boolean,
         [LAB_VALUE_NUMBER]  = lab_browser_write_number,
         [LAB_VALUE_STRING]  = lab_browser_write_string,
@@ -202,10 +202,10 @@ static bool lab_browser_field(lab_browser_reader_t *reader, unsigned *field, pro
  * @param key_length Number of bytes in key; zero when no key is supplied.
  * @return Host value identifier, or -1 for malformed input, exceeded limits or host rejection.
  */
-static int lab_browser_read(lab_browser_reader_t reader, unsigned depth, int parent, const unsigned char *key,
+static codec_handle lab_browser_read(lab_browser_reader_t reader, unsigned depth, codec_handle parent, const unsigned char *key,
                             uint32_t key_length);
 
-static int lab_browser_entry(lab_browser_reader_t reader, int parent, unsigned depth)
+static int lab_browser_entry(lab_browser_reader_t reader, codec_handle parent, unsigned depth)
 {
     lab_browser_reader_t key = {0}, child = {0};
     unsigned seen = 0, fields = 0;
@@ -234,7 +234,7 @@ static int lab_browser_entry(lab_browser_reader_t reader, int parent, unsigned d
                             key.end - key.position) >= 0;
 }
 
-static int lab_browser_read(lab_browser_reader_t reader, unsigned depth, int owner, const unsigned char *key,
+static codec_handle lab_browser_read(lab_browser_reader_t reader, unsigned depth, codec_handle owner, const unsigned char *key,
                             uint32_t key_length)
 {
     if (depth > lab_browser_depth || ++lab_browser_count > lab_browser_nodes)
@@ -355,7 +355,7 @@ unsigned char *lab_browser_output_buffer(void)
 }
 
 /* Encode a host object as a version-one envelope; zero means invalid or too large. */
-uint32_t lab_browser_encode(int root)
+uint32_t lab_browser_encode(codec_handle root)
 {
     lab_browser_used = lab_browser_count = 0;
     lab_browser_failed = 0;
@@ -370,7 +370,7 @@ uint32_t lab_browser_encode(int root)
 }
 
 /* Validate the complete envelope before returning its host object handle. */
-int lab_browser_decode(uint32_t size)
+codec_handle lab_browser_decode(uint32_t size)
 {
     if (size > lab_browser_limit)
         return -1;

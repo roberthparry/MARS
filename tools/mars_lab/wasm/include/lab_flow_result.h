@@ -9,6 +9,8 @@
 #ifndef LAB_FLOW_RESULT_H
 #define LAB_FLOW_RESULT_H
 
+#include "lab_handle.h"
+
 /** @brief Closed workflow selectors for lab_flow_result; numeric values are browser ABI. */
 typedef enum {
     LAB_FLOW_RESULT_TRANSFER      = 0, /**< Transfer result to input. */
@@ -28,6 +30,6 @@ typedef enum {
  * ignored by the other workflows.
  * @return Scoped browser handle to the next continuation plan; unsupported kinds produce an inert completion.
  */
-int lab_flow_result(lab_flow_result_kind_t kind, int frame, int view);
+browser_handle lab_flow_result(lab_flow_result_kind_t kind, frame_handle frame, view_handle view);
 
 #endif
