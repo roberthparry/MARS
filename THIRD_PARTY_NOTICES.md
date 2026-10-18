@@ -5,10 +5,56 @@ MARS is distributed under the MIT Licence. Its own licence is in
 and ships jurisdiction data generated with open-source calendar projects. The
 machine-readable inventory is in [`DEPENDENCIES.spdx`](DEPENDENCIES.spdx).
 
-MARS does not vendor the source or binary form of the linked libraries listed
-below. A distributor that bundles those libraries must also include the exact
+MARS does not vendor the source or archives of the linked libraries listed
+below. The MARS Lab build embeds required WASI libc maths, memory and string routines in its generated
+WebAssembly asset. A distributor that bundles libraries or generated assets containing
+them must also include the exact
 licence material supplied with the versions it redistributes. The notices in
 this file do not replace those obligations.
+
+## WASI libc maths, memory and strings
+
+The MARS Lab page module statically links the required double-precision maths
+routines and memory/string operations from the system `wasi-libc` package. Its musl-derived maths resides in
+`libc.a`; it does not require a WASI host runtime or JavaScript maths callbacks.
+The codec worker links the memory operations but not the maths routines.
+
+Retain the exact package's licence and component notices when distributing
+`lab_browser.wasm` or `lab_codec.wasm`, even when the archive itself is not distributed. Debian and
+Ubuntu provide these in `/usr/share/doc/wasi-libc/copyright`. The notices below
+identify the principal maths components; they do not replace the selected
+version's complete licence material.
+
+Copyright 2005–2019 Rich Felker and other musl contributors.
+Copyright 2017–2018 Arm Limited.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+Copyright 1993, 2004 Sun Microsystems, Inc.
+Copyright 2008, 2009–2011 Bruce D. Evans, Steven G. Kargl and David Schultz.
+
+Developed at SunPro, a Sun Microsystems, Inc. business.
+Permission to use, copy, modify, and distribute this software is freely
+granted, provided that this notice is preserved.
+
+Upstream: <https://github.com/WebAssembly/wasi-libc> and
+<https://git.musl-libc.org/cgit/musl/tree/COPYRIGHT>.
 
 ## SQLCipher Community Edition
 

@@ -276,7 +276,9 @@ void expr_distribution_TeX_end(expr_distribution_TeX_scope_t *scope, sbuf_t *buf
 bool expr_distribution_TeX_emit(const expr_t *expr, sbuf_t *buffer, int parent_prec)
 {
     if (expr_is_half_line_finite_part(expr)) {
-        emit_TeX_expr(expr->a, buffer, parent_prec);
+        sbuf_puts(buffer, "\\operatorname{Fp}_{1}\\!\\left[");
+        emit_TeX_expr(expr->a, buffer, PREC_LOWEST);
+        sbuf_puts(buffer, "\\right]");
         return true;
     }
     const char *qualification = expr_distribution_qualification(expr);

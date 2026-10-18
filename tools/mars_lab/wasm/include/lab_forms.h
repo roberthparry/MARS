@@ -1,6 +1,6 @@
 /**
  * @file lab_forms.h
- * @brief Private interface: structured date, numeric form and integrator-row policy for the Lab browser.
+ * @brief Application API: structured date, numeric form and integrator-row policy for the Lab browser.
  *
  * Freestanding WebAssembly functions accept numbers and presence flags only.
  * Gregorian dates use years 1..9999; invalid dates return zero, invalid weekdays
@@ -21,34 +21,52 @@
  *
  * Used by the freestanding browser modules and the versioned JavaScript host ABI.
  * This is not an installed MARS library interface; calls run synchronously on the browser thread.
+ * Boolean parameters use the wasm32 i32 ABI; browser callers must supply exactly 0 or 1.
  */
 #ifndef LAB_WASM_FORMS_H
 #define LAB_WASM_FORMS_H
 
+#include <stdbool.h>
 #include <stdint.h>
+
+/** @brief Calendar navigation unit; values retain the browser ABI. */
+typedef enum {
+    LAB_FORMS_MONTHS = 0, /**< Shift the visible month, carrying into adjacent years. */
+    LAB_FORMS_YEARS = 1   /**< Shift the year while retaining the visible month. */
+} lab_forms_period_t;
 
 /**
  * @brief Borrow a structured six-week grid from the calendar model.
- * @param year Displayed year, 1..9999. @param month Displayed month, 1..12.
- * @param selected_year Selected year. @param selected_month Selected month. @param selected_day Selected day.
- * @param today_year Current year. @param today_month Current month. @param today_day Current day.
- * @return Borrowed 42 groups of year, month, day and flags; null for invalid displayed dates.
- * Invalid selected/today dates add no highlighting. The next call reuses the buffer.
+ * @param year Whole displayed Gregorian year, 1..9999.
+ * @param month Whole displayed month, 1..12.
+ * @param selected_year Whole selected year, 1..9999; an invalid selected date suppresses selection highlighting.
+ * @param selected_month Whole selected month, 1..12.
+ * @param selected_day Whole selected day valid in the selected year and month.
+ * @param today_year Whole current local year, 1..9999; an invalid current date suppresses today's highlighting.
+ * @param today_month Whole current local month, 1..12.
+ * @param today_day Whole current local day valid in the current year and month.
+ * @return Borrowed 42 groups of four uint32_t words: year, month, day and flags (valid 1, outside month 2,
+ * today 4, selected 8). Null for an invalid displayed year/month. Copy the 672 bytes before the next grid call.
  */
 const uint32_t *lab_forms_calendar_grid(double year, double month, double selected_year, double selected_month,
                                         double selected_day, double today_year, double today_month, double today_day);
 
-/** @brief Compare finite coordinates within an absolute tolerance. @param left First coordinate.
- * @param right Second coordinate. @param tolerance Non-negative absolute tolerance. @return Matching flag. */
-int lab_forms_nearly_equal(double left, double right, double tolerance);
+/**
+ * @brief Compare finite coordinates within an absolute tolerance.
+ * @param left First coordinate, in the same units as right.
+ * @param right Second coordinate to compare.
+ * @param tolerance Finite non-negative absolute tolerance in the coordinate units.
+ * @return True when the absolute difference is at most tolerance; false for a mismatch or invalid input.
+ */
+bool lab_forms_nearly_equal(double left, double right, double tolerance);
 
 /** @brief Validate browser-supplied numeric date components, without reading text.
  * @param year Whole proleptic Gregorian year in 1..9999.
  * @param month Whole month number in 1..12.
  * @param day Whole day number valid for the supplied year and month.
- * @return One for a valid supported civil date; zero otherwise.
+ * @return True for a valid supported civil date; false otherwise.
  */
-int lab_forms_date_valid(double year, double month, double day);
+bool lab_forms_date_valid(double year, double month, double day);
 
 /** @brief Return the Gregorian month length, or zero for invalid components.
  * @param year Whole proleptic Gregorian year in 1..9999.
@@ -123,11 +141,11 @@ int lab_forms_date_day(int packed);
 int lab_forms_clamp_day(double year, double month, double day);
 
 /** @brief Select the year-navigation step from browser modifier flags.
- * @param control Non-zero when the Control modifier is pressed; takes precedence over Shift.
- * @param shift Non-zero when the Shift modifier is pressed.
+ * @param control True when the Control modifier is pressed; takes precedence over Shift.
+ * @param shift True when the Shift modifier is pressed.
  * @return Year step: 100 for Control, otherwise 10 for Shift, otherwise 1.
  */
-int lab_forms_year_step(int control, int shift);
+int lab_forms_year_step(bool control, bool shift);
 
 /** @brief Open a picker with bounded structured components; the host supplies its local current year.
  * @param year Requested year, clamped to 1..9999; non-finite input uses fallback_year.
@@ -157,11 +175,11 @@ int lab_forms_picker_set(double year, double month, double day, double fallback_
 
 /** @brief Navigate an open picker; invalid or fractional increments leave it unchanged.
  * @param delta Signed whole increment in -120000..120000.
- * @param years Non-zero shifts by years; zero shifts by months.
+ * @param unit Months or years. Other non-zero values retain year navigation for ABI compatibility.
  * @param day Requested day to preserve, clamped to the destination month; non-finite values use 1.
  * @return Destination date as YYYYMMDD, or zero for a closed picker or invalid increment.
  */
-int lab_forms_picker_shift(double delta, int years, double day);
+int lab_forms_picker_shift(double delta, lab_forms_period_t unit, double day);
 
 /** @brief Convert a structured civil time to Unix milliseconds for browser timezone APIs.
  * @param year Whole proleptic Gregorian year in 1..9999.
@@ -188,12 +206,12 @@ double lab_forms_offset_hours(double local_milliseconds, double utc_milliseconds
 double lab_forms_round_offset(double value);
 
 /** @brief Prevent removal of the final row or final integration variable.
- * @param free_row Non-zero when the candidate row is a free parameter rather than an integration bound.
+ * @param free_row True when the candidate row is a free parameter rather than an integration bound.
  * @param row_count Total number of integrator rows, including free parameters.
  * @param bound_count Number of integration-bound rows.
- * @return One if removal leaves a row and, when removing a bound, another bound; zero otherwise.
+ * @return True if removal leaves a row and, when removing a bound, another bound; false otherwise.
  */
-int lab_forms_row_removable(int free_row, int row_count, int bound_count);
+bool lab_forms_row_removable(bool free_row, int row_count, int bound_count);
 
 /** @brief Choose the first available name from nine preferred names followed by x1..x99.
  * @param first Occupied-name bitmask for candidate indices 0..31; set bits mark names already in use.

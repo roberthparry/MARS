@@ -19,6 +19,7 @@
  * without changing state. The host retains only DOM references and supplies
  * its current local year for invalid numeric year input.
  */
+#include <math.h>
 #include <stdint.h>
 
 #include "lab_forms.h"
@@ -54,7 +55,7 @@ static int lab_forms_serial(int year, int month, int day)
 }
 
 /* Validate browser-supplied numeric date components, without reading text. */
-int lab_forms_date_valid(double year, double month, double day)
+bool lab_forms_date_valid(double year, double month, double day)
 {
     return lab_forms_date_ok(year, month, day);
 }
@@ -182,7 +183,7 @@ int lab_forms_clamp_day(double year, double month, double day)
 }
 
 /* Select the year-navigation step from browser modifier flags. */
-int lab_forms_year_step(int control, int shift)
+int lab_forms_year_step(bool control, bool shift)
 {
     return control ? 100 : shift ? 10 : 1;
 }
@@ -219,24 +220,24 @@ int lab_forms_picker_set(double year, double month, double day, double fallback_
 }
 
 /* Navigate an open picker; invalid or fractional increments leave it unchanged. */
-int lab_forms_picker_shift(double delta, int years, double day)
+int lab_forms_picker_shift(double delta, lab_forms_period_t unit, double day)
 {
     if (!lab_forms_picker_year)
         return 0;
-    int next = years ? lab_forms_shift_year(lab_forms_picker_year, delta)
+    int next = unit != LAB_FORMS_MONTHS ? lab_forms_shift_year(lab_forms_picker_year, delta)
                      : lab_forms_shift_month(lab_forms_picker_year, lab_forms_picker_month, delta);
     if (!next)
         return 0;
-    int year = years ? next : lab_forms_date_year(next);
-    int month = years ? lab_forms_picker_month : lab_forms_date_month(next);
+    int year = unit != LAB_FORMS_MONTHS ? next : lab_forms_date_year(next);
+    int month = unit != LAB_FORMS_MONTHS ? lab_forms_picker_month : lab_forms_date_month(next);
     return lab_forms_picker_set(year, month, day, lab_forms_picker_year);
 }
 
 /* Compare numeric coordinates, rejecting missing/non-finite values and negative tolerances. */
-int lab_forms_nearly_equal(double left, double right, double tolerance)
+bool lab_forms_nearly_equal(double left, double right, double tolerance)
 {
     if (!lab_forms_finite(left) || !lab_forms_finite(right) || !lab_forms_finite(tolerance) || tolerance < 0)
-        return 0;
+        return false;
     double difference = left - right;
     return (difference < 0 ? -difference : difference) <= tolerance;
 }
@@ -246,7 +247,7 @@ double lab_forms_utc_milliseconds(double year, double month, double day, double 
 {
     if (!lab_forms_date_ok(year, month, day) || !lab_forms_integer(hour, 0, 24) || !lab_forms_integer(minute, 0, 59) ||
         !lab_forms_integer(second, 0, 59))
-        return __builtin_nan("");
+        return NAN;
     return ((double)(lab_forms_serial((int)year, (int)month, (int)day) - 719162) * 86400 + hour * 3600 + minute * 60 +
             second) *
            1000;
@@ -256,16 +257,16 @@ double lab_forms_utc_milliseconds(double year, double month, double day, double 
 double lab_forms_offset_hours(double local_milliseconds, double utc_milliseconds)
 {
     if (!lab_forms_finite(local_milliseconds) || !lab_forms_finite(utc_milliseconds))
-        return __builtin_nan("");
+        return NAN;
     double offset = (local_milliseconds - utc_milliseconds) / 3600000;
-    return offset >= -24 && offset <= 24 ? offset : __builtin_nan("");
+    return offset >= -24 && offset <= 24 ? offset : NAN;
 }
 
 /* Round an offset to two decimal places, using browser-compatible half-up rounding. */
 double lab_forms_round_offset(double value)
 {
     if (!lab_forms_finite(value) || value < -24 || value > 24)
-        return __builtin_nan("");
+        return NAN;
     double scaled = value * 100 + 0.5;
     int whole = (int)scaled;
     if (scaled < whole)
@@ -274,7 +275,7 @@ double lab_forms_round_offset(double value)
 }
 
 /* Prevent removal of the final row or final integration variable. */
-int lab_forms_row_removable(int free_row, int row_count, int bound_count)
+bool lab_forms_row_removable(bool free_row, int row_count, int bound_count)
 {
     return row_count > 1 && (free_row || bound_count > 1);
 }

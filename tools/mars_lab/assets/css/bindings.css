@@ -123,8 +123,10 @@
 }
 
 .plot-ranges {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  min-width: 0;
   gap: 1rem;
 }
 
@@ -354,10 +356,16 @@
 .plot-ranges > .plot-group {
   display: flex;
   flex-direction: column;
+  flex: 1 1 18rem;
+  box-sizing: border-box;
   padding: 0.85rem 1rem;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.14);
+}
+
+.plot-ranges > #plotInputRangeGroup {
+  flex: 0 1 11rem;
 }
 
 #plotKindGroup,

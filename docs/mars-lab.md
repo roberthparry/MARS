@@ -70,7 +70,7 @@ the Debian/Ubuntu `node-typescript` package is not the native compiler.
 typechecking targets run the same preflight check. Missing or unusable compilers
 produce an actionable error, while successful compiler checks print the version.
 `make check-deps` also ends with an explicit confirmation that all its dependency
-checks passed, including the C development libraries.
+checks passed, including the C development libraries and the WASM C library/toolchain.
 Lab builds compile the browser sources automatically;
 `lab-typecheck` checks both the application and browser tests strictly without
 emitting JavaScript. Browser tests are authored in `tests/browser/*.ts`;
@@ -125,7 +125,7 @@ and public APIs carry Doxygen-style comments documenting their responsibilities.
 Install the external TeX rendering tools and freestanding WebAssembly toolchain as follows:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm clang lld
+sudo apt install texlive-latex-base dvisvgm clang lld wasi-libc
 make mars-lab
 ```
 
@@ -834,6 +834,23 @@ animation callbacks capture their required DOM node separately, never a scoped
 handle. Selector/property strings crossing from C are bounded to 4,095 bytes.
 Only native presentation is installed as HTML; error messages remain text.
 
+The WebAssembly C sources follow the same project C rules as the native library.
+Headers in `wasm/include/` are application module APIs, not installed library
+headers; callers include them without implementation-access macros. Binding-only
+value helpers live in `wasm/src/lab_binding_internal.h`, and request continuation
+helpers live in `wasm/src/lab_flow_request_internal.h`. Each private include needs
+its owning access macro immediately above it. Private-header checks remain active
+inside translation units even when IntelliSense is defined.
+
+Native predicate results and true/false options use C `bool`. At the WebAssembly
+boundary these remain `i32` values: browser callers pass exactly `0` or `1` for
+boolean options, and predicate results arrive as numeric `0` or `1`. The scoped
+DOM bridge still boxes JavaScript booleans as value handles; a boolean option
+must therefore be converted explicitly with `Number(flag)` before `labDOM.call`.
+Handles referring to boolean values remain `int`. Counts, indices, status codes
+and action masks keep their numeric or enum types wherever more than two values
+have distinct meanings.
+
 The browser projection is split into native modules by responsibility:
 
 - `lab_workspace_dom.c` applies mode panels, help, busy controls, result snapshots,
@@ -943,6 +960,38 @@ at a completion plan. Only plans marked for waiting await their service result;
 cancellation prevents later dispatch or publication. Declared failure stages let
 C choose recovery without retaining scoped handles.
 
+Plot-control dispatch uses `lab_plot_control_action_t` for change, input, timer,
+Auto-click and pointer-down events. Its explicit values retain the browser ABI
+(`0` through `4`). `lab_plot_slices_edit()` returns `lab_plot_slice_edit_t` to
+distinguish unrelated events, sampling requests and control-only changes; its
+target is a scoped browser element handle, not an element index or pointer.
+
+The native browser interfaces use enums for finite choices: worksheet modes,
+request operations and outcomes, workflow kinds, editor projections, plot actions
+and DOM accessors. `lab_mode_t` in `wasm/include/lab_mode.h` is the shared worksheet
+mode contract, including the mode passed to `lab_binding_projection_update()`.
+`lab_value_kind_t` names the value classifications shared by the codec and DOM
+bridges; their scoped handles remain separate. Explicit enum values preserve the
+existing numeric browser ABI. Lengths, indices, handles, bitmasks and packed
+dispatcher codes remain numeric, and boundary validation still rejects invalid
+selectors before indexing dispatch tables.
+
+Enums also name choices that previously looked like boolean flags: server/local
+storage origin (`lab_persist_origin_t`), calendar navigation units
+(`lab_forms_period_t`), polygon/segment topology (`lab_surface_primitive_t`) and
+absolute/stepped card zoom (`lab_layout_zoom_operation_t`). Their values remain
+zero and one. APIs that historically treated every non-zero value as the second
+choice retain that behaviour; strict schema-name lookups still reject unknown
+origins. Ordinary on/off flags and mode-specific schema field indices are not
+enum selectors.
+
+Native action routing uses bounded, directly indexed tables for workflow families,
+browser events, worker lifecycle operations and camera actions. Reserved entries
+retain their existing no-op, completion or rejection behaviour. Individual handlers
+keep ownership, validity and sequencing checks explicit: a table selects an action,
+but does not replace the checks that make that action safe. DOM hit-testing and
+ordered fallback rules remain conditional where their priority is significant.
+
 `transport_types.ts` groups the numeric ABI, browser service plans, lazy module
 contracts and DOM capabilities into separate sections. Plain lookup declarations
 replace nested utility types; each service call has a named record and each plan
@@ -1025,7 +1074,11 @@ These interfaces are tool-private, not installed MARS library headers.
 
 The retained surface renderer separates display geometry from mathematical coordinates:
 
-- `lab_surface_math.c` provides bounded display arithmetic and quaternion camera operations.
+- `lab_surface_math.c` provides bounded display arithmetic and quaternion camera operations,
+  using the standard `sin`, `cos`, `atan2`, `exp2` and `log2` implementations from WASI libc.
+  The library is compiled for WebAssembly and linked into the page module, not called
+  through JavaScript. The zero vector still has direction zero; binary zoom exponents
+  remain clamped to -1022 through 1023, and invalid gesture ratios still return zero.
 - `lab_surface_geometry.c` supplies projection, six-plane clipping, axis placement and
   uniform viewport fitting for WebGL, the canvas fallback and vector export.
 - `lab_surface_volume.c` retains exact endpoint text and constructs native zoom-bound
@@ -1040,12 +1093,42 @@ request coordination and drawing API access. Pixel layout and approximate readou
 are not the authority for mathematical coordinates. See
 [3-D surface interaction](#3-d-surface-interaction) for controls and precision limits.
 
-All page implementations compile into `lab_browser.wasm`. The codec, memory
-helpers and job policy also link into the separate `lab_codec.wasm` worker asset;
+All page implementations compile into `lab_browser.wasm`. The codec and job
+policy also link into the separate `lab_codec.wasm` worker asset;
 that smaller module has no DOM imports or worksheet state.
-`lab_memory.c` supplies freestanding `memset`, `memcpy`, `memmove` and `memcmp`
-for compiler-generated memory operations, without requiring JavaScript libc
-shims. Only browser bridge functions listed in `wasm/lab_browser.imports`
+Both compile the allocation-free MARSlib wire core from
+`src/protobuf/protobuf_wire.c`, using the public `protobuf_wire-t.h` interface.
+Varints, fixed-width numeric fields and bounded field reads are shared with the
+native Protobuf codec. Only this source is included: no owning message records,
+dynamic arrays, allocator or threading code is pulled into WASM. The shared
+helpers have hidden visibility and do not expand the browser ABI. Object
+traversal, schema checks, nesting limits and fixed buffers stay in the Lab adapter.
+See [Protobuf wire operations](protobuf.md#allocation-free-wire-operations).
+Both modules link standard `memset`, `memcpy`, `memmove` and `memcmp` from WASI libc,
+without JavaScript shims. Worksheet history compaction and codec message compaction
+use `memmove` because their ranges can overlap. Disjoint transfers use `memcpy`,
+and length-checked byte equality uses `memcmp`. Static label lengths use `strlen`;
+host strings retain their browser Unicode semantics. Fixed buffer capacities,
+validation and stable depth sorting remain owned by the application.
+Integrator row formatting also uses `memcpy` between its separate, preflighted
+workspace buffers. Angle wrapping uses `fmod`, retaining each caller's zero and
+negative-angle convention. Two-coordinate screen distances use `hypot` to avoid
+overflow or underflow from squaring the coordinates before taking a square root.
+Finite checks and special values use `isfinite`, `NAN` and `INFINITY` from
+`<math.h>`. The `sqrt`, `fabs`, `floor` and `ceil` compiler builtins remain
+intentional: they generate direct WASM instructions, whereas the freestanding
+`-fno-builtin` build emits function calls for the ordinary library spellings.
+The `wasi-libc` build dependency supplies C headers and a static archive;
+its musl maths implementation resides in `libc.a`, not the empty compatibility `libm.a`.
+Only required archive members are linked; no WASI system imports are permitted.
+Application symbols use default visibility and the linker exports them with
+`--export-dynamic`; do not use `--export-all`, which also retains library internals.
+The codec worker links memory operations but no maths routines. `LAB_WASM_INCLUDE` and `LAB_WASM_LIBC`
+override the packaged header directory and archive path. The dependency probe compiles
+and links calls to all five maths functions, the four memory operations and `strlen`
+without allowing unresolved imports. Browser regressions also reject unexpected
+imports in both modules and check overlapping, unaligned and zero-length memory operations.
+Only browser bridge functions listed in `wasm/lab_browser.imports`
 (declared in `lab_host.h` and `lab_dom.h`) may remain unresolved. Keep this
 allowlist synchronised when changing the bridge. The worker has its own smaller
 `wasm/lab_codec.imports` allowlist; other missing functions fail the link
@@ -1054,7 +1137,8 @@ catches compiler/toolchain differences when building on another machine.
 The WASM compiler checks that exported functions have prior declarations, and
 generated dependency files rebuild the implementations affected by a header change.
 Objects and dependency files mirror the source layout under
-`build/<configuration>/wasm/src/`; both browser assets live in
+`build/<configuration>/wasm/src/`; the shared wire object and its optional
+assembly listing live under `build/<configuration>/wasm/marslib/`. Both browser assets live in
 `build/<configuration>/wasm/`.
 The optional `make lab-wasm-asm` target writes per-source `.s` assembly listings
 beside the objects, with separate `.s.d` dependencies. See
@@ -1488,17 +1572,20 @@ leaving the plot or starting a gesture clears that pointer state.
 
 Real-only samples retain the existing real-curve presentation. Distributional
 Fourier results retain their components and labelled impulse weights, with an
-explicit notice that pointwise amplitude is undefined; they are not passed to
-the ordinary complex-function sampler.
+explicit notice that the full distribution has no pointwise 3-D, complex-plane or
+amplitude view; they are not passed to the ordinary complex-function sampler.
+Plotting just the non-impulse curve in those views would omit part of the result.
 
 Supported Fourier distributions use real and imaginary curves for the regular
 part and signed arrows for Dirac impulse weights. An arrow is not a finite
-function value. A short spectrum title keeps the full formula in the result card;
+function value. Legend entries distinguish curves from impulse weights, and the
+vertical axis reads **Value / weight**. A short spectrum title keeps the full formula in the result card;
 identically zero sampled components do not add duplicate curves or legend entries.
 
-For supported linear spectra with affine principal-value poles, the native transform
-display separates the ordinary part, with its excluded coordinates, from the impulse
-terms. The exclusions apply only to the ordinary curve, not to the impulse supports.
+The native transform display retains one complete identity, including its Dirac
+impulses. Principal-value and finite-part qualifications remain explicit; the compact
+TeX operator `Fp₁` denotes a half-line finite part with unit cutoff. Curve-only
+pointwise exclusions are not appended to this distributional identity.
 The complete distribution remains in the copyable Expression and Function output;
 it is not replaced internally by a punctured ordinary function. Unsupported or
 infinite-series forms retain their complete distribution notation.
@@ -1510,8 +1597,12 @@ nonlinear products of distributions are not approximated as narrow peaks.
 
 **Evaluate** in Expression, Equation, Differential Equation and Integrator modes installs the
 mathematical result cards first, then generates a separate **Plot** card asynchronously.
-Expression results without a non-constant plotting variable leave the Plot card
-hidden, rather than requesting an empty plot. There is no separate Plot button.
+Expression results without a non-constant plotting variable, or with an unresolved
+transform or undefined function that prevents numerical evaluation, leave the Plot
+card hidden. Native operation metadata determines this before scheduling a plot;
+an unsuccessful automatic range search alone does not make a result ineligible.
+Supported numerical integrals and sums remain eligible even without an elementary
+closed form. There is no separate Plot button.
 Plot failures remain local to that card; they do
 not hide successful mathematical results. New evaluations, editor changes and mode
 changes invalidate obsolete plot work. Plotting does not keep Evaluate busy.

@@ -360,7 +360,10 @@ class LabDOMBridge {
         return previous;
     }
 
-    /** @brief Invoke one native export with scoped handles, release them on exit and run deferred DOM effects only after successful return. */
+    /**
+     * @brief Invoke one native export with scoped handles, release them on exit and run deferred DOM effects only after successful return.
+     * Pass C bool options as Number(flag); JavaScript booleans are boxed as scoped browser-value handles.
+     */
     public call<T = unknown>(name: string, ...args: unknown[]): T {
         if (this.active) throw new Error('Lab DOM calls cannot be nested');
         this.active = true;

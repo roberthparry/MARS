@@ -8,10 +8,12 @@
  * asynchronous request ordering and stale-response checks. Browser handles are
  * scoped to a synchronous call; name indexes retain exact native identities.
  */
+#include "lab_mode.h"
 #include "lab_dom.h"
-#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_binding_editor.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
+#include "lab_binding_internal.h"
 
 /* Share the exact native variable-kind and trimmed-name policy with row reconciliation. */
 int lab_binding_variable_name(int binding)
@@ -25,7 +27,7 @@ int lab_binding_variable_name(int binding)
 /* Select variable identities in native discovery order; constants do not become calculus arguments. */
 void lab_binding_variables(int bindings)
 {
-    int names = lab_dom_object(4);
+    int names = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < lab_binding_array_count(bindings); ++i) {
         int name = lab_binding_variable_name(lab_dom_item(bindings, i));
@@ -36,13 +38,13 @@ void lab_binding_variables(int bindings)
     lab_dom_return(names);
 }
 
-static int lab_binding_selection(unsigned mode, int bindings, int bound_names)
+static int lab_binding_selection(lab_mode_t mode, int bindings, int bound_names)
 {
-    int selected = lab_dom_object(4);
+    int selected = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < lab_binding_array_count(bindings); ++i) {
         int binding = lab_dom_item(bindings, i);
-        if (mode != 4 || !lab_dom_member(bound_names, lab_binding_name(binding)))
+        if (mode != LAB_MODE_INTEGRATOR || !lab_dom_member(bound_names, lab_binding_name(binding)))
             lab_dom_push(selected, binding);
         lab_dom_release(mark);
     }
@@ -50,7 +52,7 @@ static int lab_binding_selection(unsigned mode, int bindings, int bound_names)
 }
 
 /* Hide integration-bound names from editable parameters without changing native binding records. */
-void lab_binding_select(unsigned mode, int bindings, int bound_names)
+void lab_binding_select(lab_mode_t mode, int bindings, int bound_names)
 {
     lab_dom_return(lab_binding_selection(mode, bindings, bound_names));
 }
@@ -58,32 +60,32 @@ void lab_binding_select(unsigned mode, int bindings, int bound_names)
 static int lab_binding_editor_body(int text, int metadata)
 {
     int body = lab_dom_get(metadata, "body");
-    return lab_dom_type(body) ? body : lab_dom_clean(lab_binding_or(text, ""), 0);
+    return lab_dom_type(body) ? body : lab_dom_clean(lab_binding_or(text, ""), LAB_DOM_CLEAN_TRIM);
 }
 
 /* Select and project editor metadata; return opaque source/display bytes for the native workspace owner. */
-void lab_binding_editor(unsigned mode, int inputs, int bound_names)
+void lab_binding_editor(lab_mode_t mode, int inputs, int bound_names)
 {
     int metadata = lab_dom_get(inputs, "metadata"), text = lab_dom_get(inputs, "text");
     int body_text = lab_dom_get(inputs, "body"), ready = lab_dom_get(inputs, "ready");
     int body = lab_dom_type(body_text) ? lab_binding_editor_body(body_text, lab_dom_get(inputs, "bodyMetadata"))
                                        : lab_binding_editor_body(text, metadata);
     int bindings = lab_dom_get(inputs, "bindings");
-    if (lab_dom_type(bindings) != 4)
-        bindings = mode == 0 ? 0 : lab_dom_get(metadata, "bindings");
+    if (lab_dom_type(bindings) != LAB_VALUE_ARRAY)
+        bindings = mode == LAB_MODE_EXPRESSION ? 0 : lab_dom_get(metadata, "bindings");
     int selected = lab_binding_selection(mode, bindings, bound_names);
-    int editor = lab_dom_query(0, "#expr"), result = lab_dom_object(5);
-    lab_dom_set(result, "fullText", lab_dom_clean(lab_binding_or(text, ""), 0));
+    int editor = lab_dom_query(0, "#expr"), result = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(result, "fullText", lab_dom_clean(lab_binding_or(text, ""), LAB_DOM_CLEAN_TRIM));
     lab_dom_set(result, "displayText", body);
     lab_dom_set(result, "bindings", selected);
-    lab_dom_set(result, "refresh", lab_dom_scalar(1, mode == 0 && !lab_dom_type(ready)));
-    lab_dom_write(editor, 3, "bindingRefreshValid", lab_dom_string("true"));
+    lab_dom_set(result, "refresh", lab_dom_scalar(LAB_VALUE_BOOLEAN, mode == LAB_MODE_EXPRESSION && !lab_dom_type(ready)));
+    lab_dom_write(editor, LAB_DOM_DATASET, "bindingRefreshValid", lab_dom_string("true"));
     if (lab_dom_type(ready))
-        lab_dom_write(editor, 3, "evaluationReady",
-                      lab_dom_string(lab_binding_is(lab_dom_clean(ready, 1), "yes") ? "true" : "false"));
+        lab_dom_write(editor, LAB_DOM_DATASET, "evaluationReady",
+                      lab_dom_string(lab_binding_is(lab_dom_clean(ready, LAB_DOM_CLEAN_LOWER), "yes") ? "true" : "false"));
     else
         lab_dom_remove(editor, "data-evaluation-ready");
-    lab_dom_write(editor, 5, "", body);
+    lab_dom_write(editor, LAB_DOM_VALUE, "", body);
     lab_dom_return(result);
 }
 
@@ -120,7 +122,7 @@ void lab_binding_goal_starts(int source, int solved, int provided, int cache)
 /* Fill only falsey supplied starts from native goal metadata, preserving exact symbolic values. */
 void lab_binding_goal_prepare(int editor, int provided)
 {
-    int result = lab_dom_object(5), start = lab_binding_copy(provided);
+    int result = lab_dom_object(LAB_VALUE_OBJECT), start = lab_binding_copy(provided);
     int defaults = lab_dom_get(editor, "starts"), keys = lab_dom_keys(defaults);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < lab_dom_count(keys); ++i) {

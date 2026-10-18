@@ -884,7 +884,7 @@ namespace WorksheetRequests {
                 },
                 solverPublish: (pending: MarsApiSolverPending, response: unknown, data: unknown, failed: boolean) => this.dependencies.native.call(
                     'lab_solver_view_publish', this.dependencies.workspace.currentMode(), pending, this.pending,
-                    Number(this.dependencies.requests.current(pending.request)), this.dependencies.native.call('lab_result_solver_owner'), response, data, failed),
+                    Number(this.dependencies.requests.current(pending.request)), this.dependencies.native.call('lab_result_solver_owner'), response, data, Number(failed)),
                 solverRelease: (pending: MarsApiSolverPending) => {
                     if (this.pending === pending)
                         this.pending = null;

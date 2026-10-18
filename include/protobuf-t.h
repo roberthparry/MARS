@@ -15,6 +15,8 @@
  * This is a native wire codec, not a .proto compiler, generated service client or
  * transport implementation. Deprecated group fields are unsupported. Follow the
  * documented ownership rules for message handles and returned byte arrays.
+ * The separate protobuf_wire-t.h interface provides allocation-free operations
+ * on caller-owned buffers and is shared with the WebAssembly codec.
  */
 
 #ifndef MARS_PROTOBUF_H
@@ -25,16 +27,12 @@
 #include <stdint.h>
 
 #include "array-t.h"
+#include "protobuf_wire-t.h"
 
 /**
  * @brief Opaque ordered Protocol Buffers wire message; field meaning comes from the application's schema.
  */
 typedef struct _protobuf_t protobuf_t;
-
-/**
- * @brief Supported wire types; deprecated groups are rejected.
- */
-typedef enum { PROTOBUF_VARINT = 0, PROTOBUF_FIXED64 = 1, PROTOBUF_BYTES = 2, PROTOBUF_FIXED32 = 5 } protobuf_wire_t;
 
 /**
  * @brief Create an empty bounded message.

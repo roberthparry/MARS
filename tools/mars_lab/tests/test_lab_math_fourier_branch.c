@@ -74,6 +74,8 @@ static void test_full_distribution_and_mathematical_notation(void)
             for (size_t i = 0; i < 4; ++i)
                 lab_math_contains(math_fourier_text(r, cards[c]), forbidden[i], false);
         if (f) {
+            lab_math_contains(math_fourier_text(r, "tex"), "\\operatorname{Fp}_{1}", true);
+            lab_math_contains(math_fourier_text(r, "tex"), "\\underbrace", false);
             lab_math_contains(math_fourier_text(r, "expression"), "step(k)/k", true);
             lab_math_contains(math_fourier_text(r, "expression"), "Dk(", false);
             lab_math_contains(math_fourier_text(r, "expression"), "ln(2)", true);
@@ -83,6 +85,18 @@ static void test_full_distribution_and_mathematical_notation(void)
             lab_math_contains(math_fourier_text(r, "tex"), "\\operatorname{D}", false);
             lab_math_contains(math_fourier_text(r, "function"), "delta(k).ln", false);
         }
+    }
+    const char *bound[] = {"{@F{asin(t)} | ω=?}", "{@F{asin(t)} | ω=2}"};
+    for (size_t i = 0; i < sizeof bound / sizeof *bound; ++i) {
+        const json_t *r = math_fourier_fields(bound[i], "ω");
+        const char *identity = math_fourier_text(r, "transform_identity_TeX");
+        lab_math_contains(identity, "\\omega", true);
+        lab_math_contains(identity, "\\delta", true);
+        lab_math_contains(identity, "\\operatorname{Fp}_{1}", true);
+        lab_math_contains(identity, " = ", true);
+        lab_math_contains(identity, "NAN", false);
+        lab_math_contains(identity, "\\ne 0", false);
+        lab_math_contains(identity, "\\underbrace", false);
     }
 }
 

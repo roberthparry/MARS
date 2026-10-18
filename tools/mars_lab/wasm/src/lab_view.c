@@ -8,6 +8,9 @@
  * and applies returned decisions to the DOM. No text, SVG or mathematics is
  * parsed here. Static strings are borrowed for the lifetime of the module.
  */
+#include <string.h>
+
+#include "lab_mode.h"
 #include "lab_view.h"
 
 typedef struct {
@@ -58,15 +61,15 @@ static unsigned lab_view_card_zooms[64], lab_view_card_count;
 static int lab_view_expanded_card = -1;
 
 /* Registration is bounded and explicit; the host retains DOM references, never state ownership. */
-int lab_view_cards_reset(unsigned count)
+bool lab_view_cards_reset(unsigned count)
 {
     if (count > sizeof(lab_view_card_zooms) / sizeof(*lab_view_card_zooms))
-        return 0;
+        return false;
     lab_view_card_count = count;
     lab_view_expanded_card = -1;
     for (unsigned i = 0; i < count; ++i)
         lab_view_card_zooms[i] = 3;
-    return 1;
+    return true;
 }
 
 /* Expose the selected table index rather than a mutable host mirror. */
@@ -84,7 +87,7 @@ int lab_view_card_set_zoom(unsigned card, double index)
 }
 
 /* Step the owned state directly; browser attributes cannot change the starting point. */
-int lab_view_card_step_zoom(unsigned card, int direction)
+int lab_view_card_step_zoom(unsigned card, lab_view_zoom_direction_t direction)
 {
     if (card >= lab_view_card_count)
         return -1;
@@ -119,7 +122,7 @@ static int lab_view_finite(double value)
 
 /* Resolve editor resize policy without retaining browser handles or interpreting text. */
 const double *lab_view_editor_resize(double viewport_height, unsigned visible_count, double scroll_height,
-                                     double client_height, double current_height, double automatic_height, int manual)
+                                     double client_height, double current_height, double automatic_height, bool manual)
 {
     static double result[3];
     if (!lab_view_finite(viewport_height) || !lab_view_finite(scroll_height) || !lab_view_finite(client_height) ||
@@ -197,28 +200,24 @@ const double *lab_view_picker_rect(double viewport_width, double viewport_height
 }
 
 /* Borrow a mode label; invalid modes use Expression and invalid fields use an empty label. */
-const char *lab_view_text(unsigned mode, unsigned field)
+const char *lab_view_text(lab_mode_t mode, lab_view_label_t field)
 {
-    const lab_view_mode_t *item = &lab_view_modes[mode < 7 ? mode : 0];
+    const lab_view_mode_t *item = &lab_view_modes[(unsigned)mode < LAB_MODE_COUNT ? mode : LAB_MODE_EXPRESSION];
     const char *const fields[] = {item->title,  item->subtitle, item->rendered,
                                   item->parsed, item->function, item->value};
-    return field < 6 ? fields[field] : "";
+    return (unsigned)field <= LAB_VIEW_VALUE ? fields[field] : "";
 }
 
 /* Measure a static mode label without exposing an unbounded host memory read. */
-unsigned lab_view_text_length(unsigned mode, unsigned field)
+unsigned lab_view_text_length(lab_mode_t mode, lab_view_label_t field)
 {
-    const char *text = lab_view_text(mode, field);
-    unsigned length = 0;
-    while (text[length])
-        ++length;
-    return length;
+    return (unsigned)strlen(lab_view_text(mode, field));
 }
 
 /* Return resolved card/action flags, using the caller's measured value presence. */
-unsigned lab_view_mode_flags(unsigned mode, int has_value)
+unsigned lab_view_mode_flags(lab_mode_t mode, bool has_value)
 {
-    unsigned flags = lab_view_modes[mode < 7 ? mode : 0].flags;
+    unsigned flags = lab_view_modes[(unsigned)mode < LAB_MODE_COUNT ? mode : LAB_MODE_EXPRESSION].flags;
     if ((flags & lab_view_value_if_present) && has_value)
         flags |= lab_view_value;
     return flags;
@@ -245,7 +244,7 @@ double lab_view_zoom(double index)
 }
 
 /* Step through the fixed zoom table without wrapping. */
-unsigned lab_view_zoom_step(double index, int direction)
+unsigned lab_view_zoom_step(double index, lab_view_zoom_direction_t direction)
 {
     return lab_view_zoom_index((double)lab_view_zoom_index(index) + (direction < 0 ? -1 : 1));
 }
@@ -261,18 +260,18 @@ double lab_view_matrix_scale(double base, double zoom, double available, double 
 }
 
 /* Choose the native wrapped rendering only when its compact counterpart exceeds the measured card. */
-int lab_view_wrapped(double width, double scale, double available, int has_variant)
+bool lab_view_wrapped(double width, double scale, double available, bool has_variant)
 {
     return has_variant && lab_view_finite(width) && lab_view_finite(scale) && lab_view_finite(available) && width > 0 &&
            scale > 0 && width * scale > (available > 0 ? available : 0) + 1;
 }
 
 /* Return enabled button bits for run, back, forward, goal, less and more precision. */
-unsigned lab_view_controls(unsigned mode, int busy, int ready, unsigned back, unsigned forward, int can_goal,
-                           int minimum, int maximum)
+unsigned lab_view_controls(lab_mode_t mode, bool busy, bool ready, unsigned back, unsigned forward, bool can_goal,
+                           bool minimum, bool maximum)
 {
     if (busy)
         return 0;
-    return (!!ready) | ((back > 0) << 1) | ((forward > 0) << 2) | ((mode == 0 && can_goal) << 3) | ((!minimum) << 4) |
-           ((!maximum) << 5);
+    return (!!ready) | ((back > 0) << 1) | ((forward > 0) << 2) | ((mode == LAB_MODE_EXPRESSION && can_goal) << 3) |
+           ((!minimum) << 4) | ((!maximum) << 5);
 }

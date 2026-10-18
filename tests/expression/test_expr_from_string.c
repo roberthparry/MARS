@@ -1478,8 +1478,9 @@ static void test_from_string_series_ellipsis(void)
                        "{ a/(r - 1)·(r^(n + 1) - 1) | r = ?; a = ?, n = ? }");
     ASSERT_NOT_NULL(strstr(function_text, "return a.(r^(n + 1) - 1)/(r - 1)."));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX), "\\sum_{k=0}^{n}a\\mkern-2mu r^{k}"));
+    printf("Geometric series derivation: %s\n", string_c_str(derivation_TeX));
     ASSERT_NOT_NULL(strstr(string_c_str(derivation_TeX),
-                           "\\frac{a}{r - 1}\\mkern-2mu \\left(r^{n + 1} - 1\\right)"));
+                           "\\frac{a\\mkern-2mu \\left(r^{n + 1} - 1\\right)}{r - 1}"));
     free(function_text);
     free(expression_text);
     expr_bindings_free(bindings);

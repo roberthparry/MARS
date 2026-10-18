@@ -56,7 +56,7 @@ static int lab_flow_state_forms_accept(int frame)
 
 static int lab_flow_state_forms_payload(int frame, int rows, int expression, int fallback)
 {
-    int payload = lab_dom_object(5);
+    int payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(payload, "action", lab_dom_string("integrator"));
     if (rows)
         lab_dom_set(payload, "rows", lab_dom_get(frame, "rows"));
@@ -69,7 +69,18 @@ static int lab_flow_state_forms_payload(int frame, int rows, int expression, int
     return payload;
 }
 
+/**
+ * @brief Discard forward history during worksheet clearing.
+ * @param frame Borrowed clear-workflow frame advanced past history removal to stage 6.
+ * @return Scoped plan calling the forward-history clear service.
+ */
 static int lab_flow_state_clear_state_clear_forward(int frame);
+
+/**
+ * @brief Capture the cleared worksheet under the owning request.
+ * @param frame Borrowed clear-workflow frame holding request and receiving the captured flag.
+ * @return Scoped capture plan awaited before clearing the retained source.
+ */
 static int lab_flow_state_clear_state_capture_request(int frame);
 
 static int lab_flow_state_clear_state_clear_prelude(int frame)
@@ -231,7 +242,7 @@ static int lab_flow_state_forms_refresh_state_forms_rows(int frame)
 static int lab_flow_state_forms_refresh_complete(int frame)
 {
     int completion = lab_dom_get(frame, "completion");
-    lab_dom_set(completion, "done", lab_dom_scalar(1, 1));
+    lab_dom_set(completion, "done", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return completion;
 }
 
@@ -270,7 +281,7 @@ static int lab_flow_state_forms_parse_state_forms_rows(int frame)
 static int lab_flow_state_forms_parse_complete(int frame)
 {
     int completion = lab_dom_get(frame, "completion");
-    lab_dom_set(completion, "done", lab_dom_scalar(1, 1));
+    lab_dom_set(completion, "done", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return completion;
 }
 
@@ -301,7 +312,7 @@ static int lab_flow_state_forms_restore_guard(int frame)
 static int lab_flow_state_forms_restore_state_forms_expression(int frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     if (!lab_flow_state_forms_revision(frame))
         return lab_flow_state_forms_exhausted(frame);
     return lab_flow_call(frame, 2, "stateFormsExpression", "expression", 0, 0);
@@ -321,14 +332,14 @@ static int lab_flow_state_forms_restore_recheck(int frame)
 static int lab_flow_state_forms_restore_state_forms_expression_4(int frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(frame, 5, "stateFormsExpression", "currentExpression", 0, 0);
 }
 
 static int lab_flow_state_forms_restore_state_forms_metadata(int frame)
 {
     if (!lab_flow_state_forms_accept(frame))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(frame, 6, "stateFormsMetadata", 0, 0, 2, lab_dom_get(frame, "expression"),
                          lab_dom_get(frame, "result"));
 }
@@ -346,7 +357,7 @@ static int lab_flow_state_forms_restore_state_forms_render(int frame)
 static int lab_flow_state_forms_restore_complete(int frame)
 {
     (void)frame;
-    return lab_flow_done(lab_dom_scalar(1, 1));
+    return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
 static int lab_flow_state_forms_restore_otherwise(int frame)
@@ -375,10 +386,14 @@ static int lab_flow_state_forms_restore(int frame)
 }
 
 /* Four distinct workflows share revision policy without retaining browser handles. */
-int lab_flow_state_forms(unsigned kind, int frame, int view)
+int lab_flow_state_forms(lab_flow_state_forms_kind_t kind, int frame, int view)
 {
     (void)view;
-    static int (*const handlers[])(int) = {lab_flow_state_clear, lab_flow_state_forms_refresh,
-                                           lab_flow_state_forms_parse, lab_flow_state_forms_restore};
-    return kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0);
+    static int (*const handlers[])(int) = {
+        [LAB_FLOW_STATE_FORMS_CLEAR]          = lab_flow_state_clear,
+        [LAB_FLOW_STATE_FORMS_REFRESH]        = lab_flow_state_forms_refresh,
+        [LAB_FLOW_STATE_FORMS_PARSE_BOUNDS]   = lab_flow_state_forms_parse,
+        [LAB_FLOW_STATE_FORMS_RESTORE_BOUNDS] = lab_flow_state_forms_restore,
+    };
+    return (unsigned)kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0);
 }

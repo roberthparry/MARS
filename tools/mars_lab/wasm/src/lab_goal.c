@@ -12,7 +12,7 @@
 
 static void lab_goal_emit(int calls, const char *service, unsigned count, int first, int second)
 {
-    int call = lab_dom_object(5), args = lab_dom_object(4);
+    int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     if (count)
         lab_dom_push(args, first);
     if (count > 1)
@@ -23,24 +23,24 @@ static void lab_goal_emit(int calls, const char *service, unsigned count, int fi
 }
 
 /* Select completion services without changing browser state or inspecting mathematical text. */
-void lab_goal_complete(unsigned outcome, int data, int completion, int error)
+void lab_goal_complete(lab_request_outcome_t outcome, int data, int completion, int error)
 {
-    if (!outcome || outcome > 4) {
+    if (outcome == LAB_REQUEST_OUTCOME_STALE || (unsigned)outcome > LAB_REQUEST_OUTCOME_EXCEPTION) {
         lab_dom_return(0);
         return;
     }
-    int plan = lab_dom_object(5), calls = lab_dom_object(4);
-    unsigned success = outcome == 2 || outcome == 3;
+    int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
+    unsigned success = outcome == LAB_REQUEST_OUTCOME_SUCCESS || outcome == LAB_REQUEST_OUTCOME_PARTIAL;
     lab_dom_set(plan, "calls", calls);
-    lab_dom_set(plan, "result", lab_dom_scalar(1, success));
+    lab_dom_set(plan, "result", lab_dom_scalar(LAB_VALUE_BOOLEAN, success));
     if (!success) {
-        int message = outcome == 4 ? error : lab_dom_get(data, "error");
-        if (outcome != 4 && !lab_dom_truth(message))
+        int message = outcome == LAB_REQUEST_OUTCOME_EXCEPTION ? error : lab_dom_get(data, "error");
+        if (outcome != LAB_REQUEST_OUTCOME_EXCEPTION && !lab_dom_truth(message))
             message = lab_dom_string("Goal seek failed");
         lab_goal_emit(calls, "setRenderedError", 1, message, 0);
         lab_goal_emit(calls, "resetRenderedDigits", 0, 0, 0);
-        int options = lab_dom_object(5);
-        lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
+        int options = lab_dom_object(LAB_VALUE_OBJECT);
+        lab_dom_set(options, "keepBindings", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
         lab_goal_emit(calls, "clearResultDetails", 1, options, 0);
         lab_goal_emit(calls, "setStatus", 1, lab_dom_string("Error"), 0);
     } else {

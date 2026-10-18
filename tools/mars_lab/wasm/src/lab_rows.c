@@ -10,6 +10,8 @@
  * match the native form limit; bounded passes visit each supplied row once per
  * phase and replace repeated host crossings and temporary JavaScript sets.
  */
+#include <string.h>
+
 #include "lab_workspace.h"
 #include "lab_rows.h"
 
@@ -31,20 +33,19 @@ uint32_t lab_rows_revision_next(void)
 }
 
 /* Expression identity is supplied as an exact host comparison, never mathematical interpretation. */
-int lab_rows_revision_accept(uint32_t revision, int same_expression)
+bool lab_rows_revision_accept(uint32_t revision, bool same_expression)
 {
     return !lab_rows_exhausted && revision && revision == lab_rows_revision && same_expression;
 }
 
 static unsigned lab_rows_copy(unsigned char *target, unsigned offset, const unsigned char *text, unsigned length)
 {
-    for (unsigned i = 0; i < length; ++i)
-        target[offset + i] = text[i];
+    memcpy(target + offset, text, length);
     return offset + length;
 }
 
 /* Append one row with its separator after validating the complete output extent. */
-int lab_rows_text_append(unsigned name, unsigned lower, unsigned upper, int free_row, unsigned offset)
+int lab_rows_text_append(unsigned name, unsigned lower, unsigned upper, bool free_row, unsigned offset)
 {
     unsigned capacity = lab_workspace_capacity();
     if (name > capacity || lower > capacity - name || upper > capacity - name - lower)
@@ -56,8 +57,8 @@ int lab_rows_text_append(unsigned name, unsigned lower, unsigned upper, int free
     unsigned extra = notation + (offset != 0);
     if (offset > capacity || extra > capacity - offset || length > capacity - offset - extra)
         return -1;
-    const unsigned char *input = lab_workspace_input(0);
-    unsigned char *output = lab_workspace_input(1);
+    const unsigned char *input = lab_workspace_input(LAB_WORKSPACE_INPUT);
+    unsigned char *output = lab_workspace_input(LAB_WORKSPACE_ALTERNATE);
     if (offset)
         output[offset++] = '\n';
     if (free_row)
@@ -75,7 +76,7 @@ int lab_rows_text_append(unsigned name, unsigned lower, unsigned upper, int free
 }
 
 /* Copy authored fields around fixed notation without interpreting bound expressions. */
-int lab_rows_text(unsigned name, unsigned lower, unsigned upper, int free_row)
+int lab_rows_text(unsigned name, unsigned lower, unsigned upper, bool free_row)
 {
     return lab_rows_text_append(name, lower, upper, free_row, 0);
 }
@@ -153,22 +154,22 @@ const uint32_t *lab_rows_merge(unsigned count, unsigned bounds)
 }
 
 /* Stage the entire edit before publication, so rejected edits leave the previous plan intact. */
-const uint32_t *lab_rows_edit(unsigned count, unsigned index, unsigned operation)
+const uint32_t *lab_rows_edit(unsigned count, unsigned index, lab_row_operation_t operation)
 {
-    if (!count || !lab_rows_valid(count) || index >= count || operation < 1 || operation > 3)
+    if (!count || !lab_rows_valid(count) || index >= count || operation < LAB_ROW_TOGGLE || operation > LAB_ROW_REMOVE)
         return 0;
     unsigned bounds = 0;
     for (unsigned i = 0; i < count; ++i)
         bounds += !(lab_rows_flags[i] & lab_rows_free);
-    if (operation == 3 && (count == 1 || (bounds == 1 && !(lab_rows_flags[index] & lab_rows_free))))
+    if (operation == LAB_ROW_REMOVE && (count == 1 || (bounds == 1 && !(lab_rows_flags[index] & lab_rows_free))))
         return 0;
     uint32_t plan[1 + 2 * (lab_rows_limit + 1)];
     unsigned size = 0, result_bounds = 0;
     for (unsigned i = 0; i < count; ++i) {
-        if (operation == 3 && i == index)
+        if (operation == LAB_ROW_REMOVE && i == index)
             continue;
         uint32_t flags = lab_rows_flags[i];
-        if (operation == 1 && i == index) {
+        if (operation == LAB_ROW_TOGGLE && i == index) {
             flags ^= lab_rows_free;
             if (flags & lab_rows_free)
                 flags &= ~(lab_rows_lower | lab_rows_upper);
@@ -176,7 +177,7 @@ const uint32_t *lab_rows_edit(unsigned count, unsigned index, unsigned operation
         plan[1 + 2 * size] = i;
         plan[2 + 2 * size++] = flags;
         result_bounds += !(flags & lab_rows_free);
-        if (operation == 2 && i == index) {
+        if (operation == LAB_ROW_INSERT && i == index) {
             plan[1 + 2 * size] = lab_rows_limit;
             plan[2 + 2 * size++] = 0;
             ++result_bounds;

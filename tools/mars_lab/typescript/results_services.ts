@@ -83,7 +83,7 @@ namespace WorksheetResults {
 
         /** @brief Render native output, retain its TeX and return that exact text. */
         render(mode: WorksheetMode, data: WorksheetEvaluationData, expandable: unknown) {
-            const text = labDOM.call('lab_evaluation_render', mode, data, Number(expandable)) as string;
+            const text = labDOM.call('lab_evaluation_render', mode, data, Number(Boolean(expandable))) as string;
             WorksheetWorkspace.presentation.state.lastTex = text;
             return text;
         },

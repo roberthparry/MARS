@@ -187,6 +187,14 @@ expr_t *expr_mul_simplify_owned(const expr_t *left, const expr_t *right);
 expr_t *expr_div_simplify_owned(const expr_t *left, const expr_t *right);
 int expr_struct_eq(const expr_t *u, const expr_t *v);
 bool expr_child_exprs(const expr_t *expr, const expr_t **left_out, const expr_t **right_out);
+
+/**
+ * @brief Check that native numerical evaluation is not blocked by an unresolved transform or undefined function.
+ * Resolves supported transforms and inspects their results without assigning variables or sampling. A true result
+ * does not guarantee finite values, suitable bounds or convergence; numerical integrals and sums remain eligible.
+ */
+bool expr_has_numeric_form(const expr_t *expr);
+
 bool expr_is_formal_derivative(const expr_t *expr);
 expr_t *expr_new_formal_derivative(const expr_t *dependent, size_t wrt_count, expr_t *const *wrts);
 expr_t *expr_new_arbitrary_function(const char *name, const expr_t *argument);

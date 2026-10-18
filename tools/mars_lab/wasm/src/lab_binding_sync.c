@@ -9,17 +9,20 @@
  * service; native continuations own stale-response checks while browser adapters
  * execute awaits and workspace persistence.
  */
+#include <stdbool.h>
+
 #include "lab_dom.h"
-#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_binding_editor.h"
 #include "lab_binding_sync.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
+#include "lab_binding_internal.h"
 
 /* Prepare the complete service record, preserving Array.map holes and default semantics. */
 void lab_binding_sync_request(int inputs)
 {
-    int result = lab_dom_object(5);
-    int source = lab_dom_clean(lab_dom_text(lab_binding_or(lab_dom_get(inputs, "body"), "")), 0);
+    int result = lab_dom_object(LAB_VALUE_OBJECT);
+    int source = lab_dom_clean(lab_dom_text(lab_binding_or(lab_dom_get(inputs, "body"), "")), LAB_DOM_CLEAN_TRIM);
     lab_dom_set(result, "source", source);
     if (!lab_dom_length(source)) {
         lab_dom_return(result);
@@ -31,7 +34,7 @@ void lab_binding_sync_request(int inputs)
         lab_dom_return(result);
         return;
     }
-    int normalised = lab_dom_object(4);
+    int normalised = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     /* Each input index is visited once, as in Array.map; temporary handles are bounded. */
     for (unsigned i = 0; i < count; ++i) {
@@ -42,11 +45,11 @@ void lab_binding_sync_request(int inputs)
             int binding = lab_dom_item(bindings, i);
             if (!lab_dom_type(binding)) {
                 lab_dom_release(mark);
-                lab_dom_set(result, "invalid", lab_dom_scalar(1, 1));
+                lab_dom_set(result, "invalid", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
                 lab_dom_return(result);
                 return;
             }
-            int entry = lab_dom_object(5);
+            int entry = lab_dom_object(LAB_VALUE_OBJECT);
             lab_dom_set(entry, "name", lab_dom_text(lab_binding_or(lab_dom_get(binding, "name"), "")));
             lab_dom_set(entry, "kind", lab_binding_or(lab_dom_get(binding, "kind"), "variable"));
             int value = lab_dom_get(binding, "value");
@@ -59,7 +62,7 @@ void lab_binding_sync_request(int inputs)
         }
         lab_dom_release(mark);
     }
-    int request = lab_dom_object(5);
+    int request = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(request, "action", lab_dom_string("editor"));
     lab_dom_set(request, "operation", lab_dom_string("bindings"));
     lab_dom_set(request, "mode", lab_dom_string("replace"));
@@ -69,21 +72,21 @@ void lab_binding_sync_request(int inputs)
     lab_dom_return(result);
 }
 
-static int lab_binding_sync_flag(int data, const char *field, const char *fallback, const char *expected)
+static bool lab_binding_sync_flag(int data, const char *field, const char *fallback, const char *expected)
 {
     int value = lab_dom_truth(data) ? lab_dom_get(data, field) : 0;
-    return lab_binding_is(lab_dom_clean(lab_dom_text(lab_binding_or(value, fallback)), 1), expected);
+    return lab_binding_is(lab_dom_clean(lab_dom_text(lab_binding_or(value, fallback)), LAB_DOM_CLEAN_LOWER), expected);
 }
 
 /* Apply accepted editor presentation and derive metadata from the existing binding policies. */
 void lab_binding_sync_apply(int editor, int inputs)
 {
     int data = lab_dom_get(inputs, "data"), bindings = lab_dom_get(inputs, "bindings");
-    lab_dom_write(editor, 3, "bindingRefreshValid", lab_dom_string("true"));
-    lab_dom_write(editor, 3, "evaluationReady",
+    lab_dom_write(editor, LAB_DOM_DATASET, "bindingRefreshValid", lab_dom_string("true"));
+    lab_dom_write(editor, LAB_DOM_DATASET, "evaluationReady",
                   lab_dom_string(lab_binding_sync_flag(data, "evaluation_ready", "no", "yes") ? "true" : "false"));
-    lab_dom_write(editor, 5, "", lab_dom_get(inputs, "displayText"));
-    int result = lab_dom_object(5), variables = lab_dom_object(4);
+    lab_dom_write(editor, LAB_DOM_VALUE, "", lab_dom_get(inputs, "displayText"));
+    int result = lab_dom_object(LAB_VALUE_OBJECT), variables = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < lab_binding_array_count(bindings); ++i) {
         int name = lab_binding_variable_name(lab_dom_item(bindings, i));
@@ -93,6 +96,6 @@ void lab_binding_sync_apply(int editor, int inputs)
     }
     lab_dom_set(result, "variables", variables);
     lab_dom_set(result, "differentiable",
-                lab_dom_scalar(1, !lab_binding_sync_flag(data, "differentiable", "yes", "no")));
+                lab_dom_scalar(LAB_VALUE_BOOLEAN, !lab_binding_sync_flag(data, "differentiable", "yes", "no")));
     lab_dom_return(result);
 }

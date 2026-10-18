@@ -1,6 +1,6 @@
 /**
  * @file lab_tooltip.h
- * @brief Private interface: accessible control hints and their DOM projection for the WASM client.
+ * @brief Application API: accessible control hints and their DOM projection for the WASM client.
  *
  * Owns label precedence, authored-title caching, description restoration and
  * viewport placement. The host retains only the active node for event delivery,
@@ -14,13 +14,22 @@
 #ifndef LAB_WASM_TOOLTIP_H
 #define LAB_WASM_TOOLTIP_H
 
-/** @brief Project tooltip text, accessibility and viewport placement. @param button Candidate button node.
- * @param previous Previous active node, including a detached node, or zero.
- * @param width Viewport width. @param height Viewport height.
- * @return One when accepted; zero for absent or hidden candidates, leaving the current tooltip unchanged. */
-int lab_tooltip_show(int button, int previous, double width, double height);
+#include <stdbool.h>
 
-/** @brief Hide the tooltip and restore original accessibility attributes exactly. @param button Active node or zero. */
+/**
+ * @brief Project tooltip text, accessibility and viewport placement.
+ * @param button Scoped candidate button-node handle.
+ * @param previous Scoped previously active node handle, including a detached node, or zero for none.
+ * @param width Viewport width in CSS pixels.
+ * @param height Viewport height in CSS pixels.
+ * @return True when accepted; false for an absent node or one within a hidden container, leaving the tooltip unchanged.
+ */
+bool lab_tooltip_show(int button, int previous, double width, double height);
+
+/**
+ * @brief Hide the tooltip and restore original accessibility attributes exactly.
+ * @param button Scoped active button-node handle, or zero when no control owns the tooltip.
+ */
 void lab_tooltip_hide(int button);
 
 #endif

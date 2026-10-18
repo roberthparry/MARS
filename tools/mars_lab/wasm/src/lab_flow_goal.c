@@ -9,6 +9,7 @@
  * mathematical source. Errors in recovery itself propagate to the outer UI guard.
  */
 #include "lab_dom.h"
+#include "lab_requests.h"
 #include "lab_flow.h"
 #include "lab_flow_aux.h"
 
@@ -64,7 +65,7 @@ static int lab_flow_goal_input(int frame, int view)
 static int lab_flow_goal_source(int frame, int view)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     if (lab_dom_truth(lab_dom_get(lab_dom_get(frame, "options"), "commitBindings")))
         return lab_flow_call(frame, LAB_FLOW_GOAL_INPUT, "expressionText", "sourceText", 0, 0);
     return lab_flow_goal_input(frame, view);
@@ -74,7 +75,7 @@ static int lab_flow_goal_prepare(int frame, int view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "input")))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(frame, LAB_FLOW_GOAL_PREPARE_CURRENT, "goalPrepare", "seek", 1, 2,
                          lab_dom_get(frame, "sourceText"), lab_dom_get(frame, "start"));
 }
@@ -90,7 +91,7 @@ static int lab_flow_goal_expression(int frame, int view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(frame, LAB_FLOW_GOAL_PRECISION, "goalExpression", "expression", 0, 1,
                          lab_dom_get(lab_dom_get(frame, "seek"), "expression"));
 }
@@ -98,7 +99,7 @@ static int lab_flow_goal_expression(int frame, int view)
 static int lab_flow_goal_precision(int frame, int view)
 {
     (void)view;
-    int payload = lab_dom_object(5);
+    int payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(payload, "expression", lab_dom_get(frame, "expression"));
     lab_dom_set(payload, "target", lab_dom_get(frame, "target"));
     lab_dom_set(payload, "start", lab_dom_get(lab_dom_get(frame, "seek"), "start"));
@@ -129,7 +130,7 @@ static int lab_flow_goal_response(int frame, int view)
     int outcome = lab_dom_get(frame, "outcome");
     if (!lab_dom_truth(outcome))
         return lab_flow_done(0);
-    if (lab_dom_number(outcome) == 1)
+    if (lab_dom_number(outcome) == (double)LAB_REQUEST_OUTCOME_FAILURE)
         return lab_flow_call(frame, LAB_FLOW_GOAL_EFFECTS, "native", "plan", 0, 5, lab_dom_string("lab_goal_complete"),
                              outcome, lab_dom_get(frame, "data"), 0, 0);
     return lab_flow_call(frame, LAB_FLOW_GOAL_BODY, "native", "cards", 0, 5, lab_dom_string("lab_evaluation_cards"),
@@ -149,7 +150,7 @@ static int lab_flow_goal_assemble(int frame, int view)
     (void)view;
     int bindings = lab_dom_get(lab_dom_get(frame, "data"), "binding_values");
     if (!lab_dom_truth(bindings))
-        bindings = lab_dom_object(4);
+        bindings = lab_dom_object(LAB_VALUE_ARRAY);
     return lab_flow_call(frame, LAB_FLOW_GOAL_ASSEMBLE_CURRENT, "expressionWithBindings", "editorExpression", 1, 2,
                          lab_dom_get(frame, "editorBody"), bindings);
 }
@@ -167,8 +168,8 @@ static int lab_flow_goal_complete(int frame, int view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
-        return lab_flow_done(lab_dom_scalar(1, 0));
-    int context = lab_dom_object(5);
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
+    int context = lab_dom_object(LAB_VALUE_OBJECT);
     /* The fixed completion record is copied once; fields remain opaque browser values. */
     static const char *const fields[] = {"cards", "editorBody", "editorExpression", "seek", "target", "options"};
     for (unsigned i = 0; i < sizeof fields / sizeof *fields; ++i)
@@ -199,9 +200,9 @@ static int lab_flow_goal_error(int frame, int view)
 {
     (void)view;
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(frame, LAB_FLOW_GOAL_EFFECTS, "native", "plan", 0, 5, lab_dom_string("lab_goal_complete"),
-                         lab_dom_numeric(4), 0, 0, lab_dom_get(frame, "error"));
+                         lab_dom_numeric(LAB_REQUEST_OUTCOME_EXCEPTION), 0, 0, lab_dom_get(frame, "error"));
 }
 
 /* Advance one request-local goal continuation, without retaining handles between browser effects. */

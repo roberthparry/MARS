@@ -14,7 +14,7 @@
 
 static void lab_widget_events_emit(int calls, const char *service, unsigned count, int first, int second, int third)
 {
-    int call = lab_dom_object(5), args = lab_dom_object(4);
+    int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     const int values[] = {first, second, third};
     for (unsigned i = 0; i < count; ++i)
         lab_dom_push(args, values[i]);
@@ -31,15 +31,18 @@ static int lab_widget_events_visible(void)
 
 static void lab_widget_events_close(int calls, int focus)
 {
-    int options = lab_dom_object(5);
-    lab_dom_set(options, "restoreFocus", lab_dom_scalar(1, focus));
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "restoreFocus", lab_dom_scalar(LAB_VALUE_BOOLEAN, focus));
     lab_widget_events_emit(calls, "closeMarsDatePicker", 1, options, 0, 0);
 }
 
-static void lab_widget_events_open(int event, int state, int calls)
+/* Toggle the picker attached to the authored target. */
+static void lab_widget_events_open(lab_widget_event_action_t action, int event, int state, int plan, int calls)
 {
+    (void)action;
+    (void)plan;
     int button = lab_dom_get(event, "currentTarget");
-    int id = lab_dom_clean(lab_dom_read(button, 3, "dateTarget"), 0);
+    int id = lab_dom_clean(lab_dom_read(button, LAB_DOM_DATASET, "dateTarget"), LAB_DOM_CLEAN_TRIM);
     /* A DOM ID lookup accepts the authored identifier as data, not as a CSS selector. */
     int input = lab_dom_value_id(id);
     if (!input)
@@ -50,44 +53,66 @@ static void lab_widget_events_open(int event, int state, int calls)
         lab_widget_events_emit(calls, "openMarsDatePicker", 2, input, button, 0);
 }
 
-static void lab_widget_events_grid(int event, int state, int calls)
+/* Commit an enabled day before restoring focus. */
+static void lab_widget_events_grid(lab_widget_event_action_t action, int event, int state, int plan, int calls)
 {
+    (void)action;
+    (void)plan;
     int grid = lab_dom_id("marsDatePickerGrid");
     int button = lab_dom_closest(lab_dom_get(event, "target"), "button[data-iso-date]");
     if (!button || lab_dom_is_disabled(button) || !lab_dom_node_contains(grid, button))
         return;
     lab_widget_events_emit(calls, "commitMarsDateValue", 2, lab_dom_get(state, "input"),
-                           lab_dom_read(button, 3, "isoDate"), 0);
+                           lab_dom_read(button, LAB_DOM_DATASET, "isoDate"), 0);
     lab_widget_events_close(calls, 1);
 }
 
-static void lab_widget_events_navigation(unsigned action, int event, int calls)
+/* Select the navigation service and direction before applying year modifiers. */
+static void lab_widget_events_navigation(lab_widget_event_action_t action, int event, int state, int plan, int calls)
 {
-    int direction = (action == 2 || action == 4) ? -1 : 1;
-    int years = action >= 4;
-    if (years)
+    (void)state;
+    (void)plan;
+    static const struct {
+        const char *service;
+        int direction, years;
+    } navigation[] = {
+        [LAB_WIDGET_EVENT_PREVIOUS_MONTH] = {"shiftMarsDatePickerMonth", -1, 0},
+        [LAB_WIDGET_EVENT_NEXT_MONTH]     = {"shiftMarsDatePickerMonth",  1, 0},
+        [LAB_WIDGET_EVENT_PREVIOUS_YEAR]  = {"shiftMarsDatePickerYear",  -1, 1},
+        [LAB_WIDGET_EVENT_NEXT_YEAR]      = {"shiftMarsDatePickerYear",   1, 1},
+    };
+    /* Only the four navigation entries in the bounded dispatcher reach this table. */
+    int direction = navigation[action].direction;
+    if (navigation[action].years)
         direction *= lab_forms_year_step(lab_dom_truth(lab_dom_get(event, "ctrlKey")),
                                          lab_dom_truth(lab_dom_get(event, "shiftKey")));
-    lab_widget_events_emit(calls, years ? "shiftMarsDatePickerYear" : "shiftMarsDatePickerMonth", 1,
+    lab_widget_events_emit(calls, navigation[action].service, 1,
                            lab_dom_numeric(direction), 0, 0);
 }
 
-static void lab_widget_events_date(unsigned action, int event, int state, int plan, int calls)
+/* Validate year keystrokes before reading and committing the edited date fields. */
+static void lab_widget_events_date(lab_widget_event_action_t action, int event, int state, int plan, int calls)
 {
-    if (action == 8) {
+    if (action == LAB_WIDGET_EVENT_YEAR_KEY) {
         if (!lab_dom_equal(lab_dom_get(event, "key"), lab_dom_string("Enter")))
             return;
-        lab_dom_set(plan, "prevent", lab_dom_scalar(1, 1));
+        lab_dom_set(plan, "prevent", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     }
-    int year = action == 6 ? lab_dom_get(state, "year") : lab_dom_read(lab_dom_id("marsDatePickerYear"), 5, "");
-    int month = action == 6 ? lab_dom_read(lab_dom_id("marsDatePickerMonth"), 5, "") : lab_dom_get(state, "month");
-    int options = lab_dom_object(5);
-    lab_dom_set(options, "commit", lab_dom_scalar(1, 1));
+    int year = action == LAB_WIDGET_EVENT_MONTH ? lab_dom_get(state, "year")
+                                               : lab_dom_read(lab_dom_id("marsDatePickerYear"), LAB_DOM_VALUE, "");
+    int month = action == LAB_WIDGET_EVENT_MONTH ? lab_dom_read(lab_dom_id("marsDatePickerMonth"), LAB_DOM_VALUE, "")
+                                                : lab_dom_get(state, "month");
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "commit", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     lab_widget_events_emit(calls, "setMarsDatePickerMonthYear", 3, year, month, options);
 }
 
-static void lab_widget_events_outside(int event, int calls)
+/* Dismiss a visible picker only when the pointer is outside its controls. */
+static void lab_widget_events_outside(lab_widget_event_action_t action, int event, int state, int plan, int calls)
 {
+    (void)action;
+    (void)state;
+    (void)plan;
     int target = lab_dom_get(event, "target"), picker = lab_dom_id("marsDatePicker");
     if (!lab_widget_events_visible() || lab_dom_node_contains(picker, target) ||
         lab_dom_closest(target, ".mars-date-shell"))
@@ -95,50 +120,103 @@ static void lab_widget_events_outside(int event, int calls)
     lab_widget_events_close(calls, 0);
 }
 
-static void lab_widget_events_tooltip(unsigned action, int event, int calls)
+/* Validate pointer boundaries and Escape before emitting the selected tooltip service. */
+static void lab_widget_events_tooltip(lab_widget_event_action_t action, int event, int state, int plan, int calls)
 {
+    (void)state;
+    (void)plan;
+    static const struct {
+        const char *service;
+        unsigned count;
+        int pointer, escape;
+    } tooltips[] = {
+        [LAB_WIDGET_EVENT_TOOLTIP_OVER]   = {"showButtonTooltip", 1, 1, 0},
+        [LAB_WIDGET_EVENT_TOOLTIP_OUT]    = {"hideButtonTooltip", 0, 1, 0},
+        [LAB_WIDGET_EVENT_TOOLTIP_FOCUS]  = {"showButtonTooltip", 1, 0, 0},
+        [LAB_WIDGET_EVENT_TOOLTIP_HIDE]   = {"hideButtonTooltip", 0, 0, 0},
+        [LAB_WIDGET_EVENT_TOOLTIP_ESCAPE] = {"hideButtonTooltip", 0, 0, 1},
+    };
     int button = lab_dom_closest(lab_dom_get(event, "target"), "button");
-    if (action == 13 || action == 14) {
+    /* Only tooltip entries in the bounded dispatcher reach this table. */
+    if (tooltips[action].pointer) {
         if (!button || lab_dom_node_contains(button, lab_dom_get(event, "relatedTarget")))
             return;
-    } else if (action == 17 && !lab_dom_equal(lab_dom_get(event, "key"), lab_dom_string("Escape"))) {
+    } else if (tooltips[action].escape &&
+               !lab_dom_equal(lab_dom_get(event, "key"), lab_dom_string("Escape"))) {
         return;
     }
-    if (action == 13 || action == 15)
-        lab_widget_events_emit(calls, "showButtonTooltip", 1, button, 0, 0);
-    else
-        lab_widget_events_emit(calls, "hideButtonTooltip", 0, 0, 0, 0);
+    lab_widget_events_emit(calls, tooltips[action].service, tooltips[action].count, button, 0, 0);
+}
+
+/* Commit today's value only when an input is attached, then restore focus. */
+static void lab_widget_events_today(lab_widget_event_action_t action, int event, int state, int plan, int calls)
+{
+    (void)action;
+    (void)event;
+    (void)plan;
+    int input = lab_dom_get(state, "input");
+    if (input) {
+        lab_widget_events_emit(calls, "commitMarsTodayValue", 1, input, 0, 0);
+        lab_widget_events_close(calls, 1);
+    }
+}
+
+/* Explicit close actions restore focus to the opener. */
+static void lab_widget_events_dismiss(lab_widget_event_action_t action, int event, int state, int plan, int calls)
+{
+    (void)action;
+    (void)event;
+    (void)state;
+    (void)plan;
+    lab_widget_events_close(calls, 1);
+}
+
+/* Reposition only a visible picker, preserving the conditional state read. */
+static void lab_widget_events_reposition(lab_widget_event_action_t action, int event, int state, int plan, int calls)
+{
+    (void)action;
+    (void)event;
+    (void)plan;
+    if (lab_widget_events_visible())
+        lab_widget_events_emit(calls, "placeMarsDatePicker", 1, lab_dom_get(state, "shell"), 0, 0);
 }
 
 /* Return ordered services; browser effects cannot re-enter this scoped dispatch. */
-void lab_widget_events_dispatch(unsigned action, int event, int state)
+void lab_widget_events_dispatch(lab_widget_event_action_t action, int event, int state)
 {
-    int plan = lab_dom_object(5), calls = lab_dom_object(4);
+    /** @brief Widget action implementation using the current event and deferred service plan. */
+    typedef void (*lab_widget_event_handler_t)(lab_widget_event_action_t, int, int, int, int);
+    static const lab_widget_event_handler_t handlers[LAB_WIDGET_EVENT_OFFSET_TOUCHED + 1] = {
+        [LAB_WIDGET_EVENT_OPEN]           = lab_widget_events_open,
+        [LAB_WIDGET_EVENT_GRID_DAY]       = lab_widget_events_grid,
+        [LAB_WIDGET_EVENT_PREVIOUS_MONTH] = lab_widget_events_navigation,
+        [LAB_WIDGET_EVENT_NEXT_MONTH]     = lab_widget_events_navigation,
+        [LAB_WIDGET_EVENT_PREVIOUS_YEAR]  = lab_widget_events_navigation,
+        [LAB_WIDGET_EVENT_NEXT_YEAR]      = lab_widget_events_navigation,
+        [LAB_WIDGET_EVENT_MONTH]          = lab_widget_events_date,
+        [LAB_WIDGET_EVENT_YEAR]           = lab_widget_events_date,
+        [LAB_WIDGET_EVENT_YEAR_KEY]       = lab_widget_events_date,
+        [LAB_WIDGET_EVENT_TODAY]          = lab_widget_events_today,
+        [LAB_WIDGET_EVENT_CLOSE]          = lab_widget_events_dismiss,
+        [LAB_WIDGET_EVENT_OUTSIDE]        = lab_widget_events_outside,
+        [LAB_WIDGET_EVENT_REPOSITION]     = lab_widget_events_reposition,
+        [LAB_WIDGET_EVENT_TOOLTIP_OVER]   = lab_widget_events_tooltip,
+        [LAB_WIDGET_EVENT_TOOLTIP_OUT]    = lab_widget_events_tooltip,
+        [LAB_WIDGET_EVENT_TOOLTIP_FOCUS]  = lab_widget_events_tooltip,
+        [LAB_WIDGET_EVENT_TOOLTIP_HIDE]   = lab_widget_events_tooltip,
+        [LAB_WIDGET_EVENT_TOOLTIP_ESCAPE] = lab_widget_events_tooltip,
+    };
+    static const char *const services[LAB_WIDGET_EVENT_OFFSET_TOUCHED + 1] = {
+        [LAB_WIDGET_EVENT_OFFSET_TOUCHED] = "markDatetimeOffsetTouched",
+    };
+    int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(plan, "calls", calls);
-    if (action == 0)
-        lab_widget_events_open(event, state, calls);
-    else if (action == 1)
-        lab_widget_events_grid(event, state, calls);
-    else if (action >= 2 && action <= 5)
-        lab_widget_events_navigation(action, event, calls);
-    else if (action >= 6 && action <= 8)
-        lab_widget_events_date(action, event, state, plan, calls);
-    else if (action == 9) {
-        int input = lab_dom_get(state, "input");
-        if (input) {
-            lab_widget_events_emit(calls, "commitMarsTodayValue", 1, input, 0, 0);
-            lab_widget_events_close(calls, 1);
-        }
-    } else if (action == 10)
-        lab_widget_events_close(calls, 1);
-    else if (action == 11)
-        lab_widget_events_outside(event, calls);
-    else if (action == 12 && lab_widget_events_visible())
-        lab_widget_events_emit(calls, "placeMarsDatePicker", 1, lab_dom_get(state, "shell"), 0, 0);
-    else if (action >= 13 && action <= 17)
-        lab_widget_events_tooltip(action, event, calls);
-    else if (action == 18)
-        lab_widget_events_emit(calls, "markDatetimeOffsetTouched", 0, 0, 0, 0);
+    if ((unsigned)action < sizeof handlers / sizeof *handlers) {
+        if (handlers[action])
+            handlers[action](action, event, state, plan, calls);
+        else if (services[action])
+            lab_widget_events_emit(calls, services[action], 0, 0, 0, 0);
+    }
     lab_dom_return(plan);
 }
 
@@ -147,13 +225,21 @@ void lab_widget_events_install(int document, int window, int state)
 {
     static const struct {
         const char *selector, *type;
-        unsigned action;
-    } controls[] = {{"[data-date-target]", "click", 0},      {"#marsDatePickerGrid", "click", 1},
-                    {"#marsDatePickerPrev", "click", 2},     {"#marsDatePickerNext", "click", 3},
-                    {"#marsDatePickerYearDown", "click", 4}, {"#marsDatePickerYearUp", "click", 5},
-                    {"#marsDatePickerMonth", "change", 6},   {"#marsDatePickerYear", "change", 7},
-                    {"#marsDatePickerYear", "keydown", 8},   {"#marsDatePickerToday", "click", 9},
-                    {"#marsDatePickerClose", "click", 10},   {"#datetimeGmtOffset", "input", 18}};
+        lab_widget_event_action_t action;
+    } controls[] = {
+        {"[data-date-target]", "click", LAB_WIDGET_EVENT_OPEN},
+        {"#marsDatePickerGrid", "click", LAB_WIDGET_EVENT_GRID_DAY},
+        {"#marsDatePickerPrev", "click", LAB_WIDGET_EVENT_PREVIOUS_MONTH},
+        {"#marsDatePickerNext", "click", LAB_WIDGET_EVENT_NEXT_MONTH},
+        {"#marsDatePickerYearDown", "click", LAB_WIDGET_EVENT_PREVIOUS_YEAR},
+        {"#marsDatePickerYearUp", "click", LAB_WIDGET_EVENT_NEXT_YEAR},
+        {"#marsDatePickerMonth", "change", LAB_WIDGET_EVENT_MONTH},
+        {"#marsDatePickerYear", "change", LAB_WIDGET_EVENT_YEAR},
+        {"#marsDatePickerYear", "keydown", LAB_WIDGET_EVENT_YEAR_KEY},
+        {"#marsDatePickerToday", "click", LAB_WIDGET_EVENT_TODAY},
+        {"#marsDatePickerClose", "click", LAB_WIDGET_EVENT_CLOSE},
+        {"#datetimeGmtOffset", "input", LAB_WIDGET_EVENT_OFFSET_TOUCHED},
+    };
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i) {
         int nodes = lab_dom_all(0, controls[i].selector);
@@ -167,13 +253,20 @@ void lab_widget_events_install(int document, int window, int state)
     }
     static const struct {
         const char *type;
-        unsigned action;
-    } document_events[] = {{"pointerover", 13}, {"pointerout", 14}, {"focusin", 15}, {"focusout", 16},
-                           {"click", 16},       {"keydown", 17},    {"click", 11}};
+        lab_widget_event_action_t action;
+    } document_events[] = {
+        {"pointerover", LAB_WIDGET_EVENT_TOOLTIP_OVER},
+        {"pointerout", LAB_WIDGET_EVENT_TOOLTIP_OUT},
+        {"focusin", LAB_WIDGET_EVENT_TOOLTIP_FOCUS},
+        {"focusout", LAB_WIDGET_EVENT_TOOLTIP_HIDE},
+        {"click", LAB_WIDGET_EVENT_TOOLTIP_HIDE},
+        {"keydown", LAB_WIDGET_EVENT_TOOLTIP_ESCAPE},
+        {"click", LAB_WIDGET_EVENT_OUTSIDE},
+    };
     for (unsigned i = 0; i < sizeof document_events / sizeof *document_events; ++i)
         lab_dom_subscribe(document, document_events[i].type, "lab_widget_events_dispatch", document_events[i].action,
                           state, 0);
-    lab_dom_subscribe(window, "scroll", "lab_widget_events_dispatch", 16, state, 1);
-    lab_dom_subscribe(window, "resize", "lab_widget_events_dispatch", 16, state, 0);
-    lab_dom_subscribe(window, "resize", "lab_widget_events_dispatch", 12, state, 0);
+    lab_dom_subscribe(window, "scroll", "lab_widget_events_dispatch", LAB_WIDGET_EVENT_TOOLTIP_HIDE, state, 1);
+    lab_dom_subscribe(window, "resize", "lab_widget_events_dispatch", LAB_WIDGET_EVENT_TOOLTIP_HIDE, state, 0);
+    lab_dom_subscribe(window, "resize", "lab_widget_events_dispatch", LAB_WIDGET_EVENT_REPOSITION, state, 0);
 }

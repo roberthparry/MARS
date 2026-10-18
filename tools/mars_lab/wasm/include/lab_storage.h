@@ -20,6 +20,26 @@
 #ifndef LAB_WASM_STORAGE_H
 #define LAB_WASM_STORAGE_H
 
+#include "lab_mode.h"
+#include "lab_persist.h"
+
+/** @brief Saved control identity in the ordered restoration catalogue. */
+typedef enum {
+    LAB_STORAGE_EQUATION_VARIABLE = 0, /**< Equation solver variable. */
+    LAB_STORAGE_MATRIX_OPERATION = 1,  /**< Matrix operation selection. */
+    LAB_STORAGE_MATRIX_OPERAND = 2,    /**< Matrix operation operand. */
+    LAB_STORAGE_INTEGRATOR_BOUNDS = 3, /**< Bounds needing asynchronous preparation. */
+    LAB_STORAGE_INTERVAL_CAP = 4      /**< Integrator interval budget. */
+} lab_storage_control_t;
+
+/** @brief History-restoration boundary around host preparation and ownership checks. */
+typedef enum {
+    LAB_STORAGE_HISTORY_PLAN = 0,     /**< Describe restoration without modifying controls. */
+    LAB_STORAGE_HISTORY_CONTROLS = 1, /**< Restore equation or matrix controls. */
+    LAB_STORAGE_HISTORY_BOUNDS = 2,   /**< Complete integrator restoration after bounds preparation. */
+    LAB_STORAGE_HISTORY_CALENDAR = 3  /**< Complete the calendar editor after state restoration. */
+} lab_storage_history_phase_t;
+
 /**
  * @brief Normalise a saved precision using decimal-prefix conversion and native limits.
  * @param values Scoped two-item array containing the saved value and numeric fallback.
@@ -38,7 +58,7 @@ double lab_storage_intervals(int values, int config);
 /**
  * @brief Validate a saved matrix operation against the current browser select options.
  * @param values Scoped one-item array containing the saved operation.
- * @return No C value; publishes the trimmed recognised operation, or "eval", through lab_dom_return.
+ * @post publishes the trimmed recognised operation, or "eval", through lab_dom_return.
  */
 void lab_storage_operation(int values);
 
@@ -47,44 +67,47 @@ void lab_storage_operation(int values);
  * @param mode Mathematical worksheet index: expression 0, equation 1, differential equation 2, matrix 3 or
  * integrator 4.
  * @param values Scoped one-item array containing the saved editor text.
- * @param local Non-zero preserves local text whitespace; zero trims server text.
- * @return No C value; publishes a record containing text and flags through lab_dom_return.
+ * @param origin LAB_PERSIST_SERVER trims server text; LAB_PERSIST_LOCAL preserves authored whitespace.
+ * Other non-zero values retain the local policy for ABI compatibility.
+ * @post publishes a record containing text and flags through lab_dom_return.
  *
  * Flags use lab_persist_restore semantics: restore 1, prepare editor 2, use native
  * canonical text 4, display expression and restore its timestamp 8, and retain the
  * server integrator source 16. Empty or rejected copies and invalid modes have zero flags.
  */
-void lab_storage_editor(unsigned mode, int values, int local);
+void lab_storage_editor(lab_mode_t mode, int values, lab_persist_origin_t origin);
 
 /**
  * @brief Describe control restoration in its established storage-read order.
- * @param local Non-zero selects local storage keys and ordering; zero selects server fields and ordering.
- * @return No C value; publishes an array of field/key records through lab_dom_return.
+ * @param origin Server fields and ordering or browser storage keys and ordering.
+ * Other non-zero values retain the local policy for ABI compatibility.
+ * @post publishes an array of field/key records through lab_dom_return.
  *
  * Field identifiers are equation variable 0, matrix operation 1, matrix operand 2,
  * integrator bounds 3 and interval cap 4. The host reads and restores one field at
  * a time, awaiting native bounds preparation before accessing subsequent fields.
  */
-void lab_storage_fields(int local);
+void lab_storage_fields(lab_persist_origin_t origin);
 
 /**
  * @brief Apply one saved control value without interpreting mathematical text.
- * @param field Control identifier returned by lab_storage_fields, in the range 0..4.
+ * @param field Saved control identity returned by lab_storage_fields; unknown values are ignored.
  * @param values Scoped one-item array containing the saved field value.
- * @param local Non-zero applies local missing-value and whitespace policy; zero applies server defaults and trimming.
+ * @param origin Server defaults and trimming or local missing-value and whitespace policy.
+ * Other non-zero values retain the local policy for ABI compatibility.
  * @param config Scoped configuration containing DEFAULT_EQUATION_VARIABLE and DEFAULT_INTEGRATOR_INTERVAL_CAP.
- * @return No C value; publishes bounds requiring asynchronous preparation, or null for all other outcomes.
+ * @post publishes bounds requiring asynchronous preparation, or null for all other outcomes.
  *
  * Non-bounds controls are projected synchronously when present. Missing local
  * values preserve current controls, except a present empty operand clears its
  * control. Invalid field identifiers do nothing and publish null.
  */
-void lab_storage_control(unsigned field, int values, int local, int config);
+void lab_storage_control(lab_storage_control_t field, int values, lab_persist_origin_t origin, int config);
 
 /**
  * @brief Restore recognised saved precision settings into native workspace ownership.
  * @param data Scoped saved-state record whose precision_bits property is a per-mode record or a legacy scalar.
- * @return No value; updates native precision in place without publishing a browser result.
+ * @post updates native precision in place without publishing a browser result.
  *
  * A legacy scalar updates expression mode only. Per-mode records use own fields
  * for the seven known modes; unknown or inherited fields cannot overwrite state.
@@ -98,12 +121,12 @@ void lab_storage_precisions(int data);
  * @param server Scoped server state containing the corresponding editor text and update timestamp.
  * @param local Scoped two-item array containing local editor text and its saved timestamp.
  * @param config Scoped configuration containing DEFAULT_EXPRESSION and DEFAULT_EQUATION.
- * @return No C value; publishes a text/updatedAt recovery record, or null when the local copy is not preferred.
+ * @post publishes a text/updatedAt recovery record, or null when the local copy is not preferred.
  *
  * Text is trimmed without mathematical interpretation. A non-empty local copy
  * wins when newer, or when the server copy is empty or its configured placeholder.
  */
-void lab_storage_recovery(unsigned mode, int server, int local, int config);
+void lab_storage_recovery(lab_mode_t mode, int server, int local, int config);
 
 /**
  * @brief Assemble a recovered server patch after native editor preparation.
@@ -111,19 +134,19 @@ void lab_storage_recovery(unsigned mode, int server, int local, int config);
  * @param recovery Scoped record returned by lab_storage_recovery, including its numeric updatedAt field.
  * @param values Scoped one-item array containing the prepared opaque editor text.
  * @param now Current host clock reading in Unix milliseconds, used when the saved timestamp is falsey.
- * @return No C value; publishes a mode-specific editor/timestamp patch through lab_dom_return.
+ * @post publishes a mode-specific editor/timestamp patch through lab_dom_return.
  *
  * The host uses the patch timestamp for both expression ownership and persistence,
  * ensuring a single coherent fallback reading. This function performs no storage I/O.
  */
-void lab_storage_recovered(unsigned mode, int recovery, int values, double now);
+void lab_storage_recovered(lab_mode_t mode, int recovery, int values, double now);
 
 /**
  * @brief Plan or project history restoration at explicit asynchronous ownership boundaries.
- * @param phase Plan 0, equation/matrix controls 1, integrator bounds completion 2, or calendar editor completion 3.
+ * @param phase Planning, control projection, integrator-bounds completion or calendar-editor completion.
  * @param state Scoped history snapshot containing its exact mode and mode-specific saved fields.
  * @param config Scoped configuration containing equation-variable, integrator-bound/budget and calendar-text defaults.
- * @return No C value; phase 0 publishes a plan, while projection phases publish no browser result.
+ * @post phase 0 publishes a plan, while projection phases publish no browser result.
  *
  * The plan contains mode, text, calendar, integrator, bounds and calendarState.
  * Phase 0 does not mutate controls. The host must recheck ownership after editor,
@@ -131,6 +154,6 @@ void lab_storage_recovered(unsigned mode, int recovery, int values, double now);
  * Only controls relevant to the snapshot's exact mode are changed; unsupported
  * phases do nothing. Source and binding cleanup remain separately sequenced by the host.
  */
-void lab_storage_history(unsigned phase, int state, int config);
+void lab_storage_history(lab_storage_history_phase_t phase, int state, int config);
 
 #endif

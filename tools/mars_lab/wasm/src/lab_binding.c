@@ -16,11 +16,13 @@
  */
 #include "lab_dom.h"
 #include "lab_forms.h"
-#define MARS_LAB_BINDING_INTERNAL_ACCESS
+#include "lab_rows.h"
 #include "lab_binding.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
+#include "lab_binding_internal.h"
 
 /* Compare exact browser values with a literal without interpreting binding text. */
-int lab_binding_is(int value, const char *text)
+bool lab_binding_is(int value, const char *text)
 {
     return lab_dom_equal(value, lab_dom_string(text));
 }
@@ -31,7 +33,7 @@ int lab_binding_or(int value, const char *fallback)
     return lab_dom_truth(value) ? value : lab_dom_string(fallback);
 }
 
-static void lab_binding_text(int node, unsigned kind, const char *key, const char *text)
+static void lab_binding_text(int node, lab_dom_accessor_t kind, const char *key, const char *text)
 {
     lab_dom_write(node, kind, key, lab_dom_string(text));
 }
@@ -39,7 +41,7 @@ static void lab_binding_text(int node, unsigned kind, const char *key, const cha
 static int lab_binding_child(int parent, const char *tag, const char *classes)
 {
     int node = lab_dom_create(tag);
-    lab_binding_text(node, 2, "class", classes);
+    lab_binding_text(node, LAB_DOM_ATTRIBUTE, "class", classes);
     lab_dom_append(parent, node);
     return node;
 }
@@ -58,7 +60,7 @@ static int lab_binding_key(int name)
 /* Return the trimmed opaque name shared by presentation and reconciliation. */
 int lab_binding_name(int binding)
 {
-    return lab_dom_clean(lab_binding_or(lab_dom_get(binding, "name"), ""), 0);
+    return lab_dom_clean(lab_binding_or(lab_dom_get(binding, "name"), ""), LAB_DOM_CLEAN_TRIM);
 }
 
 static int lab_binding_name_text(int binding)
@@ -97,14 +99,14 @@ void lab_binding_label(int arguments)
     lab_dom_return(lab_binding_label_value(lab_dom_item(arguments, 0)));
 }
 
-static int lab_binding_is_unset(int value)
+static bool lab_binding_is_unset(int value)
 {
-    int text = lab_dom_clean(value, 1);
+    int text = lab_dom_clean(value, LAB_DOM_CLEAN_LOWER);
     return !lab_dom_length(text) || lab_binding_is(text, "?") || lab_binding_is(text, "nan");
 }
 
 /* Recognise UI unset sentinels without interpreting mathematical expressions. */
-int lab_binding_unset(int arguments)
+bool lab_binding_unset(int arguments)
 {
     return lab_binding_is_unset(lab_dom_item(arguments, 0));
 }
@@ -114,7 +116,7 @@ static int lab_binding_value_text(int binding)
     int value = lab_dom_get(binding, "value");
     if (!lab_dom_truth(value))
         value = lab_binding_or(lab_dom_get(binding, "display"), "");
-    value = lab_dom_clean(value, 0);
+    value = lab_dom_clean(value, LAB_DOM_CLEAN_TRIM);
     return lab_binding_is_unset(value) ? lab_dom_string("") : value;
 }
 
@@ -126,7 +128,7 @@ void lab_binding_value(int binding)
 
 static int lab_binding_input_value(int input)
 {
-    return lab_binding_or(lab_dom_clean(lab_dom_read(input, 5, ""), 0), "?");
+    return lab_binding_or(lab_dom_clean(lab_dom_read(input, LAB_DOM_VALUE, ""), LAB_DOM_CLEAN_TRIM), "?");
 }
 
 /* Only an empty input becomes a question mark; exact symbolic input remains opaque. */
@@ -135,13 +137,13 @@ void lab_binding_normalised(int input)
     lab_dom_return(lab_binding_input_value(input));
 }
 
-static int lab_binding_input(int input, int trim)
+static int lab_binding_input(int input, bool trim)
 {
-    int binding = lab_dom_object(5);
-    int name = lab_dom_read(input, 3, "bindingName");
-    int kind = lab_binding_or(lab_dom_read(input, 3, "bindingKind"), "variable");
-    lab_dom_set(binding, "name", trim ? lab_dom_clean(name, 0) : name);
-    lab_dom_set(binding, "kind", trim ? lab_dom_clean(kind, 0) : kind);
+    int binding = lab_dom_object(LAB_VALUE_OBJECT);
+    int name = lab_dom_read(input, LAB_DOM_DATASET, "bindingName");
+    int kind = lab_binding_or(lab_dom_read(input, LAB_DOM_DATASET, "bindingKind"), "variable");
+    lab_dom_set(binding, "name", trim ? lab_dom_clean(name, LAB_DOM_CLEAN_TRIM) : name);
+    lab_dom_set(binding, "kind", trim ? lab_dom_clean(kind, LAB_DOM_CLEAN_TRIM) : kind);
     lab_dom_set(binding, "value", lab_binding_input_value(input));
     return binding;
 }
@@ -149,7 +151,7 @@ static int lab_binding_input(int input, int trim)
 /* Capture visible values with the same trimmed names and exact authored expressions. */
 void lab_binding_visible(int root)
 {
-    int result = lab_dom_object(4), inputs = lab_dom_all(root, ".binding-value-input");
+    int result = lab_dom_object(LAB_VALUE_ARRAY), inputs = lab_dom_all(root, ".binding-value-input");
     unsigned count = lab_dom_count(inputs), mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
         int binding = lab_binding_input(lab_dom_item(inputs, i), 1);
@@ -164,7 +166,7 @@ void lab_binding_visible(int root)
 /* Copy own metadata fields without allowing identifiers to mutate object prototypes. */
 int lab_binding_copy(int source)
 {
-    int copy = lab_dom_object(5), keys = lab_dom_keys(source);
+    int copy = lab_dom_object(LAB_VALUE_OBJECT), keys = lab_dom_keys(source);
     unsigned count = lab_dom_count(keys), mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
         int key = lab_dom_item(keys, i);
@@ -177,12 +179,12 @@ int lab_binding_copy(int source)
 /* Count only structured arrays for binding and row policy consumers. */
 unsigned lab_binding_array_count(int array)
 {
-    return lab_dom_type(array) == 4 ? lab_dom_count(array) : 0;
+    return lab_dom_type(array) == LAB_VALUE_ARRAY ? lab_dom_count(array) : 0;
 }
 
 static void lab_binding_index(int index, int bindings)
 {
-    unsigned count = lab_dom_type(bindings) == 4 ? lab_dom_count(bindings) : 0, mark = lab_dom_mark();
+    unsigned count = lab_dom_type(bindings) == LAB_VALUE_ARRAY ? lab_dom_count(bindings) : 0, mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
         int binding = lab_dom_item(bindings, i);
         lab_dom_key_set(index, lab_binding_key(lab_binding_name(binding)), binding);
@@ -193,10 +195,10 @@ static void lab_binding_index(int index, int bindings)
 /* Overlay visible then native-authored values, preserving discovered metadata and unmatched object identity. */
 int lab_binding_authored_values(int bindings, int authored, int visible)
 {
-    int result = lab_dom_object(4), index = lab_dom_object(5);
+    int result = lab_dom_object(LAB_VALUE_ARRAY), index = lab_dom_object(LAB_VALUE_OBJECT);
     lab_binding_index(index, authored);
     lab_binding_index(index, visible);
-    unsigned count = lab_dom_type(bindings) == 4 ? lab_dom_count(bindings) : 0, mark = lab_dom_mark();
+    unsigned count = lab_dom_type(bindings) == LAB_VALUE_ARRAY ? lab_dom_count(bindings) : 0, mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
         int binding = lab_dom_item(bindings, i);
         int source = lab_dom_key_get(index, lab_binding_key(lab_binding_name(binding)));
@@ -220,12 +222,12 @@ void lab_binding_authored(int bindings, int authored, int visible)
 /* Snapshot input identity and untrimmed text for the asynchronous commit ownership checks. */
 void lab_binding_snapshot(int inputs)
 {
-    int result = lab_dom_object(4);
+    int result = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned count = lab_dom_count(inputs), mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
-        int input = lab_dom_item(inputs, i), item = lab_dom_object(5);
+        int input = lab_dom_item(inputs, i), item = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(item, "input", input);
-        lab_dom_set(item, "text", lab_dom_read(input, 5, ""));
+        lab_dom_set(item, "text", lab_dom_read(input, LAB_DOM_VALUE, ""));
         lab_dom_set(item, "binding", lab_binding_input(input, 0));
         lab_dom_push(result, item);
         lab_dom_release(mark);
@@ -234,22 +236,22 @@ void lab_binding_snapshot(int inputs)
 }
 
 /* Recheck exact input bytes after an await; connectivity is deliberately not an additional commit condition. */
-int lab_binding_snapshot_current(int snapshot)
+bool lab_binding_snapshot_current(int snapshot)
 {
     unsigned count = lab_dom_count(snapshot), mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
         int item = lab_dom_item(snapshot, i);
-        int equal = lab_dom_equal(lab_dom_read(lab_dom_get(item, "input"), 5, ""), lab_dom_get(item, "text"));
+        int equal = lab_dom_equal(lab_dom_read(lab_dom_get(item, "input"), LAB_DOM_VALUE, ""), lab_dom_get(item, "text"));
         lab_dom_release(mark);
         if (!equal)
-            return 0;
+            return false;
     }
-    return 1;
+    return true;
 }
 
 static void lab_binding_pair(int array, int key, int value)
 {
-    int pair = lab_dom_object(4);
+    int pair = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(pair, key);
     lab_dom_push(pair, value);
     lab_dom_push(array, pair);
@@ -257,14 +259,14 @@ static void lab_binding_pair(int array, int key, int value)
 
 static int lab_binding_committed_values(int snapshot)
 {
-    int result = lab_dom_object(4);
+    int result = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned count = lab_dom_count(snapshot), mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
         int item = lab_dom_item(snapshot, i), input = lab_dom_get(item, "input");
         int binding = lab_dom_get(item, "binding"), value = lab_dom_get(binding, "value");
         int name = lab_dom_get(binding, "name"), unset = lab_binding_is_unset(value);
-        lab_dom_write(input, 5, "", unset ? lab_dom_string("") : value);
-        lab_dom_write(input, 2, "title", value);
+        lab_dom_write(input, LAB_DOM_VALUE, "", unset ? lab_dom_string("") : value);
+        lab_dom_write(input, LAB_DOM_ATTRIBUTE, "title", value);
         lab_binding_pair(result, name, unset ? 0 : value);
         lab_dom_release(mark);
     }
@@ -280,7 +282,7 @@ void lab_binding_committed(int snapshot)
 /* Normalise every accepted control before updating the exact-name authored cache, as in the host path. */
 void lab_binding_committed_cache(int snapshot, int editor, int cache)
 {
-    lab_dom_write(editor, 3, "bindingRefreshValid", lab_dom_string("true"));
+    lab_dom_write(editor, LAB_DOM_DATASET, "bindingRefreshValid", lab_dom_string("true"));
     int values = lab_binding_committed_values(snapshot);
     unsigned count = lab_dom_count(values), mark = lab_dom_mark();
     /* This second pass preserves the all-controls-before-cache boundary, including duplicate names. */
@@ -297,8 +299,8 @@ void lab_binding_committed_cache(int snapshot, int editor, int cache)
 /* Select the requested kind without changing the native binding identity. */
 void lab_binding_toggle(int binding)
 {
-    int result = lab_dom_object(5), name = lab_binding_name(binding);
-    int kind = lab_dom_clean(lab_binding_or(lab_dom_get(binding, "kind"), "variable"), 0);
+    int result = lab_dom_object(LAB_VALUE_OBJECT), name = lab_binding_name(binding);
+    int kind = lab_dom_clean(lab_binding_or(lab_dom_get(binding, "kind"), "variable"), LAB_DOM_CLEAN_TRIM);
     lab_dom_set(result, "name", name);
     lab_dom_set(result, "nextKind", lab_dom_string(lab_binding_is(kind, "constant") ? "variable" : "constant"));
     lab_dom_return(result);
@@ -307,7 +309,7 @@ void lab_binding_toggle(int binding)
 static int lab_binding_sort(int source)
 {
     unsigned count = lab_dom_count(source);
-    int target = lab_dom_object(4);
+    int target = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     for (unsigned width = 1; width < count; width *= 2) {
         for (unsigned begin = 0; begin < count; begin += width * 2) {
@@ -334,8 +336,8 @@ static int lab_binding_sort(int source)
 static int lab_binding_button(int parent, const char *classes, const char *caption)
 {
     int button = lab_binding_child(parent, "button", classes);
-    lab_binding_text(button, 2, "type", "button");
-    lab_binding_text(button, 0, "", caption);
+    lab_binding_text(button, LAB_DOM_ATTRIBUTE, "type", "button");
+    lab_binding_text(button, LAB_DOM_TEXT, "", caption);
     return button;
 }
 
@@ -350,28 +352,29 @@ static void lab_binding_card(int root, int binding, int values, int kinds, int i
     int box = lab_binding_child(root, "div", constant ? "variable-value-box constant-value-box" : "variable-value-box");
     int name =
         lab_binding_child(box, "span", constant ? "variable-value-name constant-value-name" : "variable-value-name");
-    lab_dom_write(name, 0, "", label);
+    lab_dom_write(name, LAB_DOM_TEXT, "", label);
     int field = lab_binding_child(box, "div", "binding-value-field");
     int input = lab_binding_child(field, "input", "variable-value-text binding-value-input");
-    lab_binding_text(input, 2, "type", "text");
-    lab_dom_write(input, 5, "", value);
-    lab_dom_write(input, 2, "title", lab_dom_truth(value) ? value : lab_binding_or(lab_dom_get(binding, "value"), "?"));
-    lab_dom_write(input, 3, "bindingName", lab_dom_text(raw_name));
-    lab_dom_write(input, 3, "bindingKind", lab_dom_text(kind));
-    lab_binding_text(input, 2, "autocomplete", "off");
-    lab_binding_text(input, 2, "spellcheck", "false");
-    lab_binding_text(input, 2, "placeholder", " ");
-    lab_dom_write(input, 2, "aria-label", lab_binding_caption("Value of ", label, ""));
+    lab_binding_text(input, LAB_DOM_ATTRIBUTE, "type", "text");
+    lab_dom_write(input, LAB_DOM_VALUE, "", value);
+    lab_dom_write(input, LAB_DOM_ATTRIBUTE, "title",
+                  lab_dom_truth(value) ? value : lab_binding_or(lab_dom_get(binding, "value"), "?"));
+    lab_dom_write(input, LAB_DOM_DATASET, "bindingName", lab_dom_text(raw_name));
+    lab_dom_write(input, LAB_DOM_DATASET, "bindingKind", lab_dom_text(kind));
+    lab_binding_text(input, LAB_DOM_ATTRIBUTE, "autocomplete", "off");
+    lab_binding_text(input, LAB_DOM_ATTRIBUTE, "spellcheck", "false");
+    lab_binding_text(input, LAB_DOM_ATTRIBUTE, "placeholder", " ");
+    lab_dom_write(input, LAB_DOM_ATTRIBUTE, "aria-label", lab_binding_caption("Value of ", label, ""));
     int clear = lab_binding_button(field, "binding-value-clear", "×");
     int clear_label = lab_binding_caption("Clear ", label, "");
-    lab_dom_write(clear, 2, "title", clear_label);
-    lab_dom_write(clear, 2, "aria-label", clear_label);
+    lab_dom_write(clear, LAB_DOM_ATTRIBUTE, "title", clear_label);
+    lab_dom_write(clear, LAB_DOM_ATTRIBUTE, "aria-label", clear_label);
     int actions = lab_binding_child(box, "div", "variable-value-actions");
     int toggle = lab_binding_button(actions, "card-action variable-toggle", constant ? "Variable" : "Constant");
-    lab_dom_write(toggle, 2, "title",
+    lab_dom_write(toggle, LAB_DOM_ATTRIBUTE, "title",
                   lab_binding_caption("Treat ", label, constant ? " as a variable" : " as a constant"));
     int copy = lab_binding_button(actions, "card-action variable-copy", "Copy");
-    int card = lab_dom_object(5);
+    int card = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(card, "input", input);
     lab_dom_set(card, "binding", binding);
     lab_dom_set(card, "name", raw_name);
@@ -382,7 +385,7 @@ static void lab_binding_card(int root, int binding, int values, int kinds, int i
     lab_dom_set(box, "labBindingCard", card);
     int name_key = lab_binding_key(raw_name), by_kind = lab_dom_key_get(index, name_key);
     if (!by_kind) {
-        by_kind = lab_dom_object(5);
+        by_kind = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_key_set(index, name_key, by_kind);
     }
     int kind_key = lab_binding_key(kind);
@@ -394,17 +397,19 @@ static void lab_binding_card(int root, int binding, int values, int kinds, int i
 /* Clear controls without discarding the separate authored-value cache. */
 void lab_binding_clear(int root)
 {
-    lab_binding_text(root, 0, "", "");
+    lab_binding_text(root, LAB_DOM_TEXT, "", "");
     lab_dom_class(root, "hidden", 1);
-    lab_dom_set(root, "labBindingIndex", lab_dom_object(5));
+    lab_dom_set(root, "labBindingIndex", lab_dom_object(LAB_VALUE_OBJECT));
 }
 
 /* Build variable cards in discovery order, followed by stably collated constants. */
 void lab_binding_render(int root, int bindings)
 {
     lab_binding_clear(root);
-    int result = lab_dom_object(5), values = lab_dom_object(4), kinds = lab_dom_object(4);
-    int variables = lab_dom_object(4), constants = lab_dom_object(4), index = lab_dom_get(root, "labBindingIndex");
+    int result = lab_dom_object(LAB_VALUE_OBJECT), values = lab_dom_object(LAB_VALUE_ARRAY),
+        kinds = lab_dom_object(LAB_VALUE_ARRAY);
+    int variables = lab_dom_object(LAB_VALUE_ARRAY), constants = lab_dom_object(LAB_VALUE_ARRAY),
+        index = lab_dom_get(root, "labBindingIndex");
     lab_dom_set(result, "values", values);
     lab_dom_set(result, "kinds", kinds);
     unsigned count = lab_dom_count(bindings), mark = lab_dom_mark();
@@ -427,27 +432,27 @@ void lab_binding_render(int root, int bindings)
     lab_dom_return(result);
 }
 
-static int lab_binding_action(const char *name, int card, int prevent)
+static int lab_binding_action(const char *name, int card, bool prevent)
 {
-    int action = lab_dom_object(5);
+    int action = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(action, "action", lab_dom_string(name));
     lab_dom_set(action, "card", card);
     lab_dom_set(action, "prevent", lab_dom_numeric(prevent));
     return action;
 }
 
-static int lab_binding_key_event(int event, int input, int original, int card, int evaluate)
+static int lab_binding_key_event(int event, int input, int original, int card, bool evaluate)
 {
     int key = lab_dom_get(event, "key");
     if (lab_binding_is(key, "Enter")) {
         if (evaluate && (lab_dom_truth(lab_dom_get(event, "ctrlKey")) || lab_dom_truth(lab_dom_get(event, "metaKey"))))
             return lab_binding_action("evaluate", card, 1);
-        lab_dom_effect(input, 4);
+        lab_dom_effect(input, LAB_DOM_EFFECT_BLUR);
         return lab_binding_action("", card, 1);
     }
     if (lab_binding_is(key, "Escape")) {
-        lab_dom_write(input, 5, "", original);
-        lab_dom_effect(input, 4);
+        lab_dom_write(input, LAB_DOM_VALUE, "", original);
+        lab_dom_effect(input, LAB_DOM_EFFECT_BLUR);
         return lab_binding_action("", card, 1);
     }
     return 0;
@@ -474,8 +479,8 @@ void lab_binding_event(int root, int event)
         if (lab_binding_is(type, "pointerdown"))
             action = lab_binding_action("", card, 1);
         else if (lab_binding_is(type, "click")) {
-            lab_binding_text(input, 5, "", "");
-            lab_dom_effect(input, 0);
+            lab_binding_text(input, LAB_DOM_VALUE, "", "");
+            lab_dom_effect(input, LAB_DOM_EFFECT_FOCUS);
             action = lab_binding_action("clear", card, 0);
         }
     } else if (lab_binding_is(type, "click")) {
@@ -491,25 +496,25 @@ void lab_binding_event(int root, int event)
 void lab_binding_refocus(int root, int card, int editor)
 {
     int name = lab_dom_get(card, "name"), kind = lab_dom_get(card, "kind"), input = 0;
-    if (lab_dom_type(name) == 3 && lab_dom_type(kind) == 3) {
+    if (lab_dom_type(name) == LAB_VALUE_STRING && lab_dom_type(kind) == LAB_VALUE_STRING) {
         int index = lab_dom_get(root, "labBindingIndex");
         int by_kind = lab_dom_key_get(index, lab_binding_key(name));
         input = lab_dom_key_get(by_kind, lab_binding_key(kind));
     }
-    lab_dom_effect(input ? input : editor, 0);
+    lab_dom_effect(input ? input : editor, LAB_DOM_EFFECT_FOCUS);
 }
 
 static void lab_binding_integrator_field(int item, const char *label, int value, const char *key, int bound,
                                          int disabled)
 {
     int field = lab_binding_child(item, "div", disabled ? "integrator-bound-field disabled" : "integrator-bound-field");
-    lab_dom_write(lab_binding_child(field, "label", ""), 0, "", lab_dom_string(label));
+    lab_dom_write(lab_binding_child(field, "label", ""), LAB_DOM_TEXT, "", lab_dom_string(label));
     int input = lab_binding_child(field, "input", "");
-    lab_binding_text(input, 2, "spellcheck", "false");
-    lab_binding_text(input, 2, "autocomplete", "off");
-    lab_dom_write(input, 5, "", value);
-    lab_binding_text(input, 2, "placeholder", bound ? "blank for none" : "");
-    lab_binding_text(input, 3, key, "1");
+    lab_binding_text(input, LAB_DOM_ATTRIBUTE, "spellcheck", "false");
+    lab_binding_text(input, LAB_DOM_ATTRIBUTE, "autocomplete", "off");
+    lab_dom_write(input, LAB_DOM_VALUE, "", value);
+    lab_binding_text(input, LAB_DOM_ATTRIBUTE, "placeholder", bound ? "blank for none" : "");
+    lab_binding_text(input, LAB_DOM_DATASET, key, "1");
     lab_dom_disabled(input, disabled);
     lab_dom_set(input, "labIntegratorOriginal", value);
 }
@@ -517,7 +522,7 @@ static void lab_binding_integrator_field(int item, const char *label, int value,
 /* Construct integrator rows from sanitised native fields; row-removal policy remains in lab_forms. */
 void lab_binding_integrator_render(int root, int rows)
 {
-    lab_binding_text(root, 0, "", "");
+    lab_binding_text(root, LAB_DOM_TEXT, "", "");
     unsigned count = lab_dom_count(rows), bounds = 0, mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
         bounds += !lab_binding_is(lab_dom_get(lab_dom_item(rows, i), "kind"), "free");
@@ -527,19 +532,19 @@ void lab_binding_integrator_render(int root, int rows)
         int row = lab_dom_item(rows, i), kind = lab_dom_get(row, "kind"), name = lab_dom_get(row, "name");
         int free_row = lab_binding_is(kind, "free");
         int item = lab_binding_child(root, "div", "integrator-bound-row");
-        lab_dom_write(item, 3, "kind", kind);
-        lab_dom_write(item, 3, "index", lab_dom_format(i, "", ""));
+        lab_dom_write(item, LAB_DOM_DATASET, "kind", kind);
+        lab_dom_write(item, LAB_DOM_DATASET, "index", lab_dom_format(i, "", ""));
         int toggle = lab_binding_button(item, "card-action integrator-bound-toggle", free_row ? "Bound" : "Free");
         lab_dom_write(
-            toggle, 2, "title",
+            toggle, LAB_DOM_ATTRIBUTE, "title",
             lab_binding_caption(free_row ? "Integrate with respect to " : "Leave ", name, free_row ? "" : " free"));
         lab_binding_integrator_field(item, "Variable", name, "integratorName", 0, 0);
         lab_binding_integrator_field(item, "Lower bound", lab_dom_get(row, "lo"), "integratorLower", 1, free_row);
         lab_binding_integrator_field(item, "Upper bound", lab_dom_get(row, "hi"), "integratorUpper", 1, free_row);
         int add = lab_binding_button(item, "card-action integrator-bound-add", "+");
-        lab_binding_text(add, 2, "title", "Add another integral row");
+        lab_binding_text(add, LAB_DOM_ATTRIBUTE, "title", "Add another integral row");
         int remove = lab_binding_button(item, "card-action integrator-bound-remove", "−");
-        lab_binding_text(remove, 2, "title", "Remove this row");
+        lab_binding_text(remove, LAB_DOM_ATTRIBUTE, "title", "Remove this row");
         lab_dom_disabled(remove, !lab_forms_row_removable(free_row, count, bounds));
         lab_dom_release(mark);
     }
@@ -555,7 +560,7 @@ void lab_binding_integrator_event(int root, int event)
     }
     int type = lab_dom_get(event, "type");
     if (lab_binding_is(lab_dom_get(target, "tagName"), "INPUT")) {
-        int card = lab_dom_object(5);
+        int card = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(card, "input", target);
         if (lab_binding_is(type, "keydown"))
             action = lab_binding_key_event(event, target, lab_dom_get(target, "labIntegratorOriginal"), card, 0);
@@ -564,16 +569,21 @@ void lab_binding_integrator_event(int root, int event)
         else if (lab_binding_is(type, "change"))
             action = lab_binding_action("prepare", card, 0);
     } else if (lab_binding_is(type, "click")) {
-        unsigned operation = lab_dom_closest(target, ".integrator-bound-toggle")   ? 1
-                             : lab_dom_closest(target, ".integrator-bound-add")    ? 2
-                             : lab_dom_closest(target, ".integrator-bound-remove") ? 3
-                                                                                   : 0;
-        if (operation) {
-            action = lab_binding_action("edit", 0, 0);
-            lab_dom_set(action, "item", item);
-            lab_dom_set(action, "index", lab_dom_numeric(lab_dom_number(lab_dom_read(item, 3, "index"))));
-            lab_dom_set(action, "operation", lab_dom_numeric(operation));
+        lab_row_operation_t operation;
+        if (lab_dom_closest(target, ".integrator-bound-toggle"))
+            operation = LAB_ROW_TOGGLE;
+        else if (lab_dom_closest(target, ".integrator-bound-add"))
+            operation = LAB_ROW_INSERT;
+        else if (lab_dom_closest(target, ".integrator-bound-remove"))
+            operation = LAB_ROW_REMOVE;
+        else {
+            lab_dom_return(0);
+            return;
         }
+        action = lab_binding_action("edit", 0, 0);
+        lab_dom_set(action, "item", item);
+        lab_dom_set(action, "index", lab_dom_numeric(lab_dom_number(lab_dom_read(item, LAB_DOM_DATASET, "index"))));
+        lab_dom_set(action, "operation", lab_dom_numeric(operation));
     }
     lab_dom_return(action);
 }
@@ -591,8 +601,8 @@ void lab_binding_integrator_update(int root, int prepared)
         if (lab_dom_truth(normalised)) {
             for (unsigned j = 0; j < 3; ++j) {
                 int field = lab_dom_query(row, selectors[j]), value = lab_dom_get(normalised, keys[j]);
-                if (field && !lab_dom_equal(active, field) && !lab_dom_equal(lab_dom_read(field, 5, ""), value))
-                    lab_dom_write(field, 5, "", value);
+                if (field && !lab_dom_equal(active, field) && !lab_dom_equal(lab_dom_read(field, LAB_DOM_VALUE, ""), value))
+                    lab_dom_write(field, LAB_DOM_VALUE, "", value);
             }
         }
         lab_dom_release(mark);

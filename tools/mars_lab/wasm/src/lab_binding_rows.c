@@ -10,12 +10,13 @@
  */
 #include "lab_dom.h"
 #include "lab_forms.h"
-#include "lab_binding_editor.h"
-#define MARS_LAB_BINDING_INTERNAL_ACCESS
-#include "lab_binding.h"
 #include "lab_rows.h"
 #include "lab_workspace.h"
+#include "lab_binding.h"
+#include "lab_binding_editor.h"
 #include "lab_binding_rows.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
+#include "lab_binding_internal.h"
 
 static int lab_binding_row_name(unsigned index)
 {
@@ -26,7 +27,7 @@ static int lab_binding_row_name(unsigned index)
 /* Expose the exact candidate catalogue used by the native occupancy policy. */
 void lab_binding_row_names(void)
 {
-    int names = lab_dom_object(4);
+    int names = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < 108; ++i) {
         lab_dom_push(names, lab_binding_row_name(i));
@@ -80,7 +81,7 @@ void lab_binding_rows_name(int rows)
 
 static int lab_binding_row_clean(int row, int fallback)
 {
-    int result = lab_dom_object(5), name = lab_dom_get(row, "name");
+    int result = lab_dom_object(LAB_VALUE_OBJECT), name = lab_dom_get(row, "name");
     lab_dom_set(result, "kind", lab_dom_string(lab_binding_is(lab_dom_get(row, "kind"), "free") ? "free" : "bound"));
     lab_dom_set(result, "name", lab_dom_text(lab_dom_truth(name) ? name : fallback));
     lab_dom_set(result, "lo", lab_dom_text(lab_binding_or(lab_dom_get(row, "lo"), "")));
@@ -111,7 +112,8 @@ void lab_binding_rows_text(int rows)
         unsigned lengths[3], input = 0;
         for (unsigned f = 0; f < 3; ++f) {
             int length =
-                lab_dom_utf8_copy(lab_dom_get(row, fields[f]), lab_workspace_input(0) + input, capacity - input);
+                lab_dom_utf8_copy(lab_dom_get(row, fields[f]), lab_workspace_input(LAB_WORKSPACE_INPUT) + input,
+                                  capacity - input);
             if (length < 0) {
                 lab_dom_return(0);
                 return;
@@ -128,10 +130,10 @@ void lab_binding_rows_text(int rows)
         output = (unsigned)end;
         lab_dom_release(mark);
     }
-    lab_dom_return(lab_dom_utf8_string(lab_workspace_input(1), output));
+    lab_dom_return(lab_dom_utf8_string(lab_workspace_input(LAB_WORKSPACE_ALTERNATE), output));
 }
 
-static int lab_binding_row_default(int blank)
+static int lab_binding_row_default(bool blank)
 {
     int row = lab_binding_row_clean(0, lab_dom_string("x"));
     if (!blank) {
@@ -142,9 +144,9 @@ static int lab_binding_row_default(int blank)
 }
 
 /* Return the standard or blank single-bound default as an independent row array. */
-void lab_binding_rows_default(int blank)
+void lab_binding_rows_default(bool blank)
 {
-    int rows = lab_dom_object(4);
+    int rows = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(rows, lab_binding_row_default(blank));
     lab_dom_return(rows);
 }
@@ -152,7 +154,7 @@ void lab_binding_rows_default(int blank)
 /* Normalise render input in one pass over preceding authored names, avoiding repeated prefix scans. */
 void lab_binding_rows_prepare(int rows)
 {
-    int result = lab_dom_object(4), index = lab_binding_row_index();
+    int result = lab_dom_object(LAB_VALUE_ARRAY), index = lab_binding_row_index();
     uint32_t occupied[4] = {0};
     unsigned count = lab_binding_array_count(rows), mark = lab_dom_mark();
     if (!count)
@@ -170,14 +172,14 @@ void lab_binding_rows_prepare(int rows)
 /* Capture every visible structured row, retaining the established fallback for an empty stack. */
 void lab_binding_rows_read(int root)
 {
-    int result = lab_dom_object(4), nodes = root ? lab_dom_all(root, ".integrator-bound-row") : 0;
+    int result = lab_dom_object(LAB_VALUE_ARRAY), nodes = root ? lab_dom_all(root, ".integrator-bound-row") : 0;
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < lab_dom_count(nodes); ++i) {
-        int node = lab_dom_item(nodes, i), row = lab_dom_object(5);
-        lab_dom_set(row, "kind", lab_dom_read(node, 3, "kind"));
-        lab_dom_set(row, "name", lab_dom_read(lab_dom_query(node, "[data-integrator-name]"), 5, ""));
-        lab_dom_set(row, "lo", lab_dom_read(lab_dom_query(node, "[data-integrator-lower]"), 5, ""));
-        lab_dom_set(row, "hi", lab_dom_read(lab_dom_query(node, "[data-integrator-upper]"), 5, ""));
+        int node = lab_dom_item(nodes, i), row = lab_dom_object(LAB_VALUE_OBJECT);
+        lab_dom_set(row, "kind", lab_dom_read(node, LAB_DOM_DATASET, "kind"));
+        lab_dom_set(row, "name", lab_dom_read(lab_dom_query(node, "[data-integrator-name]"), LAB_DOM_VALUE, ""));
+        lab_dom_set(row, "lo", lab_dom_read(lab_dom_query(node, "[data-integrator-lower]"), LAB_DOM_VALUE, ""));
+        lab_dom_set(row, "hi", lab_dom_read(lab_dom_query(node, "[data-integrator-upper]"), LAB_DOM_VALUE, ""));
         lab_dom_push(result, lab_binding_row_clean(row, lab_dom_string("x")));
         lab_dom_release(mark);
     }
@@ -189,7 +191,7 @@ void lab_binding_rows_read(int root)
 /* Index native reference metadata by exact name, retaining the source identity alongside it. */
 void lab_binding_rows_metadata(int expression, int response)
 {
-    int metadata = lab_dom_object(5), names = lab_dom_map_new(), rows = lab_dom_get(response, "rows");
+    int metadata = lab_dom_object(LAB_VALUE_OBJECT), names = lab_dom_map_new(), rows = lab_dom_get(response, "rows");
     lab_dom_set(metadata, "expression", expression);
     lab_dom_set(metadata, "valid", lab_dom_get(response, "references_valid"));
     lab_dom_set(metadata, "names", names);
@@ -203,11 +205,11 @@ void lab_binding_rows_metadata(int expression, int response)
 }
 
 /* Unknown, invalid and stale metadata retain rows rather than guessing mathematical references. */
-int lab_binding_rows_reference(int metadata, int expression, int name)
+bool lab_binding_rows_reference(int metadata, int expression, int name)
 {
     if (!lab_dom_truth(metadata) || !lab_dom_truth(lab_dom_get(metadata, "valid")) ||
         !lab_dom_equal(expression, lab_dom_get(metadata, "expression")))
-        return 1;
+        return true;
     int referenced = lab_dom_map_get(lab_dom_get(metadata, "names"), name);
     return !lab_dom_type(referenced) || lab_dom_truth(referenced);
 }
@@ -241,7 +243,8 @@ void lab_binding_rows_plan(int rows, int metadata, int expression)
         lab_dom_release(mark);
     }
     const uint32_t *plan = lab_rows_select(count);
-    int result = lab_dom_object(5), bounds = lab_dom_object(4), active = lab_dom_object(4);
+    int result = lab_dom_object(LAB_VALUE_OBJECT), bounds = lab_dom_object(LAB_VALUE_ARRAY),
+        active = lab_dom_object(LAB_VALUE_ARRAY);
     mark = lab_dom_mark();
     for (unsigned i = 0; i < plan[0] + plan[1]; ++i) {
         unsigned index = plan[2 + i];
@@ -255,7 +258,7 @@ void lab_binding_rows_plan(int rows, int metadata, int expression)
 }
 
 /* Apply row edits atomically, retaining metadata on existing rows and clearing disabled bounds. */
-void lab_binding_rows_edit(int rows, unsigned index, unsigned operation)
+void lab_binding_rows_edit(int rows, unsigned index, lab_row_operation_t operation)
 {
     unsigned count = lab_binding_array_count(rows);
     if (count > 256) {
@@ -268,7 +271,7 @@ void lab_binding_rows_edit(int rows, unsigned index, unsigned operation)
         lab_dom_return(0);
         return;
     }
-    int result = lab_dom_object(4), next = lab_binding_row_next(rows);
+    int result = lab_dom_object(LAB_VALUE_ARRAY), next = lab_binding_row_next(rows);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < plan[0]; ++i) {
         unsigned source = plan[1 + 2 * i], flags = plan[2 + 2 * i];
@@ -294,7 +297,7 @@ void lab_binding_rows_merge(int rows, int response)
         return;
     }
     if (count > 256 || bound_count > 256) {
-        lab_dom_return(lab_dom_scalar(1, 0));
+        lab_dom_return(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
         return;
     }
     int names = lab_dom_map_new();
@@ -302,7 +305,7 @@ void lab_binding_rows_merge(int rows, int response)
     for (unsigned i = 0; i < lab_binding_array_count(bindings); ++i) {
         int name = lab_binding_variable_name(lab_dom_item(bindings, i));
         if (name)
-            lab_dom_map_set(names, name, lab_dom_scalar(1, 1));
+            lab_dom_map_set(names, name, lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
         lab_dom_release(mark);
     }
     lab_binding_rows_flags(rows);
@@ -313,10 +316,10 @@ void lab_binding_rows_merge(int rows, int response)
     }
     const uint32_t *plan = lab_rows_merge(count, bound_count);
     if (!plan) {
-        lab_dom_return(lab_dom_scalar(1, 0));
+        lab_dom_return(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
         return;
     }
-    int result = lab_dom_object(4);
+    int result = lab_dom_object(LAB_VALUE_ARRAY);
     mark = lab_dom_mark();
     for (unsigned i = 0; i < plan[0]; ++i) {
         unsigned source = plan[1 + i];

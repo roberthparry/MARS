@@ -314,6 +314,26 @@ static bool draw_impulses(svg_view_t *view, const plot_series_t *series)
     return true;
 }
 
+/* Estimate the 12 px sans-serif title without treating spaces and narrow letters as wide glyphs. */
+static double axis_title_width(const string_t *label)
+{
+    const unsigned char *bytes = (const unsigned char *)string_c_str(label);
+    double width = 0;
+    /* One bounded pass over the title; UTF-8 continuation bytes do not add glyphs. */
+    for (size_t i = 0; i < string_byte_length(label); ++i) {
+        unsigned char c = bytes[i];
+        if ((c & 0xc0) == 0x80)
+            continue;
+        if (c >= 0x80 || strchr("MWmw@%", c))
+            width += 12;
+        else if (strchr(" ilIjtfr.,:;!|'()/", c))
+            width += 4.2;
+        else
+            width += c >= 'A' && c <= 'Z' ? 8.4 : 7.2;
+    }
+    return width;
+}
+
 static bool render(svg_view_t *view, const plot_t *plot)
 {
     static bool (*const drawers[])(svg_view_t *, const plot_series_t *) = {draw_lines, draw_points, draw_impulses};
@@ -323,7 +343,9 @@ static bool render(svg_view_t *view, const plot_t *plot)
         return false;
     if (plot->options.equal_units)
         view->left = 48;
-    view->left = fmax(view->left, fmin(label_width + (string_length(plot->y_label) ? 48 : 16), plot->options.width - 112));
+    double axis_width = axis_title_width(plot->y_label);
+    view->left = fmax(view->left, fmin(label_width + (axis_width ? axis_width + 32 : 16),
+                                      plot->options.width - 112));
     view->left = fmax(view->left, fmin(x_width / 2 + 4, plot->options.width / 3.0));
     double right = fmax(32, fmin(x_width / 2 + 4, plot->options.width / 3.0));
     if (plot->options.equal_units)

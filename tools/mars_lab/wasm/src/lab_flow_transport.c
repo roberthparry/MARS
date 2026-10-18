@@ -13,9 +13,10 @@
 #include "lab_flow_transport.h"
 
 /* Synchronous resource adapters apply the effects selected by native request policy. */
-unsigned lab_transport_policy(unsigned action, unsigned channel, unsigned main_channel)
+unsigned lab_transport_policy(lab_request_operation_t action, lab_request_channel_t channel,
+                              lab_request_channel_t main_channel)
 {
-    return (action == 0 ? 1u : 0u) | (channel == main_channel ? 2u : 0u);
+    return (action == LAB_REQUEST_EVALUATE ? 1u : 0u) | (channel == main_channel ? 2u : 0u);
 }
 
 static unsigned lab_flow_transport_stage(int frame)
@@ -41,6 +42,11 @@ struct lab_flow_transport_post_context {
     int request;
 };
 
+/**
+ * @brief Advance request-owned posting, response decoding and acceptance.
+ * @param frame Borrowed browser frame retaining the stage, request, payload and transport results.
+ * @return Scoped operation or completion plan for the selected posting stage.
+ */
 static int lab_flow_transport_post(int frame);
 
 static int lab_flow_transport_post_assert_start(struct lab_flow_transport_post_context *ctx)
@@ -86,7 +92,7 @@ static int lab_flow_transport_post_accept(struct lab_flow_transport_post_context
     if (lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "response"), "ok"))) {
         int ok = lab_dom_get(lab_dom_get(ctx->frame, "data"), "ok");
         /* Only the actual boolean false rejects publication: absence, zero and empty text do not. */
-        if (lab_dom_type(ok) != 1 || lab_dom_truth(ok))
+        if (lab_dom_type(ok) != LAB_VALUE_BOOLEAN || lab_dom_truth(ok))
             return lab_flow_call(ctx->frame, flow_transport_post_stage_syntax, "presentation", 0, 0, 1, ctx->frame);
     }
     return lab_flow_call(ctx->frame, flow_transport_post_stage_done, "result", "result", 0, 1, ctx->frame);
@@ -153,6 +159,12 @@ struct lab_flow_transport_run_context {
     int request;
 };
 
+/**
+ * @brief Advance callback execution, ownership-aware recovery and finalisation.
+ * @param frame Borrowed browser frame retaining the stage, request, callback result and exception state.
+ * @param ui Non-zero to render current-request errors in the UI before finalisation; zero for outer recovery only.
+ * @return Scoped operation or completion plan for the selected runner stage.
+ */
 static int lab_flow_transport_run(int frame, int ui);
 
 static int lab_flow_transport_run_begin(struct lab_flow_transport_run_context *ctx)
@@ -183,14 +195,14 @@ static int lab_flow_transport_run_finish(struct lab_flow_transport_run_context *
 static int lab_flow_transport_run_outer_current(struct lab_flow_transport_run_context *ctx)
 {
     /* If the ownership check itself throws, its exception still passes through the finaliser. */
-    lab_dom_set(ctx->frame, "rethrow", lab_dom_scalar(1, 1));
+    lab_dom_set(ctx->frame, "rethrow", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_transport_run_stage_finish));
     return lab_flow_call(ctx->frame, flow_transport_run_stage_outer_decide, "current", "current", 0, 1, ctx->request);
 }
 
 static int lab_flow_transport_run_outer_decide(struct lab_flow_transport_run_context *ctx)
 {
-    lab_dom_set(ctx->frame, "rethrow", lab_dom_scalar(1, lab_dom_truth(lab_dom_get(ctx->frame, "current"))));
+    lab_dom_set(ctx->frame, "rethrow", lab_dom_scalar(LAB_VALUE_BOOLEAN, lab_dom_truth(lab_dom_get(ctx->frame, "current"))));
     lab_dom_set(ctx->frame, "stage", lab_dom_numeric(flow_transport_run_stage_finish));
     return lab_flow_transport_run(ctx->frame, ctx->ui);
 }
@@ -219,8 +231,8 @@ static int lab_flow_transport_run_ui_digits(struct lab_flow_transport_run_contex
 
 static int lab_flow_transport_run_ui_clear(struct lab_flow_transport_run_context *ctx)
 {
-    int options = lab_dom_object(5);
-    lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "keepBindings", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return lab_flow_call(ctx->frame, flow_transport_run_stage_ui_status, "clearResults", 0, 0, 1, options);
 }
 
@@ -267,12 +279,12 @@ static int lab_flow_transport_run(int frame, int ui)
 }
 
 /* The browser owns arbitrary result values; native plans never coerce null, undefined or thrown primitives. */
-int lab_flow_transport(unsigned kind, int frame, int view)
+int lab_flow_transport(lab_flow_transport_kind_t kind, int frame, int view)
 {
     (void)view;
-    if (kind == 0)
+    if (kind == LAB_FLOW_TRANSPORT_POST)
         return lab_flow_transport_post(frame);
-    if (kind == 1 || kind == 2)
-        return lab_flow_transport_run(frame, kind == 2);
+    if (kind == LAB_FLOW_TRANSPORT_RUN || kind == LAB_FLOW_TRANSPORT_UI_RUN)
+        return lab_flow_transport_run(frame, kind == LAB_FLOW_TRANSPORT_UI_RUN);
     return lab_flow_done(0);
 }

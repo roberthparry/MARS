@@ -2,14 +2,17 @@
  * @file lab_browser.c
  * @brief Freestanding C browser transport and worksheet limits for MARS Lab.
  *
- * Compiled to WebAssembly without libc or Python. Owns bounded Protobuf traversal,
- * wire validation and encoding for proto/lab.proto. Host imports only access
+ * Compiled to WebAssembly with library byte operations and no host system imports. Owns bounded Protobuf traversal,
+ * schema validation and encoding for proto/lab.proto, using MARSlib's shared
+ * allocation-free wire primitives. Host imports only access
  * JavaScript values and UTF-8 strings; mathematics remains in native MARS.
  * One synchronous call owns the fixed buffers; callers copy output before awaiting.
  */
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
+#include "protobuf_wire-t.h"
 #include "lab_host.h"
 #include "lab_browser.h"
 
@@ -34,10 +37,10 @@ static void lab_browser_byte(unsigned char value)
 
 static void lab_browser_varint(uint64_t value)
 {
-    do {
-        lab_browser_byte((unsigned char)((value & 127) | (value > 127 ? 128 : 0)));
-        value >>= 7;
-    } while (value);
+    size_t position = lab_browser_used;
+    if (!protobuf_wire_write_varint(lab_browser_output, lab_browser_scratch, &position, value))
+        lab_browser_failed = 1;
+    lab_browser_used = (uint32_t)position;
 }
 
 static uint32_t lab_browser_begin(unsigned field)
@@ -57,8 +60,7 @@ static void lab_browser_end(uint32_t position)
     lab_browser_used = position;
     lab_browser_varint(length);
     uint32_t start = lab_browser_used;
-    for (uint32_t i = 0; i < length; ++i)
-        lab_browser_output[start + i] = lab_browser_output[position + 5 + i];
+    memmove(lab_browser_output + start, lab_browser_output + position + 5, length);
     lab_browser_used += length;
 }
 
@@ -79,51 +81,91 @@ static void lab_browser_text(int id, unsigned field, int key_index)
     lab_browser_end(position);
 }
 
+/**
+ * @brief Encode a host Boolean payload after its value-kind field.
+ * @param id Host value identifier whose numeric truth value is read once.
+ */
+static void lab_browser_write_boolean(int id);
+
+/**
+ * @brief Encode a finite binary64 payload after its value-kind field.
+ * @param id Host value identifier; a non-finite number marks encoding as failed.
+ */
+static void lab_browser_write_number(int id);
+
+/**
+ * @brief Encode a host string payload after its value-kind field.
+ * @param id Host value identifier passed to the bounded text encoder.
+ */
+static void lab_browser_write_string(int id);
+
+/* Preserve Boolean field emission before reading the host's numeric value. */
+static void lab_browser_write_boolean(int id)
+{
+    lab_browser_varint(16);
+    lab_browser_varint(lab_host_number(id) != 0);
+}
+
+/* Reject non-finite values before emitting their fixed-width payload. */
+static void lab_browser_write_number(int id)
+{
+    union {
+        double number;
+        uint64_t bits;
+    } value = {.number = lab_host_number(id)};
+    if (((value.bits >> 52) & 2047) == 2047) {
+        lab_browser_failed = 1;
+        return;
+    }
+    lab_browser_varint(25);
+    size_t position = lab_browser_used;
+    if (!protobuf_wire_write_fixed(lab_browser_output, lab_browser_scratch, &position, PROTOBUF_FIXED64, value.bits))
+        lab_browser_failed = 1;
+    lab_browser_used = (uint32_t)position;
+}
+
+/* Retain the bounded text encoder's failure and buffer-update ordering. */
+static void lab_browser_write_string(int id)
+{
+    lab_browser_text(id, 4, -1);
+}
+
 static void lab_browser_write(int info, unsigned depth)
 {
     if (lab_browser_failed || depth > lab_browser_depth || ++lab_browser_count > lab_browser_nodes) {
         lab_browser_failed = 1;
         return;
     }
-    int kind = info & 7, id = info >> 3;
-    if (info < 0 || kind > 5) {
+    lab_value_kind_t kind = (lab_value_kind_t)(info & 7);
+    int id = info >> 3;
+    if (info < 0 || kind > LAB_VALUE_OBJECT) {
         lab_browser_failed = 1;
         return;
     }
     lab_browser_varint(8);
     lab_browser_varint((unsigned)kind);
-    if (kind == 1) {
-        lab_browser_varint(16);
-        lab_browser_varint(lab_host_number(id) != 0);
-    } else if (kind == 2) {
-        union {
-            double number;
-            uint64_t bits;
-        } value = {.number = lab_host_number(id)};
-        if (((value.bits >> 52) & 2047) == 2047) {
-            lab_browser_failed = 1;
-            return;
-        }
-        lab_browser_varint(25);
-        for (unsigned i = 0; i < 8; ++i)
-            lab_browser_byte((unsigned char)(value.bits >> (8 * i)));
-    } else if (kind == 3) {
-        lab_browser_text(id, 4, -1);
-    } else if (kind >= 4) {
+    static void (*const scalar_writers[LAB_VALUE_OBJECT + 1])(int) = {
+        [LAB_VALUE_BOOLEAN] = lab_browser_write_boolean,
+        [LAB_VALUE_NUMBER]  = lab_browser_write_number,
+        [LAB_VALUE_STRING]  = lab_browser_write_string,
+    };
+    if (scalar_writers[kind]) {
+        scalar_writers[kind](id);
+    } else if (kind >= LAB_VALUE_ARRAY) {
         int count = lab_host_count(id);
         if (count < 0 || count > lab_browser_nodes) {
             lab_browser_failed = 1;
             return;
         }
         for (int i = 0; i < count && !lab_browser_failed; ++i) {
-            uint32_t entry = lab_browser_begin(kind == 4 ? 5 : 6);
+            uint32_t entry = lab_browser_begin(kind == LAB_VALUE_ARRAY ? 5 : 6);
             uint32_t child = 0;
-            if (kind == 5) {
+            if (kind == LAB_VALUE_OBJECT) {
                 lab_browser_text(id, 1, i);
                 child = lab_browser_begin(2);
             }
             lab_browser_write(lab_host_child_info(id, i), depth + 1);
-            if (kind == 5)
+            if (kind == LAB_VALUE_OBJECT)
                 lab_browser_end(child);
             lab_browser_end(entry);
         }
@@ -135,48 +177,31 @@ typedef struct {
     uint32_t position, end;
 } lab_browser_reader_t;
 
-static int lab_browser_read_varint(lab_browser_reader_t *reader, uint64_t *value)
+static bool lab_browser_field(lab_browser_reader_t *reader, unsigned *field, protobuf_wire_t *wire, uint64_t *value,
+                              lab_browser_reader_t *slice)
 {
-    *value = 0;
-    for (unsigned i = 0; i < 10 && reader->position < reader->end; ++i) {
-        unsigned byte = reader->bytes[reader->position++];
-        if (i == 9 && byte > 1)
-            return 0;
-        *value |= (uint64_t)(byte & 127) << (7 * i);
-        if (!(byte & 128))
-            return 1;
-    }
-    return 0;
+    size_t position = reader->position;
+    protobuf_wire_field_t decoded;
+    if (!protobuf_wire_read_field(reader->bytes, reader->end, &position, &decoded))
+        return false;
+    reader->position = (uint32_t)position;
+    *field = decoded.field;
+    *wire = decoded.wire;
+    *value = decoded.integer;
+    if (decoded.wire == PROTOBUF_BYTES)
+        *slice = (lab_browser_reader_t){decoded.data, 0, (uint32_t)decoded.size};
+    return true;
 }
 
-static int lab_browser_field(lab_browser_reader_t *reader, unsigned *field, unsigned *wire, uint64_t *value,
-                             lab_browser_reader_t *slice)
-{
-    uint64_t tag;
-    if (!lab_browser_read_varint(reader, &tag) || tag < 8 || tag >> 3 > 536870911)
-        return 0;
-    *field = (unsigned)(tag >> 3);
-    *wire = tag & 7;
-    if (*wire == 0)
-        return lab_browser_read_varint(reader, value);
-    uint64_t length = *wire == 1 ? 8 : *wire == 5 ? 4 : 0;
-    if (*wire == 2) {
-        if (!lab_browser_read_varint(reader, &length))
-            return 0;
-    } else if (!length) {
-        return 0;
-    }
-    if (length > reader->end - reader->position)
-        return 0;
-    *slice = (lab_browser_reader_t){reader->bytes, reader->position, reader->position + (uint32_t)length};
-    *value = 0;
-    if (*wire != 2)
-        for (unsigned i = 0; i < length; ++i)
-            *value |= (uint64_t)reader->bytes[reader->position + i] << (8 * i);
-    reader->position += (uint32_t)length;
-    return 1;
-}
-
+/**
+ * @brief Decode one bounded serialised browser value and its descendants.
+ * @param reader Reader slice containing exactly one encoded value; its cursor is copied.
+ * @param depth Current nesting depth, checked against the decoder's recursion limit.
+ * @param parent Host container receiving this value, or -1 for the root value.
+ * @param key Object-property key bytes; NULL for an array element or the root value.
+ * @param key_length Number of bytes in key; zero when no key is supplied.
+ * @return Host value identifier, or -1 for malformed input, exceeded limits or host rejection.
+ */
 static int lab_browser_read(lab_browser_reader_t reader, unsigned depth, int parent, const unsigned char *key,
                             uint32_t key_length);
 
@@ -187,13 +212,14 @@ static int lab_browser_entry(lab_browser_reader_t reader, int parent, unsigned d
     while (reader.position < reader.end) {
         if (++fields > lab_browser_nodes)
             return 0;
-        unsigned field, wire;
+        unsigned field;
+        protobuf_wire_t wire;
         uint64_t value;
         lab_browser_reader_t slice = {0};
         if (!lab_browser_field(&reader, &field, &wire, &value, &slice))
             return 0;
         if (field <= 2) {
-            if (wire != 2 || (seen & (1u << field)))
+            if (wire != PROTOBUF_BYTES || (seen & (1u << field)))
                 return 0;
             seen |= 1u << field;
             if (field == 1)
@@ -214,7 +240,8 @@ static int lab_browser_read(lab_browser_reader_t reader, unsigned depth, int own
     if (depth > lab_browser_depth || ++lab_browser_count > lab_browser_nodes)
         return -1;
     lab_browser_reader_t original = reader, text = {0};
-    unsigned kind = 99, seen = 0, containers = 0, fields = 0;
+    lab_value_kind_t kind = LAB_VALUE_INVALID;
+    unsigned seen = 0, containers = 0, fields = 0;
     uint64_t boolean = 0;
     union {
         double number;
@@ -223,20 +250,23 @@ static int lab_browser_read(lab_browser_reader_t reader, unsigned depth, int own
     while (reader.position < reader.end) {
         if (++fields > lab_browser_nodes)
             return -1;
-        unsigned field, wire;
+        unsigned field;
+        protobuf_wire_t wire;
         uint64_t value;
         lab_browser_reader_t slice = {0};
         if (!lab_browser_field(&reader, &field, &wire, &value, &slice))
             return -1;
         if (field <= 4) {
-            static const unsigned wires[] = {0, 0, 0, 1, 2};
+            static const protobuf_wire_t wires[] = {
+                PROTOBUF_VARINT, PROTOBUF_VARINT, PROTOBUF_VARINT, PROTOBUF_FIXED64, PROTOBUF_BYTES
+            };
             if (wire != wires[field] || (seen & (1u << field)))
                 return -1;
             seen |= 1u << field;
             if (field == 1) {
                 if (value > 5)
                     return -1;
-                kind = (unsigned)value;
+                kind = (lab_value_kind_t)value;
             } else if (field == 2) {
                 if (value > 1)
                     return -1;
@@ -249,22 +279,24 @@ static int lab_browser_read(lab_browser_reader_t reader, unsigned depth, int own
                 text = slice;
             }
         } else if (field <= 6) {
-            if (wire != 2)
+            if (wire != PROTOBUF_BYTES)
                 return -1;
             containers |= 1u << field;
         }
     }
-    if (kind > 5 || !(seen & 2) || (seen & ~((kind >= 1 && kind <= 3 ? 1u << (kind + 1) : 0) | 2u)) ||
-        (containers & ~(kind >= 4 ? 1u << (kind + 1) : 0)))
+    if (kind == LAB_VALUE_INVALID || kind > LAB_VALUE_OBJECT || !(seen & 2) ||
+        (seen & ~((kind >= LAB_VALUE_BOOLEAN && kind <= LAB_VALUE_STRING ? 1u << (kind + 1) : 0) | 2u)) ||
+        (containers & ~(kind >= LAB_VALUE_ARRAY ? 1u << (kind + 1) : 0)))
         return -1;
-    int parent = lab_host_value((int)kind, kind == 1 ? (double)boolean : number.number,
+    int parent = lab_host_value(kind, kind == LAB_VALUE_BOOLEAN ? (double)boolean : number.number,
                                 text.bytes ? text.bytes + text.position : NULL, text.end - text.position, owner, key,
                                 key_length);
-    if (parent < 0 || kind < 4)
+    if (parent < 0 || kind < LAB_VALUE_ARRAY)
         return parent;
     reader = original;
     while (reader.position < reader.end) {
-        unsigned field, wire;
+        unsigned field;
+        protobuf_wire_t wire;
         uint64_t value;
         lab_browser_reader_t slice = {0};
         if (!lab_browser_field(&reader, &field, &wire, &value, &slice))
@@ -327,7 +359,7 @@ uint32_t lab_browser_encode(int root)
 {
     lab_browser_used = lab_browser_count = 0;
     lab_browser_failed = 0;
-    if (lab_host_kind(root) != 5)
+    if (lab_host_kind(root) != LAB_VALUE_OBJECT)
         return 0;
     lab_browser_varint(8);
     lab_browser_varint(1);
@@ -348,7 +380,8 @@ int lab_browser_decode(uint32_t size)
     while (reader.position < reader.end) {
         if (++fields > lab_browser_nodes)
             return -1;
-        unsigned field, wire;
+        unsigned field;
+        protobuf_wire_t wire;
         uint64_t value;
         lab_browser_reader_t slice = {0};
         if (!lab_browser_field(&reader, &field, &wire, &value, &slice))
@@ -357,17 +390,17 @@ int lab_browser_decode(uint32_t size)
             if (seen & (1u << field))
                 return -1;
             seen |= 1u << field;
-            if (field == 1 && (wire != 0 || value != 1))
+            if (field == 1 && (wire != PROTOBUF_VARINT || value != 1))
                 return -1;
             if (field == 2) {
-                if (wire != 2)
+                if (wire != PROTOBUF_BYTES)
                     return -1;
                 root = slice;
             }
         }
     }
     int id = seen == 6 ? lab_browser_read(root, 0, -1, NULL, 0) : -1;
-    return id >= 0 && lab_host_kind(id) == 5 ? id : -1;
+    return id >= 0 && lab_host_kind(id) == LAB_VALUE_OBJECT ? id : -1;
 }
 
 /* Clamp an already parsed precision value; NaN means use the caller's fallback. */

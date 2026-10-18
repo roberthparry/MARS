@@ -1,6 +1,6 @@
 /**
  * @file lab_workspace.h
- * @brief Private interface: freestanding worksheet mode, precision and bounded history ownership.
+ * @brief Application API: freestanding worksheet mode, precision and bounded history ownership.
  *
  * Stores actual editor and codec snapshot bytes in WebAssembly, not host object
  * handles. DOM rendering, serialisation and persistence I/O belong to the host;
@@ -11,9 +11,42 @@
  *
  * Used by the freestanding browser modules and the versioned JavaScript host ABI.
  * This is not an installed MARS library interface; calls run synchronously on the browser thread.
+ * Boolean arguments crossing the WebAssembly i32 ABI must be canonical 0 or 1;
+ * C callers use false or true.
  */
 #ifndef LAB_WASM_WORKSPACE_H
 #define LAB_WASM_WORKSPACE_H
+
+#include <stdbool.h>
+
+#include "lab_mode.h"
+
+/** @brief Fixed transfer buffer used to stage text or encoded snapshots. */
+typedef enum {
+    LAB_WORKSPACE_INPUT = 0,     /**< Primary input or left-hand comparison value. */
+    LAB_WORKSPACE_ALTERNATE = 1  /**< Default text or right-hand comparison value. */
+} lab_workspace_buffer_t;
+
+/** @brief Pinned editor-source field retained independently of history. */
+typedef enum {
+    LAB_WORKSPACE_FULL_TEXT = 0,    /**< Complete native editor source. */
+    LAB_WORKSPACE_DISPLAY_TEXT = 1, /**< Text currently displayed in the editor. */
+    LAB_WORKSPACE_LAST_INPUT = 2,   /**< Last evaluated input. */
+    LAB_WORKSPACE_GOAL_SOURCE = 3,  /**< Source retained for goal seeking. */
+    LAB_WORKSPACE_GOAL_TARGET = 4   /**< Goal-seeking target text. */
+} lab_workspace_source_t;
+
+/** @brief History stack identity; these ABI values are not signed navigation deltas. */
+typedef enum {
+    LAB_WORKSPACE_BACK = 0,   /**< Older worksheet snapshots. */
+    LAB_WORKSPACE_FORWARD = 1 /**< Snapshots ahead of the restored worksheet. */
+} lab_workspace_history_t;
+
+/** @brief Signed precision-step request; zero and all negative values decrease precision. */
+typedef enum {
+    LAB_WORKSPACE_PRECISION_DECREASE = -1, /**< Move to the preceding offered precision. */
+    LAB_WORKSPACE_PRECISION_INCREASE = 1   /**< Move to the following offered precision. */
+} lab_workspace_precision_direction_t;
 
 /* Workspace: C owns seven modes, their precision, editor bytes, committed snapshots and
  * bounded back/forward histories, plus active source/display, last-input and goal-seek bytes.
@@ -27,99 +60,184 @@
 /** @brief Reset every mode, precision and owned byte store to its initial state. */
 void lab_workspace_reset(void);
 
-/** @brief Borrow staging buffer zero or one; invalid indices return null. */
-unsigned char *lab_workspace_input(unsigned index);
+/**
+ * @brief Borrow a writable workspace transfer buffer.
+ * @param index Primary or alternate staging buffer; other values are rejected.
+ * @return Pointer to a fixed lab_workspace_capacity()-byte buffer, or null for another index.
+ * Consumers copy staged bytes; callers must not write beyond the capacity.
+ */
+unsigned char *lab_workspace_input(lab_workspace_buffer_t index);
 
-/** @brief Return the maximum size of an editor or encoded snapshot (4 MiB). */
+/**
+ * @brief Report the capacity of each editor/snapshot transfer buffer.
+ * @return Maximum byte count, 4 MiB; encoded values are length-delimited rather than NUL-terminated.
+ */
 unsigned lab_workspace_capacity(void);
 
-/** @brief Borrow the last returned snapshot/editor bytes until the next read. */
+/**
+ * @brief Borrow the most recently copied editor or snapshot bytes.
+ * @return Shared output buffer; use the length returned by the operation that filled it and copy before another read.
+ */
 const unsigned char *lab_workspace_output(void);
 
-/** @brief Match one of seven exact UTF-8 tokens in staging buffer zero; not a general text parser. */
-unsigned lab_workspace_mode_id(unsigned length);
+/**
+ * @brief Match an exact UTF-8 mode token staged in buffer zero.
+ * @param length Token byte count in staging buffer zero, excluding any terminator; counts above twelve are rejected.
+ * @return Expression 0, equation 1, differential equation 2, matrix 3, integrator 4, DateTime 5 or almanac 6.
+ * Unrecognised tokens return expression 0; this function does not select the mode.
+ */
+lab_mode_t lab_workspace_mode_id(unsigned length);
 
-/** @brief Return the selected mode index, with expression at zero. */
-unsigned lab_workspace_mode(void);
+/**
+ * @brief Read the selected worksheet mode.
+ * @return Current mode index in 0..6, with expression at zero.
+ */
+lab_mode_t lab_workspace_mode(void);
 
-/** @brief Select a mode; return whether it changed, with invalid indices selecting expression. */
-int lab_workspace_select(unsigned mode);
+/**
+ * @brief Select a worksheet mode and report whether it changed.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @return True when selection changed; false otherwise. Invalid indices select expression.
+ */
+bool lab_workspace_select(lab_mode_t mode);
 
-/** @brief Return a mode's initial precision in bits. */
-unsigned lab_workspace_default_precision(unsigned mode);
+/**
+ * @brief Read a mode's initial arithmetic precision.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @return 256 bits for indices 0..3, or 53 bits for all other indices.
+ */
+unsigned lab_workspace_default_precision(lab_mode_t mode);
 
-/** @brief Store finite saved bit precision, clamped to 53..262144, retaining the old value for non-finite input. */
-unsigned lab_workspace_precision_set(unsigned mode, double bits);
+/**
+ * @brief Store finite saved precision, clamping to the current Lab limits.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param bits Requested binary precision; finite fractions truncate after clamping to 53..262144.
+ * @return Stored bit count, unchanged for non-finite input; zero for an invalid mode.
+ */
+unsigned lab_workspace_precision_set(lab_mode_t mode, double bits);
 
-/** @brief Return a mode's stored bit precision, preserving the legacy 17-bit saved-value minimum. */
-unsigned lab_workspace_precision(unsigned mode);
+/**
+ * @brief Read a mode's stored binary precision.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @return Stored bit count, or zero for an invalid mode; saved settings use a minimum of 53 bits.
+ */
+unsigned lab_workspace_precision(lab_mode_t mode);
 
-/** @brief Return requested precision with the binary64 minimum of 53 bits, without changing saved state. */
-unsigned lab_workspace_requested_precision(unsigned mode);
+/**
+ * @brief Read requested precision with the binary64 floor without changing saved state.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @return Stored bit count raised to at least 53, including for an invalid or uninitialised mode.
+ */
+unsigned lab_workspace_requested_precision(lab_mode_t mode);
 
-/** @brief Apply a user precision request within 53..262144 bits, retaining state for non-finite input. */
-unsigned lab_workspace_request_precision(unsigned mode, double bits);
+/**
+ * @brief Apply an interactive precision request within the Lab limits.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param bits Requested binary precision; finite fractions truncate after clamping to 53..262144.
+ * @return Stored bit count, unchanged for non-finite input; zero for an invalid mode.
+ */
+unsigned lab_workspace_request_precision(lab_mode_t mode, double bits);
 
-/** @brief Return significant decimal digits for a bit precision, including the binary64 17-digit policy. */
+/**
+ * @brief Convert binary precision to the displayed significant decimal digit count.
+ * @param bits Binary precision; values at or below 53 and NaN use the binary64 policy, values above 262144 clamp.
+ * @return 17 for the binary64 policy; otherwise ceil(bits * log10(2)) after clamping.
+ */
 unsigned lab_workspace_digits(double bits);
 
-/** @brief Return the next or previous precision step; positive direction means increase. */
-unsigned lab_workspace_precision_step(double bits, int direction);
+/**
+ * @brief Step along the slider's offered binary precisions.
+ * @param bits Current binary precision, truncated and clamped to 53..6656 before stepping; NaN selects 53.
+ * @param direction Positive increases; zero or negative decreases.
+ * @return Next precision in 53, 106, 192, then 64-bit increments up to 6656; endpoints do not wrap.
+ */
+unsigned lab_workspace_precision_step(double bits, lab_workspace_precision_direction_t direction);
 
-/** @brief Map positions 0..103 to 53, 106, 192, then 64-bit steps through 6656 bits. */
+/**
+ * @brief Map a slider position to its offered binary precision.
+ * @param position Index, truncated and clamped to 0..103; NaN selects zero.
+ * @return 53 bits at zero, 106 at one, then 192 through 6656 in 64-bit steps.
+ */
 unsigned lab_workspace_precision_slider_bits(double position);
 
-/** @brief Find the nearest slider position without changing an arbitrary saved precision. */
+/**
+ * @brief Find the nearest offered precision without changing saved state.
+ * @param bits Arbitrary binary precision, including custom requests above the slider ceiling.
+ * @return Slider index in 0..103, clamped at either end; exact midpoint ties choose the lower precision.
+ */
 unsigned lab_workspace_precision_slider_position(unsigned bits);
 
-/** @brief Report whether precision can increase (positive direction) or decrease at the current request setting. */
-int lab_workspace_precision_can_step(unsigned mode, int direction);
+/**
+ * @brief Check whether an offered precision step is available.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param direction Positive tests increase below 6656 bits; zero or negative tests decrease above 53 bits.
+ * @return True if stepping is possible, false at the corresponding limit or for an invalid mode.
+ */
+bool lab_workspace_precision_can_step(lab_mode_t mode, lab_workspace_precision_direction_t direction);
 
-/** @brief Store editor bytes from staging buffer zero; reject invalid modes/lengths without mutation. */
-int lab_workspace_editor_set(unsigned mode, unsigned length);
+/**
+ * @brief Copy staged editor bytes into native ownership.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param length UTF-8 byte count in staging buffer zero, at most 4 MiB; zero clears the editor.
+ * @return True on success; false for invalid input or insufficient capacity, without changing the editor.
+ */
+bool lab_workspace_editor_set(lab_mode_t mode, unsigned length);
 
-/** @brief Copy editor bytes into output, returning their length, or -1 for an invalid mode. */
-int lab_workspace_editor_get(unsigned mode);
+/**
+ * @brief Copy a mode's retained editor into the shared output buffer.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @return Byte count in lab_workspace_output(), including zero for an empty editor, or -1 for an invalid mode.
+ */
+int lab_workspace_editor_get(lab_mode_t mode);
 
 /**
  * @brief Store one active editor source field from staging buffer zero.
- * @param field Full text 0, displayed text 1, last evaluation input 2, goal source 3, or goal target 4.
+ * @param field Retained full text, displayed text, last input, goal source or goal target.
  * @param length UTF-8 byte length, at most 4 MiB. Zero clears the field.
- * @return One on success; zero on invalid input or insufficient capacity without changing owned state.
+ * @return True on success; false on invalid input or insufficient capacity without changing owned state.
  * @details These five fields are pinned in the shared 32 MiB arena and are never evicted as history.
  */
-int lab_workspace_source_set(unsigned field, unsigned length);
+bool lab_workspace_source_set(lab_workspace_source_t field, unsigned length);
 
 /**
  * @brief Copy one active editor field into the shared output buffer.
- * @param field Field index 0..4, as for lab_workspace_source_set.
+ * @param field Retained source field, as for lab_workspace_source_set.
  * @return Byte count, or -1 for an invalid field without changing output.
  */
-int lab_workspace_source_get(unsigned field);
+int lab_workspace_source_get(lab_workspace_source_t field);
 
 /**
  * @brief Check exact equality between staged editor text and retained display bytes.
  * @param length Trimmed browser input byte count in staging buffer zero, at most 4 MiB.
- * @return One on equality, including two empty strings; zero otherwise or on invalid length.
+ * @return True on equality, including two empty strings; false otherwise or on invalid length.
  */
-int lab_workspace_source_matches(unsigned length);
+bool lab_workspace_source_matches(unsigned length);
 
 /**
  * @brief Copy retained source only when the staged input still matches its displayed text.
  * @param length Trimmed browser input byte count in staging buffer zero.
- * @param goal Non-zero selects goal source; zero selects full editor source and requires a non-empty display.
+ * @param goal True selects goal source; false selects full editor source and requires a non-empty display.
  * @return Copied byte count, or zero when absent, changed or invalid. Does not modify owned state.
  */
-int lab_workspace_source_resolve(unsigned length, int goal);
+int lab_workspace_source_resolve(unsigned length, bool goal);
 
 /**
  * @brief Capture authored text, retaining the previous editor when blank; calendar modes use the supplied default.
  * @param mode Mode index in 0..6.
  * @param length Candidate byte length in staging buffer zero; already trimmed by the editor adapter.
  * @param default_length Default byte length in staging buffer one.
- * @return One on success, zero for invalid input or insufficient storage; owned state is unchanged on failure.
+ * @return True on success, false for invalid input or insufficient storage; owned state is unchanged on failure.
  */
-int lab_workspace_editor_capture(unsigned mode, unsigned length, unsigned default_length);
+bool lab_workspace_editor_capture(lab_mode_t mode, unsigned length, unsigned default_length);
 
 /**
  * @brief Copy saved text or its default to output without changing the saved editor; calendars always use defaults.
@@ -127,59 +245,111 @@ int lab_workspace_editor_capture(unsigned mode, unsigned length, unsigned defaul
  * @param default_length Default byte length in staging buffer one.
  * @return Output byte length, or -1 for invalid input, leaving the previous output unchanged.
  */
-int lab_workspace_editor_restore(unsigned mode, unsigned default_length);
+int lab_workspace_editor_restore(lab_mode_t mode, unsigned default_length);
 
 /**
- * @brief Decide whether restoration should use the binding-aware editor rather than plain text.
- * @param mode Mode index in 0..6; invalid modes return zero.
- * @param has_bindings Whether native editor metadata reports bindings for the restored text.
- * @return One for expression/equation modes, or bound matrix/integrator text; zero otherwise.
+ * @brief Decide whether restoration needs a binding-aware editor.
+ * @param mode Worksheet index in 0..6; invalid modes return false.
+ * @param has_bindings True when native editor metadata reports bindings in the restored text.
+ * @return True for expression, equation and differential-equation modes, or bound matrix/integrator text;
+ * false for calendar modes, unbound structured editors and invalid modes.
  */
-int lab_workspace_editor_bound(unsigned mode, int has_bindings);
-
-/** @brief Compare staging buffers by length and bytes. */
-int lab_workspace_equal(unsigned left_length, unsigned right_length);
-
-/** @brief Commit the staged snapshot for one mode; reject empty/oversized encodings. */
-int lab_workspace_commit(unsigned mode, unsigned length);
-
-/** @brief Return a committed snapshot only when different from staging buffer zero; zero means absent/unchanged. */
-int lab_workspace_previous(unsigned mode, unsigned length);
-
-/** @brief Return the selected stack depth (zero back, one forward); invalid indices return zero. */
-unsigned lab_workspace_history_count(unsigned mode, unsigned direction);
-
-/** @brief Clear one mode's selected stack without affecting its committed snapshot or other modes. */
-void lab_workspace_history_clear(unsigned mode, unsigned direction);
+bool lab_workspace_editor_bound(lab_mode_t mode, bool has_bindings);
 
 /**
- * @brief Push staged bytes, with optional adjacent deduplication and forward invalidation.
- * @details has_text is the host's measurement of the captured editor/summary text.
- * Blank snapshots are not pushed. Flags: bit zero deduplicates, bit one clears
- * forward history, including for blanks/duplicates. Returns -1 on invalid input,
- * otherwise the resulting depth. Each stack retains at most 128 entries. The
- * Mandatory forward clearing and entry-limit removal happen before extra byte
- * eviction, so their reclaimed bytes do not cause unnecessary loss of history.
- * The shared 32 MiB pool evicts oldest history entries, scanning mode order and back
- * before forward. Active editor and committed values are never evicted. If these
- * alone leave insufficient capacity, the operation fails without mutation.
+ * @brief Compare the two complete staged byte sequences.
+ * @param left_length Byte count in staging buffer zero, at most lab_workspace_capacity().
+ * @param right_length Byte count in staging buffer one, at most lab_workspace_capacity().
+ * @return True when lengths and bytes match, including empty inputs; false for a mismatch or oversized input.
  */
-int lab_workspace_history_push(unsigned mode, unsigned direction, unsigned length, int has_text, unsigned flags);
-
-/** @brief Pop one owned snapshot into output; zero means empty and -1 means invalid indices. */
-int lab_workspace_history_pop(unsigned mode, unsigned direction);
+bool lab_workspace_equal(unsigned left_length, unsigned right_length);
 
 /**
- * @brief Atomically move back/forward, saving the staged current state on the opposite stack when nonblank.
- * @details Validates before mutating. Returns restored snapshot length, zero for
- * an empty stack, or -1 for invalid input. Does not change committed state until
- * the subsequent evaluation explicitly commits its result. Capacity is checked
- * without mutation before popping; saving the current state then cannot fail.
+ * @brief Retain a copy of the staged snapshot as one mode's committed state.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param length Encoded snapshot byte count in staging buffer zero, from one to lab_workspace_capacity().
+ * @return True on success; false for invalid input or insufficient capacity, without changing the committed snapshot.
  */
-int lab_workspace_navigate(unsigned mode, unsigned direction, unsigned length, int has_text);
+bool lab_workspace_commit(lab_mode_t mode, unsigned length);
 
-/** @brief Decide whether a nonempty local copy supersedes the server copy using timestamps/default status. */
-int lab_workspace_prefer_local(int local_present, double local_time, double server_time, int server_present,
-                               int server_is_default);
+/**
+ * @brief Copy a committed snapshot only when it differs from staged current state.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param length Current encoded snapshot byte count in staging buffer zero, from one to lab_workspace_capacity().
+ * @return Committed byte count copied into lab_workspace_output(), zero when absent or identical,
+ * or -1 for invalid mode or length.
+ */
+int lab_workspace_previous(lab_mode_t mode, unsigned length);
+
+/**
+ * @brief Read a mode's history stack depth.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param direction Back stack 0 or forward stack 1.
+ * @return Number of entries, at most 128; zero for invalid indices.
+ */
+unsigned lab_workspace_history_count(lab_mode_t mode, lab_workspace_history_t direction);
+
+/**
+ * @brief Clear one history stack without affecting committed or other-mode state.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param direction Back stack 0 or forward stack 1; invalid mode/direction pairs are ignored.
+ */
+void lab_workspace_history_clear(lab_mode_t mode, lab_workspace_history_t direction);
+
+/**
+ * @brief Push a staged snapshot with optional adjacent deduplication and forward invalidation.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param direction Destination stack: back 0 or forward 1.
+ * @param length Encoded snapshot byte count in staging buffer zero, from one to lab_workspace_capacity().
+ * @param has_text True when the captured editor/summary contains text; false suppresses the push.
+ * @param flags Bit 0 (1) deduplicates against the stack top; bit 1 (2) clears forward history, even for
+ * blank or duplicate snapshots. Only combinations 0..3 are accepted.
+ * @return Resulting stack depth, or -1 for invalid input or insufficient capacity without mutation.
+ * @details Each stack retains at most 128 entries. Mandatory forward clearing and entry-limit removal
+ * precede extra byte eviction. The shared 32 MiB pool evicts oldest history entries, scanning mode order
+ * and back before forward. Active editor and committed values are never evicted.
+ */
+int lab_workspace_history_push(lab_mode_t mode, lab_workspace_history_t direction, unsigned length, bool has_text,
+                               unsigned flags);
+
+/**
+ * @brief Remove one history snapshot and copy it to the shared output buffer.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param direction Source stack: back 0 or forward 1.
+ * @return Snapshot byte count in lab_workspace_output(), zero for an empty stack, or -1 for invalid indices.
+ */
+int lab_workspace_history_pop(lab_mode_t mode, lab_workspace_history_t direction);
+
+/**
+ * @brief Move through history and save nonblank staged current state on the opposite stack.
+ * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,
+ * DateTime 5 or almanac 6.
+ * @param direction Navigation destination: back stack 0 or forward stack 1.
+ * @param length Current snapshot byte count in staging buffer zero, from one to lab_workspace_capacity().
+ * @param has_text True saves the current snapshot to the opposite stack; false suppresses that save.
+ * @return Restored snapshot byte count in lab_workspace_output(), zero for an empty destination stack,
+ * or -1 for invalid input or insufficient capacity.
+ * @details Checks capacity before mutation; saving current state cannot fail after popping.
+ * Committed state remains unchanged until a subsequent evaluation commits its result.
+ */
+int lab_workspace_navigate(lab_mode_t mode, lab_workspace_history_t direction, unsigned length, bool has_text);
+
+/**
+ * @brief Decide whether a non-empty local editor supersedes the server copy.
+ * @param local_present True when local editor text is present.
+ * @param local_time Local saved timestamp in the same clock units as server_time, normally Unix milliseconds.
+ * @param server_time Server saved timestamp, normally Unix milliseconds.
+ * @param server_present True when server editor text is present.
+ * @param server_is_default True when server text is the configured initial placeholder.
+ * @return True when local text exists and is newer, or the server copy is absent/default; false otherwise.
+ */
+bool lab_workspace_prefer_local(bool local_present, double local_time, double server_time, bool server_present,
+                               bool server_is_default);
 
 #endif

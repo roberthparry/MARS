@@ -12,66 +12,70 @@
 
 #include <stdint.h>
 
+#include "lab_value.h"
+
 /**
  * @brief Classify a host value.
- * @param id Borrowed codec handle.
- * @return Kind: null 0, boolean 1, number 2, string 3, array 4 or object 5.
+ * @param id Scoped codec handle to the browser value being classified; not a DOM handle or linear-memory pointer.
+ * @return Kind: null 0, boolean 1, number 2, string 3, array 4 or object 5; -1 for an unsupported or invalid handle.
  */
-int lab_host_kind(int id);
+lab_value_kind_t lab_host_kind(int id);
 
 /**
  * @brief Read a number or boolean.
- * @param id Borrowed codec handle for a numeric or boolean value.
+ * @param id Scoped codec handle to a numeric or boolean browser value.
  * @return Numeric value; booleans become zero or one.
  */
 double lab_host_number(int id);
 
 /**
  * @brief Count a container's entries.
- * @param id Borrowed array or object handle.
- * @return Number of entries.
+ * @param id Scoped codec handle to a browser array or snapshotted object.
+ * @return Array length or captured enumerable-key count; zero when no container entries are available.
  */
 int lab_host_count(int id);
 
 /**
  * @brief Obtain a child's handle and kind in one host call.
- * @param id Borrowed array or object handle.
- * @param index Zero-based entry index.
- * @return Child handle shifted left by three bits, with its kind in the low bits.
+ * @param id Scoped codec handle to the parent browser array or snapshotted object.
+ * @param index Zero-based array element index or index in the object's captured enumerable-key list.
+ * @return Scoped child handle shifted left by three bits, with its kind in the low bits; -1 for an unsupported child.
  */
 int lab_host_child_info(int id, int index);
 
 /**
  * @brief Copy an object key as UTF-8.
- * @param id Borrowed object handle.
- * @param index Zero-based entry index.
- * @param target Writable WASM destination.
- * @param capacity Destination capacity in bytes.
- * @return Byte length, or a negative result when the key cannot fit.
+ * @param id Scoped codec handle to the snapshotted browser object.
+ * @param index Zero-based index in the object's captured enumerable-key list.
+ * @param[out] target Writable destination in WASM linear memory with at least capacity bytes available.
+ * @param capacity Destination capacity in bytes; no NUL terminator is written.
+ * @return UTF-8 byte count, or -1 if the key is absent, cannot fit or cannot round-trip through UTF-8.
+ * A failed copy may leave partial bytes in target.
  */
 int lab_host_key_text(int id, int index, unsigned char *target, uint32_t capacity);
 
 /**
  * @brief Copy a string value as UTF-8.
- * @param id Borrowed string handle.
- * @param target Writable WASM destination.
- * @param capacity Destination capacity in bytes.
- * @return Byte length, or a negative result when the string cannot fit.
+ * @param id Scoped codec handle to the browser string to copy.
+ * @param[out] target Writable destination in WASM linear memory with at least capacity bytes available.
+ * @param capacity Destination capacity in bytes; no NUL terminator is written.
+ * @return UTF-8 byte count, or -1 for a non-string value, insufficient capacity or a failed UTF-8 round-trip;
+ * a failed copy may leave partial bytes in target.
  */
 int lab_host_text(int id, unsigned char *target, uint32_t capacity);
 
 /**
  * @brief Create a decoded value and attach it to its parent.
  * @param kind Value kind in 0..5, as for lab_host_kind.
- * @param number Numeric or boolean payload.
- * @param text Borrowed UTF-8 bytes for a string, or null for other kinds.
- * @param length String byte count.
- * @param parent Parent container handle, or -1 for the root.
- * @param key Borrowed UTF-8 object key, or null for a root/array element.
- * @param key_length Object key byte count.
- * @return New host handle, or a negative result on failure.
+ * @param number Numeric payload for kind 2, or truth value for kind 1; ignored for other kinds.
+ * @param text Borrowed length-byte UTF-8 span in WASM linear memory for kind 3; null for other kinds.
+ * @param length String byte count, excluding any terminator; ignored unless kind is 3.
+ * @param parent Scoped codec handle to the parent array/object, or -1 for the root; arrays append in call order.
+ * @param key Borrowed key_length-byte UTF-8 span naming an object property; null for a root or array element.
+ * @param key_length Object key byte count, excluding any terminator; ignored for a root or array element.
+ * @return New scoped codec handle, or -1 for an invalid kind, invalid parent or duplicate object key.
  */
-int lab_host_value(int kind, double number, const unsigned char *text, uint32_t length, int parent,
+int lab_host_value(lab_value_kind_t kind, double number, const unsigned char *text, uint32_t length, int parent,
                    const unsigned char *key, uint32_t key_length);
 
 #endif

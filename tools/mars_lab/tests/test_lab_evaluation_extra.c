@@ -791,15 +791,20 @@ static void test_lab_extra_complex_domain_gaps(void)
 
 static void test_lab_extra_distribution_plot(void)
 {
-    const char *sources[] = {"@F{step(t)}", "@F{acos(sin(pi-x))}", "@F{step(x)}"};
-    const char *variables[] = {"ω", "k", "k"};
-    for (size_t i = 0; i < 3; ++i) {
+    const char *sources[] = {"@F{step(t)}", "@F{acos(sin(pi-x))}", "@F{step(x)}", "@F{asin(t)}"};
+    const char *variables[] = {"ω", "k", "k", "ω"};
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
         unsigned status = 0;
         string_t *payload = string_sprintf("{\"expression\":\"%s\",\"action\":\"plot\","
                                            "\"wrt\":\"%s\",\"plot_quality\":\"preview\"}", sources[i], variables[i]);
         json_t *fields = request("/eval", string_c_str(payload), &status);
         bool ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "plot_svg", "data-impulse") &&
-                  contains(fields, "plot_svg", "Imaginary") && !contains(fields, "function", "fourier(");
+                  contains(fields, "plot_svg", "Imaginary") && !contains(fields, "function", "fourier(") &&
+                  (i == 1 || contains(fields, "plot_svg", "Imaginary curve")) &&
+                  contains(fields, "plot_svg", "impulse weight") && contains(fields, "plot_svg", "Value / weight") &&
+                  contains(fields, "plot_notice", "not point values") &&
+                  contains(fields, "plot_notice", "no pointwise 3-D, complex-plane or amplitude view") &&
+                  !*lab_eval_text(fields, "plot_complex_plane") && !*lab_eval_text(fields, "plot_amplitude");
         const char *svg = lab_eval_text(fields, "plot_svg");
         const char *curve = svg ? strstr(svg, "data-series=\"0\"") : NULL;
         const char *end = curve ? strstr(curve, "</g>") : NULL;
@@ -816,17 +821,21 @@ static void test_lab_extra_distribution_plot(void)
         ok = status == 200 && test_lab_ok(fields, true) && contains(fields, "svg", "<svg") &&
              !*lab_eval_text(fields, "render_error");
         if (i != 1)
-            ok = ok && contains(fields, "transform_identity_TeX", "Ordinary part") &&
-                 contains(fields, "transform_identity_TeX", "\\ne 0") &&
-                 contains(fields, "transform_identity_TeX", "Impulses") &&
-                 !contains(fields, "transform_identity_TeX", "principal value") &&
-                 contains(fields, "expression", "principal value");
+            ok = ok && contains(fields, "transform_identity_TeX", " = ") &&
+                 contains(fields, "transform_identity_TeX", "\\delta") &&
+                 !contains(fields, "transform_identity_TeX", "NAN") &&
+                 !contains(fields, "transform_identity_TeX", "Non-impulse part") &&
+                 !contains(fields, "transform_identity_TeX", "Curve values only where") &&
+                 !contains(fields, "transform_identity_TeX", "\\ne 0") &&
+                 contains(fields, "transform_identity_TeX", i == 3 ? "\\operatorname{Fp}_{1}" : "principal value");
         if (!ok)
             show_failure(fields);
         json_free(fields);
         string_free(payload);
         TEST_ASSERT_TRUE(ok, "distribution result cards render native TeX rather than plain-text fallback");
     }
+    expect_response("/eval", "{\"expression\":\"@F{ln(abs(x))}\",\"action\":\"plot\",\"wrt\":\"k\"}",
+                    200u, "plot_svg", "data-impulse");
 }
 
 static void test_lab_extra_surface_slices(void)
@@ -1854,6 +1863,40 @@ static void test_lab_extra_help_examples(void)
     expect_response("/equation-eval", "{\"equation\":\"(x+1)^4 = 1\"}", 200u, "display_solutions", "± i");
 }
 
+static void test_lab_extra_plot_availability(void)
+{
+    static const struct {
+        const char *source;
+        const char *available;
+    } cases[] = {
+        {"Laplace(asin(-x^2),x,s)", "no"},
+        {"1+Laplace(asin(-x^2),x,s)", "no"},
+        {"{Laplace(asin(-x^2),x,s)|s=2}", "no"},
+        {"Laplace(exp(-x),x,s)", "yes"},
+        {"Fourier(exp(-x^2),x,k)", "yes"},
+        {"sin(x)", "yes"},
+        {"ln(-x^3)", "yes"},
+        {"asin(x-1000)", "yes"},
+        {"integral(sin(t^t),t,0,x)", "yes"}
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        json_t *payload = json_new_object();
+        string_t *route = string_new_with("/eval");
+        lab_eval_set(payload, "expression", cases[i].source);
+        unsigned status = 0;
+        json_t *fields = lab_eval_request(route, payload, &status);
+        bool ok = status == 200 && !strcmp(lab_eval_text(fields, "plot_available"), cases[i].available);
+        if (!ok)
+            show_failure(fields);
+        json_free(fields);
+        string_free(route);
+        json_free(payload);
+        TEST_ASSERT_TRUE(ok, "native plot availability distinguishes unresolved operations from numerical domains");
+    }
+    expect_response("/eval", "{\"expression\":\"Laplace(asin(-x^2),x,s)\",\"action\":\"plot\",\"wrt\":\"s\"}",
+                    422u, "plot_available", "no");
+}
+
 static void test_lab_extra_constant_identity(void)
 {
     expect_response("/eval", "{\"expression\":\"{ sin(x)^2+cos(x)^2 | x=? }\"}", 200u, "value", "1");
@@ -2602,6 +2645,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_expression, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_help_examples, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_constant_identity, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_availability, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_bindings, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_binding_edit, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_derivative, tests, NULL);

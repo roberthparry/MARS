@@ -912,6 +912,8 @@ async function labCheckWorkers(check: LabTestCheck): Promise<void> {
     const codec = createCodec();
     const wasmBytes = await (await fetch('/wasm/lab_codec.wasm')).arrayBuffer();
     await codec.start(wasmBytes);
+    window.checkLabMemory(codec.exports() as unknown as LabMemoryTestNative, codec.exports().lab_browser_input_buffer());
+    window.checkLabProtobufWire(codec);
     await checkLabCodecClasses(check, Codec, codec, wasmBytes);
     checkLabStoredCodec(check, codec);
     await checkLabWorkerValidation(check);

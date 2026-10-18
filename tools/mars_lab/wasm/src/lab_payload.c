@@ -16,6 +16,13 @@
 #include "lab_plot_slices.h"
 #include "lab_payload.h"
 
+/**
+ * @brief Populate mode-specific fields of an evaluation or auxiliary request payload.
+ * @param payload Scoped handle for the output object whose fields the builder fills in place.
+ * @param inputs Scoped array of positional source values and options for the selected request kind.
+ * @param request Scoped request-ownership record supplying action and persistence flags, or zero when absent.
+ * @param updated_at Expression modification timestamp copied to expression_updated_at; unused by other builders.
+ */
 typedef void (*lab_payload_builder_t)(int payload, int inputs, int request, double updated_at);
 
 static int lab_payload_or(int value, int fallback)
@@ -26,7 +33,7 @@ static int lab_payload_or(int value, int fallback)
 static int lab_payload_control(const char *selector)
 {
     int control = lab_dom_query(0, selector);
-    int text = lab_dom_read(control, 5, "");
+    int text = lab_dom_read(control, LAB_DOM_VALUE, "");
     int exact = lab_dom_get(control, "marsZoomValue");
     return lab_dom_truth(exact) && lab_dom_equal(text, lab_dom_get(control, "marsZoomText")) ? exact : text;
 }
@@ -47,7 +54,7 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
     if (request) {
         unsigned channel = (unsigned)lab_dom_number(lab_dom_get(request, "channel"));
         uint32_t token = (uint32_t)lab_dom_number(lab_dom_get(request, "token"));
-        action = lab_dom_string(lab_request_text(2, lab_request_action(channel, token)));
+        action = lab_dom_string(lab_request_text(LAB_REQUEST_CATALOGUE_ACTIONS, lab_request_action(channel, token)));
     }
     lab_dom_set(payload, "action", action);
     if (lab_dom_equal(action, lab_dom_string("plot"))) {
@@ -55,7 +62,7 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
         lab_dom_set(payload, "plot_source_mode", lab_dom_item(inputs, 5));
         if (lab_dom_equal(lab_dom_item(inputs, 5), lab_dom_string("integrator"))) {
             lab_dom_set(payload, "bounds", lab_dom_item(inputs, 7));
-            int rows = lab_dom_item(inputs, 7), names = lab_dom_object(4);
+            int rows = lab_dom_item(inputs, 7), names = lab_dom_object(LAB_VALUE_ARRAY);
             for (unsigned i = 0; i < lab_dom_count(rows); ++i)
                 lab_dom_push(names, lab_dom_get(lab_dom_item(rows, i), "name"));
             lab_plot_controls_variables(names, names);
@@ -83,7 +90,7 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
                                                               "", ""));
         lab_dom_set(payload, "plot_roll", lab_payload_control("#plotRoll"));
         lab_dom_set(payload, "plot_quality", lab_dom_string(lab_dom_truth(lab_dom_item(inputs, 6)) ? "preview" : "full"));
-        lab_dom_write(lab_dom_query(0, "#plotRange"), 3, "rotationVariable", axis);
+        lab_dom_write(lab_dom_query(0, "#plotRange"), LAB_DOM_DATASET, "rotationVariable", axis);
         lab_dom_set(payload, "plot_scale", lab_payload_control("#plotScale"));
         lab_dom_set(payload, "plot_y_lower", lab_payload_control("#plotYLower"));
         lab_dom_set(payload, "plot_y_upper", lab_payload_control("#plotYUpper"));
@@ -105,7 +112,7 @@ static void lab_payload_expression(int payload, int inputs, int request, double 
     lab_dom_set(payload, "expression_updated_at", lab_dom_numeric(updated_at));
     int persist = request ? (lab_payload_request_flags(request) & 1) != 0
                           : lab_dom_equal(lab_dom_item(inputs, 5), lab_dom_string("expression"));
-    lab_dom_set(payload, "persist_expression", lab_dom_scalar(1, persist));
+    lab_dom_set(payload, "persist_expression", lab_dom_scalar(LAB_VALUE_BOOLEAN, persist));
 }
 
 static void lab_payload_matrix(int payload, int inputs, int request, double updated_at)
@@ -114,21 +121,21 @@ static void lab_payload_matrix(int payload, int inputs, int request, double upda
     int options = lab_dom_item(inputs, 0);
     int source =
         lab_payload_or(lab_dom_get(options, "matrixText"),
-                       lab_payload_or(lab_dom_item(inputs, 1), lab_dom_clean(lab_payload_control("#expr"), 0)));
-    lab_dom_set(payload, "matrix", lab_dom_clean(source, 0));
+                       lab_payload_or(lab_dom_item(inputs, 1), lab_dom_clean(lab_payload_control("#expr"), LAB_DOM_CLEAN_TRIM)));
+    lab_dom_set(payload, "matrix", lab_dom_clean(source, LAB_DOM_CLEAN_TRIM));
     lab_dom_set(payload, "operation",
                 lab_payload_or(lab_dom_get(options, "operation"), lab_payload_control("#matrixOperation")));
     int operand = lab_dom_truth(lab_dom_item(inputs, 2)) ? lab_dom_get(options, "operand")
                                                          : lab_payload_control("#matrixOperand");
-    lab_dom_set(payload, "operand", lab_dom_clean(operand, 0));
+    lab_dom_set(payload, "operand", lab_dom_clean(operand, LAB_DOM_CLEAN_TRIM));
     int transient =
         request ? (lab_payload_request_flags(request) & 2) != 0 : lab_dom_truth(lab_dom_get(options, "skipSave"));
-    lab_dom_set(payload, "transient", lab_dom_scalar(1, transient));
+    lab_dom_set(payload, "transient", lab_dom_scalar(LAB_VALUE_BOOLEAN, transient));
 }
 
 static int lab_payload_editor_source(int inputs)
 {
-    return lab_payload_or(lab_dom_item(inputs, 0), lab_dom_clean(lab_payload_control("#expr"), 0));
+    return lab_payload_or(lab_dom_item(inputs, 0), lab_dom_clean(lab_payload_control("#expr"), LAB_DOM_CLEAN_TRIM));
 }
 
 static void lab_payload_equation(int payload, int inputs, int request, double updated_at)
@@ -172,18 +179,24 @@ static void lab_payload_weather(int payload, int inputs, int request, double upd
 }
 
 /* Construct a wire record; positional inputs contain opaque caller values, including boxed numbers. */
-void lab_payload_build(unsigned kind, int inputs, int request, double precision, double updated_at)
+void lab_payload_build(lab_payload_kind_t kind, int inputs, int request, double precision, double updated_at)
 {
     static const lab_payload_builder_t builders[] = {
-        lab_payload_expression, lab_payload_matrix,   lab_payload_equation, lab_payload_diffequation,
-        lab_payload_integrator, lab_payload_function, lab_payload_weather};
-    if (kind >= sizeof builders / sizeof *builders) {
+        [LAB_PAYLOAD_EXPRESSION]            = lab_payload_expression,
+        [LAB_PAYLOAD_MATRIX]                = lab_payload_matrix,
+        [LAB_PAYLOAD_EQUATION]              = lab_payload_equation,
+        [LAB_PAYLOAD_DIFFERENTIAL_EQUATION] = lab_payload_diffequation,
+        [LAB_PAYLOAD_INTEGRATOR]            = lab_payload_integrator,
+        [LAB_PAYLOAD_FUNCTION]              = lab_payload_function,
+        [LAB_PAYLOAD_WEATHER]               = lab_payload_weather,
+    };
+    if ((unsigned)kind >= sizeof builders / sizeof *builders) {
         lab_dom_return(0);
         return;
     }
-    int payload = lab_dom_object(5);
+    int payload = lab_dom_object(LAB_VALUE_OBJECT);
     builders[kind](payload, inputs, lab_dom_truth(request) ? request : 0, updated_at);
-    if (kind != 6)
+    if (kind != LAB_PAYLOAD_WEATHER)
         lab_dom_set(payload, "precision", lab_dom_numeric(precision));
     lab_dom_return(payload);
 }
@@ -215,7 +228,7 @@ void lab_payload_land(int data, int cells, int config)
                   {"zone", "#almanacZone", "DEFAULT_ALMANAC_ZONE"},
                   {"latitude", "#almanacLatitude", "DEFAULT_ALMANAC_LATITUDE"},
                   {"longitude", "#almanacLongitude", "DEFAULT_ALMANAC_LONGITUDE"}};
-    int payload = lab_dom_object(5), native_fields = lab_dom_get(data, "fields");
+    int payload = lab_dom_object(LAB_VALUE_OBJECT), native_fields = lab_dom_get(data, "fields");
     lab_dom_set(payload, "event_year",
                 lab_payload_or(lab_dom_get(data, "event_year"),
                                lab_payload_or(lab_dom_get(native_fields, "event_year"), lab_dom_string(""))));
@@ -227,13 +240,13 @@ void lab_payload_land(int data, int cells, int config)
         lab_dom_set(payload, fields[field].key, value);
         lab_dom_release(mark);
     }
-    int events = lab_dom_object(4);
+    int events = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(payload, "events", events);
     unsigned count = lab_dom_count(cells);
     mark = lab_dom_mark();
     for (unsigned index = 0; index < count; ++index) {
-        int event = lab_dom_object(5), cell = lab_dom_item(cells, index);
-        lab_dom_set(event, "jd", lab_dom_clean(lab_dom_read(cell, 3, "almanacLandTotality"), 0));
+        int event = lab_dom_object(LAB_VALUE_OBJECT), cell = lab_dom_item(cells, index);
+        lab_dom_set(event, "jd", lab_dom_clean(lab_dom_read(cell, LAB_DOM_DATASET, "almanacLandTotality"), LAB_DOM_CLEAN_TRIM));
         lab_dom_push(events, event);
         lab_dom_release(mark);
     }
@@ -251,7 +264,7 @@ void lab_payload_land_apply(int cells, int payload, unsigned failure)
     unsigned count = failure ? 0 : lab_dom_count(items), mark = lab_dom_mark();
     for (unsigned index = 0; index < count; ++index) {
         int item = lab_dom_item(items, index);
-        lab_dom_map_set(lookup, lab_dom_clean(lab_dom_get(item, "jd"), 0), item);
+        lab_dom_map_set(lookup, lab_dom_clean(lab_dom_get(item, "jd"), LAB_DOM_CLEAN_TRIM), item);
         lab_dom_release(mark);
     }
     int missing = lab_dom_string(fallback);
@@ -259,10 +272,10 @@ void lab_payload_land_apply(int cells, int payload, unsigned failure)
     mark = lab_dom_mark();
     for (unsigned index = 0; index < count; ++index) {
         int cell = lab_dom_item(cells, index);
-        int key = lab_dom_clean(lab_dom_read(cell, 3, "almanacLandTotality"), 0);
+        int key = lab_dom_clean(lab_dom_read(cell, LAB_DOM_DATASET, "almanacLandTotality"), LAB_DOM_CLEAN_TRIM);
         int html = lab_dom_get(lab_dom_map_get(lookup, key), "html");
-        int found = !failure && lab_dom_type(html) == 3;
-        lab_dom_write(cell, found ? 1 : 0, "", found ? html : missing);
+        int found = !failure && lab_dom_type(html) == LAB_VALUE_STRING;
+        lab_dom_write(cell, found ? LAB_DOM_HTML : LAB_DOM_TEXT, "", found ? html : missing);
         lab_dom_release(mark);
     }
 }
@@ -271,10 +284,10 @@ void lab_payload_land_apply(int cells, int payload, unsigned failure)
 void lab_payload_mobile(int data)
 {
     lab_dom_class(lab_dom_query(0, "#mobileAccess"), "hidden", 0);
-    lab_dom_write(lab_dom_query(0, "#mobileTitle"), 0, "",
+    lab_dom_write(lab_dom_query(0, "#mobileTitle"), LAB_DOM_TEXT, "",
                   lab_payload_or(lab_dom_get(data, "title"), lab_dom_string("Mobile access")));
-    lab_dom_write(lab_dom_query(0, "#mobileHint"), 0, "", lab_dom_get(data, "hint"));
+    lab_dom_write(lab_dom_query(0, "#mobileHint"), LAB_DOM_TEXT, "", lab_dom_get(data, "hint"));
     int url = lab_dom_join(0, lab_dom_get(data, "url"), "");
-    lab_dom_write(lab_dom_query(0, "#mobileUrl"), 0, "", lab_payload_or(url, lab_dom_string("Unavailable")));
-    lab_dom_write(lab_dom_query(0, "#mobileQr"), 1, "", lab_dom_get(data, "qr"));
+    lab_dom_write(lab_dom_query(0, "#mobileUrl"), LAB_DOM_TEXT, "", lab_payload_or(url, lab_dom_string("Unavailable")));
+    lab_dom_write(lab_dom_query(0, "#mobileQr"), LAB_DOM_HTML, "", lab_dom_get(data, "qr"));
 }

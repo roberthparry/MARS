@@ -9,6 +9,7 @@
  * Native response values remain opaque and no scoped handle survives a return.
  */
 #include "lab_dom.h"
+#include "lab_requests.h"
 #include "lab_flow.h"
 #include "lab_flow_aux.h"
 
@@ -80,7 +81,7 @@ static int lab_flow_weather_error(int frame, int view)
     if (!lab_dom_truth(lab_dom_get(frame, "current")))
         return lab_flow_done(0);
     return lab_flow_call(frame, LAB_FLOW_WEATHER_EFFECTS, "native", "plan", 0, 4,
-                         lab_dom_string("lab_evaluation_weather_response"), lab_dom_numeric(4), 0, 0);
+                         lab_dom_string("lab_evaluation_weather_response"), lab_dom_numeric(LAB_REQUEST_OUTCOME_EXCEPTION), 0, 0);
 }
 
 /* Advance weather publication with stale-response suppression and a single recovery boundary. */
@@ -107,7 +108,7 @@ enum { LAB_FLOW_SOLVER_POST, LAB_FLOW_SOLVER_OUTCOME, LAB_FLOW_SOLVER_RESPONSE, 
 static int lab_flow_solver_post(int frame, int view)
 {
     (void)view;
-    int payload = lab_dom_object(5);
+    int payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(payload, "tex", lab_dom_get(frame, "source"));
     return lab_flow_call(frame, LAB_FLOW_SOLVER_OUTCOME, "post", "result", 1, 3, lab_dom_get(frame, "request"), payload,
                          lab_dom_string("/render_TeX"));
@@ -125,7 +126,7 @@ static int lab_flow_solver_response(int frame, int view)
 {
     (void)view;
     int data = lab_dom_get(lab_dom_get(frame, "result"), "data");
-    if (lab_dom_number(lab_dom_get(frame, "outcome")) == 2)
+    if (lab_dom_number(lab_dom_get(frame, "outcome")) == (double)LAB_REQUEST_OUTCOME_SUCCESS)
         return lab_flow_done(data);
     int message = lab_dom_get(data, "error");
     if (!lab_dom_truth(message))

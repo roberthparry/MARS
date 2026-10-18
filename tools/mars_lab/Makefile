@@ -78,9 +78,27 @@ LAB_WASM := $(LAB_BUILD_DIR)/wasm/lab_browser.wasm
 LAB_CODEC_WASM := $(LAB_BUILD_DIR)/wasm/lab_codec.wasm
 LAB_WASM_SRCS := $(sort $(wildcard tools/mars_lab/wasm/src/*.c))
 LAB_WASM_OBJS := $(patsubst tools/mars_lab/wasm/src/%.c,$(LAB_BUILD_DIR)/wasm/src/%.o,$(LAB_WASM_SRCS))
+LAB_WASM_WIRE_OBJ := $(LAB_BUILD_DIR)/wasm/marslib/protobuf_wire.o
+LAB_WASM_OBJS += $(LAB_WASM_WIRE_OBJ)
 LAB_WASM_ASM := $(LAB_WASM_OBJS:.o=.s)
-LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin \
-                   -nostdlib -Wmissing-prototypes -Itools/mars_lab/wasm/include
+# Debian/Ubuntu's wasi-libc keeps musl maths in libc.a; libm.a is an empty compatibility archive.
+# Override both paths for another installation. Only referenced archive members are linked.
+LAB_WASM_INCLUDE ?= /usr/include/wasm32-wasi
+LAB_WASM_LIBC ?= /usr/lib/wasm32-wasi/libc.a
+# Retain the memory ABI used by the codec and direct browser regression fixtures.
+LAB_WASM_MEMORY_EXPORTS := --export=memset --export=memcpy --export=memmove --export=memcmp
+LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin -fvisibility=default \
+                   -nostdlib -Wmissing-prototypes -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -Itools/mars_lab/wasm/include
+
+# Compile only the allocation-free wire core, not the owning native codec or libmars archive.
+# Keep shared library helpers private so unreferenced functions can be discarded by the linker.
+$(LAB_BUILD_DIR)/wasm/marslib/%.o: src/protobuf/%.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/%.s: src/protobuf/%.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
 
 $(LAB_BUILD_DIR)/wasm/src/%.o: tools/mars_lab/wasm/src/%.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
@@ -99,10 +117,11 @@ lab-wasm-asm: $(LAB_WASM_ASM)
 -include $(LAB_WASM_ASM:%=%.d)
 
 # Only the declared browser bridge may remain unresolved; never import missing libc or module functions.
-$(LAB_WASM): $(LAB_WASM_OBJS) tools/mars_lab/wasm/lab_browser.imports tools/mars_lab/Makefile
-	"$(LAB_WASM_LD)" --no-entry --export-all --allow-undefined-file=tools/mars_lab/wasm/lab_browser.imports \
-	    --initial-memory=67108864 --max-memory=67108864 \
-	    $(LAB_WASM_OBJS) -o $@
+# Export application definitions, not the library's hidden helpers and WASI entry points.
+$(LAB_WASM): $(LAB_WASM_OBJS) $(LAB_WASM_LIBC) tools/mars_lab/wasm/lab_browser.imports tools/mars_lab/Makefile
+	"$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory --allow-undefined-file=tools/mars_lab/wasm/lab_browser.imports \
+	    $(LAB_WASM_MEMORY_EXPORTS) --initial-memory=67108864 --max-memory=67108864 \
+	    $(LAB_WASM_OBJS) "$(LAB_WASM_LIBC)" -o $@
 
 # Probe the actual compiler target and linker, not merely their presence on PATH.
 # Keep this Lab-specific: native library builds do not need a WebAssembly toolchain.
@@ -110,35 +129,50 @@ LAB_WASM_CC ?= clang
 LAB_WASM_LD ?= wasm-ld
 
 # Workers need only the codec and queue policy, never DOM imports or UI state.
-$(LAB_CODEC_WASM): $(addprefix $(LAB_BUILD_DIR)/wasm/src/,lab_browser.o lab_browser_storage.o lab_memory.o lab_jobs.o lab_job_worker.o) tools/mars_lab/wasm/lab_codec.imports tools/mars_lab/Makefile
-	"$(LAB_WASM_LD)" --no-entry --export-all --allow-undefined-file=tools/mars_lab/wasm/lab_codec.imports \
-	    --initial-memory=33554432 --max-memory=33554432 $(filter %.o,$^) -o $@
+$(LAB_CODEC_WASM): $(addprefix $(LAB_BUILD_DIR)/wasm/src/,lab_browser.o lab_browser_storage.o lab_jobs.o lab_job_worker.o) $(LAB_WASM_WIRE_OBJ) $(LAB_WASM_LIBC) tools/mars_lab/wasm/lab_codec.imports tools/mars_lab/Makefile
+	"$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory --allow-undefined-file=tools/mars_lab/wasm/lab_codec.imports \
+	    $(LAB_WASM_MEMORY_EXPORTS) --initial-memory=33554432 --max-memory=33554432 \
+	    $(filter %.o,$^) "$(LAB_WASM_LIBC)" -o $@
 .PHONY: check-lab-wasm-deps
 check-lab-wasm-deps:
 	@set -eu; \
 	for tool in "$(LAB_WASM_CC)" "$(LAB_WASM_LD)"; do \
 	    if ! command -v "$$tool" >/dev/null 2>&1; then \
 	        echo "Missing MARS Lab WebAssembly tool: $$tool" >&2; \
-	        echo "Debian/Ubuntu: sudo apt install clang lld" >&2; \
+	        echo "Debian/Ubuntu: sudo apt install clang lld wasi-libc" >&2; \
 	        exit 1; \
 	    fi; \
 	done; \
+	if ! test -r "$(LAB_WASM_INCLUDE)/math.h" || ! test -r "$(LAB_WASM_INCLUDE)/string.h" \
+	    || ! test -r "$(LAB_WASM_LIBC)"; then \
+	    echo "Missing MARS Lab WebAssembly C library headers or archive (wasi-libc)." >&2; \
+	    echo "LAB_WASM_INCLUDE=$(LAB_WASM_INCLUDE)" >&2; \
+	    echo "LAB_WASM_LIBC=$(LAB_WASM_LIBC)" >&2; \
+	    echo "Debian/Ubuntu: sudo apt install wasi-libc" >&2; \
+	    echo "For another installation, set LAB_WASM_INCLUDE and LAB_WASM_LIBC." >&2; \
+	    exit 1; \
+	fi; \
 	probe_dir=$$(mktemp -d /tmp/mars-check-wasm.XXXXXX); \
 	trap 'rm -f "$$probe_dir/probe.o" "$$probe_dir/probe.wasm" "$$probe_dir/probe.log"; rmdir "$$probe_dir"' EXIT; \
 	trap 'exit 1' HUP INT TERM; \
-	if ! printf '%s\n' 'int mars_wasm_probe(int value) { return value + 1; }' \
-	    | "$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -ffreestanding -nostdlib -x c -c - \
+	if ! printf '%s\n' '#include <math.h>' '#include <string.h>' \
+	    'double mars_wasm_probe(double x, double y) { return sin(x) + cos(x) + atan2(y, x) + exp2(x) + log2(y); }' \
+	    'int mars_wasm_memory_probe(char *dst, const char *src, unsigned length) {' \
+	    'memset(dst, 0, length); memcpy(dst, src, length); memmove(dst, src, length);' \
+	    'return memcmp(dst, src, length) + (int)strlen(src); }' \
+	    | "$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -ffreestanding -fno-builtin -fvisibility=default -nostdlib \
+	        -isystem "$(LAB_WASM_INCLUDE)" -x c -c - \
 	        -o "$$probe_dir/probe.o" >"$$probe_dir/probe.log" 2>&1; then \
-	    echo "MARS Lab requires Clang with the wasm32-unknown-unknown target." >&2; \
+	    echo "MARS Lab requires Clang's wasm32-unknown-unknown target and WASM maths headers." >&2; \
 	    cat "$$probe_dir/probe.log" >&2; \
-	    echo "Debian/Ubuntu: sudo apt install clang lld" >&2; \
+	    echo "Debian/Ubuntu: sudo apt install clang lld wasi-libc" >&2; \
 	    exit 1; \
 	fi; \
-	if ! "$(LAB_WASM_LD)" --no-entry --export=mars_wasm_probe "$$probe_dir/probe.o" \
+	if ! "$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory "$$probe_dir/probe.o" "$(LAB_WASM_LIBC)" \
 	    -o "$$probe_dir/probe.wasm" >"$$probe_dir/probe.log" 2>&1; then \
-	    echo "MARS Lab requires a working LLVM WebAssembly linker (wasm-ld)." >&2; \
+	    echo "MARS Lab requires wasm-ld and WASM maths that link without host imports." >&2; \
 	    cat "$$probe_dir/probe.log" >&2; \
-	    echo "Debian/Ubuntu: sudo apt install clang lld" >&2; \
+	    echo "Debian/Ubuntu: sudo apt install clang lld wasi-libc" >&2; \
 	    exit 1; \
 	fi; \
 	test -s "$$probe_dir/probe.wasm"; \

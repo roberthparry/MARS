@@ -7,6 +7,7 @@
  * result. Deferred saves use the existing native serial owner and read keepalive
  * only when publishing. Failed browser storage does not suppress server saves.
  */
+#include "lab_mode.h"
 #include "lab_dom.h"
 #include "lab_events.h"
 #include "lab_persist.h"
@@ -36,19 +37,37 @@ static int lab_state_sync_next(int frame, unsigned next, const char *service)
 
 struct lab_state_sync_save_context {
     int frame;
-    unsigned int index;
+    lab_mode_t index;
     int text;
 };
 
+/**
+ * @brief Capture the update timestamp for a worksheet save.
+ * @param ctx Save state whose frame receives updatedAt after any text canonicalisation.
+ * @return Scoped clock-read plan resuming at stage 2.
+ */
 static int lab_state_sync_save_state_now(struct lab_state_sync_save_context *ctx);
+
+/**
+ * @brief Retain the canonical text for the worksheet being saved.
+ * @param ctx Save state carrying the editor-mode index, prepared text and continuation frame.
+ * @return Scoped text-retention plan resuming at stage 4.
+ */
 static int lab_state_sync_save_state_retain_text(struct lab_state_sync_save_context *ctx);
+
+/**
+ * @brief Build local and server records from the captured worksheet fields.
+ * @param ctx Save state with editor index and text; its frame holds timestamp, matrix fields or integrator bounds and
+ *   cap.
+ * @return Scoped record-building plan saving records in the frame before stage 8.
+ */
 static int lab_state_sync_save_state_records(struct lab_state_sync_save_context *ctx);
 
 static int lab_state_sync_save_state_canonical(struct lab_state_sync_save_context *ctx)
 {
     if (!lab_persist_count(ctx->index))
         return lab_flow_done(0);
-    ctx->text = lab_dom_clean(lab_dom_text(lab_state_sync_or(ctx->text, lab_dom_string(""))), 0);
+    ctx->text = lab_dom_clean(lab_dom_text(lab_state_sync_or(ctx->text, lab_dom_string(""))), LAB_DOM_CLEAN_TRIM);
     lab_dom_set(ctx->frame, "text", ctx->text);
     if (lab_persist_canonical(ctx->index))
         return lab_flow_call(ctx->frame, 1, "stateCanonical", "text", 0, 1, ctx->text);
@@ -63,7 +82,7 @@ static int lab_state_sync_save_state_now(struct lab_state_sync_save_context *ctx
 
 static int lab_state_sync_save_state_timestamp(struct lab_state_sync_save_context *ctx)
 {
-    if (!ctx->index)
+    if (ctx->index == LAB_MODE_EXPRESSION)
         return lab_flow_call(ctx->frame, 3, "stateTimestamp", 0, 0, 1, lab_dom_get(ctx->frame, "updatedAt"));
     /* Continue for non-expression worksheets. */
     return lab_state_sync_save_state_retain_text(ctx);
@@ -76,9 +95,9 @@ static int lab_state_sync_save_state_retain_text(struct lab_state_sync_save_cont
 
 static int lab_state_sync_save_state_matrix_operation(struct lab_state_sync_save_context *ctx)
 {
-    if (ctx->index == 3)
+    if (ctx->index == LAB_MODE_MATRIX)
         return lab_flow_call(ctx->frame, 5, "stateMatrixOperation", "operation", 0, 0);
-    if (ctx->index == 4)
+    if (ctx->index == LAB_MODE_INTEGRATOR)
         return lab_flow_call(ctx->frame, 6, "stateCurrentBounds", "bounds", 0, 0);
     return lab_state_sync_save_state_records(ctx);
 }
@@ -95,13 +114,13 @@ static int lab_state_sync_save_state_interval_cap(struct lab_state_sync_save_con
 
 static int lab_state_sync_save_state_records(struct lab_state_sync_save_context *ctx)
 {
-    int values = lab_dom_object(4);
+    int values = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(values, ctx->text);
     lab_dom_push(values, lab_dom_get(ctx->frame, "updatedAt"));
-    lab_dom_push(values, ctx->index == 3 ? lab_dom_get(ctx->frame, "operation") : lab_dom_string(""));
-    lab_dom_push(values, ctx->index == 3 ? lab_dom_get(ctx->frame, "operand") : lab_dom_string(""));
-    lab_dom_push(values, ctx->index == 4 ? lab_dom_get(ctx->frame, "bounds") : lab_dom_string(""));
-    lab_dom_push(values, ctx->index == 4 ? lab_dom_get(ctx->frame, "cap") : lab_dom_numeric(0));
+    lab_dom_push(values, ctx->index == LAB_MODE_MATRIX ? lab_dom_get(ctx->frame, "operation") : lab_dom_string(""));
+    lab_dom_push(values, ctx->index == LAB_MODE_MATRIX ? lab_dom_get(ctx->frame, "operand") : lab_dom_string(""));
+    lab_dom_push(values, ctx->index == LAB_MODE_INTEGRATOR ? lab_dom_get(ctx->frame, "bounds") : lab_dom_string(""));
+    lab_dom_push(values, ctx->index == LAB_MODE_INTEGRATOR ? lab_dom_get(ctx->frame, "cap") : lab_dom_numeric(0));
     return lab_flow_call(ctx->frame, 8, "stateRecords", "records", 0, 2, lab_dom_numeric(ctx->index), values);
 }
 
@@ -139,7 +158,7 @@ static int lab_state_sync_save_otherwise(struct lab_state_sync_save_context *ctx
 
 static int lab_state_sync_save(int frame)
 {
-    unsigned index = lab_state_sync_index(frame);
+    lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     int text = lab_dom_get(frame, "text");
     struct lab_state_sync_save_context ctx = {
         .frame = frame,
@@ -167,7 +186,7 @@ static int lab_state_sync_save(int frame)
 struct lab_state_sync_publish_context {
     int frame;
     int save;
-    unsigned int index;
+    lab_mode_t index;
 };
 
 static int lab_state_sync_publish_state_forget_save_timer(struct lab_state_sync_publish_context *ctx)
@@ -179,10 +198,10 @@ static int lab_state_sync_publish_state_forget_save_timer(struct lab_state_sync_
 
 static int lab_state_sync_publish_state_save(struct lab_state_sync_publish_context *ctx)
 {
-    int options = lab_dom_object(5);
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
     int keepalive = !lab_dom_truth(lab_dom_get(ctx->save, "delay")) &&
                     lab_dom_truth(lab_dom_get(lab_dom_get(ctx->save, "options"), "keepalive"));
-    lab_dom_set(options, "keepalive", lab_dom_scalar(1, keepalive));
+    lab_dom_set(options, "keepalive", lab_dom_scalar(LAB_VALUE_BOOLEAN, keepalive));
     return lab_flow_call(ctx->frame, 2, "stateSave", 0, 0, 2, lab_dom_get(ctx->save, "patch"), options);
 }
 
@@ -195,7 +214,7 @@ static int lab_state_sync_publish_otherwise(struct lab_state_sync_publish_contex
 static int lab_state_sync_publish(int frame)
 {
     int save = lab_dom_get(frame, "save");
-    unsigned index = lab_state_sync_index(save);
+    lab_mode_t index = (lab_mode_t)lab_state_sync_index(save);
     struct lab_state_sync_publish_context ctx = {
         .frame = frame,
         .save = save,
@@ -290,7 +309,7 @@ static int lab_state_sync_mode_save_state_write_mode(int frame)
 static int lab_state_sync_mode_save_state_save(int frame)
 {
     lab_dom_delete(frame, "failed");
-    int patch = lab_dom_object(5);
+    int patch = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(patch, "lab_mode", lab_dom_get(frame, "selected"));
     return lab_flow_call(frame, 3, "stateSave", 0, 0, 1, patch);
 }
@@ -316,7 +335,7 @@ static int lab_state_sync_mode_save(int frame)
 
 struct lab_state_sync_editor_context {
     int frame;
-    unsigned int index;
+    lab_mode_t index;
     int text;
 };
 
@@ -334,7 +353,7 @@ static int lab_state_sync_editor_state_set_expression(struct lab_state_sync_edit
 {
     if (lab_workspace_editor_bound(ctx->index, lab_dom_truth(lab_dom_get(ctx->frame, "bound"))))
         return lab_flow_call(ctx->frame, 5, "stateSetExpression", 0, 0, 1, ctx->text);
-    lab_dom_write(lab_dom_id("expr"), 5, "", ctx->text);
+    lab_dom_write(lab_dom_id("expr"), LAB_DOM_VALUE, "", ctx->text);
     return lab_state_sync_next(ctx->frame, 3, "stateClearSource");
 }
 
@@ -351,7 +370,7 @@ static int lab_state_sync_editor_otherwise(struct lab_state_sync_editor_context 
 
 static int lab_state_sync_editor(int frame)
 {
-    unsigned index = lab_state_sync_index(frame);
+    lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     int text = lab_dom_get(frame, "text");
     struct lab_state_sync_editor_context ctx = {
         .frame = frame,
@@ -427,12 +446,17 @@ struct lab_state_sync_select_context {
     int changed;
 };
 
+/**
+ * @brief Synchronise tabs after selecting a worksheet mode.
+ * @param ctx Selection state whose frame resumes at stage 3 to return the changed-or-forced result.
+ * @return Scoped tab-synchronisation plan.
+ */
 static int lab_state_sync_select_state_sync_tabs(struct lab_state_sync_select_context *ctx);
 
 static int lab_state_sync_select_state_notify_mode(struct lab_state_sync_select_context *ctx)
 {
-    ctx->changed = lab_workspace_select(lab_state_sync_index(ctx->frame));
-    lab_dom_set(ctx->frame, "changed", lab_dom_scalar(1, ctx->changed));
+    ctx->changed = lab_workspace_select((lab_mode_t)lab_state_sync_index(ctx->frame));
+    lab_dom_set(ctx->frame, "changed", lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->changed));
     if (ctx->changed)
         return lab_state_sync_next(ctx->frame, 1, "stateNotifyMode");
     return lab_state_sync_select_state_sync_tabs(ctx);
@@ -450,8 +474,8 @@ static int lab_state_sync_select_state_sync_tabs(struct lab_state_sync_select_co
 
 static int lab_state_sync_select_otherwise(struct lab_state_sync_select_context *ctx)
 {
-    return lab_flow_done(
-        lab_dom_scalar(1, ctx->changed || lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "options"), "force"))));
+    return lab_flow_done(lab_dom_scalar(
+        LAB_VALUE_BOOLEAN, ctx->changed || lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "options"), "force"))));
 }
 
 static int lab_state_sync_select(int frame)
@@ -473,13 +497,42 @@ static int lab_state_sync_select(int frame)
 
 struct lab_state_sync_apply_context {
     int frame;
-    unsigned int index;
+    lab_mode_t index;
 };
 
+/**
+ * @brief Read the active mode before deciding whether to initialise datetime controls.
+ * @param ctx Mode-application state whose frame receives index after optional integrator-row rendering.
+ * @return Scoped mode-index query plan resuming at stage 5.
+ */
 static int lab_state_sync_apply_state_mode_index_4(struct lab_state_sync_apply_context *ctx);
+
+/**
+ * @brief Read the active mode before deciding whether to initialise almanac controls.
+ * @param ctx Mode-application state whose frame receives index after optional datetime location refresh.
+ * @return Scoped mode-index query plan resuming at stage 8.
+ */
 static int lab_state_sync_apply_state_mode_index_7(struct lab_state_sync_apply_context *ctx);
+
+/**
+ * @brief Synchronise the worksheet UI after calendar-specific initialisation.
+ * @param ctx Mode-application state whose frame advances past calendar defaults and saves.
+ * @return Scoped UI-synchronisation plan resuming at stage 11.
+ */
 static int lab_state_sync_apply_state_sync_ui(struct lab_state_sync_apply_context *ctx);
+
+/**
+ * @brief Read the active mode before normalising the integrator interval cap.
+ * @param ctx Mode-application state whose frame receives index after optional default-bounds reset.
+ * @return Scoped mode-index query plan resuming at stage 15.
+ */
 static int lab_state_sync_apply_state_mode_index_14(struct lab_state_sync_apply_context *ctx);
+
+/**
+ * @brief Finish mode application without further control changes.
+ * @param ctx Mode-application state; unused at this terminal stage.
+ * @return Scoped completion plan with no value.
+ */
 static int lab_state_sync_apply_otherwise(struct lab_state_sync_apply_context *ctx);
 
 static int lab_state_sync_apply_state_force_mode(struct lab_state_sync_apply_context *ctx)
@@ -499,7 +552,7 @@ static int lab_state_sync_apply_state_mode_index(struct lab_state_sync_apply_con
 
 static int lab_state_sync_apply_state_render_active_rows(struct lab_state_sync_apply_context *ctx)
 {
-    if (ctx->index == 4)
+    if (ctx->index == LAB_MODE_INTEGRATOR)
         return lab_state_sync_next(ctx->frame, 4, "stateRenderActiveRows");
     /* Continue to the next mode-dependent operation. */
     return lab_state_sync_apply_state_mode_index_4(ctx);
@@ -512,7 +565,7 @@ static int lab_state_sync_apply_state_mode_index_4(struct lab_state_sync_apply_c
 
 static int lab_state_sync_apply_state_datetime_defaults(struct lab_state_sync_apply_context *ctx)
 {
-    if (ctx->index == 5)
+    if (ctx->index == LAB_MODE_DATETIME)
         return lab_state_sync_next(ctx->frame, 6, "stateDatetimeDefaults");
     return lab_state_sync_apply_state_mode_index_7(ctx);
 }
@@ -529,7 +582,7 @@ static int lab_state_sync_apply_state_mode_index_7(struct lab_state_sync_apply_c
 
 static int lab_state_sync_apply_state_almanac_defaults(struct lab_state_sync_apply_context *ctx)
 {
-    if (ctx->index == 6)
+    if (ctx->index == LAB_MODE_ALMANAC)
         return lab_state_sync_next(ctx->frame, 9, "stateAlmanacDefaults");
     return lab_state_sync_apply_state_sync_ui(ctx);
 }
@@ -551,7 +604,7 @@ static int lab_state_sync_apply_state_mode_index_11(struct lab_state_sync_apply_
 
 static int lab_state_sync_apply_state_bound_count(struct lab_state_sync_apply_context *ctx)
 {
-    if (ctx->index == 4)
+    if (ctx->index == LAB_MODE_INTEGRATOR)
         return lab_flow_call(ctx->frame, 13, "stateBoundCount", "count", 0, 0);
     return lab_state_sync_apply_state_mode_index_14(ctx);
 }
@@ -571,7 +624,7 @@ static int lab_state_sync_apply_state_mode_index_14(struct lab_state_sync_apply_
 
 static int lab_state_sync_apply_state_normalise_cap(struct lab_state_sync_apply_context *ctx)
 {
-    if (ctx->index == 4)
+    if (ctx->index == LAB_MODE_INTEGRATOR)
         return lab_state_sync_next(ctx->frame, 16, "stateNormaliseCap");
     /* Continue when no integrator control is present. */
     return lab_state_sync_apply_otherwise(ctx);
@@ -585,7 +638,7 @@ static int lab_state_sync_apply_otherwise(struct lab_state_sync_apply_context *c
 
 static int lab_state_sync_apply(int frame)
 {
-    unsigned index = lab_state_sync_index(frame);
+    lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     struct lab_state_sync_apply_context ctx = {
         .frame = frame,
         .index = index,
@@ -635,8 +688,8 @@ static int lab_state_sync_keyboard_evaluate(int frame)
     static const char *const services[] = {
         "stateEvaluateExpression", "stateEvaluateEquation", "stateEvaluateDiffequation", "stateEvaluateMatrix",
         "stateEvaluateIntegrator", "stateEvaluateDatetime", "stateEvaluateExpression"};
-    unsigned index = lab_state_sync_index(frame);
-    return lab_state_sync_next(frame, 5, services[index < 7 ? index : 0]);
+    lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
+    return lab_state_sync_next(frame, 5, services[(unsigned)index < LAB_MODE_COUNT ? index : LAB_MODE_EXPRESSION]);
 }
 
 static int lab_state_sync_keyboard_otherwise(int frame)
@@ -661,17 +714,34 @@ static int lab_state_sync_keyboard(int frame)
 
 struct lab_state_sync_history_context {
     int frame;
-    unsigned int index;
+    lab_mode_t index;
 };
 
+/**
+ * @brief Capture history text from an override, editor or calendar summary.
+ * @param ctx History state with mode index and a frame containing optional textOverride and captured calendar state.
+ * @return Scoped text-capture plan, or the bounds/record plan when an override is already available.
+ */
 static int lab_state_sync_history_capture_text(struct lab_state_sync_history_context *ctx);
+
+/**
+ * @brief Capture integrator bounds when constructing a history entry.
+ * @param ctx History state whose mode index selects integrator bounds and whose frame receives them.
+ * @return Scoped bounds-read plan for the integrator, otherwise a history-record plan.
+ */
 static int lab_state_sync_history_state_current_bounds(struct lab_state_sync_history_context *ctx);
+
+/**
+ * @brief Construct a history record from captured worksheet values.
+ * @param ctx History state with mode index and frame-held text, calendar state and optional integrator bounds and cap.
+ * @return Scoped record-building plan saving record in the frame before stage 5.
+ */
 static int lab_state_sync_history_state_history_record(struct lab_state_sync_history_context *ctx);
 
 static int lab_state_sync_history_capture_calendar(struct lab_state_sync_history_context *ctx)
 {
-    if (ctx->index == 5 || ctx->index == 6)
-        return lab_flow_call(ctx->frame, 1, ctx->index == 5 ? "stateDatetime" : "stateAlmanac", "calendar", 0, 0);
+    if (ctx->index == LAB_MODE_DATETIME || ctx->index == LAB_MODE_ALMANAC)
+        return lab_flow_call(ctx->frame, 1, ctx->index == LAB_MODE_DATETIME ? "stateDatetime" : "stateAlmanac", "calendar", 0, 0);
     /* Continue for mathematical worksheets. */
     return lab_state_sync_history_capture_text(ctx);
 }
@@ -683,15 +753,15 @@ static int lab_state_sync_history_capture_text(struct lab_state_sync_history_con
         return lab_state_sync_history_state_current_bounds(ctx);
     }
     return lab_flow_call(ctx->frame, 2,
-                         ctx->index == 5   ? "stateDatetimeSummary"
-                         : ctx->index == 6 ? "stateAlmanacSummary"
-                                           : "stateEditorText",
+                         ctx->index == LAB_MODE_DATETIME ? "stateDatetimeSummary"
+                         : ctx->index == LAB_MODE_ALMANAC ? "stateAlmanacSummary"
+                                                         : "stateEditorText",
                          "text", 0, 1, lab_dom_get(ctx->frame, "calendar"));
 }
 
 static int lab_state_sync_history_state_current_bounds(struct lab_state_sync_history_context *ctx)
 {
-    if (ctx->index == 4)
+    if (ctx->index == LAB_MODE_INTEGRATOR)
         return lab_flow_call(ctx->frame, 3, "stateCurrentBounds", "bounds", 0, 0);
     return lab_state_sync_history_state_history_record(ctx);
 }
@@ -705,8 +775,8 @@ static int lab_state_sync_history_state_history_record(struct lab_state_sync_his
 {
     return lab_flow_call(ctx->frame, 5, "stateHistoryRecord", "record", 0, 5, lab_dom_numeric(ctx->index),
                          lab_dom_get(ctx->frame, "text"), lab_dom_get(ctx->frame, "calendar"),
-                         ctx->index == 4 ? lab_dom_get(ctx->frame, "bounds") : lab_dom_string(""),
-                         ctx->index == 4 ? lab_dom_get(ctx->frame, "cap") : lab_dom_string(""));
+                         ctx->index == LAB_MODE_INTEGRATOR ? lab_dom_get(ctx->frame, "bounds") : lab_dom_string(""),
+                         ctx->index == LAB_MODE_INTEGRATOR ? lab_dom_get(ctx->frame, "cap") : lab_dom_string(""));
 }
 
 static int lab_state_sync_history_otherwise(struct lab_state_sync_history_context *ctx)
@@ -716,7 +786,7 @@ static int lab_state_sync_history_otherwise(struct lab_state_sync_history_contex
 
 static int lab_state_sync_history(int frame)
 {
-    unsigned index = lab_state_sync_index(frame);
+    lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     struct lab_state_sync_history_context ctx = {
         .frame = frame,
         .index = index,
@@ -738,11 +808,16 @@ struct lab_state_sync_push_context {
     int entry;
 };
 
+/**
+ * @brief Append the prepared snapshot to worksheet history.
+ * @param ctx History-push state whose frame contains the supplied or newly captured snapshot.
+ * @return Scoped snapshot-push plan resuming at stage 2.
+ */
 static int lab_state_sync_push_state_push_snapshot(struct lab_state_sync_push_context *ctx);
 
 static int lab_state_sync_push_state_current_history(struct lab_state_sync_push_context *ctx)
 {
-    if (lab_dom_type(ctx->entry) == 3)
+    if (lab_dom_type(ctx->entry) == LAB_VALUE_STRING)
         return lab_flow_call(ctx->frame, 1, "stateCurrentHistory", "snapshot", 0, 1, ctx->entry);
     if (!lab_dom_truth(ctx->entry))
         return lab_flow_call(ctx->frame, 1, "stateCurrentHistory", "snapshot", 0, 0);
@@ -788,12 +863,30 @@ static const char *const lab_state_sync_control_modes[] = {"matrix", "equation",
 
 struct lab_state_sync_control_context {
     int frame;
-    unsigned int index;
+    lab_state_control_kind_t index;
     int node;
 };
 
+/**
+ * @brief Write the validated control value and refresh matrix controls when required.
+ * @param ctx Control state with target DOM node, control index and frame-held value; index zero selects matrix
+ *   operation.
+ * @return Scoped matrix-UI synchronisation plan or active-mode query plan.
+ */
 static int lab_state_sync_control_state_sync_matrix(struct lab_state_sync_control_context *ctx);
+
+/**
+ * @brief Read the current mode before saving a changed worksheet control.
+ * @param ctx Control state whose frame receives mode for comparison with the control's owning worksheet.
+ * @return Scoped active-mode query plan resuming at stage 3.
+ */
 static int lab_state_sync_control_current_mode(struct lab_state_sync_control_context *ctx);
+
+/**
+ * @brief Finish a control update without saving another worksheet's state.
+ * @param ctx Control-update state; unused at this terminal stage.
+ * @return Scoped completion plan with no value.
+ */
 static int lab_state_sync_control_otherwise(struct lab_state_sync_control_context *ctx);
 
 static int lab_state_sync_control_validate(struct lab_state_sync_control_context *ctx)
@@ -801,12 +894,13 @@ static int lab_state_sync_control_validate(struct lab_state_sync_control_context
     {
         if (!ctx->node)
             return lab_flow_done(0);
-        int value = lab_dom_read(ctx->node, 5, "");
-        if (ctx->index != 1)
-            return lab_flow_call(ctx->frame, 1, ctx->index ? "stateValidCap" : "stateValidOperation", "value", 0, 1,
-                                 value);
+        int value = lab_dom_read(ctx->node, LAB_DOM_VALUE, "");
+        if (ctx->index != LAB_STATE_CONTROL_EQUATION_VARIABLE)
+            return lab_flow_call(ctx->frame, 1,
+                                 ctx->index != LAB_STATE_CONTROL_MATRIX_OPERATION ? "stateValidCap" : "stateValidOperation",
+                                 "value", 0, 1, value);
         int fallback = lab_dom_get(lab_dom_get(ctx->frame, "config"), "DEFAULT_EQUATION_VARIABLE");
-        value = lab_dom_clean(lab_dom_text(lab_state_sync_or(value, fallback)), 0);
+        value = lab_dom_clean(lab_dom_text(lab_state_sync_or(value, fallback)), LAB_DOM_CLEAN_TRIM);
         lab_dom_set(ctx->frame, "value", lab_state_sync_or(value, fallback));
         /* Continue after native equation-variable normalisation. */
     }
@@ -815,8 +909,8 @@ static int lab_state_sync_control_validate(struct lab_state_sync_control_context
 
 static int lab_state_sync_control_state_sync_matrix(struct lab_state_sync_control_context *ctx)
 {
-    lab_dom_write(ctx->node, 5, "", lab_dom_get(ctx->frame, "value"));
-    if (!ctx->index)
+    lab_dom_write(ctx->node, LAB_DOM_VALUE, "", lab_dom_get(ctx->frame, "value"));
+    if (ctx->index == LAB_STATE_CONTROL_MATRIX_OPERATION)
         return lab_state_sync_next(ctx->frame, 2, "stateSyncMatrix");
     /* Continue: only matrix operation changes need matrix UI synchronisation. */
     return lab_state_sync_control_current_mode(ctx);
@@ -844,9 +938,9 @@ static int lab_state_sync_control_otherwise(struct lab_state_sync_control_contex
 
 static int lab_state_sync_control(int frame)
 {
-    unsigned index = lab_state_sync_index(frame);
+    lab_state_control_kind_t index = (lab_state_control_kind_t)lab_state_sync_index(frame);
 
-    if (index >= 3)
+    if ((unsigned)index > LAB_STATE_CONTROL_INTERVAL_CAP)
         return lab_flow_done(0);
     int node = lab_dom_item(lab_dom_get(frame, "controls"), index);
     struct lab_state_sync_control_context ctx = {
@@ -865,6 +959,11 @@ static int lab_state_sync_control(int frame)
                                                                                : lab_state_sync_control_otherwise(&ctx);
 }
 
+/**
+ * @brief Finish deferred-save flushing without further persistence work.
+ * @param frame Save-flush continuation frame; unused when complete or when the mode needs no flush.
+ * @return Scoped completion plan with no value.
+ */
 static int lab_state_sync_flush_otherwise(int frame);
 
 static int lab_state_sync_flush_current_mode(int frame)
@@ -879,7 +978,7 @@ static int lab_state_sync_flush_state_named_index(int frame)
 
 static int lab_state_sync_flush_state_flush_save(int frame)
 {
-    if (lab_events_flush(lab_state_sync_index(frame)))
+    if (lab_events_flush((lab_mode_t)lab_state_sync_index(frame)))
         return lab_flow_call(frame, 3, "stateFlushSave", 0, 0, 1, lab_dom_get(frame, "mode"));
     /* Continue for calendars. */
     return lab_state_sync_flush_otherwise(frame);
@@ -903,6 +1002,11 @@ static int lab_state_sync_flush(int frame)
                                                                                : lab_state_sync_flush_otherwise(frame);
 }
 
+/**
+ * @brief Finish location persistence without affecting a different active mode.
+ * @param frame Location-save continuation frame; unused after the datetime save or when another mode is active.
+ * @return Scoped completion plan with no value.
+ */
 static int lab_state_sync_location_otherwise(int frame);
 
 static int lab_state_sync_location_state_mode_index(int frame)
@@ -912,7 +1016,7 @@ static int lab_state_sync_location_state_mode_index(int frame)
 
 static int lab_state_sync_location_state_save_datetime(int frame)
 {
-    if (lab_state_sync_index(frame) == 5)
+    if (lab_state_sync_index(frame) == LAB_MODE_DATETIME)
         return lab_state_sync_next(frame, 2, "stateSaveDatetime");
     /* Continue: a later worksheet owns the visible state. */
     return lab_state_sync_location_otherwise(frame);
@@ -941,6 +1045,11 @@ struct lab_state_sync_integrator_result_context {
     int rows;
 };
 
+/**
+ * @brief Finish applying an integrator result's row update.
+ * @param ctx Integrator-result state carrying frame and merged rows; unused at completion or when no update exists.
+ * @return Scoped completion plan with no value.
+ */
 static int lab_state_sync_integrator_result_otherwise(struct lab_state_sync_integrator_result_context *ctx);
 
 static int lab_state_sync_integrator_result_state_merge_rows(struct lab_state_sync_integrator_result_context *ctx)
@@ -950,7 +1059,7 @@ static int lab_state_sync_integrator_result_state_merge_rows(struct lab_state_sy
 
 static int lab_state_sync_integrator_result_fail(struct lab_state_sync_integrator_result_context *ctx)
 {
-    if (lab_dom_type(ctx->rows) == 1 && !lab_dom_truth(ctx->rows))
+    if (lab_dom_type(ctx->rows) == LAB_VALUE_BOOLEAN && !lab_dom_truth(ctx->rows))
         return lab_flow_call(ctx->frame, 2, "fail", 0, 0, 1,
                              lab_dom_string("Integrator result exceeds the 256-row form limit"));
     if (lab_dom_truth(ctx->rows))
@@ -984,12 +1093,12 @@ static int lab_state_sync_integrator_result(int frame)
 
 struct lab_state_sync_capture_save_context {
     int frame;
-    unsigned int index;
+    lab_mode_t index;
 };
 
 static int lab_state_sync_capture_save_state_expression_saved_text(struct lab_state_sync_capture_save_context *ctx)
 {
-    if (!ctx->index)
+    if (ctx->index == LAB_MODE_EXPRESSION)
         return lab_flow_call(ctx->frame, 1, "stateExpressionSavedText", "text", 0, 0);
     return lab_flow_call(ctx->frame, 2, "stateSaveNamedEditor", 0, 0, 1, lab_dom_numeric(ctx->index));
 }
@@ -1008,7 +1117,7 @@ static int lab_state_sync_capture_save_otherwise(struct lab_state_sync_capture_s
 
 static int lab_state_sync_capture_save(int frame)
 {
-    unsigned index = lab_state_sync_index(frame);
+    lab_mode_t index = (lab_mode_t)lab_state_sync_index(frame);
     struct lab_state_sync_capture_save_context ctx = {
         .frame = frame,
         .index = index,
@@ -1030,14 +1139,14 @@ static int lab_state_sync_needs_bounds_state_mode_index(int frame)
 
 static int lab_state_sync_needs_bounds_state_bound_count(int frame)
 {
-    if (lab_state_sync_index(frame) != 4)
-        return lab_flow_done(lab_dom_scalar(1, 0));
+    if (lab_state_sync_index(frame) != LAB_MODE_INTEGRATOR)
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(frame, 2, "stateBoundCount", "count", 0, 0);
 }
 
 static int lab_state_sync_needs_bounds_otherwise(int frame)
 {
-    return lab_flow_done(lab_dom_scalar(1, lab_dom_number(lab_dom_get(frame, "count")) == 0));
+    return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, lab_dom_number(lab_dom_get(frame, "count")) == 0));
 }
 
 static int lab_state_sync_needs_bounds(int frame)
@@ -1053,14 +1162,26 @@ static int lab_state_sync_needs_bounds(int frame)
 }
 
 /* Browser callbacks retain resources, while this fixed dispatch owns synchronous decisions. */
-void lab_state_sync(unsigned kind, int frame)
+void lab_state_sync(lab_state_sync_kind_t kind, int frame)
 {
     static int (*const handlers[])(int) = {
-        lab_state_sync_save,         lab_state_sync_publish,     lab_state_sync_calendar,
-        lab_state_sync_mode_save,    lab_state_sync_editor,      lab_state_sync_result,
-        lab_state_sync_select,       lab_state_sync_apply,       lab_state_sync_keyboard,
-        lab_state_sync_history,      lab_state_sync_push,        lab_state_sync_control,
-        lab_state_sync_flush,        lab_state_sync_location,    lab_state_sync_integrator_result,
-        lab_state_sync_capture_save, lab_state_sync_needs_bounds};
-    lab_dom_return(kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0));
+        [LAB_STATE_SYNC_SAVE]              = lab_state_sync_save,
+        [LAB_STATE_SYNC_PUBLISH]           = lab_state_sync_publish,
+        [LAB_STATE_SYNC_CALENDAR]          = lab_state_sync_calendar,
+        [LAB_STATE_SYNC_SAVE_MODE]         = lab_state_sync_mode_save,
+        [LAB_STATE_SYNC_EDITOR]            = lab_state_sync_editor,
+        [LAB_STATE_SYNC_RESULT]            = lab_state_sync_result,
+        [LAB_STATE_SYNC_SELECT]            = lab_state_sync_select,
+        [LAB_STATE_SYNC_APPLY]             = lab_state_sync_apply,
+        [LAB_STATE_SYNC_KEYBOARD]          = lab_state_sync_keyboard,
+        [LAB_STATE_SYNC_HISTORY]           = lab_state_sync_history,
+        [LAB_STATE_SYNC_PUSH]              = lab_state_sync_push,
+        [LAB_STATE_SYNC_CONTROL]           = lab_state_sync_control,
+        [LAB_STATE_SYNC_FLUSH]             = lab_state_sync_flush,
+        [LAB_STATE_SYNC_LOCATION]          = lab_state_sync_location,
+        [LAB_STATE_SYNC_INTEGRATOR_RESULT] = lab_state_sync_integrator_result,
+        [LAB_STATE_SYNC_CAPTURE_SAVE]      = lab_state_sync_capture_save,
+        [LAB_STATE_SYNC_NEEDS_BOUNDS]      = lab_state_sync_needs_bounds,
+    };
+    lab_dom_return((unsigned)kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0));
 }

@@ -25,7 +25,18 @@ struct lab_flow_result_transfer_context {
     int bindings;
 };
 
+/**
+ * @brief Clear goal-seeking state during result-to-input transfer.
+ * @param ctx Transfer state whose frame resumes at stage 11 after the goal is cleared.
+ * @return Scoped plan calling the goal-clear service.
+ */
 static int lab_flow_result_transfer_result_clear_goal(struct lab_flow_result_transfer_context *ctx);
+
+/**
+ * @brief Save the editor after transferring a result into it.
+ * @param ctx Transfer state whose frame resumes at stage 22 after the editor save.
+ * @return Scoped plan calling the editor-save service.
+ */
 static int lab_flow_result_transfer_result_save_editor(struct lab_flow_result_transfer_context *ctx);
 
 static int lab_flow_result_transfer_result_input(struct lab_flow_result_transfer_context *ctx)
@@ -105,7 +116,7 @@ static int lab_flow_result_transfer_result_source_bindings(struct lab_flow_resul
 static int lab_flow_result_transfer_result_bindings(struct lab_flow_result_transfer_context *ctx)
 {
     int source = lab_dom_get(lab_dom_get(ctx->frame, "sourceRecord"), "bindings");
-    lab_dom_set(ctx->frame, "bindings", lab_dom_truth(source) ? source : lab_dom_object(4));
+    lab_dom_set(ctx->frame, "bindings", lab_dom_truth(source) ? source : lab_dom_object(LAB_VALUE_ARRAY));
     return lab_flow_call(ctx->frame, 13, "resultBindings", "resultBindings", 0, 0);
 }
 
@@ -165,7 +176,7 @@ static int lab_flow_result_transfer_update_history_buttons(struct lab_flow_resul
 
 static int lab_flow_result_transfer_set_status(struct lab_flow_result_transfer_context *ctx)
 {
-    lab_dom_effect(lab_dom_id("expr"), 0);
+    lab_dom_effect(lab_dom_id("expr"), LAB_DOM_EFFECT_FOCUS);
     return lab_flow_call(ctx->frame, 24, "setStatus", 0, 0, 1, lab_dom_string("Result sent to input"));
 }
 
@@ -230,7 +241,7 @@ static int lab_flow_result_pretty_native(struct lab_flow_result_pretty_context *
 
 static int lab_flow_result_pretty_result_presentation(struct lab_flow_result_pretty_context *ctx)
 {
-    int payload = lab_dom_object(5);
+    int payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(payload, "action", lab_dom_string("matrix"));
     lab_dom_set(payload, "text", lab_dom_get(ctx->frame, "text"));
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(3));
@@ -268,6 +279,11 @@ static int lab_flow_result_pretty(int frame, int view)
                                                                                : lab_flow_result_pretty_otherwise(&ctx);
 }
 
+/**
+ * @brief Finish result-digit adjustment without a return value.
+ * @param frame Digit-adjustment continuation frame; unused at this terminal stage.
+ * @return Scoped completion plan with no value.
+ */
 static int lab_flow_result_digits_otherwise(int frame);
 
 static int lab_flow_result_digits_result_last_TeX(int frame)
@@ -338,6 +354,11 @@ struct lab_flow_result_copy_context {
     int button;
 };
 
+/**
+ * @brief Copy non-empty result text with clipboard-failure recovery.
+ * @param ctx Copy state whose frame holds text and receives the clipboard-failure continuation.
+ * @return Scoped clipboard-write plan, or a completion plan when text is empty.
+ */
 static int lab_flow_result_copy_result_clipboard(struct lab_flow_result_copy_context *ctx);
 
 static int lab_flow_result_copy_commit_bindings(struct lab_flow_result_copy_context *ctx)
@@ -358,7 +379,7 @@ static int lab_flow_result_copy_result_datetime_summary(struct lab_flow_result_c
 {
     if (lab_dom_equal(lab_dom_get(ctx->frame, "mode"), lab_dom_string("datetime")))
         return lab_flow_call(ctx->frame, 3, "resultDatetimeSummary", "text", 0, 0);
-    lab_dom_set(ctx->frame, "text", lab_dom_clean(lab_dom_read(lab_dom_id("expr"), 5, ""), 0));
+    lab_dom_set(ctx->frame, "text", lab_dom_clean(lab_dom_read(lab_dom_id("expr"), LAB_DOM_VALUE, ""), LAB_DOM_CLEAN_TRIM));
     /* Continue: expression clipboard source is the authored editor, not a result. */
     return lab_flow_result_copy_result_clipboard(ctx);
 }
@@ -373,7 +394,7 @@ static int lab_flow_result_copy_result_clipboard(struct lab_flow_result_copy_con
 
 static int lab_flow_result_copy_result_flash(struct lab_flow_result_copy_context *ctx)
 {
-    return lab_flow_call(ctx->frame, 5, "resultFlash", 0, 0, 2, ctx->button, lab_dom_scalar(1, 1));
+    return lab_flow_call(ctx->frame, 5, "resultFlash", 0, 0, 2, ctx->button, lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
 static int lab_flow_result_copy_set_status(struct lab_flow_result_copy_context *ctx)
@@ -388,7 +409,7 @@ static int lab_flow_result_copy_result_status_later(struct lab_flow_result_copy_
 
 static int lab_flow_result_copy_result_flash_7(struct lab_flow_result_copy_context *ctx)
 {
-    return lab_flow_call(ctx->frame, 9, "resultFlash", 0, 0, 2, ctx->button, lab_dom_scalar(1, 0));
+    return lab_flow_call(ctx->frame, 9, "resultFlash", 0, 0, 2, ctx->button, lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
 static int lab_flow_result_copy_set_status_8(struct lab_flow_result_copy_context *ctx)
@@ -428,7 +449,7 @@ static int lab_flow_result_copy(unsigned input, int frame)
 
 static int lab_flow_result_TeX_result_fetch(int frame)
 {
-    int payload = lab_dom_object(5);
+    int payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(payload, "tex", lab_dom_get(frame, "TeX"));
     return lab_flow_call(frame, 1, "resultFetch", "response", 1, 2, lab_dom_string("/render_TeX"), payload);
 }
@@ -469,6 +490,11 @@ struct lab_flow_result_initialise_context {
     int frame;
 };
 
+/**
+ * @brief Finish result-card initialisation without a return value.
+ * @param ctx Result-initialisation state; unused at this terminal stage.
+ * @return Scoped completion plan with no value.
+ */
 static int lab_flow_result_initialise_otherwise(struct lab_flow_result_initialise_context *ctx);
 
 static int lab_flow_result_initialise_result_startup_snapshot(struct lab_flow_result_initialise_context *ctx)
@@ -558,7 +584,7 @@ static int lab_flow_result_initialise(int frame)
 
 /* Dispatch a bounded action number, leaving mathematical strings opaque throughout. */
 struct lab_flow_result_context {
-    unsigned int kind;
+    lab_flow_result_kind_t kind;
     int frame;
     int view;
 };
@@ -581,7 +607,7 @@ static int lab_flow_result_dispatch_digits(struct lab_flow_result_context *ctx)
 
 static int lab_flow_result_dispatch_copy(struct lab_flow_result_context *ctx)
 {
-    return lab_flow_result_copy(ctx->kind == 3, ctx->frame);
+    return lab_flow_result_copy(ctx->kind == LAB_FLOW_RESULT_COPY_INPUT, ctx->frame);
 }
 
 static int lab_flow_result_dispatch_TeX(struct lab_flow_result_context *ctx)
@@ -601,7 +627,7 @@ static int lab_flow_result_otherwise(struct lab_flow_result_context *ctx)
 }
 
 /* Select a result action through the bounded native handler catalogue. */
-int lab_flow_result(unsigned kind, int frame, int view)
+int lab_flow_result(lab_flow_result_kind_t kind, int frame, int view)
 {
     struct lab_flow_result_context ctx = {
         .kind = kind,
@@ -609,15 +635,15 @@ int lab_flow_result(unsigned kind, int frame, int view)
         .view = view,
     };
     static int (*const handlers[])(struct lab_flow_result_context *) = {
-        [0] = lab_flow_result_dispatch_transfer,
-        [1] = lab_flow_result_dispatch_pretty,
-        [2] = lab_flow_result_dispatch_digits,
-        [3] = lab_flow_result_dispatch_copy,
-        [4] = lab_flow_result_dispatch_copy,
-        [5] = lab_flow_result_dispatch_TeX,
-        [6] = lab_flow_result_dispatch_initialise,
+        [LAB_FLOW_RESULT_TRANSFER]      = lab_flow_result_dispatch_transfer,
+        [LAB_FLOW_RESULT_PRETTY_MATRIX] = lab_flow_result_dispatch_pretty,
+        [LAB_FLOW_RESULT_EXPAND_DIGITS] = lab_flow_result_dispatch_digits,
+        [LAB_FLOW_RESULT_COPY_INPUT]    = lab_flow_result_dispatch_copy,
+        [LAB_FLOW_RESULT_COPY_CARD]     = lab_flow_result_dispatch_copy,
+        [LAB_FLOW_RESULT_RENDER_LATEX]  = lab_flow_result_dispatch_TeX,
+        [LAB_FLOW_RESULT_INITIALISE]    = lab_flow_result_dispatch_initialise,
     };
-    unsigned selected = kind;
+    unsigned selected = (unsigned)kind;
     return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](&ctx)
                                                                                : lab_flow_result_otherwise(&ctx);
 }

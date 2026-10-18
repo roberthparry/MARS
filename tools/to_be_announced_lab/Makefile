@@ -94,7 +94,7 @@ $(TBA_SERVER): $(TBA_OBJS) $(STATIC_LIB) $(TBA_WASM) $(TBA_CODEC_WASM) | tba-typ
 native-tba-lab: $(TBA_SERVER)
 clean-tba-lab:
 	rm -rf tools/to_be_announced_lab/build
-$(TBA_BUILD_DIR)/tests/test_tba_native: tools/to_be_announced_lab/tests/test_tba_native.c $(TBA_STREAM_TEST) $(TBA_TEST_SUPPORT) $(TBA_TEST_HEADERS) $(TBA_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(TBA_WASM) $(TBA_WASM_SRCS) | tba-typescript
+$(TBA_BUILD_DIR)/tests/test_tba_native: tools/to_be_announced_lab/tests/test_tba_native.c $(TBA_STREAM_TEST) $(TBA_TEST_SUPPORT) $(TBA_TEST_HEADERS) $(TBA_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(TBA_WASM) $(TBA_CODEC_WASM) $(TBA_WASM_SRCS) | tba-typescript
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -Itools/to_be_announced_lab/include \
 	    -Itools/to_be_announced_lab/wasm/include -Itools/to_be_announced_lab/tests -Wl,--wrap=clock_gettime -o $@ $< $(TBA_WASM_POLICY_SRCS) $(TBA_TEST_SUPPORT) $(TBA_STREAM_TEST) \
@@ -102,7 +102,7 @@ $(TBA_BUILD_DIR)/tests/test_tba_native: tools/to_be_announced_lab/tests/test_tba
 .PHONY: test-tba-native
 test-tba-native: $(TBA_BUILD_DIR)/tests/test_tba_native $(TBA_SERVER)
 	$<
-$(TBA_BUILD_DIR)/tests/test_tba_browser: tools/to_be_announced_lab/tests/browser/test_tba_browser.c tools/to_be_announced_lab/Makefile $(TBA_TEST_SUPPORT) $(TBA_TEST_HEADERS) $(TBA_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(TBA_WASM) | tba-test-typescript
+$(TBA_BUILD_DIR)/tests/test_tba_browser: tools/to_be_announced_lab/tests/browser/test_tba_browser.c tools/to_be_announced_lab/Makefile $(TBA_TEST_SUPPORT) $(TBA_TEST_HEADERS) $(TBA_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(TBA_WASM) $(TBA_CODEC_WASM) | tba-test-typescript
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(INCLUDES) -Itools/to_be_announced_lab/include \
 	    -Itools/to_be_announced_lab/tests -DTBA_BROWSER_CHECKS_PATH='"$(abspath $(TBA_TEST_TS_CHECKS))"' \

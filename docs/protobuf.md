@@ -36,6 +36,13 @@ with `string_t` before treating them as text.
 
 ## MARS Lab browser wire contract
 
+The native codec and browser codec compile the same allocation-free wire core,
+`src/protobuf/protobuf_wire.c`. Its public interface, `protobuf_wire-t.h`, depends
+only on standard integer, size and Boolean types. The browser links this one
+component, not the owning native codec, `array_t`, threading support or the whole
+MARSlib archive. Native messages retain copied fields; browser messages retain
+their fixed-buffer and host-value ownership rules.
+
 MARS Lab's schema is maintained in `tools/mars_lab/proto/lab.proto`. Its
 version-one `Envelope` contains a root object made of typed `Value` records:
 null, boolean, finite IEEE-754 double, UTF-8 text, array or object. Object entries
@@ -59,14 +66,14 @@ files remain JSON independently of this browser representation.
 This is ordinary HTTP, not gRPC. Authentication, private-network restrictions,
 request cancellation and HTTP status codes are unchanged.
 
-Both implementations enforce a 4 MiB envelope limit, 65,536 value nodes and
+Both implementations enforce an 8 MiB envelope limit, 65,536 value nodes and
 maximum value depth 32 (root depth zero). They reject duplicate known singular
 fields, duplicate object keys, mismatched payload kinds, non-finite numbers,
 invalid UTF-8, truncation and unknown envelope versions. Supported unknown wire
 fields are ignored; removed field numbers must not be reused. The page's browser C
 module has a fixed 64 MiB linear memory and copies each encoded request before
 asynchronous network work begins. The codec-only Worker has separate, fixed
-16 MiB linear memory and uses the same C parser and validation limits.
+32 MiB linear memory and uses the same C parser and validation limits.
 Its JavaScript adapter uses own properties
 for decoded keys, including `__proto__`, without modifying prototypes. Encoding
 rejects accessors, sparse arrays and recursive codec invocation. Decoding honours
@@ -91,8 +98,8 @@ synchronous and does not create threads itself.
 `lab_wire_encode` and `lab_wire_decode` in the Lab's private `lab_wire.h` adapt
 existing `json_t` in-memory trees through the public Protobuf API. Returned
 byte arrays and trees are caller-owned. The browser module is freestanding C
-with host imports for value access and UTF-8 copying; it does not link the
-native library or use a second JavaScript wire codec. Separate C modules own
+with host imports for value access and UTF-8 copying; it links only the shared
+MARSlib wire core, not the owning codec, and uses no JavaScript wire codec. Separate C modules own
 worksheet state and history, precision and integration-budget validation,
 request lifecycles and calendar arithmetic. History uses a bounded 32 MiB pool,
 up to 128 entries per stack, and a 4 MiB individual-value limit; allocation
@@ -123,6 +130,54 @@ NULL; failed builder additions leave the message unchanged. Empty messages
 and empty byte fields are valid.
 
 ## Runnable example
+
+### Allocation-free wire operations
+
+`protobuf_wire-t.h` provides `protobuf_wire_varint_size`,
+`protobuf_wire_read_varint`, `protobuf_wire_write_varint`,
+`protobuf_wire_read_field` and `protobuf_wire_write_fixed`. All buffer operations
+take a byte bound and a cursor. Failed operations leave the cursor, result and
+destination unchanged. Reads accept non-minimal varints but reject overflow,
+truncation, invalid tags and unsupported wire types. Fixed-width writes accept
+only `PROTOBUF_FIXED32` and `PROTOBUF_FIXED64`; fixed32 values must fit 32 bits.
+
+Field reads return a `protobuf_wire_field_t` containing the field number, wire
+type, numeric bits or a borrowed byte span. Byte spans are not copied and must
+not outlive or modify their input. Callers enforce their own message-size,
+field-count and nesting limits. Keep cursors and result structures separate
+from the byte buffer. No global state, allocation or locks are required.
+
+This example writes field 1 as a varint, then reads it without creating an
+owning message.
+It is exercised as a README example in the Protobuf tests.
+
+```c
+#include <stdio.h>
+
+#include "protobuf_wire-t.h"
+
+int main(void)
+{
+    unsigned char bytes[3];
+    size_t written = 0;
+    bool ok = protobuf_wire_write_varint(bytes, sizeof bytes, &written, 8) &&
+              protobuf_wire_write_varint(bytes, sizeof bytes, &written, 150);
+    size_t offset = 0;
+    protobuf_wire_field_t field;
+    ok = ok && protobuf_wire_read_field(bytes, written, &offset, &field);
+    if (ok)
+        printf("Field %u: %llu (%zu bytes)\n", (unsigned)field.field, (unsigned long long)field.integer, written);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Field 1: 150 (3 bytes)
+```
+
+### Owning native messages
 
 This is also `scratch/protobuf_roundtrip.c`. The field numbers correspond to
 an application schema with an unsigned integer field 1 and string field 2.

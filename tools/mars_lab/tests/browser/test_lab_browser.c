@@ -21,8 +21,8 @@
 #include "lab_server.h"
 #include "lab_state.h"
 #include "test_harness.h"
-#include "test_lab_browser_fixtures.h"
 #include "test_lab_support.h"
+#include "test_lab_browser_fixtures.h"
 
 extern char **environ;
 static const char *lab_browser_executable;
@@ -65,7 +65,8 @@ static bool lab_browser_prepare(const char *directory)
                                           "transport_flow_checks.js", "editor_checks.js",
                                           "worker_checks.js",         "mobile_layout_checks.js",
                                           "surface_hover_checks.js",   "surface_mesh_checks.js",
-                                          "surface_export_checks.js"};
+                                          "surface_export_checks.js",  "surface_math_checks.js",
+                                          "memory_checks.js", "protobuf_wire_checks.js"};
     for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {
         file_t *module = lab_browser_file("tools/mars_lab/build/typescript_checks/tests/browser", modules[i]);
         string_t *text = module ? file_read_all_text(module) : NULL;

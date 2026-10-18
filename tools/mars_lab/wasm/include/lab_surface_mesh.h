@@ -10,7 +10,9 @@
 #define MARS_LAB_SURFACE_MESH_H
 
 /**
- * @brief Decode chart geometry into primitives, vertex attributes and units, or return null on invalid data.
+ * @brief Decode native SVG display geometry into retained primitives and GPU attributes.
+ * @param chart Scoped native-produced SVG chart node carrying geometry, bounds, units, axis and tick metadata.
+ * @details Publishes the decoded mesh record through lab_dom_return, or null for invalid data.
  * Segment records contain six coordinates; polygon records contain nine to fifteen.
  * Polygon fans preserve input ordering. Temporary handles are released per SVG record.
  * Empty geometry is accepted only when the chart explicitly carries data-empty="true".

@@ -2128,6 +2128,7 @@ int lab_worker_expression(int argc, char **argv)
     print_bindings("binding", bindings, precision);
     printf("differentiable  %s\n", expr_is_differentiable(display_expr) ? "yes" : "no");
     printf("evaluation_ready  %s\n", expression_evaluation_ready(expr) ? "yes" : "no");
+    printf("plot_available  %s\n", expr_has_numeric_form(display_expr) ? "yes" : "no");
     if (evaluate_request)
         print_explicit_root_family(expr, precision);
     value_note[0] = '\0';

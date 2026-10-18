@@ -100,11 +100,13 @@ static bool test_build_probe(const string_t *root, const char *target, const cha
     int status = -1;
     bool ran = checks_process_run(arguments, root, 30, &output, &errors, &status);
     bool ok = ran && (diagnostic ? status > 0 && errors && string_find(errors, diagnostic) >= 0 : status == 0);
-    const char *summary = "All dependency checks passed (C development libraries and native TypeScript compilers).\n";
+    const char *summary =
+        "All dependency checks passed (C development libraries, native TypeScript compilers and WebAssembly runtime).\n";
     if (!diagnostic && strcmp(target, "check-deps") == 0)
         ok = output && string_ends_with(output, summary) &&
              string_find(output, "LAB_TSC: Version 7.0.2\n") >= 0 &&
-             string_find(output, "TBA_TSC: Version 7.0.2\n") >= 0 && ok;
+             string_find(output, "TBA_TSC: Version 7.0.2\n") >= 0 &&
+             string_find(output, "MARS Lab WebAssembly compile/link probe passed.\n") >= 0 && ok;
     else
         ok = (!output || string_find(output, summary) < 0) && ok;
     if (diagnostic)

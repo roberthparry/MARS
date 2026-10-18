@@ -335,6 +335,38 @@ static bool viewport_segment(const string_t *svg, double end_height)
     return strstr(series, expected) != NULL;
 }
 
+static void test_plot_axis_title_space(void)
+{
+    const char *titles[] = {"Value / weight", "Temperature", "WWWWWW", "iiiiii", "界界"};
+    const double minimum_widths[] = {76, 70, 68, 16, 24};
+    const double maximum_margins[] = {108, 100, 81, 57, 57};
+    for (size_t title = 0; title < sizeof titles / sizeof *titles; ++title) {
+        for (unsigned width = 320; width <= 800; width += 240) {
+            plot_options_t options = plot_options_default();
+            options.width = width;
+            options.y_label = titles[title];
+            plot_t *plot = plot_new(&options);
+            plot_point_t points[] = {{NUM_ZERO, NUM_NEG_ONE, true}, {NUM_ONE, NUM_ONE, false}};
+            bool added = plot && plot_add_points(plot, points, 2, "", PLOT_LINES, 0);
+            string_t *svg = added ? plot_to_svg(plot) : NULL;
+            const char *source = svg ? string_c_str(svg) : "";
+            bool fits = false;
+            for (const char *node = strstr(source, "<text "); node; node = strstr(node + 6, "<text ")) {
+                const char *body = strchr(node, '>');
+                if (!body || strncmp(body + 1, titles[title], strlen(titles[title])))
+                    continue;
+                double x, y;
+                fits = sscanf(node, "<text x=\"%lf\" y=\"%lf\"", &x, &y) == 2 &&
+                       x - minimum_widths[title] >= 7.99 && x <= maximum_margins[title];
+                break;
+            }
+            string_free(svg);
+            plot_free(plot);
+            TEST_ASSERT_TRUE(fits, "axis titles fit without excessive padding for narrow letters and spaces");
+        }
+    }
+}
+
 static void test_plot_precision_and_clip(void)
 {
     number_t base = num_create_from_string("1000000000000000000000000000000");
@@ -1098,6 +1130,7 @@ int tests_main(void)
     TEST_RUN_CASE(test_plot_gaps, NULL);
     TEST_RUN_CASE(test_plot_limits, NULL);
     TEST_RUN_CASE(test_plot_precision_and_clip, NULL);
+    TEST_RUN_CASE(test_plot_axis_title_space, NULL);
     TEST_RUN_CASE(test_plot_control, NULL);
     TEST_RUN_CASE(test_plot_sampler_ownership, NULL);
     TEST_RUN_CASE(test_plot_label_notation, NULL);

@@ -8,8 +8,9 @@
  * Mathematical text and native plot results remain opaque to this controller.
  */
 #include "lab_dom.h"
-#include "lab_flow.h"
+#include "lab_requests.h"
 #include "lab_plot_slices.h"
+#include "lab_flow.h"
 #define MARS_LAB_FLOW_REQUEST_INTERNAL_ACCESS
 #include "lab_flow_request_internal.h"
 
@@ -76,19 +77,19 @@ static int lab_flow_request_calculus_capture(struct lab_flow_request_calculus_co
     int initial = lab_dom_get(ctx->frame, "initial"), mode = lab_dom_get(initial, "mode");
     ctx->matrix = lab_dom_equal(mode, lab_dom_string("matrix"));
     ctx->scalar = ctx->matrix && lab_dom_truth(lab_dom_get(initial, "scalar"));
-    lab_dom_set(ctx->frame, "matrix", lab_dom_scalar(1, ctx->matrix));
-    lab_dom_set(ctx->frame, "scalar", lab_dom_scalar(1, ctx->scalar));
+    lab_dom_set(ctx->frame, "matrix", lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->matrix));
+    lab_dom_set(ctx->frame, "scalar", lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->scalar));
     lab_dom_set(ctx->frame, "solverPlot",
-                lab_dom_scalar(1, ctx->plot && (lab_dom_equal(mode, lab_dom_string("equation")) ||
+                lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->plot && (lab_dom_equal(mode, lab_dom_string("equation")) ||
                                                 lab_dom_equal(mode, lab_dom_string("diffequation")))));
     if (lab_flow_request_truth(ctx->frame, "automatic")) {
-        lab_dom_set(ctx->frame, "wrt", lab_dom_read(lab_dom_id("plotFirst"), 5, ""));
+        lab_dom_set(ctx->frame, "wrt", lab_dom_read(lab_dom_id("plotFirst"), LAB_DOM_VALUE, ""));
         return lab_flow_call(ctx->frame, flow_request_calculus_stage_current, "calculusCapture", "snapshot", 0, 0);
     }
-    int options = lab_dom_object(5);
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(options, "button", lab_dom_get(ctx->frame, "actionButton"));
-    lab_dom_set(options, "variable", lab_dom_scalar(1, lab_dom_truth(ctx->wrt)));
-    lab_dom_set(options, "scalar", lab_dom_scalar(1, ctx->scalar));
+    lab_dom_set(options, "variable", lab_dom_scalar(LAB_VALUE_BOOLEAN, lab_dom_truth(ctx->wrt)));
+    lab_dom_set(options, "scalar", lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->scalar));
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_return, "runRequestFlow", "value", 1, 6,
                          lab_dom_numeric(7), ctx->frame, lab_dom_numeric(flow_request_calculus_stage_commit),
                          ctx->action, mode, options);
@@ -173,7 +174,7 @@ static int lab_flow_request_calculus_fetch(struct lab_flow_request_calculus_cont
     if (ctx->plot && lab_dom_equal(lab_dom_get(ctx->frame, "plotKind"), lab_dom_string("complex_curve")))
         lab_dom_set(ctx->request, "plotKind", lab_dom_string("complex_curve"));
     if (ctx->matrix && !ctx->scalar) {
-        int payload = lab_dom_object(5);
+        int payload = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(payload, "action", lab_dom_string("editor"));
         lab_dom_set(payload, "operation", lab_dom_string("calculus"));
         lab_dom_set(payload, "calculus", ctx->action);
@@ -199,12 +200,12 @@ static int lab_flow_request_calculus_matrix_fetch(struct lab_flow_request_calcul
 {
     if (!lab_flow_request_truth(ctx->frame, "current"))
         return lab_flow_done(0);
-    int options = lab_dom_object(5);
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(options, "matrixText",
                 lab_dom_get(lab_dom_get(lab_dom_get(ctx->frame, "prepared"), "editor"), "expression"));
     lab_dom_set(options, "operation", lab_dom_string("eval"));
     lab_dom_set(options, "operand", lab_dom_string(""));
-    lab_dom_set(options, "skipSave", lab_dom_scalar(1, 1));
+    lab_dom_set(options, "skipSave", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     lab_dom_set(options, "request", ctx->request);
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_outcome, "fetchMatrixOptions", "result", 1, 1,
                          options);
@@ -214,7 +215,7 @@ static int lab_flow_request_calculus_outcome(struct lab_flow_request_calculus_co
 {
     ctx->result = lab_dom_key_get(lab_dom_get(lab_dom_get(ctx->data, "presentation"), "calculus"), ctx->action);
     lab_dom_set(ctx->frame, "calculus", ctx->result);
-    int available = ctx->matrix && !ctx->scalar ? lab_dom_scalar(1, 1)
+    int available = ctx->matrix && !ctx->scalar ? lab_dom_scalar(LAB_VALUE_BOOLEAN, 1)
                     : ctx->plot ? lab_dom_get(ctx->result, "svg")
                                 : lab_flow_request_fallback(lab_dom_get(ctx->result, "expression"), "");
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_accept, "requestOutcome", "outcome", 0, 4,
@@ -223,12 +224,12 @@ static int lab_flow_request_calculus_outcome(struct lab_flow_request_calculus_co
 
 static int lab_flow_request_calculus_accept(struct lab_flow_request_calculus_context *ctx)
 {
-    unsigned outcome = (unsigned)lab_dom_number(lab_dom_get(ctx->frame, "outcome"));
-    if (!outcome)
+    lab_request_outcome_t outcome = (lab_request_outcome_t)(unsigned)lab_dom_number(lab_dom_get(ctx->frame, "outcome"));
+    if (outcome == LAB_REQUEST_OUTCOME_STALE)
         return lab_flow_done(0);
-    if (ctx->plot && (lab_dom_truth(lab_dom_get(ctx->data, "plot_slices")) || outcome != 1))
+    if (ctx->plot && (lab_dom_truth(lab_dom_get(ctx->data, "plot_slices")) || outcome != LAB_REQUEST_OUTCOME_FAILURE))
         lab_plot_slices_apply(lab_dom_get(ctx->data, "plot_slices"), lab_dom_get(ctx->request, "sliceInput"));
-    if (outcome == 1) {
+    if (outcome == LAB_REQUEST_OUTCOME_FAILURE) {
         int error = lab_dom_get(ctx->data, "error");
         if (!lab_dom_truth(error))
             error = lab_dom_get(ctx->data, "raw");
@@ -237,7 +238,7 @@ static int lab_flow_request_calculus_accept(struct lab_flow_request_calculus_con
                                  lab_dom_text(ctx->wrt), "");
         if (ctx->plot && lab_flow_request_truth(ctx->frame, "live") &&
             !lab_dom_truth(lab_dom_get(ctx->data, "plot_slices"))) {
-            lab_dom_write(lab_dom_id("plotFeedback"), 0, "", error);
+            lab_dom_write(lab_dom_id("plotFeedback"), LAB_DOM_TEXT, "", error);
             lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 0);
             return lab_flow_done(0);
         }
@@ -247,8 +248,8 @@ static int lab_flow_request_calculus_accept(struct lab_flow_request_calculus_con
     }
     if (ctx->plot)
         return lab_flow_call(ctx->frame, flow_request_calculus_stage_plot_commit, "displayPlot", 0, 0, 1, ctx->result);
-    int options = lab_dom_object(5);
-    lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "keepBindings", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_clear_error, "clearResultDetails", 0, 0, 1, options);
 }
 
@@ -297,12 +298,12 @@ static int lab_flow_request_calculus_variables(struct lab_flow_request_calculus_
 static int lab_flow_request_calculus_differentiable(struct lab_flow_request_calculus_context *ctx)
 {
     int enabled =
-        lab_flow_request_truth(ctx->frame, "solverPlot") ? lab_dom_scalar(1, 0)
+        lab_flow_request_truth(ctx->frame, "solverPlot") ? lab_dom_scalar(LAB_VALUE_BOOLEAN, 0)
         : ctx->matrix
             ? lab_dom_get(lab_dom_get(ctx->frame, "snapshot"), "differentiable")
-            : lab_dom_scalar(1, !lab_dom_equal(lab_dom_clean(lab_dom_text(lab_flow_request_fallback(
+            : lab_dom_scalar(LAB_VALUE_BOOLEAN, !lab_dom_equal(lab_dom_clean(lab_dom_text(lab_flow_request_fallback(
                                                                  lab_dom_get(ctx->data, "differentiable"), "yes")),
-                                                             1),
+                                                             LAB_DOM_CLEAN_LOWER),
                                                lab_dom_string("no")));
     return lab_flow_call(ctx->frame, flow_request_calculus_stage_buttons, "calculusDifferentiable", 0, 0, 1, enabled);
 }
@@ -341,15 +342,15 @@ static int lab_flow_request_calculus_error_clear(struct lab_flow_request_calculu
     if (!lab_flow_request_truth(ctx->frame, "current"))
         return lab_flow_done(0);
     if (lab_flow_request_truth(ctx->frame, "live")) {
-        lab_dom_write(lab_dom_id("plotFeedback"), 0, "", lab_dom_get(ctx->frame, "error"));
+        lab_dom_write(lab_dom_id("plotFeedback"), LAB_DOM_TEXT, "", lab_dom_get(ctx->frame, "error"));
         lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 0);
         return lab_flow_done(0);
     }
     if (ctx->plot)
         return lab_flow_call(ctx->frame, flow_request_calculus_stage_plot_commit, "plotError", 0, 0, 1,
                              lab_dom_get(ctx->frame, "error"));
-    int options = lab_dom_object(5);
-    lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "keepBindings", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return lab_flow_call(ctx->frame,
                          ctx->matrix ? flow_request_calculus_stage_error_variables
                                      : flow_request_calculus_stage_error_render,

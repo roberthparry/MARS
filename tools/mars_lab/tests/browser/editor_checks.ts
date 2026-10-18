@@ -118,7 +118,7 @@ window.checkLabEditor = function checkLabEditor(): void {
             equal(projected.shortened, display !== expression, 'strict inequality includes NaN and undefined/null');
         }
     }
-    for (const kind of [-1, 6, 100])
+    for (const kind of [-1, -2147483648, 6, 100, 2147483647])
         equal(native(kind, 'key', new Map()), null, 'invalid projection is inert');
 
     const reads: string[] = [];

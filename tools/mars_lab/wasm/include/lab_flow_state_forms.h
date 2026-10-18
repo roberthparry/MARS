@@ -10,13 +10,22 @@
 #ifndef LAB_FLOW_STATE_FORMS_H
 #define LAB_FLOW_STATE_FORMS_H
 
+/** @brief Closed workflow selectors for lab_flow_state_forms; numeric values are browser ABI. */
+typedef enum {
+    LAB_FLOW_STATE_FORMS_CLEAR          = 0, /**< Clear the current worksheet. */
+    LAB_FLOW_STATE_FORMS_REFRESH        = 1, /**< Refresh integrator forms. */
+    LAB_FLOW_STATE_FORMS_PARSE_BOUNDS   = 2, /**< Parse integrator bounds. */
+    LAB_FLOW_STATE_FORMS_RESTORE_BOUNDS = 3, /**< Restore integrator bounds. */
+} lab_flow_state_forms_kind_t;
+
 /**
  * @brief Advance one clear or integrator-form workflow.
  * @param kind Clear 0, refresh forms 1, parse bounds 2, restore bounds 3.
- * @param frame Borrowed mutable continuation frame containing browser values.
- * @param view Borrowed browser view; expression reads use out-of-scope services.
- * @return Scoped continuation plan; global dispatcher kinds are 72 through 75.
+ * @param frame Scoped browser handle to the mutable continuation frame storing stage, inputs and service results.
+ * @param view Reserved scoped browser-view handle; unused because expression reads use deferred services.
+ * @return Scoped browser handle to the next continuation plan, or an inert completion for invalid kinds.
+ * Global dispatcher kinds are 72 through 75.
  */
-int lab_flow_state_forms(unsigned kind, int frame, int view);
+int lab_flow_state_forms(lab_flow_state_forms_kind_t kind, int frame, int view);
 
 #endif

@@ -8,30 +8,36 @@
  * and colour group, avoiding repeated copying of a growing curve string.
  * Scoped handles bound temporary storage; browser code owns SVG element creation.
  */
+#include <math.h>
+
 #include "lab_dom.h"
 #include "lab_surface_svg.h"
 
 static int coordinate(int value, double *number)
 {
-    if (lab_dom_type(value) != 2) return 0;
+    if (lab_dom_type(value) != LAB_VALUE_NUMBER)
+        return 0;
     *number = lab_dom_to_number(value);
-    return __builtin_isfinite(*number);
+    return isfinite(*number);
 }
 
 static int commands(int points, int flat, int close)
 {
-    if (lab_dom_type(points) != 4) return 0;
+    if (lab_dom_type(points) != LAB_VALUE_ARRAY)
+        return 0;
     unsigned count = lab_dom_count(points);
     if (flat) {
-        if (count % 2) return 0;
+        if (count % 2)
+            return 0;
         count /= 2;
     }
-    if (count < 2 || (!flat && count > 12)) return 0;
-    int pieces = lab_dom_object(4);
+    if (count < 2 || (!flat && count > 12))
+        return 0;
+    int pieces = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
         int point = flat ? points : lab_dom_item(points, i);
-        if (!flat && (lab_dom_type(point) != 4 || lab_dom_count(point) != 2)) {
+        if (!flat && (lab_dom_type(point) != LAB_VALUE_ARRAY || lab_dom_count(point) != 2)) {
             lab_dom_release(mark);
             return 0;
         }
@@ -45,19 +51,21 @@ static int commands(int points, int flat, int close)
         lab_dom_push(pieces, lab_dom_format(y, "", ""));
         lab_dom_release(mark);
     }
-    if (close) lab_dom_push(pieces, lab_dom_string("Z"));
+    if (close)
+        lab_dom_push(pieces, lab_dom_string("Z"));
     return lab_dom_join_array(pieces, "");
 }
 
-static void collect(int polygons, int groups, int segments)
+static void collect(int polygons, int groups, lab_surface_primitive_t kind)
 {
-    unsigned count = lab_dom_type(polygons) == 4 ? lab_dom_count(polygons) : 0;
+    unsigned count = lab_dom_type(polygons) == LAB_VALUE_ARRAY ? lab_dom_count(polygons) : 0;
     unsigned mark = lab_dom_mark();
     int interrupted = 1;
     for (unsigned i = 0; i < count; ++i) {
         int polygon = lab_dom_item(polygons, i);
         int colour = lab_dom_get(polygon, "colour");
-        int path = lab_dom_type(colour) == 3 ? commands(lab_dom_get(polygon, "points"), 0, !segments) : 0;
+        int path = lab_dom_type(colour) == LAB_VALUE_STRING
+                       ? commands(lab_dom_get(polygon, "points"), 0, kind == LAB_SURFACE_POLYGONS) : 0;
         if (!path) {
             interrupted = 1;
             lab_dom_release(mark);
@@ -65,10 +73,11 @@ static void collect(int polygons, int groups, int segments)
         }
         unsigned used = lab_dom_count(groups);
         int group = used ? lab_dom_item(groups, used - 1) : 0;
-        if (!segments || interrupted || !group || !lab_dom_equal(colour, lab_dom_get(group, "colour"))) {
-            group = lab_dom_object(5);
+        if (kind == LAB_SURFACE_POLYGONS || interrupted || !group ||
+            !lab_dom_equal(colour, lab_dom_get(group, "colour"))) {
+            group = lab_dom_object(LAB_VALUE_OBJECT);
             lab_dom_set(group, "colour", colour);
-            lab_dom_set(group, "pieces", lab_dom_object(4));
+            lab_dom_set(group, "pieces", lab_dom_object(LAB_VALUE_ARRAY));
             lab_dom_push(groups, group);
         }
         lab_dom_push(lab_dom_get(group, "pieces"), path);
@@ -78,24 +87,26 @@ static void collect(int polygons, int groups, int segments)
 }
 
 /* Return browser-owned path strings; no SVG nodes or host handles are retained natively. */
-void lab_surface_svg_plan(int polygons, int paths, int segments)
+void lab_surface_svg_plan(int polygons, int paths, lab_surface_primitive_t kind)
 {
-    int result = lab_dom_object(5), series = lab_dom_object(4), axes = lab_dom_object(4);
-    int groups = lab_dom_object(4);
-    collect(polygons, groups, segments);
+    int result = lab_dom_object(LAB_VALUE_OBJECT), series = lab_dom_object(LAB_VALUE_ARRAY),
+        axes = lab_dom_object(LAB_VALUE_ARRAY);
+    int groups = lab_dom_object(LAB_VALUE_ARRAY);
+    collect(polygons, groups, kind);
     unsigned mark = lab_dom_mark();
     unsigned count = lab_dom_count(groups);
     for (unsigned i = 0; i < count; ++i) {
-        int group = lab_dom_item(groups, i), entry = lab_dom_object(5);
+        int group = lab_dom_item(groups, i), entry = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(entry, "colour", lab_dom_get(group, "colour"));
         lab_dom_set(entry, "path", lab_dom_join_array(lab_dom_get(group, "pieces"), ""));
         lab_dom_push(series, entry);
         lab_dom_release(mark);
     }
-    count = lab_dom_type(paths) == 4 ? lab_dom_count(paths) : 0;
+    count = lab_dom_type(paths) == LAB_VALUE_ARRAY ? lab_dom_count(paths) : 0;
     for (unsigned i = 0; i < count; ++i) {
         int path = commands(lab_dom_item(paths, i), 1, 0);
-        if (path) lab_dom_push(axes, path);
+        if (path)
+            lab_dom_push(axes, path);
         lab_dom_release(mark);
     }
     lab_dom_set(result, "series", series);

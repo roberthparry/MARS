@@ -132,7 +132,31 @@
         check(host.querySelector<HTMLElement>('[data-impulse]')! && !host.textContent.includes('No plot'),
               'Fourier step spectrum reaches the visible plot with its impulse');
         check(WorksheetContext.rendered.querySelector('svg')! && !WorksheetContext.rendered.classList.contains('error'),
-              'Separated ordinary part and impulse render as mathematical TeX');
+              'The complete distribution identity renders as mathematical TeX');
+        WorksheetBindings.controller.setExpressionEditor('@F{asin(t)}');
+        await WorksheetRequests.evaluation.evaluateExpression();
+        await waitForAutomaticPlot();
+        check(WorksheetContext.rendered.querySelector('svg') && !WorksheetContext.rendered.classList.contains('error'),
+              'The compact finite-part transform identity renders as mathematical TeX');
+        const identity = WorksheetContext.rendered.dataset.displayTex!;
+        check(identity.includes('\\operatorname{Fp}_{1}') && identity.includes('\\delta') && identity.includes(' = ') &&
+              !identity.includes('NAN') && !identity.includes('\\underbrace') && !identity.includes('Curve values'),
+              'The transform remains one complete identity without invalid coordinates or prose annotations');
+        check(host.textContent.includes('Imaginary curve') && host.textContent.includes('Imaginary impulse weight'),
+              'Distribution legends distinguish the sampled curve from the impulse weight');
+        let axisLabel: SVGTextElement | null = null;
+        for (const label of host.querySelectorAll('text')) {
+            if (label.textContent === 'Value / weight')
+                axisLabel = label;
+        }
+        check(axisLabel && axisLabel.getBBox().x >= 0,
+              'The complete distribution axis title fits inside the SVG');
+        check(axisLabel && axisLabel.getBBox().x <= 32,
+              'The distribution plot does not waste space to the left of its axis title');
+        check(document.getElementById('plotFeedback')!.textContent.includes('no pointwise 3-D, complex-plane or amplitude view'),
+              'Distribution plots explain why ordinary complex projections are absent');
+        check(!host.querySelector('.complex-grid') && host.querySelector('[data-impulse]'),
+              'The distribution is retained instead of fabricating ordinary complex projections');
     }
 
     /** @brief Use crosshairs over 2-D plots, reserving the grabbing hand for active drags. */
@@ -1095,6 +1119,23 @@
                     }
                 }
                 await LabTestBrowser.paint();
+                if (id === 'plotInputRange') {
+                    const selector = document.getElementById('plotInputRangeGroup')!.getBoundingClientRect();
+                    const bounds = document.getElementById('plotFirstGroup')!.getBoundingClientRect();
+                    const ranges = document.querySelector<HTMLElement>('.plot-ranges')!.getBoundingClientRect();
+                    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+                    if (ranges.width >= 30 * rem) {
+                        check(Math.abs(selector.top - bounds.top) < 1 && selector.right < bounds.left,
+                              'Input range selector and bounds share a row when there is room');
+                        check(selector.width <= 11 * rem + 1 && bounds.width > selector.width,
+                              'The compact input range selector leaves more space for bounds');
+                    } else {
+                        check(bounds.top >= selector.bottom,
+                              'Input range selector and bounds stack in narrow plot cards');
+                    }
+                    check(bounds.left >= ranges.left && bounds.right <= ranges.right + 1,
+                          'Range fields stay inside the plot card');
+                }
                 const card = group.closest<HTMLElement>('.result-card')!.getBoundingClientRect();
                 for (const label of group.querySelectorAll('label')) {
                     if (label.classList.contains('hidden'))
@@ -2070,6 +2111,7 @@
         check(config.DEFAULT_EXPRESSION === labApplication.configuration.DEFAULT_EXPRESSION, 'Bootstrap defaults differ from the UI');
         const empty = labWire.encode({});
         check(Array.from(empty).join(',') === '8,1,18,2,8,5', 'Protobuf golden envelope mismatch');
+        window.checkLabProtobufWire(labWire);
         const source = {
             unicode: '\ufeffμσ e\u0301 🪐\u0000',
             nil: null,
@@ -2633,6 +2675,7 @@
             await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
             await runBrowserGroup('checkLabRequestFlows', window.checkLabRequestFlows);
             await runBrowserGroup('checkLabStateFlow', window.checkLabStateFlow);
+            await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);
             await runBrowserGroup('checkSurfaceProjectionPlan', checkSurfaceProjectionPlan);
             await runBrowserGroup('checkLabSurfaceMesh', window.checkLabSurfaceMesh);
             await runBrowserGroup('checkLabSurfaceSVG', window.checkLabSurfaceSVG);
@@ -2823,6 +2866,24 @@
                     getComputedStyle(row.querySelector<HTMLElement>('.slice-limits')!).display === 'none'),
                     'Evaluate resets all ranges to Auto even for unchanged input');
             }
+            WorksheetBindings.controller.setExpressionEditor('Laplace(asin(-x^2),x,s)');
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await waitForAutomaticPlot();
+            check(document.getElementById('plotCard')!.classList.contains('hidden') &&
+                  !document.getElementById('plotRendered')!.textContent,
+                  'An unresolved transform removes the previous plot without requesting an automatic range');
+            check(WorksheetContext.rendered.querySelector('svg'),
+                  'An unresolved transform retains its symbolic result card');
+            await WorksheetWorkspace.mode.selectWorksheetMode('matrix');
+            await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+            check(document.getElementById('plotCard')!.classList.contains('hidden'),
+                  'Returning to a symbolic-only result does not restore an obsolete plot');
+            WorksheetBindings.controller.setExpressionEditor('Laplace(exp(-x),x,s)');
+            await WorksheetRequests.evaluation.evaluateExpression();
+            await waitForAutomaticPlot();
+            check(!document.getElementById('plotCard')!.classList.contains('hidden') &&
+                  document.getElementById('plotRendered')!.querySelector('svg'),
+                  'A supported transform restores automatic plotting');
             WorksheetBindings.controller.setExpressionEditor('3+4');
             await WorksheetRequests.evaluation.evaluateExpression();
             check(String(WorksheetContext.value.textContent).trim() === '7', 'Second native calculation should equal 7');

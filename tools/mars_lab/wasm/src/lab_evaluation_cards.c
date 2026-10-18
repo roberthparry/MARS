@@ -1,20 +1,20 @@
 /**
  * @file lab_evaluation_cards.c
- * @brief Evaluation result selection and mode presentation for the browser.
+ * @brief Evaluation result selection and kind presentation for the browser.
  *
  * Selects exact native card representations, composes solver diagnostics, merges
- * weather sections and projects mode-specific controls. Browser adapters deliver
+ * weather sections and projects kind-specific controls. Browser adapters deliver
  * selected values through the existing card services, preserving their asynchronous
  * cancellation and diagnostic boundaries. No mathematics is parsed or rewritten.
  * All records, cache entries and nodes are borrowed for one synchronous call;
  * returned records contain browser values, never retained WASM handle numbers.
  */
+#include "lab_mode.h"
 #include "lab_dom.h"
 #include "lab_evaluation_dom.h"
 #include "lab_layout.h"
 #include "lab_result.h"
 #include "lab_select.h"
-#define MARS_LAB_WORKSPACE_DOM_INTERNAL_ACCESS
 #include "lab_workspace_dom.h"
 #include "lab_evaluation_cards.h"
 
@@ -30,7 +30,7 @@ static int lab_evaluation_cards_field(int data, const char *key)
 
 static int lab_evaluation_cards_compact(int caches, int source)
 {
-    int editor = lab_dom_map_get(lab_dom_get(caches, "editors"), lab_dom_clean(source, 0));
+    int editor = lab_dom_map_get(lab_dom_get(caches, "editors"), lab_dom_clean(source, LAB_DOM_CLEAN_TRIM));
     return editor ? lab_dom_get(editor, "display") : source;
 }
 
@@ -55,18 +55,20 @@ static int lab_evaluation_cards_label(int data, const char *key, const char *lab
     return lab_dom_truth(value) ? lab_dom_join(lab_dom_string(label), value, "") : value;
 }
 
-static void lab_evaluation_cards_expression(int plan, int data, int text, int caches, unsigned mode)
+static void lab_evaluation_cards_expression(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
 {
     int expression = lab_evaluation_cards_field(data, "expression");
-    if (mode == 7)
+    if (kind == LAB_EVALUATION_CARDS_GOAL)
         expression = lab_evaluation_cards_or(expression, text);
     int full = lab_evaluation_cards_or(lab_dom_get(data, "full_display_expression"), expression);
-    int compact =
-        mode == 7 || lab_dom_truth(expression) ? lab_evaluation_cards_compact(caches, expression) : lab_dom_string("");
+    int compact = kind == LAB_EVALUATION_CARDS_GOAL || lab_dom_truth(expression)
+                      ? lab_evaluation_cards_compact(caches, expression)
+                      : lab_dom_string("");
     lab_evaluation_cards_pair(plan, "expression", "full_expression",
                               lab_evaluation_cards_or(lab_dom_get(data, "display_expression"), compact), full);
-    lab_dom_set(plan, "input",
-                mode == 7 ? full : lab_evaluation_cards_or(lab_dom_get(data, "editor_expression"), full));
+    lab_dom_set(plan, "input", kind == LAB_EVALUATION_CARDS_GOAL
+                                   ? full
+                                   : lab_evaluation_cards_or(lab_dom_get(data, "editor_expression"), full));
     int function = lab_evaluation_cards_field(data, "function");
     lab_evaluation_cards_pair(plan, "function", "full_function",
                               lab_evaluation_cards_or(lab_dom_get(data, "display_function"), function),
@@ -76,32 +78,35 @@ static void lab_evaluation_cards_expression(int plan, int data, int text, int ca
     lab_dom_set(plan, "derivative", lab_evaluation_cards_field(lab_dom_get(calculus, "derivative"), "expression"));
     int flag = lab_evaluation_cards_or(lab_dom_get(data, "differentiable"), lab_dom_string("yes"));
     lab_dom_set(plan, "differentiable",
-                lab_dom_scalar(1, !lab_dom_equal(lab_dom_clean(flag, 1), lab_dom_string("no"))));
+                lab_dom_scalar(LAB_VALUE_BOOLEAN,
+                               !lab_dom_equal(lab_dom_clean(flag, LAB_DOM_CLEAN_LOWER), lab_dom_string("no"))));
     lab_dom_set(plan, "unchanged",
-                lab_dom_scalar(1, lab_dom_equal(lab_dom_clean(expression, 0), lab_dom_clean(text, 0))));
+                lab_dom_scalar(LAB_VALUE_BOOLEAN,
+                               lab_dom_equal(lab_dom_clean(expression, LAB_DOM_CLEAN_TRIM),
+                                             lab_dom_clean(text, LAB_DOM_CLEAN_TRIM))));
 }
 
-static void lab_evaluation_cards_equation(int plan, int data, int text, int caches, unsigned mode)
+static void lab_evaluation_cards_equation(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
-    (void)mode;
+    (void)kind;
     int equation = lab_evaluation_cards_field(data, "equation");
     int full = lab_evaluation_cards_or(lab_dom_get(data, "full_display_equation"), equation);
     int display = lab_evaluation_cards_or(lab_dom_get(data, "display_equation"), equation);
     lab_evaluation_cards_pair(plan, "expression", "full_expression", display, full);
-    lab_dom_set(plan, "input", lab_dom_clean(lab_evaluation_cards_or(full, display), 0));
+    lab_dom_set(plan, "input", lab_dom_clean(lab_evaluation_cards_or(full, display), LAB_DOM_CLEAN_TRIM));
     int function = lab_evaluation_cards_field(data, "function");
     lab_evaluation_cards_pair(plan, "function", "full_function", function, function);
     lab_dom_set(plan, "value", lab_evaluation_cards_field(lab_dom_get(data, "presentation"), "equation_solution_text"));
     int shown = lab_dom_get(data, "display_TeX"), full_TeX = lab_dom_get(data, "full_display_TeX");
     int expand = lab_dom_truth(shown) && lab_dom_truth(full_TeX) && !lab_dom_equal(shown, full_TeX) &&
                  lab_result_can_expand(lab_dom_get(caches, "expansions"), shown, full_TeX);
-    lab_dom_set(plan, "expandable", lab_dom_scalar(1, expand));
+    lab_dom_set(plan, "expandable", lab_dom_scalar(LAB_VALUE_BOOLEAN, expand));
 }
 
-static void lab_evaluation_cards_diffequation(int plan, int data, int text, int caches, unsigned mode)
+static void lab_evaluation_cards_diffequation(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
 {
-    (void)mode;
+    (void)kind;
     int problem = lab_evaluation_cards_or(lab_dom_get(data, "problem"), text);
     lab_evaluation_cards_pair(plan, "expression", "full_expression", problem, problem);
     lab_dom_set(plan, "input", lab_evaluation_cards_or(lab_dom_get(data, "input"), text));
@@ -124,21 +129,21 @@ static void lab_evaluation_cards_diffequation(int plan, int data, int text, int 
                                                                 lab_evaluation_cards_field(data, "status"))));
 }
 
-static void lab_evaluation_cards_matrix(int plan, int data, int text, int caches, unsigned mode)
+static void lab_evaluation_cards_matrix(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)caches;
-    (void)mode;
+    (void)kind;
     lab_dom_set(plan, "scalar",
                 lab_dom_truth(lab_dom_get(data, "scalar")) ? lab_evaluation_cards_field(data, "result")
                                                            : lab_dom_string(""));
 }
 
-static void lab_evaluation_cards_integrator(int plan, int data, int text, int caches, unsigned mode)
+static void lab_evaluation_cards_integrator(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)caches;
-    (void)mode;
+    (void)kind;
     int expression = lab_evaluation_cards_field(data, "expression");
     lab_evaluation_cards_pair(plan, "expression", "full_expression", expression, expression);
     lab_dom_set(plan, "input", lab_evaluation_cards_field(data, "antiderivative"));
@@ -148,21 +153,21 @@ static void lab_evaluation_cards_integrator(int plan, int data, int text, int ca
     lab_dom_set(plan, "value", lab_evaluation_cards_field(metadata, "value_text"));
 }
 
-static void lab_evaluation_cards_datetime(int plan, int data, int text, int caches, unsigned mode)
+static void lab_evaluation_cards_datetime(int plan, int data, int text, int caches, lab_evaluation_card_kind_t kind)
 {
     (void)text;
     (void)caches;
-    (void)mode;
+    (void)kind;
     static const struct {
         const char *node, *button, *sections, *text;
     } cards[] = {{"#rendered", "", "overview_sections", "overview"},
                  {"#parsed", "#parsedMore", "range_sections", "range"},
                  {"#functionStyle", "#functionMore", "calendar_sections", "calendar"},
                  {"#value", "", "solar_sections", "solar"}};
-    int records = lab_dom_object(4);
+    int records = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < sizeof cards / sizeof *cards; ++i) {
         unsigned mark = lab_dom_mark();
-        int card = lab_dom_object(5);
+        int card = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(card, "element", lab_dom_query(0, cards[i].node));
         lab_dom_set(card, "button", *cards[i].button ? lab_dom_query(0, cards[i].button) : 0);
         lab_dom_set(card, "sections", lab_dom_get(data, cards[i].sections));
@@ -173,59 +178,99 @@ static void lab_evaluation_cards_datetime(int plan, int data, int text, int cach
     lab_dom_set(plan, "calendar", records);
 }
 
-/* Return one native card plan; mode 7 denotes goal results, otherwise normal worksheet mode indices apply. */
-void lab_evaluation_cards(unsigned mode, int data, int text, int caches)
+/* Return one native card plan; kind 7 denotes goal results, otherwise normal worksheet kind indices apply. */
+void lab_evaluation_cards(lab_evaluation_card_kind_t kind, int data, int text, int caches)
 {
-    typedef void (*lab_evaluation_cards_handler_t)(int, int, int, int, unsigned);
-    static const lab_evaluation_cards_handler_t handlers[] = {[0] = lab_evaluation_cards_expression,
-                                                              [1] = lab_evaluation_cards_equation,
-                                                              [2] = lab_evaluation_cards_diffequation,
-                                                              [3] = lab_evaluation_cards_matrix,
-                                                              [4] = lab_evaluation_cards_integrator,
-                                                              [5] = lab_evaluation_cards_datetime,
-                                                              [6] = 0,
-                                                              [7] = lab_evaluation_cards_expression};
-    if (mode >= sizeof handlers / sizeof *handlers) {
+    /**
+     * @brief Populate a card plan for the selected presentation kind.
+     * @param plan Scoped destination card-plan record.
+     * @param data Scoped native evaluation response.
+     * @param text Scoped authored source used for fallback selection.
+     * @param caches Scoped native-text caches.
+     * @param kind Worksheet-compatible presentation kind or LAB_EVALUATION_CARDS_GOAL.
+     */
+    typedef void (*lab_evaluation_cards_handler_t)(int plan, int data, int text, int caches,
+                                                  lab_evaluation_card_kind_t kind);
+    static const lab_evaluation_cards_handler_t handlers[] = {
+        [LAB_EVALUATION_CARDS_EXPRESSION]            = lab_evaluation_cards_expression,
+        [LAB_EVALUATION_CARDS_EQUATION]              = lab_evaluation_cards_equation,
+        [LAB_EVALUATION_CARDS_DIFFERENTIAL_EQUATION] = lab_evaluation_cards_diffequation,
+        [LAB_EVALUATION_CARDS_MATRIX]                = lab_evaluation_cards_matrix,
+        [LAB_EVALUATION_CARDS_INTEGRATOR]            = lab_evaluation_cards_integrator,
+        [LAB_EVALUATION_CARDS_DATETIME]              = lab_evaluation_cards_datetime,
+        [LAB_EVALUATION_CARDS_ALMANAC]               = 0,
+        [LAB_EVALUATION_CARDS_GOAL]                  = lab_evaluation_cards_expression,
+    };
+    if ((unsigned)kind >= sizeof handlers / sizeof *handlers) {
         lab_dom_return(0);
         return;
     }
-    int plan = lab_dom_object(5), empty = lab_dom_string("");
+    int plan = lab_dom_object(LAB_VALUE_OBJECT), empty = lab_dom_string("");
     static const char *const fields[] = {"expression", "full_expression", "input",
                                          "function",   "full_function",   "value"};
     for (unsigned i = 0; i < sizeof fields / sizeof *fields; ++i)
         lab_dom_set(plan, fields[i], empty);
-    if (handlers[mode])
-        handlers[mode](plan, data, text, caches, mode);
+    if (handlers[kind])
+        handlers[kind](plan, data, text, caches, kind);
     lab_dom_return(plan);
 }
 
-/* Project mode-specific notes, controls and visibility after the text-card services have run. */
-void lab_evaluation_cards_present(unsigned mode, int data)
+/* Update notes before deriving value-card visibility from the installed text. */
+static void lab_evaluation_cards_present_expression(int data)
 {
-    if (!mode) {
-        lab_evaluation_notes(data);
-        int value = lab_dom_read(lab_dom_query(0, "#value"), 0, "");
-        lab_workspace_dom_value(lab_dom_length(lab_dom_clean(value, 0)) != 0);
-    } else if (mode == 2) {
-        lab_dom_class(lab_dom_query(0, "#functionStyle"), "equation-function", 0);
-    } else if (mode == 3) {
-        lab_dom_write(lab_dom_query(0, "#valueTitle"), 0, "", lab_dom_string("Value"));
-        int operation = lab_dom_get(data, "operation"), select = lab_dom_query(0, "#matrixOperation");
-        if (select && lab_dom_truth(operation)) {
-            lab_dom_write(select, 5, "", lab_dom_clean(operation, 0));
-            if (!lab_dom_length(lab_dom_read(select, 5, "")))
-                lab_dom_write(select, 5, "", lab_dom_string("eval"));
-            lab_select_sync(select);
-            lab_workspace_dom_matrix(3);
-        }
-    } else if (mode == 5 || mode == 6) {
-        lab_layout_more(lab_dom_query(0, "#renderedMore"), 0);
+    lab_evaluation_notes(data);
+    int value = lab_dom_read(lab_dom_query(0, "#value"), LAB_DOM_TEXT, "");
+    lab_workspace_dom_value(lab_dom_length(lab_dom_clean(value, LAB_DOM_CLEAN_TRIM)) != 0);
+}
+
+/* Clear equation formatting on the differential-equation detail card. */
+static void lab_evaluation_cards_present_diffequation(int data)
+{
+    (void)data;
+    lab_dom_class(lab_dom_query(0, "#functionStyle"), "equation-function", 0);
+}
+
+/* Synchronise a supplied matrix operation after updating the value title. */
+static void lab_evaluation_cards_present_matrix(int data)
+{
+    lab_dom_write(lab_dom_query(0, "#valueTitle"), LAB_DOM_TEXT, "", lab_dom_string("Value"));
+    int operation = lab_dom_get(data, "operation"), select = lab_dom_query(0, "#matrixOperation");
+    if (select && lab_dom_truth(operation)) {
+        lab_dom_write(select, LAB_DOM_VALUE, "", lab_dom_clean(operation, LAB_DOM_CLEAN_TRIM));
+        if (!lab_dom_length(lab_dom_read(select, LAB_DOM_VALUE, "")))
+            lab_dom_write(select, LAB_DOM_VALUE, "", lab_dom_string("eval"));
+        lab_select_sync(select);
+        lab_workspace_dom_matrix(LAB_MODE_MATRIX);
     }
+}
+
+/* Calendar presentations do not expose a rendered-card expansion control. */
+static void lab_evaluation_cards_present_calendar(int data)
+{
+    (void)data;
+    lab_layout_more(lab_dom_query(0, "#renderedMore"), 0);
+}
+
+/* Project mode-specific notes, controls and visibility after the text-card services have run. */
+void lab_evaluation_cards_present(lab_mode_t mode, int data)
+{
+    /** @brief Optional presentation effects indexed by the worksheet ABI mode. */
+    static void (*const handlers[LAB_MODE_COUNT])(int) = {
+        [LAB_MODE_EXPRESSION]            = lab_evaluation_cards_present_expression,
+        [LAB_MODE_EQUATION]              = 0,
+        [LAB_MODE_DIFFERENTIAL_EQUATION] = lab_evaluation_cards_present_diffequation,
+        [LAB_MODE_MATRIX]                = lab_evaluation_cards_present_matrix,
+        [LAB_MODE_INTEGRATOR]            = 0,
+        [LAB_MODE_DATETIME]              = lab_evaluation_cards_present_calendar,
+        [LAB_MODE_ALMANAC]               = lab_evaluation_cards_present_calendar,
+    };
+    if ((unsigned)mode < sizeof handlers / sizeof *handlers && handlers[mode])
+        handlers[mode](data);
 }
 
 static int lab_evaluation_cards_copy(int source)
 {
-    int copy = lab_dom_object(5), keys = lab_dom_keys(source);
+    int copy = lab_dom_object(LAB_VALUE_OBJECT), keys = lab_dom_keys(source);
     for (unsigned i = 0; i < lab_dom_count(keys); ++i) {
         unsigned mark = lab_dom_mark();
         int key = lab_dom_item(keys, i);
@@ -250,12 +295,12 @@ void lab_evaluation_weather_state(int state, int data)
 /* Replace exact Weather sections while preserving native order, markup and copy text. */
 void lab_evaluation_weather_cards(int overview, int weather)
 {
-    int result = lab_dom_object(5), sections = lab_dom_object(4);
+    int result = lab_dom_object(LAB_VALUE_OBJECT), sections = lab_dom_object(LAB_VALUE_ARRAY);
     const int sources[] = {overview, weather};
     int weather_title = lab_dom_string("Weather");
     for (unsigned source = 0; source < 2; ++source) {
         int entries = lab_dom_get(sources[source], "overview_sections");
-        if (lab_dom_type(entries) != 4)
+        if (lab_dom_type(entries) != LAB_VALUE_ARRAY)
             continue;
         for (unsigned i = 0; i < lab_dom_count(entries); ++i) {
             unsigned mark = lab_dom_mark();
@@ -274,18 +319,18 @@ void lab_evaluation_weather_cards(int overview, int weather)
 }
 
 /* Reveal an eligible goal target, or return the source/target pair for the browser's asynchronous request. */
-void lab_evaluation_goal_start(unsigned mode, int text)
+void lab_evaluation_goal_start(lab_mode_t mode, int text)
 {
     lab_dom_return(0);
-    if (mode || !lab_dom_truth(text))
+    if (mode != LAB_MODE_EXPRESSION || !lab_dom_truth(text))
         return;
     if (lab_dom_has_class(lab_dom_query(0, "#targetRow"), "hidden")) {
         lab_workspace_dom_target(1);
         return;
     }
-    lab_workspace_dom_help(0);
-    int result = lab_dom_object(5);
-    int target = lab_dom_clean(lab_dom_read(lab_dom_query(0, "#goalTarget"), 5, ""), 0);
+    lab_workspace_dom_help(LAB_WORKSPACE_SHOW_RESULTS);
+    int result = lab_dom_object(LAB_VALUE_OBJECT);
+    int target = lab_dom_clean(lab_dom_read(lab_dom_query(0, "#goalTarget"), LAB_DOM_VALUE, ""), LAB_DOM_CLEAN_TRIM);
     lab_dom_set(result, "text", text);
     lab_dom_set(result, "target", lab_evaluation_cards_or(target, lab_dom_string("0")));
     lab_dom_return(result);

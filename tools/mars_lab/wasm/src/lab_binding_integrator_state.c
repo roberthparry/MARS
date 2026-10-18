@@ -9,14 +9,15 @@
  * Existing browser services retain asynchronous preparation and live-state accessors.
  */
 #include "lab_dom.h"
-#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_binding_integrator_state.h"
+#define MARS_LAB_BINDING_INTERNAL_ACCESS
+#include "lab_binding_internal.h"
 
 static void lab_binding_integrator_state_emit(int calls, const char *service, unsigned count, int first, int second,
                                               int third)
 {
-    int call = lab_dom_object(5), args = lab_dom_object(4);
+    int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     const int values[] = {first, second, third};
     for (unsigned i = 0; i < count; ++i)
         lab_dom_push(args, values[i]);
@@ -31,17 +32,17 @@ void lab_binding_integrator_state(int data, int fallback, int editors, int bound
     int expression = lab_dom_get(data, "binding_expression");
     if (!lab_dom_truth(expression))
         expression = fallback;
-    expression = lab_dom_clean(lab_binding_or(expression, ""), 0);
+    expression = lab_dom_clean(lab_binding_or(expression, ""), LAB_DOM_CLEAN_TRIM);
     int metadata = lab_dom_map_get(editors, expression), sorted = lab_dom_get(metadata, "expression");
     if (lab_dom_truth(sorted))
         expression = sorted;
     /* Canonical server text has its own cache key; do not infer wrapping from the first lookup. */
-    metadata = lab_dom_map_get(editors, lab_dom_clean(lab_binding_or(expression, ""), 0));
+    metadata = lab_dom_map_get(editors, lab_dom_clean(lab_binding_or(expression, ""), LAB_DOM_CLEAN_TRIM));
     int body = lab_dom_get(data, "expression");
     if (!lab_dom_truth(body))
-        body = lab_dom_read(lab_dom_query(0, "#expr"), 5, "");
-    body = lab_dom_clean(lab_binding_or(body, ""), 0);
-    int bindings = lab_dom_get(data, "binding_values"), editable = lab_dom_object(4);
+        body = lab_dom_read(lab_dom_query(0, "#expr"), LAB_DOM_VALUE, "");
+    body = lab_dom_clean(lab_binding_or(body, ""), LAB_DOM_CLEAN_TRIM);
+    int bindings = lab_dom_get(data, "binding_values"), editable = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < lab_binding_array_count(bindings); ++i) {
         int binding = lab_dom_item(bindings, i);
@@ -49,7 +50,7 @@ void lab_binding_integrator_state(int data, int fallback, int editors, int bound
             lab_dom_push(editable, binding);
         lab_dom_release(mark);
     }
-    int plan = lab_dom_object(5), calls = lab_dom_object(4);
+    int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(plan, "calls", calls);
     if (lab_dom_truth(expression) && lab_dom_truth(lab_dom_get(metadata, "wrapped"))) {
         lab_binding_integrator_state_emit(calls, "setExpressionEditor", 3, expression, editable,

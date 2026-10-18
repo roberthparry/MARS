@@ -66,6 +66,14 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
     }
 
     // Every indexed workflow must reject absent entries without an indirect-call trap.
+    for (const kind of [-1, 36, 37, 38, 39, 63, 68, 69, 70, 71, 76, 0x7fffffff]) {
+        const frame = {mode: 0, stage: 0};
+        const plan = labDOM.call<EvaluationFixturePlan>('lab_flow_step', kind, frame, {});
+        equal(plan.done, true, 'reserved or invalid workflow selector finishes safely');
+        equal(frame.stage, 0, 'reserved selector cannot enter another workflow');
+        equal((plan.calls || []).length, 0, 'reserved selector schedules no browser operation');
+        equal(Object.hasOwn(plan, 'value'), false, 'reserved selector has no result value');
+    }
     for (let kind = 0; kind < 76; ++kind) {
         const frame = {mode: 0, stage: 65535};
         const plan = labDOM.call<EvaluationFixturePlan>('lab_flow_step', kind, frame, {});

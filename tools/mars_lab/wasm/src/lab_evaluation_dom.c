@@ -7,10 +7,11 @@
  * rewritten. C owns dataset/visibility policy; the browser supplies opaque native
  * records, DOM operations and asynchronous rendering when a representation is absent.
  */
+#include "lab_mode.h"
 #include "lab_dom.h"
+#include "lab_view.h"
 #include "lab_layout.h"
 #include "lab_result.h"
-#include "lab_view.h"
 #include "lab_evaluation_dom.h"
 
 static int lab_evaluation_field(int data, const char *key, int fallback)
@@ -21,40 +22,41 @@ static int lab_evaluation_field(int data, const char *key, int fallback)
 
 static void lab_evaluation_data(int node, const char *key, int value)
 {
-    lab_dom_write(node, 3, key, value);
+    lab_dom_write(node, LAB_DOM_DATASET, key, value);
 }
 
 /* Install only native-provided renderings, retaining exact copies for digit toggles. */
-void lab_evaluation_render(unsigned mode, int data, int expandable)
+void lab_evaluation_render(lab_mode_t mode, int data, bool expandable)
 {
-    if (mode != 1 && mode != 2 && mode != 4) {
+    if (mode != LAB_MODE_EQUATION && mode != LAB_MODE_DIFFERENTIAL_EQUATION && mode != LAB_MODE_INTEGRATOR) {
         lab_dom_return(0);
         return;
     }
     int rendered = lab_dom_query(0, "#rendered"), empty = lab_dom_string("");
     /* A same-mode evaluation must not inherit the previous Plot heading. */
-    lab_dom_write(lab_dom_query(0, "#renderedTitle"), 0, "", lab_dom_string(lab_view_text(mode, 2)));
-    lab_dom_write(lab_dom_query(0, "#valueTitle"), 0, "", lab_dom_string(lab_view_text(mode, 5)));
+    lab_dom_write(lab_dom_query(0, "#renderedTitle"), LAB_DOM_TEXT, "", lab_dom_string(lab_view_text(mode, LAB_VIEW_RENDERED)));
+    lab_dom_write(lab_dom_query(0, "#valueTitle"), LAB_DOM_TEXT, "", lab_dom_string(lab_view_text(mode, LAB_VIEW_VALUE)));
     lab_result_render_invalidate();
-    lab_evaluation_data(rendered, "responsiveFit", lab_dom_string(mode == 2 ? "true" : "false"));
+    lab_evaluation_data(rendered, "responsiveFit",
+                        lab_dom_string(mode == LAB_MODE_DIFFERENTIAL_EQUATION ? "true" : "false"));
     lab_dom_class(rendered, "vertically-wrapped-tex", 0);
     int base = lab_evaluation_field(data, "tex", empty);
-    int shown = mode == 1 ? lab_evaluation_field(data, "display_TeX", base) : base;
-    int full = lab_evaluation_field(data, mode == 1 ? "full_display_TeX" : "full_TeX", base);
-    int last = mode == 4 ? full : base;
+    int shown = mode == LAB_MODE_EQUATION ? lab_evaluation_field(data, "display_TeX", base) : base;
+    int full = lab_evaluation_field(data, mode == LAB_MODE_EQUATION ? "full_display_TeX" : "full_TeX", base);
+    int last = mode == LAB_MODE_INTEGRATOR ? full : base;
     int svg = lab_evaluation_field(data, "svg", empty);
     int error = lab_evaluation_field(data, "render_error", empty);
     int fallback = lab_dom_truth(base) ? base : lab_dom_string("No rendered TeX available");
-    if (mode == 2) {
+    if (mode == LAB_MODE_DIFFERENTIAL_EQUATION) {
         last = lab_evaluation_field(
             data, "display_TeX",
             lab_evaluation_field(data, "solutions_TeX", lab_evaluation_field(data, "problem_TeX", empty)));
         shown = full = last;
         int status = lab_dom_get(data, "status");
-        const char *title = lab_dom_equal(status, lab_dom_string("series"))   ? "Equation and local series"
+        const char *title = lab_dom_equal(status, lab_dom_string("series"))    ? "Equation and local series"
                             : lab_dom_equal(status, lab_dom_string("solved")) ? "Equation and solutions"
-                                                                              : "Reduction";
-        lab_dom_write(lab_dom_query(0, "#renderedTitle"), 0, "", lab_dom_string(title));
+                                                                             : "Reduction";
+        lab_dom_write(lab_dom_query(0, "#renderedTitle"), LAB_DOM_TEXT, "", lab_dom_string(title));
         fallback = lab_dom_truth(last)
                        ? last
                        : lab_evaluation_field(data, "diagnostic", lab_dom_string("No symbolic solution available"));
@@ -71,23 +73,24 @@ void lab_evaluation_render(unsigned mode, int data, int expandable)
     lab_evaluation_data(rendered, "fullSvg", empty);
     lab_evaluation_data(rendered, "renderError", error);
     lab_layout_content(svg, lab_dom_truth(error) ? error : fallback);
-    int can_expand = mode == 1
+    int can_expand = mode == LAB_MODE_EQUATION
                          ? expandable
-                         : mode == 4 && lab_dom_truth(shown) && lab_dom_truth(full) && !lab_dom_equal(shown, full);
+                         : mode == LAB_MODE_INTEGRATOR && lab_dom_truth(shown) && lab_dom_truth(full) &&
+                               !lab_dom_equal(shown, full);
     lab_layout_more(lab_dom_query(0, "#renderedMore"), can_expand);
     lab_dom_return(last);
 }
 
 /* Display native expression notes and return its explicit differentiability decision. */
-int lab_evaluation_notes(int data)
+bool lab_evaluation_notes(int data)
 {
     int note = lab_evaluation_field(data, "value_note", lab_dom_string(""));
-    lab_dom_write(lab_dom_query(0, "#valueNote"), 0, "", note);
-    lab_dom_class(lab_dom_query(0, "#valueNoteCard"), "hidden", !lab_dom_length(lab_dom_clean(note, 0)));
-    lab_dom_write(lab_dom_query(0, "#valueTitle"), 0, "",
+    lab_dom_write(lab_dom_query(0, "#valueNote"), LAB_DOM_TEXT, "", note);
+    lab_dom_class(lab_dom_query(0, "#valueNoteCard"), "hidden", !lab_dom_length(lab_dom_clean(note, LAB_DOM_CLEAN_TRIM)));
+    lab_dom_write(lab_dom_query(0, "#valueTitle"), LAB_DOM_TEXT, "",
                   lab_dom_string(lab_dom_truth(lab_dom_get(data, "root_value")) ? "Values" : "Value"));
     int differentiable = lab_evaluation_field(data, "differentiable", lab_dom_string("yes"));
-    return !lab_dom_equal(lab_dom_clean(differentiable, 1), lab_dom_string("no"));
+    return !lab_dom_equal(lab_dom_clean(differentiable, LAB_DOM_CLEAN_LOWER), lab_dom_string("no"));
 }
 
 /* Retain the solver SVG and its request owner only after the host verifies freshness. */

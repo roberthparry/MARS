@@ -8,6 +8,8 @@
  * Interpolation uses the sampled bounds, not the camera's selected volume.
  * Native inverse projection admits pointers and markers only inside the chart.
  */
+#include <math.h>
+
 #include "lab_dom.h"
 #include "lab_surface_hover.h"
 
@@ -26,7 +28,7 @@ static int inside_chart(const double transform[6], double determinant, double wi
 {
     double local_x = ((x - transform[4]) * transform[3] - (y - transform[5]) * transform[2]) / determinant;
     double local_y = ((y - transform[5]) * transform[0] - (x - transform[4]) * transform[1]) / determinant;
-    return __builtin_isfinite(local_x) && __builtin_isfinite(local_y) &&
+    return isfinite(local_x) && isfinite(local_y) &&
            local_x >= 0 && local_x <= width && local_y >= 0 && local_y <= height;
 }
 
@@ -45,7 +47,7 @@ void lab_surface_hover(int view, int frame, int screen, double mouse_x, double m
     for (unsigned i = 0; i < 6; ++i) {
         rotation[i] = item(rows, i);
         transform[i] = number(screen, matrix_keys[i]);
-        if (!__builtin_isfinite(transform[i])) {
+        if (!isfinite(transform[i])) {
             lab_dom_return(0);
             return;
         }
@@ -56,9 +58,9 @@ void lab_surface_hover(int view, int frame, int screen, double mouse_x, double m
     }
     double width = number(frame, "width"), height = number(frame, "height"), fit = number(frame, "fit");
     double determinant = transform[0] * transform[3] - transform[1] * transform[2];
-    if (!__builtin_isfinite(determinant) || !determinant ||
-        !__builtin_isfinite(width) || !__builtin_isfinite(height) || width <= 0 || height <= 0 ||
-        !__builtin_isfinite(mouse_x) || !__builtin_isfinite(mouse_y) ||
+    if (!isfinite(determinant) || !determinant ||
+        !isfinite(width) || !isfinite(height) || width <= 0 || height <= 0 ||
+        !isfinite(mouse_x) || !isfinite(mouse_y) ||
         !inside_chart(transform, determinant, width, height, mouse_x, mouse_y)) {
         lab_dom_return(0);
         return;
@@ -84,21 +86,26 @@ void lab_surface_hover(int view, int frame, int screen, double mouse_x, double m
             for (unsigned j = 0; j < 2; ++j) {
                 raw[j][axis] = item(lab_dom_item(points, j), axis);
                 p[j][axis] = (raw[j][axis] - 0.5) * scale[axis] + shift[axis] + 0.5;
-                if (!__builtin_isfinite(p[j][axis])) valid = 0;
+                if (!isfinite(p[j][axis]))
+                    valid = 0;
             }
             double delta = p[1][axis] - p[0][axis];
             if (!delta) {
-                if (p[0][axis] < 0 || p[0][axis] > 1) valid = 0;
+                if (p[0][axis] < 0 || p[0][axis] > 1)
+                    valid = 0;
             } else {
                 double a = -p[0][axis] / delta, b = (1 - p[0][axis]) / delta;
                 double lo = a < b ? a : b, hi = a > b ? a : b;
-                if (lo > start) start = lo;
-                if (hi < end) end = hi;
+                if (lo > start)
+                    start = lo;
+                if (hi < end)
+                    end = hi;
             }
         }
         /* All geometry is now on the C stack; no per-primitive handle escapes this scope. */
         lab_dom_release(mark);
-        if (!valid || start > end) continue;
+        if (!valid || start > end)
+            continue;
         double pixel[2][2];
         for (unsigned j = 0; j < 2; ++j) {
             double q[2] = {0, 0}, t = j ? end : start;
@@ -113,12 +120,16 @@ void lab_surface_hover(int view, int frame, int screen, double mouse_x, double m
         double dx = pixel[1][0] - pixel[0][0], dy = pixel[1][1] - pixel[0][1];
         double length = dx * dx + dy * dy;
         double t = length ? ((mouse_x - pixel[0][0]) * dx + (mouse_y - pixel[0][1]) * dy) / length : 0;
-        if (t < 0) t = 0;
-        if (t > 1) t = 1;
+        if (t < 0)
+            t = 0;
+        if (t > 1)
+            t = 1;
         double x = pixel[0][0] + t * dx, y = pixel[0][1] + t * dy;
         double distance = (x - mouse_x) * (x - mouse_x) + (y - mouse_y) * (y - mouse_y);
-        if (!__builtin_isfinite(distance) || distance > best) continue;
-        if (!inside_chart(transform, determinant, width, height, x, y)) continue;
+        if (!isfinite(distance) || distance > best)
+            continue;
+        if (!inside_chart(transform, determinant, width, height, x, y))
+            continue;
         best = distance;
         double fraction = start + t * (end - start);
         for (unsigned axis = 0; axis < 3; ++axis)
@@ -133,14 +144,20 @@ void lab_surface_hover(int view, int frame, int screen, double mouse_x, double m
         static const char *const bounds[] = {"xMin", "xMax", "yMin", "yMax", "zMin", "zMax"};
         static const char *const labels[] = {"\nx ≈ ", "\nRe ≈ ", "\nIm ≈ "};
         for (unsigned axis = 0; axis < 3; ++axis) {
-            double lo = lab_dom_to_number(lab_dom_read(chart, 3, bounds[axis * 2]));
-            double hi = lab_dom_to_number(lab_dom_read(chart, 3, bounds[axis * 2 + 1]));
+            double lo = lab_dom_to_number(lab_dom_read(chart, LAB_DOM_DATASET, bounds[axis * 2]));
+            double hi = lab_dom_to_number(lab_dom_read(chart, LAB_DOM_DATASET, bounds[axis * 2 + 1]));
             double value = lo + chosen[axis] * (hi - lo);
-            if (!__builtin_isfinite(value)) { valid = 0; break; }
+            if (!isfinite(value)) {
+                valid = 0;
+                break;
+            }
             text = lab_dom_join(text, lab_dom_join(lab_dom_string(labels[axis]), lab_dom_precision(value, 7), ""), "");
         }
-        if (!valid) { lab_dom_return(previous); return; }
-        result = lab_dom_object(5);
+        if (!valid) {
+            lab_dom_return(previous);
+            return;
+        }
+        result = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(result, "x", lab_dom_numeric(chosen_x));
         lab_dom_set(result, "y", lab_dom_numeric(chosen_y));
         lab_dom_set(result, "distance", lab_dom_numeric(best));

@@ -8,6 +8,7 @@
  * Input refresh plans decode these actions into ordered host storage, timer and
  * request services. Reuse validity is projected only after its timer is cancelled.
  */
+#include "lab_mode.h"
 #include "lab_dom.h"
 #include "lab_events.h"
 
@@ -22,28 +23,36 @@ enum {
 };
 
 /* Input action masks preserve per-mode refresh and source-reuse semantics. */
-unsigned lab_events_input(unsigned mode, int bound, int unchanged)
+unsigned lab_events_input(lab_mode_t mode, bool bound, bool unchanged)
 {
-    static const unsigned actions[] = {[0] = lab_events_save,
-                                       [1] = lab_events_bindings | lab_events_save | lab_events_history,
-                                       [2] = lab_events_source | lab_events_history,
-                                       [3] = lab_events_bindings | lab_events_history,
-                                       [4] = lab_events_bindings | lab_events_history,
-                                       [5] = lab_events_calendar_editor | lab_events_history,
-                                       [6] = lab_events_history};
-    if (mode > 6)
+    static const unsigned actions[] = {
+        [LAB_MODE_EXPRESSION]            = lab_events_save,
+        [LAB_MODE_EQUATION]              = lab_events_bindings | lab_events_save | lab_events_history,
+        [LAB_MODE_DIFFERENTIAL_EQUATION] = lab_events_source | lab_events_history,
+        [LAB_MODE_MATRIX]                = lab_events_bindings | lab_events_history,
+        [LAB_MODE_INTEGRATOR]            = lab_events_bindings | lab_events_history,
+        [LAB_MODE_DATETIME]              = lab_events_calendar_editor | lab_events_history,
+        [LAB_MODE_ALMANAC]               = lab_events_history,
+    };
+    /** @brief Additional source refreshes needed when a mode has no bound editor. */
+    static const unsigned unbound_actions[LAB_MODE_COUNT] = {
+        [LAB_MODE_EQUATION]   = lab_events_source,
+        [LAB_MODE_MATRIX]     = lab_events_source,
+        [LAB_MODE_INTEGRATOR] = lab_events_source,
+    };
+    if ((unsigned)mode > LAB_MODE_ALMANAC)
         return 0;
     unsigned result = actions[mode];
-    if (!mode)
+    if (mode == LAB_MODE_EXPRESSION)
         return result | (unchanged ? lab_events_match | lab_events_history : lab_events_edit);
-    if (!bound && (mode == 1 || mode == 3 || mode == 4))
-        result |= lab_events_source;
+    if (!bound)
+        result |= unbound_actions[mode];
     return result;
 }
 
 static void lab_events_emit(int calls, const char *service, unsigned count, int first, int second)
 {
-    int call = lab_dom_object(5), args = lab_dom_object(4);
+    int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(call, "service", lab_dom_string(service));
     if (count)
         lab_dom_push(args, first);
@@ -54,9 +63,9 @@ static void lab_events_emit(int calls, const char *service, unsigned count, int 
 }
 
 /* Decode input policy into ordered adapters without mutating getter-backed host views. */
-void lab_events_refresh(unsigned mode, int bound, int unchanged, int context)
+void lab_events_refresh(lab_mode_t mode, bool bound, bool unchanged, int context)
 {
-    int plan = lab_dom_object(5), calls = lab_dom_object(4);
+    int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(plan, "calls", calls);
     lab_dom_return(plan);
     unsigned actions = lab_events_input(mode, bound, unchanged);
@@ -65,7 +74,7 @@ void lab_events_refresh(unsigned mode, int bound, int unchanged, int context)
     static const char *const modes[] = {"expression", "equation", "diffequation", "matrix",
                                         "integrator", "datetime", "almanac"};
     int name = lab_dom_string(modes[mode]), editor = lab_dom_get(context, "editor");
-    int text = lab_dom_clean(lab_dom_read(editor, 5, ""), 0);
+    int text = lab_dom_clean(lab_dom_read(editor, LAB_DOM_VALUE, ""), LAB_DOM_CLEAN_TRIM);
     if (actions & lab_events_calendar_editor)
         lab_events_emit(calls, "setModeEditor", 2, name,
                         lab_dom_length(text) ? text : lab_dom_get(context, "defaultDatetimeText"));
@@ -76,11 +85,11 @@ void lab_events_refresh(unsigned mode, int bound, int unchanged, int context)
     if (actions & lab_events_bindings)
         lab_events_emit(calls, "refreshVariableValuesFromEditor", 0, 0, 0);
     if (actions & lab_events_save) {
-        int save = lab_dom_object(5), options = lab_dom_object(5);
-        lab_dom_set(options, "debounce", lab_dom_scalar(1, 1));
+        int save = lab_dom_object(LAB_VALUE_OBJECT), options = lab_dom_object(LAB_VALUE_OBJECT);
+        lab_dom_set(options, "debounce", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
         lab_dom_set(save, "options", options);
         /* Omit equation text so its adapter uses the live save-function default after binding refresh. */
-        if (!mode)
+        if (mode == LAB_MODE_EXPRESSION)
             lab_dom_set(save, "text", text);
         lab_events_emit(calls, "saveState", 2, name, save);
     }
@@ -100,44 +109,57 @@ void lab_events_refresh(unsigned mode, int bound, int unchanged, int context)
 /* Mark reused binding metadata only when the host has cancelled its pending refresh timer. */
 void lab_events_refresh_mark(int editor)
 {
-    lab_dom_write(editor, 3, "bindingRefreshValid", lab_dom_string("true"));
+    lab_dom_write(editor, LAB_DOM_DATASET, "bindingRefreshValid", lab_dom_string("true"));
 }
 
 static void lab_events_value(const char *selector, int text)
 {
-    lab_dom_write(lab_dom_query(0, selector), 5, "", text);
+    lab_dom_write(lab_dom_query(0, selector), LAB_DOM_VALUE, "", text);
 }
 
 /* Reset scalar controls; structured row/calendar reset is an explicit caller action. */
-unsigned lab_events_clear(unsigned mode, int config)
+lab_event_clear_action_t lab_events_clear(lab_mode_t mode, int config)
 {
-    if (mode > 6)
-        return 0;
+    /** @brief Scalar reset targets and optional configured defaults. */
+    static const struct {
+        const char *selector, *initial;
+    } controls[LAB_MODE_COUNT] = {
+        [LAB_MODE_EQUATION]   = {"#equationVariable", "DEFAULT_EQUATION_VARIABLE"},
+        [LAB_MODE_MATRIX]     = {"#matrixOperand", 0},
+        [LAB_MODE_INTEGRATOR] = {"#integratorIntervalCap", "DEFAULT_INTEGRATOR_INTERVAL_CAP"},
+        [LAB_MODE_DATETIME]   = {"#expr", "DEFAULT_DATETIME_TEXT"},
+        [LAB_MODE_ALMANAC]    = {"#expr", "DEFAULT_ALMANAC_TEXT"},
+    };
+    /** @brief Structured follow-up work after scalar controls have been reset. */
+    static const lab_event_clear_action_t actions[LAB_MODE_COUNT] = {
+        [LAB_MODE_INTEGRATOR] = LAB_EVENT_CLEAR_INTEGRATOR,
+        [LAB_MODE_DATETIME]   = LAB_EVENT_CLEAR_CALENDAR,
+        [LAB_MODE_ALMANAC]    = LAB_EVENT_CLEAR_CALENDAR,
+    };
+    if ((unsigned)mode > LAB_MODE_ALMANAC)
+        return LAB_EVENT_CLEAR_NONE;
     int empty = lab_dom_string("");
     lab_events_value("#expr", empty);
-    if (mode == 1)
-        lab_events_value("#equationVariable", lab_dom_get(config, "DEFAULT_EQUATION_VARIABLE"));
-    else if (mode == 3) {
-        lab_events_value("#matrixOperand", empty);
-        lab_events_value("#matrixOperation", lab_dom_string("eval"));
-    } else if (mode == 4) {
-        lab_events_value("#integratorIntervalCap", lab_dom_get(config, "DEFAULT_INTEGRATOR_INTERVAL_CAP"));
-        return 1;
-    } else if (mode >= 5) {
-        lab_events_value("#expr", lab_dom_get(config, mode == 5 ? "DEFAULT_DATETIME_TEXT" : "DEFAULT_ALMANAC_TEXT"));
-        return 2;
+    if (controls[mode].selector) {
+        int value = controls[mode].initial ? lab_dom_get(config, controls[mode].initial) : empty;
+        lab_events_value(controls[mode].selector, value);
     }
-    return 0;
+    /* Reset the operand before changing the operation selector. */
+    if (mode == LAB_MODE_MATRIX)
+        lab_events_value("#matrixOperation", lab_dom_string("eval"));
+    return actions[mode];
 }
 
 /* Only expression/equation flush editor saves when the page becomes inactive. */
-int lab_events_flush(unsigned mode)
+bool lab_events_flush(lab_mode_t mode)
 {
-    return mode < 2;
+    return (unsigned)mode < LAB_MODE_DIFFERENTIAL_EQUATION;
 }
 
 /* Mathematical precision changes can rerun goal seek, reuse expression input or reevaluate another mode. */
-unsigned lab_events_precision(unsigned mode, int goal_source, int goal_target)
+lab_event_precision_action_t lab_events_precision(lab_mode_t mode, bool goal_source, bool goal_target)
 {
-    return !mode ? (goal_source && goal_target ? 1u : 2u) : mode < 5 ? 3u : 0u;
+    if (mode == LAB_MODE_EXPRESSION)
+        return goal_source && goal_target ? LAB_EVENT_PRECISION_GOAL : LAB_EVENT_PRECISION_REUSE;
+    return (unsigned)mode < LAB_MODE_DATETIME ? LAB_EVENT_PRECISION_EVALUATE : LAB_EVENT_PRECISION_NONE;
 }

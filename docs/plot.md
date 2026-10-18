@@ -75,6 +75,9 @@ It defaults to false; complex-plane projections enable it to preserve angles
 and circular geometry. Numerical coordinate ranges are not altered.
 Axis titles follow this drawing rectangle: the vertical title is centred to the
 left of its tick labels, including when equal-unit fitting adds margins.
+The left margin reserves space for both the numeric ticks and the horizontal
+vertical-axis title, so multiword titles do not lose their opening letters.
+Title spacing accounts for narrow letters and spaces to avoid an oversized left margin.
 Equal-unit views use balanced horizontal margins to centre the drawing rectangle.
 
 `plot_set_surface_facets()` attaches one copied set of finite real triangle vertices

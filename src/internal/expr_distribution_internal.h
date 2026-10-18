@@ -1,12 +1,11 @@
 /**
  * @file expr_distribution_internal.h
- * @brief Controlled native decomposition of distributions for plotting and presentation.
+ * @brief Controlled native decomposition of distributions for plotting.
  *
  * Lab plotting receives a regular expression and borrowed impulse coordinates
  * and weights. Infinite sums are explicitly bounded previews, never numerical
  * approximations to a Dirac delta. Unsupported nonlinear distributions fail.
- * Native transform presentation may separate ordinary curves with excluded poles
- * from impulse expressions while retaining the full symbolic distribution.
+ * Decomposition is for plotting only; mathematical result cards retain the complete distribution.
  */
 #ifndef MARS_EXPR_DISTRIBUTION_INTERNAL_H
 #define MARS_EXPR_DISTRIBUTION_INTERNAL_H
@@ -22,11 +21,6 @@ typedef bool (*expr_impulse_callback_t)(number_t coordinate, number_t weight, vo
 
 /** @brief Recognise distribution nodes, including unsupported nonlinear combinations, without evaluating them. */
 bool expr_is_distribution(const expr_t *expression);
-
-/** @brief Return owned TeX separating a supported ordinary part from impulses, or NULL without changing semantics.
- * Only linear combinations with affine principal-value poles are presented this way; the full expression is retained.
- */
-char *expr_distribution_curve_TeX(const expr_t *expression, const expr_t *variable);
 
 /** Return an owned regular part, or NULL for an absent or unsupported distribution; preview flags bounded sums. */
 expr_t *expr_distribution_decompose(const expr_t *expression, const expr_t *variable,

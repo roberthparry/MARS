@@ -35,44 +35,44 @@ static void lab_widgets_date(char text[11], unsigned year, unsigned month, unsig
 }
 
 /* Atomically project a valid calendar model during one synchronous host call. */
-int lab_widgets_picker(double year, double month, double selected_year, double selected_month, double selected_day,
-                       double today_year, double today_month, double today_day)
+bool lab_widgets_picker(double year, double month, double selected_year, double selected_month, double selected_day,
+                        double today_year, double today_month, double today_day)
 {
     const uint32_t *grid = lab_forms_calendar_grid(year, month, selected_year, selected_month, selected_day, today_year,
                                                    today_month, today_day);
     if (!grid)
-        return 0;
+        return false;
     int picker = lab_dom_query(0, "#marsDatePicker"), days = lab_dom_query(0, "#marsDatePickerGrid");
     int weekdays = lab_dom_query(0, "#marsDatePickerWeekdays");
     if (!picker || !days || !weekdays || !lab_dom_query(0, "#marsDatePickerTitle"))
-        return 0;
+        return false;
     int months = lab_dom_query(0, "#marsDatePickerMonth"), year_input = lab_dom_query(0, "#marsDatePickerYear");
     if (months && !lab_dom_count(lab_dom_all(months, "option"))) {
         for (unsigned i = 0; i < 12; ++i) {
             int option = lab_dom_create("option");
-            lab_dom_write(option, 5, "", lab_dom_format(i + 1, "", ""));
-            lab_dom_write(option, 0, "", lab_dom_string(lab_widgets_months[i]));
+            lab_dom_write(option, LAB_DOM_VALUE, "", lab_dom_format(i + 1, "", ""));
+            lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_string(lab_widgets_months[i]));
             lab_dom_append(months, option);
         }
     }
-    lab_dom_write(months, 5, "", lab_dom_format(month, "", ""));
+    lab_dom_write(months, LAB_DOM_VALUE, "", lab_dom_format(month, "", ""));
     char date[11];
     lab_widgets_date(date, year, month, 1);
     date[4] = 0;
-    lab_dom_write(year_input, 5, "", lab_dom_string(date));
-    lab_dom_write(weekdays, 0, "", lab_dom_string(""));
+    lab_dom_write(year_input, LAB_DOM_VALUE, "", lab_dom_string(date));
+    lab_dom_write(weekdays, LAB_DOM_TEXT, "", lab_dom_string(""));
     for (unsigned i = 0; i < 7; ++i) {
         int cell = lab_dom_create("div");
         lab_dom_class(cell, "mars-date-picker-weekday", 1);
-        lab_dom_write(cell, 0, "", lab_dom_string(lab_widgets_weekdays[i]));
+        lab_dom_write(cell, LAB_DOM_TEXT, "", lab_dom_string(lab_widgets_weekdays[i]));
         lab_dom_append(weekdays, cell);
     }
-    lab_dom_write(days, 0, "", lab_dom_string(""));
+    lab_dom_write(days, LAB_DOM_TEXT, "", lab_dom_string(""));
     for (unsigned i = 0; i < 42; ++i) {
         const uint32_t *cell = grid + i * 4;
         unsigned flags = cell[3];
         int button = lab_dom_create("button");
-        lab_dom_write(button, 2, "type", lab_dom_string("button"));
+        lab_dom_write(button, LAB_DOM_ATTRIBUTE, "type", lab_dom_string("button"));
         lab_dom_class(button, "mars-date-picker-day", 1);
         lab_dom_class(button, "outside", (flags & 2) != 0);
         lab_dom_class(button, "today", (flags & 4) != 0);
@@ -80,13 +80,13 @@ int lab_widgets_picker(double year, double month, double selected_year, double s
         lab_dom_disabled(button, !(flags & 1));
         if (flags & 1) {
             lab_widgets_date(date, cell[0], cell[1], cell[2]);
-            lab_dom_write(button, 3, "isoDate", lab_dom_string(date));
-            lab_dom_write(button, 0, "", lab_dom_format(cell[2], "", ""));
+            lab_dom_write(button, LAB_DOM_DATASET, "isoDate", lab_dom_string(date));
+            lab_dom_write(button, LAB_DOM_TEXT, "", lab_dom_format(cell[2], "", ""));
         }
         lab_dom_append(days, button);
     }
     lab_dom_class(picker, "hidden", 0);
-    return 1;
+    return true;
 }
 
 typedef struct {
@@ -100,12 +100,12 @@ static int lab_widgets_box(int node, lab_widgets_rect_t *rect)
 {
     if (!node)
         return 0;
-    rect->width = lab_dom_measure(node, 3);
-    rect->height = lab_dom_measure(node, 4);
+    rect->width = lab_dom_measure(node, LAB_DOM_MEASURE_RECT_WIDTH);
+    rect->height = lab_dom_measure(node, LAB_DOM_MEASURE_RECT_HEIGHT);
     if (!(rect->width > 1 && rect->height > 1))
         return 0;
-    rect->left = lab_dom_measure(node, 7);
-    rect->top = lab_dom_measure(node, 8);
+    rect->left = lab_dom_measure(node, LAB_DOM_MEASURE_RECT_LEFT);
+    rect->top = lab_dom_measure(node, LAB_DOM_MEASURE_RECT_TOP);
     return 1;
 }
 
@@ -150,7 +150,7 @@ void lab_widgets_picker_anchor(int shell)
         lab_dom_return(0);
         return;
     }
-    int result = lab_dom_object(5);
+    int result = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(result, "left", lab_dom_numeric(rect.left));
     lab_dom_set(result, "right", lab_dom_numeric(rect.left + rect.width));
     lab_dom_set(result, "top", lab_dom_numeric(rect.top));
@@ -168,24 +168,26 @@ void lab_widgets_picker_place(int state, int shell, double viewport_width, doubl
     if (!picker || !lab_widgets_anchor(shell, &anchor))
         return;
     int button = lab_dom_get(state, "button");
-    double bottom = button && lab_dom_measure(button, 4) > 1 ? lab_dom_measure(button, 9) : anchor.top + anchor.height;
+    double bottom = button && lab_dom_measure(button, LAB_DOM_MEASURE_RECT_HEIGHT) > 1
+                        ? lab_dom_measure(button, LAB_DOM_MEASURE_RECT_BOTTOM)
+                        : anchor.top + anchor.height;
     if (!viewport_width || !viewport_height) {
         int root = lab_dom_query(0, "html");
         if (!viewport_width)
-            viewport_width = lab_dom_measure(root, 0);
+            viewport_width = lab_dom_measure(root, LAB_DOM_MEASURE_CLIENT_WIDTH);
         if (!viewport_height)
-            viewport_height = lab_dom_measure(root, 10);
+            viewport_height = lab_dom_measure(root, LAB_DOM_MEASURE_CLIENT_HEIGHT);
     }
     const double *rect = lab_view_picker_rect(viewport_width, viewport_height, anchor.left, anchor.width, bottom);
     if (!rect)
         return;
     static const char *const properties[] = {"width", "left", "top", "max-height"};
     for (unsigned i = 0; i < 4; ++i)
-        lab_dom_write(picker, 4, properties[i], lab_dom_format(rect[i], "", "px"));
+        lab_dom_write(picker, LAB_DOM_STYLE, properties[i], lab_dom_format(rect[i], "", "px"));
 }
 
 /* Hide the popup and clear both native navigation and host references before any focus event. */
-void lab_widgets_picker_close(int state, int restore_focus)
+void lab_widgets_picker_close(int state, bool restore_focus)
 {
     int picker = lab_dom_query(0, "#marsDatePicker");
     if (!picker)
@@ -198,18 +200,18 @@ void lab_widgets_picker_close(int state, int restore_focus)
     lab_dom_set(state, "shell", 0);
     lab_forms_picker_close();
     if (restore_focus && button)
-        lab_dom_effect(button, 0);
+        lab_dom_effect(button, LAB_DOM_EFFECT_FOCUS);
 }
 
 /* Write a date and dispatch one deferred bubbling change only when its authored value differs. */
-int lab_widgets_date_commit(int input, int value)
+bool lab_widgets_date_commit(int input, int value)
 {
     if (!input)
-        return 0;
-    int changed = !lab_dom_equal(lab_dom_read(input, 5, ""), value);
-    lab_dom_write(input, 5, "", value);
+        return false;
+    int changed = !lab_dom_equal(lab_dom_read(input, LAB_DOM_VALUE, ""), value);
+    lab_dom_write(input, LAB_DOM_VALUE, "", value);
     if (changed)
-        lab_dom_effect(input, 2);
+        lab_dom_effect(input, LAB_DOM_EFFECT_CHANGE);
     return changed;
 }
 
@@ -226,10 +228,10 @@ void lab_widgets_picker_today(int input, int local_date, int utc_moment)
     int time = lab_dom_query(0, "#almanacTime");
     if (input && time && lab_dom_equal(input, lab_dom_query(0, "#almanacDate"))) {
         int next_time = lab_dom_get(utc_moment, "time");
-        int changed = !lab_dom_equal(lab_dom_read(time, 5, ""), next_time);
-        lab_dom_write(time, 5, "", next_time);
+        int changed = !lab_dom_equal(lab_dom_read(time, LAB_DOM_VALUE, ""), next_time);
+        lab_dom_write(time, LAB_DOM_VALUE, "", next_time);
         if (!lab_widgets_date_commit(input, lab_dom_get(utc_moment, "date")) && changed)
-            lab_dom_effect(time, 2);
+            lab_dom_effect(time, LAB_DOM_EFFECT_CHANGE);
         return;
     }
     lab_widgets_date_commit(input, local_date);
@@ -280,30 +282,31 @@ void lab_widgets_picker_open(int state, int input, int button, int selected, int
 }
 
 /* Format an accepted native date for commit; return whether the caller should refresh the calendar. */
-int lab_widgets_picker_apply(int state, int packed, int commit)
+bool lab_widgets_picker_apply(int state, int packed, bool commit)
 {
     int input = lab_dom_get(state, "input");
     unsigned year = lab_forms_date_year(packed), month = lab_forms_date_month(packed), day = lab_forms_date_day(packed);
     if (!input || !lab_forms_picker_date() || !lab_forms_date_valid(year, month, day))
-        return 0;
+        return false;
     if (commit) {
         char date[11];
         lab_widgets_date(date, year, month, day);
         lab_widgets_date_commit(input, lab_dom_string(date));
     }
-    return 1;
+    return true;
 }
 
-/* Set a month/year (0), shift months (1) or shift years (2), preserving and clamping the selected day. */
-int lab_widgets_picker_move(int state, unsigned operation, double first, double second, int selected,
-                            double fallback_year, int commit)
+/* Apply the selected month/year navigation operation, preserving and clamping the selected day. */
+bool lab_widgets_picker_move(int state, lab_picker_operation_t operation, double first, double second, int selected,
+                             double fallback_year, bool commit)
 {
-    if (!lab_dom_get(state, "input") || operation > 2)
-        return 0;
+    if (!lab_dom_get(state, "input") || (unsigned)operation > LAB_PICKER_SHIFT_YEARS)
+        return false;
     double day = lab_widgets_part(selected, "day");
     if (!day)
         day = 1;
-    int packed = operation ? lab_forms_picker_shift(first, operation == 2, day)
+    lab_forms_period_t unit = operation == LAB_PICKER_SHIFT_YEARS ? LAB_FORMS_YEARS : LAB_FORMS_MONTHS;
+    int packed = operation != LAB_PICKER_SET ? lab_forms_picker_shift(first, unit, day)
                            : lab_forms_picker_set(first, second, day, fallback_year);
     return lab_widgets_picker_apply(state, packed, commit);
 }

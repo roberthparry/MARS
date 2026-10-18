@@ -10,7 +10,10 @@
 
 // Native numeric ABI.
 
-/** @brief Native entry point accepting numeric arguments and returning a number. */
+/**
+ * @brief Native entry point accepting numeric arguments and returning a number.
+ * C bool parameters and results use numeric 0/1 at this WASM boundary, not scoped value handles.
+ */
 interface MarsTransportNumericExport {
     (...args: number[]): number;
 }

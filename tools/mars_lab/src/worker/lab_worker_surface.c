@@ -15,6 +15,8 @@
 #include <string.h>
 
 #include "plot-t.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
@@ -326,6 +328,11 @@ static string_t *surface_svg(const char *source, const char *first, const char *
 int lab_worker_plot_request(const char *source, const expr_t *expression, expr_bindings_t *bindings,
                             const expr_t *variable, int argc, char **argv)
 {
+    if (!expr_has_numeric_form(expression)) {
+        printf("plot_available  no\n");
+        printf("error       This symbolic result has no supported numerical form to plot.\n");
+        return 1;
+    }
     const char *kind = argc > 10 ? argv[10] : "auto", *requested = argc > 11 ? argv[11] : "";
     const char *quality = argc > 17 ? argv[17] : "full";
     if (strcmp(quality, "full") && strcmp(quality, "preview")) {

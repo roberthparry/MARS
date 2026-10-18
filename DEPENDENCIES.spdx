@@ -151,6 +151,16 @@ PackageLicenseDeclared: Apache-2.0 WITH LLVM-exception
 PackageCopyrightText: NOASSERTION
 PackageComment: Separately installed linker providing wasm-ld for the Lab browser build. Not required to run an already-built module; retain package-specific notices when redistributing the toolchain.
 
+PackageName: wasi-libc
+SPDXID: SPDXRef-Package-WASILibc
+PackageVersion: NOASSERTION
+PackageDownloadLocation: https://github.com/WebAssembly/wasi-libc
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageComment: Build-time WASM headers and archive; required musl maths, memory and string routines are statically linked into the MARS Lab page module; its codec worker links memory operations only. Preserve the selected package's musl, Sun and Arm notices when distributing the resulting WASM binaries. No WASI host runtime is required.
+
 PackageName: TeX-Live
 SPDXID: SPDXRef-Package-TeXLive
 PackageVersion: NOASSERTION
@@ -353,6 +363,7 @@ Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-SQLCipher
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-zstd
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-libsodium
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-glibc
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-WASILibc
 Relationship: SPDXRef-Package-libunistring OPTIONAL_DEPENDENCY_OF SPDXRef-Package-MARS
 Relationship: SPDXRef-Package-SQLCipher DEPENDS_ON SPDXRef-Package-SQLite
 Relationship: SPDXRef-Package-SQLCipher DEPENDS_ON SPDXRef-Package-OpenSSL

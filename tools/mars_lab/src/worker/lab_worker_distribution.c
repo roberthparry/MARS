@@ -81,11 +81,11 @@ int lab_worker_distribution_plot(const char *source, const expr_t *expression, c
     options.smart_y = !strcmp(scale, "auto");
     options.guard_gaps = true;
     options.x_label = expr_symbol_name(variable);
-    options.y_label = "Weight / value";
+    options.y_label = "Value / weight";
     options.title = "";
     plot_t *plot = ok ? plot_new(&options) : NULL;
     ok = ok && plot;
-    const char *names[] = {"Real", "Imaginary"};
+    const char *names[] = {"Real curve", "Imaginary curve"};
     const uint32_t colours[] = {0xd6aa55, 0x78d8cb};
     for (size_t i = 0; ok && i < 2; ++i) {
         regular_sample_t context = {regular, variable, i != 0};
@@ -116,7 +116,7 @@ int lab_worker_distribution_plot(const char *source, const expr_t *expression, c
         }
     }
     plot_point_t *impulses[] = {points.real, points.imaginary};
-    const char *impulse_names[] = {"Real impulses", "Imaginary impulses"};
+    const char *impulse_names[] = {"Real impulse weight", "Imaginary impulse weight"};
     for (size_t i = 0; ok && i < 2; ++i) {
         bool nonzero = false;
         for (size_t j = 0; j < points.count; ++j)
@@ -135,7 +135,8 @@ int lab_worker_distribution_plot(const char *source, const expr_t *expression, c
         const char *title = truncated ? "Fourier spectrum (32-term preview)" : "Fourier spectrum";
         printf("plot_title %s\nplot_title_TeX \\text{%s}\nplot_svg %s\ndifferentiable yes\n",
                title, title, string_c_str(svg));
-        printf("plot_notice Distribution: arrows show impulse weights. Pointwise amplitude is undefined.\n");
+        printf("plot_notice Curves show component values away from singularities; arrows show Dirac impulse weights, "
+               "not point values. The full distribution has no pointwise 3-D, complex-plane or amplitude view.\n");
         result = 0;
     } else if (regular)
         result = lab_worker_plot_output(source, expression, NULL, EDOM, NULL, NULL, NULL);

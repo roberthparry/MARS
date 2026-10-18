@@ -5,15 +5,17 @@
  * Stores actual editor and codec snapshot bytes in WebAssembly, not host object
  * handles. DOM rendering, serialisation and persistence I/O belong to the host;
  * mode transitions, source/display matching, precision policy, history equality, eviction and navigation
- * belong here. Fixed storage uses just over 44 MiB and requires no libc or imports.
+ * belong here. Fixed storage uses just over 44 MiB; library byte operations require no host imports or allocation.
  * The bounded mode/entry scans below update offsets after compacting a byte arena;
  * no scan depends on unbounded user input or accumulated browsing history.
  */
 #include <stdint.h>
+#include <string.h>
 
+#include "lab_mode.h"
 #include "lab_workspace.h"
 
-enum { LAB_WS_MODES = 7, LAB_WS_BYTES = 4194304, LAB_WS_ARENA = 33554432, LAB_WS_ENTRIES = 128 };
+enum { LAB_WS_MODES = LAB_MODE_COUNT, LAB_WS_BYTES = 4194304, LAB_WS_ARENA = 33554432, LAB_WS_ENTRIES = 128 };
 
 typedef struct {
     uint32_t offset, length;
@@ -30,49 +32,38 @@ static lab_workspace_entry_t lab_workspace_source[5];
 static unsigned char lab_workspace_staging[2][LAB_WS_BYTES], lab_workspace_result[LAB_WS_BYTES];
 static unsigned char lab_workspace_storage[LAB_WS_ARENA];
 static unsigned lab_workspace_used;
-static unsigned lab_workspace_selected;
+static lab_mode_t lab_workspace_selected;
 static const char *const lab_workspace_names[LAB_WS_MODES] = {"expression", "equation", "diffequation", "matrix",
                                                               "integrator", "datetime", "almanac"};
 
-static void lab_workspace_copy(unsigned char *out, const unsigned char *in, unsigned size)
+static bool lab_workspace_bytes_equal(const unsigned char *left, unsigned left_size, const unsigned char *right,
+                                      unsigned right_size)
 {
-    for (unsigned i = 0; i < size; ++i)
-        out[i] = in[i];
-}
-
-static int lab_workspace_bytes_equal(const unsigned char *left, unsigned left_size, const unsigned char *right,
-                                     unsigned right_size)
-{
-    if (left_size != right_size)
-        return 0;
-    for (unsigned i = 0; i < left_size; ++i)
-        if (left[i] != right[i])
-            return 0;
-    return 1;
+    return left_size == right_size && memcmp(left, right, left_size) == 0;
 }
 
 static void lab_workspace_remove_bytes(unsigned offset, unsigned length)
 {
     unsigned end = offset + length;
-    lab_workspace_copy(lab_workspace_storage + offset, lab_workspace_storage + end, lab_workspace_used - end);
+    memmove(lab_workspace_storage + offset, lab_workspace_storage + end, lab_workspace_used - end);
     lab_workspace_used -= length;
-    for (unsigned field = 0; field < 5; ++field)
+    for (lab_workspace_source_t field = LAB_WORKSPACE_FULL_TEXT; field <= LAB_WORKSPACE_GOAL_TARGET; ++field)
         if (lab_workspace_source[field].length && lab_workspace_source[field].offset >= end)
             lab_workspace_source[field].offset -= length;
-    for (unsigned mode = 0; mode < LAB_WS_MODES; ++mode) {
+    for (lab_mode_t mode = LAB_MODE_EXPRESSION; (unsigned)mode < LAB_WS_MODES; ++mode) {
         lab_workspace_mode_t *state = &lab_workspace_modes[mode];
         if (state->editor.length && state->editor.offset >= end)
             state->editor.offset -= length;
         if (state->committed.length && state->committed.offset >= end)
             state->committed.offset -= length;
-        for (unsigned side = 0; side < 2; ++side)
+        for (lab_workspace_history_t side = LAB_WORKSPACE_BACK; side <= LAB_WORKSPACE_FORWARD; ++side)
             for (unsigned i = 0; i < state->count[side]; ++i)
                 if (state->entries[side][i].offset >= end)
                     state->entries[side][i].offset -= length;
     }
 }
 
-static void lab_workspace_remove(lab_workspace_mode_t *state, unsigned direction, unsigned index)
+static void lab_workspace_remove(lab_workspace_mode_t *state, lab_workspace_history_t direction, unsigned index)
 {
     unsigned offset = state->entries[direction][index].offset;
     unsigned length = state->entries[direction][index].length;
@@ -90,8 +81,8 @@ static int lab_workspace_can_reserve(unsigned length, unsigned replaced)
     unsigned available = LAB_WS_ARENA - lab_workspace_used + replaced;
     if (length <= available)
         return 1;
-    for (unsigned mode = 0; mode < LAB_WS_MODES; ++mode)
-        for (unsigned side = 0; side < 2; ++side) {
+    for (lab_mode_t mode = LAB_MODE_EXPRESSION; (unsigned)mode < LAB_WS_MODES; ++mode)
+        for (lab_workspace_history_t side = LAB_WORKSPACE_BACK; side <= LAB_WORKSPACE_FORWARD; ++side) {
             lab_workspace_mode_t *state = &lab_workspace_modes[mode];
             for (unsigned i = 0; i < state->count[side]; ++i)
                 available += state->entries[side][i].length;
@@ -102,8 +93,10 @@ static int lab_workspace_can_reserve(unsigned length, unsigned replaced)
 /* Preflight has proved capacity; subsequent removals cannot invalidate that proof. */
 static void lab_workspace_reclaim(unsigned length, unsigned replaced)
 {
-    for (unsigned mode = 0; mode < LAB_WS_MODES && length > LAB_WS_ARENA - lab_workspace_used + replaced; ++mode)
-        for (unsigned side = 0; side < 2 && length > LAB_WS_ARENA - lab_workspace_used + replaced; ++side) {
+    for (lab_mode_t mode = LAB_MODE_EXPRESSION;
+         (unsigned)mode < LAB_WS_MODES && length > LAB_WS_ARENA - lab_workspace_used + replaced; ++mode)
+        for (lab_workspace_history_t side = LAB_WORKSPACE_BACK;
+             side <= LAB_WORKSPACE_FORWARD && length > LAB_WS_ARENA - lab_workspace_used + replaced; ++side) {
             lab_workspace_mode_t *state = &lab_workspace_modes[mode];
             while (state->count[side] && length > LAB_WS_ARENA - lab_workspace_used + replaced)
                 lab_workspace_remove(state, side, 0);
@@ -112,8 +105,8 @@ static void lab_workspace_reclaim(unsigned length, unsigned replaced)
 
 static int lab_workspace_replace(lab_workspace_entry_t *entry, unsigned length)
 {
-    if (lab_workspace_bytes_equal(lab_workspace_storage + entry->offset, entry->length, lab_workspace_staging[0],
-                                  length))
+    if (lab_workspace_bytes_equal(lab_workspace_storage + entry->offset, entry->length,
+                                  lab_workspace_staging[LAB_WORKSPACE_INPUT], length))
         return 1;
     if (!lab_workspace_can_reserve(length, entry->length))
         return 0;
@@ -124,13 +117,13 @@ static int lab_workspace_replace(lab_workspace_entry_t *entry, unsigned length)
         lab_workspace_remove_bytes(entry->offset, old_length);
     entry->offset = lab_workspace_used;
     entry->length = length;
-    lab_workspace_copy(lab_workspace_storage + lab_workspace_used, lab_workspace_staging[0], length);
+    memcpy(lab_workspace_storage + lab_workspace_used, lab_workspace_staging[LAB_WORKSPACE_INPUT], length);
     lab_workspace_used += length;
     return 1;
 }
 
 /* A preflighted append cannot fail. Apply mandatory entry eviction before byte-budget eviction. */
-static void lab_workspace_append(lab_workspace_mode_t *state, unsigned direction, unsigned length)
+static void lab_workspace_append(lab_workspace_mode_t *state, lab_workspace_history_t direction, unsigned length)
 {
     if (state->count[direction] == LAB_WS_ENTRIES)
         lab_workspace_remove(state, direction, 0);
@@ -138,29 +131,29 @@ static void lab_workspace_append(lab_workspace_mode_t *state, unsigned direction
     lab_workspace_entry_t *entry = &state->entries[direction][state->count[direction]++];
     entry->offset = lab_workspace_used;
     entry->length = length;
-    lab_workspace_copy(lab_workspace_storage + lab_workspace_used, lab_workspace_staging[0], length);
+    memcpy(lab_workspace_storage + lab_workspace_used, lab_workspace_staging[LAB_WORKSPACE_INPUT], length);
     lab_workspace_used += length;
 }
 
 /* Reset logical ownership; inaccessible old bytes need not be cleared. */
 void lab_workspace_reset(void)
 {
-    lab_workspace_selected = 0;
+    lab_workspace_selected = LAB_MODE_EXPRESSION;
     lab_workspace_used = 0;
-    for (unsigned field = 0; field < 5; ++field)
+    for (lab_workspace_source_t field = LAB_WORKSPACE_FULL_TEXT; field <= LAB_WORKSPACE_GOAL_TARGET; ++field)
         lab_workspace_source[field].length = 0;
-    for (unsigned mode = 0; mode < LAB_WS_MODES; ++mode) {
+    for (lab_mode_t mode = LAB_MODE_EXPRESSION; (unsigned)mode < LAB_WS_MODES; ++mode) {
         lab_workspace_mode_t *state = &lab_workspace_modes[mode];
-        state->count[0] = state->count[1] = 0;
+        state->count[LAB_WORKSPACE_BACK] = state->count[LAB_WORKSPACE_FORWARD] = 0;
         state->editor.length = state->committed.length = 0;
         state->precision = lab_workspace_default_precision(mode);
     }
 }
 
 /* Expose bounded transfer storage only, never the state structure. */
-unsigned char *lab_workspace_input(unsigned index)
+unsigned char *lab_workspace_input(lab_workspace_buffer_t index)
 {
-    return index < 2 ? lab_workspace_staging[index] : (unsigned char *)0;
+    return (unsigned)index <= LAB_WORKSPACE_ALTERNATE ? lab_workspace_staging[index] : (unsigned char *)0;
 }
 
 /* Report the byte bound to the host before it copies. */
@@ -176,47 +169,44 @@ const unsigned char *lab_workspace_output(void)
 }
 
 /* Resolve the seven fixed names; invalid names select expression. */
-unsigned lab_workspace_mode_id(unsigned length)
+lab_mode_t lab_workspace_mode_id(unsigned length)
 {
     if (length > 12)
-        return 0;
-    for (unsigned mode = 0; mode < LAB_WS_MODES; ++mode) {
+        return LAB_MODE_EXPRESSION;
+    for (lab_mode_t mode = LAB_MODE_EXPRESSION; (unsigned)mode < LAB_WS_MODES; ++mode) {
         const char *name = lab_workspace_names[mode];
-        unsigned i = 0;
-        while (name[i] && i < length && (unsigned char)name[i] == lab_workspace_staging[0][i])
-            ++i;
-        if (i == length && !name[i])
+        if (strlen(name) == length && memcmp(name, lab_workspace_staging[LAB_WORKSPACE_INPUT], length) == 0)
             return mode;
     }
-    return 0;
+    return LAB_MODE_EXPRESSION;
 }
 
 /* Return the native selection. */
-unsigned lab_workspace_mode(void)
+lab_mode_t lab_workspace_mode(void)
 {
     return lab_workspace_selected;
 }
 
 /* Keep selection and change detection together. */
-int lab_workspace_select(unsigned mode)
+bool lab_workspace_select(lab_mode_t mode)
 {
-    if (mode >= LAB_WS_MODES)
-        mode = 0;
-    int changed = mode != lab_workspace_selected;
+    if ((unsigned)mode >= LAB_WS_MODES)
+        mode = LAB_MODE_EXPRESSION;
+    bool changed = mode != lab_workspace_selected;
     lab_workspace_selected = mode;
     return changed;
 }
 
 /* Preserve the four mathematical and three low-precision defaults. */
-unsigned lab_workspace_default_precision(unsigned mode)
+unsigned lab_workspace_default_precision(lab_mode_t mode)
 {
-    return mode < 4 ? 256 : 53;
+    return (unsigned)mode < LAB_MODE_INTEGRATOR ? 256 : 53;
 }
 
 /* Clamp saved and interactive settings to the Lab limits before converting to an integer. */
-unsigned lab_workspace_precision_set(unsigned mode, double bits)
+unsigned lab_workspace_precision_set(lab_mode_t mode, double bits)
 {
-    if (mode >= LAB_WS_MODES)
+    if ((unsigned)mode >= LAB_WS_MODES)
         return 0;
     if (bits != bits || bits > 1.7976931348623157e308 || bits < -1.7976931348623157e308)
         return lab_workspace_modes[mode].precision;
@@ -226,27 +216,27 @@ unsigned lab_workspace_precision_set(unsigned mode, double bits)
 }
 
 /* Access precision without a host-side mutable mirror. */
-unsigned lab_workspace_precision(unsigned mode)
+unsigned lab_workspace_precision(lab_mode_t mode)
 {
-    return mode < LAB_WS_MODES ? lab_workspace_modes[mode].precision : 0;
+    return (unsigned)mode < LAB_WS_MODES ? lab_workspace_modes[mode].precision : 0;
 }
 
 /* Retain the binary64 floor even before a mode has initialised its precision. */
-unsigned lab_workspace_requested_precision(unsigned mode)
+unsigned lab_workspace_requested_precision(lab_mode_t mode)
 {
     unsigned bits = lab_workspace_precision(mode);
     return bits < 53 ? 53 : bits;
 }
 
 /* Interactive precision requests use the same limits as restored settings. */
-unsigned lab_workspace_request_precision(unsigned mode, double bits)
+unsigned lab_workspace_request_precision(lab_mode_t mode, double bits)
 {
     if (bits == bits && bits >= -1.7976931348623157e308 && bits <= 1.7976931348623157e308 && bits < 53)
         bits = 53;
     return lab_workspace_precision_set(mode, bits);
 }
 
-/* ceil(bits*log10(2)), with no freestanding libm dependency. */
+/* Round bits * log10(2) upwards to obtain decimal digits, without a freestanding libm dependency. */
 unsigned lab_workspace_digits(double bits)
 {
     if (!(bits > 53))
@@ -259,7 +249,7 @@ unsigned lab_workspace_digits(double bits)
 }
 
 /* Follow binary64, double-double, then 192 bits and 64-bit steps. */
-unsigned lab_workspace_precision_step(double bits, int direction)
+unsigned lab_workspace_precision_step(double bits, lab_workspace_precision_direction_t direction)
 {
     unsigned current = !(bits >= 53) ? 53 : bits > 6656 ? 6656 : (unsigned)bits;
     if (direction > 0) {
@@ -298,136 +288,140 @@ unsigned lab_workspace_precision_slider_position(unsigned bits)
 }
 
 /* Control availability follows the same native request bounds as stepping. */
-int lab_workspace_precision_can_step(unsigned mode, int direction)
+bool lab_workspace_precision_can_step(lab_mode_t mode, lab_workspace_precision_direction_t direction)
 {
     unsigned bits = lab_workspace_requested_precision(mode);
-    return mode < LAB_WS_MODES && (direction > 0 ? bits < 6656 : bits > 53);
+    return (unsigned)mode < LAB_WS_MODES && (direction > 0 ? bits < 6656 : bits > 53);
 }
 
 /* Reject overflow rather than truncate mathematical editor text. */
-int lab_workspace_editor_set(unsigned mode, unsigned length)
+bool lab_workspace_editor_set(lab_mode_t mode, unsigned length)
 {
-    if (mode >= LAB_WS_MODES || length > LAB_WS_BYTES)
-        return 0;
+    if ((unsigned)mode >= LAB_WS_MODES || length > LAB_WS_BYTES)
+        return false;
     return lab_workspace_replace(&lab_workspace_modes[mode].editor, length);
 }
 
 /* Copy editor bytes out of opaque ownership. */
-int lab_workspace_editor_get(unsigned mode)
+int lab_workspace_editor_get(lab_mode_t mode)
 {
-    if (mode >= LAB_WS_MODES)
+    if ((unsigned)mode >= LAB_WS_MODES)
         return -1;
     lab_workspace_mode_t *state = &lab_workspace_modes[mode];
-    lab_workspace_copy(lab_workspace_result, lab_workspace_storage + state->editor.offset, state->editor.length);
+    memcpy(lab_workspace_result, lab_workspace_storage + state->editor.offset, state->editor.length);
     return (int)state->editor.length;
 }
 
 /* Source fields share the bounded arena and are pinned just like active editors. */
-int lab_workspace_source_set(unsigned field, unsigned length)
+bool lab_workspace_source_set(lab_workspace_source_t field, unsigned length)
 {
-    if (field >= 5 || length > LAB_WS_BYTES)
-        return 0;
+    if ((unsigned)field > LAB_WORKSPACE_GOAL_TARGET || length > LAB_WS_BYTES)
+        return false;
     return lab_workspace_replace(&lab_workspace_source[field], length);
 }
 
 /* Copy exact authored bytes, never numerical or mathematical interpretations. */
-int lab_workspace_source_get(unsigned field)
+int lab_workspace_source_get(lab_workspace_source_t field)
 {
-    if (field >= 5)
+    if ((unsigned)field > LAB_WORKSPACE_GOAL_TARGET)
         return -1;
     const lab_workspace_entry_t *entry = &lab_workspace_source[field];
-    lab_workspace_copy(lab_workspace_result, lab_workspace_storage + entry->offset, entry->length);
+    memcpy(lab_workspace_result, lab_workspace_storage + entry->offset, entry->length);
     return (int)entry->length;
 }
 
 /* Compare the current trimmed browser input with the retained display bytes. */
-int lab_workspace_source_matches(unsigned length)
+bool lab_workspace_source_matches(unsigned length)
 {
-    const lab_workspace_entry_t *display = &lab_workspace_source[1];
+    const lab_workspace_entry_t *display = &lab_workspace_source[LAB_WORKSPACE_DISPLAY_TEXT];
     return length <= LAB_WS_BYTES &&
-           lab_workspace_bytes_equal(lab_workspace_staging[0], length, lab_workspace_storage + display->offset,
+           lab_workspace_bytes_equal(lab_workspace_staging[LAB_WORKSPACE_INPUT], length, lab_workspace_storage + display->offset,
                                      display->length);
 }
 
 /* Resolve only an unchanged display; a changed editor must go through native presentation metadata. */
-int lab_workspace_source_resolve(unsigned length, int goal)
+int lab_workspace_source_resolve(unsigned length, bool goal)
 {
-    unsigned field = goal ? 3 : 0;
-    if (!lab_workspace_source_matches(length) || (!goal && !lab_workspace_source[1].length))
+    lab_workspace_source_t field = goal ? LAB_WORKSPACE_GOAL_SOURCE : LAB_WORKSPACE_FULL_TEXT;
+    if (!lab_workspace_source_matches(length) || (!goal && !lab_workspace_source[LAB_WORKSPACE_DISPLAY_TEXT].length))
         return 0;
     return lab_workspace_source_get(field);
 }
 
 /* Calendar summaries are regenerated from their forms, never captured as authored mathematics. */
-int lab_workspace_editor_capture(unsigned mode, unsigned length, unsigned default_length)
+bool lab_workspace_editor_capture(lab_mode_t mode, unsigned length, unsigned default_length)
 {
-    if (mode >= LAB_WS_MODES || length > LAB_WS_BYTES || default_length > LAB_WS_BYTES)
-        return 0;
-    if (mode >= 5) {
-        lab_workspace_copy(lab_workspace_staging[0], lab_workspace_staging[1], default_length);
+    if ((unsigned)mode >= LAB_WS_MODES || length > LAB_WS_BYTES || default_length > LAB_WS_BYTES)
+        return false;
+    if (mode >= LAB_MODE_DATETIME) {
+        memcpy(lab_workspace_staging[LAB_WORKSPACE_INPUT], lab_workspace_staging[LAB_WORKSPACE_ALTERNATE],
+                           default_length);
         length = default_length;
     } else if (!length) {
-        return 1;
+        return true;
     }
     return lab_workspace_editor_set(mode, length);
 }
 
 /* Selecting a default is a read, so merely visiting a mode never overwrites its saved editor. */
-int lab_workspace_editor_restore(unsigned mode, unsigned default_length)
+int lab_workspace_editor_restore(lab_mode_t mode, unsigned default_length)
 {
-    if (mode >= LAB_WS_MODES || default_length > LAB_WS_BYTES)
+    if ((unsigned)mode >= LAB_WS_MODES || default_length > LAB_WS_BYTES)
         return -1;
-    if (mode < 5 && lab_workspace_modes[mode].editor.length)
+    if ((unsigned)mode < LAB_MODE_DATETIME && lab_workspace_modes[mode].editor.length)
         return lab_workspace_editor_get(mode);
-    lab_workspace_copy(lab_workspace_result, lab_workspace_staging[1], default_length);
+    memcpy(lab_workspace_result, lab_workspace_staging[LAB_WORKSPACE_ALTERNATE], default_length);
     return (int)default_length;
 }
 
 /* The first three editors always maintain bindings; structured editors require explicit bound metadata. */
-int lab_workspace_editor_bound(unsigned mode, int has_bindings)
+bool lab_workspace_editor_bound(lab_mode_t mode, bool has_bindings)
 {
-    return mode < 3 || (mode < 5 && has_bindings != 0);
+    return (unsigned)mode < LAB_MODE_MATRIX || ((unsigned)mode < LAB_MODE_DATETIME && has_bindings);
 }
 
 /* Compare complete serialisations, including form fields and their ordering. */
-int lab_workspace_equal(unsigned left_length, unsigned right_length)
+bool lab_workspace_equal(unsigned left_length, unsigned right_length)
 {
     return left_length <= LAB_WS_BYTES && right_length <= LAB_WS_BYTES &&
-           lab_workspace_bytes_equal(lab_workspace_staging[0], left_length, lab_workspace_staging[1], right_length);
+           lab_workspace_bytes_equal(lab_workspace_staging[LAB_WORKSPACE_INPUT], left_length,
+                                     lab_workspace_staging[LAB_WORKSPACE_ALTERNATE], right_length);
 }
 
 /* Commit owns a copy and cannot be changed by later host mutations. */
-int lab_workspace_commit(unsigned mode, unsigned length)
+bool lab_workspace_commit(lab_mode_t mode, unsigned length)
 {
-    if (mode >= LAB_WS_MODES || !length || length > LAB_WS_BYTES)
-        return 0;
+    if ((unsigned)mode >= LAB_WS_MODES || !length || length > LAB_WS_BYTES)
+        return false;
     return lab_workspace_replace(&lab_workspace_modes[mode].committed, length);
 }
 
 /* Unchanged evaluations do not create an extra history item. */
-int lab_workspace_previous(unsigned mode, unsigned length)
+int lab_workspace_previous(lab_mode_t mode, unsigned length)
 {
-    if (mode >= LAB_WS_MODES || !length || length > LAB_WS_BYTES)
+    if ((unsigned)mode >= LAB_WS_MODES || !length || length > LAB_WS_BYTES)
         return -1;
     lab_workspace_mode_t *state = &lab_workspace_modes[mode];
     if (!state->committed.length ||
         lab_workspace_bytes_equal(lab_workspace_storage + state->committed.offset, state->committed.length,
-                                  lab_workspace_staging[0], length))
+                                  lab_workspace_staging[LAB_WORKSPACE_INPUT], length))
         return 0;
-    lab_workspace_copy(lab_workspace_result, lab_workspace_storage + state->committed.offset, state->committed.length);
+    memcpy(lab_workspace_result, lab_workspace_storage + state->committed.offset, state->committed.length);
     return (int)state->committed.length;
 }
 
 /* Stack indices are direct and bounded. */
-unsigned lab_workspace_history_count(unsigned mode, unsigned direction)
+unsigned lab_workspace_history_count(lab_mode_t mode, lab_workspace_history_t direction)
 {
-    return mode < LAB_WS_MODES && direction < 2 ? lab_workspace_modes[mode].count[direction] : 0;
+    return (unsigned)mode < LAB_WS_MODES && (unsigned)direction <= LAB_WORKSPACE_FORWARD
+               ? lab_workspace_modes[mode].count[direction]
+               : 0;
 }
 
 /* Clearing forward history retains back history and committed state. */
-void lab_workspace_history_clear(unsigned mode, unsigned direction)
+void lab_workspace_history_clear(lab_mode_t mode, lab_workspace_history_t direction)
 {
-    if (mode >= LAB_WS_MODES || direction >= 2)
+    if ((unsigned)mode >= LAB_WS_MODES || (unsigned)direction > LAB_WORKSPACE_FORWARD)
         return;
     lab_workspace_mode_t *state = &lab_workspace_modes[mode];
     while (state->count[direction])
@@ -435,21 +429,23 @@ void lab_workspace_history_clear(unsigned mode, unsigned direction)
 }
 
 /* Native policy owns blank suppression, deduplication, invalidation and bounded eviction. */
-int lab_workspace_history_push(unsigned mode, unsigned direction, unsigned length, int has_text, unsigned flags)
+int lab_workspace_history_push(lab_mode_t mode, lab_workspace_history_t direction, unsigned length, bool has_text,
+                               unsigned flags)
 {
-    if (mode >= LAB_WS_MODES || direction >= 2 || !length || length > LAB_WS_BYTES || flags > 3)
+    if ((unsigned)mode >= LAB_WS_MODES || (unsigned)direction > LAB_WORKSPACE_FORWARD || !length ||
+        length > LAB_WS_BYTES || flags > 3)
         return -1;
     lab_workspace_mode_t *state = &lab_workspace_modes[mode];
     int duplicate = 0;
     if ((flags & 1) && state->count[direction]) {
         lab_workspace_entry_t *last = &state->entries[direction][state->count[direction] - 1];
         duplicate = lab_workspace_bytes_equal(lab_workspace_storage + last->offset, last->length,
-                                              lab_workspace_staging[0], length);
+                                              lab_workspace_staging[LAB_WORKSPACE_INPUT], length);
     }
     if (has_text && !duplicate && !lab_workspace_can_reserve(length, 0))
         return -1;
     if (flags & 2)
-        lab_workspace_history_clear(mode, 1);
+        lab_workspace_history_clear(mode, LAB_WORKSPACE_FORWARD);
     if (!has_text || duplicate)
         return (int)state->count[direction];
     lab_workspace_append(state, direction, length);
@@ -457,24 +453,24 @@ int lab_workspace_history_push(unsigned mode, unsigned direction, unsigned lengt
 }
 
 /* Copy before removal compacts the arena. */
-int lab_workspace_history_pop(unsigned mode, unsigned direction)
+int lab_workspace_history_pop(lab_mode_t mode, lab_workspace_history_t direction)
 {
-    if (mode >= LAB_WS_MODES || direction >= 2)
+    if ((unsigned)mode >= LAB_WS_MODES || (unsigned)direction > LAB_WORKSPACE_FORWARD)
         return -1;
     lab_workspace_mode_t *state = &lab_workspace_modes[mode];
     if (!state->count[direction])
         return 0;
     lab_workspace_entry_t *entry = &state->entries[direction][state->count[direction] - 1];
     unsigned length = entry->length;
-    lab_workspace_copy(lab_workspace_result, lab_workspace_storage + entry->offset, length);
+    memcpy(lab_workspace_result, lab_workspace_storage + entry->offset, length);
     lab_workspace_remove(state, direction, state->count[direction] - 1);
     return (int)length;
 }
 
 /* Navigation uses no await or host callback between its two state changes. */
-int lab_workspace_navigate(unsigned mode, unsigned direction, unsigned length, int has_text)
+int lab_workspace_navigate(lab_mode_t mode, lab_workspace_history_t direction, unsigned length, bool has_text)
 {
-    if (mode >= LAB_WS_MODES || direction >= 2 || !length || length > LAB_WS_BYTES)
+    if ((unsigned)mode >= LAB_WS_MODES || (unsigned)direction > LAB_WORKSPACE_FORWARD || !length || length > LAB_WS_BYTES)
         return -1;
     lab_workspace_mode_t *state = &lab_workspace_modes[mode];
     if (!state->count[direction])
@@ -483,13 +479,14 @@ int lab_workspace_navigate(unsigned mode, unsigned direction, unsigned length, i
         return -1;
     int restored = lab_workspace_history_pop(mode, direction);
     if (has_text)
-        lab_workspace_append(state, 1 - direction, length);
+        lab_workspace_append(state, direction == LAB_WORKSPACE_BACK ? LAB_WORKSPACE_FORWARD : LAB_WORKSPACE_BACK,
+                             length);
     return restored;
 }
 
 /* Persistence reconciliation is policy; storage reads and writes remain host I/O. */
-int lab_workspace_prefer_local(int local_present, double local_time, double server_time, int server_present,
-                               int server_is_default)
+bool lab_workspace_prefer_local(bool local_present, double local_time, double server_time, bool server_present,
+                                bool server_is_default)
 {
     return local_present && (local_time > server_time || !server_present || server_is_default);
 }

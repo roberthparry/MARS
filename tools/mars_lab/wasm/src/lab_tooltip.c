@@ -15,21 +15,23 @@
 static const struct {
     const char *id;
     const char *text;
-} lab_tooltip_labels[] = {{"back", "Return to the previous input in this mode"},
-                          {"clear", "Clear the current input and its results"},
-                          {"forward", "Move to the next input in this mode"},
-                          {"goalSeek", "Find a variable value that reaches the requested target"},
-                          {"help", "Show or hide help for the current mode"},
-                          {"inputCopy", "Copy the current input"},
-                          {"marsDatePickerClose", "Close the date picker"},
-                          {"marsDatePickerToday", "Use the current date"},
-                          {"precisionSlider", "Choose calculation precision; release to recalculate"},
-                          {"resultUseInput", "Put this result into the current mode as a new input"},
-                          {"run", "Evaluate the current input"}};
+} lab_tooltip_labels[] = {
+    {"back", "Return to the previous input in this mode"},
+    {"clear", "Clear the current input and its results"},
+    {"forward", "Move to the next input in this mode"},
+    {"goalSeek", "Find a variable value that reaches the requested target"},
+    {"help", "Show or hide help for the current mode"},
+    {"inputCopy", "Copy the current input"},
+    {"marsDatePickerClose", "Close the date picker"},
+    {"marsDatePickerToday", "Use the current date"},
+    {"precisionSlider", "Choose calculation precision; release to recalculate"},
+    {"resultUseInput", "Put this result into the current mode as a new input"},
+    {"run", "Evaluate the current input"},
+};
 
 static int lab_tooltip_label(int button)
 {
-    int id = lab_dom_read(button, 2, "id");
+    int id = lab_dom_read(button, LAB_DOM_ATTRIBUTE, "id");
     unsigned low = 0, high = sizeof(lab_tooltip_labels) / sizeof(*lab_tooltip_labels);
     while (low < high) {
         unsigned mid = low + (high - low) / 2;
@@ -48,33 +50,33 @@ static int lab_tooltip_card(int button)
 {
     int card = lab_dom_closest(button, ".result-card");
     int title = card ? lab_dom_query(card, ".card-title > span:first-child") : 0;
-    int text = lab_dom_clean(lab_dom_read(title, 0, ""), 1);
+    int text = lab_dom_clean(lab_dom_read(title, LAB_DOM_TEXT, ""), LAB_DOM_CLEAN_LOWER);
     return lab_dom_length(text) ? text : lab_dom_string("result");
 }
 
 static int lab_tooltip_text(int button)
 {
-    int title = lab_dom_clean(lab_dom_read(button, 2, "title"), 0);
+    int title = lab_dom_clean(lab_dom_read(button, LAB_DOM_ATTRIBUTE, "title"), LAB_DOM_CLEAN_TRIM);
     if (lab_dom_has(button, "title")) {
         if (lab_dom_length(title))
-            lab_dom_write(button, 3, "marsTooltipTitle", title);
+            lab_dom_write(button, LAB_DOM_DATASET, "marsTooltipTitle", title);
         else
             lab_dom_remove(button, "data-mars-tooltip-title");
     }
-    title = lab_dom_clean(lab_dom_read(button, 3, "marsTooltipTitle"), 0);
+    title = lab_dom_clean(lab_dom_read(button, LAB_DOM_DATASET, "marsTooltipTitle"), LAB_DOM_CLEAN_TRIM);
     if (lab_dom_length(title))
         return title;
     int label = lab_tooltip_label(button);
     if (label)
         return label;
-    int text = lab_dom_clean(lab_dom_read(button, 0, ""), 0);
+    int text = lab_dom_clean(lab_dom_read(button, LAB_DOM_TEXT, ""), LAB_DOM_CLEAN_TRIM);
     if (lab_dom_has_class(button, "mode-tab"))
         return lab_dom_join(lab_dom_string("Switch to "), text, " mode");
     if (lab_dom_has(button, "data-expand-card"))
         return lab_dom_join(lab_dom_join(text, lab_dom_string(" the "), ""), lab_tooltip_card(button), " card");
     if (lab_dom_has_class(button, "more-digits"))
         return lab_dom_join(lab_dom_string("Show the full value in the "), lab_tooltip_card(button), " card");
-    if (lab_dom_equal(lab_dom_read(button, 3, "copyTarget"), lab_dom_string("mobile")))
+    if (lab_dom_equal(lab_dom_read(button, LAB_DOM_DATASET, "copyTarget"), lab_dom_string("mobile")))
         return lab_dom_string("Copy the private mobile-access URL");
     if (lab_dom_has_class(button, "copy-result"))
         return lab_dom_join(lab_dom_string("Copy the "), lab_tooltip_card(button), "");
@@ -82,10 +84,10 @@ static int lab_tooltip_text(int button)
         return lab_dom_string("Copy this binding value");
     if (lab_dom_has_class(button, "select-button"))
         return lab_dom_join(lab_dom_string("Choose "), lab_dom_length(text) ? text : lab_dom_string("an option"), "");
-    label = lab_dom_clean(lab_dom_read(button, 2, "aria-label"), 0);
+    label = lab_dom_clean(lab_dom_read(button, LAB_DOM_ATTRIBUTE, "aria-label"), LAB_DOM_CLEAN_TRIM);
     if (lab_dom_length(label))
         return label;
-    text = lab_dom_clean(text, 2);
+    text = lab_dom_clean(text, LAB_DOM_CLEAN_COLLAPSE);
     return lab_dom_length(text) ? text : lab_dom_string("Activate this control");
 }
 
@@ -95,8 +97,8 @@ static int lab_tooltip_node(void)
     if (!node) {
         node = lab_dom_create("div");
         lab_dom_class(node, "mars-button-tooltip", 1);
-        lab_dom_write(node, 2, "id", lab_dom_string("marsButtonTooltip"));
-        lab_dom_write(node, 2, "role", lab_dom_string("tooltip"));
+        lab_dom_write(node, LAB_DOM_ATTRIBUTE, "id", lab_dom_string("marsButtonTooltip"));
+        lab_dom_write(node, LAB_DOM_ATTRIBUTE, "role", lab_dom_string("tooltip"));
         lab_dom_append(lab_dom_query(0, "body"), node);
     }
     return node;
@@ -107,7 +109,8 @@ void lab_tooltip_hide(int button)
 {
     if (lab_dom_has(button, "data-mars-tooltip-description")) {
         if (lab_dom_has(button, "data-mars-tooltip-described"))
-            lab_dom_write(button, 2, "aria-describedby", lab_dom_read(button, 3, "marsTooltipDescription"));
+            lab_dom_write(button, LAB_DOM_ATTRIBUTE, "aria-describedby",
+                          lab_dom_read(button, LAB_DOM_DATASET, "marsTooltipDescription"));
         else
             lab_dom_remove(button, "aria-describedby");
         lab_dom_remove(button, "data-mars-tooltip-description");
@@ -117,32 +120,35 @@ void lab_tooltip_hide(int button)
 }
 
 /* Refresh repeated hover/focus without replacing the saved original description. */
-int lab_tooltip_show(int button, int previous, double width, double height)
+bool lab_tooltip_show(int button, int previous, double width, double height)
 {
     if (!button || lab_dom_closest(button, ".hidden"))
-        return 0;
+        return false;
     if (!lab_dom_equal(button, previous))
         lab_tooltip_hide(previous);
     int node = lab_tooltip_node();
-    lab_dom_write(node, 0, "", lab_tooltip_text(button));
+    lab_dom_write(node, LAB_DOM_TEXT, "", lab_tooltip_text(button));
     lab_dom_remove(button, "title");
     if (!lab_dom_has(button, "data-mars-tooltip-description")) {
         if (lab_dom_has(button, "aria-describedby"))
-            lab_dom_write(button, 3, "marsTooltipDescribed", lab_dom_string("1"));
-        lab_dom_write(button, 3, "marsTooltipDescription", lab_dom_read(button, 2, "aria-describedby"));
+            lab_dom_write(button, LAB_DOM_DATASET, "marsTooltipDescribed", lab_dom_string("1"));
+        lab_dom_write(button, LAB_DOM_DATASET, "marsTooltipDescription",
+                      lab_dom_read(button, LAB_DOM_ATTRIBUTE, "aria-describedby"));
     }
-    int original = lab_dom_clean(lab_dom_read(button, 3, "marsTooltipDescription"), 2);
+    int original = lab_dom_clean(lab_dom_read(button, LAB_DOM_DATASET, "marsTooltipDescription"), LAB_DOM_CLEAN_COLLAPSE);
     int tokens = lab_dom_join(lab_dom_string(" "), original, " ");
     if (!lab_dom_contains(tokens, lab_dom_string(" marsButtonTooltip ")))
         original = lab_dom_join(original, lab_dom_string(lab_dom_length(original) ? " " : ""), "marsButtonTooltip");
-    lab_dom_write(button, 2, "aria-describedby", original);
+    lab_dom_write(button, LAB_DOM_ATTRIBUTE, "aria-describedby", original);
     const double *position = lab_view_tooltip_rect(
-        width, height, lab_dom_measure(button, 7), lab_dom_measure(button, 8), lab_dom_measure(button, 3),
-        lab_dom_measure(button, 9), lab_dom_measure(node, 3), lab_dom_measure(node, 4));
+        width, height, lab_dom_measure(button, LAB_DOM_MEASURE_RECT_LEFT),
+        lab_dom_measure(button, LAB_DOM_MEASURE_RECT_TOP), lab_dom_measure(button, LAB_DOM_MEASURE_RECT_WIDTH),
+        lab_dom_measure(button, LAB_DOM_MEASURE_RECT_BOTTOM), lab_dom_measure(node, LAB_DOM_MEASURE_RECT_WIDTH),
+        lab_dom_measure(node, LAB_DOM_MEASURE_RECT_HEIGHT));
     if (position) {
-        lab_dom_write(node, 4, "left", lab_dom_format(position[0], "", "px"));
-        lab_dom_write(node, 4, "top", lab_dom_format(position[1], "", "px"));
+        lab_dom_write(node, LAB_DOM_STYLE, "left", lab_dom_format(position[0], "", "px"));
+        lab_dom_write(node, LAB_DOM_STYLE, "top", lab_dom_format(position[1], "", "px"));
     }
     lab_dom_class(node, "visible", 1);
-    return 1;
+    return true;
 }

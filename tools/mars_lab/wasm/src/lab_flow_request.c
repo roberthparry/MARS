@@ -7,6 +7,7 @@
  * request-local continuation frames. Text remains opaque: mathematical preparation
  * is performed by the native server, never by this client module.
  */
+#include "lab_mode.h"
 #include "lab_dom.h"
 #include "lab_flow.h"
 #include "lab_flow_request.h"
@@ -20,7 +21,7 @@ unsigned lab_flow_request_stage(int frame)
 }
 
 /* Shared request-local truth access for continuation handlers. */
-int lab_flow_request_truth(int frame, const char *key)
+bool lab_flow_request_truth(int frame, const char *key)
 {
     return lab_dom_truth(lab_dom_get(frame, key));
 }
@@ -100,10 +101,10 @@ static int lab_flow_request_function_clear(struct lab_flow_request_function_cont
 
 static int lab_flow_request_function_begin(struct lab_flow_request_function_context *ctx)
 {
-    int options = lab_dom_object(5);
-    lab_dom_set(options, "input", lab_dom_scalar(1, lab_flow_request_truth(ctx->frame, "source")));
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "input", lab_dom_scalar(LAB_VALUE_BOOLEAN, lab_flow_request_truth(ctx->frame, "source")));
     lab_dom_set(options, "button", lab_dom_id("functionRun"));
-    lab_dom_set(options, "disableButton", lab_dom_scalar(1, 1));
+    lab_dom_set(options, "disableButton", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return lab_flow_call(ctx->frame, flow_request_function_stage_start, "requestBeginCurrent", "request", 0, 2,
                          lab_dom_string("function"), options);
 }
@@ -119,7 +120,7 @@ static int lab_flow_request_function_payload(struct lab_flow_request_function_co
     if (!ctx->request)
         return lab_flow_done(0);
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_function_stage_error_current));
-    int inputs = lab_dom_object(4);
+    int inputs = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(inputs, lab_dom_get(ctx->frame, "source"));
     return lab_flow_call(ctx->frame, flow_request_function_stage_post, "buildPayload", "payload", 0, 3,
                          lab_dom_numeric(5), inputs, ctx->request);
@@ -429,7 +430,7 @@ static int lab_flow_request_land_start(struct lab_flow_request_land_context *ctx
 
 static int lab_flow_request_land_begin(struct lab_flow_request_land_context *ctx)
 {
-    int options = lab_dom_object(5);
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(options, "parent", lab_dom_get(ctx->frame, "parent"));
     return lab_flow_call(ctx->frame, flow_request_land_stage_payload, "requestBegin", "request", 0, 3,
                          lab_dom_string("land"), lab_dom_string("almanac"), options);
@@ -570,7 +571,7 @@ static int lab_flow_request_holidays_status(struct lab_flow_request_holidays_con
 static int lab_flow_request_holidays_fetch(struct lab_flow_request_holidays_context *ctx)
 {
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_request_holidays_stage_error_current));
-    int fetch = lab_dom_object(5);
+    int fetch = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(fetch, "kind", lab_dom_string("datetime"));
     return lab_flow_call(ctx->frame, flow_request_holidays_stage_current, "fetch", "result", 1, 2, fetch,
                          ctx->request);
@@ -592,7 +593,7 @@ static int lab_flow_request_holidays_accept(struct lab_flow_request_holidays_con
                          lab_flow_request_fallback(lab_dom_get(lab_flow_request_data(ctx->frame), "local"), ""),
                          lab_dom_truth(lab_dom_get(lab_flow_request_data(ctx->frame), "local_sections"))
                              ? lab_dom_get(lab_flow_request_data(ctx->frame), "local_sections")
-                             : lab_dom_object(4));
+                             : lab_dom_object(LAB_VALUE_ARRAY));
 }
 
 static int lab_flow_request_holidays_ready(struct lab_flow_request_holidays_context *ctx)
@@ -848,7 +849,7 @@ struct lab_flow_request_editor_context {
 
 static int lab_flow_request_editor_cache(struct lab_flow_request_editor_context *ctx)
 {
-    int source = lab_dom_clean(lab_dom_text(lab_flow_request_fallback(lab_dom_get(ctx->frame, "text"), "")), 0);
+    int source = lab_dom_clean(lab_dom_text(lab_flow_request_fallback(lab_dom_get(ctx->frame, "text"), "")), LAB_DOM_CLEAN_TRIM);
     lab_dom_set(ctx->frame, "source", source);
     int editors = lab_dom_get(ctx->view, "editors");
     if (lab_dom_member(editors, source))
@@ -868,10 +869,10 @@ static int lab_flow_request_editor_select(struct lab_flow_request_editor_context
     if (pending && lab_dom_equal(lab_dom_get(pending, "context"), lab_dom_get(ctx->frame, "context")))
         return lab_flow_call(ctx->frame, flow_request_editor_stage_done, "awaitValue", "value", 1, 1,
                              lab_dom_get(pending, "promise"));
-    pending = lab_dom_object(5);
+    pending = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(pending, "context", lab_dom_get(ctx->frame, "context"));
     lab_dom_set(pending, "promise", 0);
-    int payload = lab_dom_object(5);
+    int payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(payload, "action", lab_dom_string("editor"));
     lab_dom_set(payload, "operation", lab_dom_string("analyse"));
     lab_dom_set(payload, "text", source);
@@ -1015,6 +1016,15 @@ enum {
     flow_request_fetch_stage_done
 };
 
+/** @brief Fetch-adapter choices, distinct from the seven worksheet mode identifiers. */
+typedef enum {
+    LAB_FLOW_FETCH_MATRIX                = 0,                /**< Matrix evaluation. */
+    LAB_FLOW_FETCH_EQUATION              = 1,              /**< Equation evaluation. */
+    LAB_FLOW_FETCH_DIFFERENTIAL_EQUATION = 2, /**< Differential-equation evaluation. */
+    LAB_FLOW_FETCH_DATETIME              = 3,              /**< Date/time evaluation. */
+    LAB_FLOW_FETCH_ALMANAC               = 4,               /**< Almanac evaluation. */
+} lab_flow_fetch_kind_t;
+
 static const char *const lab_flow_request_fetch_endpoints[] = {"/matrix-eval", "/equation-eval", "/diffequation-eval",
                                                                "/datetime-eval", "/almanac-eval"};
 
@@ -1022,37 +1032,37 @@ static const char *const lab_flow_request_fetch_modes[] = {"matrix", "equation",
 
 struct lab_flow_request_fetch_context {
     int frame;
-    unsigned int mode;
+    lab_flow_fetch_kind_t kind;
 };
 
 static int lab_flow_request_fetch_build(struct lab_flow_request_fetch_context *ctx)
 {
-    if (ctx->mode == 1 || ctx->mode == 2)
+    if (ctx->kind == LAB_FLOW_FETCH_EQUATION || ctx->kind == LAB_FLOW_FETCH_DIFFERENTIAL_EQUATION)
         return lab_flow_call(ctx->frame, flow_request_fetch_stage_save, "saveWorksheetState", 0, 0, 1,
-                             lab_dom_string(lab_flow_request_fetch_modes[ctx->mode]));
+                             lab_dom_string(lab_flow_request_fetch_modes[ctx->kind]));
     return lab_flow_call(ctx->frame, flow_request_fetch_stage_save, "fetchPayload", "payload", 0, 1, ctx->frame);
 }
 
 static int lab_flow_request_fetch_save(struct lab_flow_request_fetch_context *ctx)
 {
-    if (ctx->mode == 1 || ctx->mode == 2)
+    if (ctx->kind == LAB_FLOW_FETCH_EQUATION || ctx->kind == LAB_FLOW_FETCH_DIFFERENTIAL_EQUATION)
         return lab_flow_call(ctx->frame, flow_request_fetch_stage_post, "fetchPayload", "payload", 0, 1, ctx->frame);
-    if (ctx->mode == 0 && !lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "payload"), "transient")))
+    if (ctx->kind == LAB_FLOW_FETCH_MATRIX && !lab_dom_truth(lab_dom_get(lab_dom_get(ctx->frame, "payload"), "transient")))
         return lab_flow_call(ctx->frame, flow_request_fetch_stage_post, "saveWorksheetState", 0, 0, 1,
                              lab_dom_string("matrix"));
-    if (ctx->mode >= 3)
+    if (ctx->kind >= LAB_FLOW_FETCH_DATETIME)
         return lab_flow_call(ctx->frame, flow_request_fetch_stage_post,
-                             ctx->mode == 3 ? "saveLastDatetimeState" : "saveLastAlmanacState", 0, 0, 0);
+                             ctx->kind == LAB_FLOW_FETCH_DATETIME ? "saveLastDatetimeState" : "saveLastAlmanacState", 0, 0, 0);
     return lab_flow_call(ctx->frame, flow_request_fetch_stage_done, "post", "value", 1, 3,
                          lab_dom_get(ctx->frame, "request"), lab_dom_get(ctx->frame, "payload"),
-                         lab_dom_string(lab_flow_request_fetch_endpoints[ctx->mode]));
+                         lab_dom_string(lab_flow_request_fetch_endpoints[ctx->kind]));
 }
 
 static int lab_flow_request_fetch_post(struct lab_flow_request_fetch_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_request_fetch_stage_done, "post", "value", 1, 3,
                          lab_dom_get(ctx->frame, "request"), lab_dom_get(ctx->frame, "payload"),
-                         lab_dom_string(lab_flow_request_fetch_endpoints[ctx->mode]));
+                         lab_dom_string(lab_flow_request_fetch_endpoints[ctx->kind]));
 }
 
 static int lab_flow_request_fetch_otherwise(struct lab_flow_request_fetch_context *ctx)
@@ -1062,13 +1072,13 @@ static int lab_flow_request_fetch_otherwise(struct lab_flow_request_fetch_contex
 
 static int lab_flow_request_fetch(int frame)
 {
-    unsigned mode = (unsigned)lab_dom_number(lab_dom_get(frame, "mode"));
+    lab_flow_fetch_kind_t kind = (lab_flow_fetch_kind_t)(unsigned)lab_dom_number(lab_dom_get(frame, "mode"));
 
-    if (mode >= sizeof lab_flow_request_fetch_endpoints / sizeof *lab_flow_request_fetch_endpoints)
+    if ((unsigned)kind >= sizeof lab_flow_request_fetch_endpoints / sizeof *lab_flow_request_fetch_endpoints)
         return lab_flow_done(0);
     struct lab_flow_request_fetch_context ctx = {
         .frame = frame,
-        .mode = mode,
+        .kind = kind,
     };
     static int (*const handlers[])(struct lab_flow_request_fetch_context *) = {
         [flow_request_fetch_stage_build] = lab_flow_request_fetch_build,
@@ -1081,21 +1091,21 @@ static int lab_flow_request_fetch(int frame)
 }
 
 /* Direct workflow indexing; stages remain private to each independent protocol. */
-int lab_flow_request(unsigned kind, int frame, int view)
+int lab_flow_request(lab_flow_request_kind_t kind, int frame, int view)
 {
-    if (kind == 7)
+    if (kind == LAB_FLOW_REQUEST_PRESENTATION)
         return lab_flow_request_presentation_dispatch(frame, view);
     static int (*const workflows[])(int) = {
-        [0] = lab_flow_request_function,
-        [1] = lab_flow_request_calculus,
-        [2] = lab_flow_request_integrator,
-        [3] = lab_flow_request_land,
-        [4] = lab_flow_request_holidays,
-        [5] = lab_flow_request_mobile,
-        [6] = lab_flow_request_forms,
-        [7] = lab_flow_request_presentation,
-        [8] = lab_flow_request_solver,
-        [9] = lab_flow_request_fetch,
+        [LAB_FLOW_REQUEST_FUNCTION]     = lab_flow_request_function,
+        [LAB_FLOW_REQUEST_CALCULUS]     = lab_flow_request_calculus,
+        [LAB_FLOW_REQUEST_INTEGRATOR]   = lab_flow_request_integrator,
+        [LAB_FLOW_REQUEST_LAND]         = lab_flow_request_land,
+        [LAB_FLOW_REQUEST_HOLIDAYS]     = lab_flow_request_holidays,
+        [LAB_FLOW_REQUEST_MOBILE]       = lab_flow_request_mobile,
+        [LAB_FLOW_REQUEST_FORMS]        = lab_flow_request_forms,
+        [LAB_FLOW_REQUEST_PRESENTATION] = lab_flow_request_presentation,
+        [LAB_FLOW_REQUEST_SOLVER]       = lab_flow_request_solver,
+        [LAB_FLOW_REQUEST_FETCH]        = lab_flow_request_fetch,
     };
-    return kind < sizeof workflows / sizeof *workflows ? workflows[kind](frame) : lab_flow_done(0);
+    return (unsigned)kind < sizeof workflows / sizeof *workflows ? workflows[kind](frame) : lab_flow_done(0);
 }

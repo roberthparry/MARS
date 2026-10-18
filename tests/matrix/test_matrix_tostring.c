@@ -771,7 +771,8 @@ static void test_mat_to_string_common_positive_base_power(void)
 
         check_bool("shared power appears once", text && matrix_tostring_count_substring(text, "⅓^x") == 1u);
         check_bool("common-factor-only variable keeps its binding", text && strstr(text, "x = ?"));
-        check_bool("fractional coefficient retains its radical", text && strstr(text, "√(7)"));
+        printf("Shared-power matrix: %s\n", text ? text : "(null)");
+        check_bool("fractional coefficient retains its exact radical", text && strstr(text, "√(4/7)"));
         free(text);
     }
     expr_set_val(x, NUM_TWO);

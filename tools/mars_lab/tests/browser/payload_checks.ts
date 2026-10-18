@@ -85,6 +85,8 @@ window.checkLabPayload = async function checkLabPayload() {
     try {
         equal(build(99, []), null, 'unknown builder rejected');
         equal(build(-1, []), null, 'negative builder rejected');
+        equal(build(-2147483648, []), null, 'minimum signed selector rejected');
+        equal(build(2147483647, []), null, 'maximum signed selector rejected');
         const text = '  {sin([α]) | [α] = π/7, const c = ?}  ';
         const expression = build(0, [text, text, 'π/7', '[α]', 'bindings', 'expression']);
         shape(expression, [

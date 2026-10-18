@@ -9,19 +9,20 @@
  */
 #include <stdarg.h>
 
+#include "lab_mode.h"
 #include "lab_dom.h"
 #include "lab_binding_projection.h"
 
 static int lab_binding_projection_plan(void)
 {
-    int plan = lab_dom_object(5);
-    lab_dom_set(plan, "calls", lab_dom_object(4));
+    int plan = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(plan, "calls", lab_dom_object(LAB_VALUE_ARRAY));
     return plan;
 }
 
 static void lab_binding_projection_emit(int plan, const char *service, unsigned count, ...)
 {
-    int call = lab_dom_object(5), args = lab_dom_object(4);
+    int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     va_list values;
     va_start(values, count);
     for (unsigned i = 0; i < count; ++i)
@@ -33,7 +34,7 @@ static void lab_binding_projection_emit(int plan, const char *service, unsigned 
 }
 
 /* Source clearing is synchronous and ordered; goal-only clearing does not touch binding inputs. */
-void lab_binding_projection_clear(unsigned goal_only)
+void lab_binding_projection_clear(bool goal_only)
 {
     int plan = lab_binding_projection_plan(), empty = lab_dom_string("");
     if (!goal_only) {
@@ -51,13 +52,13 @@ void lab_binding_projection_clear(unsigned goal_only)
 }
 
 /* Wrapped native metadata selects the full editor even outside the expression-like modes. */
-void lab_binding_projection_update(unsigned mode, int updated, int metadata)
+void lab_binding_projection_update(lab_mode_t mode, int updated, int metadata)
 {
     int plan = lab_binding_projection_plan();
-    if (mode <= 2 || lab_dom_truth(lab_dom_get(metadata, "wrapped"))) {
+    if ((unsigned)mode <= LAB_MODE_DIFFERENTIAL_EQUATION || lab_dom_truth(lab_dom_get(metadata, "wrapped"))) {
         lab_binding_projection_emit(plan, "bindingSetEditor", 1, updated);
     } else {
-        int text = lab_dom_clean(lab_dom_truth(updated) ? lab_dom_text(updated) : lab_dom_string(""), 0);
+        int text = lab_dom_clean(lab_dom_truth(updated) ? lab_dom_text(updated) : lab_dom_string(""), LAB_DOM_CLEAN_TRIM);
         lab_binding_projection_emit(plan, "bindingSetText", 1, text);
         lab_binding_projection_emit(plan, "bindingClearSource", 0);
         lab_binding_projection_emit(plan, "bindingClearValues", 0);
@@ -78,7 +79,8 @@ void lab_binding_projection_prepare(int context, int metadata)
 void lab_binding_projection_finish(int selected)
 {
     int plan = lab_binding_projection_plan(), bindings = lab_dom_get(selected, "bindings");
-    lab_binding_projection_emit(plan, "bindingSource", 2, lab_dom_string("fullText"), lab_dom_get(selected, "fullText"));
+    lab_binding_projection_emit(plan, "bindingSource", 2, lab_dom_string("fullText"),
+                                lab_dom_get(selected, "fullText"));
     lab_binding_projection_emit(plan, "bindingSource", 2, lab_dom_string("displayText"),
                                 lab_dom_get(selected, "displayText"));
     lab_binding_projection_emit(plan, "bindingResize", 0);
@@ -91,17 +93,18 @@ void lab_binding_projection_finish(int selected)
 }
 
 /* Admission runs between scoped calls; rejected requests never mark or schedule a refresh. */
-void lab_binding_projection_refresh(unsigned phase, int context)
+void lab_binding_projection_refresh(lab_binding_refresh_phase_t phase, int context)
 {
     int plan = lab_binding_projection_plan();
-    if (phase == 0) {
-        int body = lab_dom_clean(lab_dom_get(context, "editedBody"), 0), options = lab_dom_object(5);
+    if (phase == LAB_BINDING_REFRESH_BEGIN) {
+        int body = lab_dom_clean(lab_dom_get(context, "editedBody"), LAB_DOM_CLEAN_TRIM),
+            options = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(context, "editedBody", body);
-        lab_dom_set(options, "input", lab_dom_scalar(1, lab_dom_truth(body)));
+        lab_dom_set(options, "input", lab_dom_scalar(LAB_VALUE_BOOLEAN, lab_dom_truth(body)));
         lab_binding_projection_emit(plan, "bindingCancelRefresh", 0);
         lab_binding_projection_emit(plan, "bindingBeginRefresh", 4, context, lab_dom_string("bindings"),
                                     lab_dom_string("expression"), options);
-    } else if (phase == 1 && lab_dom_truth(lab_dom_get(context, "request"))) {
+    } else if (phase == LAB_BINDING_REFRESH_SCHEDULE && lab_dom_truth(lab_dom_get(context, "request"))) {
         lab_binding_projection_emit(plan, "bindingRefreshPending", 0);
         lab_binding_projection_emit(plan, "bindingRefreshHistory", 0);
         lab_binding_projection_emit(plan, "bindingRefreshTimer", 4, lab_dom_get(context, "editedBody"),

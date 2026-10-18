@@ -16,7 +16,8 @@
  * @brief Select editor and binding projections for an integrator response.
  * @param data Scoped native response with binding_expression, expression and binding_values fields.
  * @param fallback Scoped fallback binding-expression value, used when the response field is falsey.
- * @param editors Scoped Map of exact trimmed source keys to native editor metadata.
+ * @param editors Scoped browser Map keyed by trimmed source text; canonical metadata text is looked up again
+ * before deciding whether the editor is wrapped.
  * @param bound_names Scoped Set of integration-bound names to exclude from editable parameters.
  * @details Publishes an ordered calls plan through lab_dom_return. A recognised wrapped
  * editor requests setExpressionEditor, optional clearVariableValues, then

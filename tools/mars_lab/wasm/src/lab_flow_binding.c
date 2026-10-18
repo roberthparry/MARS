@@ -7,6 +7,7 @@
  * stages use bounds-checked, directly indexed function-pointer dispatch. Source and binding values remain opaque
  * mathematics.
  */
+#include "lab_mode.h"
 #include "lab_dom.h"
 #include "lab_flow.h"
 #include "lab_flow_binding.h"
@@ -18,7 +19,7 @@ static unsigned lab_flow_binding_stage(int frame)
 
 static int lab_flow_binding_false(void)
 {
-    return lab_flow_done(lab_dom_scalar(1, 0));
+    return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
 static int lab_flow_binding_same(int frame, int source)
@@ -251,7 +252,7 @@ static int lab_flow_binding_commit_accept(struct lab_flow_binding_commit_context
 
 static int lab_flow_binding_commit_extracted(struct lab_flow_binding_commit_context *ctx)
 {
-    int context = lab_dom_object(5);
+    int context = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(context, "editor", lab_dom_get(ctx->before, "editor"));
     lab_dom_set(context, "snapshot", lab_dom_get(ctx->frame, "snapshot"));
     lab_dom_set(context, "isCurrent", lab_dom_get(ctx->frame, "isCurrent"));
@@ -350,7 +351,7 @@ static int lab_flow_binding_toggle_accept(struct lab_flow_binding_toggle_context
 {
     if (!lab_flow_binding_same(ctx->frame, 1))
         return lab_flow_done(0);
-    int context = lab_dom_object(5);
+    int context = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(context, "editor", lab_dom_get(ctx->before, "editor"));
     return lab_flow_call(ctx->frame, flow_binding_toggle_stage_effects, "native", "plan", 0, 6,
                          lab_dom_string("lab_binding_commit_plan"), lab_dom_get(ctx->before, "modeId"),
@@ -425,7 +426,7 @@ static int lab_flow_binding_refresh_capture(struct lab_flow_binding_refresh_cont
 
 static int lab_flow_binding_refresh_prepare(struct lab_flow_binding_refresh_context *ctx)
 {
-    if (lab_dom_number(lab_dom_get(ctx->before, "modeId")) == 0)
+    if (lab_dom_number(lab_dom_get(ctx->before, "modeId")) == (double)LAB_MODE_EXPRESSION)
         return lab_flow_call(ctx->frame, flow_binding_refresh_stage_done, "bindingScheduleRefresh", 0, 0, 0);
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_binding_refresh_stage_error_check));
     return lab_flow_call(ctx->frame, flow_binding_refresh_stage_recheck, "bindingPrepare", 0, 1, 1,
@@ -694,7 +695,7 @@ static int lab_flow_binding_input_current(int frame)
 {
     int input = lab_dom_get(frame, "input");
     return lab_dom_truth(lab_dom_get(input, "isConnected")) &&
-           lab_dom_equal(lab_dom_read(input, 5, ""), lab_dom_get(frame, "authored"));
+           lab_dom_equal(lab_dom_read(input, LAB_DOM_VALUE, ""), lab_dom_get(frame, "authored"));
 }
 
 enum {
@@ -710,7 +711,7 @@ enum {
 
 static int lab_flow_binding_prepare_input_prepare(int frame)
 {
-    lab_dom_set(frame, "authored", lab_dom_read(lab_dom_get(frame, "input"), 5, ""));
+    lab_dom_set(frame, "authored", lab_dom_read(lab_dom_get(frame, "input"), LAB_DOM_VALUE, ""));
     lab_dom_set(frame, "failed", lab_dom_numeric(flow_binding_prepare_input_stage_error));
     return lab_flow_call(frame, flow_binding_prepare_input_stage_update, "bindingRefreshForms", "prepared", 1, 0);
 }
@@ -797,17 +798,18 @@ struct lab_flow_binding_action_context {
 
 static int lab_flow_binding_action_start(struct lab_flow_binding_action_context *ctx)
 {
-    unsigned operation = (unsigned)lab_dom_number(lab_dom_get(ctx->frame, "operation"));
-    if (operation == 0)
+    lab_flow_binding_card_action_t operation =
+        (lab_flow_binding_card_action_t)(unsigned)lab_dom_number(lab_dom_get(ctx->frame, "operation"));
+    if (operation == LAB_FLOW_BINDING_CARD_EVALUATE)
         return lab_flow_call(ctx->frame, flow_binding_action_stage_evaluate, "bindingCommitInput", 0, 1, 1,
                              lab_dom_get(ctx->card, "input"));
-    if (operation == 1)
+    if (operation == LAB_FLOW_BINDING_CARD_CLEAR)
         return lab_flow_call(ctx->frame, flow_binding_action_stage_clear_commit, "updateHistoryButtons", 0, 0, 0);
-    if (operation != 2)
+    if (operation != LAB_FLOW_BINDING_CARD_COPY)
         return lab_flow_done(0);
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(flow_binding_action_stage_copy_failed));
     return lab_flow_call(ctx->frame, flow_binding_action_stage_copy_ok, "bindingClipboard", 0, 1, 1,
-                         lab_dom_read(lab_dom_get(ctx->card, "input"), 5, ""));
+                         lab_dom_read(lab_dom_get(ctx->card, "input"), LAB_DOM_VALUE, ""));
 }
 
 static int lab_flow_binding_action_clear_commit(struct lab_flow_binding_action_context *ctx)
@@ -829,7 +831,7 @@ static int lab_flow_binding_action_evaluate(struct lab_flow_binding_action_conte
 static int lab_flow_binding_action_copy_ok(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_copy_status, "bindingFlash", 0, 0, 2,
-                         lab_dom_get(ctx->card, "copy"), lab_dom_scalar(1, 1));
+                         lab_dom_get(ctx->card, "copy"), lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
 static int lab_flow_binding_action_copy_status(struct lab_flow_binding_action_context *ctx)
@@ -846,7 +848,7 @@ static int lab_flow_binding_action_copy_reset(struct lab_flow_binding_action_con
 static int lab_flow_binding_action_copy_failed(struct lab_flow_binding_action_context *ctx)
 {
     return lab_flow_call(ctx->frame, flow_binding_action_stage_copy_error, "bindingFlash", 0, 0, 2,
-                         lab_dom_get(ctx->card, "copy"), lab_dom_scalar(1, 0));
+                         lab_dom_get(ctx->card, "copy"), lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
 static int lab_flow_binding_action_copy_error(struct lab_flow_binding_action_context *ctx)
@@ -914,7 +916,7 @@ static int lab_flow_binding_deferred_error_report(int frame)
 {
     {
         int after = lab_dom_get(frame, "after"), full = lab_dom_get(frame, "fullText");
-        int source = lab_dom_clean(lab_dom_truth(full) ? lab_dom_text(full) : lab_dom_string(""), 0);
+        int source = lab_dom_clean(lab_dom_truth(full) ? lab_dom_text(full) : lab_dom_string(""), LAB_DOM_CLEAN_TRIM);
         if (!lab_dom_equal(lab_dom_get(frame, "mode"), lab_dom_get(after, "mode")) ||
             !lab_dom_equal(lab_dom_get(after, "source"), source))
             return lab_flow_done(0);
@@ -1006,7 +1008,7 @@ enum {
 
 static int lab_flow_binding_kind_request_request(int frame)
 {
-    int request = lab_dom_object(5);
+    int request = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(request, "action", lab_dom_string("editor"));
     lab_dom_set(request, "operation", lab_dom_string("kind"));
     lab_dom_set(request, "text", lab_dom_get(frame, "source"));
@@ -1046,26 +1048,26 @@ static int lab_flow_binding_kind_request(int frame)
 }
 
 /* Indexed workflow selection preserves module ownership without a growing name scan. */
-int lab_flow_binding(unsigned kind, int frame, int view)
+int lab_flow_binding(lab_flow_binding_kind_t kind, int frame, int view)
 {
     (void)view;
     static int (*const handlers[])(int) = {
-        [0]  = lab_flow_binding_sync,
-        [1]  = lab_flow_binding_visible,
-        [2]  = lab_flow_binding_commit,
-        [3]  = lab_flow_binding_toggle,
-        [4]  = lab_flow_binding_refresh,
-        [5]  = lab_flow_binding_queue,
-        [6]  = lab_flow_binding_goal,
-        [7]  = lab_flow_binding_row,
-        [8]  = lab_flow_binding_prepare_input,
-        [9]  = lab_flow_binding_action,
-        [10] = lab_flow_binding_deferred,
-        [11] = lab_flow_binding_begin_commit,
+        [LAB_FLOW_BINDING_SYNC]          = lab_flow_binding_sync,
+        [LAB_FLOW_BINDING_VISIBLE]       = lab_flow_binding_visible,
+        [LAB_FLOW_BINDING_COMMIT]        = lab_flow_binding_commit,
+        [LAB_FLOW_BINDING_TOGGLE]        = lab_flow_binding_toggle,
+        [LAB_FLOW_BINDING_REFRESH]       = lab_flow_binding_refresh,
+        [LAB_FLOW_BINDING_QUEUE]         = lab_flow_binding_queue,
+        [LAB_FLOW_BINDING_GOAL]          = lab_flow_binding_goal,
+        [LAB_FLOW_BINDING_ROW]           = lab_flow_binding_row,
+        [LAB_FLOW_BINDING_PREPARE_INPUT] = lab_flow_binding_prepare_input,
+        [LAB_FLOW_BINDING_ACTION]        = lab_flow_binding_action,
+        [LAB_FLOW_BINDING_DEFERRED]      = lab_flow_binding_deferred,
+        [LAB_FLOW_BINDING_BEGIN_COMMIT]  = lab_flow_binding_begin_commit,
     };
-    if (kind >= 12 && kind <= 14)
-        return lab_flow_binding_edit(kind - 12, frame);
-    if (kind == 15)
+    if (kind >= LAB_FLOW_BINDING_EDITOR_PROJECT && kind <= LAB_FLOW_BINDING_EDITOR_REFRESH)
+        return lab_flow_binding_edit((lab_flow_binding_edit_kind_t)(kind - LAB_FLOW_BINDING_EDITOR_PROJECT), frame);
+    if (kind == LAB_FLOW_BINDING_KIND_REQUEST)
         return lab_flow_binding_kind_request(frame);
-    return kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0);
+    return (unsigned)kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0);
 }

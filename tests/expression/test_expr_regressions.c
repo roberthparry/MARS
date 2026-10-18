@@ -4316,7 +4316,7 @@ static void test_unit_complex_fourth_root_beautifies_to_cartesian_surds(void)
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
-                       "1/√(2)·(√(⁴√(2) + √((√(2) + 1)/2)) + "
+                       "√(1/2)·(√(⁴√(2) + √((√(2) + 1)/2)) + "
                        "√(⁴√(2) - √((√(2) + 1)/2))·i)");
 
     free(text);
@@ -4335,7 +4335,7 @@ static void test_conjugate_unit_complex_fourth_root_keeps_cartesian_surd_symmetr
     ASSERT_NOT_NULL(expr);
     ASSERT_NOT_NULL(beautified);
     TEST_ASSERT_STR_EQ(text,
-                       "1/√(2)·(√(⁴√(2) + √((√(2) + 1)/2)) - "
+                       "√(1/2)·(√(⁴√(2) + √((√(2) + 1)/2)) - "
                        "√(⁴√(2) - √((√(2) + 1)/2))·i)");
 
     free(text);

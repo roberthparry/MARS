@@ -1,6 +1,6 @@
 /**
  * @file lab_binding_sync.h
- * @brief Private request normalisation and accepted binding-edit projection for MARS Lab.
+ * @brief Application API for request normalisation and accepted binding-edit projection for MARS Lab.
  *
  * Prepares opaque binding records for the native presentation service and projects
  * an accepted edited expression into its editor flags and variable metadata. No
@@ -15,7 +15,8 @@
 
 /**
  * @brief Prepare a binding replacement request with browser-compatible defaults.
- * @param inputs Scoped record containing body and bindings.
+ * @param inputs Scoped browser record containing opaque body text and a bindings array with name, kind,
+ * value and optional display fields; absent kinds default to variable and nullish values fall back to display.
  * @details Publishes source and an optional request through lab_dom_return. Empty
  * source requires no service; a non-empty source without a request requires editor
  * preparation only. Present nullish binding entries publish invalid=true, which
@@ -27,7 +28,8 @@ void lab_binding_sync_request(int inputs);
 /**
  * @brief Project editor metadata after the host accepts an asynchronous binding edit.
  * @param editor Scoped editor node receiving the accepted display text and readiness flags.
- * @param inputs Scoped record containing displayText, bindings and native response data.
+ * @param inputs Scoped browser record with displayText, bindings and data; data supplies evaluation_ready
+ * and differentiable flags, while bindings supplies the variable-name list.
  * @details Publishes variables and differentiable through lab_dom_return. Variable
  * names use the existing binding selection policy; response flags retain the original
  * truthy defaults and browser Unicode conversion. The caller must check request and

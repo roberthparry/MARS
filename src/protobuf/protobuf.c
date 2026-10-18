@@ -4,7 +4,8 @@
  *
  * Owns ordered field records and parses or writes supported wire types with explicit byte and field limits.
  * Repeated and unknown fields remain available to schema-aware callers; no external parser or schema compiler is
- * used.
+ * used. The allocation-free primitives in protobuf_wire.c are also compiled
+ * for WebAssembly; only this native layer owns arrays and copied field data.
  *
  * This implements protobuf_t. Applications supply schema knowledge and manage message ownership; the HTTP module
  * provides transport and gRPC framing.
@@ -61,23 +62,13 @@ void protobuf_free(protobuf_t *message)
     }
 }
 
-static size_t varint_size(uint64_t value)
-{
-    size_t size = 1;
-    while (value >= 128) {
-        value >>= 7;
-        ++size;
-    }
-    return size;
-}
-
 static bool append(protobuf_t *message, record_t *record)
 {
     if (!message || !record->field || record->field > 536870911 || array_size(message->records) == message->fields)
         return false;
-    size_t size = varint_size(((uint64_t)record->field << 3) | record->wire);
-    size_t payload = record->wire == PROTOBUF_BYTES     ? varint_size(record->size) + record->size
-                     : record->wire == PROTOBUF_VARINT  ? varint_size(record->integer)
+    size_t size = protobuf_wire_varint_size(((uint64_t)record->field << 3) | record->wire);
+    size_t payload = record->wire == PROTOBUF_BYTES     ? protobuf_wire_varint_size(record->size) + record->size
+                     : record->wire == PROTOBUF_VARINT  ? protobuf_wire_varint_size(record->integer)
                      : record->wire == PROTOBUF_FIXED32 ? 4
                                                         : 8;
     if (payload > message->limit - message->encoded || size > message->limit - message->encoded - payload ||
@@ -115,20 +106,6 @@ bool protobuf_add_bytes(protobuf_t *message, uint32_t field, const void *data, s
     return false;
 }
 
-static bool read_varint(const unsigned char *data, size_t size, size_t *offset, uint64_t *value)
-{
-    *value = 0;
-    for (unsigned i = 0; i < 10 && *offset < size; ++i) {
-        unsigned char byte = data[(*offset)++];
-        if (i == 9 && byte > 1)
-            return false;
-        *value |= (uint64_t)(byte & 127) << (i * 7);
-        if (!(byte & 128))
-            return true;
-    }
-    return false;
-}
-
 /* Decode bounded binary framing; length-delimited values remain opaque until schema interpretation. */
 protobuf_t *protobuf_decode(const void *data, size_t size, size_t max_bytes, size_t max_fields)
 {
@@ -138,30 +115,13 @@ protobuf_t *protobuf_decode(const void *data, size_t size, size_t max_bytes, siz
     const unsigned char *bytes = data;
     size_t offset = 0;
     while (offset < size) {
-        uint64_t tag, value;
-        if (!read_varint(bytes, size, &offset, &tag) || tag > UINT32_MAX || !(tag >> 3))
+        protobuf_wire_field_t field;
+        if (!protobuf_wire_read_field(bytes, size, &offset, &field))
             goto fail;
-        uint32_t field = tag >> 3;
-        unsigned wire = tag & 7;
-        if (wire == PROTOBUF_VARINT) {
-            if (!read_varint(bytes, size, &offset, &value) ||
-                !protobuf_add_integer(message, field, PROTOBUF_VARINT, value))
-                goto fail;
-        } else if (wire == PROTOBUF_BYTES) {
-            if (!read_varint(bytes, size, &offset, &value) || value > size - offset ||
-                !protobuf_add_bytes(message, field, bytes + offset, (size_t)value))
-                goto fail;
-            offset += (size_t)value;
-        } else if (wire == PROTOBUF_FIXED32 || wire == PROTOBUF_FIXED64) {
-            size_t width = wire == PROTOBUF_FIXED32 ? 4 : 8;
-            if (width > size - offset)
-                goto fail;
-            value = 0;
-            for (size_t i = 0; i < width; ++i)
-                value |= (uint64_t)bytes[offset++] << (8 * i);
-            if (!protobuf_add_integer(message, field, (protobuf_wire_t)wire, value))
-                goto fail;
-        } else
+        bool ok = field.wire == PROTOBUF_BYTES
+                      ? protobuf_add_bytes(message, field.field, field.data, field.size)
+                      : protobuf_add_integer(message, field.field, field.wire, field.integer);
+        if (!ok)
             goto fail;
     }
     return message;
@@ -172,15 +132,10 @@ fail:
 
 static bool write_varint(array_t *bytes, uint64_t value)
 {
-    do {
-        unsigned char byte = value & 127;
-        value >>= 7;
-        if (value)
-            byte |= 128;
-        if (!array_add(bytes, &byte))
-            return false;
-    } while (value);
-    return true;
+    unsigned char buffer[10];
+    size_t size = 0;
+    return protobuf_wire_write_varint(buffer, sizeof(buffer), &size, value) &&
+           array_append_carray(bytes, buffer, size);
 }
 
 /* Serialise in insertion order; unknown fields and repeated occurrences are retained. */
@@ -201,11 +156,10 @@ array_t *protobuf_encode(const protobuf_t *message)
             ok = write_varint(bytes, record->size) &&
                  (!record->size || array_append_carray(bytes, record->bytes, record->size));
         else {
-            size_t width = record->wire == PROTOBUF_FIXED32 ? 4 : 8;
-            for (size_t j = 0; ok && j < width; ++j) {
-                unsigned char byte = record->integer >> (8 * j);
-                ok = array_add(bytes, &byte);
-            }
+            unsigned char buffer[8];
+            size_t size = 0;
+            ok = protobuf_wire_write_fixed(buffer, sizeof(buffer), &size, record->wire, record->integer) &&
+                 array_append_carray(bytes, buffer, size);
         }
     }
     if (!ok) {

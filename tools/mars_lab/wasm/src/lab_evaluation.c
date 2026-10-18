@@ -12,10 +12,11 @@
  * retains no request, browser handle or authored text across calls. Returned plans
  * are browser-owned values; no persistent native storage is allocated.
  */
+#include <string.h>
+
+#include "lab_mode.h"
 #include "lab_dom.h"
 #include "lab_evaluation.h"
-
-enum { lab_evaluation_modes = 7 };
 
 enum {
     lab_eval_bindings = 1,
@@ -43,110 +44,132 @@ enum {
     lab_eval_failure = lab_eval_error | lab_eval_clear
 };
 
-static const unsigned lab_evaluation_preparation[lab_evaluation_modes] = {
-    [0] = lab_eval_bound_input | lab_eval_expression,
-    [1] = lab_eval_plain_input | lab_eval_bindings,
-    [2] = lab_eval_plain_input,
-    [3] = lab_eval_bound_input,
-    [4] = lab_eval_bound_input,
-    [5] = lab_eval_datetime,
-    [6] = lab_eval_almanac};
+static const unsigned lab_evaluation_preparation[LAB_MODE_COUNT] = {
+    [LAB_MODE_EXPRESSION]            = lab_eval_bound_input | lab_eval_expression,
+    [LAB_MODE_EQUATION]              = lab_eval_plain_input | lab_eval_bindings,
+    [LAB_MODE_DIFFERENTIAL_EQUATION] = lab_eval_plain_input,
+    [LAB_MODE_MATRIX]                = lab_eval_bound_input,
+    [LAB_MODE_INTEGRATOR]            = lab_eval_bound_input,
+    [LAB_MODE_DATETIME]              = lab_eval_datetime,
+    [LAB_MODE_ALMANAC]               = lab_eval_almanac,
+};
 
-static const struct {
-    unsigned success, failure;
-} lab_evaluation_policy[lab_evaluation_modes] = {
-    [0] = {lab_eval_install, lab_eval_failure},
-    [1] = {lab_eval_replace, lab_eval_failure},
-    [2] = {lab_eval_replace | lab_eval_await, lab_eval_failure},
-    [3] = {lab_eval_replace, lab_eval_failure | lab_eval_clear_scalar},
-    [4] = {lab_eval_replace, lab_eval_failure | lab_eval_integrator},
-    [5] = {lab_eval_replace | lab_eval_weather, lab_eval_failure | lab_eval_clear_local},
-    [6] = {lab_eval_replace, lab_eval_failure}};
+/* Stale outcomes and non-expression partial results deliberately have no actions. */
+static const unsigned lab_evaluation_policy[LAB_REQUEST_OUTCOME_EXCEPTION + 1][LAB_MODE_COUNT] = {
+    [LAB_REQUEST_OUTCOME_FAILURE][LAB_MODE_EXPRESSION]              = lab_eval_failure,
+    [LAB_REQUEST_OUTCOME_FAILURE][LAB_MODE_EQUATION]                = lab_eval_failure,
+    [LAB_REQUEST_OUTCOME_FAILURE][LAB_MODE_DIFFERENTIAL_EQUATION]   = lab_eval_failure,
+    [LAB_REQUEST_OUTCOME_FAILURE][LAB_MODE_MATRIX]                  = lab_eval_failure | lab_eval_clear_scalar,
+    [LAB_REQUEST_OUTCOME_FAILURE][LAB_MODE_INTEGRATOR]              = lab_eval_failure | lab_eval_integrator,
+    [LAB_REQUEST_OUTCOME_FAILURE][LAB_MODE_DATETIME]                = lab_eval_failure | lab_eval_clear_local,
+    [LAB_REQUEST_OUTCOME_FAILURE][LAB_MODE_ALMANAC]                 = lab_eval_failure,
+    [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_EXPRESSION]              = lab_eval_install,
+    [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_EQUATION]                = lab_eval_replace,
+    [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_DIFFERENTIAL_EQUATION]   = lab_eval_replace | lab_eval_await,
+    [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_MATRIX]                  = lab_eval_replace,
+    [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_INTEGRATOR]              = lab_eval_replace,
+    [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_DATETIME]                = lab_eval_replace | lab_eval_weather,
+    [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_ALMANAC]                 = lab_eval_replace,
+    [LAB_REQUEST_OUTCOME_PARTIAL][LAB_MODE_EXPRESSION]              = lab_eval_install | lab_eval_error,
+    [LAB_REQUEST_OUTCOME_EXCEPTION][LAB_MODE_EXPRESSION]            = lab_eval_failure,
+    [LAB_REQUEST_OUTCOME_EXCEPTION][LAB_MODE_EQUATION]              = lab_eval_failure,
+    [LAB_REQUEST_OUTCOME_EXCEPTION][LAB_MODE_DIFFERENTIAL_EQUATION] = lab_eval_failure,
+    [LAB_REQUEST_OUTCOME_EXCEPTION][LAB_MODE_MATRIX]                = lab_eval_failure,
+    [LAB_REQUEST_OUTCOME_EXCEPTION][LAB_MODE_INTEGRATOR]            = lab_eval_failure,
+    [LAB_REQUEST_OUTCOME_EXCEPTION][LAB_MODE_DATETIME]              = lab_eval_failure | lab_eval_clear_local,
+    [LAB_REQUEST_OUTCOME_EXCEPTION][LAB_MODE_ALMANAC]               = lab_eval_failure,
+};
 
 static const struct {
     const char *working, *failure;
-} lab_evaluation_labels[lab_evaluation_modes] = {
-    [0] = {"Evaluating...", "Evaluation failed"},
-    [1] = {"Solving equation...", "Equation solving failed"},
-    [2] = {"Solving differential equation...", "Differential-equation solving failed"},
-    [3] = {"Evaluating matrix...", "Matrix evaluation failed"},
-    [4] = {"Integrating...", "Integration failed"},
-    [5] = {"Calculating dates...", "Datetime calculation failed"},
-    [6] = {"Working the almanac...", "Almanac calculation failed"}};
+} lab_evaluation_labels[LAB_MODE_COUNT] = {
+    [LAB_MODE_EXPRESSION]            = {"Evaluating...", "Evaluation failed"},
+    [LAB_MODE_EQUATION]              = {"Solving equation...", "Equation solving failed"},
+    [LAB_MODE_DIFFERENTIAL_EQUATION] = {"Solving differential equation...", "Differential-equation solving failed"},
+    [LAB_MODE_MATRIX]                = {"Evaluating matrix...", "Matrix evaluation failed"},
+    [LAB_MODE_INTEGRATOR]            = {"Integrating...", "Integration failed"},
+    [LAB_MODE_DATETIME]              = {"Calculating dates...", "Datetime calculation failed"},
+    [LAB_MODE_ALMANAC]               = {"Working the almanac...", "Almanac calculation failed"},
+};
 
 /* Preparation precedes the guarded result phase, preserving setup-error history semantics. */
-unsigned lab_evaluation_prepare(unsigned mode, unsigned skip_history)
+unsigned lab_evaluation_prepare(lab_mode_t mode, bool skip_history)
 {
-    if (mode >= lab_evaluation_modes)
+    if ((unsigned)mode >= LAB_MODE_COUNT)
         return 0;
     return lab_evaluation_preparation[mode] | (skip_history ? 0u : lab_eval_history);
 }
 
-/* Outcomes are stale 0, failure 1, success 2, partial expression 3 and caught exception 4. */
-unsigned lab_evaluation_actions(unsigned mode, unsigned outcome)
+/* Return the mode-specific action mask for the accepted request outcome. */
+unsigned lab_evaluation_actions(lab_mode_t mode, lab_request_outcome_t outcome)
 {
-    if (mode >= lab_evaluation_modes || outcome == 0 || outcome > 4)
+    if ((unsigned)mode >= LAB_MODE_COUNT || outcome == LAB_REQUEST_OUTCOME_STALE ||
+        (unsigned)outcome > LAB_REQUEST_OUTCOME_EXCEPTION)
         return 0;
-    if (outcome == 1)
-        return lab_evaluation_policy[mode].failure;
-    if (outcome == 2)
-        return lab_evaluation_policy[mode].success;
-    if (outcome == 3)
-        return mode == 0 ? lab_eval_install | lab_eval_error : 0;
-    return lab_eval_failure | (mode == 5 ? lab_eval_clear_local : 0u);
+    return lab_evaluation_policy[outcome][mode];
 }
 
-/* Borrow immutable labels: working 0, failure 1, ready 2, error 3, local series 4, unsolved 5. */
-const char *lab_evaluation_text(unsigned mode, unsigned field)
+/* Borrow the mode's immutable working, failure or completion label selected by field. */
+const char *lab_evaluation_text(lab_mode_t mode, lab_evaluation_label_t field)
 {
-    static const char *const statuses[] = {"Ready", "Error", "Local series", "Not solved"};
-    if (mode >= lab_evaluation_modes || field > 5)
+    static const char *const statuses[] = {
+        [LAB_EVALUATION_LABEL_READY]        = "Ready",
+        [LAB_EVALUATION_LABEL_ERROR]        = "Error",
+        [LAB_EVALUATION_LABEL_LOCAL_SERIES] = "Local series",
+        [LAB_EVALUATION_LABEL_NOT_SOLVED]   = "Not solved",
+    };
+    if ((unsigned)mode >= LAB_MODE_COUNT || (unsigned)field > LAB_EVALUATION_LABEL_NOT_SOLVED)
         return "";
-    if (field < 2)
-        return field == 0 ? lab_evaluation_labels[mode].working : lab_evaluation_labels[mode].failure;
-    return statuses[field - 2];
+    if (field < LAB_EVALUATION_LABEL_READY)
+        return field == LAB_EVALUATION_LABEL_WORKING ? lab_evaluation_labels[mode].working
+                                                     : lab_evaluation_labels[mode].failure;
+    return statuses[field];
 }
 
 /* Only short static UI labels are scanned; authored or mathematical text never enters this module. */
-unsigned lab_evaluation_text_length(unsigned mode, unsigned field)
+unsigned lab_evaluation_text_length(lab_mode_t mode, lab_evaluation_label_t field)
 {
-    const char *text = lab_evaluation_text(mode, field);
-    unsigned length = 0;
-    while (text[length])
-        ++length;
-    return length;
+    return (unsigned)strlen(lab_evaluation_text(mode, field));
 }
 
 /* Differential-equation statuses describe solver completion without interpreting its result. */
-unsigned lab_evaluation_status(unsigned mode, unsigned outcome, unsigned series, unsigned solved)
+lab_evaluation_label_t lab_evaluation_status(lab_mode_t mode, lab_request_outcome_t outcome, bool series,
+                                             bool solved)
 {
     if (!lab_evaluation_actions(mode, outcome))
-        return 6;
-    if (outcome != 2)
-        return 3;
-    return mode == 2 ? (series ? 4u : solved ? 2u : 5u) : 2u;
+        return LAB_EVALUATION_LABEL_EMPTY;
+    if (outcome != LAB_REQUEST_OUTCOME_SUCCESS)
+        return LAB_EVALUATION_LABEL_ERROR;
+    if (mode != LAB_MODE_DIFFERENTIAL_EQUATION)
+        return LAB_EVALUATION_LABEL_READY;
+    if (series)
+        return LAB_EVALUATION_LABEL_LOCAL_SERIES;
+    return solved ? LAB_EVALUATION_LABEL_READY : LAB_EVALUATION_LABEL_NOT_SOLVED;
 }
 
-/* Select error text: fallback 0, original 1, trimmed integration diagnostic 2, trimmed raw error 3. */
-unsigned lab_evaluation_error_source(unsigned mode, unsigned has_error, unsigned generic, unsigned has_raw)
+/* Select the diagnostic source while preserving each mode's error-precedence policy. */
+lab_evaluation_error_source_t lab_evaluation_error_source(lab_mode_t mode, bool has_error, bool generic,
+                                                          bool has_raw)
 {
-    if (mode >= lab_evaluation_modes)
-        return 0;
-    if (mode != 4)
-        return has_error ? 1u : 0u;
+    if ((unsigned)mode >= LAB_MODE_COUNT)
+        return LAB_EVALUATION_ERROR_FALLBACK;
+    if (mode != LAB_MODE_INTEGRATOR)
+        return has_error ? LAB_EVALUATION_ERROR_ORIGINAL : LAB_EVALUATION_ERROR_FALLBACK;
     if (has_error && !generic)
-        return 2;
-    return has_raw ? 3u : has_error ? 2u : 0u;
+        return LAB_EVALUATION_ERROR_TRIMMED;
+    if (has_raw)
+        return LAB_EVALUATION_ERROR_RAW;
+    return has_error ? LAB_EVALUATION_ERROR_TRIMMED : LAB_EVALUATION_ERROR_FALLBACK;
 }
 
 /* Expose a label through the scoped bridge without duplicating UTF-8 buffer access in the adapter. */
-void lab_evaluation_label(unsigned mode, unsigned field)
+void lab_evaluation_label(lab_mode_t mode, lab_evaluation_label_t field)
 {
     lab_dom_return(lab_dom_string(lab_evaluation_text(mode, field)));
 }
 
 /* Name the preparation capabilities in C; the host only performs the required asynchronous work. */
-void lab_evaluation_prepare_plan(unsigned mode, int skip_history)
+void lab_evaluation_prepare_plan(lab_mode_t mode, bool skip_history)
 {
     unsigned flags = lab_evaluation_prepare(mode, skip_history);
     if (!flags) {
@@ -154,16 +177,16 @@ void lab_evaluation_prepare_plan(unsigned mode, int skip_history)
         return;
     }
     static const char *const names[] = {"bindings", "expression", "input", "trim", "datetime", "almanac", "history"};
-    int plan = lab_dom_object(5);
+    int plan = lab_dom_object(LAB_VALUE_OBJECT);
     for (unsigned i = 0; i < sizeof names / sizeof *names; ++i)
-        lab_dom_set(plan, names[i], lab_dom_scalar(1, (flags & (1u << i)) != 0));
-    lab_dom_set(plan, "label", lab_dom_string(lab_evaluation_text(mode, 0)));
+        lab_dom_set(plan, names[i], lab_dom_scalar(LAB_VALUE_BOOLEAN, (flags & (1u << i)) != 0));
+    lab_dom_set(plan, "label", lab_dom_string(lab_evaluation_text(mode, LAB_EVALUATION_LABEL_WORKING)));
     lab_dom_return(plan);
 }
 
 static void lab_evaluation_emit(int calls, const char *service, unsigned count, int first, int second)
 {
-    int call = lab_dom_object(5), args = lab_dom_object(4);
+    int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     if (count)
         lab_dom_push(args, first);
     if (count > 1)
@@ -174,31 +197,38 @@ static void lab_evaluation_emit(int calls, const char *service, unsigned count, 
 }
 
 /* Return ordered recovery services and outcome metadata; no side effects occur inside this scope. */
-void lab_evaluation_response(unsigned mode, unsigned outcome, int data, int context, int error)
+void lab_evaluation_response(lab_mode_t mode, lab_request_outcome_t outcome, int data, int context, int error)
 {
     unsigned flags = lab_evaluation_actions(mode, outcome);
     if (!flags) {
         lab_dom_return(0);
         return;
     }
-    int plan = lab_dom_object(5), calls = lab_dom_object(4);
+    int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(plan, "calls", calls);
-    lab_dom_set(plan, "install", lab_dom_scalar(1, (flags & lab_eval_install) != 0));
-    lab_dom_set(plan, "awaitInstall", lab_dom_scalar(1, (flags & lab_eval_await) != 0));
-    lab_dom_set(plan, "weather", lab_dom_scalar(1, (flags & lab_eval_weather) != 0));
+    lab_dom_set(plan, "install", lab_dom_scalar(LAB_VALUE_BOOLEAN, (flags & lab_eval_install) != 0));
+    lab_dom_set(plan, "awaitInstall", lab_dom_scalar(LAB_VALUE_BOOLEAN, (flags & lab_eval_await) != 0));
+    lab_dom_set(plan, "weather", lab_dom_scalar(LAB_VALUE_BOOLEAN, (flags & lab_eval_weather) != 0));
     int status = lab_dom_get(data, "status");
-    unsigned label = lab_evaluation_status(mode, outcome, lab_dom_equal(status, lab_dom_string("series")),
+    lab_evaluation_label_t label = lab_evaluation_status(mode, outcome, lab_dom_equal(status, lab_dom_string("series")),
                                            lab_dom_equal(status, lab_dom_string("solved")));
     lab_dom_set(plan, "status", lab_dom_string(lab_evaluation_text(mode, label)));
     if (flags & lab_eval_clear_scalar)
         lab_evaluation_emit(calls, "clearMatrixScalar", 0, 0, 0);
     if (flags & lab_eval_error) {
-        int fallback = lab_dom_string(lab_evaluation_text(mode, 1)), original = lab_dom_get(data, "error");
-        int trimmed = lab_dom_clean(original, 0), raw = lab_dom_clean(lab_dom_get(data, "raw_error"), 0);
-        unsigned source =
-            lab_evaluation_error_source(mode, mode == 4 ? lab_dom_length(trimmed) : lab_dom_truth(original),
-                                        lab_dom_equal(trimmed, fallback), lab_dom_length(raw));
-        const int messages[] = {fallback, original, trimmed, raw};
+        int fallback = lab_dom_string(lab_evaluation_text(mode, LAB_EVALUATION_LABEL_FAILURE));
+        int original = lab_dom_get(data, "error");
+        int trimmed = lab_dom_clean(original, LAB_DOM_CLEAN_TRIM),
+            raw = lab_dom_clean(lab_dom_get(data, "raw_error"), LAB_DOM_CLEAN_TRIM);
+        unsigned has_error = mode == LAB_MODE_INTEGRATOR ? lab_dom_length(trimmed) : lab_dom_truth(original);
+        lab_evaluation_error_source_t source = lab_evaluation_error_source(
+            mode, has_error, lab_dom_equal(trimmed, fallback), lab_dom_length(raw));
+        const int messages[] = {
+            [LAB_EVALUATION_ERROR_FALLBACK] = fallback,
+            [LAB_EVALUATION_ERROR_ORIGINAL] = original,
+            [LAB_EVALUATION_ERROR_TRIMMED]  = trimmed,
+            [LAB_EVALUATION_ERROR_RAW]      = raw,
+        };
         int message = lab_dom_type(error) ? error : messages[source];
         lab_evaluation_emit(calls, "setRenderedError", 1, message, 0);
         lab_evaluation_emit(calls, "resetRenderedDigits", 0, 0, 0);
@@ -206,8 +236,8 @@ void lab_evaluation_response(unsigned mode, unsigned outcome, int data, int cont
     if (flags & lab_eval_clear_local)
         lab_evaluation_emit(calls, "setDatetimeLocalText", 1, lab_dom_string(""), 0);
     if (flags & lab_eval_clear) {
-        int options = lab_dom_object(5);
-        lab_dom_set(options, "keepBindings", lab_dom_scalar(1, 1));
+        int options = lab_dom_object(LAB_VALUE_OBJECT);
+        lab_dom_set(options, "keepBindings", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
         lab_evaluation_emit(calls, "clearResultDetails", 1, options, 0);
     }
     if (flags & lab_eval_clear_error)

@@ -13,8 +13,8 @@
  * projects reusable input before returning globals for calculus-control refresh.
  * Request lifetimes and asynchronous browser callbacks remain with their adapters.
  */
+#include "lab_mode.h"
 #include "lab_dom.h"
-#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_layout.h"
 #include "lab_plot_controls.h"
@@ -23,34 +23,39 @@
 #include "lab_result.h"
 #include "lab_view.h"
 #include "lab_workspace.h"
-#define MARS_LAB_WORKSPACE_DOM_INTERNAL_ACCESS
 #include "lab_workspace_dom.h"
+
+/** @brief Calculus action stored on each generated variable button. */
+typedef enum {
+    LAB_WORKSPACE_DERIVATIVE = 0, /**< Differentiate with respect to the button's variable. */
+    LAB_WORKSPACE_INTEGRAL = 1    /**< Integrate with respect to the button's variable. */
+} lab_workspace_calculus_action_t;
 
 /* Validate decoded data without cloning state or substituting the application's default mode catalogue. */
 void lab_workspace_snapshot_validate(int envelope, int mode_names)
 {
-    unsigned kind = lab_dom_type(envelope);
-    if ((kind != 4 && kind != 5) || !lab_dom_property_present(envelope, "state")) {
+    lab_value_kind_t kind = lab_dom_type(envelope);
+    if ((kind != LAB_VALUE_ARRAY && kind != LAB_VALUE_OBJECT) || !lab_dom_property_present(envelope, "state")) {
         lab_dom_return(lab_dom_numeric(-1));
         return;
     }
     int state = lab_dom_get(envelope, "state");
     if (!state) {
         /* Property reads collapse null and undefined handles; compare the original property instead. */
-        int reference = lab_dom_object(5);
+        int reference = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(reference, "state", 0);
         lab_dom_return(lab_dom_properties_equal(envelope, "state", reference, "state") ? 0 : lab_dom_numeric(-2));
         return;
     }
     kind = lab_dom_type(state);
-    if ((kind != 4 && kind != 5) || !lab_dom_property_present(state, "mode") ||
+    if ((kind != LAB_VALUE_ARRAY && kind != LAB_VALUE_OBJECT) || !lab_dom_property_present(state, "mode") ||
         !lab_dom_property_present(state, "text")) {
         lab_dom_return(lab_dom_numeric(-2));
         return;
     }
     int mode = lab_dom_get(state, "mode");
-    unsigned count = lab_dom_type(mode_names) == 4 ? lab_dom_count(mode_names) : 0;
-    if (lab_dom_type(mode) != 3 || lab_dom_type(lab_dom_get(state, "text")) != 3 || count > 7) {
+    unsigned count = lab_dom_type(mode_names) == LAB_VALUE_ARRAY ? lab_dom_count(mode_names) : 0;
+    if (lab_dom_type(mode) != LAB_VALUE_STRING || lab_dom_type(lab_dom_get(state, "text")) != LAB_VALUE_STRING || count > 7) {
         lab_dom_return(lab_dom_numeric(-2));
         return;
     }
@@ -162,12 +167,12 @@ void lab_workspace_dom_references(void)
         {"moreDigitButtons", ".more-digits", 1},
         {"resultCards", ".result-card", 1},
     };
-    int result = lab_dom_object(5);
+    int result = lab_dom_object(LAB_VALUE_OBJECT);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < sizeof fields / sizeof *fields; ++i) {
         int value = fields[i].many ? lab_dom_all(0, fields[i].selector) : lab_dom_id(fields[i].selector);
         if (fields[i].many) {
-            int array = lab_dom_object(4);
+            int array = lab_dom_object(LAB_VALUE_ARRAY);
             unsigned element_mark = lab_dom_mark();
             for (unsigned n = 0; n < lab_dom_count(value); ++n) {
                 lab_dom_push(array, lab_dom_item(value, n));
@@ -181,7 +186,7 @@ void lab_workspace_dom_references(void)
     lab_dom_return(result);
 }
 
-static void lab_workspace_dom_text(int node, unsigned kind, const char *key, const char *text)
+static void lab_workspace_dom_text(int node, lab_dom_accessor_t kind, const char *key, const char *text)
 {
     lab_dom_write(node, kind, key, lab_dom_string(text));
 }
@@ -191,9 +196,9 @@ static void lab_workspace_dom_hidden(const char *selector, int hidden)
     lab_dom_class(lab_dom_query(0, selector), "hidden", hidden);
 }
 
-static int lab_workspace_dom_content(int node, unsigned kind)
+static int lab_workspace_dom_content(int node, lab_dom_accessor_t kind)
 {
-    return lab_dom_length(lab_dom_clean(lab_dom_read(node, kind, ""), 0)) != 0;
+    return lab_dom_length(lab_dom_clean(lab_dom_read(node, kind, ""), LAB_DOM_CLEAN_TRIM)) != 0;
 }
 
 /* Format precision from the controller, returning ordinary browser text to legacy callers. */
@@ -205,11 +210,11 @@ void lab_workspace_dom_precision(void)
 }
 
 /* Copy immutable native labels for callers that inspect the catalogue without projecting it. */
-void lab_workspace_dom_labels(unsigned mode)
+void lab_workspace_dom_labels(lab_mode_t mode)
 {
-    int labels = lab_dom_object(4);
-    for (unsigned i = 0; i < 6; ++i)
-        lab_dom_push(labels, lab_dom_string(lab_view_text(mode, i)));
+    int labels = lab_dom_object(LAB_VALUE_ARRAY);
+    for (lab_view_label_t field = LAB_VIEW_TITLE; field <= LAB_VIEW_VALUE; ++field)
+        lab_dom_push(labels, lab_dom_string(lab_view_text(mode, field)));
     lab_dom_return(labels);
 }
 
@@ -219,7 +224,7 @@ void lab_workspace_dom_status(int text)
     unsigned bits = lab_workspace_requested_precision(lab_workspace_mode());
     int digits = lab_dom_format(lab_workspace_digits(bits), " · ", " digits / ");
     int status = lab_dom_join(text, digits, "");
-    lab_dom_write(lab_dom_query(0, "#status"), 0, "", lab_dom_join(status, lab_dom_format(bits, "", " bits"), ""));
+    lab_dom_write(lab_dom_query(0, "#status"), LAB_DOM_TEXT, "", lab_dom_join(status, lab_dom_format(bits, "", " bits"), ""));
 }
 
 /* Apply one selected tab and its keyboard/accessibility state to the supplied registration list. */
@@ -228,10 +233,10 @@ void lab_workspace_dom_tabs(int tabs, int mode)
     for (unsigned i = 0; i < lab_dom_count(tabs); ++i) {
         unsigned mark = lab_dom_mark();
         int tab = lab_dom_item(tabs, i);
-        int active = lab_dom_equal(lab_dom_read(tab, 3, "mode"), mode);
+        int active = lab_dom_equal(lab_dom_read(tab, LAB_DOM_DATASET, "mode"), mode);
         lab_dom_class(tab, "active", active);
-        lab_workspace_dom_text(tab, 2, "aria-selected", active ? "true" : "false");
-        lab_workspace_dom_text(tab, 2, "tabindex", active ? "0" : "-1");
+        lab_workspace_dom_text(tab, LAB_DOM_ATTRIBUTE, "aria-selected", active ? "true" : "false");
+        lab_workspace_dom_text(tab, LAB_DOM_ATTRIBUTE, "tabindex", active ? "0" : "-1");
         lab_dom_release(mark);
     }
 }
@@ -239,10 +244,10 @@ void lab_workspace_dom_tabs(int tabs, int mode)
 /* Install the four titles and expose Function execution only for its native representation. */
 void lab_workspace_dom_titles(int rendered, int parsed, int function, int value)
 {
-    lab_dom_write(lab_dom_query(0, "#renderedTitle"), 0, "", rendered);
-    lab_dom_write(lab_dom_query(0, "#parsedTitle"), 0, "", parsed);
-    lab_dom_write(lab_dom_query(0, "#functionTitle"), 0, "", function);
-    lab_dom_write(lab_dom_query(0, "#valueTitle"), 0, "", value);
+    lab_dom_write(lab_dom_query(0, "#renderedTitle"), LAB_DOM_TEXT, "", rendered);
+    lab_dom_write(lab_dom_query(0, "#parsedTitle"), LAB_DOM_TEXT, "", parsed);
+    lab_dom_write(lab_dom_query(0, "#functionTitle"), LAB_DOM_TEXT, "", function);
+    lab_dom_write(lab_dom_query(0, "#valueTitle"), LAB_DOM_TEXT, "", value);
     lab_workspace_dom_hidden("#functionRun", !lab_dom_equal(function, lab_dom_string("Function")));
 }
 
@@ -252,12 +257,12 @@ static void lab_workspace_dom_card(int card, int visible)
         return;
     int id = lab_dom_card_id(card);
     if (!visible && id >= 0 && lab_view_card_expanded() == id)
-        lab_layout_expand(0, 2);
+        lab_layout_expand(0, LAB_LAYOUT_EXPANSION_COLLAPSE);
     lab_dom_class(card, "hidden", !visible);
 }
 
 /* Hiding an auxiliary card relinquishes expansion without changing card zoom. */
-void lab_workspace_dom_aux(int visible)
+void lab_workspace_dom_aux(bool visible)
 {
     static const char *const selectors[] = {"#parsed", "#functionStyle", "#value"};
     for (unsigned i = 0; i < sizeof selectors / sizeof *selectors; ++i) {
@@ -268,23 +273,23 @@ void lab_workspace_dom_aux(int visible)
 }
 
 /* Keep the hidden attribute and class aligned while allowing expansion CSS to control display. */
-void lab_workspace_dom_value(int visible)
+void lab_workspace_dom_value(bool visible)
 {
     int card = lab_dom_query(0, "#valueCard");
     lab_workspace_dom_card(card, visible);
     if (visible)
         lab_dom_remove(card, "hidden");
     else
-        lab_workspace_dom_text(card, 2, "hidden", "");
-    lab_workspace_dom_text(card, 4, "display", "");
+        lab_workspace_dom_text(card, LAB_DOM_ATTRIBUTE, "hidden", "");
+    lab_workspace_dom_text(card, LAB_DOM_STYLE, "display", "");
 }
 
 /* Project native mode policy and labels; supplied coverage text remains opaque catalogue data. */
-void lab_workspace_dom_mode(unsigned mode, int coverage)
+void lab_workspace_dom_mode(lab_mode_t mode, int coverage)
 {
     lab_precision_close(0);
-    if (mode >= 7)
-        mode = 0;
+    if ((unsigned)mode >= LAB_MODE_COUNT)
+        mode = LAB_MODE_EXPRESSION;
     static const char *const panels[] = {"",
                                          "#equationControls",
                                          "#diffequationControls",
@@ -295,37 +300,42 @@ void lab_workspace_dom_mode(unsigned mode, int coverage)
     static const char *const classes[] = {
         "", "", "diffequation-mode", "matrix-mode", "", "datetime-mode", "almanac-mode"};
     int body = lab_dom_query(0, "body");
-    for (unsigned i = 1; i < 7; ++i) {
-        lab_workspace_dom_hidden(panels[i], i != mode);
-        if (*classes[i])
-            lab_dom_class(body, classes[i], i == mode);
+    for (lab_mode_t panel = LAB_MODE_EQUATION; panel < LAB_MODE_COUNT; ++panel) {
+        lab_workspace_dom_hidden(panels[panel], panel != mode);
+        if (*classes[panel])
+            lab_dom_class(body, classes[panel], panel == mode);
     }
-    unsigned flags = lab_view_mode_flags(mode, lab_workspace_dom_content(lab_dom_query(0, "#value"), 0));
-    lab_workspace_dom_hidden("#datetimeLocal",
-                             mode != 5 || !lab_workspace_dom_content(lab_dom_query(0, "#datetimeLocalBody"), 0));
+    unsigned flags = lab_view_mode_flags(mode, lab_workspace_dom_content(lab_dom_query(0, "#value"), LAB_DOM_TEXT));
+    lab_workspace_dom_hidden(
+        "#datetimeLocal",
+        mode != LAB_MODE_DATETIME || !lab_workspace_dom_content(lab_dom_query(0, "#datetimeLocalBody"), LAB_DOM_TEXT));
     if (!(flags & 16))
         lab_workspace_dom_hidden("#targetRow", 1);
-    lab_workspace_dom_hidden("#derivativeButtons", !(flags & 8) && mode != 1 && mode != 2);
+    lab_workspace_dom_hidden("#derivativeButtons",
+                             !(flags & 8) && mode != LAB_MODE_EQUATION && mode != LAB_MODE_DIFFERENTIAL_EQUATION);
     lab_workspace_dom_hidden("#goalSeek", !(flags & 16));
-    lab_workspace_dom_hidden("#plotRange", mode > 2 && mode != 4);
-    lab_workspace_dom_hidden("#plotCard", (mode > 2 && mode != 4) ||
-                             !lab_workspace_dom_content(lab_dom_query(0, "#plotRendered"), 0));
-    lab_workspace_dom_text(lab_dom_query(0, "#leftPaneTitle"), 0, "", lab_view_text(mode, 0));
+    lab_workspace_dom_hidden("#plotRange", mode > LAB_MODE_DIFFERENTIAL_EQUATION && mode != LAB_MODE_INTEGRATOR);
+    lab_workspace_dom_hidden("#plotCard", (mode > LAB_MODE_DIFFERENTIAL_EQUATION && mode != LAB_MODE_INTEGRATOR) ||
+                             !lab_workspace_dom_content(lab_dom_query(0, "#plotRendered"), LAB_DOM_TEXT));
+    lab_workspace_dom_text(lab_dom_query(0, "#leftPaneTitle"), LAB_DOM_TEXT, "", lab_view_text(mode, LAB_VIEW_TITLE));
     int showing_help = lab_dom_has_class(lab_dom_query(0, "#labWorkspace"), "help-open");
-    lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), 0, "", showing_help ? "Help" : "Result");
-    int subtitle = lab_dom_string(lab_view_text(mode, 1));
-    lab_dom_write(lab_dom_query(0, "#subtitle"), 0, "", mode == 6 ? lab_dom_join(subtitle, coverage, ".") : subtitle);
-    lab_workspace_dom_titles(lab_dom_string(lab_view_text(mode, 2)), lab_dom_string(lab_view_text(mode, 3)),
-                             lab_dom_string(lab_view_text(mode, 4)), lab_dom_string(lab_view_text(mode, 5)));
+    lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), LAB_DOM_TEXT, "", showing_help ? "Help" : "Result");
+    int subtitle = lab_dom_string(lab_view_text(mode, LAB_VIEW_SUBTITLE));
+    lab_dom_write(lab_dom_query(0, "#subtitle"), LAB_DOM_TEXT, "",
+                  mode == LAB_MODE_ALMANAC ? lab_dom_join(subtitle, coverage, ".") : subtitle);
+    lab_workspace_dom_titles(lab_dom_string(lab_view_text(mode, LAB_VIEW_RENDERED)),
+                             lab_dom_string(lab_view_text(mode, LAB_VIEW_PARSED)),
+                             lab_dom_string(lab_view_text(mode, LAB_VIEW_FUNCTION)),
+                             lab_dom_string(lab_view_text(mode, LAB_VIEW_VALUE)));
     lab_workspace_dom_aux(!!(flags & 1));
     lab_workspace_dom_value(!!(flags & 2));
 }
 
 /* Only matrix solve and multiply display the second operand. */
-void lab_workspace_dom_matrix(unsigned mode)
+void lab_workspace_dom_matrix(lab_mode_t mode)
 {
-    int operation = lab_dom_read(lab_dom_query(0, "#matrixOperation"), 5, "");
-    int needed = mode == 3 && (lab_dom_equal(operation, lab_dom_string("solve")) ||
+    int operation = lab_dom_read(lab_dom_query(0, "#matrixOperation"), LAB_DOM_VALUE, "");
+    int needed = mode == LAB_MODE_MATRIX && (lab_dom_equal(operation, lab_dom_string("solve")) ||
                                lab_dom_equal(operation, lab_dom_string("multiply")));
     lab_workspace_dom_hidden("#matrixOperand", !needed);
     lab_workspace_dom_hidden("#matrixOperandLabel", !needed);
@@ -337,12 +347,12 @@ void lab_workspace_dom_help_cards(int cards, int mode)
     for (unsigned i = 0; i < lab_dom_count(cards); ++i) {
         unsigned mark = lab_dom_mark();
         int card = lab_dom_item(cards, i);
-        int tags = lab_dom_split(lab_dom_read(card, 3, "helpModes"), ",");
+        int tags = lab_dom_split(lab_dom_read(card, LAB_DOM_DATASET, "helpModes"), ",");
         int restricted = 0, matches = 0;
         /* Visit the card's authored tags, retaining only one temporary string at a time. */
         for (unsigned j = 0; j < lab_dom_count(tags); ++j) {
             unsigned token_mark = lab_dom_mark();
-            int tag = lab_dom_clean(lab_dom_item(tags, j), 0);
+            int tag = lab_dom_clean(lab_dom_item(tags, j), LAB_DOM_CLEAN_TRIM);
             restricted |= lab_dom_length(tag) != 0;
             matches |= lab_dom_equal(tag, mode);
             lab_dom_release(token_mark);
@@ -353,38 +363,38 @@ void lab_workspace_dom_help_cards(int cards, int mode)
 }
 
 /* Full-width help preserves the worksheet; its visible return action owns keyboard focus. */
-void lab_workspace_dom_help(unsigned action)
+void lab_workspace_dom_help(lab_workspace_help_action_t action)
 {
-    if (action > 2)
+    if ((unsigned)action > LAB_WORKSPACE_TOGGLE_HELP)
         return;
     int was_showing = !lab_dom_has_class(lab_dom_query(0, "#helpPane"), "hidden");
-    int showing = action == 1 || (action == 2 && !was_showing);
+    int showing = action == LAB_WORKSPACE_SHOW_HELP || (action == LAB_WORKSPACE_TOGGLE_HELP && !was_showing);
     if (showing && lab_view_card_expanded() >= 0)
-        lab_layout_expand(0, 2);
+        lab_layout_expand(0, LAB_LAYOUT_EXPANSION_COLLAPSE);
     lab_dom_class(lab_dom_query(0, "#labWorkspace"), "help-open", showing);
     lab_workspace_dom_hidden("#resultPane", showing);
     lab_workspace_dom_hidden("#helpPane", !showing);
     lab_workspace_dom_hidden("#helpClose", !showing);
-    lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), 0, "", showing ? "Help" : "Result");
+    lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), LAB_DOM_TEXT, "", showing ? "Help" : "Result");
     int input = lab_dom_query(0, "#resultUseInput");
-    lab_dom_class(input, "hidden", showing || !lab_dom_length(lab_dom_read(input, 3, "inputText")));
-    lab_workspace_dom_text(lab_dom_query(0, "#help"), 0, "", showing ? "Result" : "Help");
-    lab_workspace_dom_text(lab_dom_query(0, "#help"), 2, "aria-expanded", showing ? "true" : "false");
+    lab_dom_class(input, "hidden", showing || !lab_dom_length(lab_dom_read(input, LAB_DOM_DATASET, "inputText")));
+    lab_workspace_dom_text(lab_dom_query(0, "#help"), LAB_DOM_TEXT, "", showing ? "Result" : "Help");
+    lab_workspace_dom_text(lab_dom_query(0, "#help"), LAB_DOM_ATTRIBUTE, "aria-expanded", showing ? "true" : "false");
     if (showing != was_showing)
-        lab_dom_effect(lab_dom_query(0, showing ? "#helpClose" : "#help"), 0);
-    if (action)
+        lab_dom_effect(lab_dom_query(0, showing ? "#helpClose" : "#help"), LAB_DOM_EFFECT_FOCUS);
+    if (action != LAB_WORKSPACE_SHOW_RESULTS)
         lab_workspace_dom_status(lab_dom_string(showing ? "Help" : "Ready"));
 }
 
 /* Reveal the goal input before queuing browser focus and selection effects. */
-void lab_workspace_dom_target(int visible)
+void lab_workspace_dom_target(bool visible)
 {
     lab_workspace_dom_hidden("#targetRow", !visible);
-    lab_workspace_dom_text(lab_dom_query(0, "#goalSeek"), 0, "", visible ? "Run goal seek" : "Goal seek");
+    lab_workspace_dom_text(lab_dom_query(0, "#goalSeek"), LAB_DOM_TEXT, "", visible ? "Run goal seek" : "Goal seek");
     if (visible) {
         int target = lab_dom_query(0, "#goalTarget");
-        lab_dom_effect(target, 0);
-        lab_dom_effect(target, 3);
+        lab_dom_effect(target, LAB_DOM_EFFECT_FOCUS);
+        lab_dom_effect(target, LAB_DOM_EFFECT_SELECT);
         lab_workspace_dom_status(lab_dom_string("Enter target"));
     }
 }
@@ -395,32 +405,34 @@ void lab_workspace_dom_precision_preview(unsigned bits)
     int slider = lab_dom_query(0, "#precisionSlider");
     int digits = lab_dom_format(lab_workspace_digits(bits), bits > 6656 ? "Custom: " : "", " digits");
     int description = lab_dom_join(digits, lab_dom_format(bits, " / ", " bits"), "");
-    lab_dom_write(slider, 2, "aria-valuetext", description);
-    lab_dom_write(slider, 2, "title", description);
-    lab_dom_write(lab_dom_query(0, "#precisionValue"), 0, "", digits);
+    lab_dom_write(slider, LAB_DOM_ATTRIBUTE, "aria-valuetext", description);
+    lab_dom_write(slider, LAB_DOM_ATTRIBUTE, "title", description);
+    lab_dom_write(lab_dom_query(0, "#precisionValue"), LAB_DOM_TEXT, "", digits);
 }
 
 /* Refresh the range position only outside an active input preview. */
 void lab_workspace_dom_precision_slider(unsigned bits)
 {
     int slider = lab_dom_query(0, "#precisionSlider");
-    lab_dom_write(slider, 2, "min", lab_dom_string("0"));
-    lab_dom_write(slider, 2, "max", lab_dom_string("103"));
-    lab_dom_write(slider, 2, "step", lab_dom_string("1"));
-    lab_dom_write(slider, 5, "", lab_dom_text(lab_dom_numeric(lab_workspace_precision_slider_position(bits))));
+    lab_dom_write(slider, LAB_DOM_ATTRIBUTE, "min", lab_dom_string("0"));
+    lab_dom_write(slider, LAB_DOM_ATTRIBUTE, "max", lab_dom_string("103"));
+    lab_dom_write(slider, LAB_DOM_ATTRIBUTE, "step", lab_dom_string("1"));
+    lab_dom_write(slider, LAB_DOM_VALUE, "", lab_dom_text(lab_dom_numeric(lab_workspace_precision_slider_position(bits))));
     lab_workspace_dom_precision_preview(bits);
 }
 
 /* Project native availability and refresh the slider from this mode's saved precision. */
-void lab_workspace_dom_controls(unsigned mode, int busy, int ready, unsigned back, unsigned forward, int goal,
-                                int minimum, int maximum)
+void lab_workspace_dom_controls(lab_mode_t mode, bool busy, bool ready, unsigned back, unsigned forward, bool goal,
+                                bool minimum, bool maximum)
 {
     unsigned enabled = lab_view_controls(mode, busy, ready, back, forward, goal, minimum, maximum);
     static const char *const selectors[] = {"#run", "#back", "#forward", "#goalSeek"};
     for (unsigned i = 0; i < sizeof selectors / sizeof *selectors; ++i)
         lab_dom_disabled(lab_dom_query(0, selectors[i]), !(enabled & (1u << i)));
-    lab_workspace_dom_text(lab_dom_query(0, "#goalSeek"), 2, "title",
-                           !(enabled & 8) && !busy && mode == 0 ? "Goal seek needs at least one variable binding" : "");
+    lab_workspace_dom_text(lab_dom_query(0, "#goalSeek"), LAB_DOM_ATTRIBUTE, "title",
+                           !(enabled & 8) && !busy && mode == LAB_MODE_EXPRESSION
+                               ? "Goal seek needs at least one variable binding"
+                               : "");
     lab_dom_disabled(lab_dom_query(0, "#precisionSlider"), busy);
     lab_dom_disabled(lab_dom_id("precisionCustomToggle"), busy);
     if (busy)
@@ -437,9 +449,9 @@ static void lab_workspace_dom_disable_list(int controls, int busy, int preserve)
             lab_dom_disabled(control, busy);
         } else if (busy) {
             if (!lab_dom_truth(lab_dom_get(control, "disabled")))
-                lab_workspace_dom_text(control, 3, "busyDisabled", "1");
+                lab_workspace_dom_text(control, LAB_DOM_DATASET, "busyDisabled", "1");
             lab_dom_disabled(control, 1);
-        } else if (lab_dom_equal(lab_dom_read(control, 3, "busyDisabled"), lab_dom_string("1"))) {
+        } else if (lab_dom_equal(lab_dom_read(control, LAB_DOM_DATASET, "busyDisabled"), lab_dom_string("1"))) {
             lab_dom_disabled(control, 0);
             lab_dom_remove(control, "data-busy-disabled");
         }
@@ -448,7 +460,7 @@ static void lab_workspace_dom_disable_list(int controls, int busy, int preserve)
 }
 
 /* Repeated busy notifications preserve the initial disabled state of calendar and bounds controls. */
-void lab_workspace_dom_busy(int busy, int equation_variable, int copies, int digits)
+void lab_workspace_dom_busy(bool busy, int equation_variable, int copies, int digits)
 {
     static const char *const retained[] = {"#integratorBoundStack", "#datetimeControls", "#almanacControls"};
     /* Scope each bounded control group so large result SVGs are never traversed. */
@@ -473,27 +485,27 @@ void lab_workspace_dom_busy(int busy, int equation_variable, int copies, int dig
 }
 
 /* Apply running styling without leaving a false aria-busy attribute behind. */
-void lab_workspace_dom_running(int button, int running)
+void lab_workspace_dom_running(int button, bool running)
 {
     lab_dom_class(button, "action-running", running);
     if (running)
-        lab_workspace_dom_text(button, 2, "aria-busy", "true");
+        lab_workspace_dom_text(button, LAB_DOM_ATTRIBUTE, "aria-busy", "true");
     else
         lab_dom_remove(button, "aria-busy");
 }
 
 /* Disconnected, collapsed and zero-height editors cannot acquire a manual resize grip. */
-int lab_workspace_dom_editor_visible(int editor)
+bool lab_workspace_dom_editor_visible(int editor)
 {
-    return lab_dom_measure(editor, 12) != 0 && lab_dom_measure(editor, 10) > 0;
+    return lab_dom_measure(editor, LAB_DOM_MEASURE_VISIBLE) != 0 && lab_dom_measure(editor, LAB_DOM_MEASURE_CLIENT_HEIGHT) > 0;
 }
 
 static void lab_workspace_dom_editor_clear(int editor)
 {
     lab_dom_class(editor, "editor-manual-size", 0);
     lab_dom_class(editor, "editor-space-limited", 0);
-    lab_workspace_dom_text(editor, 4, "height", "");
-    lab_workspace_dom_text(editor, 4, "max-height", "");
+    lab_workspace_dom_text(editor, LAB_DOM_STYLE, "height", "");
+    lab_workspace_dom_text(editor, LAB_DOM_STYLE, "max-height", "");
     lab_dom_remove(editor, "data-automatic-height");
 }
 
@@ -525,19 +537,21 @@ void lab_workspace_dom_editor_resize(int editors, double viewport)
             continue;
         }
         int manual = lab_dom_has_class(editor, "editor-manual-size");
-        const double *size = lab_view_editor_resize(viewport, visible, lab_dom_measure(editor, 11),
-                                                    lab_dom_measure(editor, 10), lab_dom_measure(editor, 4),
-                                                    lab_dom_number(lab_dom_read(editor, 3, "automaticHeight")), manual);
+        const double *size = lab_view_editor_resize(
+            viewport, visible, lab_dom_measure(editor, LAB_DOM_MEASURE_SCROLL_HEIGHT),
+            lab_dom_measure(editor, LAB_DOM_MEASURE_CLIENT_HEIGHT),
+            lab_dom_measure(editor, LAB_DOM_MEASURE_RECT_HEIGHT),
+            lab_dom_number(lab_dom_read(editor, LAB_DOM_DATASET, "automaticHeight")), manual);
         if (size) {
             unsigned flags = (unsigned)size[0];
             if (flags & 1) {
                 lab_dom_class(editor, "editor-manual-size", 1);
                 lab_dom_class(editor, "editor-space-limited", !!(flags & 2));
                 if (!manual) {
-                    lab_dom_write(editor, 3, "automaticHeight", lab_dom_format(size[1], "", ""));
-                    lab_dom_write(editor, 4, "height", lab_dom_format(size[1], "", "px"));
+                    lab_dom_write(editor, LAB_DOM_DATASET, "automaticHeight", lab_dom_format(size[1], "", ""));
+                    lab_dom_write(editor, LAB_DOM_STYLE, "height", lab_dom_format(size[1], "", "px"));
                 }
-                lab_dom_write(editor, 4, "max-height", lab_dom_format(size[2], "", "px"));
+                lab_dom_write(editor, LAB_DOM_STYLE, "max-height", lab_dom_format(size[2], "", "px"));
             } else {
                 lab_workspace_dom_editor_clear(editor);
             }
@@ -547,28 +561,29 @@ void lab_workspace_dom_editor_resize(int editors, double viewport)
 }
 
 /* Build ordered calculus and expression-plot actions from opaque names and native display labels. */
-void lab_workspace_dom_derivatives(int names, int labels, int differentiable)
+void lab_workspace_dom_derivatives(int names, int labels, bool differentiable)
 {
     int panel = lab_dom_query(0, "#derivativeButtons");
-    lab_workspace_dom_text(panel, 0, "", "");
+    lab_workspace_dom_text(panel, LAB_DOM_TEXT, "", "");
     if (!panel)
         return;
     static const char *const suffixes[] = {" derivative", " integral"};
     int plots = !lab_dom_has_class(lab_dom_query(0, "#plotRange"), "hidden");
     if (plots)
         lab_plot_controls_variables(names, labels);
-    for (unsigned action = 0; action < 2; ++action) {
+    for (lab_workspace_calculus_action_t action = LAB_WORKSPACE_DERIVATIVE; action <= LAB_WORKSPACE_INTEGRAL;
+         ++action) {
         if (!differentiable)
             continue;
         for (unsigned i = 0; i < lab_dom_count(names); ++i) {
             unsigned mark = lab_dom_mark();
             int button = lab_dom_create("button"), label = lab_dom_create("i"), suffix = lab_dom_create("span");
             lab_dom_class(button, "secondary", 1);
-            lab_workspace_dom_text(button, 2, "type", "button");
-            lab_dom_write(button, 3, "variable", lab_dom_item(names, i));
-            lab_dom_write(button, 3, "calculusAction", lab_dom_format(action, "", ""));
-            lab_dom_write(label, 0, "", lab_dom_item(labels, i));
-            lab_workspace_dom_text(suffix, 0, "", suffixes[action]);
+            lab_workspace_dom_text(button, LAB_DOM_ATTRIBUTE, "type", "button");
+            lab_dom_write(button, LAB_DOM_DATASET, "variable", lab_dom_item(names, i));
+            lab_dom_write(button, LAB_DOM_DATASET, "calculusAction", lab_dom_format(action, "", ""));
+            lab_dom_write(label, LAB_DOM_TEXT, "", lab_dom_item(labels, i));
+            lab_workspace_dom_text(suffix, LAB_DOM_TEXT, "", suffixes[action]);
             lab_dom_append(button, label);
             lab_dom_append(button, suffix);
             lab_dom_append(panel, button);
@@ -580,10 +595,10 @@ void lab_workspace_dom_derivatives(int names, int labels, int differentiable)
 }
 
 /* Reuse native binding labels and the existing calculus renderer with bounded temporary handles. */
-void lab_workspace_dom_calculus(int names, int differentiable)
+void lab_workspace_dom_calculus(int names, bool differentiable)
 {
     unsigned scope = lab_dom_mark();
-    int labels = lab_dom_object(4);
+    int labels = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < lab_dom_count(names); ++i) {
         lab_dom_push(labels, lab_binding_label_value(lab_dom_item(names, i)));
@@ -595,7 +610,7 @@ void lab_workspace_dom_calculus(int names, int differentiable)
 
 static int lab_workspace_dom_copy_object(int source)
 {
-    int copy = lab_dom_object(5), keys = lab_dom_keys(source);
+    int copy = lab_dom_object(LAB_VALUE_OBJECT), keys = lab_dom_keys(source);
     for (unsigned i = 0; i < lab_dom_count(keys); ++i) {
         unsigned mark = lab_dom_mark();
         int key = lab_dom_item(keys, i);
@@ -607,7 +622,7 @@ static int lab_workspace_dom_copy_object(int source)
 
 static int lab_workspace_dom_capture(int node, int button)
 {
-    int state = lab_dom_object(5);
+    int state = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(state, "className", lab_dom_get(node, "className"));
     if (button) {
         lab_dom_set(state, "textContent", lab_dom_get(node, "textContent"));
@@ -621,21 +636,21 @@ static int lab_workspace_dom_capture(int node, int button)
 }
 
 /* Capture only the presentation fields restored by a mode change, copying the dataset by value. */
-void lab_workspace_dom_snapshot(int node, int button)
+void lab_workspace_dom_snapshot(int node, bool button)
 {
     lab_dom_return(lab_workspace_dom_capture(node, button));
 }
 
 /* Remove obsolete dataset entries before restoring the captured, opaque native presentation. */
-void lab_workspace_dom_restore(int node, int state, int button)
+void lab_workspace_dom_restore(int node, int state, bool button)
 {
-    lab_dom_write(node, 2, "class", lab_dom_get(state, "className"));
+    lab_dom_write(node, LAB_DOM_ATTRIBUTE, "class", lab_dom_get(state, "className"));
     if (button) {
-        lab_dom_write(node, 0, "", lab_dom_get(state, "textContent"));
+        lab_dom_write(node, LAB_DOM_TEXT, "", lab_dom_get(state, "textContent"));
         lab_dom_disabled(node, lab_dom_truth(lab_dom_get(state, "disabled")));
     } else {
-        lab_dom_write(node, 2, "style", lab_dom_get(state, "style"));
-        lab_dom_write(node, 1, "", lab_dom_get(state, "innerHTML"));
+        lab_dom_write(node, LAB_DOM_ATTRIBUTE, "style", lab_dom_get(state, "style"));
+        lab_dom_write(node, LAB_DOM_HTML, "", lab_dom_get(state, "innerHTML"));
     }
     int dataset = lab_dom_get(node, "dataset"), keys = lab_dom_keys(dataset);
     for (unsigned i = 0; i < lab_dom_count(keys); ++i) {
@@ -654,13 +669,13 @@ void lab_workspace_dom_restore(int node, int state, int button)
 }
 
 /* A native rendered fragment or nonblank text in any auxiliary result is worth retaining. */
-int lab_workspace_dom_has_result(void)
+bool lab_workspace_dom_has_result(void)
 {
     static const char *const selectors[] = {"#rendered", "#parsed", "#functionStyle", "#value"};
     for (unsigned i = 0; i < sizeof selectors / sizeof *selectors; ++i)
-        if (lab_workspace_dom_content(lab_dom_query(0, selectors[i]), i == 0 ? 1 : 0))
-            return 1;
-    return 0;
+        if (lab_workspace_dom_content(lab_dom_query(0, selectors[i]), i == 0 ? LAB_DOM_HTML : LAB_DOM_TEXT))
+            return true;
+    return false;
 }
 
 static const struct {
@@ -678,14 +693,14 @@ static const char *const lab_workspace_dom_result_titles[] = {
 /* Share the exact metadata defaults between snapshot capture and legacy snapshot restoration. */
 static int lab_workspace_dom_result_metadata(int source)
 {
-    int state = lab_dom_object(5);
+    int state = lab_dom_object(LAB_VALUE_OBJECT);
     static const char *const text_fields[] = {"lastTex", "lastDerivativeExpression"};
     for (unsigned i = 0; i < sizeof text_fields / sizeof *text_fields; ++i) {
         int value = lab_dom_get(source, text_fields[i]);
         lab_dom_set(state, text_fields[i], lab_dom_truth(value) ? value : lab_dom_string(""));
     }
-    int variables = lab_dom_get(source, "currentVariables"), copy = lab_dom_object(4);
-    unsigned count = lab_dom_type(variables) == 4 ? lab_dom_count(variables) : 0;
+    int variables = lab_dom_get(source, "currentVariables"), copy = lab_dom_object(LAB_VALUE_ARRAY);
+    unsigned count = lab_dom_type(variables) == LAB_VALUE_ARRAY ? lab_dom_count(variables) : 0;
     unsigned mark = lab_dom_mark();
     /* Copy every opaque variable in order; bounded scopes also cover long discovery lists. */
     for (unsigned i = 0; i < count; ++i) {
@@ -693,8 +708,8 @@ static int lab_workspace_dom_result_metadata(int source)
         lab_dom_release(mark);
     }
     lab_dom_set(state, "currentVariables", copy);
-    int differentiable = !lab_dom_equal(lab_dom_get(source, "currentDifferentiable"), lab_dom_scalar(1, 0));
-    lab_dom_set(state, "currentDifferentiable", lab_dom_scalar(1, differentiable));
+    int differentiable = !lab_dom_equal(lab_dom_get(source, "currentDifferentiable"), lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
+    lab_dom_set(state, "currentDifferentiable", lab_dom_scalar(LAB_VALUE_BOOLEAN, differentiable));
     return state;
 }
 
@@ -703,7 +718,7 @@ void lab_workspace_dom_result_states(void)
 {
     static const char *const modes[] = {
         "expression", "equation", "diffequation", "matrix", "integrator", "datetime", "almanac"};
-    int states = lab_dom_object(5);
+    int states = lab_dom_object(LAB_VALUE_OBJECT);
     for (unsigned i = 0; i < sizeof modes / sizeof *modes; ++i)
         lab_dom_set(states, modes[i], 0);
     lab_dom_return(states);
@@ -718,9 +733,9 @@ void lab_workspace_dom_result_save(int metadata)
     }
     lab_layout_plot_camera(1);
     int state = lab_workspace_dom_result_metadata(metadata);
-    int titles = lab_dom_object(4);
+    int titles = lab_dom_object(LAB_VALUE_ARRAY);
     for (unsigned i = 0; i < sizeof lab_workspace_dom_result_titles / sizeof *lab_workspace_dom_result_titles; ++i) {
-        int text = lab_dom_read(lab_dom_query(0, lab_workspace_dom_result_titles[i]), 0, "");
+        int text = lab_dom_read(lab_dom_query(0, lab_workspace_dom_result_titles[i]), LAB_DOM_TEXT, "");
         if (!i && lab_dom_equal(text, lab_dom_string("Help")))
             text = lab_dom_string("Result");
         lab_dom_push(titles, text);
@@ -733,7 +748,7 @@ void lab_workspace_dom_result_save(int metadata)
                     lab_workspace_dom_capture(node, lab_workspace_dom_result_fields[i].button));
         lab_dom_release(mark);
     }
-    lab_dom_set(state, "resultInputText", lab_dom_read(lab_dom_query(0, "#resultUseInput"), 3, "inputText"));
+    lab_dom_set(state, "resultInputText", lab_dom_read(lab_dom_query(0, "#resultUseInput"), LAB_DOM_DATASET, "inputText"));
     lab_dom_set(state, "plotSlices", lab_dom_get(lab_dom_id("plotSlices"), "marsSliceRecords"));
     lab_dom_set(state, "plotSliceSelected", lab_dom_get(lab_dom_id("plotSlices"), "marsSliceSelected"));
     lab_dom_set(state, "plotSliceModes", lab_dom_get(lab_dom_id("plotSlices"), "marsSliceModes"));
@@ -751,9 +766,9 @@ void lab_workspace_dom_result_restore(int state)
     lab_plot_slices_apply(lab_dom_get(state, "plotSlices"), lab_dom_string(""));
     lab_result_render_invalidate();
     lab_result_solver_invalidate();
-    lab_layout_expand(0, 2);
+    lab_layout_expand(0, LAB_LAYOUT_EXPANSION_COLLAPSE);
     int showing_help = lab_dom_has_class(lab_dom_query(0, "#labWorkspace"), "help-open");
-    lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), 0, "", showing_help ? "Help" : "Result");
+    lab_workspace_dom_text(lab_dom_query(0, "#rightPaneTitle"), LAB_DOM_TEXT, "", showing_help ? "Help" : "Result");
     if (!lab_dom_truth(state)) {
         lab_dom_return(0);
         return;
@@ -762,7 +777,7 @@ void lab_workspace_dom_result_restore(int state)
     for (unsigned i = 0; i < sizeof lab_workspace_dom_result_titles / sizeof *lab_workspace_dom_result_titles; ++i) {
         int text = lab_dom_item(titles, i);
         if (lab_dom_truth(text) && (i || !showing_help))
-            lab_dom_write(lab_dom_query(0, lab_workspace_dom_result_titles[i]), 0, "", text);
+            lab_dom_write(lab_dom_query(0, lab_workspace_dom_result_titles[i]), LAB_DOM_TEXT, "", text);
     }
     for (unsigned i = 0; i < sizeof lab_workspace_dom_result_fields / sizeof *lab_workspace_dom_result_fields; ++i) {
         unsigned mark = lab_dom_mark();
@@ -771,11 +786,11 @@ void lab_workspace_dom_result_restore(int state)
                                   lab_workspace_dom_result_fields[i].button);
         lab_dom_release(mark);
     }
-    lab_workspace_dom_hidden("#plotCard", !lab_workspace_dom_content(lab_dom_id("plotRendered"), 1));
-    if (lab_dom_equal(lab_dom_read(lab_dom_id("plotRendered"), 3, "plotPending"), lab_dom_string("true")))
+    lab_workspace_dom_hidden("#plotCard", !lab_workspace_dom_content(lab_dom_id("plotRendered"), LAB_DOM_HTML));
+    if (lab_dom_equal(lab_dom_read(lab_dom_id("plotRendered"), LAB_DOM_DATASET, "plotPending"), lab_dom_string("true")))
         lab_layout_plot(0, lab_dom_string("Plot cancelled when leaving this mode. Evaluate to generate it again."));
     else
-        lab_dom_write(lab_dom_id("plotRendered"), 2, "aria-busy", lab_dom_string("false"));
+        lab_dom_write(lab_dom_id("plotRendered"), LAB_DOM_ATTRIBUTE, "aria-busy", lab_dom_string("false"));
     /* Restored markup has fresh nodes: reconnect dynamic plot controls before accepting input. */
     lab_layout_plot_camera(0);
     lab_layout_zoom(lab_dom_id("plotCard"));
@@ -783,6 +798,6 @@ void lab_workspace_dom_result_restore(int state)
     lab_result_input_set(lab_dom_get(state, "resultInputText"));
     int metadata = lab_workspace_dom_result_metadata(state);
     /* Reused result input never inherits the previous mode's evaluation bindings. */
-    lab_dom_set(metadata, "resultInputBindings", lab_dom_object(4));
+    lab_dom_set(metadata, "resultInputBindings", lab_dom_object(LAB_VALUE_ARRAY));
     lab_dom_return(metadata);
 }

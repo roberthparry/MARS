@@ -11,23 +11,29 @@
  */
 #include <stdarg.h>
 
+#include "lab_mode.h"
 #include "lab_dom.h"
 #include "lab_editor.h"
-#define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding.h"
 #include "lab_binding_editor.h"
 #include "lab_evaluation_install.h"
 
 typedef struct {
     int calls, data, context, cards, view;
-    unsigned mode, outcome;
+    lab_mode_t mode;
+    lab_request_outcome_t outcome;
 } lab_evaluation_install_t;
 
+/**
+ * @brief Append one mode's evaluation-installation phase to the ordered browser-service calls.
+ * @param state Borrowed mode/outcome and scoped payload, input context, cards and view handles;
+ *   calls identifies the output array to which the handler appends services without executing them.
+ */
 typedef void (*lab_evaluation_install_handler_t)(const lab_evaluation_install_t *state);
 
 static void lab_evaluation_install_emit(int calls, const char *service, unsigned count, ...)
 {
-    int call = lab_dom_object(5), args = lab_dom_object(4);
+    int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     va_list values;
     va_start(values, count);
     for (unsigned i = 0; i < count; ++i)
@@ -56,7 +62,7 @@ static int lab_evaluation_install_bindings(const lab_evaluation_install_t *state
 
 static int lab_evaluation_install_variables(int bindings)
 {
-    int variables = lab_dom_object(4);
+    int variables = lab_dom_object(LAB_VALUE_ARRAY);
     unsigned mark = lab_dom_mark();
     for (unsigned i = 0; i < lab_binding_array_count(bindings); ++i) {
         int name = lab_binding_variable_name(lab_dom_item(bindings, i));
@@ -79,15 +85,16 @@ static void lab_evaluation_install_render(const lab_evaluation_install_t *state,
 
 static void lab_evaluation_install_clear(const lab_evaluation_install_t *state)
 {
-    lab_evaluation_install_emit(state->calls, "variables", 2, lab_dom_object(4), lab_dom_scalar(1, 0));
+    lab_evaluation_install_emit(state->calls, "variables", 2, lab_dom_object(LAB_VALUE_ARRAY),
+                                lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
 static void lab_evaluation_install_expression_begin(const lab_evaluation_install_t *state)
 {
     int bindings = lab_dom_get(state->data, "binding_values");
-    if (state->outcome != 3)
+    if (state->outcome != LAB_REQUEST_OUTCOME_PARTIAL)
         lab_evaluation_install_emit(state->calls, "setRenderedResult", 1, state->data);
-    if (state->outcome != 3 && lab_dom_truth(lab_dom_get(state->data, "expression"))) {
+    if (state->outcome != LAB_REQUEST_OUTCOME_PARTIAL && lab_dom_truth(lab_dom_get(state->data, "expression"))) {
         int text =
             lab_evaluation_install_or(lab_dom_get(state->context, "editorText"), lab_dom_get(state->context, "text"));
         lab_evaluation_install_emit(
@@ -106,12 +113,12 @@ static void lab_evaluation_install_expression_end(const lab_evaluation_install_t
     lab_evaluation_install_present(state);
     lab_evaluation_install_emit(state->calls, "source", 2, lab_dom_string("lastInput"),
                                 lab_dom_get(state->context, "text"));
-    if (state->outcome != 3) {
+    if (state->outcome != LAB_REQUEST_OUTCOME_PARTIAL) {
         int text = lab_dom_get(state->context, "editorText");
         if (!lab_dom_truth(text))
             text = lab_dom_get(state->view, "fullText");
         if (!lab_dom_truth(text))
-            text = lab_dom_clean(lab_dom_read(lab_dom_id("expr"), 5, ""), 0);
+            text = lab_dom_clean(lab_dom_read(lab_dom_id("expr"), LAB_DOM_VALUE, ""), LAB_DOM_CLEAN_TRIM);
         lab_evaluation_install_emit(state->calls, "saveWorksheetState", 2, lab_dom_string("expression"), text);
     }
     lab_evaluation_install_emit(state->calls, "derivative", 1, lab_dom_get(state->cards, "derivative"));
@@ -129,7 +136,7 @@ static void lab_evaluation_install_matrix_begin(const lab_evaluation_install_t *
         int text = lab_dom_get(state->context, "text");
         int body = lab_dom_get(lab_evaluation_install_metadata(state, text), "body");
         if (!lab_dom_type(body))
-            body = lab_dom_clean(text, 0);
+            body = lab_dom_clean(text, LAB_DOM_CLEAN_TRIM);
         lab_evaluation_install_emit(state->calls, "setExpressionEditor", 3, body,
                                     lab_evaluation_install_bindings(state, text, 0), body);
     } else {
@@ -145,7 +152,7 @@ static void lab_evaluation_install_matrix_end(const lab_evaluation_install_t *st
     lab_evaluation_install_emit(state->calls, "saveWorksheetState", 1, lab_dom_string("matrix"));
     int variables = lab_evaluation_install_variables(lab_dom_get(state->data, "binding_values"));
     lab_evaluation_install_emit(state->calls, "variables", 2, variables,
-                                lab_dom_scalar(1, lab_dom_count(variables) > 0));
+                                lab_dom_scalar(LAB_VALUE_BOOLEAN, lab_dom_count(variables) > 0));
 }
 
 static void lab_evaluation_install_equation_begin(const lab_evaluation_install_t *state)
@@ -153,7 +160,7 @@ static void lab_evaluation_install_equation_begin(const lab_evaluation_install_t
     lab_evaluation_install_render(state, lab_dom_get(state->cards, "expandable"));
     lab_evaluation_install_emit(state->calls, "installEvaluationTextCards", 1, state->cards);
     int bindings = lab_dom_get(state->data, "binding_values");
-    if (lab_dom_type(bindings) == 4)
+    if (lab_dom_type(bindings) == LAB_VALUE_ARRAY)
         lab_evaluation_install_emit(state->calls, "renderVariableValues", 1, bindings);
     else
         lab_evaluation_install_emit(state->calls, "clearVariableValues", 0);
@@ -161,24 +168,24 @@ static void lab_evaluation_install_equation_begin(const lab_evaluation_install_t
 
 static void lab_evaluation_install_solver_end(const lab_evaluation_install_t *state)
 {
-    const char *mode = state->mode == 1 ? "equation" : "diffequation";
-    if (state->mode == 2)
+    const char *mode = state->mode == LAB_MODE_EQUATION ? "equation" : "diffequation";
+    if (state->mode == LAB_MODE_DIFFERENTIAL_EQUATION)
         lab_evaluation_install_emit(state->calls, "setValueText", 1, lab_dom_get(state->cards, "value"));
     /* Plotting hides this card; every completed solver evaluation must restore it. */
-    lab_evaluation_install_emit(state->calls, "setValueCardVisible", 1, lab_dom_scalar(1, 1));
-    if (state->mode == 2)
+    lab_evaluation_install_emit(state->calls, "setValueCardVisible", 1, lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
+    if (state->mode == LAB_MODE_DIFFERENTIAL_EQUATION)
         lab_evaluation_install_emit(state->calls, "clearVariableValues", 0);
     lab_evaluation_install_emit(state->calls, "modeSource", 2, lab_dom_string(mode),
                                 lab_dom_get(state->context, "text"));
     lab_evaluation_install_emit(state->calls, "saveWorksheetState", 1, lab_dom_string(mode));
     lab_evaluation_install_emit(state->calls, "variables", 2,
                                 lab_evaluation_install_variables(lab_dom_get(state->data, "binding_values")),
-                                lab_dom_scalar(1, 0));
+                                lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
 static void lab_evaluation_install_diffequation_begin(const lab_evaluation_install_t *state)
 {
-    lab_evaluation_install_render(state, lab_dom_scalar(1, 0));
+    lab_evaluation_install_render(state, lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     lab_evaluation_install_emit(state->calls, "scheduleRenderedTeXFit", 0);
     lab_evaluation_install_emit(state->calls, "solverTextCards", 1, state->cards);
     lab_evaluation_install_present(state);
@@ -186,7 +193,7 @@ static void lab_evaluation_install_diffequation_begin(const lab_evaluation_insta
 
 static void lab_evaluation_install_integrator_begin(const lab_evaluation_install_t *state)
 {
-    lab_evaluation_install_render(state, lab_dom_scalar(1, 0));
+    lab_evaluation_install_render(state, lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     lab_evaluation_install_emit(state->calls, "installEvaluationTextCards", 1, state->cards);
     lab_evaluation_install_emit(state->calls, "applyIntegratorBindingState", 2, state->data,
                                 lab_dom_get(state->context, "text"));
@@ -211,7 +218,7 @@ static void lab_evaluation_install_datetime_begin(const lab_evaluation_install_t
     lab_evaluation_install_emit(
         state->calls, "setDatetimeLocalText", 2,
         lab_evaluation_install_or(lab_dom_get(state->data, "local"), lab_dom_string("")),
-        lab_evaluation_install_or(lab_dom_get(state->data, "local_sections"), lab_dom_object(4)));
+        lab_evaluation_install_or(lab_dom_get(state->data, "local_sections"), lab_dom_object(LAB_VALUE_ARRAY)));
     lab_evaluation_install_emit(state->calls, "applyCalendarEvaluationFields", 2, lab_dom_string("datetime"),
                                 state->data);
     lab_evaluation_install_emit(state->calls, "setResultInputText", 1, lab_dom_string(""));
@@ -221,7 +228,8 @@ static void lab_evaluation_install_calendar_end(const lab_evaluation_install_t *
 {
     lab_evaluation_install_emit(state->calls, "clearVariableValues", 0);
     lab_evaluation_install_clear(state);
-    lab_evaluation_install_emit(state->calls, state->mode == 5 ? "saveLastDatetimeState" : "saveLastAlmanacState", 0);
+    const char *service = state->mode == LAB_MODE_DATETIME ? "saveLastDatetimeState" : "saveLastAlmanacState";
+    lab_evaluation_install_emit(state->calls, service, 0);
 }
 
 static void lab_evaluation_install_almanac_begin(const lab_evaluation_install_t *state)
@@ -236,23 +244,34 @@ static void lab_evaluation_install_almanac_begin(const lab_evaluation_install_t 
 }
 
 /* Return a pure two-phase plan; all state mutation stays ordered outside the scoped bridge. */
-void lab_evaluation_install(unsigned mode, unsigned phase, unsigned outcome, int data, int context, int cards, int view)
+void lab_evaluation_install(lab_mode_t mode, lab_evaluation_install_phase_t phase, lab_request_outcome_t outcome,
+                            int data, int context, int cards, int view)
 {
-    static const lab_evaluation_install_handler_t handlers[7][2] = {
-        [0] = {lab_evaluation_install_expression_begin, lab_evaluation_install_expression_end},
-        [1] = {lab_evaluation_install_equation_begin, lab_evaluation_install_solver_end},
-        [2] = {lab_evaluation_install_diffequation_begin, lab_evaluation_install_solver_end},
-        [3] = {lab_evaluation_install_matrix_begin, lab_evaluation_install_matrix_end},
-        [4] = {lab_evaluation_install_integrator_begin, lab_evaluation_install_integrator_end},
-        [5] = {lab_evaluation_install_datetime_begin, lab_evaluation_install_calendar_end},
-        [6] = {lab_evaluation_install_almanac_begin, lab_evaluation_install_calendar_end}};
-    if (mode > 6 || phase > 1 || (outcome != 2 && !(mode == 0 && outcome == 3))) {
+    static const lab_evaluation_install_handler_t handlers[][LAB_MODE_COUNT] = {
+        [LAB_EVALUATION_INSTALL_PROJECT][LAB_MODE_EXPRESSION]             = lab_evaluation_install_expression_begin,
+        [LAB_EVALUATION_INSTALL_PROJECT][LAB_MODE_EQUATION]               = lab_evaluation_install_equation_begin,
+        [LAB_EVALUATION_INSTALL_PROJECT][LAB_MODE_DIFFERENTIAL_EQUATION]  = lab_evaluation_install_diffequation_begin,
+        [LAB_EVALUATION_INSTALL_PROJECT][LAB_MODE_MATRIX]                 = lab_evaluation_install_matrix_begin,
+        [LAB_EVALUATION_INSTALL_PROJECT][LAB_MODE_INTEGRATOR]             = lab_evaluation_install_integrator_begin,
+        [LAB_EVALUATION_INSTALL_PROJECT][LAB_MODE_DATETIME]               = lab_evaluation_install_datetime_begin,
+        [LAB_EVALUATION_INSTALL_PROJECT][LAB_MODE_ALMANAC]                = lab_evaluation_install_almanac_begin,
+        [LAB_EVALUATION_INSTALL_COMPLETE][LAB_MODE_EXPRESSION]            = lab_evaluation_install_expression_end,
+        [LAB_EVALUATION_INSTALL_COMPLETE][LAB_MODE_EQUATION]              = lab_evaluation_install_solver_end,
+        [LAB_EVALUATION_INSTALL_COMPLETE][LAB_MODE_DIFFERENTIAL_EQUATION] = lab_evaluation_install_solver_end,
+        [LAB_EVALUATION_INSTALL_COMPLETE][LAB_MODE_MATRIX]                = lab_evaluation_install_matrix_end,
+        [LAB_EVALUATION_INSTALL_COMPLETE][LAB_MODE_INTEGRATOR]            = lab_evaluation_install_integrator_end,
+        [LAB_EVALUATION_INSTALL_COMPLETE][LAB_MODE_DATETIME]              = lab_evaluation_install_calendar_end,
+        [LAB_EVALUATION_INSTALL_COMPLETE][LAB_MODE_ALMANAC]               = lab_evaluation_install_calendar_end,
+    };
+    if ((unsigned)mode > LAB_MODE_ALMANAC || (unsigned)phase > LAB_EVALUATION_INSTALL_COMPLETE ||
+        (outcome != LAB_REQUEST_OUTCOME_SUCCESS &&
+         !(mode == LAB_MODE_EXPRESSION && outcome == LAB_REQUEST_OUTCOME_PARTIAL))) {
         lab_dom_return(0);
         return;
     }
-    int result = lab_dom_object(5), calls = lab_dom_object(4);
+    int result = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_evaluation_install_t state = {calls, data, context, cards, view, mode, outcome};
     lab_dom_set(result, "calls", calls);
-    handlers[mode][phase](&state);
+    handlers[phase][mode](&state);
     lab_dom_return(result);
 }

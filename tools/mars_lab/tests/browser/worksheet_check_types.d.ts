@@ -32,19 +32,7 @@ interface LabWorksheetTestPlan extends MarsTransportPlan {
 }
 
 /** Native exports used by the isolated fixture, including memory operations. */
-interface LabWorksheetTestNative extends MarsTransportExports {
-    /** Fill a native memory range and return its start address. */
-    memset(destination: number, value: number, length: number): number;
-
-    /** Copy a disjoint native memory range and return its start address. */
-    memcpy(destination: number, source: number, length: number): number;
-
-    /** Copy a possibly overlapping native memory range. */
-    memmove(destination: number, source: number, length: number): number;
-
-    /** Compare native memory ranges using unsigned bytes. */
-    memcmp(left: number, right: number, length: number): number;
-}
+interface LabWorksheetTestNative extends MarsTransportExports, LabMemoryTestNative {}
 
 /** Original callback and its owner, retained until fixture cleanup. */
 interface LabWorksheetTestReplacement {

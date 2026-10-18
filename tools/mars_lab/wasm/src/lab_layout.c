@@ -9,23 +9,23 @@
  * No mathematical text or SVG grammar is interpreted here.
  */
 #include "lab_dom.h"
-#include "lab_result.h"
 #include "lab_view.h"
+#include "lab_result.h"
 #include "lab_plot_controls.h"
 #include "lab_plot_pointer.h"
 #include "lab_layout.h"
 
 static int lab_layout_read(int node, const char *key)
 {
-    return lab_dom_read(node, 3, key);
+    return lab_dom_read(node, LAB_DOM_DATASET, key);
 }
 
-static void lab_layout_text(int node, unsigned kind, const char *key, const char *text)
+static void lab_layout_text(int node, lab_dom_accessor_t kind, const char *key, const char *text)
 {
     lab_dom_write(node, kind, key, lab_dom_string(text));
 }
 
-static void lab_layout_number(int node, unsigned kind, const char *key, double number, const char *unit)
+static void lab_layout_number(int node, lab_dom_accessor_t kind, const char *key, double number, const char *unit)
 {
     lab_dom_write(node, kind, key, lab_dom_format(number, "", unit));
 }
@@ -38,7 +38,8 @@ static double lab_layout_base(int card, const char *key, double fallback)
 
 static double lab_layout_width(int node)
 {
-    double width = lab_dom_measure(node, 0) - lab_dom_css(node, "padding-left") - lab_dom_css(node, "padding-right");
+    double width = lab_dom_measure(node, LAB_DOM_MEASURE_CLIENT_WIDTH) - lab_dom_css(node, "padding-left") -
+                   lab_dom_css(node, "padding-right");
     return width > 0 ? width : 0;
 }
 
@@ -56,12 +57,12 @@ static double lab_layout_intrinsic(int svg, unsigned axis)
 double lab_layout_markup_width(int markup)
 {
     int box = lab_dom_create("div");
-    lab_dom_write(box, 1, "", markup);
+    lab_dom_write(box, LAB_DOM_HTML, "", markup);
     int svg = lab_dom_query(box, "svg");
     if (!svg)
         return 0;
-    double width = lab_dom_measure(svg, 1);
-    return width > 0 ? width : lab_dom_measure(svg, 5);
+    double width = lab_dom_measure(svg, LAB_DOM_MEASURE_SVG_WIDTH);
+    return width > 0 ? width : lab_dom_measure(svg, LAB_DOM_MEASURE_VIEWBOX_WIDTH);
 }
 
 static void lab_layout_frame(int card, double scale, double zoom)
@@ -78,11 +79,11 @@ static void lab_layout_frame(int card, double scale, double zoom)
     if (!svg)
         return;
     if (!lab_dom_length(lab_layout_read(svg, "baseWidth")) || !lab_dom_length(lab_layout_read(svg, "baseHeight"))) {
-        int previous = lab_dom_read(svg, 4, "transform");
-        lab_layout_text(svg, 4, "transform", "none");
-        lab_layout_number(svg, 3, "baseWidth", lab_layout_intrinsic(svg, 0), "");
-        lab_layout_number(svg, 3, "baseHeight", lab_layout_intrinsic(svg, 1), "");
-        lab_dom_write(svg, 4, "transform", previous);
+        int previous = lab_dom_read(svg, LAB_DOM_STYLE, "transform");
+        lab_layout_text(svg, LAB_DOM_STYLE, "transform", "none");
+        lab_layout_number(svg, LAB_DOM_DATASET, "baseWidth", lab_layout_intrinsic(svg, 0), "");
+        lab_layout_number(svg, LAB_DOM_DATASET, "baseHeight", lab_layout_intrinsic(svg, 1), "");
+        lab_dom_write(svg, LAB_DOM_STYLE, "transform", previous);
     }
     double width = lab_dom_number(lab_layout_read(svg, "baseWidth"));
     double height = lab_dom_number(lab_layout_read(svg, "baseHeight"));
@@ -102,13 +103,13 @@ static void lab_layout_frame(int card, double scale, double zoom)
         if (available > 0)
             scale = available / width * zoom;
     }
-    lab_layout_number(frame, 4, "width", width * scale, "px");
-    lab_layout_number(frame, 4, "height", height * scale, "px");
-    lab_layout_number(svg, 4, "width", plot ? width * scale : width, "px");
-    lab_layout_number(svg, 4, "height", plot ? height * scale : height, "px");
-    lab_dom_write(svg, 4, "transform", plot ? lab_dom_string("none") : lab_dom_format(scale, "scale(", ")"));
+    lab_layout_number(frame, LAB_DOM_STYLE, "width", width * scale, "px");
+    lab_layout_number(frame, LAB_DOM_STYLE, "height", height * scale, "px");
+    lab_layout_number(svg, LAB_DOM_STYLE, "width", plot ? width * scale : width, "px");
+    lab_layout_number(svg, LAB_DOM_STYLE, "height", plot ? height * scale : height, "px");
+    lab_dom_write(svg, LAB_DOM_STYLE, "transform", plot ? lab_dom_string("none") : lab_dom_format(scale, "scale(", ")"));
     if (plot)
-        lab_layout_text(svg, 4, "margin-bottom", "0");
+        lab_layout_text(svg, LAB_DOM_STYLE, "margin-bottom", "0");
 }
 
 /* Project a card's C-owned zoom to CSS, SVG geometry and accessible controls. */
@@ -126,21 +127,21 @@ void lab_layout_zoom(int card)
     double font = lab_layout_base(card, "--result-base-font-rem", 0.92) * zoom;
     double render_font = lab_layout_base(card, "--render-base-font-rem", 1.15) * zoom;
     double margin = lab_layout_base(card, "--render-base-margin-rem", 3) * (zoom > 1 ? zoom : 1);
-    lab_layout_number(card, 4, "--result-zoom", zoom, "");
-    lab_layout_number(card, 4, "--result-font-size", font, "rem");
-    lab_layout_number(card, 4, "--render-font-size", render_font, "rem");
-    lab_layout_number(card, 4, "--render-zoom", scale, "");
-    lab_layout_number(card, 4, "--render-margin-bottom", margin, "rem");
+    lab_layout_number(card, LAB_DOM_STYLE, "--result-zoom", zoom, "");
+    lab_layout_number(card, LAB_DOM_STYLE, "--result-font-size", font, "rem");
+    lab_layout_number(card, LAB_DOM_STYLE, "--render-font-size", render_font, "rem");
+    lab_layout_number(card, LAB_DOM_STYLE, "--render-zoom", scale, "");
+    lab_layout_number(card, LAB_DOM_STYLE, "--render-margin-bottom", margin, "rem");
     lab_layout_frame(card, scale, zoom);
     int buttons = lab_dom_all(card, "[data-zoom-reset]");
     for (unsigned i = 0; i < lab_dom_count(buttons); ++i) {
         int button = lab_dom_item(buttons, i);
         unsigned percent = (unsigned)(zoom * 100 + 0.5);
-        lab_layout_number(button, 0, "", percent, "%");
-        lab_dom_write(button, 2, "aria-label", lab_dom_format(percent, "Reset zoom from ", "%"));
+        lab_layout_number(button, LAB_DOM_TEXT, "", percent, "%");
+        lab_dom_write(button, LAB_DOM_ATTRIBUTE, "aria-label", lab_dom_format(percent, "Reset zoom from ", "%"));
         if (curve) {
-            lab_dom_write(button, 0, "", lab_dom_string("Reset"));
-            lab_dom_write(button, 2, "aria-label", lab_dom_string("Reset plot view"));
+            lab_dom_write(button, LAB_DOM_TEXT, "", lab_dom_string("Reset"));
+            lab_dom_write(button, LAB_DOM_ATTRIBUTE, "aria-label", lab_dom_string("Reset plot view"));
         }
     }
     buttons = lab_dom_all(card, "[data-zoom-step]");
@@ -152,46 +153,49 @@ void lab_layout_zoom(int card)
 }
 
 /* Mutate native state before projecting; invalid/unregistered cards remain untouched. */
-void lab_layout_set_zoom(int card, double index, int step)
+void lab_layout_set_zoom(int card, double index, lab_layout_zoom_operation_t operation)
 {
     int id = lab_dom_card_id(card);
-    int changed = step ? lab_view_card_step_zoom(id, index < 0 ? -1 : 1) : lab_view_card_set_zoom(id, index);
+    lab_view_zoom_direction_t direction = index < 0 ? LAB_VIEW_ZOOM_DECREASE : LAB_VIEW_ZOOM_INCREASE;
+    int changed = operation != LAB_LAYOUT_ZOOM_ABSOLUTE ? lab_view_card_step_zoom(id, direction)
+                                                       : lab_view_card_set_zoom(id, index);
     if (changed < 0)
         return;
     lab_layout_zoom(card);
-    lab_dom_schedule(0, 0);
+    lab_dom_schedule(LAB_DOM_SCHEDULE_FIT, 0);
 }
 
 /* Render, toggle or collapse exclusive expansion and its accessible button state. */
-void lab_layout_expand(int card, unsigned operation)
+void lab_layout_expand(int card, lab_layout_expansion_t operation)
 {
-    if (operation == 1 && lab_dom_has(card, "data-complex-panel")) {
-        int expanded = !lab_dom_equal(lab_dom_read(card, 3, "expanded"), lab_dom_string("true"));
+    if (operation == LAB_LAYOUT_EXPANSION_TOGGLE && lab_dom_has(card, "data-complex-panel")) {
+        int expanded = !lab_dom_equal(lab_dom_read(card, LAB_DOM_DATASET, "expanded"), lab_dom_string("true"));
         int host = lab_dom_id("plotRendered"), state = lab_dom_get(host, "marsComplexExpanded");
         if (!state) {
-            state = lab_dom_object(5);
+            state = lab_dom_object(LAB_VALUE_OBJECT);
             lab_dom_set(host, "marsComplexExpanded", state);
         }
         int grid = lab_dom_closest(card, ".complex-grid"), panels = lab_dom_all(grid, ".complex-panel");
         /* The four projections share one expanded viewport, never separate expanded rows. */
         for (unsigned i = 0; i < lab_dom_count(panels); ++i) {
             int panel = lab_dom_item(panels, i), selected = expanded && lab_dom_equal(panel, card);
-            lab_dom_key_set(state, lab_dom_read(panel, 3, "complexPanel"), lab_dom_scalar(1, selected));
-            lab_layout_text(panel, 3, "expanded", selected ? "true" : "false");
+            lab_dom_key_set(state, lab_dom_read(panel, LAB_DOM_DATASET, "complexPanel"),
+                            lab_dom_scalar(LAB_VALUE_BOOLEAN, selected));
+            lab_layout_text(panel, LAB_DOM_DATASET, "expanded", selected ? "true" : "false");
             lab_dom_class(panel, "complex-expanded", selected);
             int button = lab_dom_query(panel, "button");
-            lab_layout_text(button, 0, "", selected ? "Collapse" : "Expand");
-            lab_layout_text(button, 2, "aria-expanded", selected ? "true" : "false");
+            lab_layout_text(button, LAB_DOM_TEXT, "", selected ? "Collapse" : "Expand");
+            lab_layout_text(button, LAB_DOM_ATTRIBUTE, "aria-expanded", selected ? "true" : "false");
         }
         lab_dom_class(grid, "complex-focused", expanded);
-        lab_dom_schedule(1, lab_dom_id("plotCard"));
+        lab_dom_schedule(LAB_DOM_SCHEDULE_ZOOM, lab_dom_id("plotCard"));
         return;
     }
-    if (operation > 2)
+    if ((unsigned)operation > LAB_LAYOUT_EXPANSION_COLLAPSE)
         return;
-    if (operation == 1 && lab_view_card_toggle(lab_dom_card_id(card)) == -2)
+    if (operation == LAB_LAYOUT_EXPANSION_TOGGLE && lab_view_card_toggle(lab_dom_card_id(card)) == -2)
         return;
-    if (operation == 2)
+    if (operation == LAB_LAYOUT_EXPANSION_COLLAPSE)
         lab_view_cards_collapse();
     int expanded = lab_view_card_expanded();
     lab_dom_class(lab_dom_query(0, "#labWorkspace"), "result-card-expanded", expanded >= 0);
@@ -204,33 +208,33 @@ void lab_layout_expand(int card, unsigned operation)
         int buttons = lab_dom_all(entry, "[data-expand-card]");
         for (unsigned j = 0; j < lab_dom_count(buttons); ++j) {
             int button = lab_dom_item(buttons, j);
-            lab_layout_text(button, 0, "", selected ? "Collapse" : "Expand");
-            lab_layout_text(button, 2, "aria-expanded", selected ? "true" : "false");
+            lab_layout_text(button, LAB_DOM_TEXT, "", selected ? "Collapse" : "Expand");
+            lab_layout_text(button, LAB_DOM_ATTRIBUTE, "aria-expanded", selected ? "true" : "false");
         }
     }
-    if (operation == 1)
-        lab_dom_schedule(1, card);
+    if (operation == LAB_LAYOUT_EXPANSION_TOGGLE)
+        lab_dom_schedule(LAB_DOM_SCHEDULE_ZOOM, card);
 }
 
 /* Install only native markup, or an ordinary text fallback, and fit it on the next frame. */
 static void lab_layout_content_at(int rendered, int svg, int fallback)
 {
-    lab_layout_text(rendered, 0, "", "");
+    lab_layout_text(rendered, LAB_DOM_TEXT, "", "");
     if (lab_dom_length(svg)) {
         int frame = lab_dom_create("div");
         lab_dom_class(frame, "rendered-zoom-frame", 1);
-        lab_dom_write(frame, 1, "", svg);
+        lab_dom_write(frame, LAB_DOM_HTML, "", svg);
         lab_dom_append(rendered, frame);
         lab_plot_pointer_prepare(rendered);
     } else {
-        lab_dom_write(rendered, 0, "", fallback);
+        lab_dom_write(rendered, LAB_DOM_TEXT, "", fallback);
     }
     int card = lab_dom_closest(rendered, ".result-card");
     lab_dom_class(card, "plot-card", !!lab_dom_query(rendered, "[data-series]"));
     if (card && lab_dom_query(rendered, "[data-series]"))
         lab_layout_zoom(card);
     if (card)
-        lab_dom_schedule(1, card);
+        lab_dom_schedule(LAB_DOM_SCHEDULE_ZOOM, card);
 }
 
 /* Keep mathematical rendering independent of the optional plot card. */
@@ -245,7 +249,7 @@ static void complex_grid(int node, int result)
         return;
     static const char *const keys[] = {"svg", "complex_plane", "components", "amplitude"};
     static const char *const names[] = {"3-D curve", "Complex plane", "Components", "Amplitude"};
-    lab_layout_text(node, 0, "", "");
+    lab_layout_text(node, LAB_DOM_TEXT, "", "");
     int grid = lab_dom_create("div");
     lab_dom_class(grid, "complex-grid", 1);
     lab_dom_append(node, grid);
@@ -254,19 +258,19 @@ static void complex_grid(int node, int result)
         int panel = lab_dom_create("section"), heading = lab_dom_create("div");
         int title = lab_dom_create("span"), button = lab_dom_create("button"), body = lab_dom_create("div");
         lab_dom_class(panel, "complex-panel", 1);
-        lab_layout_text(panel, 3, "complexPanel", keys[i]);
+        lab_layout_text(panel, LAB_DOM_DATASET, "complexPanel", keys[i]);
         lab_dom_class(heading, "card-title", 1);
-        lab_layout_text(title, 0, "", names[i]);
+        lab_layout_text(title, LAB_DOM_TEXT, "", names[i]);
         lab_dom_class(button, "card-action", 1);
-        lab_layout_text(button, 2, "type", "button");
-        lab_layout_text(button, 0, "", "Expand");
-        lab_layout_text(button, 2, "aria-expanded", "false");
+        lab_layout_text(button, LAB_DOM_ATTRIBUTE, "type", "button");
+        lab_layout_text(button, LAB_DOM_TEXT, "", "Expand");
+        lab_layout_text(button, LAB_DOM_ATTRIBUTE, "aria-expanded", "false");
         int expanded = !focused && lab_dom_truth(lab_dom_get(lab_dom_get(node, "marsComplexExpanded"), keys[i]));
         focused = focused || expanded;
         lab_dom_class(panel, "complex-expanded", expanded);
-        lab_layout_text(panel, 3, "expanded", expanded ? "true" : "false");
-        lab_layout_text(button, 0, "", expanded ? "Collapse" : "Expand");
-        lab_layout_text(button, 2, "aria-expanded", expanded ? "true" : "false");
+        lab_layout_text(panel, LAB_DOM_DATASET, "expanded", expanded ? "true" : "false");
+        lab_layout_text(button, LAB_DOM_TEXT, "", expanded ? "Collapse" : "Expand");
+        lab_layout_text(button, LAB_DOM_ATTRIBUTE, "aria-expanded", expanded ? "true" : "false");
         lab_dom_listen(button, "click", 31, 0);
         lab_dom_class(body, "rendered", 1);
         lab_dom_append(heading, title);
@@ -277,7 +281,7 @@ static void complex_grid(int node, int result)
         lab_layout_content_at(body, lab_dom_get(result, keys[i]),
                               lab_dom_string("Amplitude is undefined for distributions."));
         if (i > 0) {
-            lab_layout_text(lab_dom_query(body, "svg[data-x-min]"), 3, "plotChart", "true");
+            lab_layout_text(lab_dom_query(body, "svg[data-x-min]"), LAB_DOM_DATASET, "plotChart", "true");
             lab_plot_pointer_prepare(body);
         }
     }
@@ -285,7 +289,7 @@ static void complex_grid(int node, int result)
 }
 
 /* Move original controls, preserving listeners and values; snapshots must never clone their identifiers. */
-void lab_layout_plot_camera(int home)
+void lab_layout_plot_camera(bool home)
 {
     int camera = lab_dom_id("plotCamera");
     int parent = home ? 0 : lab_dom_query(lab_dom_id("plotRendered"), "[data-complex-panel=\"svg\"]");
@@ -323,7 +327,7 @@ void lab_layout_plot(int result, int error)
             }
         if (body && lab_dom_length(image)) {
             lab_layout_content_at(body, image, lab_dom_string(""));
-            lab_layout_text(lab_dom_query(body, "svg[data-x-min]"), 3, "plotChart", "true");
+            lab_layout_text(lab_dom_query(body, "svg[data-x-min]"), LAB_DOM_DATASET, "plotChart", "true");
             lab_plot_pointer_prepare(body);
             lab_dom_class(lab_dom_id("plotFeedback"), "hidden", 1);
             return;
@@ -332,20 +336,20 @@ void lab_layout_plot(int result, int error)
     /* A failed navigation must not replace the coordinate-bearing chart with
      * text: its bounds and hit targets are needed to zoom back out or reset. */
     if (lab_dom_truth(error) && lab_dom_query(node, "[data-plot-chart][data-x-min], [data-surface][data-x-min]")) {
-        lab_dom_write(node, 2, "aria-busy", lab_dom_string("false"));
-        lab_dom_write(node, 3, "plotPending", lab_dom_string("false"));
+        lab_dom_write(node, LAB_DOM_ATTRIBUTE, "aria-busy", lab_dom_string("false"));
+        lab_dom_write(node, LAB_DOM_DATASET, "plotPending", lab_dom_string("false"));
         int feedback = lab_dom_id("plotFeedback");
-        lab_dom_write(feedback, 0, "", lab_dom_join(lab_dom_string("Previous view retained. "), error, ""));
+        lab_dom_write(feedback, LAB_DOM_TEXT, "", lab_dom_join(lab_dom_string("Previous view retained. "), error, ""));
         lab_dom_class(feedback, "hidden", 0);
         lab_layout_zoom(lab_dom_id("plotCard"));
         return;
     }
     lab_dom_class(lab_dom_id("plotCard"), "hidden", 0);
     lab_dom_class(node, "error", lab_dom_truth(error));
-    lab_dom_write(node, 2, "aria-busy", lab_dom_string(!result && !error ? "true" : "false"));
-    lab_dom_write(node, 3, "plotPending", lab_dom_string(!result && !error ? "true" : "false"));
-    lab_dom_write(node, 3, "displaySvg", lab_dom_truth(error) ? lab_dom_string("") : svg);
-    lab_dom_write(node, 3, "displayTex", lab_dom_get(result, "TeX"));
+    lab_dom_write(node, LAB_DOM_ATTRIBUTE, "aria-busy", lab_dom_string(!result && !error ? "true" : "false"));
+    lab_dom_write(node, LAB_DOM_DATASET, "plotPending", lab_dom_string(!result && !error ? "true" : "false"));
+    lab_dom_write(node, LAB_DOM_DATASET, "displaySvg", lab_dom_truth(error) ? lab_dom_string("") : svg);
+    lab_dom_write(node, LAB_DOM_DATASET, "displayTex", lab_dom_get(result, "TeX"));
     lab_layout_plot_camera(1);
     lab_layout_content_at(node, lab_dom_truth(error) ? lab_dom_string("") : svg,
                           !result && !error ? lab_dom_string("Generating plot…") : error);
@@ -354,7 +358,7 @@ void lab_layout_plot(int result, int error)
     lab_layout_plot_camera(0);
     lab_dom_class(lab_dom_id("plotCard"), "plot-card", 1);
     int notice = lab_dom_get(result, "notice");
-    lab_dom_write(lab_dom_id("plotFeedback"), 0, "", notice);
+    lab_dom_write(lab_dom_id("plotFeedback"), LAB_DOM_TEXT, "", notice);
     lab_dom_class(lab_dom_id("plotFeedback"), "hidden", !lab_dom_length(notice));
 }
 
@@ -382,18 +386,18 @@ void lab_layout_fit(void)
     lab_dom_class(rendered, "vertically-wrapped-tex", use_wrapped);
     if (lab_dom_equal(lab_layout_read(rendered, "responsiveVariant"), variant))
         return;
-    lab_dom_write(rendered, 3, "responsiveVariant", variant);
+    lab_dom_write(rendered, LAB_DOM_DATASET, "responsiveVariant", variant);
     int text = use_wrapped ? lab_layout_read(rendered, "wrappedTex") : 0;
     if (!lab_dom_length(text))
         text = lab_layout_read(rendered, "compactTex");
-    lab_dom_write(rendered, 3, "displayTex", text);
+    lab_dom_write(rendered, LAB_DOM_DATASET, "displayTex", text);
     int fallback = lab_layout_read(rendered, "responsiveFallback");
     lab_layout_content(use_wrapped ? wrapped : compact,
                        lab_dom_length(fallback) ? fallback : lab_dom_string("No symbolic solution available"));
 }
 
 /* Select solver wrapping using current geometry, not the geometry at request time. */
-int lab_layout_solver_wrapped(void)
+bool lab_layout_solver_wrapped(void)
 {
     int node = lab_dom_query(0, "#functionStyle");
     int compact = lab_layout_read(node, "solverCompactSvg"), wrapped = lab_layout_read(node, "solverWrappedTex");
@@ -410,39 +414,39 @@ void lab_layout_solver_install(int markup, int variant)
     int node = lab_dom_query(0, "#functionStyle");
     if (!lab_dom_length(markup) || lab_dom_equal(lab_layout_read(node, "solverVariant"), variant))
         return;
-    lab_dom_write(node, 1, "", markup);
+    lab_dom_write(node, LAB_DOM_HTML, "", markup);
     lab_dom_class(node, "equation-function", 1);
     int svg = lab_dom_query(node, "svg");
-    int width = lab_dom_read(svg, 2, "width");
+    int width = lab_dom_read(svg, LAB_DOM_ATTRIBUTE, "width");
     if (svg && lab_dom_length(width)) {
-        lab_dom_write(svg, 4, "width", lab_dom_join(lab_dom_string("calc("), width, " * var(--solver-tex-scale))"));
-        lab_layout_text(svg, 4, "max-width", "100%");
-        lab_layout_text(svg, 4, "height", "auto");
+        lab_dom_write(svg, LAB_DOM_STYLE, "width", lab_dom_join(lab_dom_string("calc("), width, " * var(--solver-tex-scale))"));
+        lab_layout_text(svg, LAB_DOM_STYLE, "max-width", "100%");
+        lab_layout_text(svg, LAB_DOM_STYLE, "height", "auto");
     }
-    lab_dom_write(node, 3, "solverVariant", variant);
+    lab_dom_write(node, LAB_DOM_DATASET, "solverVariant", variant);
 }
 
 /* Abbreviation is supplied by native presentation metadata, never inferred from displayed text. */
-void lab_layout_more(int button, int enabled)
+void lab_layout_more(int button, bool enabled)
 {
     lab_dom_class(button, "hidden", !enabled);
-    lab_layout_text(button, 0, "", "Show more digits");
-    lab_layout_text(button, 3, "expanded", "false");
+    lab_layout_text(button, LAB_DOM_TEXT, "", "Show more digits");
+    lab_layout_text(button, LAB_DOM_DATASET, "expanded", "false");
 }
 
 /* CSS owns error colours; clearing also removes obsolete inline error styles. */
-void lab_layout_error(int message, int error)
+void lab_layout_error(int message, bool error)
 {
     int rendered = lab_dom_query(0, "#rendered");
     lab_dom_class(rendered, "error", error);
     if (error) {
         lab_result_render_invalidate();
-        lab_dom_write(rendered, 0, "", lab_dom_length(message) ? message : lab_dom_string("Evaluation failed"));
+        lab_dom_write(rendered, LAB_DOM_TEXT, "", lab_dom_length(message) ? message : lab_dom_string("Evaluation failed"));
         return;
     }
     lab_dom_class(rendered, "vertically-wrapped-tex", 0);
     static const char *const properties[] = {"color",      "background",  "border-color",
                                              "box-shadow", "text-shadow", "font-family"};
     for (unsigned i = 0; i < sizeof properties / sizeof *properties; ++i)
-        lab_layout_text(rendered, 4, properties[i], "");
+        lab_layout_text(rendered, LAB_DOM_STYLE, properties[i], "");
 }

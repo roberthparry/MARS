@@ -14,7 +14,7 @@
 
 static int lab_solver_view_text(int node, const char *key)
 {
-    int value = lab_dom_read(node, 3, key);
+    int value = lab_dom_read(node, LAB_DOM_DATASET, key);
     return lab_dom_truth(value) ? value : lab_dom_string("");
 }
 
@@ -30,20 +30,20 @@ static void lab_solver_view_install(int compact, int wrapped)
 }
 
 /* Compare the complete browser snapshot without interpreting source text or retaining its handles. */
-int lab_solver_view_current(int mode, int snapshot, int active, unsigned live, int restored_owner)
+bool lab_solver_view_current(int mode, int snapshot, int active, bool live, int restored_owner)
 {
     if (!snapshot || !live || !lab_dom_equal(snapshot, active))
-        return 0;
+        return false;
     int node = lab_dom_query(0, "#functionStyle");
     return lab_solver_view_enabled(mode, node) && lab_dom_equal(node, lab_dom_get(snapshot, "node")) &&
            lab_dom_equal(restored_owner, lab_dom_get(snapshot, "restoredOwner")) &&
            lab_dom_equal(lab_solver_view_text(node, "solverParentToken"), lab_dom_get(snapshot, "parentToken")) &&
-           lab_dom_equal(lab_dom_read(node, 3, "solverCompactSvg"), lab_dom_get(snapshot, "compactSvg")) &&
-           lab_dom_equal(lab_dom_read(node, 3, "solverWrappedTex"), lab_dom_get(snapshot, "wrappedTex"));
+           lab_dom_equal(lab_dom_read(node, LAB_DOM_DATASET, "solverCompactSvg"), lab_dom_get(snapshot, "compactSvg")) &&
+           lab_dom_equal(lab_dom_read(node, LAB_DOM_DATASET, "solverWrappedTex"), lab_dom_get(snapshot, "wrappedTex"));
 }
 
 /* Project cached variants immediately or return one request plan whose lifetime belongs to the browser. */
-void lab_solver_view_prepare(int mode, int pending, unsigned pending_live, int restored_owner)
+void lab_solver_view_prepare(int mode, int pending, bool pending_live, int restored_owner)
 {
     lab_dom_return(0);
     int node = lab_dom_query(0, "#functionStyle");
@@ -63,7 +63,8 @@ void lab_solver_view_prepare(int mode, int pending, unsigned pending_live, int r
     if (!lab_dom_truth(source))
         return;
     int parent = lab_solver_view_text(node, "solverParentToken");
-    int snapshot = lab_dom_object(5), options = lab_dom_object(5), payload = lab_dom_object(5);
+    int snapshot = lab_dom_object(LAB_VALUE_OBJECT), options = lab_dom_object(LAB_VALUE_OBJECT),
+        payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(snapshot, "node", node);
     lab_dom_set(snapshot, "compactSvg", compact);
     lab_dom_set(snapshot, "wrappedTex", source);
@@ -72,7 +73,7 @@ void lab_solver_view_prepare(int mode, int pending, unsigned pending_live, int r
     lab_dom_set(snapshot, "mode", mode);
     lab_dom_set(snapshot, "operation", lab_dom_string(restored_owner ? "solverRestoreRender" : "solverRender"));
     lab_dom_set(options, "parent", lab_dom_numeric(restored_owner ? 0 : lab_dom_number(parent)));
-    lab_dom_set(options, "input", lab_dom_scalar(1, 1));
+    lab_dom_set(options, "input", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     lab_dom_set(snapshot, "options", options);
     lab_dom_set(payload, "tex", source);
     lab_dom_set(snapshot, "payload", payload);
@@ -81,15 +82,15 @@ void lab_solver_view_prepare(int mode, int pending, unsigned pending_live, int r
 }
 
 /* Reject stale replies before any cache or DOM write, then use current rather than captured geometry. */
-int lab_solver_view_publish(int mode, int snapshot, int active, unsigned live, int restored_owner, int response,
-                            int data, unsigned failed)
+bool lab_solver_view_publish(int mode, int snapshot, int active, bool live, int restored_owner, int response,
+                             int data, bool failed)
 {
     if (!lab_solver_view_current(mode, snapshot, active, live, restored_owner))
-        return 0;
+        return false;
     int compact = lab_dom_get(snapshot, "compactSvg");
     if (failed) {
         lab_layout_solver_install(compact, lab_dom_string("compact"));
-        return 1;
+        return true;
     }
     int wrapped = lab_dom_string("");
     if (lab_dom_truth(lab_dom_get(response, "ok")) && lab_dom_truth(lab_dom_get(data, "ok"))) {
@@ -97,7 +98,7 @@ int lab_solver_view_publish(int mode, int snapshot, int active, unsigned live, i
         if (lab_dom_truth(svg))
             wrapped = lab_dom_text(svg);
     }
-    lab_dom_write(lab_dom_get(snapshot, "node"), 3, "solverWrappedSvg", wrapped);
+    lab_dom_write(lab_dom_get(snapshot, "node"), LAB_DOM_DATASET, "solverWrappedSvg", wrapped);
     lab_solver_view_install(compact, wrapped);
-    return 1;
+    return true;
 }

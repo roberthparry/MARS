@@ -1442,11 +1442,11 @@ regular values. Nonlinear arguments and sinc primitives retain entire
 hypergeometric representations.
 General principal-value integration remains symbolic.
 
-Native transform presentation can separate linear distribution results into an
-ordinary part with excluded affine poles and a separate impulse expression. These
-exclusions describe only the ordinary curve; they do not remove impulse supports.
-The underlying expression and its copyable representation retain the complete
-distribution. Unsupported forms retain their original distribution notation.
+Native transform presentation keeps the complete distribution in one identity,
+including Dirac impulses and principal-value or finite-part qualifications.
+In TeX, the compact operator `Fp₁` denotes the half-line finite part with unit cutoff.
+Pointwise exclusions used when sampling curves do not restrict the identity or
+remove impulse supports. The copyable representation also retains the complete distribution.
 
 Numerical evaluation affects only the Value card. These examples leave the full
 symbolic spectrum intact, including the impulse at zero needed by the inverse:

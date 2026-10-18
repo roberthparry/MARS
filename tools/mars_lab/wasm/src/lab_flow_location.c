@@ -31,33 +31,35 @@ static int lab_flow_location_flag(int value)
 
 static int lab_flow_location_jump(int frame, unsigned next)
 {
-    return lab_flow_effects(frame, next, lab_dom_object(5));
+    return lab_flow_effects(frame, next, lab_dom_object(LAB_VALUE_OBJECT));
 }
 
 static int lab_flow_location_forms(int frame)
 {
-    unsigned action = (unsigned)lab_dom_number(lab_dom_get(frame, "action"));
+    lab_flow_location_form_action_t action =
+        (lab_flow_location_form_action_t)(unsigned)lab_dom_number(lab_dom_get(frame, "action"));
     if (!lab_flow_location_stage(frame)) {
         int option = lab_dom_get(frame, "option"), value = lab_dom_get(frame, "value");
-        if (action == 2 && (!lab_dom_truth(option) || !lab_dom_truth(value)))
-            return lab_flow_done(lab_dom_scalar(1, 0));
-        int payload = lab_dom_object(5);
-        lab_dom_set(payload, "action", lab_dom_string(action ? "town" : "time"));
-        lab_dom_set(payload, action ? "value" : "text",
+        if (action == LAB_FLOW_LOCATION_MATCH_TOWN && (!lab_dom_truth(option) || !lab_dom_truth(value)))
+            return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
+        int payload = lab_dom_object(LAB_VALUE_OBJECT);
+        lab_dom_set(payload, "action", lab_dom_string(action != LAB_FLOW_LOCATION_FORMAT_TIME ? "town" : "time"));
+        lab_dom_set(payload, action != LAB_FLOW_LOCATION_FORMAT_TIME ? "value" : "text",
                     lab_dom_text(lab_dom_truth(value) ? value : lab_dom_string("")));
-        if (action == 2) {
-            int candidates = lab_dom_object(4);
+        if (action == LAB_FLOW_LOCATION_MATCH_TOWN) {
+            int candidates = lab_dom_object(LAB_VALUE_ARRAY);
             lab_dom_push(candidates, lab_dom_get(option, "value"));
             lab_dom_set(payload, "candidates", candidates);
         }
         return lab_flow_call(frame, 1, "locForms", "response", 1, 1, payload);
     }
     int response = lab_dom_get(frame, "response");
-    if (action == 2) {
+    if (action == LAB_FLOW_LOCATION_MATCH_TOWN) {
         int index = lab_dom_get(response, "match_index");
-        return lab_flow_done(lab_dom_scalar(1, lab_dom_type(index) == 2 && lab_dom_number(index) == 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN,
+                                            lab_dom_type(index) == LAB_VALUE_NUMBER && lab_dom_number(index) == 0));
     }
-    return lab_flow_done(lab_dom_get(response, action ? "town" : "text"));
+    return lab_flow_done(lab_dom_get(response, action != LAB_FLOW_LOCATION_FORMAT_TIME ? "town" : "text"));
 }
 
 struct lab_flow_location_restore_context {
@@ -67,6 +69,11 @@ struct lab_flow_location_restore_context {
     int plan;
 };
 
+/**
+ * @brief Complete location restoration with its recorded outcome.
+ * @param ctx Restore state whose plan contains the restored result returned to the caller.
+ * @return Scoped completion plan carrying the plan's restored value.
+ */
 static int lab_flow_location_restore_otherwise(struct lab_flow_location_restore_context *ctx);
 
 static int lab_flow_location_restore_loc_current(struct lab_flow_location_restore_context *ctx)
@@ -79,9 +86,9 @@ static int lab_flow_location_restore_loc_populate(struct lab_flow_location_resto
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_location_null();
     if (!lab_dom_truth(ctx->select))
-        return lab_flow_done(lab_dom_scalar(1, 0));
-    int options = lab_dom_object(5);
-    lab_dom_set(options, "selectDefault", lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "selectDefault", lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     lab_dom_set(options, "isCurrent", lab_dom_get(ctx->frame, "isCurrent"));
     return lab_flow_call(ctx->frame, 2, "locPopulate", "preparation", 0, 3, ctx->select,
                          lab_dom_get(ctx->frame, "jurisdiction"), options);
@@ -123,7 +130,7 @@ static int lab_flow_location_restore_native_6(struct lab_flow_location_restore_c
 static int lab_flow_location_restore_loc_forms(struct lab_flow_location_restore_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->plan, "request"))) {
-        lab_dom_set(ctx->frame, "responded", lab_dom_scalar(1, 1));
+        lab_dom_set(ctx->frame, "responded", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
         return lab_flow_call(ctx->frame, 4, "locForms", "response", 1, 1, lab_dom_get(ctx->plan, "request"));
     }
     if (lab_dom_truth(lab_dom_get(ctx->plan, "controls")))
@@ -171,14 +178,14 @@ struct lab_flow_location_populate_context {
 static int lab_flow_location_populate_loc_current(struct lab_flow_location_populate_context *ctx)
 {
     if (!lab_dom_truth(ctx->select))
-        return lab_flow_done(lab_dom_object(4));
+        return lab_flow_done(lab_dom_object(LAB_VALUE_ARRAY));
     return lab_flow_call(ctx->frame, 1, "locCurrent", "current", 0, 1, lab_dom_get(ctx->frame, "isCurrent"));
 }
 
 static int lab_flow_location_populate_loc_towns(struct lab_flow_location_populate_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
-        return lab_flow_done(lab_dom_object(4));
+        return lab_flow_done(lab_dom_object(LAB_VALUE_ARRAY));
     return lab_flow_call(ctx->frame, 2, "locTowns", "towns", 0, 1, lab_dom_get(ctx->frame, "jurisdiction"));
 }
 
@@ -219,7 +226,7 @@ static int lab_flow_location_sync(int frame)
         return lab_flow_call(frame, stage + 1, "locElements", "elements", 0, 1,
                              lab_dom_string(stage ? "almanac" : "datetime"));
     if (stage == 1 || stage == 3) {
-        int elements = lab_dom_get(frame, "elements"), options = lab_dom_object(5);
+        int elements = lab_dom_get(frame, "elements"), options = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(options, "selectDefault", lab_dom_get(frame, "selectDefault"));
         return lab_flow_call(frame, stage + 1, "locPopulate", 0, 1, 3, lab_dom_get(elements, "town"),
                              lab_dom_get(lab_dom_get(elements, "jurisdiction"), "value"), options);
@@ -447,7 +454,18 @@ struct lab_flow_location_refresh_context {
     int update;
 };
 
+/**
+ * @brief Recheck location-request ownership before applying refreshed data.
+ * @param ctx Refresh state borrowing the request handle and the frame that receives the current flag.
+ * @return Scoped ownership-check plan resuming at LOC_REFRESH_APPLY.
+ */
 static int lab_flow_location_refresh_loc_refresh_second_current(struct lab_flow_location_refresh_context *ctx);
+
+/**
+ * @brief Post the captured jurisdiction and date for location refresh.
+ * @param ctx Refresh state borrowing the request and a frame containing jurisdiction and date.
+ * @return Scoped post plan awaiting result before the response-ownership check.
+ */
 static int lab_flow_location_refresh_loc_refresh_post(struct lab_flow_location_refresh_context *ctx);
 
 static int lab_flow_location_refresh_loc_refresh_elements(struct lab_flow_location_refresh_context *ctx)
@@ -458,7 +476,7 @@ static int lab_flow_location_refresh_loc_refresh_elements(struct lab_flow_locati
 static int lab_flow_location_refresh_loc_refresh_controls(struct lab_flow_location_refresh_context *ctx)
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_BEGIN, "locControls", "controls", 0, 2, ctx->mode,
-                         lab_dom_scalar(1, ctx->update));
+                         lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->update));
 }
 
 static int lab_flow_location_refresh_loc_refresh_begin(struct lab_flow_location_refresh_context *ctx)
@@ -488,8 +506,8 @@ static int lab_flow_location_refresh_loc_refresh_populate(struct lab_flow_locati
     lab_dom_set(ctx->frame, "date", lab_dom_get(ctx->state, "date"));
     lab_dom_set(ctx->frame, "failed", lab_dom_numeric(LOC_REFRESH_FINISH));
     if (ctx->update) {
-        int options = lab_dom_object(5);
-        lab_dom_set(options, "selectDefault", lab_dom_scalar(1, 0));
+        int options = lab_dom_object(LAB_VALUE_OBJECT);
+        lab_dom_set(options, "selectDefault", lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
         return lab_flow_call(ctx->frame, LOC_REFRESH_CURRENT, "locPopulate", 0, 1, 3,
                              lab_dom_get(ctx->elements, "town"), lab_dom_get(ctx->frame, "jurisdiction"), options);
     }
@@ -514,8 +532,8 @@ static int lab_flow_location_refresh_loc_refresh_coordinates(struct lab_flow_loc
 static int lab_flow_location_refresh_loc_refresh_default(struct lab_flow_location_refresh_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "matched"))) {
-        int options = lab_dom_object(5);
-        lab_dom_set(options, "selectDefault", lab_dom_scalar(1, 1));
+        int options = lab_dom_object(LAB_VALUE_OBJECT);
+        lab_dom_set(options, "selectDefault", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
         return lab_flow_call(ctx->frame, LOC_REFRESH_SECOND_CURRENT, "locPopulate", 0, 1, 3,
                              lab_dom_get(ctx->elements, "town"), lab_dom_get(ctx->frame, "jurisdiction"), options);
     }
@@ -547,7 +565,7 @@ static int lab_flow_location_refresh_loc_refresh_status(struct lab_flow_location
 
 static int lab_flow_location_refresh_loc_refresh_post(struct lab_flow_location_refresh_context *ctx)
 {
-    int payload = lab_dom_object(5);
+    int payload = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(payload, "jurisdiction", lab_dom_get(ctx->frame, "jurisdiction"));
     lab_dom_set(payload, "date", lab_dom_get(ctx->frame, "date"));
     return lab_flow_call(ctx->frame, LOC_REFRESH_RESPONSE_CURRENT, "post", "result", 1, 2, ctx->request, payload);
@@ -572,7 +590,7 @@ static int lab_flow_location_refresh_loc_refresh_response(struct lab_flow_locati
 {
     return lab_flow_call(ctx->frame, LOC_REFRESH_ACCEPT, "locResponse", 0, 0, 5, ctx->mode,
                          lab_dom_get(lab_dom_get(ctx->frame, "result"), "data"), lab_dom_get(ctx->frame, "context"),
-                         lab_dom_scalar(1, ctx->update), lab_dom_get(ctx->frame, "townApplied"));
+                         lab_dom_scalar(LAB_VALUE_BOOLEAN, ctx->update), lab_dom_get(ctx->frame, "townApplied"));
 }
 
 static int lab_flow_location_refresh_loc_refresh_accept(struct lab_flow_location_refresh_context *ctx)
@@ -639,7 +657,18 @@ struct lab_flow_location_auto_context {
     int almanac;
 };
 
+/**
+ * @brief Optionally refresh the automatic location before saving its controls.
+ * @param ctx Automatic-location state containing calendar selection and jurisdiction/coordinate refresh options.
+ * @return Scoped refresh plan, or the calendar-save plan when refresh is disabled.
+ */
 static int lab_flow_location_auto_refresh(struct lab_flow_location_auto_context *ctx);
+
+/**
+ * @brief Save the selected calendar's automatic-location settings.
+ * @param ctx Automatic-location state whose almanac flag selects the calendar and whose frame advances to stage 4.
+ * @return Scoped plan calling the selected calendar-save service.
+ */
 static int lab_flow_location_auto_save(struct lab_flow_location_auto_context *ctx);
 
 static int lab_flow_location_auto_current_mode(struct lab_flow_location_auto_context *ctx)
@@ -660,7 +689,7 @@ static int lab_flow_location_auto_loc_clear_almanac(struct lab_flow_location_aut
 static int lab_flow_location_auto_refresh(struct lab_flow_location_auto_context *ctx)
 {
     if (lab_dom_truth(lab_dom_get(ctx->options, "refreshJurisdiction"))) {
-        int refresh = lab_dom_object(5);
+        int refresh = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(refresh, "updateCoordinates", lab_dom_get(ctx->options, "refreshCoordinates"));
         return lab_flow_call(ctx->frame, 3, ctx->almanac ? "locRefreshAlmanac" : "locRefreshDatetime", 0, 1, 1,
                              refresh);
@@ -676,8 +705,8 @@ static int lab_flow_location_auto_save(struct lab_flow_location_auto_context *ct
 
 static int lab_flow_location_auto_evaluate(struct lab_flow_location_auto_context *ctx)
 {
-    int evaluate = lab_dom_object(5);
-    lab_dom_set(evaluate, "skipHistoryUpdate", lab_dom_scalar(1, 1));
+    int evaluate = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(evaluate, "skipHistoryUpdate", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     return lab_flow_call(ctx->frame, 5, ctx->almanac ? "locEvaluateAlmanac" : "locEvaluateDatetime", 0, 1, 1, evaluate);
 }
 
@@ -720,6 +749,11 @@ struct lab_flow_location_time_context {
     int snapshot;
 };
 
+/**
+ * @brief Capture request ownership context for a calendar time change.
+ * @param ctx Time-change state whose frame receives context and resumes at stage 3.
+ * @return Scoped request-context capture plan.
+ */
 static int lab_flow_location_time_request_context(struct lab_flow_location_time_context *ctx);
 
 static int lab_flow_location_time_loc_time_snapshot(struct lab_flow_location_time_context *ctx)
@@ -735,7 +769,7 @@ static int lab_flow_location_time_loc_format_time(struct lab_flow_location_time_
 
 static int lab_flow_location_time_caught(struct lab_flow_location_time_context *ctx)
 {
-    lab_dom_set(ctx->frame, "caught", lab_dom_scalar(1, 1));
+    lab_dom_set(ctx->frame, "caught", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     /* Continue: recovery checks the same request and authored-value ownership. */
     return lab_flow_location_time_request_context(ctx);
 }
@@ -798,6 +832,11 @@ struct lab_flow_location_control_context {
     unsigned int actions;
 };
 
+/**
+ * @brief Read the active mode before finishing a location-control change.
+ * @param ctx Location-control state whose frame receives currentMode and resumes at stage 5.
+ * @return Scoped plan querying the current worksheet mode.
+ */
 static int lab_flow_location_control_current_mode(struct lab_flow_location_control_context *ctx);
 
 static int lab_flow_location_control_loc_elements(struct lab_flow_location_control_context *ctx)
@@ -838,9 +877,9 @@ static int lab_flow_location_control_complete(struct lab_flow_location_control_c
 {
     if (!lab_dom_equal(ctx->mode, lab_dom_get(ctx->frame, "currentMode")))
         return lab_flow_done(0);
-    int options = lab_dom_object(5);
-    lab_dom_set(options, "refreshJurisdiction", lab_dom_scalar(1, (ctx->actions & 16) != 0));
-    lab_dom_set(options, "refreshCoordinates", lab_dom_scalar(1, (ctx->actions & 32) != 0));
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "refreshJurisdiction", lab_dom_scalar(LAB_VALUE_BOOLEAN, (ctx->actions & 16) != 0));
+    lab_dom_set(options, "refreshCoordinates", lab_dom_scalar(LAB_VALUE_BOOLEAN, (ctx->actions & 32) != 0));
     return lab_flow_call(ctx->frame, 6,
                          lab_dom_equal(ctx->mode, lab_dom_string("datetime")) ? "locTriggerDatetime"
                                                                               : "locTriggerAlmanac",
@@ -879,9 +918,10 @@ static int lab_flow_location_control(int frame)
 /* Keep these synchronous effects separate from asynchronous request continuations. */
 void lab_flow_location_local(int text, int sections, int body, int card)
 {
-    int frame = lab_dom_object(5), plan = lab_dom_object(5), calls = lab_dom_object(4);
+    int frame = lab_dom_object(LAB_VALUE_OBJECT), plan = lab_dom_object(LAB_VALUE_OBJECT),
+        calls = lab_dom_object(LAB_VALUE_ARRAY);
     text = lab_dom_get(text, "value");
-    text = lab_dom_clean(lab_dom_text(lab_dom_truth(text) ? text : lab_dom_string("")), 0);
+    text = lab_dom_clean(lab_dom_text(lab_dom_truth(text) ? text : lab_dom_string("")), LAB_DOM_CLEAN_TRIM);
     if (lab_dom_truth(body)) {
         int render = lab_flow_call(frame, 1, "locRenderLocal", 0, 0, 3, body, sections, text);
         lab_dom_push(calls, lab_dom_item(lab_dom_get(render, "calls"), 0));
@@ -904,7 +944,7 @@ void lab_flow_location_visibility(int card, int mode)
 /* Callable-method detection belongs to the browser; preference and fallbacks are native policy. */
 void lab_flow_location_select(int select, int capabilities)
 {
-    int frame = lab_dom_object(5), plan = lab_dom_object(5);
+    int frame = lab_dom_object(LAB_VALUE_OBJECT), plan = lab_dom_object(LAB_VALUE_OBJECT);
     if (lab_dom_truth(select)) {
         if (lab_dom_truth(lab_dom_get(capabilities, "rebuild")))
             plan = lab_flow_call(frame, 1, "locSelectRebuild", 0, 0, 1, select);
@@ -915,22 +955,29 @@ void lab_flow_location_select(int select, int capabilities)
 }
 
 /* Keep unchanged moves inert without making the host interpret movement policy. */
-void lab_flow_location_picker(unsigned changed)
+void lab_flow_location_picker(bool changed)
 {
-    int frame = lab_dom_object(5), plan = lab_dom_object(5);
+    int frame = lab_dom_object(LAB_VALUE_OBJECT), plan = lab_dom_object(LAB_VALUE_OBJECT);
     if (changed)
         plan = lab_flow_call(frame, 1, "locRenderPicker", 0, 0, 0);
     lab_dom_return(plan);
 }
 
 /* Dispatch a fixed group of independent workflows, with all persistent values in the browser frame. */
-int lab_flow_location(unsigned kind, int frame, int view)
+int lab_flow_location(lab_flow_location_kind_t kind, int frame, int view)
 {
     (void)view;
-    static int (*const handlers[])(int) = {[0] = lab_flow_location_forms,    [1] = lab_flow_location_restore,
-                                           [2] = lab_flow_location_populate, [3] = lab_flow_location_sync,
-                                           [4] = lab_flow_location_history,  [5] = lab_flow_location_totality,
-                                           [6] = lab_flow_location_refresh,  [7] = lab_flow_location_auto,
-                                           [8] = lab_flow_location_time,     [9] = lab_flow_location_control};
-    return kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0);
+    static int (*const handlers[])(int) = {
+        [LAB_FLOW_LOCATION_FORMS]         = lab_flow_location_forms,
+        [LAB_FLOW_LOCATION_RESTORE]       = lab_flow_location_restore,
+        [LAB_FLOW_LOCATION_POPULATE]      = lab_flow_location_populate,
+        [LAB_FLOW_LOCATION_SYNC]          = lab_flow_location_sync,
+        [LAB_FLOW_LOCATION_HISTORY]       = lab_flow_location_history,
+        [LAB_FLOW_LOCATION_TOTALITY]      = lab_flow_location_totality,
+        [LAB_FLOW_LOCATION_REFRESH]       = lab_flow_location_refresh,
+        [LAB_FLOW_LOCATION_AUTO_EVALUATE] = lab_flow_location_auto,
+        [LAB_FLOW_LOCATION_TIME]          = lab_flow_location_time,
+        [LAB_FLOW_LOCATION_CONTROL]       = lab_flow_location_control,
+    };
+    return (unsigned)kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0);
 }

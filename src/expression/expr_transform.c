@@ -3,7 +3,8 @@
  * @brief Integral-transform nodes and shared dispatch.
  *
  * Constructs transform requests, recognises their kinds and coordinates result and derivative handling. Fourier
- * and Laplace units provide the specialised mathematical rules.
+ * and Laplace units provide the specialised mathematical rules. Native numerical-form inspection distinguishes
+ * unresolved symbolic operations from supported operations whose values still depend on bindings and domains.
  *
  * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
@@ -199,6 +200,26 @@ bool expr_is_integral_transform(const expr_t *expr)
 expr_t *expr_transform_result(const expr_t *transform)
 {
     return expr_is_integral_transform(transform) ? transform_descriptors[transform->ops->kind].result(transform) : NULL;
+}
+
+/* Inspect native operations without probing arbitrary variable values or running quadrature. */
+bool expr_has_numeric_form(const expr_t *expr)
+{
+    if (!expr || !expr_computation_step("expression.numeric_form"))
+        return false;
+    if (expr_is_arbitrary_function(expr))
+        return false;
+    if (expr_is_integral_transform(expr)) {
+        expr_t *result = expr_transform_result(expr);
+        const expr_t *body = result;
+        while (body && body->ops == &ops_real_domain)
+            body = body->a;
+        bool available = body && !expr_struct_eq(body, expr) && expr_has_numeric_form(result);
+        expr_free(result);
+        return available;
+    }
+    /* Native numerical integrals, sums and distribution plots do not require elementary closed forms. */
+    return (!expr->a || expr_has_numeric_form(expr->a)) && (!expr->b || expr_has_numeric_form(expr->b));
 }
 
 /* Differentiate known transform results on their existing domains; retain genuinely unresolved requests. */

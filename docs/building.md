@@ -91,7 +91,7 @@ Optional libraries:
 On Debian/Ubuntu, install the packaged requirements used by the default build with:
 
 ```sh
-sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
+sudo apt install build-essential pkg-config clang lld wasi-libc libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
 ```
 
 Install the [standalone native TypeScript compiler](#native-typescript-compiler)
@@ -102,7 +102,7 @@ MARS Lab alone.
 If you disable libunistring support, it is not required:
 
 ```sh
-sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
+sudo apt install build-essential pkg-config clang lld wasi-libc libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
 make ENABLE_UNISTRING=0
 ```
 
@@ -117,8 +117,9 @@ make check-deps
 
 The general dependency check also verifies that each configured TypeScript
 compiler can run and reports version 7 or newer. After checking the C development
-libraries and both native TypeScript compilers, it prints the compiler versions
-followed by `All dependency checks passed (C development libraries and native TypeScript compilers).`
+libraries, both native TypeScript compilers and the WASM C library/toolchain, it prints the compiler versions
+and the successful WebAssembly probe, followed by
+`All dependency checks passed (C development libraries, native TypeScript compilers and WebAssembly runtime).`
 This final confirmation appears only if every check succeeds. It returns a
 non-zero status with installation or path guidance when
 a compiler is missing, unusable or too old. These failures print the native
@@ -231,13 +232,14 @@ MARS Lab's native C calculation modes are linked into its server executable;
 isolated child instances run them with `--worker MODE`, without scratch binaries.
 Starting and using the Lab does not require Python. TeX rendering uses `latex`
 and `dvisvgm`; building its C/WebAssembly browser module requires Clang and LLD's
-`wasm-ld` linker, even when GCC builds the native library and server.
+`wasm-ld` linker and the `wasi-libc` maths headers and archive, even when GCC
+builds the native library and server.
 Database and weather configuration use the native `mars_config` application,
 linked directly to SQLCipher; installation needs neither Python nor the SQLCipher
 command-line programme. To install the rendering and WebAssembly prerequisites:
 
 ```sh
-sudo apt install texlive-latex-base dvisvgm clang lld
+sudo apt install texlive-latex-base dvisvgm clang lld wasi-libc
 make check-lab-deps
 ```
 
@@ -249,11 +251,16 @@ MARS Lab WebAssembly compile/link probe passed.
 
 Run `make check-lab-wasm-deps` to check only the WebAssembly toolchain. Set
 `LAB_WASM_CC` and `LAB_WASM_LD` to select versioned compiler and linker executables.
+The probe checks viewport maths, memory and string functions as well as compilation and linking.
+For a non-packaged WASI libc installation, set `LAB_WASM_INCLUDE` to its header
+directory and `LAB_WASM_LIBC` to its `libc.a` archive. The defaults are
+`/usr/include/wasm32-wasi` and `/usr/lib/wasm32-wasi/libc.a`.
 The toolchain is needed at build time, not to run an already-built browser module.
 The Lab builds both `lab_browser.wasm` for the page and `lab_codec.wasm` for
 background response decoding in `tools/mars_lab/build/<mode>/wasm/`. The normal
 Lab build includes both; neither needs Emscripten, shared-memory WASM threads or
-an additional library. Keep the executable, browser adapters and WASM assets
+a WASI host runtime. The page module statically links the required maths routines;
+the codec module links memory routines only. Keep the executable, browser adapters and WASM assets
 together when deploying a build, then restart the Lab and reload the page.
 Module Worker support is required for responses of at least 128 KiB; failure to
 start the worker is reported rather than silently blocking the browser thread.
@@ -276,7 +283,7 @@ MARS Lab WebAssembly assembly: tools/mars_lab/build/release/wasm/src/
 ```
 
 Each C module produces a matching `.s` file, such as
-`tools/mars_lab/build/release/wasm/src/lab_memory.s`. Add `DEBUG=1` to use
+`tools/mars_lab/build/release/wasm/src/lab_surface_math.s`. Add `DEBUG=1` to use
 `build/debug/wasm/src/`; both configurations use the same optimised WASM flags
 as their normal object builds. The Lab-local equivalent is
 `make -C tools/mars_lab wasm-asm`.
@@ -319,7 +326,7 @@ Install headers and libraries:
 sudo make install
 ```
 
-Check development libraries and configured TypeScript compilers before building:
+Check development libraries, configured TypeScript compilers and the WASM C library/toolchain before building:
 
 ```sh
 make check-deps

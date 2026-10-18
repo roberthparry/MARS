@@ -8,11 +8,30 @@
 #ifndef LAB_WASM_PLOT_SLICES_H
 #define LAB_WASM_PLOT_SLICES_H
 
-/** @brief Return the current tab-separated slice controls as a scoped string. */
+#include "lab_plot_controls.h"
+
+/** @brief Effect of a slice-control event on the current plot. */
+typedef enum {
+    LAB_PLOT_SLICE_UNHANDLED = 0, /**< Not a slice edit; continue normal plot-control handling. */
+    LAB_PLOT_SLICE_SAMPLE = 1,    /**< Values or automatic limits changed; request new samples. */
+    LAB_PLOT_SLICE_CONTROL = 2    /**< Only the visible slice controls changed; no sampling is needed. */
+} lab_plot_slice_edit_t;
+
+/**
+ * @brief Serialise the current plot-local slice controls.
+ * @return Scoped browser string handle with one tab-separated name, lower limit, upper limit,
+ *         exact value and slider position per line; an empty string when there are no slices.
+ */
 int lab_plot_slices_payload(void);
 
-/** @brief Apply native rows only if controls still match the request snapshot. */
-void lab_plot_slices_apply(int rows, int expected);
+/**
+ * @brief Apply native slice metadata only while the controls still match the request snapshot.
+ * @param records Scoped browser string handle with one native name, lower limit, upper limit, exact value
+ *                and slider position per tab-separated line; a falsey value clears the slice controls.
+ * @param expected Scoped browser string handle holding the payload captured before the request;
+ *                 a mismatch with the current controls discards the reply.
+ */
+void lab_plot_slices_apply(int records, int expected);
 
 /** @brief Clear plot-local slices when the authored source changes. */
 void lab_plot_slices_clear(void);
@@ -20,7 +39,12 @@ void lab_plot_slices_clear(void);
 /** @brief Reset every slice to automatic limits for a new evaluation. */
 void lab_plot_slices_auto(void);
 
-/** @brief Return 1 for a sampling request, 2 for a control-only change, or 0 for an unrelated event. */
-int lab_plot_slices_edit(unsigned action, int target);
+/**
+ * @brief Handle a slice choice, range mode, exact-value edit or slider movement.
+ * @param action Plot-control event; only change and input actions modify slice values.
+ * @param target Scoped browser handle of the event's target element, used to locate its slice row.
+ * @return Whether the event is unrelated, requires fresh samples or only changes controls.
+ */
+lab_plot_slice_edit_t lab_plot_slices_edit(lab_plot_control_action_t action, int target);
 
 #endif

@@ -8,6 +8,7 @@
  * stages; mathematical text is opaque and existing native policies remain authoritative.
  */
 #include "lab_dom.h"
+#include "lab_events.h"
 #include "lab_persist.h"
 #include "lab_flow.h"
 #include "lab_flow_state.h"
@@ -34,23 +35,59 @@ static int lab_flow_state_guard(int frame, unsigned next)
 
 static int lab_flow_state_false(void)
 {
-    return lab_flow_done(lab_dom_scalar(1, 0));
+    return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
 struct lab_flow_state_editors_context {
     int frame;
     int view;
     unsigned int index;
-    int local;
+    lab_persist_origin_t origin;
     int text;
     unsigned int flags;
 };
 
+/**
+ * @brief Advance restoration of saved text for the five editor modes.
+ * @param frame Borrowed restoration frame retaining stage, editor index, storage reader, local flag and prepared text.
+ * @param view Borrowed view handle carried through the shared workflow signature; not inspected here.
+ * @return Scoped operation plan for the current editor, or a completion plan after restoration.
+ */
 static int lab_flow_state_editors(int frame, int view);
+
+/**
+ * @brief Read the current editor's saved text from the selected storage source.
+ * @param ctx Restoration state with editor index, local/server selection and the frame's storage reader.
+ * @return Scoped storage-read plan, or a completion plan once all five editors have been visited.
+ */
 static int lab_flow_state_editors_state_read(struct lab_flow_state_editors_context *ctx);
+
+/**
+ * @brief Canonicalise restored text when required before projecting it into an editor.
+ * @param ctx Restoration state carrying text, canonicalisation flags and the frame receiving canonical text.
+ * @return Scoped canonicalisation or editor-projection plan.
+ */
 static int lab_flow_state_editors_state_canonical(struct lab_flow_state_editors_context *ctx);
+
+/**
+ * @brief Install the restored canonical text in its indexed editor.
+ * @param ctx Restoration state with the editor index and the frame's canonical text handle.
+ * @return Scoped editor-projection plan resuming at stage 5.
+ */
 static int lab_flow_state_editors_state_editor(struct lab_flow_state_editors_context *ctx);
+
+/**
+ * @brief Restore expression source text and its saved timestamp.
+ * @param ctx Restoration state carrying source text and a frame containing the optional timestamp.
+ * @return Scoped expression-state plan using zero for an absent timestamp.
+ */
 static int lab_flow_state_editors_state_expression(struct lab_flow_state_editors_context *ctx);
+
+/**
+ * @brief Restore integrator source when flagged, otherwise move to the next editor.
+ * @param ctx Restoration state with source text, integrator flag and current editor index.
+ * @return Scoped integrator-source plan or the next editor's read/completion plan.
+ */
 static int lab_flow_state_editors_state_integrator_source(struct lab_flow_state_editors_context *ctx);
 
 static int lab_flow_state_editors_advance(struct lab_flow_state_editors_context *ctx)
@@ -73,16 +110,16 @@ static int lab_flow_state_editors_state_read(struct lab_flow_state_editors_conte
     if (ctx->index >= 5)
         return lab_flow_done(0);
     return lab_flow_call(ctx->frame, 2, "stateRead", "raw", 0, 2, lab_dom_get(ctx->frame, "read"),
-                         lab_dom_string(lab_persist_text(ctx->index, 0, ctx->local)));
+                         lab_dom_string(lab_persist_text(ctx->index, 0, ctx->origin)));
 }
 
 static int lab_flow_state_editors_state_prepare(struct lab_flow_state_editors_context *ctx)
 {
     ctx->text = lab_dom_text(lab_flow_state_or(lab_dom_get(ctx->frame, "raw"), lab_dom_string("")));
-    if (!ctx->local)
-        ctx->text = lab_dom_clean(ctx->text, 0);
+    if (ctx->origin == LAB_PERSIST_SERVER)
+        ctx->text = lab_dom_clean(ctx->text, LAB_DOM_CLEAN_TRIM);
     ctx->flags = lab_persist_restore(ctx->index, lab_dom_truth(ctx->text),
-                                     lab_dom_contains(ctx->text, lab_dom_string("...")), ctx->local);
+                                     lab_dom_contains(ctx->text, lab_dom_string("...")), ctx->origin);
     lab_dom_set(ctx->frame, "text", ctx->text);
     lab_dom_set(ctx->frame, "flags", lab_dom_numeric(ctx->flags));
     if (!(ctx->flags & 1))
@@ -112,13 +149,13 @@ static int lab_flow_state_editors_state_read_5(struct lab_flow_state_editors_con
 {
     if (ctx->flags & 8)
         return lab_flow_call(ctx->frame, 6, "stateRead", "timestamp", 0, 2, lab_dom_get(ctx->frame, "read"),
-                             lab_dom_string(lab_persist_text(ctx->index, 1, ctx->local)));
+                             lab_dom_string(lab_persist_text(ctx->index, 1, ctx->origin)));
     return lab_flow_state_editors_state_integrator_source(ctx);
 }
 
 static int lab_flow_state_editors_state_now(struct lab_flow_state_editors_context *ctx)
 {
-    if (!lab_dom_truth(lab_dom_get(ctx->frame, "timestamp")) && ctx->local)
+    if (!lab_dom_truth(lab_dom_get(ctx->frame, "timestamp")) && ctx->origin != LAB_PERSIST_SERVER)
         return lab_flow_call(ctx->frame, 7, "stateNow", "timestamp", 0, 0);
     /* Continue: Number conversion retains NaN for malformed saved timestamps. */
     return lab_flow_state_editors_state_expression(ctx);
@@ -153,13 +190,14 @@ static int lab_flow_state_editors(int frame, int view)
 {
     (void)view;
     unsigned stage = lab_flow_state_stage(frame), index = (unsigned)lab_dom_number(lab_dom_get(frame, "index"));
-    int local = lab_dom_truth(lab_dom_get(frame, "local")), text = lab_dom_get(frame, "text");
+    lab_persist_origin_t origin = (lab_persist_origin_t)lab_dom_truth(lab_dom_get(frame, "local"));
+    int text = lab_dom_get(frame, "text");
     unsigned flags = (unsigned)lab_dom_number(lab_dom_get(frame, "flags"));
     struct lab_flow_state_editors_context ctx = {
         .frame = frame,
         .view = view,
         .index = index,
-        .local = local,
+        .origin = origin,
         .text = text,
         .flags = flags,
     };
@@ -187,7 +225,19 @@ struct lab_flow_state_controls_context {
     int local;
 };
 
+/**
+ * @brief Advance restoration of saved controls and integrator bounds.
+ * @param frame Borrowed restoration frame retaining stage, field index, storage reader and local/server selection.
+ * @param view Borrowed view handle carried through the shared workflow signature; not inspected here.
+ * @return Scoped control-restoration operation or completion plan.
+ */
 static int lab_flow_state_controls(int frame, int view);
+
+/**
+ * @brief Increment the saved-control index and resume its storage read.
+ * @param ctx Control-restoration state whose frame index and stage are updated before redispatch.
+ * @return Scoped read plan for the next field, or a completion plan when all fields are restored.
+ */
 static int lab_flow_state_controls_next(struct lab_flow_state_controls_context *ctx);
 
 static int lab_flow_state_controls_native(struct lab_flow_state_controls_context *ctx)
@@ -265,6 +315,11 @@ struct lab_flow_state_saved_context {
     int mode;
 };
 
+/**
+ * @brief Apply the mode selected from server-saved worksheet state.
+ * @param ctx Saved-state context carrying the selected mode and the frame advanced after application.
+ * @return Scoped mode-application plan awaited before stage 11.
+ */
 static int lab_flow_state_saved_state_apply_mode(struct lab_flow_state_saved_context *ctx);
 
 static int lab_flow_state_saved_state_server_editors(struct lab_flow_state_saved_context *ctx)
@@ -370,10 +425,40 @@ struct lab_flow_state_recovery_context {
     int text;
 };
 
+/**
+ * @brief Advance local recovery of expression and equation editors.
+ * @param frame Borrowed recovery frame retaining stage, editor index, server data, recovery record and text.
+ * @param view Borrowed view handle carried through the shared workflow signature; not inspected here.
+ * @return Scoped recovery operation plan, or a completion plan after both editors.
+ */
 static int lab_flow_state_recovery(int frame, int view);
+
+/**
+ * @brief Select a local recovery record for the current editor.
+ * @param ctx Recovery state with expression/equation index and server data held in the frame.
+ * @return Scoped recovery-selection plan, or a completion plan once both editors have been visited.
+ */
 static int lab_flow_state_recovery_state_recovery(struct lab_flow_state_recovery_context *ctx);
+
+/**
+ * @brief Read the current clock for a recovered worksheet patch.
+ * @param ctx Recovery state whose frame receives now before constructing the recovered patch.
+ * @return Scoped clock-read plan resuming at stage 5.
+ */
 static int lab_flow_state_recovery_state_now(struct lab_flow_state_recovery_context *ctx);
+
+/**
+ * @brief Install recovered text in the indexed editor.
+ * @param ctx Recovery state carrying the expression/equation index, recovered text and continuation frame.
+ * @return Scoped editor-projection plan resuming at stage 8.
+ */
 static int lab_flow_state_recovery_state_editor(struct lab_flow_state_recovery_context *ctx);
+
+/**
+ * @brief Publish the recovered worksheet patch.
+ * @param ctx Recovery state whose frame holds the patch prepared from local text and timestamps.
+ * @return Scoped patch-save plan resuming at stage 11.
+ */
 static int lab_flow_state_recovery_state_save(struct lab_flow_state_recovery_context *ctx);
 
 static int lab_flow_state_recovery_advance(struct lab_flow_state_recovery_context *ctx)
@@ -509,8 +594,25 @@ struct lab_flow_state_load_context {
     int mode;
 };
 
+/**
+ * @brief Load the locally saved almanac state during storage fallback.
+ * @param ctx Load state whose frame receives almanac from the last-almanac-state storage key.
+ * @return Scoped local-calendar read plan resuming at stage 15.
+ */
 static int lab_flow_state_load_state_local_calendar_8(struct lab_flow_state_load_context *ctx);
+
+/**
+ * @brief Read the locally saved worksheet mode during storage fallback.
+ * @param ctx Load state whose frame receives savedMode before selecting a valid mode.
+ * @return Scoped local-mode read plan resuming at stage 17.
+ */
 static int lab_flow_state_load_state_local_mode(struct lab_flow_state_load_context *ctx);
+
+/**
+ * @brief Apply the mode selected by the local-storage fallback.
+ * @param ctx Load state carrying the selected mode and the frame advanced to final completion.
+ * @return Scoped mode-application plan awaited before stage 30.
+ */
 static int lab_flow_state_load_state_apply_mode(struct lab_flow_state_load_context *ctx);
 
 static int lab_flow_state_load_state_fetch(struct lab_flow_state_load_context *ctx)
@@ -526,7 +628,8 @@ static int lab_flow_state_load_state_decode(struct lab_flow_state_load_context *
 
 static int lab_flow_state_load_state_apply_saved(struct lab_flow_state_load_context *ctx)
 {
-    return lab_flow_call(ctx->frame, 3, "stateApplySaved", 0, 1, 1, lab_flow_state_or(ctx->data, lab_dom_object(5)));
+    return lab_flow_call(ctx->frame, 3, "stateApplySaved", 0, 1, 1,
+                         lab_flow_state_or(ctx->data, lab_dom_object(LAB_VALUE_OBJECT)));
 }
 
 static int lab_flow_state_load_state_recover(struct lab_flow_state_load_context *ctx)
@@ -665,7 +768,18 @@ struct lab_flow_state_history_context {
     int plan;
 };
 
+/**
+ * @brief Recheck history-restoration ownership after editor preparation.
+ * @param ctx History state whose frame holds isCurrent and receives the ownership result in current.
+ * @return Scoped guard plan resuming at stage 4 before applying history state.
+ */
 static int lab_flow_state_history_prepared_guard(struct lab_flow_state_history_context *ctx);
+
+/**
+ * @brief Recheck history-restoration ownership before final presentation.
+ * @param ctx History state whose frame holds isCurrent and receives the ownership result in current.
+ * @return Scoped guard plan resuming at stage 10 before final history projection.
+ */
 static int lab_flow_state_history_final_guard(struct lab_flow_state_history_context *ctx);
 
 static int lab_flow_state_history_begin(struct lab_flow_state_history_context *ctx)
@@ -752,7 +866,7 @@ static int lab_flow_state_history_state_clear_bindings(struct lab_flow_state_his
 static int lab_flow_state_history_otherwise(struct lab_flow_state_history_context *ctx)
 {
     (void)ctx;
-    return lab_flow_done(lab_dom_scalar(1, 1));
+    return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
 static int lab_flow_state_history(int frame, int view)
@@ -902,7 +1016,7 @@ static int lab_flow_state_capture_history_guard(struct lab_flow_state_capture_co
 static int lab_flow_state_capture_otherwise(struct lab_flow_state_capture_context *ctx)
 {
     (void)ctx;
-    return lab_flow_done(lab_dom_scalar(1, 1));
+    return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
 static int lab_flow_state_capture(int frame, int view)
@@ -926,7 +1040,18 @@ static int lab_flow_state_capture(int frame, int view)
                                                                                : lab_flow_state_capture_otherwise(&ctx);
 }
 
+/**
+ * @brief Read the selected mode for mode-specific final projection.
+ * @param frame Borrowed mode-selection frame receiving index after editor, result and bounds restoration.
+ * @return Scoped mode-index query plan resuming at stage 16.
+ */
 static int lab_flow_state_selection_state_mode_index(int frame);
+
+/**
+ * @brief Complete mode selection without further UI changes.
+ * @param frame Mode-selection continuation frame; unused when finishing or discarding stale failures.
+ * @return Scoped completion plan with no value.
+ */
 static int lab_flow_state_selection_otherwise(int frame);
 
 static int lab_flow_state_selection_state_capture_request(int frame)
@@ -1027,11 +1152,11 @@ static int lab_flow_state_selection_state_mode_index(int frame)
 
 static int lab_flow_state_selection_finish(int frame)
 {
-    unsigned index = (unsigned)lab_dom_number(lab_dom_get(frame, "index"));
+    lab_mode_t index = (lab_mode_t)(unsigned)lab_dom_number(lab_dom_get(frame, "index"));
     static const char *const finishers[] = {"stateFocusEditor",  "stateFocusEditor",      "stateFocusEditor",
                                             "stateFocusEditor",  "stateFinishIntegrator", "stateFinishDatetime",
                                             "stateFinishAlmanac"};
-    return index < 7 ? lab_flow_state_next(frame, 40, finishers[index]) : lab_flow_done(0);
+    return (unsigned)index < LAB_MODE_COUNT ? lab_flow_state_next(frame, 40, finishers[index]) : lab_flow_done(0);
 }
 
 static int lab_flow_state_selection_error_guard(int frame)
@@ -1083,6 +1208,11 @@ static int lab_flow_state_selection(int frame, int view)
                : lab_flow_state_selection_otherwise(frame);
 }
 
+/**
+ * @brief Remove precision-recovery routing and refresh history buttons.
+ * @param frame Borrowed precision-change frame whose failed handler is removed before final UI refresh.
+ * @return Scoped history-button refresh plan resuming at stage 6.
+ */
 static int lab_flow_state_precision_state_history_buttons(int frame);
 
 static int lab_flow_state_precision_state_precision_step(int frame)
@@ -1111,12 +1241,16 @@ static int lab_flow_state_precision_complete(int frame)
 {
     {
         int plan = lab_dom_get(frame, "plan");
-        unsigned action = (unsigned)lab_dom_number(lab_dom_get(plan, "action"));
-        static const char *const services[] = {"stateHistoryButtons", "statePrecisionGoal", "statePrecisionExpression",
-                                               "stateEvaluate"};
-        if (action > 3)
-            action = 0;
-        if (action)
+        lab_event_precision_action_t action = (lab_event_precision_action_t)(unsigned)lab_dom_number(lab_dom_get(plan, "action"));
+        static const char *const services[] = {
+            [LAB_EVENT_PRECISION_NONE]     = "stateHistoryButtons",
+            [LAB_EVENT_PRECISION_GOAL]     = "statePrecisionGoal",
+            [LAB_EVENT_PRECISION_REUSE]    = "statePrecisionExpression",
+            [LAB_EVENT_PRECISION_EVALUATE] = "stateEvaluate",
+        };
+        if ((unsigned)action > LAB_EVENT_PRECISION_EVALUATE)
+            action = LAB_EVENT_PRECISION_NONE;
+        if (action != LAB_EVENT_PRECISION_NONE)
             return lab_flow_call(frame, 5, services[action], 0, 1, 1, plan);
         /* Continue to finally for a no-op precision refresh. */
     }
@@ -1165,11 +1299,19 @@ static int lab_flow_state_precision(int frame, int view)
 }
 
 /* Fixed workflow dispatch keeps browser hosts free of restoration and transition policy. */
-int lab_flow_state(unsigned kind, int frame, int view)
+int lab_flow_state(lab_flow_state_kind_t kind, int frame, int view)
 {
     static int (*const handlers[])(int, int) = {
-        lab_flow_state_editors,   lab_flow_state_controls, lab_flow_state_saved,      lab_flow_state_recovery,
-        lab_flow_state_load,      lab_flow_state_history,  lab_flow_state_navigation, lab_flow_state_capture,
-        lab_flow_state_selection, lab_flow_state_precision};
-    return kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame, view) : lab_flow_done(0);
+        [LAB_FLOW_STATE_EDITORS]    = lab_flow_state_editors,
+        [LAB_FLOW_STATE_CONTROLS]   = lab_flow_state_controls,
+        [LAB_FLOW_STATE_SAVED]      = lab_flow_state_saved,
+        [LAB_FLOW_STATE_RECOVERY]   = lab_flow_state_recovery,
+        [LAB_FLOW_STATE_LOAD]       = lab_flow_state_load,
+        [LAB_FLOW_STATE_HISTORY]    = lab_flow_state_history,
+        [LAB_FLOW_STATE_NAVIGATION] = lab_flow_state_navigation,
+        [LAB_FLOW_STATE_CAPTURE]    = lab_flow_state_capture,
+        [LAB_FLOW_STATE_SELECTION]  = lab_flow_state_selection,
+        [LAB_FLOW_STATE_PRECISION]  = lab_flow_state_precision,
+    };
+    return (unsigned)kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame, view) : lab_flow_done(0);
 }

@@ -436,6 +436,9 @@ bool expr_is_integral_transform(const expr_t *expr);
 /** Simplify a forward or inverse integral-transform operator, retaining unsupported transforms. */
 expr_t *expr_transform_result(const expr_t *transform);
 
+/** @brief Check for unresolved transforms or undefined functions without numerical sampling; domains may still fail. */
+bool expr_has_numeric_form(const expr_t *expr);
+
 /** Differentiate a recognised transform result, retaining its domain or a formal derivative when unresolved. */
 expr_t *expr_transform_deriv(expr_t *transform);
 

@@ -13,7 +13,7 @@
 
 static void lab_evaluation_weather_emit(int calls, const char *service, unsigned count, int first, int second)
 {
-    int call = lab_dom_object(5), args = lab_dom_object(4);
+    int call = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_push(args, first);
     if (count == 2)
         lab_dom_push(args, second);
@@ -23,17 +23,18 @@ static void lab_evaluation_weather_emit(int calls, const char *service, unsigned
 }
 
 /* Publish inert service descriptions; the host owns freshness checks and catches installation failures. */
-void lab_evaluation_weather_response(unsigned outcome, int overview, int data)
+void lab_evaluation_weather_response(lab_request_outcome_t outcome, int overview, int data)
 {
-    if (outcome != 1 && outcome != 2 && outcome != 4) {
+    if (outcome != LAB_REQUEST_OUTCOME_FAILURE && outcome != LAB_REQUEST_OUTCOME_SUCCESS &&
+        outcome != LAB_REQUEST_OUTCOME_EXCEPTION) {
         lab_dom_return(0);
         return;
     }
-    int plan = lab_dom_object(5), calls = lab_dom_object(4);
+    int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(plan, "calls", calls);
-    if (outcome == 2)
+    if (outcome == LAB_REQUEST_OUTCOME_SUCCESS)
         lab_evaluation_weather_emit(calls, "installWeather", 2, overview, data);
-    lab_evaluation_weather_emit(calls, "setStatus", 1, lab_dom_string(outcome == 2 ? "Ready" : "Weather unavailable"),
-                                0);
+    const char *status = outcome == LAB_REQUEST_OUTCOME_SUCCESS ? "Ready" : "Weather unavailable";
+    lab_evaluation_weather_emit(calls, "setStatus", 1, lab_dom_string(status), 0);
     lab_dom_return(plan);
 }

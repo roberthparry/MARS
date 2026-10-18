@@ -72,6 +72,7 @@ static const field_t field_table[] = {
     {"operation", "operation", false},
     {"operation_function", "operation_function", true},
     {"plot_amplitude", "plot_amplitude", true},
+    {"plot_available", "plot_available", false},
     {"plot_complex_plane", "plot_complex_plane", true},
     {"plot_components", "plot_components", true},
     {"plot_notice", "plot_notice", true},

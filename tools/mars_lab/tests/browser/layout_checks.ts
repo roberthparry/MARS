@@ -388,6 +388,11 @@ window.checkLabLayout = async function checkLabLayout(): Promise<void> {
     equal(view.lab_view_wrapped(101, 1, 100, true), 0, 'one pixel fitting tolerance');
     equal(view.lab_view_wrapped(102, 1, 100, true), 1, 'overflow selects wrapped variant');
     equal(view.lab_view_wrapped(102, 1, 100, false), 0, 'missing variant cannot wrap');
+    // Scoped calls must pass C bool options numerically; raw booleans are browser-value handles.
+    equal(labDOM.call('lab_view_wrapped', 102, 1, 100, Number(false)), 0,
+          'false boolean option crosses the scoped WASM bridge as zero');
+    equal(labDOM.call('lab_view_wrapped', 102, 1, 100, Number(true)), 1,
+          'true boolean option returns canonical one from WASM');
     equal(view.lab_view_mode_flags(0, false), 29, 'empty expression value hidden');
     equal(view.lab_view_mode_flags(0, true), 31, 'expression value shown when supplied');
     const modeFlags = [29, 3, 3, 9, 3, 3, 0];
@@ -402,6 +407,8 @@ window.checkLabLayout = async function checkLabLayout(): Promise<void> {
             view.lab_view_controls(mode, false, true, 1, 1, true, false, false), mode ? 55 : 63,
             'only expression mode enables goal seek');
         equal(view.lab_view_controls(mode, false, false, 0, 0, false, true, true), 0, 'unavailable controls disabled');
+        equal(view.lab_view_controls(mode, false, true, 2, 4, true, false, false), mode ? 55 : 63,
+              'history counts remain counts, independently of boolean control options');
     }
     for (const [length, pixels] of [
              ['96px', 96], ['72pt', 96], ['6pc', 96], ['1in', 96], ['2.54cm', 96], ['25.4mm', 96], ['200', 200],

@@ -13,6 +13,12 @@
 #ifndef LAB_WASM_ALMANAC_EVENTS_H
 #define LAB_WASM_ALMANAC_EVENTS_H
 
+/** @brief Browser event selectors; numeric values are stable ABI identifiers. */
+typedef enum {
+    LAB_ALMANAC_EVENT_TOTALITY   = 0, /**< Apply the selected totality action. */
+    LAB_ALMANAC_EVENT_VISIBILITY = 1, /**< Change worksheet visibility. */
+} lab_almanac_event_action_t;
+
 /**
  * @brief Register native almanac actions idempotently on descendants of a root.
  * @param root Scoped worksheet root, or zero to search the document for totality actions.
@@ -44,6 +50,6 @@ void lab_almanac_events_render(int target, int data, int state);
  * and then saving state before either
  * rerendering the last response and refreshing totality, or evaluating without history.
  */
-void lab_almanac_events_dispatch(unsigned action, int event, int context);
+void lab_almanac_events_dispatch(lab_almanac_event_action_t action, int event, int context);
 
 #endif

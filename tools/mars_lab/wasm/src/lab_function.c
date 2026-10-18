@@ -15,46 +15,48 @@ void lab_function_source(void)
 {
     int button = lab_dom_id("functionRun"), title = lab_dom_id("functionTitle");
     if (lab_dom_truth(lab_dom_get(button, "disabled")) ||
-        !lab_dom_equal(lab_dom_read(title, 0, ""), lab_dom_string("Function"))) {
+        !lab_dom_equal(lab_dom_read(title, LAB_DOM_TEXT, ""), lab_dom_string("Function"))) {
         lab_dom_return(0);
         return;
     }
-    lab_dom_return(lab_dom_clean(lab_dom_read(lab_dom_id("functionStyle"), 3, "fullText"), 0));
+    lab_dom_return(lab_dom_clean(lab_dom_read(lab_dom_id("functionStyle"), LAB_DOM_DATASET, "fullText"), LAB_DOM_CLEAN_TRIM));
 }
 
 /* Reset execution presentation after the host has cancelled the previous request. */
 void lab_function_clear(void)
 {
     lab_dom_disabled(lab_dom_id("functionRun"), 0);
-    lab_dom_write(lab_dom_id("functionRunOutput"), 0, "", lab_dom_string(""));
+    lab_dom_write(lab_dom_id("functionRunOutput"), LAB_DOM_TEXT, "", lab_dom_string(""));
     lab_dom_class(lab_dom_id("functionRunResult"), "hidden", 1);
 }
 
 /* Show availability or progress without claiming ownership of the host's asynchronous request. */
-void lab_function_start(int available)
+void lab_function_start(bool available)
 {
     lab_dom_class(lab_dom_id("functionRunResult"), "hidden", 0);
     if (available)
         lab_dom_disabled(lab_dom_id("functionRun"), 1);
     lab_dom_write(
-        lab_dom_id("functionRunOutput"), 0, "",
+        lab_dom_id("functionRunOutput"), LAB_DOM_TEXT, "",
         lab_dom_string(available ? "Running…" : "No Function programme is available. Evaluate an input first."));
 }
 
 /* Retain output indentation and the established response-versus-exception diagnostic precedence. */
-void lab_function_complete(unsigned outcome, int timed_out, int data, int error)
+void lab_function_complete(lab_request_outcome_t outcome, bool timed_out, int data, int error)
 {
-    if (outcome != 1 && outcome != 2 && outcome != 4)
+    if (outcome != LAB_REQUEST_OUTCOME_FAILURE && outcome != LAB_REQUEST_OUTCOME_SUCCESS &&
+        outcome != LAB_REQUEST_OUTCOME_EXCEPTION)
         return;
     int text;
-    if (outcome == 4) {
+    if (outcome == LAB_REQUEST_OUTCOME_EXCEPTION) {
         text = timed_out ? lab_dom_string("Execution request timed out.")
                          : lab_dom_join(lab_dom_string("Could not run programme: "), lab_dom_get(error, "message"), "");
     } else {
         int display = lab_dom_get(lab_dom_get(data, "presentation"), "output_display");
-        int output = lab_dom_clean(lab_dom_type(display) == 3 ? display : lab_dom_get(data, "output"), 3);
-        int diagnostic = lab_dom_clean(lab_dom_get(data, "error"), 0);
-        if (outcome == 2) {
+        int output = lab_dom_clean(lab_dom_type(display) == LAB_VALUE_STRING ? display : lab_dom_get(data, "output"),
+                                   LAB_DOM_CLEAN_TRIM_END);
+        int diagnostic = lab_dom_clean(lab_dom_get(data, "error"), LAB_DOM_CLEAN_TRIM);
+        if (outcome == LAB_REQUEST_OUTCOME_SUCCESS) {
             text = lab_dom_truth(output) ? output : lab_dom_string("Programme completed without output.");
         } else if (timed_out) {
             text = lab_dom_string("Execution request timed out.");
@@ -64,5 +66,5 @@ void lab_function_complete(unsigned outcome, int timed_out, int data, int error)
                 text = lab_dom_join(lab_dom_join(output, lab_dom_string("\n\n"), ""), text, "");
         }
     }
-    lab_dom_write(lab_dom_id("functionRunOutput"), 0, "", text);
+    lab_dom_write(lab_dom_id("functionRunOutput"), LAB_DOM_TEXT, "", text);
 }

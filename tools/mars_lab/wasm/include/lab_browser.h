@@ -6,7 +6,7 @@
  * interval-budget validation and base64 storage envelopes. The JavaScript adapter stages or copies bytes in
  * bounded WASM memory. Buffers are borrowed until the next synchronous codec call;
  * callers must copy results before awaiting browser work. No mathematics is parsed.
- * Other browser responsibilities have their own headers in this private directory.
+ * Other browser responsibilities have their own headers in this application include directory.
  */
 #ifndef LAB_WASM_BROWSER_H
 #define LAB_WASM_BROWSER_H
@@ -19,16 +19,28 @@ enum { lab_browser_limit = 8 * 1024 * 1024 };
 /** @brief Padded base64 capacity for one message; also the shared input buffer capacity. */
 enum { lab_browser_storage_limit = ((lab_browser_limit + 2) / 3) * 4 };
 
-/** @brief Return the maximum encoded message size in bytes for host-side admission. */
+/**
+ * @brief Report the encoded-message admission limit.
+ * @return Maximum encoded Protobuf message size in bytes (lab_browser_limit).
+ */
 unsigned lab_browser_message_limit(void);
 
-/** @brief Return the maximum member count admitted by a host container snapshot. */
+/**
+ * @brief Report the host container-snapshot admission limit.
+ * @return Maximum number of members allowed in one container snapshot.
+ */
 unsigned lab_browser_member_limit(void);
 
-/** @brief Return the capacity of the host's temporary codec-value table. */
+/**
+ * @brief Report the capacity required by the temporary codec-value handle table.
+ * @return Number of handle-table slots, including the reserved null slot.
+ */
 unsigned lab_browser_handle_capacity(void);
 
-/** @brief Return the maximum base64 character count for a saved encoded message. */
+/**
+ * @brief Report the saved-record text admission limit.
+ * @return Maximum padded base64 character count (lab_browser_storage_limit), excluding any terminator.
+ */
 unsigned lab_browser_base64_limit(void);
 
 /**
@@ -52,7 +64,7 @@ unsigned char *lab_browser_output_buffer(void);
 
 /**
  * @brief Encode a host object in a version-one Protobuf envelope.
- * @param root Borrowed host handle for an object, not an array or scalar.
+ * @param root Borrowed codec-table handle for a browser object, not an array or scalar; valid for this codec call.
  * @return Encoded byte count, or zero for invalid, excessively deep or oversized data.
  */
 uint32_t lab_browser_encode(int root);
@@ -60,14 +72,14 @@ uint32_t lab_browser_encode(int root);
 /**
  * @brief Decode a complete version-one envelope from the input staging buffer.
  * @param size Staged byte count, at most 8 MiB.
- * @return Decoded host object handle, or -1 for invalid data or exceeded limits.
+ * @return Decoded object handle in the current codec table, or -1 for invalid data or exceeded limits.
  */
 int lab_browser_decode(uint32_t size);
 
 /**
  * @brief Encode a host object as a padded base64 Protobuf storage record.
- * @param root Borrowed host handle for an object, not an array or scalar.
- * @return Character count in the input buffer, or zero for invalid or oversized data.
+ * @param root Borrowed codec-table handle for a browser object, not an array or scalar; valid for this codec call.
+ * @return Character count in lab_browser_input_buffer without a NUL terminator, or zero for invalid or oversized data.
  * Copy the result before another codec operation; the saved-record format is unchanged.
  */
 uint32_t lab_browser_storage_encode(int root);
@@ -75,7 +87,7 @@ uint32_t lab_browser_storage_encode(int root);
 /**
  * @brief Decode a canonical padded base64 record staged in the input buffer.
  * @param size ASCII character count, at most lab_browser_storage_limit.
- * @return Decoded host object handle, or -1 for malformed base64, Protobuf or exceeded limits.
+ * @return Decoded object handle in the current codec table, or -1 for malformed base64, Protobuf or exceeded limits.
  * Decodes in place; the caller must clear the staged region after consuming the result.
  */
 int lab_browser_storage_decode(uint32_t size);
@@ -83,15 +95,15 @@ int lab_browser_storage_decode(uint32_t size);
 /**
  * @brief Clamp finite precision to the supported saved-value range.
  * @param value Parsed precision in bits.
- * @param fallback Value to return when value is not finite.
- * @return Finite input clamped to 17..262144, or fallback.
+ * @param fallback Precision in bits returned unchanged when value is not finite; it is not itself clamped.
+ * @return Finite input clamped to 17..262144 bits without integer rounding, or fallback.
  */
 double lab_browser_precision(double value, double fallback);
 
 /**
  * @brief Validate a parsed integration work budget against the offered budgets.
- * @param value Parsed interval ceiling.
- * @param fallback Value to return for an unsupported ceiling.
+ * @param value Parsed maximum integration interval count.
+ * @param fallback Interval ceiling returned unchanged for an unsupported value; it is not validated.
  * @return Accepted value (500, 5000, 20000, 50000 or 100000), or fallback.
  */
 double lab_browser_intervals(double value, double fallback);

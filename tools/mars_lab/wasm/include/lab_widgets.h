@@ -1,6 +1,6 @@
 /**
  * @file lab_widgets.h
- * @brief Private interface: calendar control projection through the scoped browser DOM bridge.
+ * @brief Application API: calendar control projection through the scoped browser DOM bridge.
  *
  * Builds month options, weekday headings and the six-week date-picker grid from
  * the existing C calendar model. Owns popup lifecycle, anchor selection, placement,
@@ -12,22 +12,41 @@
  *
  * Used by the freestanding browser modules and the versioned JavaScript host ABI.
  * This is not an installed MARS library interface; calls run synchronously on the browser thread.
+ * Boolean parameters use the wasm32 i32 ABI; browser callers must supply exactly 0 or 1.
  */
 #ifndef LAB_WASM_WIDGETS_H
 #define LAB_WASM_WIDGETS_H
 
+#include <stdbool.h>
+
+/** @brief Date-picker navigation operations with stable browser ABI values. */
+typedef enum {
+    LAB_PICKER_SET          = 0, /**< Set a year and month. */
+    LAB_PICKER_SHIFT_MONTHS = 1, /**< Shift by signed whole months. */
+    LAB_PICKER_SHIFT_YEARS  = 2, /**< Shift by signed whole years. */
+} lab_picker_operation_t;
+
 /**
- * @brief Project the calendar grid and labels to DOM controls.
- * @param year Displayed year. @param month Displayed month.
- * @param selected_year Selected year. @param selected_month Selected month. @param selected_day Selected day.
- * @param today_year Current year. @param today_month Current month. @param today_day Current day.
- * @return One on success; zero for invalid month or absent controls, without changing the DOM.
+ * @brief Project the six-week calendar grid and labels to DOM controls.
+ * @param year Displayed civil year, an integer in 1..9999.
+ * @param month Displayed calendar month, January 1 through December 12.
+ * @param selected_year Civil year of the selected date to highlight, normally 1..9999.
+ * @param selected_month Selected calendar month, January 1 through December 12.
+ * @param selected_day Selected day of month, 1..31 subject to its month and year.
+ * @param today_year Civil year of today's date to highlight, normally 1..9999.
+ * @param today_month Today's calendar month, January 1 through December 12.
+ * @param today_day Today's day of month, 1..31 subject to its month and year.
+ * @return True on success; false for an invalid displayed month/year or missing required controls, without changing DOM.
+ * @details An invalid selected or today date suppresses its highlight without rejecting the displayed month.
  */
-int lab_widgets_picker(double year, double month, double selected_year, double selected_month, double selected_day,
+bool lab_widgets_picker(double year, double month, double selected_year, double selected_month, double selected_day,
                        double today_year, double today_month, double today_day);
 
-/** @brief Return the shell's visible rectangle, or the union of its two child controls, through the host.
- * @param shell Scoped date-control shell node whose visible anchor rectangle is measured.
+/**
+ * @brief Publish the shell's visible rectangle, falling back to the union of its child controls.
+ * @param shell Scoped date-control shell-node handle.
+ * @details lab_dom_return supplies left, right, top, bottom, width and height in client CSS pixels,
+ * or null when neither the shell nor its date input/button provides a visible rectangle.
  */
 void lab_widgets_picker_anchor(int shell);
 
@@ -41,21 +60,23 @@ void lab_widgets_picker_place(int state, int shell, double viewport_width, doubl
 
 /** @brief Hide the popup and clear both native navigation and host references before any focus event.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
- * @param restore_focus Non-zero queues focus on the former opener after clearing picker ownership.
+ * @param restore_focus True queues focus on the former opener after clearing picker ownership.
  */
-void lab_widgets_picker_close(int state, int restore_focus);
+void lab_widgets_picker_close(int state, bool restore_focus);
 
 /** @brief Write a date and dispatch one deferred bubbling change only when its authored value differs.
  * @param input Scoped destination date-input node, or zero for no action.
  * @param value Scoped authored date string to write without parsing.
- * @return One if the input text changed and a change event was queued; zero if absent or unchanged.
+ * @return True if the input text changed and a change event was queued; false if absent or unchanged.
  */
-int lab_widgets_date_commit(int input, int value);
+bool lab_widgets_date_commit(int input, int value);
 
-/** @brief Select GMT for the almanac date and the local calendar date for every other input.
- * @param input Scoped date-input node; the almanac input selects UTC.
- * @param local_date Scoped current local date string.
- * @param utc_date Scoped current UTC date string.
+/**
+ * @brief Select the GMT date for the almanac and the local date for other inputs.
+ * @param input Scoped date-input node; exactly the almanac date input selects UTC.
+ * @param local_date Scoped current local calendar-date string.
+ * @param utc_date Scoped current UTC calendar-date string.
+ * @details Publishes the selected string unchanged through lab_dom_return; no input is committed.
  */
 void lab_widgets_picker_today_date(int input, int local_date, int utc_date);
 
@@ -68,8 +89,8 @@ void lab_widgets_picker_today(int input, int local_date, int utc_moment);
 
 /** @brief Project the open native month and position it; a closed picker cannot be reopened by a stale render.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
- * @param selected Scoped date record with numeric year, month and day, or zero when invalid.
- * @param today Scoped current-date record with numeric year, month and day.
+ * @param selected Scoped date record with numeric year (1..9999), month (1..12) and day, or zero when invalid.
+ * @param today Scoped current-date record with numeric year (1..9999), month (1..12) and day.
  * @param viewport_width Viewport width in CSS pixels; zero uses the document element's client width.
  * @param viewport_height Viewport height in CSS pixels; zero uses the document element's client height.
  */
@@ -79,8 +100,8 @@ void lab_widgets_picker_render(int state, int selected, int today, double viewpo
  * @param state Scoped mutable picker record containing input, button and shell nodes.
  * @param input Scoped date-input node receiving picker commits.
  * @param button Scoped opener button used for anchoring and focus restoration.
- * @param selected Scoped date record with numeric year, month and day, or zero when invalid.
- * @param today Scoped current-date record with numeric year, month and day.
+ * @param selected Scoped date record with numeric year (1..9999), month (1..12) and day, or zero when invalid.
+ * @param today Scoped current-date record with numeric year (1..9999), month (1..12) and day.
  * @param fallback_year Browser's current local year, used when the selected/today year is non-finite.
  * @param viewport_width Viewport width in CSS pixels; zero uses the document element's client width.
  * @param viewport_height Viewport height in CSS pixels; zero uses the document element's client height.
@@ -91,22 +112,22 @@ void lab_widgets_picker_open(int state, int input, int button, int selected, int
 /** @brief Format an accepted native date for commit; return whether the caller should refresh the calendar.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
  * @param packed Accepted civil date encoded as YYYYMMDD.
- * @param commit Non-zero writes the date to the input; zero only reports whether it can be applied.
- * @return One for a valid date with an open picker and owned input; zero otherwise, without committing.
+ * @param commit True writes the date to the input; false only reports whether it can be applied.
+ * @return True for a valid date with an open picker and owned input; false otherwise, without committing.
  */
-int lab_widgets_picker_apply(int state, int packed, int commit);
+bool lab_widgets_picker_apply(int state, int packed, bool commit);
 
 /** @brief Set a month/year (0), shift months (1) or shift years (2), preserving and clamping the selected day.
  * @param state Scoped mutable picker record containing input, button and shell nodes.
  * @param operation Set year/month 0, shift months 1 or shift years 2; other values are rejected.
  * @param first Requested year for operation 0; signed whole-month or whole-year increment otherwise.
- * @param second Requested month for operation 0; ignored for shifts.
- * @param selected Scoped date record with numeric year, month and day, or zero when invalid.
+ * @param second Requested one-based month (January 1 through December 12) for operation 0; ignored for shifts.
+ * @param selected Scoped date record with numeric year (1..9999), month (1..12) and day, or zero when invalid.
  * @param fallback_year Browser's current local year, used when setting a non-finite year.
- * @param commit Non-zero commits the resulting date; zero only moves the displayed calendar.
- * @return One when the resulting date can be applied; zero for a closed picker or invalid request.
+ * @param commit True commits the resulting date; false only moves the displayed calendar.
+ * @return True when the resulting date can be applied; false for a closed picker or invalid request.
  */
-int lab_widgets_picker_move(int state, unsigned operation, double first, double second, int selected,
-                            double fallback_year, int commit);
+bool lab_widgets_picker_move(int state, lab_picker_operation_t operation, double first, double second, int selected,
+                            double fallback_year, bool commit);
 
 #endif

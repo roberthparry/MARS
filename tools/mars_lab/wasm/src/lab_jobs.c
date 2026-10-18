@@ -26,7 +26,7 @@ unsigned lab_jobs_threshold(void)
     return 128 * 1024;
 }
 
-/* Expose the same policy to the host and regression tests. */
+/* Return the fixed number of job slots available to queued and active work. */
 unsigned lab_jobs_capacity(void)
 {
     return lab_jobs_slots;
@@ -71,15 +71,15 @@ uint32_t lab_jobs_take(void)
 }
 
 /* Decode the slot directly and verify its generation before changing counters. */
-unsigned lab_jobs_finish(uint32_t token)
+bool lab_jobs_finish(uint32_t token)
 {
     lab_job_t *job = &lab_jobs[token & (lab_jobs_slots - 1)];
     if (!token || job->token != token)
-        return 0;
+        return false;
     --lab_jobs_used;
     lab_jobs_size -= job->bytes;
     *job = (lab_job_t){0};
-    return 1;
+    return true;
 }
 
 /* Observe queue pressure without mutating ownership. */

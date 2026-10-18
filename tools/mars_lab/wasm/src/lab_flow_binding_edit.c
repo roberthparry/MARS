@@ -26,7 +26,7 @@ static int lab_flow_binding_edit_success(int frame)
 static int lab_flow_binding_edit_matches(int frame, int trimmed)
 {
     int text = lab_dom_get(lab_dom_get(frame, "after"), "text");
-    return lab_dom_equal(trimmed ? lab_dom_clean(text, 0) : text,
+    return lab_dom_equal(trimmed ? lab_dom_clean(text, LAB_DOM_CLEAN_TRIM) : text,
                          lab_dom_get(frame, trimmed ? "editedBody" : "editorSnapshot"));
 }
 
@@ -94,7 +94,7 @@ static int lab_flow_binding_edit_projection_body_owner(struct lab_flow_binding_e
 static int lab_flow_binding_edit_projection_body_capture(struct lab_flow_binding_edit_projection_context *ctx)
 {
     if (!lab_dom_truth(lab_dom_get(ctx->frame, "current")))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(ctx->frame,
                          lab_flow_binding_edit_stage(ctx->frame) == flow_binding_edit_projection_stage_capture
                              ? flow_binding_edit_projection_stage_bindings
@@ -105,10 +105,10 @@ static int lab_flow_binding_edit_projection_body_capture(struct lab_flow_binding
 static int lab_flow_binding_edit_projection_bindings(struct lab_flow_binding_edit_projection_context *ctx)
 {
     if (!lab_flow_binding_edit_matches(ctx->frame, 0))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     int bindings = lab_dom_get(ctx->data, "binding_values");
-    if (lab_dom_type(bindings) != 4)
-        bindings = lab_dom_object(4);
+    if (lab_dom_type(bindings) != LAB_VALUE_ARRAY)
+        bindings = lab_dom_object(LAB_VALUE_ARRAY);
     return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_body_select, "bindingAuthored", "bindings", 0,
                          2, bindings, lab_dom_get(ctx->frame, "updated"));
 }
@@ -138,7 +138,7 @@ static int lab_flow_binding_edit_projection_assemble(struct lab_flow_binding_edi
 static int lab_flow_binding_edit_projection_body_accept(struct lab_flow_binding_edit_projection_context *ctx)
 {
     if (!lab_flow_binding_edit_matches(ctx->frame, 0))
-        return lab_flow_done(lab_dom_scalar(1, 0));
+        return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     int assembled = lab_dom_get(ctx->frame, "assembled");
     if (!lab_dom_truth(assembled))
         assembled = lab_dom_get(ctx->frame, "editorBody");
@@ -166,7 +166,7 @@ static int lab_flow_binding_edit_projection_ready(struct lab_flow_binding_edit_p
 static int lab_flow_binding_edit_projection_done(struct lab_flow_binding_edit_projection_context *ctx)
 {
     (void)ctx;
-    return lab_flow_done(lab_dom_scalar(1, 1));
+    return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
 static int lab_flow_binding_edit_projection_error_owner(struct lab_flow_binding_edit_projection_context *ctx)
@@ -180,13 +180,13 @@ static int lab_flow_binding_edit_projection_error_report(struct lab_flow_binding
     if (lab_dom_truth(lab_dom_get(ctx->frame, "current")))
         return lab_flow_call(ctx->frame, flow_binding_edit_projection_stage_failed, "setStatus", 0, 0, 1,
                              lab_dom_get(ctx->frame, "error"));
-    return lab_flow_done(lab_dom_scalar(1, 0));
+    return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
 static int lab_flow_binding_edit_projection_otherwise(struct lab_flow_binding_edit_projection_context *ctx)
 {
     (void)ctx;
-    return lab_flow_done(lab_dom_scalar(1, 0));
+    return lab_flow_done(lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
 }
 
 static int lab_flow_binding_edit_projection(int frame)
@@ -422,12 +422,12 @@ static int lab_flow_binding_edit_refresh(int frame)
 }
 
 /* Keep editor workflows separately readable while sharing the binding flow range. */
-int lab_flow_binding_edit(unsigned kind, int frame)
+int lab_flow_binding_edit(lab_flow_binding_edit_kind_t kind, int frame)
 {
     static int (*const handlers[])(int) = {
-        [0] = lab_flow_binding_edit_projection,
-        [1] = lab_flow_binding_edit_apply,
-        [2] = lab_flow_binding_edit_refresh,
+        [LAB_FLOW_BINDING_EDIT_PROJECT] = lab_flow_binding_edit_projection,
+        [LAB_FLOW_BINDING_EDIT_APPLY]   = lab_flow_binding_edit_apply,
+        [LAB_FLOW_BINDING_EDIT_REFRESH] = lab_flow_binding_edit_refresh,
     };
-    return kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0);
+    return (unsigned)kind < sizeof handlers / sizeof *handlers ? handlers[kind](frame) : lab_flow_done(0);
 }

@@ -11,11 +11,21 @@
 #ifndef LAB_EDITOR_H
 #define LAB_EDITOR_H
 
+/** @brief Exact metadata projection requested by an editor consumer. */
+typedef enum {
+    LAB_EDITOR_LOOKUP = 0, /**< Complete native metadata record. */
+    LAB_EDITOR_EXPRESSION = 1, /**< Canonical expression with trimmed-source fallback. */
+    LAB_EDITOR_RESTORE = 2, /**< Authored text with trimmed-source fallback. */
+    LAB_EDITOR_BODY = 3, /**< Expression body with trimmed-source fallback. */
+    LAB_EDITOR_BINDINGS = 4, /**< Wrapped binding metadata, when present. */
+    LAB_EDITOR_COMPACT = 5 /**< Compact display, bindings and shortening status. */
+} lab_editor_metadata_t;
+
 /**
  * @brief Look up exact metadata after browser-compatible source conversion and trimming.
  * @param text Scoped input value; falsey values select the empty string.
  * @param editors Scoped Map containing native editor metadata.
- * @return Borrowed metadata handle, or zero for missing or falsey entries.
+ * @return Scoped borrowed metadata handle, or zero for missing or falsey entries.
  */
 int lab_editor_lookup(int text, int editors);
 
@@ -35,21 +45,24 @@ int lab_editor_current_value(int view);
  * @brief Publish one editor metadata projection without interpreting mathematics.
  * @param kind Lookup 0, canonical expression 1, restored source 2, body 3,
  * wrapped binding record 4, or compact presentation 5; other values return null.
- * @param inputs Scoped one-element array boxing the input, including numeric values.
- * @param editors Scoped Map of native editor metadata.
+ * @param inputs Scoped one-element array boxing the source-text input, including numeric values.
+ * @param editors Scoped Map of native editor metadata keyed by trimmed source or display text.
+ * @post Publishes the selected projection through lab_dom_return; invalid kinds publish null.
  */
-void lab_editor_metadata(unsigned kind, int inputs, int editors);
+void lab_editor_metadata(lab_editor_metadata_t kind, int inputs, int editors);
 
 /**
  * @brief Publish current-source selection through the scoped browser bridge.
  * @param view Scoped production or custom view as for lab_editor_current_value.
+ * @post Publishes the selected source through lab_dom_return.
  */
 void lab_editor_current(int view);
 
 /**
  * @brief Publish whether the selected worksheet has enough editor input to evaluate.
- * @param inputs Scoped one-element array containing the mode name.
+ * @param inputs Scoped one-element array containing a worksheet mode name; only "expression" requires source text.
  * @param view Scoped current-source view, inspected only for Expression mode.
+ * @post Publishes a boolean through lab_dom_return, true for any mode other than Expression or a truthy source.
  */
 void lab_editor_ready(int inputs, int view);
 
