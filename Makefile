@@ -21,6 +21,7 @@ CFLAGS += -D_GNU_SOURCE -pthread
 CC := gcc
 AR := ar rcs
 INSTALL ?= install
+TSC ?= tsc
 
 PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
@@ -184,7 +185,7 @@ $(CONFIG_TEST_OBJS) $(CHECKS_TEST_OBJS) $(CHECKS_TEST_FIXTURE_BIN): | native-too
 .PHONY: all clean test memtest debug release release-evidence check-deps check-public-distribution check-compliance check-native-numeric-boundaries check-lab-deps install uninstall mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab help
 
 # Documented scratch examples are opt-in; tests compile their sources directly.
-all: native-tools check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) native-lab native-tba-lab
+all: check-deps native-tools check-public-distribution check-native-numeric-boundaries $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) native-lab native-tba-lab
 
 debug:
 	$(MAKE) DEBUG=1 all
@@ -226,7 +227,40 @@ check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS) | native-tools
 # ------------------------------------------------------------
 # Dependency checks
 # ------------------------------------------------------------
-check-deps:
+.PHONY: check-native-deps check-lab-typescript-deps check-tba-typescript-deps
+check-deps: check-native-deps check-lab-typescript-deps check-tba-typescript-deps
+
+# Both Labs use the same compiler probe, but retain independent tool overrides.
+check-lab-typescript-deps: TYPESCRIPT_COMPILER = $(LAB_TSC)
+check-lab-typescript-deps: TYPESCRIPT_SETTING = LAB_TSC
+check-tba-typescript-deps: TYPESCRIPT_COMPILER = $(TBA_TSC)
+check-tba-typescript-deps: TYPESCRIPT_SETTING = TBA_TSC
+check-lab-typescript-deps check-tba-typescript-deps:
+	@set -eu; \
+	compiler="$(TYPESCRIPT_COMPILER)"; \
+	if ! command -v "$$compiler" >/dev/null 2>&1; then \
+	    echo "Missing native TypeScript compiler ($(TYPESCRIPT_SETTING)): $$compiler" >&2; \
+	    echo "Install the standalone native TypeScript 7 compiler as tsc on PATH," >&2; \
+	    echo "or set TSC=/absolute/path/to/tsc ($(TYPESCRIPT_SETTING) overrides this for one Lab)." >&2; \
+	    echo "Node.js and npm are not required." >&2; \
+	    exit 1; \
+	fi; \
+	if ! version=$$("$$compiler" --version 2>&1); then \
+	    echo "Unable to run native TypeScript compiler ($(TYPESCRIPT_SETTING)): $$compiler" >&2; \
+	    printf '%s\n' "$$version" >&2; \
+	    exit 1; \
+	fi; \
+	major=$${version#Version }; major=$${major%%.*}; \
+	case "$$major" in ''|*[!0-9]*) major=0 ;; esac; \
+	if [ "$$major" -lt 7 ]; then \
+	    echo "$(TYPESCRIPT_SETTING) requires the native TypeScript 7 compiler or newer: $$compiler" >&2; \
+	    printf '%s\n' "Reported version: $$version" >&2; \
+	    exit 1; \
+	fi; \
+	printf '%s\n' "$(TYPESCRIPT_SETTING): $$version"
+
+# Library, installation and maintenance-tool targets do not need TypeScript.
+check-native-deps:
 	@missing=0; \
 	probe_dir=$$(mktemp -d /tmp/mars-check-deps.XXXXXX) || exit 1; \
 	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
@@ -262,7 +296,7 @@ check-deps:
 	    exit 1; \
 	fi
 
-check-lab-deps: check-deps check-lab-wasm-deps
+check-lab-deps: check-native-deps check-lab-typescript-deps check-lab-wasm-deps
 	@missing=0; \
 	packages=""; \
 	check_tool() { \
@@ -287,7 +321,7 @@ check-lab-deps: check-deps check-lab-wasm-deps
 # ------------------------------------------------------------
 # Installation
 # ------------------------------------------------------------
-install: check-deps check-compliance $(STATIC_LIB) $(SHARED_LIB) $(LEGAL_DOCUMENTS)
+install: check-native-deps check-compliance $(STATIC_LIB) $(SHARED_LIB) $(LEGAL_DOCUMENTS)
 	$(INSTALL) -d "$(DESTDIR)$(LIBDIR)"
 	$(INSTALL) -d "$(DESTDIR)$(INCLUDEDIR)/mars"
 	$(INSTALL) -d "$(DESTDIR)$(DOCDIR)/docs"
@@ -401,7 +435,7 @@ $(OBJS) $(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS) \
 $(BENCH_OBJS) $(SCRATCH_OBJS) $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) \
 $(BENCH_BINS) $(SCRATCH_BINS) \
 $(FILE_COVERAGE_OBJS) $(FILE_COVERAGE_DIR)/test_file $(LAB_OBJS) $(LAB_SERVER) $(LAB_TEST_OBJS) \
-$(CONFIG_OBJS) $(CONFIG_PROGRAM) $(CONFIG_TEST_OBJS) $(CHECKS_OBJS) $(CHECKS_BIN) $(CHECKS_TEST_OBJS): | check-deps
+$(CONFIG_OBJS) $(CONFIG_PROGRAM) $(CONFIG_TEST_OBJS) $(CHECKS_OBJS) $(CHECKS_BIN) $(CHECKS_TEST_OBJS): | check-native-deps
 
 $(FILE_COVERAGE_DIR)/%.o: src/file/%.c include/file-t.h src/file/file_internal.h Makefile
 	@mkdir -p $(dir $@)
@@ -575,7 +609,7 @@ mars-lab-restart: mars-lab-stop
 to-be-announced-lab: native-tba-lab
 	@MARS_ROOT="$(CURDIR)" "$(TBA_SERVER)" $(ARGS)
 
-install-almanac-db: check-deps native-config $(ALMANAC_RULES_SOURCES)
+install-almanac-db: check-native-deps native-config $(ALMANAC_RULES_SOURCES)
 	@"$(CONFIG_PROGRAM)" almanac
 
 uninstall-almanac-db:
@@ -602,7 +636,7 @@ endif
 install-jurisdiction-db: export MARS_CALENDAR_LOCATION_ARGUMENT = $(if $(LOCATION),$(LOCATION),$(CALENDAR_LOCATION_GOAL))
 install-jurisdiction-db: export MARS_CALENDAR_LANGUAGE_ARGUMENT = $(CALENDAR_LANGUAGE)
 install-jurisdiction-db: export MARS_CALENDAR_LIBRARY = $(abspath $(SHARED_LIB))
-install-jurisdiction-db: check-deps native-config $(JURISDICTION_RULES_SOURCES)
+install-jurisdiction-db: check-native-deps native-config $(JURISDICTION_RULES_SOURCES)
 	@"$(CONFIG_PROGRAM)" jurisdiction
 
 uninstall-jurisdiction-db:
@@ -731,7 +765,8 @@ help:
 	@printf '  %-40s %s\n' "make uninstall-jurisdiction-db" "Remove only the default jurisdiction database and its configuration"
 	@printf '  %-40s %s\n' "make install-to-be-announced-lab" "Install a user desktop launcher for To-Be-Announced Lab"
 	@printf '  %-40s %s\n' "make uninstall-to-be-announced-lab" "Remove the user desktop launcher for To-Be-Announced Lab"
-	@printf '  %-40s %s\n' "make check-deps" "Check required external development libraries"
+	@printf '  %-40s %s\n' "make check-deps" "Check development libraries and native TypeScript compilers"
+	@printf '  %-40s %s\n' "make check-native-deps" "Check development libraries without browser build tools"
 	@printf '  %-40s %s\n' "make test_http_live" "Test the HTTP client against the native loopback web server"
 	@printf '  %-40s %s\n' "make test_webserver" "Run offline Linux web server tests and its README example"
 	@printf '  %-40s %s\n' "make test-readme-examples" "Compile/run complete Markdown C examples"
@@ -739,7 +774,7 @@ help:
 	@printf '  %-40s %s\n' "make check-source-policy" "Audit inline sizes, expression registries and absence of Python"
 	@printf '  %-40s %s\n' "make native-checks" "Build tools/mars_checks/build/<mode>/mars_checks"
 	@printf '  %-40s %s\n' "make native-config" "Build tools/mars_config/build/<mode>/mars_config"
-	@printf '  %-40s %s\n' "make check-lab-deps" "Check development libraries and MARS Lab TeX/WebAssembly tools"
+	@printf '  %-40s %s\n' "make check-lab-deps" "Check development libraries and MARS Lab TypeScript/TeX/WebAssembly tools"
 	@printf '  %-40s %s\n' "make check-lab-wasm-deps" "Probe Clang's WebAssembly target and the LLVM linker"
 	@printf '  %-40s %s\n' "make install" "Install libraries and headers under PREFIX (default /usr/local)"
 	@printf '  %-40s %s\n' "make uninstall" "Remove installed libraries and headers from PREFIX"

@@ -45,6 +45,9 @@ void test_checks_parser_cases(void);
  */
 void test_checks_control_cases(void);
 
+/** @brief Register browser compiler dependency regressions. @return No value. */
+void test_checks_build_cases(void);
+
 /**
  * @brief Register all migrated Python Markdown coverage and layout cases.
  * @return No value; results are recorded by the shared harness.

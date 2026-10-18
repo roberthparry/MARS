@@ -642,11 +642,7 @@ the formal transform; this rule does not introduce a general periodic-function s
 
 For example, `@L{acos(sin(2-x))}` produces the closed form
 
-\[
-F(s)=\frac{d}{s}-\frac{1}{s^2}
-     +\frac{2e^{-ds}}{s^2(1+e^{-\pi s})},
-\qquad d=2-\frac{\pi}{2},\qquad \operatorname{Re}(s)>0.
-\]
+$\quad\begin{array}{l}\displaystyle F(s)=\frac{d}{s}-\frac{1}{s^2}+\frac{2e^{-ds}}{s^2(1+e^{-\pi s})},\qquad d=2-\frac{\pi}{2},\qquad \operatorname{Re}(s)>0.\end{array}$
 
 MARS may combine these terms into a single fraction. The formula can be plotted
 for real `s > 0`; the defining transform diverges on the boundary and to its left.
@@ -798,10 +794,7 @@ tempered distributions, not ordinary convergent Fourier integrals.
 
 For example, `@F{acos(sin(pi-x))}` gives the equivalent closed series
 
-\[
-\pi^2\delta(k)+4i\sum_{n=0}^{\infty}\frac{(-1)^n}{(2n+1)^2}
-\bigl[\delta(k-(2n+1))-\delta(k+(2n+1))\bigr],\qquad k\in\mathbb R.
-\]
+$\quad\begin{array}{l}\displaystyle \pi^2\delta(k)+4i\sum_{n=0}^{\infty}\frac{(-1)^n}{(2n+1)^2}\bigl[\delta(k-(2n+1))-\delta(k+(2n+1))\bigr],\qquad k\in\mathbb R.\end{array}$
 
 Native output simplifies exact quarter-turn phases to real or imaginary
 alternating coefficients; other phases retain equivalent complex exponentials.

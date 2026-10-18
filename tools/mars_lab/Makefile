@@ -60,17 +60,15 @@ LAB_TEST_BIN := $(LAB_BUILD_DIR)/tests/test_lab_native
 
 # Browser adapters are authored in strict TypeScript. TypeScript 7's native
 # compiler needs neither Node.js nor npm; callers may supply its absolute path.
-LAB_TSC ?= tsc
+LAB_TSC ?= $(TSC)
 LAB_TS_CONFIG := tools/mars_lab/tsconfig.json
 LAB_TEST_TS_CONFIG := tools/mars_lab/tsconfig.tests.json
 
 .PHONY: lab-typescript lab-test-typescript lab-typecheck
-lab-typescript:
-	@command -v "$(LAB_TSC)" >/dev/null 2>&1 || { \
-	    echo "MARS Lab requires the native TypeScript 7 compiler; set LAB_TSC=/path/to/tsc." >&2; exit 1; }
+lab-typescript: check-lab-typescript-deps
 	"$(LAB_TSC)" --project $(LAB_TS_CONFIG)
 
-lab-typecheck:
+lab-typecheck: check-lab-typescript-deps
 	"$(LAB_TSC)" --project $(LAB_TEST_TS_CONFIG) --noEmit
 
 lab-test-typescript: lab-typescript
@@ -150,7 +148,7 @@ $(LAB_OBJS) $(LAB_SERVER) $(LAB_TEST_OBJS) $(LAB_TEST_BIN) $(LAB_BUILD_DIR)/test
 
 # Native Lab build rules. Included by the root Makefile after library variables.
 # The local Makefile delegates to this same graph, reusing MARS dependency checks.
-$(LAB_OBJS) $(LAB_SERVER): | native-tools check-deps
+$(LAB_OBJS) $(LAB_SERVER): | native-tools check-native-deps
 
 $(LAB_BUILD_DIR)/%.o: tools/mars_lab/src/%.c tools/mars_lab/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps

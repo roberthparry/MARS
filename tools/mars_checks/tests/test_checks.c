@@ -64,6 +64,7 @@ int tests_main(void)
     TEST_SECTION("Native checker parsing and policy controls");
     test_checks_parser_cases();
     test_checks_control_cases();
+    test_checks_build_cases();
     test_checks_coverage_cases();
     test_checks_evidence_cases();
     test_checks_policy_cases();

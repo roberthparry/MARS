@@ -61,8 +61,12 @@ plain status lines replace animated bars. Password and selection prompts remain
 unobstructed; a failed stage does not display successful completion.
 
 Install the native TypeScript 7 compiler as `tsc` on PATH, or supply its absolute
-path through the Make variable `LAB_TSC`. The native compiler requires neither
-Node.js nor npm. Lab builds compile the browser sources automatically;
+path through the Make variable `TSC`; `LAB_TSC` overrides it for MARS Lab alone.
+The native compiler requires neither Node.js nor npm. `make check-deps` and
+`make check-lab-deps` check compiler availability and version; compilation and
+typechecking targets run the same preflight check. Missing or unusable compilers
+produce an actionable error, while successful checks print the compiler version.
+Lab builds compile the browser sources automatically;
 `lab-typecheck` checks both the application and browser tests strictly without
 emitting JavaScript. Browser tests are authored in `tests/browser/*.ts`;
 `lab-test-typescript` compiles them into the ignored `build/typescript_checks/`
@@ -2936,7 +2940,7 @@ enabled, returns the rule-derived working shown in the **Solver** card.
 The captured input is `y''+6y*y'+4y^3=0; y'(0)=0`. The modified Emden
 solver returns the one-constant family
 
-$\displaystyle y = \frac{C_1(2C_1x+1)}{2C_1x(C_1x+1)+1}.$
+$\quad\begin{array}{l}\displaystyle y = \frac{C_1(2C_1x+1)}{2C_1x(C_1x+1)+1}.\end{array}$
 
 The zero-slope condition removes one arbitrary constant. The compact TeX
 fraction, representative real solution curves and solver working are shown together.

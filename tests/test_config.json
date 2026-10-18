@@ -2729,6 +2729,12 @@
       "enabled": true
     }
   },
+  "tools/mars_checks/tests/test_checks_build.c": {
+    "tests": {
+      "enabled": true,
+      "test_checks_typescript_dependencies": true
+    }
+  },
   "tools/mars_checks/tests/test_checks_controls.c": {
     "tests": {
       "enabled": true,

@@ -116,17 +116,21 @@ worked examples, all seven modes and private mobile access through Tailscale.
 - libcurl 7.86.0 or newer development library (HTTP/HTTPS transport)
 - `pkg-config` for discovery of library compiler and linker flags
 - Clang and LLD for the Lab's WebAssembly assets, included in the default build
+- The standalone native TypeScript 7 compiler (`tsc`) for browser assets; Node.js and npm are not required
 - OpenSSL development files for the native HTTPS protocol test fixtures
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
 
-On Debian/Ubuntu, install the default build requirements with:
+On Debian/Ubuntu, install the packaged build requirements with:
 
 ```sh
 sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
 ```
 
-Use `make check-deps` to check for required development headers and link
-libraries before building or installing.
+Install the standalone native TypeScript compiler separately and put `tsc` on
+PATH, or set the Make variable `TSC` to its absolute path. Use `make check-deps`
+to check development headers, link libraries and the configured TypeScript
+compilers; it reports compiler versions on success. `make check-native-deps`
+checks only the C development libraries and remains quiet on success.
 
 MARS Lab runs as a native C server with calculation modes linked into the same
 `mars_lab` executable. It launches isolated child instances with `--worker MODE`,

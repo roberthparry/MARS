@@ -5,9 +5,11 @@
  * Only the request workflow implementation may use these scoped frame accessors.
  * Other controllers enter through lab_flow_request() in lab_flow_request.h.
  */
-#ifndef MARS_LAB_FLOW_REQUEST_INTERNAL_ACCESS
-#error "Private request workflow interface"
+#if !defined(MARS_LAB_FLOW_REQUEST_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
+#error "Private header requires MARS_LAB_FLOW_REQUEST_INTERNAL_ACCESS."
 #endif
+
 #ifndef LAB_FLOW_REQUEST_INTERNAL_H
 #define LAB_FLOW_REQUEST_INTERNAL_H
 

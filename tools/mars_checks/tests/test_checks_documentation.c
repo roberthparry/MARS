@@ -7,10 +7,11 @@
  * are read-only repository regressions controlled by the global test harness.
  */
 #include <ctype.h>
+#include <stdio.h>
 
-#include "test_harness.h"
 #include "checks_process.h"
 #include "checks_controls.h"
+#include "test_harness.h"
 #include "test_checks.h"
 
 static string_t *test_checks_document(const char *relative)
@@ -107,7 +108,7 @@ static size_t test_checks_dollars(const string_t *line)
     return dollars;
 }
 
-static bool test_checks_indented_formulae(const string_t *text, size_t *formulae)
+static bool test_checks_indented_formulae(const string_t *text, const string_t *path, size_t *formulae)
 {
     checks_strings_t *lines = checks_split(text, '\n');
     unsigned char fence = 0;
@@ -135,16 +136,20 @@ static bool test_checks_indented_formulae(const string_t *text, size_t *formulae
             bool next = test_checks_blank(checks_strings_get(lines, i + 1));
             bool prefix = string_starts_with(line, "$\\quad\\begin{array}{l}\\displaystyle ");
             bool standalone = previous && next && checks_match(line, "^\\$[^$]+\\$[.,;:]?$", 0, NULL);
-            ok = !string_starts_with(line, "$$") && ok;
+            bool valid = !string_starts_with(line, "$$");
             string_t *trimmed = string_clone(line);
             string_trim(trimmed);
-            ok = !checks_equal(trimmed, "\\[") && !checks_equal(trimmed, "\\]") && ok;
+            valid = !checks_equal(trimmed, "\\[") && !checks_equal(trimmed, "\\]") && valid;
             string_free(trimmed);
             if (prefix || standalone) {
-                ok = prefix && string_ends_with(line, "\\end{array}$") && test_checks_dollars(line) == 2 &&
-                     string_find(line, "\\tag{") < 0 && previous && next && ok;
+                valid = prefix && string_ends_with(line, "\\end{array}$") && test_checks_dollars(line) == 2 &&
+                        string_find(line, "\\tag{") < 0 && previous && next && valid;
                 ++*formulae;
             }
+            if (!valid)
+                fprintf(stderr, "%s:%zu: formula must be an indented, unbroken Markdown paragraph\n",
+                        string_c_str(path), i + 1);
+            ok = valid && ok;
         }
         string_free(line);
     }
@@ -164,7 +169,9 @@ static void test_checks_guide_formulae_are_indented_unbroken_paragraphs(void)
             continue;
         string_t *path = checks_path(root, string_c_str(relative));
         string_t *text = checks_read(path);
-        ok = text && test_checks_indented_formulae(text, &formulae) && ok;
+        if (!text)
+            fprintf(stderr, "%s: could not read guide\n", string_c_str(relative));
+        ok = text && test_checks_indented_formulae(text, relative, &formulae) && ok;
         string_free(text);
         string_free(path);
     }
@@ -193,15 +200,21 @@ static void test_checks_laplace_documentation_uses_markdown_math_delimiters(void
             if (string_starts_with(trimmed, "```") || string_starts_with(trimmed, "~~~"))
                 fenced = !fenced;
             if (!fenced) {
-                ok = !checks_equal(trimmed, "$") && string_find(line, "\\(") < 0 && string_find(line, "\\)") < 0 &&
-                     string_find(line, "\\[") < 0 && string_find(line, "\\]") < 0 && ok;
+                bool valid = !checks_equal(trimmed, "$") && string_find(line, "\\(") < 0 &&
+                             string_find(line, "\\)") < 0 && string_find(line, "\\[") < 0 &&
+                             string_find(line, "\\]") < 0;
                 if (string_starts_with(line, "|") && test_checks_dollars(line)) {
                     ++rows;
-                    ok = test_checks_dollars(line) % 2 == 0 && ok;
+                    valid = test_checks_dollars(line) % 2 == 0 && valid;
                 }
+                if (!valid)
+                    fprintf(stderr, "%s:%zu: use balanced Markdown math delimiters\n", paths[p], i + 1);
+                ok = valid && ok;
             }
             string_free(trimmed);
         }
+        if (rows <= 10)
+            fprintf(stderr, "%s: expected more than ten mathematical table rows, found %zu\n", paths[p], rows);
         ok = rows > 10 && ok;
         checks_strings_free(lines);
         string_free(text);

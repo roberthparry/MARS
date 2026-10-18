@@ -25,17 +25,17 @@ TBA_TEST_TS_CONFIG := tools/to_be_announced_lab/tsconfig.tests.json
 TBA_TEST_TS_CHECKS := tools/to_be_announced_lab/build/typescript_checks/tests/browser/checks.js
 
 # Browser and native transport assets belong exclusively to this application.
-TBA_TSC ?= tsc
+TBA_TSC ?= $(TSC)
 TBA_WASM_CC ?= clang
 TBA_WASM_LD ?= wasm-ld
 .PHONY: tba-typescript tba-test-typescript tba-typecheck
-tba-typescript:
+tba-typescript: check-tba-typescript-deps
 	"$(TBA_TSC)" --project $(TBA_TS_CONFIG)
 
 tba-test-typescript: tba-typescript
 	"$(TBA_TSC)" --project $(TBA_TEST_TS_CONFIG)
 
-tba-typecheck:
+tba-typecheck: check-tba-typescript-deps
 	"$(TBA_TSC)" --project $(TBA_TEST_TS_CONFIG) --noEmit
 
 TBA_SRCS := $(sort $(wildcard tools/to_be_announced_lab/src/*/*.c))
@@ -84,7 +84,7 @@ check-tba-wasm-deps:
 	    echo "Private Lab requires Clang and the LLVM WebAssembly linker." >&2; exit 1; }
 $(TBA_BUILD_DIR)/server/tba_server.o: CFLAGS += -DTBA_WASM_PATH='"$(abspath $(TBA_WASM))"'
 $(TBA_BUILD_DIR)/server/tba_server.o: CFLAGS += -DTBA_CODEC_PATH='"$(abspath $(TBA_CODEC_WASM))"'
-$(TBA_BUILD_DIR)/%.o: tools/to_be_announced_lab/src/%.c tools/to_be_announced_lab/Makefile Makefile | check-deps
+$(TBA_BUILD_DIR)/%.o: tools/to_be_announced_lab/src/%.c tools/to_be_announced_lab/Makefile Makefile | check-native-deps
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/to_be_announced_lab/include \
 	    -DTBA_ROOT='"$(CURDIR)"' -DTBA_SERVER_PATH='"$(abspath $(TBA_SERVER))"' -c $< -o $@

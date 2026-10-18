@@ -70,6 +70,7 @@ Build tools:
 - `make`
 - `ar`
 - standard C library headers
+- the standalone native TypeScript 7 compiler (`tsc`) for browser assets in the default build
 
 Required libraries:
 
@@ -87,11 +88,15 @@ Optional libraries:
 
 - libunistring, enabled by default with `ENABLE_UNISTRING=1`
 
-On Debian/Ubuntu, install everything used by the default build with:
+On Debian/Ubuntu, install the packaged requirements used by the default build with:
 
 ```sh
 sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
 ```
+
+Install the standalone native TypeScript compiler separately, with `tsc` on PATH,
+or set the Make variable `TSC` to its absolute path. Node.js and npm are not
+required. `LAB_TSC` can override the compiler for MARS Lab alone.
 
 If you disable libunistring support, it is not required:
 
@@ -109,8 +114,17 @@ does not force otherwise current artefacts to rebuild. You can also run it alone
 make check-deps
 ```
 
-If a required dependency is missing, the check prints the Debian/Ubuntu package
-name to install, for example `sudo apt install libmpfr-dev`.
+The general dependency check also verifies that each configured TypeScript
+compiler can run and reports version 7 or newer. It prints the compiler versions
+on success and returns a non-zero status with installation or path guidance when
+a compiler is missing, unusable or too old. Compilation and typechecking targets
+perform the same check before invoking the compiler.
+
+If a required C dependency is missing, the check prints the Debian/Ubuntu package
+name to install, for example `sudo apt install libmpfr-dev`. For library-only
+work, `make check-native-deps` checks just these C dependencies and is quiet on
+success. Native library, maintenance-tool and database-installation targets use
+that narrower check and do not require TypeScript.
 
 For file-module test coverage, `make -j1 coverage-file` additionally requires
 `gcov` from the GCC toolchain and `gzip`. The native `mars_checks file-coverage`
@@ -274,13 +288,13 @@ Install headers and libraries:
 sudo make install
 ```
 
-Check required development libraries before building or installing:
+Check development libraries and configured TypeScript compilers before building:
 
 ```sh
 make check-deps
 ```
 
-Check the development libraries and MARS Lab TeX rendering and WebAssembly tools:
+Check development libraries and MARS Lab TypeScript, TeX rendering and WebAssembly tools:
 
 ```sh
 make check-lab-deps
