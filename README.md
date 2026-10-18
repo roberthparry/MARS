@@ -129,7 +129,8 @@ sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev lib
 Run `make typescript-install-help` for the [native TypeScript installation commands](docs/building.md#native-typescript-compiler).
 Put `tsc` on PATH, or set the Make variable `TSC` to its absolute path. Use `make check-deps`
 to check development headers, link libraries and the configured TypeScript
-compilers; it reports compiler versions on success. `make check-native-deps`
+compilers; it reports compiler versions and confirms that all dependency checks
+passed on success. `make check-native-deps`
 checks only the C development libraries and remains quiet on success.
 
 MARS Lab runs as a native C server with calculation modes linked into the same

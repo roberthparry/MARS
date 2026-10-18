@@ -229,6 +229,7 @@ check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS) | native-tools
 # ------------------------------------------------------------
 .PHONY: check-native-deps check-lab-typescript-deps check-tba-typescript-deps typescript-install-help
 check-deps: check-native-deps check-lab-typescript-deps check-tba-typescript-deps
+	@echo "All dependency checks passed (C development libraries and native TypeScript compilers)."
 
 # Both Labs use the same compiler probe, but retain independent tool overrides.
 check-lab-typescript-deps: TYPESCRIPT_COMPILER = $(LAB_TSC)

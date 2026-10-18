@@ -5,11 +5,14 @@
  * Copies the maintained Makefiles into a disposable tree and invokes their
  * dependency and TypeScript targets sequentially. Missing or unusable compilers
  * must fail before compilation and print usable installation instructions,
- * while native-only checks remain independent.
+ * while native-only checks remain independent. The overall success message
+ * must appear only after every dependency check has passed.
  * No application assets, repository settings or installed tools are modified.
  */
 #include <stdio.h>
+#include <string.h>
 
+#include "file-t.h"
 #include "checks_process.h"
 #include "test_harness.h"
 #include "test_checks.h"
@@ -30,6 +33,17 @@ static bool test_build_makefiles(const string_t *temporary)
         string_free(path);
     }
     string_free(root);
+    return ok;
+}
+
+static bool test_build_compiler(const string_t *root)
+{
+    bool ok = test_checks_write(root, "compiler", "#!/bin/sh\nprintf 'Version 7.0.2\\n'\n");
+    string_t *path = checks_path(root, "compiler");
+    file_t *file = file_new(path);
+    ok = file && file_chmod(file, 0700) && ok;
+    file_free(file);
+    string_free(path);
     return ok;
 }
 
@@ -86,6 +100,13 @@ static bool test_build_probe(const string_t *root, const char *target, const cha
     int status = -1;
     bool ran = checks_process_run(arguments, root, 30, &output, &errors, &status);
     bool ok = ran && (diagnostic ? status > 0 && errors && string_find(errors, diagnostic) >= 0 : status == 0);
+    const char *summary = "All dependency checks passed (C development libraries and native TypeScript compilers).\n";
+    if (!diagnostic && strcmp(target, "check-deps") == 0)
+        ok = output && string_ends_with(output, summary) &&
+             string_find(output, "LAB_TSC: Version 7.0.2\n") >= 0 &&
+             string_find(output, "TBA_TSC: Version 7.0.2\n") >= 0 && ok;
+    else
+        ok = (!output || string_find(output, summary) < 0) && ok;
     if (diagnostic)
         ok = test_build_install_help(errors) && ok;
     if (!ok)
@@ -115,6 +136,12 @@ static void test_checks_typescript_dependencies(void)
                           "Missing native TypeScript compiler (LAB_TSC): /missing/lab-compiler") && ok;
     ok = test_build_probe(root, "tba-typecheck", "/bin/false", "TBA_TSC=/missing/second-compiler",
                           "Missing native TypeScript compiler (TBA_TSC): /missing/second-compiler") && ok;
+    string_t *compiler = checks_path(root, "compiler");
+    ok = test_build_compiler(root) && ok;
+    ok = test_build_probe(root, "check-deps", string_c_str(compiler), "TBA_TSC=/missing/second-compiler",
+                          "Missing native TypeScript compiler (TBA_TSC): /missing/second-compiler") && ok;
+    ok = test_build_probe(root, "check-deps", string_c_str(compiler), NULL, NULL) && ok;
+    string_free(compiler);
     string_free(missing);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "compiler checks reject unavailable tools, honour overrides and keep native builds independent");

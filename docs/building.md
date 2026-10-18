@@ -116,8 +116,11 @@ make check-deps
 ```
 
 The general dependency check also verifies that each configured TypeScript
-compiler can run and reports version 7 or newer. It prints the compiler versions
-on success and returns a non-zero status with installation or path guidance when
+compiler can run and reports version 7 or newer. After checking the C development
+libraries and both native TypeScript compilers, it prints the compiler versions
+followed by `All dependency checks passed (C development libraries and native TypeScript compilers).`
+This final confirmation appears only if every check succeeds. It returns a
+non-zero status with installation or path guidance when
 a compiler is missing, unusable or too old. These failures print the native
 compiler installation commands described below. Compilation and typechecking
 targets perform the same check before invoking the compiler.
@@ -157,7 +160,8 @@ existing version directory or `tsc` entry. If the compiler is already installed,
 use `TSC=/absolute/path/to/tsc` or correct PATH instead of reinstalling it.
 The printed `export PATH` command makes `$HOME/.local/bin` visible in the current
 shell; ensure it is also on PATH in future sessions. Finish with `make check-deps`,
-which reports the configured compiler versions on success.
+which reports the configured compiler versions and confirms that all dependency
+checks passed on success.
 
 ### HTTP transport dependency
 

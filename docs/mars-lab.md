@@ -68,7 +68,9 @@ the Debian/Ubuntu `node-typescript` package is not the native compiler.
 `make check-deps` and
 `make check-lab-deps` check compiler availability and version; compilation and
 typechecking targets run the same preflight check. Missing or unusable compilers
-produce an actionable error, while successful checks print the compiler version.
+produce an actionable error, while successful compiler checks print the version.
+`make check-deps` also ends with an explicit confirmation that all its dependency
+checks passed, including the C development libraries.
 Lab builds compile the browser sources automatically;
 `lab-typecheck` checks both the application and browser tests strictly without
 emitting JavaScript. Browser tests are authored in `tests/browser/*.ts`;
