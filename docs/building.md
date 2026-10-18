@@ -94,9 +94,10 @@ On Debian/Ubuntu, install the packaged requirements used by the default build wi
 sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
 ```
 
-Install the standalone native TypeScript compiler separately, with `tsc` on PATH,
-or set the Make variable `TSC` to its absolute path. Node.js and npm are not
-required. `LAB_TSC` can override the compiler for MARS Lab alone.
+Install the [standalone native TypeScript compiler](#native-typescript-compiler)
+separately, with `tsc` on PATH, or set the Make variable `TSC` to its absolute
+path. Node.js and npm are not required. `LAB_TSC` can override the compiler for
+MARS Lab alone.
 
 If you disable libunistring support, it is not required:
 
@@ -117,8 +118,9 @@ make check-deps
 The general dependency check also verifies that each configured TypeScript
 compiler can run and reports version 7 or newer. It prints the compiler versions
 on success and returns a non-zero status with installation or path guidance when
-a compiler is missing, unusable or too old. Compilation and typechecking targets
-perform the same check before invoking the compiler.
+a compiler is missing, unusable or too old. These failures print the native
+compiler installation commands described below. Compilation and typechecking
+targets perform the same check before invoking the compiler.
 
 If a required C dependency is missing, the check prints the Debian/Ubuntu package
 name to install, for example `sudo apt install libmpfr-dev`. For library-only
@@ -131,6 +133,31 @@ For file-module test coverage, `make -j1 coverage-file` additionally requires
 command reads GCC's compressed JSON reports. It reports measured execution
 coverage and enforces minimums; see the
 [file testing guide](file.md#coverage-and-failure-path-tests) for details.
+
+### Native TypeScript compiler
+
+The [Ubuntu `node-typescript` package](https://packages.ubuntu.com/resolute/node-typescript)
+is the older, Node.js-based compiler, not the standalone native compiler used
+by this build. Installing it would introduce the runtime that MARS does not need.
+Use Microsoft's [native TypeScript 7.0.2 release](https://github.com/microsoft/typescript-go/releases/tag/typescript/v7.0.2)
+instead.
+
+Run `make typescript-install-help` to print copyable installation commands. On
+Linux x86-64 and ARM64, these begin with `sudo apt install ca-certificates curl tar`
+for the download and extraction tools. The remaining commands download the
+matching official archive, verify its published SHA-256 checksum, retain the
+compiler together with its declaration files under
+`$HOME/.local/lib/typescript/7.0.2`, and create `$HOME/.local/bin/tsc`.
+Other platforms receive the official release link so the appropriate archive
+can be selected. No installation command runs during dependency checks or when
+requesting help; the user chooses whether to execute the printed instructions.
+
+The commands are for a new per-user installation. They refuse to replace an
+existing version directory or `tsc` entry. If the compiler is already installed,
+use `TSC=/absolute/path/to/tsc` or correct PATH instead of reinstalling it.
+The printed `export PATH` command makes `$HOME/.local/bin` visible in the current
+shell; ensure it is also on PATH in future sessions. Finish with `make check-deps`,
+which reports the configured compiler versions on success.
 
 ### HTTP transport dependency
 

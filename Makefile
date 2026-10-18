@@ -227,7 +227,7 @@ check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS) | native-tools
 # ------------------------------------------------------------
 # Dependency checks
 # ------------------------------------------------------------
-.PHONY: check-native-deps check-lab-typescript-deps check-tba-typescript-deps
+.PHONY: check-native-deps check-lab-typescript-deps check-tba-typescript-deps typescript-install-help
 check-deps: check-native-deps check-lab-typescript-deps check-tba-typescript-deps
 
 # Both Labs use the same compiler probe, but retain independent tool overrides.
@@ -240,14 +240,13 @@ check-lab-typescript-deps check-tba-typescript-deps:
 	compiler="$(TYPESCRIPT_COMPILER)"; \
 	if ! command -v "$$compiler" >/dev/null 2>&1; then \
 	    echo "Missing native TypeScript compiler ($(TYPESCRIPT_SETTING)): $$compiler" >&2; \
-	    echo "Install the standalone native TypeScript 7 compiler as tsc on PATH," >&2; \
-	    echo "or set TSC=/absolute/path/to/tsc ($(TYPESCRIPT_SETTING) overrides this for one Lab)." >&2; \
-	    echo "Node.js and npm are not required." >&2; \
+	    $(MAKE) --no-print-directory typescript-install-help >&2; \
 	    exit 1; \
 	fi; \
 	if ! version=$$("$$compiler" --version 2>&1); then \
 	    echo "Unable to run native TypeScript compiler ($(TYPESCRIPT_SETTING)): $$compiler" >&2; \
 	    printf '%s\n' "$$version" >&2; \
+	    $(MAKE) --no-print-directory typescript-install-help >&2; \
 	    exit 1; \
 	fi; \
 	major=$${version#Version }; major=$${major%%.*}; \
@@ -255,9 +254,41 @@ check-lab-typescript-deps check-tba-typescript-deps:
 	if [ "$$major" -lt 7 ]; then \
 	    echo "$(TYPESCRIPT_SETTING) requires the native TypeScript 7 compiler or newer: $$compiler" >&2; \
 	    printf '%s\n' "Reported version: $$version" >&2; \
+	    $(MAKE) --no-print-directory typescript-install-help >&2; \
 	    exit 1; \
 	fi; \
 	printf '%s\n' "$(TYPESCRIPT_SETTING): $$version"
+
+# Print instructions only: dependency checks never install or download tools.
+typescript-install-help:
+	@printf '%s\n' \
+	    'The Debian/Ubuntu node-typescript package requires Node.js; use the native release instead.' \
+	    'Node.js and npm are not required. Installation guide: docs/building.md#native-typescript-compiler' \
+	    'Already installed? Use make TSC=/absolute/path/to/tsc, or put its directory on PATH.' \
+	    'Official downloads: https://github.com/microsoft/typescript-go/releases/tag/typescript/v7.0.2'; \
+	case "$$(uname -s):$$(uname -m)" in \
+	    Linux:x86_64|Linux:amd64) \
+	        arch=x64; digest=7ecad6f67377e831856367ab062ef394f21506a611405bf8ac0ff039348637d3 ;; \
+	    Linux:aarch64|Linux:arm64) \
+	        arch=arm64; digest=c83d931ac9dd7549cde6e71246aa9d6a9812843023df3e277fe3b5dcf41dd0ea ;; \
+	    *) echo 'Select the archive matching your operating system and processor from the official downloads.'; exit 0 ;; \
+	esac; \
+	printf '%s\n' \
+	    'For a new per-user installation on Debian/Ubuntu, run:' \
+	    '  sudo apt install ca-certificates curl tar' \
+	    '  (' \
+	    '    set -eu' \
+	    '    ts_install=$$(mktemp -d)' \
+	    "    curl -fL https://github.com/microsoft/typescript-go/releases/download/typescript/v7.0.2/typescript-linux-$$arch.tgz -o \"\$$ts_install/compiler.tgz\"" \
+	    "    printf '%s  %s\\n' '$$digest' \"\$$ts_install/compiler.tgz\" | sha256sum -c -" \
+	    '    tar -xzf "$$ts_install/compiler.tgz" -C "$$ts_install"' \
+	    '    mkdir -p "$$HOME/.local/lib/typescript" "$$HOME/.local/bin"' \
+	    '    test ! -e "$$HOME/.local/lib/typescript/7.0.2"' \
+	    '    mv -T "$$ts_install/package" "$$HOME/.local/lib/typescript/7.0.2"' \
+	    '    ln -sT "$$HOME/.local/lib/typescript/7.0.2/lib/tsc" "$$HOME/.local/bin/tsc"' \
+	    '  )' \
+	    '  export PATH="$$HOME/.local/bin:$$PATH"' \
+	    '  make check-deps'
 
 # Library, installation and maintenance-tool targets do not need TypeScript.
 check-native-deps:
@@ -767,6 +798,7 @@ help:
 	@printf '  %-40s %s\n' "make uninstall-to-be-announced-lab" "Remove the user desktop launcher for To-Be-Announced Lab"
 	@printf '  %-40s %s\n' "make check-deps" "Check development libraries and native TypeScript compilers"
 	@printf '  %-40s %s\n' "make check-native-deps" "Check development libraries without browser build tools"
+	@printf '  %-40s %s\n' "make typescript-install-help" "Print native compiler installation commands without installing anything"
 	@printf '  %-40s %s\n' "make test_http_live" "Test the HTTP client against the native loopback web server"
 	@printf '  %-40s %s\n' "make test_webserver" "Run offline Linux web server tests and its README example"
 	@printf '  %-40s %s\n' "make test-readme-examples" "Compile/run complete Markdown C examples"

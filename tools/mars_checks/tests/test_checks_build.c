@@ -4,7 +4,8 @@
  *
  * Copies the maintained Makefiles into a disposable tree and invokes their
  * dependency and TypeScript targets sequentially. Missing or unusable compilers
- * must fail before compilation, while native-only checks remain independent.
+ * must fail before compilation and print usable installation instructions,
+ * while native-only checks remain independent.
  * No application assets, repository settings or installed tools are modified.
  */
 #include <stdio.h>
@@ -32,6 +33,38 @@ static bool test_build_makefiles(const string_t *temporary)
     return ok;
 }
 
+static bool test_build_install_help(const string_t *text)
+{
+    const char *const instructions[] = {
+        "node-typescript package requires Node.js",
+        "make TSC=/absolute/path/to/tsc",
+        "docs/building.md#native-typescript-compiler",
+        "https://github.com/microsoft/typescript-go/releases/tag/typescript/v7.0.2"
+    };
+    bool ok = text != NULL;
+    for (size_t i = 0; ok && i < sizeof(instructions) / sizeof(*instructions); ++i)
+        ok = string_find(text, instructions[i]) >= 0;
+    if (!ok)
+        return false;
+    bool download = string_find(text, "curl -fL ") >= 0;
+    bool other_platform = string_find(text, "Select the archive matching your operating system") >= 0;
+    if (!download)
+        return other_platform;
+    const char *const commands[] = {
+        "sudo apt install ca-certificates curl tar",
+        "ts_install=$(mktemp -d)",
+        "| sha256sum -c -",
+        "tar -xzf \"$ts_install/compiler.tgz\" -C \"$ts_install\"",
+        "test ! -e \"$HOME/.local/lib/typescript/7.0.2\"",
+        "ln -sT \"$HOME/.local/lib/typescript/7.0.2/lib/tsc\" \"$HOME/.local/bin/tsc\"",
+        "export PATH=\"$HOME/.local/bin:$PATH\"",
+        "make check-deps"
+    };
+    for (size_t i = 0; i < sizeof(commands) / sizeof(*commands); ++i)
+        ok = string_find(text, commands[i]) >= 0 && ok;
+    return ok && !other_platform;
+}
+
 static bool test_build_probe(const string_t *root, const char *target, const char *compiler,
                              const char *override, const char *diagnostic)
 {
@@ -53,6 +86,8 @@ static bool test_build_probe(const string_t *root, const char *target, const cha
     int status = -1;
     bool ran = checks_process_run(arguments, root, 30, &output, &errors, &status);
     bool ok = ran && (diagnostic ? status > 0 && errors && string_find(errors, diagnostic) >= 0 : status == 0);
+    if (diagnostic)
+        ok = test_build_install_help(errors) && ok;
     if (!ok)
         fprintf(stderr, "Build probe %s: status %d\n%s\n%s\n", target, status,
                 output ? string_c_str(output) : "", errors ? string_c_str(errors) : "");

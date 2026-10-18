@@ -126,8 +126,8 @@ On Debian/Ubuntu, install the packaged build requirements with:
 sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
 ```
 
-Install the standalone native TypeScript compiler separately and put `tsc` on
-PATH, or set the Make variable `TSC` to its absolute path. Use `make check-deps`
+Run `make typescript-install-help` for the [native TypeScript installation commands](docs/building.md#native-typescript-compiler).
+Put `tsc` on PATH, or set the Make variable `TSC` to its absolute path. Use `make check-deps`
 to check development headers, link libraries and the configured TypeScript
 compilers; it reports compiler versions on success. `make check-native-deps`
 checks only the C development libraries and remains quiet on success.

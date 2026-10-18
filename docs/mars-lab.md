@@ -62,7 +62,10 @@ unobstructed; a failed stage does not display successful completion.
 
 Install the native TypeScript 7 compiler as `tsc` on PATH, or supply its absolute
 path through the Make variable `TSC`; `LAB_TSC` overrides it for MARS Lab alone.
-The native compiler requires neither Node.js nor npm. `make check-deps` and
+The native compiler requires neither Node.js nor npm. Run
+`make typescript-install-help` for [copyable installation commands](building.md#native-typescript-compiler);
+the Debian/Ubuntu `node-typescript` package is not the native compiler.
+`make check-deps` and
 `make check-lab-deps` check compiler availability and version; compilation and
 typechecking targets run the same preflight check. Missing or unusable compilers
 produce an actionable error, while successful checks print the compiler version.
