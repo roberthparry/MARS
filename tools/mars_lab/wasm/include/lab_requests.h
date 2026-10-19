@@ -97,6 +97,7 @@ typedef enum {
     LAB_REQUEST_ENDPOINT_DATETIME_LOCATION     = 12, /**< DateTime location. */
     LAB_REQUEST_ENDPOINT_ALMANAC_LOCATION      = 13, /**< Almanac location. */
     LAB_REQUEST_ENDPOINT_RENDER                = 14, /**< TeX rendering. */
+    LAB_REQUEST_ENDPOINT_ALMANAC_WEATHER       = 15, /**< Background Almanac atmosphere refresh. */
 } lab_request_endpoint_t;
 
 /** @brief Count available operations. @return Operation count; also the invalid-operation sentinel. */

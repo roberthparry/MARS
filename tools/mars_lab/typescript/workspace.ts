@@ -312,3 +312,5 @@ namespace WorksheetContext {
     };
 
 }
+
+installAlmanacGlobe();

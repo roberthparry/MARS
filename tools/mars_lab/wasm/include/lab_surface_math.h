@@ -74,4 +74,12 @@ void lab_surface_camera(lab_surface_camera_action_t action, jsref first, jsref s
  */
 void lab_surface_rotation(quaternion_jsref quaternion, double matrix[9]);
 
+/**
+ * @brief Compose and normalise two display rotations, permitting aliased output.
+ * @param left Left-hand quaternion in [x,y,z,w] order.
+ * @param right Right-hand quaternion in [x,y,z,w] order.
+ * @param[out] result Caller-owned storage for the normalised product.
+ */
+void lab_surface_quaternion_multiply(const double left[4], const double right[4], double result[4]);
+
 #endif

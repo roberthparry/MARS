@@ -165,6 +165,7 @@ int checks_markdown_api(const string_t *root)
                                                  {"regex-t.h", "regex.md"},
                                                  {"sampler-t.h", "sampler.md"},
                                                  {"set-t.h", "set.md"},
+                                                 {"shoreline-t.h", "almanac.md"},
                                                  {"sqlite-t.h", "sqlite.md"},
                                                  {"string-t.h", "string.md"},
                                                  {"thread-t.h", "thread.md"},

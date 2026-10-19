@@ -314,10 +314,13 @@ static json_t *lab_cal_location(const json_t *options, unsigned *status)
 json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *status)
 {
     const char *path = route ? string_c_str(route) : "";
+    if (!strcmp(path, "/almanac-globe"))
+        return lab_cal_globe(payload, status);
     bool is_datetime = !strcmp(path, "/datetime-eval");
     bool is_weather = !strcmp(path, "/datetime-weather");
     bool is_location = !strcmp(path, "/datetime-jurisdiction-location");
-    bool is_almanac = !strcmp(path, "/almanac-eval");
+    bool is_almanac_weather = !strcmp(path, "/almanac-weather");
+    bool is_almanac = !strcmp(path, "/almanac-eval") || is_almanac_weather;
     bool is_totality = !strcmp(path, "/almanac-land-totality");
     if (!is_datetime && !is_weather && !is_location && !is_almanac && !is_totality)
         return NULL;
@@ -403,6 +406,8 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
     }
     if (is_almanac || is_totality) {
         lab_cal_option(options, payload, "elevation", "elevation", "0");
+        if (!lab_cal_numeric(lab_cal_text(options, "elevation"), -500, 11000))
+            error = "Bad request: observer elevation must be between -500 and 11000 metres";
         lab_cal_option(options, payload, "zone", "zone", "0");
         lab_cal_option(options, payload, "time", "time", clock);
         lab_cal_option(options, payload, "visibility", "visibility", "all");
@@ -423,6 +428,14 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
     if (error) {
         json_free(options);
         return lab_cal_error(status, 400, error);
+    }
+    if (is_almanac) {
+        lab_cal_surface(options);
+        if (!strcmp(lab_cal_text(options, "sea_horizon"), "true") &&
+            !lab_cal_numeric(lab_cal_text(options, "elevation"), 0, 11000)) {
+            json_free(options);
+            return lab_cal_error(status, 400, "Bad request: height of eye above sea level must be non-negative");
+        }
     }
     string_t *timezone = lab_cal_town_timezone(options);
     lab_cal_set(options, "timezone", string_c_str(timezone));
@@ -445,10 +458,15 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
     else if (is_totality)
         response = lab_cal_totality(payload, options, status);
     else {
+        if (is_almanac_weather)
+            lab_cal_atmosphere(options);
+        else if (is_almanac)
+            lab_cal_observing_conditions(options, NULL);
         json_t *args = json_new_object();
         static const char *datetime_keys[] = {"date", "start",     "end",        "year",         "lat",
                                               "lon",  "elevation", "gmt_offset", "jurisdiction", "jdn"};
-        static const char *almanac_keys[] = {"date", "time", "zone", "lat", "lon"};
+        static const char *almanac_keys[] = {"date", "time", "zone", "lat", "lon", "elevation",
+                                            "temperature_c", "pressure_hpa", "sea_horizon"};
         const char *const *keys = is_datetime ? datetime_keys : almanac_keys;
         size_t count =
             is_datetime ? sizeof(datetime_keys) / sizeof(*datetime_keys) : sizeof(almanac_keys) / sizeof(*almanac_keys);
@@ -503,6 +521,8 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
         string_free(diagnostic);
     }
     bool ok = false;
+    if (is_almanac_weather && response)
+        lab_cal_take(response, "weather_refresh", json_new_bool(true));
     if ((is_datetime || is_almanac) && json_bool_value(lab_cal_get(response, "ok"), &ok) && ok) {
         static const char *source_keys[] = {"date", "start", "end",       "year",      "jurisdiction",
                                             "town", "lat",   "lon",       "elevation", "gmt_offset",

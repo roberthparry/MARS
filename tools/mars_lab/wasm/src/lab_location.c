@@ -717,7 +717,9 @@ void lab_location_evaluation(lab_mode_t mode, jsref data, jsref context)
             lab_location_reset_offset(context, offset);
         }
     } else if (mode == LAB_MODE_ALMANAC) {
-        static const unsigned projection[] = {2, 5, 6, 7, 3};
+        /* Observer height is authored input, not an evaluation result. Town selection and
+         * explicit location actions own height changes; replies must not reset it. */
+        static const unsigned projection[] = {2, 5, 6, 3};
         unsigned mark = lab_dom_mark();
         for (unsigned index = 0; index < sizeof projection / sizeof *projection; ++index) {
             unsigned field = projection[index];

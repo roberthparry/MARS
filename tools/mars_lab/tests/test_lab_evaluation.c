@@ -11,13 +11,18 @@
  */
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
+#include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
 #include "internal/lab_evaluate_internal.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
 #include "number-t.h"
+#define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
+#include "internal/lab_calendar_internal.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
@@ -127,7 +132,7 @@ static void test_lab_evaluation_validation(void)
 
 static void test_lab_calendar_validation(void)
 {
-    const char *routes[] = {"/datetime-eval", "/datetime-weather", "/datetime-jurisdiction-location", "/almanac-eval",
+    const char *routes[] = {"/datetime-eval", "/datetime-weather", "/datetime-jurisdiction-location", "/almanac-eval", "/almanac-weather",
                             "/almanac-land-totality"};
     json_t *payload = test_lab_json("{\"date\":\"not-a-date\"}");
     bool ok = payload != NULL;
@@ -141,6 +146,135 @@ static void test_lab_calendar_validation(void)
     }
     json_free(payload);
     TEST_ASSERT_TRUE(ok, "calendar routes reject malformed dates before network or database access");
+    unsigned status = 0;
+    string_t *route = string_new_with("/almanac-eval");
+    payload = test_lab_json("{\"date\":\"2000-01-01\",\"town\":\"Fixture\",\"elevation\":\"12000\"}");
+    json_t *response = lab_cal_request(route, payload, &status);
+    TEST_ASSERT_TRUE(status == 400 && strstr(test_lab_text(response, "error"), "elevation"),
+                     "out-of-range observer elevation is rejected before requesting weather");
+    json_free(response);
+    json_free(payload);
+    payload = test_lab_json("{\"date\":\"2000-01-01\",\"town\":\"\",\"latitude\":\"0\","
+                            "\"longitude\":\"0\",\"elevation\":\"-10\"}");
+    response = lab_cal_request(route, payload, &status);
+    TEST_ASSERT_TRUE(status == 400 && strstr(test_lab_text(response, "error"), "height of eye"),
+                     "confirmed ocean coordinates reject a negative height of eye");
+    json_free(response);
+    json_free(payload);
+    string_free(route);
+}
+
+static void test_lab_observing_conditions(void)
+{
+    json_t *options = test_lab_json(
+        "{\"date\":\"2000-01-01\",\"time\":\"12:30:00\",\"lat\":\"50\",\"elevation\":\"2000\"}");
+    json_t *weather = test_lab_json(
+        "{\"forecast\":{\"forecastday\":[{\"hour\":["
+        "{\"time_epoch\":946724400,\"temp_c\":40,\"pressure_mb\":1000},"
+        "{\"time_epoch\":946728000,\"temp_c\":3,\"pressure_mb\":790}]}]}}");
+    lab_cal_observing_conditions(options, weather);
+    double temperature = NAN, pressure = NAN;
+    bool ok = lab_cal_number(lab_cal_text(options, "temperature_c"), &temperature) && temperature == 3 &&
+              lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) && pressure == 790 &&
+              !strcmp(lab_cal_text(options, "atmosphere_note"),
+                      "Temperature: 3.0 °C · Pressure: 790 hPa · Source: WeatherAPI");
+    TEST_ASSERT_TRUE(ok, "UTC observation hour supplies both temperature and unmodified station pressure");
+    json_free(weather);
+    weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"hour\":["
+                            "{\"time_epoch\":946728000,\"temp_c\":3,\"pressure_mb\":-1}]}]}}");
+    lab_cal_observing_conditions(options, weather);
+    ok = lab_cal_number(lab_cal_text(options, "temperature_c"), &temperature) && temperature == 3 &&
+         lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) && pressure > 790 && pressure < 800 && ok;
+    TEST_ASSERT_TRUE(ok, "missing pressure alone uses the elevation fallback");
+    lab_cal_set(options, "time", "14:00:00");
+    lab_cal_observing_conditions(options, weather);
+    ok = strstr(lab_cal_text(options, "atmosphere_note"), "seasonal estimate") && ok;
+    TEST_ASSERT_TRUE(ok, "weather for a different hour is not reused");
+    json_free(weather);
+    weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"hour\":["
+                            "{\"time_epoch\":946728000,\"temp_c\":999,\"pressure_mb\":790}]}]}}");
+    lab_cal_set(options, "time", "12:30:00");
+    lab_cal_observing_conditions(options, weather);
+    ok = lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) && pressure == 790 &&
+         strstr(lab_cal_text(options, "atmosphere_note"), "seasonal estimate") && ok;
+    TEST_ASSERT_TRUE(ok, "invalid temperature alone retains provider pressure");
+    json_free(weather);
+    lab_cal_set(options, "elevation", "0");
+    lab_cal_observing_conditions(options, NULL);
+    double winter = 0, summer = 0, south_summer = 0;
+    ok = lab_cal_number(lab_cal_text(options, "temperature_c"), &winter) && ok;
+    lab_cal_set(options, "date", "2000-07-01");
+    lab_cal_observing_conditions(options, NULL);
+    ok = lab_cal_number(lab_cal_text(options, "temperature_c"), &summer) && summer > winter && ok;
+    lab_cal_set(options, "date", "2000-01-01");
+    lab_cal_set(options, "lat", "-50");
+    /* This date is outside provider coverage, so this also checks the no-network fallback path. */
+    lab_cal_atmosphere(options);
+    ok = lab_cal_number(lab_cal_text(options, "temperature_c"), &south_summer) && south_summer > winter && ok;
+    json_free(options);
+    TEST_ASSERT_TRUE(ok, "hourly conditions match UTC; pressure is not corrected twice; fallbacks are independent");
+}
+
+static bool weather_cache_fixture(const char *directory)
+{
+    (void)directory;
+    time_t now = time(NULL);
+    struct tm utc = {0};
+    gmtime_r(&now, &utc);
+    char date[16], clock[16];
+    strftime(date, sizeof date, "%Y-%m-%d", &utc);
+    strftime(clock, sizeof clock, "%H:%M:%S", &utc);
+    json_t *options = test_lab_json("{\"lat\":\"52.7077\",\"lon\":\"-2.7541\",\"elevation\":\"50\"}");
+    lab_cal_set(options, "date", date);
+    lab_cal_set(options, "time", clock);
+    string_t *source = string_sprintf("{\"current\":{\"last_updated_epoch\":%lld,\"temp_c\":8.3,\"pressure_mb\":1032}}",
+                                      (long long)now);
+    json_t *weather = json_from_text(source);
+    string_free(source);
+    lab_cal_observing_conditions(options, weather);
+    bool ok = !strcmp(lab_cal_text(options, "weather_source"), "WeatherAPI") &&
+              !strcmp(lab_cal_text(options, "temperature_c"), "8.300000");
+    if (!ok) string_fprintf(stderr, "Current observation failed: %s\n", lab_cal_text(options, "weather_source"));
+    lab_cal_weather_remember(options, weather, now);
+    lab_cal_observing_conditions(options, NULL);
+    ok = ok && !strcmp(lab_cal_text(options, "temperature_c"), "8.300000") &&
+         !strcmp(lab_cal_text(options, "weather_source"), "Recent weather estimate");
+    if (!ok) string_fprintf(stderr, "Cached observation failed: %s\n", lab_cal_text(options, "weather_source"));
+    json_t *recent = lab_cal_weather_recent(options, now + 172799);
+    ok = ok && recent && !strcmp(lab_cal_text(recent, "temp_c"), "8.3");
+    if (!ok) string_fprintf(stderr, "Recent cache lookup failed\n");
+    json_free(recent);
+    recent = lab_cal_weather_recent(options, now + 172800);
+    ok = ok && !recent;
+    json_free(recent);
+    recent = lab_cal_weather_recent(options, now - 1);
+    ok = ok && !recent;
+    json_free(recent);
+    lab_cal_set(options, "lon", "-1.7541");
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && !recent;
+    json_free(recent);
+    lab_cal_set(options, "lon", "-2.7541");
+    lab_cal_set(options, "date", "2000-01-01");
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && !recent;
+    json_free(recent);
+    lab_cal_set(options, "date", date);
+    json_t *invalid = test_lab_json("{\"current\":{\"last_updated_epoch\":0,\"temp_c\":999}}");
+    lab_cal_weather_remember(options, invalid, now);
+    json_free(invalid);
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && recent && !strcmp(lab_cal_text(recent, "temp_c"), "8.3");
+    json_free(recent);
+    json_free(weather);
+    json_free(options);
+    return ok;
+}
+
+static void test_lab_weather_recent_estimate(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(weather_cache_fixture),
+                     "current UTC observations and location-matched estimates expire strictly at 48 hours");
 }
 
 static void test_lab_integrator_deadline_policy(void)
@@ -254,4 +388,6 @@ void test_lab_evaluation_cases(void)
     TEST_RUN_IN_GROUP(test_lab_function_input, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_evaluation_validation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_calendar_validation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_observing_conditions, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_weather_recent_estimate, tests, NULL);
 }

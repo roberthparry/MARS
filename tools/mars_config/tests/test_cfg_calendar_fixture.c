@@ -82,11 +82,13 @@ static bool test_calendar_seed_prepare(void)
         return test_calendar_seed_ready && test_calendar_seed_owner == getpid();
     test_calendar_seed_attempted = true;
     test_calendar_seed_owner = getpid();
-    char directory[] = "/tmp/mars-calendar-seed-XXXXXX";
-    if (!mkdtemp(directory))
+    const char *temporary = getenv("TMPDIR");
+    string_t *parent = string_new_with(temporary && *temporary ? temporary : "/tmp");
+    test_calendar_seed_directory = parent ? file_create_temp_directory(parent) : NULL;
+    string_free(parent);
+    if (!test_calendar_seed_directory)
         return false;
-    test_calendar_seed_directory = file_new_cstr(directory);
-    string_t *path = string_sprintf("%s/calendar.db", directory);
+    string_t *path = string_sprintf("%s/calendar.db", file_path(test_calendar_seed_directory));
     test_calendar_seed = path ? file_new(path) : NULL;
     string_free(path);
     bool ok = test_calendar_seed_directory && test_calendar_seed && !atexit(test_calendar_seed_exit);

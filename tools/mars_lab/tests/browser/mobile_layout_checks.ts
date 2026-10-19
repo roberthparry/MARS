@@ -72,6 +72,19 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
                       `${width}px: ${name} outside viewport (${box.left}, ${box.right}; ${viewport})`);
             }
             check(doc.documentElement.scrollWidth <= viewport + 1, `${width}px: page scrolls sideways`);
+            for (const row of doc.querySelectorAll<HTMLElement>('.almanac-summary-row')) {
+                if (!visible(row))
+                    continue;
+                const label = row.querySelector('dt')!, value = row.querySelector('dd')!;
+                inside(row, 'Almanac summary row');
+                check(row.scrollWidth <= row.clientWidth + 1, `${width}px: Almanac summary overflows`);
+                const labelBox = label.getBoundingClientRect(), valueBox = value.getBoundingClientRect();
+                check(valueBox.top >= labelBox.bottom,
+                      `${width}px: Almanac summary values should sit below their labels`);
+                const columns = frame.contentWindow!.getComputedStyle(row.parentElement!).gridTemplateColumns.split(' ');
+                check(columns.length === (width <= 480 ? 2 : 3),
+                      `${width}px: Almanac summary should use two phone columns or three wider columns`);
+            }
             for (let i = 0; i < cards.length; ++i) {
                 const card = cards[i];
                 check(visible(card) === expected[i], `${width}px: visibility changed for card ${i} ` +
@@ -331,7 +344,9 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
                 if (width <= 560) {
                     check(!visible(almanac.querySelector<HTMLElement>('.almanac-briefing')!),
                           `${width}px: repeated Almanac introduction takes up phone space`);
-                    check(date.bottom < 460, `${width}px: Almanac date is too far down the screen`);
+                    const globe = bounds('almanacGlobe');
+                    check(date.top >= globe.bottom && date.bottom - globe.bottom < 160,
+                          `${width}px: Almanac moment controls should sit compactly below the globe`);
                     check(zone.bottom - date.top < 124, `${width}px: moment controls are too tall`);
                 }
             }

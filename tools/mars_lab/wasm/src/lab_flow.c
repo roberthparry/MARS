@@ -83,6 +83,9 @@ void lab_flow_begin(lab_flow_kind_t kind, frame_jsref frame)
     if ((unsigned)kind < LAB_FLOW_KIND_STARTUP) {
         double selected = kind == LAB_FLOW_KIND_EVALUATE ? lab_dom_number(lab_dom_get(frame, "mode"))
                                                         : (double)requests[kind].mode;
+        if (kind == LAB_FLOW_KIND_WEATHER &&
+            lab_dom_equal(lab_dom_get(lab_dom_get(frame, "state"), "mode"), lab_dom_string("almanac")))
+            selected = LAB_MODE_ALMANAC;
         if (!(selected >= (double)LAB_MODE_EXPRESSION && selected <= (double)LAB_MODE_ALMANAC) ||
             selected != (unsigned)selected) {
             lab_dom_return(0);

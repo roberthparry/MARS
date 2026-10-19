@@ -161,7 +161,7 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
         'Matrix evaluation failed', 'Integration failed', 'Datetime calculation failed', 'Almanac calculation failed'
     ];
     const preparations = [7, 13, 12, 5, 5, 16, 32];
-    const successes = [1, 13, 141, 13, 13, 269, 13];
+    const successes = [1, 13, 141, 13, 13, 269, 269];
     const rejected = [6, 6, 6, 38, 70, 22, 6];
     const preparationNames = ['bindings', 'expression', 'input', 'trim', 'datetime', 'almanac', 'history'];
     function planResponse(mode: number, outcome: number, data: unknown = {}, error: unknown = null): EvaluationFixturePlan {
@@ -452,7 +452,8 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
                 equal(calls('updateHistoryButtons').length, 1, 'history finalised once');
                 equal(calls('setStatus')[0][1], working[index], 'mode working status');
                 equal(calls('setStatus').at(-1)![1], ok ? 'Ready' : 'Error', 'mode completion status');
-                equal(calls('refreshDatetimeWeather').length, ok && index === 5 ? 1 : 0, 'weather after success only');
+                equal(calls('refreshDatetimeWeather').length, ok && (index === 5 || index === 6) ? 1 : 0,
+                    'calendar weather after success only');
                 if (ok && index === 5) {
                     equal(calls('refreshDatetimeWeather')[0][1], WorksheetRequests.labRequests.latestMain(), 'weather uses parent token');
                     equal((calls('refreshDatetimeWeather')[0][2] as {date: string}).date, '2000-01-01', 'weather retains captured date');

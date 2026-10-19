@@ -80,7 +80,9 @@ void lab_almanac_events_install(jsref root, jsref state)
 /* Project validated markup and return visibility for the browser to commit after the scope closes. */
 void lab_almanac_events_render(jsref target, jsref data, jsref state)
 {
-    int visibility = lab_almanac_events_visibility(lab_dom_get(data, "visibility"), lab_dom_get(state, "visibility"));
+    int preferred = lab_dom_truth(lab_dom_get(data, "weather_refresh")) ? lab_dom_get(state, "visibility")
+                                                                      : lab_dom_get(data, "visibility");
+    int visibility = lab_almanac_events_visibility(preferred, lab_dom_get(state, "visibility"));
     int accepted = target && state && lab_result_almanac_variant(data, visibility);
     if (accepted) {
         int variant = lab_dom_key_get(lab_dom_get(data, "almanac_presentation"), visibility);

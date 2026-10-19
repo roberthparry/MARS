@@ -106,7 +106,7 @@ window.checkLabCalendarState = async function checkLabCalendarState() {
         check(
             retired.status === 404 && !labApplication.definitionScripts.includes('almanac'),
             'retired almanac script remains served or loaded');
-        equal(native.lab_browser_abi_version(), 43, 'current browser ABI is required');
+        equal(native.lab_browser_abi_version(), 44, 'current browser ABI is required');
         equal(native.lab_browser_message_limit(), 8388608, 'native message limit is 8 MiB');
         equal(native.lab_browser_member_limit(), 65536, 'native member bound preserves container admission');
         equal(native.lab_browser_handle_capacity(), 131073, 'native handle capacity preserves host admission');
@@ -224,6 +224,15 @@ window.checkLabCalendarState = async function checkLabCalendarState() {
                 'date refresh preserves coordinates');
             elements.jurisdiction.dispatchEvent(new Event('change'));
             check(events.at(-1)![1].refreshCoordinates, 'jurisdiction change refreshes coordinates');
+            if (mode === 'almanac') {
+                for (const field of ['time', 'zone', 'latitude', 'longitude', 'elevation']) {
+                    const before = events.length;
+                    elements[field].dispatchEvent(new Event('change'));
+                    equal(events.length, before + 1, `${field} change initiates one automatic evaluation`);
+                    equal(events.at(-1)![0], 'almanac', `${field} change evaluates Almanac`);
+                    check(!events.at(-1)![1].refreshCoordinates, `${field} change preserves observer coordinates`);
+                }
+            }
             if (mode === 'datetime') {
                 equal(elements.year.value, '2024', 'date change updates year');
                 equal(elements.jdn.value, '', 'date change clears JDN');

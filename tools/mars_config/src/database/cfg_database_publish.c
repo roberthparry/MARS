@@ -49,7 +49,7 @@ void cfg_database_cleanup(const string_t *staging)
     if (!staging)
         return;
     static const char *const names[] = {"database.db", "database.db-journal", "database.db-wal", "database.db-shm",
-                                        "configuration.env"};
+                                        "configuration.env", "shoreline.bin"};
     for (size_t i = 0; i < sizeof(names) / sizeof(*names); ++i) {
         file_t *file = cfg_database_stage_file(staging, names[i]);
         if (file)

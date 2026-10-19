@@ -77,7 +77,7 @@ window.checkLabRequests = async function checkLabRequests() {
         const paths = [
             '', '/eval', '/matrix-eval', '/equation-eval', '/diffequation-eval', '/integrator-eval', '/datetime-eval',
             '/almanac-eval', '/function-run', '/datetime-weather', '/goal_seek', '/almanac-land-totality',
-            '/datetime-jurisdiction-location', '/datetime-jurisdiction-location', '/render_TeX'
+            '/datetime-jurisdiction-location', '/datetime-jurisdiction-location', '/render_TeX', '/almanac-weather'
         ];
         check(native.lab_request_operation_count() === names.length, 'operation catalogue count');
         const catalogues = [names, paths, ['', 'integral', 'bindings', 'plot']];
@@ -91,7 +91,7 @@ window.checkLabRequests = async function checkLabRequests() {
         check(!WorksheetRequests.labRequests.begin('unknown') && !WorksheetRequests.labRequests.begin('toString'), 'unknown host operation fails closed');
 
         // Cover every permitted mode/operation/scalar route, including all fixed background endpoints.
-        const masks = [127, 9, 9, 127, 32, 1, 1, 64, 32, 64, 31, 32, 4, 4, 23];
+        const masks = [127, 9, 9, 127, 96, 1, 1, 64, 32, 64, 31, 32, 4, 4, 23];
         const fixed = [0, 0, 0, 8, 9, 10, 0, 11, 12, 13, 0, 6, 14, 14, 1];
         for (let mode = 0; mode < 7; ++mode) {
             native.lab_request_set_mode(mode);
@@ -104,8 +104,10 @@ window.checkLabRequests = async function checkLabRequests() {
                     if (!token)
                         continue;
                     const channel = native.lab_request_channel(operation);
-                    const expected = operation === 0 ? [1, 3, 4, 2, 5, 6, 7][mode] :
-                                                       fixed[operation] || (mode === 3 && !scalar ? 2 : 1);
+                    let expected = operation === 0 ? [1, 3, 4, 2, 5, 6, 7][mode] :
+                                                     fixed[operation] || (mode === 3 && !scalar ? 2 : 1);
+                    if (operation === 4 && mode === 6)
+                        expected = 15;
                     check(native.lab_request_endpoint(channel, token) === expected, 'table-driven endpoint');
                     check(label(1, expected) === paths[expected], 'endpoint wire path');
                     let action = '';
@@ -216,12 +218,22 @@ window.checkLabRequests = async function checkLabRequests() {
         const cachedLand = begin(6, 7);
         check(cachedLand && native.lab_request_deadline(4, cachedLand) === 22000, 'cached worksheet land request');
         const almanac = begin(6, 0);
+        const skyWeather = begin(6, 4, 0, almanac);
+        check(skyWeather && native.lab_request_live(2, skyWeather), 'almanac weather belongs to its parent');
+        check(native.lab_request_endpoint(2, skyWeather) === 15, 'native almanac weather transport endpoint');
         check(!native.lab_request_live(4, cachedLand), 'new almanac invalidates cached land request');
         const land = begin(6, 7, 0, almanac);
         check(land && !begin(6, 7, 0, almanac + 1), 'land rejects an obsolete explicit parent');
         check(begin(6, 9) && native.lab_request_live(4, land), 'almanac location has a separate channel');
+        const newTown = begin(6, 0);
+        check(newTown !== almanac && !native.lab_request_live(0, almanac) &&
+              !native.lab_request_live(2, skyWeather) && !native.lab_request_live(4, land),
+              'new town refresh supersedes old Almanac, weather and land requests');
+        check(!native.lab_request_finish(0, almanac) && native.lab_request_live(0, newTown) && native.lab_request_busy(),
+              'superseded town completion cannot release the latest refresh');
 
         native.lab_request_set_mode(2);
+        check(!native.lab_request_live(2, skyWeather), 'leaving almanac invalidates pending weather');
         check(!begin(2, 12), 'solver rendering requires a main result parent');
         const solverMain = begin(2, 0);
         native.lab_request_finish(0, solverMain);

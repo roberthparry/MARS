@@ -247,6 +247,19 @@ static bool lab_cal_markup_events(string_t *out, const json_t *events)
     return ok && !string_append_cstr(out, "</tbody></table></div>");
 }
 
+/* Keep native summary labels aligned without changing the plain-text clipboard representation. */
+static bool lab_cal_markup_summary_row(string_t *out, const char *label, const char *value, const char *prefix)
+{
+    if (!*value)
+        return true;
+    size_t length = strlen(prefix);
+    if (length && !strncmp(value, prefix, length))
+        value += length;
+    return !string_append_cstr(out, "<div class=\"almanac-summary-row\"><dt>") &&
+           lab_cal_markup_text(out, label) && !string_append_cstr(out, "</dt><dd>") &&
+           lab_cal_markup_text(out, value) && !string_append_cstr(out, "</dd></div>");
+}
+
 /* Publish only complete markup; callers own and release the returned string. */
 string_t *lab_cal_almanac_markup(const json_t *response, const json_t *rows, const json_t *events, bool visible)
 {
@@ -260,12 +273,27 @@ string_t *lab_cal_almanac_markup(const json_t *response, const json_t *rows, con
         out &&
         !string_append_cstr(out, "<div class=\"almanac-sheet\"><div class=\"almanac-sheet-header\">"
                                  "<div class=\"almanac-sheet-title\">") &&
-        lab_cal_markup_text(out, title) && !string_append_cstr(out, "</div><div>") &&
-        lab_cal_markup_text(out, lab_cal_text(response, "moment_text")) && !string_append_cstr(out, "</div><div>") &&
-        lab_cal_markup_text(out, lab_cal_text(response, "observer_text")) &&
-        string_append_format(out, "</div><div>Location of Navigational Bodies; %s</div>",
-                             visible ? "visible bodies only" : "all bodies shown") >= 0 &&
-        !string_append_cstr(
+        lab_cal_markup_text(out, title) && !string_append_cstr(out, "</div><dl class=\"almanac-summary\">");
+    const json_t *summary = lab_cal_get(response, "observer_summary");
+    size_t cells = json_array_size(summary);
+    if (cells > 9)
+        ok = false;
+    if (cells) {
+        for (size_t i = 0; ok && i < cells; ++i) {
+            const json_t *cell = json_array_get(summary, i);
+            ok = lab_cal_markup_summary_row(out, lab_cal_text(cell, "label"), lab_cal_text(cell, "value"), "");
+        }
+    } else {
+        ok = ok && lab_cal_markup_summary_row(out, "GMT moment", lab_cal_text(response, "moment_text"), "GMT moment: ") &&
+             lab_cal_markup_summary_row(out, "Observer", lab_cal_text(response, "observer_text"), "Observer: ") &&
+             lab_cal_markup_summary_row(out, "Weather", lab_cal_text(response, "atmosphere_note"), "");
+    }
+    ok = ok && !string_append_cstr(out, "</dl>");
+    const char *note = lab_cal_text(response, "altitude_note");
+    if (ok && *note)
+        ok = !string_append_cstr(out, "<div class=\"almanac-summary-corrections\">") &&
+             lab_cal_markup_text(out, note) && !string_append_cstr(out, "</div>");
+    ok = ok && !string_append_cstr(
             out,
             "<div class=\"almanac-sheet-toolbar\" aria-label=\"Body list filter\">"
             "<span class=\"almanac-sheet-toolbar-label\">Body list</span><span class=\"almanac-visibility-toggle\" "

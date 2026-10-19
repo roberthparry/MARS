@@ -222,6 +222,22 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         </div>
       </div>
       <div class="mode-panel hidden almanac-controls" id="almanacControls">
+        <section class="almanac-globe" id="almanacGlobe" aria-label="Observer location globe">
+          <div class="almanac-globe-toolbar">
+            <strong>Observer globe</strong>
+            <button type="button" class="secondary" data-globe-action="map" aria-label="Map view" aria-pressed="false">Natural Earth</button>
+            <button type="button" class="secondary" data-globe-action="grid" aria-label="Latitude and longitude lines" aria-pressed="false">Lat/long: off</button>
+            <button type="button" class="secondary" data-globe-action="out" aria-label="Zoom globe out">−</button>
+            <button type="button" class="secondary" data-globe-action="in" aria-label="Zoom globe in">+</button>
+            <button type="button" class="secondary" data-globe-action="centre">Centre on observer</button>
+          </div>
+          <div class="almanac-globe-view">
+            <canvas id="almanacGlobeCanvas" tabindex="0" aria-label="Globe: drag or use arrow keys to rotate; plus and minus to zoom; click or press Enter to select"></canvas>
+            <div class="almanac-globe-markers"></div>
+          </div>
+          <p class="mode-hint" id="almanacGlobeStatus" role="status">Drag to rotate · drag vertically at either side to roll · scroll or pinch to zoom · select a town or point</p>
+          <p class="globe-credit">Imagery: NASA Blue Marble (2002 composite) · not current ice coverage</p>
+        </section>
         <div class="almanac-briefing" aria-hidden="true">
           <div>
             <div class="datetime-briefing-kicker">AstroNav worksheet</div>
@@ -469,7 +485,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       <div class="help-pane hidden" id="helpPane">
         <div class="help-card" data-help-modes="expression,equation,diffequation,matrix,integrator,datetime,almanac">
           <div class="help-kicker">Start Here</div>
-          <p>Choose a mode, enter the problem or use its date and location controls, then press <code>Evaluate</code>. Each mode keeps its own worksheet and working precision. Help fills the workspace with guidance for the selected mode; press <code>Return to worksheet</code> to return to your editor and cards.</p>
+          <p>Choose a mode, enter the problem or use its date and location controls, then press <code>Evaluate</code> where shown. Almanac updates automatically when its controls change. Each mode keeps its own worksheet and working precision. Help fills the workspace with guidance for the selected mode; press <code>Return to worksheet</code> to return to your editor and cards.</p>
           <ul>
             <li><code>Expression</code>: type a formula, then set any variable values needed for numeric evaluation. Symbolic operations such as <code>Dx(...)</code> can run with their differentiation variables left blank.</li>
             <li><code>Equation</code>: type an equation; use the binding roles to distinguish unknown variables from fixed constants and supply numerical starting guesses where needed.</li>
@@ -690,7 +706,9 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         </div>
         <div class="help-card" data-help-modes="almanac">
           <div class="help-kicker">Almanac Workflow</div>
-          <p>Use Almanac mode when you want celestial navigation style positions for a precise moment and observer.</p>
+          <p>Use Almanac mode when you want celestial navigation style positions for a precise moment and observer.
+            Results update automatically after each selection or completed field edit; there is no Evaluate button.
+            Press Tab or leave a text field to apply an edit. Selecting a town or point on the globe also updates the results.</p>
           <ul>
             <li><code>Date</code> and <code>GMT time</code> define the instant used by the ephemeris. The body table is calculated for that GMT instant.</li>
             <li><code>Zone</code> is used to present local event times, such as eclipse contacts. It does not change the GMT instant entered above.</li>
@@ -709,13 +727,16 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>GHA</code> (Greenwich hour angle): angle measured westwards from the Greenwich meridian to the body's celestial meridian, from 0° to 360°. It changes as Earth rotates.</li>
             <li><code>RA</code> (right ascension): angle measured eastwards along the celestial equator from the March equinox reference direction. It is shown in hours, minutes and seconds: 24 hours = 360°, so 1 hour = 15°. It is not a clock time.</li>
             <li><code>Altitude</code>: angle above (+) or below (−) the horizon; 0° is the horizon and +90° is directly overhead (the zenith). Unlike observer altitude in metres, this is an angle.</li>
+            <li>Latitude and longitude determine land or sea mode using the local shoreline database, whether you select a town or Custom. At sea, enter height of eye above sea level, not just deck height. The table adds geometric dip for an assumed unobstructed sea horizon. On land, inland water, uncertain coast or when shoreline data are unavailable, no horizon dip is applied. Dip would instead be subtracted when reducing a measured sextant sight. Waves and terrestrial refraction of the horizon are not modelled.</li>
+            <li>The table appears first using estimated atmospheric conditions. Weather loads independently in the background; a current response updates the altitudes and their temperature/pressure labels. Missing or failed weather leaves the initial table usable. A late response cannot replace a newer evaluation.</li>
+            <li>Observer elevation changes topocentric parallax, particularly for the Moon. Both modes include approximate atmospheric refraction, using WeatherAPI temperature and pressure for the observation hour when available. Missing temperature uses a rough latitude/season/elevation estimate; missing pressure uses an elevation-based estimate. The observing note identifies the inputs and mode. Provider conditions may differ from conditions at your precise location. Below −0.575° geometric altitude no refraction is applied. Temperature affects refraction, not parallax. These estimates are not suitable for precision sight reduction.</li>
             <li><code>Azimuth</code>: bearing around the horizon from true north: 0° north, 90° east, 180° south, 270° west; not magnetic north.</li>
             <li><code>s.d.</code> (S.D., semi-diameter): apparent angular radius, from disc centre to edge, in arcminutes (1′ = 1/60°). Double it for the angular diameter.</li>
             <li><code>Vmag.</code> (VMag, apparent visual magnitude): brightness as seen from Earth, not physical size or intrinsic luminosity. Smaller numbers mean brighter objects; negative values are brighter still. Five magnitudes correspond to a factor of 100 in brightness.</li>
             <li>Stars have SVG star shapes: brighter stars are larger, with size limits to keep every symbol readable. Hover for the magnitude. Missing magnitudes use a medium-sized symbol labelled unavailable; size does not represent the star's physical diameter.</li>
             <li><code>Visible</code> means the body is above the usable local horizon and passes the daylight/eclipse visibility checks.</li>
           </ul>
-          <p>Coordinates refer to the selected GMT instant; altitude and azimuth also depend on the observer's location. See the <a href="https://aa.usno.navy.mil/faq/asa_glossary" target="_blank" rel="noreferrer">USNO astronomical glossary</a> for further definitions.</p>
+          <p>Coordinates refer to the selected GMT instant; altitude and azimuth also depend on the observer's location. See the British Astronomical Association's <a href="https://britastro.org/2016/right-ascention-and-declination" target="_blank" rel="noreferrer">guide to right ascension and declination</a> for more about celestial coordinates.</p>
         </div>
         <div class="help-card" data-help-modes="almanac">
           <div class="help-kicker">Eclipses And Transits</div>
@@ -747,7 +768,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <li><code>Partial lunar eclipse</code>: part of the Moon enters the umbra. <code>Total lunar eclipse</code>: the entire Moon enters it; the Moon can remain visible with a reddish colour because Earth's atmosphere bends sunlight into the shadow.</li>
             <li><code>Solar transit</code>: Mercury or Venus crosses the Sun's disc as a small dark spot, rather than covering it like the Moon. These catalogue rows give dates only; blank magnitude, obscuration and contact cells mean not supplied, not zero.</li>
           </ul>
-          <p>Further reading: NASA's <a href="https://eclipse.gsfc.nasa.gov/help/SEglossary.html" target="_blank" rel="noreferrer">solar eclipse glossary</a> and <a href="https://eclipse.gsfc.nasa.gov/LEvis/LEviskey.html" target="_blank" rel="noreferrer">lunar eclipse contact guide</a>.</p>
+          <p>Further reading: Royal Observatory Greenwich's <a href="https://www.rmg.co.uk/stories/space-astronomy/solar-eclipses-explained" target="_blank" rel="noreferrer">solar eclipse guide</a> and <a href="https://www.rmg.co.uk/stories/space-astronomy/lunar-eclipse-guide" target="_blank" rel="noreferrer">lunar eclipse guide</a>.</p>
         </div>
         <div class="help-card" data-help-modes="integrator">
           <div class="help-kicker">Integrator Workflow</div>

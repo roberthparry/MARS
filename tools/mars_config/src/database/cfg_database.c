@@ -194,6 +194,8 @@ static bool cfg_database_source(sqlite_t *db, const string_t *root, const char *
     bool exists = file && file_exists(file);
     bool ok = path && file &&
               ((optional && !exists && !file_last_error(file)) || (exists && cfg_database_import(db, root, path)));
+    if (!ok)
+        fprintf(stderr, "Database source %s failed: %s\n", name, string_c_str(sqlite_last_error(db)));
     file_free(file);
     string_free(full);
     string_free(path);
@@ -228,7 +230,8 @@ static bool cfg_database_build(cfg_database_options *options, bool jurisdiction,
     }
     if (ok && !jurisdiction)
         ok = cfg_database_source(db, root, "packaging/almanac-db/mars_almanac_chebyshev.sql", true) &&
-             cfg_database_source(db, root, "packaging/almanac-db/mars_almanac_frame_rotation.sql", true);
+             cfg_database_source(db, root, "packaging/almanac-db/mars_almanac_frame_rotation.sql", true) &&
+             cfg_database_coast(db, root, staging);
     /* Calendar's separate native reader must see committed rules. */
     if (ok)
         ok = sqlite_exec_cstr(db, "BEGIN; COMMIT;");

@@ -68,7 +68,8 @@ static void normalise(double q[4])
         q[3] = 1;
 }
 
-static void multiply(const double a[4], const double b[4], double q[4])
+/* Compose display rotations without retaining intermediate quaternion drift. */
+void lab_surface_quaternion_multiply(const double a[4], const double b[4], double q[4])
 {
     double result[] = {
         a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
@@ -87,8 +88,8 @@ static void from_angles(const double angles[3], double q[4])
     double az[] = {0, 0, sin(a), cos(a)};
     double el[] = {sin(e), 0, 0, cos(e)};
     double ro[] = {0, 0, sin(r), cos(r)};
-    multiply(el, az, q);
-    multiply(ro, q, q);
+    lab_surface_quaternion_multiply(el, az, q);
+    lab_surface_quaternion_multiply(ro, q, q);
 }
 
 static void rows(double q[4], double m[9])
@@ -136,7 +137,7 @@ static void to_angles(double q[4], const double previous[3], double out[3])
         from_angles(angles, base);
         for (unsigned i = 0; i < 3; ++i)
             base[i] = -base[i];
-        multiply(q, base, residual);
+        lab_surface_quaternion_multiply(q, base, residual);
         r = 2 * lab_surface_atan2(residual[2], residual[3]);
     }
     out[0] = wrap(a);
@@ -193,7 +194,7 @@ static void camera_multiply(struct lab_surface_camera_context *ctx)
 {
     double second[4];
     read_vector(ctx->second, second, 4);
-    multiply(ctx->first, second, ctx->result);
+    lab_surface_quaternion_multiply(ctx->first, second, ctx->result);
 }
 
 /* Apply horizontal roll or the trackball gesture to the current quaternion. */
@@ -216,7 +217,7 @@ static void camera_drag(struct lab_surface_camera_context *ctx)
         b[3] = 1 + u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
         normalise(b);
     }
-    multiply(b, ctx->first, ctx->result);
+    lab_surface_quaternion_multiply(b, ctx->first, ctx->result);
 }
 
 /* Bounded dispatch retains the first-operand reads and zero result for unknown actions. */

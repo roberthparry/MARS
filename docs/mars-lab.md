@@ -388,6 +388,105 @@ so neither button is clipped. The wider-screen popup layout is unchanged.
 Phone navigation, calendar group headings and field labels share a 12-pixel type
 size; non-editable calendar selector buttons use 14 pixels. Editable fields stay
 at 16 pixels to avoid focus-triggered zoom on iPhone.
+Almanac evaluates automatically when a control selection changes or a field edit is
+committed (for example, by pressing Tab). Its Evaluate button is hidden; other modes
+retain theirs. Globe location selections also evaluate automatically.
+
+The left-hand Almanac card includes an observer globe, initially centred on the
+entered town or coordinates. Drag or use arrow keys to rotate; scroll, pinch or
+use the plus/minus controls to zoom. Town markers appear at closer scales. Select
+a marker to choose its town, or a point on the globe to use custom coordinates.
+Enter selects the centre point. These selections preserve observer altitude.
+“Centre on observer” returns to the entered location without resetting zoom.
+“Natural Earth / Map” switches between the photographic reference texture and a
+filled shoreline map. The map loads visible-window vector detail as you zoom;
+it does not magnify the photographic texture. Switching views preserves the observer,
+camera and grid setting. Map mode requires the installed shoreline database;
+photographic detail loads separately on zoom. Space is black with faint stars.
+“Lat/long: off/on” toggles a subtle latitude/longitude grid, initially off. Grid spacing
+becomes finer as the globe is zoomed in; toggling it does not change the observer or evaluate.
+One left click on a town immediately applies its observer location; one left click on
+the globe selects a custom point. Both start evaluation once and preserve entered
+observer elevation. Small pointer movement is tolerated; dragging, cancelled gestures
+and right clicks do not select a location.
+
+The surface uses NASA's Blue Marble land, ocean-colour and sea-ice composite,
+published in 2002. The unmodified 2048 × 1024 JPEG is bundled locally (266,599 bytes),
+with no external imagery requests. Vegetation, deserts and irregular ice boundaries
+come from that reference image, not latitude-based colour bands. It is not current
+or date-specific ice coverage and does not affect land/sea classification.
+See the [imagery notice](../THIRD_PARTY_NOTICES.md#nasa-blue-marble-globe-imagery)
+for source, credit, reuse terms and checksum.
+At 2× zoom, Natural Earth asynchronously loads the bundled 8192 × 4096 version
+(24,147,269 bytes), replacing the overview only after a successful GPU upload.
+That provides four times the linear resolution and sixteen times the pixels.
+The upgrade is requested once per globe instance, not during the initial overview
+or in Map mode. Graphics limits or allocation failure select 4096 × 2048 where
+possible, otherwise the existing overview remains available. The full texture uses
+128 MiB of GPU storage, plus temporary image decoding memory; no extra WASM memory
+or build-time image-processing dependency is introduced. This is still global
+reference imagery, not street-level satellite tiles.
+At 8× zoom the photographic view automatically switches to the native filled
+shoreline map. Simplified fills use locally sampled photographic RGB colours,
+including differing greens, deep blue and turquoise water, and white ice, rather
+than a fixed palette. A continuously moving, bounded weighted neighbourhood of
+photographic samples smooths raster detail without forming colour tiles and
+rejects opposite-surface colours at shorelines. These are approximate historical colours, not current snow or ice
+observations; they never change shoreline geometry or land/sea classification.
+Small features absent from the photograph cannot acquire additional photographic
+detail from this sampling. The GPU uses the existing texture without another
+image download or additional WASM storage.
+Visible-region SVG geometry is regenerated as the view changes instead of
+magnifying the photograph. Zooming out restores the photograph; the explicit
+Map toggle still selects map colours at any zoom. The photographic GPU texture
+is retained for that return, not freed at each zoom transition.
+The image stays on disk until requested; the server does not retain an imagery
+cache. Its HTTP body budget is 32 MiB to transfer this asset, while calculation
+payloads remain limited to 8 MiB and other static assets to 4 MiB.
+A blue-black background carries sparse decorative stars,
+and gentle view-relative lighting and blue atmospheric limb shading give the globe depth.
+Lighting and stars are illustrative, not a calculated Sun/sky simulation.
+Native C streams transparent shoreline SVG outlines from the indexed Almanac database.
+These fade in at close zoom without replacing the surface colours; the compact reference
+texture is not street-level imagery. WebGL combines the layers and WASM owns
+camera projection and picking. The browser retains town-marker elements and prevents overlapping labels.
+The globe retains a normalised quaternion orientation, composing screen-space
+drag rotations with the shared WASM `lab_surface_quaternion_multiply` helper.
+Vertical drags starting in the outer fifth of either side of the globe panel roll
+the view about its centre; the two sides turn in opposite directions, following
+the pointer. Roll sensitivity stays constant when zoomed in. Central drags retain
+the ordinary globe rotation, and two-finger gestures retain pinch zoom.
+It can rotate through either pole without latitude clamping or longitude-rate
+singularities. The shader, marker projection, picking and grid hover use the same
+rotation; extracted centre coordinates only determine geographic coverage.
+“Centre on observer” explicitly restores a north-up view of the selected location.
+The selected town keeps a gold label beside the observer marker, including at overview zoom;
+it takes priority over nearby labels while its location is visible on the globe.
+Globe town buttons and navigation remain available during an Almanac refresh.
+Selecting another town starts a replacement refresh, cancelling superseded
+evaluation and background requests; stale results cannot replace the latest town.
+Town labels retain their position while pressed so a single click stays on target.
+Their hover tooltips show the town and full country name in British English,
+rather than only the internal jurisdiction code.
+Wheel zoom covers the entire globe viewport, including town labels; moving over
+a label during a zoom gesture does not hand the gesture back to page scrolling.
+With latitude/longitude lines enabled, hovering near a line displays its coordinate
+in degrees with a hemisphere label. Intersections show both coordinates. Labels
+follow the displayed grid spacing and disappear during dragging or when the grid
+is switched off; they do not change the observer location.
+The browser reuses overscanned detail imagery during small pans. Detail requests are serialised, and
+WebGL backing resolution is capped at 1536 pixels and 1.5 device pixels per CSS pixel.
+Finer visible-window geometry loads asynchronously after zoom or rotation;
+late responses never move the camera, and detail imagery is only sampled within its
+geographic extent. No online map service is used.
+The native server prepares a resident shoreline cache before forking request
+workers. Full-resolution coordinates and a spatial tree are shared read-only;
+four display resolutions accelerate wide views without changing hit-testing.
+Newly built shoreline database chunks are uncompressed, while older compressed
+databases remain supported. These native allocations do not enlarge the WASM module.
+Missing shoreline data or unavailable WebGL leaves the ordinary observer fields
+usable, with a status message. This display is not a nautical chart.
+
 Almanac uses the same compact field styling, with GMT time and zone on one row
 and latitude and longitude on another. On phones its repeated introduction and
 ephemeris coverage/accuracy note are omitted; all input fields and result cards
@@ -3365,8 +3464,10 @@ or replacing those results.
 
 Each lookup sends the configured key, selected date, latitude and longitude
 from the local Lab server to WeatherAPI.com over HTTPS. The key is not sent to
-the browser. MARS does not cache or persist the returned weather response,
-although the date and coordinates remain in private local Lab state so that its
+the browser. MARS retains only validated current temperatures in a bounded local
+cache for up to 48 hours, allowing a recent estimate when a later request fails;
+it does not cache complete responses, forecast arrays, pressure readings or API
+keys. The date and coordinates remain in private local Lab state so that its
 inputs can be restored. The weather card identifies WeatherAPI.com as its
 source and displays the required end-user warning. Forecasts and conditions are
 probabilistic and may be inaccurate for an exact place or time. Do not use them
@@ -3395,6 +3496,65 @@ conventions, and the fact that lunar First/Fourth are P1/P4 rather than totality
 Solar and lunar partial/total phases, annular and hybrid eclipses, the umbra and
 penumbra, and date-only planetary transits are described separately, with links to
 USNO and NASA references.
+
+Observer elevation (−500 to 11000 metres above sea level) is passed to the native
+topocentric calculation, including the Moon's parallax; it is not replaced by sea
+level. Body-table altitudes include an approximate refraction correction. The
+existing optional WeatherAPI configuration supplies temperature and pressure for
+the observation hour, matched by UTC timestamp rather than provider-local time.
+Current observations are accepted when their UTC hour matches, even if the
+forecast-hour array is absent or does not cover that moment.
+Forecast and historical hourly values are not presented as live measurements. Without
+usable weather, a locally cached observation less than 48 hours old is used as a
+“Recent weather estimate” when available. Both calendar modes populate this
+cache; observations match coordinates rounded to three decimal places, and both
+retrieval and observation age must be under 48 hours. The requested observation
+moment must also be within 48 hours of the cached reading, so current weather is
+not applied to an unrelated historical or future date. Estimates never renew the
+cache age. Only temperature is reused; pressure retains its independent fallback.
+The cache uses at most 64 small files under `MARS_HOME/lab/weather-cache` (normally
+`~/.mars/lab/weather-cache`), contains no credentials, and uses non-blocking locks
+between workers. Unavailable or corrupt entries simply fall back to the seasonal
+model. Without a recent reading, a deliberately rough latitude/season estimate is reduced by
+6.5 °C per kilometre of elevation. Its northern seasonal maximum is in July,
+reversed in the southern hemisphere. Missing pressure is estimated from elevation
+using a standard atmosphere; available provider pressure is not adjusted a second time.
+[WeatherAPI describes its pressure field as station pressure](https://blog.weatherapi.com/density-altitude-real-time-calculation-weatherapi/).
+The provider's observation site may differ from the observer's exact location or
+elevation. The summary card shows temperature and atmospheric pressure on their
+own line, identifying whether each input comes from weather or an estimate. A
+separate line explains the altitude corrections; both lines are included in
+copied text for the All and Visible body lists. Missing or invalid temperature
+and pressure fall back independently.
+The initial table uses estimated conditions and never waits for weather. A separate
+background request uses the existing four-second provider deadline and refreshes
+the native altitudes when it completes. Failure leaves the estimated table usable;
+responses belonging to superseded evaluations or another mode cannot replace it.
+The current All/Visible filter is preserved during weather refresh. No weather API key is required.
+The summary uses nine separate cells in three columns (two on phones): GMT moment,
+location, zone, latitude, longitude, observer altitude, temperature, pressure and
+weather source. Coordinates display degrees and decimal minutes to two decimal
+places with compass directions; the calculation retains the original precision.
+Corrections appear below a subtle divider; copying retains the plain-text summary.
+Editing observer altitude still switches a mismatched named town to Custom.
+Evaluate and background weather refresh retain that entered altitude; returned
+calculation fields cannot overwrite it. Selecting a town or an explicit location
+action can still supply a new observer altitude.
+
+Temperature changes refraction, not parallax. Below −0.575° the displayed altitude
+receives no refraction correction. The native `shoreline_t` hit-test classifies the
+observer's latitude and longitude using spatially indexed GSHHG data in the
+almanac database. Town and Custom selections use the same geographical rule.
+Confirmed sea uses sea mode: the entered altitude is height of eye above sea level
+(non-negative), and geometric horizon dip is added to the predicted body-centre
+altitude above the assumed unobstructed sea horizon. Land, inland water, the
+500-metre uncertain coastal band and unavailable data do not receive sea-horizon
+dip. The summary identifies the classification and
+corrections. This is not a sextant sight reduction, for which dip is subtracted
+from a measured altitude. Waves and terrestrial refraction are not modelled.
+Eclipse contact searches and rise/set calculations retain their existing
+geometric/standard-atmosphere conventions, rather than applying today's weather
+to future events. The estimates are not intended for precision sight reduction.
 
 Wide worksheet tables scroll within their own keyboard-focusable areas rather
 than overflowing the result card. Event contacts show compact times; their full

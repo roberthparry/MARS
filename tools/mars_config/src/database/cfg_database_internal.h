@@ -49,6 +49,15 @@ void cfg_database_values_free(sqlite_t *db, cfg_database_values *values);
 /** Import repository-relative SQL recursively, with bounded line, statement and nesting sizes. */
 bool cfg_database_import(sqlite_t *db, const string_t *root, const string_t *path);
 
+/**
+ * @brief Import the optional packaged shoreline source without network access.
+ * @param db Borrowed writable database with no active transaction.
+ * @param root Borrowed repository root containing the packaged source.
+ * @param staging Borrowed installer-owned directory for bounded decompression.
+ * @return True on import or absent optional source; false on invalid data or I/O failure.
+ */
+bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *staging);
+
 /** Create an unpredictable mode-0700 staging directory beneath the supplied directory. */
 string_t *cfg_database_stage(const string_t *directory);
 

@@ -80,6 +80,7 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
                     'mode-specific body class');
             check(hidden(WorksheetContext.derivativeButtons) === !calculus[mode], 'calculus visibility');
             check(hidden(WorksheetContext.goalSeek) === (mode !== 0), 'goal seek is expression-only');
+            check(hidden(WorksheetContext.run) === (mode === 6), 'automatic Almanac hides Evaluate; other modes retain it');
             check(hidden(WorksheetContext.valueCard) === !valueVisible[mode], 'value policy without a numerical result');
             check(WorksheetContext.valueCard.hasAttribute('hidden') === !valueVisible[mode], 'value hidden attribute');
             check(hidden(WorksheetContext.datetimeLocal) === (mode !== 5), 'local weather belongs to Datetime');

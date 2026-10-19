@@ -40,7 +40,7 @@ static const char lab_view_datetime_subtitle[] =
     "Choose dates, a year, and a location. MARS datetime calculates calendar observances, moon phase, solar times, "
     "and optional local weather, with jurisdiction holidays added when available.";
 static const char lab_view_almanac_subtitle[] =
-    "Enter date and time in GMT, then zone, latitude, and longitude. The live almanac engine covers ";
+    "Choose a GMT moment and observer location; results update automatically. The live almanac engine covers ";
 
 static const lab_view_mode_t lab_view_modes[] = {
     {"Expression", lab_view_expression_subtitle, "Rendered TeX", "Expression", "Function", "Value",

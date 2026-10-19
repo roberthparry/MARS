@@ -4055,9 +4055,9 @@ static void test_diffequ_second_order_pde_solutions_satisfy_operator(void)
 
 static void test_diffequ_solves_two_dimensional_laplace_equation(void)
 {
-    WANT_LAPLACE_SOLUTION("phi_xx + phi_yy = 0", "φ = F(x + iy) + G(x - iy)");
-    WANT_LAPLACE_SOLUTION("3*phi_xx + 3*phi_yy = 0", "φ = F(x + iy) + G(x - iy)");
-    WANT_LAPLACE_SOLUTION("u_ss + u_tt = 0", "u = F(it + s) + G(s - it)");
+    WANT_LAPLACE_SOLUTION("phi_xx + phi_yy = 0", "φ = F(x + i·y) + G(x - i·y)");
+    WANT_LAPLACE_SOLUTION("3*phi_xx + 3*phi_yy = 0", "φ = F(x + i·y) + G(x - i·y)");
+    WANT_LAPLACE_SOLUTION("u_ss + u_tt = 0", "u = F(s + i·t) + G(s - i·t)");
     WANT_LAPLACE_SOLUTION("phi_rr + phi_r/r + phi_thetatheta/r^2 = 0", "φ = F(r·exp(iθ)) + G(r·exp(-iθ))");
     WANT_LAPLACE_SOLUTION("phi_rr + 1/r phi_r + 1/r^2 phi_thetatheta = 0", "φ = F(r·exp(iθ)) + G(r·exp(-iθ))");
     WANT_LAPLACE_SOLUTION("2*phi_thetatheta/r^2 + 2*phi_rr + 2*phi_r/r = 0", "φ = F(r·exp(iθ)) + G(r·exp(-iθ))");

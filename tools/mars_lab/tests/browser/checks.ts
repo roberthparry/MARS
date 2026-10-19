@@ -2467,6 +2467,13 @@
                       `Help spans the full workspace at ${width}px`);
                 for (const card of workspace.querySelectorAll<HTMLElement>('.help-card'))
                     check(card.scrollWidth <= card.clientWidth + 1, `Help text overflows at ${width}px`);
+                const links = workspace.querySelectorAll<HTMLAnchorElement>('.help-card a');
+                check(links.length >= 5, 'Help retains reference and provider-policy links');
+                for (const link of links) {
+                    const style = frame.contentWindow!.getComputedStyle(link);
+                    check(style.color === 'rgb(246, 211, 138)' && style.textDecorationLine.includes('underline'),
+                          `Help links must use the bright, underlined theme style at ${width}px`);
+                }
                 check(frame.contentDocument!.documentElement.scrollWidth <= width,
                       `Help must not introduce page-wide horizontal scrolling at ${width}px`);
             }
@@ -2669,8 +2676,12 @@
                 'Local visible variant was filtered again or retained the visibility column');
             check(
                 target.dataset.copyText === fixture.almanac_presentation.visible.copy_text &&
-                    target.textContent.includes('visible bodies only'),
+                    target.querySelector('[data-almanac-visibility="visible"]')?.getAttribute('aria-pressed') === 'true' &&
+                    !target.textContent.includes('visible bodies only'),
                 'Visible variant text was not used verbatim');
+            WorksheetResults.calendarResults.renderAlmanacWorksheet(target, {...fixture, visibility: 'all', weather_refresh: true});
+            check(target.dataset.copyText === fixture.almanac_presentation.visible.copy_text,
+                'Background weather reset the current visible-body filter');
             WorksheetResults.calendarResults.renderAlmanacWorksheet(target, pending);
             const emptyBody = target.querySelector<HTMLElement>('.almanac-body-table td[colspan]')!;
             check(emptyBody?.textContent.includes('No bodies found') &&

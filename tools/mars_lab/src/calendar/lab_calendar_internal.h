@@ -23,6 +23,21 @@
 string_t *lab_cal_town_timezone(const json_t *options);
 
 /**
+ * @brief Set observer classification and sea-horizon policy from the native shoreline hit-test.
+ * @param options Borrowed mutable request options with validated latitude and longitude.
+ * @note Missing or uncertain shoreline data do not enable horizon dip; no weather request is made.
+ */
+void lab_cal_surface(json_t *options);
+
+/**
+ * @brief Render bounded shoreline imagery for the observer globe.
+ * @param payload Borrowed west/south/east/north degree bounds.
+ * @param status Optional HTTP status output.
+ * @return Owned response containing an image or an explicit availability error.
+ */
+json_t *lab_cal_globe(const json_t *payload, unsigned *status);
+
+/**
  * @brief Convert a UTC Julian date using a validated zoneinfo file, restoring TZ afterwards.
  * Invalid zones return false without modifying outputs. Only single-threaded workers may call this function.
  */
@@ -81,6 +96,43 @@ json_t *lab_cal_location_fields(const json_t *fields, const json_t *options);
 
 /** @brief Prepare weather cards using a bounded native HTTPS request. */
 json_t *lab_cal_weather(const json_t *options);
+
+/**
+ * @brief Prepare approximate observing conditions using optional weather or a seasonal fallback.
+ * @param options Validated observer date, coordinates and elevation; receives temperature,
+ *                pressure and a readable provenance note.
+ */
+void lab_cal_atmosphere(json_t *options);
+
+/**
+ * @brief Select weather for the UTC observation hour and prepare native atmospheric inputs.
+ * @param options Validated date, UTC time, latitude and elevation; receives conditions and provenance.
+ * @param weather Borrowed WeatherAPI response, or NULL to use explicit fallback estimates.
+ */
+void lab_cal_observing_conditions(json_t *options, const json_t *weather);
+
+/**
+ * @brief Resolve an observer's UTC date and time to Unix seconds.
+ * @param options Borrowed validated date and time strings.
+ * @return UTC epoch seconds, or NaN when the moment cannot be read.
+ */
+double lab_cal_weather_epoch(const json_t *options);
+
+/**
+ * @brief Retain a recent provider observation in the bounded location cache shared by calendar modes.
+ * @param options Borrowed request latitude and longitude.
+ * @param weather Borrowed provider response; only its current observation is retained.
+ * @param now Retrieval time in Unix seconds.
+ */
+void lab_cal_weather_remember(const json_t *options, const json_t *weather, time_t now);
+
+/**
+ * @brief Retrieve a location-matched temperature estimate younger than 48 hours.
+ * @param options Borrowed observer coordinates and UTC moment.
+ * @param now Current Unix time used to reject expired and future cache records.
+ * @return Owned cached observation or NULL; unavailable caches never block evaluation.
+ */
+json_t *lab_cal_weather_recent(const json_t *options, time_t now);
 
 /** @brief Prepare navigation body rows and upcoming events. */
 json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status);

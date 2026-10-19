@@ -420,8 +420,9 @@ namespace WorksheetRequests {
         /** @brief Fetch weather for the captured calendar state with optional cancellation. */
         public async fetchDatetimeWeather(state: WorksheetCalendarState, signal?: AbortSignal,
                                             request: MarsApiRequest | null = null): Promise<MarsApiPostResult> {
+            const endpoint = state.mode === 'almanac' ? '/almanac-weather' : '/datetime-weather';
             return this.dependencies.requests.post(
-                request, this.dependencies.native.call('lab_payload_build', 6, [state], request, 0, 0), '/datetime-weather', signal);
+                request, this.dependencies.native.call('lab_payload_build', 6, [state], request, 0, 0), endpoint, signal);
         }
 
         /** @brief Fetch the native almanac result within the supplied request lifetime. */
@@ -1025,7 +1026,10 @@ namespace WorksheetRequests {
                     context.state = this.dependencies.locations.currentDatetimeState();
                     context.text = this.dependencies.locations.datetimeSummaryText(context.state);
                 },
-                captureAlmanac: (context: MarsApiEvaluationContext) => context.text = this.dependencies.locations.almanacSummaryText(this.dependencies.locations.currentAlmanacState()),
+                captureAlmanac: (context: MarsApiEvaluationContext) => {
+                    context.state = this.dependencies.locations.currentAlmanacState();
+                    return context.text = this.dependencies.locations.almanacSummaryText(context.state);
+                },
                 assemble: async (context: MarsApiEvaluationContext) => context.entered =
                     await this.dependencies.bindings.expressionWithVisibleBindings(context.editorText, context.enteredBindings)
             } satisfies MarsApiEvaluationServices;

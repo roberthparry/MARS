@@ -31,6 +31,7 @@ typedef struct almanac_land_box_t {
     double max_lon;
 } almanac_land_box_t;
 
+/* Bounded search seeds only; shoreline hit-tests decide whether a candidate is actually on land. */
 static const almanac_land_box_t ALMANAC_PROBABLE_LAND_BOXES[] = {
     {35.5, 44.5, -10.0, 4.5},     /* Iberia */
     {41.0, 51.5, -5.5, 10.5},     /* France */
@@ -274,21 +275,6 @@ static double almanac_land_box_min_distance_to_point_km(const almanac_land_box_t
     return almanac_surface_distance_km(latitude_degrees, longitude_degrees, lat, lon);
 }
 
-static bool almanac_probable_land_point(double latitude_degrees, double longitude_degrees)
-{
-    size_t i;
-
-    for (i = 0u; i < sizeof(ALMANAC_PROBABLE_LAND_BOXES) / sizeof(ALMANAC_PROBABLE_LAND_BOXES[0]); ++i) {
-        if (latitude_degrees >= ALMANAC_PROBABLE_LAND_BOXES[i].min_lat &&
-            latitude_degrees <= ALMANAC_PROBABLE_LAND_BOXES[i].max_lat &&
-            longitude_degrees >= ALMANAC_PROBABLE_LAND_BOXES[i].min_lon &&
-            longitude_degrees <= ALMANAC_PROBABLE_LAND_BOXES[i].max_lon) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /* Search for the nearest location with solar totality. */
 bool almanac_nearest_solar_totality(almanac_t *almanac, const almanac_observer_t *observer,
     const almanac_solar_eclipse_t *eclipse, almanac_solar_totality_location_t *out)
@@ -456,7 +442,7 @@ bool almanac_solar_eclipse_totality_seed_score(almanac_t *almanac, const almanac
                                                          out_score_degrees);
 }
 
-/* Search probable land areas for nearby solar totality. */
+/* Use bounded regional seeds, accepting only sites confirmed by the shoreline dataset. */
 bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_observer_t *observer,
     const almanac_solar_eclipse_t *eclipse, almanac_solar_totality_location_t *out)
 {
@@ -483,7 +469,12 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
         return false;
     }
 
-    if (almanac_probable_land_point(observer->latitude_degrees, observer->longitude_degrees) &&
+    shoreline_surface_t surface = almanac_surface_at(almanac, observer->latitude_degrees, observer->longitude_degrees);
+    if (surface == SHORELINE_UNKNOWN) {
+        almanac_set_error(almanac, "shoreline data unavailable for land-totality search");
+        return false;
+    }
+    if (surface == SHORELINE_LAND &&
         almanac_probe_solar_totality(almanac, observer, eclipse->greatest_eclipse.jd, observer->latitude_degrees,
                                      observer->longitude_degrees, &candidate)) {
         *out = candidate;
@@ -491,7 +482,8 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
     }
 
     have_path_seed = almanac_nearest_solar_totality(almanac, observer, eclipse, &path_seed) && path_seed.found;
-    if (have_path_seed && almanac_probable_land_point(path_seed.latitude_degrees, path_seed.longitude_degrees)) {
+    if (have_path_seed &&
+        almanac_surface_at(almanac, path_seed.latitude_degrees, path_seed.longitude_degrees) == SHORELINE_LAND) {
         *out = path_seed;
         return computation_poll_current();
     }
@@ -540,7 +532,9 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
                         continue;
                     }
                     if (almanac_probe_solar_totality_candidate(almanac, observer, eclipse->greatest_eclipse.jd, lat,
-                                                               lon, 0.35, &candidate)) {
+                                                               lon, 0.35, &candidate) &&
+                        almanac_surface_at(almanac, candidate.latitude_degrees, candidate.longitude_degrees) ==
+                            SHORELINE_LAND) {
                         almanac_remember_nearest_totality(&candidate, &best);
                     }
                 }
@@ -574,7 +568,7 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
 
                     almanac_destination_point(best.latitude_degrees, best.longitude_degrees, hypot(north_km, east_km),
                                               almanac_radians_to_degrees(atan2(east_km, north_km)), &lat, &lon);
-                    if (!almanac_probable_land_point(lat, lon))
+                    if (almanac_surface_at(almanac, lat, lon) != SHORELINE_LAND)
                         continue;
                     if (almanac_probe_solar_totality(almanac, observer, eclipse->greatest_eclipse.jd, lat, lon,
                                                      &candidate)) {
@@ -584,7 +578,8 @@ bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_obser
             }
             best = refined;
         }
-        if (almanac_refine_solar_totality(almanac, observer, eclipse->greatest_eclipse.jd, &best, &candidate)) {
+        if (almanac_refine_solar_totality(almanac, observer, eclipse->greatest_eclipse.jd, &best, &candidate) &&
+            almanac_surface_at(almanac, candidate.latitude_degrees, candidate.longitude_degrees) == SHORELINE_LAND) {
             best = candidate;
         }
     }

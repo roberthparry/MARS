@@ -302,6 +302,15 @@ static void assert_observables_case(void)
     TEST_ASSERT_TRUE(isnan(sirius_obs.semi_diameter_degrees), "Stars do not report a finite semi-diameter");
     TEST_ASSERT_TRUE(!sirius_obs.visible, "Sirius is not above the horizon at the eclipse moment");
 
+    almanac_observables_t raised;
+    observer.elevation_metres = 3000;
+    TEST_ASSERT_TRUE(almanac_observables(almanac, moon, &observer, &raised), almanac_last_error(almanac));
+    TEST_ASSERT_TRUE(fabs(raised.altitude_degrees - moon_obs.altitude_degrees) > 0.0001,
+                     "observer elevation changes lunar topocentric altitude");
+    TEST_ASSERT_TRUE(almanac_observables(almanac, sirius, &observer, &raised), almanac_last_error(almanac));
+    TEST_ASSERT_TRUE(fabs(raised.altitude_degrees - sirius_obs.altitude_degrees) < 1e-10,
+                     "distant star direction does not gain spurious horizon dip");
+
     almanac_close(almanac);
     almanac_entry_dealloc(sirius);
     almanac_entry_dealloc(moon);
@@ -312,6 +321,23 @@ static void assert_observables_case(void)
 static void test_almanac_observables_resolve_horizon_values(void)
 {
     assert_observables_case();
+    double standard = almanac_refraction_degrees(0, 10, 1013.25);
+    TEST_ASSERT_TRUE(almanac_horizon_dip_degrees(0) == 0 && almanac_horizon_dip_degrees(-10) == 0 &&
+                     isnan(almanac_horizon_dip_degrees(NAN)), "dip handles sea-level and invalid heights");
+    TEST_ASSERT_TRUE(almanac_horizon_dip_degrees(2) > 0.04 && almanac_horizon_dip_degrees(2) < 0.05 &&
+                     almanac_horizon_dip_degrees(10) > almanac_horizon_dip_degrees(2),
+                     "geometric dip increases with height of eye");
+    TEST_ASSERT_TRUE(fabs(standard - 1735.0 / 3600) < 1e-12, "reference horizon refraction");
+    TEST_ASSERT_TRUE(almanac_refraction_degrees(10, -10, 1013.25) >
+                     almanac_refraction_degrees(10, 30, 1013.25), "cold air increases refraction");
+    TEST_ASSERT_TRUE(fabs(almanac_refraction_degrees(0, 10, 506.625) - standard / 2) < 1e-12,
+                     "refraction scales with observer pressure");
+    TEST_ASSERT_TRUE(almanac_refraction_degrees(90, 10, 1013.25) == 0 &&
+                     almanac_refraction_degrees(-1, 10, 1013.25) == 0,
+                     "zenith and unsupported below-horizon altitudes are not corrected");
+    TEST_ASSERT_TRUE(isnan(almanac_refraction_degrees(NAN, 10, 1013.25)) &&
+                     isnan(almanac_refraction_degrees(10, -273.15, 1013.25)) &&
+                     isnan(almanac_refraction_degrees(10, 10, -1)), "invalid atmosphere inputs are rejected");
 }
 
 static void assert_observables_validation_case(void)

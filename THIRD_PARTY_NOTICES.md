@@ -12,6 +12,36 @@ them must also include the exact
 licence material supplied with the versions it redistributes. The notices in
 this file do not replace those obligations.
 
+## NASA Blue Marble globe imagery
+
+`tools/mars_lab/assets/earth_surface.jpg` is the unmodified 2048 × 1024 NASA
+Blue Marble composite, *Land Surface, Ocean Color and Sea Ice*, published
+8 February 2002. It is reference imagery, not current or selected-date ice coverage.
+
+Source: [NASA original JPEG](https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57730/land_ocean_ice_2048.jpg).
+Credit: NASA Goddard Space Flight Center; Reto Stöckli (surface imagery),
+Robert Simmon (ocean colour and compositing), the MODIS land, atmosphere, ocean
+and science-support groups, USGS EROS and Flagstaff, and the Defense
+Meteorological Satellite Program. No NASA endorsement is implied.
+
+The image was obtained directly from NASA, under its
+[Earth imagery reuse policy](https://science.nasa.gov/earth/faq/), which permits
+reuse, including commercial reuse, except where another copyright is indicated,
+and requests NASA credit. NASA branding and endorsement restrictions remain
+separate. The bundled file is unchanged; the Lab adds display-time lighting and
+independent shoreline and town overlays.
+
+SHA-256: `d4dc80a6ef571939d0abe04a9bed3d3d1e6cd63e59514be1c5e43a6b069e6f1e`.
+Size: 266,599 bytes. No online map service is required at runtime.
+
+The optional zoom asset, `tools/mars_lab/assets/earth_surface_detail.png`, is the
+unmodified [8192 × 4096 NASA PNG](https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57730/land_ocean_ice_8192.png)
+of the same composite, with the same credits, reuse terms and reference-date limitations.
+Size: 24,147,269 bytes. SHA-256:
+`aaddcd967a9f09fb2d7ef50ff452bebfcf10192c520465d5eb1ad8446c716e98`.
+Lower-capability graphics hardware may receive a display-time reduced-resolution texture;
+neither packaged source image is modified.
+
 ## WASI libc maths, memory and strings
 
 The MARS Lab page module statically links the required double-precision maths
@@ -307,6 +337,19 @@ copyright holder.
 
 Upstream licence information: <https://www.unicode.org/license.txt>
 
+## Shoreline data
+
+The packaged full-resolution GSHHG 2.3.7 shoreline binary is third-party data
+distributed under GNU LGPL version 3 or later, not MARS's MIT licence. The
+unmodified binary is retained as `packaging/almanac-db/gshhs_f.b.zst`; the native
+installer derives compressed, indexed shoreline tables from it.
+
+The original upstream licence, LGPL text and README, together with the GPL
+version 3 text, are retained in `packaging/almanac-db/GSHHG-*.txt`. Retain these
+notices and the corresponding source when distributing the dataset or databases
+derived from it. Source URL, checksums and transformations are recorded in
+[almanac data provenance](docs/almanac-data-provenance.md#shoreline-data).
+
 ## Astronomical data and generation tools
 
 The packaged almanac coefficients were derived from JPL Development Ephemeris
@@ -350,7 +393,9 @@ by MARS. Its service and returned data are governed by the
 shared WeatherAPI account or key. Weather remains disabled unless the person
 installing MARS Lab creates their own WeatherAPI account and configures that
 account's key. MARS Lab credits WeatherAPI.com as the source whenever it
-displays returned weather data. It does not cache or persist the response.
+displays returned weather data. It retains only a bounded local cache of
+validated current temperatures for up to 48 hours; complete responses,
+forecast arrays, pressure readings and API keys are not cached.
 
 Each lookup transmits the configured API key, selected date, latitude and
 longitude from the local MARS Lab server to WeatherAPI.com over HTTPS. The key

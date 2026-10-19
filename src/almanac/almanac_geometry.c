@@ -5,6 +5,7 @@
  * Normalises angles and calculates topocentric vectors, altitude and horizontal coordinates. Use these helpers to
  * connect celestial states to a specified observer rather than duplicate coordinate conversions in individual
  * event finders.
+ * The optional optical-refraction estimate is kept separate from geometric observables and horizon dip.
  *
  * This is part of the catalogue-backed almanac implementation. Applications should use the almanac module and provide the
  * required configured data; this file is not a standalone astronomical program.
@@ -17,6 +18,39 @@
 
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
+
+/* Compute geometric sea-horizon depression independently of atmospheric refraction. */
+double almanac_horizon_dip_degrees(double elevation_metres)
+{
+    if (!isfinite(elevation_metres))
+        return NAN;
+    if (elevation_metres <= 0)
+        return 0;
+    const double earth_mean_radius_metres = 6371008.8;
+    return almanac_radians_to_degrees(acos(earth_mean_radius_metres / (earth_mean_radius_metres + elevation_metres)));
+}
+
+/* Estimate refraction separately from geometric parallax and horizon dip. */
+double almanac_refraction_degrees(double altitude_degrees, double temperature_c, double pressure_hpa)
+{
+    if (!isfinite(altitude_degrees) || fabs(altitude_degrees) > 90 ||
+        !isfinite(temperature_c) || temperature_c < -100 || temperature_c > 60 ||
+        !isfinite(pressure_hpa) || pressure_hpa < 0 || pressure_hpa > 1200)
+        return NAN;
+    if (altitude_degrees < -0.575 || altitude_degrees > 85)
+        return 0;
+    /* NOAA/GML Solar Calculation Details: correction in arcseconds. */
+    double correction;
+    if (altitude_degrees > 5) {
+        double cotangent = 1 / tan(altitude_degrees * M_PI / 180);
+        double square = cotangent * cotangent;
+        correction = cotangent * (58.1 + square * (-0.07 + square * 0.000086));
+    } else {
+        double h = altitude_degrees;
+        correction = 1735 + h * (-518.2 + h * (103.4 + h * (-12.79 + h * 0.711)));
+    }
+    return correction / 3600 * (pressure_hpa / 1013.25) * (283.15 / (273.15 + temperature_c));
+}
 
 double almanac_normalize_degrees(double degrees)
 {

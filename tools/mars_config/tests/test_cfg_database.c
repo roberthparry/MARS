@@ -428,6 +428,8 @@ static bool test_cfg_database_packaged_almanac_fixture(const char *directory)
          test_cfg_database_query(db, "SELECT count(*) FROM almanac_chebyshev_position_segment", "188332") &&
          test_cfg_database_query(db, "SELECT count(*) FROM almanac_frame_rotation_series", "1") &&
          test_cfg_database_query(db, "SELECT count(*) FROM almanac_frame_rotation_segment", "1100") &&
+         test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "10587854") &&
+         test_cfg_database_query(db, "SELECT polygon_count FROM shoreline_dataset", "188268") &&
          test_cfg_database_almanac_coverage(db, "chebyshev_position", "7") &&
          test_cfg_database_almanac_coverage(db, "frame_rotation", "1");
     sqlite_close(db);

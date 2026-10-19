@@ -79,6 +79,8 @@ and notices accompany the bundled data.
 | JPL DE440 and NAIF auxiliary kernels | Generation sources for bundled almanac coefficients and workbook Moon data | NASA/JPL/Caltech NAIF use and redistribution rules | Low to medium | Do not bundle the kernels or SPICE Toolkit; retain official source URLs, kernel versions, published checksums, transformation details and output hashes in the almanac provenance record. Acknowledge NASA, JPL, Caltech and NAIF without implying endorsement. |
 | NumPy, SpiceyPy, PyERFA and ERFA | Historical generation tools for almanac coefficients, frame rotations and test oracles | BSD 3-Clause or MIT | Low | Retain their licences and historical provenance; they are not dependencies of the maintained native tooling or runtime. Record the exact tools and versions used for any future regeneration. |
 | AstroNav 2000-2040 workbook | Original MARS navigation worksheet | MIT | Low | Preserve the dated authorship statement, repository history and checksum in the almanac provenance record. |
+| GSHHG 2.3.7 | Packaged shoreline data and derived spatial index | LGPL-3.0-or-later | Medium | Retain the unmodified source binary, original notices and LGPL/GPL texts with data distributions; preserve the source checksum and transformation record. |
+| NASA Blue Marble surface composite | Bundled globe reference imagery | NASA Earth imagery reuse policy | Low to medium | Preserve NASA and creator credits, source URL, checksum and reference-date limitations; do not imply NASA endorsement. See the third-party imagery notice. |
 
 ## SQLCipher contingency
 

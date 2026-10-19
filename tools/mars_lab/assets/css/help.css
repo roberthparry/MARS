@@ -37,6 +37,29 @@
   color: var(--muted);
 }
 
+.help-card a {
+  color: #f6d38a;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 0.08em;
+}
+
+.help-card a:visited {
+  color: #b9dfcd;
+}
+
+.help-card a:hover,
+.help-card a:focus-visible {
+  color: #fff3ce;
+  text-decoration-thickness: 0.14em;
+}
+
+.help-card a:focus-visible {
+  outline: 2px solid #f6d38a;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
 .help-card .help-kicker {
   margin: 0 0 0.8rem;
   color: #d7e7b7;

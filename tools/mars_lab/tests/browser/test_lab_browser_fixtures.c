@@ -37,6 +37,19 @@ bool lab_browser_almanac_fixture(string_t *script)
         "\"nearest_totality_action\":{\"date\":\"2027-08-02\",\"time\":\"10:48:52\",\"zone\":\"2\","
         "\"jurisdiction\":\"ES\",\"town\":\"Málaga|36.7204|-4.4203|0\",\"latitude\":\"36.7204\","
         "\"longitude\":\"-4.4203\",\"elevation\":\"0\"}}]}");
+    json_t *summary = test_lab_json(
+        "[{\"label\":\"GMT moment\",\"value\":\"2026-10-18 18:10:39\"},"
+        "{\"label\":\"Location\",\"value\":\"Shrewsbury, GB-ENG\"},"
+        "{\"label\":\"Zone\",\"value\":\"1.00\"},"
+        "{\"label\":\"Latitude\",\"value\":\"52° 42.46′ N\"},"
+        "{\"label\":\"Longitude\",\"value\":\"2° 45.25′ W\"},"
+        "{\"label\":\"Observer altitude\",\"value\":\"50 m · Land\"},"
+        "{\"label\":\"Temperature\",\"value\":\"8.3 °C\"},"
+        "{\"label\":\"Pressure\",\"value\":\"1032 hPa\"},"
+        "{\"label\":\"Weather source\",\"value\":\"WeatherAPI temperature; estimated pressure\"}]");
+    lab_cal_take(fixture, "observer_summary", summary);
+    lab_cal_set(fixture, "altitude_note", "Altitudes corrected for observer height and refraction. "
+                                         "No horizon dip. No refraction below −0.575°.");
     json_t *pending = test_lab_json(
         "{\"visibility\":\"all\",\"events\":[{\"category\":\"Solar\","
         "\"name\":\"Solar eclipse\",\"kind\":\"partial\",\"jd\":\"2461619.9\",\"first_contact\":\"Unavailable\"}]}");

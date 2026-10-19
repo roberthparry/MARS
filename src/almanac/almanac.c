@@ -244,6 +244,7 @@ void almanac_close(almanac_t *almanac)
     if (!almanac)
         return;
     free(almanac->nutation_terms);
+    shoreline_close(almanac->shoreline);
     sqlite_close(almanac->db);
     string_free(almanac->error);
     free(almanac);

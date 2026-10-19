@@ -400,7 +400,8 @@ static bool town_seeds_total_solar_eclipse(almanac_t *almanac, const almanac_obs
     observer.latitude_degrees = town->latitude_degrees;
     observer.longitude_degrees = town->longitude_degrees;
     observer.elevation_metres = town->elevation_metres;
-    return almanac_solar_eclipse_totality_from_seed(almanac, origin, &observer, seed, 1.0, out);
+    return almanac_solar_eclipse_totality_from_seed(almanac, origin, &observer, seed, 1.0, out) &&
+           almanac_surface_at(almanac, out->latitude_degrees, out->longitude_degrees) == SHORELINE_LAND;
 }
 
 static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *almanac,
@@ -418,6 +419,8 @@ static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *al
         return false;
     out[0] = '\0';
     if (!almanac || !observer || !event)
+        return false;
+    if (almanac_surface_at(almanac, observer->latitude_degrees, observer->longitude_degrees) == SHORELINE_UNKNOWN)
         return false;
     if (!load_totality_towns(observer, &towns, &town_count))
         return false;
@@ -475,7 +478,7 @@ static bool append_solar_events(string_t *out, almanac_t *almanac, const almanac
         nearest_totality_text[0] = '\0';
         if (totality_land && !nearest_totality_town_text(nearest_totality_text, sizeof(nearest_totality_text),
                                                          almanac, observer, event)) {
-            fprintf(stderr, "Land-totality town catalogue is unavailable; cannot search for named locations\n");
+            fprintf(stderr, "Land-totality location data are unavailable; cannot search for named locations\n");
             return false;
         }
         (void)string_append_format(out, "event Solar|Solar eclipse|%s|%.9f|%.9f|%.9f|%.6f|%.3f|%s|"

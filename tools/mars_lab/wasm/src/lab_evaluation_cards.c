@@ -292,6 +292,7 @@ static jsref lab_evaluation_cards_copy(jsref source)
 void lab_evaluation_weather_state(jsref state, jsref data)
 {
     int copy = lab_evaluation_cards_copy(state), fields = lab_dom_get(data, "fields");
+    lab_dom_set(copy, "mode", lab_dom_get(data, "mode"));
     static const char *const keys[] = {"date", "latitude", "longitude"};
     for (unsigned i = 0; i < 3; ++i) {
         int value = lab_evaluation_cards_or(lab_dom_get(fields, keys[i]), lab_dom_get(state, keys[i]));

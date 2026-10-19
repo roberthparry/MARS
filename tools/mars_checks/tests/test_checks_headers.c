@@ -43,6 +43,7 @@ static bool test_headers_preprocess(const string_t *root, const string_t *input,
     const char *const options[] = {
         "cc", "-E", "-x", "c", "-D_GNU_SOURCE", "-I.", "-Iinclude", "-Isrc", "-Itests/include",
         "-Itools/mars_checks/include", "-Itools/mars_config/include", "-Itools/mars_lab/include",
+        "-Itools/mars_lab/wasm/include",
         "-Itools/to_be_announced_lab/include", "-o", "/dev/null"
     };
     checks_strings_t *arguments = checks_strings_new();

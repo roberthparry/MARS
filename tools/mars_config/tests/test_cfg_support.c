@@ -2,7 +2,7 @@
  * @file test_cfg_support.c
  * @brief Disposable process and filesystem fixtures for native installer tests.
  *
- * Owns only directories created by mkdtemp in /tmp. Runs one child at a time,
+ * Owns only private directories created beneath TMPDIR, or /tmp by default. Runs one child at a time,
  * then removes its bounded tree through the file module without following symlinks.
  */
 #include <errno.h>
@@ -58,9 +58,13 @@ static bool test_cfg_remove_tree(file_t *directory, unsigned depth, size_t *rema
 /* Isolate installer environment changes and reclaim only this fixture's tree. */
 bool test_cfg_isolated(bool (*callback)(const char *directory))
 {
-    char directory[] = "/tmp/mars-config-test-XXXXXX";
-    if (!mkdtemp(directory))
+    const char *temporary = getenv("TMPDIR");
+    string_t *parent = string_new_with(temporary && *temporary ? temporary : "/tmp");
+    file_t *root = parent ? file_create_temp_directory(parent) : NULL;
+    string_free(parent);
+    if (!root)
         return false;
+    const char *directory = file_path(root);
     fflush(NULL);
     pid_t child = fork();
     if (!child) {
@@ -81,7 +85,6 @@ bool test_cfg_isolated(bool (*callback)(const char *directory))
         } while (waited < 0 && errno == EINTR);
     }
     bool ok = waited == child && child > 0 && WIFEXITED(status) && WEXITSTATUS(status) == 0;
-    file_t *root = file_new_cstr(directory);
     size_t remaining = 2048;
     bool removed = root && test_cfg_remove_tree(root, 0, &remaining);
     file_free(root);

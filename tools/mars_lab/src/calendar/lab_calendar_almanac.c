@@ -274,6 +274,57 @@ static void lab_cal_add_transits(json_t *events, const char *start, const char *
     }
 }
 
+/* Round display minutes once so 59.995 minutes carries into the next degree. */
+static string_t *lab_cal_observer_angle(const char *text, bool latitude)
+{
+    double angle = 0;
+    if (!lab_cal_number(text, &angle) || !isfinite(angle) || fabs(angle) > (latitude ? 90 : 180))
+        return string_new_with("Unavailable");
+    unsigned hundredths = (unsigned)floor(fabs(angle) * 6000 + 0.5);
+    char direction = latitude ? (signbit(angle) ? 'S' : 'N') : (signbit(angle) ? 'W' : 'E');
+    return string_sprintf("%u° %02u.%02u′ %c", hundredths / 6000, hundredths % 6000 / 100,
+                          hundredths % 100, direction);
+}
+
+/* Retain native-formatted summary cells; the browser only lays them out. */
+static void lab_cal_summary_cell(json_t *summary, const char *label, const string_t *value)
+{
+    json_t *cell = json_new_object();
+    lab_cal_set(cell, "label", label);
+    lab_cal_set(cell, "value", string_c_str(value));
+    json_array_append(summary, cell);
+    json_free(cell);
+}
+
+/* Build the nine display cells independently of the full-precision observer coordinates. */
+static json_t *lab_cal_observer_summary(const json_t *options, const char *town, bool sea)
+{
+    const char *surface = lab_cal_text(options, "observer_surface");
+    if (!*surface) surface = sea ? "Sea" : "Land";
+    double temperature = 0, pressure = 0;
+    bool have_temperature = lab_cal_number(lab_cal_text(options, "temperature_c"), &temperature);
+    bool have_pressure = lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure);
+    string_t *values[] = {
+        string_sprintf("%s %s", lab_cal_text(options, "date"), lab_cal_text(options, "time")),
+        string_sprintf("%s, %s", *town ? town : "Custom", lab_cal_text(options, "jurisdiction")),
+        string_new_with(lab_cal_text(options, "zone")),
+        lab_cal_observer_angle(lab_cal_text(options, "lat"), true),
+        lab_cal_observer_angle(lab_cal_text(options, "lon"), false),
+        string_sprintf("%s m · %s", lab_cal_text(options, "elevation"), surface),
+        have_temperature ? string_sprintf("%.1f °C", temperature) : string_new_with("Unavailable"),
+        have_pressure ? string_sprintf("%.0f hPa", pressure) : string_new_with("Unavailable"),
+        string_new_with(*lab_cal_text(options, "weather_source") ? lab_cal_text(options, "weather_source") : "Unavailable"),
+    };
+    static const char *const labels[] = {"GMT moment", "Location", "Zone", "Latitude", "Longitude",
+                                         "Observer altitude", "Temperature", "Pressure", "Weather source"};
+    json_t *summary = json_new_array();
+    for (size_t i = 0; i < sizeof values / sizeof *values; ++i) {
+        lab_cal_summary_cell(summary, labels[i], values[i]);
+        string_free(values[i]);
+    }
+    return summary;
+}
+
 /* Produce the worksheet contract consumed by the existing Almanac browser. */
 json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
 {
@@ -377,6 +428,13 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
         string_sprintf("Observer: %s%s%s, zone %s, latitude %s, longitude %s", lab_cal_part(town_parts, town_count, 0),
                        *lab_cal_part(town_parts, town_count, 0) ? ", " : "", lab_cal_text(options, "jurisdiction"),
                        lab_cal_text(options, "zone"), lab_cal_text(options, "lat"), lab_cal_text(options, "lon"));
+    bool sea_horizon = !strcmp(lab_cal_text(options, "sea_horizon"), "true");
+    const char *surface = lab_cal_text(options, "observer_surface");
+    if (!*surface) surface = sea_horizon ? "Sea" : "Land";
+    lab_cal_take(response, "observer_summary",
+                 lab_cal_observer_summary(options, lab_cal_part(town_parts, town_count, 0), sea_horizon));
+    string_append_format(observer, ", %s %s m (%s mode)", sea_horizon ? "height of eye" : "elevation",
+                         lab_cal_text(options, "elevation"), surface);
     string_t *title =
         string_sprintf("Upcoming eclipses and inner planetary transits through %s", string_c_str(end_date));
     string_t *event_year = string_sprintf("%04d", year);
@@ -386,9 +444,16 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
     lab_cal_set(response, "observer_text", string_c_str(observer));
     lab_cal_set(response, "observer_latitude", lab_cal_text(options, "lat"));
     lab_cal_set(response, "observer_longitude", lab_cal_text(options, "lon"));
-    lab_cal_set(response, "body_text",
-                visible_only ? "Location of Navigational Bodies; visible bodies only"
-                             : "Location of Navigational Bodies; all bodies shown");
+    lab_cal_set(response, "observer_elevation", lab_cal_text(options, "elevation"));
+    lab_cal_set(response, "observer_surface", surface);
+    lab_cal_set(response, "atmosphere_note", lab_cal_text(options, "atmosphere_note"));
+    if (*lab_cal_text(options, "atmosphere_note"))
+        lab_cal_set(response, "altitude_note",
+                    sea_horizon ?
+                    "Altitudes corrected for observer height, horizon dip and refraction. "
+                    "Sea mode. No refraction below −0.575°." :
+                    "Altitudes corrected for observer height and refraction. "
+                    "No horizon dip. No refraction below −0.575°.");
     lab_cal_set(response, "event_title", string_c_str(title));
     lab_cal_set(response, "event_year", string_c_str(event_year));
     lab_cal_set(response, "event_window", string_c_str(window));

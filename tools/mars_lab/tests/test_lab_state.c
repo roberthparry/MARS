@@ -91,7 +91,7 @@ static bool page_escaping(const char *directory)
          string_find(page, "id=\"lab-config\"") < 0 &&
          string_find(page, "__LAB_NAME__") >= 0 && string_find(page, "MARS_LAB_DATA") < 0;
     json_t *config = lab_page_bootstrap(state);
-    ok = ok && !strcmp(test_lab_text(config, "BROWSER_ABI_VERSION"), "43");
+    ok = ok && !strcmp(test_lab_text(config, "BROWSER_ABI_VERSION"), "44");
     const json_t *token = test_lab_member(config, "CONTROL_TOKEN");
     const string_t *token_text = json_string_value(token);
     ok = ok && token_text && string_view_equals_literal(string_view_all(token_text),
@@ -149,12 +149,15 @@ static bool test_lab_help_content(const char *directory)
                             "exclude penumbral dimming", "A negative value means the Moon misses the umbra",
                             "Partial lunar eclipse", "Total lunar eclipse", "<code>Penumbral</code>",
                             "<code>Annular</code>", "<code>Hybrid</code>", "<code>Solar transit</code>",
-                            "not supplied, not zero",
+                            "not supplied, not zero", "https://britastro.org/2016/right-ascention-and-declination",
+                            "https://www.rmg.co.uk/stories/space-astronomy/solar-eclipses-explained",
+                            "https://www.rmg.co.uk/stories/space-astronomy/lunar-eclipse-guide",
                             "id=\"helpClose\"", "Return to worksheet", "2.5×10⁻⁵"};
     bool ok = page != NULL;
     for (size_t i = 0; page && i < sizeof(topics) / sizeof(*topics); ++i)
         ok = string_find(page, topics[i]) >= 0 && ok;
     ok = ok && string_find(page, "before <code>Evaluate</code> becomes available") < 0 &&
+         string_find(page, "aa.usno.navy.mil") < 0 && string_find(page, "eclipse.gsfc.nasa.gov") < 0 &&
          string_find(page, "is only used when you want the optional local holiday panel") < 0 &&
          string_find(page, "changes the displayed value precision without changing the expression") < 0;
     string_free(page);

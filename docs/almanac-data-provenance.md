@@ -4,6 +4,33 @@ This record identifies the origin and transformation of the astronomical data
 distributed with MARS. It distinguishes Robert H. Parry's AstroNav workbook
 from third-party scientific inputs and generation tools.
 
+## Shoreline data
+
+The independent shoreline module uses GSHHG 2.3.7, released 15 June 2017, from
+the [official GSHHG release](https://github.com/GenericMappingTools/gshhg-gmt/releases/tag/2.3.7).
+The downloaded `gshhg-bin-2.3.7.zip` archive has SHA-256
+`28600e8f7a08645aab43079326df6504212ec5ccb2b4bcf3b5f4f12ed60e82bc`.
+Its unmodified full-resolution binary `gshhs_f.b` has SHA-256
+`af9215d58ebc525b2d09654a89959829f09e6edc457f3666759cded37be4ecf6`.
+
+The repository packages those identical binary bytes using the native MARS file
+module's Zstandard compression, as `packaging/almanac-db/gshhs_f.b.zst`, SHA-256
+`87a928d71cf7a05c8084905c72d4575065400e1d68103609497211e20096eafa`.
+Installation restores that source, retains polygon levels 1–5 and builds bounded
+uncompressed coordinate chunks and an integer spatial index. Existing databases
+with compressed chunks remain readable. Level 6 is the
+alternative Antarctic grounding-line representation and is not included in queries.
+Longitude normalisation, chunk endpoint duplication and synthetic polar closure
+edges preserve containment without treating the pole/date-line closure as coastline.
+
+GSHHG is third-party data, not covered by MARS's MIT licence. The archive's licence
+specifies GNU LGPL version 3 or later. Its original licence, LGPL text and README
+are retained alongside the data as `GSHHG-LICENSE.txt`,
+`GSHHG-COPYING.LESSERv3.txt` and `GSHHG-README.txt`; the accompanying GPL version 3
+text is supplied as `GSHHG-COPYINGv3.txt`. The unmodified source remains available
+in the packaged compressed binary. No Python interpreter or download is required
+to install, query or rebuild the index.
+
 ## AstroNav workbook
 
 [`AstroNav 2000-2040.ods`](../src/almanac/AstroNav%202000-2040.ods) is the
@@ -101,6 +128,7 @@ These SHA-256 values identify the data reviewed for this provenance record:
 
 | Distributed file | SHA-256 |
 |---|---|
+| `packaging/almanac-db/gshhs_f.b.zst` | `87a928d71cf7a05c8084905c72d4575065400e1d68103609497211e20096eafa` |
 | `packaging/almanac-db/mars_almanac_chebyshev.sql` | `e3b8168f71ade640f5676916c06c40af21f4597875a5e41dfebeb4ec5fac824f` |
 | `packaging/almanac-db/mars_almanac_frame_rotation.sql` | `5885aa96b8cecda3fd79fb2a9db62567e6c7a66493aca913fb054319b074a22f` |
 | `packaging/almanac-db/mars_almanac.sql` | `addc990c0e5aedcbd04c634cdd7bc91808d39f30886167241992311d7a0183a2` |

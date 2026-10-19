@@ -458,6 +458,7 @@ int main(void) {
 | `diffequ_t` | ODE and PDE parsing with rule-based symbolic solving, optional derivations, linearisations and symmetry metadata | [`docs/diffequation.md`](./docs/diffequation.md) |
 | `expr_t` | Differentiable expression DAGs with symbolic differentiation and conservative symbolic antiderivatives | [`docs/expression.md`](./docs/expression.md) |
 | `almanac_t` | Ephemeris-backed SHA and declination lookups and snapshot queries | [`docs/almanac.md`](./docs/almanac.md) |
+| `shoreline_t` | Opaque reader for compressed, spatially indexed land/sea hit-tests | [Shoreline queries](./docs/almanac.md#shoreline-data-and-queries) |
 | `jurisdiction_t` | Jurisdiction-aware holiday and working-day queries | [`docs/jurisdiction.md`](./docs/jurisdiction.md) |
 | `sqlite_t` | Opaque SQLCipher-backed SQLite storage for encrypted object persistence | [`docs/sqlite.md`](./docs/sqlite.md) |
 | `file_t`, `file_info_t`, `file_key_t` | Linux file I/O, metadata, compression, authenticated encryption and SQLCipher transfers | [`docs/file.md`](./docs/file.md) |

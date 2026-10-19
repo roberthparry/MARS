@@ -6,6 +6,9 @@
  * and numerical types to calculate apparent celestial positions. Facilities cover
  * body catalogues, navigation coordinates, observer geometry, rise and set events,
  * transits, phases and eclipse searches, including observer-relative eclipse diagram orientations.
+ * A separate, approximate atmospheric-refraction correction accepts observer temperature and pressure;
+ * geometric observables remain available without atmospheric assumptions.
+ * Indexed shoreline queries distinguish land, sea and inland water, with an uncertain coastal band.
  *
  * Use this module for astronomical almanacs, sky-position queries and navigation
  * calculations that need catalogue-backed results. Available bodies and date
@@ -26,6 +29,7 @@
 
 #include "array-t.h"
 #include "datetime-t.h"
+#include "shoreline-t.h"
 
 /**
  * @brief Opaque astronomical almanac engine backed by configured ephemeris data.
@@ -36,6 +40,40 @@
  */
 typedef struct _almanac_t almanac_t;
 typedef struct _jurisdiction_t jurisdiction_t;
+
+/**
+ * @brief Classify a coordinate using indexed shoreline chunks in the almanac database.
+ * @param almanac Borrowed engine with an installed coastline dataset.
+ * @param latitude_degrees Finite latitude from -90 to 90 degrees.
+ * @param longitude_degrees Finite longitude from -180 to 180 degrees.
+ * @return Land, sea, inland water, uncertain coast, or unknown on failure.
+ * @note The 500-metre boundary band is a conservative display policy, not a surveyed accuracy guarantee.
+ * Old coastlines, tides, reclamation and unmapped features limit this planning aid; it is not a nautical chart.
+ */
+shoreline_surface_t almanac_surface_at(almanac_t *almanac, double latitude_degrees, double longitude_degrees);
+
+/**
+ * @brief Stream clipped shoreline vector paths from the catalogue's reader.
+ * @param almanac Borrowed engine, with installed shoreline data.
+ * @param west Western longitude in degrees.
+ * @param south Southern latitude in degrees.
+ * @param east Eastern longitude in degrees, unwrapped across the date line if necessary.
+ * @param north Northern latitude in degrees.
+ * @param tolerance Display simplification distance in degrees, from 0 to 1.
+ * @param visit Required synchronous path visitor.
+ * @param context Borrowed visitor context.
+ * @return Whether streaming succeeded; bounds and ownership follow shoreline_paths().
+ */
+bool almanac_surface_paths(almanac_t *almanac, double west, double south, double east, double north,
+                          double tolerance, shoreline_path_fn visit, void *context);
+
+/**
+ * @brief Prepare resident shoreline geometry before native request workers fork.
+ * @param almanac Borrowed engine with an installed shoreline dataset.
+ * @return True when geometry is resident, false when data or memory are unavailable.
+ * @note Uses shoreline_prepare(); no database connection is retained by the shared geometry cache.
+ */
+bool almanac_surface_prepare(almanac_t *almanac);
 
 /**
  * @brief Catalogued body kind supported by the almanac.
@@ -226,14 +264,14 @@ double almanac_entry_visual_magnitude(const almanac_entry_t *entry);
 typedef struct _almanac_observer_t {
     double latitude_degrees;
     double longitude_degrees;
-    double elevation_metres;
+    double elevation_metres; /**< Observer elevation above sea level, including height of eye where appropriate. */
 } almanac_observer_t;
 
 /**
  * @brief One set of observer-relative almanac observables.
  */
 typedef struct _almanac_observables_t {
-    double altitude_degrees;
+    double altitude_degrees; /**< Geometric altitude above the local horizontal, without refraction or horizon dip. */
     double azimuth_degrees;
     double semi_diameter_degrees;
     bool above_horizon;
@@ -447,9 +485,9 @@ bool almanac_gha_aries(almanac_t *almanac, const datetime_t *moment, double *gha
  * @brief Derive observer-relative observables from one computed almanac entry.
  *
  * This uses the apparent place already resolved into @p body together with the
- * observer location. The first implementation derives horizon observables from
- * the geocentric apparent place and geocentric distance already stored in the
- * entry.
+ * observer location, including elevation for solar-system topocentric parallax.
+ * Altitude is geometric: atmospheric refraction and sea-horizon dip are not added.
+ * Catalogue stars use their distant apparent direction.
  *
  * @param almanac open almanac engine, used for error reporting.
  * @param body computed almanac entry for the body of interest.
@@ -459,6 +497,30 @@ bool almanac_gha_aries(almanac_t *almanac, const datetime_t *moment, double *gha
  */
 bool almanac_observables(almanac_t *almanac, const almanac_entry_t *body, const almanac_observer_t *observer,
                          almanac_observables_t *out);
+
+/**
+ * @brief Estimate the atmospheric correction to geometric altitude.
+ *
+ * Uses the NOAA solar-position approximation, scaled by air pressure and absolute
+ * temperature. This is not a navigation-grade atmospheric model. Below -0.575
+ * degrees no correction is attempted; neither terrain nor sea-horizon dip is modelled.
+ * @param altitude_degrees Geometric altitude in degrees, between -90 and 90.
+ * @param temperature_c Air temperature at the observer, between -100 and 60 degrees Celsius.
+ * @param pressure_hpa Air pressure at the observer, between 0 and 1200 hPa.
+ * @return Positive correction in degrees, zero outside the supported altitude interval,
+ *         or NaN for invalid arguments.
+ */
+double almanac_refraction_degrees(double altitude_degrees, double temperature_c, double pressure_hpa);
+
+/**
+ * @brief Return geometric depression of an unobstructed sea horizon.
+ * @param elevation_metres Height of eye above sea level in metres.
+ * @return Dip in degrees, zero for non-positive height, or NaN for non-finite height.
+ * Add dip to a horizontal-reference altitude to express it above the sea horizon;
+ * subtract it when reducing a measured sea-horizon sight. Terrestrial refraction
+ * and waves are not modelled. Do not apply a land site's elevation as height of eye.
+ */
+double almanac_horizon_dip_degrees(double elevation_metres);
 
 /**
  * @brief Derive the geographical position for one computed body entry.

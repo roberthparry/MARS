@@ -82,7 +82,7 @@ export class Codec {
         for (const name of functions) {
             if (typeof exports[name] !== 'function') return false;
         }
-        return exports.lab_browser_abi_version instanceof Function && exports.lab_browser_abi_version() === 43;
+        return exports.lab_browser_abi_version instanceof Function && exports.lab_browser_abi_version() === 44;
     }
 
     /** @brief Borrow the exact byte range of a non-shared buffer or view, rejecting inputs above the native message limit. */

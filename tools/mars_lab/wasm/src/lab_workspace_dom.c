@@ -314,6 +314,7 @@ void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage)
     lab_workspace_dom_hidden("#derivativeButtons",
                              !(flags & 8) && mode != LAB_MODE_EQUATION && mode != LAB_MODE_DIFFERENTIAL_EQUATION);
     lab_workspace_dom_hidden("#goalSeek", !(flags & 16));
+    lab_workspace_dom_hidden("#run", mode == LAB_MODE_ALMANAC);
     lab_workspace_dom_hidden("#plotRange", mode > LAB_MODE_DIFFERENTIAL_EQUATION && mode != LAB_MODE_INTEGRATOR);
     lab_workspace_dom_hidden("#plotCard", (mode > LAB_MODE_DIFFERENTIAL_EQUATION && mode != LAB_MODE_INTEGRATOR) ||
                              !lab_workspace_dom_content(lab_dom_query(0, "#plotRendered"), LAB_DOM_TEXT));
@@ -468,7 +469,9 @@ void lab_workspace_dom_busy(bool busy, jsref equation_variable, jsref copies, js
         unsigned mark = lab_dom_mark();
         int parent = lab_dom_query(0, retained[i]);
         if (parent)
-            lab_workspace_dom_disable_list(lab_dom_all(parent, "input, button, select"), busy, 1);
+            /* Globe selections supersede active refreshes; keep their controls available. */
+            lab_workspace_dom_disable_list(
+                lab_dom_all(parent, "input, select, button:not(#almanacGlobe button)"), busy, 1);
         lab_dom_release(mark);
     }
     lab_dom_disabled(lab_dom_query(0, "#goalTarget"), busy);

@@ -249,15 +249,26 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
         WorksheetContext.datetimeJdn.value = 'kept';
         WorksheetLocations.calendar.applyCalendarEvaluationFields('datetime', {});
         equal(WorksheetContext.datetimeJdn.value, 'kept', 'absent field record leaves controls untouched');
+        WorksheetContext.almanacElevation.value = '123.45';
         WorksheetLocations.calendar.applyCalendarEvaluationFields(
             'almanac',
             {fields: {zone: ' 0 ', latitude: ' 0 ', longitude: ' -2 ', elevation: ' 7 ', jurisdiction: 'invalid'}});
         equal(WorksheetContext.almanacZone.value, '0', 'almanac evaluation trims zero zone');
         equal(WorksheetContext.almanacLatitude.value, '0', 'almanac evaluation retains string zero latitude');
         equal(WorksheetContext.almanacJurisdiction.value, WorksheetContext.DEFAULT_DATETIME_JURISDICTION, 'evaluation uses jurisdiction fallback');
+        equal(WorksheetContext.almanacElevation.value, '123.45', 'evaluation cannot replace authored observer height');
+        WorksheetLocations.calendar.applyCalendarEvaluationFields('almanac', {fields: {elevation: '0'}});
+        equal(WorksheetContext.almanacElevation.value, '123.45', 'returned default zero cannot reset observer height');
         WorksheetLocations.calendar.applyCalendarEvaluationFields('almanac', {fields: {zone: 0, latitude: '', elevation: null}});
         equal(WorksheetContext.almanacZone.value, '0', 'falsey returned fields preserve current values');
-        equal(WorksheetContext.almanacElevation.value, '7', 'missing returned elevation preserves current value');
+        equal(WorksheetContext.almanacElevation.value, '123.45', 'missing returned elevation preserves current value');
+        const observerState = WorksheetLocations.calendar.currentAlmanacState();
+        equal(observerState.elevation, '123.45', 'Evaluate captures the entered observer height');
+        equal(WorksheetLocations.calendar.currentAlmanacState().elevation, '123.45',
+              'repeated evaluation capture retains observer height');
+        const weatherState = {...observerState, mode: 'almanac'};
+        const weatherPayload = labDOM.call<WorksheetCalendarState>('lab_payload_build', 6, [weatherState], null, 0, 0);
+        equal(weatherPayload.elevation, '123.45', 'background weather uses the same observer height');
 
         const responseContext = WorksheetLocations.calendar.calendarLocationContext();
         WorksheetContext.datetimeLatitude.value = '12';

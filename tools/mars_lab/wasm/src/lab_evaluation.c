@@ -69,7 +69,7 @@ static const unsigned lab_evaluation_policy[LAB_REQUEST_OUTCOME_EXCEPTION + 1][L
     [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_MATRIX]                  = lab_eval_replace,
     [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_INTEGRATOR]              = lab_eval_replace,
     [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_DATETIME]                = lab_eval_replace | lab_eval_weather,
-    [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_ALMANAC]                 = lab_eval_replace,
+    [LAB_REQUEST_OUTCOME_SUCCESS][LAB_MODE_ALMANAC]                 = lab_eval_replace | lab_eval_weather,
     [LAB_REQUEST_OUTCOME_PARTIAL][LAB_MODE_EXPRESSION]              = lab_eval_install | lab_eval_error,
     [LAB_REQUEST_OUTCOME_EXCEPTION][LAB_MODE_EXPRESSION]            = lab_eval_failure,
     [LAB_REQUEST_OUTCOME_EXCEPTION][LAB_MODE_EQUATION]              = lab_eval_failure,

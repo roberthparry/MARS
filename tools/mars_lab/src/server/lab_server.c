@@ -10,6 +10,7 @@
 #include <stdlib.h>
 
 #include "array-t.h"
+#include "almanac-t.h"
 #include "file-t.h"
 #include "lab_process_request.h"
 #include "lab_calendar.h"
@@ -92,11 +93,11 @@ static bool lab_svr_message(const websrv_request_t *request, websrv_response_t *
 }
 
 static bool lab_svr_static_asset(const websrv_request_t *request, websrv_response_t *response,
-                                 const char *path, const char *type)
+                                 const char *path, const char *type, size_t max_bytes)
 {
     file_t *file = file_new_cstr(path);
     file_info_t *info = file ? file_get_info(file) : NULL;
-    bool safe = info && file_info_type(info) == FILE_TYPE_REGULAR && file_info_size(info) <= 4194304;
+    bool safe = info && file_info_type(info) == FILE_TYPE_REGULAR && file_info_size(info) <= max_bytes;
     array_t *bytes = safe ? file_read_all_bytes(file) : NULL;
     bool ok =
         bytes ? lab_svr_header(response, "Content-Type", type) &&
@@ -112,45 +113,49 @@ struct lab_svr_asset {
     const char *route;
     const char *path;
     const char *type;
+    size_t max_bytes;
 };
 
 /* Enumerated once at registration, then resolved by the webserver's route index. */
 static const struct lab_svr_asset lab_svr_assets[] = {
-    {"/wasm/lab_browser.wasm", MARS_LAB_WASM_PATH, "application/wasm"},
-    {"/wasm/lab_codec.wasm", MARS_LAB_CODEC_PATH, "application/wasm"},
-    {"/js/codec.js", "tools/mars_lab/build/typescript/codec.js", "text/javascript; charset=utf-8"},
-    {"/js/codec_types.js", "tools/mars_lab/build/typescript/codec_types.js", "text/javascript; charset=utf-8"},
-    {"/js/jobs.js", "tools/mars_lab/build/typescript/jobs.js", "text/javascript; charset=utf-8"},
-    {"/js/codec_worker.js", "tools/mars_lab/build/typescript/codec_worker.js", "text/javascript; charset=utf-8"},
-    {"/js/transport.js", "tools/mars_lab/build/typescript/transport.js", "text/javascript; charset=utf-8"},
-    {"/index.css", "tools/mars_lab/assets/index.css", "text/css; charset=utf-8"},
-    {"/css/theme.css", "tools/mars_lab/assets/css/theme.css", "text/css; charset=utf-8"},
-    {"/css/layout.css", "tools/mars_lab/assets/css/layout.css", "text/css; charset=utf-8"},
-    {"/css/worksheets.css", "tools/mars_lab/assets/css/worksheets.css", "text/css; charset=utf-8"},
-    {"/css/dates.css", "tools/mars_lab/assets/css/dates.css", "text/css; charset=utf-8"},
-    {"/css/forms.css", "tools/mars_lab/assets/css/forms.css", "text/css; charset=utf-8"},
-    {"/css/bindings.css", "tools/mars_lab/assets/css/bindings.css", "text/css; charset=utf-8"},
-    {"/css/mobile.css", "tools/mars_lab/assets/css/mobile.css", "text/css; charset=utf-8"},
-    {"/css/buttons.css", "tools/mars_lab/assets/css/buttons.css", "text/css; charset=utf-8"},
-    {"/css/results.css", "tools/mars_lab/assets/css/results.css", "text/css; charset=utf-8"},
-    {"/css/help.css", "tools/mars_lab/assets/css/help.css", "text/css; charset=utf-8"},
-    {"/css/responsive.css", "tools/mars_lab/assets/css/responsive.css", "text/css; charset=utf-8"},
-    {"/js/api.js", "tools/mars_lab/build/typescript/api.js", "text/javascript; charset=utf-8"},
-    {"/js/app.js", "tools/mars_lab/build/typescript/app.js", "text/javascript; charset=utf-8"},
-    {"/js/bindings.js", "tools/mars_lab/build/typescript/bindings.js", "text/javascript; charset=utf-8"},
-    {"/js/bindings_controller.js", "tools/mars_lab/build/typescript/bindings_controller.js", "text/javascript; charset=utf-8"},
-    {"/js/locations.js", "tools/mars_lab/build/typescript/locations.js", "text/javascript; charset=utf-8"},
-    {"/js/results.js", "tools/mars_lab/build/typescript/results.js", "text/javascript; charset=utf-8"},
-    {"/js/results_services.js", "tools/mars_lab/build/typescript/results_services.js", "text/javascript; charset=utf-8"},
-    {"/js/surface.js", "tools/mars_lab/build/typescript/surface.js", "text/javascript; charset=utf-8"},
-    {"/js/surface_camera.js", "tools/mars_lab/build/typescript/surface_camera.js", "text/javascript; charset=utf-8"},
-    {"/js/surface_export.js", "tools/mars_lab/build/typescript/surface_export.js", "text/javascript; charset=utf-8"},
-    {"/js/surface_hover.js", "tools/mars_lab/build/typescript/surface_hover.js", "text/javascript; charset=utf-8"},
-    {"/js/surface_volume.js", "tools/mars_lab/build/typescript/surface_volume.js", "text/javascript; charset=utf-8"},
-    {"/js/state.js", "tools/mars_lab/build/typescript/state.js", "text/javascript; charset=utf-8"},
-    {"/js/workspace.js", "tools/mars_lab/build/typescript/workspace.js", "text/javascript; charset=utf-8"},
-    {"/js/workspace_controllers.js", "tools/mars_lab/build/typescript/workspace_controllers.js", "text/javascript; charset=utf-8"},
-    {"/js/workspace_native.js", "tools/mars_lab/build/typescript/workspace_native.js", "text/javascript; charset=utf-8"},
+    {"/wasm/lab_browser.wasm", MARS_LAB_WASM_PATH, "application/wasm", 4194304},
+    {"/wasm/lab_codec.wasm", MARS_LAB_CODEC_PATH, "application/wasm", 4194304},
+    {"/js/codec.js", "tools/mars_lab/build/typescript/codec.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/codec_types.js", "tools/mars_lab/build/typescript/codec_types.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/jobs.js", "tools/mars_lab/build/typescript/jobs.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/codec_worker.js", "tools/mars_lab/build/typescript/codec_worker.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/transport.js", "tools/mars_lab/build/typescript/transport.js", "text/javascript; charset=utf-8", 4194304},
+    {"/index.css", "tools/mars_lab/assets/index.css", "text/css; charset=utf-8", 4194304},
+    {"/css/theme.css", "tools/mars_lab/assets/css/theme.css", "text/css; charset=utf-8", 4194304},
+    {"/css/layout.css", "tools/mars_lab/assets/css/layout.css", "text/css; charset=utf-8", 4194304},
+    {"/css/worksheets.css", "tools/mars_lab/assets/css/worksheets.css", "text/css; charset=utf-8", 4194304},
+    {"/css/dates.css", "tools/mars_lab/assets/css/dates.css", "text/css; charset=utf-8", 4194304},
+    {"/css/forms.css", "tools/mars_lab/assets/css/forms.css", "text/css; charset=utf-8", 4194304},
+    {"/css/bindings.css", "tools/mars_lab/assets/css/bindings.css", "text/css; charset=utf-8", 4194304},
+    {"/css/mobile.css", "tools/mars_lab/assets/css/mobile.css", "text/css; charset=utf-8", 4194304},
+    {"/css/buttons.css", "tools/mars_lab/assets/css/buttons.css", "text/css; charset=utf-8", 4194304},
+    {"/css/results.css", "tools/mars_lab/assets/css/results.css", "text/css; charset=utf-8", 4194304},
+    {"/css/help.css", "tools/mars_lab/assets/css/help.css", "text/css; charset=utf-8", 4194304},
+    {"/css/responsive.css", "tools/mars_lab/assets/css/responsive.css", "text/css; charset=utf-8", 4194304},
+    {"/js/api.js", "tools/mars_lab/build/typescript/api.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/app.js", "tools/mars_lab/build/typescript/app.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/bindings.js", "tools/mars_lab/build/typescript/bindings.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/bindings_controller.js", "tools/mars_lab/build/typescript/bindings_controller.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/locations.js", "tools/mars_lab/build/typescript/locations.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/globe.js", "tools/mars_lab/build/typescript/globe.js", "text/javascript; charset=utf-8", 4194304},
+    {"/earth_surface.jpg", "tools/mars_lab/assets/earth_surface.jpg", "image/jpeg", 4194304},
+    {"/earth_surface_detail.png", "tools/mars_lab/assets/earth_surface_detail.png", "image/png", 33554432},
+    {"/js/results.js", "tools/mars_lab/build/typescript/results.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/results_services.js", "tools/mars_lab/build/typescript/results_services.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface.js", "tools/mars_lab/build/typescript/surface.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface_camera.js", "tools/mars_lab/build/typescript/surface_camera.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface_export.js", "tools/mars_lab/build/typescript/surface_export.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface_hover.js", "tools/mars_lab/build/typescript/surface_hover.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface_volume.js", "tools/mars_lab/build/typescript/surface_volume.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/state.js", "tools/mars_lab/build/typescript/state.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/workspace.js", "tools/mars_lab/build/typescript/workspace.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/workspace_controllers.js", "tools/mars_lab/build/typescript/workspace_controllers.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/workspace_native.js", "tools/mars_lab/build/typescript/workspace_native.js", "text/javascript; charset=utf-8", 4194304},
 };
 
 static bool lab_svr_asset_request(const websrv_request_t *request, websrv_response_t *response, void *context)
@@ -161,7 +166,7 @@ static bool lab_svr_asset_request(const websrv_request_t *request, websrv_respon
         return false;
     if (!lab_svr_request_permitted(request))
         return lab_svr_message(request, response, 403, "MARS Lab is private; use this machine or a private network.");
-    return lab_svr_static_asset(request, response, asset->path, asset->type);
+    return lab_svr_static_asset(request, response, asset->path, asset->type, asset->max_bytes);
 }
 
 /* Browser requests stay open while awaiting their result; an observed input close cancels native work. */
@@ -229,13 +234,13 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
             return ok;
         }
         if (lab_svr_equal(path, "/favicon.svg"))
-            return lab_svr_static_asset(request, response, "packaging/linux/mars-lab.svg", "image/svg+xml");
+            return lab_svr_static_asset(request, response, "packaging/linux/mars-lab.svg", "image/svg+xml", 4194304);
         if (lab_svr_equal(path, "/apple-touch-icon.png"))
-            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-180.png", "image/png");
+            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-180.png", "image/png", 4194304);
         if (lab_svr_equal(path, "/icon-192.png"))
-            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-192.png", "image/png");
+            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-192.png", "image/png", 4194304);
         if (lab_svr_equal(path, "/icon-512.png"))
-            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-512.png", "image/png");
+            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-512.png", "image/png", 4194304);
         /* Browser installation manifests have a standard JSON format, unlike our API messages. */
         const char *body =
             "{\"name\":\"MARS Lab\",\"short_name\":\"MARS\",\"start_url\":\"/\",\"display\":\"standalone\","
@@ -257,6 +262,8 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
     string_free(media);
     if (!is_wire)
         return lab_svr_message(request, response, 415, "Expected application/x-protobuf");
+    if (websrv_request_body_size(request) > 8388608)
+        return lab_svr_message(request, response, 413, "Calculation payload exceeds the 8 MiB limit");
     json_t *payload = lab_wire_decode(websrv_request_body(request), websrv_request_body_size(request));
     if (!payload || json_type(payload) != JSON_OBJECT) {
         json_free(payload);
@@ -323,6 +330,8 @@ static bool lab_svr_register_routes(lab_server_t *server)
                                               "/datetime-weather",
                                               "/datetime-jurisdiction-location",
                                               "/almanac-eval",
+                                              "/almanac-weather",
+                                              "/almanac-globe",
                                               "/almanac-land-totality",
                                               "/funnel-toggle"};
     for (size_t i = 0; i < sizeof lab_svr_assets / sizeof *lab_svr_assets; ++i) {
@@ -357,7 +366,7 @@ lab_server_t *lab_svr_new(const string_t *address, uint16_t port, unsigned timeo
     if (!server)
         return NULL;
     websrv_limits_t limits = {
-        .max_header_bytes = 16384, .max_body_bytes = 8388608, .timeout_ms = timeout_ms ? timeout_ms : 180000};
+        .max_header_bytes = 16384, .max_body_bytes = 33554432, .timeout_ms = timeout_ms ? timeout_ms : 180000};
     server->listener = websrv_new(address, port, &limits);
     if (!server->listener || !lab_svr_register_routes(server)) {
         int error = errno;
@@ -365,6 +374,10 @@ lab_server_t *lab_svr_new(const string_t *address, uint16_t port, unsigned timeo
         errno = error;
         return NULL;
     }
+    /* Prepare once before the webserver forks; immutable geometry pages are shared by its workers. */
+    almanac_t *almanac = almanac_open();
+    almanac_surface_prepare(almanac);
+    almanac_close(almanac);
     return server;
 }
 

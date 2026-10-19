@@ -25,7 +25,7 @@ static const lab_request_policy_t lab_request_policy[LAB_REQUEST_OPERATIONS] = {
     [LAB_REQUEST_DERIVATIVE]            = {9, 1, 1, 1, 0},
     [LAB_REQUEST_INTEGRAL]              = {9, 1, 1, 1, 0},
     [LAB_REQUEST_PROGRAMME]             = {127, 1, 0, 0, 45000},
-    [LAB_REQUEST_FORECAST]              = {32, 0, 0, 0, 0},
+    [LAB_REQUEST_FORECAST]              = {96, 0, 0, 0, 0},
     [LAB_REQUEST_GOAL]                  = {1, 1, 0, 1, 0},
     [LAB_REQUEST_BINDINGS]              = {1, 1, 0, 0, 0},
     [LAB_REQUEST_LAND_TOTALITY]         = {64, 0, 0, 0, 22000},
@@ -121,6 +121,7 @@ static const char *const lab_request_paths[] = {
     [LAB_REQUEST_ENDPOINT_ALMANAC]               = "/almanac-eval",
     [LAB_REQUEST_ENDPOINT_FUNCTION]              = "/function-run",
     [LAB_REQUEST_ENDPOINT_WEATHER]               = "/datetime-weather",
+    [LAB_REQUEST_ENDPOINT_ALMANAC_WEATHER]       = "/almanac-weather",
     [LAB_REQUEST_ENDPOINT_GOAL]                  = "/goal_seek",
     [LAB_REQUEST_ENDPOINT_LAND]                  = "/almanac-land-totality",
     [LAB_REQUEST_ENDPOINT_DATETIME_LOCATION]     = "/datetime-jurisdiction-location",
@@ -304,6 +305,8 @@ lab_request_endpoint_t lab_request_endpoint(lab_request_channel_t channel, uint3
     };
     if (slot->operation == LAB_REQUEST_EVALUATE)
         return evaluation_endpoints[slot->mode];
+    if (slot->operation == LAB_REQUEST_FORECAST && slot->mode == LAB_MODE_ALMANAC)
+        return LAB_REQUEST_ENDPOINT_ALMANAC_WEATHER;
     lab_request_endpoint_t fixed = lab_request_operation_endpoints[slot->operation];
     if (fixed != LAB_REQUEST_ENDPOINT_NONE)
         return fixed;

@@ -45,6 +45,7 @@ This directory contains the longer module documentation for MARS.
   polynomials, symbolic sums and products, Li₁ and Lerch-transcendent calculus,
   integration and helper APIs
 - [`almanac_t`](./almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
+- [`shoreline_t`](./almanac.md#shoreline-data-and-queries) — opaque indexed shoreline reader and coordinate hit-tests
 - [`datetime_t`](./datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries
 - [`timeseries_t`](./timeseries.md) — datetime-indexed forecasting and time-series analysis

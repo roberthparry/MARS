@@ -1067,8 +1067,8 @@ static void test_equation_renders_exact_complex_quadratic_roots_as_surds(void)
     ASSERT_EQ_INT(equ_solve_for(equation, u, result), 0);
     ASSERT_EQ_INT((int)RESULT_COUNT(result), 2);
     ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\sqrt{59}"));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{-5 + i\\mkern-2mu \\sqrt{59}}{2}"));
-    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{-5 - i\\mkern-2mu \\sqrt{59}}{2}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{-5 + i\\,\\sqrt{59}}{2}"));
+    ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{-5 - i\\,\\sqrt{59}}{2}"));
     ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, u, result, "1e-40"));
 
     equ_solve_result_free(result);
@@ -1228,7 +1228,7 @@ static void test_equation_normalises_shifted_repeated_power_exponents(void)
     ASSERT_TRUE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\frac{\\ln(4)}{\\ln(5)}"));
     ASSERT_TRUE(test_equation_result_has_rhs_text_containing(
         result, style_LATEX,
-        "i\\mkern-2mu \\frac{\\pi\\mkern-2mu \\left(2\\mkern-2mu n + 1\\right)}{\\ln(5)}"));
+        "i\\,\\frac{\\pi\\mkern-2mu \\left(2\\mkern-2mu n + 1\\right)}{\\ln(5)}"));
     ASSERT_FALSE(test_equation_result_has_rhs_text_containing(result, style_LATEX, "\\ln(-4)"));
 
     equ_solve_result_free(result);

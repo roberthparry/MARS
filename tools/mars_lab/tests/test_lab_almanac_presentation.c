@@ -46,7 +46,7 @@ static void test_lab_almanac_variants(void)
          !strcmp(test_lab_text(json_array_get(visible_rows, 0u), "visible_icon"), "✓") &&
          !strcmp(test_lab_text(json_array_get(all_rows, 1u), "visible_label"), "Not visible") &&
          !strcmp(test_lab_text(visible, "copy_text"),
-                 "Fixture\nNow\nHere\nLocation of Navigational Bodies; visible bodies only\n"
+                 "Fixture\nNow\nHere\n"
                  "Body filter: visible only\n\nBody | Declination | GHA | RA | Altitude | Azimuth | s.d. | Vmag.\n"
                  "A |  |  |  |  |  |  | \n\nEvents\nClass | Event | Kind | Magnitude | Obscuration | Date | "
                  "First contact | Greatest eclipse | Fourth contact | Greatest GMT | Notes | Nearest totality\n"
@@ -63,6 +63,24 @@ static void test_lab_almanac_variants(void)
              strstr(test_lab_text(visible, "html"), labelled_cells[i]);
     ok = ok && strstr(test_lab_text(all, "html"), "role=\"table\"") &&
          strstr(test_lab_text(all, "html"), "role=\"rowheader\"");
+    lab_cal_set(response, "atmosphere_note", "Temperature: 12 °C; atmospheric pressure: 1005 hPa <estimated>");
+    lab_cal_set(response, "altitude_note", "Altitudes account for observer elevation and atmospheric refraction.");
+    ok = ok && lab_cal_almanac_presentation(response);
+    const json_t *updated = almanac_metadata(response);
+    static const char *const modes[] = {"all", "visible"};
+    for (size_t i = 0; ok && i < 2; ++i) {
+        const json_t *variant = test_lab_member(updated, modes[i]);
+        ok = !strstr(test_lab_text(variant, "html"), "Location of Navigational Bodies") &&
+             !strstr(test_lab_text(variant, "copy_text"), "Location of Navigational Bodies") &&
+             strstr(test_lab_text(variant, "html"), "<dl class=\"almanac-summary\">") &&
+             strstr(test_lab_text(variant, "html"), "<dt>GMT moment</dt><dd>Now</dd>") &&
+             strstr(test_lab_text(variant, "html"), "<dt>Observer</dt><dd>Here</dd>") &&
+             strstr(test_lab_text(variant, "html"), "<dt>Weather</dt><dd>Temperature:") &&
+             strstr(test_lab_text(variant, "html"), "class=\"almanac-summary-corrections\"") &&
+             strstr(test_lab_text(variant, "html"), "Temperature: 12 °C; atmospheric pressure: 1005 hPa &lt;estimated&gt;") &&
+             strstr(test_lab_text(variant, "html"), "Altitudes account for observer elevation") &&
+             strstr(test_lab_text(variant, "copy_text"), "atmospheric pressure: 1005 hPa <estimated>");
+    }
     json_free(response);
     TEST_ASSERT_TRUE(ok, "both local visibility variants and exact clipboard text retain original rows");
 }

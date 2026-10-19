@@ -31,12 +31,16 @@ typedef struct almanac_lab_options_t {
     double zone;
     double latitude;
     double longitude;
+    double elevation;
+    double temperature_c;
+    double pressure_hpa;
+    bool sea_horizon;
     almanac_body_id_t body_id;
     bool cache_only;
     bool cache_put;
 } almanac_lab_options_t;
 
-#define ALMANAC_LAB_CACHE_SCHEMA "almanac_lab_output_v6"
+#define ALMANAC_LAB_CACHE_SCHEMA "almanac_lab_output_v7"
 #define ALMANAC_LAB_CACHE_PATH_ENV "MARS_LAB_OBJECT_STORE_PATH"
 #define ALMANAC_LAB_CACHE_KEY_ENV "MARS_LAB_OBJECT_STORE_KEY"
 
@@ -149,15 +153,17 @@ done:
 
 static string_t *cache_key_for_options(const almanac_lab_options_t *options)
 {
-    char key[256];
+    char key[384];
 
     if (!options)
         return NULL;
     if (snprintf(key, sizeof(key),
-                 "mars_lab/%s/date=%04d-%02d-%02d/time=%02d:%02d:%010.6f/zone=%.9f/lat=%.9f/lon=%.9f/body=%d",
+                 "mars_lab/%s/date=%04d-%02d-%02d/time=%02d:%02d:%010.6f/zone=%.9f/lat=%.9f/lon=%.9f/body=%d"
+                 "/elevation=%.9f/temperature=%.6f/pressure=%.6f/sea=%d",
                  ALMANAC_LAB_CACHE_SCHEMA, options->year, (int)options->month, (int)options->day, (int)options->hour,
                  (int)options->minute, options->second, options->zone, options->latitude, options->longitude,
-                 (int)options->body_id) >= (int)sizeof(key)) {
+                 (int)options->body_id, options->elevation, options->temperature_c,
+                 options->pressure_hpa, options->sea_horizon) >= (int)sizeof(key)) {
         return NULL;
     }
     return string_new_with(key);
@@ -371,6 +377,8 @@ static void set_default_options(almanac_lab_options_t *options)
     options->zone = 0.0;
     options->latitude = 51.5074;
     options->longitude = -0.1278;
+    options->temperature_c = NAN;
+    options->pressure_hpa = NAN;
     options->body_id = ALMANAC_BODY_ID_MOON;
     options->cache_only = false;
     options->cache_put = false;
@@ -418,6 +426,18 @@ static bool parse_options(int argc, char **argv, almanac_lab_options_t *options)
         } else if (key_equals(arg, key_len, "lon")) {
             if (!parse_double_text(value, &options->longitude))
                 return false;
+        } else if (key_equals(arg, key_len, "elevation")) {
+            if (!parse_double_text(value, &options->elevation))
+                return false;
+        } else if (key_equals(arg, key_len, "temperature_c")) {
+            if (!parse_double_text(value, &options->temperature_c))
+                return false;
+        } else if (key_equals(arg, key_len, "pressure_hpa")) {
+            if (!parse_double_text(value, &options->pressure_hpa))
+                return false;
+        } else if (key_equals(arg, key_len, "sea_horizon")) {
+            if (!parse_boolean_text(value, &options->sea_horizon))
+                return false;
         } else if (key_equals(arg, key_len, "body")) {
             almanac_body_id_t body_id = almanac_body_id_from_code(value);
 
@@ -441,7 +461,29 @@ static bool parse_options(int argc, char **argv, almanac_lab_options_t *options)
         return false;
     if (options->zone < -14.0 || options->zone > 14.0)
         return false;
+    if (options->elevation < -500 || options->elevation > 11000)
+        return false;
+    if (options->sea_horizon && options->elevation < 0)
+        return false;
+    if (isfinite(options->temperature_c) != isfinite(options->pressure_hpa))
+        return false;
+    if (isfinite(options->temperature_c) &&
+        !isfinite(almanac_refraction_degrees(0, options->temperature_c, options->pressure_hpa)))
+        return false;
     return true;
+}
+
+static void apply_altitude_corrections(almanac_observables_t *observables, const almanac_lab_options_t *options)
+{
+    double correction = almanac_refraction_degrees(observables->altitude_degrees,
+                                                   options->temperature_c, options->pressure_hpa);
+    if (isfinite(correction))
+        observables->altitude_degrees += correction;
+    if (options->sea_horizon)
+        observables->altitude_degrees += almanac_horizon_dip_degrees(options->elevation);
+    observables->above_horizon = observables->altitude_degrees > 0;
+    double radius = isfinite(observables->semi_diameter_degrees) ? observables->semi_diameter_degrees : 0;
+    observables->visible = observables->altitude_degrees + radius > 0;
 }
 
 static void format_optional_double(char *out, size_t out_size, const char *format, double value)
@@ -619,7 +661,8 @@ int lab_worker_almanac(int argc, char **argv)
     size_t i;
 
     if (!parse_options(argc, argv, &options)) {
-        fprintf(stderr, "usage: %s date=YYYY-MM-DD time=HH:MM[:SS] zone=0 lat=51.5074 lon=-0.1278 body=MOON\n",
+        fprintf(stderr, "usage: %s date=YYYY-MM-DD time=HH:MM[:SS] zone=0 lat=51.5074 lon=-0.1278 body=MOON "
+                        "elevation=0 sea_horizon=false [temperature_c=10 pressure_hpa=1013.25]\n",
                 argc > 0 ? argv[0] : "almanac_lab");
         return 2;
     }
@@ -706,7 +749,10 @@ int lab_worker_almanac(int argc, char **argv)
     (void)string_append_format(output, "gha_aries %.9f\n", gha_aries);
     observer.latitude_degrees = options.latitude;
     observer.longitude_degrees = options.longitude;
-    observer.elevation_metres = 0.0;
+    observer.elevation_metres = options.elevation;
+    (void)string_append_format(output, "elevation %.6f\n", options.elevation);
+    (void)string_append_format(output, "temperature_c %.6f\n", options.temperature_c);
+    (void)string_append_format(output, "pressure_hpa %.6f\n", options.pressure_hpa);
     sun_observables.altitude_degrees = NAN;
     sun_observables.azimuth_degrees = NAN;
     sun_observables.semi_diameter_degrees = NAN;
@@ -718,8 +764,10 @@ int lab_worker_almanac(int argc, char **argv)
         if (!entry || almanac_entry_body_id(entry) != ALMANAC_BODY_ID_SUN)
             continue;
         sun_entry = entry;
-        if (almanac_observables(almanac, entry, &observer, &sun_observables))
+        if (almanac_observables(almanac, entry, &observer, &sun_observables)) {
+            apply_altitude_corrections(&sun_observables, &options);
             sun_altitude_degrees = sun_observables.altitude_degrees;
+        }
         break;
     }
     local_solar_eclipse_in_progress = almanac_solar_eclipse_in_progress(almanac, &observer, moment);
@@ -730,6 +778,8 @@ int lab_worker_almanac(int argc, char **argv)
         selected_observables.above_horizon = false;
         selected_observables.visible = false;
     }
+    (void)string_append_format(output, "selected_geometric_altitude %.9f\n", selected_observables.altitude_degrees);
+    apply_altitude_corrections(&selected_observables, &options);
     if (!almanac_body_geographical_position(selected, &selected_gp)) {
         selected_gp.latitude_degrees = NAN;
         selected_gp.longitude_degrees = NAN;
@@ -780,6 +830,7 @@ int lab_worker_almanac(int argc, char **argv)
             observables.above_horizon = false;
             observables.visible = false;
         }
+        apply_altitude_corrections(&observables, &options);
         gha = normalize_degrees(almanac_entry_gha_aries_degrees(entry) + almanac_entry_sha_degrees(entry));
         visible =
             visually_visible(entry, &observables, sun_altitude_degrees, sun_entry, local_solar_eclipse_in_progress);

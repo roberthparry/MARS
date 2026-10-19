@@ -33,7 +33,9 @@ window.checkLabWeather = async function checkLabWeather() {
     }
     let reads = 0;
     const unread = new Proxy({}, {
-        get() {
+        get(_target, key) {
+            if (key === 'mode')
+                return undefined;
             ++reads;
             throw new Error('Weather policy must not read payload fields');
         }
@@ -57,6 +59,10 @@ window.checkLabWeather = async function checkLabWeather() {
     equal(success.calls[0].args[1], unread, 'weather identity preserved');
     equal(success.calls[1].args[0], 'Ready', 'successful completion status');
     equal(reads, 0, 'policy does not inspect or eagerly merge response fields');
+    const sky = policy(2, {mode: 'almanac'}, unread);
+    equal(sky.calls.map(call => call.service).join(','),
+        'almanacRender,almanacAccept,refreshAlmanacLandTotality,setStatus',
+        'almanac weather replaces the native worksheet without another foreground evaluation');
     equal(WorksheetContext.rendered.innerHTML, before, 'planning cannot change the result DOM');
     policy(1, null, null);
     equal(success.calls[0].args[0], unread, 'plan references survive later scoped calls');
@@ -74,6 +80,7 @@ window.checkLabWeather = async function checkLabWeather() {
     equal(ordered.join(','), 'install,Ready', 'service execution order');
 
     const savedMode = WorksheetWorkspace.mode.currentMode();
+    const savedAlmanac = WorksheetContext.worksheetSession.calendar.almanacLastWorksheetData;
     const savedFetch = window.fetch;
     const originals = new Map<string, unknown>();
     const events: LabWorksheetWeatherEvent[] = [];
@@ -103,8 +110,9 @@ window.checkLabWeather = async function checkLabWeather() {
     }
 
     /** @brief Reject completion before the request enters the fetch adapter. */
+    let pendingScenario = '';
     function requestDidNotStart(): never {
-        throw new Error('Weather: wrapper completed without making the weather request');
+        throw new Error('Weather: wrapper completed without making the weather request: ' + pendingScenario);
     }
     const state = Object.freeze({date: '2026-10-10', latitude: '52.7077', longitude: '-2.7541'});
     const calendar = Object.freeze({title: 'Calendar', html: '<p>Native calendar</p>'});
@@ -130,6 +138,7 @@ window.checkLabWeather = async function checkLabWeather() {
         for (const scenario
                  of ['success', 'rejected', 'HTTP failure', 'network failure', 'markup exception', 'stale success',
                      'stale rejected', 'stale network failure', 'mode changed']) {
+            pendingScenario = 'datetime ' + scenario;
             mode = 'datetime';
             WorksheetRequests.labRequests.modeChanged(mode);
             const parent = WorksheetRequests.labRequests.begin('evaluate', mode);
@@ -213,6 +222,44 @@ window.checkLabWeather = async function checkLabWeather() {
                 WorksheetRequests.labRequests.finish(newer);
             check(!WorksheetRequests.labRequests.busy(), 'scenario releases its foreground work');
         }
+        let skyRenders = 0;
+        replace('renderAlmanacWorksheet', function recordSkyRender(): void { ++skyRenders; });
+        replace('refreshAlmanacLandTotality', function skipLandRefresh(): void {});
+        for (const stale of [false, true]) {
+            pendingScenario = 'almanac ' + (stale ? 'stale' : 'success');
+            mode = 'almanac';
+            WorksheetRequests.labRequests.modeChanged(mode);
+            const parent = WorksheetRequests.labRequests.begin('evaluate', mode);
+            requests.push(parent);
+            check(parent, 'fixture creates an Almanac parent');
+            WorksheetRequests.labRequests.finish(parent);
+            const gate = LabTestBrowser.responseGate();
+            const entered = LabTestBrowser.signal();
+            const skyState = {...state, mode: 'almanac', time: '12:30:00', elevation: '2', town: '', zone: '0'};
+            const admission = labDOM.call<{mode: string}>('lab_flow_begin', 2, {parent: parent!.token, state: skyState});
+            equal(admission.mode, 'almanac', 'weather admission follows the captured Almanac mode');
+            window.fetch = function captureSkyWeather(url, options) {
+                equal(String(url), '/almanac-weather', 'almanac has a separate background endpoint');
+                const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as WorksheetCalendarState;
+                equal(payload.time, skyState.time, 'weather retains observation time');
+                equal(payload.elevation, skyState.elevation, 'weather retains observer height');
+                equal(payload.town, '', 'weather retains sea-mode selection');
+                entered.resolve();
+                return gate.promise;
+            };
+            const task = WorksheetRequests.calendarRequests.refreshDatetimeWeather(parent!.token, skyState, {mode})!;
+            pending.push({task, gate});
+            await Promise.race([entered.promise, task.then(function skyDidNotStart(): never {
+                throw new Error('Weather: Almanac did not fetch: ' + JSON.stringify(events));
+            })]);
+            check(!WorksheetRequests.labRequests.busy(), 'pending almanac weather does not hold foreground busy');
+            const beforeRefresh = skyRenders;
+            if (stale)
+                requests.push(WorksheetRequests.labRequests.begin('evaluate', mode));
+            gate.resolve(response({ok: true, mode: 'almanac', weather_refresh: true}));
+            await task;
+            equal(skyRenders, beforeRefresh + (stale ? 0 : 1), 'only current almanac weather may replace the table');
+        }
     } finally {
         // Resolve pending fixtures even when an assertion interrupts normal completion.
         for (const item of pending) {
@@ -229,6 +276,7 @@ window.checkLabWeather = async function checkLabWeather() {
             }
         }
         window.fetch = savedFetch;
+        WorksheetContext.worksheetSession.calendar.almanacLastWorksheetData = savedAlmanac;
         for (const [name, callback] of originals) {
             Reflect.set(labTestModuleOwner(name), name, callback);
         }

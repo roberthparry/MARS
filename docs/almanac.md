@@ -17,6 +17,79 @@ The packaged coefficient sources, transformations, checksums and AstroNav
 workbook ownership are recorded in the
 [almanac data provenance](./almanac-data-provenance.md).
 
+## Shoreline data and queries
+
+The reusable [`shoreline_t`](../include/shoreline-t.h) module, implemented in
+`src/shoreline/`, owns shoreline storage and coordinate hit-testing. It has no
+dependency on Almanac, browser APIs or the network. Its opaque reader borrows a
+SQLite connection and owns prepared spatial queries:
+
+- `shoreline_open(db)` creates a reader, or returns `NULL` for unavailable or
+  unsupported data. The borrowed connection must outlive it.
+- `shoreline_hit_test(reader, latitude, longitude)` accepts finite decimal degrees
+  and returns `SHORELINE_LAND`, `SHORELINE_SEA`, `SHORELINE_INLAND_WATER`,
+  `SHORELINE_COAST` or `SHORELINE_UNKNOWN`. Invalid inputs and read failures are
+  unknown, never assumed sea.
+- `shoreline_close(reader)` releases the reader without closing the database.
+- `shoreline_prepare(reader)` loads exact coordinates, physical-edge flags, a
+  spatial tree and four display resolutions into native memory. File-backed readers
+  share one immutable cached dataset per process; preparation before forking lets
+  workers share its read-only pages. Anonymous databases use reader-local caches.
+- `shoreline_paths(reader, west, south, east, north, tolerance, visit, context)`
+  streams clipped vector polygons with their nesting levels. The visitor receives
+  move, line and close events; odd levels are land and even levels inland water.
+  Its Antarctic flag identifies the ice-front polygon, including clipped interior
+  views, so renderers can colour it white without recolouring nearby islands.
+  Display traversal uses the resident spatial index and selects a suitable cached
+  resolution. Close views and hit-tests retain the original coordinates. Database
+  and WAL file metadata changes invalidate shared snapshots; outstanding users retain
+  their old snapshot until release. The cache contains no live database connection.
+  Bounds may cross the date line using unwrapped longitudes. The display-only
+  tolerance is in degrees; zero retains source vertices. False from the visitor
+  cancels the query. Discard partial output on any failure.
+- `shoreline_import(db, source)` transactionally replaces only shoreline tables
+  from an open GSHHG 2.3.7 binary stream. Close readers before replacement; an
+  invalid or truncated input rolls back to the previous dataset.
+
+Calls on one reader must be serialised. `almanac_surface_at(engine, latitude,
+longitude)` lazily owns a reader for the engine's existing encrypted catalogue.
+`almanac_surface_paths()` exposes the same vector visitor through that engine.
+`almanac_surface_prepare()` prepares its resident geometry. The Lab invokes this
+before native request workers fork; unavailable data do not prevent the server
+starting, and later display requests can load newly installed data.
+The vector query keeps enclosing rings even when their edges are outside the
+window, and clips them with bounded working storage. It does not apply the
+500-metre hit-test uncertainty band. Group paths by level and fill levels 1 to 4 over a water background;
+display simplification does not alter the stored geometry or hit-test results.
+The normal almanac database installer restores the packaged source without
+network access. Older packages lacking that source remain usable for astronomy;
+their geographical classification is unknown until the database is rebuilt.
+
+The dataset retains 10,587,854 source vertices in 188,268 polygons, including
+lakes, islands within lakes and the Antarctic ice front. The alternative Antarctic
+grounding line is excluded. Artificial polar closure edges affect containment but
+are not interpreted as coastlines. Integer microdegree coordinates are split into
+at most 256 edges per uncompressed chunk, packed into BLOB pages of at most 64 KiB. An integer R-tree
+selects intersecting chunk bounds; indexed identifiers and byte offsets locate the
+coordinate data. Legacy compressed chunks remain readable; each decompression produces at most 2,056 bytes. No whole-world
+polygon scan or whole-BLOB decompression is needed for a hit-test.
+The packaged source archive remains compressed for distribution and is expanded
+once during installation; newly installed database chunks are not compressed.
+
+Within 500 metres of a mapped boundary, the result is deliberately uncertain.
+This is a display policy, not a surveyed accuracy guarantee. Historical coastline
+data cannot account for tides, reclamation or every small feature, and are not
+nautical charts. Confirmed sea can enable an assumed unobstructed sea-horizon dip;
+land, inland water, coastal uncertainty and unknown data do not enable it.
+
+Land-totality searches validate candidate coordinates with the same reader,
+including after local refinement. Their existing bounded regional/town seed search
+remains approximate: a confirmed land candidate is not a proof of the globally
+nearest accessible observing site. Coastal uncertainty is excluded conservatively.
+
+See [data provenance](./almanac-data-provenance.md#shoreline-data) for the source,
+checksums and third-party licence notices.
+
 ## Source Organisation
 
 The public API remains in `include/almanac-t.h`. Implementation files under
@@ -42,6 +115,10 @@ The public API remains in `include/almanac-t.h`. Implementation files under
 `almanac_engine_internal.h` groups the shared engine state, position, geometry,
 event and solar-eclipse declarations in one module-private header.
 `almanac_cartesian.h` contains the independent Cartesian vector interface, and
+The independent `shoreline_t` module owns geographical classification; Almanac
+borrows its public API rather than implementing polygons or compression itself.
+See [shoreline data and queries](#shoreline-data-and-queries) below.
+
 `almanac_internal.h` retains the restricted totality-search interface used by
 internal consumers. Database handles and caches remain engine-owned; event
 record layouts that are not shared stay with their implementations.
@@ -169,17 +246,32 @@ report a finite geocentric distance, and some brightness-related values may be
 
 `almanac_observables_t` returns one set of horizon-style values:
 
-- `altitude_degrees` — apparent altitude of the body's centre in degrees
+- `altitude_degrees` — geometric altitude of the body's centre in degrees (no atmospheric refraction)
 - `azimuth_degrees` — azimuth in degrees in the range `[0, 360)`
 - `semi_diameter_degrees` — angular semi-diameter in degrees when MARS has a radius model for that body, otherwise `NaN`
 - `above_horizon` — `true` when the body's centre is above the geometric horizon
 - `visible` — `true` when the body's centre or upper limb is above the horizon in this first implementation
 
-This first `almanac_observables()` implementation derives observables from the
-apparent geocentric place already stored in `almanac_entry_t`. It does not yet
-apply topocentric parallax, atmospheric refraction, or twilight policy rules.
-That means `visible` is a practical horizon flag, not a full naked-eye
-visibility model.
+`almanac_observables()` uses topocentric geometry, including observer elevation,
+for solar-system bodies. Distant catalogue stars use their apparent direction.
+Atmospheric refraction and sea-horizon dip are not included in the returned
+altitude. `visible` is a geometric horizon flag, not a full naked-eye visibility model.
+
+`almanac_refraction_degrees(altitude_degrees, temperature_c, pressure_hpa)` returns
+an optional correction to add to geometric altitude. It uses the
+[NOAA approximation](https://gml.noaa.gov/grad/solcalc/calcdetails.html), scaled by
+pressure and absolute temperature. Temperatures must be between −100 and 60 °C,
+observer pressure between 0 and 1200 hPa, and altitude between −90° and 90°;
+invalid arguments return `NaN`. No correction is attempted below −0.575° or above
+85°. This approximate optical model is not suitable for precision navigation,
+particularly near the horizon, and does not model terrain, horizon dip or anomalous refraction.
+
+`almanac_horizon_dip_degrees(elevation_metres)` returns geometric sea-horizon
+depression for a spherical Earth of mean radius 6371008.8 metres. Add this angle
+when predicting a body's altitude above an unobstructed sea horizon; subtract it
+when reducing a measured sea-horizon altitude. Non-positive heights return zero,
+and non-finite heights return `NaN`. Waves and terrestrial refraction are not
+modelled. A land site's elevation must not be treated automatically as height of eye.
 
 `almanac_body_rise_set()` computes rise/set times for one local civil day using
 the almanac ephemeris and observer topocentric geometry. It uses the supplied

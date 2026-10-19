@@ -190,6 +190,10 @@ static bool route_contracts(const char *directory)
     http_response_t *response = route_request(HTTP_GET, "/", NULL, NULL, NULL, NULL);
     bool ok = route_check(response, 200, response_contains(response, "MARS Lab"), "GET / page");
     http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-globe", "{\"west\":0,\"south\":0,\"east\":0,\"north\":1}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 400 && ok;
+    http_response_free(response);
     response = route_request(HTTP_GET, "/index.html", NULL, NULL, NULL, NULL);
     bool title_ok = response_contains(response, "<title>MARS Lab</title>");
     bool placeholders_ok = page_has_no_placeholders(response);
@@ -282,7 +286,7 @@ static bool route_contracts(const char *directory)
     ok = response && http_response_status(response) == 404 && ok;
     http_response_free(response);
     static const char *const scripts[] = {"codec", "codec_types", "jobs", "codec_worker", "transport",
-                                         "api", "app", "bindings", "bindings_controller", "locations", "results",
+                                         "api", "app", "bindings", "bindings_controller", "locations", "globe", "results",
                                          "results_services", "state", "surface", "surface_camera", "surface_export",
                                          "surface_hover", "surface_volume", "workspace", "workspace_native",
                                          "workspace_controllers"};
@@ -323,6 +327,12 @@ static bool route_contracts(const char *directory)
     http_response_free(response);
     response = route_request(HTTP_GET, "/favicon.svg", NULL, NULL, NULL, NULL);
     ok = route_check(response, 200, response_contains(response, "<svg"), "GET /favicon.svg") && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
+    const unsigned char *earth = response ? http_response_body(response) : NULL;
+    ok = route_check(response, 200, earth && http_response_body_size(response) == 266599 &&
+                     earth[0] == 0xff && earth[1] == 0xd8 &&
+                     response_header_equals(response, "Content-Type", "image/jpeg"), "GET /earth_surface.jpg") && ok;
     http_response_free(response);
     response = route_request(HTTP_POST, "/state", "{\"expression\":\"x+8\",\"expression_updated_at\":500}",
                              "application/x-protobuf", NULL, NULL);

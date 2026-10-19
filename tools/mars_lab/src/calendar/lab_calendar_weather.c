@@ -1,11 +1,12 @@
 /**
  * @file lab_calendar_weather.c
- * @brief Optional WeatherAPI daily weather adapter for native MARS Lab.
+ * @brief Optional WeatherAPI daily cards and hourly observing conditions for native MARS Lab.
  *
  * Reads the user's existing weather.env configuration through file_t, performs
  * a verified HTTPS request with a four-second deadline and emits the browser's
  * weather fields and sections. Provider errors remain an unavailable weather
- * card and never expose the API key in diagnostics.
+ * card and never expose the API key in diagnostics. Almanac conditions use UTC
+ * hour matching and explicitly labelled seasonal/pressure fallbacks.
  */
 #include <math.h>
 #include <stdlib.h>
@@ -54,6 +55,7 @@ static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key,
     http_request_set_header(request, agent, agent_value);
     http_response_t *response = http_client_send(client, request);
     json_t *payload = http_response_ok(response) ? http_response_json(response) : NULL;
+    lab_cal_weather_remember(options, payload, time(NULL));
     json_t *fields = json_new_object();
     const json_t *forecast = lab_cal_get(payload, "forecast");
     const json_t *days = lab_cal_get(forecast, "forecastday");
@@ -81,6 +83,11 @@ static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key,
         lab_cal_set(fields, "weather_source", "WeatherAPI.com");
         string_free(summary);
         break;
+    }
+    if (*lab_cal_text(options, "observing_conditions")) {
+        json_t *conditions = json_clone(options);
+        lab_cal_observing_conditions(conditions, payload);
+        lab_cal_take(fields, "observing_conditions", conditions);
     }
     json_free(payload);
     http_response_free(response);
@@ -162,4 +169,106 @@ json_t *lab_cal_weather(const json_t *options)
     string_free(overview);
     lab_cal_take(response, "fields", fields);
     return response;
+}
+
+/* Keep the rough atmosphere model native and independent of browser weather cards. */
+void lab_cal_atmosphere(json_t *options)
+{
+    lab_cal_set(options, "observing_conditions", "yes");
+    json_t *weather = lab_cal_weather(options);
+    const json_t *conditions = lab_cal_get(lab_cal_get(weather, "fields"), "observing_conditions");
+    if (conditions) {
+        static const char *keys[] = {"temperature_c", "pressure_hpa", "atmosphere_note", "weather_source"};
+        for (size_t i = 0; i < sizeof(keys) / sizeof(*keys); ++i)
+            lab_cal_set(options, keys[i], lab_cal_text(conditions, keys[i]));
+    } else
+        lab_cal_observing_conditions(options, NULL);
+    json_free(weather);
+}
+
+/* Interpret the worksheet moment in UTC independently of the provider's local calendar date. */
+double lab_cal_weather_epoch(const json_t *options)
+{
+    datetime_t *moment = datetime_from_string(lab_cal_text(options, "date"));
+    string_t *clock = string_new_with(lab_cal_text(options, "time"));
+    size_t count = 0;
+    string_t **parts = lab_cal_split(clock, ":", &count);
+    double hour = 0, minute = 0, second = 0;
+    bool valid = (count == 2 || count == 3) &&
+                 lab_cal_number(string_c_str(parts[0]), &hour) &&
+                 lab_cal_number(string_c_str(parts[1]), &minute) &&
+                 (count == 2 || lab_cal_number(string_c_str(parts[2]), &second));
+    double epoch = moment && valid ? (datetime_jdn(moment) - 2440588.0) * 86400 + hour * 3600 + minute * 60 + second : NAN;
+    datetime_dealloc(moment);
+    string_split_free(parts, count);
+    string_free(clock);
+    return epoch;
+}
+
+/* Match absolute timestamps, including current observations when their UTC hour matches. */
+static const json_t *lab_cal_observation_hour(const json_t *options, const json_t *weather)
+{
+    double epoch = lab_cal_weather_epoch(options), updated = 0;
+    const json_t *current = lab_cal_get(weather, "current");
+    if (isfinite(epoch) && lab_cal_provider_number(current, "last_updated_epoch", &updated) &&
+        floor(epoch / 3600) == floor(updated / 3600)) return current;
+    const json_t *days = lab_cal_get(lab_cal_get(weather, "forecast"), "forecastday");
+    /* Bounded provider arrays: fourteen days and up to twenty-five hours on a DST transition day. */
+    for (size_t i = 0; i < json_array_size(days) && i < 14; ++i) {
+        const json_t *hours = lab_cal_get(json_array_get(days, i), "hour");
+        for (size_t j = 0; j < json_array_size(hours) && j < 25; ++j) {
+            const json_t *hour = json_array_get(hours, j);
+            double time;
+            if (lab_cal_provider_number(hour, "time_epoch", &time) && epoch >= time - 0.001 && epoch < time + 3600)
+                return hour;
+        }
+    }
+    return NULL;
+}
+
+/* Use provider station pressure directly; apply elevation only to the missing-pressure fallback. */
+void lab_cal_observing_conditions(json_t *options, const json_t *weather)
+{
+    double latitude = 0, elevation = 0, temperature, pressure;
+    (void)lab_cal_number(lab_cal_text(options, "lat"), &latitude);
+    (void)lab_cal_number(lab_cal_text(options, "elevation"), &elevation);
+    const json_t *hour = lab_cal_observation_hour(options, weather);
+    bool measured = lab_cal_provider_number(hour, "temp_c", &temperature) && temperature >= -100 && temperature <= 60;
+    bool pressure_available = lab_cal_provider_number(hour, "pressure_mb", &pressure) &&
+                              pressure > 0 && pressure <= 1200;
+    json_t *recent = measured ? NULL : lab_cal_weather_recent(options, time(NULL));
+    bool cached = recent && lab_cal_provider_number(recent, "temp_c", &temperature);
+    if (!measured && !cached) {
+        datetime_t *date = datetime_from_string(lab_cal_text(options, "date"));
+        long january = datetime_ymd_to_jdn(datetime_year(date), DT_January, 1);
+        double day = (double)(datetime_jdn(date) - january);
+        double latitude_radians = latitude * M_PI / 180;
+        /* Deliberately coarse, not a climatological database: northern warmth peaks in July. */
+        temperature = 27 - 45 * pow(sin(latitude_radians), 2) +
+                      12 * sin(latitude_radians) * cos(2 * M_PI * (day - 200) / 365.25) - 0.0065 * elevation;
+        temperature = fmax(-100, fmin(60, temperature));
+        datetime_dealloc(date);
+    }
+    if (!pressure_available)
+        pressure = 1013.25 * pow(1 - 2.25577e-5 * elevation, 5.25588);
+    string_t *temperature_text = string_sprintf("%.6f", temperature);
+    string_t *pressure_text = string_sprintf("%.6f", pressure);
+    string_t *note = measured && pressure_available
+                         ? string_sprintf("Temperature: %.1f °C · Pressure: %.0f hPa · Source: WeatherAPI",
+                                          temperature, pressure)
+                         : string_sprintf("Temperature: %.1f °C (%s) · Pressure: %.0f hPa (%s)",
+                                          temperature, measured ? "WeatherAPI" : cached ? "recent weather estimate" : "seasonal estimate", pressure,
+                                          pressure_available ? "WeatherAPI" : "elevation estimate");
+    lab_cal_set(options, "temperature_c", string_c_str(temperature_text));
+    lab_cal_set(options, "pressure_hpa", string_c_str(pressure_text));
+    lab_cal_set(options, "atmosphere_note", string_c_str(note));
+    lab_cal_set(options, "weather_source",
+                measured && pressure_available ? "WeatherAPI" :
+                measured ? "WeatherAPI temperature; estimated pressure" :
+                cached ? "Recent weather estimate" :
+                pressure_available ? "Estimated temperature; WeatherAPI pressure" : "Estimated");
+    json_free(recent);
+    string_free(note);
+    string_free(temperature_text);
+    string_free(pressure_text);
 }

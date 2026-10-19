@@ -147,15 +147,6 @@ static bool almanac_local_day_utc_window_for_jdn(almanac_t *almanac, jurisdictio
     return true;
 }
 
-static double almanac_horizon_dip_degrees(double elevation_metres)
-{
-    static const double earth_mean_radius_metres = 6371008.8;
-
-    if (!(elevation_metres > 0.0))
-        return 0.0;
-    return almanac_radians_to_degrees(acos(earth_mean_radius_metres / (earth_mean_radius_metres + elevation_metres)));
-}
-
 static double almanac_body_horizon_residual(almanac_t *almanac, double jd, void *context)
 {
     static const double standard_refraction_degrees = 34.0 / 60.0;

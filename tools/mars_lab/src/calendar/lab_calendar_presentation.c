@@ -196,13 +196,12 @@ static json_t *lab_cal_pres_events(const json_t *source)
 
 static json_t *lab_cal_pres_variant(const json_t *response, const json_t *source, const json_t *events, bool visible)
 {
-    const char *body = visible ? "Location of Navigational Bodies; visible bodies only" :
-                                 "Location of Navigational Bodies; all bodies shown";
     json_t *variant = json_new_object(), *rows = json_new_array();
     string_t *copy = string_new();
     bool ok = variant && rows && copy;
-    static const char *const headings[] = {"worksheet_title", "moment_text", "observer_text"};
-    for (size_t i = 0; ok && i < 3u; ++i) {
+    static const char *const headings[] = {"worksheet_title", "moment_text", "observer_text",
+                                          "atmosphere_note", "altitude_note"};
+    for (size_t i = 0; ok && i < sizeof(headings) / sizeof(*headings); ++i) {
         const char *value = lab_cal_text(response, headings[i]);
         if (!i && !*value) value = "AstroNav Navigation Almanac";
         string_t *trimmed = string_new_with(value);
@@ -211,8 +210,8 @@ static json_t *lab_cal_pres_variant(const json_t *response, const json_t *source
         if (ok && string_byte_length(trimmed)) ok = string_append_format(copy, "%s\n", value) >= 0;
         string_free(trimmed);
     }
-    ok = ok && string_append_format(copy, "%s\nBody filter: %s\n\nBody | Declination | GHA | RA | Altitude | "
-                                   "Azimuth | s.d. | Vmag.%s", body, visible ? "visible only" : "all bodies",
+    ok = ok && string_append_format(copy, "Body filter: %s\n\nBody | Declination | GHA | RA | Altitude | "
+                                   "Azimuth | s.d. | Vmag.%s", visible ? "visible only" : "all bodies",
                                    visible ? "" : " | Visible") >= 0;
     static const char *const columns[] = {"name", "declination", "gha", "right_ascension", "altitude", "azimuth",
                                          "semi_diameter", "magnitude", "visible"};
@@ -240,7 +239,7 @@ static json_t *lab_cal_pres_variant(const json_t *response, const json_t *source
         ok = !string_append_cstr(copy, visible ? "\nNo bodies found for the current visibility filter. |  |  |  |  |  |  | " :
                                                "\nNo bodies found for the current visibility filter. |  |  |  |  |  |  |  | ");
     ok = ok && lab_cal_pres_copy_events(copy, response, events) &&
-         lab_cal_pres_text(variant, "body_text", body) && lab_cal_pres_text(variant, "copy_text", string_c_str(copy)) &&
+         lab_cal_pres_text(variant, "copy_text", string_c_str(copy)) &&
          lab_cal_pres_put(variant, "show_visible", json_new_bool(!visible));
     string_t *html = ok ? lab_cal_almanac_markup(response, rows, events, visible) : NULL;
     ok = ok && html && lab_cal_pres_text(variant, "html", string_c_str(html));
