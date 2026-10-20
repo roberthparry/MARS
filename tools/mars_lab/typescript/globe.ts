@@ -10,6 +10,17 @@ type GlobeView = [number, number, number, number, number, number, number];
 interface GlobeTown { town: LabTown; jurisdiction: string; country: string; }
 
 class MarsAlmanacGlobe {
+    // Display-only exceptions: indexed by jurisdiction and catalogue name, never scanned per frame.
+    private static readonly longNames = new Map<string, string>([
+        ['GB-WLS:Llanfairpwllgwyngyll', 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch']
+    ]);
+
+    private static townLabel(place: GlobeTown, zoom: number, available: number): {name: string; full: string; width: number} {
+        const full = this.longNames.get(`${place.jurisdiction}:${place.town.name}`) || place.town.name;
+        const expanded = full !== place.town.name && zoom >= 12 && available >= 430;
+        return {name: expanded ? full : place.town.name, full, width: expanded ? 430 : 128};
+    }
+
     private view: GlobeView = [0, 0, 1, -180, -90, 180, 90];
     private orientation = [0, 0, 0, 1];
     private rotation = [1, 0, 0, 0, 1, 0, 0, 0, 1];
@@ -154,10 +165,15 @@ class MarsAlmanacGlobe {
                 }
                 vec3 mapColour(vec3 mask,vec2 location){
                     bool land=mask.g>mask.b || mask.r>.8;
+                    // At town scale use one local palette per surface, not magnified photographic variations.
+                    // Unwrap around the observer view before blending so the dateline stays continuous.
+                    float centreLongitude=location.x+mod(camera.y-location.x+180.,360.)-180.;
+                    location=mix(location,vec2(centreLongitude,camera.x),smoothstep(8.,32.,camera.z));
                     // A moving local average retains photographic colour, not magnified raster detail.
                     // Reject opposite-surface samples so water cannot tint a crisp land boundary.
                     vec3 total=vec3(0.);
                     float weights=0.;
+                    float available=0.;
                     for(int y=-2;y<=2;y++) for(int x=-2;x<=2;x++) {
                         vec2 offset=vec2(float(x),float(y));
                         vec2 sampleLocation=location+offset*.08;
@@ -166,16 +182,19 @@ class MarsAlmanacGlobe {
                         vec3 sampleColour=texture2D(world,sampleUV).rgb;
                         float low=min(sampleColour.r,min(sampleColour.g,sampleColour.b));
                         float high=max(sampleColour.r,max(sampleColour.g,sampleColour.b));
-                        bool ice=low>.65 && high-low<.22;
-                        bool water=sampleColour.b>sampleColour.r && sampleColour.b>sampleColour.g;
-                        if(ice || (land != water)) {
-                            float weight=1./(1.+dot(offset,offset));
-                            total+=sampleColour*weight;
-                            weights+=weight;
-                        }
+                        float blue=sampleColour.b-max(sampleColour.r,sampleColour.g);
+                        float ice=smoothstep(.65,.75,low)*(1.-smoothstep(.15,.22,high-low));
+                        // Fade eligibility at colour thresholds: binary rejection creates visible contour patches.
+                        // Opposite-surface samples still have zero weight; only land accepts neutral ice.
+                        float match=land?max(smoothstep(0.,.08,-blue),ice):smoothstep(0.,.08,blue);
+                        float weight=1./(1.+dot(offset,offset));
+                        available+=weight;
+                        total+=sampleColour*(weight*match);
+                        weights+=weight*match;
                     }
                     // Missing photographic water samples must never fill a mapped channel with land colour.
-                    return weights>0.?total/weights:mask;
+                    // Fade to the matching surface fallback instead of jumping when the last sample disappears.
+                    return mix(mask,total/max(weights,.000001),smoothstep(0.,1.,weights/available));
                 }
                 void main(){
                     vec2 p=vec2(screen.x,-screen.y)*1.12/camera.z;
@@ -396,12 +415,14 @@ class MarsAlmanacGlobe {
         try {
             this.upload(2, await this.image([-180, -90, 180, 90], undefined, true));
             this.mapReady = true;
-        } catch (error) { if (this.map) this.status.textContent = String(error); }
+            this.draw();
+        } catch (error) { if (this.usesMap()) this.status.textContent = `Shoreline unavailable; photograph retained. ${String(error)}`; }
         finally { this.mapLoading = false; }
     }
 
     private async loadDetail(): Promise<void> {
         if (!this.root.getClientRects().length || this.gl.isContextLost()) return;
+        if (this.usesMap()) void this.loadMap();
         void this.loadHighResolution();
         const covers = (bounds: number[]): boolean => this.view[3] >= bounds[0] && this.view[4] >= bounds[1] &&
             this.view[5] <= bounds[2] && this.view[6] <= bounds[3];
@@ -500,11 +521,14 @@ class MarsAlmanacGlobe {
             // Row-major world-to-camera values are the column-major inverse rotation required by GLSL.
             gl.uniformMatrix3fv(gl.getUniformLocation(this.program, 'cameraToWorld'), false, this.rotation);
             gl.uniform4fv(gl.getUniformLocation(this.program, 'bounds'), this.detailBounds);
-            gl.uniform1i(gl.getUniformLocation(this.program, 'detailReady'), Number(this.detailReady));
+            // A regional mask must not be composited as photographic detail while the map base is pending.
+            const mapReady = this.usesMap() && this.mapReady;
+            gl.uniform1i(gl.getUniformLocation(this.program, 'detailReady'),
+                         Number(this.detailReady && (!this.usesMap() || mapReady)));
             gl.uniform4fv(gl.getUniformLocation(this.program, 'riverBounds'), this.riverBounds);
             gl.uniform1i(gl.getUniformLocation(this.program, 'riverReady'), Number(this.riverReady));
             gl.uniform1i(gl.getUniformLocation(this.program, 'grid'), Number(this.grid));
-            gl.uniform1i(gl.getUniformLocation(this.program, 'mapMode'), Number(this.usesMap()));
+            gl.uniform1i(gl.getUniformLocation(this.program, 'mapMode'), Number(mapReady));
             gl.uniform1f(gl.getUniformLocation(this.program, 'viewport'), size);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
             this.drawMarkers(size);
@@ -529,7 +553,8 @@ class MarsAlmanacGlobe {
             const point = this.project(lat, lon, size);
             if (!point) return;
             const active = Boolean(place && place === selected);
-            const width = place ? 128 : 28;
+            const label = place ? MarsAlmanacGlobe.townLabel(place, this.view[2], active ? size - 8 : size - point[0]) : null;
+            const width = label ? label.width : 28;
             if (active) {
                 point[0] = Math.max(4, Math.min(size - width, point[0] + 14));
                 point[1] = Math.max(14, Math.min(size - 14, point[1]));
@@ -547,8 +572,6 @@ class MarsAlmanacGlobe {
             if (!marker) {
                 marker = document.createElement(place ? 'button' : 'span');
                 marker.className = place ? 'globe-town' : 'globe-observer';
-                marker.textContent = place ? `• ${place.town.name}` : '⊕';
-                marker.title = place ? `${place.town.name}, ${place.country}` : 'Observer';
                 if (marker instanceof HTMLButtonElement) {
                     marker.type = 'button';
                     marker.addEventListener('click', event => {
@@ -560,6 +583,10 @@ class MarsAlmanacGlobe {
                 this.markerNodes.set(key, marker);
                 this.markers.append(marker);
             }
+            const text = label ? `• ${label.name}` : '⊕';
+            if (marker.textContent !== text) marker.textContent = text;
+            marker.title = label && place ? `${label.full}, ${place.country}` : 'Observer';
+            marker.style.maxWidth = `${width}px`;
             marker.style.left = `${point[0]}px`;
             marker.style.top = `${point[1]}px`;
             marker.classList.toggle('selected', active);

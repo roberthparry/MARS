@@ -44,6 +44,9 @@ void rivers_close(rivers_t *rivers);
 /** @brief Stream clipped river segments. */
 bool rivers_segments(rivers_t *rivers, double west, double south, double east, double north,
                      rivers_segment_fn visit, void *context);
+/** @brief Stream display segments with bounded deviation and fixed shared-node anchors. */
+bool rivers_display_segments(rivers_t *rivers, double west, double south, double east, double north,
+                             double tolerance, rivers_segment_fn visit, void *context);
 /** @brief Transactionally import legacy river geometry. */
 bool rivers_import(sqlite_t *db, file_t *source);
 #endif

@@ -1,0 +1,10 @@
+{
+    "attributes": {
+        "type": true,
+        "id": true,
+        "way_nodes": true
+    },
+    "linear_tags": ["waterway=river,stream,canal,tidal_channel"],
+    "area_tags": ["natural=water", "waterway=riverbank", "water=river,stream,canal"],
+    "include_tags": ["name", "name:en", "name:cy", "wikidata", "width", "est_width", "waterway", "water", "natural", "intermittent", "tunnel", "covered", "layer", "tidal"]
+}

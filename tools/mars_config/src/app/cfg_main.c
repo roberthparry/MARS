@@ -35,6 +35,8 @@ int main(int argc, char **argv)
              "       mars_config locales [--check | --output PATH] [--data-dir DIR]");
         puts("       mars_config globe-install | globe-check | globe-update | globe-uninstall");
         puts("       mars_config databases");
+        puts("       mars_config globe-stage-rivers INPUT.geojsonseq[.zst] NEW-CANDIDATE.db");
+        puts("       mars_config globe-install-rivers CANDIDATE.db");
         return 0;
     }
     if (argc < 2) {
@@ -45,6 +47,10 @@ int main(int argc, char **argv)
         return cfg_locales_run(argc - 2, argv + 2);
     if (cfg_app_is(argv[1], "databases"))
         return argc == 2 ? cfg_databases_run() : 2;
+    if (cfg_app_is(argv[1], "globe-stage-rivers"))
+        return argc == 4 ? cfg_globe_river_stage(argv[2], argv[3]) : 2;
+    if (cfg_app_is(argv[1], "globe-install-rivers"))
+        return argc == 3 ? cfg_globe_river_install(argv[2]) : 2;
     if (cfg_app_is(argv[1], "globe-install") || cfg_app_is(argv[1], "globe-check") ||
         cfg_app_is(argv[1], "globe-update") || cfg_app_is(argv[1], "globe-uninstall"))
         return argc == 2 ? cfg_globe_run(argv[1]) : 2;

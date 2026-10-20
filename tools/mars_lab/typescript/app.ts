@@ -108,6 +108,9 @@ class LabApplication {
     private config: LabConfiguration | undefined;
     private nativeCatalogue: LabCatalogue | undefined;
     private definitionScriptNames: readonly string[] = [];
+    private readonly townCollator = new Intl.Collator('en-GB');
+    private readonly pendingTownCodes = new Set<string>();
+    private townRefresh: Promise<void> | null = null;
 
     /** @brief Return native bootstrap configuration; reject access before bootstrap supplies it. */
     public get configuration(): LabConfiguration {
@@ -258,19 +261,47 @@ class LabApplication {
                 (this.catalogue.towns[code] ||= []).push(row);
                 (added[code] ||= []).push(row);
             }
-            this.catalogue.towns[code]?.sort((a, b) => Number(b.default) - Number(a.default) || a.name.localeCompare(b.name, 'en-GB'));
+            if (added[code]) {
+                this.catalogue.towns[code].sort((a, b) =>
+                    Number(b.default) - Number(a.default) || this.townCollator.compare(a.name, b.name));
+                this.pendingTownCodes.add(code);
+            }
         }
         if (!Object.keys(added).length) return;
         document.dispatchEvent(new CustomEvent('lab-town-catalogue-ready', {detail: added}));
-        await WorksheetLocations.townSelection.syncTownSelectors({selectDefault: false});
-        for (const mode of ['datetime', 'almanac']) {
-            const select = document.getElementById(`${mode}Town`) as WorksheetSelect;
-            const latitude = document.getElementById(`${mode}Latitude`) as HTMLInputElement;
-            const longitude = document.getElementById(`${mode}Longitude`) as HTMLInputElement;
-            if (!WorksheetLocations.townSelection.selectTownByCoordinates(select, latitude.value, longitude.value))
-                select.value = '';
-            WorksheetLocations.selects.syncSelection(select);
+        // The priority and world streams share one refresh queue rather than rebuilding menus concurrently.
+        if (!this.townRefresh) {
+            this.townRefresh = this.refreshTownMenus();
         }
+        await this.townRefresh;
+    }
+
+    private async refreshTownMenus(): Promise<void> {
+        try {
+            while (this.pendingTownCodes.size) {
+                // Yield to browser input/painting even when catalogue fetches are satisfied immediately.
+                await new Promise<void>(resolve => window.setTimeout(resolve, 0));
+                this.lifetime.signal.throwIfAborted();
+                const changed = new Set(Array.from(this.pendingTownCodes, code => this.catalogue.towns[code]));
+                this.pendingTownCodes.clear();
+                for (const mode of ['datetime', 'almanac']) {
+                    const jurisdiction = document.getElementById(`${mode}Jurisdiction`) as WorksheetSelect;
+                    const code = jurisdiction.value;
+                    const selection = WorksheetLocations.townSelection;
+                    // Ask native policy which list is used, including its country-level fallback.
+                    if (!changed.has(selection.townsForJurisdiction(code) as LabTownCatalogue[string])) continue;
+                    const select = document.getElementById(`${mode}Town`) as WorksheetSelect;
+                    const current = () => !this.lifetime.signal.aborted && jurisdiction.value === code;
+                    await selection.populateTownSelect(select, code, {selectDefault: false, isCurrent: current});
+                    if (!current()) continue;
+                    const latitude = document.getElementById(`${mode}Latitude`) as HTMLInputElement;
+                    const longitude = document.getElementById(`${mode}Longitude`) as HTMLInputElement;
+                    if (!selection.selectTownByCoordinates(select, latitude.value, longitude.value)) select.value = '';
+                    WorksheetLocations.selects.syncSelection(select);
+                    await new Promise<void>(resolve => window.setTimeout(resolve, 0));
+                }
+            }
+        } finally { this.townRefresh = null; }
     }
 
     private decodeResponse(response: MarsTransportResponse): Promise<unknown> {

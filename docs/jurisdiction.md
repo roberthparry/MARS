@@ -34,6 +34,13 @@ jurisdiction, default first, then case-insensitive name. All three use the whole
 configured database, independently of the engine's selected jurisdiction.
 Town enumeration visits indexed jurisdictions in order, limiting each name sort
 to one jurisdiction rather than sorting the entire worldwide catalogue in memory.
+The offline town generator resolves British GeoNames administrative codes to
+England (`GB-ENG`), Northern Ireland (`GB-NIR`), Scotland (`GB-SCT`) and Wales
+(`GB-WLS`). These nation identifiers must be available in its staging catalogue,
+even though their installed definitions come from the holiday seed rather than
+the target-subdivision supplement. Colchester and West Mersea belong to England,
+not the generic Britain list. Existing installations need a jurisdiction database
+reinstallation to receive corrected packaged assignments.
 
 `jurisdict_place_t` supplies the jurisdiction code, locality name, latitude,
 longitude, elevation, IANA timezone and default marker. Coordinate fields remain
@@ -810,6 +817,15 @@ weekend and UTC-offset values generated during installation. Reinstall to
 refresh these snapshots, extend their date range, or change location; travelling
 with the machine does not change the installed calendar. Future policy changes
 require updated MARS rules or system time-zone data and reinstallation.
+
+Database installation code lives together in `tools/mars_config/src/database/`.
+`cfg_database_almanac.c`, `cfg_database_jurisdiction.c` and `cfg_database_globe.c`
+own their respective database settings and installation policies. The shared
+`cfg_database.c` manages the shared installation lifecycle, single-key coordinator,
+bounded SQL imports and safe publication. Globe-specific imports and staging live
+in `cfg_database_globe.c`. These four C files share one private declarations header;
+installer code does not belong to the runtime library. This source organisation
+does not change installation commands, configuration paths or database keys.
 
 Installation uses the native `mars_config` application (built by the Make target),
 linked to MARS, and system IANA time-zone data. The installer displays a live

@@ -137,6 +137,10 @@ int main(int argc, char **argv)
         load_sql(db, "packaging/jurisdiction-db/mars_timezone_rules.sql", "insert into timezone_definition(") &&
         load_sql(db, "packaging/jurisdiction-db/mars_jurisdiction_towns.sql", "-- Worldwide supplement") &&
         sqlite_exec_cstr(db,
+            /* British nations live in the holiday seed, not mars_target_subdivisions.sql. */
+            "INSERT OR IGNORE INTO jurisdiction(jurisdiction_id,parent_jurisdiction_id,iso_country_code,name) VALUES"
+            "('GB-ENG','GB','GB','England'),('GB-NIR','GB','GB','Northern Ireland'),"
+            "('GB-SCT','GB','GB','Scotland'),('GB-WLS','GB','GB','Wales');"
             "CREATE INDEX seed_country_name ON jurisdiction_town_seed(substr(jurisdiction_id,1,2),town_name);"
             "CREATE UNIQUE INDEX zone_name ON timezone_definition_seed(timezone_name);"
             "CREATE TABLE places(id INTEGER PRIMARY KEY,name,ascii_name,lat,lon,country,admin,dem,tz,population,kind);") &&

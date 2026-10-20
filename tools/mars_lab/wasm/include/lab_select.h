@@ -75,7 +75,7 @@ bool lab_select_create(node_jsref select, jsref label, bool searchable, jsref pl
 void lab_select_rebuild(node_jsref select, bool details);
 
 /**
- * @brief Project the native selection, disabled state and current search filter.
+ * @brief Project native selection and disabled state without re-filtering unchanged options.
  * @param select Scoped enhanced select-node handle; no action when its surrounding menu is absent.
  */
 void lab_select_sync(node_jsref select);

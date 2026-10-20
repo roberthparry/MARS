@@ -205,7 +205,47 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     check(expected.every((channel, index) => Math.abs(pixel[index] - channel * light) <= 2),
                           `local photographic ${kind} retains its sampled colour in the shoreline map`);
                 }
+                // Cross the photograph's blue-dominance threshold without changing the geographic mask.
+                // A binary sample filter jumps straight from the fallback to turquoise at this boundary.
+                for (const land of [false, true]) {
+                    gl.activeTexture(gl.TEXTURE2);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                                  new Uint8Array(land ? [70, 85, 34, 255] : [7, 20, 64, 255]));
+                    let previous: Uint8Array | null = null;
+                    for (let blue = 120; blue <= 160; ++blue) {
+                        gl.activeTexture(gl.TEXTURE0);
+                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                                      new Uint8Array([60, 140, blue, 255]));
+                        gl.drawArrays(gl.TRIANGLES, 0, 6);
+                        const pixel = new Uint8Array(4);
+                        gl.readPixels(Math.floor(globeCanvas.width / 2), Math.floor(globeCanvas.height / 2),
+                                      1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+                        check(!previous || pixel.every((channel, i) => Math.abs(channel - previous![i]) <= 25),
+                              `photographic eligibility fades without a colour step on ${land ? 'land' : 'water'}`);
+                        previous = pixel;
+                    }
+                }
                 gl.uniform3f(gl.getUniformLocation(program, 'camera'), savedCamera[0], savedCamera[1], 64);
+                // Deep zoom must not magnify photographic colour stripes into geographic-looking patches.
+                const stripes = new Uint8Array(1024 * 4);
+                for (let x = 0; x < 1024; ++x)
+                    stripes.set(x % 4 < 2 ? [7, 20, 64, 255] : [12, 145, 175, 255], x * 4);
+                gl.activeTexture(gl.TEXTURE0);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, stripes);
+                gl.activeTexture(gl.TEXTURE2);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                              new Uint8Array([7, 20, 64, 255]));
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+                const localCentre = new Uint8Array(4);
+                gl.readPixels(Math.floor(globeCanvas.width / 2), Math.floor(globeCanvas.height / 2),
+                              1, 1, gl.RGBA, gl.UNSIGNED_BYTE, localCentre);
+                for (const fraction of [.25, .75]) {
+                    const pixel = new Uint8Array(4);
+                    gl.readPixels(Math.floor(globeCanvas.width * fraction), Math.floor(globeCanvas.height / 2),
+                                  1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+                    check(pixel.every((channel, i) => Math.abs(channel - localCentre[i]) <= 2),
+                          'town-scale water uses a consistent local photographic colour, not raster patches');
+                }
                 gl.uniform4f(gl.getUniformLocation(program, 'riverBounds'), -180, -90, 180, 90);
                 gl.activeTexture(gl.TEXTURE3);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
@@ -243,10 +283,36 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             }
             const map = document.querySelector<HTMLButtonElement>('[data-globe-action="map"]')!;
             check(map.getAttribute('aria-pressed') === 'false', 'photographic view is the default');
-            map.click();
-            await new Promise(requestAnimationFrame);
-            check(map.textContent === 'Map' && Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!)),
-                  'map toggle switches the live renderer');
+            const mapFetch = labHttp.fetch;
+            let rejectMask: ((reason: Error) => void) | undefined;
+            let maskRequests = 0;
+            try {
+                labHttp.fetch = (url, options) => {
+                    if (url !== '/almanac-globe') return mapFetch(url, options);
+                    ++maskRequests;
+                    if (maskRequests === 1) return new Promise((_resolve, reject) => { rejectMask = reject; });
+                    return Promise.resolve(Object.assign(new Response(), {
+                        async labData() {
+                            return {ok: true, image: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2"><path fill="#465522" d="M0 0H2V2H0Z"/></svg>'};
+                        }
+                    }));
+                };
+                map.click();
+                await new Promise(requestAnimationFrame);
+                check(Boolean(rejectMask) && !gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!),
+                      'pending shoreline mask keeps photographic rendering rather than the blue placeholder');
+                rejectMask!(new Error('delayed shoreline fixture'));
+                await new Promise(resolve => setTimeout(resolve, 50));
+                await new Promise(requestAnimationFrame);
+                check(!gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!),
+                      'failed shoreline mask retains photographic rendering');
+                map.click();
+                map.click();
+                for (let i = 0; i < 100 && !gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!); ++i)
+                    await new Promise(resolve => setTimeout(resolve, 25));
+                check(map.textContent === 'Map' && Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!)),
+                      'retry switches to map rendering only after the shoreline image is decoded and uploaded');
+            } finally { labHttp.fetch = mapFetch; }
             map.click();
             await new Promise(requestAnimationFrame);
             check(map.textContent === 'Natural Earth' && !gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!) &&
@@ -343,6 +409,25 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             town.value = '';
             const beforeTownClick = evaluations;
             labDOM.call('lab_workspace_dom_busy', 1, null, [], []);
+            labDOM.call('lab_workspace_dom_busy', 1, null, [], []);
+            for (const id of ['datetimeJurisdiction', 'datetimeTown', 'almanacJurisdiction', 'almanacTown']) {
+                const select = document.getElementById(id) as HTMLSelectElement;
+                const shell = select.closest('.select-shell')!;
+                check(!select.disabled &&
+                      Array.from(shell.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input, button'))
+                          .every(control => !control.disabled),
+                      `${id} and its custom menu remain usable during repeated busy notifications`);
+            }
+            const townShell = town.closest('.select-shell')!;
+            const townButton = townShell.querySelector<HTMLButtonElement>('.select-button')!;
+            townButton.click();
+            check(townShell.classList.contains('open'), 'town menu opens while calculations are busy');
+            const townSearch = townShell.querySelector<HTMLInputElement>('.select-search')!;
+            townSearch.value = place!.name;
+            townSearch.dispatchEvent(new Event('input', {bubbles: true}));
+            check(townShell.querySelectorAll('.select-option:not(:disabled)').length > 0,
+                  'town search returns selectable results while calculations are busy');
+            townButton.click();
             check(!(selectedLabel as HTMLButtonElement).disabled &&
                   !document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.disabled,
                   'town selection and globe navigation remain available during refresh');

@@ -16,8 +16,8 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
         check(Object.is(actual, expected), message);
     }
     const focus = document.activeElement;
-    const root = document.createElement('div');
-    root.style.cssText = 'position:fixed;left:0;top:0;z-index:10000;width:400px';
+    const root = document.createElement('section');
+    root.style.cssText = 'position:fixed;left:0;top:0;z-index:10000;width:400px;height:80px';
     document.body.appendChild(root);
     const fixtures: BindingSelectFixture[] = [];
     function create(id: string, searchable: boolean): BindingSelectFixture {
@@ -83,8 +83,16 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
         equal(labDOM.call('lab_select_enhance', first.select, {}, document), 0, 'enhancement is idempotent');
         first.button.click();
         check(first.shell.classList.contains('open'), 'one click opens once after repeated registration');
+        equal(getComputedStyle(root).overflowY, 'visible', 'open menu escapes its clipping card');
+        const outsideRow = first.items()[3];
+        const outsideRect = outsideRow.getBoundingClientRect();
+        check(outsideRect.top > root.getBoundingClientRect().bottom, 'test row lies below the card edge');
+        const hit = document.elementFromPoint(outsideRect.left + outsideRect.width / 2,
+                                             outsideRect.top + outsideRect.height / 2);
+        check(hit && outsideRow.contains(hit), 'row beyond the card remains visible to pointer hit-testing');
         first.button.click();
         check(!first.shell.classList.contains('open'), 'one subsequent click closes once');
+        equal(getComputedStyle(root).overflowY, 'hidden', 'closed card restores its original clipping');
 
         let bubbled = 0;
         root.addEventListener('keydown', () => ++bubbled);
@@ -134,6 +142,29 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
         first.select.dispatchEvent(new Event('change', {bubbles: true}));
         equal(first.button.textContent, '東京', 'external native select changes synchronise custom control');
 
+        const welsh = new Option('Llanfairpwllgwyngyll', 'welsh-long-name');
+        welsh.dataset.detail = '53.2214, -4.2033';
+        first.select.append(welsh);
+        labDOM.call('lab_select_rebuild', first.select, 1);
+        open(first);
+        first.search.value = 'llanf';
+        first.search.dispatchEvent(new Event('input', {bubbles: true}));
+        const filtered = first.items().filter(item => !item.classList.contains('hidden'));
+        equal(filtered.length, 1, 'Welsh town search has one visible result');
+        function hasStationaryRule(sheet: CSSStyleSheet): boolean {
+            return Array.from(sheet.cssRules).some(rule =>
+                rule instanceof CSSImportRule ? Boolean(rule.styleSheet && hasStationaryRule(rule.styleSheet)) :
+                rule instanceof CSSStyleRule && rule.selectorText === '.select-option:active:not(:disabled)' &&
+                rule.style.transform === 'none');
+        }
+        const stationary = Array.from(document.styleSheets).some(hasStationaryRule);
+        check(stationary, 'pressed menu results override the shared moving-button style');
+        filtered[0].querySelector<HTMLElement>('.select-option-label')!.click();
+        equal(first.select.value, 'welsh-long-name', 'one click on filtered town text selects its option');
+        check(!first.shell.classList.contains('open'), 'filtered selection closes the menu');
+        first.select.value = 'j';
+        first.select.dispatchEvent(new Event('change', {bubbles: true}));
+
         // These menus share a document target/action but require distinct select contexts.
         open(first);
         open(second);
@@ -173,6 +204,31 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
         check(first.menu.classList.contains('hidden'), 'rebuilt option closes its menu');
         key(second.button, ' ');
         equal(document.activeElement, second.items()[2], 'plain select uses native keyboard focus policy');
+
+        // A country-sized catalogue must not rewrite every row when one town changes.
+        const large = create('selectEventLarge', true);
+        const towns = Array.from({length: 5000}, (_, index) => new Option(`Town ${index}`, `town-${index}`));
+        towns[2500] = new Option('Colchester', 'colchester');
+        towns[2501] = new Option('West Mersea', 'west-mersea');
+        large.select.replaceChildren(...towns);
+        labDOM.call('lab_select_rebuild', large.select, 0);
+        open(large);
+        const rows = large.items();
+        const mutations = new MutationObserver(() => {});
+        mutations.observe(large.shell.querySelector('.select-options')!, {attributes: true, subtree: true});
+        let largeChanges = 0;
+        large.select.addEventListener('change', () => ++largeChanges);
+        rows[2500].click();
+        equal(large.select.value, 'colchester', 'large catalogue selects Colchester');
+        equal(largeChanges, 1, 'large catalogue dispatches one change');
+        check(!large.shell.classList.contains('open'), 'large catalogue closes immediately after selection');
+        check(mutations.takeRecords().length <= 4, 'selection updates at most two rows, without re-filtering 5000 towns');
+        mutations.disconnect();
+        open(large);
+        large.search.value = 'West Mersea';
+        large.search.dispatchEvent(new Event('input', {bubbles: true}));
+        rows[2501].click();
+        equal(large.select.value, 'west-mersea', 'large catalogue filtered selection remains usable');
     } finally {
         for (const fixture of fixtures)
             labDOM.call('lab_select_event', fixture.select, 3, 0, null);

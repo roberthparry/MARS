@@ -34,6 +34,7 @@ $(CONFIG_PROGRAM): $(CONFIG_OBJS) $(STATIC_LIB)
 # Private module headers are available only to their owning module's regression tests.
 $(CONFIG_BUILD_DIR)/tests/test_cfg_calendar.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/calendar
 $(CONFIG_BUILD_DIR)/tests/test_cfg_database.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
+$(CONFIG_BUILD_DIR)/tests/test_cfg_rivers.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
 $(CONFIG_BUILD_DIR)/tests/test_cfg_rendering.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
 
 $(CONFIG_BUILD_DIR)/tests/%.o: tools/mars_config/tests/%.c tools/mars_config/tests/test_cfg_support.h tools/mars_config/Makefile Makefile

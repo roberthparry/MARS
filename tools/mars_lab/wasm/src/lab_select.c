@@ -110,6 +110,7 @@ void lab_select_rebuild(node_jsref select, bool details)
     if (!shell)
         return;
     int wrap = lab_dom_query(shell, ".select-options"), options = lab_dom_all(select, "option");
+    lab_dom_set(shell, "marsSelectedOption", 0);
     lab_select_text(wrap, LAB_DOM_TEXT, "", "");
     unsigned count = lab_dom_count(options), mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
@@ -118,6 +119,7 @@ void lab_select_rebuild(node_jsref select, bool details)
         int detail = details ? lab_dom_read(option, LAB_DOM_DATASET, "detail") : 0;
         lab_select_text(item, LAB_DOM_ATTRIBUTE, "type", "button");
         lab_select_text(item, LAB_DOM_ATTRIBUTE, "role", "option");
+        lab_select_text(item, LAB_DOM_ATTRIBUTE, "aria-selected", "false");
         lab_dom_write(item, LAB_DOM_DATASET, "value", value);
         lab_dom_disabled(item, lab_dom_is_disabled(option));
         if (lab_dom_length(detail)) {
@@ -136,9 +138,10 @@ void lab_select_rebuild(node_jsref select, bool details)
         lab_dom_release(mark);
     }
     lab_select_sync(select);
+    lab_select_filter(shell);
 }
 
-/* Project selection and disabled state before applying the current search. */
+/* Project only the previous and current rows; filtering belongs to search edits and rebuilds. */
 void lab_select_sync(node_jsref select)
 {
     int shell = lab_select_shell(select);
@@ -151,22 +154,27 @@ void lab_select_sync(node_jsref select)
     lab_dom_disabled(button, lab_dom_is_disabled(select));
     if (lab_dom_is_disabled(select))
         lab_select_close(shell);
-    int value = lab_dom_read(select, LAB_DOM_VALUE, ""), items = lab_dom_all(shell, ".select-option");
-    unsigned count = lab_dom_count(items), mark = lab_dom_mark();
-    for (unsigned i = 0; i < count; ++i) {
-        int item = lab_dom_item(items, i);
-        int chosen = selected && lab_dom_equal(lab_dom_read(item, LAB_DOM_DATASET, "value"), value);
-        lab_dom_class(item, "selected", chosen);
-        lab_select_text(item, LAB_DOM_ATTRIBUTE, "aria-selected", chosen ? "true" : "false");
-        lab_dom_release(mark);
+    int previous = lab_dom_get(shell, "marsSelectedOption");
+    int items = lab_dom_get(lab_dom_query(shell, ".select-options"), "children");
+    int current = selected ? lab_dom_item(items, (unsigned)lab_dom_number(lab_dom_get(select, "selectedIndex"))) : 0;
+    if (!lab_dom_equal(previous, current)) {
+        if (previous) {
+            lab_dom_class(previous, "selected", 0);
+            lab_select_text(previous, LAB_DOM_ATTRIBUTE, "aria-selected", "false");
+        }
+        if (current) {
+            lab_dom_class(current, "selected", 1);
+            lab_select_text(current, LAB_DOM_ATTRIBUTE, "aria-selected", "true");
+        }
+        lab_dom_set(shell, "marsSelectedOption", current);
     }
-    lab_select_filter(shell);
 }
 
 static void lab_select_open(node_jsref select, jsref shell)
 {
     lab_select_text(lab_dom_query(shell, ".select-search"), LAB_DOM_VALUE, "", "");
     lab_select_sync(select);
+    lab_select_filter(shell);
     lab_dom_class(shell, "open", 1);
     lab_select_text(lab_dom_query(shell, ".select-button"), LAB_DOM_ATTRIBUTE, "aria-expanded", "true");
     lab_dom_class(lab_dom_query(shell, ".select-menu"), "hidden", 0);

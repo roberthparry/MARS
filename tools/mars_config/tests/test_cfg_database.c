@@ -142,7 +142,13 @@ static bool test_cfg_database_towns_fixture(const char *directory)
              "SELECT latitude||'|'||longitude||'|'||elevation_metres FROM jurisdiction_town_seed "
              "WHERE jurisdiction_id='ZA' AND town_name='Kalk Bay'", "-34.12752|18.44819|9") &&
          test_cfg_database_query(db,
-             "SELECT count(*) FROM jurisdiction_town_seed WHERE jurisdiction_id='GB-WLS'", "109") &&
+             "SELECT count(*) FROM jurisdiction_town_seed WHERE jurisdiction_id='GB-WLS'", "110") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town_seed WHERE jurisdiction_id='GB-ENG' "
+             "AND town_name IN('Colchester','West Mersea') AND timezone_code=250", "2") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town_seed WHERE jurisdiction_id='GB' "
+             "AND town_name IN('Colchester','West Mersea')", "0") &&
          test_cfg_database_query(db,
              "SELECT latitude||'|'||longitude||'|'||elevation_metres FROM jurisdiction_town_seed "
              "WHERE jurisdiction_id='GB-WLS' AND town_name='Fishguard' AND timezone_code=250 AND is_default='N'",

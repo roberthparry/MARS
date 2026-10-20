@@ -20,6 +20,7 @@ int tests_main(void)
     test_cfg_storage_cases();
     test_cfg_weather_cases();
     test_cfg_database_cases();
+    test_cfg_rivers_cases();
     test_cfg_calendar_cases();
     test_cfg_terminal_cases();
     test_cfg_rendering_cases();

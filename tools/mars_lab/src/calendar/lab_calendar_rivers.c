@@ -1,6 +1,6 @@
 /**
  * @file lab_calendar_rivers.c
- * @brief Bounded asynchronous globe river imagery from the jurisdiction catalogue.
+ * @brief Bounded asynchronous globe river imagery from the independent globe database.
  *
  * Converts spatially selected river segments into a transparent SVG overlay. Requests are restricted to close
  * views and bounded output; missing data leave the existing globe usable. Rivers never alter observer corrections.
@@ -42,7 +42,8 @@ json_t *lab_cal_rivers(const json_t *payload, unsigned *status)
                            .scale_x = 2048 / (b[2] - b[0]), .scale_y = 2048 / (b[3] - b[1])};
     jurisdiction_t *j = jurisdict_open(NULL);
     globe_t *r = jurisdict_globe_open(j);
-    bool ok = p.path && globe_river_segments(r, b[0], b[1], b[2], b[3], lab_river_segment, &p);
+    double tolerance = fmin(b[2] - b[0], b[3] - b[1]) / 2048;
+    bool ok = p.path && globe_river_display_segments(r, b[0], b[1], b[2], b[3], tolerance, lab_river_segment, &p);
     globe_close(r);
     jurisdict_close(j);
     string_t *image = ok ? string_sprintf(
@@ -50,7 +51,7 @@ json_t *lab_cal_rivers(const json_t *payload, unsigned *status)
         "<path fill=\"none\" stroke=\"#367fb0\" stroke-width=\"2\" stroke-linecap=\"round\" d=\"%s\"/></svg>",
         string_c_str(p.path)) : NULL;
     string_free(p.path);
-    if (!image) return lab_cal_error(status, 503, "River data unavailable; install the jurisdiction database");
+    if (!image) return lab_cal_error(status, 503, "River data unavailable; import rivers into the globe database");
     json_t *response = json_new_object();
     lab_cal_take(response, "ok", json_new_bool(true));
     lab_cal_set(response, "image", string_c_str(image));

@@ -159,6 +159,14 @@ typedef bool (*globe_river_segment_fn)(int64_t id, unsigned kind, double ax, dou
 bool globe_river_segments(globe_t *globe, double west, double south, double east, double north,
                           globe_river_segment_fn visit, void *context);
 
+/**
+ * @brief Stream river display segments using a maximum deviation in angular degrees, between zero and one.
+ * @note Zero retains exact geometry. Shared nodes, feature and chunk endpoints remain fixed; source data are unchanged.
+ * Invalid or unavailable data and cancelled queries return false; discard partial output.
+ */
+bool globe_river_display_segments(globe_t *globe, double west, double south, double east, double north,
+                                  double tolerance, globe_river_segment_fn visit, void *context);
+
 /** @brief Import a legacy river binary transactionally for format tests; withdrawn WDBII is not displayed by controllers. */
 bool globe_import_rivers(sqlite_t *db, file_t *source);
 

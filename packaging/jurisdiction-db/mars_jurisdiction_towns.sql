@@ -1132,6 +1132,8 @@ insert into jurisdiction_town_seed(
     ('GB-WLS', 'Deeside', '53.2005', '-3.0384', '28', 250, 'N'),
     ('GB-WLS', 'Ebbw Vale', '51.7771', '-3.2079', '311', 250, 'N'),
     ('GB-WLS', 'Llanelli', '51.6820', '-4.1619', '13', 250, 'N'),
+    -- GeoNames 2644080, GB extract; see THIRD_PARTY_NOTICES.md.
+    ('GB-WLS', 'Llanfairpwllgwyngyll', '53.22141', '-4.20329', '42', 250, 'N'),
     ('GB-WLS', 'Merthyr Tydfil', '51.7479', '-3.3778', '186', 250, 'N'),
     ('GB-WLS', 'Neath', '51.6632', '-3.8044', '13', 250, 'N'),
     ('GB-WLS', 'Newport', '51.5877', '-2.9983', '16', 250, 'N'),

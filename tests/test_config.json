@@ -2953,6 +2953,18 @@
       "test_cfg_rendering_working": true
     }
   },
+  "tools/mars_config/tests/test_cfg_rivers.c": {
+    "tests": {
+      "enabled": true,
+      "test_cfg_rivers_compressed_input": true,
+      "test_cfg_rivers_osm_import_and_display": true,
+      "test_cfg_rivers_section_widths": true,
+      "test_cfg_rivers_stage": true,
+      "test_cfg_rivers_storage_budget": true,
+      "test_cfg_rivers_storage_chunks": true,
+      "test_cfg_rivers_storage_detail": true
+    }
+  },
   "tools/mars_config/tests/test_cfg_storage.c": {
     "tests": {
       "enabled": true,

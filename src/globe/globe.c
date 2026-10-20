@@ -108,6 +108,13 @@ bool globe_river_segments(globe_t *g, double west, double south, double east, do
     return g && rivers_segments(g->rivers, west, south, east, north, visit, context);
 }
 
+/* Apply the caller's shoreline-scale tolerance while preserving river junctions. */
+bool globe_river_display_segments(globe_t *g, double west, double south, double east, double north,
+                                  double tolerance, globe_river_segment_fn visit, void *context)
+{
+    return g && rivers_display_segments(g->rivers, west, south, east, north, tolerance, visit, context);
+}
+
 /* Preserve transactional shoreline import without changing catalogue ownership. */
 bool globe_import_shoreline(sqlite_t *db, file_t *source)
 {

@@ -16,6 +16,7 @@
 struct _rivers_t {
     sqlite_stmt_t *query;
     bool busy;
+    bool anchors;
 };
 
 int32_t rivers_coordinate(const unsigned char *p)
@@ -30,12 +31,17 @@ rivers_t *rivers_open(sqlite_t *db)
     if (!db) return NULL;
     sqlite_stmt_t *meta = sqlite_stmt_prepare(db,
         "select format_version from rivers_dataset where id=1 and point_count>0");
-    bool ready = meta && sqlite_stmt_step(meta) == SQLITE_STEP_ROW && sqlite_stmt_column_int(meta, 0) == 1;
+    int version = meta && sqlite_stmt_step(meta) == SQLITE_STEP_ROW ? sqlite_stmt_column_int(meta, 0) : 0;
+    bool ready = version == 1 || version == 2;
     sqlite_stmt_finalize(meta);
     if (!ready) return NULL;
     rivers_t *r = calloc(1, sizeof *r);
     if (!r) return NULL;
-    r->query = sqlite_stmt_prepare(db,
+    r->anchors = version == 2;
+    r->query = sqlite_stmt_prepare(db, r->anchors ?
+        "select c.feature_id,c.kind,case when length(c.vertices) between 16 and 2056 then c.vertices end,c.anchors "
+        "from rivers_bounds b join rivers_chunk c on c.id=b.id "
+        "where b.max_x>=?1 and b.min_x<=?2 and b.max_y>=?3 and b.min_y<=?4" :
         "select c.feature_id,c.kind,case when length(c.vertices) between 16 and 2056 "
         "then c.vertices end from rivers_bounds b join rivers_chunk c on c.id=b.id "
         "where b.max_x>=?1 and b.min_x<=?2 and b.max_y>=?3 and b.min_y<=?4");
@@ -69,7 +75,37 @@ static bool rivers_clip(double p, double q, double *start, double *end)
 bool rivers_segments(rivers_t *r, double west, double south, double east, double north,
                      rivers_segment_fn visit, void *context)
 {
+    return rivers_display_segments(r, west, south, east, north, 0, visit, context);
+}
+
+static void rivers_reduce(const double x[257], const double y[257], unsigned char keep[257],
+                           unsigned first, unsigned last, double tolerance)
+{
+    if (last <= first + 1) return;
+    double dx = x[last] - x[first], dy = y[last] - y[first], square = dx * dx + dy * dy;
+    double maximum = tolerance * tolerance;
+    unsigned split = 0;
+    for (unsigned i = first + 1; i < last; ++i) {
+        if (keep[i]) { split = i; break; }
+        double t = square ? ((x[i] - x[first]) * dx + (y[i] - y[first]) * dy) / square : 0;
+        t = fmax(0, fmin(1, t));
+        double ex = x[i] - x[first] - t * dx, ey = y[i] - y[first] - t * dy;
+        double distance = ex * ex + ey * ey;
+        if (distance > maximum) { maximum = distance; split = i; }
+    }
+    if (split) {
+        keep[split] = 1;
+        rivers_reduce(x, y, keep, first, split, tolerance);
+        rivers_reduce(x, y, keep, split, last, tolerance);
+    }
+}
+
+/* Reduce only bounded chunks; junction anchors and all exact stored coordinates survive. */
+bool rivers_display_segments(rivers_t *r, double west, double south, double east, double north,
+                             double tolerance, rivers_segment_fn visit, void *context)
+{
     if (!r || r->busy || !visit || !isfinite(west) || !isfinite(south) || !isfinite(east) || !isfinite(north) ||
+        !isfinite(tolerance) || tolerance < 0 || tolerance > 1 ||
         west < -360 || west > 180 || east <= west || east - west > 360 || south < -90 || north > 90 || north <= south)
         return false;
     r->busy = true;
@@ -90,14 +126,24 @@ bool rivers_segments(rivers_t *r, double west, double south, double east, double
                 ok = false;
                 break;
             }
-            double ax = rivers_coordinate(p) / 1e6 + shift, ay = rivers_coordinate(p + 4) / 1e6;
-            for (size_t i = 8; ok && i < length; i += 8) {
-                double bx = rivers_coordinate(p + i) / 1e6 + shift, by = rivers_coordinate(p + i + 4) / 1e6;
-                if (fabs(ay) > 90 || fabs(by) > 90 || fabs(bx - ax) > 180 ||
-                    ax - shift < -180 || ax - shift > 360 || bx - shift < -180 || bx - shift > 360) {
-                    ok = false;
-                    break;
-                }
+            unsigned count = (unsigned)(length / 8);
+            double x[257], y[257];
+            unsigned char keep[257];
+            const unsigned char *anchors = r->anchors ? sqlite_stmt_column_blob(q, 3) : NULL;
+            if (r->anchors && (!anchors || sqlite_stmt_column_bytes(q, 3) != count)) { ok = false; break; }
+            for (unsigned i = 0; i < count; ++i) {
+                x[i] = rivers_coordinate(p + i * 8) / 1e6 + shift;
+                y[i] = rivers_coordinate(p + i * 8 + 4) / 1e6;
+                keep[i] = !tolerance || !anchors || anchors[i] || !i || i + 1 == count;
+                if (fabs(y[i]) > 90 || x[i] - shift < -180 || x[i] - shift > 360 ||
+                    (i && fabs(x[i] - x[i - 1]) > 180) || (anchors && anchors[i] > 1)) ok = false;
+            }
+            if (!ok) break;
+            if (tolerance && anchors) rivers_reduce(x, y, keep, 0, count - 1, tolerance);
+            double ax = x[0], ay = y[0];
+            for (unsigned i = 1; ok && i < count; ++i) {
+                if (!keep[i]) continue;
+                double bx = x[i], by = y[i];
                 double dx = bx - ax, dy = by - ay, start = 0, end = 1;
                 if (rivers_clip(-dx, ax - west, &start, &end) && rivers_clip(dx, east - ax, &start, &end) &&
                     rivers_clip(-dy, ay - south, &start, &end) && rivers_clip(dy, north - ay, &start, &end) && end > start)

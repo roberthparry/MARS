@@ -235,6 +235,11 @@
   background: rgba(113, 198, 180, 0.16);
 }
 
+/* Keep the pointer's hit target stationary between press and release. */
+.select-option:active:not(:disabled) {
+  transform: none;
+}
+
 .select-option.selected {
   color: #10190f;
   background: linear-gradient(135deg, rgba(233, 187, 90, 0.96), rgba(140, 216, 184, 0.94));

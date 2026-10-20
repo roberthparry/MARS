@@ -443,9 +443,27 @@ void lab_workspace_dom_controls(lab_mode_t mode, bool busy, bool ready, unsigned
 
 static void lab_workspace_dom_disable_list(jsref controls, int busy, int preserve)
 {
+    static const char *const locations[] = {
+        "#datetimeJurisdiction", "#datetimeTown", "#almanacJurisdiction", "#almanacTown"
+    };
+    jsref shells[4] = {0};
+    if (preserve)
+        for (unsigned i = 0; i < 4; ++i)
+            shells[i] = lab_dom_closest(lab_dom_query(0, locations[i]), ".select-shell");
     for (unsigned i = 0; i < lab_dom_count(controls); ++i) {
         unsigned mark = lab_dom_mark();
         int control = lab_dom_item(controls, i);
+        /* Location choices supersede asynchronous calculations, including custom menu search and options. */
+        int shell = preserve ? lab_dom_closest(control, ".select-shell") : 0;
+        int location = 0;
+        /* Four identity comparisons avoid scanning all descendants for every town row. */
+        for (unsigned j = 0; shell && j < 4; ++j)
+            location |= lab_dom_equal(shell, shells[j]);
+        if (location || (preserve && lab_dom_closest(control,
+                "#datetimeJurisdiction, #datetimeTown, #almanacJurisdiction, #almanacTown"))) {
+            lab_dom_release(mark);
+            continue;
+        }
         if (!preserve) {
             lab_dom_disabled(control, busy);
         } else if (busy) {

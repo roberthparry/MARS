@@ -168,6 +168,16 @@ The native server uses four separate request processes by default, not threads.
 Named-town time zones use the installed Linux zoneinfo data, including daylight
 saving at each event's instant. Jurisdiction choices, default locations and town
 menus come from the configured jurisdiction database through `/jurisdictions`.
+Search-result buttons remain stationary while pressed, keeping the same pointer
+hit area through release, including when filtering leaves only one town.
+Selecting a town updates only the previous and new selection rows, indexed by the
+native option position. Search filtering runs when opening, rebuilding or editing
+the search, not on every selection. Busy-state updates identify the four location
+menus once rather than searching their descendants again for each town button.
+Cards containing an open selection menu allow the popup to extend beyond their
+edges, so lower results remain visible and clickable; closing restores clipping.
+Button tooltips size to their text within the viewport and wrap long unbroken
+names on narrow screens, rather than truncating them.
 That startup response contains jurisdiction metadata only. Towns arrive afterwards
 through indexed `/towns?after=…` pages of at most 512 records, without delaying maths
 startup. Each page updates menus and globe markers immediately, with duplicate
@@ -460,6 +470,21 @@ are unresolved in the photograph. There is no separate bright-blue river palette
 This is a centreline overlay, not surveyed channel width,
 depth or evidence of navigability, and it does not change observer corrections.
 
+Country and town selectors in both Almanac and Datetime remain usable during
+asynchronous calculations, including their search fields and option buttons.
+Busy-state presentation does not disable these selectors or override a selector
+already disabled because its catalogue is unavailable.
+Background town batches refresh only menus whose native-selected catalogue has
+changed, including country-level fallback lists. Nearby and worldwide arrivals
+share a serial refresh queue, coalescing overlapping updates and yielding to
+browser input between menu rebuilds. Duplicate or unrelated batches do not rebuild
+the menus; the existing coordinate-selection policy remains native-owned.
+
+The photograph remains visible while the initial shoreline mask loads, including
+when map mode is selected manually. A failed mask request leaves the photograph
+in place; subsequent map requests can retry. Regional map masks are not blended
+into the photograph while the map base is unavailable.
+
 At 8× zoom the photographic view automatically switches to the native filled
 shoreline map. Simplified fills use locally sampled photographic RGB colours,
 including differing greens, deep blue and turquoise water, and white ice, rather
@@ -467,6 +492,14 @@ than a fixed palette. A continuously moving, bounded weighted neighbourhood of
 photographic samples smooths raster detail without forming colour tiles and
 rejects opposite-surface colours at shorelines. These are approximate historical colours, not current snow or ice
 observations; they never change shoreline geometry or land/sea classification.
+Sample eligibility and the fallback blend fade continuously near photographic
+colour thresholds, avoiding abrupt colour patches when the last matching sample
+disappears. This smoothing affects only fill colours: mapped waterways and
+shoreline boundaries remain unchanged, and ice-coloured samples apply only to land.
+Between 8× and 32× zoom, sampling gradually centres on the viewed location.
+At town scale, land and water each use a consistent locally sampled colour
+across the view, instead of magnifying photographic variations into bands or
+patches. The palette follows the view as it moves; it is not a fixed world palette.
 Small features absent from the photograph cannot acquire additional photographic
 detail from this sampling. When no matching photographic samples exist, the fill
 retains the shoreline mask's water or land colour, never the opposite surface's

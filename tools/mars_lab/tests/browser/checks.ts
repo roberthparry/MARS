@@ -2742,6 +2742,61 @@
             WorksheetContext.worksheetSession.calendar.almanacVisibilityMode = visibility;
         }
     }
+    /** Exercise incremental publication without altering the installed catalogue or live menu contents. */
+    async function checkTownPublicationScheduling(): Promise<void> {
+        const app = new LabApplication();
+        const fixture = app as unknown as {
+            nativeCatalogue: LabCatalogue;
+            publishTowns(towns: LabTownCatalogue): Promise<void>;
+        };
+        fixture.nativeCatalogue = {available: true, options: [], towns: {GB: []}};
+        const selection = WorksheetLocations.townSelection;
+        const saved = {
+            towns: selection.townsForJurisdiction,
+            populate: selection.populateTownSelect,
+            coordinates: selection.selectTownByCoordinates,
+            sync: WorksheetLocations.selects.syncSelection
+        };
+        const row = (value: string): LabTown => ({
+            name: value, value, latitude: 'invalid', longitude: 'invalid', elevation: '0',
+            timezone: 'Europe/London', default: false, detail: ''
+        });
+        let builds = 0, active = 0, peak = 0, inputHandled = false;
+        try {
+            // Both selectors resolve the same native-selected list (also models a country fallback).
+            selection.townsForJurisdiction = () => fixture.nativeCatalogue.towns.GB;
+            selection.populateTownSelect = async () => {
+                check(inputHandled, 'town publication yields to queued browser work before rebuilding');
+                ++builds;
+                peak = Math.max(peak, ++active);
+                await new Promise(resolve => setTimeout(resolve, 0));
+                --active;
+                return [];
+            };
+            selection.selectTownByCoordinates = () => true;
+            WorksheetLocations.selects.syncSelection = () => {};
+            await fixture.publishTowns({FR: [row('unrelated')]});
+            check(builds === 0, 'unrelated countries never rebuild selected town menus');
+            setTimeout(() => { inputHandled = true; }, 0);
+            await Promise.all([
+                fixture.publishTowns({GB: [row('first')]}),
+                fixture.publishTowns({GB: [row('second')]})
+            ]);
+            check(Number(builds) === 2 && peak === 1,
+                  'overlapping batches coalesce into one serial refresh of each affected menu');
+            await fixture.publishTowns({GB: [row('first')]});
+            check(Number(builds) === 2 && fixture.nativeCatalogue.towns.GB.length === 2,
+                  'duplicate batches neither rebuild menus nor duplicate towns');
+            await fixture.publishTowns({GB: [row('third')]});
+            check(Number(builds) === 4, 'later arrivals start a fresh refresh after the queue drains');
+        } finally {
+            selection.townsForJurisdiction = saved.towns;
+            selection.populateTownSelect = saved.populate;
+            selection.selectTownByCoordinates = saved.coordinates;
+            WorksheetLocations.selects.syncSelection = saved.sync;
+        }
+    }
+
     window.addEventListener('load', async function runBrowserChecks() {
         try {
             check(window.labReady instanceof Promise, 'Startup promise missing');
@@ -2761,6 +2816,10 @@
                 releaseTowns();
                 await labApplication.townsReady;
                 if (catalogueCheck === 'success') {
+                    check(WorksheetLocations.townSelection.townsForJurisdiction('GB-WLS') ===
+                          labApplication.catalogue.towns['GB-WLS'],
+                          'native town resolution preserves catalogue identity for incremental menu updates');
+                    await checkTownPublicationScheduling();
                     check(labApplication.catalogue.towns['GB-WLS'][0].name === 'Rhyl', 'Background towns not published');
                     check(labApplication.catalogue.towns['GB-WLS'].length === 1, 'Local/world pages duplicated a town');
                     location.href = '/?catalogue-check=fail';
@@ -2817,6 +2876,13 @@
             await window.labReady;
             await labApplication.townsReady;
             initialiseLabTestAdapters();
+            if (new URLSearchParams(location.search).get('select-check') === '1') {
+                await runBrowserGroup('checkLabSelects', window.checkLabSelects);
+                await runBrowserGroup('checkLabSelectEvents', window.checkLabSelectEvents);
+                await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);
+                await report('PASS: selection menus, 5000-town selection and globe busy-state interactions');
+                return;
+            }
             if (new URLSearchParams(location.search).get('globe-check') === '1') {
                 await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);
                 await report('PASS: globe projection, picking and water-preserving photographic colours');

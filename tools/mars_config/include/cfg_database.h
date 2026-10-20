@@ -30,6 +30,20 @@ int cfg_globe_run(const char *action);
 int cfg_globe_install_key(const char *key);
 
 /**
+ * @brief Stage reduced OSM river centrelines at a new path with an 8 m error ceiling and saved key; never publish it.
+ * @note The compacted candidate must not exceed 3,800,000,000 bytes, including indexes and encryption overhead.
+ * Known widths below 16 m are omitted per source way, independently of the 8 m geometry simplification tolerance.
+ * Accepts plain GeoJSON sequences or one Zstandard frame, streamed without an expanded intermediate file.
+ */
+int cfg_globe_river_stage(const char *input_path, const char *output_path);
+
+/**
+ * @brief Install an encrypted candidate into the configured globe, preserving unrelated tables and the saved key.
+ * @note Rebuilding a river layer above 3,800,000,000 bytes rolls back replacement, even when existing free space is reused.
+ */
+int cfg_globe_river_install(const char *candidate_path);
+
+/**
  * @brief Prompt once for a shared password and install all three databases sequentially.
  * @return Zero on success, one on failure; stops at the first failed installation.
  * An empty terminal answer retains the saved almanac key. Non-interactive calls reuse that key.

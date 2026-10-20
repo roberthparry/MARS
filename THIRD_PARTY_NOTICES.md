@@ -61,7 +61,7 @@ other additions use their country jurisdiction. Ambiguous names within a
 jurisdiction receive their stable GeoNames ID as a suffix. These edits and SQL
 conversion do not imply that the source is complete or current in real time.
 
-## GeoNames Fishguard addition
+## GeoNames Fishguard and Llanfairpwllgwyngyll additions
 
 Fishguard (GeoNames 2649372; alternative name Abergwaun) uses the
 [British extract](https://download.geonames.org/export/dump/GB.zip), downloaded
@@ -70,6 +70,12 @@ no endorsement is implied. Extracted `GB.txt` SHA-256:
 `287806663dc4a6381610d4022461e45e1c88bb91cef9265c2890180e03e28e9b`.
 The source coordinates, approximate DEM elevation and Europe/London timezone
 are retained. The reference point represents the town, not a harbour entrance.
+
+Llanfairpwllgwyngyll (GeoNames 2644080), also known as
+Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch, uses the same
+British extract and licence. Its source coordinates, approximate DEM elevation
+and Europe/London timezone are retained; the shorter source name is used for
+the town catalogue.
 
 ## GeoNames Cape Peninsula additions
 
@@ -428,6 +434,14 @@ derived from it. Source URL, checksums and transformations are recorded in
 [almanac data provenance](docs/almanac-data-provenance.md#shoreline-data).
 
 ## River data
+
+The replacement centreline import uses the OpenStreetMap planet snapshot dated
+12 October 2026, copyright OpenStreetMap contributors, under the Open Database
+Licence (ODbL) 1.0. The staged extract retains its source data separately; the
+derived SQLite geometry keeps OSM way identities and waterway classes. Attribution
+and applicable ODbL obligations continue to apply to derived databases and their
+redistribution. Centreline display simplification does not establish navigability.
+See [OpenStreetMap copyright and licence](https://www.openstreetmap.org/copyright).
 
 The full-resolution WDBII river network distributed with GSHHG 2.3.7 was formerly
 packaged as `packaging/jurisdiction-db/wdb_rivers_f.b.zst`, but has been withdrawn

@@ -380,6 +380,16 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
             check(button.matches(':focus-visible') &&
                   frame.contentWindow!.getComputedStyle(tooltip).display !== 'none',
                   'keyboard-focused buttons must retain their tooltip on touch layouts');
+            const longName = 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch, Wales';
+            tooltip.textContent = longName;
+            tooltip.style.left = '8px';
+            tooltip.style.top = '8px';
+            const tooltipRect = tooltip.getBoundingClientRect();
+            check(tooltip.textContent === longName && tooltip.scrollWidth <= tooltip.clientWidth + 1,
+                  'the complete unbroken town name must wrap inside its tooltip');
+            check(tooltipRect.right <= frame.contentWindow!.innerWidth &&
+                  tooltip.scrollHeight <= tooltip.clientHeight + 1,
+                  'the full tooltip must fit without horizontal or vertical cropping');
         }
     } finally {
         frame.remove();

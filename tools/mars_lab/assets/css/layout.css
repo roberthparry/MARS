@@ -201,6 +201,11 @@ section {
   overflow: hidden;
 }
 
+/* Selection popups must remain visible and hit-testable beyond their cards. */
+section:has(.select-shell.open) {
+  overflow: visible;
+}
+
 #workspacePanel {
   display: flex;
   min-height: 0;

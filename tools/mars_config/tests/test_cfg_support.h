@@ -25,6 +25,9 @@ void test_cfg_progress_cases(void);
 /** Register database installation tests. */
 void test_cfg_database_cases(void);
 
+/** Register installer-owned OSM river import and runtime-query regressions. */
+void test_cfg_rivers_cases(void);
+
 /** Register calendar selection and population tests. */
 void test_cfg_calendar_cases(void);
 

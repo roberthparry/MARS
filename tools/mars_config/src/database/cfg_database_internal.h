@@ -14,8 +14,54 @@
 #error "Private header requires MARS_CFG_DATABASE_INTERNAL_ACCESS."
 #endif
 
+#include <stdint.h>
+
 #include "file-t.h"
 #include "sqlite-t.h"
+
+/** Shared installer-owned settings; callbacks borrow these strings and never publish them directly. */
+typedef struct cfg_database_options {
+    string_t *home;
+    string_t *configuration_directory;
+    string_t *configuration_path;
+    file_t *configuration;
+    string_t *path;
+    string_t *expanded_path;
+    string_t *key;
+    string_t *requested_location;
+    string_t *saved_location;
+    string_t *requested_language;
+    string_t *saved_language;
+} cfg_database_options;
+
+/** Database-specific policy consumed by the common encrypted installation lifecycle. */
+typedef struct cfg_database_profile {
+    const char *name;
+    const char *title;
+    const char *default_path;
+    const char *path_variable;
+    const char *key_variable;
+    bool (*read_options)(cfg_database_options *, const string_t *, const char *, const char *);
+    bool (*import_sources)(sqlite_t *, const string_t *, const string_t *);
+    bool (*populate)(sqlite_t *, const string_t *, const cfg_database_options *, bool, string_t **, string_t **);
+    bool (*export_settings)(string_t *, const string_t *, const string_t *);
+} cfg_database_profile;
+
+/** Almanac-specific settings, legacy-path migration and packaged ephemeris sources. */
+extern const cfg_database_profile cfg_database_almanac;
+
+/** Jurisdiction-specific settings, packaged rules and calendar generation. */
+extern const cfg_database_profile cfg_database_jurisdiction;
+
+/** Resolve a setting in explicit, environment, saved and fallback order. */
+string_t *cfg_database_setting(file_t *configuration, const char *explicit_value, const char *name,
+                               const string_t *fallback);
+
+/** Append a safely quoted shell setting to an installer-owned configuration body. */
+bool cfg_database_export(string_t *body, const char *name, const string_t *value);
+
+/** Import a packaged source, allowing absence only when optional is true. */
+bool cfg_database_source(sqlite_t *db, const string_t *root, const char *name, bool optional);
 
 /** Bounded literal INSERT state, owned by a single recursive SQL stream. */
 typedef struct cfg_database_values {
@@ -58,8 +104,35 @@ bool cfg_database_import(sqlite_t *db, const string_t *root, const string_t *pat
  */
 bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *staging);
 
-/** @brief Import optional packaged rivers into a borrowed jurisdiction connection, using private staging storage. */
+/** @brief Retire withdrawn legacy river data during jurisdiction installation without changing unrelated tables. */
 bool cfg_database_rivers(sqlite_t *db, const string_t *root, const string_t *staging);
+
+/**
+ * @brief Replace river centrelines transactionally from the maintained OSM GeoJSON sequence export.
+ * @param db Borrowed writable globe database; unrelated tables are preserved.
+ * @param source Borrowed open plain or Zstandard stream; records are bounded to 4 MiB and 100,000 coordinates each.
+ * @return True after a non-empty validated import commits; false rolls back all changes.
+ * @note Installer-only: reduces stored centrelines within 8 m, fixing shared-node anchors and rejecting crossing
+ * shortcuts. Full source geometry remains in the separate extract; water-area outlines are not imported.
+ * Known widths below 16 m are omitted per source way; unknown widths and wider sections of the same river remain.
+ * Compressed input requires one complete frame with an at-most-8-MiB window; expanded input is capped at 128 GiB.
+ */
+bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source);
+
+/**
+ * @brief Copy validated OSM chunks between distinct borrowed connections, replacing only river tables transactionally.
+ * @note Rejects candidates or rebuilt river layers exceeding 3,800,000,000 bytes, including indexes; failures roll back.
+ */
+bool cfg_database_publish_rivers(sqlite_t *destination, sqlite_t *source);
+
+/** Maximum installed river-layer footprint in bytes, including indexes; shared with bounded installer regressions. */
+extern const int64_t cfg_database_river_storage_budget;
+
+/**
+ * @brief Publish with an explicitly smaller positive budget, never exceeding the approved production limit.
+ * @note Enables bounded rollback regressions without allocating gigabytes. Production uses cfg_database_publish_rivers().
+ */
+bool cfg_database_publish_rivers_limited(sqlite_t *destination, sqlite_t *source, int64_t budget);
 
 /** Create an unpredictable mode-0700 staging directory beneath the supplied directory. */
 string_t *cfg_database_stage(const string_t *directory);

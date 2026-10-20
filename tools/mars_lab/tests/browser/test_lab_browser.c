@@ -122,9 +122,11 @@ static bool lab_browser_run(const char *directory)
     bool profiling = getenv("MARS_LAB_PROFILE") && !strcmp(getenv("MARS_LAB_PROFILE"), "1");
     bool catalogue_check = getenv("MARS_LAB_CATALOGUE_CHECKS") && !strcmp(getenv("MARS_LAB_CATALOGUE_CHECKS"), "1");
     bool globe_check = getenv("MARS_LAB_GLOBE_CHECKS") && !strcmp(getenv("MARS_LAB_GLOBE_CHECKS"), "1");
+    bool select_check = getenv("MARS_LAB_SELECT_CHECKS") && !strcmp(getenv("MARS_LAB_SELECT_CHECKS"), "1");
     string_t *url =
         server ? string_sprintf("http://127.0.0.1:%u/%s", lab_svr_port(server),
-                                globe_check ? "?globe-check=1" : catalogue_check ? "?catalogue-check=success" :
+                                select_check ? "?select-check=1" : globe_check ? "?globe-check=1" :
+                                catalogue_check ? "?catalogue-check=success" :
                                 profiling ? "?profile=1" : "") : NULL;
     pid_t workers[4] = {-1, -1, -1, -1};
     bool workers_ready = server != NULL;
