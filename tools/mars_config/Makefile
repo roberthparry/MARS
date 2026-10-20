@@ -20,6 +20,9 @@ CONFIG_TEST_SRCS := $(sort $(wildcard tools/mars_config/tests/*.c))
 CONFIG_TEST_OBJS := $(patsubst tools/mars_config/tests/%.c,$(CONFIG_BUILD_DIR)/tests/%.o,$(CONFIG_TEST_SRCS))
 CONFIG_TEST_BIN := $(CONFIG_BUILD_DIR)/tests/test_mars_config
 
+$(CONFIG_BUILD_DIR)/catalogue_towns: tools/mars_config/catalogue_towns.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
+
 $(CONFIG_BUILD_DIR)/%.o: tools/mars_config/src/%.c tools/mars_config/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_config/include \
@@ -31,6 +34,7 @@ $(CONFIG_PROGRAM): $(CONFIG_OBJS) $(STATIC_LIB)
 # Private module headers are available only to their owning module's regression tests.
 $(CONFIG_BUILD_DIR)/tests/test_cfg_calendar.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/calendar
 $(CONFIG_BUILD_DIR)/tests/test_cfg_database.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
+$(CONFIG_BUILD_DIR)/tests/test_cfg_rendering.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
 
 $(CONFIG_BUILD_DIR)/tests/%.o: tools/mars_config/tests/%.c tools/mars_config/tests/test_cfg_support.h tools/mars_config/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps

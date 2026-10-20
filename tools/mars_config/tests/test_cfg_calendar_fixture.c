@@ -66,7 +66,8 @@ static bool test_calendar_seed_build(const char *directory)
 {
     string_t *path = string_sprintf("%s/calendar.db", directory);
     bool ok = path && test_calendar_seed_environment() &&
-              !cfg_database_run(true, string_c_str(path), test_calendar_seed_password, "Shrewsbury", "English", false);
+              !cfg_database_run(true, string_c_str(path), test_calendar_seed_password, "Shrewsbury, GB-ENG",
+                                "English", false);
     file_t *source = path ? file_new(path) : NULL;
     /* cfg_database_run has closed, checkpointed and published its complete database. */
     ok = ok && source && test_calendar_seed && file_copy(source, test_calendar_seed, false) &&
@@ -137,6 +138,10 @@ sqlite_t *test_cfg_calendar_database(const char *directory, string_t **path, str
               file_copy(test_calendar_seed, destination, false) && file_chmod(destination, 0600) &&
               cfg_storage_publish(config, config_directory, body);
     sqlite_t *db = ok ? sqlite_open_encrypted(*path, *key) : NULL;
+    if (db && !sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;")) {
+        sqlite_close(db);
+        db = NULL;
+    }
     string_free(body);
     string_free(quoted_key);
     string_free(quoted_path);

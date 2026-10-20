@@ -10,7 +10,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "shoreline-t.h"
+#define MARS_GLOBE_INTERNAL_ACCESS
+#include "globe_layers.h"
 #define MARS_SHORELINE_INTERNAL_ACCESS
 #include "shoreline_internal.h"
 
@@ -170,24 +171,42 @@ static bool coast_ring(coast_import_t *state, file_t *source, const unsigned cha
 /* Publish a validated shoreline dataset without changing existing astronomical data. */
 bool shoreline_import(sqlite_t *db, file_t *source)
 {
-    if (!db || !source || !sqlite_exec_cstr(db, "BEGIN IMMEDIATE"))
+    if (!db || !source || !sqlite_exec_cstr(db, "begin immediate"))
         return false;
     bool ok = sqlite_exec_cstr(db,
-        "DROP TABLE IF EXISTS shoreline_bounds; DROP TABLE IF EXISTS shoreline_chunk;"
-        "DROP TABLE IF EXISTS shoreline_blob; DROP TABLE IF EXISTS shoreline_dataset;"
-        "CREATE TABLE shoreline_dataset(id INTEGER PRIMARY KEY CHECK(id=1),format_version INTEGER NOT NULL,"
-        "source TEXT NOT NULL,point_count INTEGER NOT NULL,polygon_count INTEGER NOT NULL);"
-        "CREATE TABLE shoreline_blob(id INTEGER PRIMARY KEY,vertices BLOB NOT NULL);"
-        "CREATE TABLE shoreline_chunk(id INTEGER PRIMARY KEY,blob_id INTEGER NOT NULL,"
-        "byte_offset INTEGER NOT NULL,byte_count INTEGER NOT NULL,point_count INTEGER NOT NULL,"
-        "codec INTEGER NOT NULL,polygon_id INTEGER NOT NULL,level INTEGER NOT NULL,boundary INTEGER NOT NULL);"
-        "CREATE INDEX shoreline_polygon_chunks ON shoreline_chunk(polygon_id,id);"
-        "CREATE VIRTUAL TABLE shoreline_bounds USING rtree_i32(id,min_x,max_x,min_y,max_y);");
+        "drop table if exists shoreline_bounds;"
+        "drop table if exists shoreline_chunk;"
+        "drop table if exists shoreline_blob;"
+        "drop table if exists shoreline_dataset;"
+        "create table shoreline_dataset("
+        " id integer primary key check( id=1 ),"
+        " format_version integer not null,"
+        " source text not null,"
+        " point_count integer not null,"
+        " polygon_count integer not null"
+        ");"
+        "create table shoreline_blob("
+        " id integer primary key,"
+        " vertices blob not null"
+        ");"
+        "create table shoreline_chunk("
+        " id integer primary key,"
+        " blob_id integer not null,"
+        " byte_offset integer not null,"
+        " byte_count integer not null,"
+        " point_count integer not null,"
+        " codec integer not null, "
+        " polygon_id integer not null,"
+        " level integer not null,"
+        " boundary integer not null"
+        ");"
+        "create index shoreline_polygon_chunks on shoreline_chunk( polygon_id, id );"
+        "create virtual table shoreline_bounds using rtree_i32( id,min_x, max_x, min_y, max_y );");
     coast_import_t state = {.page_id = 1};
     if (ok) {
-        state.blob = sqlite_stmt_prepare(db, "INSERT INTO shoreline_blob VALUES(?1,?2)");
-        state.chunk = sqlite_stmt_prepare(db, "INSERT INTO shoreline_chunk VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)");
-        state.bounds = sqlite_stmt_prepare(db, "INSERT INTO shoreline_bounds VALUES(?1,?2,?3,?4,?5)");
+        state.blob = sqlite_stmt_prepare(db, "insert into shoreline_blob values( ?1, ?2 )");
+        state.chunk = sqlite_stmt_prepare(db, "insert into shoreline_chunk values( ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9 )");
+        state.bounds = sqlite_stmt_prepare(db, "insert into shoreline_bounds values( ?1, ?2, ?3, ?4, ?5 )");
         ok = state.blob && state.chunk && state.bounds;
     }
     while (ok) {
@@ -204,12 +223,12 @@ bool shoreline_import(sqlite_t *db, file_t *source)
     sqlite_stmt_finalize(state.bounds);
     if (ok) {
         sqlite_stmt_t *metadata = sqlite_stmt_prepare(db,
-            "INSERT INTO shoreline_dataset VALUES(1,1,'GSHHG 2.3.7',?1,?2)");
+            "insert into shoreline_dataset values( 1, 1, 'GSHHG 2.3.7', ?1, ?2 )");
         ok = metadata && sqlite_stmt_bind_int64(metadata, 1, state.points) &&
              sqlite_stmt_bind_int64(metadata, 2, state.polygons) && coast_execute(metadata);
         sqlite_stmt_finalize(metadata);
     }
-    if (ok) ok = sqlite_exec_cstr(db, "COMMIT");
-    if (!ok) sqlite_exec_cstr(db, "ROLLBACK");
+    if (ok) ok = sqlite_exec_cstr(db, "commit");
+    if (!ok) sqlite_exec_cstr(db, "rollback");
     return ok;
 }

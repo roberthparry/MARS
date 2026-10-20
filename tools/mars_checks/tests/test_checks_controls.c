@@ -161,6 +161,7 @@ static void test_checks_process_capture_timeout_and_errors(void)
     int status = -1;
     bool ok = checks_process_run(arguments, NULL, 3, &output, &errors, &status) && !status &&
               checks_equal(output, "literal ; $(touch unwanted)") && checks_equal(errors, "");
+    bool capture_ok = ok;
     string_free(output);
     string_free(errors);
     checks_strings_free(arguments);
@@ -168,18 +169,21 @@ static void test_checks_process_capture_timeout_and_errors(void)
     checks_strings_add(arguments, checks_text("/bin/sleep"));
     checks_strings_add(arguments, checks_text("10"));
     bool ran = checks_process_run(arguments, NULL, 0.03, &output, &errors, &status);
-    ok = !ran && errno == ETIMEDOUT && status < 0 && ok;
+    bool timeout_ok = !ran && errno == ETIMEDOUT && status < 0;
     string_free(output);
     string_free(errors);
     checks_strings_free(arguments);
     arguments = checks_strings_new();
     checks_strings_add(arguments, checks_text("/no/such/checks-executable"));
     ran = checks_process_run(arguments, NULL, 1, &output, &errors, &status);
-    ok = !ran && status == -1 && ok;
+    /* posix_spawn may report exec failure directly or through the child's documented exit status. */
+    bool missing_ok = (!ran && status == -1 && errno == ENOENT) || (ran && status == 127);
     string_free(output);
     string_free(errors);
     checks_strings_free(arguments);
-    TEST_ASSERT_TRUE(ok, "subprocess arguments are literal, timeouts terminate children and missing executables fail");
+    TEST_ASSERT_TRUE(capture_ok, "literal argument capture preserves separate standard streams");
+    TEST_ASSERT_TRUE(timeout_ok, "timeout terminates the child");
+    TEST_ASSERT_TRUE(missing_ok, "missing executable fails directly or exits with status 127");
 }
 
 static bool test_checks_reap_descendant(pid_t descendant)

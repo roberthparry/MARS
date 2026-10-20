@@ -73,7 +73,7 @@ static bool json_append_escaped_rune(string_t *out, rune_t rune)
     }
 }
 
-static bool json_append_escaped_string(string_t *out, const string_t *text)
+static bool json_escape_string(string_t *out, const string_t *text)
 {
     string_cursor_t *cursor;
 
@@ -95,6 +95,16 @@ static bool json_append_escaped_string(string_t *out, const string_t *text)
 
     string_cursor_free(cursor);
     return string_append_char(out, '"') == 0;
+}
+
+static bool json_append_escaped_string(string_t *out, const string_t *text)
+{
+    /* Normalise each escaped value locally, not the entire accumulated JSON document. */
+    string_t *escaped = string_new();
+    bool ok = out && escaped && json_escape_string(escaped, text) &&
+              string_append_utf8_exact(out, string_c_str(escaped), string_byte_length(escaped)) == 0;
+    string_free(escaped);
+    return ok;
 }
 
 static bool json_append_escaped_literal(string_t *out, const char *literal)

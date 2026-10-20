@@ -15,8 +15,8 @@
 #include "file-t.h"
 #include "json-t.h"
 #include "number-t.h"
-#include "test_harness.h"
 #include "string-t.h"
+#include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -413,6 +413,29 @@ static void example_json_file_round_trip(void)
     string_free(path);
 }
 
+static void test_serialise_unicode_catalogue(void)
+{
+    json_t *array = json_new_array();
+    string_t *name = s("Málaga \"town\"\n東京");
+    json_t *value = json_new_string(name);
+    TEST_ASSERT_NOT_NULL(array);
+    TEST_ASSERT_NOT_NULL(value);
+    for (size_t i = 0; i < 4096; ++i)
+        TEST_ASSERT_TRUE(json_array_append(array, value), "append Unicode town");
+    string_t *text = json_to_string(array);
+    TEST_ASSERT_NOT_NULL(text);
+    TEST_ASSERT_TRUE(string_find(text, "Málaga \\\"town\\\"\\n東京") >= 0, "UTF-8 and escapes are preserved");
+    json_t *parsed = json_from_text(text);
+    TEST_ASSERT_NOT_NULL(parsed);
+    TEST_ASSERT_TRUE(json_array_size(parsed) == 4096, "all town names round-trip");
+    TEST_ASSERT_TRUE(string_compare(json_string_value(json_array_get(parsed, 4095)), name) == 0, "last name is unchanged");
+    json_free(parsed);
+    string_free(text);
+    json_free(value);
+    string_free(name);
+    json_free(array);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("JSON Parsing");
@@ -422,6 +445,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_number_t_constants_use_math_spelling, tests, NULL);
 
     TEST_SECTION("JSON Serialisation");
+    TEST_RUN_IN_GROUP(test_serialise_unicode_catalogue, tests, NULL);
     TEST_RUN_IN_GROUP(test_serialise_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_file_stream_migration, tests, NULL);

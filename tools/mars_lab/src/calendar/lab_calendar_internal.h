@@ -37,6 +37,9 @@ void lab_cal_surface(json_t *options);
  */
 json_t *lab_cal_globe(const json_t *payload, unsigned *status);
 
+/** @brief Return an owned close-view river SVG response from jurisdiction data; set the optional HTTP status. */
+json_t *lab_cal_rivers(const json_t *payload, unsigned *status);
+
 /**
  * @brief Convert a UTC Julian date using a validated zoneinfo file, restoring TZ afterwards.
  * Invalid zones return false without modifying outputs. Only single-threaded workers may call this function.

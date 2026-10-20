@@ -15,6 +15,10 @@ generic container layer without exposing those internals to callers.
 - round-trip standard JSON numbers as text and as `number_t`
 - preserve full `number_t` values through a valid JSON extension object
 
+Serialisation escapes and normalises each string value locally before appending
+its validated UTF-8 bytes. Adding an accented name therefore does not repeatedly
+normalise the entire accumulated document, which matters for large catalogues.
+
 ## File I/O
 
 JSON file loading and saving use the public `file_t` API. Existing symbolic

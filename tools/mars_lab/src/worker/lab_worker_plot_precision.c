@@ -200,10 +200,12 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
 
 static number_t visible_value(number_t value, number_t ymin, number_t ymax)
 {
-    NUM_SCOPE(numbers);
-    if (finite_real(ymin) && finite_real(ymax))
-        return num_scope_detach(lesser(greater(value, ymin), ymax));
-    return num_scope_detach(num_clone(value));
+    if (finite_real(ymin) && finite_real(ymax)) {
+        value = num_gt(value, ymin) ? value : ymin;
+        value = num_lt(value, ymax) ? value : ymax;
+    }
+    /* Keep the returned temporary in the caller's numerical scope. */
+    return num_clone(value);
 }
 
 static bool probes_agree(const sampler_t *low, const sampler_t *high, number_t ymin, number_t ymax)

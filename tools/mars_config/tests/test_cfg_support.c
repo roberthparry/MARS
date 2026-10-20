@@ -74,6 +74,8 @@ bool test_cfg_isolated(bool (*callback)(const char *directory))
                      !unsetenv("MARS_ALMANAC_DB_KEY") && !unsetenv("MARS_CALENDAR_LOCATION") &&
                      !unsetenv("MARS_CALENDAR_LANGUAGE");
         bool ok = ready && callback(directory);
+        /* Release the child's inherited handle; only the parent removes the directory. */
+        file_free(root);
         fflush(NULL);
         _exit(ok ? 0 : 1);
     }

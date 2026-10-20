@@ -19,40 +19,13 @@ workbook ownership are recorded in the
 
 ## Shoreline data and queries
 
-The reusable [`shoreline_t`](../include/shoreline-t.h) module, implemented in
-`src/shoreline/`, owns shoreline storage and coordinate hit-testing. It has no
-dependency on Almanac, browser APIs or the network. Its opaque reader borrows a
-SQLite connection and owns prepared spatial queries:
-
-- `shoreline_open(db)` creates a reader, or returns `NULL` for unavailable or
-  unsupported data. The borrowed connection must outlive it.
-- `shoreline_hit_test(reader, latitude, longitude)` accepts finite decimal degrees
-  and returns `SHORELINE_LAND`, `SHORELINE_SEA`, `SHORELINE_INLAND_WATER`,
-  `SHORELINE_COAST` or `SHORELINE_UNKNOWN`. Invalid inputs and read failures are
-  unknown, never assumed sea.
-- `shoreline_close(reader)` releases the reader without closing the database.
-- `shoreline_prepare(reader)` loads exact coordinates, physical-edge flags, a
-  spatial tree and four display resolutions into native memory. File-backed readers
-  share one immutable cached dataset per process; preparation before forking lets
-  workers share its read-only pages. Anonymous databases use reader-local caches.
-- `shoreline_paths(reader, west, south, east, north, tolerance, visit, context)`
-  streams clipped vector polygons with their nesting levels. The visitor receives
-  move, line and close events; odd levels are land and even levels inland water.
-  Its Antarctic flag identifies the ice-front polygon, including clipped interior
-  views, so renderers can colour it white without recolouring nearby islands.
-  Display traversal uses the resident spatial index and selects a suitable cached
-  resolution. Close views and hit-tests retain the original coordinates. Database
-  and WAL file metadata changes invalidate shared snapshots; outstanding users retain
-  their old snapshot until release. The cache contains no live database connection.
-  Bounds may cross the date line using unwrapped longitudes. The display-only
-  tolerance is in degrees; zero retains source vertices. False from the visitor
-  cancels the query. Discard partial output on any failure.
-- `shoreline_import(db, source)` transactionally replaces only shoreline tables
-  from an open GSHHG 2.3.7 binary stream. Close readers before replacement; an
-  invalid or truncated input rolls back to the previous dataset.
+The reusable [`globe_t`](./globe.md) controller, implemented in `src/globe/`,
+owns shoreline storage, coordinate hit-testing and vector queries. Its public
+interface is `include/globe-t.h`; see the globe guide for ownership, classification,
+resident geometry and import contracts.
 
 Calls on one reader must be serialised. `almanac_surface_at(engine, latitude,
-longitude)` lazily owns a reader for the engine's existing encrypted catalogue.
+longitude)` lazily owns a reader for the independent configured encrypted globe database.
 `almanac_surface_paths()` exposes the same vector visitor through that engine.
 `almanac_surface_prepare()` prepares its resident geometry. The Lab invokes this
 before native request workers fork; unavailable data do not prevent the server
@@ -61,9 +34,10 @@ The vector query keeps enclosing rings even when their edges are outside the
 window, and clips them with bounded working storage. It does not apply the
 500-metre hit-test uncertainty band. Group paths by level and fill levels 1 to 4 over a water background;
 display simplification does not alter the stored geometry or hit-test results.
-The normal almanac database installer restores the packaged source without
-network access. Older packages lacking that source remain usable for astronomy;
-their geographical classification is unknown until the database is rebuilt.
+`make install-globe-db` restores the packaged source without network access.
+The almanac installer no longer imports geography. Missing globe storage does not
+prevent astronomy, but geographical classification remains unknown until the
+separate globe database is installed. Restart the Lab after changing database files.
 
 The dataset retains 10,587,854 source vertices in 188,268 polygons, including
 lakes, islands within lakes and the Antarctic ice front. The alternative Antarctic
@@ -115,7 +89,7 @@ The public API remains in `include/almanac-t.h`. Implementation files under
 `almanac_engine_internal.h` groups the shared engine state, position, geometry,
 event and solar-eclipse declarations in one module-private header.
 `almanac_cartesian.h` contains the independent Cartesian vector interface, and
-The independent `shoreline_t` module owns geographical classification; Almanac
+The `globe_t` controller owns geographical classification; Almanac
 borrows its public API rather than implementing polygons or compression itself.
 See [shoreline data and queries](#shoreline-data-and-queries) below.
 

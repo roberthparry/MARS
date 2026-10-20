@@ -95,6 +95,11 @@ class LabScriptLoad {
 
 /** Owns startup and browser observers; native continuations decide worksheet policy. */
 class LabApplication {
+    /** @brief Background town-loading completion; workspace startup does not await it. */
+    public townsReady: Promise<void> = Promise.resolve();
+    private townLoadingComplete = false;
+    private nearbyTowns?: AbortController;
+    private readonly townKeys = new Set<string>();
     private readonly observers: ResizeObserver[] = [];
     private readonly resizeCallbacks = new Set<LabLifetimeCallback>();
     private readonly cleanupCallbacks: LabLifetimeCallback[] = [];
@@ -148,10 +153,124 @@ class LabApplication {
             worksheet: this.startWorksheet.bind(this),
             fail: this.failStartup.bind(this)
         }, this.lifetime.signal);
+        this.townsReady = this.loadTowns().catch(error => {
+            if (!this.lifetime.signal.aborted) {
+                this.townNotice(`Town loading incomplete: ${String(error)}. Loaded towns and observer coordinates remain usable.`);
+            }
+        });
     }
 
-    private fetchResource(url: string) {
-        return labHttp.fetch(url);
+    private townNotice(message: string): void {
+        for (const id of ['datetimeJurisdiction', 'almanacJurisdiction']) {
+            const panel = document.getElementById(id)?.closest('.mode-panel');
+            if (!panel) continue;
+            let notice = panel.querySelector<HTMLElement>('[data-jurisdiction-notice]');
+            if (!notice) {
+                notice = document.createElement('p');
+                notice.className = 'mode-hint';
+                notice.dataset.jurisdictionNotice = 'true';
+                panel.prepend(notice);
+            }
+            notice.textContent = message;
+            notice.classList.toggle('hidden', !message);
+        }
+    }
+
+    private async fetchResource(url: string) {
+        if (url !== '/jurisdictions') return labHttp.fetch(url, {signal: this.lifetime.signal});
+        // Geography must not prevent the mathematical workspace from starting.
+        let data: LabCatalogue;
+        try {
+            const response = await labHttp.fetch(url, {
+                signal: AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(3000)])
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            data = await response.labData() as LabCatalogue;
+        } catch {
+            this.lifetime.signal.throwIfAborted();
+            data = {available: false, options: [], towns: {}, error: 'Jurisdiction catalogue unavailable'};
+        }
+        return {ok: true, status: 200, labData: async () => data};
+    }
+
+    private async loadTowns(): Promise<void> {
+        if (!this.catalogue.available) return;
+        this.townNotice('Loading towns… Observer coordinates remain usable.');
+        const latitude = Number((document.getElementById('almanacLatitude') as HTMLInputElement).value);
+        const longitude = Number((document.getElementById('almanacLongitude') as HTMLInputElement).value);
+        void this.loadNearbyTowns(latitude, longitude);
+        let cursor = '0';
+        do {
+            const response = await labHttp.fetch(`/towns?after=${cursor}`, {
+                signal: AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(10000)])
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const batch = await response.labData() as LabCatalogue;
+            if (!batch.available || !batch.next || !/^\d+$/.test(batch.next))
+                throw new Error(batch.error || 'Invalid town catalogue page');
+            if (batch.next !== '0' && BigInt(batch.next) <= BigInt(cursor))
+                throw new Error('Town catalogue cursor did not advance');
+            await this.publishTowns(batch.towns);
+            cursor = batch.next;
+        } while (cursor !== '0');
+        this.lifetime.signal.throwIfAborted();
+        this.townLoadingComplete = true;
+        this.nearbyTowns?.abort();
+        this.townNotice('');
+    }
+
+    /** Load a bounded priority window independently of the world-catalogue stream. */
+    public async loadNearbyTowns(latitude: number, longitude: number): Promise<void> {
+        if (this.townLoadingComplete || !this.catalogue?.available ||
+            !Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+        this.nearbyTowns?.abort();
+        const controller = this.nearbyTowns = new AbortController();
+        const signal = AbortSignal.any([controller.signal, this.lifetime.signal, AbortSignal.timeout(10000)]);
+        let cursor = '0';
+        try {
+            for (let page = 0; page < 8; ++page) {
+                const response = await labHttp.fetch(`/towns?after=${cursor}&lat=${latitude}&lon=${longitude}`, {signal});
+                if (!response.ok) return;
+                const batch = await response.labData() as LabCatalogue;
+                signal.throwIfAborted();
+                if (!batch.available || !batch.next || !/^\d+$/.test(batch.next) ||
+                    (batch.next !== '0' && BigInt(batch.next) <= BigInt(cursor))) return;
+                await this.publishTowns(batch.towns);
+                cursor = batch.next;
+                if (cursor === '0') break;
+            }
+        } catch {
+            // Priority loading is optional; the world stream still supplies these towns.
+        }
+    }
+
+    private async publishTowns(towns: LabTownCatalogue): Promise<void> {
+        const added: LabTownCatalogue = Object.create(null);
+        let count = 0;
+        for (const rows of Object.values(towns)) {
+            if (!Array.isArray(rows) || (count += rows.length) > 512) throw new Error('Invalid town catalogue batch');
+        }
+        for (const [code, rows] of Object.entries(towns)) {
+            for (const row of rows) {
+                const key = JSON.stringify([code, row.value]);
+                if (this.townKeys.has(key)) continue;
+                this.townKeys.add(key);
+                (this.catalogue.towns[code] ||= []).push(row);
+                (added[code] ||= []).push(row);
+            }
+            this.catalogue.towns[code]?.sort((a, b) => Number(b.default) - Number(a.default) || a.name.localeCompare(b.name, 'en-GB'));
+        }
+        if (!Object.keys(added).length) return;
+        document.dispatchEvent(new CustomEvent('lab-town-catalogue-ready', {detail: added}));
+        await WorksheetLocations.townSelection.syncTownSelectors({selectDefault: false});
+        for (const mode of ['datetime', 'almanac']) {
+            const select = document.getElementById(`${mode}Town`) as WorksheetSelect;
+            const latitude = document.getElementById(`${mode}Latitude`) as HTMLInputElement;
+            const longitude = document.getElementById(`${mode}Longitude`) as HTMLInputElement;
+            if (!WorksheetLocations.townSelection.selectTownByCoordinates(select, latitude.value, longitude.value))
+                select.value = '';
+            WorksheetLocations.selects.syncSelection(select);
+        }
     }
 
     private decodeResponse(response: MarsTransportResponse): Promise<unknown> {

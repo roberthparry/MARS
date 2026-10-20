@@ -20,6 +20,32 @@ void run_number_public_api_tests(void)
 {
     printf(C_CYAN "Testing number_t as a standalone public API...\n" C_RESET);
 
+    /* Internal arithmetic scopes must return their results to the caller's temporary scope. */
+    {
+        NUM_SCOPE(scope);
+        const char *inputs[] = {"1/3", "2.5", "-2.5", "2.5-1.5i"};
+
+        for (size_t i = 0; i < sizeof(inputs) / sizeof(*inputs); ++i) {
+            number_t input = num_create_from_string(inputs[i]);
+
+            TEST_ASSERT_TRUE(num_is_finite(num_round(input)), "scoped round result remains live");
+            TEST_ASSERT_TRUE(num_is_finite(num_roundn(input, 1)), "scoped decimal rounding remains live");
+            TEST_ASSERT_TRUE(num_is_finite(num_rounds(input, 2)), "scoped significant rounding remains live");
+            TEST_ASSERT_TRUE(num_is_finite(num_add_long(input, 2)), "scoped integer addition remains live");
+            TEST_ASSERT_TRUE(num_is_finite(num_mul_long(input, 2)), "scoped integer multiplication remains live");
+            TEST_ASSERT_TRUE(num_is_finite(num_arg(input)), "scoped argument remains live");
+            TEST_ASSERT_TRUE(num_is_finite(num_sinc(input)), "scoped sinc remains live");
+            if (num_is_real(input)) {
+                TEST_ASSERT_TRUE(num_is_finite(num_ceil(input)), "scoped ceiling remains live");
+                TEST_ASSERT_TRUE(num_is_finite(num_rect(input)), "scoped rectangular pulse remains live");
+                TEST_ASSERT_TRUE(num_is_finite(num_tri(input)), "scoped triangular pulse remains live");
+                TEST_ASSERT_TRUE(num_is_finite(num_circ(input)), "scoped aperture remains live");
+            }
+        }
+        TEST_ASSERT_TRUE(num_is_finite(num_ln(NUM_NEG_ONE)), "scoped logarithm branch remains live");
+        /* These results deliberately rely on scope cleanup: Valgrind checks the ownership transfer. */
+    }
+
     {
         const char *inputs[] = {"1234.567", "0.001234", "-1250", "9.99", "0", "999/1000", "1/3"};
         const char *expected[] = {"1200", "0.0012", "-1300", "10", "0", "1", "0.33"};

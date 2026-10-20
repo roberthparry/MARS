@@ -33,9 +33,8 @@ static number_t endpoint(const char *text)
 
 static number_t coordinate(number_t lo, number_t hi, unsigned index, unsigned count)
 {
-    NUM_SCOPE(numbers);
-    number_t value = num_add(lo, num_mul(num_sub(hi, lo), num_create_from_frac(index, count - 1)));
-    return num_scope_detach(value);
+    /* The caller's point, row or candidate scope owns these interpolation temporaries. */
+    return num_add(lo, num_mul(num_sub(hi, lo), num_create_from_frac(index, count - 1)));
 }
 
 static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimensions,

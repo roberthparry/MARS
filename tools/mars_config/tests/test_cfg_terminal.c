@@ -238,6 +238,7 @@ static bool test_calendar_pty_sources(const char *directory)
                                           "mars_timezone_rules.sql",
                                           "mars_jurisdiction_location_defaults.sql",
                                           "mars_jurisdiction_towns.sql",
+                                          "mars_jurisdiction_world_towns.sql",
                                           "mars_manual_first_class_rules.sql",
                                           "mars_holiday_localized_names.sql",
                                           "mars_calendar_locale_names.sql",

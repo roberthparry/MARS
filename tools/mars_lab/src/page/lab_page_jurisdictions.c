@@ -87,8 +87,9 @@ static bool lab_page_town(const jurisdict_place_t *place, void *context)
         places->ok = lab_page_town_flush(places);
         json_free(places->group);
         string_free(places->group_code);
-        places->group = json_new_array();
         places->group_code = string_new_with(place->jurisdiction_code);
+        const json_t *existing = places->group_code ? json_object_get(places->towns, places->group_code) : NULL;
+        places->group = existing ? json_clone(existing) : json_new_array();
     }
     json_t *row = json_new_object(), *is_default = json_new_bool(place->is_default);
     places->ok = places->ok && places->group && places->group_code && row && is_default &&
@@ -105,15 +106,22 @@ static bool lab_page_town(const jurisdict_place_t *place, void *context)
 }
 
 /* Obtain the live database catalogue without preventing ordinary maths when it is unavailable. */
-json_t *lab_page_jurisdictions(void)
+static json_t *lab_page_places(bool metadata, bool all_towns, int64_t after_id,
+                                bool nearby, double latitude, double longitude)
 {
     jurisdiction_t *engine = jurisdict_open(NULL);
     struct lab_page_places places = {
         .options = json_new_array(), .locations = json_new_object(), .towns = json_new_object(), .ok = true};
     bool available = engine && places.options && places.locations && places.towns &&
-                     jurisdict_each_choice(engine, lab_page_choice, &places) && places.ok &&
-                     jurisdict_each_location(engine, lab_page_location, &places) && places.ok &&
-                     jurisdict_each_town(engine, lab_page_town, &places) && places.ok && lab_page_town_flush(&places);
+                     (!metadata || (jurisdict_each_choice(engine, lab_page_choice, &places) && places.ok &&
+                                    jurisdict_each_location(engine, lab_page_location, &places) && places.ok));
+    int64_t next_id = 0;
+    if (available && (all_towns || !metadata))
+        available = (all_towns ? jurisdict_each_town(engine, lab_page_town, &places)
+                              : nearby ? jurisdict_each_town_near_batch(engine, latitude, longitude, after_id, 512,
+                                                                        lab_page_town, &places, &next_id)
+                                       : jurisdict_each_town_batch(engine, after_id, 512, lab_page_town, &places, &next_id)) &&
+                    places.ok && lab_page_town_flush(&places);
     if (!available) {
         json_free(places.options);
         json_free(places.locations);
@@ -127,6 +135,9 @@ json_t *lab_page_jurisdictions(void)
               lab_page_catalogue_set(result, "options", places.options) &&
               lab_page_catalogue_set(result, "locations", places.locations) &&
               lab_page_catalogue_set(result, "towns", places.towns);
+    string_t *cursor = string_sprintf("%lld", (long long)next_id);
+    ok = ok && cursor && lab_page_catalogue_text(result, "next", string_c_str(cursor));
+    string_free(cursor);
     if (ok && !available)
         ok = lab_page_catalogue_text(
             result, "error",
@@ -143,4 +154,28 @@ json_t *lab_page_jurisdictions(void)
     string_free(places.group_code);
     jurisdict_close(engine);
     return result;
+}
+
+/* Retain the complete native catalogue for non-transport callers. */
+json_t *lab_page_jurisdictions(void)
+{
+    return lab_page_places(true, true, 0, false, 0, 0);
+}
+
+/* Startup metadata deliberately excludes town records. */
+json_t *lab_page_jurisdiction_index(void)
+{
+    return lab_page_places(true, false, 0, false, 0, 0);
+}
+
+/* Return a bounded transport page; zero next cursor marks the empty terminal page. */
+json_t *lab_page_town_batch(int64_t after_id)
+{
+    return after_id >= 0 ? lab_page_places(false, false, after_id, false, 0, 0) : NULL;
+}
+
+/* Return a bounded local priority page while the world catalogue loads. */
+json_t *lab_page_town_near_batch(int64_t after_id, double latitude, double longitude)
+{
+    return after_id >= 0 ? lab_page_places(false, false, after_id, true, latitude, longitude) : NULL;
 }

@@ -804,6 +804,7 @@ create table jurisdiction_town_latitude (
     latitude text not null,
     check (latitude <> '')
 );
+create index idx_jurisdiction_town_latitude_numeric on jurisdiction_town_latitude(cast(latitude as real));
 create table jurisdiction_town_longitude (
     jurisdiction_town_id integer primary key references jurisdiction_town_entity(jurisdiction_town_id) on delete cascade,
     longitude text not null,

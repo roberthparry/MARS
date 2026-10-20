@@ -12,6 +12,83 @@ them must also include the exact
 licence material supplied with the versions it redistributes. The notices in
 this file do not replace those obligations.
 
+## GeoNames Sardinian town catalogue
+
+The 54 Sardinian town records added to
+`packaging/jurisdiction-db/mars_jurisdiction_towns.sql` on 19 October 2026
+come from the [GeoNames cities5000 extract](https://download.geonames.org/export/dump/cities5000.zip),
+under [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
+Credit: GeoNames, <https://www.geonames.org/>. No endorsement is implied.
+The selection uses country `IT` and administrative region `14` (Sardinia),
+excluding the neighbourhood records Li Punti-San Giovanni (3205826),
+Monte Rosello (12188754), and the southern namesake La Maddalena (2524463).
+La Maddalena (3175217) is the island town. Names, WGS84 coordinates, DEM
+elevations and `Europe/Rome` timezones are retained; records are converted to
+the existing SQL catalogue format. DEM heights are approximate town-reference
+heights, not measurements of an observer's exact position.
+
+Seven Corsican towns were added from the same extract on 19 October 2026,
+selecting country `FR` and administrative region `94`: Ajaccio (3038334),
+Bastia (3034640), Biguglia (3032668), Borgo (3031537), Calvi (3029090),
+Corte (3023506) and Porto-Vecchio (2985947). Their names, WGS84 coordinates,
+DEM elevations and `Europe/Paris` timezones are retained under the same licence.
+
+## GeoNames worldwide town supplement
+
+`packaging/jurisdiction-db/mars_jurisdiction_world_towns.sql` adds 46,455 populated
+places from the same GeoNames cities5000 snapshot downloaded on 19 October 2026,
+under Creative Commons Attribution 4.0. Credit: GeoNames,
+<https://www.geonames.org/>. No endorsement is implied.
+
+The extracted `cities5000.txt` SHA-256 is
+`1322b711ac9257fef8ef4031683e2904faa6455b3946761b26ee8514172bd853`.
+
+The native generator `tools/mars_config/catalogue_towns.c` selects `PPL`, `PPLC`
+and `PPLA` through `PPLA4` records, excluding neighbourhoods, abandoned places
+and other feature types. The combined catalogue is capped at 50,000 records.
+National capitals (`PPLC`), first-level regional seats (`PPLA`) and populations
+of at least 100,000 have first priority, followed by the cruising-region country
+list in the generator, then descending population and ascending GeoNames ID.
+This is not a coastline-distance selection or a complete harbour directory.
+It retains WGS84 coordinates and approximate DEM
+elevations, and only accepts countries and timezones supported by the packaged
+catalogue. Existing names (including ASCII spellings) within 0.1 degree on both
+axes are retained instead of adding another copy. This is a deduplication
+heuristic, not a shoreline accuracy guarantee.
+
+US and British first-level codes are matched to existing subdivision codes;
+other additions use their country jurisdiction. Ambiguous names within a
+jurisdiction receive their stable GeoNames ID as a suffix. These edits and SQL
+conversion do not imply that the source is complete or current in real time.
+
+## GeoNames Fishguard addition
+
+Fishguard (GeoNames 2649372; alternative name Abergwaun) uses the
+[British extract](https://download.geonames.org/export/dump/GB.zip), downloaded
+on 19 October 2026, under Creative Commons Attribution 4.0. Credit: GeoNames;
+no endorsement is implied. Extracted `GB.txt` SHA-256:
+`287806663dc4a6381610d4022461e45e1c88bb91cef9265c2890180e03e28e9b`.
+The source coordinates, approximate DEM elevation and Europe/London timezone
+are retained. The reference point represents the town, not a harbour entrance.
+
+## GeoNames Cape Peninsula additions
+
+Sixteen targeted seed locations use the [GeoNames South Africa extract](https://download.geonames.org/export/dump/ZA.zip),
+downloaded on 19 October 2026, under Creative Commons Attribution 4.0. Credit:
+GeoNames; no endorsement is implied. Extracted `ZA.txt` SHA-256:
+`0c1a225028f4ea4cfce7efa6e06dda1fb582251fb58a4f2dbf57c8ab6cbf5261`.
+
+The selected IDs are Fish Hoek (7289301), Noordhoek (3363610), Camps Bay (3369169),
+Hout Bay (3366639), Clovelly (3369083), Kalk Bay (3366314), Kommetjie (3365272),
+Llandudno (3364518), Scarborough (3361769), Glencairn (3367640), Saint James
+(3361940), Clifton (3369090), Sea Point (3361711), Bantry Bay (3370202), Bakoven
+(3370234) and Mouille Point (3363913). Kalk Bay uses the source's English alias
+for Kalkbaai. Coordinates and approximate DEM elevations are retained with the
+Africa/Johannesburg timezone. This targeted selection includes populated-place
+sections (`PPLX`) as well as populated places (`PPL`); it does not globally import
+every suburb. Reference points and DEM elevations are not harbour entrance or
+surveyed observer positions.
+
 ## NASA Blue Marble globe imagery
 
 `tools/mars_lab/assets/earth_surface.jpg` is the unmodified 2048 × 1024 NASA
@@ -349,6 +426,26 @@ version 3 text, are retained in `packaging/almanac-db/GSHHG-*.txt`. Retain these
 notices and the corresponding source when distributing the dataset or databases
 derived from it. Source URL, checksums and transformations are recorded in
 [almanac data provenance](docs/almanac-data-provenance.md#shoreline-data).
+
+## River data
+
+The full-resolution WDBII river network distributed with GSHHG 2.3.7 was formerly
+packaged as `packaging/jurisdiction-db/wdb_rivers_f.b.zst`, but has been withdrawn
+because its geometry is unsuitable for close views. The following provenance is
+retained for older installations. It is third-party data under GNU LGPL version 3 or later,
+not MARS's MIT licence. The upstream licence, README, LGPL and GPL texts in
+`packaging/almanac-db/GSHHG-*.txt` also apply to this dataset and must accompany
+redistribution. The native installer no longer imports this dataset.
+
+Source: <https://github.com/GenericMappingTools/gshhg-gmt/releases/download/2.3.7/gshhg-bin-2.3.7.zip>.
+Archive SHA-256: `28600e8f7a08645aab43079326df6504212ec5ccb2b4bcf3b5f4f12ed60e82bc`.
+Uncompressed `wdb_rivers_f.b` SHA-256:
+`d91eaa3b22f08535b93f3cb8afeff4e48a43ec33e8a3b798696147fc7e6d4a21`.
+
+The source is a historical, generalised network, not a nautical chart. Source
+feature identifiers and river classes are retained; names, surveyed widths,
+depths and navigability are not supplied. Centreline geometry does not imply
+that the surrounding land is water.
 
 ## Astronomical data and generation tools
 

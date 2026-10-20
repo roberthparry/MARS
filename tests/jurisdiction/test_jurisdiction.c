@@ -15,14 +15,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "array-t.h"
 #include "datetime-t.h"
 #include "file-t.h"
 #include "jurisdiction-t.h"
 #include "sqlite-t.h"
-#include "test_harness.h"
 #include "string-t.h"
+#include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -748,6 +749,9 @@ struct catalogue_counts {
     size_t count;
     bool stop;
     bool valid;
+    char previous_jurisdiction[64];
+    char previous_name[1024];
+    bool previous_default;
 };
 
 static bool count_catalogue_choice(const char *code, const char *label, void *context)
@@ -761,10 +765,23 @@ static bool count_catalogue_choice(const char *code, const char *label, void *co
 static bool count_catalogue_place(const jurisdict_place_t *place, void *context)
 {
     struct catalogue_counts *counts = context;
-    ++counts->count;
     counts->valid = counts->valid && place && place->jurisdiction_code && *place->jurisdiction_code && place->name &&
                     *place->name && place->latitude && *place->latitude && place->longitude && *place->longitude &&
                     place->timezone && *place->timezone;
+    if (counts->valid) {
+        int order = counts->count ? strcmp(counts->previous_jurisdiction, place->jurisdiction_code) : -1;
+        counts->valid = order <= 0;
+        if (!order)
+            counts->valid = counts->previous_default > place->is_default ||
+                            (counts->previous_default == place->is_default &&
+                             strcasecmp(counts->previous_name, place->name) <= 0);
+        counts->valid = counts->valid && strlen(place->jurisdiction_code) < sizeof counts->previous_jurisdiction &&
+                        strlen(place->name) < sizeof counts->previous_name;
+        snprintf(counts->previous_jurisdiction, sizeof counts->previous_jurisdiction, "%s", place->jurisdiction_code);
+        snprintf(counts->previous_name, sizeof counts->previous_name, "%s", place->name);
+        counts->previous_default = place->is_default;
+    }
+    ++counts->count;
     return !counts->stop;
 }
 

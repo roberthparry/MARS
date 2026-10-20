@@ -19,7 +19,7 @@
 void lab_cal_surface(json_t *options)
 {
     double latitude = 0, longitude = 0;
-    shoreline_surface_t surface = SHORELINE_UNKNOWN;
+    globe_surface_t surface = GLOBE_UNKNOWN;
     if (lab_cal_number(lab_cal_text(options, "lat"), &latitude) &&
         lab_cal_number(lab_cal_text(options, "lon"), &longitude)) {
         almanac_t *almanac = almanac_open();
@@ -28,7 +28,7 @@ void lab_cal_surface(json_t *options)
     }
     static const char *const names[] = {"Unknown", "Land", "Sea", "Inland water", "Coastal"};
     lab_cal_set(options, "observer_surface", names[surface]);
-    lab_cal_set(options, "sea_horizon", surface == SHORELINE_SEA ? "true" : "false");
+    lab_cal_set(options, "sea_horizon", surface == GLOBE_SEA ? "true" : "false");
 }
 
 typedef struct {
@@ -39,17 +39,17 @@ typedef struct {
     bool map;
 } lab_globe_paths_t;
 
-static bool lab_globe_path(shoreline_path_event_t event, double longitude, double latitude,
+static bool lab_globe_path(globe_path_event_t event, double longitude, double latitude,
                            unsigned level, bool antarctic, void *context)
 {
     lab_globe_paths_t *paths = context;
-    if (event == SHORELINE_PATH_MOVE) {
+    if (event == GLOBE_PATH_MOVE) {
         string_free(paths->ring);
         paths->ring = string_new();
         if (!paths->ring) return false;
         paths->vertices = 0;
     }
-    if (event == SHORELINE_PATH_CLOSE) {
+    if (event == GLOBE_PATH_CLOSE) {
         if (paths->vertices >= 3) {
             string_t *layer = paths->layers[level - 1];
             if (string_append_format(layer,

@@ -513,15 +513,20 @@ static bool route_catalogue(const char *directory)
         return false;
     http_response_t *response = route_request(HTTP_GET, "/jurisdictions", NULL, NULL, NULL, NULL);
     json_t *data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    bool index_ok = data && !json_object_size(test_lab_member(data, "towns")) &&
+                    json_array_size(test_lab_member(data, "options")) == 4 &&
+                    json_array_size(test_lab_member(test_lab_member(data, "locations"), "GB-WLS")) == 4;
+    json_free(data);
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/towns?after=0", NULL, NULL, NULL, NULL);
+    data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     bool available = false;
     const json_t *towns = test_lab_member(test_lab_member(data, "towns"), "GB-WLS");
-    const json_t *location = test_lab_member(test_lab_member(data, "locations"), "GB-WLS");
-    bool ok = data && json_bool_value(test_lab_member(data, "available"), &available) && available &&
-              json_array_size(test_lab_member(data, "options")) == 4 && json_array_size(towns) == 1 &&
+    bool ok = index_ok && data && json_bool_value(test_lab_member(data, "available"), &available) && available &&
+              json_array_size(towns) == 1 &&
               !strcmp(test_lab_text(json_array_get(towns, 0), "name"), "Rhyl") &&
               !strcmp(test_lab_text(json_array_get(towns, 0), "value"), "Rhyl|53.3190|-3.4916|5") &&
-              !strcmp(test_lab_text(json_array_get(towns, 0), "detail"), "+53.3190  -003.4916") &&
-              json_array_size(location) == 4;
+              !strcmp(test_lab_text(json_array_get(towns, 0), "detail"), "+53.3190  -003.4916");
     ok = route_check(response, 200, ok, "GET /jurisdictions database rows") && ok;
     json_free(data);
     http_response_free(response);
@@ -532,16 +537,81 @@ static bool route_catalogue(const char *directory)
     string_t *sql = string_new_with("update jurisdiction_town set town_name='Changed database town' "
                                     "where jurisdiction_town_id=2;");
     ok = db && sql && sqlite_exec(db, sql) && ok;
+    ok = ok && sqlite_exec_cstr(db,
+        "PRAGMA cache_size=-512;"
+        "BEGIN; WITH RECURSIVE ids(id) AS (VALUES(4) UNION ALL SELECT id+1 FROM ids WHERE id<50000) "
+        "INSERT INTO jurisdiction_town SELECT id,'US','Town '||id FROM ids;"
+        "INSERT INTO jurisdiction_town_latitude SELECT jurisdiction_town_id,'40' FROM jurisdiction_town WHERE jurisdiction_town_id>3;"
+        "INSERT INTO jurisdiction_town_longitude SELECT jurisdiction_town_id,'-74' FROM jurisdiction_town WHERE jurisdiction_town_id>3;"
+        "INSERT INTO jurisdiction_town_timezone SELECT jurisdiction_town_id,2 FROM jurisdiction_town WHERE jurisdiction_town_id>3; COMMIT;"
+        "ALTER TABLE jurisdiction_town RENAME TO town_storage;"
+        "CREATE VIEW jurisdiction_town AS SELECT * FROM town_storage;");
     string_free(sql);
     sqlite_close(db);
     string_free(path);
-    response = route_request(HTTP_GET, "/jurisdictions", NULL, NULL, NULL, NULL);
+    response = route_request(HTTP_GET, "/towns", NULL, NULL, NULL, NULL);
     data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     towns = test_lab_member(test_lab_member(data, "towns"), "GB-WLS");
     ok = route_check(response, 200, !strcmp(test_lab_text(json_array_get(towns, 0), "name"), "Changed database town"),
                      "GET /jurisdictions reflects database change") &&
          ok;
     json_free(data);
+    http_response_free(response);
+
+    response = route_request(HTTP_GET, "/towns?after=0&lat=53.3&lon=-3.5", NULL, NULL, NULL, NULL);
+    data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    ok = route_check(response, 200,
+                     json_array_size(test_lab_member(test_lab_member(data, "towns"), "GB-WLS")) == 1 &&
+                     json_array_size(test_lab_member(test_lab_member(data, "towns"), "US")) == 0,
+                     "local priority page excludes distant towns") && ok;
+    json_free(data);
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/towns?after=0&lat=nan&lon=0", NULL, NULL, NULL, NULL);
+    ok = route_check(response, 400, true, "reject non-finite town centre") && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/towns?after=&lat=0&lon=0", NULL, NULL, NULL, NULL);
+    ok = route_check(response, 400, true, "reject missing town cursor") && ok;
+    http_response_free(response);
+
+    /* The complete fixture exceeds the value-node budget; every HTTP page must still round-trip. */
+    int64_t cursor = 0;
+    size_t total = 0;
+    for (unsigned page = 0; ok && page < 100; ++page) {
+        string_t *url = string_sprintf("/towns?after=%lld", (long long)cursor);
+        response = url ? route_request(HTTP_GET, string_c_str(url), NULL, NULL, NULL, NULL) : NULL;
+        data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+        const json_t *groups = test_lab_member(data, "towns");
+        size_t count = 0;
+        for (size_t i = 0; i < json_object_size(groups); ++i)
+            count += json_array_size(json_object_value_at(groups, i));
+        int64_t next = strtoll(test_lab_text(data, "next"), NULL, 10);
+        ok = route_check(response, 200, data && count <= 512 &&
+                         ((count && next > cursor) || (!count && next == 0)), "bounded town page") && ok;
+        total += count;
+        cursor = next;
+        string_free(url);
+        json_free(data);
+        http_response_free(response);
+        if (!cursor)
+            break;
+    }
+    ok = ok && total == 50000 && cursor == 0;
+    path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    ok = ok && db && sqlite_exec_cstr(db,
+        "UPDATE jurisdiction_town_latitude SET latitude='0' WHERE jurisdiction_town_id=50000;"
+        "UPDATE jurisdiction_town_longitude SET longitude='179.9' WHERE jurisdiction_town_id=50000;");
+    sqlite_close(db);
+    string_free(path);
+    response = route_request(HTTP_GET, "/towns?after=0&lat=0&lon=-179.9", NULL, NULL, NULL, NULL);
+    data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    ok = route_check(response, 200,
+                     json_array_size(test_lab_member(test_lab_member(data, "towns"), "US")) == 1,
+                     "local priority window wraps at date line") && ok;
+    json_free(data);
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/towns?after=-1", NULL, NULL, NULL, NULL);
+    ok = route_check(response, 400, true, "reject invalid town cursor") && ok;
     http_response_free(response);
 
     ok = !setenv("MARS_JURISDICTION_DB_KEY", "wrong-fixture-key", 1) && ok;
@@ -595,10 +665,65 @@ static void test_lab_server_lifetime(void)
 }
 
 /* Run one real server subprocess at a time through the suite's normal harness. */
+static bool route_rivers(const char *directory)
+{
+    if (!test_lab_catalogue_database(directory)) return false;
+    string_t *globe_path = string_sprintf("%s/globe.db", directory);
+    bool configured = globe_path && !setenv("MARS_GLOBE_DB_PATH", string_c_str(globe_path), 1) &&
+                      !setenv("MARS_GLOBE_DB_KEY", "river-globe-test", 1);
+    string_free(globe_path);
+    if (!configured) return false;
+    if (setenv("NO_PROXY", "*", 1) || setenv("no_proxy", "*", 1)) return false;
+    const char *bounds = "{\"west\":-1,\"south\":-1,\"east\":2,\"north\":2}";
+    http_response_t *response = route_request(HTTP_POST, "/almanac-rivers", bounds,
+                                             "application/x-protobuf", NULL, NULL);
+    bool ok = response && http_response_status(response) == 503;
+    http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-rivers", "{\"west\":-180,\"south\":-90,\"east\":180,\"north\":90}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 400 && ok;
+    http_response_free(response);
+    string_t *path = string_new_with(getenv("MARS_GLOBE_DB_PATH"));
+    string_t *key = string_new_with(getenv("MARS_GLOBE_DB_KEY"));
+    sqlite_t *db = sqlite_open_encrypted(path, key);
+    string_free(path); string_free(key);
+    ok = db && sqlite_exec_cstr(db,
+        "create table rivers_dataset(id integer,format_version integer,point_count integer,source text);"
+        "insert into rivers_dataset values(1,1,2,'synthetic fixture');"
+        "create table rivers_chunk(id integer primary key,feature_id integer,kind integer,vertices blob);"
+        "insert into rivers_chunk values(1,1,1,x'0000000000000000000f4240000f4240');"
+        "create virtual table rivers_bounds using rtree_i32(id,min_x,max_x,min_y,max_y);"
+        "insert into rivers_bounds values(1,0,1000000,0,1000000);") && ok;
+    sqlite_close(db);
+    response = route_request(HTTP_POST, "/almanac-rivers", bounds, "application/x-protobuf", NULL, NULL);
+    json_t *data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    const char *image = test_lab_text(data, "image");
+    ok = route_check(response, 200, image && strstr(image, "<svg") && strstr(image, "M682.667"),
+                     "bounded river overlay") && ok;
+    json_free(data);
+    http_response_free(response);
+    path = string_new_with(getenv("MARS_GLOBE_DB_PATH"));
+    key = string_new_with(getenv("MARS_GLOBE_DB_KEY"));
+    db = sqlite_open_encrypted(path, key);
+    string_free(path); string_free(key);
+    ok = db && sqlite_exec_cstr(db, "update rivers_dataset set source='WDBII / GSHHG 2.3.7'") && ok;
+    sqlite_close(db);
+    response = route_request(HTTP_POST, "/almanac-rivers", bounds, "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 503 && ok;
+    http_response_free(response);
+    return ok;
+}
+
+static void test_lab_http_rivers(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(route_rivers), "river overlay uses independent globe data and rejects wide requests");
+}
+
 void test_lab_route_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_server_lifetime, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_contracts, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_catalogue, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_rejections, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_http_rivers, tests, NULL);
 }

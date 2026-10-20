@@ -62,13 +62,13 @@ static void number_readme_binomial_cardinality(void)
 
 void run_number_readme_mersenne_prime_search(void)
 {
-    static const unsigned want_exponents[] = {2,   3,   5,   7,   13,   17,   19,   31,   61,   89,
-                                                  107, 127, 521, 607, 1279, 2203, 2281, 3217, 4253, 4423};
+    static const unsigned want_exponents[] = {2, 3, 5, 7, 13, 17, 19, 31, 61, 89, 107, 127, 521, 607, 1279, 2203};
     number_t two = num_create_from_long(2);
     number_t one = num_create_from_long(1);
     unsigned found = 0u;
 
-    for (unsigned p = 2u; p <= 4423u; ++p) {
+    /* Keep the documented search bounded for sequential memory checking. */
+    for (unsigned p = 2u; p <= 2203u; ++p) {
         number_t exponent = num_create_from_long((long)p);
 
         if (num_is_prime(exponent)) {

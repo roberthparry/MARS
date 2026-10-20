@@ -120,10 +120,10 @@ static bool cfg_database_options_read(cfg_database_options *options, bool jurisd
     return ok;
 }
 
-static string_t *cfg_database_password(const string_t *saved, bool jurisdiction)
+static string_t *cfg_database_password(const string_t *saved, const char *label)
 {
     string_t *prompt = string_sprintf(
-        "Choose a password to protect your private %s database%s: ", jurisdiction ? "jurisdiction" : "almanac",
+        "Choose a password to protect %s%s: ", label,
         string_byte_length(saved) ? " [leave blank to keep current key]" : "");
     if (!prompt)
         return NULL;
@@ -194,8 +194,11 @@ static bool cfg_database_source(sqlite_t *db, const string_t *root, const char *
     bool exists = file && file_exists(file);
     bool ok = path && file &&
               ((optional && !exists && !file_last_error(file)) || (exists && cfg_database_import(db, root, path)));
-    if (!ok)
-        fprintf(stderr, "Database source %s failed: %s\n", name, string_c_str(sqlite_last_error(db)));
+    if (!ok) {
+        const string_t *error = sqlite_last_error(db);
+        fprintf(stderr, "Database source %s failed: %s\n", name,
+                error && string_byte_length(error) ? string_c_str(error) : "see SQL import diagnostic above");
+    }
     file_free(file);
     string_free(full);
     string_free(path);
@@ -219,7 +222,9 @@ static bool cfg_database_build(cfg_database_options *options, bool jurisdiction,
     }
     cfg_progress_t *progress = cfg_progress_start("Preparing encrypted database");
     sqlite_t *db = temporary && root ? sqlite_open_encrypted(temporary_path, options->key) : NULL;
-    ok = ok && db && destination && sqlite_exec_cstr(db, "PRAGMA foreign_keys = ON;");
+    /* Bound both working caches as catalogues grow; their pages are locked by SQLCipher. */
+    ok = ok && db && destination &&
+         sqlite_exec_cstr(db, "PRAGMA foreign_keys = ON; PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;");
     cfg_progress_finish(progress, ok);
     if (ok) {
         fprintf(stderr, "Building encrypted %s database...\n", jurisdiction ? "jurisdiction" : "almanac");
@@ -228,13 +233,15 @@ static bool cfg_database_build(cfg_database_options *options, bool jurisdiction,
                                               : "packaging/almanac-db/mars_almanac.sql",
                                  false);
     }
+    if (ok && jurisdiction)
+        ok = cfg_database_rivers(db, root, staging);
     if (ok && !jurisdiction)
         ok = cfg_database_source(db, root, "packaging/almanac-db/mars_almanac_chebyshev.sql", true) &&
-             cfg_database_source(db, root, "packaging/almanac-db/mars_almanac_frame_rotation.sql", true) &&
-             cfg_database_coast(db, root, staging);
-    /* Calendar's separate native reader must see committed rules. */
+             cfg_database_source(db, root, "packaging/almanac-db/mars_almanac_frame_rotation.sql", true);
+    /* Commit for calendar's separate reader, then release the import cache so its locked pages do not
+     * compete with calendar generation. Keep SQLCipher memory security enabled throughout. */
     if (ok)
-        ok = sqlite_exec_cstr(db, "BEGIN; COMMIT;");
+        ok = sqlite_exec_cstr(db, "BEGIN; COMMIT; PRAGMA shrink_memory;");
     string_t *chosen_location = NULL, *chosen_language = NULL;
     if (ok && jurisdiction)
         ok = cfg_calendar_populate(db, temporary_path, options->key, options->requested_location,
@@ -272,16 +279,17 @@ static bool cfg_database_build(cfg_database_options *options, bool jurisdiction,
 }
 
 /* Configure only the selected private database, using literal settings and native SQLCipher. */
-int cfg_database_run(bool jurisdiction, const char *path, const char *key, const char *location, const char *language,
-                     bool interactive)
+static int cfg_database_install(bool jurisdiction, const char *path, const char *key, const char *location,
+                                const char *language, bool interactive, bool prompt_password)
 {
     cfg_database_options options = {0};
     bool ok = cfg_database_options_read(&options, jurisdiction, path, key, location, language);
     interactive = interactive && isatty(STDIN_FILENO);
-    if (ok && interactive) {
+    if (ok && interactive && prompt_password) {
         printf("%s database setup\nConfig file: %s\n", jurisdiction ? "Jurisdiction" : "Almanac",
                string_c_str(options.configuration_path));
-        string_t *chosen = cfg_database_password(options.key, jurisdiction);
+        string_t *chosen = cfg_database_password(options.key, jurisdiction ? "the jurisdiction database" :
+                                                                           "the almanac database");
         string_free(options.key);
         options.key = chosen;
         ok = chosen != NULL;
@@ -296,6 +304,35 @@ int cfg_database_run(bool jurisdiction, const char *path, const char *key, const
     if (!ok)
         fprintf(stderr, "Failed to configure the %s database; check settings, private storage and packaged SQL.\n",
                 jurisdiction ? "jurisdiction" : "almanac");
+    cfg_database_options_free(&options);
+    return ok ? 0 : 1;
+}
+
+/* Preserve standalone password and calendar prompting. */
+int cfg_database_run(bool jurisdiction, const char *path, const char *key, const char *location, const char *language,
+                     bool interactive)
+{
+    return cfg_database_install(jurisdiction, path, key, location, language, interactive, true);
+}
+
+/* Select one credential before any database is installed; do not expose it through child arguments or environment. */
+int cfg_databases_run(void)
+{
+    cfg_database_options options = {0};
+    bool interactive = isatty(STDIN_FILENO);
+    bool ok = cfg_database_options_read(&options, false, NULL, NULL, NULL, NULL);
+    string_t *key = ok ? (interactive ? cfg_database_password(options.key, "all three MARS databases")
+                                     : string_clone(options.key)) : NULL;
+    ok = ok && key && string_byte_length(key);
+    if (ok)
+        ok = cfg_globe_install_key(string_c_str(key)) == 0;
+    if (ok)
+        ok = cfg_database_install(false, NULL, string_c_str(key), NULL, NULL, interactive, false) == 0;
+    if (ok)
+        ok = cfg_database_install(true, NULL, string_c_str(key), NULL, NULL, interactive, false) == 0;
+    if (!ok)
+        fputs("Combined database installation stopped; later databases were not changed.\n", stderr);
+    string_free(key);
     cfg_database_options_free(&options);
     return ok ? 0 : 1;
 }

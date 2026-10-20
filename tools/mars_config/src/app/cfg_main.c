@@ -33,6 +33,8 @@ int main(int argc, char **argv)
              "       mars_config jurisdiction [TOWN] [--language LANGUAGE] [--db-path PATH]\n"
              "                                [--db-key KEY] [--noninteractive]\n"
              "       mars_config locales [--check | --output PATH] [--data-dir DIR]");
+        puts("       mars_config globe-install | globe-check | globe-update | globe-uninstall");
+        puts("       mars_config databases");
         return 0;
     }
     if (argc < 2) {
@@ -41,6 +43,11 @@ int main(int argc, char **argv)
     }
     if (cfg_app_is(argv[1], "locales"))
         return cfg_locales_run(argc - 2, argv + 2);
+    if (cfg_app_is(argv[1], "databases"))
+        return argc == 2 ? cfg_databases_run() : 2;
+    if (cfg_app_is(argv[1], "globe-install") || cfg_app_is(argv[1], "globe-check") ||
+        cfg_app_is(argv[1], "globe-update") || cfg_app_is(argv[1], "globe-uninstall"))
+        return argc == 2 ? cfg_globe_run(argv[1]) : 2;
     bool weather = cfg_app_is(argv[1], "weather"), jurisdiction = cfg_app_is(argv[1], "jurisdiction");
     if (!weather && !jurisdiction && !cfg_app_is(argv[1], "almanac")) {
         fputs("Unknown configuration command\n", stderr);

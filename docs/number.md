@@ -333,6 +333,11 @@ Inside an active scope:
 - scoped temporaries must not outlive the scope unless they are detached first
   with `num_scope_detach(...)`
 
+Arithmetic helpers that use an internal scope return their results to the
+caller's scope. This includes rounding, integer addition and multiplication,
+arguments and pulse functions; their internal cleanup must neither free the
+returned result nor bypass the caller's automatic cleanup.
+
 Detaching behaves differently depending on how the scoped value is stored:
 
 - plain heap-backed scoped values are transferred out of the scope directly
@@ -1631,4 +1636,53 @@ Output:
 
 ```text
 elementary charge: 801088317/5000000000000000000000000000 C
+```
+
+## Bounded Mersenne prime search
+
+This README example searches exponents from 2 to 2203, finding the first 16
+Mersenne primes. The bound keeps the corresponding sequential memory test
+manageable; it is not a limit of the number API.
+
+```c
+#include <stdio.h>
+
+#include "number-t.h"
+
+int main(void)
+{
+    number_t two = num_create_from_long(2);
+    number_t one = num_create_from_long(1);
+    unsigned found = 0u;
+
+    for (unsigned p = 2u; p <= 2203u; ++p) {
+        number_t exponent = num_create_from_long((long)p);
+        if (num_is_prime(exponent)) {
+            number_t mersenne_base = num_pow_int(two, (int)p);
+            number_t mersenne = num_sub(mersenne_base, one);
+            if (num_is_prime(mersenne)) {
+                if ((found % 4u) == 3u)
+                    printf("M_%-4u is prime\n", p);
+                else
+                    printf("M_%-4u is prime    ", p);
+                found++;
+            }
+            num_destroy(&mersenne);
+            num_destroy(&mersenne_base);
+        }
+        num_destroy(&exponent);
+    }
+    num_destroy(&two);
+    num_destroy(&one);
+    return 0;
+}
+```
+
+Output:
+
+```text
+M_2    is prime    M_3    is prime    M_5    is prime    M_7    is prime
+M_13   is prime    M_17   is prime    M_19   is prime    M_31   is prime
+M_61   is prime    M_89   is prime    M_107  is prime    M_127  is prime
+M_521  is prime    M_607  is prime    M_1279 is prime    M_2203 is prime
 ```

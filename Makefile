@@ -55,6 +55,7 @@ JURISDICTION_RULES_SQL ?= $(JURISDICTION_DB_SOURCE_DIR)/mars_holiday_rules.sql
 HOLIDAY_RULES_SQL ?= $(JURISDICTION_RULES_SQL)
 JURISDICTION_RULES_SOURCES := $(JURISDICTION_RULES_SQL) $(JURISDICTION_DB_SOURCE_DIR)/mars_country_jurisdictions.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_generated_first_class_rules.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_target_subdivisions.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_manual_first_class_rules.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_jurisdiction_location_defaults.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_jurisdiction_towns.sql $(JURISDICTION_DB_SOURCE_DIR)/mars_timezone_rules.sql
 JURISDICTION_RULES_SOURCES += $(JURISDICTION_DB_SOURCE_DIR)/mars_calendar_local.sql
+JURISDICTION_RULES_SOURCES += $(JURISDICTION_DB_SOURCE_DIR)/mars_jurisdiction_world_towns.sql
 JURISDICTION_RULES_SOURCES += $(JURISDICTION_DB_SOURCE_DIR)/mars_calendar_locale_names.sql
 JURISDICTION_RULES_SOURCES += $(JURISDICTION_DB_SOURCE_DIR)/mars_holiday_localized_names.sql
 HOLIDAY_RULES_SOURCES := $(JURISDICTION_RULES_SOURCES)
@@ -642,6 +643,23 @@ mars-lab-restart: mars-lab-stop
 to-be-announced-lab: native-tba-lab
 	@MARS_ROOT="$(CURDIR)" "$(TBA_SERVER)" $(ARGS)
 
+.PHONY: install-globe-db update-globe-db check-globe-db uninstall-globe-db
+.PHONY: install-mars-db
+install-mars-db: check-native-deps native-config
+	@"$(CONFIG_PROGRAM)" databases
+
+install-globe-db: check-native-deps native-config
+	@"$(CONFIG_PROGRAM)" globe-install
+
+check-globe-db: check-native-deps native-config
+	@"$(CONFIG_PROGRAM)" globe-check
+
+update-globe-db: check-native-deps native-config
+	@"$(CONFIG_PROGRAM)" globe-update
+
+uninstall-globe-db: check-native-deps native-config
+	@"$(CONFIG_PROGRAM)" globe-uninstall
+
 install-almanac-db: check-native-deps native-config $(ALMANAC_RULES_SOURCES)
 	@"$(CONFIG_PROGRAM)" almanac
 
@@ -791,6 +809,10 @@ help:
 	@printf '  %-40s %s\n' "make install-mars-lab" "Install a user desktop launcher for MARS Lab"
 	@printf '  %-40s %s\n' "make uninstall-mars-lab" "Remove the user desktop launcher for MARS Lab"
 	@printf '  %-40s %s\n' "make install-almanac-db" "Build and configure the Almanac database only"
+	@printf '  %-40s %s\n' "make install-globe-db" "Install a separate shoreline-only globe database"
+	@printf '  %-40s %s\n' "make install-mars-db" "Install globe, almanac and jurisdiction databases sequentially"
+	@printf '  %-40s %s\n' "make check-globe-db" "Verify the globe database and shoreline availability"
+	@printf '  %-40s %s\n' "make update-globe-db / uninstall-globe-db" "Reserved; currently refuse changes"
 	@printf '  %-40s %s\n' "make uninstall-almanac-db" "Remove the configured Almanac database"
 	@printf '  %-40s %s\n' "make install-jurisdiction-db [town]" "Build the private database and calendar_local for a town"
 	@echo "    Use LOCATION='town, jurisdiction' for a qualified or multiword town."

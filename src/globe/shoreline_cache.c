@@ -16,7 +16,8 @@
 #include <string.h>
 #include <zstd.h>
 
-#include "shoreline-t.h"
+#define MARS_GLOBE_INTERNAL_ACCESS
+#include "globe_layers.h"
 #define MARS_SHORELINE_INTERNAL_ACCESS
 #include "shoreline_internal.h"
 

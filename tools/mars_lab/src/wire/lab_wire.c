@@ -275,7 +275,7 @@ array_t *lab_wire_encode_response(const json_t *value, bool *failed)
         *failed = !bytes;
     if (!bytes) {
         string_t *text = string_new_with("{\"ok\":false,\"error\":\"Lab response could not be encoded within the "
-                                          "8 MiB transport limit. Reduce plot detail or result size.\"}");
+                                          "8 MiB, 65536-value or depth-32 transport limits. Reduce result size.\"}");
         json_t *error = text ? json_from_text(text) : NULL;
         bytes = error ? lab_wire_encode(error) : NULL;
         json_free(error);

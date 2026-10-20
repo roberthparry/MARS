@@ -4,7 +4,7 @@
  *
  * Exercises locale rendering and the pure calendar_local projections independently.
  * Disposable encrypted databases load the real
- * locale and view SQL through the public file and sqlite APIs. Expected labels are
+ * locale and view SQL through the native streaming importer, including bounded recursive SQL includes. Expected labels are
  * fixed references, including a pinned Babel/CLDR fixture; Gregorian arithmetic and
  * civil Hijri expectations are independent of the SQL view. Optional ICU C calls
  * retain the long Hebrew and Hijri oracle comparisons without runtime Python.
@@ -29,6 +29,8 @@
 #include "file-t.h"
 #include "datetime-t.h"
 #include "sqlite-t.h"
+#define MARS_CFG_DATABASE_INTERNAL_ACCESS
+#include "cfg_database_internal.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"
 
@@ -133,15 +135,13 @@ static bool test_cfg_rendering_sql_ok(sqlite_t *db, const char *sql)
 
 static bool test_cfg_rendering_load_sql(sqlite_t *db, const char *path)
 {
-    string_t *absolute = string_sprintf("%s/%s", MARS_CONFIG_ROOT_DIR, path);
-    file_t *file = absolute ? file_new(absolute) : NULL;
-    string_free(absolute);
-    string_t *text = file ? file_read_all_text(file) : NULL;
-    bool ok = text && sqlite_exec(db, text);
+    string_t *root = string_new_with(MARS_CONFIG_ROOT_DIR);
+    string_t *relative = string_new_with(path);
+    bool ok = root && relative && cfg_database_import(db, root, relative);
     if (!ok)
         string_fprintf(stderr, "calendar rendering could not load %s: %S\n", path, sqlite_last_error(db));
-    string_free(text);
-    file_free(file);
+    string_free(relative);
+    string_free(root);
     return ok;
 }
 
@@ -152,7 +152,8 @@ static sqlite_t *test_cfg_rendering_database(const char *directory)
     sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
     string_free(path);
     string_free(key);
-    bool ok = db && test_cfg_rendering_load_sql(db, "packaging/jurisdiction-db/mars_calendar_locale_names.sql") &&
+    bool ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
+              test_cfg_rendering_load_sql(db, "packaging/jurisdiction-db/mars_calendar_locale_names.sql") &&
               test_cfg_rendering_load_sql(db, "packaging/jurisdiction-db/mars_calendar_local.sql") &&
               test_cfg_rendering_sql_ok(db, "INSERT INTO calendar_local_settings VALUES"
                                             "(1,'Test','GB-ENG','Europe/London',52,-2,2024,2025,'en_GB')");

@@ -81,6 +81,8 @@ interface LabTownCatalogue {
 
 /** @brief Consumed jurisdiction catalogue fields, including database availability. */
 interface LabCatalogue {
+    /** @brief Decimal database cursor for bounded town responses; zero terminates pagination. */
+    next?: string;
     /** @brief Whether the native jurisdiction database supplied the catalogue. */
     available: boolean;
 

@@ -50,6 +50,7 @@ const char *cfg_database_trace_label(const string_t *path)
         [13] = "packaging/almanac-db/mars_almanac_frame_rotation.sql",
         [14] = "packaging/jurisdiction-db/mars_manual_first_class_rules.sql",
         [17] = "packaging/jurisdiction-db/mars_holiday_rules.sql",
+        [18] = "packaging/jurisdiction-db/mars_jurisdiction_world_towns.sql",
         [24] = "packaging/jurisdiction-db/mars_jurisdiction_location_defaults.sql",
         [25] = "packaging/jurisdiction-db/mars_country_jurisdictions.sql",
         [26] = "packaging/almanac-db/mars_almanac.sql",
@@ -221,7 +222,7 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
     char *line = malloc(cfg_database_line_limit);
     bool ok = file && pending && line && file_open_read(file);
     char chunk[16384];
-    size_t used = 0, count = 0, bytes_read = 0;
+    size_t used = 0, count = 0, bytes_read = 0, line_number = 1;
     while (ok) {
         ok = file_read(file, chunk, sizeof(chunk), &count);
         if (!ok || !count)
@@ -236,6 +237,8 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
             line[used++] = chunk[i];
             if (chunk[i] == '\n') {
                 ok = cfg_database_sql_line(db, root, pending, &values, &lexer, line, used, depth, progress);
+                if (ok)
+                    ++line_number;
                 used = 0;
             }
         }
@@ -250,6 +253,9 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
         ok = cfg_database_execute(db, &values, string_c_str(pending));
     if (file && file_is_open(file))
         ok = file_close(file) && ok;
+    if (!ok)
+        fprintf(stderr, "SQL import failed: source=%s line=%zu (read, syntax or import-limit failure)\n",
+                label, line_number);
     free(line);
     cfg_database_values_free(db, &values);
     string_free(pending);

@@ -141,10 +141,13 @@ static bool intg_match_affine_term_local(const expr_t *expr, size_t ndim, expr_t
 
     if (expr_match_scaled_expr(expr, &inner_scale, &base) && num_is_real(inner_scale)) {
         number_t product = num_mul(scale, inner_scale);
+        bool matched = intg_match_affine_term_local(base, ndim, vars, product, constant_io, coeffs_io);
 
-        return intg_match_affine_term_local(base, ndim, vars, product, constant_io, coeffs_io);
+        num_destroy(&inner_scale);
+        return matched;
     }
 
+    num_destroy(&inner_scale);
     return false;
 }
 
@@ -186,6 +189,7 @@ static bool intg_match_scaled_affine_power_deg5_local(const expr_t *expr, size_t
         return true;
     }
 
+    num_destroy(&inner_scale);
     num_destroy(&constant);
     return false;
 }
@@ -531,6 +535,7 @@ static int intg_match_affine_form(const expr_t *expr, size_t ndim, expr_t *const
 
     intg_number_array_clear(poly, IG_POLY_COEFF_COUNT);
     intg_number_array_clear(coeffs, 4u);
+    num_destroy(&scale);
     num_destroy(&constant);
     return matched ? 1 : 0;
 }

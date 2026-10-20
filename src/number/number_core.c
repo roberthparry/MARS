@@ -2847,6 +2847,15 @@ void num_scope_leave(num_scope_t **scope_ptr)
     *scope_ptr = NULL;
 }
 
+/* Preserve an internal result while transferring temporary ownership to the calling scope. */
+number_t number_scope_result(num_scope_t **scope, number_t result)
+{
+    result = num_scope_detach(result);
+    num_scope_leave(scope);
+    number_scope_register_value(&result);
+    return result;
+}
+
 bool num_scope_is_active(void)
 {
     return number_scope_current != NULL && number_scope_suspend_depth == 0u;
@@ -3979,6 +3988,7 @@ number_t num_imag_part(const number_t number)
     return vt && vt->imag_part ? number_take(vt->imag_part(&number)) : number_invalid();
 }
 
+/* Return the principal argument with the caller's usual temporary ownership. */
 number_t num_arg(const number_t number)
 {
     NUM_SCOPE(scope);
@@ -3987,26 +3997,28 @@ number_t num_arg(const number_t number)
     if (!number_is_valid_value(&number))
         return number_invalid();
     if (vt && vt->arg_value)
-        return number_take(vt->arg_value(&number));
+        return number_scope_result(&scope, number_take(vt->arg_value(&number)));
     number_t zero = number_create_exact_mpfr_long_prec(0, num_get_prec_bits(number) ? num_get_prec_bits(number)
                                                                                     : number_default_precision_bits);
     number_t real = vt && vt->is_complex ? num_real_part(number) : num_clone(number);
     number_t result = num_atan2(zero, real);
-    return num_scope_detach(result);
+    return number_scope_result(&scope, result);
 }
 
+/* Add an integer without exposing the internal conversion temporary. */
 number_t num_add_long(const number_t number, long value)
 {
     NUM_SCOPE(scope);
     number_t rhs = num_create_from_long(value);
     number_t result = num_add(number, rhs);
-    return num_scope_detach(result);
+    return number_scope_result(&scope, result);
 }
 
+/* Multiply by an integer while preserving the caller's result ownership. */
 number_t num_mul_long(const number_t number, long value)
 {
     NUM_SCOPE(scope);
     number_t rhs = num_create_from_long(value);
     number_t result = num_mul(number, rhs);
-    return num_scope_detach(result);
+    return number_scope_result(&scope, result);
 }

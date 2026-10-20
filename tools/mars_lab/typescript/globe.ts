@@ -17,6 +17,7 @@ class MarsAlmanacGlobe {
     private readonly markers: HTMLElement;
     private readonly status: HTMLElement;
     private readonly gridTooltip = document.createElement('div');
+    private readonly gridMarker = document.createElement('span');
     private readonly gl: WebGLRenderingContext;
     private readonly program: WebGLProgram;
     private readonly textures: WebGLTexture[] = [];
@@ -31,6 +32,7 @@ class MarsAlmanacGlobe {
     private requestBounds: number[] | null = null;
     private readonly markerNodes = new Map<GlobeTown | null, HTMLElement>();
     private markerSignature = '';
+    private observerSignature = '';
     private readonly towns = new Map<string, GlobeTown[]>();
     private readonly townById = new Map<string, GlobeTown>();
     private readonly pointers = new Map<number, {x: number; y: number}>();
@@ -39,10 +41,17 @@ class MarsAlmanacGlobe {
     private suppressClick = false;
     private start = {x: 0, y: 0};
     private timer = 0;
+    private detailTimer = 0;
     private frame = 0;
     private generation = 0;
     private selection = 0;
     private request: AbortController | null = null;
+    private riverRequest: AbortController | null = null;
+    private riverGeneration = 0;
+    private riverReady = false;
+    private riverBounds = [-180, -90, 180, 90];
+    private riverZoom = 0;
+    private riverUnloadTimer = 0;
 
     constructor(private readonly root: HTMLElement) {
         this.canvas = root.querySelector('canvas')!;
@@ -50,8 +59,10 @@ class MarsAlmanacGlobe {
         this.status = root.querySelector('[role="status"]')!;
         this.gridTooltip.className = 'globe-grid-tooltip';
         this.gridTooltip.setAttribute('role', 'tooltip');
-        this.gridTooltip.hidden = true;
-        this.canvas.parentElement!.append(this.gridTooltip);
+        this.gridMarker.className = 'globe-grid-marker';
+        this.gridMarker.setAttribute('aria-hidden', 'true');
+        this.hideGridHover();
+        this.canvas.parentElement!.append(this.gridTooltip, this.gridMarker);
         const gl = this.canvas.getContext('webgl', {alpha: true, antialias: true});
         if (!gl) throw new Error('The globe needs WebGL; the observer fields remain available.');
         this.gl = gl;
@@ -63,7 +74,7 @@ class MarsAlmanacGlobe {
         const position = gl.getAttribLocation(this.program, 'position');
         gl.enableVertexAttribArray(position);
         gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-        for (let i = 0; i < 3; ++i) {
+        for (let i = 0; i < 4; ++i) {
             const texture = gl.createTexture();
             if (!texture) throw new Error('Could not allocate globe imagery.');
             this.textures.push(texture);
@@ -78,7 +89,14 @@ class MarsAlmanacGlobe {
         gl.uniform1i(gl.getUniformLocation(this.program, 'world'), 0);
         gl.uniform1i(gl.getUniformLocation(this.program, 'detail'), 1);
         gl.uniform1i(gl.getUniformLocation(this.program, 'mapWorld'), 2);
+        gl.uniform1i(gl.getUniformLocation(this.program, 'rivers'), 3);
         this.events();
+        document.addEventListener('lab-town-catalogue-ready', event => {
+            if (!this.started) return;
+            this.indexTowns((event as CustomEvent<LabTownCatalogue>).detail);
+            this.markerSignature = '';
+            this.draw();
+        });
         new ResizeObserver(() => this.draw()).observe(this.canvas);
         const visible = new IntersectionObserver(entries => {
             if (!this.started && entries.some(entry => entry.isIntersecting)) {
@@ -100,6 +118,9 @@ class MarsAlmanacGlobe {
             [gl.FRAGMENT_SHADER, `precision highp float;
                 varying vec2 screen;
                 uniform sampler2D world, detail, mapWorld;
+                uniform sampler2D rivers;
+                uniform vec4 riverBounds;
+                uniform bool riverReady;
                 uniform bool mapMode;
                 uniform vec3 camera;
                 uniform mat3 cameraToWorld;
@@ -108,7 +129,30 @@ class MarsAlmanacGlobe {
                 uniform bool grid;
                 uniform float viewport;
                 const float rad=0.017453292519943295;
-                vec3 mapColour(vec3 mask,vec2 location,vec3 photograph){
+                // Driver inverse-trigonometric approximations can shift close-up geography by kilometres.
+                // Reduce atan2 to |t|<=tan(pi/8), then use a bounded odd series in highp arithmetic.
+                float geographicAngle(float y,float x){
+                    vec2 a=abs(vec2(x,y));
+                    float major=max(a.x,a.y);
+                    if(major==0.) return 0.;
+                    float t=min(a.x,a.y)/major;
+                    t=t/(1.+sqrt(1.+t*t));
+                    float s=t*t;
+                    float series=-1./19.;
+                    series=1./17.+s*series;
+                    series=-1./15.+s*series;
+                    series=1./13.+s*series;
+                    series=-1./11.+s*series;
+                    series=1./9.+s*series;
+                    series=-1./7.+s*series;
+                    series=1./5.+s*series;
+                    series=-1./3.+s*series;
+                    float angle=2.*t*(1.+s*series);
+                    if(a.y>a.x) angle=1.5707963267948966-angle;
+                    if(x<0.) angle=3.141592653589793-angle;
+                    return y<0.?-angle:angle;
+                }
+                vec3 mapColour(vec3 mask,vec2 location){
                     bool land=mask.g>mask.b || mask.r>.8;
                     // A moving local average retains photographic colour, not magnified raster detail.
                     // Reject opposite-surface samples so water cannot tint a crisp land boundary.
@@ -130,18 +174,18 @@ class MarsAlmanacGlobe {
                             weights+=weight;
                         }
                     }
-                    return weights>0.?total/weights:photograph;
+                    // Missing photographic water samples must never fill a mapped channel with land colour.
+                    return weights>0.?total/weights:mask;
                 }
                 void main(){
                     vec2 p=vec2(screen.x,-screen.y)*1.12/camera.z;
                     float r=dot(p,p); if(r>1.){gl_FragColor=vec4(0.);return;}
                     float z=sqrt(max(0.,1.-r));
                     vec3 globe=cameraToWorld*vec3(p.x,-p.y,z);
-                    float lat=asin(clamp(globe.y,-1.,1.))/rad;
-                    float lon=atan(globe.x,globe.z)/rad;
+                    float lat=geographicAngle(globe.y,length(globe.xz))/rad;
+                    float lon=geographicAngle(globe.x,globe.z)/rad;
                     lon=mod(lon+180.,360.)-180.;
                     vec4 colour=texture2D(world,vec2((lon+180.)/360.,(90.-lat)/180.));
-                    vec3 photograph=colour.rgb;
                     if(mapMode) colour=texture2D(mapWorld,vec2((lon+180.)/360.,(90.-lat)/180.));
                     float centre=(bounds.x+bounds.z)*.5;
                     float unwrapped=centre+mod(lon-centre+180.,360.)-180.;
@@ -150,9 +194,23 @@ class MarsAlmanacGlobe {
                         vec4 coast=texture2D(detail,uv);
                         colour.rgb=mix(colour.rgb,coast.rgb,mapMode?1.:coast.a*smoothstep(2.,6.,camera.z));
                     }
-                    if(mapMode) colour.rgb=mapColour(colour.rgb,vec2(lon,lat),photograph);
+                    if(mapMode) colour.rgb=mapColour(colour.rgb,vec2(lon,lat));
                     float light=.8+.2*max(0.,dot(vec3(p.x,-p.y,z),normalize(vec3(-.35,.45,1.))));
                     vec3 surface=mix(colour.rgb*light,vec3(.32,.60,.88),.18*pow(1.-z,4.));
+                    if(riverReady && camera.z>=12.) {
+                        float rc=(riverBounds.x+riverBounds.z)*.5;
+                        float rl=rc+mod(lon-rc+180.,360.)-180.;
+                        vec2 ru=vec2((rl-riverBounds.x)/(riverBounds.z-riverBounds.x),
+                                     (riverBounds.w-lat)/(riverBounds.w-riverBounds.y));
+                        if(ru.x>=0. && ru.x<=1. && ru.y>=0. && ru.y<=1.) {
+                            vec4 river=texture2D(rivers,ru);
+                            if(river.a>0.) {
+                                vec3 water=mapColour(vec3(7.,20.,64.)/255.,vec2(lon,lat));
+                                vec3 riverSurface=mix(water*light,vec3(.32,.60,.88),.18*pow(1.-z,4.));
+                                surface=mix(surface,riverSurface,river.a);
+                            }
+                        }
+                    }
                     if(grid) {
                         float step=camera.z<4.?15.:camera.z<12.?5.:camera.z<60.?1.:camera.z<240.?.25:camera.z<1200.?.05:.01;
                         float latitudeLine=abs(mod(lat+step*.5,step)-step*.5);
@@ -177,11 +235,12 @@ class MarsAlmanacGlobe {
         return program;
     }
 
-    private indexTowns(): void {
+    private indexTowns(catalogue: LabTownCatalogue = WorksheetContext.JURISDICTION_TOWN_OPTIONS): void {
         const countries = new Intl.DisplayNames(['en-GB'], {type: 'region'});
-        for (const [jurisdiction, towns] of Object.entries(WorksheetContext.JURISDICTION_TOWN_OPTIONS)) {
+        for (const [jurisdiction, towns] of Object.entries(catalogue)) {
             const country = countries.of(jurisdiction.split('-')[0]) || jurisdiction;
             for (const town of towns) {
+                if (this.townById.has(JSON.stringify([jurisdiction, town.value]))) continue;
                 const latitude = Number(town.latitude), longitude = Number(town.longitude);
                 if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
                 const key = `${Math.floor(latitude / 5)},${Math.floor((longitude === 180 ? -180 : longitude) / 5)}`;
@@ -206,6 +265,11 @@ class MarsAlmanacGlobe {
         if (this.usesMap()) void this.loadMap();
     }
 
+    private observerState(): string {
+        return JSON.stringify(['Latitude', 'Longitude', 'Town', 'Jurisdiction'].map(
+            field => (document.getElementById('almanac' + field) as HTMLInputElement | HTMLSelectElement).value));
+    }
+
     private centre(): void {
         const lat = this.input('Latitude').value, lon = this.input('Longitude').value;
         if (!lat.trim() || !lon.trim() || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon)) ||
@@ -214,24 +278,35 @@ class MarsAlmanacGlobe {
             return;
         }
         this.orientation = labDOM.call('lab_globe_centre', Number(lat), Number(lon)) as number[];
+        this.observerSignature = this.observerState();
         this.move(0, 0, 1);
     }
 
     private move(dx: number, dy: number, factor: number, roll = 0): void {
-        this.gridTooltip.hidden = true;
+        this.hideGridHover();
+        window.clearTimeout(this.detailTimer);
+        ++this.riverGeneration;
+        this.riverRequest?.abort();
+        this.riverRequest = null;
         const wasMap = this.usesMap();
         this.orientation = labDOM.call('lab_globe_rotate', this.orientation, this.view[2], dx, dy, roll) as number[];
         this.rotation = (labDOM.call('lab_surface_camera', 1, this.orientation, null, null, null, 0) as number[][]).flat();
         this.view = labDOM.call('lab_globe_view', this.orientation, this.view[2], factor) as GlobeView;
+        this.scheduleRiverUnload();
         if (wasMap !== this.usesMap()) this.resetDetail();
         this.draw();
         window.clearTimeout(this.timer);
-        this.timer = window.setTimeout(() => { if (this.view[2] > 1.5) void this.loadDetail(); }, 300);
+        this.timer = window.setTimeout(() => {
+            if (this.view[2] > 1.5) void this.loadDetail();
+            void this.loadRivers();
+            void labApplication.loadNearbyTowns(this.view[0], this.view[1]);
+        }, 300);
     }
 
-    private async image(bounds: number[], signal?: AbortSignal, map = this.usesMap()): Promise<HTMLImageElement> {
+    private async image(bounds: number[], signal?: AbortSignal, map = this.usesMap(),
+                        route = '/almanac-globe'): Promise<HTMLImageElement> {
         const [west, south, east, north] = bounds;
-        const response = await labHttp.fetch('/almanac-globe', {
+        const response = await labHttp.fetch(route, {
             method: 'POST', body: labWire.encode({west, south, east, north, view: map ? 'map' : 'natural'}), signal
         });
         const result = await response.labData() as {ok: boolean; image?: string; error?: string};
@@ -249,6 +324,9 @@ class MarsAlmanacGlobe {
         const gl = this.gl;
         gl.activeTexture(gl.TEXTURE0 + index);
         gl.bindTexture(gl.TEXTURE_2D, this.textures[index]);
+        const filter = index === 2 || (index === 1 && this.usesMap()) ? gl.NEAREST : gl.LINEAR;
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
         this.draw();
     }
@@ -350,10 +428,60 @@ class MarsAlmanacGlobe {
             if (generation === this.generation) {
                 this.requestBounds = null;
                 if (loaded && this.view[2] > 1.5) {
-                    window.clearTimeout(this.timer);
-                    this.timer = window.setTimeout(() => { void this.loadDetail(); }, 300);
+                    window.clearTimeout(this.detailTimer);
+                    this.detailTimer = window.setTimeout(() => { void this.loadDetail(); }, 300);
                 }
             }
+        }
+    }
+
+    private scheduleRiverUnload(): void {
+        if (this.view[2] >= 12) {
+            window.clearTimeout(this.riverUnloadTimer);
+            this.riverUnloadTimer = 0;
+        } else if (this.riverReady && !this.riverUnloadTimer) {
+            this.riverUnloadTimer = window.setTimeout(() => {
+                this.riverUnloadTimer = 0;
+                if (this.view[2] >= 12) return;
+                const gl = this.gl;
+                // Keep a complete sampler, but replace the regional allocation with one transparent pixel.
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, this.textures[3]);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                              new Uint8Array([0, 0, 0, 0]));
+                this.riverReady = false;
+                this.riverZoom = 0;
+                this.root.dataset.rivers = 'unloaded';
+                this.draw();
+            }, 2000);
+        }
+    }
+
+    private async loadRivers(): Promise<void> {
+        if (this.view[2] < 12 || !this.root.getClientRects().length || this.gl.isContextLost()) return;
+        const bounds = (labDOM.call('lab_globe_view', this.orientation, this.view[2] / 1.15, 1) as GlobeView).slice(3);
+        if (bounds[2] - bounds[0] > 30 || bounds[3] - bounds[1] > 30) return;
+        if (this.riverReady && this.view[3] >= this.riverBounds[0] && this.view[4] >= this.riverBounds[1] &&
+            this.view[5] <= this.riverBounds[2] && this.view[6] <= this.riverBounds[3] &&
+            this.view[2] <= this.riverZoom * 1.5) return;
+        const generation = ++this.riverGeneration, zoom = this.view[2];
+        this.riverRequest?.abort();
+        const request = this.riverRequest = new AbortController();
+        const timeout = window.setTimeout(() => request.abort(), 15000);
+        try {
+            const image = await this.image(bounds, request.signal, false, '/almanac-rivers');
+            if (generation !== this.riverGeneration || request.signal.aborted) return;
+            this.riverBounds = bounds;
+            this.riverZoom = zoom;
+            this.riverReady = true;
+            this.upload(3, image);
+            this.root.dataset.rivers = 'ready';
+        } catch {
+            // An unavailable optional layer must not delay or disable observer selection.
+            if (generation === this.riverGeneration) this.root.dataset.rivers = 'unavailable';
+        } finally {
+            window.clearTimeout(timeout);
+            if (generation === this.riverGeneration) this.riverRequest = null;
         }
     }
 
@@ -373,6 +501,8 @@ class MarsAlmanacGlobe {
             gl.uniformMatrix3fv(gl.getUniformLocation(this.program, 'cameraToWorld'), false, this.rotation);
             gl.uniform4fv(gl.getUniformLocation(this.program, 'bounds'), this.detailBounds);
             gl.uniform1i(gl.getUniformLocation(this.program, 'detailReady'), Number(this.detailReady));
+            gl.uniform4fv(gl.getUniformLocation(this.program, 'riverBounds'), this.riverBounds);
+            gl.uniform1i(gl.getUniformLocation(this.program, 'riverReady'), Number(this.riverReady));
             gl.uniform1i(gl.getUniformLocation(this.program, 'grid'), Number(this.grid));
             gl.uniform1i(gl.getUniformLocation(this.program, 'mapMode'), Number(this.usesMap()));
             gl.uniform1f(gl.getUniformLocation(this.program, 'viewport'), size);
@@ -478,6 +608,7 @@ class MarsAlmanacGlobe {
             this.input('Longitude').value = place ? place.town.longitude : String(longitude);
             // Deliberately leave the authored observer altitude untouched.
             this.status.textContent = place ? `Selected ${place.town.name}` : 'Selected custom observer location';
+            this.observerSignature = this.observerState();
             this.draw();
             await WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation();
         } catch (error) { if (generation === this.selection) this.status.textContent = String(error); }
@@ -490,8 +621,13 @@ class MarsAlmanacGlobe {
         if (point) void this.select(point[0], point[1]);
     }
 
+    private hideGridHover(): void {
+        this.gridTooltip.hidden = this.gridMarker.hidden = true;
+        this.canvas.classList.remove('grid-hover');
+    }
+
     private hoverGrid(event: PointerEvent): void {
-        this.gridTooltip.hidden = true;
+        this.hideGridHover();
         if (!this.grid || this.pointers.size || event.target !== this.canvas) return;
         const box = this.canvas.getBoundingClientRect(), radius = box.width * this.view[2] / 2.24;
         const point = labDOM.call('lab_globe_pick', (event.clientX - box.left - box.width / 2) / radius,
@@ -499,21 +635,31 @@ class MarsAlmanacGlobe {
         if (!point) return;
         const [latitude, longitude, flags] = labDOM.call('lab_globe_grid', point[0], point[1], this.view[2], box.width) as number[];
         if (!flags) return;
-        const coordinate = (value: number, positive: string, negative: string): string =>
-            `${Number(Math.abs(value).toFixed(2))}°${value ? ` ${value < 0 ? negative : positive}` : ''}`;
+        const marker = this.project(flags & 1 ? latitude : point[0], flags & 2 ? longitude : point[1], box.width);
+        if (!marker) return;
         const labels: string[] = [];
-        if (flags & 1) labels.push(`Latitude ${coordinate(latitude, 'N', 'S')}`);
-        if (flags & 2) labels.push(`Longitude ${coordinate(longitude, 'E', 'W')}`);
+        if (flags & 1) labels.push(`Latitude ${MarsAlmanacGlobe.coordinate(latitude, 'N', 'S')}`);
+        if (flags & 2) labels.push(`Longitude ${MarsAlmanacGlobe.coordinate(longitude, 'E', 'W')}`);
         this.gridTooltip.textContent = labels.join(' · ');
         this.gridTooltip.hidden = false;
+        this.gridMarker.style.left = `${marker[0]}px`;
+        this.gridMarker.style.top = `${marker[1]}px`;
+        this.gridMarker.hidden = false;
+        this.canvas.classList.add('grid-hover');
         this.gridTooltip.style.left = `${Math.max(4, Math.min(box.width - this.gridTooltip.offsetWidth - 4, event.clientX - box.left + 12))}px`;
         this.gridTooltip.style.top = `${Math.max(4, Math.min(box.height - this.gridTooltip.offsetHeight - 4, event.clientY - box.top + 16))}px`;
+    }
+
+    public static coordinate(value: number, positive: string, negative: string): string {
+        const hundredths = Math.round(Math.abs(value) * 6000);
+        const degrees = Math.floor(hundredths / 6000), minutes = (hundredths % 6000) / 100;
+        return `${degrees}°${minutes ? ` ${minutes.toFixed(2)}′` : ''}${value ? ` ${value < 0 ? negative : positive}` : ''}`;
     }
 
     private events(): void {
         const viewport = this.canvas.parentElement!;
         viewport.addEventListener('pointermove', event => this.hoverGrid(event));
-        viewport.addEventListener('pointerleave', () => { this.gridTooltip.hidden = true; });
+        viewport.addEventListener('pointerleave', () => this.hideGridHover());
         this.root.querySelectorAll<HTMLButtonElement>('[data-globe-action]').forEach(button => {
             button.addEventListener('click', () => {
                 if (button.dataset.globeAction === 'map') {
@@ -525,7 +671,7 @@ class MarsAlmanacGlobe {
                     this.draw();
                 } else if (button.dataset.globeAction === 'grid') {
                     this.grid = !this.grid;
-                    this.gridTooltip.hidden = true;
+                    this.hideGridHover();
                     button.setAttribute('aria-pressed', String(this.grid));
                     button.textContent = `Lat/long: ${this.grid ? 'on' : 'off'}`;
                     this.draw();
@@ -540,7 +686,7 @@ class MarsAlmanacGlobe {
             this.move(0, 0, event.deltaY < 0 ? 1.15 : 1 / 1.15);
         }, {passive: false});
         this.canvas.addEventListener('pointerdown', event => {
-            this.gridTooltip.hidden = true;
+            this.hideGridHover();
             if (event.button !== 0) return;
             this.canvas.setPointerCapture(event.pointerId);
             this.pointers.set(event.pointerId, {x: event.clientX, y: event.clientY});
@@ -595,6 +741,12 @@ class MarsAlmanacGlobe {
             event.preventDefault(); ++this.generation; this.request?.abort();
             window.clearTimeout(this.timer);
             this.status.textContent = 'Globe graphics interrupted. Reload to restore; observer fields remain available.';
+        });
+        document.addEventListener('mars-almanac-observer-committed', () => {
+            if (this.observerSignature !== this.observerState()) {
+                ++this.selection;
+                this.centre();
+            }
         });
         for (const id of ['almanacLatitude', 'almanacLongitude', 'almanacTown', 'almanacJurisdiction'])
             document.getElementById(id)?.addEventListener('change', () => {

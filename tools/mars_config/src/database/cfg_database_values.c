@@ -202,6 +202,15 @@ bool cfg_database_values_line(sqlite_t *db, cfg_database_values *values, string_
     *handled = false;
     if (!values->prefix)
         return true;
+    /* A standalone comment or blank line between tuples is valid SQL, even after
+     * a batch has been flushed. Keep it in pending for SQLCipher's own lexer. */
+    cfg_database_scan scan = {.view = string_view_all(line)};
+    cfg_database_scan_spaces(&scan);
+    if (scan.pos == string_view_length(scan.view) ||
+        (cfg_database_scan_char(&scan, '-') && cfg_database_scan_char(&scan, '-'))) {
+        *handled = true;
+        return true;
+    }
     bool last = false;
     if (!cfg_database_tuple(line, &last)) {
         if (values->transaction)

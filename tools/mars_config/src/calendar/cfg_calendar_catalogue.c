@@ -2,8 +2,9 @@
  * @file cfg_calendar_catalogue.c
  * @brief Indexed town resolution and explicit substring/fuzzy discovery.
  *
- * The installed catalogue is normalised once into connection-local temporary
- * tables. Ordinary lookups use an index; only requested discovery scans names.
+ * The installed catalogue is normalised once into an encrypted staging table,
+ * removed by the installer after selection. Ordinary lookups use an index;
+ * only requested discovery scans names.
  * Country duplicates are suppressed only when a matching subdivision describes
  * the same physical town. All returned locations own their string fields.
  */
@@ -26,11 +27,11 @@ void cfg_calendar_place_clear(void *value)
 bool cfg_calendar_catalogue(sqlite_t *db)
 {
     bool ok = sqlite_exec_cstr(
-        db, "DROP TABLE IF EXISTS temp.cfg_calendar_places;"
-            "CREATE TEMP TABLE cfg_calendar_places(normalized TEXT NOT NULL,name TEXT NOT NULL,"
+        db, "SAVEPOINT cfg_calendar_catalogue; DROP TABLE IF EXISTS main.cfg_calendar_places;"
+            "CREATE TABLE cfg_calendar_places(normalized TEXT NOT NULL,name TEXT NOT NULL,"
             "jurisdiction TEXT NOT NULL,latitude REAL NOT NULL,longitude REAL NOT NULL,timezone TEXT NOT NULL,"
-            "default_for TEXT); CREATE INDEX temp.cfg_calendar_place_name ON cfg_calendar_places(normalized);"
-            "CREATE INDEX temp.cfg_calendar_place_default ON cfg_calendar_places(default_for);");
+            "default_for TEXT); CREATE INDEX cfg_calendar_place_name ON cfg_calendar_places(normalized);"
+            "CREATE INDEX cfg_calendar_place_default ON cfg_calendar_places(default_for);");
     sqlite_stmt_t *read =
         ok ? sqlite_stmt_prepare(
                  db,
@@ -67,7 +68,11 @@ bool cfg_calendar_catalogue(sqlite_t *db)
     }
     sqlite_stmt_finalize(write);
     sqlite_stmt_finalize(read);
-    return ok && step == SQLITE_STEP_DONE;
+    ok = ok && step == SQLITE_STEP_DONE;
+    if (!ok)
+        sqlite_exec_cstr(db, "ROLLBACK TO cfg_calendar_catalogue");
+    bool released = sqlite_exec_cstr(db, "RELEASE cfg_calendar_catalogue");
+    return ok && released;
 }
 
 static bool cfg_calendar_query_parts(const string_t *text, string_t **name, string_t **jurisdiction)

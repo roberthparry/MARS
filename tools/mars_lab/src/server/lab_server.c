@@ -7,7 +7,9 @@
  * Routes are registered before workers are forked; each worker owns its request state.
  */
 #include <errno.h>
+#include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "array-t.h"
 #include "almanac-t.h"
@@ -216,9 +218,46 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
             return ok;
         }
         if (lab_svr_equal(path, "/jurisdictions")) {
-            json_t *catalogue = lab_page_jurisdictions();
+            json_t *catalogue = lab_page_jurisdiction_index();
             bool ok = catalogue && lab_svr_value(request, response, catalogue);
             json_free(catalogue);
+            return ok;
+        }
+        if (lab_svr_equal(path, "/towns")) {
+            const char *target = string_c_str(websrv_request_target(request));
+            int64_t cursor = 0;
+            double latitude = 0, longitude = 0;
+            bool nearby = false;
+            bool valid = !strcmp(target, "/towns");
+            if (!strncmp(target, "/towns?after=", 13)) {
+                const char *digit = target + 13;
+                valid = *digit >= '0' && *digit <= '9';
+                for (; valid && *digit && *digit != '&'; ++digit) {
+                    valid = *digit >= '0' && *digit <= '9' && cursor <= (INT64_MAX - (*digit - '0')) / 10;
+                    if (valid)
+                        cursor = cursor * 10 + *digit - '0';
+                }
+                if (valid && *digit) {
+                    char *end = NULL;
+                    valid = !strncmp(digit, "&lat=", 5);
+                    if (valid) {
+                        latitude = strtod(digit + 5, &end);
+                        valid = end != digit + 5 && !strncmp(end, "&lon=", 5);
+                    }
+                    if (valid) {
+                        const char *start = end + 5;
+                        longitude = strtod(start, &end);
+                        valid = end != start && !*end && isfinite(latitude) && isfinite(longitude) &&
+                                fabs(latitude) <= 90 && fabs(longitude) <= 180;
+                    }
+                    nearby = valid;
+                }
+            }
+            if (!valid)
+                return lab_svr_message(request, response, 400, "Invalid town catalogue cursor");
+            json_t *batch = nearby ? lab_page_town_near_batch(cursor, latitude, longitude) : lab_page_town_batch(cursor);
+            bool ok = batch && lab_svr_value(request, response, batch);
+            json_free(batch);
             return ok;
         }
         if (lab_svr_equal(path, "/catalogue")) {
@@ -309,6 +348,7 @@ static bool lab_svr_register_routes(lab_server_t *server)
                                              "/catalogue",
                                              "/state",
                                              "/jurisdictions",
+                                             "/towns",
                                              "/mobile-access",
                                              "/favicon.svg",
                                              "/apple-touch-icon.png",
@@ -332,6 +372,7 @@ static bool lab_svr_register_routes(lab_server_t *server)
                                               "/almanac-eval",
                                               "/almanac-weather",
                                               "/almanac-globe",
+                                              "/almanac-rivers",
                                               "/almanac-land-totality",
                                               "/funnel-toggle"};
     for (size_t i = 0; i < sizeof lab_svr_assets / sizeof *lab_svr_assets; ++i) {

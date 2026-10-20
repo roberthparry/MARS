@@ -310,6 +310,15 @@ char *number_cstring_from_text(string_t *text);
 void number_box_free(number_t *number);
 void number_assign(number_t *dst, number_t value);
 void number_scope_register_value(const number_t *number);
+
+/**
+ * @brief Transfer an internal temporary into the caller's numerical scope.
+ * @param scope Address of the active internal scope; cleared after leaving it.
+ * @param result Result owned by that scope, to preserve across its cleanup.
+ * @return Live result registered with the caller's scope, or explicitly owned if none is active.
+ */
+number_t number_scope_result(num_scope_t **scope, number_t result);
+
 int number_scope_unregister_value(const number_t *number);
 num_scope_t *number_scope_suspend(void);
 void number_scope_resume(num_scope_t *scope);

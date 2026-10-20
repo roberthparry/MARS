@@ -58,6 +58,9 @@ bool cfg_database_import(sqlite_t *db, const string_t *root, const string_t *pat
  */
 bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *staging);
 
+/** @brief Import optional packaged rivers into a borrowed jurisdiction connection, using private staging storage. */
+bool cfg_database_rivers(sqlite_t *db, const string_t *root, const string_t *staging);
+
 /** Create an unpredictable mode-0700 staging directory beneath the supplied directory. */
 string_t *cfg_database_stage(const string_t *directory);
 

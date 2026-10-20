@@ -18,6 +18,7 @@ insert into jurisdiction_location_default_longitude values('GB-ENG','-2.7541'),(
 insert into jurisdiction_location_default_timezone values('GB-ENG',1),('GB-WLS',1),('US',2);
 insert into jurisdiction_location_default_locality values('GB-ENG','Shrewsbury'),('GB-WLS','Rhyl'),('US','New York');
 create table jurisdiction_town(jurisdiction_town_id integer primary key,jurisdiction_id text,town_name text);
+create view jurisdiction_town_jurisdiction_id as select jurisdiction_town_id,jurisdiction_id from jurisdiction_town;
 create table jurisdiction_town_latitude(jurisdiction_town_id integer primary key,latitude text);
 create table jurisdiction_town_longitude(jurisdiction_town_id integer primary key,longitude text);
 create table jurisdiction_town_elevation(jurisdiction_town_id integer primary key,elevation_metres text);

@@ -401,7 +401,7 @@ static bool town_seeds_total_solar_eclipse(almanac_t *almanac, const almanac_obs
     observer.longitude_degrees = town->longitude_degrees;
     observer.elevation_metres = town->elevation_metres;
     return almanac_solar_eclipse_totality_from_seed(almanac, origin, &observer, seed, 1.0, out) &&
-           almanac_surface_at(almanac, out->latitude_degrees, out->longitude_degrees) == SHORELINE_LAND;
+           almanac_surface_at(almanac, out->latitude_degrees, out->longitude_degrees) == GLOBE_LAND;
 }
 
 static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *almanac,
@@ -420,7 +420,7 @@ static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *al
     out[0] = '\0';
     if (!almanac || !observer || !event)
         return false;
-    if (almanac_surface_at(almanac, observer->latitude_degrees, observer->longitude_degrees) == SHORELINE_UNKNOWN)
+    if (almanac_surface_at(almanac, observer->latitude_degrees, observer->longitude_degrees) == GLOBE_UNKNOWN)
         return false;
     if (!load_totality_towns(observer, &towns, &town_count))
         return false;

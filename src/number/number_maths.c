@@ -2469,7 +2469,7 @@ static number_t number_log_imag_multiple(const number_t *number, number_const_id
         num_destroy(&out);
         out = neg;
     }
-    return num_scope_detach(out);
+    return number_scope_result(&scope, out);
 }
 
 static int number_try_get_exact_int(const number_t number, int *out)
@@ -3650,19 +3650,19 @@ number_t num_round(const number_t number)
     if (!number_is_valid_value(&number))
         return number_invalid();
     if (!num_is_finite(number))
-        return num_scope_detach(num_clone(number));
+        return number_scope_result(&scope, num_clone(number));
     if (!num_is_real(number)) {
         number_t real = num_round(num_real_part(number));
         number_t imag = num_round(num_imag_part(number));
-        return num_scope_detach(num_add(real, num_mul(NUM_I, imag)));
+        return number_scope_result(&scope, num_add(real, num_mul(NUM_I, imag)));
     }
     if (num_is_integer(number))
-        return num_scope_detach(num_clone(number));
+        return number_scope_result(&scope, num_clone(number));
     number_t magnitude = num_abs(number);
     number_t integer = num_floor(magnitude);
     number_t remainder = num_sub(magnitude, integer);
     number_t rounded = num_ge(remainder, NUM_HALF) ? num_add(integer, NUM_ONE) : num_clone(integer);
-    return num_scope_detach(num_lt(number, NUM_ZERO) ? num_neg(rounded) : rounded);
+    return number_scope_result(&scope, num_lt(number, NUM_ZERO) ? num_neg(rounded) : rounded);
 }
 
 /* Scale using native number arithmetic, retaining exact decimal fractions where supported. */
@@ -3670,11 +3670,11 @@ number_t num_roundn(const number_t number, int n)
 {
     NUM_SCOPE(scope);
     if (n == 0 || !num_is_finite(number))
-        return num_scope_detach(num_round(number));
+        return number_scope_result(&scope, num_round(number));
     if (!num_is_real(number)) {
         number_t real = num_roundn(num_real_part(number), n);
         number_t imag = num_roundn(num_imag_part(number), n);
-        return num_scope_detach(num_add(real, num_mul(NUM_I, imag)));
+        return number_scope_result(&scope, num_add(real, num_mul(NUM_I, imag)));
     }
     size_t bits = num_get_effective_prec_bits(number);
     number_t ten = num_create_from_long(10L);
@@ -3686,16 +3686,16 @@ number_t num_roundn(const number_t number, int n)
     }
     number_t scale = num_pow_int(ten, n);
     if (!num_is_finite(scale))
-        return num_scope_detach(n > 0 ? num_clone(number) : num_clone(NUM_NAN));
+        return number_scope_result(&scope, n > 0 ? num_clone(number) : num_clone(NUM_NAN));
     if (num_is_zero(scale))
-        return num_scope_detach(num_clone(NUM_ZERO));
+        return number_scope_result(&scope, num_clone(NUM_ZERO));
     number_t value = num_is_exact(number) ? num_clone(number) : num_as_inexact_real_prec(number, bits + 64u);
     number_t scaled = num_mul(value, scale);
     number_t rounded = num_round(scaled);
     number_t out = num_div(rounded, scale);
     if (!num_is_exact(number))
         num_set_prec_bits(&out, bits);
-    return num_scope_detach(out);
+    return number_scope_result(&scope, out);
 }
 
 /* Count decimal digits from the magnitude, correcting logarithm rounding at powers of ten. */
@@ -3703,19 +3703,19 @@ number_t num_rounds(const number_t number, unsigned int n)
 {
     NUM_SCOPE(scope);
     if (n == 0u)
-        return num_scope_detach(num_clone(NUM_NAN));
+        return number_scope_result(&scope, num_clone(NUM_NAN));
     if (!num_is_finite(number) || num_is_zero(number))
-        return num_scope_detach(num_clone(number));
+        return number_scope_result(&scope, num_clone(number));
     if (!num_is_real(number)) {
         number_t real = num_rounds(num_real_part(number), n);
         number_t imag = num_rounds(num_imag_part(number), n);
-        return num_scope_detach(num_add(real, num_mul(NUM_I, imag)));
+        return number_scope_result(&scope, num_add(real, num_mul(NUM_I, imag)));
     }
     number_t magnitude = num_abs(number);
     number_t logarithm = num_floor(num_log10(magnitude));
     double order_value = num_to_double(logarithm);
     if (!isfinite(order_value) || order_value <= INT_MIN || order_value >= INT_MAX)
-        return num_scope_detach(num_clone(NUM_NAN));
+        return number_scope_result(&scope, num_clone(NUM_NAN));
     int order = (int)order_value;
     number_t ten = num_create_from_long(10L);
     number_t base = order >= -4096 && order <= 4096 ? num_pow_int(ten, order) : num_pow10(order);
@@ -3725,19 +3725,20 @@ number_t num_rounds(const number_t number, unsigned int n)
         ++order;
     double places = (double)n - 1.0 - order;
     if (places > INT_MAX)
-        return num_scope_detach(num_clone(number));
+        return number_scope_result(&scope, num_clone(number));
     if (places < INT_MIN)
-        return num_scope_detach(num_clone(NUM_NAN));
-    return num_scope_detach(num_roundn(number, (int)places));
+        return number_scope_result(&scope, num_clone(NUM_NAN));
+    return number_scope_result(&scope, num_roundn(number, (int)places));
 }
 
+/* Obtain the ceiling through negated floor, retaining the result in the caller's scope. */
 number_t num_ceil(const number_t number)
 {
     NUM_SCOPE(scope);
     number_t neg = num_neg(number);
     number_t floor_neg = num_floor(neg);
 
-    return num_scope_detach(num_neg(floor_neg));
+    return number_scope_result(&scope, num_neg(floor_neg));
 }
 
 number_t num_pow10(int exponent10)

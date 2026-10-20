@@ -65,4 +65,17 @@ json_t *lab_page_catalogue(void);
  */
 json_t *lab_page_jurisdictions(void);
 
+/** @brief Return owned startup metadata with empty towns; release with json_free(). */
+json_t *lab_page_jurisdiction_index(void);
+
+/**
+ * @brief Return up to 512 towns after an indexed ID, as an owned transport object.
+ * @param after_id Zero initially, then the previous response's decimal next cursor.
+ * @return Owned object with towns, available and next; next="0" denotes an empty final page.
+ */
+json_t *lab_page_town_batch(int64_t after_id);
+
+/** @brief Return up to 512 towns within five degrees of a centre, with an ascending-ID cursor. */
+json_t *lab_page_town_near_batch(int64_t after_id, double latitude, double longitude);
+
 #endif

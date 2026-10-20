@@ -29,7 +29,7 @@
 
 #include "array-t.h"
 #include "datetime-t.h"
-#include "shoreline-t.h"
+#include "globe-t.h"
 
 /**
  * @brief Opaque astronomical almanac engine backed by configured ephemeris data.
@@ -42,18 +42,18 @@ typedef struct _almanac_t almanac_t;
 typedef struct _jurisdiction_t jurisdiction_t;
 
 /**
- * @brief Classify a coordinate using indexed shoreline chunks in the almanac database.
- * @param almanac Borrowed engine with an installed coastline dataset.
+ * @brief Classify a coordinate using the independent configured globe database.
+ * @param almanac Borrowed engine; globe storage is opened lazily and owned separately from the ephemeris connection.
  * @param latitude_degrees Finite latitude from -90 to 90 degrees.
  * @param longitude_degrees Finite longitude from -180 to 180 degrees.
  * @return Land, sea, inland water, uncertain coast, or unknown on failure.
  * @note The 500-metre boundary band is a conservative display policy, not a surveyed accuracy guarantee.
  * Old coastlines, tides, reclamation and unmapped features limit this planning aid; it is not a nautical chart.
  */
-shoreline_surface_t almanac_surface_at(almanac_t *almanac, double latitude_degrees, double longitude_degrees);
+globe_surface_t almanac_surface_at(almanac_t *almanac, double latitude_degrees, double longitude_degrees);
 
 /**
- * @brief Stream clipped shoreline vector paths from the catalogue's reader.
+ * @brief Stream clipped shoreline vector paths from the independent globe reader.
  * @param almanac Borrowed engine, with installed shoreline data.
  * @param west Western longitude in degrees.
  * @param south Southern latitude in degrees.
@@ -62,16 +62,16 @@ shoreline_surface_t almanac_surface_at(almanac_t *almanac, double latitude_degre
  * @param tolerance Display simplification distance in degrees, from 0 to 1.
  * @param visit Required synchronous path visitor.
  * @param context Borrowed visitor context.
- * @return Whether streaming succeeded; bounds and ownership follow shoreline_paths().
+ * @return Whether streaming succeeded; bounds and ownership follow globe_surface_paths().
  */
 bool almanac_surface_paths(almanac_t *almanac, double west, double south, double east, double north,
-                          double tolerance, shoreline_path_fn visit, void *context);
+                          double tolerance, globe_path_fn visit, void *context);
 
 /**
  * @brief Prepare resident shoreline geometry before native request workers fork.
  * @param almanac Borrowed engine with an installed shoreline dataset.
  * @return True when geometry is resident, false when data or memory are unavailable.
- * @note Uses shoreline_prepare(); no database connection is retained by the shared geometry cache.
+ * @note Uses globe_surface_prepare(); no database connection is retained by the shared geometry cache.
  */
 bool almanac_surface_prepare(almanac_t *almanac);
 

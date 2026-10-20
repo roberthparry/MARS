@@ -10,7 +10,8 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "shoreline-t.h"
+#define MARS_GLOBE_INTERNAL_ACCESS
+#include "globe_layers.h"
 #define MARS_SHORELINE_INTERNAL_ACCESS
 #include "shoreline_internal.h"
 
@@ -25,7 +26,7 @@ typedef struct {
     coast_point_t last;
     unsigned level;
     bool emitted, ok, antarctic;
-    shoreline_path_fn visit;
+    globe_path_fn visit;
     void *context;
 } coast_path_t;
 
@@ -53,7 +54,7 @@ static void coast_feed(coast_path_t *path, unsigned stage, coast_point_t point)
     if (!path->ok) return;
     if (stage == 4) {
         if (path->emitted && hypot(point.x - path->last.x, point.y - path->last.y) < path->tolerance) return;
-        path->ok = path->visit(path->emitted ? SHORELINE_PATH_LINE : SHORELINE_PATH_MOVE,
+        path->ok = path->visit(path->emitted ? GLOBE_PATH_LINE : GLOBE_PATH_MOVE,
                               point.x, point.y, path->level, path->antarctic, path->context);
         path->emitted = true;
         path->last = point;
@@ -76,7 +77,7 @@ static void coast_finish(coast_path_t *path)
         if (clip->present) coast_edge(path, stage, clip->previous, clip->first);
     }
     if (path->ok && path->emitted)
-        path->ok = path->visit(SHORELINE_PATH_CLOSE, 0, 0, path->level, path->antarctic, path->context);
+        path->ok = path->visit(GLOBE_PATH_CLOSE, 0, 0, path->level, path->antarctic, path->context);
     memset(path->clips, 0, sizeof path->clips);
     path->emitted = false;
 }
@@ -105,7 +106,7 @@ static bool coast_display_ring(const coast_geometry_t *geometry, const coast_rin
 
 /* Clip spatially indexed resident geometry, retaining exact coordinates for close views and hit-testing. */
 bool shoreline_paths(shoreline_t *shoreline, double west, double south, double east, double north,
-                     double tolerance, shoreline_path_fn visit, void *context)
+                     double tolerance, globe_path_fn visit, void *context)
 {
     if (!shoreline || !visit || !isfinite(west) || !isfinite(east) || !isfinite(south) || !isfinite(north) ||
         !isfinite(tolerance) || tolerance < 0 || tolerance > 1 || west < -360 || west > 180 ||

@@ -10,6 +10,20 @@ It answers questions such as:
 - whether a date is a national holiday
 - how many working days fall in a date range
 
+## River network
+
+River geometry belongs in the independent globe database, not the jurisdiction
+catalogue. The inaccurate WDBII network has been withdrawn; no replacement is
+packaged yet. Town and calendar data remain available.
+
+`jurisdict_globe_open()` returns an owned `globe_t` controller borrowing the engine's
+town connection and owning its separately configured geometry connection. Release
+it with `globe_close()` before closing the jurisdiction engine. Missing globe
+storage leaves towns available; legacy river tables in jurisdiction storage are
+not used.
+See the [globe module guide](globe.md) for the query API, storage, dataset
+provenance, memory behaviour and limitations.
+
 ## Catalogue visitors
 
 `jurisdict_each_choice()` enumerates installed country and subdivision codes with
@@ -18,6 +32,8 @@ include the parent name. `jurisdict_each_location()` enumerates representative
 locations in jurisdiction-code order. `jurisdict_each_town()` enumerates towns by
 jurisdiction, default first, then case-insensitive name. All three use the whole
 configured database, independently of the engine's selected jurisdiction.
+Town enumeration visits indexed jurisdictions in order, limiting each name sort
+to one jurisdiction rather than sorting the entire worldwide catalogue in memory.
 
 `jurisdict_place_t` supplies the jurisdiction code, locality name, latitude,
 longitude, elevation, IANA timezone and default marker. Coordinate fields remain
@@ -185,6 +201,18 @@ The jurisdiction database installer creates the read-only SQL view
 `packaging/jurisdiction-db/mars_calendar_local.sql`. Its name stays the same
 regardless of the selected town.
 
+Before generating the calendar, the installer releases unused SQLCipher import-cache
+memory. This avoids retaining locked cache pages while opening the calendar reader
+and building the snapshot; encryption and SQLCipher memory protection remain enabled.
+The installer's main and temporary page caches are each limited to a suggested
+512 KiB working size, keeping larger town imports within the same memory-lock budget.
+Large town-import and normalised-selection tables live in the encrypted staging
+database rather than memory-only temporary storage. They are removed before the
+database is published; no unencrypted spill files are needed.
+The bounded SQL importer accepts blank lines and standalone `--` comments between
+literal tuples, including after a batch has been flushed. Import failures identify
+the packaged source and line number without printing SQL or credentials.
+
 To select Limmen during installation:
 
 ```sh
@@ -196,6 +224,67 @@ The final output line is:
 ```text
 calendar_local location: Limmen, NL
 ```
+
+The Italian catalogue includes 54 Sardinian towns, covering coastal and inland
+locations such as Cagliari, Sassari, Olbia, Alghero, Oristano, Nuoro, Bosa and
+Tortolì. These use GeoNames coordinates and approximate DEM elevations with the
+`Europe/Rome` timezone; the [data attribution](../THIRD_PARTY_NOTICES.md#geonames-sardinian-town-catalogue)
+describes their source. Reinstall the jurisdiction database and reload MARS Lab
+to make added towns available in both the observer selector and globe.
+
+The French catalogue also includes Ajaccio, Bastia, Biguglia, Borgo, Calvi,
+Corte and Porto-Vecchio in Corsica, from the same GeoNames extract, with
+approximate DEM elevations and the `Europe/Paris` timezone.
+
+The worldwide supplement brings the packaged catalogue to **50,000 locations**,
+adding 46,455 GeoNames populated places across more than 200 countries and
+territories. Existing coordinates and default choices are retained. Duplicate
+names within a jurisdiction are distinguished by a GeoNames-ID suffix. New US
+and British places use supported subdivisions; other new places use country
+jurisdictions rather than guessing a regional holiday policy. Coordinates and
+DEM elevations describe reference points, not an observer's exact position.
+
+`jurisdict_each_town_batch()` provides indexed, ascending-ID pagination for
+bounded transports. Start with ID zero, request 1–1024 records, and continue
+with the returned last ID until an empty batch returns zero. Records are borrowed
+for the callback duration, as with the other catalogue visitors. A callback may
+stop early; the returned ID then identifies its last visited record. These cursors
+must not be reused after the installed database is replaced. Display ordering is
+separate from ID pagination; `jurisdict_each_town()` retains its ordered full visitor.
+
+`jurisdict_each_town_near_batch()` prioritises towns within five degrees of the
+supplied latitude and longitude, wrapping longitude across the date line. It uses
+the same bounded ID pagination; keep the centre fixed until the local sequence
+ends. This rectangular window is not a nearest-distance ranking. New installations
+index numeric latitude for these queries; older databases remain compatible but
+may scan the latitude records until reinstalled.
+
+The globe indexes towns geographically and suppresses overlapping labels in the
+current view, while retaining the selected label. Loading uses bounded background
+pages rather than one large response. The generator caps the combined seed and
+supplement at 50,000 records. National capitals, first-level regional seats and
+towns with at least 100,000 inhabitants take precedence, followed by the selected
+cruising regions; remaining candidates are ranked by population, with GeoNames
+ID breaking ties. These are country-level priorities, not a coastline-distance
+filter or a verified harbour directory. Existing smaller seed towns remain available.
+
+Coverage includes 109 Welsh and 137 Irish records, Fishguard, Wexford, all three Nykøbing
+towns, Castricum, Alkmaar and Madalena on Pico. Small villages absent from the
+cities5000 source still need targeted additions.
+Fishguard is a targeted seed from the fuller British extract, using its town
+reference point rather than a harbour entrance position.
+The seed also includes 16 targeted Cape Peninsula places from the fuller South
+African extract, including Fish Hoek, Noordhoek, Camps Bay, Hout Bay, Clovelly
+and Kalk Bay. Selected coastal suburbs are included even where the worldwide
+source omits them; regenerating the supplement keeps the overall 50,000-record cap.
+This is not a complete gazetteer. See the
+[worldwide data attribution](../THIRD_PARTY_NOTICES.md#geonames-worldwide-town-supplement).
+
+Maintainers can regenerate the supplement with the native `catalogue_towns`
+target in `tools/mars_config/Makefile`. The executable takes the extracted
+GeoNames cities5000 TSV pathname and output SQL pathname, and runs from the
+repository root. It uses indexed staging queries, preserves the original seed,
+and emits bounded batches; installation does not download geographical data.
 
 The optional town is looked up in the packaged catalogue, without network
 geolocation. Matching ignores case, accents and repeated spaces. An interactive

@@ -5,7 +5,10 @@
  * Projects the installed database through borrowed callback records. SQL joins use
  * the normalised catalogue keys; no packaged C or JSON copy supplies these rows.
  * Visitors may stop early. Statements are always finalised, including on errors.
+ * Town name sorting is bounded to one indexed jurisdiction at a time.
  */
+#include <math.h>
+
 #define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
 
@@ -24,14 +27,10 @@ static sqlite_stmt_t *jurisdiction_catalogue_prepare(jurisdiction_t *jurisdictio
     return stmt;
 }
 
-static bool jurisdiction_catalogue_places(jurisdiction_t *jurisdiction, const char *sql,
-                                          jurisdict_place_visit_fn visitor, void *context)
+static bool jurisdiction_catalogue_rows(sqlite_stmt_t *stmt, jurisdict_place_visit_fn visitor,
+                                        void *context, bool *stopped)
 {
-    sqlite_stmt_t *stmt = jurisdiction_catalogue_prepare(jurisdiction, sql, visitor != NULL);
-    if (!stmt)
-        return false;
     sqlite_step_result_t step;
-    bool stopped = false;
     while ((step = sqlite_stmt_step(stmt)) == SQLITE_STEP_ROW) {
         jurisdict_place_t place = {.jurisdiction_code = sqlite_stmt_column_text(stmt, 0),
                                    .name = sqlite_stmt_column_text(stmt, 1),
@@ -41,11 +40,53 @@ static bool jurisdiction_catalogue_places(jurisdiction_t *jurisdiction, const ch
                                    .timezone = sqlite_stmt_column_text(stmt, 5),
                                    .is_default = sqlite_stmt_column_int(stmt, 6) != 0};
         if (!visitor(&place, context)) {
-            stopped = true;
+            *stopped = true;
             break;
         }
     }
-    bool ok = stopped || step == SQLITE_STEP_DONE;
+    return *stopped || step == SQLITE_STEP_DONE;
+}
+
+/* Seek by the indexed town ID without rescanning preceding pages. */
+static bool jurisdiction_town_batch(jurisdiction_t *jurisdiction, int64_t after_id, size_t limit,
+                                    jurisdict_place_visit_fn visitor, void *context, int64_t *next_id,
+                                    bool nearby, double latitude, double longitude)
+{
+    globe_t *globe = jurisdict_globe_open(jurisdiction);
+    bool ok = globe_towns_batch(globe, after_id, limit, nearby, latitude, longitude, visitor, context, next_id);
+    globe_close(globe);
+    if (!ok && jurisdiction)
+        jurisdiction_set_error(jurisdiction, "Cannot read a town catalogue batch");
+    return ok;
+}
+
+/* Enumerate a bounded ID page of the complete catalogue. */
+bool jurisdict_each_town_batch(jurisdiction_t *jurisdiction, int64_t after_id, size_t limit,
+                               jurisdict_place_visit_fn visitor, void *context, int64_t *next_id)
+{
+    return jurisdiction_town_batch(jurisdiction, after_id, limit, visitor, context, next_id, false, 0, 0);
+}
+
+/* Prioritise a small geographical window, wrapping longitude at the date line. */
+bool jurisdict_each_town_near_batch(jurisdiction_t *jurisdiction, double latitude, double longitude,
+                                    int64_t after_id, size_t limit, jurisdict_place_visit_fn visitor,
+                                    void *context, int64_t *next_id)
+{
+    if (next_id)
+        *next_id = 0;
+    if (!isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180)
+        return false;
+    return jurisdiction_town_batch(jurisdiction, after_id, limit, visitor, context, next_id, true, latitude, longitude);
+}
+
+static bool jurisdiction_catalogue_places(jurisdiction_t *jurisdiction, const char *sql,
+                                          jurisdict_place_visit_fn visitor, void *context)
+{
+    sqlite_stmt_t *stmt = jurisdiction_catalogue_prepare(jurisdiction, sql, visitor != NULL);
+    if (!stmt)
+        return false;
+    bool stopped = false;
+    bool ok = jurisdiction_catalogue_rows(stmt, visitor, context, &stopped);
     if (!ok)
         jurisdiction_set_error(jurisdiction, "Cannot enumerate the configured jurisdiction catalogue");
     sqlite_stmt_finalize(stmt);
@@ -107,6 +148,24 @@ bool jurisdict_each_town(jurisdiction_t *jurisdiction, jurisdict_place_visit_fn 
         "left join jurisdiction_town_elevation elev using(jurisdiction_town_id) "
         "left join jurisdiction_default_town def on def.jurisdiction_town_id = town.jurisdiction_town_id "
         "and def.jurisdiction_id = town.jurisdiction_id "
-        "order by town.jurisdiction_id, is_default desc, town.town_name collate nocase, town.jurisdiction_town_id;";
-    return jurisdiction_catalogue_places(jurisdiction, sql, visitor, context);
+        "where town.jurisdiction_id=?1 "
+        "order by is_default desc, town.town_name collate nocase, town.jurisdiction_town_id;";
+    /* Keep the sorter bounded to one indexed jurisdiction, not the entire world catalogue. */
+    sqlite_stmt_t *groups = jurisdiction_catalogue_prepare(jurisdiction,
+        "SELECT DISTINCT jurisdiction_id FROM jurisdiction_town_jurisdiction_id ORDER BY jurisdiction_id",
+        visitor != NULL);
+    sqlite_stmt_t *towns = groups ? jurisdiction_catalogue_prepare(jurisdiction, sql, visitor != NULL) : NULL;
+    bool ok = groups && towns, stopped = false;
+    sqlite_step_result_t step = SQLITE_STEP_DONE;
+    while (ok && !stopped && (step = sqlite_stmt_step(groups)) == SQLITE_STEP_ROW) {
+        sqlite_stmt_reset(towns);
+        ok = sqlite_stmt_bind_text(towns, 1, sqlite_stmt_column_text(groups, 0)) &&
+             jurisdiction_catalogue_rows(towns, visitor, context, &stopped);
+    }
+    ok = ok && (stopped || step == SQLITE_STEP_DONE);
+    if (!ok && jurisdiction)
+        jurisdiction_set_error(jurisdiction, "Cannot enumerate the configured jurisdiction catalogue");
+    sqlite_stmt_finalize(towns);
+    sqlite_stmt_finalize(groups);
+    return ok;
 }

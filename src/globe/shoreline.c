@@ -11,7 +11,8 @@
 #include <stdlib.h>
 #include <zstd.h>
 
-#include "shoreline-t.h"
+#define MARS_GLOBE_INTERNAL_ACCESS
+#include "globe_layers.h"
 #define MARS_SHORELINE_INTERNAL_ACCESS
 #include "shoreline_internal.h"
 
@@ -59,7 +60,7 @@ static bool coast_cached_ring(const coast_geometry_t *geometry, const coast_ring
     return true;
 }
 
-static shoreline_surface_t coast_cached_hit(coast_geometry_t *geometry, double latitude, double longitude)
+static globe_surface_t coast_cached_hit(coast_geometry_t *geometry, double latitude, double longitude)
 {
     coast_hit_t hit = {.y = latitude * 1000000, .scale = 0.111195 * cos(latitude * 0.017453292519943295)};
     double tx = hit.scale > 0.000001 ? 500 / hit.scale : 360000000, ty = 500 / 0.111195;
@@ -68,10 +69,10 @@ static shoreline_surface_t coast_cached_hit(coast_geometry_t *geometry, double l
         double bounds[] = {hit.x - tx, hit.y - ty, 360000000, hit.y + ty};
         coast_geometry_visit(geometry, bounds, 0, coast_cached_ring, &hit);
     }
-    if (hit.boundary) return SHORELINE_COAST;
+    if (hit.boundary) return GLOBE_COAST;
     for (unsigned level = 4; level; --level)
-        if (hit.crossings & (1u << level)) return level % 2 ? SHORELINE_LAND : SHORELINE_INLAND_WATER;
-    return SHORELINE_SEA;
+        if (hit.crossings & (1u << level)) return level % 2 ? GLOBE_LAND : GLOBE_INLAND_WATER;
+    return GLOBE_SEA;
 }
 
 /* Prepare one reusable spatial query against a borrowed database connection. */
@@ -79,20 +80,37 @@ shoreline_t *shoreline_open(sqlite_t *db)
 {
     if (!db) return NULL;
     sqlite_stmt_t *metadata = sqlite_stmt_prepare(db,
-        "SELECT format_version FROM shoreline_dataset WHERE id=1 AND point_count>0");
+        "select"
+        " format_version "
+        "from shoreline_dataset "
+        "where id=1"
+        "  and point_count>0");
     bool ready = metadata && sqlite_stmt_step(metadata) == SQLITE_STEP_ROW && sqlite_stmt_column_int(metadata, 0) == 1;
     sqlite_stmt_finalize(metadata);
     if (!ready) {
         return NULL;
     }
     sqlite_stmt_t *query = sqlite_stmt_prepare(db,
-        "SELECT c.level,c.codec,c.point_count,CASE WHEN length(b.vertices)<=65536 "
-        "AND c.byte_offset>=0 AND c.byte_count BETWEEN 1 AND 2056 "
-        "AND c.byte_offset<=length(b.vertices)-c.byte_count "
-        "THEN substr(b.vertices,c.byte_offset+1,c.byte_count) END,c.boundary "
-        "FROM shoreline_bounds r JOIN shoreline_chunk c ON c.id=r.id "
-        "JOIN shoreline_blob b ON b.id=c.blob_id "
-        "WHERE r.max_x>=?1 AND r.min_y<=?2 AND r.max_y>=?3");
+        "select"
+        " c.level,"
+        " c.codec,"
+        " c.point_count,"
+        " case"
+        "  when length(b.vertices)<=65536"
+        "   and c.byte_offset>=0"
+        "   and c.byte_count between 1 and 2056"
+        "   and c.byte_offset<=length(b.vertices)-c.byte_count"
+        "       then substr(b.vertices,c.byte_offset+1,c.byte_count)"
+        " end,"
+        " c.boundary "
+        "from shoreline_bounds r "
+        "join shoreline_chunk c"
+        "  on c.id=r.id "
+        "join shoreline_blob b"
+        "  on b.id=c.blob_id "
+        "where r.max_x>=?1"
+        "  and r.min_y<=?2"
+        "  and r.max_y>=?3");
     shoreline_t *shoreline = query ? malloc(sizeof *shoreline) : NULL;
     if (!shoreline) {
         sqlite_stmt_finalize(query);
@@ -114,14 +132,14 @@ void shoreline_close(shoreline_t *shoreline)
 }
 
 /* Classify a point with bounded decompression of spatially selected chunks. */
-shoreline_surface_t shoreline_hit_test(shoreline_t *shoreline, double latitude_degrees, double longitude_degrees)
+globe_surface_t shoreline_hit_test(shoreline_t *shoreline, double latitude_degrees, double longitude_degrees)
 {
     if (!shoreline || !isfinite(latitude_degrees) || !isfinite(longitude_degrees) ||
         fabs(latitude_degrees) > 90 || fabs(longitude_degrees) > 180)
-        return SHORELINE_UNKNOWN;
+        return GLOBE_UNKNOWN;
     coast_geometry_t *geometry = coast_geometry_acquire(shoreline, false);
     if (geometry) {
-        shoreline_surface_t surface = coast_cached_hit(geometry, latitude_degrees, longitude_degrees);
+        globe_surface_t surface = coast_cached_hit(geometry, latitude_degrees, longitude_degrees);
         coast_geometry_release(geometry);
         return surface;
     }
@@ -174,12 +192,12 @@ shoreline_surface_t shoreline_hit_test(shoreline_t *shoreline, double latitude_d
     }
     sqlite_stmt_reset(query);
     if (!ok) {
-        return SHORELINE_UNKNOWN;
+        return GLOBE_UNKNOWN;
     }
     if (boundary)
-        return SHORELINE_COAST;
+        return GLOBE_COAST;
     for (unsigned level = 4; level; --level)
         if (crossings & (1u << level))
-            return level % 2 ? SHORELINE_LAND : SHORELINE_INLAND_WATER;
-    return SHORELINE_SEA;
+            return level % 2 ? GLOBE_LAND : GLOBE_INLAND_WATER;
+    return GLOBE_SEA;
 }

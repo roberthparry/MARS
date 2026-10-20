@@ -153,7 +153,7 @@ typedef struct almanac_frame_rotation_segment_t {
 } almanac_frame_rotation_segment_t;
 
 struct _almanac_t {
-    shoreline_t *shoreline;
+    globe_t *shoreline;
     sqlite_t *db;
     string_t *error;
     bool correction_model_loaded;

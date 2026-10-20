@@ -31,6 +31,11 @@ and generated mathematical rendering. They do not reproduce another
 application's user interface or third-party branded artwork and are distributed
 under the repository's MIT Licence.
 
+The Almanac capture also includes NASA Blue Marble imagery displayed on the
+observer globe, with its attribution visible below the globe. The underlying
+imagery retains the provenance and terms recorded in
+`THIRD_PARTY_NOTICES.md`; the screenshot does not change those terms.
+
 ## Future assets
 
 Any future visual asset copied or adapted from another source must be recorded

@@ -79,6 +79,25 @@
     }
 
     const failureCase = new URLSearchParams(location.search).get('failure');
+    const catalogueCheck = new URLSearchParams(location.search).get('catalogue-check');
+    let releaseTowns: () => void = () => {};
+    const townGate = new Promise<void>(resolve => { releaseTowns = resolve; });
+    if (catalogueCheck) {
+        nativeSetTimeout(() => {
+            void report(`FAIL: catalogue check timed out (${catalogueCheck}); readyState=${document.readyState}; ` +
+                `status=${document.getElementById('status')?.textContent}; ` +
+                `errors=${failures.join('; ')}`);
+        }, 60000);
+        window.fetch = async (url, options) => {
+            if (catalogueCheck === 'index-fail' && String(url) === '/jurisdictions')
+                return new Response('unavailable', {status: 503});
+            if (String(url).startsWith('/towns?after=')) {
+                if (String(url) === '/towns?after=0') await townGate;
+                else if (catalogueCheck === 'fail') return new Response('unavailable', {status: 503});
+            }
+            return nativeFetch(url, options);
+        };
+    }
     window.addEventListener('error', function recordError(event) {
         failures.push(event.message || 'Resource load failed');
     }, true);
@@ -2726,7 +2745,36 @@
     window.addEventListener('load', async function runBrowserChecks() {
         try {
             check(window.labReady instanceof Promise, 'Startup promise missing');
-            if (failureCase === 'database') {
+            if (catalogueCheck) {
+                await window.labReady;
+                check(!((document.getElementById('run')! as HTMLButtonElement).disabled), 'Town loading blocks maths');
+                check(String(WorksheetContext.value.textContent).trim() === '5', 'Maths evaluates before towns arrive');
+                check(MarsAlmanacGlobe.coordinate(51.99376, 'N', 'S') === '51° 59.63′ N', 'Decimal-minute latitude');
+                check(MarsAlmanacGlobe.coordinate(-4.97631, 'E', 'W') === '4° 58.58′ W', 'Decimal-minute longitude');
+                check(MarsAlmanacGlobe.coordinate(89.999999, 'N', 'S') === '90° N', 'Minutes carry into degrees');
+                check(MarsAlmanacGlobe.coordinate(0, 'E', 'W') === '0°', 'Zero coordinate');
+                if (catalogueCheck === 'success') {
+                    await labApplication.loadNearbyTowns(53.319, -3.4916);
+                    check(labApplication.catalogue.towns['GB-WLS']?.[0].name === 'Rhyl',
+                        'Local towns appear while the world stream is still blocked');
+                }
+                releaseTowns();
+                await labApplication.townsReady;
+                if (catalogueCheck === 'success') {
+                    check(labApplication.catalogue.towns['GB-WLS'][0].name === 'Rhyl', 'Background towns not published');
+                    check(labApplication.catalogue.towns['GB-WLS'].length === 1, 'Local/world pages duplicated a town');
+                    location.href = '/?catalogue-check=fail';
+                } else if (catalogueCheck === 'fail') {
+                    check(labApplication.catalogue.towns['GB-WLS']?.[0].name === 'Rhyl', 'Later failure discarded loaded towns');
+                    check(document.querySelector('[data-jurisdiction-notice]:not(.hidden)') !== null, 'Town error not shown');
+                    location.href = '/?catalogue-check=index-fail';
+                } else {
+                    check(!labApplication.catalogue.available, 'Failed metadata did not fall back');
+                    await report('PASS: bounded town loading, independent maths startup and catalogue failure recovery');
+                }
+                return;
+            }
+            if (failureCase === 'database' || failureCase === 'catalogue') {
                 await window.labReady;
                 check(
                     (document.getElementById('datetimeJurisdiction')! as HTMLSelectElement).disabled,
@@ -2736,6 +2784,10 @@
                     String(WorksheetContext.value.textContent).trim() === '7',
                     `Unavailable database blocked ordinary maths: mode=${WorksheetWorkspace.mode.currentMode()}, input=${WorksheetContext.expr.value}, ` +
                         `value=${WorksheetContext.value.textContent}, rendered=${WorksheetContext.rendered.textContent}`);
+                if (failureCase === 'catalogue') {
+                    location.href = '/?failure=script';
+                    return;
+                }
                 await report(
                     'PASS: startup, native evaluation, editor, modes, cards, dates, state, mobile, failure recovery');
                 return;
@@ -2746,13 +2798,6 @@
                     document.getElementById('status')!.textContent === 'Startup failed',
                     'Missing startup asset not reported');
                 check((document.getElementById('run')! as HTMLButtonElement).disabled, 'Failed startup leaves Evaluate enabled');
-                if (failureCase === 'catalogue') {
-                    check(
-                        document.getElementById('rendered')!.textContent.includes('503'),
-                        'Startup error lacks HTTP status');
-                    location.href = '/?failure=script';
-                    return;
-                }
                 if (failureCase === 'server-missing' || failureCase === 'server-mismatch') {
                     check(
                         document.getElementById('rendered')!.textContent.includes('make mars-lab-restart'),
@@ -2770,7 +2815,13 @@
                 return;
             }
             await window.labReady;
+            await labApplication.townsReady;
             initialiseLabTestAdapters();
+            if (new URLSearchParams(location.search).get('globe-check') === '1') {
+                await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);
+                await report('PASS: globe projection, picking and water-preserving photographic colours');
+                return;
+            }
             if (labProfile.enabled) {
                 await report('PASS: PROFILE ' + JSON.stringify(await labProfile.run()));
                 return;

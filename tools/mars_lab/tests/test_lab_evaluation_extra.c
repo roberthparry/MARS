@@ -984,6 +984,25 @@ static void test_lab_extra_surface(void)
                     422u, "error", "roll");
 }
 
+/* Exercise both coordinate scopes without rendering or launching calculation workers. */
+static void test_lab_extra_plot_range_ownership(void)
+{
+    const char *limits[] = {"", "", "", ""};
+    size_t precision = num_get_default_prec_bits();
+
+    for (unsigned dimensions = 1; dimensions <= 2; ++dimensions) {
+        number_t bounds[] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
+        bool ok = lab_worker_plot_ranges(dimensions == 1 ? "x^2" : "x^2+y^2", "x",
+                                         dimensions == 1 ? NULL : "y", limits, bounds);
+        for (unsigned axis = 0; axis < dimensions; ++axis)
+            ok = ok && num_to_double(bounds[2 * axis]) == -10 && num_to_double(bounds[2 * axis + 1]) == 10;
+        for (unsigned i = 0; i < 4; ++i)
+            num_destroy(&bounds[i]);
+        TEST_ASSERT_TRUE(ok, "automatic range coordinates retain their expected bounds");
+        TEST_ASSERT_TRUE(num_get_default_prec_bits() == precision, "range probing restores worksheet precision");
+    }
+}
+
 static void test_lab_extra_plot_ranges(void)
 {
     static const struct {
@@ -2650,6 +2669,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_surface_height, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_surface_names, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_ranges, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_plot_range_ownership, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_stepped_ranges, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_preview, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_series_domain, tests, NULL);

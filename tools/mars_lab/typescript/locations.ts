@@ -330,8 +330,9 @@ namespace WorksheetLocations {
             return WorksheetWorkspace.mode.evaluateCurrentMode();
         },
 
-        /** @brief Persist the current almanac controls. */
+        /** @brief Notify observer views after a committed location, then persist the controls. */
         locSaveAlmanac() {
+            document.dispatchEvent(new Event('mars-almanac-observer-committed'));
             return WorksheetPersistence.persistence.saveCalendar('almanac');
         },
 
@@ -884,8 +885,9 @@ namespace WorksheetLocations {
         }
 
         /** @brief Restore calendar controls and town selection under an ownership guard. */
-        restoreCalendarHistory(mode: WorksheetMode, source: unknown, isCurrent: WorksheetGuard = locationOwnership.current): Promise<void> {
-            return this.dependencies.flow().continue(30, {mode, source, isCurrent}) as Promise<void>;
+        async restoreCalendarHistory(mode: WorksheetMode, source: unknown, isCurrent: WorksheetGuard = locationOwnership.current): Promise<void> {
+            await this.dependencies.flow().continue(30, {mode, source, isCurrent});
+            if (mode === 'almanac' && isCurrent()) document.dispatchEvent(new Event('mars-almanac-observer-committed'));
         }
 
         /** @brief Run the native location and evaluation continuation for a totality action. */

@@ -1602,7 +1602,8 @@
       "test_number_t_extension_round_trip": true,
       "test_parse_object_array_and_escapes": true,
       "test_rejects_non_json_number_forms": true,
-      "test_serialise_round_trip": true
+      "test_serialise_round_trip": true,
+      "test_serialise_unicode_catalogue": true
     }
   },
   "tests/jurisdiction/test_jurisdiction.c": {
@@ -2395,6 +2396,12 @@
     "test_regex_limits": true,
     "test_regex_unicode_locale": true
   },
+  "tests/rivers/test_rivers.c": {
+    "tests": {
+      "enabled": true,
+      "test_rivers_index_and_rollback": true
+    }
+  },
   "tests/sampler/test_sampler.c": {
     "example_sampler_callback": true,
     "example_sampler_derivatives": true,
@@ -2879,11 +2886,15 @@
       "test_cfg_database_bounds": true,
       "test_cfg_database_conflicts": true,
       "test_cfg_database_failure": true,
+      "test_cfg_database_globe": true,
+      "test_cfg_database_globe_packaged": true,
       "test_cfg_database_jurisdiction": true,
       "test_cfg_database_large": true,
       "test_cfg_database_packaged_almanac": true,
       "test_cfg_database_paths": true,
       "test_cfg_database_precedence": true,
+      "test_cfg_database_rivers": true,
+      "test_cfg_database_sardinia": true,
       "test_cfg_database_stream": true,
       "test_cfg_database_trace": true
     }
@@ -2907,6 +2918,7 @@
   "tools/mars_config/tests/test_cfg_make.c": {
     "tests": {
       "enabled": true,
+      "test_cfg_make_databases": true,
       "test_cfg_make_dry": true,
       "test_cfg_make_forward": true,
       "test_cfg_make_help": true,
@@ -3079,6 +3091,7 @@
       "test_lab_extra_plot_availability": true,
       "test_lab_extra_plot_precision": true,
       "test_lab_extra_plot_preview": true,
+      "test_lab_extra_plot_range_ownership": true,
       "test_lab_extra_plot_ranges": true,
       "test_lab_extra_plot_series_domain": true,
       "test_lab_extra_plot_stepped_ranges": true,
@@ -3743,6 +3756,7 @@
       "test_lab_http_catalogue": true,
       "test_lab_http_contracts": true,
       "test_lab_http_rejections": true,
+      "test_lab_http_rivers": true,
       "test_lab_server_lifetime": true
     }
   },

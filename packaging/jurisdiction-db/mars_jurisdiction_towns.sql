@@ -1,7 +1,10 @@
 -- Town/location choices for MARS Lab jurisdiction observers.
 -- Elevations are metres above mean sea level, populated from GeoNames DEM where available.
+-- Sardinian coverage: 54 GeoNames cities5000 records; see THIRD_PARTY_NOTICES.md for selection and attribution.
+-- Corsican coverage: seven GeoNames cities5000 records; see THIRD_PARTY_NOTICES.md for selection and attribution.
 
-create temp table jurisdiction_town_seed(
+-- The encrypted staging database holds this larger working table; it is dropped below.
+create table jurisdiction_town_seed(
     jurisdiction_id,
     town_name,
     latitude,
@@ -992,9 +995,15 @@ insert into jurisdiction_town_seed(
     ('FK', 'Stanley', '-51.6938', '-57.8570', '28', 220, 'N'),
     ('FM', 'Palikir', '6.9248', '158.1611', '90', 313, 'N'),
     ('FO', 'Tórshavn', '62.0097', '-6.7716', '1', 215, 'N'),
+    ('FR', 'Ajaccio', '41.91886', '8.73812', '12', 259, 'N'),
     ('FR', 'Angers', '47.4716', '-0.5520', '42', 259, 'N'),
+    ('FR', 'Bastia', '42.70219', '9.45123', '1', 259, 'N'),
+    ('FR', 'Biguglia', '42.62692', '9.42018', '145', 259, 'N'),
     ('FR', 'Bordeaux', '44.8404', '-0.5805', '20', 259, 'N'),
+    ('FR', 'Borgo', '42.55488', '9.42636', '266', 259, 'N'),
+    ('FR', 'Calvi', '42.56604', '8.75713', '4', 259, 'N'),
     ('FR', 'Cergy-Pontoise', '49.0389', '2.0781', '54', 259, 'N'),
+    ('FR', 'Corte', '42.30956', '9.14917', '433', 259, 'N'),
     ('FR', 'Le Havre', '49.4935', '0.1079', '5', 259, 'N'),
     ('FR', 'Lille', '50.6330', '3.0586', '20', 259, 'N'),
     ('FR', 'Lyon', '45.7485', '4.8467', '173', 259, 'N'),
@@ -1005,6 +1014,7 @@ insert into jurisdiction_town_seed(
     ('FR', 'Nice', '43.7031', '7.2661', '25', 259, 'N'),
     ('FR', 'Paris', '48.8534', '2.3488', '42', 259, 'N'),
     ('FR', 'Paris 13e Arrondissement', '48.8262', '2.3599', '48', 259, 'N'),
+    ('FR', 'Porto-Vecchio', '41.59101', '9.27947', '57', 259, 'N'),
     ('FR', 'Reims', '49.2653', '4.0285', '88', 259, 'N'),
     ('FR', 'Rennes', '48.1120', '-1.6743', '39', 259, 'N'),
     ('FR', 'Rouen', '49.4431', '1.0993', '21', 259, 'N'),
@@ -1108,6 +1118,8 @@ insert into jurisdiction_town_seed(
     ('GB-SCT', 'Paisley', '55.8317', '-4.4325', '50', 250, 'N'),
     ('GB-SCT', 'Perth', '56.3952', '-3.4314', '10', 250, 'N'),
     ('GB-WLS', 'Rhyl', '53.3210', '-3.4800', '8', 250, 'Y'),
+    -- GeoNames 2649372, GB extract; see THIRD_PARTY_NOTICES.md.
+    ('GB-WLS', 'Fishguard', '51.99376', '-4.97631', '63', 250, 'N'),
     ('GB-WLS', 'Aberdare', '51.7144', '-3.4492', '135', 250, 'N'),
     ('GB-WLS', 'Barry', '51.3998', '-3.2838', '25', 250, 'N'),
     ('GB-WLS', 'Bridgend', '51.5058', '-3.5772', '23', 250, 'N'),
@@ -1512,29 +1524,83 @@ insert into jurisdiction_town_seed(
     ('IS', 'Reykjanesbær', '63.9981', '-22.5611', '13', 217, 'N'),
     ('IS', 'Reykjavík', '64.1355', '-21.8954', '37', 217, 'N'),
     ('IS', 'Ísafjörður', '66.0755', '-23.1240', '2', 217, 'N'),
+    ('IT', 'Alghero', '40.55969', '8.31953', '18', 263, 'N'),
     ('IT', 'Amalfi', '40.6340', '14.6027', '6', 263, 'N'),
+    ('IT', 'Arbus', '39.52616', '8.5997', '297', 263, 'N'),
+    ('IT', 'Arzachena', '41.0762', '9.39055', '54', 263, 'N'),
+    ('IT', 'Assemini', '39.29123', '8.99879', '8', 263, 'N'),
     ('IT', 'Bari', '41.1207', '16.8698', '5', 263, 'N'),
     ('IT', 'Bologna', '44.4938', '11.3387', '54', 263, 'N'),
+    ('IT', 'Bosa', '40.29927', '8.49827', '18', 263, 'N'),
     ('IT', 'Brescia', '45.5356', '10.2147', '149', 263, 'N'),
+    ('IT', 'Cabras', '39.92871', '8.53242', '7', 263, 'N'),
+    ('IT', 'Cagliari', '39.23054', '9.11917', '41', 263, 'N'),
+    ('IT', 'Capoterra', '39.1752', '8.97199', '50', 263, 'N'),
     ('IT', 'Capri', '40.5507', '14.2429', '142', 263, 'N'),
+    ('IT', 'Carbonia', '39.16465', '8.5213', '94', 263, 'N'),
+    ('IT', 'Carloforte', '39.14081', '8.3039', '2', 263, 'N'),
+    ('IT', 'Castelsardo', '40.91256', '8.71453', '52', 263, 'N'),
     ('IT', 'Catania', '37.4922', '15.0704', '7', 263, 'N'),
+    ('IT', 'Decimomannu', '39.31033', '8.96964', '11', 263, 'N'),
+    ('IT', 'Dolianova', '39.37791', '9.17697', '225', 263, 'N'),
+    ('IT', 'Domusnovas', '39.32404', '8.64921', '148', 263, 'N'),
+    ('IT', 'Dorgali', '40.29221', '9.58702', '380', 263, 'N'),
+    ('IT', 'Elmas', '39.26878', '9.05021', '8', 263, 'N'),
     ('IT', 'Florence', '43.7792', '11.2463', '50', 263, 'N'),
     ('IT', 'Genoa', '44.4048', '8.9444', '19', 263, 'N'),
+    ('IT', 'Gonnosfanadiga', '39.49426', '8.662', '190', 263, 'N'),
+    ('IT', 'Guspini', '39.53954', '8.63502', '141', 263, 'N'),
+    ('IT', 'Iglesias', '39.3092', '8.5372', '190', 263, 'N'),
+    ('IT', 'Ittiri', '40.59151', '8.56976', '393', 263, 'N'),
+    ('IT', 'La Maddalena', '41.21424', '9.40833', '5', 263, 'N'),
+    ('IT', 'Macomer', '40.26233', '8.76733', '568', 263, 'N'),
+    ('IT', 'Maracalagonis', '39.28574', '9.22874', '84', 263, 'N'),
     ('IT', 'Messina', '38.1939', '15.5526', '3', 263, 'N'),
     ('IT', 'Milan', '45.4643', '9.1895', '122', 263, 'N'),
     ('IT', 'Modena', '44.6478', '10.9254', '34', 263, 'N'),
+    ('IT', 'Monserrato', '39.25642', '9.1444', '8', 263, 'N'),
     ('IT', 'Naples', '40.8522', '14.2681', '17', 263, 'N'),
     ('IT', 'Napoli', '40.8518', '14.2681', '17', 263, 'N'),
+    ('IT', 'Nuoro', '40.31991', '9.32568', '535', 263, 'N'),
+    ('IT', 'Olbia', '40.92337', '9.49802', '11', 263, 'N'),
+    ('IT', 'Oliena', '40.27617', '9.40193', '317', 263, 'N'),
+    ('IT', 'Oristano', '39.9036', '8.59257', '11', 263, 'N'),
+    ('IT', 'Orosei', '40.37826', '9.69248', '14', 263, 'N'),
+    ('IT', 'Ossi', '40.67483', '8.59254', '321', 263, 'N'),
+    ('IT', 'Ozieri', '40.5863', '9.0034', '380', 263, 'N'),
     ('IT', 'Padova', '45.4080', '11.8859', '12', 263, 'N'),
     ('IT', 'Palermo', '38.1157', '13.3615', '14', 263, 'N'),
     ('IT', 'Parma', '44.7993', '10.3262', '57', 263, 'N'),
+    ('IT', 'Porto Torres', '40.83375', '8.40531', '22', 263, 'N'),
     ('IT', 'Prato', '43.8805', '11.0970', '61', 263, 'N'),
+    ('IT', 'Quartu Sant''Elena', '39.22935', '9.25004', '33', 263, 'N'),
+    ('IT', 'Quartucciu', '39.25262', '9.17764', '15', 263, 'N'),
     ('IT', 'Reggio Calabria', '38.1105', '15.6613', '31', 263, 'N'),
     ('IT', 'Rome', '41.8919', '12.5113', '20', 263, 'N'),
+    ('IT', 'Samassi', '39.48208', '8.90538', '54', 263, 'N'),
+    ('IT', 'San Gavino Monreale', '39.55008', '8.79065', '60', 263, 'N'),
+    ('IT', 'San Sperate', '39.35758', '9.00814', '42', 263, 'N'),
+    ('IT', 'Sanluri', '39.56176', '8.89969', '135', 263, 'N'),
+    ('IT', 'Sant''Antioco', '39.07017', '8.45243', '28', 263, 'N'),
+    ('IT', 'Sassari', '40.72586', '8.55552', '190', 263, 'N'),
+    ('IT', 'Selargius', '39.25779', '9.16323', '13', 263, 'N'),
+    ('IT', 'Sennori', '40.7878', '8.59285', '252', 263, 'N'),
+    ('IT', 'Serramanna', '39.42335', '8.92243', '45', 263, 'N'),
+    ('IT', 'Sestu', '39.29846', '9.09248', '45', 263, 'N'),
+    ('IT', 'Settimo San Pietro', '39.2911', '9.1857', '75', 263, 'N'),
+    ('IT', 'Siniscola', '40.57344', '9.69695', '30', 263, 'N'),
+    ('IT', 'Sinnai', '39.30286', '9.20283', '145', 263, 'N'),
+    ('IT', 'Sorso', '40.79949', '8.5757', '131', 263, 'N'),
     ('IT', 'Taranto', '40.4644', '17.2471', '15', 263, 'N'),
+    ('IT', 'Tempio Pausania', '40.90068', '9.10456', '570', 263, 'N'),
+    ('IT', 'Terralba', '39.72056', '8.63504', '13', 263, 'N'),
+    ('IT', 'Tortolì', '39.92626', '9.65569', '19', 263, 'N'),
     ('IT', 'Trieste', '45.6495', '13.7768', '2', 263, 'N'),
     ('IT', 'Turin', '45.0705', '7.6868', '239', 263, 'N'),
+    ('IT', 'Uta', '39.29186', '8.95234', '7', 263, 'N'),
     ('IT', 'Verona', '45.4385', '10.9938', '59', 263, 'N'),
+    ('IT', 'Villacidro', '39.45734', '8.74105', '230', 263, 'N'),
+    ('IT', 'Villasor', '39.3813', '8.9427', '27', 263, 'N'),
     ('JE', 'Saint Helier', '49.1880', '-2.1049', '11', 245, 'N'),
     ('JM', 'Half Way Tree', '18.0125', '-76.7993', '72', 94, 'N'),
     ('JM', 'Kingston', '17.9970', '-76.7936', '65', 94, 'N'),
@@ -3447,6 +3513,23 @@ insert into jurisdiction_town_seed(
     ('ZA', 'Thembisa', '-25.9964', '28.2268', '1577', 24, 'N'),
     ('ZA', 'Vereeniging', '-26.6731', '27.9261', '1445', 24, 'N'),
     ('ZA', 'Welkom', '-27.9774', '26.7351', '1376', 24, 'N'),
+    -- Cape Peninsula additions: GeoNames ZA extract; attribution and IDs in THIRD_PARTY_NOTICES.md.
+    ('ZA', 'Fish Hoek', '-34.13419', '18.42484', '15', 24, 'N'),
+    ('ZA', 'Noordhoek', '-34.10071', '18.36501', '12', 24, 'N'),
+    ('ZA', 'Camps Bay', '-33.95166', '18.38437', '71', 24, 'N'),
+    ('ZA', 'Hout Bay', '-34.0331', '18.34837', '36', 24, 'N'),
+    ('ZA', 'Clovelly', '-34.12487', '18.43276', '27', 24, 'N'),
+    ('ZA', 'Kalk Bay', '-34.12752', '18.44819', '9', 24, 'N'),
+    ('ZA', 'Kommetjie', '-34.14019', '18.32919', '15', 24, 'N'),
+    ('ZA', 'Llandudno', '-34.01027', '18.34318', '56', 24, 'N'),
+    ('ZA', 'Scarborough', '-34.197', '18.375', '263', 24, 'N'),
+    ('ZA', 'Glencairn', '-34.15591', '18.41995', '39', 24, 'N'),
+    ('ZA', 'Saint James', '-34.11799', '18.45829', '15', 24, 'N'),
+    ('ZA', 'Clifton', '-33.93684', '18.37914', '63', 24, 'N'),
+    ('ZA', 'Sea Point', '-33.91858', '18.38968', '24', 24, 'N'),
+    ('ZA', 'Bantry Bay', '-33.92795', '18.38259', '123', 24, 'N'),
+    ('ZA', 'Bakoven', '-33.96045', '18.38167', '113', 24, 'N'),
+    ('ZA', 'Mouille Point', '-33.90027', '18.40531', '6', 24, 'N'),
     ('ZM', 'Chililabombwe', '-12.3648', '27.8229', '1316', 35, 'N'),
     ('ZM', 'Chingola', '-12.5290', '27.8838', '1363', 35, 'N'),
     ('ZM', 'Chipata', '-13.6333', '32.6500', '1147', 35, 'N'),
@@ -3488,6 +3571,13 @@ insert into jurisdiction_town_seed(
     ('ZW', 'Ruwa', '-17.8897', '31.2447', '1562', 23, 'N'),
     ('ZW', 'Zvishavane', '-20.3267', '30.0665', '998', 23, 'N');
 
+create temp table jurisdiction_town_original_default as
+select jurisdiction_id, min(town_name) as town_name from jurisdiction_town_seed group by jurisdiction_id;
+
+-- Worldwide supplement: preserve original fallback choices before appending new rows.
+.read packaging/jurisdiction-db/mars_jurisdiction_world_towns.sql
+create index jurisdiction_town_seed_name on jurisdiction_town_seed(jurisdiction_id, town_name);
+
 create temp table jurisdiction_town_totality_seed(
     jurisdiction_id,
     town_name,
@@ -3522,7 +3612,7 @@ values
 insert into jurisdiction_town(jurisdiction_id, town_name)
 select jurisdiction_id, town_name
 from jurisdiction_town_seed
-order by jurisdiction_id, town_name;
+order by rowid;
 
 insert into jurisdiction_town_latitude(jurisdiction_town_id, latitude)
 select town.jurisdiction_town_id, seed.latitude
@@ -3578,9 +3668,16 @@ join jurisdiction_location_default_locality as locality
  and locality.locality_name = seed.town_name;
 
 insert or ignore into jurisdiction_default_town(jurisdiction_id, jurisdiction_town_id)
+select town.jurisdiction_id, town.jurisdiction_town_id
+from jurisdiction_town as town
+join jurisdiction_town_original_default as original
+  on original.jurisdiction_id = town.jurisdiction_id and original.town_name = town.town_name;
+
+insert or ignore into jurisdiction_default_town(jurisdiction_id, jurisdiction_town_id)
 select town.jurisdiction_id, MIN(town.jurisdiction_town_id)
 from jurisdiction_town as town
 group by town.jurisdiction_id;
 
 drop table jurisdiction_town_totality_seed;
+drop table jurisdiction_town_original_default;
 drop table jurisdiction_town_seed;

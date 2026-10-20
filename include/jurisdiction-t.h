@@ -8,6 +8,8 @@
  * dated exceptions represented in the installed catalogue.
  * Read-only visitors enumerate jurisdiction choices, representative locations and
  * towns, retaining stored coordinate precision and explicit default-town markers.
+ * A geographic adapter opens independent globe_t readers on the same catalogue;
+ * river geometry remains separate from calendar policy and shoreline classification.
  *
  * Use this module for business calendars and calculations whose result depends on
  * local rules, rather than calendar arithmetic alone. Results depend on the
@@ -20,9 +22,12 @@
 #define MARS_JURISDICTION_H
 
 #include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
 
 #include "array-t.h"
 #include "datetime-t.h"
+#include "globe-t.h"
 
 /**
  * @brief Opaque jurisdiction policy engine backed by configured rule data.
@@ -34,20 +39,15 @@
 typedef struct _jurisdiction_t jurisdiction_t;
 
 /**
- * @brief Borrowed database location or town, valid only during its visitor callback.
- *
- * Coordinate text retains the database's precision. Default locations have elevation
- * "0" when no altitude is stored. Do not free or retain these pointers.
+ * @brief Open an owned globe controller borrowing this engine's configured jurisdiction connection.
+ * @param jurisdiction Borrowed open engine, which must outlive the returned reader.
+ * @return Owned controller to release with globe_close(), or NULL on invalid input or allocation failure.
+ * @note Query globe_has_layer() for availability; withdrawn WDBII geometry is never exposed.
  */
-typedef struct jurisdict_place_t {
-    const char *jurisdiction_code; /**< Owning jurisdiction code. */
-    const char *name;              /**< Locality or town name. */
-    const char *latitude;          /**< Latitude in decimal degrees, as stored. */
-    const char *longitude;         /**< Longitude in decimal degrees, as stored. */
-    const char *elevation;         /**< Elevation in metres, or "0" when unspecified. */
-    const char *timezone;          /**< IANA timezone name. */
-    bool is_default;               /**< Whether this is the jurisdiction's selected default. */
-} jurisdict_place_t;
+globe_t *jurisdict_globe_open(jurisdiction_t *jurisdiction);
+
+/** @brief Borrowed geographic place record; its definition is owned by globe-t.h. */
+typedef globe_place_t jurisdict_place_t;
 
 /**
  * @brief Visit a jurisdiction choice; return false to stop successfully.
@@ -92,6 +92,31 @@ bool jurisdict_each_location(jurisdiction_t *jurisdiction, jurisdict_place_visit
  * @return True on completion or requested early stop, false on invalid arguments or database failure.
  */
 bool jurisdict_each_town(jurisdiction_t *jurisdiction, jurisdict_place_visit_fn visitor, void *context);
+
+/**
+ * @brief Visit an indexed batch of towns in ascending database-ID order.
+ * @param jurisdiction Open catalogue engine.
+ * @param after_id Last ID from the previous batch, or zero initially.
+ * @param limit Maximum rows, from 1 to 1024.
+ * @param visitor Borrowed-record callback; false stops this batch early.
+ * @param context Caller-owned callback context.
+ * @param next_id Last visited ID, or zero for an empty batch. Continue until zero.
+ * @return True on success. Cursors are valid only while the installed database is unchanged.
+ */
+bool jurisdict_each_town_batch(jurisdiction_t *jurisdiction, int64_t after_id, size_t limit,
+                               jurisdict_place_visit_fn visitor, void *context, int64_t *next_id);
+
+/**
+ * @brief Enumerate an ascending-ID town page within five degrees of a centre on both axes.
+ * Latitude must be finite and within [-90,90], longitude within [-180,180]. Longitude
+ * wraps at the date line. This is a rectangular priority window, not a distance ranking.
+ * Limit, borrowed callback records and next_id follow jurisdict_each_town_batch().
+ * Keep the centre unchanged while paging; restart at ID zero for another centre.
+ * Packaged databases index numeric latitude; older databases remain readable.
+ */
+bool jurisdict_each_town_near_batch(jurisdiction_t *jurisdiction, double latitude, double longitude,
+                                    int64_t after_id, size_t limit, jurisdict_place_visit_fn visitor,
+                                    void *context, int64_t *next_id);
 
 /**
  * @brief One holiday occurrence.

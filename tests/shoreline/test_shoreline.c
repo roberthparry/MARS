@@ -9,10 +9,12 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <zstd.h>
 
-#include "shoreline-t.h"
+#include "globe-t.h"
+#include "almanac-t.h"
 #include "string-t.h"
 #include "test_harness.h"
 
@@ -91,17 +93,17 @@ static void path_crossing(coast_test_path_t *path, double x, double y)
     path->last_y = y;
 }
 
-static bool check_path(shoreline_path_event_t event, double longitude, double latitude,
+static bool check_path(globe_path_event_t event, double longitude, double latitude,
                        unsigned level, bool antarctic, void *context)
 {
     coast_test_path_t *path = context;
     path->saw_antarctic |= antarctic;
     path->valid = path->valid && isfinite(longitude) && isfinite(latitude) && level >= 1 && level <= 4;
-    if (event == SHORELINE_PATH_MOVE) {
+    if (event == GLOBE_PATH_MOVE) {
         path->first_x = path->last_x = longitude;
         path->first_y = path->last_y = latitude;
         path->inside = false;
-    } else if (event == SHORELINE_PATH_LINE) {
+    } else if (event == GLOBE_PATH_LINE) {
         path_crossing(path, longitude, latitude);
     } else {
         path_crossing(path, path->first_x, path->first_y);
@@ -143,71 +145,76 @@ static void test_shoreline_nested_rings_and_rollback(void)
     file_t *source = temporary_file(directory, "rings.bin");
     sqlite_t *db = memory_database();
     TEST_ASSERT_NOT_NULL(db);
-    TEST_ASSERT_TRUE(shoreline_open(db) == NULL, "missing data are not sea");
+    globe_t *empty = globe_open(db, NULL);
+    TEST_ASSERT_TRUE(empty && !globe_has_layer(empty, GLOBE_LAYER_SHORELINE) &&
+                     globe_hit_test(empty, 0, 0) == GLOBE_UNKNOWN, "missing data are not sea");
+    TEST_ASSERT_TRUE(!globe_has_layer(empty, GLOBE_LAYER_ROADS) &&
+                     !globe_has_layer(empty, GLOBE_LAYER_BUILDINGS), "uninstalled detail is unavailable");
+    globe_close(empty);
     TEST_ASSERT_TRUE(file_open_write(source) &&
                      write_square(source, 0, 1, -20, 20, -20, 20, true) &&
                      write_square(source, 1, 2, -10, 10, -10, 10, false) &&
                      write_square(source, 2, 3, -5, 5, -5, 5, false) &&
                      write_square(source, 3, 4, -1, 1, -1, 1, false) &&
                      write_square(source, 4, 1, 170, 190, -10, 10, false) && file_close(source), "fixture rings");
-    TEST_ASSERT_TRUE(file_open_read(source) && shoreline_import(db, source) && file_close(source), "import rings");
-    shoreline_t *shoreline = shoreline_open(db);
+    TEST_ASSERT_TRUE(file_open_read(source) && globe_import_shoreline(db, source) && file_close(source), "import rings");
+    globe_t *shoreline = globe_open(db, NULL);
     TEST_ASSERT_NOT_NULL(shoreline);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 15, 0), SHORELINE_LAND);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 7, 0), SHORELINE_INLAND_WATER);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 3, 0), SHORELINE_LAND);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 0, 0), SHORELINE_INLAND_WATER);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 30, 0), SHORELINE_SEA);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 20, 0), SHORELINE_COAST);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 20.003, 0), SHORELINE_COAST);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 20.01, 0), SHORELINE_SEA);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 0, -179), SHORELINE_LAND);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 0, 179), SHORELINE_LAND);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 0, -180), SHORELINE_LAND);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, NAN, 0), SHORELINE_UNKNOWN);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 91, 0), SHORELINE_UNKNOWN);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 15, 0), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 7, 0), GLOBE_INLAND_WATER);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 3, 0), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, 0), GLOBE_INLAND_WATER);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 30, 0), GLOBE_SEA);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20, 0), GLOBE_COAST);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20.003, 0), GLOBE_COAST);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20.01, 0), GLOBE_SEA);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, -179), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, 179), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, -180), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, NAN, 0), GLOBE_UNKNOWN);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 91, 0), GLOBE_UNKNOWN);
     const double samples[][2] = {{0, 15}, {0, 7}, {0, 3}, {0, 0}, {0, 30}};
     TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "PRAGMA cache_size=-1024"), "caller cache budget");
     for (unsigned i = 0; i < sizeof samples / sizeof *samples; ++i) {
         coast_test_path_t path = {.x = samples[i][0], .y = samples[i][1], .valid = true};
-        TEST_ASSERT_TRUE(shoreline_paths(shoreline, -32, -32, 32, 32, 0, check_path, &path), "clipped vector rings");
+        TEST_ASSERT_TRUE(globe_surface_paths(shoreline, -32, -32, 32, 32, 0, check_path, &path), "clipped vector rings");
         TEST_ASSERT_TRUE(path.valid && path.closed == 4, "bounded closed polygons");
-        TEST_ASSERT_INT_EQ(path.land, shoreline_hit_test(shoreline, path.y, path.x) == SHORELINE_LAND);
+        TEST_ASSERT_INT_EQ(path.land, globe_hit_test(shoreline, path.y, path.x) == GLOBE_LAND);
     }
     coast_test_path_t path = {.x = 0, .y = 15, .valid = true};
-    TEST_ASSERT_TRUE(shoreline_paths(shoreline, -1, 14, 1, 16, 0, check_path, &path), "enclosing polygon retained");
+    TEST_ASSERT_TRUE(globe_surface_paths(shoreline, -1, 14, 1, 16, 0, check_path, &path), "enclosing polygon retained");
     TEST_ASSERT_TRUE(path.land, "viewport wholly inside land remains green");
     path = (coast_test_path_t){.x = 180, .y = 0, .valid = true};
-    TEST_ASSERT_TRUE(shoreline_paths(shoreline, 160, -16, 200, 16, 0, check_path, &path), "date-line vectors");
+    TEST_ASSERT_TRUE(globe_surface_paths(shoreline, 160, -16, 200, 16, 0, check_path, &path), "date-line vectors");
     TEST_ASSERT_TRUE(path.land, "date-line island filled");
-    TEST_ASSERT_TRUE(shoreline_prepare(shoreline), "reusable resident geometry");
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 20.003, 0), SHORELINE_COAST);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 0, -179), SHORELINE_LAND);
+    TEST_ASSERT_TRUE(globe_surface_prepare(shoreline), "reusable resident geometry");
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20.003, 0), GLOBE_COAST);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, -179), GLOBE_LAND);
     TEST_ASSERT_TRUE(make_legacy_chunk(db), "legacy compressed chunk fixture");
-    TEST_ASSERT_TRUE(shoreline_prepare(shoreline), "anonymous cache refreshes after mutation and reads legacy chunks");
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 15, 0), SHORELINE_LAND);
+    TEST_ASSERT_TRUE(globe_surface_prepare(shoreline), "anonymous cache refreshes after mutation and reads legacy chunks");
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 15, 0), GLOBE_LAND);
     sqlite_stmt_t *cache = sqlite_stmt_prepare(db, "PRAGMA cache_size");
     TEST_ASSERT_TRUE(cache && sqlite_stmt_step(cache) == SQLITE_STEP_ROW, "read restored cache budget");
     TEST_ASSERT_INT_EQ(sqlite_stmt_column_int(cache, 0), -1024);
     sqlite_stmt_finalize(cache);
-    TEST_ASSERT_TRUE(!shoreline_paths(shoreline, 0, 0, 0, 1, 0, check_path, &path), "reject empty extent");
-    TEST_ASSERT_TRUE(!shoreline_paths(shoreline, NAN, 0, 1, 1, 0, check_path, &path), "reject non-finite extent");
-    shoreline_close(shoreline);
+    TEST_ASSERT_TRUE(!globe_surface_paths(shoreline, 0, 0, 0, 1, 0, check_path, &path), "reject empty extent");
+    TEST_ASSERT_TRUE(!globe_surface_paths(shoreline, NAN, 0, 1, 1, 0, check_path, &path), "reject non-finite extent");
+    globe_close(shoreline);
     size_t written;
     TEST_ASSERT_TRUE(file_open_write(source) && file_write(source, "broken", 6, &written) && file_close(source),
                      "truncated replacement fixture");
-    TEST_ASSERT_TRUE(file_open_read(source) && !shoreline_import(db, source) && file_close(source),
+    TEST_ASSERT_TRUE(file_open_read(source) && !globe_import_shoreline(db, source) && file_close(source),
                      "bad replacement rolls back");
-    shoreline = shoreline_open(db);
+    shoreline = globe_open(db, NULL);
     TEST_ASSERT_NOT_NULL(shoreline);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 15, 0), SHORELINE_LAND);
-    shoreline_close(shoreline);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 15, 0), GLOBE_LAND);
+    globe_close(shoreline);
     TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "UPDATE shoreline_chunk SET codec=1; UPDATE shoreline_blob SET vertices=x'00'"),
                      "corrupt payload fixture");
-    shoreline = shoreline_open(db);
-    TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, 15, 0), SHORELINE_UNKNOWN);
-    TEST_ASSERT_TRUE(!shoreline_paths(shoreline, -32, -32, 32, 32, 0, check_path, &path), "reject corrupt vector source");
-    shoreline_close(shoreline);
+    shoreline = globe_open(db, NULL);
+    TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 15, 0), GLOBE_UNKNOWN);
+    TEST_ASSERT_TRUE(!globe_surface_paths(shoreline, -32, -32, 32, 32, 0, check_path, &path), "reject corrupt vector source");
+    globe_close(shoreline);
     sqlite_close(db);
     TEST_ASSERT_TRUE(file_delete(source) && file_remove_directory(directory), "remove owned fixtures");
     file_free(source);
@@ -229,35 +236,35 @@ static void test_shoreline_packaged_world(void)
     string_free(key);
     TEST_ASSERT_NOT_NULL(db);
     bool imported = file_decompress_zstd(packed, source, 128 * 1024 * 1024, false) &&
-                    file_open_read(source) && shoreline_import(db, source) && file_close(source);
+                    file_open_read(source) && globe_import_shoreline(db, source) && file_close(source);
     if (!imported)
         fprintf(stderr, "Shoreline import: file error %d, database error %s\n", file_last_error(source),
                 string_c_str(sqlite_last_error(db)));
     TEST_ASSERT_TRUE(imported, "import GSHHG");
-    shoreline_t *shoreline = shoreline_open(db);
+    globe_t *shoreline = globe_open(db, NULL);
     TEST_ASSERT_NOT_NULL(shoreline);
-    const struct { double latitude, longitude; shoreline_surface_t surface; } sites[] = {
-        {52.7077, -2.7541, SHORELINE_LAND},
-        {36.7202, -4.4203, SHORELINE_COAST},
-        {36.7300, -4.4300, SHORELINE_LAND},
-        {51, 0, SHORELINE_LAND},
-        {0, 0, SHORELINE_SEA},
-        {40, -30, SHORELINE_SEA},
-        {-25, 135, SHORELINE_LAND},
-        {40, -100, SHORELINE_LAND},
-        {0, 180, SHORELINE_SEA},
-        {0, -180, SHORELINE_SEA},
-        {-89, 0, SHORELINE_LAND},
-        {-89, 180, SHORELINE_LAND},
-        {-89, -180, SHORELINE_LAND},
-        {-90, 0, SHORELINE_LAND},
-        {90, 0, SHORELINE_SEA},
-        {47.7, -87.5, SHORELINE_INLAND_WATER},
-        {-17.7, 178.1, SHORELINE_LAND},
+    const struct { double latitude, longitude; globe_surface_t surface; } sites[] = {
+        {52.7077, -2.7541, GLOBE_LAND},
+        {36.7202, -4.4203, GLOBE_COAST},
+        {36.7300, -4.4300, GLOBE_LAND},
+        {51, 0, GLOBE_LAND},
+        {0, 0, GLOBE_SEA},
+        {40, -30, GLOBE_SEA},
+        {-25, 135, GLOBE_LAND},
+        {40, -100, GLOBE_LAND},
+        {0, 180, GLOBE_SEA},
+        {0, -180, GLOBE_SEA},
+        {-89, 0, GLOBE_LAND},
+        {-89, 180, GLOBE_LAND},
+        {-89, -180, GLOBE_LAND},
+        {-90, 0, GLOBE_LAND},
+        {90, 0, GLOBE_SEA},
+        {47.7, -87.5, GLOBE_INLAND_WATER},
+        {-17.7, 178.1, GLOBE_LAND},
     };
     for (size_t i = 0; i < sizeof sites / sizeof *sites; ++i) {
         printf("Classify %.4f, %.4f\n", sites[i].latitude, sites[i].longitude);
-        TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, sites[i].latitude, sites[i].longitude), sites[i].surface);
+        TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, sites[i].latitude, sites[i].longitude), sites[i].surface);
     }
     sqlite_stmt_t *query = sqlite_stmt_prepare(db, "SELECT point_count,polygon_count FROM shoreline_dataset");
     TEST_ASSERT_TRUE(query && sqlite_stmt_step(query) == SQLITE_STEP_ROW, "dataset metadata");
@@ -265,18 +272,42 @@ static void test_shoreline_packaged_world(void)
     TEST_ASSERT_INT_EQ(sqlite_stmt_column_int(query, 1), 188268);
     sqlite_stmt_finalize(query);
     coast_test_path_t world = {.x = -2.7541, .y = 52.7077, .valid = true};
-    TEST_ASSERT_TRUE(shoreline_paths(shoreline, -180, -90, 180, 90, 0.08, check_path, &world), "world vector overview");
+    TEST_ASSERT_TRUE(globe_surface_paths(shoreline, -180, -90, 180, 90, 0.08, check_path, &world), "world vector overview");
     TEST_ASSERT_TRUE(world.valid && world.land && world.closed > 1000, "world vectors include inland observer");
     TEST_ASSERT_TRUE(world.saw_antarctic && !world.antarctic, "Antarctica distinguished from ordinary land");
-    TEST_ASSERT_TRUE(shoreline_prepare(shoreline), "world cache remains resident");
+    TEST_ASSERT_TRUE(globe_surface_prepare(shoreline), "world cache remains resident");
     for (size_t i = 0; i < sizeof sites / sizeof *sites; ++i)
-        TEST_ASSERT_INT_EQ(shoreline_hit_test(shoreline, sites[i].latitude, sites[i].longitude), sites[i].surface);
+        TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, sites[i].latitude, sites[i].longitude), sites[i].surface);
     coast_test_path_t polar = {.x = 0, .y = -85, .valid = true};
-    TEST_ASSERT_TRUE(shoreline_paths(shoreline, -5, -86, 5, -84, 0, check_path, &polar), "polar vector detail");
+    TEST_ASSERT_TRUE(globe_surface_paths(shoreline, -5, -86, 5, -84, 0, check_path, &polar), "polar vector detail");
     TEST_ASSERT_TRUE(polar.valid && polar.land && polar.antarctic, "clipped Antarctic interior retains ice-front identity");
     coast_test_path_t lake = {.x = -87.5, .y = 47.7, .valid = true};
-    TEST_ASSERT_TRUE(shoreline_paths(shoreline, -88, 47, -87, 48, 0, check_path, &lake), "lake vector detail");
+    TEST_ASSERT_TRUE(globe_surface_paths(shoreline, -88, 47, -87, 48, 0, check_path, &lake), "lake vector detail");
     TEST_ASSERT_TRUE(lake.valid && !lake.land, "inland water remains water in vector detail");
+    const char *names[] = {"MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY"};
+    string_t *saved[4] = {0};
+    for (size_t i = 0; i < 4; ++i)
+        if (getenv(names[i])) saved[i] = string_new_with(getenv(names[i]));
+    bool configured = !setenv(names[0], file_path(database), 1) && !setenv(names[1], "shoreline-test", 1) &&
+                      !setenv(names[2], ":memory:", 1) && !setenv(names[3], "empty-almanac-test", 1);
+    globe_t *independent = configured ? globe_open_configured(NULL) : NULL;
+    almanac_t *empty_almanac = configured ? almanac_open() : NULL;
+    bool separate = independent && empty_almanac &&
+                    globe_hit_test(independent, 52.7077, -2.7541) == GLOBE_LAND &&
+                    almanac_surface_at(empty_almanac, 52.7077, -2.7541) == GLOBE_LAND;
+    globe_close(independent);
+    almanac_close(empty_almanac);
+    bool missing = !setenv(names[0], "/nonexistent/mars-globe-test.db", 1);
+    independent = globe_open_configured(NULL);
+    missing = missing && !independent;
+    globe_close(independent);
+    for (size_t i = 0; i < 4; ++i) {
+        if (saved[i]) setenv(names[i], string_c_str(saved[i]), 1);
+        else unsetenv(names[i]);
+        string_free(saved[i]);
+    }
+    TEST_ASSERT_TRUE(separate, "empty astronomical database uses independent configured globe geometry");
+    TEST_ASSERT_TRUE(missing, "missing globe database is not created or replaced by legacy geometry");
     query = sqlite_stmt_prepare(db, "SELECT count(*),sum(length(vertices)) FROM shoreline_blob");
     TEST_ASSERT_TRUE(query && sqlite_stmt_step(query) == SQLITE_STEP_ROW, "BLOB totals");
     printf("Shoreline BLOB pages: %d; uncompressed bytes: %lld\n", sqlite_stmt_column_int(query, 0),
@@ -287,8 +318,8 @@ static void test_shoreline_packaged_world(void)
     TEST_ASSERT_INT_EQ(sqlite_stmt_column_int(query, 0), 0);
     sqlite_stmt_finalize(query);
     TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "UPDATE shoreline_blob SET vertices=x'00' WHERE id=1"), "replace cached data");
-    TEST_ASSERT_TRUE(!shoreline_prepare(shoreline), "file-backed cache rejects changed corrupt data");
-    shoreline_close(shoreline);
+    TEST_ASSERT_TRUE(!globe_surface_prepare(shoreline), "file-backed cache rejects changed corrupt data");
+    globe_close(shoreline);
     sqlite_close(db);
     file_info_t *info = file_get_info(database);
     TEST_ASSERT_NOT_NULL(info);

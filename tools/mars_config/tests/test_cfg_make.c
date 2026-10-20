@@ -117,8 +117,12 @@ static bool test_cfg_make_reject_fixture(const char *directory)
 static bool test_cfg_make_forward_fixture(const char *directory)
 {
     (void)directory;
-    /* The isolated parent stays alive while Make invokes its executable through procfs. */
-    string_t *executable = string_sprintf("/proc/%ld/exe", (long)getpid());
+    /* Resolve in this process: under instrumentation the raw procfs link can name the checker itself. */
+    file_t *self = file_new_cstr("/proc/self/exe");
+    char *target = NULL;
+    string_t *executable = self && file_read_link(self, &target) ? string_new_with(target) : NULL;
+    free(target);
+    file_free(self);
     string_t *override = executable ? string_sprintf("CONFIG_PROGRAM=%s", string_c_str(executable)) : NULL;
     bool ok = executable && override && test_cfg_make_environment() &&
               !setenv("MARS_TEST_MAKE_PROGRAM", string_c_str(executable), 1);
@@ -238,9 +242,33 @@ static void test_cfg_make_help(void)
                      "help lists current targets and obsolete aliases are removed");
 }
 
+static bool test_cfg_make_databases_fixture(const char *directory)
+{
+    (void)directory;
+    const char *args[] = {"make", "--no-print-directory", "-n", "-j1", "-o", "native-config",
+                         "-o", "check-native-deps", "CONFIG_PROGRAM=/not-executed/native-config",
+                         "ALMANAC_RULES_SOURCES=", "JURISDICTION_RULES_SOURCES=", "install-mars-db", NULL};
+    string_t *output = NULL;
+    int status = -1;
+    bool ok = test_cfg_make_environment() && lab_proc_run(args, MARS_CONFIG_ROOT_DIR, 30000, 1048576, &output, &status) &&
+              status == 0 && output;
+    ok = ok && string_find(output, "\" databases") >= 0 &&
+         string_find(output, "\" globe-install") < 0 && string_find(output, "\" almanac") < 0 &&
+         string_find(output, "\" jurisdiction") < 0;
+    string_free(output);
+    return ok;
+}
+
+static void test_cfg_make_databases(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_make_databases_fixture),
+                     "combined database target dispatches one shared-password installer");
+}
+
 /* Register ordinary Make integration cases before the README groups. */
 void test_cfg_make_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_cfg_make_databases, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_dry, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_reject, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_forward, tests, NULL);

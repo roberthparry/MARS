@@ -112,6 +112,10 @@ static bool checks_fixtures_start_peer(checks_fixtures_t *fixtures, size_t index
     struct peer *peer = &fixtures->peers[index];
     if (peer->process > 0)
         return true;
+    /* Reject known path/permission failures before owning a listener. Spawn may otherwise
+     * report exec failure only as a later child exit, rather than a synchronous error. */
+    if (faccessat(AT_FDCWD, string_c_str(fixtures->executable), X_OK, AT_EACCESS))
+        return false;
     int listener = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (listener < 0)
         return false;

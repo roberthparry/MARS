@@ -168,6 +168,18 @@ The native server uses four separate request processes by default, not threads.
 Named-town time zones use the installed Linux zoneinfo data, including daylight
 saving at each event's instant. Jurisdiction choices, default locations and town
 menus come from the configured jurisdiction database through `/jurisdictions`.
+That startup response contains jurisdiction metadata only. Towns arrive afterwards
+through indexed `/towns?after=…` pages of at most 512 records, without delaying maths
+startup. Each page updates menus and globe markers immediately, with duplicate
+records suppressed. A separate request with `lat` and `lon` parameters prioritises
+a five-degree window around the observer and then the current globe centre.
+After rotation settles, an obsolete local request is cancelled and the new centre
+takes priority. Each local run is capped at eight pages; the world stream supplies
+the remainder independently. The complete catalogue is retained in browser memory.
+A failed later page leaves already-loaded towns and observer coordinates usable,
+with an incomplete-loading notice. Priority-request failures do not stop the world stream.
+Fractional gridline tooltip coordinates use degrees and decimal minutes to two
+decimal places; whole degrees stay compact, and minute rounding carries into degrees.
 There is no duplicated geographic catalogue in the Lab assets. Database changes
 appear on the next page load; restart workers to refresh their indexed native
 town-to-timezone lookup. A missing or unreadable database disables the country
@@ -426,6 +438,28 @@ possible, otherwise the existing overview remains available. The full texture us
 128 MiB of GPU storage, plus temporary image decoding memory; no extra WASM memory
 or build-time image-processing dependency is introduced. This is still global
 reference imagery, not street-level satellite tiles.
+At 12× zoom or closer, once the requested longitude and latitude spans are each
+at most 30°, an independent asynchronous request loads a river SVG overlay from
+the **jurisdiction database**. The initial globe, towns and observer selection
+never wait for this layer. Requests are debounced after movement, cancelled when
+the view changes and time-limited; obsolete responses cannot replace the current
+overlay. Only one regional river texture is retained (about 16 MiB). Zooming out
+below 12× hides it immediately and releases its storage after a two-second grace
+period; zooming back in during that interval cancels the release and reuses it.
+Returning after release loads the visible region again asynchronously. Towns
+remain resident to preserve immediate selection; this river policy does not
+evict the selected town or introduce a town-cache memory cap.
+Only spatially indexed chunks intersecting the view are read. Missing
+river data leave the globe usable. The WDBII dataset has been withdrawn because
+it misses important town-scale meanders. Updated builds reject it even in older
+databases; no replacement river dataset is currently packaged.
+
+River strokes use the same local photographic water-colour sampling and lighting
+as sea and fjord fills, including the water-only fallback where narrow channels
+are unresolved in the photograph. There is no separate bright-blue river palette.
+This is a centreline overlay, not surveyed channel width,
+depth or evidence of navigability, and it does not change observer corrections.
+
 At 8× zoom the photographic view automatically switches to the native filled
 shoreline map. Simplified fills use locally sampled photographic RGB colours,
 including differing greens, deep blue and turquoise water, and white ice, rather
@@ -434,7 +468,10 @@ photographic samples smooths raster detail without forming colour tiles and
 rejects opposite-surface colours at shorelines. These are approximate historical colours, not current snow or ice
 observations; they never change shoreline geometry or land/sea classification.
 Small features absent from the photograph cannot acquire additional photographic
-detail from this sampling. The GPU uses the existing texture without another
+detail from this sampling. When no matching photographic samples exist, the fill
+retains the shoreline mask's water or land colour, never the opposite surface's
+photographic colour. Filled masks use nearest-neighbour texture sampling so their
+land and water colours are not interpolated together. The GPU uses the existing texture without another
 image download or additional WASM storage.
 Visible-region SVG geometry is regenerated as the view changes instead of
 magnifying the photograph. Zooming out restores the photograph; the explicit
@@ -460,6 +497,9 @@ It can rotate through either pole without latitude clamping or longitude-rate
 singularities. The shader, marker projection, picking and grid hover use the same
 rotation; extracted centre coordinates only determine geographic coverage.
 “Centre on observer” explicitly restores a north-up view of the selected location.
+Using an eclipse location or restoring an observer from history also recentres the
+globe and updates its selected-town label, preserving zoom without starting an
+additional evaluation. Saving an unchanged observer does not reset a rotated view.
 The selected town keeps a gold label beside the observer marker, including at overview zoom;
 it takes priority over nearby labels while its location is visible on the globe.
 Globe town buttons and navigation remain available during an Almanac refresh.
@@ -472,8 +512,13 @@ Wheel zoom covers the entire globe viewport, including town labels; moving over
 a label during a zoom gesture does not hand the gesture back to page scrolling.
 With latitude/longitude lines enabled, hovering near a line displays its coordinate
 in degrees with a hemisphere label. Intersections show both coordinates. Labels
-follow the displayed grid spacing and disappear during dragging or when the grid
-is switched off; they do not change the observer location.
+include an outlined marker snapped to the highlighted line or intersection,
+and the grab cursor becomes a crosshair while the coordinate tooltip is visible.
+The GPU coordinate conversion uses a range-reduced inverse-tangent series to
+keep close-up shorelines and gridlines aligned with native picking and markers.
+Labels follow the displayed grid spacing. Both tooltip and marker disappear
+during dragging or when the grid is switched off; they do not change the observer
+location.
 The browser reuses overscanned detail imagery during small pans. Detail requests are serialised, and
 WebGL backing resolution is capped at 1536 pixels and 1.5 device pixels per CSS pixel.
 Finer visible-window geometry loads asynchronously after zoom or rotation;
@@ -1436,8 +1481,12 @@ route are removed. Edit the native tables and rebuild to change packaged default
 the existing saved worksheet state still takes precedence.
 `lab_page_jurisdictions()` reads configured database storage through the public
 jurisdiction visitors and returns owned `options`, `locations` and `towns`
-collections, with an explicit availability flag. The browser endpoint and native
-timezone index consume that same database-backed representation.
+collections, with an explicit availability flag. The native timezone index uses
+that complete representation. The browser uses `lab_page_jurisdiction_index()`
+for metadata and `lab_page_town_batch()` for bounded pages instead, keeping both
+the byte and value-node transport limits intact. A zero `next` cursor marks the
+empty final page. Metadata failures fall back to unavailable geography so that
+ordinary maths remains usable; metadata requests have a three-second timeout.
 `lab_page_defaults()` returns the owned worksheet-default snapshot and
 `lab_page_render()` renders the escaped template with request-specific state.
 `lab_page_bootstrap()` returns owned startup configuration for the Protobuf wire format.
@@ -3552,6 +3601,11 @@ altitude above the assumed unobstructed sea horizon. Land, inland water, the
 dip. The summary identifies the classification and
 corrections. This is not a sextant sight reduction, for which dip is subtracted
 from a measured altitude. Waves and terrestrial refraction are not modelled.
+Thus the worksheet corrects predicted sighting altitudes for the observer's
+topocentric position and refraction everywhere, and adds sea-horizon dip only
+where the shoreline data confirms open sea. It deliberately withholds that dip
+near coasts and on land: an entered elevation is not evidence of an unobstructed
+sea horizon.
 Eclipse contact searches and rise/set calculations retain their existing
 geometric/standard-atmosphere conventions, rather than applying today's weather
 to future events. The estimates are not intended for precision sight reduction.
@@ -3622,11 +3676,14 @@ Undefined orientations are explicitly labelled; missing geometry omits the
 preview rather than inventing a shape. Changing to a nearest-totality location
 requires a new evaluation, just as the contact times do.
 
-The captured request is for London at `2026-10-16 12:00:00` GMT. The expanded
-worksheet shows the navigational-body table, including bodies below the horizon,
-with their declination, hour angle, right ascension, altitude, azimuth and visibility.
+The captured request is for London at `2026-10-16 12:00:00` GMT, at an observer
+elevation of 25 metres. The globe and observer controls appear beside the
+navigational-body table, including bodies below the horizon. The summary identifies
+London as land and shows the weather inputs used for refraction; sea-horizon dip
+is therefore excluded. Weather values reflect the captured response and may vary
+when the request is repeated.
 
-[![MARS Lab expanded almanac worksheet showing London navigational bodies and their visibility](images/mars-lab/almanac.png?v=20261016-location)](images/mars-lab/almanac.png?v=20261016-location)
+[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261019-full-page)](images/mars-lab/almanac.png?v=20261019-full-page)
 
 ## Mobile and private remote access
 

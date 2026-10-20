@@ -128,7 +128,10 @@ static bool test_calendar_catalogue_fixture(const char *directory)
         const char *input;
         const char *label;
     } cases[] = {{"LiMmEn", "Limmen, NL"},
-                 {"Shrewsbury", "Shrewsbury, GB-ENG"},
+                 {"Shrewsbury", NULL},
+                 {"Shrewsbury, GB-ENG", "Shrewsbury, GB-ENG"},
+                 {"Shrewsbury, US-MA", "Shrewsbury, US-MA"},
+                 {"Shrewsbury, US-MO", "Shrewsbury, US-MO"},
                  {"Shrewsbury, GB", "Shrewsbury, GB"},
                  {"Quebec", "Québec, CA-QC"},
                  {"Québec", "Québec, CA-QC"},
@@ -176,7 +179,7 @@ static bool test_calendar_menu_fixture(const char *directory)
         const char *request;
         const char *saved;
         const char *expected;
-    } cases[] = {{"n\np\n999\nQuebc\n1\n", "", "", "Québec, CA-QC"},
+    } cases[] = {{"n\np\n999\nQuebc\nQuebec\n1\n", "", "", "Québec, CA-QC"},
                  {"/\nno-such-town-9182\nQuebec\n1\n", "Quebc", "", "Québec, CA-QC"},
                  {"\n", "", "Limmen, NL", "Limmen, NL"},
                  {"q\n", "Quebec", "", NULL},
@@ -444,7 +447,7 @@ static bool test_calendar_snapshot_fixture(const char *directory)
     sqlite_t *db = test_cfg_calendar_database(directory, &path, &key);
     bool ok = db && !setenv("TZ", "Pacific/Honolulu", 1) && !setenv("MARS_JURISDICTION_DB_PATH", "sentinel", 1) &&
               !setenv("MARS_JURISDICTION_DB_KEY", "", 1) &&
-              test_calendar_populate(db, path, key, "Shrewsbury", "English", true);
+              test_calendar_populate(db, path, key, "Shrewsbury, GB-ENG", "English", true);
     string_t *tz = string_new_with(getenv("TZ")), *old_path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
     string_t *old_key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
     ok = ok && test_calendar_text(tz, "Pacific/Honolulu") && test_calendar_text(old_path, "sentinel") &&
@@ -619,22 +622,22 @@ static bool test_calendar_translation_snapshots_fixture(const char *directory)
     bool ok = db != NULL;
     static const struct {
         const char *town, *locale, *date, *holiday;
-    } cases[] = {{"Québec", "fr_CA", "2026-07-01", "Fête du Canada"},
-                 {"Limmen", "fy_NL", "2026-12-25", "Earste Krystdei"},
-                 {"Rhyl", "cy_GB", "2026-12-28", "Dydd San Steffan (diwrnod amgen)"},
-                 {"Rhyl", "ga_GB", "2026-12-28", "Lá Fhéile Stiofáin (lá ionaid)"},
+    } cases[] = {{"Québec, CA-QC", "fr_CA", "2026-07-01", "Fête du Canada"},
+                 {"Limmen, NL", "fy_NL", "2026-12-25", "Earste Krystdei"},
+                 {"Rhyl, GB-WLS", "cy_GB", "2026-12-28", "Dydd San Steffan (diwrnod amgen)"},
+                 {"Rhyl, GB-WLS", "ga_GB", "2026-12-28", "Lá Fhéile Stiofáin (lá ionaid)"},
                  {"Kingston, JM", "jam", "2026-08-06", "Independence Deh"},
-                 {"New York City", "es_US", "2026-07-04", "Día de la Independencia"},
-                 {"New Orleans", "frc", "2026-07-04", "Fête de l'Indépendance"},
-                 {"Philadelphia", "pdc", "2026-07-04", "Der Viert vun Tschulei"},
-                 {"Anchorage", "ik", "2026-12-25", "Kuraisimaġvik"},
-                 {"Anchorage", "ik", "2026-07-04", "Independence Day"},
-                 {"Haifa", "he_IL", "2026-04-02", "פסח"},
-                 {"Haifa", "ar_IL", "2026-04-02", "عيد الفصح اليهودي"},
-                 {"Jerusalem", "yi", "2026-04-02", "פּסח"},
-                 {"Jerusalem", "lad", "2026-04-02", "Pesah"},
-                 {"New York City", "yi", "2026-07-04", "אומאָפּהענגיקייט־טאָג"},
-                 {"New York City", "lad", "2026-07-04", "Diya de la independensya"}};
+                 {"New York City, US-NY", "es_US", "2026-07-04", "Día de la Independencia"},
+                 {"New Orleans, US-LA", "frc", "2026-07-04", "Fête de l'Indépendance"},
+                 {"Philadelphia, US-PA", "pdc", "2026-07-04", "Der Viert vun Tschulei"},
+                 {"Anchorage, US-AK", "ik", "2026-12-25", "Kuraisimaġvik"},
+                 {"Anchorage, US-AK", "ik", "2026-07-04", "Independence Day"},
+                 {"Haifa, IL", "he_IL", "2026-04-02", "פסח"},
+                 {"Haifa, IL", "ar_IL", "2026-04-02", "عيد الفصح اليهودي"},
+                 {"Jerusalem, IL", "yi", "2026-04-02", "פּסח"},
+                 {"Jerusalem, IL", "lad", "2026-04-02", "Pesah"},
+                 {"New York City, US-NY", "yi", "2026-07-04", "אומאָפּהענגיקייט־טאָג"},
+                 {"New York City, US-NY", "lad", "2026-07-04", "Diya de la independensya"}};
     for (size_t i = 0; i < sizeof(cases) / sizeof(*cases) && ok; ++i)
         ok = test_calendar_translated_snapshot(db, path, key, cases[i].town, cases[i].locale, cases[i].date,
                                                cases[i].holiday);
@@ -644,7 +647,7 @@ static bool test_calendar_translation_snapshots_fixture(const char *directory)
              db, "INSERT INTO holiday_observance_rule(holiday_id,holiday_rule_id,observed_rule_kind,observed_name,"
                  "weekend_mask,suppress_original,valid_from_year,valid_to_year,priority) VALUES"
                  "(1005125,3279799,'previous_weekday','Independence Day (observed)','6,7','N',2026,2026,100)") &&
-         test_calendar_translated_snapshot(db, path, key, "New York City", "es_US", "2026-07-03",
+         test_calendar_translated_snapshot(db, path, key, "New York City, US-NY", "es_US", "2026-07-03",
                                            "Día de la Independencia (día de observancia)");
     sqlite_close(db);
     string_free(path);

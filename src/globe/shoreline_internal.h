@@ -5,7 +5,7 @@
  * The reader borrows its connection and owns its prepared hit-test and any anonymous-database cache reference.
  * File-backed geometry is shared independently of connections. Codecs describe coordinate chunks, not BLOB pages.
  * Only shoreline implementation
- * units may include this header; applications use the opaque reader in shoreline-t.h.
+ * units may include this header; applications use the opaque reader in globe-t.h.
  */
 #ifndef MARS_SHORELINE_INTERNAL_H
 #define MARS_SHORELINE_INTERNAL_H

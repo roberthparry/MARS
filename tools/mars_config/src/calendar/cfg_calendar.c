@@ -34,6 +34,9 @@ bool cfg_calendar_populate(sqlite_t *db, const string_t *path, const string_t *k
     string_t *label =
         locale ? string_sprintf("%s, %s", string_c_str(place.name), string_c_str(place.jurisdiction)) : NULL;
     ok = ok && locale && label;
+    /* Selection is finished: release its encrypted working table before calendar expansion. */
+    bool cleared = db && sqlite_exec_cstr(db, "DROP TABLE IF EXISTS main.cfg_calendar_places; PRAGMA shrink_memory;");
+    ok = ok && cleared;
     progress = ok ? cfg_progress_start("Generating local calendar") : NULL;
     ok = ok && cfg_calendar_snapshot(db, path, key, &place, locale);
     cfg_progress_finish(progress, ok);

@@ -3,33 +3,33 @@
  * @brief Connect the almanac catalogue to the independent shoreline reader.
  *
  * Lazily owns one opaque shoreline reader per astronomical engine. Geography, compression and spatial indexing
- * belong to the shoreline module; this adapter only supplies the existing encrypted database connection.
+ * belong to the globe module. Geometry comes exclusively from its independent configured database.
  */
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
 
-/* Prepare shared immutable geometry while the caller still owns its database connection. */
+/* Prepare shared immutable geometry from independent globe storage. */
 bool almanac_surface_prepare(almanac_t *almanac)
 {
     if (!almanac) return false;
-    if (!almanac->shoreline) almanac->shoreline = shoreline_open(almanac->db);
-    return shoreline_prepare(almanac->shoreline);
+    if (!almanac->shoreline) almanac->shoreline = globe_open_configured(NULL);
+    return globe_surface_prepare(almanac->shoreline);
 }
 
-/* Reuse the shared catalogue connection without exposing it to callers. */
-shoreline_surface_t almanac_surface_at(almanac_t *almanac, double latitude_degrees, double longitude_degrees)
+/* Classify through the independently owned globe connection. */
+globe_surface_t almanac_surface_at(almanac_t *almanac, double latitude_degrees, double longitude_degrees)
 {
-    if (!almanac) return SHORELINE_UNKNOWN;
+    if (!almanac) return GLOBE_UNKNOWN;
     if (!almanac->shoreline)
-        almanac->shoreline = shoreline_open(almanac->db);
-    return shoreline_hit_test(almanac->shoreline, latitude_degrees, longitude_degrees);
+        almanac->shoreline = globe_open_configured(NULL);
+    return globe_hit_test(almanac->shoreline, latitude_degrees, longitude_degrees);
 }
 
 /* Supply bounded display imagery without exposing the engine's database. */
 bool almanac_surface_paths(almanac_t *almanac, double west, double south, double east, double north,
-                          double tolerance, shoreline_path_fn visit, void *context)
+                          double tolerance, globe_path_fn visit, void *context)
 {
     if (!almanac) return false;
-    if (!almanac->shoreline) almanac->shoreline = shoreline_open(almanac->db);
-    return shoreline_paths(almanac->shoreline, west, south, east, north, tolerance, visit, context);
+    if (!almanac->shoreline) almanac->shoreline = globe_open_configured(NULL);
+    return globe_surface_paths(almanac->shoreline, west, south, east, north, tolerance, visit, context);
 }

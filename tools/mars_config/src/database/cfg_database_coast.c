@@ -7,7 +7,7 @@
  */
 #include <stdio.h>
 
-#include "shoreline-t.h"
+#include "globe-t.h"
 #include "cfg_progress.h"
 #define MARS_CFG_DATABASE_INTERNAL_ACCESS
 #include "cfg_database_internal.h"
@@ -24,7 +24,7 @@ bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *stag
     if (ok && exists) {
         cfg_progress_t *progress = cfg_progress_start("Indexing shorelines");
         ok = file_decompress_zstd(packed, plain, 128 * 1024 * 1024, false) &&
-             file_open_read(plain) && shoreline_import(db, plain);
+             file_open_read(plain) && globe_import_shoreline(db, plain);
         if (!ok)
             fprintf(stderr, "Shoreline import failed (source error %d, staging error %d): %s\n",
                     file_last_error(packed), file_last_error(plain), string_c_str(sqlite_last_error(db)));

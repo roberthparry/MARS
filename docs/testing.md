@@ -44,6 +44,11 @@ C programmes, including the thread and lock examples and their expected output.
 Installer tests use disposable private directories beneath `/tmp`, not the
 user's configured databases. The checker suite exercises passing and failing
 fixtures; failures deliberately produced inside a test are not suite failures.
+Calendar fixtures select `Shrewsbury, GB-ENG` explicitly: the worldwide catalogue
+also contains American towns named Shrewsbury. Resolution tests retain all these
+entries and check both ambiguous unqualified names and jurisdiction-qualified
+choices. Calendar rendering fixtures use the native streaming SQL importer so
+nested town-catalogue includes follow the same rules as installation.
 The README checker reuses the native C loopback protocol fixtures for HTTP,
 HTTPS, WebSocket and gRPC examples. OpenSSL development files are required for
 their TLS support; Python is not used. Fixtures belong under `tests/http/fixtures/`
@@ -187,6 +192,13 @@ routine bounded checks; deeper allocation traces can substantially increase
 the checker's own memory use. Increasing trace depth is not required for full
 leak detection.
 
+Check whether an editor-launched shell supplies a foreign `LOCPATH` before
+interpreting locale-related leaks. On this system, a standalone libc
+`newlocale`/`freelocale` check leaked 46 bytes with VS Code's bundled locale
+path, but reported no leaks when `LOCPATH` was unset. Use the system locale
+search path for these checks; do not suppress the allocation report or change
+the application's locale semantics to conceal it.
+
 For MARS Lab evaluation checks, trace exec'd calculation children with
 `--trace-children=yes`: checking the test harness alone does not check the
 integrated workers. Use a per-process `--log-file` containing `%p` so Valgrind
@@ -201,6 +213,96 @@ UndefinedBehaviorSanitizer provide complementary checks in a separate build;
 stop on the first diagnostic. If sandbox restrictions prevent LeakSanitizer's
 final scan, report that check as incomplete rather than disabling leak detection
 and calling the result clean.
+
+### Recorded Check: 19 October 2026
+
+Memory checks found and corrected numerical temporary-scope ownership errors,
+unreleased integration-matcher scales, and detached Lab plot-range and precision
+temporaries. Focused number, expression, matrix, qfloat, qcomplex, plot, regex and
+Lab regressions completed with zero Valgrind errors and zero heap bytes at exit.
+The integration regression also completed cleanly with a specifically approved
+five-minute allowance; it took about 94 seconds at the half-core CPU limit.
+The smaller number README examples were checked last and completed cleanly.
+
+The Mersenne-prime README search was shortened, with approval, from exponents
+2–4423 to 2–2203 (the first 16 Mersenne primes), and its documentation was
+synchronised. The isolated Valgrind rerun passed in 99.586 seconds overall
+(93.79 seconds in the example), within the approved five-minute allowance.
+It reported zero errors, no suppressions and zero heap bytes at exit, with
+173.2 MiB peak memory and no swap under the half-core CPU limit.
+
+These results are not a complete-suite memory clearance. The original broad memory run was
+interrupted during configuration fixtures, before the checks-tool suite, and a
+subsequent ordinary regression run stalled in the Lab suite's pipe wait. A further
+ordinary Lab run made progress without failures but reached its four-minute
+diagnostic timeout at the eclipse previews; the isolated 18 process tests passed. Those
+remaining checks require separate isolation and completion. Temporary test
+selections were restored, retaining the new plot-range ownership regression.
+
+A subsequent bounded audit reproduced a configuration-test child leak: the
+forked child retained its inherited temporary-directory handle. It now frees
+that handle before `_exit`, while the parent remains responsible for removing
+the directory. Checker subprocess tests now accept both synchronous `ENOENT`
+and the documented child exit status 127 for a failed `posix_spawn` execution.
+Their assertions run after resource cleanup. README fixture startup rejects
+known missing or non-executable paths before allocating a listener, preserving
+retry and recovery behaviour when execution errors are reported asynchronously.
+The configuration Make fixture also resolves its own executable before passing
+it to Make: a raw `/proc/<pid>/exe` path otherwise launches Valgrind itself.
+Its isolated memory rerun passed in 23.309 seconds with no reported errors.
+
+The checker controls and parser/build/coverage batches completed under Valgrind
+with no errors, as did the isolated README fixture retry/recovery regression.
+The corrected controls and fixture regression also passed without Valgrind.
+The initially combined evidence/header/documentation and configuration/locale
+batches hit the 90-second cap. After resuming with the approved five-minute
+limit, separate batches completed 23 checker evidence/policy/header cases,
+four documentation cases and 17 configuration/storage/weather/locale/Make cases,
+all with zero reported Valgrind errors. Database conflict/path checks and the
+trace/stream/precedence checks also completed with zero errors in the parent
+and fixture children. A combined database batch had reached its deadline;
+allocations reported during forced termination are not counted as completed
+leak checks. Completed selections are checkpointed locally for the remaining
+sequential run. The original full packaged database-import
+cases took approximately 12 and 88 minutes under Valgrind, so they need an
+explicitly agreed longer allowance or alternative instrumented coverage.
+The baseline also contains failed HTTP and Lab worker/mathematical assertions
+whose successful reruns have not yet been established. No complete-suite
+memory clearance or commit is recorded by this follow-up.
+
+A separate native jurisdiction-install check reproduced SQLCipher `mlock`
+warnings during calendar generation with an 8 MiB locked-memory limit. Releasing
+the unused import cache before that phase allowed the same Limmen/Dutch install
+to complete in 184.233 seconds with no locking warnings, without disabling
+SQLCipher memory protection or raising the limit. This native check is not a
+replacement for the outstanding full-import Valgrind coverage.
+The final-build streaming-import regression also passed under Valgrind in
+75.429 seconds, with zero errors and no definite, indirect or possible leaks
+in either the runner or its fixture child.
+
+The earlier reduced worldwide town supplement contained 9,061 locations in total. Its
+native import/count/duplicate/default checks passed, as did eight JSON cases
+(including a 4,096-name multilingual round trip) and the catalogue visitor
+ordering/early-stop case. JSON and catalogue visitor Valgrind reruns reported
+zero errors and no definite, indirect or possible leaks. The visitor run retained
+72 reachable bytes. A fresh disposable full installation completed in 185.534
+seconds without SQLCipher locking warnings. The isolated town-import and source
+allow-list memory checks also passed in 53.023 seconds, with zero errors and no
+lost allocations in either the runner or its fixture child. Native page-catalogue
+preparation took 1.142 CPU seconds (2.324 seconds elapsed at the half-core limit),
+producing 1,828,873 bytes of JSON with a 58.6 MiB process peak. These are initial
+server-side loading measurements, not browser click-latency measurements or full-suite clearance.
+
+The subsequent 50,000-record catalogue passed the isolated native import,
+duplicate-name, source allow-list, preserved-default and requested-town coverage
+checks in 2.70 seconds. Coverage assertions include Wales, Ireland, Wexford,
+the three Nykøbing towns, Castricum, Alkmaar and Madalena on Pico. Regenerating
+the 46,472-row supplement produced byte-identical SQL without memory-lock warnings.
+The HTTP catalogue regression passed in 22.80 seconds with a 50,000-town fixture,
+decoding every page with the real wire codec and checking the 512-record limit,
+advancing cursors and final empty page. Wrong-key decryption diagnostics are
+expected in its failure-path check. These are focused native checks, not new
+Valgrind results or a measurement of browser interaction latency at 50,000 towns.
 
 ### Recorded Check: 6 September 2026
 
