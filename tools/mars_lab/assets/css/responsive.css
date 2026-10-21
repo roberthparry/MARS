@@ -244,6 +244,8 @@
     padding: 0.65rem 0.45rem;
   }
 
+  body.almanac-mode #workspaceActionsHome { min-height: 7rem; }
+
   .derivative-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -438,6 +440,7 @@
 }
 
 @media (max-width: 560px) {
+  body.almanac-mode #workspaceActionsHome { min-height: 4rem; }
   /* Preserve the native table and every value, but lay out each body as an
      individually labelled entry instead of a nine-column horizontal strip. */
   .almanac-body-table {

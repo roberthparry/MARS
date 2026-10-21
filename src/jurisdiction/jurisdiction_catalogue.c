@@ -139,7 +139,7 @@ bool jurisdict_each_town(jurisdiction_t *jurisdiction, jurisdict_place_visit_fn 
 {
     static const char sql[] =
         "select town.jurisdiction_id, town.town_name, lat.latitude, lon.longitude, "
-        "coalesce(elev.elevation_metres,'0'), "
+        "coalesce(nullif(elev.elevation_metres,'-9999'),'0'), "
         "code.timezone_name, case when def.jurisdiction_id is null then 0 else 1 end as is_default "
         "from jurisdiction_town town join jurisdiction_town_latitude lat using(jurisdiction_town_id) "
         "join jurisdiction_town_longitude lon using(jurisdiction_town_id) "

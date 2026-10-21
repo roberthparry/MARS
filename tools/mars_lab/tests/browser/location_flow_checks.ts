@@ -147,7 +147,7 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
             },
             locSaveDatetime: () => events.push('save'),
             locEvaluateDatetime(options: {skipHistoryUpdate?: boolean}) {
-                equal(options.skipHistoryUpdate, true, 'auto-evaluation owns final history update');
+                equal(options.skipHistoryUpdate, false, 'user changes retain the previous calendar state');
                 events.push('evaluate');
             },
             updateHistoryButtons: () => events.push('history')
@@ -157,6 +157,18 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
         await pending;
         pending = null;
         equal(events.join(','), 'refresh,save,evaluate,history', 'auto-evaluation service order');
+        events.length = 0;
+        await run(33, {mode: 'almanac', options: {}}, {
+            currentMode: () => 'almanac',
+            locClearAlmanac: () => events.push('clear'),
+            locSaveAlmanac: () => events.push('save'),
+            locEvaluateAlmanac(options: WorksheetEvaluationOptions) {
+                equal(options.skipHistoryUpdate, false, 'Almanac observer changes also record history');
+                events.push('evaluate');
+            },
+            updateHistoryButtons: () => events.push('history')
+        });
+        equal(events.join(','), 'clear,save,evaluate,history', 'Almanac records history after clearing cached results');
         events.length = 0;
         await run(33, {mode: 'almanac', options: {}}, {
             currentMode: () => 'datetime',

@@ -10,9 +10,11 @@
  * disposable test_cfg_isolated home; no user's configuration is accessed.
  */
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "file-t.h"
+#include "globe-t.h"
 #include "sqlite-t.h"
 #include "cfg_storage.h"
 #include "cfg_database.h"
@@ -127,7 +129,15 @@ static bool test_cfg_database_towns_fixture(const char *directory)
     string_t *root = string_new_with(MARS_CONFIG_ROOT_DIR);
     string_t *world = string_new_with("packaging/jurisdiction-db/mars_jurisdiction_world_towns.sql");
     ok = ok && root && world && cfg_database_import(db, root, world) &&
-         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town_seed", "50000") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town_seed", "50004") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town_seed WHERE jurisdiction_id IN('AU','AU-QLD') "
+             "AND town_name='Mooloolaba' AND latitude='-26.68164' AND longitude='153.11925' "
+             "AND elevation_metres='7' AND timezone_code=222 AND is_default='N'", "2") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town_seed WHERE jurisdiction_id IN('AU','AU-QLD') "
+             "AND town_name='Maroochydore' AND latitude='-26.66008' AND longitude='153.09953' "
+             "AND elevation_metres='6' AND timezone_code=222 AND is_default='N'", "2") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town_seed WHERE jurisdiction_id='ZA' AND timezone_code=24 "
              "AND is_default='N' AND CAST(latitude AS REAL) BETWEEN -34.3 AND -33.8 "
@@ -188,7 +198,22 @@ static bool test_cfg_database_towns_fixture(const char *directory)
     ok = ok && db && entry &&
          sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
          cfg_database_import(db, root, entry) &&
-         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50000");
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50004") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town_elevation WHERE elevation_metres='-9999'", "0") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town t LEFT JOIN jurisdiction_town_elevation e "
+             "USING(jurisdiction_town_id) WHERE e.jurisdiction_town_id IS NULL", "10") &&
+         test_cfg_database_query(db,
+             "SELECT latitude||'|'||longitude||'|'||coalesce(elevation_metres,'0') FROM jurisdiction_town "
+             "JOIN jurisdiction_town_latitude USING(jurisdiction_town_id) "
+             "JOIN jurisdiction_town_longitude USING(jurisdiction_town_id) "
+             "LEFT JOIN jurisdiction_town_elevation USING(jurisdiction_town_id) "
+             "WHERE jurisdiction_id='MU' AND town_name='Baie du Tombeau'", "-20.1194|57.4914|0") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town t JOIN jurisdiction_town_timezone z "
+             "ON z.jurisdiction_town_id=t.jurisdiction_town_id WHERE jurisdiction_id IN('AU','AU-QLD') "
+             "AND town_name IN('Mooloolaba','Maroochydore') AND z.timezone_code=222", "4");
     sqlite_close(db);
     file_free(complete);
     string_free(entry);
@@ -759,7 +784,7 @@ static bool test_cfg_database_globe_fixture(const char *directory)
 {
     bool ok = !setenv("MARS_ROOT", directory, 1) && !setenv("MARS_GLOBE_DB_KEY", "fixture-only", 1) &&
               !unsetenv("MARS_GLOBE_DB_PATH");
-    ok = ok && cfg_globe_run("globe-update") == 2 && cfg_globe_run("globe-uninstall") == 2 &&
+    ok = ok && cfg_globe_run("globe-update") == 1 && cfg_globe_run("globe-uninstall") == 2 &&
          cfg_globe_run("globe-check") == 1 && cfg_globe_run("globe-install") == 1;
     ok = ok && !setenv("MARS_ALMANAC_DB_KEY", "shared-fixture", 1) && cfg_databases_run() == 1;
     file_t *almanac = test_cfg_database_file(directory, "almanac/almanac.db");
@@ -782,6 +807,108 @@ static void test_cfg_database_globe(void)
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_globe_fixture), "globe setup fails safely without shoreline source");
 }
 
+typedef struct {
+    double x, y, first_x, first_y, last_x, last_y;
+    bool inside, land;
+} cfg_coast_probe_t;
+
+static bool test_cfg_coast_path(globe_path_event_t event, double x, double y, unsigned level,
+                                bool antarctic, void *context)
+{
+    (void)antarctic;
+    cfg_coast_probe_t *p = context;
+    if (event == GLOBE_PATH_MOVE) {
+        p->first_x = p->last_x = x;
+        p->first_y = p->last_y = y;
+        p->inside = false;
+        return true;
+    }
+    if (event == GLOBE_PATH_CLOSE) { x = p->first_x; y = p->first_y; }
+    if ((p->last_y > p->y) != (y > p->y) &&
+        p->x < p->last_x + (p->y - p->last_y) * (x - p->last_x) / (y - p->last_y)) p->inside = !p->inside;
+    p->last_x = x; p->last_y = y;
+    if (event == GLOBE_PATH_CLOSE && p->inside) p->land = level % 2;
+    return true;
+}
+
+static bool test_cfg_coast_sydney(sqlite_t *db)
+{
+    globe_t *globe = globe_open(db, NULL);
+    bool ok = globe && globe_hit_test(globe, -33.8678, 151.2073) == GLOBE_LAND;
+    const struct { double lat, lon; bool land; } sites[] = {
+        {-33.8678, 151.2073, true},  /* Catalogue Sydney, unchanged. */
+        {-33.8688, 151.2093, true},  /* Default NSW observer, unchanged. */
+        {-33.8700, 151.1920, true},  /* Pyrmont. */
+        {-33.8610, 151.2020, true},  /* Barangaroo. */
+        {-33.8665, 151.2010, false}, /* Darling Harbour. */
+        {-33.8550, 151.2130, false}, /* Circular Quay. */
+        {-33.8630, 151.2190, false}  /* Woolloomooloo Bay. */
+    };
+    for (size_t i = 0; ok && i < sizeof sites / sizeof *sites; ++i) {
+        for (unsigned zoom = 0; ok && zoom < 2; ++zoom) {
+            double span = zoom ? .03 : .12;
+            cfg_coast_probe_t p = {.x = sites[i].lon, .y = sites[i].lat};
+            ok = globe_surface_paths(globe, p.x - span, p.y - span, p.x + span, p.y + span,
+                                      span / 1024, test_cfg_coast_path, &p) && p.land == sites[i].land;
+        }
+    }
+    ok = ok && globe_hit_test(globe, -33.8678, 151.2073) == GLOBE_LAND &&
+         globe_hit_test(globe, 52.7077, -2.7541) == GLOBE_LAND;
+    globe_close(globe);
+    return ok;
+}
+
+static bool test_cfg_coast_correction_fixture(const char *directory)
+{
+    file_t *input = test_cfg_database_file(directory, "input.bin");
+    file_t *output = test_cfg_database_file(directory, "output.bin");
+    file_t *patch = test_cfg_database_file(directory, "corrections.json");
+    const uint32_t words[] = {7, 5, 3841, 0, 10, 0, 10, 0, 0, 0, 0, 0, 0, 10, 0, 10, 10, 0, 10, 0, 0};
+    unsigned char bytes[sizeof words];
+    for (size_t i = 0; i < sizeof words / sizeof *words; ++i)
+        for (unsigned j = 0; j < 4; ++j) bytes[i * 4 + j] = (unsigned char)(words[i] >> ((3 - j) * 8));
+    bool ok = input && output && patch && file_write_all_bytes(input, bytes, sizeof bytes);
+    const char *cases[] = {
+        "{\"revision\":1,\"patches\":[{\"polygon\":7,\"source_points\":5,\"first\":1,\"last\":2,"
+        "\"coordinates\":[[10,0],[8,5],[10,10]]}]}",
+        "{\"revision\":1,\"patches\":[{\"polygon\":7,\"source_points\":5,\"first\":1,\"last\":2,"
+        "\"coordinates\":[[9,0],[8,5],[10,10]]}]}",
+        "{\"revision\":1,\"patches\":[{\"polygon\":7,\"source_points\":5,\"first\":1,\"last\":2,"
+        "\"coordinates\":[[10,0],[12,5],[10,10]]}]}",
+        "{\"revision\":1,\"patches\":[{\"polygon\":8,\"source_points\":5,\"first\":1,\"last\":2,"
+        "\"coordinates\":[[10,0],[8,5],[10,10]]}]}",
+        "{\"revision\":1,\"patches\":[{\"polygon\":7,\"source_points\":6,\"first\":1,\"last\":2,"
+        "\"coordinates\":[[10,0],[8,5],[10,10]]}]}",
+        "{\"revision\":2,\"patches\":[]}", "{broken"
+    };
+    for (size_t i = 0; ok && i < sizeof cases / sizeof *cases; ++i) {
+        string_t *text = string_new_with(cases[i]);
+        ok = text && file_write_all_text(patch, text) && cfg_database_coast_correct(input, output, patch) == (i == 0);
+        string_free(text);
+        if (ok && i == 0) {
+            unsigned char result[sizeof bytes + 8];
+            size_t count;
+            ok = file_open_read(output) && file_read(output, result, sizeof result, &count) &&
+                 count == sizeof result && result[7] == 6 && result[63] == 8 && result[67] == 5;
+            file_close(output);
+        }
+        if (file_exists(output)) ok = file_delete(output) && ok;
+    }
+    unsigned char unchanged[sizeof bytes];
+    size_t count;
+    ok = ok && file_open_read(input) && file_read(input, unchanged, sizeof unchanged, &count) &&
+         count == sizeof unchanged && !memcmp(bytes, unchanged, sizeof bytes);
+    file_close(input);
+    file_free(input); file_free(output); file_free(patch);
+    return ok;
+}
+
+static void test_cfg_database_coast_corrections(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_coast_correction_fixture),
+                     "bounded shoreline corrections preserve source and reject invalid spans and endpoints");
+}
+
 static bool test_cfg_database_globe_packaged_fixture(const char *directory)
 {
     bool ok = !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) &&
@@ -791,9 +918,24 @@ static bool test_cfg_database_globe_packaged_fixture(const char *directory)
     file_t *database = test_cfg_database_file(directory, "globe/globe.db");
     sqlite_t *db = ok && database ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
-         test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "10587854") &&
+         test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "10589219") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
-                                    "('almanac_body','jurisdiction_town','rivers_dataset')", "0");
+                                    "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
+         test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
+             "create table retained(value);insert into retained values(42);"
+             "create table rivers_dataset(id,source);insert into rivers_dataset values(1,'retained fixture')");
+    sqlite_close(db);
+    ok = ok && !cfg_globe_run("globe-update") && !cfg_globe_run("globe-update");
+    db = ok ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
+    ok = ok && db && test_cfg_coast_sydney(db) &&
+         test_cfg_database_query(db, "select value from retained", "42") &&
+         test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
+         test_cfg_database_query(db, "select point_count from shoreline_dataset", "10589219");
+    sqlite_close(db);
+    /* Missing correction/source data must not destroy an already working globe. */
+    ok = ok && !setenv("MARS_ROOT", directory, 1) && cfg_globe_run("globe-update") == 1;
+    db = ok ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
+    ok = ok && db && test_cfg_coast_sydney(db);
     sqlite_close(db);
     file_free(database);
     return ok;
@@ -809,6 +951,7 @@ static void test_cfg_database_globe_packaged(void)
 void test_cfg_database_cases(void)
 {
     TEST_RUN_IN_GROUP(test_cfg_database_globe, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_database_coast_corrections, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_globe_packaged, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_trace, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_sardinia, tests, NULL);

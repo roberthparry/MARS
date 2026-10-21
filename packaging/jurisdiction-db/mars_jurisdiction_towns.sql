@@ -2,6 +2,7 @@
 -- Elevations are metres above mean sea level, populated from GeoNames DEM where available.
 -- Sardinian coverage: 54 GeoNames cities5000 records; see THIRD_PARTY_NOTICES.md for selection and attribution.
 -- Corsican coverage: seven GeoNames cities5000 records; see THIRD_PARTY_NOTICES.md for selection and attribution.
+-- Sunshine Coast exceptions: Mooloolaba and Maroochydore (GeoNames PPLX); see THIRD_PARTY_NOTICES.md.
 
 -- The encrypted staging database holds this larger working table; it is dropped below.
 create table jurisdiction_town_seed(
@@ -180,7 +181,9 @@ insert into jurisdiction_town_seed(
     ('AU', 'Hobart', '-42.8794', '147.3294', '19', 224, 'N'),
     ('AU', 'Logan City', '-27.6392', '153.1094', '39', 222, 'N'),
     ('AU', 'Mackay', '-21.1534', '149.1655', '11', 222, 'N'),
+    ('AU', 'Maroochydore', '-26.66008', '153.09953', '6', 222, 'N'),
     ('AU', 'Melbourne', '-37.8140', '144.9633', '25', 225, 'N'),
+    ('AU', 'Mooloolaba', '-26.68164', '153.11925', '7', 222, 'N'),
     ('AU', 'Newcastle', '-32.9295', '151.7801', '48', 227, 'N'),
     ('AU', 'Perth', '-31.9522', '115.8614', '34', 226, 'N'),
     ('AU', 'Sunshine Coast', '-26.6568', '153.0796', '9', 222, 'N'),
@@ -201,6 +204,8 @@ insert into jurisdiction_town_seed(
     ('AU-QLD', 'Brisbane', '-27.4679', '153.0281', '27', 222, 'N'),
     ('AU-QLD', 'Gold Coast', '-28.0003', '153.4309', '12', 222, 'N'),
     ('AU-QLD', 'Logan City', '-27.6392', '153.1094', '39', 222, 'N'),
+    ('AU-QLD', 'Maroochydore', '-26.66008', '153.09953', '6', 222, 'N'),
+    ('AU-QLD', 'Mooloolaba', '-26.68164', '153.11925', '7', 222, 'N'),
     ('AU-QLD', 'Sunshine Coast', '-26.6568', '153.0796', '9', 222, 'N'),
     ('AU-QLD', 'Townsville', '-19.2664', '146.8057', '15', 222, 'N'),
     ('AU-SA', 'Adelaide', '-34.9287', '138.5986', '59', 221, 'N'),
@@ -3635,7 +3640,9 @@ select town.jurisdiction_town_id, seed.elevation_metres
 from jurisdiction_town_seed as seed
 join jurisdiction_town as town
   on town.jurisdiction_id = seed.jurisdiction_id
- and town.town_name = seed.town_name;
+ and town.town_name = seed.town_name
+-- Preserve missing DEM provenance in the seed, but do not store it as an elevation.
+where seed.elevation_metres <> '-9999';
 
 insert into jurisdiction_town_timezone(jurisdiction_town_id, timezone_code)
 select town.jurisdiction_town_id, seed.timezone_code

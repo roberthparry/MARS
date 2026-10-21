@@ -19,6 +19,19 @@
 
 #include "almanac-t.h"
 
+/** Opaque, event-local sampled Sun/Moon positions used only to shortlist catalogue locations. */
+typedef struct _almanac_totality_screen_t almanac_totality_screen_t;
+
+/** Build an owned two-minute screening grid over the local refinement's twelve-hour window; NULL on failure. */
+almanac_totality_screen_t *almanac_totality_screen_new(almanac_t *almanac, const almanac_solar_eclipse_t *eclipse);
+
+/** Release a screening grid; NULL is accepted. */
+void almanac_totality_screen_free(almanac_totality_screen_t *screen);
+
+/** Shortlist a location using a generous angular margin; acceptance still requires exact totality and land checks. */
+bool almanac_totality_screen_candidate(almanac_t *almanac, const almanac_totality_screen_t *screen,
+                                       const almanac_observer_t *observer, bool *possible);
+
 typedef struct _almanac_solar_totality_location_t {
     bool found;
     almanac_event_time_t greatest_eclipse;

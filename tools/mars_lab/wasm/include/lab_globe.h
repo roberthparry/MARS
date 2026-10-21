@@ -65,4 +65,13 @@ void lab_globe_grid(double latitude, double longitude, double zoom, double size)
  * @return Via the bridge, [latitude,longitude,zoom,west,south,east,north].
  */
 void lab_globe_view(quaternion_jsref orientation, double zoom, double factor);
+
+/**
+ * @brief Interpolate a three-stage history flight: zoom out, shortest-path rotation, then restore zoom.
+ * @param start Five finite numbers: unit quaternion x,y,z,w and zoom in 1..4096.
+ * @param target Saved camera in the same format, including roll.
+ * @param progress Elapsed fraction clamped to 0..1; endpoints preserve the exact supplied camera.
+ * @return Via the bridge, a five-number camera, or null for malformed input.
+ */
+void lab_globe_flight(jsref start, jsref target, double progress);
 #endif

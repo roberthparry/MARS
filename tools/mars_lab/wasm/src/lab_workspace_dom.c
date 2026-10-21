@@ -305,6 +305,11 @@ void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage)
         if (*classes[panel])
             lab_dom_class(body, classes[panel], panel == mode);
     }
+    /* Move the original controls, preserving their listeners, focusability and native enablement policy. */
+    int actions = lab_dom_id("workspaceActions");
+    int home = lab_dom_id(mode == LAB_MODE_ALMANAC ? "almanacActions" : "workspaceActionsHome");
+    if (actions && home && !lab_dom_equal(lab_dom_get(actions, "parentElement"), home))
+        lab_dom_append(home, actions);
     unsigned flags = lab_view_mode_flags(mode, lab_workspace_dom_content(lab_dom_query(0, "#value"), LAB_DOM_TEXT));
     lab_workspace_dom_hidden(
         "#datetimeLocal",
@@ -487,9 +492,10 @@ void lab_workspace_dom_busy(bool busy, jsref equation_variable, jsref copies, js
         unsigned mark = lab_dom_mark();
         int parent = lab_dom_query(0, retained[i]);
         if (parent)
-            /* Globe selections supersede active refreshes; keep their controls available. */
+            /* Globe selections remain available; shared actions retain their separate native enablement policy. */
             lab_workspace_dom_disable_list(
-                lab_dom_all(parent, "input, select, button:not(#almanacGlobe button)"), busy, 1);
+                lab_dom_all(parent, "input, select, button:not(#almanacGlobe button):not(#workspaceActions button)"),
+                busy, 1);
         lab_dom_release(mark);
     }
     lab_dom_disabled(lab_dom_query(0, "#goalTarget"), busy);

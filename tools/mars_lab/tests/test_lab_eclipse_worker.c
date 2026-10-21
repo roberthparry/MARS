@@ -6,7 +6,8 @@
  * or worker override. Checks the solar/lunar wire fields and resulting SVG at
  * greatest eclipse, including differing lunar orientations for two observers.
  * A disposable town catalogue exercises named totality, action transport and
- * catalogue-error reporting without modifying the installed data.
+ * catalogue-error reporting without modifying the installed data. A 50,000-town
+ * fixture mixes distant misses and dense near misses to check the worker budget.
  */
 #include <math.h>
 #include <stdio.h>
@@ -45,6 +46,47 @@ static bool eclipse_town_catalogue(const char *directory)
     return ok;
 }
 
+static bool eclipse_totality_action_roundtrip(const json_t *action)
+{
+    json_t *options = json_new_object();
+    static const char *const worker_keys[] = {"date", "time", "zone", "elevation"};
+    for (size_t i = 0; i < sizeof(worker_keys) / sizeof(*worker_keys); ++i)
+        lab_cal_set(options, worker_keys[i], test_lab_text(action, worker_keys[i]));
+    lab_cal_set(options, "lat", test_lab_text(action, "latitude"));
+    lab_cal_set(options, "lon", test_lab_text(action, "longitude"));
+    lab_cal_set(options, "body", "SUN");
+    string_t *diagnostic = NULL;
+    json_t *fields = lab_cal_run("almanac_lab", options, 20000, &diagnostic);
+    lab_cal_set(options, "visibility", "all");
+    lab_cal_set(options, "timezone", "Europe/Madrid");
+    lab_cal_set(options, "jurisdiction", test_lab_text(action, "jurisdiction"));
+    lab_cal_set(options, "town", test_lab_text(action, "town"));
+    unsigned status = 200;
+    json_t *worksheet = fields ? lab_cal_almanac(fields, options, &status) : NULL;
+    const json_t *events = test_lab_member(worksheet, "events");
+    bool found = false;
+    for (size_t i = 0; i < json_array_size(events); ++i) {
+        const json_t *event = json_array_get(events, i);
+        if (!strcmp(test_lab_text(event, "category"), "Solar") &&
+            !strncmp(test_lab_text(event, "gmt_time"), "2027-08-02", 10)) {
+            found = !strcmp(test_lab_text(event, "kind"), "total") &&
+                    !strcmp(test_lab_text(event, "obscuration"), "100.0%");
+        }
+    }
+    bool ok = status == 200 && found && !strcmp(test_lab_text(action, "date"), "2027-08-02") &&
+              !strncmp(test_lab_text(action, "time"), "08:", 3) &&
+              !strcmp(test_lab_text(action, "zone"), "2.00");
+    if (!ok)
+        string_fprintf(stderr, "Totality action round trip: %s; time=%s; eclipse retained=%d\n",
+                       diagnostic ? string_c_str(diagnostic) : "unexpected worksheet",
+                       test_lab_text(action, "time"), found);
+    json_free(worksheet);
+    json_free(fields);
+    string_free(diagnostic);
+    json_free(options);
+    return ok;
+}
+
 static bool eclipse_totality_response(const char *jd, const json_t *request)
 {
     json_t *payload = test_lab_json("{\"event_year\":\"2027\",\"events\":[]}");
@@ -62,7 +104,8 @@ static bool eclipse_totality_response(const char *jd, const json_t *request)
               !strcmp(test_lab_text(item, "jd"), jd) && strstr(test_lab_text(item, "nearest_totality"), "Málaga") &&
               strstr(test_lab_text(item, "nearest_totality"), "GMT+2") &&
               strstr(test_lab_text(item, "html"), "data-almanac-use-totality") &&
-              strstr(test_lab_text(test_lab_member(item, "nearest_totality_action"), "town"), "Málaga|");
+              strstr(test_lab_text(test_lab_member(item, "nearest_totality_action"), "town"), "Málaga|") &&
+              eclipse_totality_action_roundtrip(test_lab_member(item, "nearest_totality_action"));
     json_free(response);
     json_free(options);
     json_free(entry);
@@ -276,6 +319,57 @@ static bool eclipse_worker_fixture(const char *directory)
     return ok && fabs(difference) > 10;
 }
 
+static bool eclipse_catalogue_scale_fixture(const char *directory)
+{
+    bool ok = !(ephemeris_home ? setenv("MARS_HOME", string_c_str(ephemeris_home), 1) : unsetenv("MARS_HOME")) &&
+              !unsetenv("MARS_LAB_OBJECT_STORE_PATH") && !unsetenv("MARS_LAB_OBJECT_STORE_KEY") &&
+              !unsetenv("MARS_LAB_ALMANAC_EVENT_BINARY") && eclipse_town_catalogue(directory);
+    string_t *path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    string_t *key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
+    sqlite_t *db = ok && path && key ? sqlite_open_encrypted(path, key) : NULL;
+    ok = db && sqlite_exec_cstr(db,
+        "BEGIN; INSERT INTO jurisdiction VALUES('IS',null,'country','Iceland');"
+        "INSERT INTO timezone_code VALUES('Atlantic/Reykjavik',4);"
+        "WITH RECURSIVE ids(id) AS (VALUES(5) UNION ALL SELECT id+1 FROM ids WHERE id<50000) "
+        "INSERT INTO jurisdiction_town SELECT id,'IS','Nearby fixture '||id FROM ids;"
+        "INSERT INTO jurisdiction_town_latitude SELECT jurisdiction_town_id,"
+        "CASE WHEN jurisdiction_town_id%2=0 THEN '64.3218' ELSE '41.1496' END "
+        "FROM jurisdiction_town WHERE jurisdiction_town_id>=5;"
+        "INSERT INTO jurisdiction_town_longitude SELECT jurisdiction_town_id,"
+        "CASE WHEN jurisdiction_town_id%2=0 THEN '-22.0749' ELSE '-8.6109' END "
+        "FROM jurisdiction_town WHERE jurisdiction_town_id>=5;"
+        "INSERT INTO jurisdiction_town_elevation SELECT jurisdiction_town_id,'8' "
+        "FROM jurisdiction_town WHERE jurisdiction_town_id>=5;"
+        "INSERT INTO jurisdiction_town_timezone SELECT jurisdiction_town_id,4 "
+        "FROM jurisdiction_town WHERE jurisdiction_town_id>=5; COMMIT;") && ok;
+    sqlite_close(db);
+    string_free(path);
+    string_free(key);
+    json_t *options = test_lab_json(
+        "{\"start\":\"2027-08-01\",\"end\":\"2027-08-04\",\"lat\":\"64.3218\",\"lon\":\"-22.0749\","
+        "\"kind\":\"solar\",\"totality\":\"land\"}");
+    string_t *diagnostic = NULL;
+    json_t *fields = ok ? lab_cal_run("almanac_event_lab", options, 20000, &diagnostic) : NULL;
+    ok = fields && strstr(lab_cal_text(fields, "event"), "town\tMálaga\tES\tEurope/Madrid\t") && ok;
+    if (!ok)
+        string_fprintf(stderr, "Large-catalogue land search: %s\n",
+                       diagnostic ? string_c_str(diagnostic) : "missing validated town");
+    json_free(fields);
+    string_free(diagnostic);
+    json_free(options);
+    return ok;
+}
+
+static void test_lab_totality_large_catalogue(void)
+{
+    const char *configured_home = getenv("MARS_HOME");
+    ephemeris_home = configured_home ? string_new_with(configured_home) : NULL;
+    bool ok = (!configured_home || ephemeris_home) && test_lab_isolated(eclipse_catalogue_scale_fixture);
+    string_free(ephemeris_home);
+    ephemeris_home = NULL;
+    TEST_ASSERT_TRUE(ok, "Akranes finds verified land totality beyond 1,024 nearer towns within the existing worker timeout");
+}
+
 static void test_lab_eclipse_worker_geometry(void)
 {
     const char *configured_home = getenv("MARS_HOME");
@@ -291,4 +385,5 @@ static void test_lab_eclipse_worker_geometry(void)
 void test_lab_eclipse_worker_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_eclipse_worker_geometry, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_totality_large_catalogue, tests, NULL);
 }

@@ -746,6 +746,37 @@ static void test_almanac_2027_totality_seed_uses_the_towns_local_maximum(void)
     TEST_ASSERT_TRUE(array_size(events) == 1u, "August 2027 window contains the want solar eclipse");
     event = array_get(events, 0u);
     TEST_ASSERT_NOT_NULL(event);
+    almanac_totality_screen_t *screen = almanac_totality_screen_new(almanac, event);
+    bool possible = false;
+    TEST_ASSERT_NOT_NULL(screen);
+    TEST_ASSERT_TRUE(almanac_totality_screen_candidate(almanac, screen, &malaga, &possible) && possible,
+                     "shared screening retains Málaga despite a different local maximum time");
+    TEST_ASSERT_TRUE(almanac_totality_screen_candidate(almanac, screen, &london, &possible) && !possible,
+                     "partial-only London is excluded before expensive refinement");
+    almanac_observer_t akranes = {64.3218, -22.0749, 8};
+    TEST_ASSERT_TRUE(almanac_totality_screen_candidate(almanac, screen, &akranes, &possible) && !possible,
+                     "Icelandic towns do not consume the exact-totality search budget in 2027");
+    almanac_observer_t porto = {41.1496, -8.6109, 8};
+    TEST_ASSERT_TRUE(almanac_totality_screen_candidate(almanac, screen, &porto, &possible) && !possible,
+                     "the tighter screen rejects Portuguese near misses admitted by the broad angular margin");
+    unsigned retained_total = 0;
+    for (unsigned i = 0; i < 21; ++i) {
+        almanac_observer_t crossing = {35.8 + i * 0.1, -4.4203, 22};
+        double crossing_score = NAN;
+        TEST_ASSERT_TRUE(almanac_solar_eclipse_totality_seed_score(almanac, &crossing, event, &crossing_score),
+                         "the exact engine scores a transect across the totality path");
+        TEST_ASSERT_TRUE(almanac_totality_screen_candidate(almanac, screen, &crossing, &possible),
+                         "the shared screen accepts valid transect coordinates");
+        if (crossing_score <= 0) {
+            TEST_ASSERT_TRUE(possible, "screening must retain exact totality points across the path boundaries");
+            ++retained_total;
+        }
+    }
+    TEST_ASSERT_TRUE(retained_total >= 3, "the screening transect exercises multiple genuine totality locations");
+    TEST_ASSERT_TRUE(!almanac_totality_screen_candidate(NULL, screen, &malaga, &possible) && !possible,
+                     "screening rejects an absent engine");
+    almanac_totality_screen_free(screen);
+    almanac_totality_screen_free(NULL);
     TEST_ASSERT_TRUE(almanac_solar_eclipse_totality_seed_score(almanac, &malaga, event, &score_degrees),
                      almanac_last_error(almanac));
     TEST_ASSERT_TRUE(score_degrees <= 0.0, "Málaga lies inside the totality path at its local maximum");

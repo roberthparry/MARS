@@ -238,6 +238,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <p class="mode-hint" id="almanacGlobeStatus" role="status">Drag to rotate · drag vertically at either side to roll · scroll or pinch to zoom · select a town or point</p>
           <p class="globe-credit">Imagery: NASA Blue Marble (2002 composite) · not current ice coverage</p>
         </section>
+        <div id="almanacActions"></div>
         <div class="almanac-briefing" aria-hidden="true">
           <div>
             <div class="datetime-briefing-kicker">AstroNav worksheet</div>
@@ -322,13 +323,15 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <label for="goalTarget">Target</label>
         <input id="goalTarget" spellcheck="false" value="0">
       </div>
-      <div class="controls">
-        <button id="run">Evaluate</button>
-        <button class="secondary" id="back">Back</button>
-        <button class="secondary" id="forward">Forward</button>
-        <button class="secondary" id="help" aria-controls="helpPane" aria-expanded="false">Help</button>
-        <button class="secondary" id="goalSeek">Goal seek</button>
-        <button class="secondary" id="clear">Clear</button>
+      <div id="workspaceActionsHome">
+        <div class="controls" id="workspaceActions">
+          <button id="run">Evaluate</button>
+          <button class="secondary" id="back">Back</button>
+          <button class="secondary" id="forward">Forward</button>
+          <button class="secondary" id="help" aria-controls="helpPane" aria-expanded="false">Help</button>
+          <button class="secondary" id="goalSeek">Goal seek</button>
+          <button class="secondary" id="clear">Clear</button>
+        </div>
       </div>
       <div class="controls derivative-controls" id="derivativeButtons"></div>
       <div class="variable-values hidden" id="variableValues"></div>

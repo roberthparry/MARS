@@ -27,30 +27,173 @@
 #define MARS_CFG_DATABASE_INTERNAL_ACCESS
 #include "cfg_database_internal.h"
 
+static const json_t *osm_field(const json_t *value, const char *name);
+
+static uint32_t cfg_coast_get(const unsigned char *p)
+{
+    return (uint32_t)p[0] << 24 | (uint32_t)p[1] << 16 | (uint32_t)p[2] << 8 | p[3];
+}
+
+static void cfg_coast_put(unsigned char *p, uint32_t n)
+{
+    p[0] = n >> 24; p[1] = n >> 16; p[2] = n >> 8; p[3] = n;
+}
+
+static bool cfg_coast_integer(const json_t *value, int64_t minimum, int64_t maximum, int64_t *result)
+{
+    const string_t *number = value ? json_number_text(value) : NULL;
+    if (!number) return false;
+    const char *text = string_c_str(number);
+    char *end;
+    errno = 0;
+    long long n = strtoll(text, &end, 10);
+    if (errno || end == text || *end || n < minimum || n > maximum) return false;
+    *result = n;
+    return true;
+}
+
+static bool cfg_coast_write(file_t *file, const void *bytes, size_t length)
+{
+    size_t written;
+    return file_write(file, bytes, length, &written) && written == length;
+}
+
+static bool cfg_coast_copy(file_t *input, file_t *output, size_t length)
+{
+    unsigned char buffer[65536];
+    while (length) {
+        size_t wanted = length < sizeof buffer ? length : sizeof buffer, read;
+        if (!file_read(input, buffer, wanted, &read) || read != wanted || !cfg_coast_write(output, buffer, read))
+            return false;
+        length -= read;
+    }
+    return true;
+}
+
+/* Apply a reviewed, endpoint-checked span replacement, never a town-specific display offset. */
+static bool cfg_coast_ring_patch(file_t *input, file_t *output, unsigned char *header, const json_t *patch)
+{
+    uint32_t count = cfg_coast_get(header + 4);
+    int64_t expected, first, last;
+    const json_t *coordinates = osm_field(patch, "coordinates");
+    size_t replacements = json_array_size(coordinates);
+    if (count < 2 || count > 4000000 || replacements < 2 || replacements > 100000 ||
+        !cfg_coast_integer(osm_field(patch, "source_points"), count, count, &expected) ||
+        !cfg_coast_integer(osm_field(patch, "first"), 0, count - 2, &first) ||
+        !cfg_coast_integer(osm_field(patch, "last"), first + 1, count - 1, &last)) return false;
+    size_t bytes = (size_t)count * 8, read;
+    unsigned char *original = malloc(bytes), *replacement = malloc(replacements * 8);
+    bool ok = original && replacement && file_read(input, original, bytes, &read) && read == bytes;
+    for (size_t i = 0; ok && i < replacements; ++i) {
+        const json_t *pair = json_array_get(coordinates, i);
+        int64_t x, y;
+        ok = json_array_size(pair) == 2 &&
+             cfg_coast_integer(json_array_get(pair, 0), (int32_t)cfg_coast_get(header + 12),
+                               (int32_t)cfg_coast_get(header + 16), &x) &&
+             cfg_coast_integer(json_array_get(pair, 1), (int32_t)cfg_coast_get(header + 20),
+                               (int32_t)cfg_coast_get(header + 24), &y);
+        if (ok) {
+            cfg_coast_put(replacement + i * 8, (uint32_t)x);
+            cfg_coast_put(replacement + i * 8 + 4, (uint32_t)y);
+        }
+    }
+    ok = ok && !memcmp(original + first * 8, replacement, 8) &&
+         !memcmp(original + last * 8, replacement + (replacements - 1) * 8, 8);
+    if (ok) {
+        cfg_coast_put(header + 4, count - (uint32_t)(last - first + 1) + (uint32_t)replacements);
+        ok = cfg_coast_write(output, header, 44) && cfg_coast_write(output, original, (size_t)first * 8) &&
+             cfg_coast_write(output, replacement, replacements * 8) &&
+             cfg_coast_write(output, original + (last + 1) * 8, (count - (size_t)last - 1) * 8);
+    }
+    free(original); free(replacement);
+    return ok;
+}
+
+/* Keep the upstream archive intact; prepare a bounded corrected stream before opening any write transaction. */
+bool cfg_database_coast_correct(file_t *input, file_t *output, file_t *corrections)
+{
+    file_info_t *info = file_get_info(corrections);
+    bool ok = info && file_info_size(info) > 0 && file_info_size(info) <= 4 * 1024 * 1024;
+    file_info_free(info);
+    string_t *text = ok ? file_read_all_text(corrections) : NULL;
+    json_t *document = text ? json_from_text(text) : NULL;
+    string_free(text);
+    const json_t *patches = osm_field(document, "patches");
+    size_t count = json_array_size(patches), next = 0;
+    int64_t revision, previous = -1;
+    ok = ok && count > 0 && count <= 64 && cfg_coast_integer(osm_field(document, "revision"), 1, 1, &revision);
+    for (size_t i = 0; ok && i < count; ++i) {
+        int64_t polygon;
+        ok = cfg_coast_integer(osm_field(json_array_get(patches, i), "polygon"), previous + 1, INT32_MAX, &polygon);
+        if (ok) previous = polygon;
+    }
+    ok = ok && file_open_read(input) && file_open(output, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
+    size_t total = 0;
+    while (ok) {
+        unsigned char header[44];
+        size_t read;
+        ok = file_read(input, header, sizeof header, &read);
+        if (!ok || !read) break;
+        if (read != sizeof header) { ok = false; break; }
+        uint32_t points = cfg_coast_get(header + 4);
+        if (points < 2 || points > 20000000 || (total += 44 + (size_t)points * 8) > 128 * 1024 * 1024) {
+            ok = false;
+            break;
+        }
+        const json_t *patch = next < count ? json_array_get(patches, next) : NULL;
+        int64_t polygon = -1;
+        if (patch) cfg_coast_integer(osm_field(patch, "polygon"), 0, INT32_MAX, &polygon);
+        if ((int64_t)cfg_coast_get(header) == polygon) {
+            ok = cfg_coast_ring_patch(input, output, header, patch);
+            ++next;
+        } else {
+            ok = cfg_coast_write(output, header, sizeof header) && cfg_coast_copy(input, output, (size_t)points * 8);
+        }
+    }
+    ok = file_close(input) && ok;
+    ok = file_close(output) && ok && next == count;
+    json_free(document);
+    return ok;
+}
+
 /* Keep the optional geographic import separate from SQL statement ingestion. */
 bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *staging)
 {
     string_t *packed_path = string_sprintf("%s/packaging/almanac-db/gshhs_f.b.zst", string_c_str(root));
     string_t *plain_path = string_sprintf("%s/shoreline.bin", string_c_str(staging));
+    string_t *corrected_path = string_sprintf("%s/shoreline-corrected.bin", string_c_str(staging));
+    string_t *patch_path = string_sprintf("%s/packaging/globe-db/shoreline-corrections.json", string_c_str(root));
     file_t *packed = packed_path ? file_new(packed_path) : NULL;
     file_t *plain = plain_path ? file_new(plain_path) : NULL;
+    file_t *corrected = corrected_path ? file_new(corrected_path) : NULL;
+    file_t *patch = patch_path ? file_new(patch_path) : NULL;
     bool exists = packed && file_exists(packed);
-    bool ok = packed && plain && !file_last_error(packed);
+    bool ok = packed && plain && corrected && patch && exists && !file_last_error(packed);
     if (ok && exists) {
         cfg_progress_t *progress = cfg_progress_start("Indexing shorelines");
         ok = file_decompress_zstd(packed, plain, 128 * 1024 * 1024, false) &&
-             file_open_read(plain) && globe_import_shoreline(db, plain);
+             cfg_database_coast_correct(plain, corrected, patch) &&
+             file_open_read(corrected);
+        bool transaction = ok && sqlite_exec_cstr(db, "begin immediate");
+        ok = transaction && globe_import_shoreline(db, corrected) && sqlite_exec_cstr(db,
+                 "update shoreline_dataset set source='GSHHG 2.3.7 + reviewed OSM shoreline corrections r1' where id=1") &&
+             sqlite_exec_cstr(db, "commit");
+        if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
         if (!ok)
             fprintf(stderr, "Shoreline import failed (source error %d, staging error %d): %s\n",
                     file_last_error(packed), file_last_error(plain), string_c_str(sqlite_last_error(db)));
         file_close(plain);
+        file_close(corrected);
         if (file_exists(plain) && !file_delete(plain)) ok = false;
+        if (file_exists(corrected) && !file_delete(corrected)) ok = false;
         cfg_progress_finish(progress, ok);
     }
     file_free(packed);
     file_free(plain);
+    file_free(corrected); file_free(patch);
     string_free(packed_path);
     string_free(plain_path);
+    string_free(corrected_path); string_free(patch_path);
     return ok;
 }
 
@@ -823,8 +966,9 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
 {
     bool install = action && !strcmp(action, "globe-install");
     bool check = action && !strcmp(action, "globe-check");
-    if (!install && !check) {
-        fputs("Globe update/removal is not implemented yet; no files changed.\n", stderr);
+    bool update = action && !strcmp(action, "globe-update");
+    if (!install && !check && !update) {
+        fputs("Globe removal is not implemented yet; no files changed.\n", stderr);
         return 2;
     }
     string_t *home = cfg_storage_home();
@@ -855,7 +999,19 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
     string_t *staging = NULL, *temporary_path = NULL, *root = NULL, *body = NULL;
     file_t *temporary = NULL;
     sqlite_t *db = NULL;
-    if (ok && (check || exists)) {
+    root = cfg_storage_value(getenv("MARS_ROOT"));
+    if (root && !string_byte_length(root)) {
+        string_free(root);
+        root = string_new_with(MARS_CONFIG_ROOT_DIR);
+    }
+    if (ok && update) {
+        /* Import replaces only shoreline tables in one transaction; credentials and other layers are untouched. */
+        staging = exists ? cfg_database_stage(parent) : NULL;
+        db = staging ? sqlite_open_encrypted(expanded, key) : NULL;
+        ok = db && root && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
+             cfg_globe_valid(db) && cfg_database_coast(db, root, staging) && cfg_globe_valid(db);
+        sqlite_close(db);
+    } else if (ok && (check || exists)) {
         db = exists ? sqlite_open_encrypted(expanded, key) : NULL;
         ok = db && sqlite_exec_cstr(db, "PRAGMA query_only=ON; PRAGMA cache_size=-512;") && cfg_globe_valid(db);
         sqlite_close(db);
@@ -865,11 +1021,6 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         staging = ok ? cfg_database_stage(parent) : NULL;
         temporary_path = staging ? string_sprintf("%s/database.db", string_c_str(staging)) : NULL;
         temporary = temporary_path ? file_new(temporary_path) : NULL;
-        root = cfg_storage_value(getenv("MARS_ROOT"));
-        if (root && !string_byte_length(root)) {
-            string_free(root);
-            root = string_new_with(MARS_CONFIG_ROOT_DIR);
-        }
         db = temporary && root ? sqlite_open_encrypted(temporary_path, key) : NULL;
         ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
              cfg_database_coast(db, root, staging) && cfg_globe_valid(db);
@@ -883,7 +1034,8 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         string_free(quoted_key);
         ok = ok && body && cfg_database_publish(temporary, destination, config, config_dir, staging, body);
     }
-    if (ok) puts(install ? "Globe database ready: existing data preserved; shoreline available."
+    if (ok) puts(update ? "Globe shoreline updated; other layers and database settings preserved. Restart MARS Lab."
+                        : install ? "Globe database ready: existing data preserved; shoreline available."
                         : "Globe database integrity and shoreline availability verified.");
     else fputs("Globe database operation failed; check its path, key and packaged shoreline source.\n", stderr);
     file_free(temporary);

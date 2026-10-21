@@ -5,6 +5,11 @@ river readers behind a single public interface. Implementations live under
 `src/globe`; there are no separate public shoreline or river headers or guides.
 SVG and WebGL rendering remain application responsibilities.
 
+Town batches use the same elevation fallback as the jurisdiction catalogue:
+missing elevations and legacy `-9999` DEM no-data markers become `0` metres.
+Valid negative elevations remain unchanged. The fallback is an assumption for
+observer selection, not a measured altitude; users should supply their actual height.
+
 ## Ownership and layer availability
 
 `globe_open()` accepts borrowed shoreline and jurisdiction SQLite connections,
@@ -45,9 +50,12 @@ before publication. Missing packaged geometry is an error, not an empty installa
 
 `make check-globe-db` checks integrity and shoreline availability with the saved
 settings. It does not prove positional accuracy or import other geographic layers.
-`make update-globe-db` and `make uninstall-globe-db` currently reserve the command
-interface only: both fail explicitly without changing files. Safe incremental
-updates and coordinated removal remain to be implemented.
+`make update-globe-db` replaces only the shoreline tables in an existing globe
+database, using the packaged source and reviewed corrections. The import is
+transactional; source preparation failures leave the database untouched and
+import failures roll back. The saved key, configuration and other layers are
+preserved. Stop MARS Lab before updating and restart it afterwards. This is
+not a river installation command. `make uninstall-globe-db` still refuses changes.
 `make install-mars-db` asks for one shared password before starting, with confirmation
 when entering a new password. An empty answer retains the saved almanac key.
 That selected key is passed directly to the globe, almanac and jurisdiction
@@ -63,7 +71,8 @@ the configured globe.
 
 `globe_has_layer()` reports availability through `globe_layer_t`. Shoreline and
 future detailed geometry belong in the globe database; towns remain in the
-jurisdiction database. Only the packaged GSHHG shoreline is currently installed.
+jurisdiction database. New installations include the packaged GSHHG shoreline
+with reviewed local corrections; existing installations require the explicit update.
 
 The browser uses a directly indexed, jurisdiction-qualified long-name exception
 table for display labels. Currently Llanfairpwllgwyngyll is the only entry.
@@ -117,12 +126,47 @@ output when a query fails or its visitor cancels.
 
 `globe_import_shoreline()` transactionally replaces shoreline tables from an
 open GSHHG 2.3.7 binary stream. It retains unrelated tables and rolls back
-malformed input. Stored uncompressed coordinate chunks use BLOB pages and an
+malformed input. Its savepoint also permits a caller-owned transaction, so the
+installer publishes geometry and correction provenance atomically.
+Stored uncompressed coordinate chunks use BLOB pages and an
 integer R-tree; older compressed chunks remain readable. Levels 1–5 are retained,
 using the Antarctic ice front rather than the alternative grounding line.
 
 See [almanac data provenance](almanac-data-provenance.md#shoreline-data) for
 source, checksums and licence notices.
+
+### Reviewed local shoreline corrections
+
+The installer applies `packaging/globe-db/shoreline-corrections.json` to a
+temporary copy of the upstream binary stream before import. The original archive
+is unchanged. Corrections are sorted by polygon ID and specify an original point
+count, a zero-based inclusive vertex span and replacement microdegree coordinates. Both
+endpoints must match the original exactly; coordinates must remain within its
+bounds. Unknown revisions, missing polygons, changed source counts and invalid
+endpoints fail before database import. Preparation uses a 64 KiB copy buffer,
+at most 32 MB for a corrected source ring, and a bounded correction document.
+
+Revision 1 corrects the southern Sydney Harbour waterfront from Woolloomooloo
+through the CBD, Darling Harbour and Rozelle Bay to Balmain. GSHHG placed the
+unchanged Sydney catalogue coordinate (33.8678° S, 151.2073° E) outside its land polygon.
+The replacement uses [OSM Sydney Harbour relation 1252425](https://www.openstreetmap.org/relation/1252425),
+version 123, retrieved on 21 October 2026. Harbour banks are represented by a
+water multipolygon, not necessarily by `natural=coastline` ways; coastline-only
+extraction misses them. No town-coordinate offset or town-specific rendering
+rule is applied.
+
+The eastern join intersects the original edge. The western join retains the
+original Balmain endpoint, about 18 metres from the OSM bank. The retained OSM
+vertices are rounded to integer microdegrees, without smoothing or downsampling.
+This local seam is not a claim of surveyed accuracy or a worldwide coastline
+upgrade. The corrected stream adds 1,365 vertices (10,920 raw coordinate bytes),
+bringing its imported point count to 10,589,219. Geographic regressions check
+Sydney and nearby land, plus water in Darling Harbour, Circular Quay and
+Woolloomooloo Bay at two display scales, as well as cold and resident hit-tests.
+
+The correction is © OpenStreetMap contributors, available under the
+[Open Database Licence 1.0](https://www.openstreetmap.org/copyright).
+GSHHG's existing licence and attribution remain applicable to the base source.
 
 ### OSM coastline candidate: detail budget and acceptance
 

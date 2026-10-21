@@ -530,9 +530,26 @@ It can rotate through either pole without latitude clamping or longitude-rate
 singularities. The shader, marker projection, picking and grid hover use the same
 rotation; extracted centre coordinates only determine geographic coverage.
 “Centre on observer” explicitly restores a north-up view of the selected location.
-Using an eclipse location or restoring an observer from history also recentres the
-globe and updates its selected-town label, preserving zoom without starting an
-additional evaluation. Saving an unchanged observer does not reset a rotated view.
+Using an eclipse location also recentres the globe without starting an additional
+evaluation. Almanac history retains five camera numbers (quaternion and zoom), not
+textures or geographical data. **Back** and **Forward** zoom out, rotate along the
+shortest quaternion path, then restore the saved zoom and roll over 3.6 seconds.
+The departing location retains the latest zoom and rotation, including adjustments
+made after selecting it. Camera adjustments refresh that entry without adding
+history steps or clearing the forward branch.
+Regional shoreline, river and town requests wait until the flight settles; only
+the selected marker is drawn during flight. New navigation or manual globe input
+cancels the previous flight. Reduced-motion preferences skip the animation, and
+older history entries without camera data centre the observer at the current zoom.
+The native `lab_globe_flight()` bridge validates the five-number camera records and
+interpolates zoom and quaternion orientation; the browser only schedules frames.
+Saving an unchanged observer does not reset a rotated view.
+
+In Almanac mode, **Back**, **Forward**, **Help** and **Clear** sit directly below
+the globe, above the worksheet introduction. Their former area below the observer
+fields remains empty to leave room for country and town dropdowns. Other modes
+retain the usual action-row position; the same buttons and handlers are reused.
+
 The selected town keeps a gold label beside the observer marker, including at overview zoom;
 it takes priority over nearby labels while its location is visible on the globe.
 Globe town buttons and navigation remain available during an Almanac refresh.
@@ -940,6 +957,13 @@ mode and composes diagnostic and weather sections without interpreting mathemati
 `wasm/src/lab_storage.c` owns saved-control normalisation, recovery precedence and
 history restoration plans; browser storage access and awaited editor preparation
 retain their cancellation checks in the host.
+
+Automatic evaluations after user edits to DateTime or Almanac controls record the
+previous committed worksheet in that mode's Back history. This includes town,
+jurisdiction, coordinates, altitude, date and time changes. Back restores those
+controls and enables Forward; a new edit after going Back discards the abandoned
+forward branch. Unchanged evaluations do not add duplicate entries. History
+restoration and presentation-only refreshes still suppress new history entries.
 
 `almanac.js` and its route are removed. Native calendar markup is installed by
 `results.js`, request transport lives in `api.js`, and shared observer controls
@@ -3699,8 +3723,16 @@ penumbral shading in its preview. Cell tooltips explain both measurements.
 The named-totality search uses `jurisdict_each_town()` and the jurisdiction
 module's installed configuration, including database-backed town coordinates and
 timezones. Catalogue failures are reported as failures, not as an absence of
-totality. The distance-ordered search checks at most 1,024 candidate towns;
-it is a named-location search, not an exhaustive search of all land.
+totality. A single catalogue pass screens every town against shared, two-minute
+Sun/Moon samples over the same twelve-hour window used by local refinement.
+An initial 0.1-degree apparent-separation screen is followed by a chord-interpolated
+check against the apparent radius difference, with a 0.001-degree allowance.
+Only possible totality locations are retained and distance-sorted; there is no first-1,024-towns cut-off. Surviving
+candidates undergo the exact local-maximum calculation and a shoreline land
+check before becoming actionable. The approximately 17 KiB screening grid is
+released after each event; rejected towns are not retained. This remains a
+sampled named-location search, not a guarantee of the nearest point on all land.
+The existing 20-second worker timeout and asynchronous request ownership remain.
 The preview is rotated for the selected observer at the event time, with the
 local zenith upwards, including hemisphere, longitude and time-dependent tilt.
 Solar geometry is topocentric; lunar shadow sizes use the engine's geocentric
@@ -3708,6 +3740,10 @@ convention, with the shadow direction projected into the observer's local view.
 Undefined orientations are explicitly labelled; missing geometry omits the
 preview rather than inventing a shape. Changing to a nearest-totality location
 requires a new evaluation, just as the contact times do.
+The nearest-totality **Use** action supplies the destination's greatest-eclipse
+date and time in GMT, matching the worksheet inputs. Its label and event contact
+times remain local civil time, and the destination's zone remains selected for
+display. A non-zero zone must not shift the observation away from totality.
 
 The captured request is for London at `2026-10-16 12:00:00` GMT, at an observer
 elevation of 25 metres. The globe and observer controls appear beside the

@@ -26,9 +26,10 @@
 
 #include "file-t.h"
 #include "http-t.h"
+#include "jurisdiction-t.h"
+#include "sqlite-t.h"
 #include "lab_server.h"
 #include "lab_wire.h"
-#include "sqlite-t.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
@@ -507,6 +508,57 @@ static void test_lab_http_contracts(void)
                      "real HTTP routes serve assets, persist state and evaluate maths");
 }
 
+static bool catalogue_elevation(const jurisdict_place_t *place, void *context)
+{
+    size_t *count = context;
+    const char *expected = !strcmp(place->name, "Shrewsbury") ? "-250" : "0";
+    if (!place->elevation || strcmp(place->elevation, expected))
+        return false;
+    ++*count;
+    return true;
+}
+
+static bool route_catalogue_elevation(const char *directory)
+{
+    if (!test_lab_catalogue_database(directory))
+        return false;
+    string_t *path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    string_t *key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
+    sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    bool ok = db && sqlite_exec_cstr(db,
+        "UPDATE jurisdiction_town_elevation SET elevation_metres='-250' WHERE jurisdiction_town_id=1;"
+        "UPDATE jurisdiction_town_elevation SET elevation_metres='-9999' WHERE jurisdiction_town_id=2;"
+        "DELETE FROM jurisdiction_town_elevation WHERE jurisdiction_town_id=3;");
+    sqlite_close(db);
+    string_free(path);
+    string_free(key);
+    jurisdiction_t *engine = ok ? jurisdict_open(NULL) : NULL;
+    size_t count = 0;
+    int64_t next = 0;
+    ok = engine && jurisdict_each_town(engine, catalogue_elevation, &count) && count == 3 && ok;
+    count = 0;
+    ok = jurisdict_each_town_batch(engine, 0, 32, catalogue_elevation, &count, &next) && count == 3 && ok;
+    count = 0;
+    ok = jurisdict_each_town_near_batch(engine, 53.3, -3.5, 0, 32, catalogue_elevation, &count, &next) &&
+         count == 2 && ok;
+    jurisdict_close(engine);
+    http_response_t *response = route_request(HTTP_GET, "/towns?after=0", NULL, NULL, NULL, NULL);
+    json_t *data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    const json_t *towns = test_lab_member(test_lab_member(data, "towns"), "GB-WLS");
+    ok = route_check(response, 200,
+        !strcmp(test_lab_text(json_array_get(towns, 0), "value"), "Rhyl|53.3190|-3.4916|0"),
+        "missing DEM elevation is not sent to observer selection") && ok;
+    json_free(data);
+    http_response_free(response);
+    return ok;
+}
+
+static void test_lab_catalogue_elevation(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(route_catalogue_elevation),
+        "legacy no-data and absent elevations use zero; real below-sea-level elevations survive all catalogue paths");
+}
+
 static bool route_catalogue(const char *directory)
 {
     if (!test_lab_catalogue_database(directory))
@@ -724,6 +776,7 @@ void test_lab_route_cases(void)
     TEST_RUN_IN_GROUP(test_lab_server_lifetime, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_contracts, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_catalogue, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_catalogue_elevation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_rejections, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_rivers, tests, NULL);
 }

@@ -3,13 +3,14 @@
  * @brief Browser canvas, texture loading and input adapter for the native observer globe.
  *
  * A bundled NASA surface composite supplies wide-view colour; native filled SVG shorelines replace it at deep zoom.
- * WASM owns picking, movement and marker projection.
+ * WASM owns picking, movement, history-flight interpolation and marker projection.
  * GPU sampling keeps rotation responsive while a cancellable request obtains finer shoreline imagery.
  */
 type GlobeView = [number, number, number, number, number, number, number];
 interface GlobeTown { town: LabTown; jurisdiction: string; country: string; }
 
 class MarsAlmanacGlobe {
+    private static instance: MarsAlmanacGlobe | null = null;
     // Display-only exceptions: indexed by jurisdiction and catalogue name, never scanned per frame.
     private static readonly longNames = new Map<string, string>([
         ['GB-WLS:Llanfairpwllgwyngyll', 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch']
@@ -63,6 +64,102 @@ class MarsAlmanacGlobe {
     private riverBounds = [-180, -90, 180, 90];
     private riverZoom = 0;
     private riverUnloadTimer = 0;
+    private flightFrame = 0;
+    private flightGeneration = 0;
+    private flightTarget: number[] | null = null;
+    private historyRestoring = false;
+
+    /** Capture only five camera numbers; imagery and catalogues remain outside worksheet history. */
+    public static captureHistory(): number[] | undefined {
+        const globe = this.instance;
+        if (!globe) return undefined;
+        if (globe.flightTarget) return globe.flightTarget.slice();
+        globe.rememberHistory();
+        const orientation = globe.observerSignature === globe.observerState() ? globe.orientation :
+            labDOM.call('lab_globe_centre', Number(globe.input('Latitude').value),
+                Number(globe.input('Longitude').value)) as number[] | null;
+        return orientation ? [...orientation, globe.view[2]] : undefined;
+    }
+
+    /** Suspend automatic centring while asynchronous history restoration resolves the destination. */
+    public static beginHistory(): number | undefined {
+        const globe = this.instance;
+        if (!globe) return undefined;
+        globe.cancelFlight();
+        globe.historyRestoring = true;
+        globe.stopRegionRequests();
+        // A saved zoom may cross from photographic detail to a land mask or vice versa.
+        globe.detailReady = false;
+        globe.riverReady = false;
+        return globe.flightGeneration;
+    }
+
+    /** Start only the still-owned restoration; stale completions cannot move the camera. */
+    public static finishHistory(token: number | undefined, camera: unknown, accepted: boolean): void {
+        const globe = this.instance;
+        if (!globe || token !== globe.flightGeneration) return;
+        globe.historyRestoring = false;
+        if (!accepted) { globe.move(0, 0, 1); return; }
+        const start = [...globe.orientation, globe.view[2]];
+        const saved = labDOM.call('lab_globe_flight', start, camera, 1) as number[] | null;
+        const target = saved || MarsAlmanacGlobe.captureHistory();
+        if (!target) return;
+        globe.observerSignature = globe.observerState();
+        globe.flightTarget = target;
+        globe.hideGridHover();
+        const complete = (): void => {
+            globe.applyCamera(target);
+            globe.cancelFlight();
+            globe.move(0, 0, 1);
+        };
+        if (!globe.started || document.hidden || globe.gl.isContextLost() ||
+            matchMedia('(prefers-reduced-motion: reduce)').matches || start.every((value, i) => value === target[i])) {
+            complete();
+            return;
+        }
+        const began = performance.now();
+        const tick = (now: number): void => {
+            if (token !== globe.flightGeneration) return;
+            if (WorksheetWorkspace.mode.currentMode() !== 'almanac') { globe.cancelFlight(); return; }
+            globe.flightFrame = 0;
+            const progress = (now - began) / 3600;
+            if (progress >= 1 || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                complete();
+                return;
+            }
+            const next = labDOM.call('lab_globe_flight', start, target, progress) as number[];
+            globe.applyCamera(next);
+            globe.flightFrame = requestAnimationFrame(tick);
+        };
+        globe.flightFrame = requestAnimationFrame(tick);
+    }
+
+    private cancelFlight(): void {
+        ++this.flightGeneration;
+        cancelAnimationFrame(this.flightFrame);
+        this.flightFrame = 0;
+        this.flightTarget = null;
+        this.historyRestoring = false;
+    }
+
+    private stopRegionRequests(): void {
+        window.clearTimeout(this.timer);
+        window.clearTimeout(this.detailTimer);
+        ++this.generation;
+        ++this.riverGeneration;
+        this.request?.abort();
+        this.request = null;
+        this.requestBounds = null;
+        this.riverRequest?.abort();
+        this.riverRequest = null;
+    }
+
+    private applyCamera(camera: number[]): void {
+        this.orientation = camera.slice(0, 4);
+        this.view = labDOM.call('lab_globe_view', this.orientation, camera[4], 1) as GlobeView;
+        this.rotation = (labDOM.call('lab_surface_camera', 1, this.orientation, null, null, null, 0) as number[][]).flat();
+        this.draw();
+    }
 
     constructor(private readonly root: HTMLElement) {
         this.canvas = root.querySelector('canvas')!;
@@ -113,11 +210,13 @@ class MarsAlmanacGlobe {
             if (!this.started && entries.some(entry => entry.isIntersecting)) {
                 this.started = true;
                 this.indexTowns();
-                this.centre();
+                if (this.observerSignature !== this.observerState()) this.centre();
+                else this.move(0, 0, 1);
                 void this.loadWorld();
             }
         });
         visible.observe(root);
+        MarsAlmanacGlobe.instance = this;
     }
 
     private createProgram(): WebGLProgram {
@@ -289,26 +388,36 @@ class MarsAlmanacGlobe {
             field => (document.getElementById('almanac' + field) as HTMLInputElement | HTMLSelectElement).value));
     }
 
+    private rememberHistory(): void {
+        if (!this.historyRestoring && !this.flightTarget && this.observerSignature)
+            WorksheetPersistence.history.rememberGlobeCamera(
+                this.observerSignature, [...this.orientation, this.view[2]]);
+    }
+
     private centre(): void {
+        if (this.historyRestoring) return;
         const lat = this.input('Latitude').value, lon = this.input('Longitude').value;
         if (!lat.trim() || !lon.trim() || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon)) ||
             Math.abs(Number(lat)) > 90 || Math.abs(Number(lon)) > 180) {
             this.status.textContent = 'Enter an observer location to centre the globe.';
             return;
         }
+        this.rememberHistory();
         this.orientation = labDOM.call('lab_globe_centre', Number(lat), Number(lon)) as number[];
         this.observerSignature = this.observerState();
         this.move(0, 0, 1);
     }
 
     private move(dx: number, dy: number, factor: number, roll = 0): void {
+        this.cancelFlight();
         this.hideGridHover();
         window.clearTimeout(this.detailTimer);
         ++this.riverGeneration;
         this.riverRequest?.abort();
         this.riverRequest = null;
         const wasMap = this.usesMap();
-        this.orientation = labDOM.call('lab_globe_rotate', this.orientation, this.view[2], dx, dy, roll) as number[];
+        if (dx || dy || roll)
+            this.orientation = labDOM.call('lab_globe_rotate', this.orientation, this.view[2], dx, dy, roll) as number[];
         this.rotation = (labDOM.call('lab_surface_camera', 1, this.orientation, null, null, null, 0) as number[][]).flat();
         this.view = labDOM.call('lab_globe_view', this.orientation, this.view[2], factor) as GlobeView;
         this.scheduleRiverUnload();
@@ -597,7 +706,7 @@ class MarsAlmanacGlobe {
         if (selected) append(Number(selected.town.latitude), Number(selected.town.longitude), selected);
         const latitude = this.input('Latitude').value, longitude = this.input('Longitude').value;
         if (latitude.trim() && longitude.trim()) append(Number(latitude), Number(longitude));
-        if (this.view[2] >= 3) {
+        if (this.view[2] >= 3 && !this.flightTarget) {
             const [, , , west, south, east, north] = this.view;
             for (let y = Math.floor(south / 5); y <= Math.floor(north / 5); ++y) {
                 for (let x = Math.floor(west / 5); x <= Math.floor(east / 5); ++x) {
@@ -613,6 +722,8 @@ class MarsAlmanacGlobe {
     }
 
     private async select(latitude: number, longitude: number, place?: GlobeTown): Promise<void> {
+        this.rememberHistory();
+        this.cancelFlight();
         const generation = ++this.selection;
         const select = document.getElementById('almanacTown') as WorksheetSelect;
         const elevation = this.input('Elevation').value;
@@ -689,6 +800,7 @@ class MarsAlmanacGlobe {
         viewport.addEventListener('pointerleave', () => this.hideGridHover());
         this.root.querySelectorAll<HTMLButtonElement>('[data-globe-action]').forEach(button => {
             button.addEventListener('click', () => {
+                this.cancelFlight();
                 if (button.dataset.globeAction === 'map') {
                     this.map = !this.map;
                     button.setAttribute('aria-pressed', String(this.map));
@@ -715,6 +827,7 @@ class MarsAlmanacGlobe {
         this.canvas.addEventListener('pointerdown', event => {
             this.hideGridHover();
             if (event.button !== 0) return;
+            this.cancelFlight();
             this.canvas.setPointerCapture(event.pointerId);
             this.pointers.set(event.pointerId, {x: event.clientX, y: event.clientY});
             this.start = {x: event.clientX, y: event.clientY};
@@ -765,11 +878,13 @@ class MarsAlmanacGlobe {
             }
         });
         this.canvas.addEventListener('webglcontextlost', event => {
+            this.cancelFlight();
             event.preventDefault(); ++this.generation; this.request?.abort();
             window.clearTimeout(this.timer);
             this.status.textContent = 'Globe graphics interrupted. Reload to restore; observer fields remain available.';
         });
         document.addEventListener('mars-almanac-observer-committed', () => {
+            if (this.historyRestoring) return;
             if (this.observerSignature !== this.observerState()) {
                 ++this.selection;
                 this.centre();
@@ -777,8 +892,11 @@ class MarsAlmanacGlobe {
         });
         for (const id of ['almanacLatitude', 'almanacLongitude', 'almanacTown', 'almanacJurisdiction'])
             document.getElementById(id)?.addEventListener('change', () => {
+                this.cancelFlight();
                 ++this.selection;
-                requestAnimationFrame(() => this.centre());
+                requestAnimationFrame(() => {
+                    if (this.observerSignature !== this.observerState()) this.centre();
+                });
             });
     }
 }

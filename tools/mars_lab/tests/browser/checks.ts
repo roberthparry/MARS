@@ -2742,6 +2742,144 @@
             WorksheetContext.worksheetSession.calendar.almanacVisibilityMode = visibility;
         }
     }
+    /** Exercise calendar edits and navigation through the real native history and control adapters. */
+    async function checkCalendarHistoryNavigation(): Promise<void> {
+        const savedFetch = window.fetch;
+        const savedGlobeFetch = labHttp.fetch;
+        labHttp.fetch = (url, options) => url === '/almanac-globe' || url === '/almanac-rivers' ?
+            Promise.reject(new Error('History camera fixture: no regional imagery')) : savedGlobeFetch(url, options);
+        const savedMode = WorksheetWorkspace.mode.currentMode();
+        // History must work even when an evaluation fails, without contacting astronomy/weather providers.
+        window.fetch = (url, options) => /^\/(almanac|datetime)-eval$/.test(String(url)) ?
+            Promise.resolve(new Response(labWire.encode({ok: false, error: 'History fixture'}),
+                {status: 422, headers: {'Content-Type': 'application/x-protobuf'}})) : savedFetch(url, options);
+        try {
+            for (const mode of ['almanac', 'datetime'] as const) {
+                WorksheetWorkspace.mode.setMode(mode);
+                WorksheetWorkspace.presentation.syncModeUI();
+                await new Promise(requestAnimationFrame);
+                await new Promise(requestAnimationFrame);
+                const history = WorksheetPersistence.history;
+                const saved = history.snapshot();
+                const cursors = [history.cursor(0), history.cursor(1)];
+                const retained = cursors.map(cursor => {
+                    const entries: WorksheetSnapshot[] = [];
+                    while (cursor.length) entries.push(cursor.pop()!);
+                    return entries;
+                });
+                const latitude = document.getElementById(mode + 'Latitude') as HTMLInputElement;
+                const longitude = document.getElementById(mode + 'Longitude') as HTMLInputElement;
+                const elevation = document.getElementById(mode + 'Elevation') as HTMLInputElement;
+                const town = document.getElementById(mode + 'Town') as WorksheetSelect;
+                const back = document.getElementById('back') as HTMLButtonElement;
+                const forward = document.getElementById('forward') as HTMLButtonElement;
+                const evaluate = mode === 'almanac' ? WorksheetRequests.evaluation.evaluateAlmanac :
+                    WorksheetRequests.evaluation.evaluateDatetime;
+                const automatic = mode === 'almanac' ? WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation :
+                    WorksheetLocations.calendarActions.triggerDatetimeAutoEvaluation;
+                const globe = mode === 'almanac' ? Reflect.get(MarsAlmanacGlobe, 'instance') as {
+                    view: number[]; orientation: number[]; flightTarget: number[] | null;
+                    applyCamera(camera: number[]): void;
+                    stopRegionRequests(): void;
+                } : null;
+                const savedCamera = globe ? [...globe.orientation, globe.view[2]] : null;
+                const camera = (zoom: number, roll: number): number[] => {
+                    document.querySelector<HTMLButtonElement>('[data-globe-action="centre"]')!.click();
+                    const orientation = labDOM.call('lab_globe_rotate',
+                        labDOM.call('lab_globe_centre', Number(latitude.value), Number(longitude.value)),
+                        1, 0, 0, roll) as number[];
+                    const value = [...orientation, zoom];
+                    globe!.applyCamera(value);
+                    return value;
+                };
+                const settledCamera = async (expected: number[]): Promise<void> => {
+                    if (globe!.flightTarget && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                        await new Promise(resolve => setTimeout(resolve, 1200));
+                        check(globe!.view[2] === 1, 'history rotation takes place at the whole-Earth overview');
+                    }
+                    for (let i = 0; i < 300 && globe!.flightTarget; ++i)
+                        await new Promise(resolve => setTimeout(resolve, 20));
+                    check(!globe!.flightTarget && globe!.view[2] === expected[4] &&
+                          globe!.orientation.every((value, i) => Math.abs(value - expected[i]) < 1e-12),
+                          `history restores exact saved zoom and quaternion roll: expected=${expected}, ` +
+                          `actual=${globe!.orientation},${globe!.view[2]}, pending=${globe!.flightTarget}`);
+                };
+                try {
+                    latitude.value = '51';
+                    WorksheetLocations.townSelection.clearTownForCustomCoordinates(town, latitude, longitude, elevation);
+                    let firstCamera = globe ? camera(12.5, .3) : null;
+                    await evaluate({skipHistoryUpdate: true});
+                    // Zoom and roll after the selection was committed, then depart without another evaluation.
+                    if (globe) firstCamera = camera(43.75, .6);
+                    check(history.backwardCount() === 0, mode + ': camera changes do not add history steps');
+                    latitude.value = '52';
+                    const secondCamera = globe ? camera(87.25, -.4) : null;
+                    await automatic();
+                    check(history.backwardCount() === 1 && !back.disabled && forward.disabled,
+                          mode + ': automatic edit enables Back');
+                    await WorksheetPersistence.navigation.navigate(0);
+                    check(Number(latitude.value) === 51 && !forward.disabled && back.disabled,
+                          `${mode}: Back restores coordinates and enables Forward: latitude=${latitude.value}, ` +
+                          `back=${history.backwardCount()}/${back.disabled}, forward=${history.forwardCount()}/${forward.disabled}`);
+                    if (firstCamera) await settledCamera(firstCamera);
+                    if (globe) {
+                        firstCamera = camera(65.5, -.2);
+                        check(history.forwardCount() === 1 && !forward.disabled,
+                              'adjusting a restored camera retains the forward branch');
+                    }
+                    await WorksheetPersistence.navigation.navigate(1);
+                    check(Number(latitude.value) === 52 && !back.disabled && forward.disabled,
+                          mode + ': Forward restores the edited observer');
+                    if (secondCamera) await settledCamera(secondCamera);
+                    await automatic();
+                    check(history.backwardCount() === 1, mode + ': unchanged evaluation does not duplicate history');
+                    await WorksheetPersistence.navigation.navigate(0);
+                    if (globe) {
+                        // A newer navigation must win without waiting for the first flight to finish.
+                        await WorksheetPersistence.navigation.navigate(1);
+                        await WorksheetPersistence.navigation.navigate(0);
+                        await settledCamera(firstCamera!);
+                    }
+                    latitude.value = '53';
+                    await automatic();
+                    check(history.forwardCount() === 0 && forward.disabled && !back.disabled,
+                          mode + ': a fresh edit discards the forward branch');
+                    if (globe) {
+                        MarsAlmanacGlobe.finishHistory(MarsAlmanacGlobe.beginHistory(), secondCamera, true);
+                        document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();
+                        check(!globe.flightTarget, 'manual zoom interrupts a flight immediately');
+                        const match = window.matchMedia;
+                        try {
+                            window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ?
+                                {matches: true} as MediaQueryList : match.call(window, query);
+                            MarsAlmanacGlobe.finishHistory(MarsAlmanacGlobe.beginHistory(), firstCamera, true);
+                            check(!globe.flightTarget && globe.view[2] === firstCamera![4],
+                                  'reduced motion restores saved zoom immediately without a flight');
+                        } finally { window.matchMedia = match; }
+                    }
+                } finally {
+                    await WorksheetPersistence.navigation.restore(saved);
+                    if (globe && savedCamera) {
+                        document.querySelector<HTMLButtonElement>('[data-globe-action="centre"]')!.click();
+                        globe.stopRegionRequests();
+                        globe.applyCamera(savedCamera);
+                    }
+                    for (let side = 0; side < cursors.length; ++side) {
+                        while (cursors[side].length) cursors[side].pop();
+                        for (const entry of retained[side].reverse()) cursors[side].push(entry);
+                    }
+                    history.commit();
+                }
+            }
+        } finally {
+            window.fetch = savedFetch;
+            labHttp.fetch = savedGlobeFetch;
+            WorksheetWorkspace.mode.setMode(savedMode);
+            WorksheetWorkspace.presentation.syncModeUI();
+            WorksheetWorkspace.presentation.updateHistoryButtons();
+        }
+    }
+
     /** Exercise incremental publication without altering the installed catalogue or live menu contents. */
     async function checkTownPublicationScheduling(): Promise<void> {
         const app = new LabApplication();
@@ -2877,10 +3015,13 @@
             await labApplication.townsReady;
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('select-check') === '1') {
+                await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
+                await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
+                await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation);
                 await runBrowserGroup('checkLabSelects', window.checkLabSelects);
                 await runBrowserGroup('checkLabSelectEvents', window.checkLabSelectEvents);
                 await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);
-                await report('PASS: selection menus, 5000-town selection and globe busy-state interactions');
+                await report('PASS: calendar Back/Forward, selection menus, 5000-town selection and globe busy-state interactions');
                 return;
             }
             if (new URLSearchParams(location.search).get('globe-check') === '1') {
@@ -2910,6 +3051,7 @@
             await runBrowserGroup('checkLabResultFlows', window.checkLabResultFlows);
             await runBrowserGroup('checkLabBindingFlows', window.checkLabBindingFlows);
             await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
+            await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation);
             await runBrowserGroup('checkLabRequestFlows', window.checkLabRequestFlows);
             await runBrowserGroup('checkLabStateFlow', window.checkLabStateFlow);
             await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);

@@ -216,6 +216,11 @@ double almanac_body_semi_diameter_from_distance_degrees(almanac_body_id_t body_i
 double almanac_angular_separation_degrees(const cartesian3_t *a, const cartesian3_t *b);
 double almanac_ecliptic_longitude_degrees(const cartesian3_t *vector);
 bool almanac_observer_is_valid(almanac_t *almanac, const almanac_observer_t *observer);
+
+/** Compute the ellipsoidal observer position using an already resolved sidereal angle, in degrees. */
+bool almanac_observer_position_au(almanac_t *almanac, const almanac_observer_t *observer, double gha_aries,
+                                  cartesian3_t *out);
+
 bool almanac_topocentric_vector(almanac_t *almanac, const cartesian3_t *geocentric_equatorial_au,
     const almanac_observer_t *observer, double jd, cartesian3_t *out);
 double almanac_topocentric_altitude_degrees(almanac_t *almanac, const cartesian3_t *topocentric_equatorial_au,

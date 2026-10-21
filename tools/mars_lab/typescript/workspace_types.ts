@@ -45,6 +45,8 @@ interface WorksheetRowsMetadata { expression: string; [field: string]: unknown; 
 interface WorksheetSnapshot {
     mode: WorksheetMode;
     text: string;
+    /** Optional Almanac display camera: quaternion x,y,z,w and zoom; no geography or imagery. */
+    globeCamera?: number[];
     [field: string]: unknown;
 }
 interface WorksheetResultValues {

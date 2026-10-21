@@ -104,6 +104,13 @@ bool cfg_database_import(sqlite_t *db, const string_t *root, const string_t *pat
  */
 bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *staging);
 
+/**
+ * @brief Prepare reviewed shoreline span corrections without modifying the upstream source or any database.
+ * @note All handles are borrowed and closed. Output must not exist. Revision, source counts, bounds and matching
+ * endpoints are checked; malformed or missing corrections fail before import. Failed output is caller-cleaned.
+ */
+bool cfg_database_coast_correct(file_t *input, file_t *output, file_t *corrections);
+
 /** @brief Retire withdrawn legacy river data during jurisdiction installation without changing unrelated tables. */
 bool cfg_database_rivers(sqlite_t *db, const string_t *root, const string_t *staging);
 

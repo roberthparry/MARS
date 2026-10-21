@@ -243,13 +243,29 @@ The French catalogue also includes Ajaccio, Bastia, Biguglia, Borgo, Calvi,
 Corte and Porto-Vecchio in Corsica, from the same GeoNames extract, with
 approximate DEM elevations and the `Europe/Paris` timezone.
 
-The worldwide supplement brings the packaged catalogue to **50,000 locations**,
+The worldwide supplement established a baseline of **50,000 locations**,
 adding 46,455 GeoNames populated places across more than 200 countries and
 territories. Existing coordinates and default choices are retained. Duplicate
 names within a jurisdiction are distinguished by a GeoNames-ID suffix. New US
 and British places use supported subdivisions; other new places use country
 jurisdictions rather than guessing a regional holiday policy. Coordinates and
 DEM elevations describe reference points, not an observer's exact position.
+
+The source DEM value `-9999` denotes unavailable elevation, not a location below
+sea level. Imports omit that elevation record while retaining the town. Catalogue
+readers also recognise the sentinel in older installed databases and return the
+existing `0` metre fallback. This is an assumed starting value, not a surveyed
+height; set the actual observer altitude when known. Genuine negative elevations
+are preserved, and manually entered observer heights remain subject to validation.
+
+Targeted Sunshine Coast additions bring the current packaged total to **50,004
+records**: Mooloolaba and Maroochydore each appear under Australia (`AU`) and
+Queensland (`AU-QLD`), with the `Australia/Brisbane` timezone. GeoNames classifies
+these as urban sections (`PPLX`), normally excluded by the worldwide generator;
+explicit seeds retain these useful coastal locations without importing every
+suburb. The existing Sunshine Coast entry and all other towns are retained.
+Reinstall the jurisdiction database and restart MARS Lab to load catalogue changes;
+updating the globe database alone does not update towns.
 
 `jurisdict_each_town_batch()` provides indexed, ascending-ID pagination for
 bounded transports. Start with ID zero, request 1–1024 records, and continue

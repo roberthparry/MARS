@@ -123,3 +123,60 @@ void lab_globe_view(quaternion_jsref orientation, double zoom, double factor)
     double values[] = {latitude, longitude, zoom, longitude - lon_span, south, longitude + lon_span, north};
     globe_result(values, 7);
 }
+
+static bool globe_camera_read(jsref camera, double values[5])
+{
+    if (lab_dom_type(camera) != LAB_VALUE_ARRAY || lab_dom_count(camera) != 5) return false;
+    double norm = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        jsref value = lab_dom_item(camera, i);
+        if (lab_dom_type(value) != LAB_VALUE_NUMBER) return false;
+        values[i] = lab_dom_to_number(value);
+        if (!isfinite(values[i])) return false;
+        if (i < 4) norm += values[i] * values[i];
+    }
+    return fabs(norm - 1) < 1e-6 && values[4] >= 1 && values[4] <= 4096;
+}
+
+static double globe_ease(double t)
+{
+    t = fmax(0, fmin(1, t));
+    return t * t * (3 - 2 * t);
+}
+
+/* Display-only interpolation; never alter the observer or retain browser handles between frames. */
+void lab_globe_flight(jsref start, jsref target, double progress)
+{
+    double a[5], b[5], result[5];
+    if (!isfinite(progress) || !globe_camera_read(start, a) || !globe_camera_read(target, b)) {
+        lab_dom_return(0);
+        return;
+    }
+    if (progress <= 0 || progress >= 1) {
+        globe_result(progress <= 0 ? a : b, 5);
+        return;
+    }
+    double dot = 0;
+    for (unsigned i = 0; i < 4; ++i) dot += a[i] * b[i];
+    if (dot < 0) {
+        dot = -dot;
+        for (unsigned i = 0; i < 4; ++i) b[i] = -b[i];
+    }
+    double turn = globe_ease((progress - 0.25) / 0.5);
+    double left = 1 - turn, right = turn;
+    if (dot < 0.9995) {
+        double angle = acos(fmax(0, fmin(1, dot))), divisor = sin(angle);
+        left = sin((1 - turn) * angle) / divisor;
+        right = sin(turn * angle) / divisor;
+    }
+    double norm = 0;
+    for (unsigned i = 0; i < 4; ++i) {
+        result[i] = left * a[i] + right * b[i];
+        norm += result[i] * result[i];
+    }
+    for (unsigned i = 0; i < 4; ++i) result[i] /= sqrt(norm);
+    /* Logarithmic zoom gives consistent pacing at both street and continental scales. */
+    result[4] = progress < 0.25 ? exp(log(a[4]) * (1 - globe_ease(progress / 0.25))) :
+                progress > 0.75 ? exp(log(b[4]) * globe_ease((progress - 0.75) / 0.25)) : 1;
+    globe_result(result, 5);
+}

@@ -32,6 +32,27 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         check(view[2] === 4096 && view[3] < view[5] && view[4] < view[6], 'zoom bounded with valid texture extent');
     }
     check(labDOM.call('lab_globe_pick', 2, 0, [0, 0, 0, 1]) === null, 'globe limb rejects outside clicks');
+    for (const [lat, lon] of [[52, -2], [-33, 151], [89.99, -179.9], [0, 180]]) {
+        const start = [...labDOM.call('lab_globe_centre', 0, 179.9) as number[], 150];
+        const end = [...labDOM.call('lab_globe_rotate',
+            labDOM.call('lab_globe_centre', lat, lon), 1, 0, 0, .4) as number[], 4096];
+        const frame = (progress: number): number[] => labDOM.call('lab_globe_flight', start, end, progress) as number[];
+        check(JSON.stringify(frame(0)) === JSON.stringify(start) && JSON.stringify(frame(1)) === JSON.stringify(end),
+              'history flight retains exact endpoints including zoom and roll');
+        check(frame(.125)[4] > 1 && frame(.125)[4] < 150 && frame(.5)[4] === 1 &&
+              frame(.875)[4] > 1 && frame(.875)[4] < 4096, 'flight zooms out before rotating and then zooms in');
+        for (const progress of [.125, .25, .4, .5, .6, .75, .875]) {
+            const camera = frame(progress);
+            check(camera.every(Number.isFinite) && Math.abs(Math.hypot(...camera.slice(0, 4)) - 1) < 1e-12,
+                  'history interpolation stays finite and normalised at poles and the date line');
+        }
+        const flipped = end.map((value, index) => index < 4 ? -value : value);
+        const a = frame(.5), b = labDOM.call('lab_globe_flight', start, flipped, .5) as number[];
+        check(Math.abs(a.slice(0, 4).reduce((sum, value, i) => sum + value * b[i], 0) - 1) < 1e-12,
+              'equivalent quaternion signs take the same shortest rotation');
+        for (const invalid of [null, [], [0, 0, 0, 0, 2], [0, 0, 0, 1, Infinity], [0, 0, 0, 1, 4097]])
+            check(labDOM.call('lab_globe_flight', start, invalid, .5) === null, 'malformed saved cameras are rejected');
+    }
     for (const latitude of [80, -80]) {
         const start = labDOM.call('lab_globe_centre', latitude, 0) as number[];
         const dy = latitude > 0 ? .5 : -.5;

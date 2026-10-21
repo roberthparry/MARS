@@ -138,7 +138,7 @@ bool globe_towns_batch(globe_t *globe, int64_t after_id, size_t limit, bool near
         return false;
     const char *sql =
         "select town.jurisdiction_id,town.town_name,lat.latitude,lon.longitude,"
-        "coalesce(elev.elevation_metres,'0'),code.timezone_name,"
+        "coalesce(nullif(elev.elevation_metres,'-9999'),'0'),code.timezone_name,"
         "case when def.jurisdiction_id is null then 0 else 1 end,town.jurisdiction_town_id "
         "from jurisdiction_town town join jurisdiction_town_latitude lat using(jurisdiction_town_id) "
         "join jurisdiction_town_longitude lon using(jurisdiction_town_id) "

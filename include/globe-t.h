@@ -133,10 +133,11 @@ globe_surface_t globe_hit_test(globe_t *shoreline, double latitude_degrees, doub
 
 /**
  * @brief Transactionally replace shoreline tables from a GSHHG 2.3.7 binary stream.
- * @param db Borrowed writable database with no active transaction; unrelated tables are retained.
+ * @param db Borrowed writable database; unrelated tables are retained.
  * @param source Borrowed open binary input positioned at its first polygon header.
  * @return True after publication; false rolls back the replacement without closing either resource.
- * @note Keeps levels 1–5, using the Antarctic ice front rather than the alternative grounding line.
+ * @note Uses a savepoint: a caller-owned transaction remains open and controls final publication.
+ * Keeps levels 1–5, using the Antarctic ice front rather than the alternative grounding line.
  */
 bool globe_import_shoreline(sqlite_t *db, file_t *source);
 
@@ -181,7 +182,7 @@ typedef struct _globe_place_t {
     const char *name;              /**< Locality or town name. */
     const char *latitude;          /**< Latitude in decimal degrees, as stored. */
     const char *longitude;         /**< Longitude in decimal degrees, as stored. */
-    const char *elevation;         /**< Elevation in metres, or "0" when unspecified. */
+    const char *elevation;         /**< Elevation in metres, or "0" when absent or the source uses -9999 for no data. */
     const char *timezone;          /**< IANA timezone name. */
     bool is_default;               /**< Whether this is the jurisdiction's selected default. */
 } globe_place_t;

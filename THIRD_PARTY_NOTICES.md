@@ -45,7 +45,8 @@ The extracted `cities5000.txt` SHA-256 is
 
 The native generator `tools/mars_config/catalogue_towns.c` selects `PPL`, `PPLC`
 and `PPLA` through `PPLA4` records, excluding neighbourhoods, abandoned places
-and other feature types. The combined catalogue is capped at 50,000 records.
+and other feature types. Generation is capped at 50,000 records; the current
+package additionally retains the four targeted Sunshine Coast records below.
 National capitals (`PPLC`), first-level regional seats (`PPLA`) and populations
 of at least 100,000 have first priority, followed by the cruising-region country
 list in the generator, then descending population and ascending GeoNames ID.
@@ -60,6 +61,19 @@ US and British first-level codes are matched to existing subdivision codes;
 other additions use their country jurisdiction. Ambiguous names within a
 jurisdiction receive their stable GeoNames ID as a suffix. These edits and SQL
 conversion do not imply that the source is complete or current in real time.
+
+## GeoNames Sunshine Coast additions
+
+Mooloolaba (GeoNames 2157109) and Maroochydore (GeoNames 2207268) use the
+[GeoNames cities5000 extract](https://download.geonames.org/export/dump/cities5000.zip)
+downloaded on 21 October 2026, under Creative Commons Attribution 4.0.
+Credit: GeoNames; no endorsement is implied. Extracted `cities5000.txt` SHA-256:
+`5efdc64a870f000b283a50b25f7b4845c5b9851bdad32737e7bb5f5353fc6755`.
+Both are `PPLX` urban sections and are deliberately included as targeted coastal
+seeds despite that feature type's exclusion from general worldwide generation.
+Their source coordinates and DEM elevations are retained, using the existing
+Australia/Brisbane timezone code. Each appears in both `AU` and `AU-QLD`;
+the existing supplement is unchanged, giving 50,004 packaged catalogue records.
 
 ## GeoNames Fishguard and Llanfairpwllgwyngyll additions
 

@@ -158,6 +158,13 @@ static void test_shoreline_nested_rings_and_rollback(void)
                      write_square(source, 3, 4, -1, 1, -1, 1, false) &&
                      write_square(source, 4, 1, 170, 190, -10, 10, false) && file_close(source), "fixture rings");
     TEST_ASSERT_TRUE(file_open_read(source) && globe_import_shoreline(db, source) && file_close(source), "import rings");
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "BEGIN IMMEDIATE; CREATE TABLE retained(value); INSERT INTO retained VALUES(7)") &&
+                     file_open_read(source) && globe_import_shoreline(db, source) && file_close(source) &&
+                     sqlite_exec_cstr(db, "ROLLBACK"), "shoreline import participates in caller-owned transaction");
+    sqlite_stmt_t *retained = sqlite_stmt_prepare(db, "SELECT count(*) FROM sqlite_master WHERE name='retained'");
+    TEST_ASSERT_TRUE(retained && sqlite_stmt_step(retained) == SQLITE_STEP_ROW &&
+                     sqlite_stmt_column_int(retained, 0) == 0, "nested import does not commit caller changes");
+    sqlite_stmt_finalize(retained);
     globe_t *shoreline = globe_open(db, NULL);
     TEST_ASSERT_NOT_NULL(shoreline);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 15, 0), GLOBE_LAND);
@@ -203,8 +210,14 @@ static void test_shoreline_nested_rings_and_rollback(void)
     size_t written;
     TEST_ASSERT_TRUE(file_open_write(source) && file_write(source, "broken", 6, &written) && file_close(source),
                      "truncated replacement fixture");
-    TEST_ASSERT_TRUE(file_open_read(source) && !globe_import_shoreline(db, source) && file_close(source),
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "BEGIN IMMEDIATE; CREATE TABLE retained(value); INSERT INTO retained VALUES(7)") &&
+                     file_open_read(source) && !globe_import_shoreline(db, source) && file_close(source) &&
+                     sqlite_exec_cstr(db, "COMMIT"),
                      "bad replacement rolls back");
+    retained = sqlite_stmt_prepare(db, "SELECT value FROM retained");
+    TEST_ASSERT_TRUE(retained && sqlite_stmt_step(retained) == SQLITE_STEP_ROW &&
+                     sqlite_stmt_column_int(retained, 0) == 7, "failed import preserves caller transaction");
+    sqlite_stmt_finalize(retained);
     shoreline = globe_open(db, NULL);
     TEST_ASSERT_NOT_NULL(shoreline);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 15, 0), GLOBE_LAND);

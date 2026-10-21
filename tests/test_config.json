@@ -2884,6 +2884,7 @@
     "tests": {
       "enabled": true,
       "test_cfg_database_bounds": true,
+      "test_cfg_database_coast_corrections": true,
       "test_cfg_database_conflicts": true,
       "test_cfg_database_failure": true,
       "test_cfg_database_globe": true,
@@ -3026,7 +3027,8 @@
   "tools/mars_lab/tests/test_lab_eclipse_worker.c": {
     "tests": {
       "enabled": true,
-      "test_lab_eclipse_worker_geometry": true
+      "test_lab_eclipse_worker_geometry": true,
+      "test_lab_totality_large_catalogue": true
     }
   },
   "tools/mars_lab/tests/test_lab_evaluation.c": {
@@ -3765,6 +3767,7 @@
   "tools/mars_lab/tests/test_lab_routes.c": {
     "tests": {
       "enabled": true,
+      "test_lab_catalogue_elevation": true,
       "test_lab_http_catalogue": true,
       "test_lab_http_contracts": true,
       "test_lab_http_rejections": true,

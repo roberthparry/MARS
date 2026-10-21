@@ -526,9 +526,10 @@ static json_t *lab_cal_totality_item(const char *requested_jd, const char *paylo
         const char *jurisdiction = lab_cal_part(parts, count, 2);
         const char *timezone = lab_cal_part(parts, count, 3);
         zone = lab_cal_event_zone(jd, jurisdiction, zone, timezone);
-        string_t *local = lab_cal_jd_text(jd, zone, false);
+        /* Worksheet date/time fields are GMT; the destination label alone uses local civil time. */
+        string_t *gmt = lab_cal_jd_text(jd, 0, false);
         string_t *display_time = lab_cal_civil_time(jd, jurisdiction, zone, timezone);
-        string_t *date = string_substring(local, 0, 10), *clock = string_substring(local, 11, 8);
+        string_t *date = string_substring(gmt, 0, 10), *clock = string_substring(gmt, 11, 8);
         string_t *zone_text = string_sprintf("%.2f", zone);
         string_t *lat = string_sprintf("%.6f", latitude), *lon = string_sprintf("%.6f", longitude);
         string_t *height = string_sprintf("%.0f", elevation);
@@ -559,7 +560,7 @@ static json_t *lab_cal_totality_item(const char *requested_jd, const char *paylo
             item = NULL;
         }
         string_free(html);
-        string_free(local);
+        string_free(gmt);
         string_free(display_time);
         string_free(date);
         string_free(clock);

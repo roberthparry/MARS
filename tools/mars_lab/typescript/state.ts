@@ -288,6 +288,19 @@ namespace WorksheetPersistence {
             if (!this.port.commit(index, length)) throw new Error('Could not commit worksheet state');
         }
 
+        /** @brief Refresh only the departing observer's camera, without changing either history stack. */
+        rememberGlobeCamera(observer: string, camera: number[]): void {
+            const index = this.port.modeIndex('almanac');
+            const state = this.port.read(this.port.previous(index, this.port.stage(null)));
+            const location = state?.almanac as Record<string, string> | undefined;
+            if (!state || !location || observer !== JSON.stringify(
+                ['latitude', 'longitude', 'town', 'jurisdiction'].map(field => location[field]))) return;
+            if (state.globeCamera?.every((value, i) => value === camera[i])) return;
+            state.globeCamera = camera;
+            if (!this.port.commit(index, this.port.stage(state)))
+                throw new Error('Could not retain the observer camera');
+        }
+
         /** @brief Clear native forward history for the selected worksheet. */
         clearForward(mode: WorksheetMode = this.port.mode()): void {
             return this.port.clear(this.port.modeIndex(mode), 1);
@@ -877,8 +890,17 @@ namespace WorksheetPersistence {
         },
 
         /** @brief Restore a snapshot while its request remains current. */
-        stateRestoreHistory(state: WorksheetSnapshot, request: WorksheetRequest) {
-            return navigation.restore(state, stateCallbacks.requestCurrent.bind(null, request));
+        async stateRestoreHistory(state: WorksheetSnapshot, request: WorksheetRequest) {
+            const token = state.mode === 'almanac' ? MarsAlmanacGlobe.beginHistory() : undefined;
+            let restored = false;
+            try {
+                restored = await navigation.restore(state, stateCallbacks.requestCurrent.bind(null, request));
+                return restored;
+            } finally {
+                if (state.mode === 'almanac')
+                    MarsAlmanacGlobe.finishHistory(token, state.globeCamera,
+                        restored && stateCallbacks.requestCurrent(request));
+            }
         },
 
         /** @brief Evaluate restored state without adding another history entry. */
@@ -899,7 +921,12 @@ namespace WorksheetPersistence {
 
         /** @brief Build a native history snapshot from editor and control values. */
         stateHistoryRecord(index: number, text: string, calendar: unknown, bounds: string, cap: string) {
-            return labDOM.call('lab_persist_history', index, text, calendar, bounds, cap, labApplication.configuration) as WorksheetSnapshot;
+            const state = labDOM.call('lab_persist_history', index, text, calendar, bounds, cap, labApplication.configuration) as WorksheetSnapshot;
+            if (state.mode === 'almanac') {
+                const camera = MarsAlmanacGlobe.captureHistory();
+                if (camera) state.globeCamera = camera;
+            }
+            return state;
         },
 
         /** @brief Capture current history with an optional authored-text override. */

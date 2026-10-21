@@ -171,7 +171,7 @@ static bool coast_ring(coast_import_t *state, file_t *source, const unsigned cha
 /* Publish a validated shoreline dataset without changing existing astronomical data. */
 bool shoreline_import(sqlite_t *db, file_t *source)
 {
-    if (!db || !source || !sqlite_exec_cstr(db, "begin immediate"))
+    if (!db || !source || !sqlite_exec_cstr(db, "savepoint shoreline_import"))
         return false;
     bool ok = sqlite_exec_cstr(db,
         "drop table if exists shoreline_bounds;"
@@ -228,7 +228,7 @@ bool shoreline_import(sqlite_t *db, file_t *source)
              sqlite_stmt_bind_int64(metadata, 2, state.polygons) && coast_execute(metadata);
         sqlite_stmt_finalize(metadata);
     }
-    if (ok) ok = sqlite_exec_cstr(db, "commit");
-    if (!ok) sqlite_exec_cstr(db, "rollback");
+    if (ok) ok = sqlite_exec_cstr(db, "release shoreline_import");
+    if (!ok) sqlite_exec_cstr(db, "rollback to shoreline_import; release shoreline_import");
     return ok;
 }

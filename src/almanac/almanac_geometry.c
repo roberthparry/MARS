@@ -292,8 +292,9 @@ bool almanac_observables(almanac_t *almanac, const almanac_entry_t *body, const 
     return true;
 }
 
-static bool almanac_observer_equatorial_position_au(almanac_t *almanac, const almanac_observer_t *observer, double jd,
-    cartesian3_t *out)
+/* Share the same ellipsoid between exact geometry and the catalogue's sampled screening pass. */
+bool almanac_observer_position_au(almanac_t *almanac, const almanac_observer_t *observer, double gha_aries,
+                                  cartesian3_t *out)
 {
     static const double earth_equatorial_radius_au = 6378.137 / 149597870.7;
     static const double earth_flattening = 1.0 / 298.257223563;
@@ -306,14 +307,12 @@ static bool almanac_observer_equatorial_position_au(almanac_t *almanac, const al
     double prime_vertical;
     double rho_xy;
     double rho_z;
-    double gha_aries;
 
     if (!almanac || !observer || !out)
         return false;
     if (!almanac_observer_is_valid(almanac, observer))
         return false;
-    gha_aries = almanac_apparent_gha_aries_for_jd(almanac, jd);
-    if (gha_aries == DBL_MAX)
+    if (!isfinite(gha_aries) || gha_aries == DBL_MAX)
         return false;
 
     latitude = almanac_degrees_to_radians(observer->latitude_degrees);
@@ -335,9 +334,10 @@ bool almanac_topocentric_vector(almanac_t *almanac, const cartesian3_t *geocentr
 {
     cartesian3_t observer_position;
 
-    if (!geocentric_equatorial_au || !out)
+    if (!almanac || !observer || !geocentric_equatorial_au || !out)
         return false;
-    if (!almanac_observer_equatorial_position_au(almanac, observer, jd, &observer_position))
+    double gha_aries = almanac_apparent_gha_aries_for_jd(almanac, jd);
+    if (!almanac_observer_position_au(almanac, observer, gha_aries, &observer_position))
         return false;
     *out = cartesian_subtract(geocentric_equatorial_au, &observer_position);
     return true;

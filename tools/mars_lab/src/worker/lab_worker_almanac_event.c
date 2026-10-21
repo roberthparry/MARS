@@ -43,10 +43,9 @@ typedef struct almanac_event_lab_options_t {
     almanac_event_lab_kind_t kind;
 } almanac_event_lab_options_t;
 
-#define ALMANAC_EVENT_LAB_CACHE_SCHEMA "almanac_event_lab_output_v22"
+#define ALMANAC_EVENT_LAB_CACHE_SCHEMA "almanac_event_lab_output_v23"
 #define ALMANAC_EVENT_LAB_CACHE_PATH_ENV "MARS_LAB_OBJECT_STORE_PATH"
 #define ALMANAC_EVENT_LAB_CACHE_KEY_ENV "MARS_LAB_OBJECT_STORE_KEY"
-#define TOTALITY_TOWN_SCORE_LIMIT 1024u
 
 typedef struct almanac_totality_town_t {
     char jurisdiction_id[32];
@@ -341,6 +340,8 @@ static bool append_totality_town(almanac_totality_town_t **towns, size_t *count,
 
 typedef struct almanac_totality_towns_t {
     const almanac_observer_t *observer;
+    almanac_t *almanac;
+    const almanac_totality_screen_t *screen;
     almanac_totality_town_t *towns;
     size_t count;
     size_t capacity;
@@ -359,6 +360,14 @@ static bool collect_totality_town(const jurisdict_place_t *place, void *context)
         fabs(town.latitude_degrees) > 90 || fabs(town.longitude_degrees) > 180 ||
         town.elevation_metres < -500 || town.elevation_metres > 9000)
         return true;
+    almanac_observer_t candidate = {town.latitude_degrees, town.longitude_degrees, town.elevation_metres};
+    bool possible = false;
+    if (!almanac_totality_screen_candidate(collection->almanac, collection->screen, &candidate, &possible)) {
+        collection->failed = true;
+        return false;
+    }
+    if (!possible)
+        return true;
     copy_text_field(town.jurisdiction_id, sizeof(town.jurisdiction_id), place->jurisdiction_code);
     copy_text_field(town.town_name, sizeof(town.town_name), place->name);
     copy_text_field(town.timezone_name, sizeof(town.timezone_name), place->timezone);
@@ -369,19 +378,22 @@ static bool collect_totality_town(const jurisdict_place_t *place, void *context)
     return !collection->failed;
 }
 
-static bool load_totality_towns(const almanac_observer_t *observer, almanac_totality_town_t **out, size_t *count)
+static bool load_totality_towns(almanac_t *almanac, const almanac_observer_t *observer,
+                                const almanac_solar_eclipse_t *event, almanac_totality_town_t **out, size_t *count)
 {
-    almanac_totality_towns_t collection = {.observer = observer};
-    jurisdiction_t *catalogue = jurisdict_open(NULL);
+    almanac_totality_screen_t *screen = almanac_totality_screen_new(almanac, event);
+    almanac_totality_towns_t collection = {.observer = observer, .almanac = almanac, .screen = screen};
+    jurisdiction_t *catalogue = screen ? jurisdict_open(NULL) : NULL;
     bool ok = catalogue && jurisdict_each_town(catalogue, collect_totality_town, &collection) && !collection.failed;
     jurisdict_close(catalogue);
+    almanac_totality_screen_free(screen);
     *out = NULL;
     *count = 0;
     if (!ok) {
         free(collection.towns);
         return false;
     }
-    /* Enumerate once, then score the bounded nearest-town shortlist in distance order. */
+    /* One streaming pass screens every town; only possible path locations are retained and distance-sorted. */
     if (collection.count > 1)
         qsort(collection.towns, collection.count, sizeof(*collection.towns), totality_town_compare);
     *out = collection.towns;
@@ -409,7 +421,6 @@ static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *al
 {
     almanac_totality_town_t *towns = NULL;
     size_t town_count = 0u;
-    size_t score_limit;
     size_t i;
     const almanac_totality_town_t *best_town = NULL;
     almanac_solar_totality_location_t best_location;
@@ -422,22 +433,11 @@ static bool nearest_totality_town_text(char *out, size_t out_size, almanac_t *al
         return false;
     if (almanac_surface_at(almanac, observer->latitude_degrees, observer->longitude_degrees) == GLOBE_UNKNOWN)
         return false;
-    if (!load_totality_towns(observer, &towns, &town_count))
+    if (!load_totality_towns(almanac, observer, event, &towns, &town_count))
         return false;
-    score_limit = town_count < TOTALITY_TOWN_SCORE_LIMIT ? town_count : TOTALITY_TOWN_SCORE_LIMIT;
     memset(&best_location, 0, sizeof(best_location));
-    for (i = 0u; i < score_limit; ++i) {
-        almanac_observer_t town_observer;
+    for (i = 0u; i < town_count; ++i) {
         almanac_solar_totality_location_t candidate;
-        double score_degrees = NAN;
-
-        town_observer.latitude_degrees = towns[i].latitude_degrees;
-        town_observer.longitude_degrees = towns[i].longitude_degrees;
-        town_observer.elevation_metres = towns[i].elevation_metres;
-        if (!almanac_solar_eclipse_totality_seed_score(almanac, &town_observer, event, &score_degrees) ||
-            !(score_degrees <= 0.0)) {
-            continue;
-        }
         memset(&candidate, 0, sizeof(candidate));
         if (!town_seeds_total_solar_eclipse(almanac, observer, event, &towns[i], &candidate))
             continue;

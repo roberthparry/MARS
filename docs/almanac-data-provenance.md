@@ -16,7 +16,8 @@ Its unmodified full-resolution binary `gshhs_f.b` has SHA-256
 The repository packages those identical binary bytes using the native MARS file
 module's Zstandard compression, as `packaging/almanac-db/gshhs_f.b.zst`, SHA-256
 `87a928d71cf7a05c8084905c72d4575065400e1d68103609497211e20096eafa`.
-Installation restores that source, retains polygon levels 1–5 and builds bounded
+Installation restores that source, applies the reviewed corrections described
+below, retains polygon levels 1–5 and builds bounded
 uncompressed coordinate chunks and an integer spatial index. Existing databases
 with compressed chunks remain readable. Level 6 is the
 alternative Antarctic grounding-line representation and is not included in queries.
@@ -30,6 +31,27 @@ are retained alongside the data as `GSHHG-LICENSE.txt`,
 text is supplied as `GSHHG-COPYINGv3.txt`. The unmodified source remains available
 in the packaged compressed binary. No Python interpreter or download is required
 to install, query or rebuild the index.
+
+The globe installer also applies the versioned span replacements in
+`packaging/globe-db/shoreline-corrections.json`. Revision 1 replaces GSHHG polygon
+6 zero-based vertices 13,104–13,212 inclusive with 1,474 vertices, including its unchanged
+endpoints. The southern Sydney Harbour bank comes from
+[OpenStreetMap relation 1252425](https://www.openstreetmap.org/relation/1252425),
+version 123. The full XML response retrieved on 21 October 2026 from the official
+OSM API has SHA-256
+`edb6c2d88d08e4b9d4eec38c596d77e01e0a3c4792048a99fd24408ab489b0ca`.
+Its outer water ring was exported using osmium 1.19.0; the selected bank was
+reversed to follow the GSHHG land-ring direction and rounded to microdegrees.
+The eastern join is an edge intersection; the western join retains the old
+Balmain endpoint approximately 18 metres away. Neither smoothing nor a city
+coordinate adjustment is applied. No other GSHHG span is changed.
+
+These correction coordinates are © OpenStreetMap contributors under the
+[Open Database Licence 1.0](https://www.openstreetmap.org/copyright), not MARS's
+MIT licence. The GSHHG source archive and its existing licence notices remain
+unchanged. See [reviewed shoreline corrections](globe.md#reviewed-local-shoreline-corrections)
+for validation and update behaviour. This is a local geographic improvement,
+not surveyed shoreline or a navigation chart.
 
 ## AstroNav workbook
 

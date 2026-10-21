@@ -81,6 +81,22 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             check(hidden(WorksheetContext.derivativeButtons) === !calculus[mode], 'calculus visibility');
             check(hidden(WorksheetContext.goalSeek) === (mode !== 0), 'goal seek is expression-only');
             check(hidden(WorksheetContext.run) === (mode === 6), 'automatic Almanac hides Evaluate; other modes retain it');
+            const actions = document.getElementById('workspaceActions')!;
+            const actionHome = document.getElementById(mode === 6 ? 'almanacActions' : 'workspaceActionsHome')!;
+            check(actions.parentElement === actionHome && actions.contains(WorksheetContext.back),
+                  'original action buttons move below the globe only in Almanac mode');
+            if (mode === 6) {
+                check(actionHome.previousElementSibling?.id === 'almanacGlobe' &&
+                      actionHome.nextElementSibling?.classList.contains('almanac-briefing'),
+                      'Almanac actions sit between globe and worksheet introduction');
+                check(document.getElementById('workspaceActionsHome')!.getBoundingClientRect().height >= 48,
+                      'former button area remains reserved for country and town dropdowns');
+                const backDisabled = WorksheetContext.back.disabled;
+                labDOM.call('lab_workspace_dom_busy', 1, null, [], []);
+                check(WorksheetContext.back.disabled === backDisabled && !WorksheetContext.help.disabled &&
+                      !WorksheetContext.clear.disabled, 'calendar busy handling does not take over shared actions');
+                labDOM.call('lab_workspace_dom_busy', 0, null, [], []);
+            }
             check(hidden(WorksheetContext.valueCard) === !valueVisible[mode], 'value policy without a numerical result');
             check(WorksheetContext.valueCard.hasAttribute('hidden') === !valueVisible[mode], 'value hidden attribute');
             check(hidden(WorksheetContext.datetimeLocal) === (mode !== 5), 'local weather belongs to Datetime');
@@ -95,6 +111,8 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         native.lab_workspace_select(0);
         labDOM.call('lab_workspace_dom_help', 1);
         labDOM.call('lab_workspace_dom_mode', 0, '');
+        check(document.getElementById('workspaceActions')!.parentElement?.id === 'workspaceActionsHome',
+              'leaving Almanac restores the original action-row position');
         check(WorksheetContext.rightPaneTitle.textContent === 'Help', 'mode projection retains the heading of visible Help');
         labDOM.call('lab_workspace_dom_help', 0);
         WorksheetContext.targetRow.classList.remove('hidden');

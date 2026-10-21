@@ -706,7 +706,8 @@ static jsref lab_flow_location_auto_save(struct lab_flow_location_auto_context *
 static jsref lab_flow_location_auto_evaluate(struct lab_flow_location_auto_context *ctx)
 {
     int evaluate = lab_dom_object(LAB_VALUE_OBJECT);
-    lab_dom_set(evaluate, "skipHistoryUpdate", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
+    /* User-edited calendar controls must retain the previous committed observer/date. */
+    lab_dom_set(evaluate, "skipHistoryUpdate", lab_dom_scalar(LAB_VALUE_BOOLEAN, 0));
     return lab_flow_call(ctx->frame, 5, ctx->almanac ? "locEvaluateAlmanac" : "locEvaluateDatetime", 0, 1, 1, evaluate);
 }
 

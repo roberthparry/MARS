@@ -14,8 +14,9 @@
 #include <stdbool.h>
 
 /**
- * @brief Install or verify independent shoreline storage using saved globe settings or environment overrides.
- * @param action globe-install or globe-check; reserved update/removal commands fail without changing files.
+ * @brief Install, verify or update independent shoreline storage using saved settings or environment overrides.
+ * @param action globe-install, globe-check or globe-update; reserved removal commands fail without changing files.
+ * @note Updating replaces only shoreline tables transactionally and retains the key, configuration and other layers.
  * @return Zero on success, one on operational failure, two for an unsupported action.
  * Installation validates existing destinations without replacing them. Missing keys may be prompted for on a terminal.
  * No network download occurs.

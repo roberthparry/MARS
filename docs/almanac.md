@@ -84,6 +84,7 @@ The public API remains in `include/almanac-t.h`. Implementation files under
 | `almanac_lunar_eclipse.c` | Lunar eclipse geometry, circumstances and searches |
 | `almanac_transit.c` | Mercury and Venus solar transits |
 | `almanac_totality.c` | Nearby totality locations and probable-land refinement |
+| `almanac_totality_screen.c` | Shared event-local samples for inexpensive town-candidate screening |
 | `almanac_cartesian.c` | Shared Cartesian vector operations |
 
 `almanac_engine_internal.h` groups the shared engine state, position, geometry,
@@ -96,6 +97,18 @@ See [shoreline data and queries](#shoreline-data-and-queries) below.
 `almanac_internal.h` retains the restricted totality-search interface used by
 internal consumers. Database handles and caches remain engine-owned; event
 record layouts that are not shared stay with their implementations.
+
+The restricted `almanac_totality_screen_new()` / `almanac_totality_screen_candidate()`
+interface prepares 361 Earth-fixed Sun/Moon samples at two-minute intervals over
+six hours either side of an event's local maximum. It reuses the engine's observer
+ellipsoid and apparent ephemeris, keeping about 17 KiB regardless of catalogue size.
+The broad 0.1-degree screening margin is followed by a chord-interpolated check
+against the apparent Moon/Sun radius difference, with a 0.001-degree allowance.
+This avoids spending the refinement budget on dense clusters of near misses.
+Acceptance is only a request for exact local-maximum refinement, never a totality result.
+Horizon and shoreline checks belong to that final validation. Sampling does not
+prove an exhaustive nearest-land solution. Release the event-local samples with
+`almanac_totality_screen_free()`; no global cache or catalogue ownership is introduced.
 
 ## Capabilities
 
