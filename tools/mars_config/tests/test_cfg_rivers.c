@@ -458,7 +458,7 @@ static void test_cfg_rivers_numeric_decoder(void)
     sqlite_t *db = test_database();
     string_t *text = string_new_with(
         "{\"properties\":{\"@type\":\"way\",\"@id\":9,\"waterway\":\"river\","
-        "\"@way_\\u006eodes\":[9223372036854775806,9223372036854775807]},"
+        "\"name\":\"ေပါင်း​ေလာင်းမြစ်\",\"@way_\\u006eodes\":[9223372036854775806,9223372036854775807]},"
         "\"geometry\":null,\"geome\\u0074ry\":{\"type\":\"LineString\",\"coordinates\":null,"
         "\"coordina\\u0074es\":[[1e0,-2.5e-1],[2e0,3.5e-1]]},\"type\":\"Feature\","
         "\"decoy\":{\"geometry\":{\"coordinates\":[[90,90]]},\"@way_nodes\":[0]}}\n");

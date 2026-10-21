@@ -803,7 +803,11 @@ static bool osm_records_feed(osm_river_import_t *state, string_t *record, const 
                 ok = feature && osm_line(state, feature, &parsed);
                 json_free(feature);
                 string_free(parsed.metadata);
-                if (!ok) return false;
+                if (!ok) {
+                    fprintf(stderr, "River record %lld failed validation or storage (%zu bytes).\n",
+                            (long long)state->records + 1, string_byte_length(record));
+                    return false;
+                }
                 string_clear(record);
                 if (++state->records % 100000 == 0) {
                     printf("River input: %lld records, %lld sections retained, %lld narrow sections omitted.\n",

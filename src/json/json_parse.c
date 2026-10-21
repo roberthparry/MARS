@@ -36,13 +36,13 @@ static void json_skip_ws(json_parser_t *parser)
 
 static bool json_consume_ascii(json_parser_t *parser, char expected)
 {
-    rune_t rune;
+    unsigned char ch;
 
     if (!parser || !parser->cursor)
         return false;
 
-    rune = string_cursor_peek(parser->cursor);
-    if (!rune_is_equal(rune, expected))
+    /* JSON punctuation is ASCII, even when a following combining mark joins its display grapheme. */
+    if (!string_cursor_peek_ascii(parser->cursor, &ch) || ch != (unsigned char)expected)
         return false;
 
     return string_cursor_next(parser->cursor) == 0;
@@ -72,8 +72,8 @@ static bool json_parse_hex4(json_parser_t *parser, uint32_t *out)
     uint32_t scalar = 0u;
 
     for (int i = 0; i < 4; ++i) {
-        rune_t rune = string_cursor_peek(parser->cursor);
-        int digit = json_hex_value(rune_value(rune));
+        unsigned char ch;
+        int digit = string_cursor_peek_ascii(parser->cursor, &ch) ? json_hex_value(ch) : -1;
 
         if (digit < 0)
             return false;

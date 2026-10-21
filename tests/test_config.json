@@ -1600,6 +1600,7 @@
       "test_file_stream_migration": true,
       "test_number_t_constants_use_math_spelling": true,
       "test_number_t_extension_round_trip": true,
+      "test_parse_leading_combining_marks": true,
       "test_parse_object_array_and_escapes": true,
       "test_rejects_non_json_number_forms": true,
       "test_serialise_round_trip": true,

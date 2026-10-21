@@ -135,6 +135,20 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                   'globe initially centres the observer');
             const grid = document.querySelector<HTMLButtonElement>('[data-globe-action="grid"]')!;
             check(grid.getAttribute('aria-pressed') === 'false', 'coordinate grid starts off');
+            const observerBox = marker!.getBoundingClientRect();
+            const observerHoverEvaluations = evaluations;
+            globeCanvas.dispatchEvent(new PointerEvent('pointermove', {bubbles: true,
+                clientX: observerBox.left + observerBox.width / 2,
+                clientY: observerBox.top + observerBox.height / 2}));
+            const observerTooltip = document.querySelector<HTMLElement>('.globe-grid-tooltip')!;
+            check(!observerTooltip.hidden &&
+                  observerTooltip.textContent!.includes(`Latitude ${MarsAlmanacGlobe.coordinate(Number(latitude.value), 'N', 'S')}`) &&
+                  observerTooltip.textContent!.includes(`Longitude ${MarsAlmanacGlobe.coordinate(Number(longitude.value), 'E', 'W')}`),
+                  'observer marker hover shows exact coordinates without Shift or the grid');
+            check(getComputedStyle(marker!).pointerEvents === 'none' && evaluations === observerHoverEvaluations,
+                  'observer hover preserves dragging and does not trigger calculations');
+            globeCanvas.parentElement!.dispatchEvent(new PointerEvent('pointerleave'));
+            check(observerTooltip.hidden === true, 'leaving the globe clears observer hover');
             const beforeGrid = [latitude.value, longitude.value, evaluations];
             const gl = globeCanvas.getContext('webgl')!;
             const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram;
@@ -368,6 +382,24 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             check(gridTooltip.hidden === true, 'disabling graticule hides its tooltip');
             check(gridMarker.hidden === true, 'disabling graticule hides its line marker');
             check(getComputedStyle(globeCanvas).cursor === 'grab', 'leaving grid hover restores the grab cursor');
+            const freePoint = labDOM.call('lab_globe_project', 35.5, -23.25,
+                labDOM.call('lab_globe_centre', 52.7077, -2.7541)) as number[];
+            globeCanvas.dispatchEvent(new PointerEvent('pointermove', {bubbles: true,
+                clientX: hoverBox.left + hoverBox.width * (.5 + freePoint[0] / 2.24),
+                clientY: hoverBox.top + hoverBox.height / 2 + hoverBox.width * freePoint[1] / 2.24}));
+            window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Shift', shiftKey: true}));
+            check(!gridTooltip.hidden && gridTooltip.textContent!.includes('Latitude 35° 30.00′ N') &&
+                  gridTooltip.textContent!.includes('Longitude 23° 15.00′ W'),
+                  'stationary Shift hover reports the pointer coordinates with the grid disabled');
+            window.dispatchEvent(new KeyboardEvent('keyup', {key: 'Shift'}));
+            check(gridTooltip.hidden === true, 'releasing Shift hides free-coordinate hover');
+            window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Shift', shiftKey: true}));
+            window.dispatchEvent(new Event('blur'));
+            check(gridTooltip.hidden === true, 'window blur clears the coordinate tooltip');
+            window.dispatchEvent(new KeyboardEvent('keydown', {key: 'Shift', shiftKey: true}));
+            check(gridTooltip.hidden === true, 'blur discards the stale pointer position');
+            check(latitude.value === beforeGrid[0] && longitude.value === beforeGrid[1] && evaluations === beforeGrid[2],
+                  'Shift hover neither selects an observer nor triggers calculations');
             globeCanvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
             await new Promise(requestAnimationFrame);
             check(document.querySelector('.globe-observer') === marker, 'camera movement reuses its observer marker');
@@ -412,7 +444,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             document.querySelector<HTMLButtonElement>('[data-globe-action="centre"]')!.click();
             await new Promise(requestAnimationFrame);
             const country = new Intl.DisplayNames(['en-GB'], {type: 'region'}).of(jurisdiction.split('-')[0]);
-            check(selectedLabel!.title === `${place!.name}, ${country}`,
+            check(selectedLabel!.title.startsWith(`${place!.name}, ${country} · Latitude `) &&
+                  selectedLabel!.title.includes(`Longitude ${MarsAlmanacGlobe.coordinate(Number(place!.longitude), 'E', 'W')}`),
                   'town tooltip includes the full country name rather than its jurisdiction code');
             check(getComputedStyle(selectedLabel!).color === 'rgb(255, 211, 121)' &&
                   selectedLabel!.getAttribute('aria-current') === 'location', 'selected label is gold and identified');

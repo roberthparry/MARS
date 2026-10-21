@@ -29,6 +29,7 @@ class MarsAlmanacGlobe {
     private readonly markers: HTMLElement;
     private readonly status: HTMLElement;
     private readonly gridTooltip = document.createElement('div');
+    private hoverPointer: PointerEvent | null = null;
     private readonly gridMarker = document.createElement('span');
     private readonly gl: WebGLRenderingContext;
     private readonly program: WebGLProgram;
@@ -694,7 +695,9 @@ class MarsAlmanacGlobe {
             }
             const text = label ? `• ${label.name}` : '⊕';
             if (marker.textContent !== text) marker.textContent = text;
-            marker.title = label && place ? `${label.full}, ${place.country}` : 'Observer';
+            const name = label && place ? `${label.full}, ${place.country}` : 'Observer';
+            marker.title = `${name} · Latitude ${MarsAlmanacGlobe.coordinate(lat, 'N', 'S')} · ` +
+                `Longitude ${MarsAlmanacGlobe.coordinate(lon, 'E', 'W')}`;
             marker.style.maxWidth = `${width}px`;
             marker.style.left = `${point[0]}px`;
             marker.style.top = `${point[1]}px`;
@@ -764,14 +767,21 @@ class MarsAlmanacGlobe {
         this.canvas.classList.remove('grid-hover');
     }
 
-    private hoverGrid(event: PointerEvent): void {
+    private hoverGrid(event: PointerEvent, shift = event.shiftKey): void {
         this.hideGridHover();
-        if (!this.grid || this.pointers.size || event.target !== this.canvas) return;
+        if (this.pointers.size || event.target !== this.canvas) return;
+        // The observer remains pointer-transparent so dragging can start on its crosshair.
+        const observer = this.markerNodes.get(null), observerBox = observer?.getBoundingClientRect();
+        const overObserver = !shift && observerBox && event.clientX >= observerBox.left && event.clientX <= observerBox.right &&
+            event.clientY >= observerBox.top && event.clientY <= observerBox.bottom;
+        if (!this.grid && !shift && !overObserver) return;
         const box = this.canvas.getBoundingClientRect(), radius = box.width * this.view[2] / 2.24;
-        const point = labDOM.call('lab_globe_pick', (event.clientX - box.left - box.width / 2) / radius,
+        const point = overObserver ? [Number(this.input('Latitude').value), Number(this.input('Longitude').value)] :
+            labDOM.call('lab_globe_pick', (event.clientX - box.left - box.width / 2) / radius,
             (event.clientY - box.top - box.height / 2) / radius, this.orientation) as number[] | null;
         if (!point) return;
-        const [latitude, longitude, flags] = labDOM.call('lab_globe_grid', point[0], point[1], this.view[2], box.width) as number[];
+        const [latitude, longitude, flags] = shift || overObserver ? [point[0], point[1], 3] :
+            labDOM.call('lab_globe_grid', point[0], point[1], this.view[2], box.width) as number[];
         if (!flags) return;
         const marker = this.project(flags & 1 ? latitude : point[0], flags & 2 ? longitude : point[1], box.width);
         if (!marker) return;
@@ -796,8 +806,20 @@ class MarsAlmanacGlobe {
 
     private events(): void {
         const viewport = this.canvas.parentElement!;
-        viewport.addEventListener('pointermove', event => this.hoverGrid(event));
-        viewport.addEventListener('pointerleave', () => this.hideGridHover());
+        viewport.addEventListener('pointermove', event => {
+            this.hoverPointer = event;
+            this.hoverGrid(event);
+        });
+        const clearHover = (): void => {
+            this.hoverPointer = null;
+            this.hideGridHover();
+        };
+        viewport.addEventListener('pointerleave', clearHover);
+        window.addEventListener('blur', clearHover);
+        for (const name of ['keydown', 'keyup'] as const) window.addEventListener(name, event => {
+            if (event.key === 'Shift' && this.hoverPointer)
+                this.hoverGrid(this.hoverPointer, event.shiftKey);
+        });
         this.root.querySelectorAll<HTMLButtonElement>('[data-globe-action]').forEach(button => {
             button.addEventListener('click', () => {
                 this.cancelFlight();

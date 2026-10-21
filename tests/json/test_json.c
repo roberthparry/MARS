@@ -436,10 +436,37 @@ static void test_serialise_unicode_catalogue(void)
     json_free(array);
 }
 
+static void test_parse_leading_combining_marks(void)
+{
+    static const char *const inputs[] = {
+        "\"ေပါင်း​ေလာင်းမြစ်\"", "\"\u0301accent\"", "\"\\u0061\u0301\"",
+        "{\"\u0301key\":\"ေပါင်း​ေလာင်းမြစ်\"}"
+    };
+    static const char *const expected[] = {"ေပါင်း​ေလာင်းမြစ်", "\u0301accent", "a\u0301", "ေပါင်း​ေလာင်းမြစ်"};
+    for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i) {
+        string_t *text = s(inputs[i]);
+        json_t *value = json_from_text(text);
+        TEST_ASSERT_NOT_NULL(value);
+        const json_t *name = i == 3 ? object_get_literal(value, "\u0301key") : value;
+        string_t *want = s(expected[i]);
+        TEST_ASSERT_TRUE(name && json_string_value(name) && string_compare(json_string_value(name), want) == 0,
+                         "combining marks and the full name are retained without dropping or duplicating characters");
+        string_free(want);
+        string_t *encoded = json_to_string(value);
+        json_t *again = encoded ? json_from_text(encoded) : NULL;
+        TEST_ASSERT_NOT_NULL(again);
+        string_t *second = json_to_string(again);
+        TEST_ASSERT_TRUE(second && string_compare(encoded, second) == 0,
+                         "leading combining marks in keys and values survive JSON round trips");
+        string_free(second); json_free(again); string_free(encoded); json_free(value); string_free(text);
+    }
+}
+
 int tests_main(void)
 {
     TEST_SECTION("JSON Parsing");
     TEST_RUN_IN_GROUP(test_parse_object_array_and_escapes, tests, NULL);
+    TEST_RUN_IN_GROUP(test_parse_leading_combining_marks, tests, NULL);
     TEST_RUN_IN_GROUP(test_rejects_non_json_number_forms, tests, NULL);
     TEST_RUN_IN_GROUP(test_number_t_extension_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_number_t_constants_use_math_spelling, tests, NULL);

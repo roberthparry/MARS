@@ -18,6 +18,9 @@ generic container layer without exposing those internals to callers.
 Serialisation escapes and normalises each string value locally before appending
 its validated UTF-8 bytes. Adding an accented name therefore does not repeatedly
 normalise the entire accumulated document, which matters for large catalogues.
+Parsing recognises JSON punctuation and hexadecimal escape digits as ASCII,
+independently of display grapheme boundaries. Keys and values may therefore
+begin with Unicode combining marks, including names written in Burmese.
 
 ## File I/O
 

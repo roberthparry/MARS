@@ -74,6 +74,15 @@ future detailed geometry belong in the globe database; towns remain in the
 jurisdiction database. New installations include the packaged GSHHG shoreline
 with reviewed local corrections; existing installations require the explicit update.
 
+Holding **Shift** while hovering over the globe shows the latitude and longitude
+beneath the pointer in degrees and decimal minutes, even with the coordinate grid
+disabled. Pressing or releasing Shift updates the tooltip without moving the mouse.
+Hovering does not change the observer or trigger calculations; leaving the globe
+or switching windows clears the tooltip.
+Town-marker tooltips also include coordinates alongside the full name and country.
+Hovering the observer crosshair shows its exact selected coordinates without Shift,
+even when the grid is disabled; the crosshair remains transparent to dragging.
+
 The browser uses a directly indexed, jurisdiction-qualified long-name exception
 table for display labels. Currently Llanfairpwllgwyngyll is the only entry.
 Its full name appears in the tooltip at every zoom level and on the globe from
@@ -437,6 +446,10 @@ node IDs retain their exact positive 64-bit values. The existing 100,000-vertex
 per-way ceiling remains, with a 128-level JSON nesting limit. Reordered and escaped
 field names and last-value-wins duplicate fields retain their normal interpretation.
 Input and junction passes report elapsed times separately from simplification.
+Record validation or storage failures report the one-based input record number
+and byte length before rolling back, allowing bounded diagnostic replays without
+changing installed data. Unicode names, including leading combining marks, remain
+valid metadata and do not cause river sections to be discarded.
 After identifying shared junctions with disk-backed node counts, the
 installer reduces stored centrelines with an eight-metre maximum displacement
 budget, chosen conservatively from the finest regional shoreline trial tolerance.
