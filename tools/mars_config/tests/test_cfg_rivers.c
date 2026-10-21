@@ -452,6 +452,62 @@ static void test_cfg_rivers_compressed_input(void)
     file_free(plain); file_free(packed); file_free(directory);
 }
 
+static void test_cfg_rivers_numeric_decoder(void)
+{
+    file_t *directory = temporary_directory(), *source = child(directory, "numeric.geojsonseq");
+    sqlite_t *db = test_database();
+    string_t *text = string_new_with(
+        "{\"properties\":{\"@type\":\"way\",\"@id\":9,\"waterway\":\"river\","
+        "\"@way_\\u006eodes\":[9223372036854775806,9223372036854775807]},"
+        "\"geometry\":null,\"geome\\u0074ry\":{\"type\":\"LineString\",\"coordinates\":null,"
+        "\"coordina\\u0074es\":[[1e0,-2.5e-1],[2e0,3.5e-1]]},\"type\":\"Feature\","
+        "\"decoy\":{\"geometry\":{\"coordinates\":[[90,90]]},\"@way_nodes\":[0]}}\n");
+    TEST_ASSERT_TRUE(db && text && file_write_all_text(source, text) && file_open_read(source) &&
+                     cfg_database_import_osm_rivers(db, source),
+                     "decode reordered, escaped and duplicate keys, exponents and exact 64-bit node IDs");
+    file_close(source);
+    string_free(text);
+    globe_t *g = globe_open_databases(NULL, db, NULL);
+    hits_t h = {.west = 1, .south = -.25, .east = 2, .north = .35, .valid = true};
+    TEST_ASSERT_TRUE(g && globe_river_segments(g, 0, -1, 3, 1, hit, &h) && h.count == 1 && h.valid,
+                     "numeric decoding preserves coordinates and ignores unrelated nested fields");
+    globe_close(g);
+    static const struct { const char *coordinates, *nodes; } invalid[] = {
+        {"[[01,0],[2,0]]", "[1,2]"},
+        {"[[+1,0],[2,0]]", "[1,2]"},
+        {"[[1e999,0],[2,0]]", "[1,2]"},
+        {"[[181,0],[2,0]]", "[1,2]"},
+        {"[[1,91],[2,0]]", "[1,2]"},
+        {"[[1,0,3],[2,0]]", "[1,2]"},
+        {"[[1,0],[2,0],]", "[1,2]"},
+        {"[[1,0][2,0]]", "[1,2]"},
+        {"[[1,0],[2,0]]", "[1]"},
+        {"[[1,0],[2,0]]", "[1,2,3]"},
+        {"[[1,0],[2,0]]", "[1,9223372036854775808]"},
+        {"[[1,0],[2,0]]", "[1,2.5]"},
+        {"[[1,0],[2,0]]", "[1,2e0]"},
+        {"[[1,0],[2,0]]", "[1,0]"},
+        {"[[1,0],[2,0]]", "[1,-2]"}
+    };
+    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
+        text = string_sprintf(
+            "{\"type\":\"Feature\",\"geometry\":{\"type\":\"LineString\",\"coordinates\":%s},"
+            "\"properties\":{\"@type\":\"way\",\"@id\":1,\"waterway\":\"river\",\"@way_nodes\":%s}}\n",
+            invalid[i].coordinates, invalid[i].nodes);
+        TEST_ASSERT_TRUE(text && file_write_all_text(source, text) && file_open_read(source) &&
+                         !cfg_database_import_osm_rivers(db, source), "reject malformed or out-of-range numeric arrays");
+        file_close(source);
+        string_free(text);
+        sqlite_stmt_t *q = sqlite_stmt_prepare(db, "select feature_id from rivers_chunk");
+        TEST_ASSERT_TRUE(q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int64(q, 0) == 9 &&
+                         sqlite_stmt_step(q) == SQLITE_STEP_DONE, "failed decoding preserves the previous candidate");
+        sqlite_stmt_finalize(q);
+    }
+    sqlite_close(db);
+    TEST_ASSERT_TRUE(file_delete(source) && file_remove_directory(directory), "remove disposable decoder fixtures");
+    file_free(source); file_free(directory);
+}
+
 static bool test_cfg_rivers_stage_fixture(const char *directory)
 {
     string_t *input_path = string_sprintf("%s/river.geojsonseq", directory);
@@ -497,4 +553,5 @@ void test_cfg_rivers_cases(void)
     TEST_RUN_IN_GROUP(test_cfg_rivers_section_widths, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_compressed_input, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_stage, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_rivers_numeric_decoder, tests, NULL);
 }

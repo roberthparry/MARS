@@ -429,6 +429,14 @@ Truncation, checksum failures, trailing data, concatenated frames and a missing
 final record newline roll back the import. Both forms have a 128 GiB decoded-input
 safety ceiling, distinct from the final database budget. Progress reports every
 100,000 input records include retained and omitted section counts.
+The importer validates each bounded record's JSON syntax before decoding metadata
+with the ordinary JSON module. Coordinate and node-reference arrays are read
+directly into a reused native buffer, avoiding arbitrary-precision number trees
+for geographic values. Coordinate conversion uses a private C numeric locale;
+node IDs retain their exact positive 64-bit values. The existing 100,000-vertex
+per-way ceiling remains, with a 128-level JSON nesting limit. Reordered and escaped
+field names and last-value-wins duplicate fields retain their normal interpretation.
+Input and junction passes report elapsed times separately from simplification.
 After identifying shared junctions with disk-backed node counts, the
 installer reduces stored centrelines with an eight-metre maximum displacement
 budget, chosen conservatively from the finest regional shoreline trial tolerance.

@@ -10,11 +10,13 @@
  */
 #include <ctype.h>
 #include <errno.h>
+#include <locale.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <zstd.h>
 
@@ -197,9 +199,14 @@ bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *stag
     return ok;
 }
 
+typedef struct { int32_t x, y; int64_t node; } osm_vertex_t;
+
 typedef struct {
     sqlite_stmt_t *chunk, *bounds, *node;
     int64_t chunks, features, points, narrow_sections, unknown_width_sections, records;
+    osm_vertex_t *vertices;
+    size_t capacity;
+    locale_t numeric_locale;
 } osm_river_import_t;
 
 /* Match the finest shoreline trial budget, not a fixed spacing or a vertex quota. */
@@ -281,16 +288,178 @@ static bool osm_integer(const json_t *value, int64_t *out)
     return true;
 }
 
-static bool osm_coordinate(const json_t *value, int32_t *out, double limit)
+typedef struct { const char *first, *last; } osm_span_t;
+typedef struct {
+    osm_span_t coordinates, nodes;
+    const char *copied;
+    string_t *metadata;
+} osm_record_t;
+
+static void osm_json_space(const char **p, const char *end)
 {
-    const string_t *s = value ? json_number_text(value) : NULL;
-    if (!s) return false;
-    const char *text = string_c_str(s);
-    char *end;
+    while (*p < end && (**p == ' ' || **p == '\t' || **p == '\r' || **p == '\n')) ++*p;
+}
+
+static bool osm_json_take(const char **p, const char *end, char ch)
+{
+    osm_json_space(p, end);
+    if (*p == end || **p != ch) return false;
+    ++*p;
+    return true;
+}
+
+/* Validate lexical strings without allocating a node for every coordinate or OSM reference. */
+static bool osm_json_string(const char **p, const char *end)
+{
+    if (!osm_json_take(p, end, '"')) return false;
+    while (*p < end) {
+        unsigned char ch = (unsigned char)*(*p)++;
+        if (ch == '"') return true;
+        if (ch < 0x20) return false;
+        if (ch == '\\') {
+            if (*p == end) return false;
+            ch = (unsigned char)*(*p)++;
+            if (ch == 'u') {
+                for (unsigned i = 0; i < 4; ++i)
+                    if (*p == end || !isxdigit((unsigned char)*(*p)++)) return false;
+            } else if (!strchr("\"\\/bfnrt", ch)) return false;
+        }
+    }
+    return false;
+}
+
+static bool osm_json_number(const char **p, const char *end)
+{
+    if (*p < end && **p == '-') ++*p;
+    if (*p == end) return false;
+    if (**p == '0') ++*p;
+    else {
+        if (**p < '1' || **p > '9') return false;
+        do { ++*p; } while (*p < end && **p >= '0' && **p <= '9');
+    }
+    if (*p < end && **p == '.') {
+        ++*p;
+        if (*p == end || **p < '0' || **p > '9') return false;
+        do { ++*p; } while (*p < end && **p >= '0' && **p <= '9');
+    }
+    if (*p < end && (**p == 'e' || **p == 'E')) {
+        ++*p;
+        if (*p < end && (**p == '+' || **p == '-')) ++*p;
+        if (*p == end || **p < '0' || **p > '9') return false;
+        do { ++*p; } while (*p < end && **p >= '0' && **p <= '9');
+    }
+    return true;
+}
+
+/* Escaped field names retain the ordinary parser's interpretation; the usual ASCII keys allocate nothing. */
+static bool osm_json_key(osm_span_t key, const char *name)
+{
+    size_t bytes = (size_t)(key.last - key.first);
+    if (!memchr(key.first, '\\', bytes))
+        return bytes == strlen(name) + 2 && !memcmp(key.first + 1, name, bytes - 2);
+    string_t *text = string_new();
+    bool ok = text && string_append_bytes(text, key.first, bytes) == 0;
+    json_t *value = ok ? json_from_text(text) : NULL;
+    ok = osm_text(value, name);
+    json_free(value); string_free(text);
+    return ok;
+}
+
+/* Scope is bounded: root, geometry and properties; nested unrelated objects cannot supply river fields. */
+static bool osm_json_scan(const char **p, const char *end, unsigned depth, unsigned scope, osm_record_t *record)
+{
+    osm_json_space(p, end);
+    if (*p == end || depth > 128) return false;
+    if (**p == '"') return osm_json_string(p, end);
+    if (**p == '[' || **p == '{') {
+        bool object = *(*p)++ == '{';
+        char close = object ? '}' : ']';
+        if (osm_json_take(p, end, close)) return true;
+        for (;;) {
+            unsigned child = 0;
+            osm_span_t *capture = NULL;
+            if (object) {
+                osm_json_space(p, end);
+                osm_span_t key = {.first = *p};
+                if (!osm_json_string(p, end)) return false;
+                key.last = *p;
+                if (!osm_json_take(p, end, ':')) return false;
+                if (scope == 1 && osm_json_key(key, "geometry")) {
+                    child = 2; record->coordinates = (osm_span_t){0};
+                } else if (scope == 1 && osm_json_key(key, "properties")) {
+                    child = 3; record->nodes = (osm_span_t){0};
+                } else if (scope == 2 && osm_json_key(key, "coordinates")) capture = &record->coordinates;
+                else if (scope == 3 && osm_json_key(key, "@way_nodes")) capture = &record->nodes;
+            }
+            osm_json_space(p, end);
+            const char *start = *p;
+            if (!osm_json_scan(p, end, depth + 1, child, record)) return false;
+            if (capture) {
+                *capture = (osm_span_t){start, *p};
+                if (string_append_bytes(record->metadata, record->copied, (size_t)(start - record->copied)) != 0 ||
+                    string_append_cstr(record->metadata, "null") < 0) return false;
+                record->copied = *p;
+            }
+            if (osm_json_take(p, end, close)) return true;
+            if (!osm_json_take(p, end, ',')) return false;
+        }
+    }
+    static const char *const literals[] = {"null", "true", "false"};
+    for (unsigned i = 0; i < 3; ++i) {
+        size_t length = strlen(literals[i]);
+        if ((size_t)(end - *p) >= length && !memcmp(*p, literals[i], length)) { *p += length; return true; }
+    }
+    return osm_json_number(p, end);
+}
+
+static bool osm_raw_coordinate(const char **p, const char *end, locale_t locale, int32_t *out, double limit)
+{
+    osm_json_space(p, end);
+    char *tail;
     errno = 0;
-    double n = strtod(text, &end);
-    if (errno || end == text || *end || !isfinite(n) || fabs(n) > limit) return false;
-    *out = (int32_t)llround(n * 1e6);
+    double value = strtod_l(*p, &tail, locale);
+    if (errno || tail == *p || tail > end || !isfinite(value) || fabs(value) > limit) return false;
+    *out = (int32_t)llround(value * 1e6);
+    *p = tail;
+    return true;
+}
+
+/* Reuse a bounded native vertex buffer; general-purpose arbitrary-precision JSON numbers are not needed here. */
+static bool osm_raw_vertices(osm_river_import_t *state, const osm_record_t *record, size_t *count)
+{
+    const char *p = record->coordinates.first, *end = record->coordinates.last;
+    size_t n = 0;
+    if (!p || !record->nodes.first || !osm_json_take(&p, end, '[')) return false;
+    do {
+        if (n == 100000 || !osm_json_take(&p, end, '[')) return false;
+        if (n == state->capacity) {
+            size_t capacity = state->capacity ? state->capacity * 2 : 256;
+            if (capacity > 100000) capacity = 100000;
+            osm_vertex_t *vertices = realloc(state->vertices, capacity * sizeof(*vertices));
+            if (!vertices) return false;
+            state->vertices = vertices; state->capacity = capacity;
+        }
+        if (!osm_raw_coordinate(&p, end, state->numeric_locale, &state->vertices[n].x, 180) ||
+            !osm_json_take(&p, end, ',') ||
+            !osm_raw_coordinate(&p, end, state->numeric_locale, &state->vertices[n].y, 90) ||
+            !osm_json_take(&p, end, ']')) return false;
+        ++n;
+    } while (osm_json_take(&p, end, ','));
+    if (n < 2 || !osm_json_take(&p, end, ']') || p != end) return false;
+    p = record->nodes.first; end = record->nodes.last;
+    if (!osm_json_take(&p, end, '[')) return false;
+    for (size_t i = 0; i < n; ++i) {
+        if (i && !osm_json_take(&p, end, ',')) return false;
+        osm_json_space(&p, end);
+        char *tail;
+        errno = 0;
+        long long node = strtoll(p, &tail, 10);
+        if (errno || tail == p || tail > end || node <= 0) return false;
+        state->vertices[i].node = node;
+        p = tail;
+    }
+    if (!osm_json_take(&p, end, ']') || p != end) return false;
+    *count = n;
     return true;
 }
 
@@ -381,7 +550,7 @@ static bool osm_width_metres(const json_t *properties, double *width)
     return true;
 }
 
-static bool osm_line(osm_river_import_t *s, const json_t *feature)
+static bool osm_line(osm_river_import_t *s, const json_t *feature, const osm_record_t *record)
 {
     if (!osm_text(osm_field(feature, "type"), "Feature")) return false;
     const json_t *geometry = osm_field(feature, "geometry"), *properties = osm_field(feature, "properties");
@@ -398,9 +567,8 @@ static bool osm_line(osm_river_import_t *s, const json_t *feature)
     int64_t id;
     if (!osm_text(osm_field(properties, "@type"), "way") ||
         !osm_integer(osm_field(properties, "@id"), &id)) return false;
-    const json_t *coordinates = osm_field(geometry, "coordinates"), *nodes = osm_field(properties, "@way_nodes");
-    size_t n = json_array_size(coordinates);
-    if (n < 2 || n > 100000 || json_array_size(nodes) != n) return false;
+    size_t n;
+    if (!osm_raw_vertices(s, record, &n)) return false;
     double width;
     if (osm_width_metres(properties, &width)) {
         if (width < cfg_river_minimum_width_metres) {
@@ -412,8 +580,7 @@ static bool osm_line(osm_river_import_t *s, const json_t *feature)
     bool dateline = false;
     int32_t last = 0;
     for (size_t i = 0; i < n; ++i) {
-        int32_t x;
-        if (!osm_coordinate(json_array_get(json_array_get(coordinates, i), 0), &x, 180)) return false;
+        int32_t x = s->vertices[i].x;
         if (i && llabs((int64_t)x - last) > 180000000) dateline = true;
         last = x;
     }
@@ -421,11 +588,8 @@ static bool osm_line(osm_river_import_t *s, const json_t *feature)
     size_t used = 0;
     int32_t west = INT32_MAX, east = INT32_MIN, south = INT32_MAX, north = INT32_MIN, previous = 0;
     for (size_t i = 0; i < n; ++i) {
-        const json_t *pair = json_array_get(coordinates, i);
-        int32_t x, y;
-        int64_t node;
-        if (json_array_size(pair) != 2 || !osm_coordinate(json_array_get(pair, 0), &x, 180) ||
-            !osm_coordinate(json_array_get(pair, 1), &y, 90) || !osm_integer(json_array_get(nodes, i), &node)) return false;
+        int32_t x = s->vertices[i].x, y = s->vertices[i].y;
+        int64_t node = s->vertices[i].node;
         /* Unwrap date-line crossings into the reader's [-180,360] interval. */
         if (dateline && x < 0) x += 360000000;
         if (i && llabs((int64_t)x - previous) > 180000000) return false;
@@ -629,9 +793,16 @@ static bool osm_records_feed(osm_river_import_t *state, string_t *record, const 
             if (string_byte_length(record)) return false;
         } else if (input[i] == '\n') {
             if (string_byte_length(record)) {
-                json_t *feature = json_from_text(record);
-                bool ok = feature && osm_line(state, feature);
+                const char *p = string_c_str(record), *end = p + string_byte_length(record);
+                osm_record_t parsed = {.copied = p, .metadata = string_new()};
+                bool ok = parsed.metadata && osm_json_scan(&p, end, 0, 1, &parsed);
+                osm_json_space(&p, end);
+                ok = ok && p == end &&
+                     string_append_bytes(parsed.metadata, parsed.copied, (size_t)(end - parsed.copied)) == 0;
+                json_t *feature = ok ? json_from_text(parsed.metadata) : NULL;
+                ok = feature && osm_line(state, feature, &parsed);
                 json_free(feature);
+                string_free(parsed.metadata);
                 if (!ok) return false;
                 string_clear(record);
                 if (++state->records % 100000 == 0) {
@@ -699,6 +870,12 @@ static bool osm_records_read(osm_river_import_t *state, file_t *source)
     return ok;
 }
 
+static double cfg_river_seconds(void)
+{
+    struct timespec now;
+    return clock_gettime(CLOCK_MONOTONIC, &now) == 0 ? now.tv_sec + now.tv_nsec / 1e9 : 0;
+}
+
 /* Publish reduced centrelines only after records, junctions and the storage-detail pass have been validated. */
 bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source)
 {
@@ -712,6 +889,8 @@ bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source)
         "create virtual table rivers_bounds using rtree_i32(id,min_x,max_x,min_y,max_y);"
         "create table rivers_node_use(id integer primary key,uses integer not null);");
     osm_river_import_t state = {0};
+    state.numeric_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
+    ok = ok && state.numeric_locale;
     if (ok) {
         state.chunk = sqlite_stmt_prepare(db, "insert into rivers_chunk values(?1,?2,?3,?4,?5,NULL)");
         state.bounds = sqlite_stmt_prepare(db, "insert into rivers_bounds values(?1,?2,?3,?4,?5)");
@@ -720,9 +899,22 @@ bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source)
         ok = state.chunk && state.bounds && state.node;
     }
     /* A final newline and, when compressed, a complete frame are required before publication. */
+    double phase = cfg_river_seconds();
     if (ok) ok = osm_records_read(&state, source);
+    free(state.vertices);
+    if (state.numeric_locale) freelocale(state.numeric_locale);
     sqlite_stmt_finalize(state.chunk); sqlite_stmt_finalize(state.bounds); sqlite_stmt_finalize(state.node);
+    if (ok) {
+        printf("River input complete: %lld records in %.1f s; resolving shared junctions.\n",
+               (long long)state.records, cfg_river_seconds() - phase);
+        fflush(stdout);
+    }
+    phase = cfg_river_seconds();
     if (ok) ok = osm_anchors(db);
+    if (ok) {
+        printf("River junctions complete in %.1f s.\n", cfg_river_seconds() - phase);
+        fflush(stdout);
+    }
     int64_t source_points = state.points;
     cfg_progress_t *progress = ok ? cfg_progress_start("Reducing stored rivers to shoreline detail") : NULL;
     if (ok) ok = cfg_river_simplify(db, &state.points);
