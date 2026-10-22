@@ -53,13 +53,37 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             borderRequests.push(request);
             return Object.assign(new Response(), {async labData() { return {
                 ok: true, country: request.country_code === 'BR' ? 'Brazil' : 'Uruguay',
-                country_code: request.country_code || 'UY', country_flag: ''
+                country_code: request.country_code || 'UY',
+                country_flag: 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg"/>')
             }; }});
         };
         borderGlobe.loadCountry();
         await new Promise(resolve => setTimeout(resolve, 0));
         check(borderGlobe.country === 'Brazil' && borderRequests[0].country_code === 'BR',
               'named border-town observer uses the same catalogue country as its town label');
+        const selectedCountry = document.getElementById('almanacJurisdiction')!
+            .closest('.select-shell')!.querySelector<HTMLElement>('.select-button')!;
+        const oldCode = selectedCountry.dataset.countryCode;
+        const oldChildren = Array.from(selectedCountry.childNodes);
+        try {
+            selectedCountry.dataset.countryCode = 'BR';
+            selectedCountry.textContent = 'Brazil';
+            await new Promise(resolve => setTimeout(resolve, 0));
+            check(Boolean(selectedCountry.querySelector('img.country-flag')) && borderRequests.length === 1,
+                  'globe flag populates an unhovered closed country selector without another lookup');
+            selectedCountry.textContent = 'Brazil';
+            await new Promise(resolve => setTimeout(resolve, 0));
+            check(Boolean(selectedCountry.querySelector('img.country-flag')) && borderRequests.length === 1,
+                  'native text refresh immediately restores the already loaded selected-country flag');
+            selectedCountry.dataset.countryCode = '';
+            await new Promise(resolve => setTimeout(resolve, 0));
+            check(!selectedCountry.querySelector('img.country-flag'),
+                  'clearing the jurisdiction removes stale selected-country artwork');
+        } finally {
+            if (oldCode === undefined) delete selectedCountry.dataset.countryCode;
+            else selectedCountry.dataset.countryCode = oldCode;
+            selectedCountry.replaceChildren(...oldChildren);
+        }
         borderGlobe.hoverCountryKey = '-33.69,-53.46';
         borderGlobe.loadCountry([-33.69, -53.46]);
         await new Promise(resolve => setTimeout(resolve, 0));

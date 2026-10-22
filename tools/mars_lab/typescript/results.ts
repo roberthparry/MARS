@@ -30,6 +30,7 @@ namespace WorksheetResults {
         private activeButton: HTMLElement | null = null;
         private readonly flags = new Map<string, {name: string; flag: string}>();
         private flagBytes = 0;
+        private readonly selectedCountries = new Map<HTMLElement, MutationObserver>();
         private flagRequest: {code: string; controller: AbortController} | null = null;
         private countryObserver: IntersectionObserver | null = null;
         private countryMutation: MutationObserver | null = null;
@@ -119,6 +120,33 @@ namespace WorksheetResults {
             }
             this.flags.set(code, {name, flag});
             this.flagBytes += bytes;
+            // Only two selected-country controls exist; neither requires opening or hovering its menu.
+            for (const id of ['almanacJurisdiction', 'datetimeJurisdiction']) {
+                const button = document.getElementById(id)?.closest('.select-shell')?.querySelector<HTMLElement>('.select-button');
+                if (!button) continue;
+                for (const [old, observer] of this.selectedCountries) if (!old.isConnected) {
+                    observer.disconnect();
+                    this.selectedCountries.delete(old);
+                }
+                if (!this.selectedCountries.has(button)) {
+                    const observer = new MutationObserver(() => this.selectedCountryArtwork(button));
+                    observer.observe(button, {childList: true, attributes: true, attributeFilter: ['data-country-code']});
+                    this.selectedCountries.set(button, observer);
+                }
+                this.selectedCountryArtwork(button);
+            }
+        }
+
+        private selectedCountryArtwork(button: HTMLElement): void {
+            const flag = this.flags.get(button.dataset.countryCode || '')?.flag;
+            if (flag) this.countryArtwork(button, flag);
+            else button.querySelector('img.country-flag')?.remove();
+        }
+
+        /** @brief Share completed globe metadata with selected-country controls and tooltip consumers. */
+        rememberCountry(code: string, name: string, flag: string): void {
+            if (/^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(code) &&
+                (!flag || flag.startsWith('data:image/svg+xml;base64,'))) this.cacheFlag(code, name, flag);
         }
 
         private observeCountryMenu(button: HTMLElement): void {
@@ -271,6 +299,8 @@ namespace WorksheetResults {
 
         /** @brief Release this owner's active tooltip during shutdown. */
         dispose(): void {
+            for (const observer of this.selectedCountries.values()) observer.disconnect();
+            this.selectedCountries.clear();
             this.countryObserver?.disconnect();
             this.countryObserver = null;
             this.countryMutation?.disconnect();

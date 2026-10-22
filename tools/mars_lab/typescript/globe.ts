@@ -767,6 +767,7 @@ class MarsAlmanacGlobe {
                 const code = typeof result.country_code === 'string' && /^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(result.country_code)
                     ? result.country_code : '';
                 const value = {name: result.country, flag, code};
+                WorksheetResults.tooltip.rememberCountry(code, value.name, flag);
                 const bytes = 2 * (value.name.length + flag.length + code.length);
                 while (this.countryCache.size && (this.countryCache.size >= 64 || this.countryCacheBytes + bytes > 1048576)) {
                     const oldest = this.countryCache.keys().next().value!;

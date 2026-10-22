@@ -46,6 +46,10 @@ is asynchronous, and textual controls remain usable while flags arrive. Database
 lookups use the existing indexed country code, without a separate BLOB-offset format.
 Hidden row images are released. Missing artwork
 leaves text-only labels; subdivision entries use the catalogue's flag fallback.
+Completed globe country lookups also populate the tooltip flag cache. The two
+selected-country buttons restore cached artwork after native text/selection
+updates even when their menus have never been opened or hovered; this restoration
+does not issue a request or wait for observer calculations.
 
 MARS Lab is the browser-based graphical client supplied with MARS. It provides
 one workspace for expressions, equations, differential equations, matrices,
