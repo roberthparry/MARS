@@ -33,6 +33,45 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         check(deferredRequest, 'initial Almanac request defers annual events so the observer card can appear first');
     } finally { labHttp.fetch = initialFetch; }
 
+    const borderFetch = labHttp.fetch;
+    const borderInputs: Record<string, {value: string}> = {
+        Jurisdiction: {value: 'BR'}, Town: {value: 'border-town'},
+        Latitude: {value: '-33.69'}, Longitude: {value: '-53.46'}
+    };
+    const borderGlobe = Object.assign(Object.create(MarsAlmanacGlobe.prototype), {
+        input: (key: string) => borderInputs[key], draw: () => {},
+        townById: new Map([[JSON.stringify(['BR', 'border-town']), {
+            jurisdiction: 'BR', country: 'Brazil', town: {latitude: '-33.69', longitude: '-53.46'}
+        }]]),
+        countryCache: new Map(), countryPending: new Map(), countryCacheBytes: 0
+    }) as {loadCountry(point?: number[]): void; country: string; hoverCountry: string; hoverCountryKey: string};
+    const borderRequests: Array<{country_code?: string}> = [];
+    try {
+        labHttp.fetch = async (url, options) => {
+            if (url !== '/almanac-country') return borderFetch(url, options);
+            const request = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {country_code?: string};
+            borderRequests.push(request);
+            return Object.assign(new Response(), {async labData() { return {
+                ok: true, country: request.country_code === 'BR' ? 'Brazil' : 'Uruguay',
+                country_code: request.country_code || 'UY', country_flag: ''
+            }; }});
+        };
+        borderGlobe.loadCountry();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        check(borderGlobe.country === 'Brazil' && borderRequests[0].country_code === 'BR',
+              'named border-town observer uses the same catalogue country as its town label');
+        borderGlobe.hoverCountryKey = '-33.69,-53.46';
+        borderGlobe.loadCountry([-33.69, -53.46]);
+        await new Promise(resolve => setTimeout(resolve, 0));
+        check(borderGlobe.hoverCountry === 'Uruguay' && !borderRequests[1].country_code,
+              'free-coordinate hover retains geographic lookup, separate from named-town metadata');
+        borderInputs.Latitude.value = '-33.7';
+        borderGlobe.loadCountry();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        check(borderGlobe.country === 'Uruguay' && !borderRequests[2].country_code,
+              'edited coordinates cannot inherit a stale selected town country');
+    } finally { labHttp.fetch = borderFetch; }
+
     const townPageResponse = await labHttp.fetch('/towns?after=0&jurisdiction=GB-WLS');
     const townPage = await townPageResponse.labData() as LabCatalogue;
     check(townPageResponse.ok && townPage.available && Boolean(townPage.towns['GB-WLS']?.length) &&

@@ -29,6 +29,11 @@ not copies of flag artwork. Globe redraws retain the custom accessible tooltip
 without reintroducing a competing plain browser title.
 Town dropdown labels and tooltips omit GeoNames disambiguation IDs; stored town identities and source
 attribution remain unchanged. Other descriptive parts of a town name are retained.
+For a selected catalogue town, the observer crosshair and town label use the same
+catalogue country and flag, avoiding approximate-boundary disagreements at border
+towns. This applies only while the observer coordinates match that town. Custom
+points and Shift-hover continue to use geographic boundary lookup, with separate
+cache entries so named-town metadata cannot overwrite a coordinate result.
 
 Country/jurisdiction dropdowns also show available flags beside visible entries
 and the selected label, as well as in their tooltips. Opening or focusing the menu

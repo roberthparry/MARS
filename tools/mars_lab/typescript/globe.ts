@@ -745,16 +745,17 @@ class MarsAlmanacGlobe {
         return depth > 0 && px >= 0 && px <= size && py >= 0 && py <= size ? [px, py] : null;
     }
 
-    private async lookupCountry(lat: number, lon: number, signal: AbortSignal): Promise<{name: string; flag: string; code: string}> {
+    private async lookupCountry(lat: number, lon: number, signal: AbortSignal, countryCode = ''): Promise<{name: string; flag: string; code: string}> {
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
-        const key = `${lat},${lon}`, cached = this.countryCache.get(key);
+        const key = countryCode ? `town:${countryCode}` : `${lat},${lon}`, cached = this.countryCache.get(key);
         if (cached) return cached;
         let pending = this.countryPending.get(key);
         if (!pending) {
             const controller = new AbortController();
             const promise = (async () => {
                 const response = await labHttp.fetch('/almanac-country', {
-                    method: 'POST', body: labWire.encode({lat, lon}), signal: controller.signal
+                    method: 'POST', body: labWire.encode(countryCode ? {country_code: countryCode} : {lat, lon}),
+                    signal: controller.signal
                 });
                 const result = await response.labData() as {
                     ok?: boolean; country?: string; country_flag?: string; country_code?: string
@@ -802,10 +803,23 @@ class MarsAlmanacGlobe {
         });
     }
 
+    private observerTown(): GlobeTown | undefined {
+        const place = this.townById.get(JSON.stringify([this.input('Jurisdiction').value, this.input('Town').value]));
+        return place && Number(place.town.latitude) === Number(this.input('Latitude').value) &&
+            Number(place.town.longitude) === Number(this.input('Longitude').value) ? place : undefined;
+    }
+
+    private observerCountryKey(): string {
+        const place = this.observerTown();
+        return place ? `town:${place.jurisdiction}` :
+            `${Number(this.input('Latitude').value)},${Number(this.input('Longitude').value)}`;
+    }
+
     private loadCountry(hoverPoint?: number[]): void {
         const lat = hoverPoint ? hoverPoint[0] : Number(this.input('Latitude').value);
         const lon = hoverPoint ? hoverPoint[1] : Number(this.input('Longitude').value);
-        const key = `${lat},${lon}`;
+        const town = hoverPoint ? undefined : this.observerTown();
+        const key = hoverPoint ? `${lat},${lon}` : this.observerCountryKey();
         if (!hoverPoint && key === this.countryKey) return;
         if (!hoverPoint) {
             this.countryKey = key;
@@ -816,7 +830,7 @@ class MarsAlmanacGlobe {
             this.hoverCountry = cached?.name || '';
             this.hoverCountryFlag = cached?.flag || '';
         } else {
-            this.country = cached?.name || '';
+            this.country = cached?.name || town?.country || '';
             this.countryFlag = cached?.flag || '';
         }
         if (this.countryCache.has(key) || !Number.isFinite(lat) || !Number.isFinite(lon) ||
@@ -827,7 +841,7 @@ class MarsAlmanacGlobe {
         const timeout = window.setTimeout(() => request.abort(), 5000);
         void (async () => {
             try {
-                const result = await this.lookupCountry(lat, lon, request.signal);
+                const result = await this.lookupCountry(lat, lon, request.signal, town?.jurisdiction);
                 if ((hoverPoint ? this.hoverCountryKey : this.countryKey) !== key || request.signal.aborted) return;
                 if (hoverPoint) {
                     this.hoverCountry = result.name;
@@ -1056,8 +1070,7 @@ class MarsAlmanacGlobe {
         const labels: string[] = [];
         if (flags & 1) labels.push(`Latitude ${MarsAlmanacGlobe.coordinate(latitude, 'N', 'S')}`);
         if (flags & 2) labels.push(`Longitude ${MarsAlmanacGlobe.coordinate(longitude, 'E', 'W')}`);
-        const observerCountry = overObserver && this.countryKey ===
-            `${Number(this.input('Latitude').value)},${Number(this.input('Longitude').value)}`;
+        const observerCountry = overObserver && this.countryKey === this.observerCountryKey();
         const country = shift ? this.hoverCountry : observerCountry ? this.country : '';
         const countryFlag = shift ? this.hoverCountryFlag : observerCountry ? this.countryFlag : '';
         if (country) labels.push(country);
