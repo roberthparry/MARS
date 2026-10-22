@@ -386,6 +386,30 @@ PackageLicenseDeclared: MIT
 PackageCopyrightText: NOASSERTION
 PackageComment: HTTP/2 library used transitively by the verified system libcurl build, including MARS unary gRPC requests. Not directly linked by MARS or used by its native webserver; retain the selected package's copyright and permission notice when bundling.
 
+PackageName: flag-icons
+SPDXID: SPDXRef-Package-flag-icons
+PackageVersion: 7.3.2
+PackageDownloadLocation: https://github.com/lipis/flag-icons/archive/refs/tags/v7.3.2.tar.gz
+PackageChecksum: SHA256: 6a5497e1029e66415c3941a5e5ee001944b0a7e46bf365c6d5a91a033acee87e
+FilesAnalyzed: false
+PackageLicenseConcluded: MIT
+PackageLicenseDeclared: MIT
+PackageCopyrightText: Copyright (c) 2013 Panayiotis Lipiridis
+PackageComment: Bundled 4:3 SVG artwork and licence only. The native jurisdiction importer retains the licence in its database. Upstream generation tools are not required.
+
+PackageName: Natural-Earth-admin-0-map-units
+SPDXID: SPDXRef-Package-Natural-Earth-countries
+PackageVersion: 5.1.1
+PackageDownloadLocation: https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_map_units.zip
+PackageChecksum: SHA256: 45bebe2aaf8bf42b9daf4428594925bcb11eabd32fe9dc6e0acf681438053eb5
+FilesAnalyzed: false
+PackageLicenseConcluded: NOASSERTION
+PackageLicenseDeclared: NOASSERTION
+PackageCopyrightText: NOASSERTION
+PackageComment: Natural Earth public-domain waiver: https://www.naturalearthdata.com/about/terms-of-use/. Packaged SHP and DBF files are unchanged apart from Zstandard compression. Generalised de facto boundaries at 1:10 million map scale.
+
+Relationship: SPDXRef-Package-MARS CONTAINS SPDXRef-Package-flag-icons
+Relationship: SPDXRef-Package-MARS CONTAINS SPDXRef-Package-Natural-Earth-countries
 Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-Package-MARS
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-libcurl
 Relationship: SPDXRef-Package-nghttp2 OPTIONAL_DEPENDENCY_OF SPDXRef-Package-libcurl

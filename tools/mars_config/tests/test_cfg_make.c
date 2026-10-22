@@ -30,6 +30,15 @@ void test_cfg_make_self_fixture(void)
     file_t *command = file_new_cstr("/proc/self/cmdline");
     char bytes[4096];
     size_t length = 0, prefix = strlen(program) + 1;
+    if (getenv("MARS_TEST_MAKE_RELEASE")) {
+        bool ok = command && file_open_read(command) && file_read(command, bytes, sizeof(bytes), &length) &&
+                  length == prefix + sizeof("databases-update") && prefix <= sizeof(bytes) &&
+                  !memcmp(bytes, program, prefix) &&
+                  !memcmp(bytes + prefix, "databases-update", sizeof("databases-update"));
+        file_free(command);
+        if (ok) { puts("release update fixture verified"); fflush(stdout); }
+        _exit(ok && !getenv("MARS_TEST_MAKE_FAIL") ? 0 : 93);
+    }
     bool ok = command && file_open_read(command) && file_read(command, bytes, sizeof(bytes), &length) &&
               length == prefix + sizeof("jurisdiction") && prefix <= sizeof(bytes) && !memcmp(bytes, program, prefix) &&
               !memcmp(bytes + prefix, "jurisdiction", sizeof("jurisdiction")) && location && expected_location &&
@@ -265,9 +274,47 @@ static void test_cfg_make_databases(void)
                      "combined database target dispatches one shared-password installer");
 }
 
+static bool test_cfg_make_release_fixture(const char *directory)
+{
+    file_t *self = file_new_cstr("/proc/self/exe");
+    char *target = NULL;
+    bool ok = test_cfg_make_environment() && self && file_read_link(self, &target);
+    string_t *program = ok ? string_sprintf("CONFIG_PROGRAM=%s", target) : NULL;
+    string_t *launcher_path = string_sprintf("%s/launcher", directory);
+    string_t *launcher_arg = launcher_path ? string_sprintf("MARS_LAB_LAUNCHER=%s", string_c_str(launcher_path)) : NULL;
+    file_t *launcher = launcher_path ? file_new(launcher_path) : NULL;
+    ok = ok && program && launcher_arg && launcher && !setenv("MARS_TEST_MAKE_PROGRAM", target, 1) &&
+         !setenv("MARS_TEST_MAKE_RELEASE", "1", 1) && !unsetenv("MARS_TEST_MAKE_FAIL");
+    const char *args[] = {"make", "--no-print-directory", "-j1", "-o", "check-compliance",
+        "MAKE=make --no-print-directory -j1 -o all -o native-config -o check-native-deps",
+        program ? string_c_str(program) : "", launcher_arg ? string_c_str(launcher_arg) : "", "release", NULL};
+    for (unsigned pass = 0; pass < 4 && ok; ++pass) {
+        if (pass == 1) ok = file_write_all_bytes(launcher, "fixture", 7) && file_chmod(launcher, 0600);
+        if (pass == 2) ok = file_chmod(launcher, 0700);
+        if (pass == 3) ok = !setenv("MARS_TEST_MAKE_FAIL", "1", 1);
+        string_t *output = NULL;
+        int status = -1;
+        ok = ok && lab_proc_run(args, MARS_CONFIG_ROOT_DIR, 30000, 262144, &output, &status) && output &&
+             ((status == 0) == (pass != 3)) &&
+             ((string_find(output, "release update fixture verified") >= 0) == (pass >= 2));
+        if (!ok) fprintf(stderr, "Release dispatch pass %u failed: %s\n", pass, output ? string_c_str(output) : "no output");
+        string_free(output);
+    }
+    free(target); file_free(self); file_free(launcher);
+    string_free(program); string_free(launcher_arg); string_free(launcher_path);
+    return ok;
+}
+
+static void test_cfg_make_release(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_make_release_fixture),
+                     "release updates only with an executable installed launcher and propagates migration failure");
+}
+
 /* Register ordinary Make integration cases before the README groups. */
 void test_cfg_make_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_cfg_make_release, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_databases, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_dry, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_reject, tests, NULL);

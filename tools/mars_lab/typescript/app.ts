@@ -95,9 +95,13 @@ class LabScriptLoad {
 
 /** Owns startup and browser observers; native continuations decide worksheet policy. */
 class LabApplication {
-    /** @brief Background town-loading completion; workspace startup does not await it. */
+    /** @brief Initial selected-jurisdiction loading; workspace startup does not await it. */
     public townsReady: Promise<void> = Promise.resolve();
-    private townLoadingComplete = false;
+    private readonly townJurisdictions = new Set<string>();
+    private readonly failedTownCodes = new Set<string>();
+    private readonly townJobs = new Map<string, {controller: AbortController; promise: Promise<void>}>();
+    private nearbyCentre: [number, number] | null = null;
+    private nearbyComplete = false;
     private nearbyTowns?: AbortController;
     private readonly townKeys = new Set<string>();
     private readonly observers: ResizeObserver[] = [];
@@ -164,6 +168,9 @@ class LabApplication {
     }
 
     private townNotice(message: string): void {
+        if (!message && this.failedTownCodes.size)
+            message = `Some towns for ${Array.from(this.failedTownCodes).join(', ')} could not be loaded. ` +
+                'Loaded towns remain usable; reselect to retry.';
         for (const id of ['datetimeJurisdiction', 'almanacJurisdiction']) {
             const panel = document.getElementById(id)?.closest('.mode-panel');
             if (!panel) continue;
@@ -198,52 +205,101 @@ class LabApplication {
 
     private async loadTowns(): Promise<void> {
         if (!this.catalogue.available) return;
-        this.townNotice('Loading towns… Observer coordinates remain usable.');
+        const refresh = () => { void this.loadSelectedTowns(); };
+        for (const id of ['datetimeJurisdiction', 'almanacJurisdiction'])
+            document.getElementById(id)?.addEventListener('change', refresh, {signal: this.lifetime.signal});
+        document.addEventListener('mars-almanac-observer-committed', refresh, {signal: this.lifetime.signal});
         const latitude = Number((document.getElementById('almanacLatitude') as HTMLInputElement).value);
         const longitude = Number((document.getElementById('almanacLongitude') as HTMLInputElement).value);
         void this.loadNearbyTowns(latitude, longitude);
+        await this.loadSelectedTowns();
+    }
+
+    private async loadSelectedTowns(): Promise<void> {
+        const codes = new Set(['almanacJurisdiction', 'datetimeJurisdiction'].map(id =>
+            (document.getElementById(id) as HTMLSelectElement)?.value || '').filter(code => /^[A-Z0-9-]{2,32}$/.test(code)));
+        // Include parent fallback only when its subdivision is selected, never the whole world.
+        for (const code of Array.from(codes)) if (code.includes('-')) codes.add(code.split('-')[0]);
+        for (const code of this.failedTownCodes) if (!codes.has(code)) this.failedTownCodes.delete(code);
+        for (const [code, job] of this.townJobs) if (!codes.has(code)) job.controller.abort();
+        for (const code of codes) {
+            if (this.lifetime.signal.aborted) return;
+            const selected = ['datetimeJurisdiction', 'almanacJurisdiction'].some(id => {
+                const value = (document.getElementById(id) as HTMLSelectElement)?.value || '';
+                return value === code || value.startsWith(code + '-');
+            });
+            if (!selected || this.townJurisdictions.has(code)) continue;
+            let job = this.townJobs.get(code);
+            if (job?.controller.signal.aborted) job = undefined;
+            if (!job) {
+                const controller = new AbortController();
+                const promise = this.loadJurisdictionTowns(code, controller.signal).catch(() => {
+                    if (!controller.signal.aborted && !this.lifetime.signal.aborted) {
+                        this.failedTownCodes.add(code);
+                        this.townNotice('');
+                    }
+                }).finally(() => {
+                    if (this.townJobs.get(code)?.controller === controller) this.townJobs.delete(code);
+                });
+                job = {controller, promise};
+                this.townJobs.set(code, job);
+            }
+            await job.promise;
+        }
+    }
+
+    private async loadJurisdictionTowns(code: string, controller: AbortSignal): Promise<void> {
+        this.failedTownCodes.delete(code);
+        this.townNotice(`Loading towns for ${code}… Available towns and coordinates remain usable.`);
         let cursor = '0';
         do {
-            const response = await labHttp.fetch(`/towns?after=${cursor}`, {
-                signal: AbortSignal.any([this.lifetime.signal, AbortSignal.timeout(10000)])
-            });
+            const signal = AbortSignal.any([controller, this.lifetime.signal, AbortSignal.timeout(10000)]);
+            const response = await labHttp.fetch(`/towns?after=${cursor}&jurisdiction=${code}`, {signal});
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const batch = await response.labData() as LabCatalogue;
+            signal.throwIfAborted();
             if (!batch.available || !batch.next || !/^\d+$/.test(batch.next))
                 throw new Error(batch.error || 'Invalid town catalogue page');
             if (batch.next !== '0' && BigInt(batch.next) <= BigInt(cursor))
                 throw new Error('Town catalogue cursor did not advance');
             await this.publishTowns(batch.towns);
+            this.townNotice('');
             cursor = batch.next;
         } while (cursor !== '0');
         this.lifetime.signal.throwIfAborted();
-        this.townLoadingComplete = true;
-        this.nearbyTowns?.abort();
+        this.townJurisdictions.add(code);
         this.townNotice('');
     }
 
-    /** Load a bounded priority window independently of the world-catalogue stream. */
+    /** Load towns near the current view without downloading the world catalogue. */
     public async loadNearbyTowns(latitude: number, longitude: number): Promise<void> {
-        if (this.townLoadingComplete || !this.catalogue?.available ||
+        if (!this.catalogue?.available ||
             !Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+        if (this.nearbyComplete && this.nearbyCentre && Math.abs(latitude - this.nearbyCentre[0]) < 1 &&
+            Math.abs(longitude - this.nearbyCentre[1]) < 1) return;
         this.nearbyTowns?.abort();
+        this.nearbyCentre = [latitude, longitude];
+        this.nearbyComplete = false;
         const controller = this.nearbyTowns = new AbortController();
         const signal = AbortSignal.any([controller.signal, this.lifetime.signal, AbortSignal.timeout(10000)]);
         let cursor = '0';
         try {
             for (let page = 0; page < 8; ++page) {
                 const response = await labHttp.fetch(`/towns?after=${cursor}&lat=${latitude}&lon=${longitude}`, {signal});
-                if (!response.ok) return;
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const batch = await response.labData() as LabCatalogue;
                 signal.throwIfAborted();
                 if (!batch.available || !batch.next || !/^\d+$/.test(batch.next) ||
-                    (batch.next !== '0' && BigInt(batch.next) <= BigInt(cursor))) return;
+                    (batch.next !== '0' && BigInt(batch.next) <= BigInt(cursor))) throw new Error('Invalid local town page');
                 await this.publishTowns(batch.towns);
+                this.townNotice('');
                 cursor = batch.next;
                 if (cursor === '0') break;
             }
+            if (this.nearbyTowns === controller) this.nearbyComplete = true;
         } catch {
-            // Priority loading is optional; the world stream still supplies these towns.
+            if (this.nearbyTowns === controller) this.nearbyCentre = null;
+            // Local loading is optional; selected-country menus load independently.
         }
     }
 
@@ -269,7 +325,7 @@ class LabApplication {
         }
         if (!Object.keys(added).length) return;
         document.dispatchEvent(new CustomEvent('lab-town-catalogue-ready', {detail: added}));
-        // The priority and world streams share one refresh queue rather than rebuilding menus concurrently.
+        // Local and jurisdiction pages share one refresh queue to avoid concurrent menu rebuilds.
         if (!this.townRefresh) {
             this.townRefresh = this.refreshTownMenus();
         }

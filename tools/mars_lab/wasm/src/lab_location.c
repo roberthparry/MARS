@@ -94,6 +94,8 @@ void lab_location_validate(lab_profile_kind_t kind, jsref boxed, jsref fallback,
 
 static jsref lab_location_town_list(jsref context, jsref value)
 {
+    if (lab_dom_type(value) == LAB_VALUE_STRING && !lab_dom_length(value))
+        return lab_dom_object(LAB_VALUE_ARRAY);
     int config = lab_dom_get(context, "config");
     int code = lab_location_validated(LAB_PROFILE_JURISDICTION, value, lab_dom_get(config, "DEFAULT_DATETIME_JURISDICTION"),
                                       lab_dom_get(context, "jurisdictions"));
@@ -126,11 +128,19 @@ bool lab_location_catalogue(jsref catalogue)
     for (unsigned field = 0; field < 2; ++field) {
         int select = selects[field];
         lab_dom_write(select, LAB_DOM_TEXT, "", lab_dom_string(""));
+        if (field == 1) {
+            int unknown = lab_dom_create("option");
+            lab_dom_write(unknown, LAB_DOM_VALUE, "", lab_dom_string(""));
+            lab_dom_write(unknown, LAB_DOM_TEXT, "", lab_dom_string("Country not identified"));
+            lab_dom_append(select, unknown);
+        }
         unsigned row_mark = lab_dom_mark();
         for (unsigned index = 0; index < count; ++index) {
             int row = lab_dom_item(options, index), option = lab_dom_create("option");
             lab_dom_write(option, LAB_DOM_VALUE, "", lab_dom_item(row, 0));
             lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_item(row, 1));
+            lab_dom_write(option, LAB_DOM_DATASET, "countryCode", lab_dom_item(row, 0));
+            lab_dom_write(option, LAB_DOM_DATASET, "countryOption", lab_dom_string("1"));
             lab_dom_append(select, option);
             lab_dom_release(row_mark);
         }
@@ -178,6 +188,8 @@ void lab_location_populate(node_jsref select, jsref towns, bool select_default)
     static const char *const attributes[] = {"latitude", "longitude", "elevation", "timezone", "detail"};
     int previous = lab_location_value(select), empty = lab_dom_string("");
     lab_dom_write(select, LAB_DOM_TEXT, "", empty);
+    int jurisdiction = lab_dom_read(lab_dom_query(lab_dom_closest(select, ".mode-panel"),
+                                                 "select[id$='Jurisdiction']"), LAB_DOM_VALUE, "");
     unsigned count = lab_dom_count(towns), default_index = 0, found_default = 0, previous_exists = 0;
     unsigned mark = lab_dom_mark();
     for (unsigned index = 0; index < count; ++index) {
@@ -189,6 +201,7 @@ void lab_location_populate(node_jsref select, jsref towns, bool select_default)
         previous_exists |= lab_dom_equal(previous, value);
         int name = lab_dom_get(town, "name");
         lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_truth(name) ? lab_location_text(name) : lab_dom_string("Location"));
+        lab_dom_write(option, LAB_DOM_DATASET, "countryCode", jurisdiction);
         for (unsigned field = 0; field < sizeof attributes / sizeof *attributes; ++field)
             lab_dom_write(option, LAB_DOM_DATASET, attributes[field], lab_location_text(lab_dom_get(town, attributes[field])));
         if (lab_dom_truth(lab_dom_get(town, "default"))) {
@@ -459,6 +472,10 @@ static jsref lab_location_resolve(lab_mode_t mode, lab_calendar_operation_t oper
             [LAB_PROFILE_FALLBACK]   = fallback,
         };
         int chosen = (unsigned)choice <= LAB_PROFILE_FALLBACK ? choices[choice] : fallback;
+        if (mode == LAB_MODE_ALMANAC && kind == LAB_PROFILE_JURISDICTION && operation != LAB_CALENDAR_RESET &&
+            !lab_dom_length(text) && lab_dom_type(lab_dom_key_get(source,
+                lab_dom_join(prefix, lab_dom_string(key), ""))) == LAB_VALUE_STRING)
+            chosen = text;
         lab_dom_set(result, key, chosen);
         lab_dom_release(mark);
     }
@@ -717,18 +734,30 @@ void lab_location_evaluation(lab_mode_t mode, jsref data, jsref context)
             lab_location_reset_offset(context, offset);
         }
     } else if (mode == LAB_MODE_ALMANAC) {
+        bool offshore = lab_location_is(lab_dom_get(data, "observer_surface"), "Sea");
+        if (offshore) {
+            lab_location_write(lab_location_element(mode, 3), lab_dom_string(""));
+            lab_location_populate(lab_location_element(mode, 4), lab_dom_object(LAB_VALUE_ARRAY), false);
+            lab_location_write(lab_location_element(mode, 4), lab_dom_string(""));
+        }
         /* Observer height is authored input, not an evaluation result. Town selection and
          * explicit location actions own height changes; replies must not reset it. */
         static const unsigned projection[] = {2, 5, 6, 3};
         unsigned mark = lab_dom_mark();
         for (unsigned index = 0; index < sizeof projection / sizeof *projection; ++index) {
             unsigned field = projection[index];
+            if (field == 3 && offshore)
+                continue;
             int value = lab_dom_get(fields, lab_profile_text(mode, field, LAB_PROFILE_KEY));
+            if (field == 3 && lab_dom_type(value) == LAB_VALUE_STRING && !lab_dom_length(value)) {
+                lab_location_write(lab_location_element(mode, field), value);
+                continue;
+            }
             if (lab_dom_truth(value)) {
                 value = lab_dom_clean(value, LAB_DOM_CLEAN_TRIM);
                 if (field == 3)
                     value = lab_location_validated(LAB_PROFILE_JURISDICTION, value,
-                                                   lab_dom_get(config, "DEFAULT_DATETIME_JURISDICTION"),
+                                                   lab_dom_string(""),
                                                    lab_dom_get(context, "jurisdictions"));
                 lab_location_write(lab_location_element(mode, field), value);
             }

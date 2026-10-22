@@ -228,6 +228,7 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
             int64_t cursor = 0;
             double latitude = 0, longitude = 0;
             bool nearby = false;
+            const char *jurisdiction = NULL;
             bool valid = !strcmp(target, "/towns");
             if (!strncmp(target, "/towns?after=", 13)) {
                 const char *digit = target + 13;
@@ -237,7 +238,14 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
                     if (valid)
                         cursor = cursor * 10 + *digit - '0';
                 }
-                if (valid && *digit) {
+                if (valid && !strncmp(digit, "&jurisdiction=", 14)) {
+                    jurisdiction = digit + 14;
+                    size_t length = strlen(jurisdiction);
+                    valid = length >= 2 && length <= 32;
+                    for (size_t i = 0; valid && i < length; ++i)
+                        valid = (jurisdiction[i] >= 'A' && jurisdiction[i] <= 'Z') ||
+                                (jurisdiction[i] >= '0' && jurisdiction[i] <= '9') || jurisdiction[i] == '-';
+                } else if (valid && *digit) {
                     char *end = NULL;
                     valid = !strncmp(digit, "&lat=", 5);
                     if (valid) {
@@ -255,7 +263,8 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
             }
             if (!valid)
                 return lab_svr_message(request, response, 400, "Invalid town catalogue cursor");
-            json_t *batch = nearby ? lab_page_town_near_batch(cursor, latitude, longitude) : lab_page_town_batch(cursor);
+            json_t *batch = jurisdiction ? lab_page_town_jurisdiction_batch(cursor, jurisdiction) :
+                           nearby ? lab_page_town_near_batch(cursor, latitude, longitude) : lab_page_town_batch(cursor);
             bool ok = batch && lab_svr_value(request, response, batch);
             json_free(batch);
             return ok;
@@ -372,6 +381,8 @@ static bool lab_svr_register_routes(lab_server_t *server)
                                               "/almanac-eval",
                                               "/almanac-weather",
                                               "/almanac-globe",
+                                              "/almanac-country",
+                                              "/almanac-borders",
                                               "/almanac-rivers",
                                               "/almanac-land-totality",
                                               "/funnel-toggle"};

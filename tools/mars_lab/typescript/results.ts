@@ -28,6 +28,205 @@ namespace WorksheetResults {
     /** Own the active tooltip node; native code retains presentation policy. */
     export class WorksheetTooltipController {
         private activeButton: HTMLElement | null = null;
+        private readonly flags = new Map<string, {name: string; flag: string}>();
+        private flagBytes = 0;
+        private flagRequest: {code: string; controller: AbortController} | null = null;
+        private countryObserver: IntersectionObserver | null = null;
+        private countryMutation: MutationObserver | null = null;
+        private countryShell: Element | null = null;
+        private readonly visibleCountries = new Set<HTMLElement>();
+        private menuRequest: AbortController | null = null;
+        private readonly pendingFlags = new Map<string, {
+            controller: AbortController;
+            consumers: number;
+            promise: Promise<{name: string; flag: string}>;
+        }>();
+
+        private async fetchFlag(code: string, signal: AbortSignal): Promise<{name: string; flag: string}> {
+            if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+            const cached = this.flags.get(code);
+            if (cached) return cached;
+            let pending = this.pendingFlags.get(code);
+            if (!pending) {
+                const controller = new AbortController();
+                const promise = (async () => {
+                    const response = await labHttp.fetch('/almanac-country', {
+                        method: 'POST', body: labWire.encode({country_code: code}), signal: controller.signal
+                    });
+                    const data = await response.labData() as {ok?: boolean; country?: string; country_flag?: string};
+                    if (controller.signal.aborted || !response.ok || !data.ok) throw new Error('Flag unavailable');
+                    const name = typeof data.country === 'string' ? data.country : '';
+                    const flag = typeof data.country_flag === 'string' &&
+                        data.country_flag.startsWith('data:image/svg+xml;base64,') ? data.country_flag : '';
+                    if ((name.length + flag.length) * 2 > 1048576) throw new Error('Flag too large');
+                    this.cacheFlag(code, name, flag);
+                    return {name, flag};
+                })();
+                pending = {controller, consumers: 0, promise};
+                this.pendingFlags.set(code, pending);
+            }
+            const shared = pending;
+            ++shared.consumers;
+            return new Promise((resolve, reject) => {
+                let released = false;
+                const release = () => {
+                    if (released) return false;
+                    released = true;
+                    signal.removeEventListener('abort', cancel);
+                    if (--shared.consumers === 0) {
+                        shared.controller.abort();
+                        if (this.pendingFlags.get(code) === shared) this.pendingFlags.delete(code);
+                    }
+                    return true;
+                };
+                const cancel = () => {
+                    if (release()) reject(new DOMException('Cancelled', 'AbortError'));
+                };
+                signal.addEventListener('abort', cancel, {once: true});
+                shared.promise.then(value => {
+                    if (release()) resolve(value);
+                }, error => {
+                    if (release()) reject(error);
+                });
+            });
+        }
+
+        private countryArtwork(button: HTMLElement, flag: string): void {
+            if (button.dataset.countryOption !== '1' || !flag) return;
+            let image = button.querySelector<HTMLImageElement>('img.country-flag');
+            if (!image) {
+                image = document.createElement('img');
+                image.decoding = 'async';
+                image.className = 'country-flag'; image.alt = '';
+                button.prepend(image);
+            }
+            if (image.getAttribute('src') !== flag) image.src = flag;
+        }
+
+        private cacheFlag(code: string, name: string, flag: string): void {
+            const bytes = (flag.length + name.length) * 2;
+            if (bytes > 1048576) return;
+            const previous = this.flags.get(code);
+            if (previous) {
+                this.flagBytes -= (previous.name.length + previous.flag.length) * 2;
+                this.flags.delete(code);
+            }
+            while (this.flags.size && (this.flags.size >= 32 || this.flagBytes + bytes > 1048576)) {
+                const oldest = this.flags.keys().next().value!;
+                const entry = this.flags.get(oldest)!;
+                this.flagBytes -= (entry.flag.length + entry.name.length) * 2;
+                this.flags.delete(oldest);
+            }
+            this.flags.set(code, {name, flag});
+            this.flagBytes += bytes;
+        }
+
+        private observeCountryMenu(button: HTMLElement): void {
+            if (button.dataset.countryOption !== '1') return;
+            const shell = button.closest('.select-shell');
+            if (!shell) return;
+            if (shell === this.countryShell) { void this.fillCountryMenu(); return; }
+            this.countryObserver?.disconnect();
+            this.countryMutation?.disconnect();
+            this.menuRequest?.abort();
+            this.menuRequest = null;
+            this.countryShell = shell;
+            this.visibleCountries.clear();
+            this.countryObserver = new IntersectionObserver(entries => {
+                for (const entry of entries) {
+                    const item = entry.target as HTMLElement;
+                    if (entry.isIntersecting) this.visibleCountries.add(item);
+                    else {
+                        this.visibleCountries.delete(item);
+                        item.querySelector('img.country-flag')?.remove();
+                    }
+                }
+                if (!this.visibleCountries.size) this.menuRequest?.abort();
+                void this.fillCountryMenu();
+            });
+            shell.querySelectorAll<HTMLElement>('[data-country-option="1"]').forEach(item => this.countryObserver!.observe(item));
+            this.countryMutation = new MutationObserver(records => {
+                for (const item of this.visibleCountries) {
+                    if (!item.isConnected) {
+                        this.visibleCountries.delete(item);
+                        this.countryObserver?.unobserve(item);
+                    }
+                }
+                if (records.some(record => (record.target as Element).classList?.contains('select-options'))) {
+                    this.countryObserver?.disconnect();
+                    this.visibleCountries.clear();
+                    shell.querySelectorAll<HTMLElement>('[data-country-option="1"]').forEach(item => this.countryObserver!.observe(item));
+                }
+                void this.fillCountryMenu();
+            });
+            this.countryMutation.observe(shell, {childList: true, subtree: true});
+        }
+
+        private async fillCountryMenu(): Promise<void> {
+            if (this.menuRequest) return;
+            for (const item of this.visibleCountries) {
+                const code = item.dataset.countryCode || '';
+                if (!/^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(code)) continue;
+                if (this.flags.has(code)) {
+                    this.countryArtwork(item, this.flags.get(code)!.flag);
+                    continue;
+                }
+                const request = new AbortController();
+                this.menuRequest = request;
+                const timer = window.setTimeout(() => request.abort(), 5000);
+                try {
+                    const {flag} = await this.fetchFlag(code, request.signal);
+                    if (request.signal.aborted) return;
+                    if (this.visibleCountries.has(item) && item.dataset.countryCode === code) this.countryArtwork(item, flag);
+                } catch { return; }
+                finally {
+                    window.clearTimeout(timer);
+                    if (this.menuRequest === request) this.menuRequest = null;
+                }
+            }
+        }
+
+        private loadFlag(button: WorksheetCopyButton): void {
+            this.observeCountryMenu(button);
+            const code = button.dataset.countryCode || '';
+            if (this.flagRequest?.code !== code) {
+                this.flagRequest?.controller.abort();
+                this.flagRequest = null;
+            }
+            delete button.dataset.countryFlag;
+            delete button.dataset.countryName;
+            if (!/^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(code)) return;
+            if (this.flags.has(code)) {
+                const entry = this.flags.get(code)!;
+                button.dataset.countryFlag = entry.flag;
+                button.dataset.countryName = entry.name;
+                this.countryArtwork(button, entry.flag);
+                return;
+            }
+            if (this.flagRequest) return;
+            const request = {code, controller: new AbortController()};
+            this.flagRequest = request;
+            const timer = window.setTimeout(() => request.controller.abort(), 5000);
+            void (async () => {
+                try {
+                    const {name, flag} = await this.fetchFlag(code, request.controller.signal);
+                    if (request.controller.signal.aborted || this.flagRequest !== request) return;
+                    const active = this.activeButton;
+                    if (active?.isConnected && active.dataset.countryCode === code) {
+                        active.dataset.countryFlag = flag;
+                        active.dataset.countryName = name;
+                        this.countryArtwork(active, flag);
+                        const {width, height} = this.viewport();
+                        this.native().call('lab_tooltip_show', active, active, width, height);
+                    }
+                } catch {
+                    // Country artwork is optional; retain the immediately available textual tooltip.
+                } finally {
+                    window.clearTimeout(timer);
+                    if (this.flagRequest === request) this.flagRequest = null;
+                }
+            })();
+        }
 
         /** @brief Inject native projection and live viewport measurement. */
         constructor(
@@ -44,6 +243,13 @@ namespace WorksheetResults {
 
         /** @brief Show a valid candidate without replacing ownership when native code rejects it. */
         show(button: WorksheetCopyButton): void {
+            if (button) {
+                if (this.activeButton && this.activeButton !== button) {
+                    delete this.activeButton.dataset.countryFlag;
+                    delete this.activeButton.dataset.countryName;
+                }
+                this.loadFlag(button);
+            }
             const {width, height} = this.viewport();
             if (this.native().call('lab_tooltip_show', button, this.activeButton, width, height))
                 this.activeButton = button;
@@ -51,13 +257,32 @@ namespace WorksheetResults {
 
         /** @brief Hide native presentation and release the active node. */
         hide(): void {
+            this.flagRequest?.controller.abort();
+            this.flagRequest = null;
+            if (this.activeButton) {
+                delete this.activeButton.dataset.countryFlag;
+                delete this.activeButton.dataset.countryName;
+            }
             this.native().call('lab_tooltip_hide', this.activeButton);
             this.activeButton = null;
         }
 
         /** @brief Release this owner's active tooltip during shutdown. */
         dispose(): void {
+            this.countryObserver?.disconnect();
+            this.countryObserver = null;
+            this.countryMutation?.disconnect();
+            this.countryMutation = null;
+            this.countryShell = null;
+            this.visibleCountries.clear();
+            this.menuRequest?.abort();
             if (this.activeButton) this.hide();
+            this.flagRequest?.controller.abort();
+            this.flagRequest = null;
+            this.flags.clear();
+            for (const pending of this.pendingFlags.values()) pending.controller.abort();
+            this.pendingFlags.clear();
+            this.flagBytes = 0;
         }
     }
 

@@ -1,6 +1,6 @@
 /**
  * @file cfg_database_globe.c
- * @brief Globe database configuration, shoreline import and river data preparation.
+ * @brief Globe database configuration, shoreline and country import, and river data preparation.
  *
  * Owns the globe installer and offline OSM river conversion, candidate staging and
  * transactional river publication. Stored centrelines have a conservative eight-metre
@@ -176,11 +176,11 @@ bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *stag
         ok = file_decompress_zstd(packed, plain, 128 * 1024 * 1024, false) &&
              cfg_database_coast_correct(plain, corrected, patch) &&
              file_open_read(corrected);
-        bool transaction = ok && sqlite_exec_cstr(db, "begin immediate");
+        bool transaction = ok && sqlite_exec_cstr(db, "savepoint globe_coast");
         ok = transaction && globe_import_shoreline(db, corrected) && sqlite_exec_cstr(db,
                  "update shoreline_dataset set source='GSHHG 2.3.7 + reviewed OSM shoreline corrections r1' where id=1") &&
-             sqlite_exec_cstr(db, "commit");
-        if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
+             sqlite_exec_cstr(db, "release globe_coast");
+        if (transaction && !ok) sqlite_exec_cstr(db, "rollback to globe_coast; release globe_coast");
         if (!ok)
             fprintf(stderr, "Shoreline import failed (source error %d, staging error %d): %s\n",
                     file_last_error(packed), file_last_error(plain), string_c_str(sqlite_last_error(db)));
@@ -1145,6 +1145,34 @@ static string_t *cfg_globe_setting(file_t *config, const char *name, const strin
     return value;
 }
 
+static bool cfg_globe_countries(sqlite_t *db, const string_t *root, const string_t *staging)
+{
+    const char *extensions[] = {"shp", "dbf"};
+    file_t *plain[2] = {NULL, NULL};
+    bool ok = true;
+    cfg_progress_t *progress = cfg_progress_start("Indexing country boundaries");
+    for (unsigned i = 0; i < 2; ++i) {
+        string_t *packed_path = string_sprintf("%s/packaging/globe-db/map-units-5.1.1.%s.zst",
+                                              string_c_str(root), extensions[i]);
+        string_t *plain_path = string_sprintf("%s/countries.%s", string_c_str(staging), extensions[i]);
+        file_t *packed = packed_path ? file_new(packed_path) : NULL;
+        plain[i] = plain_path ? file_new(plain_path) : NULL;
+        ok = ok && packed && plain[i] && file_decompress_zstd(packed, plain[i], 16 * 1024 * 1024, false) &&
+             file_open_read(plain[i]);
+        file_free(packed); string_free(packed_path); string_free(plain_path);
+    }
+    ok = ok && globe_import_countries(db, plain[0], plain[1]);
+    for (unsigned i = 0; i < 2; ++i) {
+        if (plain[i]) {
+            file_close(plain[i]);
+            if (file_exists(plain[i])) file_delete(plain[i]);
+        }
+        file_free(plain[i]);
+    }
+    cfg_progress_finish(progress, ok);
+    return ok;
+}
+
 static bool cfg_globe_valid(sqlite_t *db)
 {
     sqlite_stmt_t *q = db ? sqlite_stmt_prepare(db, "PRAGMA integrity_check") : NULL;
@@ -1155,6 +1183,13 @@ static bool cfg_globe_valid(sqlite_t *db)
     ok = ok && globe && globe_has_layer(globe, GLOBE_LAYER_SHORELINE);
     globe_close(globe);
     return ok;
+}
+
+/* Called inside the shared release updater's transaction; leave all unrelated layers intact. */
+bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging)
+{
+    return cfg_globe_valid(db) && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
+           cfg_globe_valid(db);
 }
 
 /* Keep globe setup independent; unsupported operations fail without changing storage. */
@@ -1201,11 +1236,15 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         root = string_new_with(MARS_CONFIG_ROOT_DIR);
     }
     if (ok && update) {
-        /* Import replaces only shoreline tables in one transaction; credentials and other layers are untouched. */
+        /* Publish both layers together; credentials and rivers are untouched. */
         staging = exists ? cfg_database_stage(parent) : NULL;
         db = staging ? sqlite_open_encrypted(expanded, key) : NULL;
-        ok = db && root && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
-             cfg_globe_valid(db) && cfg_database_coast(db, root, staging) && cfg_globe_valid(db);
+        bool transaction = db && root &&
+            sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
+            cfg_globe_valid(db) && sqlite_exec_cstr(db, "begin immediate");
+        ok = transaction && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
+             cfg_globe_valid(db) && cfg_database_revision(db, "globe", 2) && sqlite_exec_cstr(db, "commit");
+        if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
         sqlite_close(db);
     } else if (ok && (check || exists)) {
         db = exists ? sqlite_open_encrypted(expanded, key) : NULL;
@@ -1219,7 +1258,8 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         temporary = temporary_path ? file_new(temporary_path) : NULL;
         db = temporary && root ? sqlite_open_encrypted(temporary_path, key) : NULL;
         ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
-             cfg_database_coast(db, root, staging) && cfg_globe_valid(db);
+             cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
+             cfg_database_revision(db, "globe", 2);
         sqlite_close(db);
         string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
         string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;
@@ -1230,10 +1270,10 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         string_free(quoted_key);
         ok = ok && body && cfg_database_publish(temporary, destination, config, config_dir, staging, body);
     }
-    if (ok) puts(update ? "Globe shoreline updated; other layers and database settings preserved. Restart MARS Lab."
+    if (ok) puts(update ? "Globe shoreline and countries updated; other layers and settings preserved. Restart MARS Lab."
                         : install ? "Globe database ready: existing data preserved; shoreline available."
                         : "Globe database integrity and shoreline availability verified.");
-    else fputs("Globe database operation failed; check its path, key and packaged shoreline source.\n", stderr);
+    else fputs("Globe database operation failed; check its path, key and packaged geographic sources.\n", stderr);
     file_free(temporary);
     cfg_database_cleanup(staging);
     string_free(staging); string_free(temporary_path); string_free(root); string_free(body);

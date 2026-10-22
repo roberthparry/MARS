@@ -1,6 +1,6 @@
 /**
  * @file globe-t.h
- * @brief Unified geographic controller for shorelines, rivers, towns and regional map layers.
+ * @brief Unified geographic controller for shorelines, countries, rivers, towns and regional map layers.
  *
  * The controller borrows independently selectable shoreline, map and town SQLite connections and owns layer readers.
  * Roads and buildings have explicit unavailable states until their regional dataset is implemented and installed.
@@ -18,6 +18,8 @@
  * establish safe navigation or public access to land. Callers own the database and input file; they must serialise
  * queries on an instance and close instances before replacing their dataset. Missing, malformed or unreadable
  * data produce an unknown result.
+ * Optional administrative polygons supply selected-land country names through bounded indexed queries.
+ * Their generalised boundaries never replace the detailed shoreline or establish legal jurisdiction.
  */
 #ifndef MARS_GLOBE_H
 #define MARS_GLOBE_H
@@ -132,6 +134,37 @@ void globe_close(globe_t *shoreline);
 globe_surface_t globe_hit_test(globe_t *shoreline, double latitude_degrees, double longitude_degrees);
 
 /**
+ * @brief Return an owned country name for a confirmed land point, or NULL when unavailable or ambiguous.
+ * Uses indexed Natural Earth administrative boundaries, independently of the shoreline geometry.
+ * Border points and uncertain coastal classifications yield no name. This is not a legal boundary determination.
+ * The caller releases the result with string_free; access to the borrowed database must be serialised.
+ */
+string_t *globe_country_at(globe_t *globe, double latitude_degrees, double longitude_degrees);
+
+/** @brief Return an owned ISO country or UK constituent-country code for confirmed land, or NULL when unavailable; release with string_free. */
+string_t *globe_country_code_at(globe_t *globe, double latitude_degrees, double longitude_degrees);
+
+/** @brief Visit one shared land-border segment in longitude/latitude degrees; false stops with failure. */
+typedef bool (*globe_border_segment_fn)(double ax, double ay, double bx, double by, void *context);
+
+/**
+ * @brief Stream indexed shared administrative borders for a finite viewport, never administrative coastlines.
+ * Bounds may wrap the date line with west in [-360,180] and east-west in (0,360]. Latitude is [-90,90].
+ * Output is bounded to 250,000 segments; false means missing data, invalid bounds, or visitor/budget failure.
+ * Generalised boundaries are for overview display only and do not establish legal jurisdiction.
+ */
+bool globe_border_segments(globe_t *globe, double west, double south, double east, double north,
+                           globe_border_segment_fn visitor, void *context);
+
+/**
+ * @brief Transactionally replace country boundaries from open Natural Earth polygon SHP and UTF-8 DBF streams.
+ * Both streams must start at byte zero. Other globe layers are preserved; malformed input rolls back replacement.
+ * Border matching accepts at most 1,048,576 source edges in a temporary ordinary-heap geometry buffer; no large
+ * SQLCipher temporary table is used. The buffer and sorting workspace are released before returning.
+ */
+bool globe_import_countries(sqlite_t *db, file_t *shapes, file_t *attributes);
+
+/**
  * @brief Transactionally replace shoreline tables from a GSHHG 2.3.7 binary stream.
  * @param db Borrowed writable database; unrelated tables are retained.
  * @param source Borrowed open binary input positioned at its first polygon header.
@@ -147,7 +180,8 @@ typedef enum _globe_layer_t {
     GLOBE_LAYER_RIVERS,
     GLOBE_LAYER_TOWNS,
     GLOBE_LAYER_ROADS,
-    GLOBE_LAYER_BUILDINGS
+    GLOBE_LAYER_BUILDINGS,
+    GLOBE_LAYER_COUNTRIES
 } globe_layer_t;
 
 /** @brief Return whether a controller has a usable installed implementation for this layer. */
@@ -206,5 +240,14 @@ typedef bool (*globe_place_visit_fn)(const globe_place_t *place, void *context);
  */
 bool globe_towns_batch(globe_t *globe, int64_t after_id, size_t limit, bool nearby, double latitude, double longitude,
                        globe_place_visit_fn visit, void *context, int64_t *next_id);
+
+/**
+ * @brief Page through towns belonging to one non-empty jurisdiction code using indexed membership.
+ *
+ * Cursor, limit, callback ownership and return semantics follow globe_towns_batch().
+ * Does not include parent or child jurisdictions implicitly.
+ */
+bool globe_towns_jurisdiction_batch(globe_t *globe, const char *jurisdiction, int64_t after_id, size_t limit,
+                                    globe_place_visit_fn visit, void *context, int64_t *next_id);
 
 #endif

@@ -6,7 +6,7 @@
  * a verified HTTPS request with a four-second deadline and emits the browser's
  * weather fields and sections. Provider errors remain an unavailable weather
  * card and never expose the API key in diagnostics. Almanac conditions use UTC
- * hour matching and explicitly labelled seasonal/pressure fallbacks.
+ * timestamp matching, adjacent-hour interpolation and explicitly labelled fallbacks.
  */
 #include <math.h>
 #include <stdlib.h>
@@ -44,7 +44,7 @@ static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key,
     string_t *url = string_sprintf("https://api.weatherapi.com/v1/%s.json?key=%s&q=%.6f,%.6f&dt=%s", endpoint,
                                    string_c_str(escaped), latitude, longitude, lab_cal_text(options, "date"));
     if (span >= 0 && span < 14)
-        string_append_format(url, "&days=%d", span + 1);
+        string_append_format(url, "&days=%d", span < 13 ? span + 2 : 14);
     http_client_t *client = http_client_new();
     http_limits_t limits = {.connect_timeout_ms = 4000, .total_timeout_ms = 4000, .max_body_bytes = 2 * 1024 * 1024};
     http_client_set_limits(client, &limits);
@@ -211,7 +211,7 @@ static const json_t *lab_cal_observation_hour(const json_t *options, const json_
     double epoch = lab_cal_weather_epoch(options), updated = 0;
     const json_t *current = lab_cal_get(weather, "current");
     if (isfinite(epoch) && lab_cal_provider_number(current, "last_updated_epoch", &updated) &&
-        floor(epoch / 3600) == floor(updated / 3600)) return current;
+        floor(epoch / 3600) == floor(updated / 3600) && fabs(epoch - updated) <= 1800) return current;
     const json_t *days = lab_cal_get(lab_cal_get(weather, "forecast"), "forecastday");
     /* Bounded provider arrays: fourteen days and up to twenty-five hours on a DST transition day. */
     for (size_t i = 0; i < json_array_size(days) && i < 14; ++i) {
@@ -226,6 +226,28 @@ static const json_t *lab_cal_observation_hour(const json_t *options, const json_
     return NULL;
 }
 
+/* Provider arrays are bounded; absolute epochs handle midnight and local clock changes. */
+static bool lab_cal_hourly_temperature(const json_t *options, const json_t *weather, double *temperature)
+{
+    double epoch = lab_cal_weather_epoch(options), before = -INFINITY, after = INFINITY, low = 0, high = 0;
+    if (!isfinite(epoch)) return false;
+    const json_t *days = lab_cal_get(lab_cal_get(weather, "forecast"), "forecastday");
+    for (size_t i = 0; i < json_array_size(days) && i < 14; ++i) {
+        const json_t *hours = lab_cal_get(json_array_get(days, i), "hour");
+        for (size_t j = 0; j < json_array_size(hours) && j < 25; ++j) {
+            const json_t *hour = json_array_get(hours, j);
+            double time, value;
+            if (!lab_cal_provider_number(hour, "time_epoch", &time) ||
+                !lab_cal_provider_number(hour, "temp_c", &value) || value < -100 || value > 60) continue;
+            if (time <= epoch && time > before) { before = time; low = value; }
+            if (time >= epoch && time < after) { after = time; high = value; }
+        }
+    }
+    if (!isfinite(before) || !isfinite(after) || after - before > 3600) return false;
+    *temperature = after == before ? low : low + (high - low) * (epoch - before) / (after - before);
+    return true;
+}
+
 /* Use provider station pressure directly; apply elevation only to the missing-pressure fallback. */
 void lab_cal_observing_conditions(json_t *options, const json_t *weather)
 {
@@ -233,11 +255,21 @@ void lab_cal_observing_conditions(json_t *options, const json_t *weather)
     (void)lab_cal_number(lab_cal_text(options, "lat"), &latitude);
     (void)lab_cal_number(lab_cal_text(options, "elevation"), &elevation);
     const json_t *hour = lab_cal_observation_hour(options, weather);
-    bool measured = lab_cal_provider_number(hour, "temp_c", &temperature) && temperature >= -100 && temperature <= 60;
+    const json_t *current = lab_cal_get(weather, "current");
+    double observed = 0, epoch = lab_cal_weather_epoch(options);
+    bool current_temperature = hour && hour == current &&
+        lab_cal_provider_number(current, "last_updated_epoch", &observed) && fabs(epoch - observed) <= 1800 &&
+        lab_cal_provider_number(current, "temp_c", &temperature) && temperature >= -100 && temperature <= 60;
+    bool interpolated = !current_temperature && lab_cal_hourly_temperature(options, weather, &temperature);
+    bool measured = current_temperature || interpolated ||
+        (hour != current && lab_cal_provider_number(hour, "temp_c", &temperature) && temperature >= -100 && temperature <= 60);
     bool pressure_available = lab_cal_provider_number(hour, "pressure_mb", &pressure) &&
                               pressure > 0 && pressure <= 1200;
     json_t *recent = measured ? NULL : lab_cal_weather_recent(options, time(NULL));
     bool cached = recent && lab_cal_provider_number(recent, "temp_c", &temperature);
+    const char *source = current_temperature ? "WeatherAPI" : interpolated ? "WeatherAPI hourly interpolation" :
+                         measured ? "WeatherAPI hourly value" : cached ? "Recent weather estimate" :
+                         "Rough seasonal assumption";
     if (!measured && !cached) {
         datetime_t *date = datetime_from_string(lab_cal_text(options, "date"));
         long january = datetime_ymd_to_jdn(datetime_year(date), DT_January, 1);
@@ -246,27 +278,26 @@ void lab_cal_observing_conditions(json_t *options, const json_t *weather)
         /* Deliberately coarse, not a climatological database: northern warmth peaks in July. */
         temperature = 27 - 45 * pow(sin(latitude_radians), 2) +
                       12 * sin(latitude_radians) * cos(2 * M_PI * (day - 200) / 365.25) - 0.0065 * elevation;
-        temperature = fmax(-100, fmin(60, temperature));
+        temperature = round(fmax(-100, fmin(60, temperature)));
         datetime_dealloc(date);
     }
     if (!pressure_available)
         pressure = 1013.25 * pow(1 - 2.25577e-5 * elevation, 5.25588);
     string_t *temperature_text = string_sprintf("%.6f", temperature);
     string_t *pressure_text = string_sprintf("%.6f", pressure);
-    string_t *note = measured && pressure_available
-                         ? string_sprintf("Temperature: %.1f °C · Pressure: %.0f hPa · Source: WeatherAPI",
-                                          temperature, pressure)
-                         : string_sprintf("Temperature: %.1f °C (%s) · Pressure: %.0f hPa (%s)",
-                                          temperature, measured ? "WeatherAPI" : cached ? "recent weather estimate" : "seasonal estimate", pressure,
-                                          pressure_available ? "WeatherAPI" : "elevation estimate");
+    string_t *source_text = string_new_with(source);
+    if (cached && lab_cal_provider_number(recent, "observed", &observed))
+        string_append_format(source_text, " (%.0f min old; %.0f min from selected time)",
+                             difftime(time(NULL), (time_t)observed) / 60, fabs(epoch - observed) / 60);
+    string_t *note = string_sprintf("Temperature: %.1f °C · Pressure: %.0f hPa · Source: %s%s",
+                                    temperature, pressure, string_c_str(source_text),
+                                    pressure_available ? "" : "; estimated pressure");
     lab_cal_set(options, "temperature_c", string_c_str(temperature_text));
     lab_cal_set(options, "pressure_hpa", string_c_str(pressure_text));
     lab_cal_set(options, "atmosphere_note", string_c_str(note));
-    lab_cal_set(options, "weather_source",
-                measured && pressure_available ? "WeatherAPI" :
-                measured ? "WeatherAPI temperature; estimated pressure" :
-                cached ? "Recent weather estimate" :
-                pressure_available ? "Estimated temperature; WeatherAPI pressure" : "Estimated");
+    if (!pressure_available) string_append_cstr(source_text, "; estimated pressure");
+    lab_cal_set(options, "weather_source", string_c_str(source_text));
+    string_free(source_text);
     json_free(recent);
     string_free(note);
     string_free(temperature_text);

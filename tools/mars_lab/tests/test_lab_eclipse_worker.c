@@ -210,10 +210,11 @@ static bool almanac_location_modes(void)
              !strcmp(lab_cal_text(response, "observer_surface"), i == 2 ? "Sea" : "Land") &&
              strstr(lab_cal_text(response, "altitude_note"), i == 2 ? "Sea mode." : "No horizon dip.") && ok;
         const json_t *summary = test_lab_member(response, "observer_summary");
-        ok = json_array_size(summary) == 9 &&
+        ok = json_array_size(summary) >= 9 && json_array_size(summary) <= 10 &&
              !strcmp(test_lab_text(json_array_get(summary, 3), "value"), i == 2 ? "0° 00.00′ N" : "52° 42.46′ N") &&
              !strcmp(test_lab_text(json_array_get(summary, 4), "value"), i == 2 ? "0° 00.00′ E" : "2° 45.25′ W") &&
-             !strcmp(test_lab_text(json_array_get(summary, 8), "value"), "Estimated") &&
+             !strcmp(test_lab_text(json_array_get(summary, 8), "value"),
+                     "Rough seasonal assumption; estimated pressure") &&
              !strcmp(lab_cal_text(response, "observer_latitude"), i == 2 ? "0" : "52.707700") && ok;
         json_free(response);
     }

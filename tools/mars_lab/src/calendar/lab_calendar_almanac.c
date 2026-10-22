@@ -296,7 +296,7 @@ static void lab_cal_summary_cell(json_t *summary, const char *label, const strin
     json_free(cell);
 }
 
-/* Build the nine display cells independently of the full-precision observer coordinates. */
+/* Build the standard display cells and optional country metadata independently of full-precision coordinates. */
 static json_t *lab_cal_observer_summary(const json_t *options, const char *town, bool sea)
 {
     const char *surface = lab_cal_text(options, "observer_surface");
@@ -306,12 +306,16 @@ static json_t *lab_cal_observer_summary(const json_t *options, const char *town,
     bool have_pressure = lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure);
     string_t *values[] = {
         string_sprintf("%s %s", lab_cal_text(options, "date"), lab_cal_text(options, "time")),
-        string_sprintf("%s, %s", *town ? town : "Custom", lab_cal_text(options, "jurisdiction")),
+        *lab_cal_text(options, "country") ?
+            (*town ? string_sprintf("%s, %s", town, lab_cal_text(options, "country")) :
+                     string_new_with(lab_cal_text(options, "country"))) :
+            string_sprintf("%s — %s", *town ? town : "Custom", sea ? "Offshore" : surface),
         string_new_with(lab_cal_text(options, "zone")),
         lab_cal_observer_angle(lab_cal_text(options, "lat"), true),
         lab_cal_observer_angle(lab_cal_text(options, "lon"), false),
         string_sprintf("%s m · %s", lab_cal_text(options, "elevation"), surface),
-        have_temperature ? string_sprintf("%.1f °C", temperature) : string_new_with("Unavailable"),
+        have_temperature ? string_sprintf(strstr(lab_cal_text(options, "weather_source"), "Rough seasonal assumption") ?
+                                           "~%.0f °C" : "%.1f °C", temperature) : string_new_with("Unavailable"),
         have_pressure ? string_sprintf("%.0f hPa", pressure) : string_new_with("Unavailable"),
         string_new_with(*lab_cal_text(options, "weather_source") ? lab_cal_text(options, "weather_source") : "Unavailable"),
     };
@@ -322,6 +326,8 @@ static json_t *lab_cal_observer_summary(const json_t *options, const char *town,
         lab_cal_summary_cell(summary, labels[i], values[i]);
         string_free(values[i]);
     }
+    if (*lab_cal_text(options, "country"))
+        lab_cal_set((json_t *)json_array_get(summary, 1), "flag", lab_cal_text(options, "country_flag"));
     return summary;
 }
 
@@ -426,7 +432,9 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
     string_t **town_parts = lab_cal_split(town, "|", &town_count);
     string_t *observer =
         string_sprintf("Observer: %s%s%s, zone %s, latitude %s, longitude %s", lab_cal_part(town_parts, town_count, 0),
-                       *lab_cal_part(town_parts, town_count, 0) ? ", " : "", lab_cal_text(options, "jurisdiction"),
+                       *lab_cal_part(town_parts, town_count, 0) ? ", " : "",
+                       *lab_cal_text(options, "country") ? lab_cal_text(options, "country") :
+                       !strcmp(lab_cal_text(options, "sea_horizon"), "true") ? "Offshore" : "Country not identified",
                        lab_cal_text(options, "zone"), lab_cal_text(options, "lat"), lab_cal_text(options, "lon"));
     bool sea_horizon = !strcmp(lab_cal_text(options, "sea_horizon"), "true");
     const char *surface = lab_cal_text(options, "observer_surface");

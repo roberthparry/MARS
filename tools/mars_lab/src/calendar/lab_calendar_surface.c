@@ -6,29 +6,99 @@
  * Town names never decide land/sea mode. This adapter does not fetch weather or change observer elevation.
  * Clipped shoreline paths produce transparent SVG outlines or a filled map at the requested zoom resolution.
  * No latitude-based snow or sea-ice colours are invented; the outlines never change geographic classification.
+ * Selected-position country requests use the independent globe boundary layer without astronomical evaluation.
+ * Town tooltips can request jurisdiction-owned artwork directly by their catalogue ISO country code.
  */
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sodium.h>
 
 #include "almanac-t.h"
+#include "globe-t.h"
+#include "jurisdiction-t.h"
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
+
+static void lab_country_catalogue(json_t *result, const char *code)
+{
+    lab_cal_set(result, "country", "");
+    lab_cal_set(result, "country_code", "");
+    lab_cal_set(result, "country_flag", "");
+    string_t *name = NULL, *svg = NULL;
+    jurisdiction_t *jurisdiction = code ? jurisdict_open(NULL) : NULL;
+    if (code && jurisdict_country(jurisdiction, code, &name, &svg)) {
+        lab_cal_set(result, "country", string_c_str(name));
+        lab_cal_set(result, "country_code", code);
+        size_t length = svg ? string_byte_length(svg) : 0;
+        size_t capacity = sodium_base64_ENCODED_LEN(length, sodium_base64_VARIANT_ORIGINAL);
+        char *encoded = length ? malloc(capacity) : NULL;
+        if (encoded) {
+            sodium_bin2base64(encoded, capacity, (const unsigned char *)string_c_str(svg), length,
+                              sodium_base64_VARIANT_ORIGINAL);
+            string_t *uri = string_sprintf("data:image/svg+xml;base64,%s", encoded);
+            if (uri) lab_cal_set(result, "country_flag", string_c_str(uri));
+            string_free(uri); free(encoded);
+        }
+    }
+    jurisdict_close(jurisdiction); string_free(name); string_free(svg);
+}
+
+static void lab_country_metadata(json_t *result, globe_t *globe, double latitude, double longitude)
+{
+    string_t *code = globe_country_code_at(globe, latitude, longitude);
+    lab_country_catalogue(result, code ? string_c_str(code) : NULL);
+    string_free(code);
+}
 
 /* Apply the same geographic policy to named towns, custom locations and asynchronous weather refreshes. */
 void lab_cal_surface(json_t *options)
 {
+    lab_cal_set(options, "country", "");
+    lab_cal_set(options, "country_code", "");
+    lab_cal_set(options, "country_flag", "");
     double latitude = 0, longitude = 0;
     globe_surface_t surface = GLOBE_UNKNOWN;
     if (lab_cal_number(lab_cal_text(options, "lat"), &latitude) &&
         lab_cal_number(lab_cal_text(options, "lon"), &longitude)) {
-        almanac_t *almanac = almanac_open();
-        surface = almanac_surface_at(almanac, latitude, longitude);
-        almanac_close(almanac);
+        globe_t *globe = globe_open_configured(NULL);
+        surface = globe_hit_test(globe, latitude, longitude);
+        lab_country_metadata(options, globe, latitude, longitude);
+        globe_close(globe);
     }
     static const char *const names[] = {"Unknown", "Land", "Sea", "Inland water", "Coastal"};
     lab_cal_set(options, "observer_surface", names[surface]);
     lab_cal_set(options, "sea_horizon", surface == GLOBE_SEA ? "true" : "false");
+}
+
+/* Resolve geographic or catalogue-owned metadata without astronomical calculations or weather requests. */
+json_t *lab_cal_country(const json_t *payload, unsigned *status)
+{
+    const char *code = lab_cal_text(payload, "country_code");
+    if (*code) {
+        size_t length = strlen(code);
+        bool valid = (length == 2 || (length >= 4 && length <= 6 && code[2] == '-')) &&
+                     code[0] >= 'A' && code[0] <= 'Z' && code[1] >= 'A' && code[1] <= 'Z';
+        for (size_t i = 3; i < length && valid; ++i)
+            valid = (code[i] >= 'A' && code[i] <= 'Z') || (code[i] >= '0' && code[i] <= '9');
+        if (!valid)
+            return lab_cal_error(status, 400, "Invalid country code");
+        json_t *response = json_new_object();
+        lab_cal_take(response, "ok", json_new_bool(true));
+        lab_country_catalogue(response, code);
+        return response;
+    }
+    double latitude, longitude;
+    if (!lab_cal_number(lab_cal_text(payload, "lat"), &latitude) ||
+        !lab_cal_number(lab_cal_text(payload, "lon"), &longitude) || fabs(latitude) > 90 || fabs(longitude) > 180)
+        return lab_cal_error(status, 400, "Invalid country lookup coordinate");
+    globe_t *globe = globe_open_configured(NULL);
+    json_t *response = json_new_object();
+    lab_cal_take(response, "ok", json_new_bool(true));
+    lab_country_metadata(response, globe, latitude, longitude);
+    globe_close(globe);
+    return response;
 }
 
 typedef struct {

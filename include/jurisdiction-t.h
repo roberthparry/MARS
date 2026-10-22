@@ -8,6 +8,8 @@
  * dated exceptions represented in the installed catalogue.
  * Read-only visitors enumerate jurisdiction choices, representative locations and
  * towns, retaining stored coordinate precision and explicit default-town markers.
+ * Indexed country presentation metadata supplies catalogue-owned names and offline flag artwork by ISO code.
+ * Geographic country identification belongs to globe_t; choosing a jurisdiction does not establish a point's country.
  * A geographic adapter opens independent globe_t readers on the same catalogue;
  * river geometry remains separate from calendar policy and shoreline classification.
  *
@@ -45,6 +47,15 @@ typedef struct _jurisdiction_t jurisdiction_t;
  * @note Query globe_has_layer() for availability; withdrawn WDBII geometry is never exposed.
  */
 globe_t *jurisdict_globe_open(jurisdiction_t *jurisdiction);
+
+/**
+ * @brief Read presentation metadata by uppercase ISO country or subdivision code.
+ * Subdivisions without artwork fall back to their parent country's name and flag.
+ * Required name and flag outputs receive owned strings, released with string_free. A missing optional
+ * flag gives NULL while the country name remains available. False clears both outputs. This does not
+ * infer a country from the selected jurisdiction, coordinates or a nearby town.
+ */
+bool jurisdict_country(jurisdiction_t *jurisdiction, const char *code, string_t **name, string_t **flag_svg);
 
 /** @brief Borrowed geographic place record; its definition is owned by globe-t.h. */
 typedef globe_place_t jurisdict_place_t;
@@ -105,6 +116,15 @@ bool jurisdict_each_town(jurisdiction_t *jurisdiction, jurisdict_place_visit_fn 
  */
 bool jurisdict_each_town_batch(jurisdiction_t *jurisdiction, int64_t after_id, size_t limit,
                                jurisdict_place_visit_fn visitor, void *context, int64_t *next_id);
+
+/**
+ * @brief Enumerate one jurisdiction's towns in bounded, indexed ID pages.
+ *
+ * The code must be non-empty; parent and child jurisdictions are not included implicitly.
+ * Cursor, limit and borrowed callback semantics follow jurisdict_each_town_batch().
+ */
+bool jurisdict_each_town_jurisdiction_batch(jurisdiction_t *jurisdiction, const char *code, int64_t after_id, size_t limit,
+                                            jurisdict_place_visit_fn visitor, void *context, int64_t *next_id);
 
 /**
  * @brief Enumerate an ascending-ID town page within five degrees of a centre on both axes.

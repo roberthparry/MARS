@@ -92,8 +92,9 @@
             if (catalogueCheck === 'index-fail' && String(url) === '/jurisdictions')
                 return new Response('unavailable', {status: 503});
             if (String(url).startsWith('/towns?after=')) {
-                if (String(url) === '/towns?after=0') await townGate;
-                else if (catalogueCheck === 'fail') return new Response('unavailable', {status: 503});
+                if (String(url).startsWith('/towns?after=0&jurisdiction=')) await townGate;
+                else if (catalogueCheck === 'fail' && String(url).includes('&jurisdiction='))
+                    return new Response('unavailable', {status: 503});
             }
             return nativeFetch(url, options);
         };
@@ -2949,7 +2950,7 @@
                 if (catalogueCheck === 'success') {
                     await labApplication.loadNearbyTowns(53.319, -3.4916);
                     check(labApplication.catalogue.towns['GB-WLS']?.[0].name === 'Rhyl',
-                        'Local towns appear while the world stream is still blocked');
+                        'Local towns appear while selected-jurisdiction loading is still blocked');
                 }
                 releaseTowns();
                 await labApplication.townsReady;
@@ -2959,7 +2960,7 @@
                           'native town resolution preserves catalogue identity for incremental menu updates');
                     await checkTownPublicationScheduling();
                     check(labApplication.catalogue.towns['GB-WLS'][0].name === 'Rhyl', 'Background towns not published');
-                    check(labApplication.catalogue.towns['GB-WLS'].length === 1, 'Local/world pages duplicated a town');
+                    check(labApplication.catalogue.towns['GB-WLS'].length === 1, 'Local/country pages duplicated a town');
                     location.href = '/?catalogue-check=fail';
                 } else if (catalogueCheck === 'fail') {
                     check(labApplication.catalogue.towns['GB-WLS']?.[0].name === 'Rhyl', 'Later failure discarded loaded towns');

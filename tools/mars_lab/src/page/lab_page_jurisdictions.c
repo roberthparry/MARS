@@ -107,7 +107,7 @@ static bool lab_page_town(const jurisdict_place_t *place, void *context)
 
 /* Obtain the live database catalogue without preventing ordinary maths when it is unavailable. */
 static json_t *lab_page_places(bool metadata, bool all_towns, int64_t after_id,
-                                bool nearby, double latitude, double longitude)
+                                bool nearby, double latitude, double longitude, const char *jurisdiction)
 {
     jurisdiction_t *engine = jurisdict_open(NULL);
     struct lab_page_places places = {
@@ -118,6 +118,8 @@ static json_t *lab_page_places(bool metadata, bool all_towns, int64_t after_id,
     int64_t next_id = 0;
     if (available && (all_towns || !metadata))
         available = (all_towns ? jurisdict_each_town(engine, lab_page_town, &places)
+                              : jurisdiction ? jurisdict_each_town_jurisdiction_batch(engine, jurisdiction, after_id, 512,
+                                                                                      lab_page_town, &places, &next_id)
                               : nearby ? jurisdict_each_town_near_batch(engine, latitude, longitude, after_id, 512,
                                                                         lab_page_town, &places, &next_id)
                                        : jurisdict_each_town_batch(engine, after_id, 512, lab_page_town, &places, &next_id)) &&
@@ -159,23 +161,30 @@ static json_t *lab_page_places(bool metadata, bool all_towns, int64_t after_id,
 /* Retain the complete native catalogue for non-transport callers. */
 json_t *lab_page_jurisdictions(void)
 {
-    return lab_page_places(true, true, 0, false, 0, 0);
+    return lab_page_places(true, true, 0, false, 0, 0, NULL);
 }
 
 /* Startup metadata deliberately excludes town records. */
 json_t *lab_page_jurisdiction_index(void)
 {
-    return lab_page_places(true, false, 0, false, 0, 0);
+    return lab_page_places(true, false, 0, false, 0, 0, NULL);
 }
 
 /* Return a bounded transport page; zero next cursor marks the empty terminal page. */
 json_t *lab_page_town_batch(int64_t after_id)
 {
-    return after_id >= 0 ? lab_page_places(false, false, after_id, false, 0, 0) : NULL;
+    return after_id >= 0 ? lab_page_places(false, false, after_id, false, 0, 0, NULL) : NULL;
 }
 
-/* Return a bounded local priority page while the world catalogue loads. */
+/* Return a bounded local page independently of selected-jurisdiction loading. */
 json_t *lab_page_town_near_batch(int64_t after_id, double latitude, double longitude)
 {
-    return after_id >= 0 ? lab_page_places(false, false, after_id, true, latitude, longitude) : NULL;
+    return after_id >= 0 ? lab_page_places(false, false, after_id, true, latitude, longitude, NULL) : NULL;
+}
+
+/* Return only the requested jurisdiction, leaving unrelated countries on disk. */
+json_t *lab_page_town_jurisdiction_batch(int64_t after_id, const char *jurisdiction)
+{
+    return after_id >= 0 && jurisdiction && *jurisdiction ?
+        lab_page_places(false, false, after_id, false, 0, 0, jurisdiction) : NULL;
 }

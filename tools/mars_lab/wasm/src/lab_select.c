@@ -30,6 +30,22 @@ static jsref lab_select_shell(node_jsref select)
     return lab_dom_closest(select, ".select-shell");
 }
 
+/* Copy only small catalogue identifiers; artwork is loaded lazily by the tooltip owner. */
+static void lab_select_town_metadata(jsref button, jsref option)
+{
+    int code = lab_dom_read(option, LAB_DOM_DATASET, "countryCode");
+    lab_dom_write(button, LAB_DOM_DATASET, "countryCode", code);
+    int country = lab_dom_read(option, LAB_DOM_DATASET, "countryOption");
+    lab_dom_write(button, LAB_DOM_DATASET, "countryOption", country);
+    int name = lab_dom_length(code) && !lab_dom_length(country) ?
+               lab_dom_read(option, LAB_DOM_TEXT, "") : lab_dom_string("");
+    lab_dom_write(button, LAB_DOM_DATASET, "townTooltipName", name);
+    int detail = lab_dom_read(option, LAB_DOM_DATASET, "detail");
+    int suffix = lab_dom_length(code) && lab_dom_length(detail) ?
+                 lab_dom_join(lab_dom_string(" · "), detail, "") : lab_dom_string("");
+    lab_dom_write(button, LAB_DOM_DATASET, "townTooltipCoordinates", suffix);
+}
+
 static void lab_select_close(jsref shell)
 {
     lab_dom_class(shell, "open", 0);
@@ -121,6 +137,7 @@ void lab_select_rebuild(node_jsref select, bool details)
         lab_select_text(item, LAB_DOM_ATTRIBUTE, "role", "option");
         lab_select_text(item, LAB_DOM_ATTRIBUTE, "aria-selected", "false");
         lab_dom_write(item, LAB_DOM_DATASET, "value", value);
+        lab_select_town_metadata(item, option);
         lab_dom_disabled(item, lab_dom_is_disabled(option));
         if (lab_dom_length(detail)) {
             lab_dom_class(item, "two-column", 1);
@@ -148,6 +165,7 @@ void lab_select_sync(node_jsref select)
     if (!shell)
         return;
     int button = lab_dom_query(shell, ".select-button"), selected = lab_dom_selected(select);
+    lab_select_town_metadata(button, selected);
     lab_dom_write(button, LAB_DOM_TEXT, "",
                   selected ? lab_dom_read(selected, LAB_DOM_TEXT, "")
                            : lab_dom_read(shell, LAB_DOM_DATASET, "placeholder"));

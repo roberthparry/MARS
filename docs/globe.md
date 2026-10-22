@@ -1,9 +1,89 @@
 # `globe_t`
 
-The opaque geographic controller in `include/globe-t.h` owns the shoreline and
-river readers behind a single public interface. Implementations live under
-`src/globe`; there are no separate public shoreline or river headers or guides.
+The opaque geographic controller in `include/globe-t.h` owns the shoreline,
+country and river readers behind a single public interface. Implementations live
+under `src/globe`; there are no separate public shoreline or river headers or guides.
 SVG and WebGL rendering remain application responsibilities.
+
+## Selected-position countries
+
+`globe_country_at(globe, latitude, longitude)` returns an owned `string_t` country
+name, released with `string_free`, or NULL if unavailable or ambiguous. The
+existing shoreline must independently classify the point as land. Coastal
+uncertainty, sea, missing data and overlapping administrative polygons do not
+produce a guessed country. This does not change the selected jurisdiction.
+`globe_has_layer(globe, GLOBE_LAYER_COUNTRIES)` reports administrative-layer availability.
+`globe_country_code_at()` returns the independently resolved ISO alpha-2 code, or a UK constituent-country code
+such as `GB-WLS` or `GB-SCT`.
+The Lab joins that code to jurisdiction-owned country names and flag artwork;
+it never substitutes the form's selected jurisdiction for a geographic result.
+
+Natural Earth 5.1.1 admin-0 map units are public-domain data at **1:10 million
+map scale**, not ten-metre accuracy. They follow the source's de facto boundary
+policy; names are indicative and are not legal or navigational determinations.
+The detailed shoreline remains unchanged. Small islands and border locations
+can lack an answer at this administrative scale.
+
+`globe_import_countries(db, shapes, attributes)` imports open SHP/DBF streams in
+a savepoint, preserving unrelated tables and rolling back malformed input.
+It creates `country_name`, `country_chunk` and `country_bounds` (an integer
+R-tree). Each chunk contains at most 256 edges; lookup selects eastward-ray
+candidates and combines ring parity, including holes. Reads are bounded to
+10,000 chunks; exceeding that bound yields no name. Connections require the
+same serialised ownership as other globe operations.
+
+The imported 5.1.1 layer measured approximately **9.3 MB including shared borders
+and spatial indexes** in the isolated SQLite test. Encryption/page layout may change this
+slightly; no world-sized country geometry cache is allocated by lookup.
+
+New globe installations include the layer. Existing databases acquire it with
+`make update-globe-db`; simply reinstalling preserves an existing database.
+Restart MARS Lab afterwards. `/almanac-country` performs only the independent
+geographic lookup. The browser requests it asynchronously on selection changes,
+cancels superseded requests, ignores stale replies and caches at most 64 results,
+with a 1 MiB budget for country-name and flag string contents.
+Ordinary pointer movement never starts a country lookup. Shift-hover shows coordinates
+immediately, then requests country metadata after a 220 ms pause. Each new point
+cancels obsolete work and clears its old label; releasing Shift, dragging or leaving
+the globe cancels pending hover work. Hover and selection share the bounded cache,
+but retain separate request ownership. Sea and uncertain positions have no flag;
+failures leave coordinates usable and never trigger Almanac calculations.
+
+### Optional country borders
+
+The **Borders** button is off by default. It requests only the visible region's
+shared land borders asynchronously, using `globe_border_segments()` and the
+`/almanac-borders` endpoint. Import matches identical quantised edges belonging
+to different map units; unmatched administrative coastlines are omitted. This
+deliberately favours omission over invented connections where source topology
+does not match. Borders are indicative, following Natural Earth's de facto policy.
+
+`country_border_chunk` stores at most 256 segments per BLOB; `country_border_bounds`
+is an integer R-tree. Queries handle the date line and cap output at 250,000
+segments. Import matches edges using a bounded ordinary-heap buffer of public
+source coordinates, rather than a large SQLCipher temporary table. The buffer
+accepts at most 1,048,576 edges (20 MiB of records, plus sorting workspace) and is
+released before publication. This avoids exhausting the usual 8 MiB locked-memory
+allowance during border matching, without disabling SQLCipher memory protection,
+raising system resource limits or writing plaintext scratch tables.
+No worldwide vertex cache is needed at runtime. A single 1024×1024 RGBA texture
+uses about 4 MiB; new regional imagery replaces it rather than accumulating tiles.
+Borders fade between 24× and 64× zoom and unload at 64×, or when disabled. Returning
+to a wider view reloads them. Superseded requests are cancelled and stale responses
+cannot publish. The detailed shoreline remains untouched.
+
+The 298 map units distinguish England, Wales, Scotland and Northern Ireland.
+Shared Welsh and Scottish land borders are included. The Isle of Man has its own
+identity and flag; its island edge uses the detailed shoreline, not an invented
+administrative or maritime border. Existing installations migrate to revision 2
+with `make update-mars-db` (also run by `make release` when Lab is installed).
+
+Source: [Natural Earth admin-0 map units](https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_map_units.zip),
+[public-domain terms](https://www.naturalearthdata.com/about/terms-of-use/).
+The packaged SHP and DBF streams are unchanged, compressed with Zstandard.
+Archive SHA-256: `45bebe2aaf8bf42b9daf4428594925bcb11eabd32fe9dc6e0acf681438053eb5`.
+Packaged SHP SHA-256: `58c3b3b36ebb1ef48d9e375f7c743db90a8b82fae093c64c1d1e269a808a7729`.
+Packaged DBF SHA-256: `49b3ac0ff0d35a70d6a2d9502a32f45d2df460c7224988e4fe34942401c3c99f`.
 
 Town batches use the same elevation fallback as the jurisdiction catalogue:
 missing elevations and legacy `-9999` DEM no-data markers become `0` metres.
@@ -38,8 +118,8 @@ the jurisdiction town catalogue.
 
 ### Installation targets
 
-`make install-globe-db` creates a separate encrypted shoreline-only database from
-the packaged GSHHG source, with no download. Its default location is
+`make install-globe-db` creates a separate encrypted shoreline and country database
+from the packaged GSHHG and Natural Earth sources, with no download. Its default location is
 `$MARS_HOME/globe/globe.db` (normally `~/.mars/globe/globe.db`); settings are saved
 privately in `config/globe-db.env`. `MARS_GLOBE_DB_PATH` and `MARS_GLOBE_DB_KEY`
 override saved values. A terminal may prompt for a new password. Non-interactive
@@ -50,8 +130,8 @@ before publication. Missing packaged geometry is an error, not an empty installa
 
 `make check-globe-db` checks integrity and shoreline availability with the saved
 settings. It does not prove positional accuracy or import other geographic layers.
-`make update-globe-db` replaces only the shoreline tables in an existing globe
-database, using the packaged source and reviewed corrections. The import is
+`make update-globe-db` replaces the shoreline and country tables in an existing globe
+database, using the packaged sources and reviewed shoreline corrections. Each layer import is
 transactional; source preparation failures leave the database untouched and
 import failures roll back. The saved key, configuration and other layers are
 preserved. Stop MARS Lab before updating and restart it afterwards. This is
@@ -89,6 +169,10 @@ Its full name appears in the tooltip at every zoom level and on the globe from
 12× zoom when 430 pixels of label space are available. Narrow views retain the
 short label. Expanded labels reserve their full width for decluttering; neither
 catalogue identities nor selection values change.
+
+`globe_towns_jurisdiction_batch()` uses indexed membership to read only one
+jurisdiction, with the same cursor and callback ownership as `globe_towns_batch()`.
+It does not implicitly include parent or child jurisdictions.
 
 `globe_towns_batch()` reads bounded, ascending-ID pages of at most 1024 towns
 through `globe_place_visit_fn`. Its borrowed `globe_place_t` fields retain stored

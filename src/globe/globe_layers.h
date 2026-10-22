@@ -1,6 +1,6 @@
 /**
  * @file globe_layers.h
- * @brief Private shoreline and river engines owned by the globe controller.
+ * @brief Private shoreline, country and river engines owned by the globe controller.
  *
  * Only globe implementation files use these layer interfaces. Applications include globe-t.h.
  * Each layer borrows its database and requires serialised access.
@@ -16,6 +16,16 @@
 
 /** @brief Open an existing configured geometry store; caller owns the connection, or NULL on failure. */
 sqlite_t *globe_configured_database(void);
+
+/** @brief Resolve a country polygon through bounded, indexed ray intersections; caller owns the returned name. */
+string_t *countries_at(sqlite_t *db, double latitude, double longitude);
+
+/** @brief Resolve an owned country name or ISO code, without inferring codes for unrecognised territories. */
+string_t *countries_lookup(sqlite_t *db, double latitude, double longitude, bool code);
+
+/** @brief Stream bounded indexed shared borders, preserving the detailed shoreline independently. */
+bool countries_borders(sqlite_t *db, double west, double south, double east, double north,
+                        globe_border_segment_fn visitor, void *context);
 
 /** @brief Private shoreline reader. */
 typedef struct _shoreline_t shoreline_t;

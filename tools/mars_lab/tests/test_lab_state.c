@@ -140,6 +140,8 @@ static bool test_lab_help_content(const char *directory)
                             "Matrix Operation Selector", "Transforms And Sums", "Roots And Complex Numbers",
                             "Datetime Workflow", "Almanac Workflow", "Work budget ceiling",
                             "Hover over a town marker or the observer crosshair", "degrees and decimal minutes",
+                            "offline boundary layer can identify it", "does not change your selected jurisdiction",
+                            "selected land country's name and offline flag", "shared country land borders, off by default",
                             "Hold <code>Shift</code> while hovering over the globe", "without moving the mouse",
                             "Both coordinate-tooltip features work with <code>Lat/long: off</code>",
                             "Hovering does not select a location or trigger calculations",

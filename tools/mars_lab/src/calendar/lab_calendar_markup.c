@@ -276,12 +276,20 @@ string_t *lab_cal_almanac_markup(const json_t *response, const json_t *rows, con
         lab_cal_markup_text(out, title) && !string_append_cstr(out, "</div><dl class=\"almanac-summary\">");
     const json_t *summary = lab_cal_get(response, "observer_summary");
     size_t cells = json_array_size(summary);
-    if (cells > 9)
+    if (cells > 10)
         ok = false;
     if (cells) {
         for (size_t i = 0; ok && i < cells; ++i) {
             const json_t *cell = json_array_get(summary, i);
-            ok = lab_cal_markup_summary_row(out, lab_cal_text(cell, "label"), lab_cal_text(cell, "value"), "");
+            const char *flag = lab_cal_text(cell, "flag");
+            if (!strcmp(lab_cal_text(cell, "label"), "Location") &&
+                !strncmp(flag, "data:image/svg+xml;base64,", 26)) {
+                ok = !string_append_cstr(out, "<div class=\"almanac-summary-row\"><dt>Location</dt><dd>"
+                                              "<img class=\"country-flag\" alt=\"\" src=\"") &&
+                     lab_cal_markup_text(out, flag) && !string_append_cstr(out, "\"> ") &&
+                     lab_cal_markup_text(out, lab_cal_text(cell, "value")) && !string_append_cstr(out, "</dd></div>");
+            } else
+                ok = lab_cal_markup_summary_row(out, lab_cal_text(cell, "label"), lab_cal_text(cell, "value"), "");
         }
     } else {
         ok = ok && lab_cal_markup_summary_row(out, "GMT moment", lab_cal_text(response, "moment_text"), "GMT moment: ") &&

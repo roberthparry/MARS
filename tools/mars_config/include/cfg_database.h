@@ -52,6 +52,13 @@ int cfg_globe_river_install(const char *candidate_path);
 int cfg_databases_run(void);
 
 /**
+ * @brief Apply pending versioned migrations to existing databases sequentially, without prompting or replacing files.
+ * Saved credentials and paths are reused. Missing databases are skipped; invalid keys, newer revisions and failed
+ * migrations stop the operation. Each database commits its migration and revision together, preserving unrelated data.
+ */
+int cfg_databases_update(void);
+
+/**
  * @brief Install the selected private database using native SQLCipher.
  * @param jurisdiction True selects jurisdiction; false selects almanac.
  * @param path Optional borrowed command-line database path.

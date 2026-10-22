@@ -195,6 +195,30 @@ static bool route_contracts(const char *directory)
                              "application/x-protobuf", NULL, NULL);
     ok = response && http_response_status(response) == 400 && ok;
     http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-country", "{\"lat\":91,\"lon\":0}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 400 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-country", "{\"country_code\":\"../GB\"}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 400 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-country", "{\"country_code\":\"GB\"}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 200 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-country", "{\"country_code\":\"GB-WLS\"}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 200 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-borders", "{\"west\":0,\"south\":0,\"east\":361,\"north\":1}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 400 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-country", "{\"lat\":0,\"lon\":-30}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 200 && ok;
+    http_response_free(response);
     response = route_request(HTTP_GET, "/index.html", NULL, NULL, NULL, NULL);
     bool title_ok = response_contains(response, "<title>MARS Lab</title>");
     bool placeholders_ok = page_has_no_placeholders(response);

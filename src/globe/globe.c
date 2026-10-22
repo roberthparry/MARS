@@ -15,8 +15,10 @@ struct _globe_t {
     shoreline_t *shoreline;
     rivers_t *rivers;
     sqlite_t *details;
+    sqlite_t *geometry;
     sqlite_t *owned_geometry;
     bool towns;
+    bool countries;
 };
 
 static bool globe_table(sqlite_t *db, const char *name)
@@ -42,6 +44,9 @@ globe_t *globe_open_databases(sqlite_t *shore_db, sqlite_t *map_db, sqlite_t *to
     if (!g) return NULL;
     g->shoreline = shoreline_open(shore_db);
     g->details = town_db;
+    g->geometry = shore_db;
+    g->countries = globe_table(shore_db, "country_bounds") && globe_table(shore_db, "country_chunk") &&
+                   globe_table(shore_db, "country_name");
     g->towns = globe_table(town_db, "jurisdiction_town");
     if (globe_table(map_db, "rivers_dataset")) {
         sqlite_stmt_t *q = sqlite_stmt_prepare(map_db,
@@ -77,8 +82,8 @@ void globe_close(globe_t *g)
 /* Use a bounded indexed capability table, including explicit unavailable future layers. */
 bool globe_has_layer(const globe_t *g, globe_layer_t layer)
 {
-    if (!g || (unsigned)layer > GLOBE_LAYER_BUILDINGS) return false;
-    const bool available[] = {g->shoreline != NULL, g->rivers != NULL, g->towns, false, false};
+    if (!g || (unsigned)layer > GLOBE_LAYER_COUNTRIES) return false;
+    const bool available[] = {g->shoreline != NULL, g->rivers != NULL, g->towns, false, false, g->countries};
     return available[layer];
 }
 
@@ -86,6 +91,31 @@ bool globe_has_layer(const globe_t *g, globe_layer_t layer)
 globe_surface_t globe_hit_test(globe_t *g, double latitude, double longitude)
 {
     return shoreline_hit_test(g ? g->shoreline : NULL, latitude, longitude);
+}
+
+/* Require independently verified land; never substitute the selected jurisdiction or a nearby town. */
+string_t *globe_country_at(globe_t *g, double latitude, double longitude)
+{
+    if (!g || !g->countries || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180 ||
+        globe_hit_test(g, latitude, longitude) != GLOBE_LAND) return NULL;
+    return countries_at(g->geometry, latitude, longitude);
+}
+
+/* Geographic codes link to jurisdiction metadata without using the selected form jurisdiction. */
+string_t *globe_country_code_at(globe_t *g, double latitude, double longitude)
+{
+    if (!g || !g->countries || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180 ||
+        globe_hit_test(g, latitude, longitude) != GLOBE_LAND) return NULL;
+    string_t *code = countries_lookup(g->geometry, latitude, longitude, true);
+    if (code && string_byte_length(code) != 2 && string_byte_length(code) != 6) { string_free(code); return NULL; }
+    return code;
+}
+
+/* Borders are a separate display layer; availability never changes land/sea classification. */
+bool globe_border_segments(globe_t *g, double west, double south, double east, double north,
+                           globe_border_segment_fn visitor, void *context)
+{
+    return g && countries_borders(g->geometry, west, south, east, north, visitor, context);
 }
 
 /* Prepare the existing shared shoreline cache only when explicitly requested. */
@@ -128,8 +158,8 @@ bool globe_import_rivers(sqlite_t *db, file_t *source)
 }
 
 /* Page through indexed town identifiers; preserve existing catalogue ordering and geographic priority semantics. */
-bool globe_towns_batch(globe_t *globe, int64_t after_id, size_t limit, bool nearby, double latitude, double longitude,
-                       globe_place_visit_fn visitor, void *context, int64_t *next_id)
+static bool globe_town_page(globe_t *globe, int64_t after_id, size_t limit, bool nearby, double latitude, double longitude,
+                            const char *jurisdiction, globe_place_visit_fn visitor, void *context, int64_t *next_id)
 {
     if (next_id)
         *next_id = 0;
@@ -147,7 +177,9 @@ bool globe_towns_batch(globe_t *globe, int64_t after_id, size_t limit, bool near
         "left join jurisdiction_town_elevation elev using(jurisdiction_town_id) "
         "left join jurisdiction_default_town def on def.jurisdiction_town_id=town.jurisdiction_town_id "
         "and def.jurisdiction_id=town.jurisdiction_id ";
-    const char *filter = nearby ?
+    const char *filter = jurisdiction ?
+        "where town.jurisdiction_id=?3 and town.jurisdiction_town_id>?1 "
+        "order by town.jurisdiction_town_id limit ?2" : nearby ?
         "where cast(lat.latitude as real) between ?3-5 and ?3+5 "
         "and (abs(cast(lon.longitude as real)-?4)<=5 or abs(cast(lon.longitude as real)-?4)>=355) "
         "and town.jurisdiction_town_id>?1 order by town.jurisdiction_town_id limit ?2" :
@@ -156,6 +188,7 @@ bool globe_towns_batch(globe_t *globe, int64_t after_id, size_t limit, bool near
     sqlite_stmt_t *stmt = query ? sqlite_stmt_prepare(globe->details, string_c_str(query)) : NULL;
     string_free(query);
     bool ok = stmt && sqlite_stmt_bind_int64(stmt, 1, after_id) && sqlite_stmt_bind_int64(stmt, 2, (int64_t)limit) &&
+              (!jurisdiction || sqlite_stmt_bind_text(stmt, 3, jurisdiction)) &&
               (!nearby || (sqlite_stmt_bind_double(stmt, 3, latitude) && sqlite_stmt_bind_double(stmt, 4, longitude)));
     sqlite_step_result_t step = SQLITE_STEP_DONE;
     bool stopped = false;
@@ -176,4 +209,22 @@ bool globe_towns_batch(globe_t *globe, int64_t after_id, size_t limit, bool near
     ok = ok && (stopped || step == SQLITE_STEP_DONE);
     sqlite_stmt_finalize(stmt);
     return ok;
+}
+
+/* Page through the world or a bounded geographic window. */
+bool globe_towns_batch(globe_t *globe, int64_t after_id, size_t limit, bool nearby, double latitude, double longitude,
+                       globe_place_visit_fn visitor, void *context, int64_t *next_id)
+{
+    return globe_town_page(globe, after_id, limit, nearby, latitude, longitude, NULL, visitor, context, next_id);
+}
+
+/* Load only the requested jurisdiction through its indexed catalogue membership. */
+bool globe_towns_jurisdiction_batch(globe_t *globe, const char *jurisdiction, int64_t after_id, size_t limit,
+                                    globe_place_visit_fn visitor, void *context, int64_t *next_id)
+{
+    if (!jurisdiction || !*jurisdiction) {
+        if (next_id) *next_id = 0;
+        return false;
+    }
+    return globe_town_page(globe, after_id, limit, false, 0, 0, jurisdiction, visitor, context, next_id);
 }

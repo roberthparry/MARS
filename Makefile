@@ -194,6 +194,9 @@ debug:
 
 release: check-compliance
 	$(MAKE) DEBUG=0 all
+	@if [ -x "$(MARS_LAB_LAUNCHER)" ]; then \
+		$(MAKE) --no-print-directory DEBUG=0 update-mars-db; \
+	fi
 
 release-evidence: release
 	@tools/mars_checks/build/release/mars_checks release-evidence --library "$(RELEASE_LIBRARY)" --output "$(RELEASE_EVIDENCE)"
@@ -645,6 +648,10 @@ to-be-announced-lab: native-tba-lab
 
 .PHONY: install-globe-db update-globe-db check-globe-db uninstall-globe-db
 .PHONY: install-mars-db
+.PHONY: update-mars-db
+update-mars-db: check-native-deps native-config
+	@MARS_ROOT="$(CURDIR)" "$(CONFIG_PROGRAM)" databases-update
+
 install-mars-db: check-native-deps native-config
 	@"$(CONFIG_PROGRAM)" databases
 
@@ -811,6 +818,7 @@ help:
 	@printf '  %-40s %s\n' "make install-almanac-db" "Build and configure the Almanac database only"
 	@printf '  %-40s %s\n' "make install-globe-db" "Install a separate shoreline-only globe database"
 	@printf '  %-40s %s\n' "make install-mars-db" "Install globe, almanac and jurisdiction databases sequentially"
+	@printf '  %-40s %s\n' "make update-mars-db" "Apply pending migrations to existing databases without prompting"
 	@printf '  %-40s %s\n' "make check-globe-db" "Verify the globe database and shoreline availability"
 	@printf '  %-40s %s\n' "make update-globe-db" "Update shoreline geometry, preserving other globe layers"
 	@printf '  %-40s %s\n' "make uninstall-globe-db" "Reserved; currently refuses changes"

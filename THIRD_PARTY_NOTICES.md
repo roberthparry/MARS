@@ -12,6 +12,21 @@ them must also include the exact
 licence material supplied with the versions it redistributes. The notices in
 this file do not replace those obligations.
 
+## Offline country flags and boundaries
+
+The SVG country flags in `packaging/jurisdiction-db/flags` come from
+[flag-icons 7.3.2](https://github.com/lipis/flag-icons/tree/v7.3.2).
+Copyright (c) 2013 Panayiotis Lipiridis. They are redistributed under the
+[MIT licence supplied with the artwork](packaging/jurisdiction-db/flags/LICENSE).
+The jurisdiction importer also retains that licence and source information in
+`jurisdiction_country_flag_source`. No upstream generation tools are required.
+
+The compressed country polygon and attribute files in `packaging/globe-db`
+come from Natural Earth admin-0 map units 5.1.1, at 1:10 million map scale.
+Natural Earth provides them under its [public-domain terms](https://www.naturalearthdata.com/about/terms-of-use/).
+See [the globe guide](docs/globe.md#selected-position-countries) for provenance,
+checksums, generalisation limits and the source's de facto boundary policy.
+
 ## GeoNames Sardinian town catalogue
 
 The 54 Sardinian town records added to

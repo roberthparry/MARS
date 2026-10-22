@@ -316,6 +316,10 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
     const char *path = route ? string_c_str(route) : "";
     if (!strcmp(path, "/almanac-globe"))
         return lab_cal_globe(payload, status);
+    if (!strcmp(path, "/almanac-country"))
+        return lab_cal_country(payload, status);
+    if (!strcmp(path, "/almanac-borders"))
+        return lab_cal_borders(payload, status);
     if (!strcmp(path, "/almanac-rivers"))
         return lab_cal_rivers(payload, status);
     bool is_datetime = !strcmp(path, "/datetime-eval");

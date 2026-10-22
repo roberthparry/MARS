@@ -37,6 +37,12 @@ void lab_cal_surface(json_t *options);
  */
 json_t *lab_cal_globe(const json_t *payload, unsigned *status);
 
+/** @brief Return country metadata for a land point or an explicit catalogue ISO code, without astronomical evaluation. */
+json_t *lab_cal_country(const json_t *payload, unsigned *status);
+
+/** @brief Render bounded shared land borders without drawing administrative coastlines. */
+json_t *lab_cal_borders(const json_t *payload, unsigned *status);
+
 /** @brief Return an owned close-view river SVG response from jurisdiction data; set the optional HTTP status. */
 json_t *lab_cal_rivers(const json_t *payload, unsigned *status);
 

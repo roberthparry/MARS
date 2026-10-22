@@ -177,7 +177,7 @@ static void test_lab_observing_conditions(void)
     bool ok = lab_cal_number(lab_cal_text(options, "temperature_c"), &temperature) && temperature == 3 &&
               lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) && pressure == 790 &&
               !strcmp(lab_cal_text(options, "atmosphere_note"),
-                      "Temperature: 3.0 °C · Pressure: 790 hPa · Source: WeatherAPI");
+                      "Temperature: 3.0 °C · Pressure: 790 hPa · Source: WeatherAPI hourly value");
     TEST_ASSERT_TRUE(ok, "UTC observation hour supplies both temperature and unmodified station pressure");
     json_free(weather);
     weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"hour\":["
@@ -188,7 +188,7 @@ static void test_lab_observing_conditions(void)
     TEST_ASSERT_TRUE(ok, "missing pressure alone uses the elevation fallback");
     lab_cal_set(options, "time", "14:00:00");
     lab_cal_observing_conditions(options, weather);
-    ok = strstr(lab_cal_text(options, "atmosphere_note"), "seasonal estimate") && ok;
+    ok = strstr(lab_cal_text(options, "atmosphere_note"), "Rough seasonal assumption") && ok;
     TEST_ASSERT_TRUE(ok, "weather for a different hour is not reused");
     json_free(weather);
     weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"hour\":["
@@ -196,10 +196,42 @@ static void test_lab_observing_conditions(void)
     lab_cal_set(options, "time", "12:30:00");
     lab_cal_observing_conditions(options, weather);
     ok = lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) && pressure == 790 &&
-         strstr(lab_cal_text(options, "atmosphere_note"), "seasonal estimate") && ok;
+         strstr(lab_cal_text(options, "atmosphere_note"), "Rough seasonal assumption") && ok;
     TEST_ASSERT_TRUE(ok, "invalid temperature alone retains provider pressure");
     json_free(weather);
+    weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"hour\":["
+                            "{\"time_epoch\":946728000,\"temp_c\":10,\"pressure_mb\":790}]},"
+                            "{\"hour\":[{\"time_epoch\":946731600,\"temp_c\":20}]}]}}");
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_text(options, "temperature_c"), "15.000000") &&
+                     strstr(lab_cal_text(options, "weather_source"), "hourly interpolation"),
+                     "adjacent hourly epochs interpolate the selected half hour across provider day arrays");
+    lab_cal_set(options, "time", "12:15:00");
+    lab_cal_set(options, "zone", "10");
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_text(options, "temperature_c"), "12.500000"),
+                     "selected GMT minutes matter and display zone does not shift weather epochs");
+    lab_cal_set(options, "time", "15:00:00");
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(strstr(lab_cal_text(options, "weather_source"), "Rough seasonal assumption"),
+                     "hourly temperatures are not extrapolated beyond available coverage");
+    json_free(weather);
     lab_cal_set(options, "elevation", "0");
+    weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"hour\":["
+                            "{\"time_epoch\":946767600,\"temp_c\":10}]},{\"hour\":["
+                            "{\"time_epoch\":946771200,\"temp_c\":14}]}]}}");
+    lab_cal_set(options, "time", "23:30:00");
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_text(options, "temperature_c"), "12.000000"),
+                     "temperature interpolates across actual UTC midnight");
+    json_free(weather);
+    weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"day\":{\"mintemp_c\":0,\"maxtemp_c\":30},"
+                            "\"hour\":[{\"time_epoch\":946764000,\"temp_c\":10},"
+                            "{\"time_epoch\":946771200,\"temp_c\":14}]}]}}");
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(strstr(lab_cal_text(options, "weather_source"), "Rough seasonal assumption"),
+                     "missing hours and daily extrema do not invent an hourly temperature curve");
+    json_free(weather);
     lab_cal_observing_conditions(options, NULL);
     double winter = 0, summer = 0, south_summer = 0;
     ok = lab_cal_number(lab_cal_text(options, "temperature_c"), &winter) && ok;
@@ -238,18 +270,32 @@ static bool weather_cache_fixture(const char *directory)
     lab_cal_weather_remember(options, weather, now);
     lab_cal_observing_conditions(options, NULL);
     ok = ok && !strcmp(lab_cal_text(options, "temperature_c"), "8.300000") &&
-         !strcmp(lab_cal_text(options, "weather_source"), "Recent weather estimate");
+         strstr(lab_cal_text(options, "weather_source"), "Recent weather estimate (") &&
+         strstr(lab_cal_text(options, "weather_source"), "min from selected time)");
     if (!ok) string_fprintf(stderr, "Cached observation failed: %s\n", lab_cal_text(options, "weather_source"));
-    json_t *recent = lab_cal_weather_recent(options, now + 172799);
+    json_t *recent = lab_cal_weather_recent(options, now + 3599);
     ok = ok && recent && !strcmp(lab_cal_text(recent, "temp_c"), "8.3");
     if (!ok) string_fprintf(stderr, "Recent cache lookup failed\n");
     json_free(recent);
-    recent = lab_cal_weather_recent(options, now + 172800);
+    recent = lab_cal_weather_recent(options, now + 3601);
     ok = ok && !recent;
     json_free(recent);
     recent = lab_cal_weather_recent(options, now - 1);
     ok = ok && !recent;
     json_free(recent);
+    time_t later = now + 7200;
+    struct tm later_utc = {0};
+    char later_date[16], later_clock[16];
+    gmtime_r(&later, &later_utc);
+    strftime(later_date, sizeof later_date, "%Y-%m-%d", &later_utc);
+    strftime(later_clock, sizeof later_clock, "%H:%M:%S", &later_utc);
+    lab_cal_set(options, "date", later_date);
+    lab_cal_set(options, "time", later_clock);
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && !recent;
+    json_free(recent);
+    lab_cal_set(options, "date", date);
+    lab_cal_set(options, "time", clock);
     lab_cal_set(options, "lon", "-1.7541");
     recent = lab_cal_weather_recent(options, now);
     ok = ok && !recent;

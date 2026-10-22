@@ -340,6 +340,25 @@ static void test_lab_calendar_markup_escaping(void)
     TEST_ASSERT_TRUE(ok, "native markup escapes content and action attributes and retains section empty-value policy");
 }
 
+static void test_lab_country_presentation(void)
+{
+    json_t *response = test_lab_json("{\"observer_summary\":[{\"label\":\"Location\",\"value\":\"Britain & <UK>\","
+                                    "\"flag\":\"data:image/svg+xml;base64,PHN2Zy8+\"}],\"rows\":[],\"events\":[]}");
+    string_t *html = lab_cal_almanac_markup(response, test_lab_member(response, "rows"),
+                                           test_lab_member(response, "events"), false);
+    bool ok = html && strstr(string_c_str(html), "class=\"country-flag\" alt=\"\"") &&
+              strstr(string_c_str(html), "Britain &amp; &lt;UK&gt;") && strstr(string_c_str(html), "<dt>Location</dt>") &&
+              !strstr(string_c_str(html), "<dt>Country</dt>");
+    string_free(html);
+    json_t *cell = (json_t *)json_array_get(test_lab_member(response, "observer_summary"), 0);
+    lab_cal_set(cell, "flag", "javascript:alert(1)");
+    html = lab_cal_almanac_markup(response, test_lab_member(response, "rows"), test_lab_member(response, "events"), false);
+    ok = ok && html && !strstr(string_c_str(html), "javascript:") && !strstr(string_c_str(html), "country-flag") &&
+         strstr(string_c_str(html), "Britain &amp; &lt;UK&gt;");
+    string_free(html); json_free(response);
+    TEST_ASSERT_TRUE(ok, "country text remains accessible and escaped; only offline SVG image URIs are accepted");
+}
+
 static void test_lab_almanac_presentation_bound(void)
 {
     json_t *response = test_lab_json("{\"almanac_presentation\":{\"sentinel\":\"unchanged\"}}");
@@ -431,6 +450,7 @@ void test_lab_almanac_presentation_cases(void)
     TEST_RUN_IN_GROUP(test_lab_almanac_times, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_land_policy, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_calendar_markup_escaping, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_country_presentation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_presentation_bound, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_eclipse_previews, tests, NULL);
 }

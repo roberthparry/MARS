@@ -10,11 +10,13 @@
  * disposable test_cfg_isolated home; no user's configuration is accessed.
  */
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "file-t.h"
 #include "globe-t.h"
+#include "jurisdiction-t.h"
 #include "sqlite-t.h"
 #include "cfg_storage.h"
 #include "cfg_database.h"
@@ -780,6 +782,107 @@ static void test_cfg_database_rivers(void)
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_rivers_fixture), "retired rivers removed without changing unrelated data");
 }
 
+static bool test_cfg_country_flags_fixture(const char *directory)
+{
+    file_t *database = test_cfg_database_file(directory, "flags.db");
+    sqlite_t *db = database ? test_cfg_database_open(database, "country-flags-fixture") : NULL;
+    string_t *root = string_new_with(MARS_CONFIG_ROOT_DIR);
+    bool ok = db && root && sqlite_exec_cstr(db,
+        "create table jurisdiction(jurisdiction_id text primary key,jurisdiction_type text,iso_country_code text,"
+        "cldr_region_code text,name text);create table retained(value);insert into retained values(42)") &&
+        cfg_database_source(db, root, "packaging/jurisdiction-db/mars_country_jurisdictions.sql", false) &&
+        sqlite_exec_cstr(db, "insert into jurisdiction values('GB-ENG','subdivision','GB','GB','England'),"
+                             "('GB-WLS','subdivision','GB','GB','Wales'),"
+                             "('GB-SCT','subdivision','GB','GB','Scotland'),"
+                             "('GB-NIR','subdivision','GB','GB','Northern Ireland')") &&
+        cfg_database_flags(db, root) && cfg_database_flags(db, root) &&
+        test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "253") &&
+        test_cfg_database_query(db, "select value from retained", "42") &&
+        test_cfg_database_query(db, "select version from jurisdiction_country_flag_source", "7.3.2");
+    sqlite_stmt_t *q = ok ? sqlite_stmt_prepare(db,
+        "select sum(length(svg)) from jurisdiction_country_flag") : NULL;
+    if (q && sqlite_stmt_step(q) == SQLITE_STEP_ROW)
+        printf("Offline jurisdiction flag SVG bytes: %lld\n", (long long)sqlite_stmt_column_int64(q, 0));
+    sqlite_stmt_finalize(q); sqlite_close(db); string_free(root);
+    ok = ok && !setenv("MARS_JURISDICTION_DB_PATH", file_path(database), 1) &&
+         !setenv("MARS_JURISDICTION_DB_KEY", "country-flags-fixture", 1);
+    jurisdiction_t *j = ok ? jurisdict_open("FR") : NULL;
+    string_t *name = NULL, *svg = NULL;
+    ok = ok && jurisdict_country(j, "GB", &name, &svg) && name && svg &&
+         strstr(string_c_str(svg), "<svg") && !strcmp(string_c_str(name), "Britain (UK)");
+    string_free(name); string_free(svg);
+    const char *const codes[] = {"GB-WLS", "GB-SCT", "IM"};
+    const char *const names[] = {"Wales", "Scotland", "Isle of Man"};
+    const char *const artwork[] = {"flag-icons-gb-wls", "flag-icons-gb-sct", "flag-icons-im"};
+    for (unsigned i = 0; i < 3; ++i) {
+        name = NULL; svg = NULL;
+        ok = ok && jurisdict_country(j, codes[i], &name, &svg) && name && svg &&
+             !strcmp(string_c_str(name), names[i]) && strstr(string_c_str(svg), artwork[i]);
+        string_free(name); string_free(svg);
+    }
+    ok = !jurisdict_country(j, "../GB", &name, &svg) && !name && !svg && ok;
+    jurisdict_close(j); file_free(database);
+    return ok;
+}
+
+static void test_cfg_country_flags(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_country_flags_fixture), "offline flags and country names belong to the catalogue");
+}
+
+static bool test_cfg_database_update_fixture(const char *directory)
+{
+    bool ok = !unsetenv("MARS_GLOBE_DB_PATH") && !unsetenv("MARS_GLOBE_DB_KEY") &&
+              !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0;
+    file_t *database = test_cfg_database_file(directory, "existing.db");
+    sqlite_t *db = ok ? test_cfg_database_open(database, "saved-update-key") : NULL;
+    ok = ok && db && sqlite_exec_cstr(db,
+        "create table jurisdiction(jurisdiction_id text primary key,jurisdiction_type text,iso_country_code text);"
+        "insert into jurisdiction values('GB','country','GB');"
+        "create table retained(value);insert into retained values(42)");
+    sqlite_close(db);
+    file_t *config_directory = test_cfg_database_file(directory, "config");
+    string_t *settings = string_sprintf("export MARS_JURISDICTION_DB_PATH='%s'\n"
+                                        "export MARS_JURISDICTION_DB_KEY='saved-update-key'\n", file_path(database));
+    ok = ok && config_directory && file_create_directory(config_directory, 0700, true) && settings &&
+         test_cfg_database_write(directory, "config/jurisdiction-db.env", string_c_str(settings)) &&
+         cfg_databases_update() == 1; /* Missing migration source must not stamp success. */
+    db = test_cfg_database_open(database, "saved-update-key");
+    ok = ok && db && test_cfg_database_query(db,
+        "select count(*) from sqlite_master where name='mars_database_revision'", "0") &&
+        test_cfg_database_query(db, "select value from retained", "42") &&
+        sqlite_exec_cstr(db, "alter table jurisdiction rename to saved_jurisdiction");
+    sqlite_close(db);
+    ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && cfg_databases_update() == 1;
+    db = test_cfg_database_open(database, "saved-update-key");
+    ok = ok && db && test_cfg_database_query(db,
+        "select count(*) from sqlite_master where name in ('mars_database_revision','jurisdiction_country_flag',"
+        "'jurisdiction_country_flag_source')", "0") &&
+        sqlite_exec_cstr(db, "alter table saved_jurisdiction rename to jurisdiction");
+    sqlite_close(db);
+    ok = ok && cfg_databases_update() == 0 &&
+         !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
+    db = test_cfg_database_open(database, "saved-update-key");
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "2") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "1") &&
+         test_cfg_database_query(db, "select value from retained", "42") &&
+         cfg_database_revision(db, "jurisdiction", 3);
+    sqlite_close(db);
+    ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
+         cfg_databases_update() == 1;
+    file_t *config = test_cfg_database_file(directory, "config/jurisdiction-db.env");
+    string_t *after = config ? file_read_all_text(config) : NULL;
+    ok = ok && after && !string_compare(settings, after);
+    string_free(after); string_free(settings); file_free(config); file_free(config_directory); file_free(database);
+    return ok;
+}
+
+static void test_cfg_database_update(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_update_fixture),
+                     "release updates preserve keys and unrelated rows, skip current/missing stores and fail safely");
+}
+
 static bool test_cfg_database_globe_fixture(const char *directory)
 {
     bool ok = !setenv("MARS_ROOT", directory, 1) && !setenv("MARS_GLOBE_DB_KEY", "fixture-only", 1) &&
@@ -918,20 +1021,28 @@ static bool test_cfg_database_globe_packaged_fixture(const char *directory)
     file_t *database = test_cfg_database_file(directory, "globe/globe.db");
     sqlite_t *db = ok && database ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
+         test_cfg_database_query(db, "SELECT count(*) FROM country_name", "298") &&
          test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "10589219") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
                                     "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
          test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
-             "create table retained(value);insert into retained values(42);"
+             "delete from mars_database_revision;create table retained(value);insert into retained values(42);"
              "create table rivers_dataset(id,source);insert into rivers_dataset values(1,'retained fixture')");
     sqlite_close(db);
-    ok = ok && !cfg_globe_run("globe-update") && !cfg_globe_run("globe-update");
+    ok = ok && !cfg_databases_update() && !cfg_databases_update() && !cfg_globe_run("globe-update");
     db = ok ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
     ok = ok && db && test_cfg_coast_sydney(db) &&
          test_cfg_database_query(db, "select value from retained", "42") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "10589219");
     sqlite_close(db);
+    /* Country metadata is independent of town selection and requires verified land. */
+    db = ok ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
+    globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
+    string_t *country = globe_country_at(globe, 52.7077, -2.7541);
+    string_t *sea_country = globe_country_at(globe, 0, -30);
+    ok = ok && country && !strcmp(string_c_str(country), "England") && !sea_country;
+    string_free(country); string_free(sea_country); globe_close(globe); sqlite_close(db);
     /* Missing correction/source data must not destroy an already working globe. */
     ok = ok && !setenv("MARS_ROOT", directory, 1) && cfg_globe_run("globe-update") == 1;
     db = ok ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
@@ -951,6 +1062,8 @@ static void test_cfg_database_globe_packaged(void)
 void test_cfg_database_cases(void)
 {
     TEST_RUN_IN_GROUP(test_cfg_database_globe, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_country_flags, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_database_update, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_coast_corrections, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_globe_packaged, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_trace, tests, NULL);

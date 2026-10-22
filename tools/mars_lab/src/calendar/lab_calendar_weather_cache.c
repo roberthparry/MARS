@@ -102,7 +102,7 @@ json_t *lab_cal_weather_recent(const json_t *options, time_t now)
     bool valid = record && !strcmp(lab_cal_text(record, "location"), string_c_str(location)) &&
                  lab_cal_number(lab_cal_text(record, "retrieved"), &retrieved) && retrieved <= now && now - retrieved < 172800 &&
                  lab_cal_number(lab_cal_text(record, "observed"), &observed) && observed <= now && now - observed < 172800 &&
-                 isfinite(epoch) && fabs(epoch - observed) < 172800 &&
+                 isfinite(epoch) && fabs(epoch - observed) <= 3600 && now - observed <= 3600 &&
                  lab_cal_number(lab_cal_text(record, "temp_c"), &temperature) && temperature >= -100 && temperature <= 60;
     if (!valid) { json_free(record); record = NULL; }
     file_free(slot);

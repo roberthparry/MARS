@@ -1,10 +1,11 @@
 /**
  * @file test_shoreline.c
- * @brief Shoreline storage, spatial classification and upstream dataset regressions.
+ * @brief Shoreline and country storage, spatial classification and upstream dataset regressions.
  *
  * Exercises opaque readers against synthetic nested rings and the packaged GSHHG data. Checks bounded chunk
  * decompression, transactional rollback, longitude wrapping and uncertain boundaries without an ephemeris engine.
  * Temporary files use the native file module; the caller's installed database is never modified.
+ * Administrative tests cover indexed country queries, enclaves, islands and transactional import failures.
  */
 #include <math.h>
 #include <stdint.h>
@@ -16,6 +17,8 @@
 #include "globe-t.h"
 #include "almanac-t.h"
 #include "string-t.h"
+#define MARS_GLOBE_INTERNAL_ACCESS
+#include "globe/globe_layers.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -347,9 +350,121 @@ static void test_shoreline_packaged_world(void)
     file_free(directory);
 }
 
+static bool country_test_border(double ax, double ay, double bx, double by, void *context)
+{
+    size_t *count = context;
+    ++*count;
+    return isfinite(ax) && isfinite(ay) && isfinite(bx) && isfinite(by);
+}
+
+static void test_country_packaged_boundaries(void)
+{
+    file_t *directory = temporary_directory();
+    TEST_ASSERT_NOT_NULL(directory);
+    const char *extensions[] = {"shp", "dbf"};
+    file_t *source[2] = {NULL, NULL};
+    for (unsigned i = 0; i < 2; ++i) {
+        string_t *path = string_sprintf("packaging/globe-db/map-units-5.1.1.%s.zst", extensions[i]);
+        file_t *packed = file_new(path);
+        string_free(path);
+        source[i] = temporary_file(directory, extensions[i]);
+        TEST_ASSERT_TRUE(file_decompress_zstd(packed, source[i], 16 * 1024 * 1024, false) && file_open_read(source[i]),
+                         "bounded country source decompression");
+        file_free(packed);
+    }
+    /* Exercise the installed, disk-backed layout rather than locking the entire world catalogue in RAM. */
+    file_t *database = temporary_file(directory, "countries.db");
+    string_t *path = string_new_with(file_path(database)), *key = string_new_with("country-import-test");
+    sqlite_t *db = sqlite_open_encrypted(path, key);
+    string_free(path); string_free(key);
+    TEST_ASSERT_NOT_NULL(db);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "PRAGMA cache_size=-512;PRAGMA temp.cache_size=-512;"
+                                         "create table retained(value);insert into retained values(42)"), "other layer");
+    TEST_ASSERT_TRUE(globe_import_countries(db, source[0], source[1]), "packaged country polygons import");
+    string_t *iso = countries_lookup(db, 52.7077, -2.7541, true);
+    TEST_ASSERT_TRUE(iso && !strcmp(string_c_str(iso), "GB-ENG"), "constituent-country code joins the jurisdiction catalogue");
+    string_free(iso);
+    size_t borders = 0;
+    TEST_ASSERT_TRUE(countries_borders(db, -180, -90, 180, 90, country_test_border, &borders) && borders > 68617,
+                     "map units retain international borders and add constituent-country boundaries");
+    printf("Shared international border segments: %zu\n", borders);
+    borders = 0;
+    TEST_ASSERT_TRUE(countries_borders(db, -5, 50, 2, 51, country_test_border, &borders) && borders == 0,
+                     "English coastline is not duplicated as an administrative border");
+    TEST_ASSERT_TRUE(countries_borders(db, -3.3, 51.5, -2.3, 53.3, country_test_border, &borders) && borders > 0,
+                     "Wales has a land border with England");
+    borders = 0;
+    TEST_ASSERT_TRUE(countries_borders(db, -4, 54.8, -1.5, 56, country_test_border, &borders) && borders > 0,
+                     "Scotland has a land border with England");
+    borders = 0;
+    TEST_ASSERT_TRUE(countries_borders(db, -4.9, 54, -4, 54.5, country_test_border, &borders) && borders == 0,
+                     "Isle of Man has no invented shared land or maritime boundary");
+    TEST_ASSERT_TRUE(countries_borders(db, 6, 48, 9, 50, country_test_border, &borders) && borders > 0,
+                     "Franco-German land border is present");
+    TEST_ASSERT_TRUE(!countries_borders(db, 0, 0, 361, 1, country_test_border, &borders), "invalid viewport rejected");
+    static const struct { double lat, lon; const char *name; } sites[] = {
+        {52.7077, -2.7541, "England"}, {48.8566, 2.3522, "France"},
+        {51.4816, -3.1791, "Wales"}, {55.9533, -3.1883, "Scotland"}, {54.23, -4.52, "Isle of Man"},
+        {-29.31, 27.48, "Lesotho"}, {-25.75, 28.19, "South Africa"},
+        {-17.77, 177.42, "Fiji"}, {55.70, 12.50, "Denmark"}, {52.37, 4.90, "Netherlands"},
+        {38.72, -9.14, "Portugal"}, {0, -30, NULL}, {NAN, 0, NULL}, {91, 0, NULL}
+    };
+    for (size_t i = 0; i < sizeof sites / sizeof *sites; ++i) {
+        string_t *name = countries_at(db, sites[i].lat, sites[i].lon);
+        printf("Country %.5f %.5f: %s\n", sites[i].lat, sites[i].lon, name ? string_c_str(name) : "unavailable");
+        if (sites[i].name) TEST_ASSERT_TRUE(name && !strcmp(string_c_str(name), sites[i].name), sites[i].name);
+        else TEST_ASSERT_TRUE(!name, "sea or invalid position has no country");
+        string_free(name);
+    }
+    globe_t *globe = globe_open_databases(db, db, NULL);
+    TEST_ASSERT_TRUE(globe_has_layer(globe, GLOBE_LAYER_COUNTRIES), "country layer reports availability");
+    TEST_ASSERT_TRUE(!globe_country_at(globe, 52.7077, -2.7541), "country polygons cannot replace missing shoreline");
+    globe_close(globe);
+    TEST_ASSERT_TRUE(!globe_import_countries(db, source[0], source[1]), "truncated source rejected");
+    file_t *broken = temporary_file(directory, "broken.shp");
+    unsigned char header[100];
+    size_t count = 0;
+    TEST_ASSERT_TRUE(file_seek(source[0], 0, FILE_SEEK_BEGIN) &&
+                     file_read(source[0], header, sizeof header, &count) && count == sizeof header &&
+                     file_open_write(broken) && file_write(broken, header, sizeof header, &count) &&
+                     count == sizeof header && file_close(broken) && file_open_read(broken) &&
+                     file_seek(source[1], 0, FILE_SEEK_BEGIN), "header-only shape fixture");
+    TEST_ASSERT_TRUE(!globe_import_countries(db, broken, source[1]), "failure after replacement begins rolls back");
+    file_close(broken); file_delete(broken); file_free(broken);
+    string_t *name = countries_at(db, 52.7077, -2.7541);
+    TEST_ASSERT_TRUE(name && !strcmp(string_c_str(name), "England"), "failed import preserves boundaries");
+    string_free(name);
+    sqlite_stmt_t *q = sqlite_stmt_prepare(db, "select page_count*page_size from pragma_page_count,pragma_page_size");
+    TEST_ASSERT_TRUE(q && sqlite_stmt_step(q) == SQLITE_STEP_ROW, "measure country storage");
+    printf("Country database including spatial index: %lld bytes\n", (long long)sqlite_stmt_column_int64(q, 0));
+    TEST_ASSERT_TRUE(sqlite_stmt_column_int64(q, 0) < 15 * 1024 * 1024, "country storage budget");
+    sqlite_stmt_finalize(q);
+    q = sqlite_stmt_prepare(db, "select value from retained");
+    TEST_ASSERT_TRUE(q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int(q, 0) == 42,
+                     "unrelated data preserved");
+    sqlite_stmt_finalize(q);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db,
+        "insert into country_name values(1000,'Overlapping fixture','');"
+        "insert into country_chunk select id+100000,1000,points from country_chunk where country="
+        "(select id from country_name where name='England');"
+        "insert into country_bounds select b.id+100000,b.west,b.east,b.south,b.north from country_bounds b "
+        "join country_chunk c on c.id=b.id where c.country=(select id from country_name where name='England')"),
+        "overlapping administrative fixture");
+    name = countries_at(db, 52.7077, -2.7541);
+    TEST_ASSERT_TRUE(!name, "overlapping countries produce no guessed name");
+    string_free(name);
+    sqlite_close(db);
+    file_delete(database); file_free(database);
+    for (unsigned i = 0; i < 2; ++i) {
+        file_close(source[i]); file_delete(source[i]); file_free(source[i]);
+    }
+    file_remove_directory(directory); file_free(directory);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Indexed shorelines");
+    TEST_RUN_IN_GROUP(test_country_packaged_boundaries, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_nested_rings_and_rollback, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_packaged_world, tests, NULL);
     return TEST_EXIT_CODE();

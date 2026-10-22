@@ -8,9 +8,40 @@
  * Town name sorting is bounded to one indexed jurisdiction at a time.
  */
 #include <math.h>
+#include <string.h>
 
 #define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
+
+/* Resolve independently identified country metadata using its indexed catalogue key. */
+bool jurisdict_country(jurisdiction_t *j, const char *code, string_t **name, string_t **flag_svg)
+{
+    if (name) *name = NULL;
+    if (flag_svg) *flag_svg = NULL;
+    size_t length = code ? strlen(code) : 0;
+    if (!j || !name || !flag_svg || name == flag_svg || !code ||
+        (length != 2 && (length < 4 || length > 6 || code[2] != '-')) ||
+        code[0] < 'A' || code[0] > 'Z' || code[1] < 'A' || code[1] > 'Z') return false;
+    for (size_t i = 3; i < length; ++i)
+        if ((code[i] < 'A' || code[i] > 'Z') && (code[i] < '0' || code[i] > '9')) return false;
+    sqlite_stmt_t *q = sqlite_stmt_prepare(j->db,
+        "select name from jurisdiction where jurisdiction_id=?1 and jurisdiction_type in ('country','subdivision')");
+    if (q && sqlite_stmt_bind_text(q, 1, code) && sqlite_stmt_step(q) == SQLITE_STEP_ROW)
+        *name = string_new_with(sqlite_stmt_column_text(q, 0));
+    sqlite_stmt_finalize(q);
+    if (!*name) return false;
+    q = sqlite_stmt_prepare(j->db, "select svg from jurisdiction_country_flag where iso_country_code=?1");
+    if (q && sqlite_stmt_bind_text(q, 1, code) && sqlite_stmt_step(q) == SQLITE_STEP_ROW &&
+        sqlite_stmt_column_bytes(q, 0) <= 1024 * 1024)
+        *flag_svg = string_new_with(sqlite_stmt_column_text(q, 0));
+    sqlite_stmt_finalize(q);
+    if (length > 2 && !*flag_svg) {
+        char parent[3] = {code[0], code[1], 0};
+        string_free(*name); *name = NULL;
+        return jurisdict_country(j, parent, name, flag_svg);
+    }
+    return true;
+}
 
 static sqlite_stmt_t *jurisdiction_catalogue_prepare(jurisdiction_t *jurisdiction, const char *sql, bool visitor)
 {
@@ -57,6 +88,16 @@ static bool jurisdiction_town_batch(jurisdiction_t *jurisdiction, int64_t after_
     globe_close(globe);
     if (!ok && jurisdiction)
         jurisdiction_set_error(jurisdiction, "Cannot read a town catalogue batch");
+    return ok;
+}
+
+/* Enumerate only one jurisdiction through the globe controller. */
+bool jurisdict_each_town_jurisdiction_batch(jurisdiction_t *jurisdiction, const char *code, int64_t after_id, size_t limit,
+                                            jurisdict_place_visit_fn visitor, void *context, int64_t *next_id)
+{
+    globe_t *globe = jurisdict_globe_open(jurisdiction);
+    bool ok = globe_towns_jurisdiction_batch(globe, code, after_id, limit, visitor, context, next_id);
+    globe_close(globe);
     return ok;
 }
 

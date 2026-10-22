@@ -1,10 +1,73 @@
 # MARS Lab
 
+The Almanac's Location cell combines an identified land country and its flag,
+with the town name when selected; there is no separate Country cell. Offshore
+custom points read “Custom — Offshore”. The scientific surface classification
+remains “Sea” for horizon-dip calculations. Map clicks clear stale town/country
+selections immediately, then asynchronously select an identified land country
+without replacing the clicked coordinates with a town's coordinates. Uncertain
+or offshore points leave the country menu at “Country not identified”. Offshore
+evaluation replies also clear stale country and town selections; an empty returned
+jurisdiction never restores a default country. An authored
+time zone and observer altitude are preserved; a country alone cannot establish
+a precise time zone or elevation.
+
+Shift-hover coordinates also show the independently resolved land country and its
+offline flag after a short pointer pause. Requests are asynchronous and cancelled
+on movement or release. Sea or uncertain locations retain coordinates only;
+hovering never changes the observer or runs calculations.
+
+The optional globe borders include Wales and Scotland. Wales, Scotland and the
+Isle of Man use their own jurisdiction-owned flags in town and selected-position
+tooltips and the Navigation Almanac card. The Isle of Man's island edge remains
+the detailed shoreline. Existing databases receive these additions through
+`make update-mars-db`, also invoked by `make release` when Lab is installed.
+
+Town labels on the globe and Town/Location dropdown rows use the same asynchronous
+flag tooltip cache, including keyboard focus. Rows carry small jurisdiction codes,
+not copies of flag artwork. Globe redraws retain the custom accessible tooltip
+without reintroducing a competing plain browser title.
+Town tooltips omit GeoNames disambiguation IDs; stored town identities and source
+attribution remain unchanged. Other descriptive parts of a town name are retained.
+
+Country/jurisdiction dropdowns also show available flags beside visible entries
+and the selected label, as well as in their tooltips. Opening or focusing the menu
+starts lazy observation: artwork loads sequentially for visible rows, sharing the
+32-entry, 1 MiB tooltip cache. Concurrent requests for the same country share one
+asynchronous fetch; it is cancelled when its last consumer leaves. Artwork decoding
+is asynchronous, and textual controls remain usable while flags arrive. Database
+lookups use the existing indexed country code, without a separate BLOB-offset format.
+Hidden row images are released. Missing artwork
+leaves text-only labels; subdivision entries use the catalogue's flag fallback.
+
 MARS Lab is the browser-based graphical client supplied with MARS. It provides
 one workspace for expressions, equations, differential equations, matrices,
 symbolic and numerical integration, civil date calculations and the
 astronomical almanac. The browser is the presentation layer: mathematical work
 is sent to the native server's built-in calculation modes, which use MARSlib.
+
+## Database updates during release builds
+
+After a successful build, `make release` runs `make update-mars-db` if the configured
+MARS Lab launcher is installed and executable. Without an installed launcher the
+release remains build-only. The updater checks existing globe, almanac and
+jurisdiction databases sequentially, using their saved paths and keys without
+password prompts or configuration changes. Missing databases are skipped; install
+them explicitly with `make install-mars-db`.
+
+Updates are explicit, versioned migrations, not automatic reruns of the database
+installers. The current migrations refresh packaged shoreline/country geometry and
+jurisdiction flag metadata; the almanac has no pending migration. Future changes
+must register a migration and increase its managed-data revision. Source edits alone
+do not trigger a rebuild. Imported rivers, calendar settings and unrelated tables
+are preserved. River candidates are never published by a release build.
+
+Each database commits its changes and revision together. Current databases require
+no source import. Failed migrations roll back and fail the release; earlier successful
+database updates remain committed and are skipped when retrying. Invalid credentials,
+locked databases and revisions newer than this build are errors, never reasons to
+recreate a database. Close and reopen MARS Lab after updating so its caches are refreshed;
+the updater does not stop running applications automatically.
 
 ## Native calculation control
 
@@ -179,15 +242,19 @@ edges, so lower results remain visible and clickable; closing restores clipping.
 Button tooltips size to their text within the viewport and wrap long unbroken
 names on narrow screens, rather than truncating them.
 That startup response contains jurisdiction metadata only. Towns arrive afterwards
-through indexed `/towns?after=…` pages of at most 512 records, without delaying maths
+through indexed `/towns?after=…&jurisdiction=…` pages of at most 512 records, without delaying maths
 startup. Each page updates menus and globe markers immediately, with duplicate
 records suppressed. A separate request with `lat` and `lon` parameters prioritises
 a five-degree window around the observer and then the current globe centre.
 After rotation settles, an obsolete local request is cancelled and the new centre
-takes priority. Each local run is capped at eight pages; the world stream supplies
-the remainder independently. The complete catalogue is retained in browser memory.
+takes priority. Each local run is capped at eight pages, and moving within one
+degree of the last requested centre avoids repeating that window. Only selected
+jurisdictions (and their parent fallback) and viewed areas are fetched: there is
+no world-catalogue download. Changing country cancels obsolete country requests.
+Already fetched records are retained for reuse during the session.
 A failed later page leaves already-loaded towns and observer coordinates usable,
-with an incomplete-loading notice. Priority-request failures do not stop the world stream.
+with an incomplete-loading notice. Nearby-request failures do not stop country loading.
+The loading notice clears when the first usable page arrives, not after every country.
 Fractional gridline tooltip coordinates use degrees and decimal minutes to two
 decimal places; whole degrees stay compact, and minute rounding carries into degrees.
 There is no duplicated geographic catalogue in the Lab assets. Database changes
@@ -418,8 +485,36 @@ The left-hand Almanac card includes an observer globe, initially centred on the
 entered town or coordinates. Drag or use arrow keys to rotate; scroll, pinch or
 use the plus/minus controls to zoom. Town markers appear at closer scales. Select
 a marker to choose its town, or a point on the globe to use custom coordinates.
-Enter selects the centre point. These selections preserve observer altitude.
+Enter selects the centre point. These selections preserve observer altitude,
+camera orientation and zoom, including after asynchronous country lookup and
+evaluation. Selecting a location through the dropdown still centres the globe.
 “Centre on observer” returns to the entered location without resetting zoom.
+“Borders: off/on” optionally adds indicative shared country land borders. Visible
+regions load asynchronously; borders fade at close zoom and their texture is
+released at 64× zoom or when switched off. Administrative coastlines are not drawn.
+The detailed shoreline remains unchanged. These generalised boundaries are not
+surveyed or legally definitive.
+
+When the selected position is confidently on land and its country can be identified,
+the observer tooltip and AstroNav Navigation Almanac card show its country name
+and an offline flag. Both come from the jurisdiction catalogue, joined by the
+geographically resolved ISO code, not the form's jurisdiction choice. Missing
+flags leave the name readable; uncertain or sea positions do not inherit a country.
+Town-marker tooltips also display an offline flag, using the town's catalogue
+jurisdiction country code rather than a coastal geometry hit-test. Hover and keyboard
+focus load artwork asynchronously; text appears immediately. The tooltip controller
+keeps at most 32 country entries within a 1 MiB string budget, cancels obsolete
+requests and never attaches a flag to every town in the catalogue. Missing artwork
+leaves the textual tooltip usable. Custom observer positions still require the
+independent geographic lookup described above.
+Custom-point selection, its marker and Shift-hover share an in-flight country
+lookup for identical coordinates, including the resolved jurisdiction code. A
+cached point can update the dropdown without another database request. Cancellation
+of one consumer does not interrupt another consumer of the same lookup.
+Update globe geometry with `make update-globe-db`, and refresh flag metadata with
+`make update-mars-db`, then restart the Lab. See the
+[jurisdiction guide](jurisdiction.md#country-names-and-flags) for ownership and licensing.
+
 “Natural Earth / Map” switches between the photographic reference texture and a
 filled shoreline map. The map loads visible-window vector detail as you zoom;
 it does not magnify the photographic texture. Switching views preserves the observer,
@@ -3571,7 +3666,8 @@ or replacing those results.
 Each lookup sends the configured key, selected date, latitude and longitude
 from the local Lab server to WeatherAPI.com over HTTPS. The key is not sent to
 the browser. MARS retains only validated current temperatures in a bounded local
-cache for up to 48 hours, allowing a recent estimate when a later request fails;
+cache for up to 48 hours, but reuses them only within one hour of both the current
+time and selected moment when a later request fails;
 it does not cache complete responses, forecast arrays, pressure readings or API
 keys. The date and coordinates remain in private local Lab state so that its
 inputs can be restored. The weather card identifies WeatherAPI.com as its
@@ -3608,22 +3704,25 @@ topocentric calculation, including the Moon's parallax; it is not replaced by se
 level. Body-table altitudes include an approximate refraction correction. The
 existing optional WeatherAPI configuration supplies temperature and pressure for
 the observation hour, matched by UTC timestamp rather than provider-local time.
-Current observations are accepted when their UTC hour matches, even if the
-forecast-hour array is absent or does not cover that moment.
-Forecast and historical hourly values are not presented as live measurements. Without
-usable weather, a locally cached observation less than 48 hours old is used as a
-“Recent weather estimate” when available. Both calendar modes populate this
-cache; observations match coordinates rounded to three decimal places, and both
-retrieval and observation age must be under 48 hours. The requested observation
-moment must also be within 48 hours of the cached reading, so current weather is
-not applied to an unrelated historical or future date. Estimates never renew the
-cache age. Only temperature is reused; pressure retains its independent fallback.
+Current observations require the same UTC hour and a separation of at most thirty
+minutes from the selected moment. Otherwise valid hourly temperatures bracketing
+the selected GMT timestamp are linearly interpolated, including across day arrays.
+Gaps exceeding one hour are not interpolated. A lone value for the containing hour
+is labelled as an hourly value, not a live measurement; extrapolation is not used.
+Daily minimum and maximum values remain in the daily weather card: without the
+times of those extremes they do not define a trustworthy daily temperature curve.
+Cached observations must be at most one hour old and within one hour of the
+selected moment, matching coordinates rounded to three decimal places. Their
+source label includes their age and separation from the selected time. Estimates
+never renew cache age. Only temperature is reused; pressure retains its independent fallback.
 The cache uses at most 64 small files under `MARS_HOME/lab/weather-cache` (normally
 `~/.mars/lab/weather-cache`), contains no credentials, and uses non-blocking locks
 between workers. Unavailable or corrupt entries simply fall back to the seasonal
 model. Without a recent reading, a deliberately rough latitude/season estimate is reduced by
 6.5 °C per kilometre of elevation. Its northern seasonal maximum is in July,
-reversed in the southern hemisphere. Missing pressure is estimated from elevation
+reversed in the southern hemisphere. This has no time-of-day information: it is
+labelled **Rough seasonal assumption** and displayed as an approximate whole-degree
+value, not a local weather prediction. Missing pressure is estimated from elevation
 using a standard atmosphere; available provider pressure is not adjusted a second time.
 [WeatherAPI describes its pressure field as station pressure](https://blog.weatherapi.com/density-altitude-real-time-calculation-weatherapi/).
 The provider's observation site may differ from the observer's exact location or

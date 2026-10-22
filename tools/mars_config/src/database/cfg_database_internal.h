@@ -19,6 +19,15 @@
 #include "file-t.h"
 #include "sqlite-t.h"
 
+/** @brief Import optional bundled country flags into the jurisdiction catalogue, preserving other tables. */
+bool cfg_database_flags(sqlite_t *db, const string_t *root);
+
+/** Record a completed managed-data migration inside its caller-owned transaction. */
+bool cfg_database_revision(sqlite_t *db, const char *name, int revision);
+
+/** Refresh packaged shoreline and country layers without touching river data or credentials. */
+bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging);
+
 /** Shared installer-owned settings; callbacks borrow these strings and never publish them directly. */
 typedef struct cfg_database_options {
     string_t *home;

@@ -10,6 +10,38 @@ It answers questions such as:
 - whether a date is a national holiday
 - how many working days fall in a date range
 
+## Country names and flags
+
+`jurisdict_country(jurisdiction, code, &name, &flag_svg)` looks up an exact uppercase
+ISO alpha-2 country code or subdivision code through the catalogue's indexed key.
+Subdivisions with artwork use their own name and flag; others fall back to their
+parent country's presentation. Wales (`GB-WLS`), Scotland (`GB-SCT`) and the
+Isle of Man (`IM`) therefore retain their distinct flags. The caller releases
+both owned strings with `string_free`. An unavailable flag leaves its output NULL
+while the country name remains usable. Invalid or unknown codes return false and
+clear both outputs; the selected jurisdiction is never used as a fallback.
+
+`jurisdiction_country_flag` owns offline SVG artwork, keyed by country code.
+`jurisdiction_country_flag_source` retains its version, upstream address and full
+MIT licence. The bundled flag-icons 7.3.2 artwork imports for all 249 ISO countries
+and the four UK constituent-country entries;
+the SVG contents total approximately 1.64 MB before SQLite page overhead.
+Running `make update-mars-db` applies pending flag metadata migrations to an
+existing database without rebuilding its calendar or town tables. The separate
+`make install-jurisdiction-db` command rebuilds the packaged database. Custom older
+packages without artwork remain usable. Country geometry and ISO identifiers
+remain in the separate globe database, updated with `make update-globe-db`.
+
+The Almanac uses the independently identified land country's name and flag in
+the selected-position tooltip and its Navigation Almanac card. Sea positions,
+uncertain coasts and missing/ambiguous boundaries do not inherit a country from
+the form selection. Flags are decorative beside accessible country-name text;
+they are not evidence of legal jurisdiction. No network request is required.
+
+Artwork: [flag-icons 7.3.2](https://github.com/lipis/flag-icons/tree/v7.3.2),
+[bundled MIT licence](../packaging/jurisdiction-db/flags/LICENSE).
+Source archive SHA-256: `6a5497e1029e66415c3941a5e5ee001944b0a7e46bf365c6d5a91a033acee87e`.
+
 ## River network
 
 River geometry belongs in the independent globe database, not the jurisdiction
@@ -266,6 +298,10 @@ explicit seeds retain these useful coastal locations without importing every
 suburb. The existing Sunshine Coast entry and all other towns are retained.
 Reinstall the jurisdiction database and restart MARS Lab to load catalogue changes;
 updating the globe database alone does not update towns.
+
+`jurisdict_each_town_jurisdiction_batch()` restricts indexed town pagination to
+one non-empty jurisdiction code, without implicit parent or child expansion.
+It shares the page limits, cursor semantics and borrowed callback records below.
 
 `jurisdict_each_town_batch()` provides indexed, ascending-ID pagination for
 bounded transports. Start with ID zero, request 1–1024 records, and continue

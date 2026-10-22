@@ -78,4 +78,7 @@ json_t *lab_page_town_batch(int64_t after_id);
 /** @brief Return up to 512 towns within five degrees of a centre, with an ascending-ID cursor. */
 json_t *lab_page_town_near_batch(int64_t after_id, double latitude, double longitude);
 
+/** @brief Return a bounded ID page for one non-empty jurisdiction code. */
+json_t *lab_page_town_jurisdiction_batch(int64_t after_id, const char *jurisdiction);
+
 #endif

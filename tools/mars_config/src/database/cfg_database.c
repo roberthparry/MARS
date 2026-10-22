@@ -1,6 +1,6 @@
 /**
  * @file cfg_database.c
- * @brief Shared encrypted database installation manager and bounded SQL services.
+ * @brief Shared encrypted database installation, versioned migrations and bounded SQL services.
  *
  * Owns setting precedence, password prompting, streaming SQL imports, staging and
  * rollback-safe publication. Dispatches to the almanac and jurisdiction policies;
@@ -41,6 +41,111 @@ typedef struct cfg_database_scan {
     string_view_t view;
     size_t pos;
 } cfg_database_scan;
+
+/* Keep migration revisions explicit: changing an importer alone must not silently rewrite installed data. */
+typedef struct cfg_database_migration {
+    const char *name, *path_variable, *key_variable, *default_path;
+    int revision;
+    bool (*apply)(sqlite_t *, const string_t *, const string_t *);
+} cfg_database_migration;
+
+bool cfg_database_revision(sqlite_t *db, const char *name, int revision)
+{
+    bool ok = sqlite_exec_cstr(db,
+        "create table if not exists mars_database_revision(name text primary key,revision integer not null)");
+    sqlite_stmt_t *stmt = ok ? sqlite_stmt_prepare(db,
+        "insert into mars_database_revision values(?1,?2) on conflict(name) do update set revision=excluded.revision") : NULL;
+    ok = stmt && sqlite_stmt_bind_text(stmt, 1, name) && sqlite_stmt_bind_int64(stmt, 2, revision) &&
+         sqlite_stmt_step(stmt) == SQLITE_STEP_DONE;
+    sqlite_stmt_finalize(stmt);
+    return ok;
+}
+
+static bool cfg_database_current_revision(sqlite_t *db, const char *name, int64_t *revision)
+{
+    *revision = 0;
+    sqlite_stmt_t *stmt = sqlite_stmt_prepare(db,
+        "select 1 from sqlite_master where type='table' and name='mars_database_revision'");
+    sqlite_step_result_t step = stmt ? sqlite_stmt_step(stmt) : SQLITE_STEP_ERROR;
+    sqlite_stmt_finalize(stmt);
+    if (step != SQLITE_STEP_ROW) return step == SQLITE_STEP_DONE;
+    stmt = sqlite_stmt_prepare(db, "select revision from mars_database_revision where name=?1");
+    bool ok = stmt && sqlite_stmt_bind_text(stmt, 1, name);
+    step = ok ? sqlite_stmt_step(stmt) : SQLITE_STEP_ERROR;
+    if (step == SQLITE_STEP_ROW) *revision = sqlite_stmt_column_int64(stmt, 0);
+    sqlite_stmt_finalize(stmt);
+    return (step == SQLITE_STEP_ROW || step == SQLITE_STEP_DONE) && *revision >= 0;
+}
+
+static bool cfg_database_flags_refresh(sqlite_t *db, const string_t *root, const string_t *staging)
+{
+    (void)staging;
+    /* Unlike optional installation assets, a declared migration must not succeed without its source. */
+    string_t *path = string_sprintf("%s/packaging/jurisdiction-db/flags/LICENSE", string_c_str(root));
+    file_t *source = path ? file_new(path) : NULL;
+    bool ok = source && file_exists(source) && cfg_database_flags(db, root);
+    file_free(source); string_free(path);
+    return ok;
+}
+
+static bool cfg_database_update_one(const cfg_database_migration *migration)
+{
+    string_t *home = cfg_storage_home();
+    string_t *config_path = home ? string_sprintf("%s/config/%s-db.env", string_c_str(home), migration->name) : NULL;
+    string_t *fallback = home ? string_sprintf("%s/%s", string_c_str(home), migration->default_path) : NULL;
+    file_t *config = config_path ? file_new(config_path) : NULL;
+    string_t *raw = config ? cfg_database_setting(config, NULL, migration->path_variable, fallback) : NULL;
+    string_t *path = raw ? cfg_storage_expand_path(raw) : NULL;
+    file_t *destination = path ? file_new(path) : NULL;
+    bool exists = false;
+    bool ok = destination && cfg_storage_safe_regular(destination, &exists);
+    string_t *key = ok && exists ? cfg_database_setting(config, NULL, migration->key_variable, NULL) : NULL;
+    sqlite_t *db = key && string_byte_length(key) ? sqlite_open_encrypted(path, key) : NULL;
+    int64_t revision = 0;
+    if (ok && exists)
+        ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
+             cfg_database_current_revision(db, migration->name, &revision) && revision <= migration->revision;
+    if (ok && exists && revision < migration->revision) {
+        const char *environment = getenv("MARS_ROOT");
+        string_t *root = string_new_with(environment && *environment ? environment : MARS_CONFIG_ROOT_DIR);
+        string_t *parent = cfg_storage_parent(path);
+        string_t *staging = parent ? cfg_database_stage(parent) : NULL;
+        bool transaction = root && staging && sqlite_exec_cstr(db, "begin immediate");
+        /* Recheck under the writer lock so simultaneous releases cannot apply a migration twice. */
+        ok = transaction && cfg_database_current_revision(db, migration->name, &revision) &&
+             revision <= migration->revision;
+        if (ok && revision < migration->revision) {
+            printf("Updating %s database to managed-data revision %d...\n", migration->name, migration->revision);
+            ok = migration->apply && migration->apply(db, root, staging) &&
+                 cfg_database_revision(db, migration->name, migration->revision);
+        }
+        if (ok) ok = sqlite_exec_cstr(db, "commit");
+        if (!ok && transaction) sqlite_exec_cstr(db, "rollback");
+        cfg_database_cleanup(staging);
+        string_free(staging); string_free(parent); string_free(root);
+    }
+    if (ok) printf("%s database: %s.\n", migration->name, exists ? "up to date" : "not installed; skipped");
+    else fprintf(stderr, "%s database update failed; check saved credentials, source data and database availability.\n",
+                 migration->name);
+    sqlite_close(db); file_free(destination); file_free(config);
+    string_free(key); string_free(path); string_free(raw); string_free(fallback); string_free(config_path); string_free(home);
+    return ok;
+}
+
+/* Explicit migrations, not wholesale installer rebuilds; no settings or keys are rewritten. */
+int cfg_databases_update(void)
+{
+    static const cfg_database_migration migrations[] = {
+        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 2, cfg_database_globe_refresh},
+        {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL},
+        {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
+         "jurisdiction/mars_jurisdiction_rules.db", 2, cfg_database_flags_refresh},
+    };
+    /* Three independent stores, in installation order; stop before later stores on failure. */
+    for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)
+        if (!cfg_database_update_one(&migrations[i])) return 1;
+    return 0;
+}
 
 static bool cfg_database_space(unsigned char ch)
 {

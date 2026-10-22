@@ -2438,6 +2438,7 @@
   "tests/shoreline/test_shoreline.c": {
     "tests": {
       "enabled": true,
+      "test_country_packaged_boundaries": true,
       "test_shoreline_nested_rings_and_rollback": true,
       "test_shoreline_packaged_world": true
     }
@@ -2884,6 +2885,7 @@
   "tools/mars_config/tests/test_cfg_database.c": {
     "tests": {
       "enabled": true,
+      "test_cfg_country_flags": true,
       "test_cfg_database_bounds": true,
       "test_cfg_database_coast_corrections": true,
       "test_cfg_database_conflicts": true,
@@ -2898,7 +2900,8 @@
       "test_cfg_database_rivers": true,
       "test_cfg_database_sardinia": true,
       "test_cfg_database_stream": true,
-      "test_cfg_database_trace": true
+      "test_cfg_database_trace": true,
+      "test_cfg_database_update": true
     }
   },
   "tools/mars_config/tests/test_cfg_locales.c": {
@@ -2925,6 +2928,7 @@
       "test_cfg_make_forward": true,
       "test_cfg_make_help": true,
       "test_cfg_make_reject": true,
+      "test_cfg_make_release": true,
       "test_cfg_make_uninstall": true
     }
   },
@@ -3007,6 +3011,7 @@
       "test_lab_almanac_times": true,
       "test_lab_almanac_variants": true,
       "test_lab_calendar_markup_escaping": true,
+      "test_lab_country_presentation": true,
       "test_lab_eclipse_previews": true
     }
   },

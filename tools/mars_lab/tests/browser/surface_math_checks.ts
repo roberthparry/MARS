@@ -20,6 +20,16 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         if (!condition) throw new Error('Surface maths: ' + message);
     }
 
+    const townPageResponse = await labHttp.fetch('/towns?after=0&jurisdiction=GB-WLS');
+    const townPage = await townPageResponse.labData() as LabCatalogue;
+    check(townPageResponse.ok && townPage.available && Boolean(townPage.towns['GB-WLS']?.length) &&
+          Object.keys(townPage.towns).every(code => code === 'GB-WLS'),
+          'on-demand town endpoint returns only the requested jurisdiction');
+    const townEndResponse = await labHttp.fetch(`/towns?after=${townPage.next}&jurisdiction=GB-WLS`);
+    const townEnd = await townEndResponse.labData() as LabCatalogue;
+    check(townEndResponse.ok && townEnd.next === '0' && !Object.keys(townEnd.towns).length,
+          'jurisdiction cursor terminates without fetching other countries');
+
     for (const [latitude, longitude] of [[52.7077, -2.7541], [0, 179.9], [89.9, -179.9], [-89.9, 0]]) {
         const orientation = labDOM.call('lab_globe_centre', latitude, longitude) as number[];
         const projected = labDOM.call('lab_globe_project', latitude, longitude, orientation) as number[];
@@ -149,6 +159,98 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                   'observer hover preserves dragging and does not trigger calculations');
             globeCanvas.parentElement!.dispatchEvent(new PointerEvent('pointerleave'));
             check(observerTooltip.hidden === true, 'leaving the globe clears observer hover');
+            const countryFetch = labHttp.fetch;
+            const countryReplies: Array<{resolve: (response: MarsTransportResponse) => void; signal?: AbortSignal | null}> = [];
+            const originalLatitude = latitude.value;
+            try {
+                labHttp.fetch = (url, options) => {
+                    if (url !== '/almanac-country') return countryFetch(url, options);
+                    return new Promise(resolve => countryReplies.push({resolve, signal: options?.signal}));
+                };
+                const selectCountryPoint = async (value: string): Promise<void> => {
+                    latitude.value = value;
+                    document.querySelector<HTMLButtonElement>('[data-globe-action="centre"]')!.click();
+                    await new Promise(requestAnimationFrame);
+                    await new Promise(requestAnimationFrame);
+                };
+                const hoverObserver = (): void => {
+                    const box = document.querySelector<HTMLElement>('.globe-observer')!.getBoundingClientRect();
+                    globeCanvas.dispatchEvent(new PointerEvent('pointermove', {bubbles: true,
+                        clientX: box.left + box.width / 2, clientY: box.top + box.height / 2}));
+                };
+                const reply = (country: string): MarsTransportResponse => Object.assign(new Response(), {
+                    async labData() { return {ok: true, country,
+                        country_flag: country ? 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><path fill="blue" d="M0 0H4V3H0Z"/></svg>') : ''}; }
+                });
+                await selectCountryPoint('52.7081');
+                check(countryReplies.length === 1, 'selection starts one asynchronous country lookup');
+                hoverObserver(); hoverObserver();
+                check(countryReplies.length === 1 && !observerTooltip.hidden,
+                      'hover remains responsive and never starts a country query');
+                await selectCountryPoint('52.7082');
+                check(countryReplies.length === 2 && countryReplies[0].signal?.aborted === true,
+                      'new selection cancels the obsolete country lookup');
+                countryReplies[1].resolve(reply('United Kingdom'));
+                await new Promise(resolve => setTimeout(resolve, 30));
+                hoverObserver();
+                check(observerTooltip.textContent!.includes('United Kingdom'), 'land observer tooltip includes its country');
+                check(observerTooltip.querySelector<HTMLImageElement>('img.country-flag')?.alt === '',
+                      'country tooltip includes an offline flag with adjacent accessible country text');
+                countryReplies[0].resolve(reply('Obsolete country'));
+                await new Promise(resolve => setTimeout(resolve, 30));
+                hoverObserver();
+                check(!observerTooltip.textContent!.includes('Obsolete country'), 'stale country reply cannot relabel selection');
+                await selectCountryPoint('52.7083');
+                hoverObserver();
+                check(!observerTooltip.textContent!.includes('United Kingdom'), 'pending selection clears the old country');
+                check(!observerTooltip.querySelector('img.country-flag'), 'pending selection clears the old flag');
+                countryReplies[2].resolve(reply(''));
+                await new Promise(resolve => setTimeout(resolve, 30));
+                await selectCountryPoint('52.7082');
+                hoverObserver();
+                check(countryReplies.length === 3 && observerTooltip.textContent!.includes('United Kingdom'),
+                      'revisiting a cached coordinate avoids another database request');
+                check(evaluations === observerHoverEvaluations, 'country lookups do not evaluate the almanac');
+                const hoverBox = globeCanvas.getBoundingClientRect();
+                const shiftHover = (offset: number): void => {
+                    globeCanvas.dispatchEvent(new PointerEvent('pointermove', {bubbles: true, shiftKey: true,
+                        clientX: hoverBox.left + hoverBox.width / 2 + offset,
+                        clientY: hoverBox.top + hoverBox.height / 2 + 12}));
+                };
+                shiftHover(11); shiftHover(12); shiftHover(13);
+                check(countryReplies.length === 3 && observerTooltip.textContent!.includes('Latitude'),
+                      'Shift hover displays coordinates immediately and debounces country requests');
+                await new Promise(resolve => setTimeout(resolve, 260));
+                check(countryReplies.length === 4, 'a settled Shift pointer starts one country lookup');
+                countryReplies[3].resolve(reply('Wales'));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(observerTooltip.textContent!.includes('Wales') &&
+                      Boolean(observerTooltip.querySelector('img.country-flag')),
+                      'Shift hover adds the independently resolved country and flag');
+                shiftHover(14);
+                check(!observerTooltip.textContent!.includes('Wales') &&
+                      !observerTooltip.querySelector('img.country-flag'),
+                      'moving the Shift pointer immediately clears old country metadata');
+                await new Promise(resolve => setTimeout(resolve, 260));
+                countryReplies[4].resolve(reply(''));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(!observerTooltip.hidden && !observerTooltip.querySelector('img.country-flag'),
+                      'sea or uncertain Shift hover retains coordinates without a flag');
+                shiftHover(15);
+                await new Promise(resolve => setTimeout(resolve, 260));
+                window.dispatchEvent(new KeyboardEvent('keyup', {key: 'Shift'}));
+                check(countryReplies[5].signal?.aborted === true, 'releasing Shift cancels its country request');
+                countryReplies[5].resolve(reply('Obsolete hover country'));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(!observerTooltip.textContent!.includes('Obsolete hover country') &&
+                      evaluations === observerHoverEvaluations, 'late hover replies cannot relabel or evaluate the observer');
+            } finally {
+                labHttp.fetch = countryFetch;
+                latitude.value = originalLatitude;
+                document.querySelector<HTMLButtonElement>('[data-globe-action="centre"]')!.click();
+                await new Promise(requestAnimationFrame);
+                globeCanvas.parentElement!.dispatchEvent(new PointerEvent('pointerleave'));
+            }
             const beforeGrid = [latitude.value, longitude.value, evaluations];
             const gl = globeCanvas.getContext('webgl')!;
             const program = gl.getParameter(gl.CURRENT_PROGRAM) as WebGLProgram;
@@ -424,7 +526,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 WorksheetPersistence.persistence.saveCalendar = saveCalendar;
             }
             await new Promise(requestAnimationFrame);
-            const selectedLabel = document.querySelector<HTMLElement>('.globe-town.selected');
+            const selectedLabel = document.querySelector<HTMLButtonElement>('.globe-town.selected');
             check(Boolean(selectedLabel) && selectedLabel!.textContent!.includes(place!.name),
                   'selected town keeps its label beside the observer');
             const committedMarker = document.querySelector<HTMLElement>('.globe-observer')!;
@@ -444,9 +546,123 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             document.querySelector<HTMLButtonElement>('[data-globe-action="centre"]')!.click();
             await new Promise(requestAnimationFrame);
             const country = new Intl.DisplayNames(['en-GB'], {type: 'region'}).of(jurisdiction.split('-')[0]);
-            check(selectedLabel!.title.startsWith(`${place!.name}, ${country} · Latitude `) &&
-                  selectedLabel!.title.includes(`Longitude ${MarsAlmanacGlobe.coordinate(Number(place!.longitude), 'E', 'W')}`),
+            check(selectedLabel!.dataset.marsTooltipTitle!.startsWith(`${place!.name}, ${country} · Latitude `) &&
+                  selectedLabel!.dataset.marsTooltipTitle!.includes(`Longitude ${MarsAlmanacGlobe.coordinate(Number(place!.longitude), 'E', 'W')}`) &&
+                  !selectedLabel!.hasAttribute('title'),
                   'town tooltip includes the full country name rather than its jurisdiction code');
+            const townFlagFetch = labHttp.fetch;
+            const originalTooltipName = selectedLabel!.dataset.townTooltipName!;
+            const originalTooltipTitle = selectedLabel!.dataset.marsTooltipTitle!;
+            selectedLabel!.dataset.townTooltipName = originalTooltipName + ' (GeoNames 1234567)';
+            selectedLabel!.dataset.marsTooltipTitle = originalTooltipTitle.replace(originalTooltipName,
+                selectedLabel!.dataset.townTooltipName);
+            const townFlagReplies: Array<{resolve: (response: MarsTransportResponse) => void; signal?: AbortSignal | null}> = [];
+            try {
+                labHttp.fetch = (url, options) => url === '/almanac-country'
+                    ? new Promise(resolve => townFlagReplies.push({resolve, signal: options?.signal}))
+                    : townFlagFetch(url, options);
+                selectedLabel!.dispatchEvent(new PointerEvent('pointerover', {bubbles: true}));
+                const tooltip = document.querySelector<HTMLElement>('#marsButtonTooltip')!;
+                check(townFlagReplies.length === 1 && tooltip.textContent!.includes(place!.name),
+                      'town tooltip shows text immediately while its country flag loads');
+                check(!tooltip.textContent!.includes('GeoNames') && !tooltip.textContent!.includes('1234567'),
+                      'initial town tooltip omits catalogue source IDs');
+                const flagResponse = Object.assign(new Response(), {async labData() { return {ok: true, country,
+                    country_flag: 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg"/>')}; }});
+                townFlagReplies[0].resolve(flagResponse);
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(tooltip.querySelector('img.country-flag')?.getAttribute('alt') === '' &&
+                      tooltip.textContent!.includes(country!), 'town tooltip displays a decorative flag beside country text');
+                check(!tooltip.textContent!.includes('GeoNames') && !tooltip.textContent!.includes('1234567'),
+                      'asynchronous country enrichment does not restore source IDs');
+                selectedLabel!.dataset.townTooltipName = originalTooltipName;
+                selectedLabel!.dataset.marsTooltipTitle = originalTooltipTitle;
+                WorksheetResults.tooltip.hide();
+                WorksheetResults.tooltip.show(selectedLabel!);
+                check(townFlagReplies.length === 1 && Boolean(tooltip.querySelector('img.country-flag')),
+                      'repeated town hover reuses the cached country flag');
+                WorksheetResults.tooltip.hide();
+                const townShell = document.querySelector<HTMLSelectElement>('#almanacTown')!.closest('.select-shell')!;
+                const townRow = townShell.querySelector<HTMLButtonElement>('.select-option.selected')!;
+                check(townRow.dataset.countryCode === selectedLabel!.dataset.countryCode,
+                      'dropdown towns carry the same jurisdiction metadata as globe labels');
+                townShell.classList.add('open');
+                townShell.querySelector('.select-menu')!.classList.remove('hidden');
+                townRow.dispatchEvent(new PointerEvent('pointerover', {bubbles: true}));
+                check(townFlagReplies.length === 1 && Boolean(tooltip.querySelector('img.country-flag')),
+                      'actual dropdown hover reuses the flag cache and displays artwork');
+                const rowName = townRow.dataset.townTooltipName;
+                townRow.dataset.townTooltipName = 'Newport (Harbour) (GeoNames 1234567)';
+                WorksheetResults.tooltip.show(townRow);
+                check(tooltip.textContent!.includes('Newport (Harbour)') && !tooltip.textContent!.includes('GeoNames'),
+                      'dropdown town tooltip keeps descriptive parentheses but omits GeoNames IDs');
+                townRow.dataset.townTooltipName = rowName;
+                WorksheetResults.tooltip.hide();
+                townShell.classList.remove('open');
+                townShell.querySelector('.select-menu')!.classList.add('hidden');
+                selectedLabel!.dispatchEvent(new FocusEvent('focusin', {bubbles: true}));
+                document.querySelector<HTMLButtonElement>('[data-globe-action="centre"]')!.click();
+                await new Promise(requestAnimationFrame);
+                check(!selectedLabel!.hasAttribute('title'),
+                      'globe redraw never reinstates a competing plain browser tooltip');
+                WorksheetResults.tooltip.hide();
+                const savedCode = selectedLabel!.dataset.countryCode;
+                selectedLabel!.dataset.countryCode = savedCode === 'DK' ? 'NL' : 'DK';
+                WorksheetResults.tooltip.show(selectedLabel!);
+                WorksheetResults.tooltip.hide();
+                check(townFlagReplies[1].signal?.aborted === true, 'leaving a town cancels pending flag work');
+                townFlagReplies[1].resolve(flagResponse);
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(!tooltip.classList.contains('visible'), 'late flag replies cannot reopen a hidden tooltip');
+                selectedLabel!.dataset.countryCode = 'GB-WLS';
+                WorksheetResults.tooltip.show(selectedLabel!);
+                const welshResponse = Object.assign(new Response(), {async labData() { return {ok: true,
+                    country: 'Wales', country_flag: 'data:image/svg+xml;base64,' +
+                        btoa('<svg xmlns="http://www.w3.org/2000/svg"/>')}; }});
+                townFlagReplies[2].resolve(welshResponse);
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(tooltip.textContent!.includes(', Wales · Latitude ') &&
+                      Boolean(tooltip.querySelector('img.country-flag')),
+                      'constituent-country tooltip pairs its own country name with its flag');
+                WorksheetResults.tooltip.hide();
+                selectedLabel!.dataset.countryCode = savedCode;
+                const countryShell = document.querySelector<HTMLSelectElement>('#almanacJurisdiction')!.closest('.select-shell')!;
+                const countryButton = countryShell.querySelector<HTMLButtonElement>('.select-button')!;
+                countryButton.dispatchEvent(new FocusEvent('focusin', {bubbles: true}));
+                check(countryButton.dataset.countryCode === savedCode &&
+                      Boolean(countryButton.querySelector('img.country-flag')) &&
+                      Boolean(tooltip.querySelector('img.country-flag')),
+                      'selected country reuses the town flag cache in its button and tooltip');
+                countryShell.classList.add('open');
+                countryShell.querySelector('.select-menu')!.classList.remove('hidden');
+                const countryRow = countryShell.querySelector<HTMLButtonElement>('.select-option.selected')!;
+                countryRow.dispatchEvent(new PointerEvent('pointerover', {bubbles: true}));
+                check(Boolean(countryRow.querySelector('img.country-flag')) &&
+                      countryRow.querySelector('img')!.getAttribute('alt') === '',
+                      'country dropdown row shows decorative cached artwork beside its existing label');
+                countryShell.classList.remove('open');
+                countryShell.querySelector('.select-menu')!.classList.add('hidden');
+                const flagLoader = WorksheetResults.tooltip as unknown as {
+                    fetchFlag(code: string, signal: AbortSignal): Promise<{name: string; flag: string}>;
+                };
+                const firstConsumer = new AbortController(), secondConsumer = new AbortController();
+                const beforeShared = townFlagReplies.length;
+                const firstResult = flagLoader.fetchFlag('FR', firstConsumer.signal).catch(() => null);
+                const secondResult = flagLoader.fetchFlag('FR', secondConsumer.signal);
+                check(townFlagReplies.length === beforeShared + 1,
+                      'concurrent menu and tooltip consumers share one asynchronous country request');
+                firstConsumer.abort();
+                check(!townFlagReplies[beforeShared].signal?.aborted,
+                      'leaving one consumer preserves the request needed by another');
+                townFlagReplies[beforeShared].resolve(flagResponse);
+                check(await firstResult === null && Boolean((await secondResult).flag),
+                      'cancelled consumers stop independently while the remaining consumer receives artwork');
+            } finally {
+                selectedLabel!.dataset.townTooltipName = originalTooltipName;
+                selectedLabel!.dataset.marsTooltipTitle = originalTooltipTitle;
+                WorksheetResults.tooltip.hide();
+                labHttp.fetch = townFlagFetch;
+            }
             check(getComputedStyle(selectedLabel!).color === 'rgb(255, 211, 121)' &&
                   selectedLabel!.getAttribute('aria-current') === 'location', 'selected label is gold and identified');
             for (const target of [globeCanvas, selectedLabel!]) {
@@ -525,10 +741,31 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             const box = globeCanvas.getBoundingClientRect();
             const click = {bubbles: true, button: 0, clientX: box.left + box.width * .56, clientY: box.top + box.height * .5};
             const beforePointClick = evaluations, previousLongitude = longitude.value;
+            const pointFetch = labHttp.fetch;
+            labHttp.fetch = (url, options) => url === '/almanac-country'
+                ? Promise.resolve(Object.assign(new Response(), {async labData() {
+                    return {ok: true, country: '', country_code: '', country_flag: ''};
+                }})) : pointFetch(url, options);
             globeCanvas.dispatchEvent(new MouseEvent('click', click));
+            check((document.getElementById('almanacJurisdiction') as HTMLSelectElement).value === '',
+                  'custom point immediately clears the previous country');
+            await new Promise(resolve => setTimeout(resolve, 0));
             check(longitude.value !== previousLongitude && town.value === '' && evaluations === beforePointClick + 1,
-                  'one left click immediately selects a globe point and evaluates once');
+                  'one left click selects exact coordinates and evaluates once after country lookup');
             const selectedLongitude = longitude.value;
+            const jurisdictionSelect = document.getElementById('almanacJurisdiction') as HTMLSelectElement;
+            jurisdictionSelect.value = jurisdiction;
+            labDOM.call('lab_location_evaluation', 6,
+                {observer_surface: 'Sea', fields: {jurisdiction}},
+                WorksheetLocations.calendar.calendarLocationContext());
+            check(jurisdictionSelect.value === '' && town.value === '' && longitude.value === selectedLongitude &&
+                  jurisdictionSelect.closest('.select-shell')!.querySelector('.select-button')!.textContent!
+                      .includes('Country not identified'),
+                  'offshore evaluation clears stale country and town controls without changing coordinates');
+            jurisdictionSelect.value = jurisdiction;
+            labDOM.call('lab_location_evaluation', 6, {fields: {jurisdiction: ''}},
+                WorksheetLocations.calendar.calendarLocationContext());
+            check(jurisdictionSelect.value === '', 'evaluation preserves an explicitly unidentified country');
             globeCanvas.dispatchEvent(new MouseEvent('click', {...click, button: 2}));
             check(longitude.value === selectedLongitude && evaluations === beforePointClick + 1,
                   'right click does not select an observer');
@@ -561,8 +798,47 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 globeCanvas.dispatchEvent(new PointerEvent('pointermove', {...pointer, clientX: pointer.clientX + 3}));
                 globeCanvas.dispatchEvent(new PointerEvent('pointerup', pointer));
                 globeCanvas.dispatchEvent(new MouseEvent('click', click));
+                await new Promise(resolve => setTimeout(resolve, 0));
                 check(evaluations === beforePointClick + 2, 'a single click after dragging tolerates small hand movement');
-            } finally { globeCanvas.setPointerCapture = capture; }
+            } finally { globeCanvas.setPointerCapture = capture; labHttp.fetch = pointFetch; }
+            try {
+                let countryCalls = 0;
+                let resolveCountry!: (response: MarsTransportResponse) => void;
+                labHttp.fetch = (url, options) => url === '/almanac-country'
+                    ? (++countryCalls, new Promise(resolve => { resolveCountry = resolve; })) : pointFetch(url, options);
+                const clickedCamera = MarsAlmanacGlobe.captureHistory()!;
+                const landClick = {...click, clientX: click.clientX + 14};
+                globeCanvas.dispatchEvent(new MouseEvent('click', landClick));
+                const pickedCoordinates = [latitude.value, longitude.value];
+                await new Promise(requestAnimationFrame);
+                check(countryCalls === 1, 'custom selection and its marker share one pending geographic lookup');
+                resolveCountry(Object.assign(new Response(), {async labData() {
+                    return {ok: true, country: 'Wales', country_code: 'GB-WLS', country_flag: ''};
+                }}));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check((document.getElementById('almanacJurisdiction') as HTMLSelectElement).value === 'GB-WLS' &&
+                      town.value === '' && latitude.value === pickedCoordinates[0] && longitude.value === pickedCoordinates[1],
+                      'identified land changes the country menu without snapping the clicked point to a town');
+                globeCanvas.dispatchEvent(new MouseEvent('click', landClick));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(countryCalls === 1 && jurisdictionSelect.value === 'GB-WLS',
+                      'reselecting cached custom land restores its country without another request');
+                document.dispatchEvent(new Event('mars-almanac-observer-committed'));
+                check(MarsAlmanacGlobe.captureHistory()!.every((value, index) => value === clickedCamera[index]),
+                      'asynchronous country resolution preserves the clicked camera and its saved zoom');
+                jurisdictionSelect.value = '';
+                latitude.value = String(Number(latitude.value));
+                document.dispatchEvent(new Event('mars-almanac-observer-committed'));
+                check(MarsAlmanacGlobe.captureHistory()!.every((value, index) => value === clickedCamera[index]),
+                      'evaluation metadata changes do not recentre a clicked position');
+                latitude.value = String(Number(latitude.value) + 1);
+                town.dispatchEvent(new Event('change', {bubbles: true}));
+                await new Promise(requestAnimationFrame);
+                const dropdownCamera = MarsAlmanacGlobe.captureHistory()!;
+                const centred = labDOM.call('lab_globe_centre', Number(latitude.value), Number(longitude.value)) as number[];
+                check(centred.every((value, index) => value === dropdownCamera[index]),
+                      'dropdown changes still centre the selected observer');
+            } finally { labHttp.fetch = pointFetch; }
             const originalFetch = labHttp.fetch;
             const originalNearby = labApplication.loadNearbyTowns;
             let nearbyRequests = 0;
@@ -639,6 +915,53 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 pendingSurface.forEach(resolve => resolve(riverReply()));
                 labApplication.loadNearbyTowns = originalNearby;
                 labHttp.fetch = originalFetch;
+            }
+            const bordersButton = globeRoot.querySelector<HTMLButtonElement>('[data-globe-action="borders"]')!;
+            const borderFetch = labHttp.fetch, borderUpload = gl.texImage2D;
+            const borderReplies: Array<{resolve: (response: MarsTransportResponse) => void; signal?: AbortSignal | null}> = [];
+            let borderReleases = 0;
+            try {
+                check(bordersButton.getAttribute('aria-pressed') === 'false', 'country borders default to off');
+                labHttp.fetch = (url, options) => url === '/almanac-borders' ?
+                    new Promise(resolve => borderReplies.push({resolve, signal: options?.signal})) : borderFetch(url, options);
+                gl.texImage2D = function (...args: unknown[]): void {
+                    if (gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE4 && args.length === 9 &&
+                        args[3] === 1 && args[4] === 1) ++borderReleases;
+                    Reflect.apply(borderUpload, gl, args);
+                };
+                bordersButton.click();
+                check(borderReplies.length === 1, 'enabling borders starts an asynchronous request');
+                globeCanvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
+                check(borderReplies[0].signal?.aborted === true, 'moving cancels obsolete border requests');
+                for (let i = 0; i < 40 && borderReplies.length < 2; ++i) await new Promise(resolve => setTimeout(resolve, 25));
+                check(borderReplies.length === 2, 'new viewport requests replacement borders');
+                borderReplies[0].resolve(riverReply());
+                await new Promise(resolve => setTimeout(resolve, 30));
+                check(globeRoot.dataset.borders !== 'ready', 'stale border response cannot publish');
+                borderReplies[1].resolve(riverReply());
+                for (let i = 0; i < 40 && globeRoot.dataset.borders !== 'ready'; ++i)
+                    await new Promise(resolve => setTimeout(resolve, 25));
+                check(globeRoot.dataset.borders === 'ready', 'visible shared borders upload independently');
+                for (let i = 0; i < 9; ++i) zoomIn.click();
+                await new Promise(requestAnimationFrame);
+                check(globeRoot.dataset.borders === 'zoom-hidden' && borderReleases > 0 &&
+                      !gl.getUniform(program, gl.getUniformLocation(program, 'borderReady')!),
+                      'close zoom hides coarse borders and releases their texture memory');
+                for (let i = 0; i < 24; ++i) zoomOut.click();
+                for (let i = 0; i < 40 && borderReplies.length < 3; ++i) await new Promise(resolve => setTimeout(resolve, 25));
+                check(borderReplies.length === 3, 'zooming back out reloads borders');
+                borderReplies[2].resolve(riverReply());
+                for (let i = 0; i < 40 && globeRoot.dataset.borders !== 'ready'; ++i)
+                    await new Promise(resolve => setTimeout(resolve, 25));
+                bordersButton.click();
+                await new Promise(requestAnimationFrame);
+                check(globeRoot.dataset.borders === 'off' && borderReleases >= 2,
+                      'switching borders off releases imagery without changing the observer');
+            } finally {
+                if (bordersButton.getAttribute('aria-pressed') === 'true') bordersButton.click();
+                borderReplies.forEach(request => request.resolve(riverReply()));
+                labHttp.fetch = borderFetch; gl.texImage2D = borderUpload;
+                for (let i = 0; i < 24; ++i) zoomOut.click();
             }
         } finally {
             [latitude.value, longitude.value, elevation.value] = saved;
