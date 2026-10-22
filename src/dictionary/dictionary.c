@@ -49,14 +49,14 @@ struct bucket {
 
 /* Opaque entry */
 
-struct _dictionary_entry_t {
+typedef struct _dictionary_entry_t {
     struct _dictionary_t *dict;
     size_t index;
-};
+} dictionary_entry_t;
 
 /* Dictionary structure */
 
-struct _dictionary_t {
+typedef struct _dictionary_t {
     size_t key_size;
     size_t value_size;
     size_t key_data_offset;   /* aligned offset after the hash */
@@ -92,7 +92,7 @@ struct _dictionary_t {
 
     /* scratch entry for APIs that return an opaque handle */
     struct _dictionary_entry_t scratch_entry;
-};
+} dictionary_t;
 
 /* -------------------------------------------------------------------------
  * Slot helpers
@@ -606,7 +606,7 @@ const void *dictionary_get_value(const dictionary_t *dict, size_t index)
 }
 
 /* -------------------------------------------------------------------------
- * Internal: build a sorted index array (thread-safe via qsort_r)
+ * Internal: build a sorted index array with caller-local comparison state
  * ---------------------------------------------------------------------- */
 
 struct sort_ctx {
@@ -614,10 +614,16 @@ struct sort_ctx {
     int (*cmp)(const struct _dictionary_t *, size_t, size_t);
 };
 
-static int sort_thunk(const void *a, const void *b, void *arg)
+/* Context-aware heapsort avoids platform-specific qsort_r signatures and global comparator state. */
+static void sort_sift(size_t *items, size_t count, size_t root, const struct sort_ctx *ctx)
 {
-    struct sort_ctx *ctx = (struct sort_ctx *)arg;
-    return ctx->cmp(ctx->dict, *(const size_t *)a, *(const size_t *)b);
+    while (root < count / 2) {
+        size_t child = root * 2 + 1;
+        if (child + 1 < count && ctx->cmp(ctx->dict, items[child], items[child + 1]) < 0) ++child;
+        if (ctx->cmp(ctx->dict, items[root], items[child]) >= 0) break;
+        size_t swap = items[root]; items[root] = items[child]; items[child] = swap;
+        root = child;
+    }
 }
 
 static int sort_cmp_keys_ctx(const struct _dictionary_t *dict, size_t ia, size_t ib)
@@ -658,7 +664,11 @@ static bool dict_build_sorted_idx(struct _dictionary_t *dict, size_t **idx, size
         (*idx)[i] = i;
 
     struct sort_ctx ctx = {.dict = dict, .cmp = cmp};
-    qsort_r(*idx, dict->count, sizeof(size_t), sort_thunk, &ctx);
+    for (size_t root = dict->count / 2; root > 0; --root) sort_sift(*idx, dict->count, root - 1, &ctx);
+    for (size_t end = dict->count; end > 1; --end) {
+        size_t swap = (*idx)[0]; (*idx)[0] = (*idx)[end - 1]; (*idx)[end - 1] = swap;
+        sort_sift(*idx, end - 1, 0, &ctx);
+    }
 
     *valid = true;
     return true;

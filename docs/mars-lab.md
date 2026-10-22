@@ -12,6 +12,19 @@ jurisdiction never restores a default country. An authored
 time zone and observer altitude are preserved; a country alone cannot establish
 a precise time zone or elevation.
 
+Explicit country-menu selections await the country's first town page asynchronously
+before applying the default town. Further pages continue loading in the background;
+the browser controls remain usable. A newer country, town or coordinate selection
+cancels the pending selection. This differs from globe-point selection, which keeps
+the clicked coordinates and does not wait for the town catalogue.
+
+Observer selections show a native-rendered summary immediately from the current
+controls and resident country/flag cache, before the almanac response arrives.
+This pending summary clears the previous observer's results and copy text;
+surface classification, weather and calculated results remain explicitly pending.
+The validated response replaces it with the complete worksheet. This improves
+selection feedback without claiming that the underlying calculations finish sooner.
+
 Shift-hover coordinates also show the independently resolved land country and its
 offline flag after a short pointer pause. Requests are asynchronous and cancelled
 on movement or release. Sea or uncertain locations retain coordinates only;
@@ -35,10 +48,59 @@ towns. This applies only while the observer coordinates match that town. Custom
 points and Shift-hover continue to use geographic boundary lookup, with separate
 cache entries so named-town metadata cannot overwrite a coordinate result.
 
+The browser WebAssembly module starts with 66 MiB and may grow on demand to a
+96 MiB ceiling. This provides allocation headroom for the native town catalogue
+and metadata caches without allocating the maximum at startup. The separate codec
+worker remains unchanged. The flag cache's retained text limit is still 1 MiB,
+plus small dictionary and entry bookkeeping allocations.
+
+Town records are shared by menus and the globe in native `array_t` storage.
+`dictionary_t` indexes jurisdiction lists, selection keys and long-name exceptions;
+direct five-degree spatial buckets restrict globe queries to the visible region.
+`lab_town_store_add`, `lab_town_store_list`, `lab_town_store_get` and
+`lab_town_store_region` copy data across the bridge without retaining scoped browser
+handles. Menus receive sorted snapshots and markers use stable jurisdiction/town
+keys rather than object identity. Failed batch allocations roll back that batch.
+An 8 MiB admission budget covers copied town text and a conservative per-record
+index allowance; exhausted storage reports a catalogue-loading error instead of
+silently discarding existing towns. Page disposal releases the records and indexes.
+Temporary display arrays, DOM nodes, request promises and GPU resources remain
+browser-owned. Binding and result-presentation collections are unchanged by this
+geography migration.
+
+Town lookup does not search the owning record array. The catalogue key is the
+jurisdiction code plus the native town selection value; a separate dictionary
+resolves jurisdiction lists, and spatial buckets select globe candidates.
+The rendered option lists also have native indexes in `lab_menu_index`: exact
+selection values use a dictionary, coordinate restoration binary-searches sorted
+latitude and longitude arrays and checks the narrower candidate range, and a
+sorted suffix index preserves arbitrary substring matching in normalised Unicode
+text. Coordinate matching retains the 0.000001-degree tolerance and first-option
+precedence. `lab_menu_index_stats` exposes candidate counts for regression checks.
+Browser mutation observers invalidate indexes synchronously when option text,
+values, coordinates or order change. Filtering updates matching and previously
+visible rows rather than testing every option's text on each keystroke.
+
+Building indexes, rendering complete menus, producing snapshots and freeing
+records still require iteration. Native menu indexes have an 8 MiB per-index and
+16 MiB combined admission budget, with at most 1,024 UTF-8 bytes of indexed search
+text per option to bound suffix-comparison work; if allocation or admission fails, the controls
+remain usable through their slower scan-based fallback. Thus fast lookup is the
+normal path, not a claim that every operation or low-memory fallback is constant-time.
+
+`lab_country_cache_get` and `lab_country_cache_put` manage the globe's separate
+coordinate/town-country metadata in a native dictionary, with FIFO eviction at
+64 entries or a 1 MiB text-allocation budget. Flags are not duplicated in this cache.
+
 Country/jurisdiction dropdowns also show available flags beside visible entries
 and the selected label, as well as in their tooltips. Opening or focusing the menu
 starts lazy observation: artwork loads sequentially for visible rows, sharing the
-32-entry, 1 MiB tooltip cache. Concurrent requests for the same country share one
+32-entry native `dictionary_t` cache with a 1 MiB UTF-8 text budget. C owns copied
+country names and flag data, validation, replacement, FIFO eviction and cleanup;
+no scoped JavaScript handles survive a native call. Dictionary lookup and linked
+eviction avoid linear cache scans. The globe's native coordinate cache retains country
+names/codes only, not duplicate artwork. JavaScript retains request promises,
+cancellation controllers and DOM images. Concurrent requests for the same country share one
 asynchronous fetch. Cached flags are restored immediately after selection, even
 while a different country's artwork is loading. A shared request
 is cancelled when its last consumer leaves. Artwork decoding
@@ -46,6 +108,31 @@ is asynchronous, and textual controls remain usable while flags arrive. Database
 lookups use the existing indexed country code, without a separate BLOB-offset format.
 Hidden row images are released. Missing artwork
 leaves text-only labels; subdivision entries use the catalogue's flag fallback.
+Jurisdiction search indexes the aliases “United Kingdom” and “UK” for the British
+constituent-country entries, even where the displayed label uses “Britain”. Partial
+searches match these aliases through the existing suffix index; labels and selection
+codes remain unchanged. Crown Dependencies are not included in that alias.
+
+The flag cache, coordinate-country cache, town catalogue, menu indexes and border
+geometry each own their mutable state in a private singleton. Their public entry
+points use `lab_serial_dispatch` to cover each complete read, update, eviction or
+cleanup operation. Native builds serialise callbacks with an embedded mutex;
+browser WASM uses its non-shared instance and the bridge's existing owner-thread
+and re-entry guard. Shared-memory WASM builds of these services are rejected:
+worker requests must be sent to the browser owner, not passed shared DOM handles.
+Dispatch is synchronous, so request structures and scoped handles never outlive
+the call. Internal operations do not redispatch to their own service. Immutable
+lookup tables remain read-only and require no synchronisation.
+The browser bridge uses `lab_flag_cache_get` and `lab_flag_cache_put` for metadata,
+`lab_flag_cache_clear` at shutdown, and `lab_flag_cache_stats` for entry/text-byte
+diagnostics. Invalid or oversized insertions are rejected without replacing the
+existing entry; returned strings are scoped copies rather than native pointers.
+The opt-in root Make target `lab-cache-memtest` runs the production flag and
+coordinate-country caches with the real dictionary and serial dispatcher under
+Valgrind. Its allocation-free browser bridge fixture exercises repeated replacement,
+FIFO eviction, byte limits, rejected input and idempotent teardown. The test requires
+zero live heap blocks and no Valgrind errors. It does not establish browser-side
+handle lifetime safety or cover the town/menu stores; those require separate checks.
 Completed globe country lookups also populate the tooltip flag cache. The two
 selected-country buttons restore cached artwork after native text/selection
 updates even when their menus have never been opened or hovered; this restoration
@@ -507,8 +594,18 @@ camera orientation and zoom, including after asynchronous country lookup and
 evaluation. Selecting a location through the dropdown still centres the globe.
 “Centre on observer” returns to the entered location without resetting zoom.
 “Borders: off/on” optionally adds indicative shared country land borders. Visible
-regions load asynchronously; borders fade at close zoom and their texture is
+regions load asynchronously; borders fade at close zoom and their native geometry is
 released at 64× zoom or when switched off. Administrative coastlines are not drawn.
+Borders are a true SVG overlay with a one-CSS-pixel, non-scaling stroke, not a
+rasterised texture. Native WebAssembly owns the segment array and projects it using
+the globe camera, including roll, clipping at the horizon and viewport. Long arcs
+are subdivided according to zoom; unchanged camera frames reuse the path. Requests
+are cancellable and bounded to 250,000 segments; malformed or oversized data cannot
+replace the accepted geometry. Missing border data do not disable observer selection.
+The `/almanac-borders` endpoint accepts `format: "segments"` for decimal geographic
+segments. `lab_globe_borders_load`, `lab_globe_borders_path` and
+`lab_globe_borders_clear` own, project and release this display-only WASM cache;
+input and generated path text each have a 16 MiB ceiling.
 The detailed shoreline remains unchanged. These generalised boundaries are not
 surveyed or legally definitive.
 

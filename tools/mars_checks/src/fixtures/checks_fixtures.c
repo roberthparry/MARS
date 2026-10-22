@@ -39,11 +39,11 @@ struct peer {
     unsigned port;
 };
 
-struct checks_fixtures {
+typedef struct checks_fixtures {
     string_t *root;
     string_t *executable;
     struct peer peers[3];
-};
+} checks_fixtures_t;
 
 /* Own a lazy set of protocol fixtures. */
 checks_fixtures_t *checks_fixtures_new(const string_t *root)

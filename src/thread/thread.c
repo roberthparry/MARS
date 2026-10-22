@@ -13,11 +13,11 @@
 
 #include "thread-t.h"
 
-struct _thread_t {
+typedef struct _thread_t {
     pthread_t native;
     lock_t *completion;
     bool joinable;
-};
+} thread_t;
 
 typedef struct {
     thread_callback_t callback;

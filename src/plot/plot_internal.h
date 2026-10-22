@@ -45,7 +45,7 @@ bool plot_tick_text(string_t *out, plot_tick_layout_t *layout, const string_t *l
 /** @brief Measure conservative numeric tick width; a negative result reports formatting failure. */
 double plot_tick_width(number_t lower, number_t upper, double font_size);
 
-struct _plot_t {
+typedef struct _plot_t {
     double azimuth, elevation, roll;
     plot_options_t options;
     string_t *title, *x_label, *y_label, *z_label;
@@ -64,7 +64,7 @@ struct _plot_t {
     size_t refined_count;
     bool shaded, shade_reversed;
     number_t shade_bounds[2];
-};
+} plot_t;
 
 /** @brief Render a copied rectangular surface; caller supplies the C numeric locale. */
 string_t *plot_surface_svg(const plot_t *plot);

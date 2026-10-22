@@ -13,11 +13,11 @@
 #define MARS_RIVERS_INTERNAL_ACCESS
 #include "rivers_internal.h"
 
-struct _rivers_t {
+typedef struct _rivers_t {
     sqlite_stmt_t *query;
     bool busy;
     bool anchors;
-};
+} rivers_t;
 
 int32_t rivers_coordinate(const unsigned char *p)
 {

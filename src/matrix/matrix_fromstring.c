@@ -27,11 +27,11 @@ typedef struct {
     expr_t *expr;
 } mat_binding_entry_t;
 
-struct _mat_bindings_t {
+typedef struct _mat_bindings_t {
     size_t count;
     mat_binding_entry_t *entries;
     dictionary_t *index;
-};
+} mat_bindings_t;
 
 typedef struct {
     string_t *name;

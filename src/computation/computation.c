@@ -17,14 +17,14 @@
 #define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
 #include "internal/computation_internal.h"
 
-struct _computation_t {
+typedef struct _computation_t {
     atomic_uint_fast64_t references;
     atomic_uint_fast64_t work_used;
     atomic_int status;
     atomic_uint_fast64_t deadline_polls;
     uint64_t deadline_ns;
     computation_options_t options;
-};
+} computation_t;
 
 static _Thread_local computation_t *computation_scope;
 

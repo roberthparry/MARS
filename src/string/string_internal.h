@@ -42,13 +42,13 @@
  *                 that need short-lived materialised storage.
  *   scratch_cap — number of bytes allocated for scratch.
  */
-struct _string_t {
+typedef struct _string_t {
     char *data;
     size_t len;
     size_t cap;
     char *scratch;
     size_t scratch_cap;
-};
+} string_t;
 
 /**
  * @brief Internal cursor over a string.
@@ -63,11 +63,11 @@ struct _string_t {
  *   owned_source — optional owned backing string for view-derived cursors.
  *   pos          — current encoded byte position within source.
  */
-struct _string_cursor_t {
+typedef struct _string_cursor_t {
     const string_t *source;
     string_t *owned_source;
     size_t pos;
-};
+} string_cursor_t;
 
 /**
  * @brief Ensure @p s has room for at least @p needed bytes (including the NUL).

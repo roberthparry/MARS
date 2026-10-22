@@ -154,12 +154,12 @@ typedef struct {
     size_t capacity;
 } function_dag_table_t;
 
-struct _expr_function_temporaries_t {
+typedef struct _expr_function_temporaries_t {
     function_temporary_table_t temporaries;
     autoname_table_t autonames;
     varlist_t variables;
     varlist_t constants;
-};
+} expr_function_temporaries_t;
 
 static void function_temporary_table_init(function_temporary_table_t *table)
 {

@@ -53,10 +53,24 @@ LAB_SRCS := $(sort $(wildcard tools/mars_lab/src/*/*.c))
 LAB_OBJS := $(patsubst tools/mars_lab/src/%.c,$(LAB_BUILD_DIR)/%.o,$(LAB_SRCS))
 LAB_SERVER := $(LAB_BUILD_DIR)/mars_lab
 LAB_SUPPORT_OBJS := $(filter-out $(LAB_BUILD_DIR)/app/lab_main.o,$(LAB_OBJS))
-LAB_TEST_SRCS := $(sort $(wildcard tools/mars_lab/tests/*.c))
+LAB_TEST_SRCS := $(filter-out tools/mars_lab/tests/test_lab_cache_memory.c,$(sort $(wildcard tools/mars_lab/tests/*.c)))
 LAB_TEST_HEADERS := $(wildcard tools/mars_lab/tests/*.h)
 LAB_TEST_OBJS := $(patsubst tools/mars_lab/tests/%.c,$(LAB_BUILD_DIR)/tests/%.o,$(LAB_TEST_SRCS))
+LAB_TEST_OBJS += $(LAB_BUILD_DIR)/tests/lab_serial_native.o
 LAB_TEST_BIN := $(LAB_BUILD_DIR)/tests/test_lab_native
+
+LAB_CACHE_MEMORY_BIN := $(LAB_BUILD_DIR)/tests/test_lab_cache_memory
+LAB_CACHE_MEMORY_SRCS := tools/mars_lab/tests/test_lab_cache_memory.c \
+    tools/mars_lab/wasm/src/lab_flag_cache.c tools/mars_lab/wasm/src/lab_country_cache.c \
+    tools/mars_lab/wasm/src/lab_serial.c
+
+$(LAB_CACHE_MEMORY_BIN): $(LAB_CACHE_MEMORY_SRCS) $(wildcard tools/mars_lab/wasm/include/*.h) $(STATIC_LIB)
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -UNDEBUG -Iinclude -Itools/mars_lab/wasm/include -o $@ $(LAB_CACHE_MEMORY_SRCS) $(STATIC_LIB) $(LDLIBS)
+
+.PHONY: lab-cache-memtest
+lab-cache-memtest: $(LAB_CACHE_MEMORY_BIN)
+	valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=99 $(LAB_CACHE_MEMORY_BIN)
 
 # Browser adapters are authored in strict TypeScript. TypeScript 7's native
 # compiler needs neither Node.js nor npm; callers may supply its absolute path.
@@ -80,6 +94,8 @@ LAB_WASM_SRCS := $(sort $(wildcard tools/mars_lab/wasm/src/*.c))
 LAB_WASM_OBJS := $(patsubst tools/mars_lab/wasm/src/%.c,$(LAB_BUILD_DIR)/wasm/src/%.o,$(LAB_WASM_SRCS))
 LAB_WASM_WIRE_OBJ := $(LAB_BUILD_DIR)/wasm/marslib/protobuf_wire.o
 LAB_WASM_OBJS += $(LAB_WASM_WIRE_OBJ)
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/dictionary.o
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/array.o
 LAB_WASM_ASM := $(LAB_WASM_OBJS:.o=.s)
 # Debian/Ubuntu's wasi-libc keeps musl maths in libc.a; libm.a is an empty compatibility archive.
 # Override both paths for another installation. Only referenced archive members are linked.
@@ -90,7 +106,25 @@ LAB_WASM_MEMORY_EXPORTS := --export=memset --export=memcpy --export=memmove --ex
 LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin -fvisibility=default \
                    -nostdlib -Wmissing-prototypes -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -Itools/mars_lab/wasm/include
 
-# Compile only the allocation-free wire core, not the owning native codec or libmars archive.
+# Link generic containers separately; do not pull in the native libmars archive.
+# array_t uses WASI-libc's single-threaded pthread ABI; the final link still forbids WASI imports.
+$(LAB_BUILD_DIR)/wasm/marslib/array.o: src/array/array.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -D_GNU_SOURCE -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/array.s: src/array/array.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -D_GNU_SOURCE -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/dictionary.o: src/dictionary/dictionary.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -D_GNU_SOURCE -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/dictionary.s: src/dictionary/dictionary.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) -D_GNU_SOURCE -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
+# Compile only the allocation-free wire core, not the owning native codec.
 # Keep shared library helpers private so unreferenced functions can be discarded by the linker.
 $(LAB_BUILD_DIR)/wasm/marslib/%.o: src/protobuf/%.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
@@ -120,7 +154,7 @@ lab-wasm-asm: $(LAB_WASM_ASM)
 # Export application definitions, not the library's hidden helpers and WASI entry points.
 $(LAB_WASM): $(LAB_WASM_OBJS) $(LAB_WASM_LIBC) tools/mars_lab/wasm/lab_browser.imports tools/mars_lab/Makefile
 	"$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory --allow-undefined-file=tools/mars_lab/wasm/lab_browser.imports \
-	    $(LAB_WASM_MEMORY_EXPORTS) --initial-memory=67108864 --max-memory=67108864 \
+	    $(LAB_WASM_MEMORY_EXPORTS) --initial-memory=69206016 --max-memory=100663296 \
 	    $(LAB_WASM_OBJS) "$(LAB_WASM_LIBC)" -o $@
 
 # Probe the actual compiler target and linker, not merely their presence on PATH.
@@ -203,6 +237,12 @@ $(LAB_BUILD_DIR)/tests/%.o: tools/mars_lab/tests/%.c $(LAB_TEST_HEADERS) $(TEST_
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_lab/include -Itools/mars_lab/src -c $< -o $@
 
 # Link the same native adapters as the application, excluding its main function.
+$(LAB_BUILD_DIR)/tests/lab_serial_native.o: tools/mars_lab/wasm/src/lab_serial.c tools/mars_lab/wasm/include/lab_serial.h
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -Itools/mars_lab/wasm/include -c $< -o $@
+
+$(LAB_BUILD_DIR)/tests/test_lab_wasm_build.o: CFLAGS += -Itools/mars_lab/wasm/include
+
 $(LAB_TEST_BIN): $(LAB_TEST_OBJS) $(LAB_SUPPORT_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LAB_SERVER)
 	@mkdir -p $(dir $@)
 	$(CC) $(LDFLAGS) -o $@ $(LAB_TEST_OBJS) $(LAB_SUPPORT_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS)

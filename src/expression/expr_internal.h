@@ -334,7 +334,7 @@ typedef struct expr_binding_expr {
     } u;
 } expr_binding_expr_t;
 
-struct _expr_t {
+typedef struct _expr_t {
     const expr_ops_t *ops;
     expr_t *a;
     expr_t *b;
@@ -351,7 +351,7 @@ struct _expr_t {
     size_t formal_wrt_count;
     int refcount;
     uint64_t var_id;
-};
+} expr_t;
 
 extern const expr_ops_t ops_const;
 extern const expr_ops_t ops_var;
@@ -758,13 +758,13 @@ typedef struct {
     bool is_constant;
 } expr_binding_entry_t;
 
-struct _expr_bindings_t {
+typedef struct _expr_bindings_t {
     size_t count;
     expr_binding_entry_t *entries;
     dictionary_t *index;
     bool has_symbolic_derivative;
     bool has_symbolic_integral;
-};
+} expr_bindings_t;
 
 /* ------------------------------------------------------------------------- */
 /* Internal helpers                                                          */

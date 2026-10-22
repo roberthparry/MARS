@@ -15,10 +15,10 @@
 #define MARS_REGEX_INTERNAL_ACCESS
 #include "regex_native.h"
 
-struct _regex_t {
+typedef struct _regex_t {
     regex_native_t *native;
     regex_options_t options;
-};
+} regex_t;
 
 static regex_status_t regex_fail(int code, const char *message, string_t **error)
 {

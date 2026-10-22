@@ -561,6 +561,31 @@ void test_slice_view_ops(void)
 
     array_slice_destroy(slice);
     array_destroy(arr);
+
+    /* Portable slice heapsort: exercise odd/even heap sizes, duplicates and repeated sorting. */
+    unsigned seed = 12345;
+    for (size_t count = 1; count <= 129; ++count) {
+        int input[129], expected[129];
+        arr = array_create(sizeof(int), NULL, NULL);
+        ASSERT_TRUE(arr);
+        for (size_t i = 0; i < count; ++i) {
+            seed = seed * 1664525u + 1013904223u;
+            input[i] = expected[i] = (int)(seed % 41) - 20;
+        }
+        ASSERT_TRUE(array_append_carray(arr, input, count));
+        slice = array_slice(arr, 0, count);
+        ASSERT_TRUE(slice);
+        qsort(expected, count, sizeof(int), int_cmp);
+        for (unsigned repeat = 0; repeat < 2; ++repeat) {
+            array_slice_sort(slice, int_cmp);
+            for (size_t i = 0; i < count; ++i) {
+                ASSERT_EQ_INT(*(int *)array_slice_get(slice, i), expected[i]);
+                ASSERT_EQ_INT(*(int *)array_get(arr, i), input[i]);
+            }
+        }
+        array_slice_destroy(slice);
+        array_destroy(arr);
+    }
 }
 
 void test_stack_ints(void)

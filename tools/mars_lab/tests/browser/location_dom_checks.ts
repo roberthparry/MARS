@@ -255,7 +255,7 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             {fields: {zone: ' 0 ', latitude: ' 0 ', longitude: ' -2 ', elevation: ' 7 ', jurisdiction: 'invalid'}});
         equal(WorksheetContext.almanacZone.value, '0', 'almanac evaluation trims zero zone');
         equal(WorksheetContext.almanacLatitude.value, '0', 'almanac evaluation retains string zero latitude');
-        equal(WorksheetContext.almanacJurisdiction.value, WorksheetContext.DEFAULT_DATETIME_JURISDICTION, 'evaluation uses jurisdiction fallback');
+        equal(WorksheetContext.almanacJurisdiction.value, '', 'unknown returned jurisdiction does not invent a default country');
         equal(WorksheetContext.almanacElevation.value, '123.45', 'evaluation cannot replace authored observer height');
         WorksheetLocations.calendar.applyCalendarEvaluationFields('almanac', {fields: {elevation: '0'}});
         equal(WorksheetContext.almanacElevation.value, '123.45', 'returned default zero cannot reset observer height');
@@ -481,9 +481,10 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
         };
         equal(labDOM.call('lab_location_catalogue', bootstrapCatalogue), 1, 'valid bootstrap catalogue accepted');
         for (const jurisdiction of [WorksheetContext.datetimeJurisdiction, WorksheetContext.almanacJurisdiction]) {
-            equal(jurisdiction.options.length, 2, 'bootstrap options projected to both modes');
-            equal(jurisdiction.options[0].textContent, 'United <Kingdom>', 'jurisdiction labels remain plain text');
-            equal(jurisdiction.value, 'GB', 'first jurisdiction selected by native select');
+            const unknown = jurisdiction === WorksheetContext.almanacJurisdiction ? 1 : 0;
+            equal(jurisdiction.options.length, 2 + unknown, 'Almanac retains its unidentified-country option');
+            equal(jurisdiction.options[unknown].textContent, 'United <Kingdom>', 'jurisdiction labels remain plain text');
+            equal(jurisdiction.value, unknown ? '' : 'GB', 'Almanac does not invent a country before identification');
             equal(jurisdiction.disabled, false, 'available catalogue enables jurisdiction');
         }
         bootstrapCatalogue.available = false;

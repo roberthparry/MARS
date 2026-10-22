@@ -3819,6 +3819,7 @@
     },
     "tests": {
       "enabled": true,
+      "test_lab_serial_dispatch": true,
       "test_lab_wasm_assembly_plans": true,
       "test_lab_wasm_header_boundaries": true,
       "test_lab_wasm_math_dependency": true

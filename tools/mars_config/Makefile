@@ -23,6 +23,13 @@ CONFIG_TEST_BIN := $(CONFIG_BUILD_DIR)/tests/test_mars_config
 $(CONFIG_BUILD_DIR)/catalogue_towns: tools/mars_config/catalogue_towns.c $(STATIC_LIB)
 	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
+# Optional offline preparation only; GEOS is not linked into mars_config or libmars.
+$(CONFIG_BUILD_DIR)/coastline_stage: tools/mars_config/coastline_stage.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
+
+$(CONFIG_BUILD_DIR)/coastline_review: tools/mars_config/coastline_review.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
+
 $(CONFIG_BUILD_DIR)/%.o: tools/mars_config/src/%.c tools/mars_config/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_config/include \

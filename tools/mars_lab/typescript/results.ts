@@ -28,8 +28,6 @@ namespace WorksheetResults {
     /** Own the active tooltip node; native code retains presentation policy. */
     export class WorksheetTooltipController {
         private activeButton: HTMLElement | null = null;
-        private readonly flags = new Map<string, {name: string; flag: string}>();
-        private flagBytes = 0;
         private readonly selectedCountries = new Map<HTMLElement, MutationObserver>();
         private flagRequest: {code: string; controller: AbortController} | null = null;
         private countryObserver: IntersectionObserver | null = null;
@@ -45,7 +43,7 @@ namespace WorksheetResults {
 
         private async fetchFlag(code: string, signal: AbortSignal): Promise<{name: string; flag: string}> {
             if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
-            const cached = this.flags.get(code);
+            const cached = this.cachedCountry(code);
             if (cached) return cached;
             let pending = this.pendingFlags.get(code);
             if (!pending) {
@@ -59,8 +57,7 @@ namespace WorksheetResults {
                     const name = typeof data.country === 'string' ? data.country : '';
                     const flag = typeof data.country_flag === 'string' &&
                         data.country_flag.startsWith('data:image/svg+xml;base64,') ? data.country_flag : '';
-                    if ((name.length + flag.length) * 2 > 1048576) throw new Error('Flag too large');
-                    this.cacheFlag(code, name, flag);
+                    if (!this.cacheFlag(code, name, flag)) throw new Error('Flag cache rejected metadata');
                     return {name, flag};
                 })();
                 pending = {controller, consumers: 0, promise};
@@ -104,22 +101,13 @@ namespace WorksheetResults {
             if (image.getAttribute('src') !== flag) image.src = flag;
         }
 
-        private cacheFlag(code: string, name: string, flag: string): void {
-            const bytes = (flag.length + name.length) * 2;
-            if (bytes > 1048576) return;
-            const previous = this.flags.get(code);
-            if (previous) {
-                this.flagBytes -= (previous.name.length + previous.flag.length) * 2;
-                this.flags.delete(code);
-            }
-            while (this.flags.size && (this.flags.size >= 32 || this.flagBytes + bytes > 1048576)) {
-                const oldest = this.flags.keys().next().value!;
-                const entry = this.flags.get(oldest)!;
-                this.flagBytes -= (entry.flag.length + entry.name.length) * 2;
-                this.flags.delete(oldest);
-            }
-            this.flags.set(code, {name, flag});
-            this.flagBytes += bytes;
+        /** @brief Read copied metadata from the bounded native dictionary. */
+        cachedCountry(code: string): {name: string; flag: string} | null {
+            return this.native().call('lab_flag_cache_get', code) as {name: string; flag: string} | null;
+        }
+
+        private cacheFlag(code: string, name: string, flag: string): boolean {
+            if (!this.native().call('lab_flag_cache_put', code, name, flag)) return false;
             // Only two selected-country controls exist; neither requires opening or hovering its menu.
             for (const id of ['almanacJurisdiction', 'datetimeJurisdiction']) {
                 const button = document.getElementById(id)?.closest('.select-shell')?.querySelector<HTMLElement>('.select-button');
@@ -135,18 +123,18 @@ namespace WorksheetResults {
                 }
                 this.selectedCountryArtwork(button);
             }
+            return true;
         }
 
         private selectedCountryArtwork(button: HTMLElement): void {
-            const flag = this.flags.get(button.dataset.countryCode || '')?.flag;
+            const flag = this.cachedCountry(button.dataset.countryCode || '')?.flag;
             if (flag) this.countryArtwork(button, flag);
             else button.querySelector('img.country-flag')?.remove();
         }
 
         /** @brief Share completed globe metadata with selected-country controls and tooltip consumers. */
         rememberCountry(code: string, name: string, flag: string): void {
-            if (/^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(code) &&
-                (!flag || flag.startsWith('data:image/svg+xml;base64,'))) this.cacheFlag(code, name, flag);
+            this.cacheFlag(code, name, flag);
         }
 
         private observeCountryMenu(button: HTMLElement): void {
@@ -193,14 +181,14 @@ namespace WorksheetResults {
         private async fillCountryMenu(): Promise<void> {
             // Selection rebuilds the button's text; restore resident artwork before waiting on any other country.
             for (const item of this.visibleCountries) {
-                const cached = this.flags.get(item.dataset.countryCode || '');
+                const cached = this.cachedCountry(item.dataset.countryCode || '');
                 if (cached) this.countryArtwork(item, cached.flag);
             }
             if (this.menuRequest) return;
             for (const item of this.visibleCountries) {
                 const code = item.dataset.countryCode || '';
                 if (!/^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(code)) continue;
-                if (this.flags.has(code)) continue;
+                if (this.cachedCountry(code)) continue;
                 const request = new AbortController();
                 this.menuRequest = request;
                 const timer = window.setTimeout(() => request.abort(), 5000);
@@ -226,8 +214,8 @@ namespace WorksheetResults {
             delete button.dataset.countryFlag;
             delete button.dataset.countryName;
             if (!/^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(code)) return;
-            if (this.flags.has(code)) {
-                const entry = this.flags.get(code)!;
+            const entry = this.cachedCountry(code);
+            if (entry) {
                 button.dataset.countryFlag = entry.flag;
                 button.dataset.countryName = entry.name;
                 this.countryArtwork(button, entry.flag);
@@ -311,10 +299,9 @@ namespace WorksheetResults {
             if (this.activeButton) this.hide();
             this.flagRequest?.controller.abort();
             this.flagRequest = null;
-            this.flags.clear();
+            this.native().call('lab_flag_cache_clear');
             for (const pending of this.pendingFlags.values()) pending.controller.abort();
             this.pendingFlags.clear();
-            this.flagBytes = 0;
         }
     }
 

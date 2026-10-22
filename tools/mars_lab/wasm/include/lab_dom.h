@@ -501,6 +501,12 @@ jsref lab_dom_all(jsref parent, const char *selector);
  */
 unsigned lab_dom_count(jsref list);
 
+/** @brief Return a mutation version for a select's option text, values, coordinates and ordering. */
+unsigned lab_dom_option_version(node_jsref select);
+
+/** @brief Assign a select's chosen index through the DOM setter without dispatching an event. */
+void lab_dom_select_index(node_jsref select, int index);
+
 /**
  * @brief Read an indexed browser collection member.
  * @param list Scoped array, NodeList or other indexed browser value.

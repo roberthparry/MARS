@@ -29,14 +29,14 @@
 #include "array-t.h"
 #include "string-t.h"
 
-struct _file_t {
+typedef struct _file_t {
     char *path;
     FILE *stream;
     DIR *directory;
     file_access_t access;
     int direction;
     int error;
-};
+} file_t;
 
 bool file_fail(file_t *file, int error);
 bool file_succeed(file_t *file);

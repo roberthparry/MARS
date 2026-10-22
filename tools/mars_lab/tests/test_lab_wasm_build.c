@@ -9,13 +9,67 @@
  * ungranted includes, including repeated includes and IntelliSense translation units.
  * Dependency checks reject absent maths headers and invalid archives with installation guidance.
  */
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "file-t.h"
 #include "lab_process.h"
+#include "lab_serial.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
+
+typedef struct _serial_fixture_t {
+    lab_serial_t serial;
+    unsigned count;
+    bool coherent;
+} serial_fixture_t;
+
+typedef struct _serial_worker_t {
+    serial_fixture_t *fixture;
+    bool succeeded;
+} serial_worker_t;
+
+static void serial_increment(void *context)
+{
+    serial_fixture_t *fixture = context;
+    unsigned before = fixture->count;
+    sched_yield();
+    fixture->coherent = fixture->coherent && fixture->count == before;
+    fixture->count = before + 1;
+}
+
+static void *serial_worker(void *context)
+{
+    serial_worker_t *worker = context;
+    worker->succeeded = true;
+    for (unsigned i = 0; i < 10000; ++i)
+        if (!lab_serial_dispatch(&worker->fixture->serial, serial_increment, worker->fixture)) {
+            worker->succeeded = false;
+            break;
+        }
+    return NULL;
+}
+
+static void test_lab_serial_dispatch(void)
+{
+    serial_fixture_t fixture = {.serial = LAB_SERIAL_INITIALIZER, .coherent = true};
+    serial_worker_t workers[4] = {{.fixture = &fixture}, {.fixture = &fixture},
+                                  {.fixture = &fixture}, {.fixture = &fixture}};
+    pthread_t threads[4];
+    unsigned started = 0;
+    while (started < 4 && !pthread_create(&threads[started], NULL, serial_worker, &workers[started])) ++started;
+    bool ok = started == 4;
+    for (unsigned i = 0; i < started; ++i) {
+        ok = !pthread_join(threads[i], NULL) && ok;
+        ok = workers[i].succeeded && ok;
+    }
+    ok = !lab_serial_dispatch(NULL, serial_increment, &fixture) &&
+         !lab_serial_dispatch(&fixture.serial, NULL, &fixture) && ok;
+    pthread_mutex_destroy(&fixture.serial.mutex);
+    TEST_ASSERT_TRUE(ok && fixture.coherent && fixture.count == 40000,
+                     "serial dispatch protects complete state transitions from four native contenders");
+}
 
 static bool wasm_make_environment(void)
 {
@@ -210,6 +264,7 @@ static void example_lab_wasm_assembly(void)
 /* Register ordinary build-graph checks before README output. */
 void test_lab_wasm_build_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_lab_serial_dispatch, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wasm_assembly_plans, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wasm_header_boundaries, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wasm_math_dependency, tests, NULL);

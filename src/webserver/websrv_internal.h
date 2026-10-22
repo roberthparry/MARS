@@ -25,28 +25,28 @@ typedef struct {
     void *context[HTTP_OPTIONS + 1];
 } websrv_routes_t;
 
-struct _websrv_t {
+typedef struct _websrv_t {
     int fd;
     uint16_t port;
     websrv_limits_t limits;
     dictionary_t *routes;
     bool active;
-};
-struct _websrv_request_t {
+} websrv_t;
+typedef struct _websrv_request_t {
     int connection_fd;
     webmethod_t method;
     string_t *target, *path, *peer;
     unsigned char *body;
     size_t body_size;
     dictionary_t *headers;
-};
-struct _websrv_response_t {
+} websrv_request_t;
+typedef struct _websrv_response_t {
     unsigned status;
     unsigned char *body;
     size_t body_size;
     dictionary_t *headers;
     size_t max_body, max_headers, header_bytes;
-};
+} websrv_response_t;
 
 dictionary_t *websrv_dict_new(size_t value_size);
 void websrv_headers_free(dictionary_t *headers);

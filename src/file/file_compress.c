@@ -19,7 +19,7 @@
 #define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 
-struct _file_decoder_t {
+typedef struct _file_decoder_t {
     ZSTD_DCtx *context;
     file_t *source;
     file_t *output;
@@ -29,7 +29,7 @@ struct _file_decoder_t {
     size_t magic_size;
     bool complete;
     unsigned char buffer[FILE_STREAM_BLOCK];
-};
+} file_decoder_t;
 
 bool file_compress_emit(file_t *source, file_emit_fn emit, void *context)
 {

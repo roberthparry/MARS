@@ -29,7 +29,7 @@ typedef struct almanac_lunar_eclipse_geometry_t {
     double moon_altitude_degrees;
 } almanac_lunar_eclipse_geometry_t;
 
-struct _almanac_lunar_eclipse_t {
+typedef struct _almanac_lunar_eclipse_t {
     almanac_lunar_eclipse_kind_t kind;
     almanac_event_time_t p1_contact;
     almanac_event_time_t u1_contact;
@@ -46,7 +46,7 @@ struct _almanac_lunar_eclipse_t {
     double penumbral_radius_degrees;
     double moon_semi_diameter_degrees;
     double orientation_degrees;
-};
+} almanac_lunar_eclipse_t;
 
 static bool almanac_lunar_eclipse_geometry(almanac_t *almanac, double jd, const almanac_observer_t *observer,
     almanac_lunar_eclipse_geometry_t *out)

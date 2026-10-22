@@ -215,6 +215,11 @@ static bool route_contracts(const char *directory)
                              "application/x-protobuf", NULL, NULL);
     ok = response && http_response_status(response) == 400 && ok;
     http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-borders",
+                             "{\"west\":0,\"south\":0,\"east\":1,\"north\":1,\"projection_scale\":-1}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = response && http_response_status(response) == 400 && ok;
+    http_response_free(response);
     response = route_request(HTTP_POST, "/almanac-country", "{\"lat\":0,\"lon\":-30}",
                              "application/x-protobuf", NULL, NULL);
     ok = response && http_response_status(response) == 200 && ok;
@@ -749,6 +754,17 @@ static bool route_rivers(const char *directory)
                       !setenv("MARS_GLOBE_DB_KEY", "river-globe-test", 1);
     string_free(globe_path);
     if (!configured) return false;
+    string_t *config_directory = string_sprintf("%s/config", directory);
+    string_t *config_path = string_sprintf("%s/config/globe-db.env", directory);
+    string_t *config_text = string_sprintf("MARS_GLOBE_DB_PATH=%s\nMARS_GLOBE_DB_KEY=river-globe-test\n",
+                                           getenv("MARS_GLOBE_DB_PATH"));
+    file_t *config_folder = config_directory ? file_new(config_directory) : NULL;
+    file_t *config_file = config_path ? file_new(config_path) : NULL;
+    configured = config_folder && config_file && config_text && file_create_directory(config_folder, 0700, false) &&
+                 file_write_all_text(config_file, config_text) && !setenv("MARS_HOME", directory, 1);
+    file_free(config_folder); file_free(config_file);
+    string_free(config_directory); string_free(config_path); string_free(config_text);
+    if (!configured) return false;
     if (setenv("NO_PROXY", "*", 1) || setenv("no_proxy", "*", 1)) return false;
     const char *bounds = "{\"west\":-1,\"south\":-1,\"east\":2,\"north\":2}";
     http_response_t *response = route_request(HTTP_POST, "/almanac-rivers", bounds,
@@ -769,13 +785,26 @@ static bool route_rivers(const char *directory)
         "create table rivers_chunk(id integer primary key,feature_id integer,kind integer,vertices blob);"
         "insert into rivers_chunk values(1,1,1,x'0000000000000000000f4240000f4240');"
         "create virtual table rivers_bounds using rtree_i32(id,min_x,max_x,min_y,max_y);"
-        "insert into rivers_bounds values(1,0,1000000,0,1000000);") && ok;
+        "insert into rivers_bounds values(1,0,1000000,0,1000000);"
+        "create table country_border_chunk(id integer primary key,points blob not null);"
+        "insert into country_border_chunk values(1,x'000000000000000040420f0040420f00');"
+        "create virtual table country_border_bounds using rtree_i32(id,west,east,south,north);"
+        "insert into country_border_bounds values(1,0,1000000,0,1000000);") && ok;
     sqlite_close(db);
     response = route_request(HTTP_POST, "/almanac-rivers", bounds, "application/x-protobuf", NULL, NULL);
     json_t *data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     const char *image = test_lab_text(data, "image");
     ok = route_check(response, 200, image && strstr(image, "<svg") && strstr(image, "M682.667"),
                      "bounded river overlay") && ok;
+    json_free(data);
+    http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-borders",
+        "{\"west\":-1,\"south\":-1,\"east\":2,\"north\":2,\"format\":\"segments\"}",
+        "application/x-protobuf", NULL, NULL);
+    data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    ok = route_check(response, 200,
+        !strcmp(test_lab_text(data, "segments"), "0.000000 0.000000 1.000000 1.000000\n") &&
+        !*test_lab_text(data, "image"), "geographic border vectors without raster imagery") && ok;
     json_free(data);
     http_response_free(response);
     path = string_new_with(getenv("MARS_GLOBE_DB_PATH"));

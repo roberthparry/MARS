@@ -18,9 +18,9 @@
 typedef struct {
     string_t *name, *value, *filename, *type, *path;
 } form_part_t;
-struct _http_form_t {
+typedef struct _http_form_t {
     array_t *parts;
-};
+} http_form_t;
 
 static void part_free(void *value)
 {

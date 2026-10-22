@@ -8,7 +8,8 @@
  * getters; a deferred service commits visibility changes. Native markup and copy
  * text pass through unchanged. Browser listeners retain their targets and context
  * objects, while all integer handles expire at the end of each synchronous call.
- * Request ownership and cancellation remain in the existing asynchronous adapters.
+ * A pending summary displays resident observer controls without predicting calculated
+ * values. Request ownership and cancellation remain in the existing asynchronous adapters.
  */
 #ifndef LAB_WASM_ALMANAC_EVENTS_H
 #define LAB_WASM_ALMANAC_EVENTS_H
@@ -41,6 +42,13 @@ void lab_almanac_events_install(jsref root, jsref state);
  * visibility; the browser supplies the existing diagnostic. State is never written.
  */
 void lab_almanac_events_render(jsref target, jsref data, jsref state);
+
+/** @brief Show selected observer controls immediately, with unresolved calculated fields explicitly pending.
+ * @param target Worksheet container whose obsolete results are replaced.
+ * @param country Optional cached country name and flag; no network lookup is performed.
+ * @details Reads current Almanac controls without modifying them or predicting surface/weather results.
+ */
+void lab_almanac_events_preview(jsref target, jsref country);
 
 /**
  * @brief Return ordered deferred services for a totality or visibility action.

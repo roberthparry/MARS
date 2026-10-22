@@ -12,7 +12,7 @@
 
 #include "diagnostic-t.h"
 
-struct _diagnostic_t {
+typedef struct _diagnostic_t {
     atomic_size_t references;
     diagnostic_severity_t severity;
     int64_t code;
@@ -23,7 +23,7 @@ struct _diagnostic_t {
     bool located;
     diagnostic_t *cause;
     size_t depth;
-};
+} diagnostic_t;
 
 /* Publish only complete, independently owned records. */
 diagnostic_t *diagnostic_new(diagnostic_severity_t severity, const char *domain, int64_t code,

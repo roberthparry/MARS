@@ -20,6 +20,117 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         if (!condition) throw new Error('Surface maths: ' + message);
     }
 
+    const borderCamera = [0, 0, 0, 1];
+    const borderGeometry = (camera = borderCamera, zoom = 1, size = 800): string | null =>
+        labDOM.call('lab_globe_borders_path', camera, zoom, size) as string | null;
+    try {
+        check(Boolean(labDOM.call('lab_globe_borders_load', '-10 0 10 0\n')), 'native border coordinates load');
+        const path = borderGeometry()!;
+        check(path.startsWith('M337.98 400.00L') && path.endsWith('462.02 400.00'),
+              'border projection agrees with the globe equator and screen scale');
+        check(!labDOM.call('lab_globe_borders_load', '0 0 NaN 0') && borderGeometry() === path,
+              'invalid replacement preserves accepted native geometry');
+        check(!labDOM.call('lab_globe_borders_load', '0 91 1 0') &&
+              !labDOM.call('lab_globe_borders_load', '0 0 1'), 'invalid latitude and incomplete segments are rejected');
+        labDOM.call('lab_globe_borders_load', '170 0 -170 0\n');
+        check(borderGeometry() === '', 'far hemisphere borders are hidden');
+        const dateLine = labDOM.call('lab_globe_centre', 0, 180) as number[];
+        check(Boolean(borderGeometry(dateLine)) && borderGeometry(dateLine)!.length < 1000,
+              'antimeridian segment follows the short visible arc');
+        labDOM.call('lab_globe_borders_load', '80 0 100 0\n');
+        check(borderGeometry()!.endsWith('757.14 400.00'), 'crossing border clips exactly at the visible limb');
+        labDOM.call('lab_globe_borders_load', '-10 0 10 0\n');
+        const rolled = [0, 0, Math.SQRT1_2, Math.SQRT1_2];
+        check(borderGeometry(rolled)!.startsWith('M400.00 462.02L'), 'border projection follows camera roll');
+        const close = borderGeometry(borderCamera, 10)!;
+        check(close.startsWith('M0.00 400.00L') && close.endsWith('800.00 400.00'),
+              'zoomed border is clipped to the viewport');
+        check(borderGeometry(borderCamera, 64) === null, 'coarse border geometry is hidden at deep zoom');
+        labDOM.call('lab_globe_borders_load', '0 0 0.01 0.01\n'.repeat(20000));
+        const begin = performance.now();
+        check(Boolean(borderGeometry()), 'large bounded border layer projects without bridge-handle exhaustion');
+        check(performance.now() - begin < 2000, 'large border projection has bounded execution time');
+    } finally { labDOM.call('lab_globe_borders_clear'); }
+
+    const flag = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg"/>');
+    const cachedFlag = (code: string) => labDOM.call('lab_flag_cache_get', code) as {name: string; flag: string} | null;
+    const flagStats = () => labDOM.call('lab_flag_cache_stats') as {entries: number; bytes: number};
+    labDOM.call('lab_flag_cache_clear');
+    try {
+        check(Boolean(labDOM.call('lab_flag_cache_put', 'BR', 'Brasil — 巴西', flag)), 'native flag insertion succeeds');
+        check(cachedFlag('BR')?.name === 'Brasil — 巴西' && cachedFlag('BR')?.flag === flag,
+              'dictionary preserves copied Unicode names and artwork across bridge calls');
+        check(flagStats().bytes === new TextEncoder().encode('Brasil — 巴西' + flag).length,
+              'native cache accounts for actual UTF-8 text storage');
+        check(Boolean(labDOM.call('lab_flag_cache_put', 'BR', 'Brazil', flag)) && flagStats().entries === 1 &&
+              cachedFlag('BR')?.name === 'Brazil', 'replacement updates one native dictionary entry');
+        check(!labDOM.call('lab_flag_cache_put', 'br', 'invalid', flag) &&
+              !labDOM.call('lab_flag_cache_put', 'BR', 'bad\ud800', flag) &&
+              !labDOM.call('lab_flag_cache_put', 'BR', 'bad', 'javascript:bad') &&
+              cachedFlag('BR')?.name === 'Brazil', 'invalid metadata preserves the cached entry');
+        labDOM.call('lab_flag_cache_clear');
+        const codes = Array.from({length: 33}, (_, i) => String.fromCharCode(65 + Math.floor(i / 26), 65 + i % 26));
+        for (const code of codes) check(Boolean(labDOM.call('lab_flag_cache_put', code, code, flag)), 'bounded cache insert');
+        check(flagStats().entries === 32 && !cachedFlag(codes[0]) && Boolean(cachedFlag(codes[32])),
+              'the 33rd flag evicts the oldest insertion');
+        labDOM.call('lab_flag_cache_clear');
+        const large = 'data:image/svg+xml;base64,' + 'A'.repeat(600000);
+        const largeFirst = labDOM.call('lab_flag_cache_put', 'BR', 'Brazil', large);
+        const largeSecond = labDOM.call('lab_flag_cache_put', 'UY', 'Uruguay', large);
+        check(Boolean(largeFirst) && Boolean(largeSecond) &&
+              flagStats().entries === 1 && flagStats().bytes <= 1048576 && !cachedFlag('BR'),
+              `byte pressure evicts entries before the count limit is reached: ${largeFirst}, ${largeSecond}, ${JSON.stringify(flagStats())}`);
+        check(!labDOM.call('lab_flag_cache_put', 'UY', 'too large', large + large) &&
+              cachedFlag('UY')?.name === 'Uruguay', 'oversized replacement leaves the old flag intact');
+    } finally { labDOM.call('lab_flag_cache_clear'); }
+    check(flagStats().entries === 0 && flagStats().bytes === 0, 'cache shutdown releases entries and accounting');
+
+    const town = (name: string, latitude: string, longitude: string): LabTown => ({
+        name, latitude, longitude, elevation: '0', timezone: '', default: false, value: name, detail: name
+    });
+    const townBatch = [town('Native western', '0', '-180'), town('Native eastern', '0', '180'),
+        town('Native pole', '90', '0')];
+    check(labDOM.call('lab_town_store_add', 'ZZ', townBatch) === 3,
+          'native array stores a town batch');
+    check(labDOM.call('lab_town_store_add', 'ZZ', townBatch) === 0,
+          'native dictionary deduplicates catalogue rows');
+    townBatch[0].name = 'mutated browser input';
+    const retained = labDOM.call('lab_town_store_get', 'ZZ', 'Native western') as {town: LabTown};
+    check(retained.town.name === 'Native western', 'town storage owns its strings independently of input objects');
+    retained.town.name = 'mutated snapshot';
+    check((labDOM.call('lab_town_store_get', 'ZZ', 'Native western') as {town: LabTown}).town.name === 'Native western',
+          'snapshot changes cannot modify native town records');
+    const dateline = labDOM.call('lab_town_store_region', 175, -1, 185, 1) as {jurisdiction: string; town: LabTown}[];
+    check(dateline.filter(place => place.jurisdiction === 'ZZ').length === 2,
+          'spatial buckets wrap both representations of the date line');
+    check((labDOM.call('lab_town_store_region', -5, 90, 5, 90) as {jurisdiction: string}[])
+        .some(place => place.jurisdiction === 'ZZ'), 'north-pole bucket remains in bounds');
+    check((labDOM.call('lab_town_store_region', 0, 1e300, 5, 1e300) as unknown[]).length === 0,
+          'out-of-range latitude bounds cannot overflow bucket indexes');
+    check(labDOM.call('lab_town_store_add', 'ZZ', [town('rollback', '0', '0'), town('bad\ud800', '0', '0')]) === -1 &&
+          !labDOM.call('lab_town_store_get', 'ZZ', 'rollback'), 'invalid UTF-8 input rolls back the complete batch');
+    const overBudget = Array.from({length: 130}, (_, i) => ({...town(`quota-${i}`, '1', '1'), detail: 'x'.repeat(65536)}));
+    check(labDOM.call('lab_town_store_add', 'ZZ', overBudget) === -1 &&
+          !labDOM.call('lab_town_store_get', 'ZZ', 'quota-0') &&
+          Boolean(labDOM.call('lab_town_store_get', 'ZZ', 'Native western')),
+          'quota failure rolls back new rows and preserves existing records across native memory growth');
+    const largeCatalogue = Array.from({length: 5000}, (_, i) => town(`Native catalogue ${i}`, 'invalid', 'invalid'));
+    check(labDOM.call('lab_town_store_add', 'ZX', largeCatalogue) === 5000,
+          'large native catalogue insertion keeps temporary bridge handles bounded');
+    check((labDOM.call('lab_town_store_list', 'ZX') as LabTown[]).length === 5000 &&
+          (labDOM.call('lab_town_store_get', 'ZX', 'Native catalogue 4999') as GlobeTown).town.value === 'Native catalogue 4999',
+          'large catalogue snapshots remain bounded and exact selection keys use the dictionary');
+    labDOM.call('lab_town_store_add', 'GB-WLS', [town('Llanfairpwllgwyngyll', '53.22', '-4.2')]);
+    check((labDOM.call('lab_town_store_get', 'GB-WLS', 'Llanfairpwllgwyngyll') as GlobeTown)
+        .fullName === 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch',
+        'native exception dictionary supplies the full Welsh town name');
+    labDOM.call('lab_country_cache_clear');
+    for (let i = 0; i < 65; ++i) labDOM.call('lab_country_cache_put', `test:${i}`, 'Country — 巴西', 'BR');
+    check(!labDOM.call('lab_country_cache_get', 'test:0') &&
+        (labDOM.call('lab_country_cache_get', 'test:64') as {name: string}).name === 'Country — 巴西',
+        'native spatial-country cache preserves Unicode and evicts its oldest entry');
+    labDOM.call('lab_country_cache_clear');
+
     const initialFetch = labHttp.fetch;
     let deferredRequest = false;
     try {
@@ -40,11 +151,10 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     };
     const borderGlobe = Object.assign(Object.create(MarsAlmanacGlobe.prototype), {
         input: (key: string) => borderInputs[key], draw: () => {},
-        townById: new Map([[JSON.stringify(['BR', 'border-town']), {
-            jurisdiction: 'BR', country: 'Brazil', town: {latitude: '-33.69', longitude: '-53.46'}
-        }]]),
-        countryCache: new Map(), countryPending: new Map(), countryCacheBytes: 0
+        countryNames: new Intl.DisplayNames(['en-GB'], {type: 'region'}),
+        countryPending: new Map()
     }) as {loadCountry(point?: number[]): void; country: string; hoverCountry: string; hoverCountryKey: string};
+    labDOM.call('lab_town_store_add', 'BR', [town('border-town', '-33.69', '-53.46')]);
     const borderRequests: Array<{country_code?: string}> = [];
     try {
         labHttp.fetch = async (url, options) => {
@@ -255,7 +365,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                         clientX: box.left + box.width / 2, clientY: box.top + box.height / 2}));
                 };
                 const reply = (country: string): MarsTransportResponse => Object.assign(new Response(), {
-                    async labData() { return {ok: true, country,
+                    async labData() { return {ok: true, country, country_code: country ? 'GB' : '',
                         country_flag: country ? 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 3"><path fill="blue" d="M0 0H4V3H0Z"/></svg>') : ''}; }
                 });
                 await selectCountryPoint('52.7081');
@@ -584,7 +694,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             check(Math.abs(parseFloat(document.querySelector<HTMLElement>('.globe-observer')!.style.left) -
                 globeCanvas.clientWidth / 2) > 1, 'keyboard rotates the globe');
             const jurisdiction = (document.getElementById('almanacJurisdiction') as HTMLSelectElement).value;
-            const place = WorksheetContext.JURISDICTION_TOWN_OPTIONS[jurisdiction]?.find(candidate =>
+            const place = (labDOM.call('lab_town_store_list', jurisdiction) as LabTown[] | null)?.find(candidate =>
                 Array.from(town.options).some(option => option.value === candidate.value));
             check(Boolean(place), 'selected-town regression has a catalogue town');
             const beforeCommitZoom = (gl.getUniform(program, gl.getUniformLocation(program, 'camera')!) as Float32Array)[2];
@@ -1013,50 +1123,55 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 labHttp.fetch = originalFetch;
             }
             const bordersButton = globeRoot.querySelector<HTMLButtonElement>('[data-globe-action="borders"]')!;
-            const borderFetch = labHttp.fetch, borderUpload = gl.texImage2D;
+            const borderFetch = labHttp.fetch;
             const borderReplies: Array<{resolve: (response: MarsTransportResponse) => void; signal?: AbortSignal | null}> = [];
-            let borderReleases = 0;
+            const borderFormats: string[] = [];
+            const vectorReply = (): MarsTransportResponse => ({ok: true, status: 200,
+                labData: async () => ({ok: true, segments: '-20 0 20 0\n'})}) as MarsTransportResponse;
+            const borderPath = globeRoot.querySelector<SVGPathElement>('.globe-border-overlay path')!;
             try {
                 check(bordersButton.getAttribute('aria-pressed') === 'false', 'country borders default to off');
-                labHttp.fetch = (url, options) => url === '/almanac-borders' ?
-                    new Promise(resolve => borderReplies.push({resolve, signal: options?.signal})) : borderFetch(url, options);
-                gl.texImage2D = function (...args: unknown[]): void {
-                    if (gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE4 && args.length === 9 &&
-                        args[3] === 1 && args[4] === 1) ++borderReleases;
-                    Reflect.apply(borderUpload, gl, args);
+                labHttp.fetch = (url, options) => {
+                    if (url !== '/almanac-borders') return borderFetch(url, options);
+                    const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {format: string};
+                    borderFormats.push(payload.format);
+                    return new Promise(resolve => borderReplies.push({resolve, signal: options?.signal}));
                 };
                 bordersButton.click();
                 check(borderReplies.length === 1, 'enabling borders starts an asynchronous request');
+                check(borderFormats[0] === 'segments' && borderPath.getAttribute('stroke-width') === '1' &&
+                      borderPath.getAttribute('vector-effect') === 'non-scaling-stroke',
+                      'borders request native vectors and draw a non-scaling one-pixel SVG stroke');
                 globeCanvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
                 check(borderReplies[0].signal?.aborted === true, 'moving cancels obsolete border requests');
                 for (let i = 0; i < 40 && borderReplies.length < 2; ++i) await new Promise(resolve => setTimeout(resolve, 25));
                 check(borderReplies.length === 2, 'new viewport requests replacement borders');
-                borderReplies[0].resolve(riverReply());
+                borderReplies[0].resolve(vectorReply());
                 await new Promise(resolve => setTimeout(resolve, 30));
                 check(globeRoot.dataset.borders !== 'ready', 'stale border response cannot publish');
-                borderReplies[1].resolve(riverReply());
+                borderReplies[1].resolve(vectorReply());
                 for (let i = 0; i < 40 && globeRoot.dataset.borders !== 'ready'; ++i)
                     await new Promise(resolve => setTimeout(resolve, 25));
-                check(globeRoot.dataset.borders === 'ready', 'visible shared borders upload independently');
+                check(globeRoot.dataset.borders === 'ready', 'visible shared borders load independently');
                 for (let i = 0; i < 9; ++i) zoomIn.click();
                 await new Promise(requestAnimationFrame);
-                check(globeRoot.dataset.borders === 'zoom-hidden' && borderReleases > 0 &&
-                      !gl.getUniform(program, gl.getUniformLocation(program, 'borderReady')!),
-                      'close zoom hides coarse borders and releases their texture memory');
+                check(globeRoot.dataset.borders === 'zoom-hidden' && borderPath.getAttribute('d') === '' &&
+                      labDOM.call('lab_globe_borders_path', [0, 0, 0, 1], 1, 800) === null,
+                      'close zoom hides coarse borders and releases their native geometry');
                 for (let i = 0; i < 24; ++i) zoomOut.click();
                 for (let i = 0; i < 40 && borderReplies.length < 3; ++i) await new Promise(resolve => setTimeout(resolve, 25));
                 check(borderReplies.length === 3, 'zooming back out reloads borders');
-                borderReplies[2].resolve(riverReply());
+                borderReplies[2].resolve(vectorReply());
                 for (let i = 0; i < 40 && globeRoot.dataset.borders !== 'ready'; ++i)
                     await new Promise(resolve => setTimeout(resolve, 25));
                 bordersButton.click();
                 await new Promise(requestAnimationFrame);
-                check(globeRoot.dataset.borders === 'off' && borderReleases >= 2,
-                      'switching borders off releases imagery without changing the observer');
+                check(globeRoot.dataset.borders === 'off' && borderPath.getAttribute('d') === '',
+                      'switching borders off clears vectors without changing the observer');
             } finally {
                 if (bordersButton.getAttribute('aria-pressed') === 'true') bordersButton.click();
-                borderReplies.forEach(request => request.resolve(riverReply()));
-                labHttp.fetch = borderFetch; gl.texImage2D = borderUpload;
+                borderReplies.forEach(request => request.resolve(vectorReply()));
+                labHttp.fetch = borderFetch;
                 for (let i = 0; i < 24; ++i) zoomOut.click();
             }
         } finally {

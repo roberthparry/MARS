@@ -23,11 +23,11 @@
 
 enum { ALMANAC_TOTALITY_SAMPLES = 361 };
 
-struct _almanac_totality_screen_t {
+typedef struct _almanac_totality_screen_t {
     cartesian3_t sun[ALMANAC_TOTALITY_SAMPLES];
     cartesian3_t moon[ALMANAC_TOTALITY_SAMPLES];
     double cosine_squared;
-};
+} almanac_totality_screen_t;
 
 /* Prepare fixed-size screening data without modifying or retaining the catalogue. */
 almanac_totality_screen_t *almanac_totality_screen_new(almanac_t *almanac, const almanac_solar_eclipse_t *eclipse)

@@ -5,8 +5,11 @@
  * Converts spatially selected river segments into a transparent SVG overlay. Requests are restricted to close
  * views and bounded output; missing data leave the existing globe usable. Rivers never alter observer corrections.
  * Shared country borders use their own overview endpoint and never draw generalised administrative coastlines.
+ * Vector requests return bounded decimal geographic segments for native browser projection; the legacy SVG
+ * response remains available for callers without a vector layer.
  */
 #include <math.h>
+#include <string.h>
 
 #include "jurisdiction-t.h"
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
@@ -17,6 +20,7 @@ typedef struct {
     double west, north, scale_x, scale_y;
     size_t segments;
     size_t limit;
+    bool vectors;
 } lab_river_paths_t;
 
 static bool lab_river_segment(int64_t id, unsigned kind, double ax, double ay, double bx, double by, void *context)
@@ -31,6 +35,10 @@ static bool lab_river_segment(int64_t id, unsigned kind, double ax, double ay, d
 
 static bool lab_border_segment(double ax, double ay, double bx, double by, void *context)
 {
+    lab_river_paths_t *p = context;
+    if (p->vectors)
+        return ++p->segments <= p->limit &&
+            string_append_format(p->path, "%.6f %.6f %.6f %.6f\n", ax, ay, bx, by) >= 0;
     return lab_river_segment(0, 0, ax, ay, bx, by, context);
 }
 
@@ -45,15 +53,34 @@ json_t *lab_cal_borders(const json_t *payload, unsigned *status)
     if (b[0] < -360 || b[0] > 180 || b[2] - b[0] < 0.000001 || b[2] - b[0] > 360 ||
         b[1] < -90 || b[3] > 90 || b[3] - b[1] < 0.000001)
         return lab_cal_error(status, 400, "Invalid border bounds");
+    double projection_scale = 0;
+    const char *scale_text = lab_cal_text(payload, "projection_scale");
+    if (*scale_text && (!lab_cal_number(scale_text, &projection_scale) || !isfinite(projection_scale) ||
+                       projection_scale <= 0 || projection_scale > 1000000))
+        return lab_cal_error(status, 400, "Invalid border display scale");
+    /* Bound the projected stroke to one CSS pixel; projection can only shorten it towards the limb. */
+    double stroke = projection_scale > 0 ?
+        fmin(1.2, 1024 / (projection_scale * fmax(b[2] - b[0], b[3] - b[1]) * 0.017453292519943295)) : 1.2;
     lab_river_paths_t p = {.path = string_new(), .west = b[0], .north = b[3], .limit = 250000,
+                           .vectors = !strcmp(lab_cal_text(payload, "format"), "segments"),
                            .scale_x = 1024 / (b[2] - b[0]), .scale_y = 1024 / (b[3] - b[1])};
     globe_t *globe = globe_open_configured(NULL);
     bool ok = p.path && globe_border_segments(globe, b[0], b[1], b[2], b[3], lab_border_segment, &p);
     globe_close(globe);
+    if (p.vectors) {
+        json_t *response = ok ? json_new_object() : NULL;
+        if (response) {
+            lab_cal_take(response, "ok", json_new_bool(true));
+            lab_cal_set(response, "segments", string_c_str(p.path));
+            if (status) *status = 200;
+        }
+        string_free(p.path);
+        return response ? response : lab_cal_error(status, 503, "Country borders unavailable; update the globe database");
+    }
     string_t *image = ok ? string_sprintf(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1024\" height=\"1024\" viewBox=\"0 0 1024 1024\">"
-        "<path fill=\"none\" stroke=\"#dcc7a0\" stroke-width=\"1.2\" stroke-linecap=\"round\" d=\"%s\"/></svg>",
-        string_c_str(p.path)) : NULL;
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2048\" height=\"2048\" viewBox=\"0 0 1024 1024\">"
+        "<path fill=\"none\" stroke=\"#dcc7a0\" stroke-width=\"%.6f\" stroke-linecap=\"round\" d=\"%s\"/></svg>",
+        stroke, string_c_str(p.path)) : NULL;
     string_free(p.path);
     if (!image) return lab_cal_error(status, 503, "Country borders unavailable; update the globe database");
     json_t *response = json_new_object();

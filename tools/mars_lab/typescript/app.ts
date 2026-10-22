@@ -99,11 +99,10 @@ class LabApplication {
     public townsReady: Promise<void> = Promise.resolve();
     private readonly townJurisdictions = new Set<string>();
     private readonly failedTownCodes = new Set<string>();
-    private readonly townJobs = new Map<string, {controller: AbortController; promise: Promise<void>}>();
+    private readonly townJobs = new Map<string, {controller: AbortController; promise: Promise<void>; ready: Promise<void>}>();
     private nearbyCentre: [number, number] | null = null;
     private nearbyComplete = false;
     private nearbyTowns?: AbortController;
-    private readonly townKeys = new Set<string>();
     private readonly observers: ResizeObserver[] = [];
     private readonly resizeCallbacks = new Set<LabLifetimeCallback>();
     private readonly cleanupCallbacks: LabLifetimeCallback[] = [];
@@ -112,7 +111,6 @@ class LabApplication {
     private config: LabConfiguration | undefined;
     private nativeCatalogue: LabCatalogue | undefined;
     private definitionScriptNames: readonly string[] = [];
-    private readonly townCollator = new Intl.Collator('en-GB');
     private readonly pendingTownCodes = new Set<string>();
     private townRefresh: Promise<void> | null = null;
 
@@ -205,6 +203,12 @@ class LabApplication {
 
     private async loadTowns(): Promise<void> {
         if (!this.catalogue.available) return;
+        for (const [code, rows] of Object.entries(this.catalogue.towns)) {
+            if (labDOM.call<number>('lab_town_store_add', code, rows) < 0) throw new Error('Cannot retain town catalogue');
+            delete this.catalogue.towns[code];
+        }
+        Object.defineProperty(this.catalogue.towns, 'nativeStore', {value: true, configurable: true});
+        document.dispatchEvent(new CustomEvent('lab-town-catalogue-ready'));
         const refresh = () => { void this.loadSelectedTowns(); };
         for (const id of ['datetimeJurisdiction', 'almanacJurisdiction'])
             document.getElementById(id)?.addEventListener('change', refresh, {signal: this.lifetime.signal});
@@ -216,6 +220,7 @@ class LabApplication {
     }
 
     private async loadSelectedTowns(): Promise<void> {
+        const pending: Promise<void>[] = [];
         const codes = new Set(['almanacJurisdiction', 'datetimeJurisdiction'].map(id =>
             (document.getElementById(id) as HTMLSelectElement)?.value || '').filter(code => /^[A-Z0-9-]{2,32}$/.test(code)));
         // Include parent fallback only when its subdivision is selected, never the whole world.
@@ -233,22 +238,33 @@ class LabApplication {
             if (job?.controller.signal.aborted) job = undefined;
             if (!job) {
                 const controller = new AbortController();
-                const promise = this.loadJurisdictionTowns(code, controller.signal).catch(() => {
+                let firstPage!: () => void;
+                const ready = new Promise<void>(resolve => { firstPage = resolve; });
+                const promise = this.loadJurisdictionTowns(code, controller.signal, firstPage).catch(() => {
                     if (!controller.signal.aborted && !this.lifetime.signal.aborted) {
                         this.failedTownCodes.add(code);
                         this.townNotice('');
                     }
                 }).finally(() => {
+                    firstPage();
                     if (this.townJobs.get(code)?.controller === controller) this.townJobs.delete(code);
                 });
-                job = {controller, promise};
+                job = {controller, promise, ready};
                 this.townJobs.set(code, job);
             }
-            await job.promise;
+            pending.push(job.promise);
         }
+        await Promise.all(pending);
     }
 
-    private async loadJurisdictionTowns(code: string, controller: AbortSignal): Promise<void> {
+    /** Await only the first country page; the remaining catalogue continues in the background. */
+    public async prepareCountrySelection(code: string): Promise<void> {
+        if (!this.catalogue?.available || this.townJurisdictions.has(code)) return;
+        void this.loadSelectedTowns();
+        await this.townJobs.get(code)?.ready;
+    }
+
+    private async loadJurisdictionTowns(code: string, controller: AbortSignal, firstPage: () => void): Promise<void> {
         this.failedTownCodes.delete(code);
         this.townNotice('');
         let cursor = '0';
@@ -263,6 +279,7 @@ class LabApplication {
             if (batch.next !== '0' && BigInt(batch.next) <= BigInt(cursor))
                 throw new Error('Town catalogue cursor did not advance');
             await this.publishTowns(batch.towns);
+            firstPage();
             this.townNotice('');
             cursor = batch.next;
         } while (cursor !== '0');
@@ -304,27 +321,21 @@ class LabApplication {
     }
 
     private async publishTowns(towns: LabTownCatalogue): Promise<void> {
-        const added: LabTownCatalogue = Object.create(null);
+        let added = 0;
         let count = 0;
         for (const rows of Object.values(towns)) {
             if (!Array.isArray(rows) || (count += rows.length) > 512) throw new Error('Invalid town catalogue batch');
         }
         for (const [code, rows] of Object.entries(towns)) {
-            for (const row of rows) {
-                const key = JSON.stringify([code, row.value]);
-                if (this.townKeys.has(key)) continue;
-                this.townKeys.add(key);
-                (this.catalogue.towns[code] ||= []).push(row);
-                (added[code] ||= []).push(row);
-            }
-            if (added[code]) {
-                this.catalogue.towns[code].sort((a, b) =>
-                    Number(b.default) - Number(a.default) || this.townCollator.compare(a.name, b.name));
+            const inserted = labDOM.call<number>('lab_town_store_add', code, rows);
+            if (inserted < 0) throw new Error('Cannot retain town catalogue batch');
+            if (inserted) {
+                added += inserted;
                 this.pendingTownCodes.add(code);
             }
         }
-        if (!Object.keys(added).length) return;
-        document.dispatchEvent(new CustomEvent('lab-town-catalogue-ready', {detail: added}));
+        if (!added) return;
+        document.dispatchEvent(new CustomEvent('lab-town-catalogue-ready'));
         // Local and jurisdiction pages share one refresh queue to avoid concurrent menu rebuilds.
         if (!this.townRefresh) {
             this.townRefresh = this.refreshTownMenus();
@@ -338,14 +349,13 @@ class LabApplication {
                 // Yield to browser input/painting even when catalogue fetches are satisfied immediately.
                 await new Promise<void>(resolve => window.setTimeout(resolve, 0));
                 this.lifetime.signal.throwIfAborted();
-                const changed = new Set(Array.from(this.pendingTownCodes, code => this.catalogue.towns[code]));
+                const changed = new Set(this.pendingTownCodes);
                 this.pendingTownCodes.clear();
                 for (const mode of ['datetime', 'almanac']) {
                     const jurisdiction = document.getElementById(`${mode}Jurisdiction`) as WorksheetSelect;
                     const code = jurisdiction.value;
                     const selection = WorksheetLocations.townSelection;
-                    // Ask native policy which list is used, including its country-level fallback.
-                    if (!changed.has(selection.townsForJurisdiction(code) as LabTownCatalogue[string])) continue;
+                    if (!changed.has(code) && !changed.has(code.split('-')[0])) continue;
                     const select = document.getElementById(`${mode}Town`) as WorksheetSelect;
                     const current = () => !this.lifetime.signal.aborted && jurisdiction.value === code;
                     await selection.populateTownSelect(select, code, {selectDefault: false, isCurrent: current});
@@ -399,6 +409,12 @@ class LabApplication {
     }
 
     private disposeWire(): void {
+        if (this.nativeCatalogue) {
+            labDOM.call('lab_town_store_clear');
+            labDOM.call('lab_country_cache_clear');
+            labDOM.call('lab_menu_index_clear');
+            labDOM.call('lab_globe_borders_clear');
+        }
         labWire.dispose();
     }
 

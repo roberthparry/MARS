@@ -7,17 +7,12 @@
  * GPU sampling keeps rotation responsive while a cancellable request obtains finer shoreline imagery.
  */
 type GlobeView = [number, number, number, number, number, number, number];
-interface GlobeTown { town: LabTown; jurisdiction: string; country: string; }
+interface GlobeTown { town: LabTown; jurisdiction: string; country: string; fullName?: string; }
 
 class MarsAlmanacGlobe {
     private static instance: MarsAlmanacGlobe | null = null;
-    // Display-only exceptions: indexed by jurisdiction and catalogue name, never scanned per frame.
-    private static readonly longNames = new Map<string, string>([
-        ['GB-WLS:Llanfairpwllgwyngyll', 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch']
-    ]);
-
     private static townLabel(place: GlobeTown, zoom: number, available: number): {name: string; full: string; width: number} {
-        const full = this.longNames.get(`${place.jurisdiction}:${place.town.name}`) || place.town.name;
+        const full = place.fullName || place.town.name;
         const expanded = full !== place.town.name && zoom >= 12 && available >= 430;
         return {name: expanded ? full : place.town.name, full, width: expanded ? 430 : 128};
     }
@@ -27,6 +22,9 @@ class MarsAlmanacGlobe {
     private rotation = [1, 0, 0, 0, 1, 0, 0, 0, 1];
     private readonly canvas: HTMLCanvasElement;
     private readonly markers: HTMLElement;
+    private readonly borderOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    private readonly borderPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    private borderSignature = '';
     private readonly status: HTMLElement;
     private readonly gridTooltip = document.createElement('div');
     private readonly countryFlagIcon = document.createElement('img');
@@ -44,7 +42,7 @@ class MarsAlmanacGlobe {
     private highResolutionRequested = false;
     private detailZoom = 0;
     private requestBounds: number[] | null = null;
-    private readonly markerNodes = new Map<GlobeTown | null, HTMLElement>();
+    private readonly markerNodes = new Map<string | null, HTMLElement>();
     private markerSignature = '';
     private observerSignature = '';
     private clickedObserver: [number, number] | null = null;
@@ -52,21 +50,18 @@ class MarsAlmanacGlobe {
     private country = '';
     private countryFlag = '';
     private countryRequest: AbortController | null = null;
-    private countryCache = new Map<string, {name: string; flag: string; code: string}>();
     private readonly countryPending = new Map<string, {
         controller: AbortController;
         users: number;
         promise: Promise<{name: string; flag: string; code: string}>;
     }>();
-    private countryCacheBytes = 0;
     private hoverCountryKey = '';
     private hoverCountry = '';
     private hoverCountryFlag = '';
     private hoverCountryRequest: AbortController | null = null;
     private hoverCountryTimer = 0;
     private hoverShift = false;
-    private readonly towns = new Map<string, GlobeTown[]>();
-    private readonly townById = new Map<string, GlobeTown>();
+    private readonly countryNames = new Intl.DisplayNames(['en-GB'], {type: 'region'});
     private readonly pointers = new Map<number, {x: number; y: number}>();
     private started = false;
     private dragged = false;
@@ -88,7 +83,6 @@ class MarsAlmanacGlobe {
     private borders = false;
     private borderReady = false;
     private borderBounds = [-180, -90, 180, 90];
-    private borderZoom = 0;
     private borderRequest: AbortController | null = null;
     private flightFrame = 0;
     private flightGeneration = 0;
@@ -194,6 +188,16 @@ class MarsAlmanacGlobe {
         this.canvas = root.querySelector('canvas')!;
         this.markers = root.querySelector('.almanac-globe-markers')!;
         this.status = root.querySelector('[role="status"]')!;
+        this.borderOverlay.classList.add('globe-border-overlay');
+        this.borderOverlay.setAttribute('aria-hidden', 'true');
+        this.borderOverlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden';
+        this.borderPath.setAttribute('fill', 'none');
+        this.borderPath.setAttribute('stroke', '#dcc7a0');
+        this.borderPath.setAttribute('stroke-width', '1');
+        this.borderPath.setAttribute('vector-effect', 'non-scaling-stroke');
+        this.borderPath.setAttribute('stroke-linecap', 'round');
+        this.borderOverlay.append(this.borderPath);
+        this.canvas.after(this.borderOverlay);
         this.gridTooltip.className = 'globe-grid-tooltip';
         this.gridTooltip.setAttribute('role', 'tooltip');
         this.gridMarker.className = 'globe-grid-marker';
@@ -211,7 +215,7 @@ class MarsAlmanacGlobe {
         const position = gl.getAttribLocation(this.program, 'position');
         gl.enableVertexAttribArray(position);
         gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-        for (let i = 0; i < 5; ++i) {
+        for (let i = 0; i < 4; ++i) {
             const texture = gl.createTexture();
             if (!texture) throw new Error('Could not allocate globe imagery.');
             this.textures.push(texture);
@@ -227,11 +231,9 @@ class MarsAlmanacGlobe {
         gl.uniform1i(gl.getUniformLocation(this.program, 'detail'), 1);
         gl.uniform1i(gl.getUniformLocation(this.program, 'mapWorld'), 2);
         gl.uniform1i(gl.getUniformLocation(this.program, 'rivers'), 3);
-        gl.uniform1i(gl.getUniformLocation(this.program, 'borders'), 4);
         this.events();
-        document.addEventListener('lab-town-catalogue-ready', event => {
+        document.addEventListener('lab-town-catalogue-ready', () => {
             if (!this.started) return;
-            this.indexTowns((event as CustomEvent<LabTownCatalogue>).detail);
             this.markerSignature = '';
             this.draw();
         });
@@ -239,7 +241,6 @@ class MarsAlmanacGlobe {
         const visible = new IntersectionObserver(entries => {
             if (!this.started && entries.some(entry => entry.isIntersecting)) {
                 this.started = true;
-                this.indexTowns();
                 if (this.observerSignature !== this.observerState()) this.centre();
                 else this.move(0, 0, 1);
                 void this.loadWorld();
@@ -261,9 +262,6 @@ class MarsAlmanacGlobe {
                 uniform sampler2D rivers;
                 uniform vec4 riverBounds;
                 uniform bool riverReady;
-                uniform sampler2D borders;
-                uniform vec4 borderBounds;
-                uniform bool borderReady;
                 uniform bool mapMode;
                 uniform vec3 camera;
                 uniform mat3 cameraToWorld;
@@ -348,16 +346,6 @@ class MarsAlmanacGlobe {
                     if(mapMode) colour.rgb=mapColour(colour.rgb,vec2(lon,lat));
                     float light=.8+.2*max(0.,dot(vec3(p.x,-p.y,z),normalize(vec3(-.35,.45,1.))));
                     vec3 surface=mix(colour.rgb*light,vec3(.32,.60,.88),.18*pow(1.-z,4.));
-                    if(borderReady && camera.z<64.) {
-                        float bc=(borderBounds.x+borderBounds.z)*.5;
-                        float bl=bc+mod(lon-bc+180.,360.)-180.;
-                        vec2 bu=vec2((bl-borderBounds.x)/(borderBounds.z-borderBounds.x),
-                                     (borderBounds.w-lat)/(borderBounds.w-borderBounds.y));
-                        if(bu.x>=0. && bu.x<=1. && bu.y>=0. && bu.y<=1.) {
-                            vec4 border=texture2D(borders,bu);
-                            surface=mix(surface,border.rgb,border.a*.7*(1.-smoothstep(24.,64.,camera.z)));
-                        }
-                    }
                     if(riverReady && camera.z>=12.) {
                         float rc=(riverBounds.x+riverBounds.z)*.5;
                         float rl=rc+mod(lon-rc+180.,360.)-180.;
@@ -396,23 +384,18 @@ class MarsAlmanacGlobe {
         return program;
     }
 
-    private indexTowns(catalogue: LabTownCatalogue = WorksheetContext.JURISDICTION_TOWN_OPTIONS): void {
-        const countries = new Intl.DisplayNames(['en-GB'], {type: 'region'});
-        for (const [jurisdiction, towns] of Object.entries(catalogue)) {
-            const country = countries.of(jurisdiction.split('-')[0]) || jurisdiction;
-            for (const town of towns) {
-                if (this.townById.has(JSON.stringify([jurisdiction, town.value]))) continue;
-                const latitude = Number(town.latitude), longitude = Number(town.longitude);
-                if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) continue;
-                const key = `${Math.floor(latitude / 5)},${Math.floor((longitude === 180 ? -180 : longitude) / 5)}`;
-                const bucket = this.towns.get(key) || [];
-                const place = {town, jurisdiction, country};
-                bucket.push(place);
-                this.townById.set(JSON.stringify([jurisdiction, town.value]), place);
-                this.towns.set(key, bucket);
-            }
-        }
+    private placeCountry(place: GlobeTown): GlobeTown {
+        place.country = this.countryNames.of(place.jurisdiction.split('-')[0]) || place.jurisdiction;
+        return place;
     }
+
+    private selectedTown(): GlobeTown | undefined {
+        const place = labDOM.call('lab_town_store_get', this.input('Jurisdiction').value,
+            this.input('Town').value) as GlobeTown | null;
+        return place ? this.placeCountry(place) : undefined;
+    }
+
+    private townKey(place: GlobeTown): string { return `${place.jurisdiction}:${place.town.value}`; }
 
     private input(name: string): HTMLInputElement { return document.getElementById(`almanac${name}`) as HTMLInputElement; }
 
@@ -643,15 +626,10 @@ class MarsAlmanacGlobe {
     private unloadBorders(): void {
         this.borderRequest?.abort();
         this.borderRequest = null;
-        if (this.borderReady) {
-            const gl = this.gl;
-            gl.activeTexture(gl.TEXTURE4);
-            gl.bindTexture(gl.TEXTURE_2D, this.textures[4]);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
-                          new Uint8Array([0, 0, 0, 0]));
-        }
+        if (this.borderReady) labDOM.call('lab_globe_borders_clear');
+        this.borderPath.setAttribute('d', '');
+        this.borderSignature = '';
         this.borderReady = false;
-        this.borderZoom = 0;
         this.root.dataset.borders = this.borders ? 'zoom-hidden' : 'off';
     }
 
@@ -661,16 +639,24 @@ class MarsAlmanacGlobe {
         const bounds = zoom <= 2 ? [-180, -90, 180, 90] :
             (labDOM.call('lab_globe_view', this.orientation, zoom / 1.15, 1) as GlobeView).slice(3);
         if (this.borderReady && this.view[3] >= this.borderBounds[0] && this.view[4] >= this.borderBounds[1] &&
-            this.view[5] <= this.borderBounds[2] && this.view[6] <= this.borderBounds[3] && zoom <= this.borderZoom * 1.5) return;
+            this.view[5] <= this.borderBounds[2] && this.view[6] <= this.borderBounds[3]) return;
         this.borderRequest?.abort();
         const request = this.borderRequest = new AbortController();
         const timeout = window.setTimeout(() => request.abort(), 15000);
         this.root.dataset.borders = 'loading';
         try {
-            const image = await this.image(bounds, request.signal, false, '/almanac-borders');
+            const [west, south, east, north] = bounds;
+            const response = await labHttp.fetch('/almanac-borders', {
+                method: 'POST', signal: request.signal,
+                body: labWire.encode({west, south, east, north, format: 'segments'})
+            });
+            const result = await response.labData() as {ok?: boolean; segments?: string};
             if (request !== this.borderRequest || request.signal.aborted || !this.borders || this.view[2] >= 64) return;
-            this.borderBounds = bounds; this.borderZoom = zoom; this.borderReady = true;
-            this.upload(4, image);
+            if (!response.ok || !result.ok || typeof result.segments !== 'string' ||
+                !labDOM.call('lab_globe_borders_load', result.segments)) throw new Error('Border vectors unavailable');
+            this.borderBounds = bounds; this.borderReady = true;
+            this.borderSignature = '';
+            this.draw();
             this.root.dataset.borders = 'ready';
         } catch {
             if (request === this.borderRequest) this.root.dataset.borders = 'unavailable';
@@ -729,14 +715,26 @@ class MarsAlmanacGlobe {
                          Number(this.detailReady && (!this.usesMap() || mapReady)));
             gl.uniform4fv(gl.getUniformLocation(this.program, 'riverBounds'), this.riverBounds);
             gl.uniform1i(gl.getUniformLocation(this.program, 'riverReady'), Number(this.riverReady));
-            gl.uniform4fv(gl.getUniformLocation(this.program, 'borderBounds'), this.borderBounds);
-            gl.uniform1i(gl.getUniformLocation(this.program, 'borderReady'), Number(this.borders && this.borderReady));
             gl.uniform1i(gl.getUniformLocation(this.program, 'grid'), Number(this.grid));
             gl.uniform1i(gl.getUniformLocation(this.program, 'mapMode'), Number(mapReady));
             gl.uniform1f(gl.getUniformLocation(this.program, 'viewport'), size);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
+            this.drawBorders(size);
             this.drawMarkers(size);
         });
+    }
+
+    private drawBorders(size: number): void {
+        if (!this.borders || !this.borderReady || this.view[2] >= 64) return;
+        const signature = `${size},${this.view[2]},${this.orientation.join(',')}`;
+        if (signature === this.borderSignature) return;
+        this.borderSignature = signature;
+        const path = labDOM.call('lab_globe_borders_path', this.orientation, this.view[2], size) as string | null;
+        this.borderOverlay.setAttribute('viewBox', `0 0 ${size} ${size}`);
+        const fade = Math.max(0, Math.min(1, (this.view[2] - 24) / 40));
+        this.borderPath.setAttribute('opacity', String(0.7 * (1 - fade * fade * (3 - 2 * fade))));
+        this.borderPath.setAttribute('d', path || '');
+        if (path === null) this.root.dataset.borders = 'unavailable';
     }
 
     private project(lat: number, lon: number, size: number): [number, number] | null {
@@ -745,9 +743,16 @@ class MarsAlmanacGlobe {
         return depth > 0 && px >= 0 && px <= size && py >= 0 && py <= size ? [px, py] : null;
     }
 
+    private cachedCountry(key: string): {name: string; flag: string; code: string} | undefined {
+        const place = labDOM.call('lab_country_cache_get', key) as {name: string; code: string} | null;
+        if (!place) return undefined;
+        const metadata = place.code ? WorksheetResults.tooltip.cachedCountry(place.code) : {flag: ''};
+        return metadata ? {...place, flag: metadata.flag} : undefined;
+    }
+
     private async lookupCountry(lat: number, lon: number, signal: AbortSignal, countryCode = ''): Promise<{name: string; flag: string; code: string}> {
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
-        const key = countryCode ? `town:${countryCode}` : `${lat},${lon}`, cached = this.countryCache.get(key);
+        const key = countryCode ? `town:${countryCode}` : `${lat},${lon}`, cached = this.cachedCountry(key);
         if (cached) return cached;
         let pending = this.countryPending.get(key);
         if (!pending) {
@@ -768,17 +773,7 @@ class MarsAlmanacGlobe {
                     ? result.country_code : '';
                 const value = {name: result.country, flag, code};
                 WorksheetResults.tooltip.rememberCountry(code, value.name, flag);
-                const bytes = 2 * (value.name.length + flag.length + code.length);
-                while (this.countryCache.size && (this.countryCache.size >= 64 || this.countryCacheBytes + bytes > 1048576)) {
-                    const oldest = this.countryCache.keys().next().value!;
-                    const entry = this.countryCache.get(oldest)!;
-                    this.countryCacheBytes -= 2 * (entry.name.length + entry.flag.length + entry.code.length);
-                    this.countryCache.delete(oldest);
-                }
-                if (bytes <= 1048576) {
-                    this.countryCache.set(key, value);
-                    this.countryCacheBytes += bytes;
-                }
+                labDOM.call('lab_country_cache_put', key, value.name, code);
                 return value;
             })();
             pending = {controller, users: 0, promise};
@@ -805,7 +800,7 @@ class MarsAlmanacGlobe {
     }
 
     private observerTown(): GlobeTown | undefined {
-        const place = this.townById.get(JSON.stringify([this.input('Jurisdiction').value, this.input('Town').value]));
+        const place = this.selectedTown();
         return place && Number(place.town.latitude) === Number(this.input('Latitude').value) &&
             Number(place.town.longitude) === Number(this.input('Longitude').value) ? place : undefined;
     }
@@ -826,7 +821,7 @@ class MarsAlmanacGlobe {
             this.countryKey = key;
             this.countryRequest?.abort();
         }
-        const cached = this.countryCache.get(key);
+        const cached = this.cachedCountry(key);
         if (hoverPoint) {
             this.hoverCountry = cached?.name || '';
             this.hoverCountryFlag = cached?.flag || '';
@@ -834,7 +829,7 @@ class MarsAlmanacGlobe {
             this.country = cached?.name || town?.country || '';
             this.countryFlag = cached?.flag || '';
         }
-        if (this.countryCache.has(key) || !Number.isFinite(lat) || !Number.isFinite(lon) ||
+        if (cached || !Number.isFinite(lat) || !Number.isFinite(lon) ||
             Math.abs(lat) > 90 || Math.abs(lon) > 180) return;
         const request = new AbortController();
         if (hoverPoint) this.hoverCountryRequest = request;
@@ -867,16 +862,16 @@ class MarsAlmanacGlobe {
     private drawMarkers(size: number): void {
         this.loadCountry();
         const townId = JSON.stringify([this.input('Jurisdiction').value, this.input('Town').value]);
-        const selected = this.townById.get(townId);
+        const selected = this.selectedTown();
         const signature = `${this.orientation},${this.view[2]},${size},${this.input('Latitude').value},${this.input('Longitude').value},${townId}`;
         if (signature === this.markerSignature) return;
         this.markerSignature = signature;
-        const occupied = new Set<string>(), visible = new Set<GlobeTown | null>();
+        const occupied = new Set<string>(), visible = new Set<string | null>();
         const append = (lat: number, lon: number, place?: GlobeTown): void => {
-            if (place && visible.has(place)) return;
+            if (place && visible.has(this.townKey(place))) return;
             const point = this.project(lat, lon, size);
             if (!point) return;
-            const active = Boolean(place && place === selected);
+            const active = Boolean(place && selected && this.townKey(place) === this.townKey(selected));
             const label = place ? MarsAlmanacGlobe.townLabel(place, this.view[2], active ? size - 8 : size - point[0]) : null;
             const width = label ? label.width : 28;
             if (active) {
@@ -890,7 +885,7 @@ class MarsAlmanacGlobe {
                     cells.push(`${x},${y}`);
             if (place && !active && cells.some(cell => occupied.has(cell))) return;
             cells.forEach(cell => occupied.add(cell));
-            const key = place || null;
+            const key = place ? this.townKey(place) : null;
             visible.add(key);
             let marker = this.markerNodes.get(key);
             if (!marker) {
@@ -933,13 +928,9 @@ class MarsAlmanacGlobe {
         if (latitude.trim() && longitude.trim()) append(Number(latitude), Number(longitude));
         if (this.view[2] >= 3 && !this.flightTarget) {
             const [, , , west, south, east, north] = this.view;
-            for (let y = Math.floor(south / 5); y <= Math.floor(north / 5); ++y) {
-                for (let x = Math.floor(west / 5); x <= Math.floor(east / 5); ++x) {
-                    const wrapped = ((x + 36) % 72 + 72) % 72 - 36;
-                    for (const place of this.towns.get(`${y},${wrapped}`) || [])
-                        append(Number(place.town.latitude), Number(place.town.longitude), place);
-                }
-            }
+            const places = labDOM.call('lab_town_store_region', west, south, east, north) as GlobeTown[];
+            for (const place of places)
+                append(Number(place.town.latitude), Number(place.town.longitude), this.placeCountry(place));
         }
         for (const [key, marker] of this.markerNodes) {
             if (!visible.has(key)) { marker.remove(); this.markerNodes.delete(key); }
@@ -1032,7 +1023,7 @@ class MarsAlmanacGlobe {
         if (key === this.hoverCountryKey) return;
         this.clearHoverCountry();
         this.hoverCountryKey = key;
-        const cached = this.countryCache.get(key);
+        const cached = this.cachedCountry(key);
         this.hoverCountry = cached?.name || '';
         this.hoverCountryFlag = cached?.flag || '';
         if (!cached) this.hoverCountryTimer = window.setTimeout(() => {

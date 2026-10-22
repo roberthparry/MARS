@@ -18,7 +18,7 @@
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
-struct _lab_worker_implicit_t {
+typedef struct _lab_worker_implicit_t {
     equation_t *equation;
     expr_t *residual, *axes[3];
     expr_t *phases[2], *active;
@@ -27,7 +27,7 @@ struct _lab_worker_implicit_t {
     number_t lower[3], span[3];
     size_t count, bits;
     bool local;
-};
+} lab_worker_implicit_t;
 
 /* Convert either circular function to a cosine phase without changing its zeros. */
 static expr_t *cosine_phase(const expr_t *expression)

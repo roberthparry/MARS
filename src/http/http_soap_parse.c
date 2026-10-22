@@ -14,12 +14,12 @@
 #define MARS_HTTP_INTERNAL_ACCESS
 #include "http_internal.h"
 
-struct _http_soap_t {
+typedef struct _http_soap_t {
     xml_t *document;
     const xml_t *body;
     bool fault;
     string_t *code, *reason;
-};
+} http_soap_t;
 
 static bool equal(const string_t *text, const char *literal)
 {

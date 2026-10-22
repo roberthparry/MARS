@@ -46,12 +46,12 @@ typedef enum equation_search_kind {
     EQUATION_SEARCH_ZETA_ZEROS
 } equation_search_kind_t;
 
-struct _equation_solutions_t {
+typedef struct _equation_solutions_t {
     equation_t **solutions;
     size_t count;
     equation_solve_status_t status;
     equation_search_kind_t search_kind;
-};
+} equation_solutions_t;
 
 bool equ_match_affine_linear_expr(const expr_t *expr, const expr_t *wrt, bool require_nonzero_coeff,
                                   number_t *constant_out, number_t *coeff_out);

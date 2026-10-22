@@ -22,11 +22,11 @@
 #include "string-t.h"
 
 /* Private state and helpers shared only by jurisdiction implementation files. */
-struct _jurisdiction_t {
+typedef struct _jurisdiction_t {
     sqlite_t *db;
     string_t *error;
     char jurisdiction[32];
-};
+} jurisdiction_t;
 
 typedef struct lineage_row_t {
     char jurisdiction_id[32];

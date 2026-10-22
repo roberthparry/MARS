@@ -8,6 +8,8 @@ lab_dom_closest
 lab_dom_compare
 lab_dom_contains
 lab_dom_count
+lab_dom_option_version
+lab_dom_select_index
 lab_dom_create
 lab_dom_css
 lab_dom_delete

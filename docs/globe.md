@@ -5,6 +5,44 @@ country and river readers behind a single public interface. Implementations live
 under `src/globe`; there are no separate public shoreline or river headers or guides.
 SVG and WebGL rendering remain application responsibilities.
 
+## Outstanding delivery priority — 22 October 2026
+
+The user's active implementation priority is to deliver and install the worldwide coastline and rivers with an
+**8 m simplification tolerance**. Extraction or staging alone is not completion.
+This tolerance is not a guarantee of source positional accuracy or point spacing.
+The targeted flag/country cache and dictionary memory checks have now passed;
+they are no longer a prerequisite. Resume this delivery work before unrelated improvements.
+
+- Resolve the restored coastline candidate's cross-ring contacts against the
+  original geometry; validate waterway preservation, nesting, quantisation and
+  the final point budget while retaining existing inland waters.
+- Package and integrate the validated coastline, install it, and verify visible
+  before/after improvement at Málaga and representative other locations.
+- Recover the timed-out river staging safely, add resumable checkpoints, and
+  finish simplification at the same tolerance. Prioritise larger rivers worldwide,
+  including the Severn; omit narrow sections rather than entire rivers. Keep the
+  final river database footprint within the authorised **3.8 GB** budget.
+- The user explicitly requested on 22 October that the work not time out.
+  For these offline preparation jobs, replace expired wall-clock deadlines with
+  `RuntimeMaxSec=infinity` when launching the next validated stage, and verify the
+  effective service setting. Preserve existing CPU, memory, no-swap, file-size
+  and disk-I/O caps; this is not permission to remove resource safeguards.
+  Do not restart the existing monolithic river import unchanged: it commits only
+  after simplification. First implement and test durable phase/batch checkpoints
+  and resumable staging, keeping incomplete candidates unpublishable. Preserve
+  the failed candidate and journal until recovery has been assessed safely.
+  Removing a runtime deadline does not prevent crashes, OOM or shutdown; durable
+  checkpoints are required as well. Report the actual launched unit and verified
+  limits rather than implying that recording this task starts a background job.
+- Run the relevant native and almanac browser tests sequentially, install the
+  validated river data, and verify that both layers are actually displayed.
+
+As of this checkpoint neither replacement is installed. The coastline review
+finished with 530 contacts requiring investigation. The river service timed out
+at 17:00 on 22 October; input and junction processing completed, but final
+simplification was not confirmed. Recheck live files and service status on resume;
+do not treat these snapshots as current progress or promise an unmeasured ETA.
+
 ## Selected-position countries
 
 `globe_country_at(globe, latitude, longitude)` returns an owned `string_t` country
@@ -262,6 +300,89 @@ The correction is © OpenStreetMap contributors, available under the
 GSHHG's existing licence and attribution remain applicable to the base source.
 
 ### OSM coastline candidate: detail budget and acceptance
+
+The optional offline `tools/mars_config/coastline_stage.c` preparer joins the
+audited way-reference OPL file to coordinate-bearing OPL (or a GeoJSON sequence)
+by OSM way ID. Coordinate-bearing OPL is preferred: a lines-only GeoJSON export
+can omit closed coastline ways tagged as areas, and area construction can change
+ring direction. The completeness audit rejects an export with missing ways.
+Its SQLite staging file retains unmodified WKB geometry, original point counts
+and first/last OSM node identities. Unique endpoint indexes reject branching or
+duplicate joins; indexed audits reject missing geometry and unmatched endpoints.
+Coincident coordinates never manufacture a connection between different nodes.
+The output starts marked `incomplete`. Following the coordinate and endpoint
+audit, indexed traversal assigns every way to a directed closed ring and records
+ring point counts without loading worldwide coordinates into memory. Successful
+staging marks it `closed_ring_topology_checked`, **not** polygon-valid or installable.
+The optional build target accepts `GEOS_CFLAGS` for the GEOS C headers and links
+GEOS only into this preparation executable, never into MARS at runtime. Its
+`--self-test` checks sequence parsing, source-point reconciliation and rejection
+of disconnected node identities. Existing staging files are never overwritten.
+The separate `--validate-rings` pass records individual polygon validity and
+diagnostics in `ring_validation`; it does not approve publication. It unwraps
+date-line crossings and checks coordinate agreement at node joins. Rings above
+two million points, polar closures and construction failures are explicitly
+deferred for separate bounded processing, never silently accepted. Cross-ring
+relationships and simplification still require further validation. The native
+self-test also checks a valid triangle and rejection of a self-crossing ring.
+The separate `--validate-large-rings` pass permits up to eight million points per
+ring under an external memory cap and retries deferred rings. Completed validation
+batches are checkpointed. The complete repaired extract was assembled into
+833,418 directed rings containing 78,988,079 points after shared way endpoints
+were removed. All passed individual-ring validity on 22 October 2026, including
+the two continental rings of 7,109,768 and 7,274,308 points. This supersedes the
+earlier inability to complete worldwide ring construction, but does not establish
+cross-ring relationships, simplification safety or installation readiness.
+
+`--simplify-rings` accepts a staged file and a tolerance in metres, restricted to
+0.5–40 m. It writes separately keyed, resumable `simplified_rings` candidates,
+retaining source coordinates. The angular tolerance uses a conservative
+111,700 metres per degree for both axes; it is not a positional-accuracy claim.
+Each candidate must remain a valid polygon without holes and retain its source
+orientation, otherwise the original ring is retained. Global cross-ring checks,
+waterway checks, point-budget measurements and visual comparisons are still
+required before publication. This command never updates the installed globe.
+For rings above 500,000 points, boundary-only Douglas–Peucker simplification
+avoids the topology-preserving simplifier's large segment index. It does not run
+polygon repair: invalid or orientation-changing results fall back to the source.
+The review tool's `--classify-contacts` mode reads an existing review database without
+changing it and separates chunk-level touches, crossings, overlaps and other
+contacts. These are diagnostic categories, not installation approval: chunk endpoints
+can affect the classification, and source geometry still needs comparison.
+The restored candidate's completed review recorded 530 contacts: 8 touches,
+506 crossings, 14 overlaps and 2 other contacts. It remains unsuitable for installation
+until these relationships have been resolved and the remaining checks pass.
+The same cross-ring and water-preservation acceptance checks still apply. Rings
+above 100,000 points are individually checkpointed so a resource-limit failure
+does not discard all preceding continental work.
+If a large boundary-only candidate is invalid, independent sections of at most
+16,385 vertices use topology-preserving simplification. Original section endpoints
+are retained. Whole-ring validity checks locate any remaining contacts and an
+STRtree finds affected sections, which are restored from the original geometry.
+After at most 256 attempts the tool falls back to the complete original ring;
+it never repairs invalid polygons by inventing components. The separate
+`--refine-large-rings` mode retries only previously retained large source rings,
+preserving all other candidate records and checkpointing replacements individually.
+
+The optional offline `coastline_review` executable accepts a completed staging
+database, its simplification tolerance and a new review-database path. It refuses
+incomplete candidates and never overwrites an existing review. It validates each
+candidate ring and divides boundaries into overlapping chunks of at most 256
+vertices. An R-tree restricts cross-ring contact tests to spatial neighbours;
+periodic copies also test contacts across the date line. Results and offending
+chunk/ring pairs are recorded separately from the read-only source. A clear result
+is deliberately labelled `boundary_contacts_clear_not_install_approved`: it does
+not establish unchanged nesting, water preservation, acceptable point counts or
+export correctness. Its native self-test covers ordinary and date-line crossings,
+separated rings and rejection of a self-crossing polygon. No mutable global state
+or installed-database mutation is involved.
+
+`coastline_stage --restore-small-contacts` takes the staging database, tolerance
+and a completed contact-review database. For contacting rings of at most 500,000
+source points it restores valid original geometry, archiving the replaced
+candidate rows in `contact_restoration_prior`. Larger rings remain unchanged.
+This is a conservative preparation step, not automatic approval: the entire
+candidate must undergo a fresh boundary review and point-budget check afterwards.
 
 The 12 October 2026 planet coastline extract is an offline candidate, not an
 installed replacement. Its 555,379,506-byte PBF contains 78,154,276 nodes and

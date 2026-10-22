@@ -18,10 +18,10 @@
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 
-struct _de_lie_t {
+typedef struct _de_lie_t {
     expr_t *coordinate[3];
     expr_t *rhs;
-};
+} de_lie_t;
 
 static bool de_lie_zero_polynomial(const de_lie_t *lie, const expr_t *expr, size_t coordinate)
 {

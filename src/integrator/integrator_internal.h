@@ -26,14 +26,14 @@
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
-struct _integrator_t {
+typedef struct _integrator_t {
     number_t abs_tol;
     number_t rel_tol;
     size_t max_intervals;
     size_t last_intervals;
     expr_t *last_exact_result;
     computation_t *computation;
-};
+} integrator_t;
 
 /** @brief Reserve shared work or poll cancellation; absent control permits work. */
 bool intg_checkpoint(integrator_t *ig, uint64_t work);

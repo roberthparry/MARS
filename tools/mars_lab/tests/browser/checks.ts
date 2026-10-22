@@ -2924,7 +2924,8 @@
             check(Number(builds) === 2 && peak === 1,
                   'overlapping batches coalesce into one serial refresh of each affected menu');
             await fixture.publishTowns({GB: [row('first')]});
-            check(Number(builds) === 2 && fixture.nativeCatalogue.towns.GB.length === 2,
+            check(Number(builds) === 2 && (labDOM.call('lab_town_store_list', 'GB') as LabTown[])
+                .filter(town => town.value === 'first' || town.value === 'second').length === 2,
                   'duplicate batches neither rebuild menus nor duplicate towns');
             await fixture.publishTowns({GB: [row('third')]});
             check(Number(builds) === 4, 'later arrivals start a fresh refresh after the queue drains');
@@ -2933,6 +2934,32 @@
             selection.populateTownSelect = saved.populate;
             selection.selectTownByCoordinates = saved.coordinates;
             WorksheetLocations.selects.syncSelection = saved.sync;
+        }
+    }
+
+    async function checkCountrySelectionReadiness() {
+        const original = labApplication.prepareCountrySelection;
+        let release!: () => void;
+        let calls = 0;
+        labApplication.prepareCountrySelection = () => new Promise<void>(resolve => { release = resolve; });
+        const actions = new WorksheetLocations.CalendarActionController({
+            flow: () => ({continue: async () => { ++calls; }})
+        });
+        try {
+            const selection = actions.refreshAlmanacJurisdictionLocation();
+            check(calls === 0, 'country default selection waits for its first town page');
+            release();
+            await selection;
+            check(Number(calls) === 1, 'country default selection resumes after towns arrive');
+            const obsolete = actions.refreshAlmanacJurisdictionLocation();
+            document.getElementById('almanacLatitude')!.dispatchEvent(new Event('input', {bubbles: true}));
+            release();
+            await obsolete;
+            check(Number(calls) === 1, 'late country towns cannot replace a newer authored position');
+            await actions.refreshAlmanacJurisdictionLocation({updateCoordinates: false});
+            check(Number(calls) === 2, 'point selection does not wait for country towns');
+        } finally {
+            labApplication.prepareCountrySelection = original;
         }
     }
 
@@ -2951,21 +2978,22 @@
                     check(document.querySelector('[data-jurisdiction-notice]:not(.hidden)') === null,
                         'Routine town loading stays silent while a country page is pending');
                     await labApplication.loadNearbyTowns(53.319, -3.4916);
-                    check(labApplication.catalogue.towns['GB-WLS']?.[0].name === 'Rhyl',
+                    check((labDOM.call('lab_town_store_list', 'GB-WLS') as LabTown[] | null)?.[0].name === 'Rhyl',
                         'Local towns appear while selected-jurisdiction loading is still blocked');
                 }
                 releaseTowns();
                 await labApplication.townsReady;
                 if (catalogueCheck === 'success') {
-                    check(WorksheetLocations.townSelection.townsForJurisdiction('GB-WLS') ===
-                          labApplication.catalogue.towns['GB-WLS'],
-                          'native town resolution preserves catalogue identity for incremental menu updates');
+                    check(JSON.stringify(WorksheetLocations.townSelection.townsForJurisdiction('GB-WLS')) ===
+                          JSON.stringify(labDOM.call('lab_town_store_list', 'GB-WLS')),
+                          'native town resolution projects the shared catalogue for incremental menu updates');
                     await checkTownPublicationScheduling();
-                    check(labApplication.catalogue.towns['GB-WLS'][0].name === 'Rhyl', 'Background towns not published');
-                    check(labApplication.catalogue.towns['GB-WLS'].length === 1, 'Local/country pages duplicated a town');
+                    await checkCountrySelectionReadiness();
+                    check((labDOM.call('lab_town_store_list', 'GB-WLS') as LabTown[])[0].name === 'Rhyl', 'Background towns not published');
+                    check((labDOM.call('lab_town_store_list', 'GB-WLS') as LabTown[]).length === 1, 'Local/country pages duplicated a town');
                     location.href = '/?catalogue-check=fail';
                 } else if (catalogueCheck === 'fail') {
-                    check(labApplication.catalogue.towns['GB-WLS']?.[0].name === 'Rhyl', 'Later failure discarded loaded towns');
+                    check((labDOM.call('lab_town_store_list', 'GB-WLS') as LabTown[] | null)?.[0].name === 'Rhyl', 'Later failure discarded loaded towns');
                     check(document.querySelector('[data-jurisdiction-notice]:not(.hidden)') !== null, 'Town error not shown');
                     location.href = '/?catalogue-check=index-fail';
                 } else {
@@ -3020,9 +3048,11 @@
             if (new URLSearchParams(location.search).get('select-check') === '1') {
                 await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
                 await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
+                await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
                 await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation);
                 await runBrowserGroup('checkLabSelects', window.checkLabSelects);
                 await runBrowserGroup('checkLabSelectEvents', window.checkLabSelectEvents);
+                await runBrowserGroup('checkLabAlmanacEvents', window.checkLabAlmanacEvents);
                 await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);
                 await report('PASS: calendar Back/Forward, selection menus, 5000-town selection and globe busy-state interactions');
                 return;
@@ -3116,7 +3146,7 @@
                 getComputedStyle(document.documentElement).getPropertyValue('--code').trim(),
                 'Theme variables missing');
             check(getComputedStyle((document.getElementById('run')! as HTMLButtonElement)).borderRadius === '999px', 'Button styling missing');
-            check(WorksheetContext.JURISDICTION_TOWN_OPTIONS['GB-WLS'].length > 0, 'Welsh catalogue unavailable');
+            check((labDOM.call('lab_town_store_list', 'GB-WLS') as LabTown[]).length > 0, 'Welsh catalogue unavailable');
             check(
                 String(WorksheetContext.value.textContent).trim() === '5',
                 `Initial calculation: ${WorksheetContext.value.textContent}; ${WorksheetContext.rendered.textContent}`);

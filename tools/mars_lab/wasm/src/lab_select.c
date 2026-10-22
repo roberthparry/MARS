@@ -10,6 +10,7 @@
  * each row, so even large town catalogues use bounded bridge storage.
  */
 #include "lab_dom.h"
+#include "lab_menu_index.h"
 #include "lab_select.h"
 
 static void lab_select_text(node_jsref node, lab_dom_accessor_t kind, const char *key, const char *text)
@@ -105,6 +106,28 @@ static jsref lab_select_selected(jsref shell)
 static void lab_select_filter(jsref shell)
 {
     int query = lab_dom_normalize(lab_dom_read(lab_dom_query(shell, ".select-search"), LAB_DOM_VALUE, ""));
+    int select = lab_dom_query(shell, "select");
+    int changes = lab_menu_index_filter(select, query);
+    if (changes) {
+        if (lab_dom_truth(lab_dom_get(changes, "unchanged"))) return;
+        int items = lab_dom_get(lab_dom_query(shell, ".select-options"), "children");
+        int hidden = lab_dom_get(changes, "hidden"), shown = lab_dom_get(changes, "visible");
+        unsigned mark = lab_dom_mark(), navigation = 0;
+        for (unsigned i = 0; i < lab_dom_count(hidden); ++i) {
+            lab_dom_class(lab_dom_item(items, (unsigned)lab_dom_number(lab_dom_item(hidden, i))), "hidden", 1);
+            lab_dom_release(mark);
+        }
+        for (unsigned i = 0; i < lab_dom_count(shown); ++i) {
+            int item = lab_dom_item(items, (unsigned)lab_dom_number(lab_dom_item(shown, i)));
+            lab_dom_class(item, "hidden", 0);
+            if (!lab_dom_is_disabled(item))
+                lab_dom_write(item, LAB_DOM_DATASET, "navIndex", lab_dom_format(navigation++, "", ""));
+            lab_dom_release(mark);
+        }
+        lab_dom_class(lab_dom_query(shell, ".select-empty"), "visible", !lab_dom_count(shown));
+        return;
+    }
+    /* Allocation failure preserves a usable menu; normal queries use the native suffix index. */
     int items = lab_dom_all(shell, ".select-option");
     unsigned visible = 0, navigation = 0, count = lab_dom_count(items), mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
@@ -122,6 +145,9 @@ static void lab_select_filter(jsref shell)
 /* Rebuild from the actual select options, including disabled optgroups and town details. */
 void lab_select_rebuild(node_jsref select, bool details)
 {
+    if (!select) return;
+    lab_menu_index_invalidate(select);
+    lab_dom_set(select, "labNativeMenuDetails", lab_dom_scalar(LAB_VALUE_BOOLEAN, details));
     int shell = lab_select_shell(select);
     if (!shell)
         return;

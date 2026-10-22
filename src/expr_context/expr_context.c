@@ -26,10 +26,10 @@ typedef struct {
     number_t value;
 } context_entry_t;
 
-struct _expr_context_t {
+typedef struct _expr_context_t {
     dictionary_t *symbols;
     uint64_t revision;
-};
+} expr_context_t;
 
 static size_t context_key_hash(const void *key)
 {

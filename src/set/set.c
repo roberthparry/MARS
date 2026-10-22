@@ -24,7 +24,7 @@ struct bucket {
     struct bucket *next; /* next in chain */
 };
 
-struct _set_t {
+typedef struct _set_t {
     size_t elem_size;   /* size of each element */
     size_t data_offset; /* aligned offset after the hash */
     size_t slot_stride; /* padded hash and element storage */
@@ -47,7 +47,7 @@ struct _set_t {
     set_cmp_fn cmp_fn;
     set_clone_fn clone_fn;
     set_destroy_fn destroy_fn;
-};
+} set_t;
 
 /* Slot layout:
  *

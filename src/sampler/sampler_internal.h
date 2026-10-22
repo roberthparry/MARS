@@ -14,7 +14,7 @@
 
 #include "sampler-t.h"
 
-struct _sampler_t {
+typedef struct _sampler_t {
     sampler_point_t *points;
     size_t count, capacity, evaluations;
     sampler_options_t options;
@@ -22,7 +22,7 @@ struct _sampler_t {
     sampler_callback_t callback;
     sampler_derivative_callback_t derivative_callback;
     void *argument;
-};
+} sampler_t;
 
 /** @brief Refine one borrowed edge, appending owned ordered samples after its left endpoint. */
 bool sampler_refine(sampler_t *sampler, const sampler_point_t *left, const sampler_point_t *right, unsigned depth);

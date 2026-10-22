@@ -896,7 +896,29 @@ namespace WorksheetLocations {
         }
 
         /** @brief Refresh location data through native policy, optionally replacing coordinates. */
-        refreshCalendarJurisdictionLocation(mode: WorksheetMode, {updateCoordinates = true}: WorksheetCalendarOptions = {}): Promise<void> {
+        async refreshCalendarJurisdictionLocation(mode: WorksheetMode, {updateCoordinates = true}: WorksheetCalendarOptions = {}): Promise<void> {
+            const jurisdiction = document.getElementById(`${mode}Jurisdiction`) as HTMLSelectElement | null;
+            if (updateCoordinates && jurisdiction) {
+                const code = jurisdiction.value;
+                const latitude = document.getElementById(`${mode}Latitude`) as HTMLInputElement | null;
+                const longitude = document.getElementById(`${mode}Longitude`) as HTMLInputElement | null;
+                const previousLatitude = latitude?.value;
+                const previousLongitude = longitude?.value;
+                const pending = new AbortController();
+                let superseded = false;
+                const cancel = () => { superseded = true; };
+                const panel = jurisdiction.closest('.mode-panel');
+                panel?.addEventListener('change', cancel, {capture: true, signal: pending.signal});
+                panel?.addEventListener('input', cancel, {capture: true, signal: pending.signal});
+                document.addEventListener('mars-almanac-observer-committed', cancel, {signal: pending.signal});
+                try {
+                    await labApplication.prepareCountrySelection(code);
+                    if (superseded || jurisdiction.value !== code || latitude?.value !== previousLatitude ||
+                        longitude?.value !== previousLongitude) return;
+                } finally {
+                    pending.abort();
+                }
+            }
             return this.dependencies.flow().continue(32, {mode, updateCoordinates}) as Promise<void>;
         }
 
@@ -917,6 +939,11 @@ namespace WorksheetLocations {
 
         /** @brief Delegate almanac refresh, persistence and evaluation ordering to C. */
         triggerAlmanacAutoEvaluation({refreshJurisdiction = false, refreshCoordinates = false}: WorksheetAutoEvaluationOptions = {}): Promise<void> {
+            if (WorksheetWorkspace.mode.currentMode() === 'almanac' && !refreshJurisdiction && !refreshCoordinates) {
+                const jurisdiction = document.getElementById('almanacJurisdiction') as HTMLSelectElement | null;
+                labDOM.call('lab_almanac_events_preview', document.getElementById('rendered'),
+                    jurisdiction ? WorksheetResults.tooltip.cachedCountry(jurisdiction.value) : null);
+            }
             return this.dependencies.flow().continue(33, {mode: 'almanac', options: {refreshJurisdiction, refreshCoordinates}}) as Promise<void>;
         }
 

@@ -11,20 +11,20 @@
 
 #include "checks_readme.h"
 
-struct checks_example {
+typedef struct checks_example {
     string_t *id;
     string_t *path;
     string_t *code;
     string_t *expected;
     size_t line;
     bool has_main;
-};
+} checks_example_t;
 
-struct checks_examples {
+typedef struct checks_examples {
     checks_example_t *values;
     size_t count;
     size_t capacity;
-};
+} checks_examples_t;
 
 struct fence {
     size_t start;

@@ -21,7 +21,7 @@ typedef struct {
     executor_task_t *active;
 } executor_worker_t;
 
-struct _executor_t {
+typedef struct _executor_t {
     lock_t *gate;
     lock_t *wake;
     lock_t *idle;
@@ -32,7 +32,7 @@ struct _executor_t {
     size_t head;
     size_t tail;
     executor_stats_t stats;
-};
+} executor_t;
 
 static void *executor_worker(void *argument)
 {

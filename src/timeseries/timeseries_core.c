@@ -190,7 +190,7 @@ void ts_free(timeseries_t *series)
     free(series);
 }
 
-struct _ts_builder_t {
+typedef struct _ts_builder_t {
     number_t *values;
     datetime_t **index;
     bool *missing;
@@ -200,7 +200,7 @@ struct _ts_builder_t {
     bool shape_known;
     ts_frequency_t frequency;
     ts_year_type_t year_type;
-};
+} ts_builder_t;
 
 static int ts_builder_reserve(ts_builder_t *builder, size_t needed)
 {

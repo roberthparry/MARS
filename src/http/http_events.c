@@ -15,7 +15,7 @@
 #define MARS_HTTP_INTERNAL_ACCESS
 #include "http_internal.h"
 
-struct _http_event_reader_t {
+typedef struct _http_event_reader_t {
     array_t *line;
     string_t *data, *event, *id;
     http_event_fn callback;
@@ -23,7 +23,7 @@ struct _http_event_reader_t {
     size_t limit;
     uint64_t retry;
     bool retry_set, data_seen, first, after_cr, failed, finished, active;
-};
+} http_event_reader_t;
 
 /* Create independent line/event buffers and persistent reconnection metadata. */
 http_event_reader_t *http_event_reader_new(size_t limit, http_event_fn callback, void *user_data)

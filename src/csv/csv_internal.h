@@ -19,7 +19,7 @@
 /** @brief Incremental field syntax, retained between input chunks. */
 typedef enum { CSV_FIELD_START, CSV_FIELD_PLAIN, CSV_FIELD_QUOTED, CSV_FIELD_CLOSED } csv_field_state_t;
 
-struct _csv_t {
+typedef struct _csv_t {
     csv_options_t options;
     file_t *file;
     bool writer, final, finished, need_input, bom_checked, bom_written, skip_lf, last_cr;
@@ -31,7 +31,7 @@ struct _csv_t {
     size_t count, capacity, header_count;
     dictionary_t *index;
     csv_error_t error;
-};
+} csv_t;
 
 /** @brief Preserve the first failure. @param csv Borrowed handle. @param code errno value. @return False. */
 bool csv_fail(csv_t *csv, int code);

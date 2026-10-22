@@ -35,9 +35,9 @@
 #define MARS_LAB_CODEC_PATH "tools/mars_lab/build/release/wasm/lab_codec.wasm"
 #endif
 
-struct lab_server {
+typedef struct lab_server {
     websrv_t *listener;
-};
+} lab_server_t;
 
 static bool lab_svr_equal(const string_t *text, const char *literal)
 {

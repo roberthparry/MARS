@@ -33,11 +33,11 @@ typedef struct {
     bool point_allowed;
 } quantity_unit_t;
 
-struct _quantity_t {
+typedef struct _quantity_t {
     number_t value;
     quantity_unit_t unit;
     bool point;
-};
+} quantity_t;
 
 /** @brief Set errno and return NULL for pointer-returning operations. */
 void *quantity_fail(int error);

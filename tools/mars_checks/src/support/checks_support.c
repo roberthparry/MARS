@@ -17,11 +17,11 @@
 #include "regex-t.h"
 #include "checks_support.h"
 
-struct checks_strings {
+typedef struct checks_strings {
     string_t **values;
     size_t count;
     size_t capacity;
-};
+} checks_strings_t;
 
 /* Report unrecoverable infrastructure errors. */
 void checks_fatal(const char *message)

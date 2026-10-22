@@ -6,11 +6,73 @@
  * returns ordered browser service plans. Visibility state remains accessible through
  * a live browser object; listeners retain browser contexts, never WASM handles.
  * Browser adapters retain asynchronous request ownership and cancellation checks.
- * No astronomical data or mathematical markup is parsed, reconstructed or rewritten.
+ * Also projects a pending observer summary from resident controls while calculations
+ * run. No astronomical data or mathematical markup is parsed, reconstructed or rewritten.
  */
 #include "lab_dom.h"
 #include "lab_result.h"
 #include "lab_almanac_events.h"
+
+static jsref lab_almanac_preview_element(jsref parent, const char *tag, const char *class_name, jsref text)
+{
+    jsref element = lab_dom_create(tag);
+    if (class_name)
+        lab_dom_write(element, LAB_DOM_ATTRIBUTE, "class", lab_dom_string(class_name));
+    if (text)
+        lab_dom_write(element, LAB_DOM_TEXT, "", text);
+    lab_dom_append(parent, element);
+    return element;
+}
+
+static jsref lab_almanac_preview_value(const char *selector)
+{
+    return lab_dom_read(lab_dom_query(0, selector), LAB_DOM_VALUE, "");
+}
+
+/* Display only resident observer information; never reuse the previous observer's calculated results. */
+void lab_almanac_events_preview(jsref target, jsref country)
+{
+    if (!target)
+        return;
+    lab_dom_write(target, LAB_DOM_TEXT, "", lab_dom_string(""));
+    lab_dom_write(target, LAB_DOM_DATASET, "copyText", lab_dom_string(""));
+    jsref sheet = lab_almanac_preview_element(target, "div", "almanac-sheet", 0);
+    jsref header = lab_almanac_preview_element(sheet, "div", "almanac-sheet-header", 0);
+    lab_almanac_preview_element(header, "div", "almanac-sheet-title",
+                                lab_dom_string("AstroNav Navigation Almanac"));
+    jsref summary = lab_almanac_preview_element(header, "dl", "almanac-summary", 0);
+    jsref town_select = lab_dom_query(0, "#almanacTown");
+    jsref town = lab_dom_length(lab_dom_read(town_select, LAB_DOM_VALUE, "")) ?
+                     lab_dom_read(lab_dom_selected(town_select), LAB_DOM_TEXT, "") : lab_dom_string("Custom");
+    jsref name = lab_dom_get(country, "name");
+    jsref pending = lab_dom_string("Updating…");
+    jsref values[] = {
+        lab_dom_join(lab_almanac_preview_value("#almanacDate"), lab_almanac_preview_value("#almanacTime"), " "),
+        lab_dom_length(name) ? lab_dom_join(town, name, ", ") : town,
+        lab_almanac_preview_value("#almanacZone"),
+        lab_dom_join(lab_almanac_preview_value("#almanacLatitude"), lab_dom_string("°"), ""),
+        lab_dom_join(lab_almanac_preview_value("#almanacLongitude"), lab_dom_string("°"), ""),
+        lab_dom_join(lab_almanac_preview_value("#almanacElevation"), lab_dom_string(" m · Updating…"), ""),
+        pending, pending, pending,
+    };
+    static const char *const labels[] = {"GMT moment", "Location", "Zone", "Latitude", "Longitude",
+                                        "Observer altitude", "Temperature", "Pressure", "Weather source"};
+    for (unsigned i = 0; i < sizeof values / sizeof *values; ++i) {
+        jsref row = lab_almanac_preview_element(summary, "div", "almanac-summary-row", 0);
+        lab_almanac_preview_element(row, "dt", 0, lab_dom_string(labels[i]));
+        jsref value = lab_almanac_preview_element(row, "dd", 0, 0);
+        jsref flag = lab_dom_get(country, "flag");
+        if (i == 1 && lab_dom_starts_with(flag, "data:image/svg+xml;base64,")) {
+            jsref icon = lab_almanac_preview_element(value, "img", "country-flag", 0);
+            lab_dom_write(icon, LAB_DOM_ATTRIBUTE, "src", flag);
+            lab_dom_write(icon, LAB_DOM_ATTRIBUTE, "alt", lab_dom_string(""));
+        }
+        lab_almanac_preview_element(value, "span", 0, values[i]);
+    }
+    jsref status = lab_almanac_preview_element(header, "div", "almanac-summary-corrections",
+                                               lab_dom_string("Calculating for the selected observer…"));
+    lab_dom_write(status, LAB_DOM_ATTRIBUTE, "role", lab_dom_string("status"));
+}
 
 static jsref lab_almanac_events_visibility(jsref value, jsref fallback)
 {

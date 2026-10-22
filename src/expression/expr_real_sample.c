@@ -34,10 +34,10 @@ typedef struct {
     int axis;
 } sample_instruction_t;
 
-struct _expr_real_sample_t {
+typedef struct _expr_real_sample_t {
     size_t count, axes;
     sample_instruction_t instructions[SAMPLE_NODES];
-};
+} expr_real_sample_t;
 
 static sample_value_t rounded(double value, double error)
 {

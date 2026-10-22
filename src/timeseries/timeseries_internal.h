@@ -30,7 +30,7 @@
 #include "csv-t.h"
 #include "timeseries-t.h"
 
-struct _timeseries_t {
+typedef struct _timeseries_t {
     size_t length;
     number_t *values;
     datetime_t **index;
@@ -40,7 +40,7 @@ struct _timeseries_t {
     ts_year_type_t year_type;
     bool is_regular;
     size_t season_period;
-};
+} timeseries_t;
 
 typedef struct ts_arima_meta_t {
     const ts_arima_result_t *owner;

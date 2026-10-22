@@ -18,13 +18,13 @@
 #include "xml-t.h"
 #include "array-t.h"
 #define XML_MAX_DEPTH 128u
-struct _xml_t {
+typedef struct _xml_t {
     xml_type_t type;
     string_t *name;
     string_t *text;
     dictionary_t *attributes;
     array_t *children;
-};
+} xml_t;
 bool xml_attach_owned(xml_t *parent, xml_t *child);
 bool xml_valid_name(const string_t *name);
 bool xml_valid_text(const string_t *text);

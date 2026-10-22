@@ -17,8 +17,6 @@
 #error "Private header requires MARS_SHORELINE_INTERNAL_ACCESS."
 #endif
 
-typedef struct _coast_geometry_t coast_geometry_t;
-
 /** @brief Exact stored coordinate; boundary marks the preceding edge as physical rather than a polar closure. */
 typedef struct { int32_t x, y; } coast_vertex_t;
 
@@ -31,7 +29,7 @@ typedef struct {
 } coast_ring_t;
 
 /** @brief Immutable cached geometry borrowed for the duration of a retained reference. */
-struct _coast_geometry_t {
+typedef struct _coast_geometry_t {
     coast_vertex_t *vertices;
     unsigned char *boundary;
     coast_ring_t *rings;
@@ -40,7 +38,7 @@ struct _coast_geometry_t {
     size_t vertex_count, ring_count, lod_count, node_count;
     unsigned references;
     string_t *key;
-};
+} coast_geometry_t;
 
 /**
  * @brief Visit one spatially selected ring.
@@ -85,11 +83,11 @@ bool coast_geometry_visit(const coast_geometry_t *geometry, const double bounds[
 int coast_geometry_lod(double tolerance);
 
 /** @brief Reader-owned query and borrowed catalogue connection. */
-struct _shoreline_t {
+typedef struct _shoreline_t {
     sqlite_stmt_t *query;
     sqlite_t *db;
     coast_geometry_t *local_geometry;
-};
+} shoreline_t;
 
 /** @brief Stable stored encoding for an independently readable coordinate chunk. */
 typedef enum _shoreline_codec_t {

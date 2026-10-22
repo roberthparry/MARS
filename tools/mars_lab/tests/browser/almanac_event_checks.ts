@@ -139,6 +139,19 @@ window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
         check(dispatch(0, null).calls.length === 0, 'missing totality target is inert');
 
         // Native rendering validates first, preserves exact HTML/copy text and uses the visibility fallback.
+        labDOM.call('lab_almanac_events_preview', target, {
+            name: 'England', flag: 'data:image/svg+xml;base64,PHN2Zy8+'
+        });
+        check(target.querySelectorAll('.almanac-summary-row').length === 9,
+            'immediate observer preview includes all summary fields');
+        check(target.textContent!.includes('England') && target.querySelector('img.country-flag') !== null,
+            'immediate observer preview uses resident country metadata');
+        check(target.textContent!.includes('Updating…') && target.dataset.copyText === '' &&
+            target.querySelector('[role="status"]') !== null,
+            'pending observer preview clears stale copied results and labels unresolved calculations');
+        labDOM.call('lab_almanac_events_preview', target, {name: '<unsafe>', flag: 'javascript:invalid'});
+        check(target.textContent!.includes('<unsafe>') && target.querySelector('unsafe, img') === null,
+            'preview treats country names as text and rejects non-image flag URLs');
         backing.visibility = 'all';
         backing.worksheet = data;
         check(

@@ -26,18 +26,18 @@
 #define MARS_SQLITE_INTERNAL_ACCESS
 #include "sqlite_internal.h"
 
-struct _sqlite_t {
+typedef struct _sqlite_t {
     sqlite3 *handle;
     string_t *error;
     diagnostic_t *diagnostic;
-};
+} sqlite_t;
 
-struct _sqlite_stmt_t {
+typedef struct _sqlite_stmt_t {
     sqlite_t *db;
     sqlite3_stmt *handle;
     string_t *error;
     diagnostic_t *diagnostic;
-};
+} sqlite_stmt_t;
 
 static bool sqlite_text_is_empty(const string_t *text)
 {

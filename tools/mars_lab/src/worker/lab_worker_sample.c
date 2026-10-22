@@ -17,11 +17,11 @@
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
-struct _lab_worker_sample_t {
+typedef struct _lab_worker_sample_t {
     expr_t *expression, *axes[3];
     size_t count;
     expr_real_sample_t *fast;
-};
+} lab_worker_sample_t;
 
 /* The public sampler keeps its usual precision-preserving arithmetic and backend dispatch. */
 number_t lab_worker_sample_coordinate(number_t value, size_t bits)

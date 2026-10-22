@@ -28,7 +28,7 @@ typedef struct {
     number_t value;
 } json_number_payload_t;
 
-struct _json_t {
+typedef struct _json_t {
     json_type_t type;
     union {
         bool boolean;
@@ -37,7 +37,7 @@ struct _json_t {
         array_t *array;
         dictionary_t *object;
     } u;
-};
+} json_t;
 
 bool json_type_valid(json_type_t type);
 json_t *json_alloc(json_type_t type);

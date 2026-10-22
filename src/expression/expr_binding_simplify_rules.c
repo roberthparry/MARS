@@ -2092,16 +2092,13 @@ static expr_binding_expr_t *binding_expr_neg_sqrt_quotient_ulong(unsigned long r
     return expr_binding_expr_new_neg(binding_expr_sqrt_quotient_ulong(radicand, denom));
 }
 
-typedef struct _binding_trig_exact_rule_t binding_trig_exact_rule_t;
-typedef expr_binding_expr_t *(*binding_trig_fold_fn)(expr_binding_expr_t *expr, const binding_trig_exact_rule_t *rule);
-
-struct _binding_trig_exact_rule_t {
-    binding_trig_fold_fn fold;
+typedef struct _binding_trig_exact_rule_t {
+    expr_binding_expr_t *(*fold)(expr_binding_expr_t *expr, const struct _binding_trig_exact_rule_t *rule);
     const number_t *number_value;
     unsigned long radicand;
     unsigned long denominator;
     unsigned long scale;
-};
+} binding_trig_exact_rule_t;
 
 #define BINDING_TRIG_EXACT_TWELFTH_COUNT 24u
 #define BINDING_TRIG_EXACT_INDEX_MISSING (-1)

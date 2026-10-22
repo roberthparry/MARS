@@ -86,6 +86,8 @@ class LabDOMBridge {
     private hasReturn = false;
     private eventServices: MarsTransportServices | null = null;
     private readonly subscriptions = new WeakMap<EventTarget, Map<string, Set<unknown>>>();
+    private readonly optionVersions = new WeakMap<Element, {observer: MutationObserver; version: number}>();
+    private readonly optionObservers = new Set<MutationObserver>();
     private readonly eventLifetime = new AbortController();
     private presentation: LabDOMPresentation | null = null;
     private readonly decoder = new TextDecoder('utf-8', {fatal: true});
@@ -107,6 +109,8 @@ class LabDOMBridge {
     /** Release native event listeners and presentation references at the end of the application lifetime. */
     public dispose(): void {
         this.eventLifetime.abort();
+        for (const observer of this.optionObservers) observer.disconnect();
+        this.optionObservers.clear();
         this.eventServices = null;
         this.presentation = null;
     }
@@ -511,6 +515,26 @@ class LabDOMBridge {
         lab_dom_value_id: id => this.remember(document.getElementById(String(this.values[id] || ''))),
         lab_dom_closest: (node, selector) => this.remember(marsTransportIsDOM(this.values[node], 'Element') ? this.values[node].closest(this.literal(selector)) : undefined),
         lab_dom_count: list => Number(this.get(this.values[list], 'length')) || 0,
+        lab_dom_select_index: (select, index) => {
+            const node = this.values[select];
+            if (marsTransportIsDOM(node, 'HTMLSelectElement')) node.selectedIndex = index;
+        },
+        lab_dom_option_version: select => {
+            const node = this.element(select);
+            let state = this.optionVersions.get(node);
+            if (!state) {
+                const entry = {observer: null as unknown as MutationObserver, version: 1};
+                entry.observer = new MutationObserver(() => { ++entry.version; });
+                entry.observer.observe(node, {
+                    subtree: true, childList: true, characterData: true, attributes: true,
+                    attributeFilter: ['value', 'label', 'disabled', 'data-latitude', 'data-longitude', 'data-detail']
+                });
+                this.optionVersions.set(node, state = entry);
+                this.optionObservers.add(entry.observer);
+            }
+            if (state.observer.takeRecords().length) ++state.version;
+            return state.version;
+        },
         lab_dom_item: (list, index) => this.remember(this.get(this.values[list], index)),
         lab_dom_node_contains: (parent, child) =>
             !!(this.values[parent] && this.values[child] && this.node(parent).contains(this.node(child))),

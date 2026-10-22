@@ -11,7 +11,7 @@
 #define MARS_GLOBE_INTERNAL_ACCESS
 #include "globe_layers.h"
 
-struct _globe_t {
+typedef struct _globe_t {
     shoreline_t *shoreline;
     rivers_t *rivers;
     sqlite_t *details;
@@ -19,7 +19,7 @@ struct _globe_t {
     sqlite_t *owned_geometry;
     bool towns;
     bool countries;
-};
+} globe_t;
 
 static bool globe_table(sqlite_t *db, const char *name)
 {

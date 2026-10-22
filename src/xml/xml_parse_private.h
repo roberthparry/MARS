@@ -32,7 +32,7 @@ typedef struct {
     string_view_t view;
 } parse_cursor_t;
 
-struct _xml_reader_t {
+typedef struct _xml_reader_t {
     xml_limits_t limits;
     xml_event_fn callback;
     void *user_data;
@@ -48,7 +48,7 @@ struct _xml_reader_t {
     uint32_t quote;
     parse_mode_t mode;
     bool failed, finished, root_seen, declaration_allowed, first_scalar, previous_cr, reference;
-};
+} xml_reader_t;
 
 /* Shared scalar cursor operations and diagnostics for parser implementation files. */
 bool xml_parse_fail(xml_reader_t *reader, const char *message);

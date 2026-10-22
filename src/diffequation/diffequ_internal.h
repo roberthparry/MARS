@@ -21,7 +21,7 @@
 
 #include "diffequation-t.h"
 
-struct _diffequ_t {
+typedef struct _diffequ_t {
     equation_t *equation;
     expr_t *display_lhs;
     expr_t *display_rhs;
@@ -47,9 +47,9 @@ struct _diffequ_t {
     size_t repeated_quadratic_power;
     expr_t *repeated_quadratic_square;
     char *repeated_quadratic_dependent;
-};
+} diffequ_t;
 
-struct _diffequ_solve_result_t {
+typedef struct _diffequ_solve_result_t {
     de_solve_status_t status;
     de_solver_t solver;
     equation_t **solutions;
@@ -63,7 +63,7 @@ struct _diffequ_solve_result_t {
     expr_t *series_centre;
     expr_t **series_coefficients;
     size_t series_degree;
-};
+} diffequ_solve_result_t;
 
 diffequ_t *de_new_owned(equation_t *equation);
 diffequ_solve_result_t *de_solve_result_new(de_solve_status_t status, de_solver_t solver, const char *diagnostic);

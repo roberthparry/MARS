@@ -3,6 +3,13 @@
 `dictionary_t` is a generic key/value container with caller-defined hashing,
 comparison, cloning, and destruction rules.
 
+The Lab browser also compiles the same dictionary implementation for WebAssembly;
+its bounded country-flag cache uses native keys and owned UTF-8 values. Browser
+objects and scoped bridge handles are not stored in the dictionary. The browser
+build links this module separately rather than linking the complete native library.
+Sorted views use context-aware heapsort with no global comparator state or
+platform-specific `qsort_r` dependency.
+
 Stored keys and values are aligned for fundamental C types, up to the
 alignment of `max_align_t`, including `long double`. Odd-sized byte keys do
 not misalign subsequent entries. Types requiring extended alignment are not

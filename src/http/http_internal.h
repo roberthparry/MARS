@@ -23,7 +23,7 @@
 #if LIBCURL_VERSION_NUM < 0x075600
 #error "The HTTP module requires libcurl 7.86.0 or newer."
 #endif
-struct _http_client_t {
+typedef struct _http_client_t {
     CURL *easy;
     http_limits_t limits;
     array_t *ca;
@@ -36,8 +36,8 @@ struct _http_client_t {
     http_error_t error;
     string_t *message;
     bool active;
-};
-struct _http_request_t {
+} http_client_t;
+typedef struct _http_request_t {
     webmethod_t method;
     string_t *url;
     dictionary_t *headers;
@@ -46,8 +46,8 @@ struct _http_request_t {
     string_t *body_path;
     bool has_body;
     bool http2;
-};
-struct _http_response_t {
+} http_request_t;
+typedef struct _http_response_t {
     long status;
     dictionary_t *headers;
     array_t *body;
@@ -55,14 +55,14 @@ struct _http_response_t {
     size_t header_bytes;
     bool streamed;
     bool http2;
-};
-struct _http_websocket_t {
+} http_response_t;
+typedef struct _http_websocket_t {
     http_client_t *client;
     CURL *easy;
     struct curl_slist *headers;
     size_t header_bytes;
     bool open, busy;
-};
+} http_websocket_t;
 dictionary_t *http_headers_new(void);
 void http_headers_free(dictionary_t *headers);
 bool http_headers_store(dictionary_t *headers, const string_t *name, const string_t *value, bool replace);

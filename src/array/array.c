@@ -569,11 +569,21 @@ struct cmp_ctx {
     array_cmp_fn cmp;
 };
 
-static int cmp_indices_r(const void *a, const void *b, void *ctx)
+static int cmp_indices(size_t ia, size_t ib, const struct cmp_ctx *c)
 {
-    struct cmp_ctx *c = ctx;
-    size_t ia = *(const size_t *)a, ib = *(const size_t *)b;
     return c->cmp((const char *)c->arena + ia * c->elem_size, (const char *)c->arena + ib * c->elem_size);
+}
+
+/* Keep comparison context local and avoid platform-specific qsort_r signatures. */
+static void slice_sort_sift(size_t *items, size_t count, size_t root, const struct cmp_ctx *ctx)
+{
+    while (root < count / 2) {
+        size_t child = root * 2 + 1;
+        if (child + 1 < count && cmp_indices(items[child], items[child + 1], ctx) < 0) ++child;
+        if (cmp_indices(items[root], items[child], ctx) >= 0) break;
+        size_t swap = items[root]; items[root] = items[child]; items[child] = swap;
+        root = child;
+    }
 }
 
 void array_slice_sort(array_slice_t *slice, array_cmp_fn cmp)
@@ -584,7 +594,16 @@ void array_slice_sort(array_slice_t *slice, array_cmp_fn cmp)
     pthread_mutex_lock(&arr->mutex);
     array_slice_materialize_indices(slice);
     struct cmp_ctx ctx = {arr->arena, arr->elem_size, cmp};
-    qsort_r(slice->indices, slice->size, sizeof(size_t), cmp_indices_r, &ctx);
+    if (slice->indices) {
+        for (size_t root = slice->size / 2; root > 0; --root)
+            slice_sort_sift(slice->indices, slice->size, root - 1, &ctx);
+        for (size_t end = slice->size; end > 1; --end) {
+            size_t swap = slice->indices[0];
+            slice->indices[0] = slice->indices[end - 1];
+            slice->indices[end - 1] = swap;
+            slice_sort_sift(slice->indices, end - 1, 0, &ctx);
+        }
+    }
     pthread_mutex_unlock(&arr->mutex);
 }
 

@@ -14,11 +14,11 @@
 #define MARS_HTTP_INTERNAL_ACCESS
 #include "http_internal.h"
 
-struct _http_grpc_t {
+typedef struct _http_grpc_t {
     int status;
     string_t *message;
     protobuf_t *payload;
-};
+} http_grpc_t;
 
 static bool header(http_request_t *request, const char *name, const char *value)
 {

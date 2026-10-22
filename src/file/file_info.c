@@ -18,14 +18,14 @@
 #define MARS_FILE_INTERNAL_ACCESS
 #include "file_internal.h"
 
-struct _file_info_t {
+typedef struct _file_info_t {
     struct statx status;
     char *name;
     unsigned attributes;
     char *link_target;
     file_info_t *target_info;
     int target_error;
-};
+} file_info_t;
 
 file_info_t *file_info_query(file_t *file, int fd, const char *path, const char *name, int flags)
 {

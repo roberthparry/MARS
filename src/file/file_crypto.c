@@ -20,9 +20,9 @@
 #define FILE_CIPHER_HEADER (16u + crypto_secretstream_xchacha20poly1305_HEADERBYTES)
 static const unsigned char file_cipher_magic[8] = {'M', 'A', 'R', 'S', 'E', 'N', 'C', 1};
 
-struct _file_key_t {
+typedef struct _file_key_t {
     unsigned char bytes[crypto_secretstream_xchacha20poly1305_KEYBYTES];
-};
+} file_key_t;
 
 typedef struct {
     const file_key_t *key;

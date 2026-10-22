@@ -139,11 +139,11 @@ typedef struct number_scope_state_t {
     number_scope_arena_block_t *arena_blocks;
 } number_scope_state_t;
 
-struct _num_scope_t {
+typedef struct _num_scope_t {
     number_scope_state_t *state;
     struct _num_scope_t *previous;
     int active;
-};
+} num_scope_t;
 
 static num_scope_t *number_scope_current = NULL;
 static size_t number_scope_suspend_depth = 0u;

@@ -25,10 +25,10 @@ typedef struct {
     size_t size;
 } record_t;
 
-struct _protobuf_t {
+typedef struct _protobuf_t {
     array_t *records;
     size_t limit, fields, encoded;
-};
+} protobuf_t;
 
 static void release_record(void *pointer)
 {

@@ -25,7 +25,7 @@
 #include "string-t.h"
 
 /* Private position state and interfaces for the almanac implementation. */
-struct _almanac_entry_t {
+typedef struct _almanac_entry_t {
     almanac_body_id_t body_id;
     almanac_body_kind_t body_kind;
     double moment_jd;
@@ -37,7 +37,7 @@ struct _almanac_entry_t {
     double heliocentric_distance_au;
     double phase_angle_degrees;
     double visual_magnitude;
-};
+} almanac_entry_t;
 
 typedef struct almanac_state_t {
     cartesian3_t geocentric_equatorial_au;
@@ -152,7 +152,7 @@ typedef struct almanac_frame_rotation_segment_t {
     double coeff[ALMANAC_FRAME_ROTATION_COMPONENT_COUNT][ALMANAC_CHEB_MAX_COEFF_COUNT];
 } almanac_frame_rotation_segment_t;
 
-struct _almanac_t {
+typedef struct _almanac_t {
     globe_t *shoreline;
     sqlite_t *db;
     string_t *error;
@@ -165,7 +165,7 @@ struct _almanac_t {
     almanac_frame_rotation_segment_t frame_rotation_segment_cache;
     bool model_row_cached[ALMANAC_BODY_ID_COUNT];
     almanac_model_row_t model_row_cache[ALMANAC_BODY_ID_COUNT];
-};
+} almanac_t;
 
 typedef struct almanac_poly8_t {
     double c0;
@@ -281,7 +281,7 @@ typedef struct almanac_solar_eclipse_circumstance_t {
     bool central;
 } almanac_solar_eclipse_circumstance_t;
 
-struct _almanac_solar_eclipse_t {
+typedef struct _almanac_solar_eclipse_t {
     almanac_solar_eclipse_kind_t kind;
     almanac_event_time_t first_contact;
     almanac_event_time_t second_contact;
@@ -295,7 +295,7 @@ struct _almanac_solar_eclipse_t {
     double moon_semi_diameter_degrees;
     double orientation_degrees;
     bool central;
-};
+} almanac_solar_eclipse_t;
 
 bool almanac_solar_eclipse_geometry(almanac_t *almanac, double jd, const almanac_observer_t *observer,
     almanac_solar_eclipse_geometry_t *out);

@@ -14,14 +14,13 @@
 #include "expression-t.h"
 #include "string-t.h"
 
-typedef struct _lab_plot_prepared_t lab_plot_prepared_t;
-struct _lab_plot_prepared_t {
+typedef struct _lab_plot_prepared_t {
     string_t *title, *TeX, *numeric;
     expr_t *curves[16];
     string_t *labels[16];
     size_t count;
     bool family;
-};
+} lab_plot_prepared_t;
 
 /** @brief Read a bounded optional server record; reject mismatched sources, modes, axes or precision. */
 lab_plot_prepared_t *lab_worker_plot_prepared_read(int argc, char **argv);

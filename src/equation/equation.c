@@ -24,7 +24,7 @@
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
 
-struct _equation_t {
+typedef struct _equation_t {
     expr_t *lhs;
     expr_t *rhs;
     expr_bindings_t *bindings;
@@ -33,7 +33,7 @@ struct _equation_t {
     string_t *lhs_display_unbound;
     string_t *rhs_display_unbound;
     bool power_series_domain;
-};
+} equation_t;
 
 /* Simplify an independent result while preserving specialised solver notation and domains. */
 equation_t *equ_simplify_with_context(const equation_t *equation, const expr_context_t *context)

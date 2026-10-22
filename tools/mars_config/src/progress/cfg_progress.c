@@ -18,7 +18,7 @@
 #include "thread-t.h"
 #include "cfg_progress.h"
 
-struct cfg_progress {
+typedef struct cfg_progress {
     thread_t *thread;
     lock_t *mutex;
     lock_t *worker_mutex;
@@ -29,7 +29,7 @@ struct cfg_progress {
     struct timespec started;
     unsigned tick;
     bool terminal;
-};
+} cfg_progress_t;
 
 static void cfg_progress_render(const cfg_progress_t *progress, bool finished, bool success)
 {

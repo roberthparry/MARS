@@ -16,11 +16,11 @@
 #define MARS_REGEX_INTERNAL_ACCESS
 #include "regex_native.h"
 
-struct _regex_native_t {
+typedef struct _regex_native_t {
     regex_t expression;
     locale_t locale;
     bool multiline;
-};
+} regex_native_t;
 
 static int regex_native_fail(int code, const char *message, string_t **error)
 {

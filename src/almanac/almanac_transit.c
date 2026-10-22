@@ -28,7 +28,7 @@ typedef struct almanac_solar_transit_geometry_t {
     double sun_altitude_degrees;
 } almanac_solar_transit_geometry_t;
 
-struct _almanac_solar_transit_t {
+typedef struct _almanac_solar_transit_t {
     almanac_body_id_t body_id;
     almanac_event_time_t first_contact;
     almanac_event_time_t second_contact;
@@ -40,7 +40,7 @@ struct _almanac_solar_transit_t {
     double planet_semi_diameter_degrees;
     double chord_distance_fraction;
     bool interior;
-};
+} almanac_solar_transit_t;
 
 static bool almanac_solar_transit_geometry(almanac_t *almanac, almanac_body_id_t body_id, double jd,
     const almanac_observer_t *observer, almanac_solar_transit_geometry_t *out)

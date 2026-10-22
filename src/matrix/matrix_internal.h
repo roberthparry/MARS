@@ -201,7 +201,7 @@ typedef struct matrix_meta_t {
    Matrix object (opaque in matrix-t.h)
    ============================================================ */
 
-struct _matrix_t {
+typedef struct _matrix_t {
     size_t rows;
     size_t cols;
     size_t nnz;
@@ -211,7 +211,7 @@ struct _matrix_t {
     const struct store_vtable *store;
 
     void **data; /* row pointers for dense/sparse; NULL for identity */
-};
+} matrix_t;
 
 /* ============================================================
    Element vtable instances (defined in matrix_vtables.c)

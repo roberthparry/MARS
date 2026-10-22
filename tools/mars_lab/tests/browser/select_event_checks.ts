@@ -205,11 +205,36 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
         key(second.button, ' ');
         equal(document.activeElement, second.items()[2], 'plain select uses native keyboard focus policy');
 
+        const jurisdictions = create('selectEventJurisdictionAliases', true);
+        const countryRows = [
+            ['Britain (UK) – England', 'GB-ENG'], ['Britain (UK) – Wales', 'GB-WLS'],
+            ['Britain (UK) – Scotland', 'GB-SCT'], ['Britain (UK) – Northern Ireland', 'GB-NIR'],
+            ['South Africa', 'ZA'], ['Isle of Man', 'IM']
+        ].map(([label, code]) => {
+            const option = new Option(label, code);
+            option.dataset.countryOption = '1';
+            option.dataset.countryCode = code;
+            return option;
+        });
+        jurisdictions.select.replaceChildren(...countryRows);
+        labDOM.call('lab_select_rebuild', jurisdictions.select, 0);
+        open(jurisdictions);
+        jurisdictions.search.value = 'united king';
+        jurisdictions.search.dispatchEvent(new Event('input', {bubbles: true}));
+        equal(jurisdictions.items().filter(item => !item.classList.contains('hidden')).length, 4,
+              'partial United Kingdom alias finds all four constituent jurisdictions only');
+        jurisdictions.items()[2].click();
+        equal(jurisdictions.select.value, 'GB-SCT', 'alias result selects its actual jurisdiction');
+
         // A country-sized catalogue must not rewrite every row when one town changes.
         const large = create('selectEventLarge', true);
         const towns = Array.from({length: 5000}, (_, index) => new Option(`Town ${index}`, `town-${index}`));
         towns[2500] = new Option('Colchester', 'colchester');
         towns[2501] = new Option('West Mersea', 'west-mersea');
+        towns.forEach((option, index) => {
+            option.dataset.latitude = '10';
+            option.dataset.longitude = String(index / 1000);
+        });
         large.select.replaceChildren(...towns);
         labDOM.call('lab_select_rebuild', large.select, 0);
         open(large);
@@ -229,6 +254,39 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
         large.search.dispatchEvent(new Event('input', {bubbles: true}));
         rows[2501].click();
         equal(large.select.value, 'west-mersea', 'large catalogue filtered selection remains usable');
+        const stats = () => labDOM.call('lab_menu_index_stats', large.select) as {
+            rows: number; coordinateCandidates: number; textCandidates: number
+        };
+        open(large);
+        large.search.value = 'ersea';
+        large.search.dispatchEvent(new Event('input', {bubbles: true}));
+        equal(large.items().filter(item => !item.classList.contains('hidden')).length, 1,
+              'native suffix search preserves matching inside a word');
+        check(stats().textCandidates > 0 && stats().textCandidates < 5,
+              'substring lookup examines matching suffixes, not all 5000 town strings');
+        check(labDOM.call('lab_location_coordinates', large.select, {latitude: '10.0000005', longitude: '4.999'}),
+              'indexed coordinate restoration retains its tolerance');
+        equal(large.select.selectedIndex, 4999, 'coordinate index selects the correct option');
+        equal(large.select.value, 'town-4999', 'indexed selection invokes the real DOM setter');
+        check(!Object.hasOwn(large.select, 'selectedIndex'), 'indexed selection does not shadow the DOM property');
+        equal(stats().coordinateCandidates, 1, 'binary coordinate lookup chooses the selective longitude axis');
+        towns[4000].dataset.longitude = towns[2].dataset.longitude;
+        check(labDOM.call('lab_location_coordinates', large.select, {latitude: '10', longitude: '0.002'}),
+              'synchronous coordinate mutations invalidate the native index');
+        equal(large.select.selectedIndex, 2, 'duplicate coordinates retain first-option precedence');
+        towns[4999].value = 'changed-key';
+        check(!labDOM.call('lab_location_choose', large.select, {value: 'town-4999'}) &&
+              labDOM.call('lab_location_choose', large.select, {value: 'changed-key'}),
+              'key dictionary invalidates synchronously when option values change');
+        equal(large.select.value, 'changed-key', 'key lookup updates the actual native selection');
+        towns[4999].textContent = 'Γάμα';
+        labDOM.call('lab_select_rebuild', large.select, 0);
+        open(large);
+        large.search.value = 'αμ';
+        large.search.dispatchEvent(new Event('input', {bubbles: true}));
+        equal(large.items().filter(item => !item.classList.contains('hidden')).length, 1,
+              'suffix indexing preserves Unicode and accent-normalised substring matching');
+        check(!large.items()[4999].classList.contains('hidden'), 'Unicode search returns the expected town row');
     } finally {
         for (const fixture of fixtures)
             labDOM.call('lab_select_event', fixture.select, 3, 0, null);

@@ -17,7 +17,7 @@
 #include "thread-t.h"
 #include "executor-t.h"
 
-struct _executor_task_t {
+typedef struct _executor_task_t {
     atomic_size_t references;
     atomic_int status;
     lock_t *done;
@@ -29,7 +29,7 @@ struct _executor_task_t {
     void *result;
     diagnostic_t *diagnostic;
     int error;
-};
+} executor_task_t;
 
 /** @brief Worker-local pool identity, used to reject blocking dependency and self-destruction calls. */
 extern _Thread_local executor_t *executor_current;

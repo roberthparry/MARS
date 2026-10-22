@@ -9,8 +9,8 @@
  * supplies promises and Intl timezone lookup. Handles belong to one synchronous call.
  * Native-owned generation tokens live as opaque objects on the select nodes;
  * restoration snapshots and change listeners reject obsolete asynchronous work.
- * Catalogue rendering and coordinate matching visit each candidate because the
- * catalogue has no coordinate index. Per-row scopes bound temporary handle usage.
+ * Catalogue rendering visits each output row; key and coordinate restoration use
+ * native menu indexes. Per-row scopes bound temporary handle usage.
  */
 #include <string.h>
 
@@ -20,6 +20,8 @@
 #include "lab_profile.h"
 #include "lab_select.h"
 #include "lab_location.h"
+#include "lab_town_store.h"
+#include "lab_menu_index.h"
 
 /* Omit catalogue disambiguation IDs from town display text, retaining all other descriptive text. */
 jsref lab_location_town_text(jsref text)
@@ -115,10 +117,13 @@ static jsref lab_location_town_list(jsref context, jsref value)
     int config = lab_dom_get(context, "config");
     int code = lab_location_validated(LAB_PROFILE_JURISDICTION, value, lab_dom_get(config, "DEFAULT_DATETIME_JURISDICTION"),
                                       lab_dom_get(context, "jurisdictions"));
-    int catalogue = lab_dom_get(context, "towns"), towns = lab_dom_key_get(catalogue, code);
+    int catalogue = lab_dom_get(context, "towns");
+    bool native = lab_dom_truth(lab_dom_get(catalogue, "nativeStore"));
+    int towns = native ? lab_town_store_snapshot(code) : lab_dom_key_get(catalogue, code);
     if (lab_dom_type(towns) == LAB_VALUE_ARRAY)
         return towns;
-    towns = lab_dom_key_get(catalogue, lab_dom_item(lab_dom_split(code, "-"), 0));
+    int parent = lab_dom_item(lab_dom_split(code, "-"), 0);
+    towns = native ? lab_town_store_snapshot(parent) : lab_dom_key_get(catalogue, parent);
     return lab_dom_type(towns) == LAB_VALUE_ARRAY ? towns : lab_dom_object(LAB_VALUE_ARRAY);
 }
 
@@ -263,29 +268,27 @@ void lab_location_selected(node_jsref select)
     lab_dom_return(lab_location_selected_option(select));
 }
 
-static double lab_location_number(jsref value)
-{
-    if (lab_dom_type(value) == LAB_VALUE_NUMBER)
-        return lab_dom_to_number(value);
-    int input = lab_dom_create("input");
-    lab_dom_write(input, LAB_DOM_ATTRIBUTE, "type", lab_dom_string("number"));
-    lab_dom_write(input, LAB_DOM_VALUE, "", lab_dom_clean(value, LAB_DOM_CLEAN_TRIM));
-    return lab_dom_to_number(lab_dom_get(input, "valueAsNumber"));
-}
-
 /* Find a coordinate pair with native tolerance policy and reject absent/non-finite numbers. */
 bool lab_location_coordinates(node_jsref select, jsref coordinates)
 {
     if (!select)
         return false;
-    double latitude = lab_location_number(lab_dom_get(coordinates, "latitude"));
-    double longitude = lab_location_number(lab_dom_get(coordinates, "longitude"));
+    double latitude = lab_menu_index_number(lab_dom_get(coordinates, "latitude"));
+    double longitude = lab_menu_index_number(lab_dom_get(coordinates, "longitude"));
+    int indexed = lab_menu_index_coordinates(select, latitude, longitude);
+    if (indexed >= 0) {
+        lab_dom_select_index(select, indexed);
+        lab_select_sync(select);
+        return true;
+    }
+    if (indexed == -1) return false;
+    /* Keep controls usable if a bounded index cannot be allocated. */
     int options = lab_dom_get(select, "options");
     unsigned count = lab_dom_count(options), mark = lab_dom_mark();
     for (unsigned index = 0; index < count; ++index) {
         int option = lab_dom_item(options, index);
-        if (lab_forms_nearly_equal(lab_location_number(lab_dom_read(option, LAB_DOM_DATASET, "latitude")), latitude, 0.000001) &&
-            lab_forms_nearly_equal(lab_location_number(lab_dom_read(option, LAB_DOM_DATASET, "longitude")),
+        if (lab_forms_nearly_equal(lab_menu_index_number(lab_dom_read(option, LAB_DOM_DATASET, "latitude")), latitude, 0.000001) &&
+            lab_forms_nearly_equal(lab_menu_index_number(lab_dom_read(option, LAB_DOM_DATASET, "longitude")),
                                    longitude, 0.000001)) {
             lab_location_write(select, lab_location_value(option));
             lab_dom_release(mark);
@@ -304,12 +307,12 @@ void lab_location_clear_custom(node_jsref select, jsref latitude, jsref longitud
         return;
     int selected = lab_dom_clean(lab_dom_read(option, LAB_DOM_DATASET, "elevation"), LAB_DOM_CLEAN_TRIM);
     int current = lab_dom_clean(lab_location_value(elevation), LAB_DOM_CLEAN_TRIM);
-    if (lab_forms_nearly_equal(lab_location_number(lab_dom_read(option, LAB_DOM_DATASET, "latitude")),
-                               lab_location_number(lab_location_value(latitude)), 0.000001) &&
-        lab_forms_nearly_equal(lab_location_number(lab_dom_read(option, LAB_DOM_DATASET, "longitude")),
-                               lab_location_number(lab_location_value(longitude)), 0.000001) &&
+    if (lab_forms_nearly_equal(lab_menu_index_number(lab_dom_read(option, LAB_DOM_DATASET, "latitude")),
+                               lab_menu_index_number(lab_location_value(latitude)), 0.000001) &&
+        lab_forms_nearly_equal(lab_menu_index_number(lab_dom_read(option, LAB_DOM_DATASET, "longitude")),
+                               lab_menu_index_number(lab_location_value(longitude)), 0.000001) &&
         (!lab_dom_length(selected) || !lab_dom_length(current) ||
-         lab_forms_nearly_equal(lab_location_number(selected), lab_location_number(current), 0.01)))
+         lab_forms_nearly_equal(lab_menu_index_number(selected), lab_menu_index_number(current), 0.01)))
         return;
     lab_location_write(select, lab_dom_string(""));
 }
@@ -368,11 +371,20 @@ bool lab_location_choose(node_jsref select, jsref selection)
         int options = lab_dom_get(select, "options");
         if (!(index >= 0 && index < lab_dom_count(options)) || index != (unsigned)index)
             return false;
-        value = lab_location_value(lab_dom_item(options, (unsigned)index));
+        lab_dom_select_index(select, (int)index);
+        lab_select_sync(select);
+        return true;
     } else {
         value = lab_dom_clean(lab_dom_get(selection, "value"), LAB_DOM_CLEAN_TRIM);
         if (!lab_dom_length(value))
             return false;
+        int indexed = lab_menu_index_key(select, value);
+        if (indexed >= 0) {
+            lab_dom_select_index(select, indexed);
+            lab_select_sync(select);
+            return true;
+        }
+        if (indexed == -1) return false;
     }
     int previous = lab_location_value(select);
     lab_dom_write(select, LAB_DOM_VALUE, "", value);
