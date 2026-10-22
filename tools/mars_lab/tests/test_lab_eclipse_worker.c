@@ -147,6 +147,17 @@ static bool eclipse_worksheet_response(void)
          !strcmp(test_lab_text(json_array_get(summary, 3), "value"), "13° 00.00′ S") &&
          !strcmp(test_lab_text(json_array_get(summary, 4), "value"), "180° 00.00′ E") && ok;
     json_free(response);
+    lab_cal_set(options, "defer_events", "true");
+    response = fields ? lab_cal_almanac(fields, options, &status) : NULL;
+    const json_t *preview = test_lab_member(test_lab_member(response, "almanac_presentation"), "all");
+    ok = ok && test_lab_ok(response, true) && json_array_size(test_lab_member(response, "observer_summary")) == 9 &&
+         json_array_size(test_lab_member(response, "all_rows")) > 0 &&
+         json_array_size(test_lab_member(response, "events")) == 0 &&
+         !strcmp(test_lab_text(response, "events_notice"), "Calculating upcoming events…") &&
+         strstr(test_lab_text(preview, "html"), "Calculating upcoming events…") &&
+         strstr(test_lab_text(preview, "copy_text"), "Calculating upcoming events…") &&
+         !strstr(test_lab_text(preview, "copy_text"), "No events found.");
+    json_free(response);
     json_free(fields);
     string_free(diagnostic);
     json_free(options);

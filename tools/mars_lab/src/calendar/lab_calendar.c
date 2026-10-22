@@ -436,6 +436,9 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
         return lab_cal_error(status, 400, error);
     }
     if (is_almanac) {
+        /* Only the initial interactive request may defer the annual event search. */
+        lab_cal_set(options, "defer_events", !is_almanac_weather &&
+                    !strcmp(lab_cal_text(payload, "defer_events"), "true") ? "true" : "false");
         lab_cal_surface(options);
         if (!strcmp(lab_cal_text(options, "sea_horizon"), "true") &&
             !lab_cal_numeric(lab_cal_text(options, "elevation"), 0, 11000)) {

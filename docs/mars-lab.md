@@ -254,7 +254,13 @@ no world-catalogue download. Changing country cancels obsolete country requests.
 Already fetched records are retained for reuse during the session.
 A failed later page leaves already-loaded towns and observer coordinates usable,
 with an incomplete-loading notice. Nearby-request failures do not stop country loading.
-The loading notice clears when the first usable page arrives, not after every country.
+Routine town loading is silent; only loading failures display a notice.
+Interactive Almanac requests publish the observer card and body positions before
+the annual eclipse/transit search. The existing asynchronous weather refresh then
+supplies the upcoming events for the same captured selection; stale replies cannot
+replace a newer location. Until then the event section explicitly says it is being
+calculated rather than reporting that no events exist. Direct API requests retain
+complete results unless `defer_events` is explicitly set to `"true"`.
 Fractional gridline tooltip coordinates use degrees and decimal minutes to two
 decimal places; whole degrees stay compact, and minute rounding carries into degrees.
 There is no duplicated geographic catalogue in the Lab assets. Database changes

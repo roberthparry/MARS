@@ -1060,6 +1060,9 @@ static jsref lab_flow_request_fetch_save(struct lab_flow_request_fetch_context *
 
 static jsref lab_flow_request_fetch_post(struct lab_flow_request_fetch_context *ctx)
 {
+    /* Publish the observer and bodies before the deferred weather/event refresh. */
+    if (ctx->kind == LAB_FLOW_FETCH_ALMANAC)
+        lab_dom_set(lab_dom_get(ctx->frame, "payload"), "defer_events", lab_dom_string("true"));
     return lab_flow_call(ctx->frame, flow_request_fetch_stage_done, "post", "value", 1, 3,
                          lab_dom_get(ctx->frame, "request"), lab_dom_get(ctx->frame, "payload"),
                          lab_dom_string(lab_flow_request_fetch_endpoints[ctx->kind]));

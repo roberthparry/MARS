@@ -42,6 +42,9 @@ void lab_evaluation_weather_response(lab_request_outcome_t outcome, jsref overvi
             lab_evaluation_weather_emit(calls, "installWeather", 2, overview, data);
     }
     const char *status = outcome == LAB_REQUEST_OUTCOME_SUCCESS ? "Ready" : "Weather unavailable";
+    if (outcome != LAB_REQUEST_OUTCOME_SUCCESS &&
+        lab_dom_truth(lab_dom_get(overview, "events_notice")))
+        status = "Upcoming events and weather unavailable; retry the selection";
     lab_evaluation_weather_emit(calls, "setStatus", 1, lab_dom_string(status), 0);
     lab_dom_return(plan);
 }

@@ -320,8 +320,13 @@ string_t *lab_cal_almanac_markup(const json_t *response, const json_t *rows, con
     ok = ok && !string_append_cstr(out, "</span></div></div>") &&
          lab_cal_markup_bodies(out, rows, source ? source : rows, response, visible) &&
          !string_append_cstr(out, "<div class=\"almanac-events-title\">") &&
-         lab_cal_markup_text(out, lab_cal_text(response, "event_title")) && !string_append_cstr(out, "</div>") &&
-         lab_cal_markup_events(out, events) && !string_append_cstr(out, "</div>");
+         lab_cal_markup_text(out, lab_cal_text(response, "event_title")) && !string_append_cstr(out, "</div>");
+    if (*lab_cal_text(response, "events_notice"))
+        ok = ok && !string_append_cstr(out, "<p class=\"mode-hint\" role=\"status\">") &&
+             lab_cal_markup_text(out, lab_cal_text(response, "events_notice")) && !string_append_cstr(out, "</p>");
+    else
+        ok = ok && lab_cal_markup_events(out, events);
+    ok = ok && !string_append_cstr(out, "</div>");
     if (!ok) {
         string_free(out);
         return NULL;

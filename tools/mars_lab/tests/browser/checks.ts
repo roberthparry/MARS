@@ -2948,6 +2948,8 @@
                 check(MarsAlmanacGlobe.coordinate(89.999999, 'N', 'S') === '90° N', 'Minutes carry into degrees');
                 check(MarsAlmanacGlobe.coordinate(0, 'E', 'W') === '0°', 'Zero coordinate');
                 if (catalogueCheck === 'success') {
+                    check(document.querySelector('[data-jurisdiction-notice]:not(.hidden)') === null,
+                        'Routine town loading stays silent while a country page is pending');
                     await labApplication.loadNearbyTowns(53.319, -3.4916);
                     check(labApplication.catalogue.towns['GB-WLS']?.[0].name === 'Rhyl',
                         'Local towns appear while selected-jurisdiction loading is still blocked');

@@ -6,6 +6,8 @@
  * body formatting. Event times prefer each named town's validated IANA zone;
  * unavailable zones fall back to jurisdiction rules, then the supplied zone.
  * All child failures are returned as errors, never empty successful tables.
+ * Interactive previews explicitly mark deferred events while publishing observer
+ * details and body positions; the background refresh supplies complete events.
  */
 #include <errno.h>
 #include <math.h>
@@ -374,7 +376,9 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
     string_split_free(clock_parts, clock_count);
     string_free(clock_text);
     string_t *search_start = lab_cal_jd_text(start_jd - 1, 0, true), *search_end = lab_cal_jd_text(end_jd + 1, 0, true);
-    json_t *raw = lab_cal_run_events(options, string_c_str(search_start), string_c_str(search_end), false, &error);
+    bool deferred = !strcmp(lab_cal_text(options, "defer_events"), "true");
+    json_t *raw = deferred ? json_new_array() :
+        lab_cal_run_events(options, string_c_str(search_start), string_c_str(search_end), false, &error);
     string_free(search_start);
     string_free(search_end);
     datetime_dealloc(date);
@@ -409,7 +413,7 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
             json_free(event);
     }
     json_free(raw);
-    lab_cal_add_transits(events, lab_cal_text(options, "date"), string_c_str(end_date));
+    if (!deferred) lab_cal_add_transits(events, lab_cal_text(options, "date"), string_c_str(end_date));
     events = lab_cal_sort_events(events);
     bool visible_only = !strcmp(lab_cal_text(options, "visibility"), "visible");
     for (size_t i = 0; i < json_array_size(all_rows); ++i) {
@@ -463,6 +467,7 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
                     "Altitudes corrected for observer height and refraction. "
                     "No horizon dip. No refraction below −0.575°.");
     lab_cal_set(response, "event_title", string_c_str(title));
+    lab_cal_set(response, "events_notice", deferred ? "Calculating upcoming events…" : "");
     lab_cal_set(response, "event_year", string_c_str(event_year));
     lab_cal_set(response, "event_window", string_c_str(window));
     lab_cal_set(response, "selected_code", "");

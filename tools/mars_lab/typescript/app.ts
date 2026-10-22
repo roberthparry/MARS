@@ -250,7 +250,7 @@ class LabApplication {
 
     private async loadJurisdictionTowns(code: string, controller: AbortSignal): Promise<void> {
         this.failedTownCodes.delete(code);
-        this.townNotice(`Loading towns for ${code}… Available towns and coordinates remain usable.`);
+        this.townNotice('');
         let cursor = '0';
         do {
             const signal = AbortSignal.any([controller, this.lifetime.signal, AbortSignal.timeout(10000)]);

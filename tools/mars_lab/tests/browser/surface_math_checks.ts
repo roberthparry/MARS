@@ -20,6 +20,19 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         if (!condition) throw new Error('Surface maths: ' + message);
     }
 
+    const initialFetch = labHttp.fetch;
+    let deferredRequest = false;
+    try {
+        labHttp.fetch = async (url, options) => {
+            if (url !== '/almanac-eval') return initialFetch(url, options);
+            const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {defer_events?: string};
+            deferredRequest = payload.defer_events === 'true';
+            return Object.assign(new Response(), {async labData() { return {ok: true}; }});
+        };
+        await WorksheetRequests.evaluationTransport.fetchAlmanacEvaluation();
+        check(deferredRequest, 'initial Almanac request defers annual events so the observer card can appear first');
+    } finally { labHttp.fetch = initialFetch; }
+
     const townPageResponse = await labHttp.fetch('/towns?after=0&jurisdiction=GB-WLS');
     const townPage = await townPageResponse.labData() as LabCatalogue;
     check(townPageResponse.ok && townPage.available && Boolean(townPage.towns['GB-WLS']?.length) &&

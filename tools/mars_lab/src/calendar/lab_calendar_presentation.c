@@ -152,7 +152,9 @@ static bool lab_cal_pres_copy_events(string_t *copy, const json_t *response, con
             ok = lab_cal_pres_cell(copy, value, j != 0u);
         }
     }
-    if (ok && !json_array_size(events)) ok = !string_append_cstr(copy, "\nNo events found.");
+    if (ok && !json_array_size(events))
+        ok = string_append_format(copy, "\n%s", *lab_cal_text(response, "events_notice") ?
+                                  lab_cal_text(response, "events_notice") : "No events found.") >= 0;
     return ok;
 }
 
