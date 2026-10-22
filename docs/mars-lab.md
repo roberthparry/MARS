@@ -27,7 +27,7 @@ Town labels on the globe and Town/Location dropdown rows use the same asynchrono
 flag tooltip cache, including keyboard focus. Rows carry small jurisdiction codes,
 not copies of flag artwork. Globe redraws retain the custom accessible tooltip
 without reintroducing a competing plain browser title.
-Town tooltips omit GeoNames disambiguation IDs; stored town identities and source
+Town dropdown labels and tooltips omit GeoNames disambiguation IDs; stored town identities and source
 attribution remain unchanged. Other descriptive parts of a town name are retained.
 
 Country/jurisdiction dropdowns also show available flags beside visible entries

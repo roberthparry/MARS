@@ -21,6 +21,22 @@
 #include "lab_select.h"
 #include "lab_location.h"
 
+/* Omit catalogue disambiguation IDs from town display text, retaining all other descriptive text. */
+jsref lab_location_town_text(jsref text)
+{
+    int parts = lab_dom_split(text, " (GeoNames ");
+    if (lab_dom_count(parts) != 2)
+        return text;
+    int tail = lab_dom_item(parts, 1);
+    unsigned digits = 0, length = lab_dom_length(tail);
+    while (digits < length && digits < 10 &&
+           lab_dom_contains(lab_dom_string("0123456789"), lab_dom_slice(tail, digits, digits + 1)))
+        ++digits;
+    if (!digits || !lab_dom_equal(lab_dom_slice(tail, digits, digits + 1), lab_dom_string(")")))
+        return text;
+    return lab_dom_join(lab_dom_item(parts, 0), lab_dom_slice(tail, digits + 1, length), "");
+}
+
 /** @brief Calendar control indices shared by selection and response projection. */
 static const struct {
     unsigned town, offset;
@@ -200,7 +216,8 @@ void lab_location_populate(node_jsref select, jsref towns, bool select_default)
         lab_dom_write(option, LAB_DOM_VALUE, "", value);
         previous_exists |= lab_dom_equal(previous, value);
         int name = lab_dom_get(town, "name");
-        lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_truth(name) ? lab_location_text(name) : lab_dom_string("Location"));
+        lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_truth(name) ?
+                      lab_location_town_text(lab_location_text(name)) : lab_dom_string("Location"));
         lab_dom_write(option, LAB_DOM_DATASET, "countryCode", jurisdiction);
         for (unsigned field = 0; field < sizeof attributes / sizeof *attributes; ++field)
             lab_dom_write(option, LAB_DOM_DATASET, attributes[field], lab_location_text(lab_dom_get(town, attributes[field])));

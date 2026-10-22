@@ -184,6 +184,23 @@ window.checkLabSelects = async function checkLabSelects() {
     }
     try {
         const label = document.createElement('label');
+        const towns = document.createElement('select');
+        root.append(towns);
+        const townKey = 'Adampur (GeoNames 1462733)|31.43|75.71';
+        labDOM.call('lab_location_populate', towns, [
+            {name: 'Adampur (GeoNames 1462733)', value: townKey, default: true},
+            {name: 'Newport (Harbour) (GeoNames 1234567)', value: 'harbour'},
+            {name: 'Place (GeoNames unknown)', value: 'other'}
+        ], true);
+        WorksheetLocations.selects.enhance(towns, {searchable: true});
+        const townShell = towns.closest('.select-shell')!;
+        check(towns.value === townKey && towns.options[0].text === 'Adampur',
+              'town labels omit GeoNames IDs without changing selection keys');
+        check(townShell.querySelector('.select-button')!.textContent === 'Adampur' &&
+              townShell.querySelector('.select-option')!.textContent === 'Adampur',
+              'selected town and open dropdown both omit GeoNames IDs');
+        check(towns.options[1].text === 'Newport (Harbour)' && towns.options[2].text === 'Place (GeoNames unknown)',
+              'town display preserves other parentheses and nonnumeric descriptions');
         const select = document.createElement('select');
         select.id = 'nativeSelectFixture';
         label.htmlFor = select.id;

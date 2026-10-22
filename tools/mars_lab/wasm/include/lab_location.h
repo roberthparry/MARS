@@ -25,6 +25,9 @@
 #include "lab_mode.h"
 #include "lab_profile.h"
 
+/** @brief Omit a GeoNames numeric disambiguator from displayed town text without changing its catalogue key. */
+jsref lab_location_town_text(jsref text);
+
 /** @brief Native event emitted by a town selector. */
 typedef enum {
     LAB_LOCATION_SELECTION_CHANGED = 1 /**< Invalidate pending restoration after a select change. */

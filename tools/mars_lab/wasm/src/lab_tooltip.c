@@ -10,6 +10,7 @@
  */
 #include "lab_dom.h"
 #include "lab_view.h"
+#include "lab_location.h"
 #include "lab_tooltip.h"
 
 static const struct {
@@ -104,21 +105,6 @@ static jsref lab_tooltip_node(void)
     return node;
 }
 
-/* Omit catalogue disambiguation IDs from town hints, retaining all other descriptive text. */
-static jsref lab_tooltip_town_text(jsref text)
-{
-    int parts = lab_dom_split(text, " (GeoNames ");
-    if (lab_dom_count(parts) != 2)
-        return text;
-    int tail = lab_dom_item(parts, 1);
-    unsigned digits = 0, length = lab_dom_length(tail);
-    while (digits < length && digits < 10 &&
-           lab_dom_contains(lab_dom_string("0123456789"), lab_dom_slice(tail, digits, digits + 1)))
-        ++digits;
-    if (!digits || !lab_dom_equal(lab_dom_slice(tail, digits, digits + 1), lab_dom_string(")")))
-        return text;
-    return lab_dom_join(lab_dom_item(parts, 0), lab_dom_slice(tail, digits + 1, length), "");
-}
 
 /* Restore exact original spelling, whitespace and absent/empty attribute distinction. */
 void lab_tooltip_hide(jsref button)
@@ -152,7 +138,7 @@ bool lab_tooltip_show(jsref button, jsref previous, double width, double height)
             lab_dom_read(button, LAB_DOM_DATASET, "townTooltipCoordinates"), ""));
     }
     if (lab_dom_length(lab_dom_read(button, LAB_DOM_DATASET, "townTooltipName")))
-        lab_dom_write(node, LAB_DOM_TEXT, "", lab_tooltip_town_text(lab_dom_read(node, LAB_DOM_TEXT, "")));
+        lab_dom_write(node, LAB_DOM_TEXT, "", lab_location_town_text(lab_dom_read(node, LAB_DOM_TEXT, "")));
     int flag = lab_dom_read(button, LAB_DOM_DATASET, "countryFlag");
     if (lab_dom_length(lab_dom_read(button, LAB_DOM_DATASET, "countryCode")) &&
         lab_dom_starts_with(flag, "data:image/svg+xml;base64,")) {
