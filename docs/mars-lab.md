@@ -34,7 +34,9 @@ Country/jurisdiction dropdowns also show available flags beside visible entries
 and the selected label, as well as in their tooltips. Opening or focusing the menu
 starts lazy observation: artwork loads sequentially for visible rows, sharing the
 32-entry, 1 MiB tooltip cache. Concurrent requests for the same country share one
-asynchronous fetch; it is cancelled when its last consumer leaves. Artwork decoding
+asynchronous fetch. Cached flags are restored immediately after selection, even
+while a different country's artwork is loading. A shared request
+is cancelled when its last consumer leaves. Artwork decoding
 is asynchronous, and textual controls remain usable while flags arrive. Database
 lookups use the existing indexed country code, without a separate BLOB-offset format.
 Hidden row images are released. Missing artwork

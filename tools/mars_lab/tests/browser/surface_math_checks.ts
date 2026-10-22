@@ -657,7 +657,27 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 countryShell.querySelector('.select-menu')!.classList.add('hidden');
                 const flagLoader = WorksheetResults.tooltip as unknown as {
                     fetchFlag(code: string, signal: AbortSignal): Promise<{name: string; flag: string}>;
+                    fillCountryMenu(): Promise<void>;
+                    visibleCountries: Set<HTMLElement>;
+                    menuRequest: AbortController | null;
                 };
+                const previousMenuRequest = flagLoader.menuRequest;
+                const wasVisible = flagLoader.visibleCountries.has(countryButton);
+                const blockedMenu = new AbortController();
+                try {
+                    flagLoader.menuRequest = blockedMenu;
+                    flagLoader.visibleCountries.add(countryButton);
+                    countryButton.querySelector('img.country-flag')?.remove();
+                    const beforeCached = townFlagReplies.length;
+                    const repaint = flagLoader.fillCountryMenu();
+                    check(Boolean(countryButton.querySelector('img.country-flag')) &&
+                          townFlagReplies.length === beforeCached && !blockedMenu.signal.aborted,
+                          'selected country restores cached artwork immediately while another flag request is pending');
+                    await repaint;
+                } finally {
+                    flagLoader.menuRequest = previousMenuRequest;
+                    if (!wasVisible) flagLoader.visibleCountries.delete(countryButton);
+                }
                 const firstConsumer = new AbortController(), secondConsumer = new AbortController();
                 const beforeShared = townFlagReplies.length;
                 const firstResult = flagLoader.fetchFlag('FR', firstConsumer.signal).catch(() => null);

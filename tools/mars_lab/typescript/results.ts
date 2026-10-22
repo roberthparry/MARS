@@ -163,14 +163,16 @@ namespace WorksheetResults {
         }
 
         private async fillCountryMenu(): Promise<void> {
+            // Selection rebuilds the button's text; restore resident artwork before waiting on any other country.
+            for (const item of this.visibleCountries) {
+                const cached = this.flags.get(item.dataset.countryCode || '');
+                if (cached) this.countryArtwork(item, cached.flag);
+            }
             if (this.menuRequest) return;
             for (const item of this.visibleCountries) {
                 const code = item.dataset.countryCode || '';
                 if (!/^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(code)) continue;
-                if (this.flags.has(code)) {
-                    this.countryArtwork(item, this.flags.get(code)!.flag);
-                    continue;
-                }
+                if (this.flags.has(code)) continue;
                 const request = new AbortController();
                 this.menuRequest = request;
                 const timer = window.setTimeout(() => request.abort(), 5000);
