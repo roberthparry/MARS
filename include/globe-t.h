@@ -165,12 +165,17 @@ bool globe_border_segments(globe_t *globe, double west, double south, double eas
 bool globe_import_countries(sqlite_t *db, file_t *shapes, file_t *attributes);
 
 /**
- * @brief Transactionally replace shoreline tables from a GSHHG 2.3.7 binary stream.
+ * @brief Transactionally replace shoreline tables from legacy GSHHG or lossless binary64 rings.
  * @param db Borrowed writable database; unrelated tables are retained.
- * @param source Borrowed open binary input positioned at its first polygon header.
+ * @param source Borrowed open binary input positioned at its first polygon header or MARSCF64 signature.
  * @return True after publication; false rolls back the replacement without closing either resource.
  * @note Uses a savepoint: a caller-owned transaction remains open and controls final publication.
  * Keeps levels 1–5, using the Antarctic ice front rather than the alternative grounding line.
+ * The lossless format starts with the eight bytes MARSCF64, then uses GSHHG-shaped 44-byte headers
+ * and big-endian binary64 degree coordinate pairs. Header bounds are outward-rounded microdegrees.
+ * Geometry must already have passed topology and nesting validation; this importer checks encoding,
+ * coordinate ranges and storage integrity, not geographic topology. Version 2 readers retain coordinate
+ * precision through indexed queries and full-resolution paths; legacy version 1 data remain readable.
  */
 bool globe_import_shoreline(sqlite_t *db, file_t *source);
 

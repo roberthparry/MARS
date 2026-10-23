@@ -126,6 +126,11 @@ bool lab_tooltip_show(jsref button, jsref previous, double width, double height)
 {
     if (!button || lab_dom_closest(button, ".hidden"))
         return false;
+    if (lab_dom_has_class(button, "select-button") &&
+        lab_dom_length(lab_dom_read(button, LAB_DOM_DATASET, "countryOption"))) {
+        lab_tooltip_hide(previous);
+        return false;
+    }
     if (!lab_dom_equal(button, previous))
         lab_tooltip_hide(previous);
     int node = lab_tooltip_node();

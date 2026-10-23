@@ -34,7 +34,7 @@ window.checkLabWeather = async function checkLabWeather() {
     let reads = 0;
     const unread = new Proxy({}, {
         get(_target, key) {
-            if (key === 'mode')
+            if (key === 'mode' || key === 'events_notice')
                 return undefined;
             ++reads;
             throw new Error('Weather policy must not read payload fields');
@@ -165,8 +165,8 @@ window.checkLabWeather = async function checkLabWeather() {
             pending.push({task, gate});
             await Promise.race([entered.promise, task.then(requestDidNotStart)]);
             equal(
-                named('status').map(event => event[1]).join(','), 'Loading weather...',
-                'loading status precedes the asynchronous response');
+                named('status').map(event => event[1]).join(','), '',
+                'background weather preserves the calendar header while awaiting the response');
             equal(named('render').length, 0, 'nothing rendered before the response');
             let newer = null;
             const stale = scenario.startsWith('stale') || scenario === 'mode changed';

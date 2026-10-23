@@ -12,6 +12,12 @@ It answers questions such as:
 
 ## Country names and flags
 
+`jurisdict_setup_origin` visits the single location saved by calendar installation,
+independently of the engine's selected jurisdiction. It supplies borrowed place strings
+for the callback's duration, including coordinates and the IANA timezone. It returns false
+when setup is missing or unreadable, without substituting a jurisdiction default or
+inferring coordinates from the machine's language. MARS Lab uses this for its home-sky card.
+
 `jurisdict_country(jurisdiction, code, &name, &flag_svg)` looks up an exact uppercase
 ISO alpha-2 country code or subdivision code through the catalogue's indexed key.
 Subdivisions with artwork use their own name and flag; others fall back to their

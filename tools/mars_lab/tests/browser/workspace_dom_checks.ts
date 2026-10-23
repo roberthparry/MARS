@@ -100,6 +100,10 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             check(hidden(WorksheetContext.valueCard) === !valueVisible[mode], 'value policy without a numerical result');
             check(WorksheetContext.valueCard.hasAttribute('hidden') === !valueVisible[mode], 'value hidden attribute');
             check(hidden(WorksheetContext.datetimeLocal) === (mode !== 5), 'local weather belongs to Datetime');
+            check(hidden(document.querySelector('.precision-toolbar') as HTMLElement) === (mode === 5 || mode === 6),
+                  'precision toolbar is hidden only in Datetime and Almanac modes');
+            check((getComputedStyle(document.querySelector('.precision-toolbar')!).display === 'none') ===
+                  (mode === 5 || mode === 6), 'precision toolbar visibility survives layout styling');
             const labels = labDOM.call<string[]>('lab_workspace_dom_labels', mode);
             check(WorksheetContext.leftPaneTitle.textContent === labels[0], 'native workspace heading');
             check(
@@ -151,6 +155,53 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
 
         native.lab_workspace_select(savedMode);
         native.lab_workspace_request_precision(savedMode, 53);
+        for (const calendarMode of [5, 6]) {
+            native.lab_workspace_select(calendarMode);
+            WorksheetWorkspace.presentation.setStatus('Calculating');
+            check(!WorksheetContext.statusEl.textContent!.includes('digits /'), 'calendar status omits numeric precision');
+        }
+        const skyTemplate = document.getElementById('homeSky') || document.createElement('span');
+        skyTemplate.id = 'homeSky';
+        skyTemplate.className = 'sky-status-template';
+        skyTemplate.hidden = true;
+        skyTemplate.innerHTML = '<span class="sky-status-strip"><svg aria-label="Moon"></svg>' +
+            '<span>Sunset 18:20</span><span>Sunrise 07:10</span><span>12:00 GMT</span><img class="country-flag" alt="Finland"></span>';
+        document.body.append(skyTemplate);
+        for (const calendarMode of [5, 6]) {
+            native.lab_workspace_select(calendarMode);
+            labDOM.call('lab_workspace_dom_mode', calendarMode, '');
+            WorksheetWorkspace.presentation.setStatus('Ready');
+            check(Boolean(WorksheetContext.statusEl.querySelector('svg')) &&
+                  WorksheetContext.statusEl.textContent!.includes('Sunset 18:20Sunrise 07:1012:00 GMT') &&
+                  Boolean(WorksheetContext.statusEl.querySelector('img.country-flag')),
+                  'calendar status installs the native Moon, sunset, sunrise, time and flag strip');
+            if (window.innerWidth > 900) {
+                const mobile = document.querySelector('#mobileAccess summary')!.getBoundingClientRect();
+                const sky = WorksheetContext.statusEl.querySelector('.sky-status-strip')!.getBoundingClientRect();
+                check(Math.abs(mobile.top - sky.top) < 1,
+                      'DateTime and Almanac sky cards align with the top of the Mobile button');
+            }
+            WorksheetWorkspace.presentation.setStatus('Calculating');
+            check(Boolean(WorksheetContext.statusEl.querySelector('svg')), 'worksheet loading preserves the independent home sky');
+        }
+        native.lab_workspace_select(6);
+        const skySnapshot = labDOM.call('lab_workspace_dom_result_save', {});
+        WorksheetContext.statusEl.textContent = 'Ready';
+        labDOM.call('lab_workspace_dom_result_restore', skySnapshot);
+        check(Boolean(WorksheetContext.statusEl.querySelector('.sky-status-strip svg')) &&
+              WorksheetContext.statusEl.textContent!.includes('Sunset 18:20'),
+              'restoring a retained calendar result restores its sky header without reevaluation');
+        skyTemplate.remove();
+        native.lab_workspace_select(6);
+        labDOM.call('lab_workspace_dom_mode', 6, '');
+        WorksheetContext.statusEl.innerHTML = '<span class="sky-status-strip">Moon: 87.1% illuminated</span>';
+        native.lab_workspace_select(4);
+        labDOM.call('lab_workspace_dom_mode', 4, '');
+        check(!WorksheetContext.statusEl.querySelector('.sky-status-strip') &&
+              WorksheetContext.statusEl.textContent!.startsWith('Ready · ') &&
+              !WorksheetContext.statusEl.textContent!.includes('Moon'),
+              'switching from Almanac to Integrator immediately clears calendar status before evaluation');
+        native.lab_workspace_select(savedMode);
         check(precisionStatusText() === '17 digits / 53 bits', 'native precision status');
         WorksheetWorkspace.presentation.setStatus('Ready μ');
         check(WorksheetContext.statusEl.textContent === 'Ready μ · 17 digits / 53 bits', 'opaque Unicode status text');

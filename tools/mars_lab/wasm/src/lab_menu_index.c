@@ -138,6 +138,25 @@ static void destroy_index(menu_index_t *index)
     free(index);
 }
 
+/* Share identical searchable text between the indexed and bounded fallback paths. */
+jsref lab_menu_index_search_text(node_jsref option, bool details)
+{
+    jsref text = lab_dom_join(lab_dom_read(option, LAB_DOM_TEXT, ""), lab_dom_string(" "), "");
+    text = lab_dom_join(text, lab_dom_read(option, LAB_DOM_DATASET, "latitude"), " ");
+    text = lab_dom_join(text, lab_dom_read(option, LAB_DOM_DATASET, "longitude"), " ");
+    text = lab_dom_join(text, details ? lab_dom_read(option, LAB_DOM_DATASET, "detail") : 0, " ");
+    text = lab_dom_join(text, lab_dom_read(option, LAB_DOM_VALUE, ""), "");
+    if (lab_dom_truth(lab_dom_read(option, LAB_DOM_DATASET, "countryOption"))) {
+        char code[7] = {0};
+        int length = lab_dom_utf8_copy(lab_dom_read(option, LAB_DOM_DATASET, "countryCode"),
+                                       (unsigned char *)code, sizeof code - 1);
+        if (length >= 0 && (!strcmp(code, "GB") || !strcmp(code, "GB-ENG") ||
+                            !strcmp(code, "GB-WLS") || !strcmp(code, "GB-SCT") || !strcmp(code, "GB-NIR")))
+            text = lab_dom_join(text, lab_dom_string("United Kingdom UK"), " ");
+    }
+    return lab_dom_normalize(text);
+}
+
 static menu_index_t *build_index(node_jsref select, unsigned version)
 {
     menu_store_t *state = menu_store();
@@ -162,27 +181,13 @@ static menu_index_t *build_index(node_jsref select, unsigned version)
     for (unsigned i = 0; i < index->count; ++i) {
         unsigned mark = lab_dom_mark();
         jsref option = lab_dom_item(options, i), value = lab_dom_read(option, LAB_DOM_VALUE, "");
-        jsref text = lab_dom_join(lab_dom_read(option, LAB_DOM_TEXT, ""), lab_dom_string(" "), "");
-        text = lab_dom_join(text, lab_dom_read(option, LAB_DOM_DATASET, "latitude"), " ");
-        text = lab_dom_join(text, lab_dom_read(option, LAB_DOM_DATASET, "longitude"), " ");
-        text = lab_dom_join(text, lab_dom_truth(lab_dom_get(select, "labNativeMenuDetails")) ?
-                                  lab_dom_read(option, LAB_DOM_DATASET, "detail") : 0, " ");
-        text = lab_dom_join(text, value, "");
-        /* Jurisdiction labels may say Britain rather than the official country name.
-         * Index aliases once, preserving the ordinary suffix-search query path. */
-        if (lab_dom_truth(lab_dom_read(option, LAB_DOM_DATASET, "countryOption"))) {
-            char code[7] = {0};
-            int length = lab_dom_utf8_copy(lab_dom_read(option, LAB_DOM_DATASET, "countryCode"),
-                                           (unsigned char *)code, sizeof code - 1);
-            if (length >= 0 && (!strcmp(code, "GB") || !strcmp(code, "GB-ENG") ||
-                                !strcmp(code, "GB-WLS") || !strcmp(code, "GB-SCT") || !strcmp(code, "GB-NIR")))
-                text = lab_dom_join(text, lab_dom_string("United Kingdom UK"), " ");
-        }
+        jsref text = searchable ? lab_menu_index_search_text(option,
+            lab_dom_truth(lab_dom_get(select, "labNativeMenuDetails"))) : lab_dom_string("");
         menu_row_t *row = calloc(1, sizeof *row);
         if (!row) { lab_dom_release(mark); goto failed; }
         row->index = i;
         row->key = copy_text(value);
-        row->text = copy_text(searchable ? lab_dom_normalize(text) : lab_dom_string(""));
+        row->text = copy_text(text);
         row->latitude = lab_menu_index_number_owned(lab_dom_read(option, LAB_DOM_DATASET, "latitude"));
         row->longitude = lab_menu_index_number_owned(lab_dom_read(option, LAB_DOM_DATASET, "longitude"));
         lab_dom_release(mark);

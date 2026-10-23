@@ -43,6 +43,27 @@ bool jurisdict_country(jurisdiction_t *j, const char *code, string_t **name, str
     return true;
 }
 
+/* Read the singleton setup origin without inferring a place from language or a worksheet selection. */
+bool jurisdict_setup_origin(jurisdiction_t *j, jurisdict_place_visit_fn visitor, void *context)
+{
+    if (!j || !visitor) return false;
+    sqlite_stmt_t *q = sqlite_stmt_prepare(j->db,
+        "SELECT jurisdiction,location,CAST(latitude AS TEXT),CAST(longitude AS TEXT),timezone "
+        "FROM calendar_local_settings WHERE singleton=1");
+    bool ok = q && sqlite_stmt_step(q) == SQLITE_STEP_ROW;
+    if (ok) {
+        jurisdict_place_t place = {.jurisdiction_code = sqlite_stmt_column_text(q, 0),
+            .name = sqlite_stmt_column_text(q, 1), .latitude = sqlite_stmt_column_text(q, 2),
+            .longitude = sqlite_stmt_column_text(q, 3), .timezone = sqlite_stmt_column_text(q, 4),
+            .elevation = "0", .is_default = true};
+        ok = place.jurisdiction_code && *place.jurisdiction_code && place.name && *place.name &&
+             place.latitude && place.longitude && place.timezone && *place.timezone;
+        if (ok) visitor(&place, context);
+    }
+    sqlite_stmt_finalize(q);
+    return ok;
+}
+
 static sqlite_stmt_t *jurisdiction_catalogue_prepare(jurisdiction_t *jurisdiction, const char *sql, bool visitor)
 {
     if (!jurisdiction)

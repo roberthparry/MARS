@@ -2439,6 +2439,7 @@
     "tests": {
       "enabled": true,
       "test_country_packaged_boundaries": true,
+      "test_shoreline_lossless_coordinates": true,
       "test_shoreline_nested_rings_and_rollback": true,
       "test_shoreline_packaged_world": true
     }
@@ -3012,7 +3013,8 @@
       "test_lab_almanac_variants": true,
       "test_lab_calendar_markup_escaping": true,
       "test_lab_country_presentation": true,
-      "test_lab_eclipse_previews": true
+      "test_lab_eclipse_previews": true,
+      "test_lab_sky_status": true
     }
   },
   "tools/mars_lab/tests/test_lab_calendar_extra.c": {

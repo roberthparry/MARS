@@ -9,7 +9,7 @@
  * Every result/help card is inventoried before resizing; mobile CSS may not hide
  * a desktop-visible card. The iframe runs production CSS without a second app.
  */
-window.checkLabMobileLayout = async function checkLabMobileLayout(state: string): Promise<void> {
+window.checkLabMobileLayout = async function checkLabMobileLayout(state: string, desktopOnly = false): Promise<void> {
     /** @brief Report a layout failure with the captured worksheet state. */
     function check(condition: unknown, message: string): void {
         if (!condition)
@@ -54,6 +54,43 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string)
             doc.body.appendChild(source.cloneNode(true));
         const cards = [...doc.querySelectorAll<HTMLElement>(selectors)];
         check(cards.length === originals.length, 'complete card inventory copied');
+        const originalClasses = doc.body.className;
+        for (const width of [390, 900, 1280, 1870]) {
+            frame.style.width = width + 'px';
+            for (const mode of ['', 'equation-mode', 'diffequation-mode', 'matrix-mode', 'integrator-mode',
+                                'datetime-mode', 'almanac-mode']) {
+                doc.body.className = mode;
+                const header = doc.querySelector('header')!;
+                const padding = parseFloat(frame.contentWindow!.getComputedStyle(header).paddingTop);
+                const titleTop = doc.querySelector('h1')!.getBoundingClientRect().top;
+                check(Math.abs(titleTop - header.getBoundingClientRect().top - padding) < 1,
+                      `${width}px: ${mode || 'expression'} title keeps the same top padding`);
+            }
+        }
+        doc.body.className = originalClasses;
+        if (doc.body.matches('.datetime-mode, .almanac-mode')) {
+            frame.style.width = '1870px';
+            const sky = doc.querySelector('.sky-status-strip');
+            const result = doc.getElementById('resultWorkspacePanel');
+            if (sky && result && visible(result)) {
+                const skyBox = sky.getBoundingClientRect();
+                const mobile = doc.querySelector('#mobileAccess summary')!.getBoundingClientRect();
+                const gap = result.getBoundingClientRect().top - skyBox.bottom;
+                check(Math.abs(skyBox.top - mobile.top) < 1, 'wide calendar header remains top-aligned');
+                check(gap >= 8 && gap <= 20, `wide calendar result gap is compact without overlap (${gap})`);
+                check(skyBox.left > doc.querySelector('.lab-tabs')!.getBoundingClientRect().right,
+                      'wide calendar sky card does not overlap the mode tabs');
+            }
+        }
+        if (desktopOnly) {
+            for (const width of [320, 560, 900]) {
+                frame.style.width = width + 'px';
+                const sky = doc.querySelector('.sky-status-strip');
+                check(!sky || sky.getBoundingClientRect().height === 0,
+                      `${width}px: mobile calendar layout omits the home-sky card`);
+            }
+            return;
+        }
         const viewports: MobileLayoutViewport[] = [
             {width: 320, height: 568},
             {width: 390, height: 844},

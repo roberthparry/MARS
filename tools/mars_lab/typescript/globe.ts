@@ -82,8 +82,8 @@ class MarsAlmanacGlobe {
     private riverUnloadTimer = 0;
     private borders = false;
     private borderReady = false;
-    private borderBounds = [-180, -90, 180, 90];
     private borderRequest: AbortController | null = null;
+    private borderRequestKey = '';
     private flightFrame = 0;
     private flightGeneration = 0;
     private flightTarget: number[] | null = null;
@@ -626,10 +626,8 @@ class MarsAlmanacGlobe {
     private unloadBorders(): void {
         this.borderRequest?.abort();
         this.borderRequest = null;
-        if (this.borderReady) labDOM.call('lab_globe_borders_clear');
         this.borderPath.setAttribute('d', '');
         this.borderSignature = '';
-        this.borderReady = false;
         this.root.dataset.borders = this.borders ? 'zoom-hidden' : 'off';
     }
 
@@ -638,10 +636,16 @@ class MarsAlmanacGlobe {
         const zoom = this.view[2];
         const bounds = zoom <= 2 ? [-180, -90, 180, 90] :
             (labDOM.call('lab_globe_view', this.orientation, zoom / 1.15, 1) as GlobeView).slice(3);
-        if (this.borderReady && this.view[3] >= this.borderBounds[0] && this.view[4] >= this.borderBounds[1] &&
-            this.view[5] <= this.borderBounds[2] && this.view[6] <= this.borderBounds[3]) return;
+        if (labDOM.call('lab_globe_borders_covers', this.view)) {
+            this.root.dataset.borders = 'ready';
+            this.draw();
+            return;
+        }
+        const requestKey = bounds.join(',');
+        if (this.borderRequest && !this.borderRequest.signal.aborted && this.borderRequestKey === requestKey) return;
         this.borderRequest?.abort();
         const request = this.borderRequest = new AbortController();
+        this.borderRequestKey = requestKey;
         const timeout = window.setTimeout(() => request.abort(), 15000);
         this.root.dataset.borders = 'loading';
         try {
@@ -653,8 +657,8 @@ class MarsAlmanacGlobe {
             const result = await response.labData() as {ok?: boolean; segments?: string};
             if (request !== this.borderRequest || request.signal.aborted || !this.borders || this.view[2] >= 64) return;
             if (!response.ok || !result.ok || typeof result.segments !== 'string' ||
-                !labDOM.call('lab_globe_borders_load', result.segments)) throw new Error('Border vectors unavailable');
-            this.borderBounds = bounds; this.borderReady = true;
+                !labDOM.call('lab_globe_borders_load_region', result.segments, bounds)) throw new Error('Border vectors unavailable');
+            this.borderReady = true;
             this.borderSignature = '';
             this.draw();
             this.root.dataset.borders = 'ready';
@@ -738,9 +742,8 @@ class MarsAlmanacGlobe {
     }
 
     private project(lat: number, lon: number, size: number): [number, number] | null {
-        const [x, y, depth] = labDOM.call('lab_globe_project', lat, lon, this.orientation) as number[];
-        const px = size * (0.5 + x * this.view[2] / 2.24), py = size * (0.5 + y * this.view[2] / 2.24);
-        return depth > 0 && px >= 0 && px <= size && py >= 0 && py <= size ? [px, py] : null;
+        const point = labDOM.call('lab_globe_project', lat, lon, this.orientation);
+        return labDOM.call('lab_globe_marker_pixels', point, this.view[2], size) as [number, number] | null;
     }
 
     private cachedCountry(key: string): {name: string; flag: string; code: string} | undefined {
@@ -866,25 +869,17 @@ class MarsAlmanacGlobe {
         const signature = `${this.orientation},${this.view[2]},${size},${this.input('Latitude').value},${this.input('Longitude').value},${townId}`;
         if (signature === this.markerSignature) return;
         this.markerSignature = signature;
-        const occupied = new Set<string>(), visible = new Set<string | null>();
+        const visible = new Set<string | null>();
+        labDOM.call('lab_globe_markers_begin', size);
         const append = (lat: number, lon: number, place?: GlobeTown): void => {
             if (place && visible.has(this.townKey(place))) return;
-            const point = this.project(lat, lon, size);
+            let point = this.project(lat, lon, size);
             if (!point) return;
             const active = Boolean(place && selected && this.townKey(place) === this.townKey(selected));
             const label = place ? MarsAlmanacGlobe.townLabel(place, this.view[2], active ? size - 8 : size - point[0]) : null;
             const width = label ? label.width : 28;
-            if (active) {
-                point[0] = Math.max(4, Math.min(size - width, point[0] + 14));
-                point[1] = Math.max(14, Math.min(size - 14, point[1]));
-            }
-            if (place && (point[0] + width > size || point[1] < 14 || point[1] > size - 14)) return;
-            const cells: string[] = [];
-            for (let x = Math.floor((point[0] - 8) / 32); x <= Math.floor((point[0] + width) / 32); ++x)
-                for (let y = Math.floor((point[1] - 15) / 24); y <= Math.floor((point[1] + 15) / 24); ++y)
-                    cells.push(`${x},${y}`);
-            if (place && !active && cells.some(cell => occupied.has(cell))) return;
-            cells.forEach(cell => occupied.add(cell));
+            point = labDOM.call('lab_globe_markers_place', point[0], point[1], width, Number(Boolean(place)), Number(active)) as [number, number] | null;
+            if (!point) return;
             const key = place ? this.townKey(place) : null;
             visible.add(key);
             let marker = this.markerNodes.get(key);
@@ -1083,9 +1078,7 @@ class MarsAlmanacGlobe {
     }
 
     public static coordinate(value: number, positive: string, negative: string): string {
-        const hundredths = Math.round(Math.abs(value) * 6000);
-        const degrees = Math.floor(hundredths / 6000), minutes = (hundredths % 6000) / 100;
-        return `${degrees}°${minutes ? ` ${minutes.toFixed(2)}′` : ''}${value ? ` ${value < 0 ? negative : positive}` : ''}`;
+        return labDOM.call('lab_globe_coordinate', value, positive, negative) as string;
     }
 
     private events(): void {

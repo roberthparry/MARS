@@ -19,6 +19,8 @@
 #include "string-t.h"
 #define MARS_GLOBE_INTERNAL_ACCESS
 #include "globe/globe_layers.h"
+#define MARS_SHORELINE_INTERNAL_ACCESS
+#include "globe/shoreline_internal.h"
 #include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -120,13 +122,13 @@ static bool check_path(globe_path_event_t event, double longitude, double latitu
     return path->valid;
 }
 
-static bool make_legacy_chunk(sqlite_t *db)
+static bool make_compressed_chunk(sqlite_t *db, int codec)
 {
     sqlite_stmt_t *query = sqlite_stmt_prepare(db,
         "SELECT substr(b.vertices,c.byte_offset+1,c.byte_count) FROM shoreline_chunk c "
         "JOIN shoreline_blob b ON b.id=c.blob_id WHERE c.id=1");
     bool ok = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW;
-    unsigned char packed[4096];
+    unsigned char packed[8192];
     size_t length = ok ? ZSTD_compress(packed, sizeof packed, sqlite_stmt_column_blob(query, 0),
                                       sqlite_stmt_column_bytes(query, 0), 3) : 0;
     sqlite_stmt_finalize(query);
@@ -135,10 +137,100 @@ static bool make_legacy_chunk(sqlite_t *db)
     ok = query && sqlite_stmt_bind_blob(query, 1, packed, length) && sqlite_stmt_step(query) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(query);
     query = sqlite_stmt_prepare(db,
-        "UPDATE shoreline_chunk SET blob_id=1000000,byte_offset=0,byte_count=?1,codec=1 WHERE id=1");
-    ok = ok && query && sqlite_stmt_bind_int(query, 1, (int)length) && sqlite_stmt_step(query) == SQLITE_STEP_DONE;
+        "UPDATE shoreline_chunk SET blob_id=1000000,byte_offset=0,byte_count=?1,codec=?2 WHERE id=1");
+    ok = ok && query && sqlite_stmt_bind_int(query, 1, (int)length) && sqlite_stmt_bind_int(query, 2, codec) &&
+         sqlite_stmt_step(query) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(query);
     return ok;
+}
+
+static bool write_bytes(file_t *file, const void *bytes, size_t size)
+{
+    size_t written;
+    return file_write(file, bytes, size, &written) && written == size;
+}
+
+static bool write_precise_ring(file_t *file, int id, const double (*vertices)[2], size_t count)
+{
+    unsigned char header[44] = {0}, point[16];
+    double west = INFINITY, east = -INFINITY, south = INFINITY, north = -INFINITY;
+    for (size_t i = 0; i < count; ++i) {
+        west = fmin(west, vertices[i][0]); east = fmax(east, vertices[i][0]);
+        south = fmin(south, vertices[i][1]); north = fmax(north, vertices[i][1]);
+    }
+    put_integer(header, id); put_integer(header + 4, (int)count); put_integer(header + 8, 15 * 256 + 1);
+    put_integer(header + 12, (int32_t)floor(west * 1000000));
+    put_integer(header + 16, (int32_t)ceil(east * 1000000));
+    put_integer(header + 20, (int32_t)floor(south * 1000000));
+    put_integer(header + 24, (int32_t)ceil(north * 1000000));
+    bool ok = write_bytes(file, header, sizeof header);
+    for (size_t i = 0; ok && i < count; ++i) {
+        coast_encode_double(point, vertices[i][0]); coast_encode_double(point + 8, vertices[i][1]);
+        ok = write_bytes(file, point, sizeof point);
+    }
+    return ok;
+}
+
+typedef struct _coast_exact_probe_t {
+    const double (*vertices)[2];
+    size_t count, seen;
+} coast_exact_probe_t;
+
+static bool check_exact_path(globe_path_event_t event, double x, double y, unsigned level, bool antarctic, void *context)
+{
+    coast_exact_probe_t *probe = context;
+    if (level != 1 || antarctic) return false;
+    if (event == GLOBE_PATH_CLOSE) return true;
+    if (probe->seen >= probe->count) return false;
+    const double *expected = probe->vertices[probe->seen++];
+    return x == expected[0] && y == expected[1];
+}
+
+static void test_shoreline_lossless_coordinates(void)
+{
+    file_t *directory = temporary_directory();
+    TEST_ASSERT_NOT_NULL(directory);
+    file_t *source = temporary_file(directory, "lossless.bin");
+    sqlite_t *db = memory_database();
+    TEST_ASSERT_NOT_NULL(db);
+    const double corners[][2] = {{-20, -20}, {20, -20}, {20, 20}, {-20, 20}, {-20, -20}};
+    double square[1025][2];
+    for (unsigned i = 0; i < 1025; ++i) {
+        unsigned edge = i == 1024 ? 3 : i / 256, offset = i == 1024 ? 256 : i % 256;
+        for (unsigned axis = 0; axis < 2; ++axis)
+            square[i][axis] = corners[edge][axis] + (corners[edge + 1][axis] - corners[edge][axis]) * offset / 256;
+    }
+    const double tiny[][2] = {{100.5934961, 2.9196721}, {100.5934962, 2.9196721},
+                             {100.5934962, 2.9196722}, {100.5934961, 2.9196721}};
+    TEST_ASSERT_TRUE(file_open_write(source) && write_bytes(source, "MARSCF64", 8) &&
+        write_precise_ring(source, 1, square, 1025) && write_precise_ring(source, 2, tiny, 4) &&
+        file_close(source) && file_open_read(source) && globe_import_shoreline(db, source), "lossless import");
+    file_close(source);
+    globe_t *globe = globe_open(db, NULL);
+    TEST_ASSERT_NOT_NULL(globe);
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, 0, 0), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, 30, 0), GLOBE_SEA);
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, tiny[0][1], tiny[0][0]), GLOBE_COAST);
+    coast_exact_probe_t probe = {.vertices = tiny, .count = 4};
+    TEST_ASSERT_TRUE(globe_surface_paths(globe, 100.59, 2.91, 100.60, 2.93, 0, check_exact_path, &probe) &&
+                     probe.seen >= 3, "collapsed-on-microdegree-grid ring survives with exact original vertices");
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, 0, 0), GLOBE_LAND);
+    TEST_ASSERT_TRUE(make_compressed_chunk(db, SHORELINE_CODEC_F64_ZSTD) && globe_surface_prepare(globe),
+                     "lossless compressed resident coordinates");
+    globe_close(globe);
+    globe = globe_open(db, NULL);
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, 0, 0), GLOBE_LAND);
+    globe_close(globe);
+    const double invalid[][2] = {{NAN, 0}, {1, 1}, {2, 0}, {NAN, 0}};
+    TEST_ASSERT_TRUE(file_open_write(source) && write_bytes(source, "MARSCF64", 8) &&
+        write_precise_ring(source, 3, invalid, 4) && file_close(source) && file_open_read(source) &&
+        !globe_import_shoreline(db, source), "non-finite lossless input rolls back");
+    file_close(source);
+    globe = globe_open(db, NULL);
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, 0, 0), GLOBE_LAND);
+    globe_close(globe);
+    sqlite_close(db);
+    file_delete(source); file_free(source); file_remove_directory(directory); file_free(directory);
 }
 
 static void test_shoreline_nested_rings_and_rollback(void)
@@ -200,7 +292,7 @@ static void test_shoreline_nested_rings_and_rollback(void)
     TEST_ASSERT_TRUE(globe_surface_prepare(shoreline), "reusable resident geometry");
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20.003, 0), GLOBE_COAST);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, -179), GLOBE_LAND);
-    TEST_ASSERT_TRUE(make_legacy_chunk(db), "legacy compressed chunk fixture");
+    TEST_ASSERT_TRUE(make_compressed_chunk(db, SHORELINE_CODEC_ZSTD), "legacy compressed chunk fixture");
     TEST_ASSERT_TRUE(globe_surface_prepare(shoreline), "anonymous cache refreshes after mutation and reads legacy chunks");
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 15, 0), GLOBE_LAND);
     sqlite_stmt_t *cache = sqlite_stmt_prepare(db, "PRAGMA cache_size");
@@ -465,6 +557,7 @@ int tests_main(void)
 {
     TEST_SECTION("Indexed shorelines");
     TEST_RUN_IN_GROUP(test_country_packaged_boundaries, tests, NULL);
+    TEST_RUN_IN_GROUP(test_shoreline_lossless_coordinates, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_nested_rings_and_rollback, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_packaged_world, tests, NULL);
     return TEST_EXIT_CODE();

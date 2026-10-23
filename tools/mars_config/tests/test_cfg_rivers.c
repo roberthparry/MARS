@@ -527,6 +527,29 @@ static bool test_cfg_rivers_stage_fixture(const char *directory)
     globe_t *g = db ? globe_open_databases(NULL, db, NULL) : NULL;
     ok = ok && g && globe_has_layer(g, GLOBE_LAYER_RIVERS);
     globe_close(g); sqlite_close(db);
+    ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
+    /* Recreate an interrupted junction phase from the independently known source fixture. */
+    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    ok = db && sqlite_exec_cstr(db,
+        "delete from rivers_dataset;"
+        "create table rivers_node_use(id integer primary key,uses integer not null);"
+        "insert into rivers_node_use values(1,1),(2,1);"
+        "update rivers_chunk set anchors=NULL,node_ids=x'00000000000000010000000000000002';"
+        "update rivers_stage set phase=1,last_chunk=0");
+    sqlite_close(db);
+    ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
+    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    ok = db && sqlite_exec_cstr(db,
+        "delete from rivers_dataset;create table rivers_node_use(id integer primary key,uses integer not null);"
+        "update rivers_stage set phase=2,last_chunk=0");
+    sqlite_close(db);
+    ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
+    /* Resume rejects a different source even if it is itself valid GeoJSON. */
+    string_t *changed = string_clone(text);
+    ok = ok && changed && string_append_cstr(changed, "\n") == 0 && file_write_all_text(input, changed) &&
+         cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path)) != 0 &&
+         file_write_all_text(input, text);
+    string_free(changed);
     string_t *packed_path = string_sprintf("%s/river.geojsonseq.zst", directory);
     string_t *second_path = string_sprintf("%s/compressed-candidate.db", directory);
     file_t *packed = packed_path ? file_new(packed_path) : NULL;
@@ -538,9 +561,63 @@ static bool test_cfg_rivers_stage_fixture(const char *directory)
     return ok;
 }
 
+static bool test_cfg_rivers_checkpoint_fixture(const char *directory)
+{
+    string_t *input_path = string_sprintf("%s/checkpoint.geojsonseq", directory);
+    string_t *output_path = string_sprintf("%s/checkpoint.db", directory);
+    string_t *key = string_new_with("river-stage-fixture"), *text = string_new();
+    file_t *input = input_path ? file_new(input_path) : NULL;
+    bool ok = input && output_path && key && text && !setenv("MARS_GLOBE_DB_KEY", string_c_str(key), 1);
+    for (unsigned i = 0; ok && i < 10002; ++i)
+        ok = string_append_cstr(text,
+            "{\"type\":\"Feature\",\"geometry\":{\"type\":\"LineString\",\"coordinates\":[[1,1],[2,2]]},"
+            "\"properties\":{\"@type\":\"way\",\"@id\":1,\"@way_nodes\":[1,2],\"waterway\":\"river\"}}\n") == 0;
+    ok = ok && file_write_all_text(input, text) &&
+         !cfg_globe_river_stage(string_c_str(input_path), string_c_str(output_path));
+    sqlite_t *db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    ok = db && sqlite_exec_cstr(db,
+        "delete from rivers_dataset;create table rivers_node_use(id integer primary key,uses integer not null);"
+        "insert into rivers_node_use values(1,2),(2,2);"
+        "update rivers_chunk set anchors=NULL,node_ids=x'00000000000000010000000000000002';"
+        "update rivers_stage set phase=1,last_chunk=0;"
+        "create trigger checkpoint_stop before update of anchors on rivers_chunk when new.id=1001 "
+        "begin select raise(abort,'fixture interruption'); end");
+    sqlite_close(db);
+    ok = ok && cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path)) != 0;
+    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    sqlite_stmt_t *check = db ? sqlite_stmt_prepare(db,
+        "select phase,last_chunk,(select count(*) from rivers_dataset) from rivers_stage") : NULL;
+    ok = check && sqlite_stmt_step(check) == SQLITE_STEP_ROW && sqlite_stmt_column_int(check, 0) == 1 &&
+         sqlite_stmt_column_int(check, 1) == 1000 && sqlite_stmt_column_int(check, 2) == 0;
+    sqlite_stmt_finalize(check);
+    ok = ok && sqlite_exec_cstr(db, "drop trigger checkpoint_stop");
+    sqlite_close(db);
+    ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
+    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    ok = db && sqlite_exec_cstr(db,
+        "delete from rivers_dataset;delete from rivers_chunk where id>10000;delete from rivers_bounds where id>10000;"
+        "create table rivers_node_use(id integer primary key,uses integer not null);"
+        "insert into rivers_node_use values(1,2),(2,2);"
+        "update rivers_chunk set anchors=NULL,node_ids=x'00000000000000010000000000000002';"
+        "update rivers_stage set phase=0,last_chunk=0,records=10000,chunks=10000,features=10000,points=20000,"
+        "source_points=0,unknown_width_sections=10000");
+    sqlite_close(db);
+    ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
+    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    check = db ? sqlite_stmt_prepare(db,
+        "select point_count,feature_count,(select count(*) from rivers_chunk) from rivers_dataset") : NULL;
+    ok = check && sqlite_stmt_step(check) == SQLITE_STEP_ROW && sqlite_stmt_column_int(check, 0) == 20004 &&
+         sqlite_stmt_column_int(check, 1) == 10002 && sqlite_stmt_column_int(check, 2) == 10002;
+    sqlite_stmt_finalize(check); sqlite_close(db);
+    file_free(input); string_free(input_path); string_free(output_path); string_free(key); string_free(text);
+    return ok;
+}
+
 static void test_cfg_rivers_stage(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_rivers_stage_fixture), "staging encrypts a fresh candidate and refuses overwrites");
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_rivers_checkpoint_fixture),
+                     "batch checkpoints survive failure and input replay does not duplicate records");
 }
 
 /* Register installer regressions with the sequential configuration runner. */

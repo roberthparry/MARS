@@ -1,12 +1,13 @@
 /**
  * @file shoreline_import.c
- * @brief Transactional import of GSHHG shoreline rings into bounded, indexed BLOB pages.
+ * @brief Transactional import of legacy and lossless shoreline rings into bounded, indexed BLOB pages.
  *
  * Used by the native database installer. Each uncompressed chunk contains at most 256 edges.
  * Integer microdegree bounds use an R-tree; offsets address chunks within
  * 64 KiB pages. The alternative Antarctic grounding line is excluded in favour of the ice-front boundary.
  * Input and database failures roll back the complete replacement, retaining astronomical tables.
  */
+#include <math.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -25,6 +26,7 @@ typedef struct _coast_import_t {
     int64_t chunk_id;
     int64_t points;
     int64_t polygons;
+    bool precise;
 } coast_import_t;
 
 static uint32_t coast_unsigned(const unsigned char *p)
@@ -63,20 +65,25 @@ static bool coast_chunk(coast_import_t *state, const unsigned char *points, size
     if (state->used + size > sizeof state->page && !coast_flush(state))
         return false;
     int32_t min_x = INT32_MAX, max_x = INT32_MIN, min_y = INT32_MAX, max_y = INT32_MIN;
-    for (size_t i = 0; i < length; i += 8) {
-        int32_t x = coast_signed(points + i), y = coast_signed(points + i + 4);
-        if (x < min_x) min_x = x;
-        if (x > max_x) max_x = x;
-        if (y < min_y) min_y = y;
-        if (y > max_y) max_y = y;
+    size_t stride = state->precise ? 16 : 8;
+    for (size_t i = 0; i < length; i += stride) {
+        coast_vertex_t point;
+        if (!coast_decode_vertex(points + i, state->precise ? SHORELINE_CODEC_F64 : SHORELINE_CODEC_RAW, &point))
+            return false;
+        int32_t west = (int32_t)floor(point.x * 1000000), east = (int32_t)ceil(point.x * 1000000);
+        int32_t south = (int32_t)floor(point.y * 1000000), north = (int32_t)ceil(point.y * 1000000);
+        if (west < min_x) min_x = west;
+        if (east > max_x) max_x = east;
+        if (south < min_y) min_y = south;
+        if (north > max_y) max_y = north;
     }
     ++state->chunk_id;
     bool ok = sqlite_stmt_bind_int64(state->chunk, 1, state->chunk_id) &&
               sqlite_stmt_bind_int64(state->chunk, 2, state->page_id) &&
               sqlite_stmt_bind_int(state->chunk, 3, (int)state->used) &&
               sqlite_stmt_bind_int(state->chunk, 4, (int)size) &&
-              sqlite_stmt_bind_int(state->chunk, 5, (int)(length / 8)) &&
-              sqlite_stmt_bind_int(state->chunk, 6, SHORELINE_CODEC_RAW) &&
+              sqlite_stmt_bind_int(state->chunk, 5, (int)(length / stride)) &&
+              sqlite_stmt_bind_int(state->chunk, 6, state->precise ? SHORELINE_CODEC_F64 : SHORELINE_CODEC_RAW) &&
               sqlite_stmt_bind_int(state->chunk, 7, polygon) &&
               sqlite_stmt_bind_int(state->chunk, 8, level == 5 ? 1 : level) &&
               sqlite_stmt_bind_int(state->chunk, 9, boundary) && coast_execute(state->chunk) &&
@@ -168,6 +175,56 @@ static bool coast_ring(coast_import_t *state, file_t *source, const unsigned cha
     return true;
 }
 
+static bool coast_precise_ring(coast_import_t *state, file_t *source, const unsigned char *header)
+{
+    uint32_t n = coast_unsigned(header + 4), flag = coast_unsigned(header + 8), level = flag & 255;
+    int32_t west = coast_signed(header + 12), east = coast_signed(header + 16);
+    int32_t south = coast_signed(header + 20), north = coast_signed(header + 24);
+    int polygon = coast_signed(header);
+    if (polygon < 0 || n < 2 || n > 20000000 || level < 1 || level > 6 || ((flag >> 8) & 255) != 15 ||
+        west < -180000000 || east > 360000000 || east < west ||
+        south < -90000000 || north > 90000000 || north < south) return false;
+    unsigned char points[4112], first[16], point[16], input[16384];
+    size_t used = 0, count;
+    for (uint32_t i = 0; i < n; ++i) {
+        if (i % 1024 == 0) {
+            size_t remaining = n - i, length = (remaining < 1024 ? remaining : 1024) * 16;
+            if (!file_read(source, input, length, &count) || count != length) return false;
+        }
+        memcpy(point, input + (i % 1024) * 16, sizeof point);
+        coast_vertex_t vertex;
+        if (!coast_decode_vertex(point, SHORELINE_CODEC_F64, &vertex) ||
+            vertex.x * 1000000 < west - 0.001 || vertex.x * 1000000 > east + 0.001 ||
+            vertex.y * 1000000 < south - 0.001 || vertex.y * 1000000 > north + 0.001) return false;
+        if (level == 6) continue;
+        if (!i) memcpy(first, point, sizeof first);
+        memcpy(points + used, point, sizeof point);
+        used += sizeof point;
+        if (used == sizeof points) {
+            if (!coast_chunk(state, points, used, polygon, level, true)) return false;
+            memcpy(points, point, sizeof point);
+            used = sizeof point;
+        }
+    }
+    if (level == 6) return true;
+    bool polar = level == 5 && west == -180000000 && east == 180000000 && south == -90000000;
+    if (!polar && memcmp(first, point, sizeof first)) {
+        memcpy(points + used, first, sizeof first);
+        used += sizeof first;
+    }
+    if (used > 16 && !coast_chunk(state, points, used, polygon, level, true)) return false;
+    if (polar) {
+        unsigned char cap[64];
+        memcpy(cap, point, 16); memcpy(cap + 16, point, 16);
+        memcpy(cap + 32, first, 16); memcpy(cap + 48, first, 16);
+        coast_encode_double(cap + 24, -90); coast_encode_double(cap + 40, -90);
+        if (!coast_chunk(state, cap, sizeof cap, polygon, level, false)) return false;
+    }
+    state->points += n;
+    ++state->polygons;
+    return true;
+}
+
 /* Publish a validated shoreline dataset without changing existing astronomical data. */
 bool shoreline_import(sqlite_t *db, file_t *source)
 {
@@ -209,13 +266,23 @@ bool shoreline_import(sqlite_t *db, file_t *source)
         state.bounds = sqlite_stmt_prepare(db, "insert into shoreline_bounds values( ?1, ?2, ?3, ?4, ?5 )");
         ok = state.blob && state.chunk && state.bounds;
     }
+    unsigned char prefix[8];
+    size_t prefix_size = 0;
+    ok = ok && file_read(source, prefix, sizeof prefix, &prefix_size) && prefix_size == sizeof prefix;
+    state.precise = ok && !memcmp(prefix, "MARSCF64", sizeof prefix);
+    bool first_header = !state.precise;
     while (ok) {
         unsigned char header[44];
-        size_t count;
-        ok = file_read(source, header, sizeof header, &count);
+        size_t count = 0;
+        size_t offset = first_header ? sizeof prefix : 0;
+        if (first_header) memcpy(header, prefix, sizeof prefix);
+        first_header = false;
+        ok = file_read(source, header + offset, sizeof header - offset, &count);
+        count += offset;
         if (!ok || !count)
             break;
-        ok = count == sizeof header && coast_ring(&state, source, header);
+        ok = count == sizeof header && (state.precise ? coast_precise_ring(&state, source, header) :
+                                                      coast_ring(&state, source, header));
     }
     ok = ok && state.polygons > 0 && coast_flush(&state);
     sqlite_stmt_finalize(state.blob);
@@ -223,9 +290,12 @@ bool shoreline_import(sqlite_t *db, file_t *source)
     sqlite_stmt_finalize(state.bounds);
     if (ok) {
         sqlite_stmt_t *metadata = sqlite_stmt_prepare(db,
-            "insert into shoreline_dataset values( 1, 1, 'GSHHG 2.3.7', ?1, ?2 )");
+            "insert into shoreline_dataset values( 1, ?3, ?4, ?1, ?2 )");
         ok = metadata && sqlite_stmt_bind_int64(metadata, 1, state.points) &&
-             sqlite_stmt_bind_int64(metadata, 2, state.polygons) && coast_execute(metadata);
+             sqlite_stmt_bind_int64(metadata, 2, state.polygons) &&
+             sqlite_stmt_bind_int(metadata, 3, state.precise ? 2 : 1) &&
+             sqlite_stmt_bind_text(metadata, 4, state.precise ? "MARS lossless shoreline" : "GSHHG 2.3.7") &&
+             coast_execute(metadata);
         sqlite_stmt_finalize(metadata);
     }
     if (ok) ok = sqlite_exec_cstr(db, "release shoreline_import");

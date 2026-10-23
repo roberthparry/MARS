@@ -85,7 +85,8 @@
   padding: 0.08rem 0.25rem;
 }
 
-.hidden {
+.hidden,
+.precision-toolbar.hidden {
   display: none;
 }
 

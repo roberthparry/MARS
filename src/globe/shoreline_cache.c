@@ -86,12 +86,6 @@ static string_t *coast_geometry_key(sqlite_t *db, bool *shared)
     return NULL;
 }
 
-static int32_t coast_cache_coordinate(const unsigned char *bytes)
-{
-    uint32_t n = (uint32_t)bytes[0] << 24 | (uint32_t)bytes[1] << 16 | (uint32_t)bytes[2] << 8 | bytes[3];
-    return (int32_t)(n <= INT32_MAX ? (int64_t)n : (int64_t)n - 4294967296LL);
-}
-
 static bool coast_geometry_read(sqlite_t *db, coast_geometry_t *geometry)
 {
     sqlite_stmt_t *query = sqlite_stmt_prepare(db,
@@ -111,7 +105,7 @@ static bool coast_geometry_read(sqlite_t *db, coast_geometry_t *geometry)
         "FROM shoreline_chunk ORDER BY id");
     sqlite_stmt_t *page_query = sqlite_stmt_prepare(db, "SELECT vertices FROM shoreline_blob WHERE id=?1");
     ok = query && page_query;
-    unsigned char page[65536], decoded[2056];
+    unsigned char page[65536], decoded[4112];
     size_t page_length = 0;
     int64_t page_id = -1, polygon = -1;
     sqlite_step_result_t step = SQLITE_STEP_DONE;
@@ -120,9 +114,9 @@ static bool coast_geometry_read(sqlite_t *db, coast_geometry_t *geometry)
         int level = sqlite_stmt_column_int(query, 1), codec = sqlite_stmt_column_int(query, 2);
         int count = sqlite_stmt_column_int(query, 3), offset = sqlite_stmt_column_int(query, 5);
         int length = sqlite_stmt_column_int(query, 6), boundary = sqlite_stmt_column_int(query, 7);
+        size_t stride = coast_codec_stride(codec);
         if (id < 0 || level < 1 || level > 4 || count < 2 || count > 257 || offset < 0 || length < 1 ||
-            length > 2056 || next_page < 0 || (boundary != 0 && boundary != 1) ||
-            (codec != SHORELINE_CODEC_RAW && codec != SHORELINE_CODEC_ZSTD) ||
+            length > (int)sizeof decoded || next_page < 0 || (boundary != 0 && boundary != 1) || !stride ||
             geometry->vertex_count + (size_t)count > (size_t)vertices) { ok = false; break; }
         if (page_id != next_page) {
             ok = sqlite_stmt_bind_int64(page_query, 1, next_page) && sqlite_stmt_step(page_query) == SQLITE_STEP_ROW;
@@ -136,8 +130,10 @@ static bool coast_geometry_read(sqlite_t *db, coast_geometry_t *geometry)
         if ((size_t)offset > page_length || (size_t)length > page_length - (size_t)offset) { ok = false; break; }
         const unsigned char *bytes = page + offset;
         size_t size = (size_t)length;
-        if (codec == SHORELINE_CODEC_ZSTD) { size = ZSTD_decompress(decoded, sizeof decoded, bytes, size); bytes = decoded; }
-        if (size != (size_t)count * 8) { ok = false; break; }
+        if (codec == SHORELINE_CODEC_ZSTD || codec == SHORELINE_CODEC_F64_ZSTD) {
+            size = ZSTD_decompress(decoded, sizeof decoded, bytes, size); bytes = decoded;
+        }
+        if (size != (size_t)count * stride) { ok = false; break; }
         if (id != polygon) {
             if (geometry->ring_count == (size_t)rings) { ok = false; break; }
             coast_ring_t *ring = &geometry->rings[geometry->ring_count++];
@@ -150,18 +146,18 @@ static bool coast_geometry_read(sqlite_t *db, coast_geometry_t *geometry)
         coast_ring_t *ring = &geometry->rings[geometry->ring_count - 1];
         if (ring->level != (unsigned)level) { ok = false; break; }
         ring->antarctic |= !boundary;
-        for (size_t at = 0; ok && at < size; at += 8) {
-            coast_vertex_t vertex = {coast_cache_coordinate(bytes + at), coast_cache_coordinate(bytes + at + 4)};
-            if (vertex.x < -180000000 || vertex.x > 360000000 || vertex.y < -90000000 || vertex.y > 90000000) {
-                ok = false; break;
-            }
+        for (size_t at = 0; ok && at < size; at += stride) {
+            coast_vertex_t vertex;
+            if (!coast_decode_vertex(bytes + at, codec, &vertex)) { ok = false; break; }
             geometry->vertices[geometry->vertex_count] = vertex;
             geometry->boundary[geometry->vertex_count++] = (unsigned char)boundary;
             ++ring->count;
-            if (vertex.x < ring->west) ring->west = vertex.x;
-            if (vertex.x > ring->east) ring->east = vertex.x;
-            if (vertex.y < ring->south) ring->south = vertex.y;
-            if (vertex.y > ring->north) ring->north = vertex.y;
+            int32_t west = (int32_t)floor(vertex.x * 1000000), east = (int32_t)ceil(vertex.x * 1000000);
+            int32_t south = (int32_t)floor(vertex.y * 1000000), north = (int32_t)ceil(vertex.y * 1000000);
+            if (west < ring->west) ring->west = west;
+            if (east > ring->east) ring->east = east;
+            if (south < ring->south) ring->south = south;
+            if (north > ring->north) ring->north = north;
         }
     }
     sqlite_stmt_finalize(query);
@@ -193,7 +189,7 @@ static bool coast_geometry_resolutions(coast_geometry_t *geometry)
         for (unsigned lod = 0; lod < 4; ++lod) {
             ring->lod_first[lod] = (uint32_t)geometry->lod_count;
             coast_vertex_t last = geometry->vertices[ring->first];
-            double distance = coast_lod_steps[lod] * 1000000;
+            double distance = coast_lod_steps[lod];
             for (uint32_t n = 0; n < ring->count; ++n) {
                 uint32_t index = ring->first + n;
                 coast_vertex_t vertex = geometry->vertices[index];

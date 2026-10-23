@@ -43,6 +43,36 @@ at 17:00 on 22 October; input and junction processing completed, but final
 simplification was not confirmed. Recheck live files and service status on resume;
 do not treat these snapshots as current progress or promise an unmeasured ETA.
 
+The offline `globe-stage-rivers` command now records versioned checkpoints and
+the source SHA-256 in `rivers_stage`. `globe-resume-rivers` takes the same input
+and existing candidate paths; a mismatched source or older staging format is
+rejected. Input checkpoints commit every 10,000 records, and junction/simplification
+checkpoints every 1,000 chunks, with geometry and cursor committed together.
+Input-phase resume streams the compressed source from its start but skips already
+validated records without reinserting nodes or geometry. Later phases resume by
+indexed chunk ID. Dataset publication metadata remains absent until simplification
+finishes. The ordinary transactional importer remains all-or-nothing.
+Compaction, integrity checks, the 3.8 GB limit and geographic acceptance are still
+required; a successful resume alone does not install or approve the dataset.
+The local operational launcher is `build/mapdetail-source/run-rivers-checkpointed.sh`.
+It uses a separate `rivers-261012-selected-8m-checkpointed.sqlite3` candidate and
+`mars-rivers-checkpointed-20261022.service`, with no wall-clock deadline and an
+8 GiB disk-space reserve. It verifies kernel resource caps, never installs data,
+and requires administrator authentication. Its existence does not mean it is running.
+The eight focused river regressions passed after this change, including a forced
+junction-phase interruption after chunk 1,000, successful resume, input replay without
+duplicate records and rejection of a different source hash. The configuration build
+and compliance check also passed. The original test configuration was restored.
+The broad configuration suite was stopped after its river checks passed, during
+unrelated calendar-installation fixtures; it was not recorded as a complete suite pass.
+Live status checked at 22:47 BST on 22 October: the checkpointed service is active,
+started at 22:20:11, with `RuntimeMaxUSec=infinity`. Its latest input checkpoint is
+860,000 records and 26,306,022 points; this is ingestion, not completed simplification.
+The latest 800,000-record summary retained 792,009 sections and omitted 7,991 narrow
+sections. Memory was about 779 MiB and free disk space 62 GiB. No coastline service
+was active; its completed review still requires the 530 contacts to be resolved.
+Neither candidate is installed. The old river candidate and journal remain untouched.
+
 ## Selected-position countries
 
 `globe_country_at(globe, latitude, longitude)` returns an owned `string_t` country
@@ -256,12 +286,42 @@ vertex. This tolerance never changes hit-test classification. Discard partial
 output when a query fails or its visitor cancels.
 
 `globe_import_shoreline()` transactionally replaces shoreline tables from an
-open GSHHG 2.3.7 binary stream. It retains unrelated tables and rolls back
+open GSHHG 2.3.7 binary stream or a lossless `MARSCF64` stream. It retains unrelated tables and rolls back
 malformed input. Its savepoint also permits a caller-owned transaction, so the
 installer publishes geometry and correction provenance atomically.
 Stored uncompressed coordinate chunks use BLOB pages and an
 integer R-tree; older compressed chunks remain readable. Levels 1–5 are retained,
 using the Antarctic ice front rather than the alternative grounding line.
+
+Lossless streams begin with the eight ASCII bytes `MARSCF64`, followed by the
+same 44-byte polygon headers and big-endian IEEE binary64 longitude/latitude
+pairs in degrees. Header bounds are outward-rounded integer microdegrees; they
+do not reduce the coordinate precision. Version 2 datasets use raw binary64
+chunks (codec 2) or bounded Zstandard frames of the same pairs (codec 3).
+Version 1 and its integer codecs remain readable. Each chunk still contains
+at most 257 points and each page at most 64 KiB; binary64 chunks are at most
+4,112 bytes. Non-finite or out-of-range coordinates are rejected. Import checks
+encoding and bounds, not topology: the source still requires geographic validation.
+
+Indexed hit-testing and resident full-resolution paths now retain coordinates
+in degrees without rounding through the microdegree grid. Spatial indexes use
+outward-rounded bounds, so sub-microdegree islands are not excluded by truncation.
+This addresses the 35 rounding failures without removing rings or moving their
+vertices: the already validated source coordinates can be retained exactly.
+Binary64 uses 16 raw bytes per coordinate pair rather than 8, and resident
+vertices use the same width. Installation and the resident point budget must
+account for that increase; the lossless codec alone is not installation approval.
+The optional native `check_shoreline_precision` diagnostic reads a completed
+quantisation-failure audit and staging database read-only, then checks bit-exact
+encoding and decoding of every original vertex in every rejected ring. The
+ordinary shoreline tests cover tiny-ring preservation through import and paths,
+full-sized chunks, compressed reads, cold and resident queries, malformed-input
+rollback and legacy world-data compatibility.
+The read-only check of the 23 October audit passed for all 35 rejected rings:
+7,600,134 original coordinate pairs survived native binary64 encoding and decoding
+bit-for-bit. This removes the need to alter those rings to fit a coarse integer
+grid. The installed globe is still unchanged; the exporter must use the lossless
+format and the remaining installation acceptance checks still apply.
 
 See [almanac data provenance](almanac-data-provenance.md#shoreline-data) for
 source, checksums and licence notices.
@@ -349,9 +409,56 @@ The review tool's `--classify-contacts` mode reads an existing review database w
 changing it and separates chunk-level touches, crossings, overlaps and other
 contacts. These are diagnostic categories, not installation approval: chunk endpoints
 can affect the classification, and source geometry still needs comparison.
-The restored candidate's completed review recorded 530 contacts: 8 touches,
-506 crossings, 14 overlaps and 2 other contacts. It remains unsuitable for installation
-until these relationships have been resolved and the remaining checks pass.
+The first local-section repair restored 76 small rings and six large-ring regions.
+Its complete review reduced 530 contacts to 64 (8 touches, 38 crossings, 16 overlaps
+and 2 other contacts), with 34,477,698 candidate points. It is not installed or approved.
+Of the 23 contacts between unchanged source rings, 22 lie on the artificial date-line
+split and one is a genuine crossing near Vancouver Island. Neither category is silently
+waived by the validator. The other 41 contacts involve simplified boundaries.
+Later repair passes must retain earlier repair regions. The native review tool's
+`--merge-contacts NEW-regions.sqlite3 OLD-review.sqlite3 NEW-review.sqlite3` mode copies
+contact geometry into an exclusive new, transactional cumulative repair input. It rejects
+incomplete reviews, leaves inputs unchanged and marks the output as repair regions only,
+not a fresh validation. This prevents a later pass from undoing earlier local restoration.
+The second and third cumulative passes reduced the contact counts to 29 and 27
+respectively. The third candidate has 34,485,970 points. Its remaining contacts
+comprise 26 date-line joins and one crossing between unchanged source island rings.
+The fourth pass uses a coverage-preserving source repair overlay and a seam-aware
+review; it keeps the memory, CPU, no-swap and I/O caps with no runtime deadline.
+That pass completed successfully on 23 October 2026: 833,417 effective rings,
+34,485,968 points, 768,862 neighbour comparisons and zero unresolved boundary
+contacts. The 26 complementary date-line joins are recorded separately. Both
+original island records remain in the repair overlay. The result is explicitly
+`boundary_contacts_clear_not_install_approved`, not a delivered shoreline update.
+The installer still imports GSHHG plus the Sydney correction. The next delivery
+work must preserve inland waters, check nesting and microdegree quantisation,
+export the same effective overlay geometry, and address the resident reader's
+32-million-vertex ceiling and the installer's 128 MiB decompression limit before
+transactional installation and visual verification.
+The review tool's optional final `--microdegrees` flag rounds the effective
+candidate to the globe's stored integer-microdegree grid before checking validity
+and cross-ring contacts. It retains the exact reviewed geometry in `quantized_rings`
+for subsequent export, without changing the staging or installed databases. A
+collapsed or invalid rounded ring leaves the review incomplete; rounding-induced
+contacts fail the review. Native tests cover exact coordinate conversion, collapse
+and a contact introduced by rounding. The capped installation-check launcher is
+prepared for this global review; it is not an installation command.
+The first stored-coordinate review failed on ring 2955146 after microdegree
+conversion, before completing the boundary comparison. The installed globe is
+unchanged. The next audit records every invalid rounded ring, its GEOS reason
+and error coordinates in `invalid_rings`, rather than stopping at the first one.
+Any such ring gives the result `quantization_invalid_not_install_approved` and
+prevents the boundary comparison from running on an incomplete subset. An I/O
+or database failure still stops the run as incomplete; it is not a geometry repair.
+The full second microdegree audit completed on 23 October 2026 and rejected 35
+of 833,417 effective rings: 33 self-intersections, one ring self-intersection and
+one collapsed component with too few points. Diagnostics are retained in
+`coastline-261012-microdegree-audit-r2-8m.sqlite3`. This is a completed failure
+audit, not a timeout; no global boundary comparison or installation was approved.
+The next repair must address stored-coordinate topology, including the collapsed
+component, without silently dropping rings or closing water passages.
+Installation remains blocked until the contacts, nesting, water-preservation and export
+checks pass; a successful repair pass alone does not authorise the candidate.
 The same cross-ring and water-preservation acceptance checks still apply. Rings
 above 100,000 points are individually checkpointed so a resource-limit failure
 does not discard all preceding continental work.
@@ -376,6 +483,25 @@ not establish unchanged nesting, water preservation, acceptable point counts or
 export correctness. Its native self-test covers ordinary and date-line crossings,
 separated rings and rejection of a self-crossing polygon. No mutable global state
 or installed-database mutation is involved.
+
+The reviewer records complementary date-line joins separately in `seam_contacts`.
+Both complete polygon envelopes must lie on opposite sides of exactly the same
+±180-degree boundary, and their entire intersection must lie on that boundary.
+Same-side contacts, near-seam contacts and crossings remain errors. This does not
+assert global seam completeness or replace nesting and water-preservation checks.
+
+The offline `coastline_repair` tool takes a staging database, tolerance, completed
+contact review and exclusive new overlay path. It unions only overlapping original
+fallback polygons of at most 500,000 points each, with equal orientation, and rejects
+holes, disconnected unions and reused repair members. The overlay stores both original
+WKB records, the replacement and the absorbed-ring mapping; the source database is
+unchanged. The review tool accepts this overlay as its optional fourth argument,
+checks its original WKB against the current candidate and validates the effective
+geometry rather than counting an absorbed island twice. Stale overlays are rejected.
+An overlay is not an installed shoreline: export must consume the same effective
+geometry, and all other acceptance checks remain required. Native self-tests cover
+coverage preservation, reversed orientation, separated polygons, overlay provenance,
+effective candidate selection and stale-overlay rejection.
 
 `coastline_stage --restore-small-contacts` takes the staging database, tolerance
 and a completed contact-review database. For contacting rings of at most 500,000

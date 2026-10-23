@@ -24,18 +24,18 @@ enum {
     LAB_FLOW_WEATHER_ERROR
 };
 
-static jsref lab_flow_weather_start(frame_jsref frame, view_jsref view)
-{
-    (void)view;
-    return lab_flow_call(frame, LAB_FLOW_WEATHER_FETCH, "setStatus", 0, 0, 1, lab_dom_string("Loading weather..."));
-}
-
 static jsref lab_flow_weather_fetch(frame_jsref frame, view_jsref view)
 {
     (void)view;
     lab_dom_set(frame, "failed", lab_dom_numeric(LAB_FLOW_WEATHER_ERROR_CURRENT));
     return lab_flow_call(frame, LAB_FLOW_WEATHER_OUTCOME, "fetchWeather", "result", 1, 2, lab_dom_get(frame, "state"),
                          lab_dom_get(frame, "request"));
+}
+
+static jsref lab_flow_weather_start(frame_jsref frame, view_jsref view)
+{
+    /* Background weather must not replace the already calculated calendar header. */
+    return lab_flow_weather_fetch(frame, view);
 }
 
 static jsref lab_flow_weather_outcome(frame_jsref frame, view_jsref view)

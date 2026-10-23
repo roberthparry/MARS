@@ -21,9 +21,46 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     }
 
     const borderCamera = [0, 0, 0, 1];
+    check(Boolean(labDOM.call('lab_globe_nearby_covers', 10, -179.8, 10, 179.8)) &&
+          !labDOM.call('lab_globe_nearby_covers', 12, -179.8, 10, 179.8) &&
+          !labDOM.call('lab_globe_nearby_covers', NaN, 0, 0, 0),
+          'native nearby-town reuse handles the date line and rejects invalid or distant centres');
+    labDOM.call('lab_globe_markers_begin', 800);
+    const admitMarker = (x: number, y: number, width = 80, town = true, selected = false) =>
+        labDOM.call('lab_globe_markers_place', x, y, width, Number(town), Number(selected)) as number[] | null;
+    check(JSON.stringify(admitMarker(100, 100)) === '[100,100]', 'native marker admission preserves pixels');
+    check(admitMarker(110, 100) === null && Boolean(admitMarker(300, 100)),
+          'native direct-indexed grid rejects overlap but admits separated labels');
+    check(Boolean(admitMarker(110, 100, 80, true, true)), 'selected marker bypasses overlap suppression');
+    check(admitMarker(790, 100) === null && admitMarker(100, 5) === null, 'native marker clipping protects edges');
+    labDOM.call('lab_globe_markers_begin', 800);
+    check(Boolean(admitMarker(100, 100)), 'new frame resets native occupancy');
+    check(JSON.stringify(admitMarker(790, 799, 80, true, true)) === '[720,786]',
+          'selected marker is clamped inside the viewport');
+    labDOM.call('lab_globe_markers_begin', Infinity);
+    check(admitMarker(100, 100) === null, 'invalid viewport disables native marker admission');
+    check(labDOM.call('lab_globe_coordinate', -4.42, 'E', 'W') === '4° 25.20′ W' &&
+          labDOM.call('lab_globe_coordinate', 0, 'N', 'S') === '0°' &&
+          labDOM.call('lab_globe_coordinate', 12.9999999, 'N', 'S') === '13° N',
+          'native coordinate formatting preserves hemispheres, zero and minute rollover');
+    check(JSON.stringify(labDOM.call('lab_globe_marker_pixels', [0, 0, 1], 1, 800)) === '[400,400]' &&
+          labDOM.call('lab_globe_marker_pixels', [0, 0, -1], 1, 800) === null &&
+          labDOM.call('lab_globe_marker_pixels', [1, 0, 1], 10, 800) === null,
+          'native viewport projection clips the far hemisphere and offscreen points');
     const borderGeometry = (camera = borderCamera, zoom = 1, size = 800): string | null =>
         labDOM.call('lab_globe_borders_path', camera, zoom, size) as string | null;
     try {
+        const covered = (bounds: number[]) => Boolean(labDOM.call('lab_globe_borders_covers', [0, 0, 1, ...bounds]));
+        check(Boolean(labDOM.call('lab_globe_borders_load_region', '-10 0 10 0\n', [-180, -90, 180, 90])) &&
+              covered([170, -80, 530, 80]), 'native worldwide coverage recognises wrapped views');
+        check(Boolean(labDOM.call('lab_globe_borders_load_region', '175 0 185 0\n', [170, -20, 190, 20])) &&
+              covered([-185, -10, -175, 10]) && !covered([-185, -30, -175, 10]) &&
+              !covered([-170, -10, -160, 10]), 'native regional coverage checks longitude wrapping and latitude');
+        check(!labDOM.call('lab_globe_borders_load_region', '0 0 NaN 0', [-180, -90, 180, 90]) &&
+              covered([-185, -10, -175, 10]) && !covered([-170, -10, -160, 10]),
+              'invalid geometry cannot replace native coverage');
+        labDOM.call('lab_globe_borders_clear');
+        check(!covered([-185, -10, -175, 10]), 'clearing native borders also clears geographic coverage');
         check(Boolean(labDOM.call('lab_globe_borders_load', '-10 0 10 0\n')), 'native border coordinates load');
         const path = borderGeometry()!;
         check(path.startsWith('M337.98 400.00L') && path.endsWith('462.02 400.00'),
@@ -1142,6 +1179,9 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 check(borderFormats[0] === 'segments' && borderPath.getAttribute('stroke-width') === '1' &&
                       borderPath.getAttribute('vector-effect') === 'non-scaling-stroke',
                       'borders request native vectors and draw a non-scaling one-pixel SVG stroke');
+                await new Promise(resolve => setTimeout(resolve, 400));
+                check(borderReplies.length === 1 && !borderReplies[0].signal?.aborted,
+                      'scheduled viewport refresh shares an identical pending border request');
                 globeCanvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
                 check(borderReplies[0].signal?.aborted === true, 'moving cancels obsolete border requests');
                 for (let i = 0; i < 40 && borderReplies.length < 2; ++i) await new Promise(resolve => setTimeout(resolve, 25));
@@ -1153,21 +1193,25 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 for (let i = 0; i < 40 && globeRoot.dataset.borders !== 'ready'; ++i)
                     await new Promise(resolve => setTimeout(resolve, 25));
                 check(globeRoot.dataset.borders === 'ready', 'visible shared borders load independently');
+                bordersButton.click();
+                bordersButton.click();
+                await new Promise(requestAnimationFrame);
+                check(globeRoot.dataset.borders === 'ready' && borderReplies.length === 2,
+                      'switching borders back on reuses native geometry without a network round trip');
                 for (let i = 0; i < 9; ++i) zoomIn.click();
                 await new Promise(requestAnimationFrame);
                 check(globeRoot.dataset.borders === 'zoom-hidden' && borderPath.getAttribute('d') === '' &&
-                      labDOM.call('lab_globe_borders_path', [0, 0, 0, 1], 1, 800) === null,
-                      'close zoom hides coarse borders and releases their native geometry');
+                      labDOM.call('lab_globe_borders_path', [0, 0, 0, 1], 1, 800) !== null,
+                      'close zoom hides coarse borders but retains the bounded native cache');
                 for (let i = 0; i < 24; ++i) zoomOut.click();
-                for (let i = 0; i < 40 && borderReplies.length < 3; ++i) await new Promise(resolve => setTimeout(resolve, 25));
-                check(borderReplies.length === 3, 'zooming back out reloads borders');
-                borderReplies[2].resolve(vectorReply());
+                await new Promise(resolve => setTimeout(resolve, 400));
+                check(borderReplies.length === 2, 'zooming back out reuses borders without another request');
                 for (let i = 0; i < 40 && globeRoot.dataset.borders !== 'ready'; ++i)
                     await new Promise(resolve => setTimeout(resolve, 25));
                 bordersButton.click();
                 await new Promise(requestAnimationFrame);
                 check(globeRoot.dataset.borders === 'off' && borderPath.getAttribute('d') === '',
-                      'switching borders off clears vectors without changing the observer');
+                      'switching borders off hides vectors without changing the observer');
             } finally {
                 if (bordersButton.getAttribute('aria-pressed') === 'true') bordersButton.click();
                 borderReplies.forEach(request => request.resolve(vectorReply()));

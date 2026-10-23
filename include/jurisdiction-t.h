@@ -8,6 +8,7 @@
  * dated exceptions represented in the installed catalogue.
  * Read-only visitors enumerate jurisdiction choices, representative locations and
  * towns, retaining stored coordinate precision and explicit default-town markers.
+ * A separate visitor exposes the machine's installed calendar origin without substituting a selected jurisdiction.
  * Indexed country presentation metadata supplies catalogue-owned names and offline flag artwork by ISO code.
  * Geographic country identification belongs to globe_t; choosing a jurisdiction does not establish a point's country.
  * A geographic adapter opens independent globe_t readers on the same catalogue;
@@ -76,6 +77,15 @@ typedef bool (*jurisdict_choice_visit_fn)(const char *code, const char *label, v
  * @return True to continue, false to stop.
  */
 typedef bool (*jurisdict_place_visit_fn)(const jurisdict_place_t *place, void *context);
+
+/**
+ * @brief Visit the machine origin saved by calendar setup, independently of selected jurisdictions.
+ * @param jurisdiction Open engine using the configured jurisdiction database.
+ * @param visitor Callback receiving one borrowed place; its return value is ignored.
+ * @param context Caller-owned callback context.
+ * @return True when a complete setup origin was visited; false when missing or unreadable.
+ */
+bool jurisdict_setup_origin(jurisdiction_t *jurisdiction, jurisdict_place_visit_fn visitor, void *context);
 
 /**
  * @brief Enumerate database jurisdiction choices in case-insensitive label order.

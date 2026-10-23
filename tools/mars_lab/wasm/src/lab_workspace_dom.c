@@ -218,13 +218,31 @@ void lab_workspace_dom_labels(lab_mode_t mode)
     lab_dom_return(labels);
 }
 
-/* Compose a status label without exposing precision formatting policy to the host. */
-void lab_workspace_dom_status(jsref text)
+static void lab_workspace_dom_status_for_mode(lab_mode_t mode, jsref text, bool sky_ready)
 {
-    unsigned bits = lab_workspace_requested_precision(lab_workspace_mode());
+    if (mode == LAB_MODE_DATETIME || mode == LAB_MODE_ALMANAC) {
+        int status = lab_dom_query(0, "#status");
+        if (sky_ready) {
+            int source = lab_dom_query(0, "#homeSky");
+            int html = lab_dom_read(source, LAB_DOM_HTML, "");
+            if (lab_dom_length(html)) {
+                lab_dom_write(status, LAB_DOM_HTML, "", html);
+                return;
+            }
+        }
+        lab_dom_write(status, LAB_DOM_TEXT, "", text);
+        return;
+    }
+    unsigned bits = lab_workspace_requested_precision(mode);
     int digits = lab_dom_format(lab_workspace_digits(bits), " · ", " digits / ");
     int status = lab_dom_join(text, digits, "");
     lab_dom_write(lab_dom_query(0, "#status"), LAB_DOM_TEXT, "", lab_dom_join(status, lab_dom_format(bits, "", " bits"), ""));
+}
+
+/* Compose status only for the current mode; calendar presentation cannot leak into mathematics. */
+void lab_workspace_dom_status(jsref text)
+{
+    lab_workspace_dom_status_for_mode(lab_workspace_mode(), text, true);
 }
 
 /* Apply one selected tab and its keyboard/accessibility state to the supplied registration list. */
@@ -290,6 +308,12 @@ void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage)
     lab_precision_close(0);
     if ((unsigned)mode >= LAB_MODE_COUNT)
         mode = LAB_MODE_EXPRESSION;
+    int status = lab_dom_query(0, "#status"), status_mode = lab_dom_format(mode, "", "");
+    if (!lab_dom_equal(lab_dom_read(status, LAB_DOM_DATASET, "workspaceMode"), status_mode)) {
+        lab_dom_write(status, LAB_DOM_DATASET, "workspaceMode", status_mode);
+        lab_workspace_dom_status_for_mode(mode, lab_dom_string("Ready"), true);
+    }
+    lab_workspace_dom_hidden(".precision-toolbar", mode == LAB_MODE_DATETIME || mode == LAB_MODE_ALMANAC);
     static const char *const panels[] = {"",
                                          "#equationControls",
                                          "#diffequationControls",
@@ -823,6 +847,9 @@ void lab_workspace_dom_result_restore(jsref state)
     lab_layout_zoom(lab_dom_id("plotCard"));
     lab_result_solver_restore();
     lab_result_input_set(lab_dom_get(state, "resultInputText"));
+    /* Retained calendar results must restore their header after mode switching cleared it. */
+    if (!showing_help)
+        lab_workspace_dom_status(lab_dom_string("Ready"));
     int metadata = lab_workspace_dom_result_metadata(state);
     /* Reused result input never inherits the previous mode's evaluation bindings. */
     lab_dom_set(metadata, "resultInputBindings", lab_dom_object(LAB_VALUE_ARRAY));

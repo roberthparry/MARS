@@ -398,7 +398,54 @@ static GEOSGeometry *join_parts(GEOSContextHandle_t geos, coast_part_t *parts, u
     return ring ? GEOSGeom_createPolygon_r(geos, ring, NULL, 0) : NULL;
 }
 
-static GEOSGeometry *simplify_partitioned_ring(GEOSContextHandle_t geos, const GEOSGeometry *source, double tolerance)
+static void restore_zone_part(void *item, void *userdata)
+{
+    coast_part_t *part = item;
+    GEOSContextHandle_t geos = userdata;
+    if (part->restored) return;
+    GEOSGeometry *original = GEOSGeom_clone_r(geos, part->original);
+    GEOSGeom_destroy_r(geos, part->candidate);
+    part->candidate = original;
+    part->restored = true;
+}
+
+static int shift_longitude(double *x, double *y, void *context)
+{
+    (void)y;
+    *x += *(double *)context;
+    return 1;
+}
+
+static bool restore_review_zones(sqlite3 *review, int64_t ring, GEOSContextHandle_t geos,
+                                GEOSSTRtree *index, double tolerance)
+{
+    sqlite3_stmt *q = NULL;
+    bool ok = sqlite3_prepare_v2(review,
+        "SELECT a.geometry,b.geometry FROM contacts c JOIN chunks a ON a.id=c.first_chunk "
+        "JOIN chunks b ON b.id=c.second_chunk WHERE c.first_ring=?1 OR c.second_ring=?1", -1, &q, NULL) == SQLITE_OK &&
+        sqlite3_bind_int64(q, 1, ring) == SQLITE_OK;
+    int step = SQLITE_DONE;
+    while (ok && (step = sqlite3_step(q)) == SQLITE_ROW) {
+        GEOSGeometry *a = GEOSGeomFromWKB_buf_r(geos, sqlite3_column_blob(q, 0), sqlite3_column_bytes(q, 0));
+        GEOSGeometry *b = GEOSGeomFromWKB_buf_r(geos, sqlite3_column_blob(q, 1), sqlite3_column_bytes(q, 1));
+        GEOSGeometry *contact = a && b ? GEOSIntersection_r(geos, a, b) : NULL;
+        GEOSGeometry *zone = contact ? GEOSBuffer_r(geos, contact, tolerance * 2, 1) : NULL;
+        ok = zone && GEOSisEmpty_r(geos, zone) == 0;
+        for (double shift = -360; ok && shift <= 360; shift += 360) {
+            GEOSGeometry *copy = GEOSGeom_transformXY_r(geos, zone, shift_longitude, &shift);
+            ok = copy != NULL;
+            if (copy) GEOSSTRtree_query_r(geos, index, copy, restore_zone_part, geos);
+            GEOSGeom_destroy_r(geos, copy);
+        }
+        GEOSGeom_destroy_r(geos, zone); GEOSGeom_destroy_r(geos, contact);
+        GEOSGeom_destroy_r(geos, a); GEOSGeom_destroy_r(geos, b);
+    }
+    sqlite3_finalize(q);
+    return ok && step == SQLITE_DONE;
+}
+
+static GEOSGeometry *simplify_partitioned_ring(GEOSContextHandle_t geos, const GEOSGeometry *source, double tolerance,
+                                               sqlite3 *review, int64_t ring_id)
 {
     const GEOSGeometry *shell = GEOSGetExteriorRing_r(geos, source);
     const GEOSCoordSequence *coordinates = shell ? GEOSGeom_getCoordSeq_r(geos, shell) : NULL;
@@ -424,6 +471,7 @@ static GEOSGeometry *simplify_partitioned_ring(GEOSContextHandle_t geos, const G
         if (ok) GEOSSTRtree_insert_r(geos, index, parts[i].original, &parts[i]);
     }
     GEOSGeometry *candidate = NULL;
+    if (ok && review) ok = restore_review_zones(review, ring_id, geos, index, tolerance);
     for (unsigned attempt = 0; ok && attempt < 256; ++attempt) {
         candidate = join_parts(geos, parts, count);
         char *reason = NULL;
@@ -476,7 +524,7 @@ static bool simplify_rings(sqlite3 *db, double metres, int64_t ring_point_limit,
         bool fallback = !same_orientation(geos, source, candidate) || GEOSisValid_r(geos, candidate) != 1;
         if (fallback && source && points > 500000) {
             GEOSGeom_destroy_r(geos, candidate);
-            candidate = simplify_partitioned_ring(geos, source, metres / 111700.0);
+            candidate = simplify_partitioned_ring(geos, source, metres / 111700.0, NULL, 0);
             fallback = !same_orientation(geos, source, candidate) || GEOSisValid_r(geos, candidate) != 1;
         }
         if (fallback) {
@@ -566,6 +614,63 @@ static bool restore_small_contacts(sqlite3 *db, sqlite3 *review, double metres)
     return ok && step == SQLITE_DONE && execute(db, "COMMIT");
 }
 
+static bool restore_contact_sections(sqlite3 *db, sqlite3 *review, double metres, const char *review_name)
+{
+    if (!restore_small_contacts(db, review, metres)) return false;
+    bool ok = execute(db,
+        "CREATE TABLE IF NOT EXISTS contact_section_prior("
+        "review TEXT,ring_id INTEGER,tolerance REAL,points INTEGER,geometry BLOB,fallback INTEGER,"
+        "PRIMARY KEY(review,ring_id,tolerance))");
+    sqlite3_stmt *ids = NULL, *ring = NULL, *save = NULL, *update = NULL;
+    ok = ok && sqlite3_prepare_v2(review,
+        "SELECT first_ring FROM contacts UNION SELECT second_ring FROM contacts ORDER BY 1", -1, &ids, NULL) == SQLITE_OK &&
+        sqlite3_prepare_v2(db,
+        "SELECT r.first_node,r.points FROM rings r JOIN simplified_rings s ON s.ring_id=r.id AND s.tolerance=?2 "
+        "WHERE r.id=?1 AND r.points>500000 AND s.fallback=0 AND NOT EXISTS(SELECT 1 FROM contact_section_prior p "
+        "WHERE p.ring_id=r.id AND p.tolerance=?2 AND p.review=?3)", -1, &ring, NULL) == SQLITE_OK &&
+        sqlite3_prepare_v2(db,
+        "INSERT INTO contact_section_prior SELECT ?3,ring_id,tolerance,points,geometry,fallback "
+        "FROM simplified_rings WHERE ring_id=?1 AND tolerance=?2", -1, &save, NULL) == SQLITE_OK &&
+        sqlite3_prepare_v2(db, "UPDATE simplified_rings SET geometry=?1,points=?2 WHERE ring_id=?3 AND tolerance=?4",
+                           -1, &update, NULL) == SQLITE_OK;
+    GEOSContextHandle_t geos = GEOS_init_r();
+    ok = ok && geos;
+    int step = SQLITE_DONE;
+    while (ok && (step = sqlite3_step(ids)) == SQLITE_ROW) {
+        int64_t id = sqlite3_column_int64(ids, 0);
+        ok = sqlite3_bind_int64(ring, 1, id) == SQLITE_OK && sqlite3_bind_double(ring, 2, metres) == SQLITE_OK &&
+             sqlite3_bind_text(ring, 3, review_name, -1, SQLITE_TRANSIENT) == SQLITE_OK;
+        int found = ok ? sqlite3_step(ring) : SQLITE_ERROR;
+        if (found == SQLITE_ROW) {
+            int64_t points = sqlite3_column_int64(ring, 1);
+            fprintf(stderr, "Restoring contact sections: ring %" PRId64 ", source points %" PRId64 "\n", id, points);
+            fflush(stderr);
+            GEOSGeometry *source = ring_geometry(db, geos, sqlite3_column_int64(ring, 0), points, 8000000);
+            GEOSGeometry *candidate = source ? simplify_partitioned_ring(geos, source, metres / 111700.0, review, id) : NULL;
+            size_t size = 0;
+            unsigned char *wkb = candidate ? GEOSGeomToWKB_buf_r(geos, candidate, &size) : NULL;
+            int count = candidate ? GEOSGetNumCoordinates_r(geos, candidate) : 0;
+            ok = wkb && size <= 256 * 1048576 && count >= 4 && count <= points &&
+                 same_orientation(geos, source, candidate) && GEOSisValid_r(geos, candidate) == 1 && execute(db, "BEGIN") &&
+                 sqlite3_bind_int64(save, 1, id) == SQLITE_OK && sqlite3_bind_double(save, 2, metres) == SQLITE_OK &&
+                 sqlite3_bind_text(save, 3, review_name, -1, SQLITE_TRANSIENT) == SQLITE_OK && sqlite3_step(save) == SQLITE_DONE &&
+                 sqlite3_bind_blob(update, 1, wkb, (int)size, SQLITE_TRANSIENT) == SQLITE_OK &&
+                 sqlite3_bind_int(update, 2, count) == SQLITE_OK && sqlite3_bind_int64(update, 3, id) == SQLITE_OK &&
+                 sqlite3_bind_double(update, 4, metres) == SQLITE_OK && sqlite3_step(update) == SQLITE_DONE && execute(db, "COMMIT");
+            sqlite3_reset(save); sqlite3_reset(update); sqlite3_clear_bindings(update);
+            GEOSFree_r(geos, wkb); GEOSGeom_destroy_r(geos, candidate); GEOSGeom_destroy_r(geos, source);
+            if (ok) fprintf(stderr, "Contact repair checkpoint: ring %" PRId64 ", %d/%" PRId64 " points\n", id, count, points);
+            fflush(stderr);
+        } else ok = found == SQLITE_DONE;
+        sqlite3_reset(ring);
+    }
+    sqlite3_finalize(ids); sqlite3_finalize(ring); sqlite3_finalize(save); sqlite3_finalize(update);
+    if (geos) GEOS_finish_r(geos);
+    if (!ok) execute(db, "ROLLBACK");
+    fprintf(stderr, "Contact-section restoration %s; full cross-ring review still required\n", ok ? "finished" : "interrupted");
+    return ok && step == SQLITE_DONE;
+}
+
 static bool self_test(void)
 {
     string_t *parent = string_new_with("/tmp");
@@ -622,10 +727,25 @@ static bool self_test(void)
     ok = ok && reduced && GEOSisValid_r(geos, reduced) == 1 && same_orientation(geos, source, reduced) &&
          GEOSGetNumCoordinates_r(geos, reduced) == 5;
     GEOSGeom_destroy_r(geos, reduced);
-    reduced = source ? simplify_partitioned_ring(geos, source, 8.0 / 111700.0) : NULL;
+    reduced = source ? simplify_partitioned_ring(geos, source, 8.0 / 111700.0, NULL, 0) : NULL;
     ok = ok && reduced && GEOSisValid_r(geos, reduced) == 1 && same_orientation(geos, source, reduced) &&
          GEOSGetNumCoordinates_r(geos, reduced) == 5;
+    GEOSGeom_destroy_r(geos, reduced);
+    sqlite3 *zones = NULL;
+    ok = ok && sqlite3_open(":memory:", &zones) == SQLITE_OK && execute(zones,
+        "CREATE TABLE contacts(first_ring INTEGER,second_ring INTEGER,first_chunk INTEGER,second_chunk INTEGER);"
+        "CREATE TABLE chunks(id INTEGER PRIMARY KEY,geometry BLOB);INSERT INTO contacts VALUES(1,2,1,2)");
+    GEOSGeometry *line = GEOSGeomFromWKT_r(geos, "LINESTRING(360.5 -0.0001,360.5 0.0001)");
+    size_t bytes = 0;
+    unsigned char *blob = line ? GEOSGeomToWKB_buf_r(geos, line, &bytes) : NULL;
+    sqlite3_stmt *zone_insert = NULL;
+    ok = ok && blob && sqlite3_prepare_v2(zones, "INSERT INTO chunks VALUES(1,?1),(2,?1)", -1, &zone_insert, NULL) == SQLITE_OK &&
+         sqlite3_bind_blob(zone_insert, 1, blob, (int)bytes, SQLITE_TRANSIENT) == SQLITE_OK && sqlite3_step(zone_insert) == SQLITE_DONE;
+    sqlite3_finalize(zone_insert); GEOSFree_r(geos, blob); GEOSGeom_destroy_r(geos, line);
+    reduced = ok ? simplify_partitioned_ring(geos, source, 8.0 / 111700.0, zones, 1) : NULL;
+    ok = ok && reduced && GEOSisValid_r(geos, reduced) == 1 && GEOSGetNumCoordinates_r(geos, reduced) == 6;
     GEOSGeom_destroy_r(geos, reduced); GEOSGeom_destroy_r(geos, source);
+    if (zones) sqlite3_close(zones);
     if (geos) GEOS_finish_r(geos);
     if (db) sqlite3_close(db);
     if (reference && file_exists(reference)) ok = file_delete(reference) && ok;
@@ -641,7 +761,7 @@ static bool self_test(void)
 int main(int argc, char **argv)
 {
     if (argc == 2 && !strcmp(argv[1], "--self-test")) return self_test() ? 0 : 1;
-    if (argc == 5 && !strcmp(argv[1], "--restore-small-contacts")) {
+    if (argc == 5 && (!strcmp(argv[1], "--restore-small-contacts") || !strcmp(argv[1], "--restore-contact-sections"))) {
         char *end;
         errno = 0;
         double metres = strtod(argv[3], &end);
@@ -649,7 +769,9 @@ int main(int argc, char **argv)
         sqlite3 *db = NULL, *review = NULL;
         bool ok = sqlite3_open_v2(argv[2], &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, NULL) == SQLITE_OK &&
                   sqlite3_open_v2(argv[4], &review, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK &&
-                  execute(db, "PRAGMA cache_size=-32768;PRAGMA temp_store=FILE") && restore_small_contacts(db, review, metres);
+                  execute(db, "PRAGMA cache_size=-32768;PRAGMA temp_store=FILE");
+        if (ok) ok = !strcmp(argv[1], "--restore-contact-sections") ?
+            restore_contact_sections(db, review, metres, argv[4]) : restore_small_contacts(db, review, metres);
         if (review) sqlite3_close(review);
         if (db) sqlite3_close(db);
         return ok ? 0 : 1;

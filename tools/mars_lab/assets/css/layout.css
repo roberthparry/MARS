@@ -13,6 +13,11 @@ header {
   gap: 1rem;
 }
 
+/* The title stays at the header's top padding, independently of the status card's height. */
+header > div:first-child {
+  align-self: start;
+}
+
 h1 {
   margin: 0;
   font-size: clamp(1.8rem, 4vw, 3.2rem);
@@ -33,6 +38,66 @@ h1 {
   text-align: right;
   color: var(--muted);
   font-size: 0.95rem;
+}
+
+.sky-status-strip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem 1rem;
+  font-size: 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(220, 232, 216, 0.16);
+  border-radius: 0.7rem;
+  background: rgba(12, 30, 25, 0.32);
+}
+
+.sky-status-events,
+.sky-status-selection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem 1rem;
+}
+
+.sky-status-selection {
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(220, 232, 216, 0.16);
+}
+
+.sky-status-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.sky-status-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sky-status-value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sky-status-strip .almanac-body-symbol,
+.sky-status-moon {
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.65rem;
+  flex-shrink: 0;
+}
+
+.sky-status-strip .country-flag {
+  width: 1.6rem;
+  height: 1.1rem;
+  object-fit: contain;
 }
 
 main {

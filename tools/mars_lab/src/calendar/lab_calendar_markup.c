@@ -13,7 +13,8 @@
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 
-static bool lab_cal_markup_text(string_t *out, const char *value)
+/* Escape all variable content before inserting it into native markup. */
+bool lab_cal_markup_text(string_t *out, const char *value)
 {
     string_t *text = string_new_with(value);
     string_cursor_t *cursor = text ? string_cursor_new(text) : NULL;
@@ -326,7 +327,9 @@ string_t *lab_cal_almanac_markup(const json_t *response, const json_t *rows, con
              lab_cal_markup_text(out, lab_cal_text(response, "events_notice")) && !string_append_cstr(out, "</p>");
     else
         ok = ok && lab_cal_markup_events(out, events);
-    ok = ok && !string_append_cstr(out, "</div>");
+    string_t *sky = lab_cal_sky_markup(response, true);
+    ok = ok && sky && !string_append_cstr(out, string_c_str(sky)) && !string_append_cstr(out, "</div>");
+    string_free(sky);
     if (!ok) {
         string_free(out);
         return NULL;

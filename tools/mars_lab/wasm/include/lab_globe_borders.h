@@ -15,6 +15,12 @@
 /** @brief Replace the native segment cache atomically; return false for malformed or oversized input. */
 bool lab_globe_borders_load(jsref text);
 
+/** @brief Atomically load segments and their geographic coverage [west, south, east, north]. */
+bool lab_globe_borders_load_region(jsref text, jsref bounds);
+
+/** @brief Test whether native cached coverage contains a globe view, including wrapped longitudes. */
+bool lab_globe_borders_covers(jsref view);
+
 /** @brief Release the optional border geometry. */
 void lab_globe_borders_clear(void);
 

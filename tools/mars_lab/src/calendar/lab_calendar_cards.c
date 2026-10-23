@@ -271,6 +271,17 @@ json_t *lab_cal_datetime(json_t *fields)
     }
     lab_cal_section(sections, "Sun and Moon", true, rows);
     json_free(rows);
+    string_t *sky = lab_cal_sky_markup(response, false);
+    json_t *date_section = json_clone(json_array_get(sections, 0));
+    string_t *date_html = sky ? string_sprintf("%s%s", lab_cal_text(date_section, "html"), string_c_str(sky)) : NULL;
+    if (date_html) lab_cal_set(date_section, "html", string_c_str(date_html));
+    json_t *sky_sections = json_new_array();
+    lab_cal_append(sky_sections, date_section);
+    lab_cal_append(sky_sections, json_clone(json_array_get(sections, 1)));
+    json_free(sections);
+    sections = sky_sections;
+    string_free(date_html);
+    string_free(sky);
     lab_cal_sections(response, "overview", sections);
 
     sections = json_new_array();

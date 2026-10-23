@@ -172,12 +172,7 @@ void lab_select_rebuild(node_jsref select, bool details)
         } else {
             lab_dom_write(item, LAB_DOM_TEXT, "", label);
         }
-        int search = lab_dom_join(label, lab_dom_string(" "), "");
-        search = lab_dom_join(search, lab_dom_read(option, LAB_DOM_DATASET, "latitude"), " ");
-        search = lab_dom_join(search, lab_dom_read(option, LAB_DOM_DATASET, "longitude"), " ");
-        search = lab_dom_join(search, detail, " ");
-        search = lab_dom_join(search, value, "");
-        lab_dom_write(item, LAB_DOM_DATASET, "searchText", lab_dom_normalize(search));
+        lab_dom_write(item, LAB_DOM_DATASET, "searchText", lab_menu_index_search_text(option, details));
         lab_dom_release(mark);
     }
     lab_select_sync(select);

@@ -225,6 +225,19 @@ window.checkLabSelectEvents = function checkLabSelectEvents() {
               'partial United Kingdom alias finds all four constituent jurisdictions only');
         jurisdictions.items()[2].click();
         equal(jurisdictions.select.value, 'GB-SCT', 'alias result selects its actual jurisdiction');
+        const jurisdictionButton = jurisdictions.select.closest('.select-shell')!.querySelector('.select-button');
+        check(!labDOM.call('lab_tooltip_show', jurisdictionButton, null, 800, 600),
+              'selected jurisdiction does not repeat its country name and flag in a tooltip');
+        // An oversized row deliberately makes the bounded suffix index unavailable.
+        jurisdictions.select.add(new Option('x'.repeat(1100), 'oversized'));
+        labDOM.call('lab_select_rebuild', jurisdictions.select, 0);
+        open(jurisdictions);
+        jurisdictions.search.value = 'united kin';
+        jurisdictions.search.dispatchEvent(new Event('input', {bubbles: true}));
+        equal(jurisdictions.items().filter(item => !item.classList.contains('hidden')).length, 4,
+              'United Kingdom aliases also work when the bounded index falls back');
+        jurisdictions.items()[1].click();
+        equal(jurisdictions.select.value, 'GB-WLS', 'fallback alias result selects Wales');
 
         // A country-sized catalogue must not rewrite every row when one town changes.
         const large = create('selectEventLarge', true);

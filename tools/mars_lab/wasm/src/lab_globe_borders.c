@@ -21,6 +21,8 @@ typedef struct { double point[2][3]; } border_segment_t;
 typedef struct _border_store_t {
     lab_serial_t serial;
     array_t *segments;
+    double bounds[4];
+    bool has_bounds;
     const size_t border_limit;
     const size_t text_limit;
 } border_store_t;
@@ -77,6 +79,7 @@ static void lab_globe_borders_clear_owned(void)
     border_store_t *state = border_store();
     array_destroy(state->segments);
     state->segments = NULL;
+    state->has_bounds = false;
 }
 
 /* Admit complete coordinate records only, with a fixed memory and segment budget. */
@@ -254,6 +257,65 @@ bool lab_globe_borders_load(jsref text)
     border_store_t *state = border_store();
     globe_borders_load_request_t request = {.text = text, .result = 0};
     lab_serial_dispatch(&state->serial, globe_borders_load_dispatch, &request);
+    return request.result;
+}
+
+typedef struct _border_region_request_t {
+    jsref text, coordinates;
+    bool result;
+} border_region_request_t;
+
+static bool border_bounds(jsref source, unsigned offset, double bounds[4])
+{
+    if (lab_dom_type(source) != LAB_VALUE_ARRAY || lab_dom_count(source) != offset + 4) return false;
+    for (unsigned i = 0; i < 4; ++i) {
+        jsref value = lab_dom_item(source, offset + i);
+        if (lab_dom_type(value) != LAB_VALUE_NUMBER) return false;
+        bounds[i] = lab_dom_to_number(value);
+        if (!isfinite(bounds[i])) return false;
+    }
+    return bounds[0] < bounds[2] && bounds[2] - bounds[0] <= 360 &&
+           bounds[1] >= -90 && bounds[3] <= 90 && bounds[1] < bounds[3];
+}
+
+static void border_region_load_dispatch(void *context)
+{
+    border_region_request_t *request = context;
+    double bounds[4];
+    if (!border_bounds(request->coordinates, 0, bounds) || !lab_globe_borders_load_owned(request->text)) return;
+    border_store_t *state = border_store();
+    for (unsigned i = 0; i < 4; ++i) state->bounds[i] = bounds[i];
+    state->has_bounds = true;
+    request->result = true;
+}
+
+/* Publish coverage and geometry together through the native owner. */
+bool lab_globe_borders_load_region(jsref text, jsref bounds)
+{
+    border_region_request_t request = {.text = text, .coordinates = bounds};
+    lab_serial_dispatch(&border_store()->serial, border_region_load_dispatch, &request);
+    return request.result;
+}
+
+static void border_region_covers_dispatch(void *context)
+{
+    border_region_request_t *request = context;
+    border_store_t *state = border_store();
+    double view[4];
+    if (!state->has_bounds || !border_bounds(request->coordinates, 3, view)) return;
+    const double *bounds = state->bounds;
+    if (view[1] < bounds[1] || view[3] > bounds[3]) return;
+    if (bounds[2] - bounds[0] >= 360) { request->result = true; return; }
+    double shift = 360 * floor((bounds[0] - view[0]) / 360);
+    for (unsigned i = 0; i < 2; ++i, shift += 360)
+        if (view[0] + shift >= bounds[0] && view[2] + shift <= bounds[2]) request->result = true;
+}
+
+/* Keep geographic cache policy out of the browser transport adapter. */
+bool lab_globe_borders_covers(jsref view)
+{
+    border_region_request_t request = {.coordinates = view};
+    lab_serial_dispatch(&border_store()->serial, border_region_covers_dispatch, &request);
     return request.result;
 }
 

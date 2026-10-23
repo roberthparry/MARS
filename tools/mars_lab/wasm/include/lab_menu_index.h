@@ -11,10 +11,15 @@
 #ifndef LAB_MENU_INDEX_H
 #define LAB_MENU_INDEX_H
 
+#include <stdbool.h>
+
 #include "lab_handle.h"
 
 /** @brief Parse coordinates with the same strict numeric-input rules as location controls. */
 double lab_menu_index_number(jsref value);
+
+/** @brief Build normalised option search text, including jurisdiction aliases, without retaining handles. */
+jsref lab_menu_index_search_text(node_jsref option, bool details);
 
 /** @brief Return an option index by exact value, -1 if absent, or -2 if indexing is unavailable. */
 int lab_menu_index_key(node_jsref select, jsref value);

@@ -9,7 +9,7 @@
 /** Entry points for these browser regressions. */
 interface Window {
     /** @brief Check a live worksheet snapshot at the fixture's phone and tablet sizes. */
-    checkLabMobileLayout(state: string): Promise<void>;
+    checkLabMobileLayout(state: string, desktopOnly?: boolean): Promise<void>;
 }
 
 /** @brief One responsive viewport exercised by the isolated CSS fixture. */

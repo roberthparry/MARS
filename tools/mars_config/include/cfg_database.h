@@ -35,8 +35,12 @@ int cfg_globe_install_key(const char *key);
  * @note The compacted candidate must not exceed 3,800,000,000 bytes, including indexes and encryption overhead.
  * Known widths below 16 m are omitted per source way, independently of the 8 m geometry simplification tolerance.
  * Accepts plain GeoJSON sequences or one Zstandard frame, streamed without an expanded intermediate file.
+ * Saves source-identified phase/batch checkpoints for cfg_globe_river_resume; incomplete stages lack publication metadata.
  */
 int cfg_globe_river_stage(const char *input_path, const char *output_path);
+
+/** @brief Resume a checkpointed river candidate after verifying its source SHA-256; never publish it. */
+int cfg_globe_river_resume(const char *input_path, const char *output_path);
 
 /**
  * @brief Install an encrypted candidate into the configured globe, preserving unrelated tables and the saved key.

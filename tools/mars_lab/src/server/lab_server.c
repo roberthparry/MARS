@@ -376,6 +376,7 @@ static bool lab_svr_register_routes(lab_server_t *server)
                                               "/matrix-eval",
                                               "/integrator-eval",
                                               "/datetime-eval",
+                                              "/home-sky",
                                               "/datetime-weather",
                                               "/datetime-jurisdiction-location",
                                               "/almanac-eval",

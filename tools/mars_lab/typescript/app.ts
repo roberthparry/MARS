@@ -108,6 +108,8 @@ class LabApplication {
     private readonly cleanupCallbacks: LabLifetimeCallback[] = [];
     private readonly lifetime = new AbortController();
     private refreshTimer: number | undefined;
+    private homeSkyTimer: number | undefined;
+    private homeSkyPending = false;
     private config: LabConfiguration | undefined;
     private nativeCatalogue: LabCatalogue | undefined;
     private definitionScriptNames: readonly string[] = [];
@@ -292,8 +294,8 @@ class LabApplication {
     public async loadNearbyTowns(latitude: number, longitude: number): Promise<void> {
         if (!this.catalogue?.available ||
             !Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-        if (this.nearbyComplete && this.nearbyCentre && Math.abs(latitude - this.nearbyCentre[0]) < 1 &&
-            Math.abs(longitude - this.nearbyCentre[1]) < 1) return;
+        if (this.nearbyComplete && this.nearbyCentre &&
+            labDOM.call('lab_globe_nearby_covers', latitude, longitude, ...this.nearbyCentre)) return;
         this.nearbyTowns?.abort();
         this.nearbyCentre = [latitude, longitude];
         this.nearbyComplete = false;
@@ -430,6 +432,36 @@ class LabApplication {
     public startRefresh(): void {
         if (this.refreshTimer !== undefined) window.clearInterval(this.refreshTimer);
         this.refreshTimer = window.setInterval(WorksheetRequests.calendarRequests.refreshMobileAccess, 5000);
+        if (this.homeSkyTimer !== undefined) window.clearInterval(this.homeSkyTimer);
+        this.homeSkyTimer = window.setInterval(() => { void this.refreshHomeSky(); }, 60000);
+        void this.refreshHomeSky();
+    }
+
+    /** Fetch opaque native home-sky markup; no worksheet coordinates, dates or astronomy enter this request. */
+    public async refreshHomeSky(): Promise<void> {
+        if (this.homeSkyPending || this.lifetime.signal.aborted) return;
+        this.homeSkyPending = true;
+        try {
+            const response = await labHttp.fetch('/home-sky', {
+                method: 'POST', body: labWire.encode({}), signal: this.lifetime.signal
+            });
+            const data = await response.labData() as {html?: string};
+            if (!response.ok || !data.html || this.lifetime.signal.aborted) return;
+            let source = document.getElementById('homeSky');
+            if (!source) {
+                source = document.createElement('span');
+                source.id = 'homeSky';
+                source.hidden = true;
+                document.body.append(source);
+            }
+            source.innerHTML = data.html;
+            const mode = WorksheetWorkspace.mode.currentMode();
+            if (mode === 'datetime' || mode === 'almanac') WorksheetWorkspace.presentation.setStatus('Ready');
+        } catch {
+            // Keep the last native home reading during a transient transport failure.
+        } finally {
+            this.homeSkyPending = false;
+        }
     }
 
     /** @brief Subscribe a resize callback once by identity and retain it for disposal. */
@@ -446,6 +478,8 @@ class LabApplication {
         this.observers.length = 0;
         window.clearInterval(this.refreshTimer);
         this.refreshTimer = undefined;
+        window.clearInterval(this.homeSkyTimer);
+        this.homeSkyTimer = undefined;
         for (const callback of this.resizeCallbacks)
             this.resizeTarget.removeEventListener('resize', callback);
         this.resizeCallbacks.clear();

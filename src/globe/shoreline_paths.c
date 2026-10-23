@@ -97,7 +97,7 @@ static bool coast_display_ring(const coast_geometry_t *geometry, const coast_rin
     for (uint32_t i = 0; path->ok && i < count; ++i) {
         uint32_t index = display->lod < 0 ? ring->first + i : geometry->lod[ring->lod_first[display->lod] + i];
         coast_vertex_t vertex = geometry->vertices[index];
-        coast_point_t point = {vertex.x * 0.000001 - display->wrap * 360, vertex.y * 0.000001};
+        coast_point_t point = {vertex.x - display->wrap * 360, vertex.y};
         coast_feed(path, 0, point);
     }
     coast_finish(path);

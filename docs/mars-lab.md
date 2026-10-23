@@ -112,6 +112,8 @@ Jurisdiction search indexes the aliases “United Kingdom” and “UK” for th
 constituent-country entries, even where the displayed label uses “Britain”. Partial
 searches match these aliases through the existing suffix index; labels and selection
 codes remain unchanged. Crown Dependencies are not included in that alias.
+The bounded index and its allocation/size-limit fallback share the same native
+search-text builder, so aliases remain available when an index cannot be retained.
 
 The flag cache, coordinate-country cache, town catalogue, menu indexes and border
 geometry each own their mutable state in a private singleton. Their public entry
@@ -594,8 +596,10 @@ camera orientation and zoom, including after asynchronous country lookup and
 evaluation. Selecting a location through the dropdown still centres the globe.
 “Centre on observer” returns to the entered location without resetting zoom.
 “Borders: off/on” optionally adds indicative shared country land borders. Visible
-regions load asynchronously; borders fade at close zoom and their native geometry is
-released at 64× zoom or when switched off. Administrative coastlines are not drawn.
+regions load asynchronously; borders fade at close zoom and are hidden at 64× zoom
+or when switched off. The last bounded native region remains cached, so switching
+back on or zooming back out reuses it immediately when it covers the view. Identical
+in-flight requests are shared rather than restarted. Administrative coastlines are not drawn.
 Borders are a true SVG overlay with a one-CSS-pixel, non-scaling stroke, not a
 rasterised texture. Native WebAssembly owns the segment array and projects it using
 the globe camera, including roll, clipping at the horizon and viewport. Long arcs
@@ -606,8 +610,53 @@ The `/almanac-borders` endpoint accepts `format: "segments"` for decimal geograp
 segments. `lab_globe_borders_load`, `lab_globe_borders_path` and
 `lab_globe_borders_clear` own, project and release this display-only WASM cache;
 input and generated path text each have a 16 MiB ceiling.
+`lab_globe_borders_load_region` publishes geometry and coverage atomically;
+`lab_globe_borders_covers` makes the geographic reuse decision in WebAssembly,
+including longitude wrapping. JavaScript only coordinates transport and display.
+The selected jurisdiction field shows its name and flag without a redundant hover tooltip;
+town and globe tooltips remain available.
+The status line omits precision in DateTime and Almanac. Both use the same independent
+home-origin card: current Moon image, today's sunset and sunrise, current local date/time
+and the setup jurisdiction's available flag. The origin comes from calendar setup's
+singleton location, coordinates and timezone, never the worksheet or browser language.
+The compact header groups the Moon and solar clocks on its first row, with local date/time
+and flag below. The clock explicitly shows its GMT offset and omits fractional seconds.
+On desktop, both calendar modes align the top of this card with the Mobile button;
+mathematical modes retain their existing header layout.
+The page title stays top-aligned with the same responsive top padding in every mode,
+independently of status-card height or subtitle wrapping.
+Wide calendar layouts place this pair beside the toolbar's unused right-hand area,
+reducing the gap above the result panel; narrower layouts retain normal document flow.
+Mobile layouts (900 pixels wide or less) omit the home-sky card entirely.
+Native ephemerides supply the current Moon's phase and home-relative orientation. Solar
+clocks use the native approximation, marked “≈”, with zoneinfo conversion at each event
+and local-date matching across midnight and daylight-saving changes. Polar conditions
+remain explicit. An absent setup origin is reported rather than guessed from a dropdown.
+The browser fetches opaque native markup from `/home-sky` on startup and once per minute;
+no browser astronomy is performed. Refreshes do not overlap and stop at page disposal.
+Transient transport failures retain the last reading. Worksheet selections and weather
+requests do not change the home card or trigger extra home calculations.
+Switching modes resets the status immediately; mathematical modes never retain
+the previous calendar's sky image or text while waiting for their next result.
+Returning to a retained calendar result restores its sky strip alongside the cards,
+without requiring another evaluation.
+Displaying this card does not require a worksheet calculation.
+Mode-switch input focus preserves the page's scroll position; entering Almanac does not
+scroll down to the date controls below the globe.
 The detailed shoreline remains unchanged. These generalised boundaries are not
 surveyed or legally definitive.
+
+Browser/native responsibility audit: globe marker collision admission, selected-label
+clamping, viewport projection and coordinate formatting now run in WebAssembly.
+`lab_globe_markers_begin` resets a fixed, approximately 44 KiB direct-indexed bitmap;
+`lab_globe_markers_place` admits each candidate through its serialised native owner.
+The collision grid is no longer represented by JavaScript string-key sets or cell arrays.
+Candidate ordering is unchanged: this migration does not yet prioritise capitals.
+Nearby-town query reuse also uses native geographic coverage, including longitude
+wrapping across the date line, through `lab_globe_nearby_covers`.
+JavaScript retains DOM-node indexes, event subscriptions, request cancellation,
+opaque native-result metadata and GPU/browser layout plumbing. Those collections
+are not evidence of JavaScript performing algebra or geographic computation.
 
 When the selected position is confidently on land and its country can be identified,
 the observer tooltip and AstroNav Navigation Almanac card show its country name
@@ -1850,6 +1899,8 @@ Each mode retains its most recent editor text, binding values and controls
 between sessions. Input events save an in-progress edit as well as a submitted
 calculation, so moving between modes or restarting the Lab does not restore an
 older expression or equation.
+The precision toolbar is hidden in Datetime and Almanac modes, where it does not
+apply. Returning to a mathematical mode restores it without changing saved precision.
 The precision slider changes the working precision used by the mathematical
 helpers. Its native-defined positions start at 53 bits (binary64), then 106 bits,
 then 192 bits, followed by equal 64-bit steps through 6,656 bits. The maximum displays 2,004

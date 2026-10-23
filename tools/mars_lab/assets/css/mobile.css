@@ -5,6 +5,39 @@
   gap: 0.55rem;
 }
 
+/* Calendar information and the Mobile disclosure share one top-aligned desktop row. */
+@media (min-width: 901px) {
+  body:is(.almanac-mode, .datetime-mode) .header-side {
+    grid-template-columns: auto auto;
+    align-items: start;
+    column-gap: 1rem;
+  }
+
+  body:is(.almanac-mode, .datetime-mode) .header-side > .status {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  body:is(.almanac-mode, .datetime-mode) .header-side > .mobile-card {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+  }
+}
+
+/* The wide calendar toolbar leaves its right side free for the home card. */
+@media (min-width: 1600px) {
+  body:is(.almanac-mode, .datetime-mode) .header-side {
+    transform: translateY(4.5rem);
+  }
+
+  body:is(.almanac-mode, .datetime-mode) main {
+    row-gap: 0.65rem;
+  }
+}
+
 .mobile-card {
   position: relative;
   z-index: 30;

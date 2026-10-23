@@ -148,6 +148,10 @@ STATIC_LIB := $(BUILD_DIR)/libmars.a
 SHARED_LIB := $(BUILD_DIR)/libmars.so
 
 # Test-only native protocol peers; OpenSSL is not an additional MARS link requirement.
+
+$(TEST_BUILD_DIR)/shoreline/check_shoreline_precision: tests/shoreline/check_shoreline_precision.c $(STATIC_LIB)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 HTTP_FIXTURE_BIN := $(TEST_BUILD_DIR)/http/fixtures/http_fixture
 HTTP_FIXTURE_SRCS := $(sort $(wildcard tests/http/fixtures/*.c))
 HTTP_FIXTURE_CFLAGS := $(shell pkg-config --cflags openssl 2>/dev/null)

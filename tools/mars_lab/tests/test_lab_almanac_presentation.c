@@ -3,8 +3,9 @@
  * @brief Native almanac visibility, clipboard and event presentation regressions.
  *
  * Uses the controlled calendar test facade with synthetic native response trees.
- * No ephemeris, worker, network or browser is required. Verifies local-toggle
- * variants, original action preservation, time fallback and bounded publication.
+ * Verifies local-toggle variants, original action preservation, time fallback and
+ * bounded publication. Home-sky checks additionally use native zoneinfo and available
+ * configured ephemerides; no weather, network or browser is required.
  */
 #include <string.h>
 
@@ -439,9 +440,66 @@ static void test_lab_eclipse_previews(void)
     TEST_ASSERT_TRUE(ok, "solar/lunar overlap geometry, observer tilt and missing-data handling remain native SVG");
 }
 
+static void test_lab_sky_status(void)
+{
+    json_t *response = test_lab_json(
+        "{\"fields\":{\"date\":\"2026-10-22\",\"time\":\"19:00:20.0\"},"
+        "\"observer_latitude\":\"52.7\",\"observer_longitude\":\"-2.75\","
+        "\"all_rows\":[{\"code\":\"MOON\",\"phase\":\"60\",\"right_ascension_hours\":\"10\","
+        "\"declination_degrees\":\"5\",\"gha_degrees\":\"30\"},{\"code\":\"SUN\","
+        "\"right_ascension_hours\":\"14\",\"declination_degrees\":\"-10\"}],"
+        "\"observer_summary\":[{\"label\":\"Location\",\"value\":\"England & point\","
+        "\"flag\":\"data:image/svg+xml;base64,PHN2Zy8+\"}]}" );
+    string_t *html = lab_cal_sky_markup(response, true);
+    const char *text = html ? string_c_str(html) : "";
+    const char *moon = strstr(text, "almanac-moon-phase"), *set = strstr(text, "Sunset ");
+    const char *rise = strstr(text, "Sunrise "), *moment = strstr(text, "2026-10-22 19:00:20 GMT");
+    const char *flag = strstr(text, "class=\"country-flag\"");
+    bool ok = moon && set && rise && moment && flag && moon < set && set < rise && rise < moment && moment < flag &&
+              strstr(text, "England &amp; point") && strstr(text, "75.0% illuminated") &&
+              strstr(text, "Selected time") && strstr(text, "sky-status-value") && !strstr(text, "19:00:20.0");
+    string_free(html);
+    lab_cal_set(response, "observer_latitude", "90");
+    html = lab_cal_sky_markup(response, true);
+    ok = ok && html && strstr(string_c_str(html), "polar night");
+    string_free(html);
+    lab_cal_set(response, "observer_latitude", "nan");
+    html = lab_cal_sky_markup(response, true);
+    ok = ok && html && strstr(string_c_str(html), "unavailable");
+    string_free(html);
+    json_free(response);
+    response = test_lab_json("{\"fields\":{\"date\":\"2026-10-22\",\"sunset\":\"18:20\","
+                             "\"sunrise\":\"07:10\",\"moon_phase\":\"Waxing Crescent\"}}");
+    html = lab_cal_sky_markup(response, false);
+    ok = ok && html && strstr(string_c_str(html), "🌒") && strstr(string_c_str(html), "18:20") &&
+         strstr(string_c_str(html), "07:10") && !strstr(string_c_str(html), "country-flag");
+    string_free(html);
+    json_free(response);
+    json_t *origin = test_lab_json("{\"location\":\"Home & origin\",\"jurisdiction\":\"GB-ENG\","
+        "\"latitude\":\"52.7077\",\"longitude\":\"-2.7541\",\"timezone\":\"Europe/London\"}");
+    html = lab_cal_home_markup(origin, (time_t)1792670400);
+    ok = ok && html && strstr(string_c_str(html), "2026-10-22 13:00:00 GMT+01:00") &&
+         strstr(string_c_str(html), "Home &amp; origin") && strstr(string_c_str(html), "Sunset · local") &&
+         strstr(string_c_str(html), "almanac-moon-phase") &&
+         strstr(string_c_str(html), "local zenith up") &&
+         !strstr(string_c_str(html), "Selected time");
+    string_free(html);
+    html = lab_cal_home_markup(origin, (time_t)1797940800);
+    ok = ok && html && strstr(string_c_str(html), "2026-12-22 12:00:00 GMT+00:00") &&
+         strstr(string_c_str(html), "almanac-moon-phase");
+    string_free(html);
+    lab_cal_set(origin, "timezone", "missing/origin");
+    html = lab_cal_home_markup(origin, (time_t)1792670400);
+    ok = ok && !html;
+    string_free(html);
+    json_free(origin);
+    TEST_ASSERT_TRUE(ok, "native sky strip preserves Moon orientation, clock order, flags, polar states and escaping");
+}
+
 /* Register bounded almanac presentation checks before README examples. */
 void test_lab_almanac_presentation_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_lab_sky_status, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_variants, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_symbols, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_star_sizes, tests, NULL);

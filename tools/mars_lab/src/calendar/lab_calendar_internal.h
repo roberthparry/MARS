@@ -19,6 +19,12 @@
 
 #include "lab_calendar.h"
 
+/** @brief Render current setup-origin sky information at a supplied UTC instant for native tests and the header route. */
+string_t *lab_cal_home_markup(const json_t *origin, time_t now);
+
+/** @brief Read the installed setup origin and return the current independent home-sky header. */
+json_t *lab_cal_home_sky(void);
+
 /** @brief Resolve submitted town metadata or the packaged catalogue to an owned IANA zone name. */
 string_t *lab_cal_town_timezone(const json_t *options);
 
@@ -157,6 +163,12 @@ bool lab_cal_almanac_presentation(json_t *response);
 
 /** @brief Append a body glyph or phase disc using borrowed Sun and worksheet observer data for orientation. */
 bool lab_cal_body_symbol(string_t *out, const json_t *row, const json_t *sun, const json_t *observer);
+
+/** @brief Escape variable text for native HTML content or quoted attributes. */
+bool lab_cal_markup_text(string_t *out, const char *value);
+
+/** @brief Build a hidden native sky-strip template from completed result data; caller frees the string. */
+string_t *lab_cal_sky_markup(const json_t *response, bool almanac);
 
 /** @brief Append a maximum-eclipse SVG from native event geometry; omit it if geometry is unavailable. */
 bool lab_cal_eclipse_symbol(string_t *out, const json_t *event);

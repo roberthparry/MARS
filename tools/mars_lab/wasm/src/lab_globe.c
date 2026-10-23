@@ -17,6 +17,14 @@ static double globe_longitude(double longitude)
     return longitude - 360 * floor((longitude + 180) / 360);
 }
 
+/* Reuse nearby-town coverage using geographic longitude wrapping, not host arithmetic. */
+bool lab_globe_nearby_covers(double latitude, double longitude, double cached_latitude, double cached_longitude)
+{
+    return isfinite(latitude) && isfinite(longitude) && isfinite(cached_latitude) && isfinite(cached_longitude) &&
+           fabs(latitude) <= 90 && fabs(cached_latitude) <= 90 && fabs(longitude) <= 180 && fabs(cached_longitude) <= 180 &&
+           fabs(latitude - cached_latitude) < 1 && fabs(globe_longitude(longitude - cached_longitude)) < 1;
+}
+
 static void globe_result(const double *values, unsigned count)
 {
     jsref result = lab_dom_object(LAB_VALUE_ARRAY);

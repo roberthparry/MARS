@@ -3046,6 +3046,43 @@
             await labApplication.townsReady;
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('select-check') === '1') {
+                await runBrowserGroup('real DateTime sky header', async () => {
+                    const originalMode = WorksheetWorkspace.mode.currentMode();
+                    await labApplication.refreshHomeSky();
+                    WorksheetWorkspace.mode.setMode('datetime');
+                    WorksheetWorkspace.presentation.syncModeUI();
+                    const response = await labHttp.fetch('/datetime-eval', {
+                        method: 'POST',
+                        body: labWire.encode({date: '2026-10-22', start: '2026-01-01', end: '2027-01-01',
+                            year: '2026', latitude: '52.7077', longitude: '-2.7541', gmt_offset: '1',
+                            elevation: '75', jurisdiction: 'GB-ENG'})
+                    });
+                    const data = await response.labData() as LabTestCalendarEvaluation;
+                    check(response.ok && data.ok, 'Real DateTime response succeeds');
+                    await WorksheetRequests.evaluation.installEvaluationResult(5, data);
+                    WorksheetWorkspace.presentation.setStatus('Ready');
+                    const home = document.getElementById('homeSky')!;
+                    check(Boolean(home) && WorksheetContext.statusEl.innerHTML === home.innerHTML,
+                          'Real DateTime response shows the independent home header');
+                    const homeMarkup = home.innerHTML;
+                    await window.checkLabMobileLayout('DateTime home header spacing', true);
+                    WorksheetWorkspace.mode.setMode(originalMode);
+                    WorksheetWorkspace.presentation.syncModeUI();
+                    delete WorksheetWorkspace.presentation.resultStates.datetime;
+                    await WorksheetWorkspace.mode.selectWorksheetMode('datetime');
+                    check(WorksheetContext.statusEl.innerHTML === homeMarkup,
+                          'DateTime mode entry preserves the independent home header');
+                    window.scrollTo(0, 0);
+                    await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
+                    check(window.scrollY < 1 && document.activeElement === WorksheetContext.almanacDate,
+                          'Entering Almanac focuses its date without scrolling below the globe');
+                    check(WorksheetContext.statusEl.innerHTML === homeMarkup,
+                          'Almanac uses the same home origin rather than its selected observer');
+                    await window.checkLabMobileLayout('Almanac home header spacing', true);
+                    WorksheetWorkspace.mode.setMode(originalMode);
+                    WorksheetWorkspace.presentation.syncModeUI();
+                });
+                await runBrowserGroup('checkLabWeather', window.checkLabWeather);
                 await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
                 await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
                 await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);

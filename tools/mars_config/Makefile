@@ -30,6 +30,9 @@ $(CONFIG_BUILD_DIR)/coastline_stage: tools/mars_config/coastline_stage.c $(STATI
 $(CONFIG_BUILD_DIR)/coastline_review: tools/mars_config/coastline_review.c $(STATIC_LIB)
 	$(CC) $(CFLAGS) $(INCLUDES) $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
 
+$(CONFIG_BUILD_DIR)/coastline_repair: tools/mars_config/coastline_repair.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
+
 $(CONFIG_BUILD_DIR)/%.o: tools/mars_config/src/%.c tools/mars_config/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_config/include \

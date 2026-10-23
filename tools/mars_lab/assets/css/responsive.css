@@ -1,5 +1,13 @@
 /* Tablet and phone overrides; must follow the component styles. */
 @media (max-width: 900px) {
+  body:is(.almanac-mode, .datetime-mode) .status:has(.sky-status-strip) {
+    display: none;
+  }
+
+  body:is(.almanac-mode, .datetime-mode) .header-side:has(.sky-status-strip) {
+    margin-top: 0;
+  }
+
   .mobile-card {
     display: none;
   }

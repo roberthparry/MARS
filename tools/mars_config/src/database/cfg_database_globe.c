@@ -207,7 +207,34 @@ typedef struct {
     osm_vertex_t *vertices;
     size_t capacity;
     locale_t numeric_locale;
+    sqlite_t *checkpoint_db;
+    int phase;
+    int64_t last_chunk, source_points, replay_records, seen_records;
 } osm_river_import_t;
+
+/* Persist geometry and its exact resume cursor in the same durable transaction. */
+static bool osm_checkpoint(osm_river_import_t *state)
+{
+    if (!state->checkpoint_db) return true;
+    sqlite_stmt_t *save = sqlite_stmt_prepare(state->checkpoint_db,
+        "update rivers_stage set phase=?1,last_chunk=?2,records=?3,chunks=?4,features=?5,points=?6,"
+        "narrow_sections=?7,unknown_width_sections=?8,source_points=?9 where id=1");
+    bool ok = save && sqlite_stmt_bind_int(save, 1, state->phase) &&
+        sqlite_stmt_bind_int64(save, 2, state->last_chunk) && sqlite_stmt_bind_int64(save, 3, state->records) &&
+        sqlite_stmt_bind_int64(save, 4, state->chunks) && sqlite_stmt_bind_int64(save, 5, state->features) &&
+        sqlite_stmt_bind_int64(save, 6, state->points) && sqlite_stmt_bind_int64(save, 7, state->narrow_sections) &&
+        sqlite_stmt_bind_int64(save, 8, state->unknown_width_sections) &&
+        sqlite_stmt_bind_int64(save, 9, state->source_points) && sqlite_stmt_step(save) == SQLITE_STEP_DONE;
+    sqlite_stmt_finalize(save);
+    ok = ok && sqlite_exec_cstr(state->checkpoint_db, "commit;begin immediate");
+    if (ok) {
+        printf("River checkpoint: phase %d, records %lld, chunk %lld/%lld, points %lld.\n", state->phase,
+               (long long)state->records, (long long)state->last_chunk, (long long)state->chunks,
+               (long long)state->points);
+        fflush(stdout);
+    }
+    return ok;
+}
 
 /* Match the finest shoreline trial budget, not a fixed spacing or a vertex quota. */
 static const double cfg_river_storage_metres = 8.0;
@@ -627,14 +654,16 @@ static bool osm_line(osm_river_import_t *s, const json_t *feature, const osm_rec
     return true;
 }
 
-static bool osm_anchors(sqlite_t *db)
+static bool osm_anchors(sqlite_t *db, osm_river_import_t *state)
 {
-    sqlite_stmt_t *rows = sqlite_stmt_prepare(db, "select id,node_ids from rivers_chunk order by id");
+    sqlite_stmt_t *rows = sqlite_stmt_prepare(db, "select id,node_ids from rivers_chunk where id>?1 order by id");
     sqlite_stmt_t *count = sqlite_stmt_prepare(db, "select uses from rivers_node_use where id=?1");
     sqlite_stmt_t *update = sqlite_stmt_prepare(db, "update rivers_chunk set anchors=?1,node_ids=NULL where id=?2");
-    bool ok = rows && count && update;
+    bool ok = rows && count && update && sqlite_stmt_bind_int64(rows, 1, state->last_chunk);
     sqlite_step_result_t step = SQLITE_STEP_DONE;
     while (ok && (step = sqlite_stmt_step(rows)) == SQLITE_STEP_ROW) {
+        if (state->last_chunk && state->last_chunk % 1000 == 0 && !osm_checkpoint(state)) { ok = false; break; }
+        state->last_chunk = sqlite_stmt_column_int64(rows, 0);
         size_t bytes = sqlite_stmt_column_bytes(rows, 1), n = bytes / 8;
         const unsigned char *p = sqlite_stmt_column_blob(rows, 1);
         unsigned char anchors[257];
@@ -736,16 +765,18 @@ static bool cfg_river_neighbours(sqlite_stmt_t *query, int64_t chunk, cfg_river_
 }
 
 /* Reduce the candidate, never the source extract; anchors and whole-feature identities survive unchanged. */
-static bool cfg_river_simplify(sqlite_t *db, int64_t *points)
+static bool cfg_river_simplify(sqlite_t *db, osm_river_import_t *state)
 {
-    sqlite_stmt_t *rows = sqlite_stmt_prepare(db, "select id,vertices,anchors from rivers_chunk order by id");
+    sqlite_stmt_t *rows = sqlite_stmt_prepare(db, "select id,vertices,anchors from rivers_chunk where id>?1 order by id");
     sqlite_stmt_t *update = sqlite_stmt_prepare(db, "update rivers_chunk set vertices=?1,anchors=?2 where id=?3");
     sqlite_stmt_t *neighbours = sqlite_stmt_prepare(db,
         "select c.vertices from rivers_bounds b join rivers_chunk c on c.id=b.id "
         "where b.id<>?1 and b.min_x<=?2 and b.max_x>=?3 and b.min_y<=?4 and b.max_y>=?5 limit 129");
-    bool ok = rows && update && neighbours;
+    bool ok = rows && update && neighbours && sqlite_stmt_bind_int64(rows, 1, state->last_chunk);
     sqlite_step_result_t step = SQLITE_STEP_DONE;
     while (ok && (step = sqlite_stmt_step(rows)) == SQLITE_STEP_ROW) {
+        if (state->last_chunk && state->last_chunk % 1000 == 0 && !osm_checkpoint(state)) { ok = false; break; }
+        state->last_chunk = sqlite_stmt_column_int64(rows, 0);
         size_t bytes = sqlite_stmt_column_bytes(rows, 1), n = bytes / 8;
         const unsigned char *v = sqlite_stmt_column_blob(rows, 1), *a = sqlite_stmt_column_blob(rows, 2);
         if (!v || !a || n < 2 || n > 257 || bytes % 8 || sqlite_stmt_column_bytes(rows, 2) != n) {
@@ -780,7 +811,7 @@ static bool cfg_river_simplify(sqlite_t *db, int64_t *points)
         ok = sqlite_stmt_bind_blob(update, 1, vertices, used * 8) &&
              sqlite_stmt_bind_blob(update, 2, anchors, used) &&
              sqlite_stmt_bind_int64(update, 3, sqlite_stmt_column_int64(rows, 0)) && osm_step(update);
-        if (ok) *points -= (int64_t)(n - used);
+        if (ok) state->points -= (int64_t)(n - used);
     }
     sqlite_stmt_finalize(rows); sqlite_stmt_finalize(update); sqlite_stmt_finalize(neighbours);
     return ok && step == SQLITE_STEP_DONE;
@@ -793,6 +824,7 @@ static bool osm_records_feed(osm_river_import_t *state, string_t *record, const 
             if (string_byte_length(record)) return false;
         } else if (input[i] == '\n') {
             if (string_byte_length(record)) {
+                if (state->seen_records++ < state->replay_records) { string_clear(record); continue; }
                 const char *p = string_c_str(record), *end = p + string_byte_length(record);
                 osm_record_t parsed = {.copied = p, .metadata = string_new()};
                 bool ok = parsed.metadata && osm_json_scan(&p, end, 0, 1, &parsed);
@@ -809,7 +841,9 @@ static bool osm_records_feed(osm_river_import_t *state, string_t *record, const 
                     return false;
                 }
                 string_clear(record);
-                if (++state->records % 100000 == 0) {
+                ++state->records;
+                if (state->records % 10000 == 0 && !osm_checkpoint(state)) return false;
+                if (state->records % 100000 == 0) {
                     printf("River input: %lld records, %lld sections retained, %lld narrow sections omitted.\n",
                            (long long)state->records, (long long)state->features, (long long)state->narrow_sections);
                     fflush(stdout);
@@ -914,14 +948,15 @@ bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source)
         fflush(stdout);
     }
     phase = cfg_river_seconds();
-    if (ok) ok = osm_anchors(db);
+    if (ok) ok = osm_anchors(db, &state);
     if (ok) {
         printf("River junctions complete in %.1f s.\n", cfg_river_seconds() - phase);
         fflush(stdout);
     }
     int64_t source_points = state.points;
     cfg_progress_t *progress = ok ? cfg_progress_start("Reducing stored rivers to shoreline detail") : NULL;
-    if (ok) ok = cfg_river_simplify(db, &state.points);
+    state.last_chunk = 0;
+    if (ok) ok = cfg_river_simplify(db, &state);
     cfg_progress_finish(progress, ok);
     if (ok) {
         sqlite_stmt_t *meta = sqlite_stmt_prepare(db,
@@ -939,8 +974,85 @@ bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source)
     return ok;
 }
 
-/* Build a candidate separately from the working globe database. */
-int cfg_globe_river_stage(const char *input_path, const char *output_path)
+/* Resume only our versioned staging format; publication metadata appears at completion alone. */
+static bool osm_stage_run(sqlite_t *db, file_t *source, const char *digest, bool resume)
+{
+    bool ok = sqlite_exec_cstr(db, "begin immediate");
+    if (ok && !resume) {
+        ok = sqlite_exec_cstr(db,
+            "create table rivers_stage(id integer primary key,version integer,source_sha256 text,phase integer,"
+            "last_chunk integer,records integer,chunks integer,features integer,points integer,narrow_sections integer,"
+            "unknown_width_sections integer,source_points integer);"
+            "create table rivers_dataset(id integer primary key,format_version integer,source text,point_count integer,"
+            "feature_count integer,source_point_count integer,storage_tolerance_metres real);"
+            "create table rivers_chunk(id integer primary key,feature_id integer,kind integer,vertices blob,node_ids blob,anchors blob);"
+            "create index rivers_feature_chunks on rivers_chunk(feature_id,id);"
+            "create virtual table rivers_bounds using rtree_i32(id,min_x,max_x,min_y,max_y);"
+            "create table rivers_node_use(id integer primary key,uses integer not null)");
+        sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db,
+            "insert into rivers_stage values(1,1,?1,0,0,0,0,0,0,0,0,0)") : NULL;
+        ok = insert && sqlite_stmt_bind_text(insert, 1, digest) && sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
+        sqlite_stmt_finalize(insert);
+    }
+    osm_river_import_t state = {.checkpoint_db = db};
+    sqlite_stmt_t *saved = ok ? sqlite_stmt_prepare(db,
+        "select phase,last_chunk,records,chunks,features,points,narrow_sections,unknown_width_sections,source_points "
+        "from rivers_stage where id=1 and version=1 and source_sha256=?1") : NULL;
+    ok = saved && sqlite_stmt_bind_text(saved, 1, digest) && sqlite_stmt_step(saved) == SQLITE_STEP_ROW;
+    if (ok) {
+        state.phase = sqlite_stmt_column_int(saved, 0);
+        state.last_chunk = sqlite_stmt_column_int64(saved, 1);
+        state.records = sqlite_stmt_column_int64(saved, 2);
+        state.chunks = sqlite_stmt_column_int64(saved, 3);
+        state.features = sqlite_stmt_column_int64(saved, 4);
+        state.points = sqlite_stmt_column_int64(saved, 5);
+        state.narrow_sections = sqlite_stmt_column_int64(saved, 6);
+        state.unknown_width_sections = sqlite_stmt_column_int64(saved, 7);
+        state.source_points = sqlite_stmt_column_int64(saved, 8);
+        state.replay_records = state.records;
+        ok = state.phase >= 0 && state.phase <= 3 && state.last_chunk >= 0 &&
+             state.last_chunk <= state.chunks && state.records >= 0 && state.points >= 0;
+    }
+    sqlite_stmt_finalize(saved);
+    if (ok) ok = osm_checkpoint(&state);
+    if (ok && state.phase == 0) {
+        state.numeric_locale = newlocale(LC_NUMERIC_MASK, "C", (locale_t)0);
+        state.chunk = sqlite_stmt_prepare(db, "insert into rivers_chunk values(?1,?2,?3,?4,?5,NULL)");
+        state.bounds = sqlite_stmt_prepare(db, "insert into rivers_bounds values(?1,?2,?3,?4,?5)");
+        state.node = sqlite_stmt_prepare(db,
+            "insert into rivers_node_use values(?1,1) on conflict(id) do update set uses=2");
+        ok = state.numeric_locale && state.chunk && state.bounds && state.node && osm_records_read(&state, source) &&
+             state.seen_records >= state.replay_records;
+        free(state.vertices);
+        if (state.numeric_locale) freelocale(state.numeric_locale);
+        sqlite_stmt_finalize(state.chunk); sqlite_stmt_finalize(state.bounds); sqlite_stmt_finalize(state.node);
+        state.source_points = state.points;
+        state.phase = 1; state.last_chunk = 0;
+        if (ok) ok = osm_checkpoint(&state);
+    }
+    if (ok && state.phase == 1) {
+        ok = osm_anchors(db, &state);
+        state.phase = 2; state.last_chunk = 0;
+        if (ok) ok = osm_checkpoint(&state);
+    }
+    if (ok && state.phase == 2) {
+        ok = cfg_river_simplify(db, &state);
+        sqlite_stmt_t *meta = ok ? sqlite_stmt_prepare(db,
+            "insert into rivers_dataset values(1,2,'OpenStreetMap centreline export / ODbL',?1,?2,?3,8)") : NULL;
+        ok = meta && sqlite_stmt_bind_int64(meta, 1, state.points) &&
+             sqlite_stmt_bind_int64(meta, 2, state.features) && sqlite_stmt_bind_int64(meta, 3, state.source_points) &&
+             sqlite_stmt_step(meta) == SQLITE_STEP_DONE;
+        sqlite_stmt_finalize(meta);
+        if (ok) ok = sqlite_exec_cstr(db, "drop table rivers_node_use");
+        state.phase = 3;
+        if (ok) ok = osm_checkpoint(&state);
+    }
+    if (ok) ok = sqlite_exec_cstr(db, "commit");
+    else sqlite_exec_cstr(db, "rollback");
+    return ok;
+}
+
+static int cfg_globe_river_stage_run(const char *input_path, const char *output_path, bool resume)
 {
     string_t *home = cfg_storage_home();
     string_t *config_path = home ? string_sprintf("%s/config/globe-db.env", string_c_str(home)) : NULL;
@@ -950,16 +1062,17 @@ int cfg_globe_river_stage(const char *input_path, const char *output_path)
                     config ? cfg_storage_setting(config, "MARS_GLOBE_DB_KEY") : NULL;
     file_t *input = file_new_cstr(input_path), *output = file_new_cstr(output_path);
     string_t *path = string_new_with(output_path);
-    bool ok = key && string_byte_length(key) && input && output && path && file_open_read(input);
-    if (ok) ok = file_open(output, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
+    string_t *digest = input ? file_sha256(input) : NULL;
+    bool ok = key && string_byte_length(key) && input && output && path && digest && file_open_read(input);
+    if (ok) ok = resume ? file_exists(output) : file_open(output, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
     if (output && file_is_open(output)) ok = file_close(output) && ok;
-    if (ok) ok = file_chmod(output, 0600);
+    if (ok && !resume) ok = file_chmod(output, 0600);
     sqlite_t *db = ok ? sqlite_open_encrypted(path, key) : NULL;
     ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-8192;PRAGMA temp_store=FILE;PRAGMA temp.cache_size=-1024;");
     if (ok) {
         puts("Staging rivers with an 8 m error ceiling and a 3.8 GB final size limit; installed globe unchanged.");
         fflush(stdout);
-        ok = cfg_database_import_osm_rivers(db, input);
+        ok = osm_stage_run(db, input, string_c_str(digest), resume);
     }
     if (ok) ok = sqlite_exec_cstr(db, "VACUUM") && cfg_river_candidate_fits(db, cfg_database_river_storage_budget);
     sqlite_stmt_t *totals = ok ? sqlite_stmt_prepare(db,
@@ -982,10 +1095,22 @@ int cfg_globe_river_stage(const char *input_path, const char *output_path)
     sqlite_stmt_finalize(check);
     sqlite_close(db);
     file_free(input); file_free(output); file_free(config);
-    string_free(path); string_free(key); string_free(config_path); string_free(home);
+    string_free(path); string_free(key); string_free(config_path); string_free(home); string_free(digest);
     if (ok) puts("Encrypted river candidate ready for geographic review; not installed.");
     else fputs("River candidate failed; installed globe unchanged. Do not install the failed candidate.\n", stderr);
     return ok ? 0 : 1;
+}
+
+/* Build a fresh checkpointed candidate without touching the installed globe. */
+int cfg_globe_river_stage(const char *input_path, const char *output_path)
+{
+    return cfg_globe_river_stage_run(input_path, output_path, false);
+}
+
+/* Resume only a matching-source checkpointed candidate, never an arbitrary database. */
+int cfg_globe_river_resume(const char *input_path, const char *output_path)
+{
+    return cfg_globe_river_stage_run(input_path, output_path, true);
 }
 
 static bool cfg_river_step(sqlite_stmt_t *q)

@@ -314,6 +314,10 @@ static json_t *lab_cal_location(const json_t *options, unsigned *status)
 json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *status)
 {
     const char *path = route ? string_c_str(route) : "";
+    if (!strcmp(path, "/home-sky")) {
+        if (status) *status = 200;
+        return lab_cal_home_sky();
+    }
     if (!strcmp(path, "/almanac-globe"))
         return lab_cal_globe(payload, status);
     if (!strcmp(path, "/almanac-country"))

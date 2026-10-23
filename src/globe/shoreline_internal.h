@@ -17,8 +17,8 @@
 #error "Private header requires MARS_SHORELINE_INTERNAL_ACCESS."
 #endif
 
-/** @brief Exact stored coordinate; boundary marks the preceding edge as physical rather than a polar closure. */
-typedef struct { int32_t x, y; } coast_vertex_t;
+/** @brief Decoded coordinate in degrees; binary64 inputs retain their original precision. */
+typedef struct { double x, y; } coast_vertex_t;
 
 /** @brief Immutable polygon metadata and four display-only index ranges. */
 typedef struct {
@@ -92,7 +92,18 @@ typedef struct _shoreline_t {
 /** @brief Stable stored encoding for an independently readable coordinate chunk. */
 typedef enum _shoreline_codec_t {
     SHORELINE_CODEC_RAW = 0, /**< Big-endian signed 32-bit coordinate pairs. */
-    SHORELINE_CODEC_ZSTD     /**< One complete Zstandard frame of those coordinate pairs. */
+    SHORELINE_CODEC_ZSTD,    /**< One complete Zstandard frame of those coordinate pairs. */
+    SHORELINE_CODEC_F64,     /**< Big-endian IEEE binary64 longitude/latitude pairs, in degrees. */
+    SHORELINE_CODEC_F64_ZSTD /**< One complete Zstandard frame of binary64 coordinate pairs. */
 } shoreline_codec_t;
+
+/** @brief Return the coordinate-pair width, or zero for an unknown codec. */
+size_t coast_codec_stride(int codec);
+
+/** @brief Decode one validated coordinate pair into degrees without reducing binary64 precision. */
+bool coast_decode_vertex(const unsigned char *bytes, int codec, coast_vertex_t *vertex);
+
+/** @brief Encode one binary64 value in machine-independent big-endian order. */
+void coast_encode_double(unsigned char *bytes, double value);
 
 #endif

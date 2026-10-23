@@ -38,6 +38,9 @@ void lab_globe_rotate(quaternion_jsref orientation, double zoom, double dx, doub
  */
 void lab_globe_project(double latitude, double longitude, quaternion_jsref orientation);
 
+/** @brief Test whether a completed nearby-town query covers a centre within one degree, including the date line. */
+bool lab_globe_nearby_covers(double latitude, double longitude, double cached_latitude, double cached_longitude);
+
 /**
  * @brief Resolve a visible globe position to geographic coordinates.
  * @param x Horizontal displacement divided by globe radius.

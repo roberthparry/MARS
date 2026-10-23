@@ -1127,7 +1127,7 @@ namespace WorksheetPersistence {
         // --- Editor focus and completion ---
         /** @brief Focus the worksheet source editor. */
         stateFocusEditor() {
-            return WorksheetContext.expr.focus();
+            return WorksheetContext.expr.focus({preventScroll: true});
         },
 
         /** @brief Restore retained editor text for the current worksheet. */
@@ -1139,19 +1139,19 @@ namespace WorksheetPersistence {
         stateFinishIntegrator() {
             if (WorksheetContext.integratorIntervalCap)
                 WorksheetContext.integratorIntervalCap.value = String(statePolicy.intervalCap(WorksheetContext.integratorIntervalCap.value));
-            WorksheetContext.expr.focus();
+            WorksheetContext.expr.focus({preventScroll: true});
         },
 
-        /** @brief Fill blank DateTime defaults and focus its date input. */
+        /** @brief Fill blank DateTime defaults and focus its date input without moving the page. */
         stateFinishDatetime() {
             WorksheetLocations.calendar.restoreDatetimeDefaultsIfBlank();
-            WorksheetContext.datetimeDate?.focus();
+            WorksheetContext.datetimeDate?.focus({preventScroll: true});
         },
 
-        /** @brief Fill blank almanac defaults and focus its date input. */
+        /** @brief Fill blank almanac defaults and focus its date input without scrolling below the globe. */
         stateFinishAlmanac() {
             WorksheetLocations.calendar.restoreAlmanacDefaultsIfBlank();
-            WorksheetContext.almanacDate?.focus();
+            WorksheetContext.almanacDate?.focus({preventScroll: true});
         },
 
         /** @brief Clear the editor's manually selected size. */
