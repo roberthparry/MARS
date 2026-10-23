@@ -230,6 +230,38 @@ static void test_lab_wasm_math_dependency(void)
     TEST_ASSERT_TRUE(test_lab_isolated(wasm_math_dependency), "maths dependencies are checked with actionable diagnostics");
 }
 
+static bool wasm_array_headers(const char *directory)
+{
+    string_t *path = string_sprintf("%s/pthread.h", directory);
+    string_t *object = string_sprintf("%s/array.o", directory);
+    string_t *option = string_sprintf("-I%s", directory);
+    file_t *poison = path ? file_new(path) : NULL;
+    string_t *source = string_new_with("#error WASM must not require pthread headers\n");
+    const char *compiler = getenv("LAB_WASM_CC"), *headers = getenv("LAB_WASM_INCLUDE");
+    if (!compiler || !*compiler) compiler = "clang";
+    if (!headers || !*headers) headers = "/usr/include/wasm32-wasi";
+    bool ok = path && object && option && poison && source && file_write_all_text(poison, source);
+    for (unsigned shared = 0; ok && shared < 2; ++shared) {
+        const char *args[] = {compiler, "--target=wasm32-wasi", "-nostdlibinc", "-ffreestanding",
+            "-isystem", headers, "-Iinclude", string_c_str(option), "-Werror",
+            shared ? "-matomics" : "-mno-atomics", "-c", "src/array/array.c", "-o", string_c_str(object), NULL};
+        string_t *output = NULL;
+        int status = -1;
+        ok = lab_proc_run(args, NULL, 10000, 128u * 1024u, &output, &status) &&
+             (shared ? status != 0 && output && string_find(output, "does not support shared-memory") >= 0 : status == 0);
+        if (!ok) string_fprintf(stderr, "Array header probe: %s\n", output ? string_c_str(output) : "no output");
+        string_free(output);
+    }
+    string_free(path); string_free(object); string_free(option); string_free(source); file_free(poison);
+    return ok;
+}
+
+static void test_lab_wasm_array_headers(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(wasm_array_headers),
+                     "non-shared WASM arrays need no pthread header; shared memory is rejected");
+}
+
 static bool wasm_readme(const char *directory)
 {
     (void)directory;
@@ -268,6 +300,7 @@ void test_lab_wasm_build_cases(void)
     TEST_RUN_IN_GROUP(test_lab_wasm_assembly_plans, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wasm_header_boundaries, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wasm_math_dependency, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_wasm_array_headers, tests, NULL);
 }
 
 /* Generate and verify the documented listing after ordinary tests. */

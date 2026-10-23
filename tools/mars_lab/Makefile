@@ -104,10 +104,10 @@ LAB_WASM_LIBC ?= /usr/lib/wasm32-wasi/libc.a
 # Retain the memory ABI used by the codec and direct browser regression fixtures.
 LAB_WASM_MEMORY_EXPORTS := --export=memset --export=memcpy --export=memmove --export=memcmp
 LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin -fvisibility=default \
-                   -nostdlib -Wmissing-prototypes -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -Itools/mars_lab/wasm/include
+                   -nostdlib -nostdlibinc -Wmissing-prototypes -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -Itools/mars_lab/wasm/include
 
 # Link generic containers separately; do not pull in the native libmars archive.
-# array_t uses WASI-libc's single-threaded pthread ABI; the final link still forbids WASI imports.
+# array_t uses owner-thread locking in non-shared WASM, without a WASI pthread dependency.
 $(LAB_BUILD_DIR)/wasm/marslib/array.o: src/array/array.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -D_GNU_SOURCE -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
@@ -187,22 +187,28 @@ check-lab-wasm-deps:
 	    exit 1; \
 	fi; \
 	probe_dir=$$(mktemp -d /tmp/mars-check-wasm.XXXXXX); \
-	trap 'rm -f "$$probe_dir/probe.o" "$$probe_dir/probe.wasm" "$$probe_dir/probe.log"; rmdir "$$probe_dir"' EXIT; \
+	trap 'rm -f "$$probe_dir/probe.o" "$$probe_dir/array.o" "$$probe_dir/probe.wasm" "$$probe_dir/probe.log"; rmdir "$$probe_dir"' EXIT; \
 	trap 'exit 1' HUP INT TERM; \
-	if ! printf '%s\n' '#include <math.h>' '#include <string.h>' \
+	if ! printf '%s\n' '#include <math.h>' '#include <string.h>' '#include "array-t.h"' \
+	    'void mars_wasm_array_probe(void) { array_t *a = array_create(sizeof(int), 0, 0); array_destroy(a); }' \
 	    'double mars_wasm_probe(double x, double y) { return sin(x) + cos(x) + atan2(y, x) + exp2(x) + log2(y); }' \
 	    'int mars_wasm_memory_probe(char *dst, const char *src, unsigned length) {' \
 	    'memset(dst, 0, length); memcpy(dst, src, length); memmove(dst, src, length);' \
 	    'return memcmp(dst, src, length) + (int)strlen(src); }' \
-	    | "$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -ffreestanding -fno-builtin -fvisibility=default -nostdlib \
-	        -isystem "$(LAB_WASM_INCLUDE)" -x c -c - \
+	    | "$(LAB_WASM_CC)" --target=wasm32-unknown-unknown -ffreestanding -fno-builtin -fvisibility=default -nostdlib -nostdlibinc \
+	        -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -x c -c - \
 	        -o "$$probe_dir/probe.o" >"$$probe_dir/probe.log" 2>&1; then \
 	    echo "MARS Lab requires Clang's wasm32-unknown-unknown target and WASM maths headers." >&2; \
 	    cat "$$probe_dir/probe.log" >&2; \
 	    echo "Debian/Ubuntu: sudo apt install clang lld wasi-libc" >&2; \
 	    exit 1; \
 	fi; \
-	if ! "$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory "$$probe_dir/probe.o" "$(LAB_WASM_LIBC)" \
+	if ! "$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -D_GNU_SOURCE -fvisibility=hidden \
+	    -c src/array/array.c -o "$$probe_dir/array.o" >"$$probe_dir/probe.log" 2>&1; then \
+	    echo "MARS Lab requires target C headers for its non-shared WASM containers; host libc headers are not supported." >&2; \
+	    cat "$$probe_dir/probe.log" >&2; exit 1; \
+	fi; \
+	if ! "$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory "$$probe_dir/probe.o" "$$probe_dir/array.o" "$(LAB_WASM_LIBC)" \
 	    -o "$$probe_dir/probe.wasm" >"$$probe_dir/probe.log" 2>&1; then \
 	    echo "MARS Lab requires wasm-ld and WASM maths that link without host imports." >&2; \
 	    cat "$$probe_dir/probe.log" >&2; \

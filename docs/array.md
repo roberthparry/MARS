@@ -4,9 +4,10 @@ Generic, opaque containers with dense element storage and caller-defined
 copy/cleanup rules for the stored element slots.
 
 The MARS Lab browser links the same `array_t` implementation into WebAssembly for
-its shared town catalogue and spatial buckets. Its single-threaded WASI-libc mutex
-implementation supplies the existing locking interface without browser threading
-imports. Slice sorting uses a context-aware heapsort rather than platform-specific
+its shared town catalogue and spatial buckets. Non-shared WebAssembly uses explicit
+owner-thread locking without requiring WASI pthread headers or symbols. Shared-memory
+WebAssembly builds are rejected; native builds retain POSIX recursive mutexes.
+Slice sorting uses a context-aware heapsort rather than platform-specific
 `qsort_r`, preserving caller-local comparison state in native and WebAssembly builds.
 
 ---

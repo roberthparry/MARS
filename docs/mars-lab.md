@@ -1596,11 +1596,15 @@ intentional: they generate direct WASM instructions, whereas the freestanding
 The `wasi-libc` build dependency supplies C headers and a static archive;
 its musl maths implementation resides in `libc.a`, not the empty compatibility `libm.a`.
 Only required archive members are linked; no WASI system imports are permitted.
+System header discovery is disabled for WASM compilations so a missing target header
+cannot silently fall back to the host's libc. Generic arrays use owner-thread locking
+in non-shared WASM and do not require WASI pthread support. Native arrays retain their
+recursive mutexes; shared-memory WASM builds are rejected explicitly.
 Application symbols use default visibility and the linker exports them with
 `--export-dynamic`; do not use `--export-all`, which also retains library internals.
 The codec worker links memory operations but no maths routines. `LAB_WASM_INCLUDE` and `LAB_WASM_LIBC`
 override the packaged header directory and archive path. The dependency probe compiles
-and links calls to all five maths functions, the four memory operations and `strlen`
+and links the actual array implementation as well as calls to all five maths functions, the four memory operations and `strlen`
 without allowing unresolved imports. Browser regressions also reject unexpected
 imports in both modules and check overlapping, unaligned and zero-length memory operations.
 Only browser bridge functions listed in `wasm/lab_browser.imports`
