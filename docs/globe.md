@@ -323,6 +323,21 @@ bit-for-bit. This removes the need to alter those rings to fit a coarse integer
 grid. The installed globe is still unchanged; the exporter must use the lossless
 format and the remaining installation acceptance checks still apply.
 
+Offline `coastline_export` now streams the effective eight-metre candidate into
+an exclusive `MARSCF64` intermediate. It consumes the completed boundary review's
+chunks in their indexed order and compares every coordinate, including periodic
+date-line copies, with the geometry being exported. It rejects stale geometry,
+missing or extra chunks, mismatched totals and unsuccessful reviews. Original
+binary64 coordinate bits are written unchanged; polygon identifiers are assigned
+sequentially for the native stream. The exporter performs no geometry repair.
+Its self-test covers exact tiny-ring preservation, the effective repair overlay,
+native import compatibility, rejection of stale and incomplete reviews, and
+refusal to overwrite an existing output. Failed outputs remain incomplete and
+must not be installed. This is a coastline-only intermediate: inland-water
+composition, nesting and polar-boundary acceptance, packaging and installation
+remain outstanding. The normal importer must consume a finished validated
+artifact, not invoke these offline preparation tools or repair bad geometry.
+
 See [almanac data provenance](almanac-data-provenance.md#shoreline-data) for
 source, checksums and licence notices.
 
