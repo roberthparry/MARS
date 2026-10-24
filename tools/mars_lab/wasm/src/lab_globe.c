@@ -155,8 +155,11 @@ void lab_globe_view(quaternion_jsref orientation, double zoom, double factor)
     zoom = fmax(1, fmin(4096, zoom * factor));
     double span = asin(fmin(1, 1.6 / zoom)) / globe_radian;
     double south = fmax(-90, latitude - span), north = fmin(90, latitude + span);
+    /* The viewport fits in this spherical cap. Its tangent meridians give the
+     * exact longitude extent; dividing by the cosine at its northern edge
+     * greatly over-fetches high-latitude views and can exhaust geometry budgets. */
     double lon_span = south <= -90 || north >= 90 ? 180 :
-        fmin(180, span / fmax(0.00001, cos(fmax(fabs(south), fabs(north)) * globe_radian)));
+        asin(fmin(1, sin(span * globe_radian) / cos(latitude * globe_radian))) / globe_radian;
     double values[] = {latitude, longitude, zoom, longitude - lon_span, south, longitude + lon_span, north};
     globe_result(values, 7);
 }

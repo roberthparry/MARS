@@ -48,6 +48,10 @@ static void coast_edge(coast_path_t *path, unsigned stage, coast_point_t a, coas
     if ((da >= 0) != (db >= 0)) {
         double fraction = da / (da - db);
         coast_point_t intersection = {a.x + fraction * (b.x - a.x), a.y + fraction * (b.y - a.y)};
+        /* Adjacent patches must share an exact clipping coordinate. Round-off
+         * here otherwise turns retraced boundary joins into thin polygons. */
+        if (stage < 2) intersection.x = path->limits[stage];
+        else intersection.y = path->limits[stage];
         coast_feed(path, stage + 1, intersection);
     }
     if (db >= 0) coast_feed(path, stage + 1, b);
@@ -57,8 +61,15 @@ static void coast_feed(coast_path_t *path, unsigned stage, coast_point_t point)
 {
     if (!path->ok) return;
     if (stage == 4) {
+        /* Keep both ends of a transition onto or off a clipping boundary. A
+         * near-corner point must not replace the start of a long artificial edge. */
+        bool boundary = point.x == path->limits[0] || point.x == path->limits[1] ||
+                        point.y == path->limits[2] || point.y == path->limits[3];
+        bool previous_boundary = path->last.x == path->limits[0] || path->last.x == path->limits[1] ||
+                                 path->last.y == path->limits[2] || path->last.y == path->limits[3];
         if (path->emitted && ((point.x == path->last.x && point.y == path->last.y) ||
-            hypot(point.x - path->last.x, point.y - path->last.y) < path->tolerance)) return;
+            (!boundary && !previous_boundary &&
+             hypot(point.x - path->last.x, point.y - path->last.y) < path->tolerance))) return;
         path->ok = path->visit(path->emitted ? GLOBE_PATH_LINE : GLOBE_PATH_MOVE,
                               point.x, point.y, path->level, path->antarctic, path->context);
         path->emitted = true;

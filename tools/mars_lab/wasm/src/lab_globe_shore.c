@@ -6,8 +6,8 @@
  * Projects and subdivides geographic edges with the same camera as picking, clips
  * the hidden hemisphere and joins clipped endpoints along the globe limb. Small
  * source patches make these limb arcs unambiguous. Nesting order is retained.
- * SVG viewport clipping is performed by the browser. The same native projection
- * supplies binary GPU coverage plans for terrain-colour compositing, without SVG
+ * Close views are clipped natively to the overscanned frame before publication.
+ * The same native projection supplies binary GPU coverage plans for terrain-colour compositing, without SVG
  * image decoding. A dispatched singleton owns all retained mutable state.
  */
 #include <math.h>
@@ -21,16 +21,19 @@
 #include "lab_dom.h"
 #include "lab_serial.h"
 #include "lab_globe_shore.h"
+#define MARS_LAB_GLOBE_EDGES_INTERNAL_ACCESS
+#include "lab_globe_edges.h"
 #define MARS_LAB_GLOBE_SHORE_INTERNAL_ACCESS
 #include "lab_globe_shore_internal.h"
 
-typedef struct _shore_vertex_t { double lon, lat; } shore_vertex_t;
+typedef lab_globe_vertex_t shore_vertex_t;
 typedef struct _shore_ring_t { size_t first, count; unsigned level, ice; } shore_ring_t;
 typedef struct _shore_point_t { double x, y, z; } shore_point_t;
 typedef struct _shore_store_t {
     lab_serial_t serial;
     array_t *vertices, *rings;
     webgl_mask_t *mask;
+    lab_globe_edges_t *edges;
     double bounds[4];
 } shore_store_t;
 typedef struct _shore_request_t {
@@ -46,7 +49,9 @@ typedef struct _shore_output_t {
     char *text;
     size_t length, capacity, generated;
     webgl_mask_t *mask;
+    array_t *clips;
 } shore_output_t;
+typedef struct _shore_clip_ref_t { unsigned id, level; } shore_clip_ref_t;
 
 static shore_store_t *shore_store(void)
 {
@@ -145,6 +150,8 @@ static void shore_clear(void *context)
     shore_store_t *store = shore_store();
     array_destroy(store->vertices); array_destroy(store->rings);
     store->vertices = store->rings = NULL;
+    lab_globe_edges_free(store->edges);
+    store->edges = NULL;
     webgl_mask_free(store->mask);
     store->mask = NULL;
 }
@@ -196,7 +203,8 @@ static void shore_load(void *context)
     }
     array_t *vertices = array_create(sizeof(shore_vertex_t), NULL, NULL);
     array_t *rings = array_create(sizeof(shore_ring_t), NULL, NULL);
-    bool ok = vertices && rings, opened = false;
+    lab_globe_edges_t *edges = lab_globe_edges_new();
+    bool ok = vertices && rings && edges, opened = false;
     shore_ring_t ring = {0};
     unsigned previous_level = 1;
     const char *cursor = text + (binary ? 4 : 0), *end = text + length;
@@ -219,8 +227,14 @@ static void shore_load(void *context)
             /* Display simplification may collapse tiny islands; do not reject the surrounding coastline. */
             if (ok && !shore_has_area(vertices, &ring))
                 ok = array_remove_elements(vertices, ring.first, ring.count);
-            else if (ok)
+            else if (ok) {
                 ok = array_size(rings) < 100000 && array_append_carray(rings, &ring, 1);
+                for (size_t i = 0; ok && i < ring.count; ++i) {
+                    const shore_vertex_t *a = array_get(vertices, ring.first + i);
+                    const shore_vertex_t *b = array_get(vertices, ring.first + (i + 1) % ring.count);
+                    ok = lab_globe_edges_add(edges, *a, *b);
+                }
+            }
             opened = false;
             continue;
         }
@@ -251,12 +265,14 @@ static void shore_load(void *context)
     }
     free(owned);
     if (ok && !opened) {
+        lab_globe_edges_finish(edges);
         shore_clear(NULL);
         shore_store_t *store = shore_store();
         store->vertices = vertices; store->rings = rings;
+        store->edges = edges;
         memcpy(store->bounds, bounds, sizeof bounds);
         request->result = true;
-    } else { array_destroy(vertices); array_destroy(rings); }
+    } else { array_destroy(vertices); array_destroy(rings); lab_globe_edges_free(edges); }
 }
 
 static void shore_covers(void *context)
@@ -299,6 +315,101 @@ static bool shore_clip(array_t *visible, shore_point_t a, shore_point_t b)
     return b.z < 0 || array_append_carray(visible, &b, 1);
 }
 
+/* Shared intervals use the same arithmetic in either direction. In particular,
+ * a retraced clipping join must cancel, not enclose two different curve chords. */
+static bool shore_segment(array_t *visible, shore_vertex_t a, shore_vertex_t b, const double matrix[9],
+                           double step, size_t *generated, shore_output_t *output)
+{
+    unsigned count = (unsigned)fmax(1, ceil(fmax(fabs(b.lon - a.lon), fabs(b.lat - a.lat)) / step));
+    if ((*generated += count) > 1000000 || (output->generated += count) > 2000000) return false;
+    bool forward = a.lon < b.lon || (a.lon == b.lon && a.lat <= b.lat);
+    shore_vertex_t lo = forward ? a : b, hi = forward ? b : a;
+    shore_point_t previous = shore_project(a.lon, a.lat, matrix);
+    for (unsigned j = 1; j <= count; ++j) {
+        double t = (double)(forward ? j : count - j) / count;
+        shore_point_t next = j == count ? shore_project(b.lon, b.lat, matrix) :
+            shore_project(lo.lon + t * (hi.lon - lo.lon), lo.lat + t * (hi.lat - lo.lat), matrix);
+        if (!shore_clip(visible, previous, next)) return false;
+        previous = next;
+    }
+    return true;
+}
+
+/* Bound both output paths before float conversion or browser tessellation. The
+ * extra half-frame on each side retains the existing drag-preview overscan. */
+static bool shore_viewport(array_t **visible, double limit, double scale)
+{
+    array_t *points = *visible;
+    size_t count = array_size(points);
+    if (!count) return true;
+    unsigned outside = 0, common = 15;
+    bool limb = false;
+    for (size_t i = 0; i < count; ++i) {
+        const shore_point_t *p = array_get(points, i);
+        unsigned sides = (p->x < -limit) | ((p->x > limit) << 1) |
+                         ((p->y < -limit) << 2) | ((p->y > limit) << 3);
+        outside |= sides;
+        common &= sides;
+        limb |= p->z == 0;
+    }
+    if (!outside) return true;
+    /* Limb joins are curved. Expand them before planar clipping, using the same
+     * subpixel chord bound as the GPU path, rather than closing across the globe. */
+    if (limb) {
+        array_t *expanded = array_create(sizeof(shore_point_t), NULL, NULL);
+        if (!expanded) return false;
+        bool ok = true;
+        for (size_t i = 0; ok && i < count; ++i) {
+            const shore_point_t *a = array_get(points, (i + count - 1) % count);
+            const shore_point_t *b = array_get(points, i);
+            if (a->z == 0 && b->z == 0) {
+                double angle = atan2(a->x * b->y - a->y * b->x, a->x * b->x + a->y * b->y);
+                unsigned steps = (unsigned)fmax(1, ceil(fabs(angle) * sqrt(scale / .4)));
+                for (unsigned j = 1; ok && j < steps; ++j) {
+                    double t = angle * j / steps, c = cos(t), s = sin(t);
+                    shore_point_t p = {a->x * c - a->y * s, a->x * s + a->y * c, 1};
+                    ok = array_size(expanded) < 2000000 && array_append_carray(expanded, &p, 1);
+                }
+            }
+            shore_point_t p = {b->x, b->y, 1};
+            ok = ok && array_size(expanded) < 2000000 && array_append_carray(expanded, &p, 1);
+        }
+        if (!ok) { array_destroy(expanded); return false; }
+        array_destroy(points);
+        *visible = points = expanded;
+        common = 0;
+    }
+    if (common) return array_remove_elements(points, 0, count);
+    for (unsigned side = 0; side < 4; ++side) {
+        count = array_size(points);
+        if (!count) break;
+        array_t *clipped = array_create(sizeof(shore_point_t), NULL, NULL);
+        if (!clipped) return false;
+        shore_point_t a = *(const shore_point_t *)array_get(points, count - 1);
+        double boundary = side % 2 ? limit : -limit;
+        bool ok = true;
+        for (size_t i = 0; ok && i < count; ++i) {
+            shore_point_t b = *(const shore_point_t *)array_get(points, i);
+            double av = side < 2 ? a.x : a.y, bv = side < 2 ? b.x : b.y;
+            bool ain = side % 2 ? av <= boundary : av >= boundary;
+            bool bin = side % 2 ? bv <= boundary : bv >= boundary;
+            if (ain != bin) {
+                double t = (boundary - av) / (bv - av);
+                shore_point_t p = {a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), 1};
+                if (side < 2) p.x = boundary;
+                else p.y = boundary;
+                ok = array_append_carray(clipped, &p, 1);
+            }
+            if (ok && bin) ok = array_append_carray(clipped, &b, 1);
+            a = b;
+        }
+        if (!ok) { array_destroy(clipped); return false; }
+        array_destroy(points);
+        *visible = points = clipped;
+    }
+    return true;
+}
+
 /* Interpolate latitude-dependent polar colour within each geographic patch, rather than using a hard ice boundary. */
 static bool shore_polar_gradient(shore_output_t *output, const shore_ring_t *ring, const double matrix[9],
                                  double scale, double size)
@@ -338,16 +449,16 @@ static bool shore_ring(shore_output_t *output, const shore_ring_t *ring, const d
     for (size_t i = 0; ok && i < ring->count; ++i) {
         const shore_vertex_t *a = array_get(store->vertices, ring->first + i);
         const shore_vertex_t *b = array_get(store->vertices, ring->first + (i + 1) % ring->count);
-        unsigned count = (unsigned)fmax(1, ceil(fmax(fabs(b->lon - a->lon), fabs(b->lat - a->lat)) / step));
-        if ((generated += count) > 1000000 || (output->generated += count) > 2000000) { ok = false; break; }
-        shore_point_t previous = shore_project(a->lon, a->lat, matrix);
-        for (unsigned j = 1; ok && j <= count; ++j) {
-            double t = (double)j / count;
-            shore_point_t next = shore_project(a->lon + t * (b->lon - a->lon), a->lat + t * (b->lat - a->lat), matrix);
-            ok = shore_clip(visible, previous, next);
-            previous = next;
+        lab_globe_edge_cursor_t cursor;
+        lab_globe_edge_begin(store->edges, *a, *b, &cursor);
+        shore_vertex_t previous = *a, knot;
+        while (ok && lab_globe_edge_next(&cursor, &knot)) {
+            ok = shore_segment(visible, previous, knot, matrix, step, &generated, output);
+            previous = knot;
         }
+        if (ok) ok = shore_segment(visible, previous, *b, matrix, step, &generated, output);
     }
+    if (ok && scale >= size * 8 / 2.24) ok = shore_viewport(&visible, size / scale, scale);
     size_t count = array_size(visible);
     if (ok && output->mask && count >= 3) {
         ok = webgl_mask_begin(output->mask, ring->level);
@@ -376,10 +487,12 @@ static bool shore_ring(shore_output_t *output, const shore_ring_t *ring, const d
                              (unsigned)ring->first, (unsigned)ring->first);
         } else
             ok = shore_append(output, "<path fill=\"%s\" stroke=\"%s\" ", colour, colour);
-        /* Cover antialiasing gaps at shared clipping edges without drawing a geographic grid.
-         * Match the fill (including polar gradients) and keep the overlap screen-sized. */
+        shore_clip_ref_t reference = {(unsigned)ring->first, ring->level};
+        ok = ok && array_append_carray(output->clips, &reference, 1);
+        /* The level's filled union clips these seam-covering outlines. Retraced
+         * clipping bridges have no filled area and must not acquire a coastline. */
         ok = ok && shore_append(output, "stroke-width=\"1\" vector-effect=\"non-scaling-stroke\" "
-                                       "stroke-linejoin=\"round\" d=\"");
+                                       "stroke-linejoin=\"round\" id=\"shore-ring-%u\" d=\"", reference.id);
         for (size_t i = 0; ok && i <= count; ++i) {
             const shore_point_t *p = array_get(visible, i % count);
             const shore_point_t *previous = array_get(visible, (i + count - 1) % count);
@@ -414,14 +527,40 @@ static void shore_svg(void *context)
         if (!output.mask) { lab_dom_return(0); return; }
     }
     output.text = malloc(output.capacity);
+    output.clips = array_create(sizeof(shore_clip_ref_t), NULL, NULL);
     double scale = size * zoom / 2.24;
-    bool ok = output.text && shore_append(&output, "<circle cx=\"%.3f\" cy=\"%.3f\" r=\"%.3f\" fill=\"#071440\"/>",
-                                          size / 2, size / 2, scale);
+    bool ok = output.text && output.clips && shore_append(&output,
+        "<circle cx=\"%.3f\" cy=\"%.3f\" r=\"%.3f\" fill=\"#071440\"/>", size / 2, size / 2, scale);
+    unsigned level = 0;
     /* This bounded pass renders every selected polygon; spatial selection happens on the native server. */
-    for (size_t i = 0; ok && i < array_size(store->rings); ++i)
-        ok = shore_ring(&output, array_get(store->rings, i), matrix, scale, size);
+    for (size_t i = 0; ok && i < array_size(store->rings); ++i) {
+        const shore_ring_t *ring = array_get(store->rings, i);
+        if (ring->level != level) {
+            if (level) ok = shore_append(&output, "</g>");
+            level = ring->level;
+            ok = ok && shore_append(&output, "<g clip-path=\"url(#shore-level-%u)\">", level);
+        }
+        ok = ok && shore_ring(&output, ring, matrix, scale, size);
+    }
+    if (ok && level) ok = shore_append(&output, "</g>");
+    level = 0;
+    ok = ok && shore_append(&output, "<defs>");
+    /* SVG clip-path children form a union, independent of ring winding. References
+     * reuse geometry without copying its text; the clip is applied once per level. */
+    for (size_t i = 0; ok && i < array_size(output.clips); ++i) {
+        const shore_clip_ref_t *reference = array_get(output.clips, i);
+        if (reference->level != level) {
+            if (level) ok = shore_append(&output, "</clipPath>");
+            level = reference->level;
+            ok = ok && shore_append(&output, "<clipPath id=\"shore-level-%u\">", level);
+        }
+        ok = ok && shore_append(&output, "<use href=\"#shore-ring-%u\"/>", reference->id);
+    }
+    if (ok && level) ok = shore_append(&output, "</clipPath>");
+    ok = ok && shore_append(&output, "</defs>");
     lab_dom_return(ok ? lab_dom_utf8_string((const unsigned char *)output.text, output.length) : 0);
     free(output.text);
+    array_destroy(output.clips);
 }
 
 /* Atomically admit a replacement display region. */

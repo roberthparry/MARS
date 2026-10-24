@@ -100,9 +100,17 @@ Clipping also drops consecutive points below that tolerance. These display-only
 reductions avoid drawing every source vertex when zoomed out; the exact stored
 coordinates remain available for close views and geographic queries.
 WASM admission discards exactly collinear clipping remnants before projection.
-Such remnants have no land area, but stroking them would draw false lines across
-water, including in the terrain-colour coverage mask. No area threshold is used,
-so narrow, non-collinear islands remain available.
+No area threshold is used, so narrow, non-collinear islands remain available.
+Clipping a concave polygon can also leave separate filled pieces connected by a
+retraced, zero-width edge. SVG outlines are clipped to the union of filled regions
+at each nesting level, preventing those joins from drawing false coastlines across
+water while retaining seam coverage between adjacent patches, including polar ones.
+Shared geographic edges use a sorted native endpoint index, built once per region,
+so overlapping spans receive identical subdivisions in either direction. Native
+clipping preserves exact boundary coordinates and corners during simplification;
+otherwise a skipped corner can turn a patch edge into a long, thin sliver.
+Close-view projection clips both SVG and GPU geometry to the overscanned frame
+before publication; far-off-screen vertices do not reach browser tessellation.
 
 At close zoom (8× and above), dragging and zooming retain the detailed local SVG.
 A constant-cost native WASM affine camera transform moves the existing paths,
@@ -116,6 +124,11 @@ Dragging no longer substitutes the coarse world texture for available local vect
 Retained paths are shown only when their own geometry revision covers the current
 view. Their full-globe ocean background must never hide newly exposed, unloaded
 land. Requests include a larger geographical margin to accommodate nearby drags.
+The native bounds use the tangent meridians of the viewport's spherical cap,
+including rolled cameras, poles and date-line crossings. This avoids inflating
+regional requests into near-hemisphere downloads which exceed the transport budget.
+Multi-patch regions prepare and reuse the native spatial index once, rather than
+rereading the same continental polygons for each patch on a cold connection.
 Before local vectors are available, and at wide views, WebGL provides a preview. This preview uses a
 separate, native-generated global texture with the same flat land/water and polar
 palette. This temporary preview is coarser than the settled SVG; it does not replace
@@ -830,8 +843,13 @@ and an offline flag. Both come from the jurisdiction catalogue, joined by the
 geographically resolved ISO code, not the form's jurisdiction choice. Missing
 flags leave the name readable; uncertain or sea positions do not inherit a country.
 Town-marker tooltips also display an offline flag, using the town's catalogue
-jurisdiction country code rather than a coastal geometry hit-test. Hover and keyboard
-focus load artwork asynchronously; text appears immediately. The tooltip controller
+jurisdiction country code rather than a coastal geometry hit-test. Broad UK (`GB`)
+town entries carry a separate native display code resolved from the country boundary
+layer: English locations use `GB-ENG`, and Welsh and Scottish locations retain their
+own codes. Catalogue grouping and selection keys are unchanged. The display code
+survives native town caching and is shared by markers, town menus and observer tooltips.
+If geography is unavailable, the existing catalogue code remains the fallback.
+Hover and keyboard focus load artwork asynchronously; text appears immediately. The tooltip controller
 keeps at most 32 country entries within a 1 MiB string budget, cancels obsolete
 requests and never attaches a flag to every town in the catalogue. Missing artwork
 leaves the textual tooltip usable. Custom observer positions still require the
@@ -4043,6 +4061,13 @@ topocentric calculation, including the Moon's parallax; it is not replaced by se
 level. Body-table altitudes include an approximate refraction correction. The
 existing optional WeatherAPI configuration supplies temperature and pressure for
 the observation hour, matched by UTC timestamp rather than provider-local time.
+Provider requests and replies use JSON; Protobuf is only the separate browser-to-Lab
+transport. If returned hourly epochs show that the selected GMT moment falls in
+the preceding or following local day, Lab requests that adjacent day once. Both
+requests share the existing four-second network budget. This handles either side
+of local midnight without changing the observation time, relying on the editable
+display zone, or shifting the daily weather card. Missing hours within a returned
+day and failed requests still use explicitly labelled fallback conditions.
 Current observations require the same UTC hour and a separation of at most thirty
 minutes from the selected moment. Otherwise valid hourly temperatures bracketing
 the selected GMT timestamp are linearly interpolated, including across day arrays.
@@ -4080,16 +4105,28 @@ location, zone, latitude, longitude, observer altitude, temperature, pressure an
 weather source. Coordinates display degrees and decimal minutes to two decimal
 places with compass directions; the calculation retains the original precision.
 Corrections appear below a subtle divider; copying retains the plain-text summary.
+Location labels omit trailing numeric GeoNames identifiers in the card, observer
+text and clipboard output. Full catalogue names and selection keys retain those
+identifiers to distinguish towns with the same name. Successful calculations save
+the resolved jurisdiction returned in the result, including an empty jurisdiction
+for an unidentified location, rather than restoring an obsolete submitted country.
 Editing observer altitude still switches a mismatched named town to Custom.
 Evaluate and background weather refresh retain that entered altitude; returned
 calculation fields cannot overwrite it. Selecting a town or an explicit location
 action can still supply a new observer altitude.
 
 Temperature changes refraction, not parallax. Below −0.575° the displayed altitude
-receives no refraction correction. The native `shoreline_t` hit-test classifies the
-observer's latitude and longitude using spatially indexed GSHHG data in the
-almanac database. Town and Custom selections use the same geographical rule.
-Confirmed sea uses sea mode: the entered altitude is height of eye above sea level
+receives no refraction correction. The native globe hit-test classifies the
+observer's latitude and longitude using the installed, spatially indexed shoreline
+in the globe database. Town and Custom selections use the same geographical rule.
+Sea points within five kilometres of mapped shoreline are labelled **Coastal water**,
+not **Offshore**. This conservative presentation policy covers near-shore basins
+without claiming to identify a harbour or its jurisdiction; administrative polygons
+remain independent. Such points do not automatically receive sea-horizon dip.
+The five-kilometre check uses `globe_hit_test_radius()` and leaves the normal
+500-metre uncertainty band and displayed geometry unchanged. If that extra check
+fails, sea mode is withheld rather than assuming an unobstructed horizon.
+Sea beyond this proximity band uses sea mode: the entered altitude is height of eye above sea level
 (non-negative), and geometric horizon dip is added to the predicted body-centre
 altitude above the assumed unobstructed sea horizon. Land, inland water, the
 500-metre uncertain coastal band and unavailable data do not receive sea-horizon
@@ -4098,7 +4135,8 @@ corrections. This is not a sextant sight reduction, for which dip is subtracted
 from a measured altitude. Waves and terrestrial refraction are not modelled.
 Thus the worksheet corrects predicted sighting altitudes for the observer's
 topocentric position and refraction everywhere, and adds sea-horizon dip only
-where the shoreline data confirms open sea. It deliberately withholds that dip
+where the shoreline data passes this open-water proximity policy, which cannot
+guarantee a clear horizon or navigational safety. It deliberately withholds that dip
 near coasts and on land: an entered elevation is not evidence of an unobstructed
 sea horizon.
 Eclipse contact searches and rise/set calculations retain their existing

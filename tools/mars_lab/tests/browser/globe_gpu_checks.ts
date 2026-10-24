@@ -4,7 +4,8 @@
  *
  * Rasterising SVG is a test oracle only, never the production mask path. Tests
  * cover concavity, nesting, reversed/overlapping rings, horizon arcs, polar and
- * date-line cameras, empty coverage, repeated rendering and resource reuse.
+ * date-line cameras, deep zoom, dense outlines, empty coverage, repeated rendering
+ * and resource reuse. Interior cracks cannot excuse themselves as boundary pixels.
  */
 async function checkGlobeGPU(check: (condition: boolean, message: string) => void): Promise<void> {
     const moduleURL = '/js/globe_gpu.js';
@@ -22,6 +23,14 @@ async function checkGlobeGPU(check: (condition: boolean, message: string) => voi
     const reverse = 'M1 0 -25 -25\nL-25 25\nL25 25\nL25 -25\nZ\n';
     const fixtures: [string, number[], number, number[]?][] = [
         [square, [0, 0, 0, 1], 1],
+        [square, labDOM.call('lab_globe_centre', 1.321, 3.123) as number[], 64],
+        [square, labDOM.call('lab_globe_centre', -2.345, 4.567) as number[], 256],
+        [square, labDOM.call('lab_globe_centre', 3.456, -1.234) as number[], 4096],
+        [reverse, [0, 0, 0, 1], 64],
+        [square + 'M2 0 -1 -25\nL1 -25\nL1 25\nL-1 25\nZ\n' +
+            'M3 0 -0.1 -0.1\nL0.1 -0.1\nL0.1 0.1\nL-0.1 0.1\nZ\n',
+            [0, 0, 0, 1], 64],
+        ['M1 0 80 -25\nL100 -25\nL100 25\nL80 25\nZ\n', [0, 0, 0, 1], 16],
         [square + 'M2 0 -15 -15\nL15 -15\nL15 15\nL-15 15\nZ\n' +
             'M3 0 -5 -5\nL5 -5\nL5 5\nL-5 5\nZ\n', [0, 0, 0, 1], 2],
         ['M1 0 -25 -25\nL25 -25\nL25 -5\nL-5 -5\nL-5 25\nL-25 25\nZ\n', [0, 0, 0, 1], 2],
@@ -33,8 +42,17 @@ async function checkGlobeGPU(check: (condition: boolean, message: string) => voi
             labDOM.call('lab_globe_centre', 0, 180) as number[], 4, [170, -90, 190, 90]],
         ['', [0, 0, 0, 1], 1]
     ];
+    let dense = '';
+    for (let i = 0; i < 4096; ++i) {
+        const angle = i * 2 * Math.PI / 4096, radius = 20 + 5 * Math.sin(angle * 11);
+        dense += `${i ? 'L' : 'M1 0 '}${(radius * Math.cos(angle)).toFixed(9)} ${(radius * Math.sin(angle)).toFixed(9)}\n`;
+    }
+    dense += 'Z\n';
+    for (const zoom of [16, 32, 40, 48, 64, 256])
+        fixtures.push([dense, labDOM.call('lab_globe_centre', 1.321, 3.123) as number[], zoom]);
     try {
         for (const [text, orientation, zoom, bounds] of fixtures) {
+            const pixels = 256;
             check(Boolean(labDOM.call('lab_globe_shore_load', text, bounds || [-180, -90, 180, 90])),
                   'GPU fixture admitted');
             const began = performance.now();
@@ -42,48 +60,60 @@ async function checkGlobeGPU(check: (condition: boolean, message: string) => voi
             check(typeof svg === 'string', 'one native projection supplies SVG and binary coverage');
             const vertices = new Float32Array(native.memory.buffer, native.lab_globe_mask_vertices(),
                 native.lab_globe_mask_vertex_count() * 2).slice();
+            if (zoom >= 8)
+                check(vertices.every(coordinate => Math.abs(coordinate) <= 1),
+                      'close-view native geometry is clipped before GPU float conversion');
             const batches = new Uint32Array(native.memory.buffer, native.lab_globe_mask_batches(),
                 native.lab_globe_mask_batch_count() * 3).slice();
+            // Match projected scale with a larger, low-zoom native SVG. Its path
+            // bypasses viewport clipping, giving an independent clipping oracle.
+            const referenceSize = zoom >= 8 && zoom <= 128 ? 800 * zoom / 7 : 800;
+            const referenceSVG = referenceSize === 800 ? svg :
+                `<g transform="translate(${(800 - referenceSize) / 2} ${(800 - referenceSize) / 2})">` +
+                labDOM.call('lab_globe_shore_svg', orientation, 7, referenceSize) + '</g>';
             const frame = {svg, vertices, batches}, projectMs = performance.now() - began;
             const submit = performance.now();
-            texture = renderer.render(frame, 256, quad, texture);
-            texture = renderer.render(frame, 256, quad, texture);
+            texture = renderer.render(frame, pixels, quad, texture);
+            texture = renderer.render(frame, pixels, quad, texture);
             const submitMs = (performance.now() - submit) / 2;
             gl.bindFramebuffer(gl.FRAMEBUFFER, read);
             gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-            const actual = new Uint8Array(256 * 256 * 4);
-            gl.readPixels(0, 0, 256, 256, gl.RGBA, gl.UNSIGNED_BYTE, actual);
+            const actual = new Uint8Array(pixels * pixels * 4);
+            gl.readPixels(0, 0, pixels, pixels, gl.RGBA, gl.UNSIGNED_BYTE, actual);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            const reference = document.createElement('canvas'); reference.width = reference.height = 256;
+            const reference = document.createElement('canvas'); reference.width = reference.height = pixels;
             const context = reference.getContext('2d')!;
-            context.fillStyle = 'black'; context.fillRect(0, 0, 256, 256);
+            context.fillStyle = 'black'; context.fillRect(0, 0, pixels, pixels);
             const image = new Image(), url = URL.createObjectURL(new Blob([
-                '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="-400 -400 1600 1600">' +
-                '<style>circle,path{fill:black;stroke:none}path:not([fill="#071440"]){fill:white}</style>' + svg + '</svg>'
+                `<svg xmlns="http://www.w3.org/2000/svg" width="${pixels}" height="${pixels}" viewBox="-400 -400 1600 1600">` +
+                '<style>circle,path{fill:black;stroke:none}path:not([fill="#071440"]){fill:white}</style>' + referenceSVG + '</svg>'
             ], {type: 'image/svg+xml'}));
             try { image.src = url; await image.decode(); context.drawImage(image, 0, 0); }
             finally { URL.revokeObjectURL(url); }
-            const expected = context.getImageData(0, 0, 256, 256).data;
+            const expected = context.getImageData(0, 0, pixels, pixels).data;
             let differences = 0, actualLand = 0, expectedLand = 0;
+            const differenceLocations: string[] = [];
             for (let i = 0; i < actual.length; i += 4) {
                 if (actual[i] > 128) ++actualLand;
                 if (expected[i] > 128) ++expectedLand;
-                if ((expected[i] < 15 || expected[i] > 240) && Math.abs(actual[i] - expected[i]) > 128) {
-                    const pixel = i / 4, x = pixel % 256, y = Math.floor(pixel / 256);
+                if ((expected[i] === 0 || expected[i] === 255) && Math.abs(actual[i] - expected[i]) > 128) {
+                    const pixel = i / 4, x = pixel % pixels, y = Math.floor(pixel / pixels);
                     let edge = false;
                     // Repeated SVG alpha compositing expands fractional edge pixels towards opacity.
                     // Compare interiors exactly, allowing only a one-pixel boundary neighbourhood.
                     for (let dy = -1; dy <= 1; ++dy) for (let dx = -1; dx <= 1; ++dx) {
-                        if (x + dx < 0 || x + dx >= 256 || y + dy < 0 || y + dy >= 256) continue;
-                        const neighbour = ((y + dy) * 256 + x + dx) * 4;
-                        if (Math.abs(expected[neighbour] - expected[i]) > 32 ||
-                            Math.abs(actual[neighbour] - actual[i]) > 128) edge = true;
+                        if (x + dx < 0 || x + dx >= pixels || y + dy < 0 || y + dy >= pixels) continue;
+                        const neighbour = ((y + dy) * pixels + x + dx) * 4;
+                        if (Math.abs(expected[neighbour] - expected[i]) > 32) edge = true;
                     }
-                    if (!edge) ++differences;
+                    if (!edge) {
+                        ++differences;
+                        if (differenceLocations.length < 12) differenceLocations.push(`${x},${y}:${actual[i]}/${expected[i]}`);
+                    }
                 }
             }
             check(differences === 0, `GPU coverage agrees with SVG, allowing boundary antialiasing ` +
-                `(${differences} pixels, land ${actualLand}/${expectedLand}, zoom ${zoom}, geometry ${text.slice(0, 40)})`);
+                `(${differences} pixels, land ${actualLand}/${expectedLand}, zoom ${zoom}, ${differenceLocations.join(';')})`);
             check(gl.getError() === gl.NO_ERROR, 'GPU mask leaves no WebGL errors');
             console.log(`GPU MASK: ${vertices.length / 2} vertices, ${batches.length / 3} batches, ` +
                         `${projectMs.toFixed(2)}ms native projection, ${submitMs.toFixed(2)}ms CPU submission`);

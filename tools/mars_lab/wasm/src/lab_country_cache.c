@@ -17,7 +17,7 @@
 
 typedef struct _country_entry_t {
     struct _country_entry_t *previous, *next;
-    char key[128], code[7];
+    char key[128], code[7], nautical_zone[8];
     unsigned char *name;
     size_t bytes;
 } country_entry_t;
@@ -38,7 +38,7 @@ static country_cache_t *country_cache(void)
 }
 
 static void lab_country_cache_get_owned(jsref key_value);
-static bool lab_country_cache_put_owned(jsref key, jsref name, jsref code);
+static bool lab_country_cache_put_owned(jsref key, jsref name, jsref code, jsref nautical_zone);
 static void lab_country_cache_clear_owned(void);
 
 static size_t country_hash(const void *key)
@@ -86,11 +86,13 @@ static void lab_country_cache_get_owned(jsref key_value)
     jsref result = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(result, "name", lab_dom_utf8_string(entry->name, strlen((const char *)entry->name)));
     lab_dom_set(result, "code", lab_dom_utf8_string((const unsigned char *)entry->code, strlen(entry->code)));
+    lab_dom_set(result, "nauticalZone", lab_dom_utf8_string((const unsigned char *)entry->nautical_zone,
+                                                           strlen(entry->nautical_zone)));
     lab_dom_return(result);
 }
 
 /* Validate and allocate replacement text before changing existing entries. */
-static bool lab_country_cache_put_owned(jsref key, jsref name, jsref code)
+static bool lab_country_cache_put_owned(jsref key, jsref name, jsref code, jsref nautical_zone)
 {
     country_cache_t *state = country_cache();
     unsigned length = lab_dom_length(name);
@@ -101,11 +103,12 @@ static bool lab_country_cache_put_owned(jsref key, jsref name, jsref code)
     entry->name = malloc(capacity + 1);
     int bytes = entry->name ? lab_dom_utf8_copy(name, entry->name, capacity) : -1;
     if (bytes < 0 || !copy_key(key, entry->key, sizeof entry->key) ||
-        !copy_key(code, entry->code, sizeof entry->code)) {
+        !copy_key(code, entry->code, sizeof entry->code) ||
+        (nautical_zone && !copy_key(nautical_zone, entry->nautical_zone, sizeof entry->nautical_zone))) {
         free(entry->name); free(entry); return false;
     }
     entry->name[bytes] = 0;
-    entry->bytes = capacity + 1 + strlen(entry->key) + strlen(entry->code);
+    entry->bytes = capacity + 1 + strlen(entry->key) + strlen(entry->code) + strlen(entry->nautical_zone);
     if (entry->bytes > 1048576) { free(entry->name); free(entry); return false; }
     if (!state->countries) state->countries = dictionary_create(128, sizeof(country_entry_t *), country_hash, country_compare,
                                                    NULL, NULL, NULL, NULL, NULL);
@@ -154,20 +157,21 @@ typedef struct _country_cache_put_request_t {
     jsref key;
     jsref name;
     jsref code;
+    jsref nautical_zone;
     bool result;
 } country_cache_put_request_t;
 
 static void country_cache_put_dispatch(void *context)
 {
     country_cache_put_request_t *request = context;
-    request->result = lab_country_cache_put_owned(request->key, request->name, request->code);
+    request->result = lab_country_cache_put_owned(request->key, request->name, request->code, request->nautical_zone);
 }
 
 /* Execute the complete operation through the singleton's serial dispatcher. */
-bool lab_country_cache_put(jsref key, jsref name, jsref code)
+bool lab_country_cache_put(jsref key, jsref name, jsref code, jsref nautical_zone)
 {
     country_cache_t *state = country_cache();
-    country_cache_put_request_t request = {.key = key, .name = name, .code = code, .result = 0};
+    country_cache_put_request_t request = {.key = key, .name = name, .code = code, .nautical_zone = nautical_zone, .result = 0};
     lab_serial_dispatch(&state->serial, country_cache_put_dispatch, &request);
     return request.result;
 }

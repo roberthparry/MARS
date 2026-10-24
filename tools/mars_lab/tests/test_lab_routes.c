@@ -25,10 +25,12 @@
 #include <unistd.h>
 
 #include "file-t.h"
+#include "globe-t.h"
 #include "http-t.h"
 #include "jurisdiction-t.h"
 #include "sqlite-t.h"
 #include "lab_server.h"
+#include "lab_page.h"
 #include "lab_wire.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
@@ -588,6 +590,69 @@ static void test_lab_catalogue_elevation(void)
         "legacy no-data and absent elevations use zero; real below-sea-level elevations survive all catalogue paths");
 }
 
+static bool route_catalogue_country(const char *directory)
+{
+    if (!test_lab_catalogue_database(directory)) return false;
+    string_t *path = string_sprintf("%s/geometry.db", directory);
+    sqlite_t *geometry = sqlite_open_plain(path);
+    file_t *sources[2] = {NULL, NULL};
+    const char *extensions[] = {"shp", "dbf"};
+    bool ok = geometry != NULL;
+    for (unsigned i = 0; ok && i < 2; ++i) {
+        string_t *packed_path = string_sprintf("packaging/globe-db/map-units-5.1.1.%s.zst", extensions[i]);
+        string_t *plain_path = string_sprintf("%s/map.%s", directory, extensions[i]);
+        file_t *packed = file_new(packed_path);
+        sources[i] = file_new(plain_path);
+        ok = packed && sources[i] && file_decompress_zstd(packed, sources[i], 16 * 1048576, false) &&
+             file_open_read(sources[i]);
+        file_free(packed); string_free(packed_path); string_free(plain_path);
+    }
+    ok = ok && globe_import_countries(geometry, sources[0], sources[1]);
+    file_free(sources[0]); file_free(sources[1]); sqlite_close(geometry);
+    ok = ok && !setenv("MARS_GLOBE_DB_PATH", string_c_str(path), 1) && !setenv("MARS_GLOBE_DB_KEY", "", 1);
+    string_free(path);
+    path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    string_t *key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
+    sqlite_t *db = sqlite_open_encrypted(path, key);
+    ok = ok && db && sqlite_exec_cstr(db,
+        "UPDATE jurisdiction_town SET jurisdiction_id='GB';"
+        "UPDATE jurisdiction_town SET town_name='London' WHERE jurisdiction_town_id=1;"
+        "UPDATE jurisdiction_town_latitude SET latitude='51.5074' WHERE jurisdiction_town_id=1;"
+        "UPDATE jurisdiction_town_longitude SET longitude='-0.1278' WHERE jurisdiction_town_id=1;"
+        "UPDATE jurisdiction_town SET town_name='Cardiff' WHERE jurisdiction_town_id=2;"
+        "UPDATE jurisdiction_town_latitude SET latitude='51.4816' WHERE jurisdiction_town_id=2;"
+        "UPDATE jurisdiction_town_longitude SET longitude='-3.1791' WHERE jurisdiction_town_id=2;"
+        "UPDATE jurisdiction_town SET town_name='Edinburgh' WHERE jurisdiction_town_id=3;"
+        "UPDATE jurisdiction_town_latitude SET latitude='55.9533' WHERE jurisdiction_town_id=3;"
+        "UPDATE jurisdiction_town_longitude SET longitude='-3.1883' WHERE jurisdiction_town_id=3;");
+    sqlite_close(db); string_free(path); string_free(key);
+    json_t *catalogue = ok ? lab_page_town_jurisdiction_batch(0, "GB") : NULL;
+    const json_t *towns = test_lab_member(test_lab_member(catalogue, "towns"), "GB");
+    if (!ok || json_array_size(towns) != 3) {
+        string_t *diagnostic = catalogue ? json_to_string(catalogue) : NULL;
+        string_fprintf(stderr, "Country fixture ready=%d catalogue=%s\n", ok,
+                       diagnostic ? string_c_str(diagnostic) : "null");
+        string_free(diagnostic);
+    }
+    ok = ok && json_array_size(towns) == 3;
+    for (size_t i = 0; ok && i < 3; ++i) {
+        const json_t *row = json_array_get(towns, i);
+        const char *name = test_lab_text(row, "name");
+        const char *expected = !strcmp(name, "London") ? "GB-ENG" : !strcmp(name, "Cardiff") ? "GB-WLS" : "GB-SCT";
+        ok = !strcmp(test_lab_text(row, "country_code"), expected);
+        if (!ok) string_fprintf(stderr, "Country fixture %s expected=%s actual=%s\n", name, expected,
+                               test_lab_text(row, "country_code"));
+    }
+    json_free(catalogue);
+    return ok;
+}
+
+static void test_lab_catalogue_country(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(route_catalogue_country),
+        "UK catalogue towns retain their group but display their geographic constituent-country flags");
+}
+
 static bool route_catalogue(const char *directory)
 {
     if (!test_lab_catalogue_database(directory))
@@ -830,6 +895,7 @@ void test_lab_route_cases(void)
     TEST_RUN_IN_GROUP(test_lab_http_contracts, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_catalogue, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_catalogue_elevation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_catalogue_country, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_rejections, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_rivers, tests, NULL);
 }

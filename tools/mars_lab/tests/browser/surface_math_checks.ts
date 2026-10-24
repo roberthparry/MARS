@@ -82,6 +82,66 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
               'collinear clipping remnants never become stroked lines across water');
         check(shoreLoad(lines + square) && shoreSvg() === front,
               'discarding zero-width clipping remnants leaves real coastlines unchanged');
+        // A concave polygon clipped at longitude zero becomes two filled pieces
+        // joined by a retraced, zero-width edge. That join is not coastline.
+        const bridge = 'M1 0 0 -10\nL-10 -10\nL-10 -5\nL0 -5\nL0 5\nL-10 5\nL-10 10\nL0 10\nZ\n';
+        check(shoreLoad(bridge), 'clipped disconnected land pieces load');
+        const bridgeImage = new Image(), bridgeURL = URL.createObjectURL(new Blob([
+            `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800">${shoreSvg()}</svg>`
+        ], {type: 'image/svg+xml'}));
+        try {
+            bridgeImage.src = bridgeURL;
+            await bridgeImage.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = canvas.height = 800;
+            const context = canvas.getContext('2d')!;
+            context.drawImage(bridgeImage, 0, 0);
+            const pixels = context.getImageData(399, 380, 2, 40).data;
+            check(pixels.every((value, i) => value === [7, 20, 64, 255][i % 4]),
+                  'retraced clipping joins do not draw straight coastlines through open water');
+        } finally { URL.revokeObjectURL(bridgeURL); }
+        const curvedBridge = 'M1 0 -1.31 48.17\nL-2.71 48.17\nL-2.71 48.93\nL-1.31 48.93\n' +
+            'L-1.31 49.83\nL-2.71 49.83\nL-2.71 50.91\nL-1.31 50.91\nZ\n';
+        const separatePieces = 'M1 0 -1.31 48.17\nL-2.71 48.17\nL-2.71 48.93\nL-1.31 48.93\nZ\n' +
+            'M1 0 -1.31 49.83\nL-2.71 49.83\nL-2.71 50.91\nL-1.31 50.91\nZ\n';
+        const camera = labDOM.call('lab_globe_rotate', labDOM.call('lab_globe_centre', 49.51, -3.17), 1, 0, 0, .37) as number[];
+        const raster = async (text: string): Promise<Uint8ClampedArray> => {
+            check(shoreLoad(text), 'curved clipping fixture loads');
+            const image = new Image(), url = URL.createObjectURL(new Blob([
+                `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800">${shoreSvg(camera, 32)}</svg>`
+            ], {type: 'image/svg+xml'}));
+            try {
+                image.src = url;
+                await image.decode();
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 800;
+                const context = canvas.getContext('2d')!;
+                context.drawImage(image, 0, 0);
+                return context.getImageData(0, 0, 800, 800).data;
+            } finally { URL.revokeObjectURL(url); }
+        };
+        const background = 'M1 0 -10 40\nL10 40\nL10 60\nL-10 60\nZ\n';
+        const bridgeCases: [string, string, number[]][] = [
+            [curvedBridge, separatePieces, [7, 20, 64]],
+            [curvedBridge.replaceAll('M1 0', 'M1 1'), separatePieces.replaceAll('M1 0', 'M1 1'), [7, 20, 64]],
+            [background + curvedBridge.replaceAll('M1 0', 'M2 0'),
+                background + separatePieces.replaceAll('M1 0', 'M2 0'), [70, 85, 34]]
+        ];
+        for (const [joined, separate, colour] of bridgeCases) {
+            const actual = await raster(joined), expected = await raster(separate);
+            let changed = 0;
+            for (let y = 1; y < 799; ++y) for (let x = 1; x < 799; ++x) {
+                const offset = (y * 800 + x) * 4;
+                if (colour.some((value, channel) => expected[offset + channel] !== value) ||
+                    colour.every((value, channel) => actual[offset + channel] === value)) continue;
+                let boundary = false;
+                for (let dy = -1; dy <= 1; ++dy) for (let dx = -1; dx <= 1; ++dx)
+                    if (colour.some((value, channel) => expected[((y + dy) * 800 + x + dx) * 4 + channel] !== value))
+                        boundary = true;
+                if (!boundary) ++changed;
+            }
+            check(changed === 0, `projected clipping joins cancel for land, ice and lakes (${changed} pixels)`);
+        }
         check(shoreLoad('M1 0 0 0\nL1 0\nL1 0.000000001\nZ\n') && shoreSvg()!.includes('<path'),
               'exact degeneracy checks retain extremely thin real polygons');
         check(shoreLoad(square), 'restore valid shoreline after collapsed-island checks');
@@ -326,6 +386,47 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     const hortaMarker = islandMarkers.firstElementChild;
     islandGlobe.drawMarkers(800);
     check(islandMarkers.firstElementChild === hortaMarker, 'stationary arrival reuses the restored town markers');
+    const englishTown = {...town('London', '51.5074', '-0.1278'), country_code: 'GB-ENG'};
+    check(labDOM.call('lab_town_store_add', 'GB', [englishTown]) === 1,
+          'UK catalogue accepts a separate native display country');
+    const englishPlace = labDOM.call('lab_town_store_get', 'GB', 'London') as GlobeTown;
+    check(englishPlace.jurisdiction === 'GB' && englishPlace.town.country_code === 'GB-ENG',
+          'native storage preserves display country without changing catalogue membership');
+    const englishCamera = labDOM.call('lab_globe_centre', 51.5074, -.1278) as number[];
+    const englishMarkers = document.createElement('div');
+    const englishInputs: Record<string, {value: string}> = {
+        Jurisdiction: {value: 'GB'}, Town: {value: 'London'},
+        Latitude: {value: '51.5074'}, Longitude: {value: '-0.1278'}
+    };
+    const englishGlobe = Object.assign(Object.create(MarsAlmanacGlobe.prototype), {
+        orientation: englishCamera, view: labDOM.call('lab_globe_view', englishCamera, 512, 1),
+        markerSignature: '', markers: englishMarkers, markerNodes: new Map(), loadCountry: () => {},
+        input: (key: string) => englishInputs[key], countryNames: new Intl.DisplayNames(['en-GB'], {type: 'region'})
+    }) as {drawMarkers(size: number): void; observerCountryKey(): string};
+    englishGlobe.drawMarkers(800);
+    const englishMarker = englishMarkers.querySelector<HTMLButtonElement>('.globe-town')!;
+    check(englishMarker.dataset.countryCode === 'GB-ENG' && englishGlobe.observerCountryKey() === 'town:GB-ENG',
+          'marker and selected observer use England even when the catalogue group is UK');
+    const englishSelect = document.createElement('select');
+    labDOM.call('lab_location_populate', englishSelect, [englishPlace.town], true);
+    check(englishSelect.options[0].dataset.countryCode === 'GB-ENG',
+          'town menu carries the same display country as the globe marker');
+    const englishFlag = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg"><path fill="red"/></svg>');
+    WorksheetResults.tooltip.rememberCountry('GB', 'United Kingdom',
+        'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg"><path fill="blue"/></svg>'));
+    WorksheetResults.tooltip.rememberCountry('GB-ENG', 'England', englishFlag);
+    document.body.append(englishMarkers);
+    try {
+        WorksheetResults.tooltip.show(englishMarker);
+        const tooltip = document.querySelector<HTMLElement>('#marsButtonTooltip')!;
+        check(tooltip.textContent!.includes('London, England') &&
+              tooltip.querySelector('img.country-flag')?.getAttribute('src') === englishFlag,
+              'a cached UK flag cannot replace England in a London tooltip');
+    } finally {
+        WorksheetResults.tooltip.hide();
+        englishMarkers.remove();
+        labDOM.call('lab_flag_cache_clear');
+    }
     check(labDOM.call('lab_town_store_add', 'ZZ', [town('rollback', '0', '0'), town('bad\ud800', '0', '0')]) === -1 &&
           !labDOM.call('lab_town_store_get', 'ZZ', 'rollback'), 'invalid UTF-8 input rolls back the complete batch');
     const overBudget = Array.from({length: 130}, (_, i) => ({...town(`quota-${i}`, '1', '1'), detail: 'x'.repeat(65536)}));
@@ -344,10 +445,13 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         .fullName === 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch',
         'native exception dictionary supplies the full Welsh town name');
     labDOM.call('lab_country_cache_clear');
-    for (let i = 0; i < 65; ++i) labDOM.call('lab_country_cache_put', `test:${i}`, 'Country — 巴西', 'BR');
+    for (let i = 0; i < 65; ++i) labDOM.call('lab_country_cache_put', `test:${i}`, 'Country — 巴西', 'BR', '');
     check(!labDOM.call('lab_country_cache_get', 'test:0') &&
         (labDOM.call('lab_country_cache_get', 'test:64') as {name: string}).name === 'Country — 巴西',
         'native spatial-country cache preserves Unicode and evicts its oldest entry');
+    labDOM.call('lab_country_cache_put', 'water:41,51', '', '', '3');
+    check((labDOM.call('lab_country_cache_get', 'water:41,51') as {nauticalZone: string}).nauticalZone === '3',
+        'native geographic cache preserves nautical suggestions independently of country names');
     labDOM.call('lab_country_cache_clear');
 
     const initialFetch = labHttp.fetch;
@@ -445,6 +549,29 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
               'globe centre picks observer coordinates');
         const view = labDOM.call('lab_globe_view', orientation, 1, 8192) as number[];
         check(view[2] === 4096 && view[3] < view[5] && view[4] < view[6], 'zoom bounded with valid texture extent');
+    }
+    const regionalCamera = [0.438915922285622, -0.03708466129533938, -0.09795837018398082, 0.8924022068393097];
+    const regionalView = labDOM.call('lab_globe_view', regionalCamera, 8.671137658463438 / 2, 1) as number[];
+    check(regionalView[5] - regionalView[3] < 80 && regionalView[5] - regionalView[3] > 70,
+          'mid-latitude regional prefetch remains regional instead of requesting most of a hemisphere');
+    for (const latitude of [0, 52, -52, 80, -80]) {
+        for (const longitude of [-179.95, 0, 179.95]) {
+            const camera = labDOM.call('lab_globe_rotate',
+                labDOM.call('lab_globe_centre', latitude, longitude), 1, 0, 0, .37) as number[];
+            for (const zoom of [1, 2, 4.335568829231719, 8, 64, 4096]) {
+                const view = labDOM.call('lab_globe_view', camera, zoom, 1) as number[];
+                const radius = Math.min(1, 1.6 / zoom) * (1 - 1e-12);
+                for (let i = 0; i < 72; ++i) {
+                    const angle = i * Math.PI / 36;
+                    const point = labDOM.call('lab_globe_pick', radius * Math.cos(angle),
+                        radius * Math.sin(angle), camera) as number[];
+                    const lon = point[1] + 360 * Math.round((view[1] - point[1]) / 360);
+                    check(point[0] >= view[4] - 1e-8 && point[0] <= view[6] + 1e-8 &&
+                          lon >= view[3] - 1e-8 && lon <= view[5] + 1e-8,
+                          'tight spherical bounds retain the entire rolled viewport, poles and date-line crossings');
+                }
+            }
+        }
     }
     check(labDOM.call('lab_globe_pick', 2, 0, [0, 0, 0, 1]) === null, 'globe limb rejects outside clicks');
     for (const [lat, lon] of [[52, -2], [-33, 151], [89.99, -179.9], [0, 180]]) {
@@ -1601,16 +1728,37 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             const click = {bubbles: true, button: 0, clientX: box.left + box.width * .56, clientY: box.top + box.height * .5};
             const beforePointClick = evaluations, previousLongitude = longitude.value;
             const pointFetch = labHttp.fetch;
+            const observerZone = document.getElementById('almanacZone') as HTMLInputElement;
+            observerZone.value = '0';
             labHttp.fetch = (url, options) => url === '/almanac-country'
                 ? Promise.resolve(Object.assign(new Response(), {async labData() {
-                    return {ok: true, country: '', country_code: '', country_flag: ''};
+                    return {ok: true, country: '', country_code: '', country_flag: '', nautical_zone: '3'};
                 }})) : pointFetch(url, options);
+            const waterFetch = labHttp.fetch;
             globeCanvas.dispatchEvent(new MouseEvent('click', click));
             check((document.getElementById('almanacJurisdiction') as HTMLSelectElement).value === '',
                   'custom point immediately clears the previous country');
             await new Promise(resolve => setTimeout(resolve, 0));
             check(longitude.value !== previousLongitude && town.value === '' && evaluations === beforePointClick + 1,
                   'one left click selects exact coordinates and evaluates once after country lookup');
+            check(observerZone.value === '3', 'unassigned inland water adopts the native nautical UTC-offset suggestion');
+            labDOM.call('lab_country_cache_clear');
+            let resolveZone!: (response: MarsTransportResponse) => void;
+            labHttp.fetch = (url, options) => url === '/almanac-country'
+                ? new Promise<MarsTransportResponse>(resolve => { resolveZone = resolve; }) : pointFetch(url, options);
+            globeCanvas.dispatchEvent(new MouseEvent('click', click));
+            observerZone.value = '5.5';
+            observerZone.dispatchEvent(new Event('input', {bubbles: true}));
+            resolveZone(Object.assign(new Response(), {async labData() {
+                return {ok: true, country: '', country_code: '', country_flag: '', nautical_zone: '3'};
+            }}));
+            await new Promise(resolve => setTimeout(resolve, 0));
+            check(observerZone.value === '5.5', 'a delayed nautical suggestion cannot overwrite a manual zone edit');
+            globeCanvas.dispatchEvent(new MouseEvent('click', click));
+            await new Promise(resolve => setTimeout(resolve, 0));
+            check(observerZone.value === '3', 'a new water selection retains its nautical suggestion through the native cache');
+            labHttp.fetch = waterFetch;
+            const afterZoneSelections = evaluations;
             const selectedLongitude = longitude.value;
             const jurisdictionSelect = document.getElementById('almanacJurisdiction') as HTMLSelectElement;
             jurisdictionSelect.value = jurisdiction;
@@ -1634,7 +1782,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 WorksheetLocations.calendar.calendarLocationContext());
             check(jurisdictionSelect.value === '', 'evaluation preserves an explicitly unidentified country');
             globeCanvas.dispatchEvent(new MouseEvent('click', {...click, button: 2}));
-            check(longitude.value === selectedLongitude && evaluations === beforePointClick + 1,
+            check(longitude.value === selectedLongitude && evaluations === afterZoneSelections,
                   'right click does not select an observer');
             const capture = globeCanvas.setPointerCapture;
             globeCanvas.setPointerCapture = () => {};
@@ -1653,20 +1801,20 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                           before.some((value, index) => Math.abs(value - after[index]) > .01),
                           'vertical drag at either edge rolls the rendered globe without moving its centre');
                     globeCanvas.dispatchEvent(new MouseEvent('click', edge));
-                    check(evaluations === beforePointClick + 1, 'edge roll does not select or evaluate an observer');
+                    check(evaluations === afterZoneSelections, 'edge roll does not select or evaluate an observer');
                 }
                 const pointer = {...click, pointerId: 42, pointerType: 'mouse'};
                 globeCanvas.dispatchEvent(new PointerEvent('pointerdown', pointer));
                 globeCanvas.dispatchEvent(new PointerEvent('pointermove', {...pointer, clientX: pointer.clientX + 30}));
                 globeCanvas.dispatchEvent(new PointerEvent('pointerup', {...pointer, clientX: pointer.clientX + 30}));
                 globeCanvas.dispatchEvent(new MouseEvent('click', click));
-                check(evaluations === beforePointClick + 1, 'a completed drag does not select an observer');
+                check(evaluations === afterZoneSelections, 'a completed drag does not select an observer');
                 globeCanvas.dispatchEvent(new PointerEvent('pointerdown', pointer));
                 globeCanvas.dispatchEvent(new PointerEvent('pointermove', {...pointer, clientX: pointer.clientX + 3}));
                 globeCanvas.dispatchEvent(new PointerEvent('pointerup', pointer));
                 globeCanvas.dispatchEvent(new MouseEvent('click', click));
                 await new Promise(resolve => setTimeout(resolve, 0));
-                check(evaluations === beforePointClick + 2, 'a single click after dragging tolerates small hand movement');
+                check(evaluations === afterZoneSelections + 1, 'a single click after dragging tolerates small hand movement');
             } finally { globeCanvas.setPointerCapture = capture; labHttp.fetch = pointFetch; }
             try {
                 let countryCalls = 0;
@@ -1680,12 +1828,13 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 await new Promise(requestAnimationFrame);
                 check(countryCalls === 1, 'custom selection and its marker share one pending geographic lookup');
                 resolveCountry(Object.assign(new Response(), {async labData() {
-                    return {ok: true, country: 'Wales', country_code: 'GB-WLS', country_flag: ''};
+                    return {ok: true, country: 'Wales', country_code: 'GB-WLS', country_flag: '', nautical_zone: '4'};
                 }}));
                 await new Promise(resolve => setTimeout(resolve, 0));
                 check((document.getElementById('almanacJurisdiction') as HTMLSelectElement).value === 'GB-WLS' &&
                       town.value === '' && latitude.value === pickedCoordinates[0] && longitude.value === pickedCoordinates[1],
                       'identified land changes the country menu without snapping the clicked point to a town');
+                check(observerZone.value === '3', 'an identified jurisdiction rejects a nautical-zone suggestion');
                 globeCanvas.dispatchEvent(new MouseEvent('click', landClick));
                 await new Promise(resolve => setTimeout(resolve, 0));
                 check(countryCalls === 1 && jurisdictionSelect.value === 'GB-WLS',

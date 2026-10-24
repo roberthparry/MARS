@@ -132,8 +132,17 @@ static bool test_cfg_database_towns_fixture(const char *directory)
                   "GROUP BY town_name HAVING count(*)>1)", "0");
     string_t *root = string_new_with(MARS_CONFIG_ROOT_DIR);
     string_t *world = string_new_with("packaging/jurisdiction-db/mars_jurisdiction_world_towns.sql");
+    /* The pinned Europe/Simferopol group covers 45 Crimean towns. Their UA membership is independent
+     * of civil-clock rules; verify both seeds and the normalised installer output below. */
     ok = ok && root && world && cfg_database_import(db, root, world) &&
          test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town_seed", "50004") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town_seed WHERE timezone_code=268 AND jurisdiction_id='UA'", "45") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town_seed WHERE timezone_code=268 AND jurisdiction_id<>'UA'", "0") &&
+         test_cfg_database_query(db,
+             "SELECT jurisdiction_id FROM jurisdiction_town_seed WHERE town_name='Chornomorske (GeoNames 710687)' "
+             "AND latitude='45.50657' AND longitude='32.69776'", "UA") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town_seed WHERE jurisdiction_id IN('AU','AU-QLD') "
              "AND town_name='Mooloolaba' AND latitude='-26.68164' AND longitude='153.11925' "
@@ -203,6 +212,14 @@ static bool test_cfg_database_towns_fixture(const char *directory)
          sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
          cfg_database_import(db, root, entry) &&
          test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50033") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town t JOIN jurisdiction_town_timezone z USING(jurisdiction_town_id) "
+             "WHERE z.timezone_code=268 AND t.jurisdiction_id='UA'", "45") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town t JOIN jurisdiction_town_timezone z USING(jurisdiction_town_id) "
+             "WHERE z.timezone_code=268 AND t.jurisdiction_id<>'UA'", "0") &&
+         test_cfg_database_query(db,
+             "SELECT jurisdiction_id FROM jurisdiction_town WHERE town_name='Chornomorske (GeoNames 710687)'", "UA") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town t JOIN jurisdiction_town_timezone z USING(jurisdiction_town_id) "
              "WHERE jurisdiction_id='PT-20' AND z.timezone_code=211", "10") &&
@@ -967,6 +984,71 @@ static void test_cfg_database_globe(void)
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_globe_fixture), "globe setup fails safely without shoreline source");
 }
 
+static bool test_cfg_country_migration_mode(const char *directory, const char *key)
+{
+    file_t *database = test_cfg_database_file(directory, "country_migration.db");
+    sqlite_t *db = database ? test_cfg_database_open(database, key) : NULL;
+    bool ok = db && sqlite_exec_cstr(db,
+        "create table shoreline_dataset(id,format_version,point_count);"
+        "insert into shoreline_dataset values(1,2,7);"
+        "create table shoreline_blob(id,vertices);"
+        "create table shoreline_chunk(id,level,codec,point_count,byte_offset,byte_count,boundary,blob_id);"
+        "create virtual table shoreline_bounds using rtree(id,min_x,max_x,min_y,max_y);"
+        "create table rivers_dataset(id,source);insert into rivers_dataset values(1,'retained');"
+        "create table country_name(id,name,iso_country_code);insert into country_name values(1,'old','RU');") &&
+        cfg_database_revision(db, "globe", 3);
+    sqlite_close(db);
+    ok = ok && !setenv("MARS_GLOBE_DB_PATH", file_path(database), 1) && !setenv("MARS_GLOBE_DB_KEY", key, 1) &&
+         !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 1;
+    db = ok ? test_cfg_database_open(database, key) : NULL;
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "3") &&
+         test_cfg_database_query(db, "select name from country_name", "old");
+    sqlite_close(db);
+    file_t *folder = test_cfg_database_file(directory, "packaging/globe-db");
+    ok = ok && folder && file_create_directory(folder, 0700, true);
+    file_free(folder);
+    const char *extensions[] = {"shp", "dbf"};
+    for (unsigned i = 0; ok && i < 2; ++i) {
+        string_t *relative = string_sprintf("packaging/globe-db/map-units-5.1.1.%s.zst", extensions[i]);
+        file_t *source = relative ? test_cfg_database_file(MARS_CONFIG_ROOT_DIR, string_c_str(relative)) : NULL;
+        file_t *target = relative ? test_cfg_database_file(directory, string_c_str(relative)) : NULL;
+        ok = source && target && file_copy(source, target, false);
+        file_free(source); file_free(target); string_free(relative);
+    }
+    /* No shoreline archive exists here: revision three must only rebuild country geometry. */
+    ok = ok && !cfg_databases_update();
+    db = ok ? test_cfg_database_open(database, key) : NULL;
+    globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
+    string_t *code = globe_country_code_at(globe, 44.95, 34.1);
+    ok = ok && code && !strcmp(string_c_str(code), "UA") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "4") &&
+         test_cfg_database_query(db, "select point_count from shoreline_dataset", "7") &&
+         test_cfg_database_query(db, "select source from rivers_dataset", "retained") &&
+         test_cfg_database_query(db, "select count(*) from country_name", "298");
+    string_free(code); globe_close(globe); sqlite_close(db);
+    /* A current database must remain usable even when the migration sources are no longer available. */
+    string_t *missing = string_sprintf("%s/missing", directory);
+    ok = ok && missing && !setenv("MARS_ROOT", string_c_str(missing), 1) && !cfg_databases_update();
+    string_free(missing); file_free(database);
+    return ok;
+}
+
+static bool test_cfg_country_migration_plain(const char *directory)
+{
+    return test_cfg_country_migration_mode(directory, "");
+}
+
+static bool test_cfg_country_migration_encrypted(const char *directory)
+{
+    return test_cfg_country_migration_mode(directory, "country-fixture-key");
+}
+
+static void test_cfg_country_migration(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_country_migration_plain), "plaintext country-only migration and rollback");
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_country_migration_encrypted), "encrypted country-only migration and rollback");
+}
+
 typedef struct {
     double x, y, first_x, first_y, last_x, last_y;
     bool inside, land;
@@ -1079,7 +1161,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "SELECT count(*) FROM country_name", "298") &&
          test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "3") &&
+         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "4") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
                                     "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
          test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
@@ -1092,7 +1174,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
          test_cfg_database_query(db, "select value from retained", "42") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "3");
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "4");
     sqlite_close(db);
     /* Country metadata is independent of town selection and land/water classification. */
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1121,7 +1203,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_coast_sydney(db) && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "select count(*) from country_name", "298") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "3") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "4") &&
          test_cfg_database_query(db, "select count(*) from sqlite_master where name in ('retained','rivers_dataset')", "0") &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_KEY", key) &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_PATH", file_path(database)) &&
@@ -1220,6 +1302,7 @@ void test_cfg_database_cases(void)
     TEST_RUN_IN_GROUP(test_cfg_database_almanac_plain, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_jurisdiction_plain, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_globe, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_country_migration, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_country_flags, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_update, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_coast_corrections, tests, NULL);

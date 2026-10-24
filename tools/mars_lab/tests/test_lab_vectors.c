@@ -3,7 +3,7 @@
  * @brief Isolated native shoreline-vector transport regressions.
  *
  * Imports synthetic nested rings into a private encrypted globe database, then
- * exercises world and regional vector selection without astronomy or network access.
+ * exercises world and regional vector selection and near-shore observer policy without astronomy or network access.
  */
 #include <stdint.h>
 #include <math.h>
@@ -62,6 +62,32 @@ static bool vector_response(const json_t *response, bool single)
     return ok;
 }
 
+static bool vector_surface_policy(void)
+{
+    const struct { const char *latitude, *surface, *horizon, *location; } cases[] = {
+        {"5.01", "Coastal water", "false", "Custom — Coastal water"},
+        {"5.1", "Sea", "true", "Custom — Offshore"},
+        {"5.001", "Coastal", "false", "Custom — Coastal"},
+        {"4", "Land", "false", "Custom — Land"},
+        {"2", "Inland water", "false", "Custom — Inland water"}
+    };
+    bool ok = true;
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        json_t *options = test_lab_json("{\"lon\":\"0\",\"elevation\":\"39\",\"jurisdiction\":\"RO\"}");
+        lab_cal_set(options, "lat", cases[i].latitude);
+        lab_cal_surface(options);
+        string_t *location = lab_cal_observer_location(options, "", !strcmp(cases[i].horizon, "true"));
+        ok = ok && !strcmp(lab_cal_text(options, "observer_surface"), cases[i].surface) &&
+             !strcmp(lab_cal_text(options, "sea_horizon"), cases[i].horizon) &&
+             !strcmp(lab_cal_text(options, "elevation"), "39") &&
+             !*lab_cal_observer_jurisdiction(options) && location &&
+             !strcmp(string_c_str(location), cases[i].location);
+        string_free(location);
+        json_free(options);
+    }
+    return ok;
+}
+
 static bool vector_fixture(const char *directory)
 {
     string_t *path = string_sprintf("%s/globe.db", directory), *input_path = string_sprintf("%s/rings.bin", directory);
@@ -85,12 +111,14 @@ static bool vector_fixture(const char *directory)
     setenv("MARS_GLOBE_DB_PATH", string_c_str(path), 1);
     ok = globe_reader_get(reader) && ok;
     globe_reader_free(reader);
+    ok = vector_surface_policy() && ok;
     ok = lab_cal_surface_open() && ok;
     const char *requests[] = {
         "{\"west\":-6,\"south\":-6,\"east\":6,\"north\":6,\"format\":\"vectors\"}",
+        "{\"west\":-38,\"south\":-22,\"east\":36,\"north\":22,\"format\":\"vectors\"}",
         "{\"west\":-180,\"south\":-90,\"east\":180,\"north\":90,\"format\":\"vectors\"}"
     };
-    for (unsigned i = 0; ok && i < 2; ++i) {
+    for (unsigned i = 0; ok && i < sizeof requests / sizeof *requests; ++i) {
         json_t *payload = test_lab_json(requests[i]);
         unsigned status = 200;
         json_t *response = lab_cal_globe(payload, &status);
@@ -111,12 +139,13 @@ static bool vector_fixture(const char *directory)
         }
     }
     lab_cal_surface_close();
+    ok = vector_surface_policy() && ok;
     pid_t owner = ok ? lab_surface_service_start(2) : -1;
     ok = ok && owner > 0;
-    for (unsigned i = 0; ok && i < 2; ++i) {
+    for (unsigned i = 0; ok && i < sizeof requests / sizeof *requests; ++i) {
         pid_t client = fork();
         if (!client) {
-            lab_surface_service_select(i);
+            lab_surface_service_select(i % 2);
             json_t *payload = test_lab_json(requests[i]);
             unsigned status = 200;
             json_t *response = lab_surface_service_request(payload, &status);

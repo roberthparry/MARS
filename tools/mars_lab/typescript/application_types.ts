@@ -53,6 +53,9 @@ interface LabConfiguration {
 
 /** @brief One native town object, including prepared selection and display text. */
 interface LabTown {
+    /** @brief Native display jurisdiction, distinct from the catalogue grouping when necessary. */
+    country_code?: string;
+
     /** @brief Display name supplied by the jurisdiction database. */
     name: string;
 

@@ -223,7 +223,8 @@ void lab_location_populate(node_jsref select, jsref towns, bool select_default)
         int name = lab_dom_get(town, "name");
         lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_truth(name) ?
                       lab_location_town_text(lab_location_text(name)) : lab_dom_string("Location"));
-        lab_dom_write(option, LAB_DOM_DATASET, "countryCode", jurisdiction);
+        int country = lab_dom_get(town, "country_code");
+        lab_dom_write(option, LAB_DOM_DATASET, "countryCode", lab_dom_length(country) ? country : jurisdiction);
         for (unsigned field = 0; field < sizeof attributes / sizeof *attributes; ++field)
             lab_dom_write(option, LAB_DOM_DATASET, attributes[field], lab_location_text(lab_dom_get(town, attributes[field])));
         if (lab_dom_truth(lab_dom_get(town, "default"))) {

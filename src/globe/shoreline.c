@@ -18,7 +18,7 @@
 
 
 
-static bool coast_near(double ax, double ay, double bx, double by, double x, double y, double scale)
+static bool coast_near(double ax, double ay, double bx, double by, double x, double y, double scale, double radius)
 {
     ax = (ax - x) * scale;
     bx = (bx - x) * scale;
@@ -26,11 +26,11 @@ static bool coast_near(double ax, double ay, double bx, double by, double x, dou
     by = (by - y) * 111195;
     double dx = bx - ax, dy = by - ay, length = dx * dx + dy * dy;
     double t = length > 0 ? fmax(0, fmin(1, -(ax * dx + ay * dy) / length)) : 0;
-    return hypot(ax + t * dx, ay + t * dy) <= 500;
+    return hypot(ax + t * dx, ay + t * dy) <= radius;
 }
 
 typedef struct {
-    double x, y, scale;
+    double x, y, scale, radius;
     unsigned crossings;
     bool boundary;
 } coast_hit_t;
@@ -45,7 +45,7 @@ static bool coast_cached_ring(const coast_geometry_t *geometry, const coast_ring
         if ((a.y > hit->y) != (b.y > hit->y) &&
             hit->x < a.x + (hit->y - a.y) * ((double)b.x - a.x) / ((double)b.y - a.y))
             hit->crossings ^= 1u << ring->level;
-        if (geometry->boundary[index] && coast_near(a.x, a.y, b.x, b.y, hit->x, hit->y, hit->scale)) {
+        if (geometry->boundary[index] && coast_near(a.x, a.y, b.x, b.y, hit->x, hit->y, hit->scale, hit->radius)) {
             hit->boundary = true;
             return false;
         }
@@ -54,10 +54,10 @@ static bool coast_cached_ring(const coast_geometry_t *geometry, const coast_ring
     return true;
 }
 
-static globe_surface_t coast_cached_hit(coast_geometry_t *geometry, double latitude, double longitude)
+static globe_surface_t coast_cached_hit(coast_geometry_t *geometry, double latitude, double longitude, double radius)
 {
-    coast_hit_t hit = {.y = latitude, .scale = 111195 * cos(latitude * 0.017453292519943295)};
-    double tx = hit.scale > 1 ? 500 / hit.scale : 360, ty = 500 / 111195.0;
+    coast_hit_t hit = {.y = latitude, .scale = 111195 * cos(latitude * 0.017453292519943295), .radius = radius};
+    double tx = hit.scale > 1 ? radius / hit.scale : 360, ty = radius / 111195.0;
     for (int wrap = -1; !hit.boundary && wrap <= 1; ++wrap) {
         hit.x = longitude + wrap * 360.0;
         double bounds[] = {(hit.x - tx) * 1000000, (hit.y - ty) * 1000000, 360000000, (hit.y + ty) * 1000000};
@@ -126,15 +126,22 @@ void shoreline_close(shoreline_t *shoreline)
     free(shoreline);
 }
 
-/* Classify a point with bounded decompression of spatially selected chunks. */
+/* Retain the standard uncertainty band independently of wider contextual queries. */
 globe_surface_t shoreline_hit_test(shoreline_t *shoreline, double latitude_degrees, double longitude_degrees)
 {
+    return shoreline_hit_test_radius(shoreline, latitude_degrees, longitude_degrees, 500);
+}
+
+/* Classify with a caller-selected proximity band without changing any polygon. */
+globe_surface_t shoreline_hit_test_radius(shoreline_t *shoreline, double latitude_degrees, double longitude_degrees,
+                                         double radius)
+{
     if (!shoreline || !isfinite(latitude_degrees) || !isfinite(longitude_degrees) ||
-        fabs(latitude_degrees) > 90 || fabs(longitude_degrees) > 180)
+        fabs(latitude_degrees) > 90 || fabs(longitude_degrees) > 180 || !isfinite(radius) || radius < 0 || radius > 20000)
         return GLOBE_UNKNOWN;
     coast_geometry_t *geometry = coast_geometry_acquire(shoreline, false);
     if (geometry) {
-        globe_surface_t surface = coast_cached_hit(geometry, latitude_degrees, longitude_degrees);
+        globe_surface_t surface = coast_cached_hit(geometry, latitude_degrees, longitude_degrees, radius);
         coast_geometry_release(geometry);
         return surface;
     }
@@ -143,8 +150,8 @@ globe_surface_t shoreline_hit_test(shoreline_t *shoreline, double latitude_degre
     bool boundary = false, ok = query != NULL;
     double y = latitude_degrees, scale = 111195 * cos(latitude_degrees * 0.017453292519943295);
     /* At the poles the east/west scale tends to zero; retain all longitude candidates. */
-    double tolerance_x = scale > 1 ? 500 / scale : 360;
-    double tolerance_y = 500 / 111195.0;
+    double tolerance_x = scale > 1 ? radius / scale : 360;
+    double tolerance_y = radius / 111195.0;
     for (int wrap = -1; ok && wrap <= 1; ++wrap) {
         double x = longitude_degrees + wrap * 360.0;
         ok = sqlite_stmt_bind_double(query, 1, (x - tolerance_x) * 1000000) &&
@@ -182,7 +189,7 @@ globe_surface_t shoreline_hit_test(shoreline_t *shoreline, double latitude_degre
                 double bx = b.x, by = b.y;
                 if ((ay > y) != (by > y) && x < ax + (y - ay) * (bx - ax) / (by - ay))
                     crossings ^= 1u << level;
-                boundary = boundary || (physical && coast_near(ax, ay, bx, by, x, y, scale));
+                boundary = boundary || (physical && coast_near(ax, ay, bx, by, x, y, scale, radius));
                 ax = bx;
                 ay = by;
             }

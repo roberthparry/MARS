@@ -1285,7 +1285,9 @@ static bool cfg_globe_valid(sqlite_t *db)
 /* Called inside the shared release updater's transaction; leave all unrelated layers intact. */
 bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging)
 {
-    return cfg_globe_valid(db) && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
+    int64_t revision = 0;
+    return cfg_database_current_revision(db, "globe", &revision) && cfg_globe_valid(db) &&
+           (revision >= 3 || cfg_database_coast(db, root, staging)) && cfg_globe_countries(db, root, staging) &&
            cfg_globe_valid(db);
 }
 
@@ -1330,7 +1332,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
             sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
             cfg_globe_valid(db) && sqlite_exec_cstr(db, "begin immediate");
         ok = transaction && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
-             cfg_globe_valid(db) && cfg_database_revision(db, "globe", 3) && sqlite_exec_cstr(db, "commit");
+             cfg_globe_valid(db) && cfg_database_revision(db, "globe", 4) && sqlite_exec_cstr(db, "commit");
         if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
         sqlite_close(db);
     } else if (ok && check) {
@@ -1346,7 +1348,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         db = temporary && root ? cfg_database_open(temporary_path, key) : NULL;
         ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
-             cfg_database_revision(db, "globe", 3);
+             cfg_database_revision(db, "globe", 4);
         sqlite_close(db);
         string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
         string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;

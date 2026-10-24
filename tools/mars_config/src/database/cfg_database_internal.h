@@ -28,7 +28,10 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root);
 /** Record a completed managed-data migration inside its caller-owned transaction. */
 bool cfg_database_revision(sqlite_t *db, const char *name, int revision);
 
-/** Refresh packaged shoreline and country layers without touching river data or credentials. */
+/** Read the managed-data revision, returning zero for legacy databases without revision metadata. */
+bool cfg_database_current_revision(sqlite_t *db, const char *name, int64_t *revision);
+
+/** Refresh countries and, before revision three, shoreline; retain river data and credentials. */
 bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging);
 
 /** Shared installer-owned settings; callbacks borrow these strings and never publish them directly. */

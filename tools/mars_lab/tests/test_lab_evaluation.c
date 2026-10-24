@@ -164,8 +164,62 @@ static void test_lab_calendar_validation(void)
     string_free(route);
 }
 
+static void check_weather_local_day(void)
+{
+    const struct { const char *date, *clock; int first, last, shift; } cases[] = {
+        {"2026-10-23", "23:06:19", -3600, 79200, 1},
+        {"2026-10-23", "00:06:19", 25200, 108000, -1},
+        {"2026-10-23", "23:06:19", 25200, 108000, 0},
+        {"2026-10-23", "12:06:19", -3600, 79200, 0},
+        {"2026-10-31", "23:06:19", -50400, 32400, 1},
+        {"2027-01-01", "00:06:19", 43200, 126000, -1},
+        {"2026-10-23", "23:59:59", 0, 82800, 0},
+        {"2026-10-23", "00:00:00", 0, 82800, 0},
+        {"2026-10-23", "23:06:19", -20700, 62100, 1},
+        {"2026-10-25", "23:06:19", -3600, 82800, 0},
+        {"2026-03-29", "22:30:00", 0, 79200, 0},
+        {"2026-03-29", "23:30:00", 0, 79200, 1}
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        json_t *options = test_lab_json("{\"observing_conditions\":\"yes\",\"zone\":\"-12\"}");
+        lab_cal_set(options, "date", cases[i].date); lab_cal_set(options, "time", cases[i].clock);
+        double midnight = floor(lab_cal_weather_epoch(options) / 86400) * 86400;
+        string_t *source = string_sprintf("{\"forecast\":{\"forecastday\":[{\"date\":\"%s\",\"hour\":["
+            "{\"time_epoch\":%.0f},{\"time_epoch\":%.0f}]}]}}", cases[i].date,
+            midnight + cases[i].first, midnight + cases[i].last);
+        json_t *weather = json_from_text(source);
+        TEST_ASSERT_INT_EQ(lab_cal_weather_day_shift(options, weather), cases[i].shift);
+        lab_cal_set(options, "observing_conditions", "");
+        TEST_ASSERT_INT_EQ(lab_cal_weather_day_shift(options, weather), 0);
+        json_free(weather); string_free(source); json_free(options);
+    }
+    json_t *options = test_lab_json("{\"date\":\"2026-10-23\",\"time\":\"23:06:19\","
+                                    "\"observing_conditions\":\"yes\",\"lat\":\"51.5\",\"elevation\":\"39\"}");
+    json_t *weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"date\":\"2026-10-23\",\"hour\":["
+        "{\"time_epoch\":1792710000},{\"time_epoch\":1792792800}]},{\"date\":\"2026-10-24\",\"hour\":["
+        "{\"time_epoch\":1792796400,\"temp_c\":10,\"pressure_mb\":1008},"
+        "{\"time_epoch\":1792800000,\"temp_c\":12,\"pressure_mb\":1009}]}]}}");
+    TEST_ASSERT_INT_EQ(lab_cal_weather_day_shift(options, weather), 0);
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(strstr(lab_cal_text(options, "weather_source"), "hourly interpolation") &&
+                     !strcmp(lab_cal_text(options, "pressure_hpa"), "1008.000000") &&
+                     !strcmp(lab_cal_text(options, "date"), "2026-10-23") &&
+                     !strcmp(lab_cal_text(options, "time"), "23:06:19"),
+                     "next local day supplies conditions without changing the selected GMT moment");
+    json_free(weather);
+    weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"date\":\"2026-10-23\",\"hour\":["
+        "{\"time_epoch\":1792789200},{\"time_epoch\":1792800000}]}]}}");
+    TEST_ASSERT_INT_EQ(lab_cal_weather_day_shift(options, weather), 0);
+    json_free(weather);
+    weather = test_lab_json("{\"error\":{\"code\":2007}}");
+    TEST_ASSERT_INT_EQ(lab_cal_weather_day_shift(options, weather), 0);
+    TEST_ASSERT_INT_EQ(lab_cal_weather_day_shift(options, NULL), 0);
+    json_free(weather); json_free(options);
+}
+
 static void test_lab_observing_conditions(void)
 {
+    check_weather_local_day();
     json_t *options = test_lab_json(
         "{\"date\":\"2000-01-01\",\"time\":\"12:30:00\",\"lat\":\"50\",\"elevation\":\"2000\"}");
     json_t *weather = test_lab_json(

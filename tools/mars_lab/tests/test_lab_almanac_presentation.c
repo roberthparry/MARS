@@ -7,6 +7,7 @@
  * bounded publication. Home-sky checks additionally use native zoneinfo and available
  * configured ephemerides; no weather, network or browser is required.
  */
+#include <math.h>
 #include <string.h>
 
 #define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
@@ -343,6 +344,111 @@ static void test_lab_calendar_markup_escaping(void)
 
 static void test_lab_country_presentation(void)
 {
+    const struct { double longitude; const char *zone; } zones[] = {
+        {0, "0"}, {-0.1, "0"}, {7.4999, "0"}, {7.5, "1"}, {-7.5, "-1"},
+        {51, "3"}, {52.4999, "3"}, {52.5, "4"}, {-52.5, "-4"}, {180, "12"}, {-180, "-12"},
+        {181, ""}, {NAN, ""}, {INFINITY, ""}
+    };
+    json_t *suggestion = json_new_object();
+    lab_cal_set(suggestion, "zone", "5.5");
+    for (size_t i = 0; i < sizeof zones / sizeof *zones; ++i) {
+        lab_cal_nautical_zone(suggestion, true, false, true, zones[i].longitude);
+        TEST_ASSERT_TRUE(!strcmp(lab_cal_text(suggestion, "nautical_zone"), zones[i].zone),
+                         "nautical UTC offsets have east-positive signs, half-zone boundaries and date-line sides");
+    }
+    const bool allowed[][3] = {{false, false, true}, {true, true, true}, {true, false, false}};
+    for (size_t i = 0; i < sizeof allowed / sizeof *allowed; ++i) {
+        lab_cal_set(suggestion, "nautical_zone", "3");
+        lab_cal_nautical_zone(suggestion, allowed[i][0], allowed[i][1], allowed[i][2], 51);
+        TEST_ASSERT_TRUE(!*lab_cal_text(suggestion, "nautical_zone"),
+                         "no nautical default for oceans, land, identified jurisdictions or missing boundary data");
+    }
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_text(suggestion, "zone"), "5.5"), "suggestions never overwrite authored offsets");
+    json_free(suggestion);
+    json_t *water = test_lab_json("{\"location_name\":\"Caspian Sea\",\"observer_surface\":\"Inland water\"}");
+    string_t *location = lab_cal_observer_location(water, "", false);
+    TEST_ASSERT_TRUE(location && !strcmp(string_c_str(location), "Caspian Sea") &&
+                     !*lab_cal_observer_jurisdiction(water), "named water supplies a location but never a country");
+    string_free(location);
+    lab_cal_set(water, "country", "Fixture country");
+    location = lab_cal_observer_location(water, "", false);
+    TEST_ASSERT_TRUE(location && !strcmp(string_c_str(location), "Caspian Sea"), "water name remains the location");
+    string_free(location);
+    location = lab_cal_observer_location(water, "Fixture town", false);
+    TEST_ASSERT_TRUE(location && !strcmp(string_c_str(location), "Fixture town, Fixture country"),
+                     "an explicitly selected town retains its own name");
+    string_free(location);
+    lab_cal_set(water, "location_name", "");
+    lab_cal_set(water, "country", "");
+    location = lab_cal_observer_location(water, "", false);
+    TEST_ASSERT_TRUE(location && !strcmp(string_c_str(location), "Custom — Inland water"),
+                     "unrecognised water retains the existing location fallback");
+    string_free(location);
+    json_free(water);
+    json_t *crimea = test_lab_json("{\"country\":\"Ukraine\",\"country_code\":\"UA\",\"jurisdiction\":\"RU\","
+        "\"observer_surface\":\"Land\",\"town\":\"Chornomorske (GeoNames 710687)|45.50657|32.69776|17\"}");
+    const struct { const char *source, *display; } town_names[] = {
+        {"Chornomorske (GeoNames 710687)", "Chornomorske, Ukraine"},
+        {"Staryi Krym (GeoNames 692714)", "Staryi Krym, Ukraine"},
+        {"Évora (GeoNames 123)", "Évora, Ukraine"},
+        {"Town (North)", "Town (North), Ukraine"},
+        {"Town (GeoNames )", "Town (GeoNames ), Ukraine"},
+        {"Town (GeoNames 123) Bay", "Town (GeoNames 123) Bay, Ukraine"},
+        {"Town (GeoNames abc)", "Town (GeoNames abc), Ukraine"}
+    };
+    for (size_t i = 0; i < sizeof town_names / sizeof *town_names; ++i) {
+        location = lab_cal_observer_location(crimea, town_names[i].source, false);
+        TEST_ASSERT_TRUE(location && !strcmp(string_c_str(location), town_names[i].display),
+                         "display omits only trailing numeric source identifiers, preserving real parenthetical names");
+        string_free(location);
+    }
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_observer_jurisdiction(crimea), "UA") &&
+                     !strcmp(lab_cal_text(crimea, "town"), "Chornomorske (GeoNames 710687)|45.50657|32.69776|17"),
+                     "resolved Ukraine overrides the old country without changing the disambiguated town key");
+    lab_cal_set(crimea, "country", "");
+    location = lab_cal_observer_location(crimea, "Chornomorske (GeoNames 710687)", false);
+    TEST_ASSERT_TRUE(location && !strcmp(string_c_str(location), "Chornomorske — Land"),
+                     "fallback location labels also hide source identifiers");
+    string_free(location);
+    json_free(crimea);
+    json_t *options = test_lab_json("{\"country\":\"Ukraine\",\"country_code\":\"UA\",\"jurisdiction\":\"RU\","
+        "\"observer_surface\":\"Land\",\"town\":\"Chornomorske (GeoNames 710687)|45.50657|32.69776|17\","
+        "\"lat\":\"45.50657\",\"lon\":\"32.69776\",\"elevation\":\"39\",\"date\":\"2026-10-24\","
+        "\"time\":\"12:00:00\",\"zone\":\"3\",\"visibility\":\"all\",\"defer_events\":\"true\"}");
+    json_t *fields = test_lab_json("{\"snapshot\":\"MOON|Moon|moon|0|0|0|0|0|1|0.5|0|0|0|0|YES|0|0|0|10|20|0.5\"}");
+    unsigned status = 200;
+    json_t *observer_response = lab_cal_almanac(fields, options, &status);
+    const json_t *location_cell = json_array_get(lab_cal_get(observer_response, "observer_summary"), 1);
+    const json_t *rendered = lab_cal_get(lab_cal_get(observer_response, "almanac_presentation"), "all");
+    TEST_ASSERT_TRUE(status == 200 && !strcmp(lab_cal_text(location_cell, "value"), "Chornomorske, Ukraine") &&
+                     strstr(lab_cal_text(rendered, "html"), "Chornomorske, Ukraine") &&
+                     strstr(lab_cal_text(rendered, "copy_text"), "Chornomorske, Ukraine") &&
+                     !strstr(lab_cal_text(rendered, "html"), "GeoNames") &&
+                     !strstr(lab_cal_text(rendered, "copy_text"), "GeoNames") &&
+                     !strstr(lab_cal_text(observer_response, "worksheet"), "GeoNames"),
+                     "summary, rendered card and copied worksheet use the same clean Ukrainian location");
+    json_t *updates = lab_cal_state_updates(false, options, observer_response);
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_text(updates, "almanac_jurisdiction"), "UA") &&
+                     !strcmp(lab_cal_text(updates, "almanac_town"), lab_cal_text(options, "town")) &&
+                     !strcmp(lab_cal_text(updates, "almanac_latitude"), "45.50657") &&
+                     !strcmp(lab_cal_text(updates, "almanac_elevation"), "39") &&
+                     !strcmp(lab_cal_text(updates, "almanac_zone"), "3"),
+                     "saved observer uses the resolved country without losing the town key or authored inputs");
+    json_free(updates);
+    lab_cal_set(fields, "jurisdiction", "");
+    lab_cal_take(observer_response, "fields", json_clone(fields));
+    updates = lab_cal_state_updates(false, options, observer_response);
+    TEST_ASSERT_TRUE(!*lab_cal_text(updates, "almanac_jurisdiction"), "unidentified country clears the saved jurisdiction");
+    json_free(updates);
+    lab_cal_set(fields, "date", "2026-10-25");
+    lab_cal_set(fields, "julian_day_number", "2461339");
+    lab_cal_take(observer_response, "fields", json_clone(fields));
+    updates = lab_cal_state_updates(true, options, observer_response);
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_text(updates, "datetime_date"), "2026-10-25") &&
+                     !strcmp(lab_cal_text(updates, "datetime_jdn"), "2461339") &&
+                     !strcmp(lab_cal_text(updates, "datetime_jurisdiction"), "RU"),
+                     "DateTime retains its explicit calendar jurisdiction and canonical date projection");
+    json_free(updates); json_free(observer_response); json_free(fields); json_free(options);
     json_t *coastal = test_lab_json("{\"jurisdiction\":\"ZA\",\"country_code\":\"\","
         "\"town\":\"Mossel Bay|-34.183|22.146\",\"lat\":\"-34.183000\",\"lon\":\"22.146000\","
         "\"observer_surface\":\"Coastal\"}");

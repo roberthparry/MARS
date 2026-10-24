@@ -5,6 +5,63 @@ country and river readers behind a single public interface. Implementations live
 under `src/globe`; there are no separate public shoreline or river headers or guides.
 SVG and WebGL rendering remain application responsibilities.
 
+## Named inland waters
+
+`globe_water_name_at` returns an owned geographic name independently of country
+identification. It currently recognises the Caspian Sea. Indexed ray intersections
+check that the selected point and a known reference point occupy the same shoreline
+polygon; a rectangular region is only an early rejection optimisation. Land,
+islands, nearby separate lakes and the coastal uncertainty band are excluded.
+Invalid input, unrecognised water and unavailable or corrupt geometry return
+`NULL`. Release a returned name with `string_free`.
+
+The lookup reads the installed shoreline data without a database migration or
+network request. It is not a complete gazetteer and does not assign nationality,
+maritime jurisdiction or navigation rights. Surface classification remains
+independent: recognising a water body's name does not change its inland-water
+classification.
+
+On a custom globe selection, the Lab suggests longitude-based nautical time only
+for inland water with no identified geographic jurisdiction, and only when the
+country-boundary layer is available. Ocean points, land, coastal uncertainty and
+inland water belonging to an identified jurisdiction keep their existing zone.
+The zone control and summary identify its value as a UTC offset: positive east,
+negative west, the opposite sign from a traditional nautical *zone description*.
+Defaults use 15-degree bands, with half-band ties rounded away from Greenwich;
+the two representations of the date line retain offsets of +12 and -12.
+This is not a civil-time or daylight-saving lookup. The editable value persists
+through evaluation and relaunch; a new selection may offer a new default, but a
+pending geographic reply never overwrites a zone edited while that reply was in
+flight. Cached geographic replies retain their suggestion without another lookup.
+The band convention is described in [NGA Bowditch, volume 2, table 26](https://msi.nga.mil/api/publications/download?key=16693975%2FSFH00000%2FBowditch_Vol_2_LoRes_2019.pdf);
+the control uses UTC-offset signs rather than that table's zone-description signs.
+
+With a configured globe database whose shoreline includes the Caspian Sea:
+
+```c
+#include <stdio.h>
+
+#include "globe-t.h"
+#include "string-t.h"
+
+int main(void)
+{
+    globe_t *globe = globe_open_configured(NULL);
+    string_t *name = globe_water_name_at(globe, 41, 51);
+    printf("%s\n", name ? string_c_str(name) : "Unnamed water");
+    int status = name ? 0 : 1;
+    string_free(name);
+    globe_close(globe);
+    return status;
+}
+```
+
+Output:
+
+```text
+Caspian Sea
+```
+
 ## Live SVG shoreline display
 
 MARS Lab's map surface uses filled SVG paths, not a shoreline image uploaded to
@@ -253,8 +310,14 @@ The Lab joins that code to jurisdiction-owned country names and flag artwork;
 it never substitutes the form's selected jurisdiction for a geographic result.
 
 Natural Earth 5.1.1 admin-0 map units are public-domain data at **1:10 million
-map scale**, not ten-metre accuracy. They follow the source's de facto boundary
-policy; names are indicative and are not legal or navigational determinations.
+map scale**, not ten-metre accuracy. The packaged Ukraine and Russia polygons
+use the source's Ukrainian viewpoint so that Crimea, including Sevastopol, is
+identified as Ukraine, consistent with
+[UN General Assembly resolution 68/262](https://digitallibrary.un.org/record/767883).
+Other map units retain the source's de facto boundary policy; this is not a
+worldwide conversion to UN-recognised boundaries. Names are indicative and are
+not legal or navigational determinations. This country correction does not
+alter civil time-zone rules or reinterpret occupation as sovereignty.
 The detailed shoreline remains unchanged. Small islands and border locations
 can lack an answer at this administrative scale.
 
@@ -295,7 +358,8 @@ shared land borders asynchronously, using `globe_border_segments()` and the
 `/almanac-borders` endpoint. Import matches identical quantised edges belonging
 to different map units; unmatched administrative coastlines are omitted. This
 deliberately favours omission over invented connections where source topology
-does not match. Borders are indicative, following Natural Earth's de facto policy.
+does not match. Borders are indicative and use the same country policy as lookup:
+there is no international border between Crimea and mainland Ukraine.
 
 `country_border_chunk` stores at most 256 segments per BLOB; `country_border_bounds`
 is an integer R-tree. Queries handle the date line and cap output at 250,000
@@ -314,14 +378,33 @@ cannot publish. The detailed shoreline remains untouched.
 The 298 map units distinguish England, Wales, Scotland and Northern Ireland.
 Shared Welsh and Scottish land borders are included. The Isle of Man has its own
 identity and flag; its island edge uses the detailed shoreline, not an invented
-administrative or maritime border. Existing installations migrate to revision 2
+administrative or maritime border. Existing installations migrate to revision 4
 with `make update-mars-db` (also run by `make release` when Lab is installed).
+Revision 4 replaces the country layer atomically and rebuilds shared borders;
+databases already at revision 3 retain their shoreline without reimporting it.
+River data and database credentials remain unchanged. Older databases also receive
+the previously required shoreline update. Failed migrations retain the preceding
+data and revision. Restart the Lab and reload the page to discard cached country results.
 
 Source: [Natural Earth admin-0 map units](https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_map_units.zip),
 [public-domain terms](https://www.naturalearthdata.com/about/terms-of-use/).
-The packaged SHP and DBF streams are unchanged, compressed with Zstandard.
-Archive SHA-256: `45bebe2aaf8bf42b9daf4428594925bcb11eabd32fe9dc6e0acf681438053eb5`.
-Packaged SHP SHA-256: `58c3b3b36ebb1ef48d9e375f7c743db90a8b82fae093c64c1d1e269a808a7729`.
+The DBF attribute stream remains unchanged. The SHP retains all 298 map-unit
+records and their ordering; only the UA and RU geometries are replaced from the
+pinned [5.1.1 Ukrainian viewpoint SHP](https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.1/10m_cultural/ne_10m_admin_0_countries_ukr.shp)
+and [matching DBF](https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.1/10m_cultural/ne_10m_admin_0_countries_ukr.dbf).
+`tools/mars_config/country_compose.c` performs this offline composition using the
+file module. Its five positional arguments are the original map-unit SHP and DBF,
+the viewpoint SHP and DBF, and a new output SHP. It matches `ISO_A2_EH`, requires
+exactly one UA and RU record in each input, and refuses an existing output. Reuse
+the original map-unit DBF and compress the resulting SHP with Zstandard level 19.
+It neither downloads data nor opens installed databases. The globe importer and
+country regression tests validate the composed polygons before publication.
+
+Original map-unit archive SHA-256: `45bebe2aaf8bf42b9daf4428594925bcb11eabd32fe9dc6e0acf681438053eb5`.
+Original compressed SHP SHA-256: `58c3b3b36ebb1ef48d9e375f7c743db90a8b82fae093c64c1d1e269a808a7729`.
+Viewpoint SHP SHA-256: `ec923b81a27e36efce7bb293c45ce87134f967330ef137d04e1be9c4940b6d82`.
+Viewpoint DBF SHA-256: `4fe3184c24f5cb7516aee1c20ebc6326a3ad6c2158cf844bcb5a1620c3670862`.
+Corrected compressed SHP SHA-256: `b7deb7448e69864e898728530a5df345d492fd2db7d4a6e8f4531e12ad7cb66c`.
 Packaged DBF SHA-256: `49b3ac0ff0d35a70d6a2d9502a32f45d2df460c7224988e4fe34942401c3c99f`.
 
 Town batches use the same elevation fallback as the jurisdiction catalogue:
@@ -477,6 +560,13 @@ that a region has no features.
 this is a planning policy, not a surveyed accuracy guarantee. Invalid input,
 missing geometry and read failures are unknown, never implicitly sea.
 
+`globe_hit_test_radius()` uses the same exact geometry with a caller-selected
+proximity band from zero to 20,000 metres. It returns `GLOBE_COAST` near a physical
+boundary on either side, ignoring virtual polygon closures. Distances use a local
+tangent-plane approximation. Invalid radii and unavailable or corrupt data return
+`GLOBE_UNKNOWN`. This does not change the default 500-metre classification, alter
+polygons, establish harbour membership or assign maritime jurisdiction.
+
 Cold hit-tests use indexed chunks; resident hit-tests use exact coordinates,
 not simplified display geometry. Islands within lakes retain their nesting.
 
@@ -499,7 +589,11 @@ Existing resident geometry is reused, and wider requests still prepare the share
 Bounds may cross the date line: west is between −360° and 180°, east is greater
 than west by at most 360°, and latitude bounds lie within −90° to 90° with north
 greater than south. Display tolerance is between 0° and 1°; zero retains every
-vertex. This tolerance never changes hit-test classification. Discard partial
+vertex. Clipping intersections retain the exact bound coordinate, and simplification
+preserves transitions onto and off clipping boundaries to avoid artificial slivers.
+Clipped concave polygons may contain retraced, zero-width joins: these contribute
+no filled area and must not be interpreted as physical coastline strokes.
+This tolerance never changes hit-test classification. Discard partial
 output when a query fails or its visitor cancels.
 
 `globe_import_shoreline()` transactionally replaces shoreline tables from an

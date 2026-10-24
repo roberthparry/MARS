@@ -2,12 +2,13 @@
  * @file lab_calendar_surface.c
  * @brief Native geographic classification and globe imagery for Almanac observers.
  *
- * Opens the local encrypted catalogue and delegates coordinate hit-testing to its opaque shoreline reader.
+ * Opens the local catalogue and delegates coordinate hit-testing to its opaque shoreline reader.
  * Town names never decide land/sea mode. This adapter does not fetch weather or change observer elevation.
  * Clipped shoreline paths produce transparent SVG outlines or a filled map at the requested zoom resolution.
  * No latitude-based snow or sea-ice colours are invented; the outlines never change geographic classification.
  * Selected-position country requests use the independent globe boundary layer without astronomical evaluation.
  * Town tooltips can request jurisdiction-owned artwork directly by their catalogue ISO country code.
+ * Recognised water names are separate geographic labels and never supply an inferred jurisdiction.
  */
 #include <math.h>
 #include <stdio.h>
@@ -45,11 +46,26 @@ static void lab_country_catalogue(json_t *result, const char *code)
     jurisdict_close(jurisdiction); string_free(name); string_free(svg);
 }
 
-static void lab_country_metadata(json_t *result, globe_t *globe, double latitude, double longitude)
+static bool lab_country_metadata(json_t *result, globe_t *globe, double latitude, double longitude)
 {
     string_t *code = globe_country_code_at(globe, latitude, longitude);
+    bool identified = code && string_byte_length(code);
     lab_country_catalogue(result, code ? string_c_str(code) : NULL);
     string_free(code);
+    return identified;
+}
+
+/* Suggest a nautical UTC offset only for positively classified, administratively unassigned inland water. */
+void lab_cal_nautical_zone(json_t *result, bool inland_water, bool identified, bool boundaries_available, double longitude)
+{
+    lab_cal_set(result, "nautical_zone", "");
+    if (!inland_water || identified || !boundaries_available || !isfinite(longitude) || fabs(longitude) > 180) return;
+    /* East-positive UTC offsets, not the opposite-signed traditional nautical zone descriptions.
+     * At half-zone boundaries choose the zone farther from Greenwich; preserve the two date-line sides. */
+    int offset = (int)round(longitude / 15);
+    string_t *text = string_sprintf("%d", offset);
+    if (text) lab_cal_set(result, "nautical_zone", string_c_str(text));
+    string_free(text);
 }
 
 static bool lab_country_selected_town(const json_t *options)
@@ -90,18 +106,30 @@ void lab_cal_surface(json_t *options)
     lab_cal_set(options, "country", "");
     lab_cal_set(options, "country_code", "");
     lab_cal_set(options, "country_flag", "");
+    lab_cal_set(options, "location_name", "");
     double latitude = 0, longitude = 0;
     globe_surface_t surface = GLOBE_UNKNOWN;
+    bool coastal_water = false, sea_horizon = false;
     if (lab_cal_number(lab_cal_text(options, "lat"), &latitude) &&
         lab_cal_number(lab_cal_text(options, "lon"), &longitude)) {
         globe_t *globe = globe_open_configured(NULL);
         surface = globe_hit_test(globe, latitude, longitude);
+        if (surface == GLOBE_SEA) {
+            /* Water beyond the uncertainty band is not necessarily offshore: harbour basins can be kilometres wide.
+             * A conservative proximity policy avoids assuming a clear sea horizon beside mapped land. */
+            globe_surface_t surroundings = globe_hit_test_radius(globe, latitude, longitude, 5000);
+            coastal_water = surroundings == GLOBE_COAST;
+            sea_horizon = surroundings == GLOBE_SEA;
+        }
         lab_country_metadata(options, globe, latitude, longitude);
+        string_t *water = surface == GLOBE_INLAND_WATER ? globe_water_name_at(globe, latitude, longitude) : NULL;
+        if (water) lab_cal_set(options, "location_name", string_c_str(water));
+        string_free(water);
         globe_close(globe);
     }
     static const char *const names[] = {"Unknown", "Land", "Sea", "Inland water", "Coastal"};
-    lab_cal_set(options, "observer_surface", names[surface]);
-    lab_cal_set(options, "sea_horizon", surface == GLOBE_SEA ? "true" : "false");
+    lab_cal_set(options, "observer_surface", coastal_water ? "Coastal water" : names[surface]);
+    lab_cal_set(options, "sea_horizon", sea_horizon ? "true" : "false");
     if (!*lab_cal_text(options, "country_code")) {
         const char *selected = lab_cal_observer_jurisdiction(options);
         if (*selected) lab_country_catalogue(options, selected);
@@ -132,7 +160,10 @@ json_t *lab_cal_country(const json_t *payload, unsigned *status)
     globe_t *globe = globe_open_configured(NULL);
     json_t *response = json_new_object();
     lab_cal_take(response, "ok", json_new_bool(true));
-    lab_country_metadata(response, globe, latitude, longitude);
+    bool identified = lab_country_metadata(response, globe, latitude, longitude);
+    bool boundaries = globe_has_layer(globe, GLOBE_LAYER_COUNTRIES);
+    bool inland_water = !identified && boundaries && globe_hit_test(globe, latitude, longitude) == GLOBE_INLAND_WATER;
+    lab_cal_nautical_zone(response, inland_water, identified, boundaries, longitude);
     globe_close(globe);
     return response;
 }

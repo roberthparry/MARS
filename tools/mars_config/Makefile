@@ -20,6 +20,9 @@ CONFIG_TEST_SRCS := $(sort $(wildcard tools/mars_config/tests/*.c))
 CONFIG_TEST_OBJS := $(patsubst tools/mars_config/tests/%.c,$(CONFIG_BUILD_DIR)/tests/%.o,$(CONFIG_TEST_SRCS))
 CONFIG_TEST_BIN := $(CONFIG_BUILD_DIR)/tests/test_mars_config
 
+$(CONFIG_BUILD_DIR)/country_compose: tools/mars_config/country_compose.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
+
 $(CONFIG_BUILD_DIR)/catalogue_towns: tools/mars_config/catalogue_towns.c $(STATIC_LIB)
 	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 

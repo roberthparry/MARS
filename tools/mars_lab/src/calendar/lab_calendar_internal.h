@@ -41,6 +41,19 @@ json_t *lab_cal_globe_vectors(const double bounds[4], unsigned *status);
 /** Return geographic ownership or a coordinate-matched selected town's fallback jurisdiction; borrowed text. */
 const char *lab_cal_observer_jurisdiction(const json_t *options);
 
+/** @brief Return an owned observer label, keeping recognised waters distinct from country ownership. */
+string_t *lab_cal_observer_location(const json_t *options, const char *town, bool sea);
+
+/** Build owned profile updates from authored inputs and canonical result fields; does not write state. */
+json_t *lab_cal_state_updates(bool is_datetime, const json_t *options, const json_t *response);
+
+/**
+ * @brief Set an optional east-positive nautical UTC offset for inland water with no geographic jurisdiction.
+ * @note Requires available boundary data; never changes the submitted observer zone. Half-zone ties round away
+ * from Greenwich, with +180 and -180 degrees retaining +12 and -12 respectively. Invalid inputs clear the suggestion.
+ */
+void lab_cal_nautical_zone(json_t *result, bool inland_water, bool identified, bool boundaries_available, double longitude);
+
 /**
  * @brief Render bounded shoreline imagery for the observer globe.
  * @param payload Borrowed west/south/east/north degree bounds.
@@ -138,6 +151,15 @@ void lab_cal_observing_conditions(json_t *options, const json_t *weather);
  * @return UTC epoch seconds, or NaN when the moment cannot be read.
  */
 double lab_cal_weather_epoch(const json_t *options);
+
+/**
+ * @brief Select an adjacent provider-local day when the requested UTC hour lies outside returned coverage.
+ * @param options Borrowed observation date/time with observing_conditions enabled; daily cards are not shifted.
+ * @param weather Borrowed provider response containing dated forecast days and absolute hourly epochs.
+ * @return Minus one or plus one for an adjacent day, or zero for covered, missing, gapped or unrelated data.
+ * @note Uses bounded hourly arrays, not the editable display-zone value. Callers permit at most one follow-up request.
+ */
+int lab_cal_weather_day_shift(const json_t *options, const json_t *weather);
 
 /**
  * @brief Retain a recent provider observation in the bounded location cache shared by calendar modes.

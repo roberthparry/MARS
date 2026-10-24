@@ -310,6 +310,35 @@ static json_t *lab_cal_location(const json_t *options, unsigned *status)
     return response;
 }
 
+/* Capture authored inputs and canonical result fields without publishing state. */
+json_t *lab_cal_state_updates(bool is_datetime, const json_t *options, const json_t *response)
+{
+    static const char *source_keys[] = {"date", "start", "end",       "year",      "jurisdiction",
+                                        "town", "lat",   "lon",       "elevation", "gmt_offset",
+                                        "time", "zone",  "visibility"};
+    static const char *state_keys[] = {"date", "start",    "end",       "year",      "jurisdiction",
+                                       "town", "latitude", "longitude", "elevation", "gmt_offset",
+                                       "time", "zone",     "visibility"};
+    json_t *updates = json_new_object();
+    for (size_t i = 0; i < sizeof(source_keys) / sizeof(*source_keys); ++i) {
+        if (!lab_cal_get(options, source_keys[i]))
+            continue;
+        string_t *key = string_sprintf("%s_%s", is_datetime ? "datetime" : "almanac", state_keys[i]);
+        lab_cal_set(updates, string_c_str(key), lab_cal_text(options, source_keys[i]));
+        string_free(key);
+    }
+    if (is_datetime) {
+        const json_t *fields = lab_cal_get(response, "fields");
+        lab_cal_set(updates, "datetime_date", lab_cal_text(fields, "date"));
+        lab_cal_set(updates, "datetime_jdn", lab_cal_text(fields, "julian_day_number"));
+    } else {
+        /* Persist the same resolved jurisdiction displayed by the result, not the stale request country. */
+        const json_t *fields = lab_cal_get(response, "fields");
+        lab_cal_set(updates, "almanac_jurisdiction", lab_cal_text(fields, "jurisdiction"));
+    }
+    return updates;
+}
+
 /* Dispatch only the exact supported paths, leaving other adapters untouched. */
 json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *status)
 {
@@ -537,25 +566,7 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
     if (is_almanac_weather && response)
         lab_cal_take(response, "weather_refresh", json_new_bool(true));
     if ((is_datetime || is_almanac) && json_bool_value(lab_cal_get(response, "ok"), &ok) && ok) {
-        static const char *source_keys[] = {"date", "start", "end",       "year",      "jurisdiction",
-                                            "town", "lat",   "lon",       "elevation", "gmt_offset",
-                                            "time", "zone",  "visibility"};
-        static const char *state_keys[] = {"date", "start",    "end",       "year",      "jurisdiction",
-                                           "town", "latitude", "longitude", "elevation", "gmt_offset",
-                                           "time", "zone",     "visibility"};
-        json_t *updates = json_new_object();
-        for (size_t i = 0; i < sizeof(source_keys) / sizeof(*source_keys); ++i) {
-            if (!lab_cal_get(options, source_keys[i]))
-                continue;
-            string_t *key = string_sprintf("%s_%s", is_datetime ? "datetime" : "almanac", state_keys[i]);
-            lab_cal_set(updates, string_c_str(key), lab_cal_text(options, source_keys[i]));
-            string_free(key);
-        }
-        if (is_datetime) {
-            const json_t *fields = lab_cal_get(response, "fields");
-            lab_cal_set(updates, "datetime_date", lab_cal_text(fields, "date"));
-            lab_cal_set(updates, "datetime_jdn", lab_cal_text(fields, "julian_day_number"));
-        }
+        json_t *updates = lab_cal_state_updates(is_datetime, options, response);
         if (!lab_state_save(updates)) {
             json_free(response);
             response = lab_cal_error(status, 500, "Calendar calculation succeeded but saving Lab state failed");

@@ -16,12 +16,15 @@
  *
  * Cold hit-tests use indexed chunks; resident hit-tests use exact cached coordinates, never display simplifications.
  * Older compressed chunks remain readable. The 500-metre coastal uncertainty
- * band is a planning policy, not a surveyed accuracy guarantee. These data are not nautical charts and cannot
+ * band is a planning policy, not a surveyed accuracy guarantee. Context queries may choose a wider proximity band
+ * without altering polygons or ownership. These data are not nautical charts and cannot
  * establish safe navigation or public access to land. Callers own the database and input file; they must serialise
  * queries on an instance and close instances before replacing their dataset. Missing, malformed or unreadable
  * data produce an unknown result.
  * Optional administrative polygons supply selected-position country names through bounded indexed queries.
  * Their generalised boundaries never replace the detailed shoreline or establish legal jurisdiction.
+ * Named-water lookup currently recognises the Caspian Sea through exact shoreline containment, independently
+ * of country ownership; it is not a comprehensive water-name gazetteer.
  */
 #ifndef MARS_GLOBE_H
 #define MARS_GLOBE_H
@@ -153,6 +156,31 @@ void globe_close(globe_t *shoreline);
  * @return Surface classification, or GLOBE_UNKNOWN on invalid input or unavailable data.
  */
 globe_surface_t globe_hit_test(globe_t *shoreline, double latitude_degrees, double longitude_degrees);
+
+/**
+ * @brief Classify with a caller-selected distance from physical shoreline boundaries.
+ * @param globe Borrowed controller; serialise access as for globe_hit_test().
+ * @param latitude_degrees Finite latitude in [-90,90].
+ * @param longitude_degrees Finite longitude in [-180,180].
+ * @param radius_metres Finite proximity radius from zero to 20,000 metres, inclusive.
+ * @return GLOBE_COAST within the radius; otherwise the ordinary surface type, or GLOBE_UNKNOWN on failure.
+ * @note Distances use a local tangent-plane approximation, not a surveyed or geodesic distance guarantee.
+ * Virtual polygon-closing edges are excluded. A wider radius denotes proximity on either side of a boundary,
+ * not harbour membership, maritime ownership, shelter or a clear horizon. The default 500-metre API is unchanged.
+ */
+globe_surface_t globe_hit_test_radius(globe_t *globe, double latitude_degrees, double longitude_degrees,
+                                      double radius_metres);
+
+/**
+ * @brief Identify a recognised inland water without assigning a country.
+ * @param globe Borrowed geographic controller; serialise access as for surface classification.
+ * @param latitude_degrees Latitude in degrees, between -90 and 90.
+ * @param longitude_degrees Longitude in degrees, between -180 and 180.
+ * @return Owned name, or NULL for unrecognised waters, land, coastal uncertainty, invalid input or unavailable data.
+ * @note Currently recognises the Caspian Sea by its shoreline polygon, not merely a rectangular region.
+ * Other lakes and islands are excluded. Names do not establish legal jurisdiction or navigational safety.
+ */
+string_t *globe_water_name_at(globe_t *globe, double latitude_degrees, double longitude_degrees);
 
 /**
  * @brief Return an owned country name for a covered point, or NULL when unavailable or ambiguous.

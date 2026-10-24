@@ -9,6 +9,7 @@
  */
 type GlobeView = [number, number, number, number, number, number, number];
 interface GlobeTown { town: LabTown; jurisdiction: string; country: string; fullName?: string; }
+interface GlobeCountry { name: string; flag: string; code: string; nauticalZone: string; }
 
 class MarsAlmanacGlobe {
     /** @brief Copy a snapshot of the displayed camera, without requesting new map data. */
@@ -167,7 +168,7 @@ class MarsAlmanacGlobe {
     private readonly countryPending = new Map<string, {
         controller: AbortController;
         users: number;
-        promise: Promise<{name: string; flag: string; code: string}>;
+        promise: Promise<GlobeCountry>;
     }>();
     private hoverCountryKey = '';
     private hoverCountry = '';
@@ -1021,14 +1022,14 @@ class MarsAlmanacGlobe {
         return labDOM.call('lab_globe_marker_pixels', point, this.view[2], size) as [number, number] | null;
     }
 
-    private cachedCountry(key: string): {name: string; flag: string; code: string} | undefined {
-        const place = labDOM.call('lab_country_cache_get', key) as {name: string; code: string} | null;
+    private cachedCountry(key: string): GlobeCountry | undefined {
+        const place = labDOM.call('lab_country_cache_get', key) as Omit<GlobeCountry, 'flag'> | null;
         if (!place) return undefined;
         const metadata = place.code ? WorksheetResults.tooltip.cachedCountry(place.code) : {flag: ''};
         return metadata ? {...place, flag: metadata.flag} : undefined;
     }
 
-    private async lookupCountry(lat: number, lon: number, signal: AbortSignal, countryCode = ''): Promise<{name: string; flag: string; code: string}> {
+    private async lookupCountry(lat: number, lon: number, signal: AbortSignal, countryCode = ''): Promise<GlobeCountry> {
         if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
         const key = countryCode ? `town:${countryCode}` : `${lat},${lon}`, cached = this.cachedCountry(key);
         if (cached) return cached;
@@ -1041,7 +1042,7 @@ class MarsAlmanacGlobe {
                     signal: controller.signal
                 });
                 const result = await response.labData() as {
-                    ok?: boolean; country?: string; country_flag?: string; country_code?: string
+                    ok?: boolean; country?: string; country_flag?: string; country_code?: string; nautical_zone?: string
                 };
                 if (!response.ok || !result.ok || typeof result.country !== 'string' || controller.signal.aborted)
                     throw new Error('Country unavailable');
@@ -1049,9 +1050,11 @@ class MarsAlmanacGlobe {
                     result.country_flag.startsWith('data:image/svg+xml;base64,') ? result.country_flag : '';
                 const code = typeof result.country_code === 'string' && /^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(result.country_code)
                     ? result.country_code : '';
-                const value = {name: result.country, flag, code};
+                const nauticalZone = !code && typeof result.nautical_zone === 'string' &&
+                    /^-?(?:[0-9]|1[0-2])$/.test(result.nautical_zone) ? result.nautical_zone : '';
+                const value = {name: result.country, flag, code, nauticalZone};
                 WorksheetResults.tooltip.rememberCountry(code, value.name, flag);
-                labDOM.call('lab_country_cache_put', key, value.name, code);
+                labDOM.call('lab_country_cache_put', key, value.name, code, nauticalZone);
                 return value;
             })();
             pending = {controller, users: 0, promise};
@@ -1085,7 +1088,7 @@ class MarsAlmanacGlobe {
 
     private observerCountryKey(): string {
         const place = this.observerTown();
-        return place ? `town:${place.jurisdiction}` :
+        return place ? `town:${place.town.country_code || place.jurisdiction}` :
             `${Number(this.input('Latitude').value)},${Number(this.input('Longitude').value)}`;
     }
 
@@ -1115,7 +1118,7 @@ class MarsAlmanacGlobe {
         const timeout = window.setTimeout(() => request.abort(), 5000);
         void (async () => {
             try {
-                const result = await this.lookupCountry(lat, lon, request.signal, town?.jurisdiction);
+                const result = await this.lookupCountry(lat, lon, request.signal, town?.town.country_code || town?.jurisdiction);
                 if ((hoverPoint ? this.hoverCountryKey : this.countryKey) !== key || request.signal.aborted) return;
                 if (hoverPoint) {
                     this.hoverCountry = result.name;
@@ -1182,7 +1185,7 @@ class MarsAlmanacGlobe {
             marker.removeAttribute('title');
             marker.setAttribute('aria-label', marker.dataset.marsTooltipTitle);
             if (place && label) {
-                marker.dataset.countryCode = place.jurisdiction;
+                marker.dataset.countryCode = place.town.country_code || place.jurisdiction;
                 marker.dataset.townTooltipName = label.full;
                 marker.dataset.townTooltipCoordinates = ` · Latitude ${MarsAlmanacGlobe.coordinate(lat, 'N', 'S')} · ` +
                     `Longitude ${MarsAlmanacGlobe.coordinate(lon, 'E', 'W')}`;
@@ -1218,6 +1221,11 @@ class MarsAlmanacGlobe {
         const select = document.getElementById('almanacTown') as WorksheetSelect;
         const jurisdiction = document.getElementById('almanacJurisdiction') as WorksheetSelect;
         const elevation = this.input('Elevation').value;
+        const zone = this.input('Zone'), previousZone = zone.value;
+        let zoneEdited = false;
+        const changedZone = () => { zoneEdited = true; };
+        zone.addEventListener('input', changedZone);
+        zone.addEventListener('change', changedZone);
         try {
             if (place) {
                 // The catalogue is already resident: commit the selection before yielding to evaluation.
@@ -1252,6 +1260,8 @@ class MarsAlmanacGlobe {
                     if (generation !== this.selection || this.input('Latitude').value !== String(latitude) ||
                         this.input('Longitude').value !== String(longitude) || jurisdiction.value || select.value) return;
                     const code = !request.signal.aborted ? data.code : '';
+                    if (!request.signal.aborted && !zoneEdited && zone.value === previousZone &&
+                        data.nauticalZone !== '' && !code) zone.value = data.nauticalZone;
                     if (code && jurisdiction.querySelector(`option[value="${CSS.escape(code)}"]`)) {
                         jurisdiction.value = code;
                         labDOM.call('lab_location_populate', select,
@@ -1273,6 +1283,10 @@ class MarsAlmanacGlobe {
             this.observerSignature = this.observerState();
             await WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation();
         } catch (error) { if (generation === this.selection) this.status.textContent = String(error); }
+        finally {
+            zone.removeEventListener('input', changedZone);
+            zone.removeEventListener('change', changedZone);
+        }
     }
 
     private pick(x: number, y: number): void {

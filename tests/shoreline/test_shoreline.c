@@ -256,8 +256,10 @@ static void test_shoreline_lossless_coordinates(void)
     globe = globe_open(db, NULL);
     TEST_ASSERT_INT_EQ(globe_hit_test(globe, -89, 0), GLOBE_LAND);
     TEST_ASSERT_INT_EQ(globe_hit_test(globe, -85, 180), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, -85, 180, 5000), GLOBE_LAND);
     TEST_ASSERT_INT_EQ(globe_hit_test(globe, -60, 0), GLOBE_SEA);
     TEST_ASSERT_TRUE(globe_surface_prepare(globe), "explicit polar cap resident geometry");
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, -85, 180, 5000), GLOBE_LAND);
     globe_close(globe);
     for (unsigned rotation = 1; rotation < 6; ++rotation) {
         double rotated[7][2];
@@ -279,6 +281,24 @@ static void test_shoreline_lossless_coordinates(void)
     file_close(source);
     sqlite_close(db);
     file_delete(source); file_free(source); file_remove_directory(directory); file_free(directory);
+}
+
+static void check_shore_proximity(globe_t *globe)
+{
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 20.01, 0, 500), GLOBE_SEA);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 20.01, 0, 5000), GLOBE_COAST);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 20.05, 0, 5000), GLOBE_SEA);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 19.99, 0, 5000), GLOBE_COAST);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 19.99, 0, 0), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 0, -169.99, 5000), GLOBE_COAST);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 0, 169.99, 5000), GLOBE_COAST);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 9.99, 0, 5000), GLOBE_COAST);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 9.99, 0, 500), GLOBE_INLAND_WATER);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 20.01, 0, -1), GLOBE_UNKNOWN);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 20.01, 0, NAN), GLOBE_UNKNOWN);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 20.01, 0, INFINITY), GLOBE_UNKNOWN);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 20.01, 0, 20001), GLOBE_UNKNOWN);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(NULL, 20.01, 0, 5000), GLOBE_UNKNOWN);
 }
 
 static void test_shoreline_nested_rings_and_rollback(void)
@@ -318,6 +338,7 @@ static void test_shoreline_nested_rings_and_rollback(void)
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20, 0), GLOBE_COAST);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20.003, 0), GLOBE_COAST);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20.01, 0), GLOBE_SEA);
+    check_shore_proximity(shoreline);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, -179), GLOBE_LAND);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, 179), GLOBE_LAND);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, -180), GLOBE_LAND);
@@ -349,6 +370,7 @@ static void test_shoreline_nested_rings_and_rollback(void)
     TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "ROLLBACK TO distant_ring; RELEASE distant_ring"),
                      "restore the distant ring before whole-world preparation");
     TEST_ASSERT_TRUE(globe_surface_prepare(shoreline), "reusable resident geometry");
+    check_shore_proximity(shoreline);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20.003, 0), GLOBE_COAST);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, -179), GLOBE_LAND);
     TEST_ASSERT_TRUE(make_compressed_chunk(db, SHORELINE_CODEC_ZSTD), "legacy compressed chunk fixture");
@@ -441,6 +463,11 @@ static void test_shoreline_packaged_world(void)
         TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, sites[i].latitude, sites[i].longitude), sites[i].surface);
     }
     sqlite_stmt_t *query = sqlite_stmt_prepare(db, "SELECT point_count,polygon_count FROM shoreline_dataset");
+    string_t *water = globe_water_name_at(shoreline, 41, 51);
+    TEST_ASSERT_TRUE(water && !strcmp(string_c_str(water), "Caspian Sea"), "packaged Caspian polygon is named");
+    string_free(water);
+    water = globe_water_name_at(shoreline, 47.7, -87.5);
+    TEST_ASSERT_TRUE(!water, "other inland waters do not inherit the Caspian name");
     TEST_ASSERT_TRUE(query && sqlite_stmt_step(query) == SQLITE_STEP_ROW, "dataset metadata");
     TEST_ASSERT_INT_EQ(sqlite_stmt_column_int(query, 0), 10587854);
     TEST_ASSERT_INT_EQ(sqlite_stmt_column_int(query, 1), 188268);
@@ -565,6 +592,9 @@ static void test_country_packaged_boundaries(void)
                      "Isle of Man has no invented shared land or maritime boundary");
     TEST_ASSERT_TRUE(countries_borders(db, 6, 48, 9, 50, country_test_border, &borders) && borders > 0,
                      "Franco-German land border is present");
+    borders = 0;
+    TEST_ASSERT_TRUE(countries_borders(db, 33.5, 45.7, 35, 46.3, country_test_border, &borders) && borders == 0,
+                     "Crimea has no international land border with mainland Ukraine");
     TEST_ASSERT_TRUE(!countries_borders(db, 0, 0, 361, 1, country_test_border, &borders), "invalid viewport rejected");
     static const struct { double lat, lon; const char *name; } sites[] = {
         {52.7077, -2.7541, "England"}, {48.8566, 2.3522, "France"},
@@ -582,6 +612,30 @@ static void test_country_packaged_boundaries(void)
     }
     globe_t *globe = globe_open_databases(db, db, NULL);
     TEST_ASSERT_TRUE(globe_has_layer(globe, GLOBE_LAYER_COUNTRIES), "country layer reports availability");
+    static const struct { double lat, lon; const char *code, *name; } recognised[] = {
+        {45.00, 33.70, "UA", "Ukraine"},
+        {44.95, 34.10, "UA", "Ukraine"},
+        {44.60, 33.53, "UA", "Ukraine"},
+        {45.35, 36.47, "UA", "Ukraine"},
+        {46.66, 32.62, "UA", "Ukraine"},
+        {48.02, 37.80, "UA", "Ukraine"},
+        {44.90, 37.32, "RU", "Russia"},
+        {45.20, 36.75, "RU", "Russia"},
+        {55.75, 37.62, "RU", "Russia"},
+        {44.00, 34.00, NULL, NULL},
+        {45.00, 37.00, NULL, NULL}
+    };
+    for (size_t i = 0; i < sizeof recognised / sizeof *recognised; ++i) {
+        string_t *code = globe_country_code_at(globe, recognised[i].lat, recognised[i].lon);
+        string_t *name = globe_country_at(globe, recognised[i].lat, recognised[i].lon);
+        printf("Country policy %.5f %.5f: %s\n", recognised[i].lat, recognised[i].lon,
+               code ? string_c_str(code) : "unavailable");
+        TEST_ASSERT_TRUE(recognised[i].code ? code && !strcmp(string_c_str(code), recognised[i].code) : !code,
+                         "Crimea and Sevastopol resolve to UA without reassigning Russian mainland or sea");
+        TEST_ASSERT_TRUE(recognised[i].name ? name && !strcmp(string_c_str(name), recognised[i].name) : !name,
+                         "country names and flag codes agree");
+        string_free(code); string_free(name);
+    }
     string_t *independent = globe_country_at(globe, 52.7077, -2.7541);
     TEST_ASSERT_TRUE(independent && !strcmp(string_c_str(independent), "England"),
                      "administrative coverage does not depend on shoreline availability");
@@ -657,6 +711,104 @@ static void test_country_packaged_boundaries(void)
     file_remove_directory(directory); file_free(directory);
 }
 
+static void test_shoreline_named_water(void)
+{
+    file_t *directory = temporary_directory();
+    TEST_ASSERT_NOT_NULL(directory);
+    file_t *source = temporary_file(directory, "named-water.b");
+    sqlite_t *db = memory_database();
+    TEST_ASSERT_TRUE(db && file_open_write(source) &&
+        write_square(source, 0, 1, 40, 60, 30, 55, false) &&
+        write_square(source, 17, 2, 48, 54, 37, 47, true) &&
+        write_square(source, 18, 3, 52, 53, 43, 44, false) &&
+        write_square(source, 19, 2, 46, 47, 40, 42, false) && file_close(source), "named-water geometry fixture");
+    TEST_ASSERT_TRUE(file_open_read(source) && globe_import_shoreline(db, source) && file_close(source),
+                     "import independent water polygons and an island");
+    globe_t *globe = globe_open(db, NULL);
+    const struct { double lat, lon; bool named; } cases[] = {
+        {41, 51, true}, {38, 50, true}, {46, 50, true}, {43.5, 52.5, false},
+        {41, 46.5, false}, {41, 47.5, false}, {37, 50, false}, {0, 0, false}, {NAN, 51, false}
+    };
+    for (unsigned cache = 0; cache < 2; ++cache) {
+        if (cache) TEST_ASSERT_TRUE(globe_surface_prepare(globe), "prepare cached surface classification");
+        for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+            string_t *name = globe_water_name_at(globe, cases[i].lat, cases[i].lon);
+            TEST_ASSERT_TRUE(cases[i].named ? name && !strcmp(string_c_str(name), "Caspian Sea") : !name,
+                             "only the reference water polygon receives its name; nearby lakes and islands do not");
+            string_free(name);
+        }
+    }
+    TEST_ASSERT_TRUE(!globe_water_name_at(NULL, 41, 51), "missing water dataset has no guessed name");
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "UPDATE shoreline_chunk SET codec=999 WHERE polygon_id=17"),
+                     "invalidate named-water geometry");
+    TEST_ASSERT_TRUE(!globe_water_name_at(globe, 41, 51), "corrupt geometry has no guessed name");
+    globe_close(globe);
+    sqlite_close(db);
+    TEST_ASSERT_TRUE(file_delete(source) && file_remove_directory(directory), "remove named-water fixture");
+    file_free(source);
+    file_free(directory);
+}
+
+static void example_globe_named_water(void)
+{
+    /* README example: supply a small independent shoreline with the documented reference point. */
+    file_t *directory = temporary_directory();
+    TEST_ASSERT_NOT_NULL(directory);
+    file_t *source = temporary_file(directory, "example-water.b");
+    sqlite_t *db = memory_database();
+    TEST_ASSERT_TRUE(db && file_open_write(source) &&
+        write_square(source, 0, 1, 40, 60, 30, 55, false) &&
+        write_square(source, 1, 2, 48, 54, 37, 47, false) && file_close(source) &&
+        file_open_read(source) && globe_import_shoreline(db, source) && file_close(source), "README shoreline fixture");
+    globe_t *globe = globe_open(db, NULL);
+    string_t *name = globe_water_name_at(globe, 41, 51);
+    printf("%s\n", name ? string_c_str(name) : "Unnamed water");
+    int status = name ? 0 : 1;
+    TEST_ASSERT_TRUE(name && !strcmp(string_c_str(name), "Caspian Sea"), "README output: Caspian Sea");
+    string_free(name);
+    globe_close(globe);
+    TEST_ASSERT_INT_EQ(status, 0);
+    sqlite_close(db);
+    TEST_ASSERT_TRUE(file_delete(source) && file_remove_directory(directory), "remove README fixture");
+    file_free(source);
+    file_free(directory);
+}
+
+static void test_shoreline_clipping_preserves_boundaries(void)
+{
+    file_t *directory = temporary_directory();
+    TEST_ASSERT_NOT_NULL(directory);
+    file_t *source = temporary_file(directory, "clipped.bin");
+    sqlite_t *db = memory_database();
+    TEST_ASSERT_NOT_NULL(db);
+    const double vertices[7][2] = {{0, 0}, {9.999, 0}, {10.1, 1}, {10.1, 9}, {9.999, 10}, {0, 10}, {0, 0}};
+    const double rotations[4][4] = {{1, 0, 0, 1}, {0, -1, 1, 0}, {-1, 0, 0, -1}, {0, 1, -1, 0}};
+    for (unsigned turn = 0; turn < 4; ++turn) {
+        double rotated[7][2];
+        const double *r = rotations[turn];
+        for (unsigned i = 0; i < 7; ++i) {
+            rotated[i][0] = r[0] * vertices[i][0] + r[1] * vertices[i][1];
+            rotated[i][1] = r[2] * vertices[i][0] + r[3] * vertices[i][1];
+        }
+        TEST_ASSERT_TRUE(file_open(source, FILE_MODE_CREATE, FILE_ACCESS_WRITE) && write_bytes(source, "MARSCF64", 8) &&
+            write_precise_ring(source, 1, rotated, 7) && file_close(source) && file_open_read(source) &&
+            globe_import_shoreline(db, source) && file_close(source), "import near-boundary corners");
+        globe_t *globe = globe_open(db, NULL);
+        TEST_ASSERT_NOT_NULL(globe);
+        for (unsigned resident = 0; resident < 2; ++resident) {
+            coast_test_path_t probe = {.x = r[0] * 9.9999 + r[1] * 5, .y = r[2] * 9.9999 + r[3] * 5, .valid = true};
+            if (resident) TEST_ASSERT_TRUE(globe_surface_prepare(globe), "resident boundary fixture");
+            TEST_ASSERT_TRUE(globe_surface_paths(globe, -10, -10, 10, 10, .1, check_path, &probe) &&
+                             probe.valid && probe.land, "simplification preserves exact clipping corners on every side");
+        }
+        globe_close(globe);
+    }
+    sqlite_close(db);
+    TEST_ASSERT_TRUE(file_delete(source) && file_remove_directory(directory), "remove clipping fixture");
+    file_free(source);
+    file_free(directory);
+}
+
 static void test_shoreline_geometry_budget(void)
 {
     TEST_ASSERT_TRUE(coast_geometry_budget(36000000, 850000, 16000000, 8000000),
@@ -673,9 +825,12 @@ int tests_main(void)
 {
     TEST_SECTION("Indexed shorelines");
     TEST_RUN_IN_GROUP(test_shoreline_geometry_budget, tests, NULL);
+    TEST_RUN_IN_GROUP(test_shoreline_clipping_preserves_boundaries, tests, NULL);
+    TEST_RUN_IN_GROUP(test_shoreline_named_water, tests, NULL);
     TEST_RUN_IN_GROUP(test_country_packaged_boundaries, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_lossless_coordinates, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_nested_rings_and_rollback, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_packaged_world, tests, NULL);
+    TEST_RUN_IN_GROUP(example_globe_named_water, readme_examples, NULL);
     return TEST_EXIT_CODE();
 }

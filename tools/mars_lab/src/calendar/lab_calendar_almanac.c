@@ -298,6 +298,35 @@ static void lab_cal_summary_cell(json_t *summary, const char *label, const strin
     json_free(cell);
 }
 
+/* Keep source identifiers in selection keys, not in human-readable location names. */
+static string_t *lab_cal_town_label(const char *town)
+{
+    const char *suffix = strstr(town, " (GeoNames ");
+    if (suffix && suffix != town) {
+        const char *digit = suffix + strlen(" (GeoNames ");
+        const char *end = digit;
+        while (*end >= '0' && *end <= '9') ++end;
+        if (end != digit && end[0] == ')' && !end[1])
+            return string_sprintf("%.*s", (int)(suffix - town), town);
+    }
+    return string_new_with(town);
+}
+
+/* Share the geographic display name across the summary, observer text and clipboard presentation. */
+string_t *lab_cal_observer_location(const json_t *options, const char *town, bool sea)
+{
+    const char *country = lab_cal_text(options, "country");
+    const char *water = lab_cal_text(options, "location_name");
+    const char *surface = lab_cal_text(options, "observer_surface");
+    if (!*town && *water) return string_new_with(water);
+    string_t *label = lab_cal_town_label(town);
+    if (!label) return NULL;
+    string_t *result = *country ? (*town ? string_sprintf("%S, %s", label, country) : string_new_with(country)) :
+        string_sprintf("%s — %s", *town ? string_c_str(label) : "Custom", sea ? "Offshore" : *surface ? surface : "Land");
+    string_free(label);
+    return result;
+}
+
 /* Build the standard display cells and optional country metadata independently of full-precision coordinates. */
 static json_t *lab_cal_observer_summary(const json_t *options, const char *town, bool sea)
 {
@@ -308,10 +337,7 @@ static json_t *lab_cal_observer_summary(const json_t *options, const char *town,
     bool have_pressure = lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure);
     string_t *values[] = {
         string_sprintf("%s %s", lab_cal_text(options, "date"), lab_cal_text(options, "time")),
-        *lab_cal_text(options, "country") ?
-            (*town ? string_sprintf("%s, %s", town, lab_cal_text(options, "country")) :
-                     string_new_with(lab_cal_text(options, "country"))) :
-            string_sprintf("%s — %s", *town ? town : "Custom", sea ? "Offshore" : surface),
+        lab_cal_observer_location(options, town, sea),
         string_new_with(lab_cal_text(options, "zone")),
         lab_cal_observer_angle(lab_cal_text(options, "lat"), true),
         lab_cal_observer_angle(lab_cal_text(options, "lon"), false),
@@ -321,7 +347,7 @@ static json_t *lab_cal_observer_summary(const json_t *options, const char *town,
         have_pressure ? string_sprintf("%.0f hPa", pressure) : string_new_with("Unavailable"),
         string_new_with(*lab_cal_text(options, "weather_source") ? lab_cal_text(options, "weather_source") : "Unavailable"),
     };
-    static const char *const labels[] = {"GMT moment", "Location", "Zone", "Latitude", "Longitude",
+    static const char *const labels[] = {"GMT moment", "Location", "Zone (UTC offset)", "Latitude", "Longitude",
                                          "Observer altitude", "Temperature", "Pressure", "Weather source"};
     json_t *summary = json_new_array();
     for (size_t i = 0; i < sizeof values / sizeof *values; ++i) {
@@ -434,12 +460,12 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
     string_t *town = string_new_with(lab_cal_text(options, "town"));
     size_t town_count = 0;
     string_t **town_parts = lab_cal_split(town, "|", &town_count);
+    string_t *location = lab_cal_observer_location(options, lab_cal_part(town_parts, town_count, 0),
+                                                  !strcmp(lab_cal_text(options, "sea_horizon"), "true"));
     string_t *observer =
-        string_sprintf("Observer: %s%s%s, zone %s, latitude %s, longitude %s", lab_cal_part(town_parts, town_count, 0),
-                       *lab_cal_part(town_parts, town_count, 0) ? ", " : "",
-                       *lab_cal_text(options, "country") ? lab_cal_text(options, "country") :
-                       !strcmp(lab_cal_text(options, "sea_horizon"), "true") ? "Offshore" : "Country not identified",
+        string_sprintf("Observer: %s, zone %s, latitude %s, longitude %s", string_c_str(location),
                        lab_cal_text(options, "zone"), lab_cal_text(options, "lat"), lab_cal_text(options, "lon"));
+    string_free(location);
     bool sea_horizon = !strcmp(lab_cal_text(options, "sea_horizon"), "true");
     const char *surface = lab_cal_text(options, "observer_surface");
     if (!*surface) surface = sea_horizon ? "Sea" : "Land";

@@ -3,10 +3,11 @@
  * @brief Optional WeatherAPI daily cards and hourly observing conditions for native MARS Lab.
  *
  * Reads the user's existing weather.env configuration through file_t, performs
- * a verified HTTPS request with a four-second deadline and emits the browser's
+ * verified HTTPS requests sharing a four-second deadline and emits the browser's
  * weather fields and sections. Provider errors remain an unavailable weather
  * card and never expose the API key in diagnostics. Almanac conditions use UTC
  * timestamp matching, adjacent-hour interpolation and explicitly labelled fallbacks.
+ * When UTC and provider-local dates differ, one adjacent-day request can recover the missing observation hour.
  */
 #include <math.h>
 #include <stdlib.h>
@@ -31,7 +32,7 @@ static void lab_cal_measurement(json_t *fields, const char *key, double value, c
     string_free(text);
 }
 
-static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key, int span)
+static json_t *lab_cal_weather_payload(const json_t *options, const string_t *key, int span, size_t timeout_ms)
 {
     string_t *escaped = http_url_encode(key);
     double latitude, longitude;
@@ -46,7 +47,8 @@ static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key,
     if (span >= 0 && span < 14)
         string_append_format(url, "&days=%d", span < 13 ? span + 2 : 14);
     http_client_t *client = http_client_new();
-    http_limits_t limits = {.connect_timeout_ms = 4000, .total_timeout_ms = 4000, .max_body_bytes = 2 * 1024 * 1024};
+    http_limits_t limits = {.connect_timeout_ms = timeout_ms, .total_timeout_ms = timeout_ms,
+                            .max_body_bytes = 2 * 1024 * 1024};
     http_client_set_limits(client, &limits);
     http_request_t *request = http_request_new(HTTP_GET, url);
     string_t *accept = string_new_with("Accept"), *json = string_new_with("application/json");
@@ -55,7 +57,74 @@ static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key,
     http_request_set_header(request, agent, agent_value);
     http_response_t *response = http_client_send(client, request);
     json_t *payload = http_response_ok(response) ? http_response_json(response) : NULL;
+    http_response_free(response);
+    http_request_free(request);
+    http_client_free(client);
+    string_free(accept);
+    string_free(json);
+    string_free(agent);
+    string_free(agent_value);
+    string_free(url);
+    string_free(escaped);
+    return payload;
+}
+
+/* Provider days are local; their absolute hourly epochs determine whether another date is needed. */
+int lab_cal_weather_day_shift(const json_t *options, const json_t *weather)
+{
+    if (!*lab_cal_text(options, "observing_conditions")) return 0;
+    double epoch = lab_cal_weather_epoch(options), first = INFINITY, last = -INFINITY;
+    if (!isfinite(epoch)) return 0;
+    const json_t *days = lab_cal_get(lab_cal_get(weather, "forecast"), "forecastday");
+    for (size_t i = 0; i < json_array_size(days) && i < 14; ++i) {
+        const json_t *day = json_array_get(days, i), *hours = lab_cal_get(day, "hour");
+        bool selected_day = !strcmp(lab_cal_text(day, "date"), lab_cal_text(options, "date"));
+        for (size_t j = 0; j < json_array_size(hours) && j < 25; ++j) {
+            double hour;
+            if (!lab_cal_provider_number(json_array_get(hours, j), "time_epoch", &hour)) continue;
+            if (epoch >= hour && epoch < hour + 3600) return 0;
+            if (selected_day) { first = fmin(first, hour); last = fmax(last, hour); }
+        }
+    }
+    if (!isfinite(first) || !isfinite(last)) return 0;
+    if (epoch < first && first - epoch <= 86400) return -1;
+    if (epoch >= last + 3600 && epoch - (last + 3600) < 86400) return 1;
+    return 0;
+}
+
+static json_t *lab_cal_weather_adjacent(const json_t *options, const string_t *key, int span, int shift,
+                                       size_t timeout_ms)
+{
+    datetime_t *day = datetime_from_string(lab_cal_text(options, "date"));
+    if (!day) return NULL;
+    datetime_init_jdn(day, datetime_jdn(day) + shift);
+    string_t *date = string_sprintf("%04d-%02d-%02d", datetime_year(day), datetime_month(day), datetime_day(day));
+    datetime_dealloc(day);
+    if (!date || strcmp(string_c_str(date), "2010-01-01") < 0 || span + shift > 300) {
+        string_free(date);
+        return NULL;
+    }
+    json_t *request = json_clone(options);
+    lab_cal_set(request, "date", string_c_str(date));
+    json_t *payload = lab_cal_weather_payload(request, key, span + shift, timeout_ms);
+    json_free(request);
+    string_free(date);
+    return payload;
+}
+
+static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key, int span)
+{
+    struct timespec start = {0}, end = {0};
+    bool timed = clock_gettime(CLOCK_MONOTONIC, &start) == 0;
+    json_t *payload = lab_cal_weather_payload(options, key, span, 4000), *adjacent = NULL;
+    int shift = lab_cal_weather_day_shift(options, payload);
+    if (shift && timed && clock_gettime(CLOCK_MONOTONIC, &end) == 0) {
+        double elapsed = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_nsec - start.tv_nsec) / 1000000.0;
+        if (elapsed >= 0 && elapsed < 3999)
+            adjacent = lab_cal_weather_adjacent(options, key, span, shift, (size_t)(4000 - elapsed));
+    }
     lab_cal_weather_remember(options, payload, time(NULL));
+    lab_cal_weather_remember(options, adjacent, time(NULL));
     json_t *fields = json_new_object();
     const json_t *forecast = lab_cal_get(payload, "forecast");
     const json_t *days = lab_cal_get(forecast, "forecastday");
@@ -86,19 +155,11 @@ static json_t *lab_cal_fetch_weather(const json_t *options, const string_t *key,
     }
     if (*lab_cal_text(options, "observing_conditions")) {
         json_t *conditions = json_clone(options);
-        lab_cal_observing_conditions(conditions, payload);
+        lab_cal_observing_conditions(conditions, adjacent ? adjacent : payload);
         lab_cal_take(fields, "observing_conditions", conditions);
     }
     json_free(payload);
-    http_response_free(response);
-    http_request_free(request);
-    http_client_free(client);
-    string_free(accept);
-    string_free(json);
-    string_free(agent);
-    string_free(agent_value);
-    string_free(url);
-    string_free(escaped);
+    json_free(adjacent);
     return fields;
 }
 

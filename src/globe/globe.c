@@ -93,6 +93,19 @@ globe_surface_t globe_hit_test(globe_t *g, double latitude, double longitude)
     return shoreline_hit_test(g ? g->shoreline : NULL, latitude, longitude);
 }
 
+/* Query near-shore context without altering default classification or country ownership. */
+globe_surface_t globe_hit_test_radius(globe_t *g, double latitude, double longitude, double radius_metres)
+{
+    return shoreline_hit_test_radius(g ? g->shoreline : NULL, latitude, longitude, radius_metres);
+}
+
+/* Geographic water names do not imply administrative ownership. */
+string_t *globe_water_name_at(globe_t *g, double latitude, double longitude)
+{
+    const char *name = shoreline_water_name(g ? g->shoreline : NULL, latitude, longitude);
+    return name ? string_new_with(name) : NULL;
+}
+
 /* Administrative coverage is independent of land/water; never infer it from a nearby town. */
 string_t *globe_country_at(globe_t *g, double latitude, double longitude)
 {

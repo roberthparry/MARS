@@ -35,6 +35,12 @@ shoreline_t *shoreline_open(sqlite_t *db);
 void shoreline_close(shoreline_t *shoreline);
 /** @brief Classify an exact coordinate, retaining coastal uncertainty. */
 globe_surface_t shoreline_hit_test(shoreline_t *shoreline, double latitude, double longitude);
+
+/** @brief Classify using a finite proximity radius in metres from zero to 20,000, or return unknown on failure. */
+globe_surface_t shoreline_hit_test_radius(shoreline_t *shoreline, double latitude, double longitude, double radius);
+
+/** @brief Return a static geographic water name after exact containment, or NULL for unrecognised/uncertain points. */
+const char *shoreline_water_name(shoreline_t *shoreline, double latitude, double longitude);
 /** @brief Prepare shared geometry. */
 bool shoreline_prepare(shoreline_t *shoreline);
 /** @brief Stream clipped shoreline paths. */

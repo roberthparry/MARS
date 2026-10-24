@@ -67,21 +67,23 @@ json_t *lab_cal_globe_vectors(const double bounds[4], unsigned *status)
         ok = ok && output.layers[i];
     }
     globe_t *globe = lab_vector_reader ? globe_reader_get(lab_vector_reader) : globe_open_configured(NULL);
-    /* World views are split into small projection patches below; prepare once
-     * rather than rereading entire continental rings for every cold patch. */
-    if (bounds[2] - bounds[0] > 90 || bounds[3] - bounds[1] > 90)
-        ok = ok && globe_surface_prepare(globe);
     /* A regional patch remains far smaller than a hemisphere. The WASM
      * projector subdivides its edges before horizon clipping; ten-degree
      * cells unnecessarily reread the same continental rings nine times. */
     unsigned columns = (unsigned)ceil((bounds[2] - bounds[0]) / 30);
     unsigned rows = (unsigned)ceil((bounds[3] - bounds[1]) / 30);
+    /* Every multi-patch request reuses the indexed geometry, including regional
+     * views. Otherwise each cold patch rereads the same continental rings and
+     * can exceed the HTTP deadline before the detailed map is available. */
+    if (columns > 1 || rows > 1) ok = ok && globe_surface_prepare(globe);
     double dx = (bounds[2] - bounds[0]) / columns, dy = (bounds[3] - bounds[1]) / rows;
     double tolerance = fmin(bounds[2] - bounds[0], bounds[3] - bounds[1]) / 4096;
     for (unsigned y = 0; ok && y < rows; ++y) {
         for (unsigned x = 0; ok && x < columns; ++x) {
             double west = bounds[0] + x * dx, south = bounds[1] + y * dy;
-            ok = globe_surface_paths(globe, west, south, west + dx, south + dy,
+            double east = x + 1 == columns ? bounds[2] : bounds[0] + (x + 1) * dx;
+            double north = y + 1 == rows ? bounds[3] : bounds[1] + (y + 1) * dy;
+            ok = globe_surface_paths(globe, west, south, east, north,
                                      tolerance, lab_vector_point, &output);
         }
     }

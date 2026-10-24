@@ -22,13 +22,15 @@
 typedef struct _town_record_t {
     char *key;
     char code[7];
-    char *fields[7];
+    char *fields[8];
     double latitude, longitude;
     bool preferred;
     size_t bytes;
 } town_record_t;
 
-static const char *const field_names[] = {"name", "latitude", "longitude", "elevation", "timezone", "value", "detail"};
+static const char *const field_names[] = {
+    "name", "latitude", "longitude", "elevation", "timezone", "value", "detail", "country_code"
+};
 
 typedef struct _town_store_t {
     lab_serial_t serial;
@@ -127,7 +129,8 @@ static jsref town_value(const town_record_t *record, bool place)
 {
     town_store_t *state = town_store();
     jsref town = lab_dom_object(LAB_VALUE_OBJECT);
-    for (unsigned i = 0; i < 7; ++i) lab_dom_set(town, field_names[i], text_value(record->fields[i]));
+    for (unsigned i = 0; i < sizeof field_names / sizeof *field_names; ++i)
+        lab_dom_set(town, field_names[i], text_value(record->fields[i]));
     lab_dom_set(town, "default", lab_dom_scalar(LAB_VALUE_BOOLEAN, record->preferred));
     if (!place) return town;
     jsref result = lab_dom_object(LAB_VALUE_OBJECT);
@@ -143,7 +146,7 @@ static jsref town_value(const town_record_t *record, bool place)
 
 static void release_record(town_record_t *record)
 {
-    for (unsigned i = 0; i < 7; ++i) free(record->fields[i]);
+    for (unsigned i = 0; i < sizeof field_names / sizeof *field_names; ++i) free(record->fields[i]);
     free(record->key);
     free(record);
 }
@@ -209,7 +212,7 @@ static int lab_town_store_add_owned(jsref code_value, jsref rows)
         record->bytes = 512; /* Conservative allowance for record, index and array capacity overhead. */
         memcpy(record->code, code, strlen(code) + 1);
         bool valid = true;
-        for (unsigned i = 0; i < 7; ++i) {
+        for (unsigned i = 0; i < sizeof field_names / sizeof *field_names; ++i) {
             record->fields[i] = copy_text(lab_dom_get(row, field_names[i]));
             if (!record->fields[i]) valid = false;
             else record->bytes += strlen(record->fields[i]) + 1;
