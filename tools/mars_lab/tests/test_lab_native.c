@@ -593,6 +593,7 @@ int tests_main(void)
     test_lab_forms_cases();
     test_lab_syntax_cases();
     test_lab_almanac_presentation_cases();
+    test_lab_vector_cases();
     test_lab_eclipse_worker_cases();
     TEST_SECTION("Native mathematical worker regressions");
     test_lab_math_cases();

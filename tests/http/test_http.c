@@ -55,6 +55,9 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 #define main http_websocket_example_main
 #include "../../scratch/http_websocket.c"
 #undef main
+#define main http_receive_example_main
+#include "../../scratch/http_receive.c"
+#undef main
 
 static unsigned plain_port, tls_port;
 static pid_t plain_pid = -1, tls_pid = -1;
@@ -124,6 +127,63 @@ static bool header_equals(const http_response_t *response, const char *name, con
     bool ok = value && string_view_equals_literal(string_view_all(value), expected);
     string_free(key);
     return ok;
+}
+
+static void test_http_async_receiver(void)
+{
+    TEST_ASSERT_TRUE(!http_receive_new(0), "zero budget rejected");
+    http_receive_t *receiver = http_receive_new(4);
+    TEST_ASSERT_TRUE(receiver != NULL, "allocate receiver");
+    unsigned char *chunk = http_receive_reserve(receiver, 2);
+    TEST_ASSERT_TRUE(chunk != NULL, "reserve first chunk");
+    chunk[0] = 0; chunk[1] = 255;
+    TEST_ASSERT_TRUE(http_receive_commit(receiver, 2), "commit first chunk");
+    TEST_ASSERT_TRUE(!http_receive_data(receiver) && !http_receive_size(receiver), "partial body is not published");
+    chunk = http_receive_reserve(receiver, 2);
+    TEST_ASSERT_TRUE(chunk != NULL, "reserve last chunk");
+    chunk[0] = 128; chunk[1] = 1;
+    TEST_ASSERT_TRUE(http_receive_commit(receiver, 2) && http_receive_finish(receiver, 404), "HTTP errors retain bodies");
+    const unsigned char expected[] = {0, 255, 128, 1};
+    TEST_ASSERT_TRUE(http_receive_status(receiver) == 404 && http_receive_error(receiver) == HTTP_ERROR_NONE &&
+                     http_receive_size(receiver) == 4 && !memcmp(http_receive_data(receiver), expected, 4),
+                     "binary body and status survive completion");
+    TEST_ASSERT_TRUE(!http_receive_reserve(receiver, 1) && !http_receive_commit(receiver, 1) &&
+                     !http_receive_finish(receiver, 200), "completed receiver rejects further writes");
+    http_receive_fail(receiver, HTTP_ERROR_CANCELLED);
+    TEST_ASSERT_TRUE(http_receive_status(receiver) == 404, "late cancellation leaves completion unchanged");
+    http_receive_free(receiver);
+
+    receiver = http_receive_new(4);
+    TEST_ASSERT_TRUE(receiver && !http_receive_reserve(receiver, 5), "oversized reservation rejected");
+    TEST_ASSERT_TRUE(http_receive_error(receiver) == HTTP_ERROR_LIMIT && !http_receive_finish(receiver, 200),
+                     "over-budget body cannot complete");
+    http_receive_free(receiver);
+    receiver = http_receive_new(4);
+    TEST_ASSERT_TRUE(receiver && http_receive_reserve(receiver, 2) && !http_receive_commit(receiver, 3),
+                     "over-commit rejected");
+    TEST_ASSERT_TRUE(http_receive_error(receiver) == HTTP_ERROR_ARGUMENT && !http_receive_data(receiver),
+                     "bad reservation cannot expose bytes");
+    http_receive_free(receiver);
+    receiver = http_receive_new(4);
+    TEST_ASSERT_TRUE(receiver && http_receive_reserve(receiver, 1) && !http_receive_reserve(receiver, 1),
+                     "overlapping reservations rejected");
+    TEST_ASSERT_TRUE(http_receive_error(receiver) == HTTP_ERROR_ARGUMENT, "reservation misuse reported");
+    http_receive_free(receiver);
+    receiver = http_receive_new(4);
+    TEST_ASSERT_TRUE(receiver && http_receive_reserve(receiver, 1) && !http_receive_finish(receiver, 200),
+                     "uncommitted data cannot complete");
+    TEST_ASSERT_TRUE(http_receive_error(receiver) == HTTP_ERROR_PROTOCOL, "incomplete stream reported");
+    http_receive_free(receiver);
+    receiver = http_receive_new(4);
+    http_receive_fail(receiver, HTTP_ERROR_CANCELLED);
+    TEST_ASSERT_TRUE(!http_receive_reserve(receiver, 1) && !http_receive_finish(receiver, 200) &&
+                     http_receive_error(receiver) == HTTP_ERROR_CANCELLED, "cancelled body stays inaccessible");
+    http_receive_free(receiver);
+    receiver = http_receive_new(4);
+    TEST_ASSERT_TRUE(receiver && http_receive_finish(receiver, 204) && http_receive_size(receiver) == 0,
+                     "empty completed body accepted");
+    http_receive_free(receiver);
+    http_receive_free(NULL);
 }
 
 static void test_http_validation_and_encoding(void)
@@ -1124,6 +1184,12 @@ static void example_http_websocket(void)
     TEST_ASSERT_INT_EQ(status, EXIT_SUCCESS);
 }
 
+/* README: asynchronous receiver with an offline host-delivered chunk. */
+static void example_http_receive(void)
+{
+    TEST_ASSERT_INT_EQ(http_receive_example_main(), EXIT_SUCCESS);
+}
+
 int tests_main(void)
 {
     plain_pid = start_fixture(false, false, &plain_port);
@@ -1133,6 +1199,7 @@ int tests_main(void)
         return 1;
     }
     TEST_SECTION("HTTP");
+    TEST_RUN_IN_GROUP(test_http_async_receiver, tests, NULL);
     TEST_RUN_IN_GROUP(test_http_validation_and_encoding, tests, NULL);
     TEST_RUN_IN_GROUP(test_http_headers_status_and_reuse, tests, NULL);
     TEST_RUN_IN_GROUP(test_http_methods_and_binary, tests, NULL);
@@ -1162,6 +1229,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_http_services, readme_examples, "http,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_http_grpc, readme_examples, "http,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_http_websocket, readme_examples, "http,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_http_receive, readme_examples, "http,readme,output");
     stop_fixture(plain_pid); stop_fixture(tls_pid);
     return TEST_EXIT_CODE();
 }

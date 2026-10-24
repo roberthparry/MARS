@@ -82,7 +82,7 @@ export class Codec {
         for (const name of functions) {
             if (typeof exports[name] !== 'function') return false;
         }
-        return exports.lab_browser_abi_version instanceof Function && exports.lab_browser_abi_version() === 45;
+        return exports.lab_browser_abi_version instanceof Function && exports.lab_browser_abi_version() === 47;
     }
 
     /** @brief Borrow the exact byte range of a non-shared buffer or view, rejecting inputs above the native message limit. */
@@ -207,6 +207,7 @@ export class Codec {
     }
 
     private classify(value: unknown): number {
+        if (value instanceof Uint8Array && value.buffer instanceof ArrayBuffer) return 6;
         if (value === null) return 0;
         if (typeof value === 'boolean') return 1;
         if (typeof value === 'number') return 2;
@@ -315,6 +316,12 @@ export class Codec {
     }
 
     private hostText(id: number, pointer: number, capacity: number): number {
+        const bytes = this.values[id];
+        if (bytes instanceof Uint8Array && bytes.buffer instanceof ArrayBuffer) {
+            if (bytes.byteLength > capacity) return -1;
+            new Uint8Array(this.exports().memory.buffer, pointer, bytes.byteLength).set(bytes);
+            return bytes.byteLength;
+        }
         return this.writeText(this.values[id], pointer, capacity);
     }
 
@@ -333,6 +340,8 @@ export class Codec {
             value = [];
         else if (type === 5)
             value = Object.create(null);
+        else if (type === 6)
+            value = new Uint8Array(this.exports().memory.buffer, pointer, length).slice();
         else
             return -1;
         if (parent >= 0) {

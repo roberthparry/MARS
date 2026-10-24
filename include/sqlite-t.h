@@ -2,7 +2,7 @@
  * @file sqlite-t.h
  * @brief Opaque SQLCipher-backed storage for MARS objects.
  *
- * Use this module for encrypted persistent data with SQLite query semantics.
+ * Use this module for plaintext or encrypted persistent data with SQLite query semantics.
  * Opaque database and statement handles support SQL execution, parameter binding,
  * typed result access and transactions. Object-storage helpers persist supported
  * MARS values without exposing database implementation details.
@@ -16,9 +16,10 @@
  * at rest does not replace application-level access control.
  *
  * The public type is intentionally named sqlite_t because callers should think
- * in terms of SQLite semantics. The implementation uses SQLCipher and refuses
- * to open a database without a non-empty key, so files created through this API
- * are encrypted at rest.
+ * in terms of SQLite semantics. The implementation uses SQLCipher: sqlite_open_plain()
+ * creates ordinary SQLite files without key derivation or page encryption;
+ * sqlite_open_encrypted() requires a non-empty key and never falls back to plaintext.
+ * Neither opening function converts an existing database between formats.
  *
  * Long-running CSV ingestion/export paths cooperate with an optional computation_run() scope.
  * Without a scope, existing calls remain supported. Cancellation, deadlines and
@@ -40,7 +41,7 @@
 #include "csv-t.h"
 
 /**
- * @brief Opaque encrypted SQLite database handle.
+ * @brief Opaque plaintext or encrypted SQLite database handle.
  */
 typedef struct _sqlite_t sqlite_t;
 
@@ -78,6 +79,18 @@ typedef enum _sqlite_step_result_t {
  * @return An open database handle, or `NULL` on failure.
  */
 sqlite_t *sqlite_open_encrypted(const string_t *path, const string_t *key);
+
+/**
+ * @brief Opens or creates an unencrypted SQLite database using SQLCipher without a key.
+ *
+ * No key derivation or page encryption is performed. Encrypted files fail to open;
+ * conversion requires a separate export. This does not disable memory protection
+ * requested by encrypted connections elsewhere in the process. Foreign keys are enabled.
+ * The caller owns the handle and must close it with sqlite_close().
+ * @param path Non-empty database path, or `:memory:` for temporary in-memory storage.
+ * @return An open database handle, or NULL for an invalid path or unreadable database.
+ */
+sqlite_t *sqlite_open_plain(const string_t *path);
 
 /**
  * @brief Closes an open database handle.

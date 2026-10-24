@@ -820,7 +820,7 @@ help:
 	@printf '  %-40s %s\n' "make install-mars-lab" "Install a user desktop launcher for MARS Lab"
 	@printf '  %-40s %s\n' "make uninstall-mars-lab" "Remove the user desktop launcher for MARS Lab"
 	@printf '  %-40s %s\n' "make install-almanac-db" "Build and configure the Almanac database only"
-	@printf '  %-40s %s\n' "make install-globe-db" "Install a separate shoreline-only globe database"
+	@printf '  %-40s %s\n' "make install-globe-db" "Build and install a fresh shoreline and country globe database"
 	@printf '  %-40s %s\n' "make install-mars-db" "Install globe, almanac and jurisdiction databases sequentially"
 	@printf '  %-40s %s\n' "make update-mars-db" "Apply pending migrations to existing databases without prompting"
 	@printf '  %-40s %s\n' "make check-globe-db" "Verify the globe database and shoreline availability"

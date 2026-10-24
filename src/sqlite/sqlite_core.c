@@ -1,6 +1,6 @@
 /**
  * @file sqlite_core.c
- * @brief Encrypted SQLite database, statement and object storage.
+ * @brief Plaintext and encrypted SQLite database, statement and object storage.
  *
  * Wraps SQLCipher connections and prepared statements with key validation, typed bindings and result access. MARS
  * object serialisation is persisted as data rather than live pointers or descriptors.
@@ -161,12 +161,12 @@ static bool sqlite_verify_key(sqlite_t *db)
     return ok;
 }
 
-sqlite_t *sqlite_open_encrypted(const string_t *path, const string_t *key)
+static sqlite_t *sqlite_open_storage(const string_t *path, const string_t *key)
 {
     sqlite_t *db;
     int rc;
 
-    if (sqlite_text_is_empty(path) || sqlite_text_is_empty(key))
+    if (sqlite_text_is_empty(path))
         return NULL;
 
     db = calloc(1u, sizeof(*db));
@@ -186,20 +186,32 @@ sqlite_t *sqlite_open_encrypted(const string_t *path, const string_t *key)
         return NULL;
     }
 
-    rc = sqlite3_key(db->handle, string_c_str(key), (int)string_byte_length(key));
+    rc = key ? sqlite3_key(db->handle, string_c_str(key), (int)string_byte_length(key)) : SQLITE_OK;
     if (rc != SQLITE_OK) {
         sqlite_set_error_code(db, rc);
         sqlite_close(db);
         return NULL;
     }
 
-    if (!sqlite_exec_cstr(db, "pragma cipher_memory_security = on") ||
+    if ((key && !sqlite_exec_cstr(db, "pragma cipher_memory_security = on")) ||
         !sqlite_exec_cstr(db, "pragma foreign_keys = on") || !sqlite_verify_key(db)) {
         sqlite_close(db);
         return NULL;
     }
 
     return db;
+}
+
+/* Open without a codec or key derivation; never retry an encrypted database. */
+sqlite_t *sqlite_open_plain(const string_t *path)
+{
+    return sqlite_open_storage(path, NULL);
+}
+
+/* Require a non-empty key; failure must never downgrade storage to plaintext. */
+sqlite_t *sqlite_open_encrypted(const string_t *path, const string_t *key)
+{
+    return sqlite_text_is_empty(key) ? NULL : sqlite_open_storage(path, key);
 }
 
 void sqlite_close(sqlite_t *db)

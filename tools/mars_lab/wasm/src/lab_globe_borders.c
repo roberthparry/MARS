@@ -5,6 +5,7 @@
  * array_t owns unit-sphere segment endpoints. Projection shares the globe quaternion, subdivides long
  * arcs to subpixel chord error, clips the hidden hemisphere and viewport, and emits only SVG path data.
  * No database access, JavaScript geometry cache or raster texture is involved. Input and output are capped;
+ * path storage grows with visible output rather than reserving the complete ceiling for every frame.
  * malformed replacement data leave the previously accepted cache intact.
  * Mutable resident state belongs to a private singleton. Public operations enter its serial dispatcher;
  * internal helpers execute only within that ownership boundary. No scoped browser handles are retained.
@@ -18,6 +19,10 @@
 #include "lab_globe_borders.h"
 
 typedef struct { double point[2][3]; } border_segment_t;
+typedef struct _border_output_t {
+    char *text;
+    size_t length, capacity;
+} border_output_t;
 typedef struct _border_store_t {
     lab_serial_t serial;
     array_t *segments;
@@ -145,9 +150,22 @@ static void append_pixel(char *output, size_t *length, double value)
     output[(*length)++] = '0' + hundredths % 10;
 }
 
-static bool append_segment(char *output, size_t *length, double a[3], double b[3], double scale, double size)
+static bool reserve_segment(border_output_t *output)
 {
-    border_store_t *state = border_store();
+    const size_t limit = border_store()->text_limit, needed = 40;
+    if (limit - output->length < needed) return false;
+    if (output->capacity - output->length >= needed) return true;
+    size_t capacity = output->capacity ? output->capacity * 2 : 4096;
+    if (capacity > limit) capacity = limit;
+    char *text = realloc(output->text, capacity);
+    if (!text) return false;
+    output->text = text;
+    output->capacity = capacity;
+    return true;
+}
+
+static bool append_segment(border_output_t *output, double a[3], double b[3], double scale, double size)
+{
     if (a[2] <= 0 && b[2] <= 0) return true;
     if (a[2] < 0 || b[2] < 0) {
         double t = a[2] / (a[2] - b[2]), intersection[3];
@@ -162,15 +180,15 @@ static bool append_segment(char *output, size_t *length, double a[3], double b[3
     double x = size / 2 + a[0] * scale, y = size / 2 - a[1] * scale;
     double dx = (b[0] - a[0]) * scale, dy = -(b[1] - a[1]) * scale, lo = 0, hi = 1;
     if (!clip_axis(x, dx, size, &lo, &hi) || !clip_axis(y, dy, size, &lo, &hi)) return true;
-    if (state->text_limit - *length < 40) return false;
-    output[(*length)++] = 'M';
-    append_pixel(output, length, x + lo * dx);
-    output[(*length)++] = ' ';
-    append_pixel(output, length, y + lo * dy);
-    output[(*length)++] = 'L';
-    append_pixel(output, length, x + hi * dx);
-    output[(*length)++] = ' ';
-    append_pixel(output, length, y + hi * dy);
+    if (!reserve_segment(output)) return false;
+    output->text[output->length++] = 'M';
+    append_pixel(output->text, &output->length, x + lo * dx);
+    output->text[output->length++] = ' ';
+    append_pixel(output->text, &output->length, y + lo * dy);
+    output->text[output->length++] = 'L';
+    append_pixel(output->text, &output->length, x + hi * dx);
+    output->text[output->length++] = ' ';
+    append_pixel(output->text, &output->length, y + hi * dy);
     return true;
 }
 
@@ -178,7 +196,7 @@ static bool append_segment(char *output, size_t *length, double a[3], double b[3
 static void lab_globe_borders_path_owned(quaternion_jsref orientation, double zoom, double size)
 {
     border_store_t *state = border_store();
-    if (!state->segments || !isfinite(zoom) || !isfinite(size) || zoom < 1 || zoom >= 64 || size <= 0 || size > 16384) {
+    if (!state->segments || !isfinite(zoom) || !isfinite(size) || zoom < 1 || zoom > 4096 || size <= 0 || size > 16384) {
         lab_dom_return(0);
         return;
     }
@@ -186,9 +204,8 @@ static void lab_globe_borders_path_owned(quaternion_jsref orientation, double zo
     lab_surface_rotation(orientation, matrix);
     for (unsigned i = 0; i < 9; ++i)
         if (!isfinite(matrix[i])) { lab_dom_return(0); return; }
-    char *output = malloc(state->text_limit);
-    if (!output) { lab_dom_return(0); return; }
-    size_t length = 0, pieces = 0;
+    border_output_t output = {0};
+    size_t pieces = 0;
     bool ok = true;
     double step = fmin(0.05, sqrt(0.8 / scale));
     double direct_dot = cos(step);
@@ -204,7 +221,7 @@ static void lab_globe_borders_path_owned(quaternion_jsref orientation, double zo
         }
         if (camera[0][2] <= 0 && camera[1][2] <= 0) continue;
         if (dot >= direct_dot) {
-            ok = append_segment(output, &length, camera[0], camera[1], scale, size);
+            ok = append_segment(&output, camera[0], camera[1], scale, size);
             continue;
         }
         double angle = acos(fmax(-1, fmin(1, dot))), sine = sin(angle);
@@ -220,11 +237,11 @@ static void lab_globe_borders_path_owned(quaternion_jsref orientation, double zo
                 current[i] = left * camera[0][i] + right * camera[1][i];
                 a[i] = previous[i]; b[i] = current[i]; previous[i] = current[i];
             }
-            ok = append_segment(output, &length, a, b, scale, size);
+            ok = append_segment(&output, a, b, scale, size);
         }
     }
-    lab_dom_return(ok ? lab_dom_utf8_string((const unsigned char *)output, length) : 0);
-    free(output);
+    lab_dom_return(ok ? lab_dom_utf8_string((const unsigned char *)output.text, output.length) : 0);
+    free(output.text);
 }
 
 static void globe_borders_clear_dispatch(void *context)

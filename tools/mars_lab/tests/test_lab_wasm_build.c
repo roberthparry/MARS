@@ -275,8 +275,10 @@ static bool wasm_readme(const char *directory)
     string_t *assembly = listing ? file_read_all_text(listing) : NULL;
     string_t *dependencies = dependency ? file_read_all_text(dependency) : NULL;
     ok = ok && assembly && dependencies && string_find(assembly, ".functype") >= 0 &&
-         string_find(assembly, "call\tsin") >= 0 && string_find(dependencies, "lab_surface_math.s:") >= 0 &&
-         string_find(dependencies, "tools/mars_lab/wasm/include/lab_surface_math.h") >= 0;
+         string_find(assembly, "call\tquaternion_axis_angle") >= 0 &&
+         string_find(dependencies, "lab_surface_math.s:") >= 0 &&
+         string_find(dependencies, "tools/mars_lab/wasm/include/lab_surface_math.h") >= 0 &&
+         string_find(dependencies, "include/quaternion-t.h") >= 0;
     string_free(dependencies);
     string_free(assembly);
     file_free(dependency);

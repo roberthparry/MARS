@@ -517,7 +517,8 @@ static bool test_cfg_rivers_stage_fixture(const char *directory)
         "\"properties\":{\"@type\":\"way\",\"@id\":1,\"@way_nodes\":[1,2],\"waterway\":\"river\"}}\n");
     file_t *input = input_path ? file_new(input_path) : NULL;
     file_t *output = output_path ? file_new(output_path) : NULL;
-    bool ok = input && output && text && !setenv("MARS_GLOBE_DB_KEY", "river-stage-fixture", 1) &&
+    bool ok = input && output && text && !setenv("MARS_GLOBE_DB_KEY", "", 1) &&
+              !setenv("MARS_GLOBE_RIVER_DB_KEY", "river-stage-fixture", 1) &&
               file_write_all_text(input, text) && !cfg_globe_river_stage(string_c_str(input_path), string_c_str(output_path));
     file_info_t *info = output ? file_get_info(output) : NULL;
     ok = ok && info && file_info_permissions(info) == 0600 &&
@@ -615,7 +616,8 @@ static bool test_cfg_rivers_checkpoint_fixture(const char *directory)
 
 static void test_cfg_rivers_stage(void)
 {
-    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_rivers_stage_fixture), "staging encrypts a fresh candidate and refuses overwrites");
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_rivers_stage_fixture),
+                     "staging retains its separate encryption key with plaintext installed storage and refuses overwrites");
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_rivers_checkpoint_fixture),
                      "batch checkpoints survive failure and input replay does not duplicate records");
 }

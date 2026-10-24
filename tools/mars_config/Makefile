@@ -36,6 +36,21 @@ $(CONFIG_BUILD_DIR)/coastline_repair: tools/mars_config/coastline_repair.c $(STA
 $(CONFIG_BUILD_DIR)/coastline_export: tools/mars_config/coastline_export.c $(STATIC_LIB)
 	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
+$(CONFIG_BUILD_DIR)/coastline_trial: tools/mars_config/coastline_trial.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
+
+$(CONFIG_BUILD_DIR)/coastline_compose: tools/mars_config/coastline_compose.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
+
+$(CONFIG_BUILD_DIR)/coastline_reconcile: tools/mars_config/coastline_reconcile.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
+
+$(CONFIG_BUILD_DIR)/coastline_polar: tools/mars_config/coastline_polar.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
+
+$(CONFIG_BUILD_DIR)/coastline_water: tools/mars_config/coastline_water.c $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
+
 $(CONFIG_BUILD_DIR)/%.o: tools/mars_config/src/%.c tools/mars_config/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_config/include \

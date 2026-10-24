@@ -17,7 +17,8 @@ typedef enum {
     LAB_VALUE_NUMBER = 2,   /**< Binary64 numeric scalar. */
     LAB_VALUE_STRING = 3,   /**< Browser string. */
     LAB_VALUE_ARRAY = 4,    /**< Indexed array. */
-    LAB_VALUE_OBJECT = 5   /**< Object record; the codec requires a supported plain record. */
+    LAB_VALUE_OBJECT = 5,  /**< Object record; the codec requires a supported plain record. */
+    LAB_VALUE_BYTES = 6    /**< Opaque byte array; never interpreted as text. */
 } lab_value_kind_t;
 
 #endif

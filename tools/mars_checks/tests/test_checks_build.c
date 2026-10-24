@@ -21,7 +21,8 @@ static bool test_build_makefiles(const string_t *temporary)
 {
     const char *const files[] = {
         "Makefile", "tools/mars_lab/Makefile", "tools/to_be_announced_lab/Makefile",
-        "tools/mars_config/Makefile", "tools/mars_checks/Makefile"
+        "tools/mars_config/Makefile", "tools/mars_checks/Makefile",
+        "include/array-t.h", "include/string-t.h", "src/array/array.c", "src/array/array_mutex.h"
     };
     string_t *root = checks_text(MARS_CHECKS_ROOT_DIR);
     bool ok = test_checks_write(temporary, "src/.keep", "") && test_checks_write(temporary, "tests/.keep", "");

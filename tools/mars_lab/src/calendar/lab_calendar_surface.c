@@ -52,6 +52,38 @@ static void lab_country_metadata(json_t *result, globe_t *globe, double latitude
     string_free(code);
 }
 
+static bool lab_country_selected_town(const json_t *options)
+{
+    const char *surface = lab_cal_text(options, "observer_surface");
+    if (strcmp(surface, "Land") && strcmp(surface, "Coastal") && strcmp(surface, "Inland water")) return false;
+    string_t *town = string_new_with(lab_cal_text(options, "town"));
+    size_t count = 0;
+    string_t **parts = lab_cal_split(town, "|", &count);
+    double latitude, longitude, town_latitude, town_longitude;
+    bool matches = count >= 3 && string_byte_length(parts[0]) &&
+        lab_cal_number(lab_cal_text(options, "lat"), &latitude) &&
+        lab_cal_number(lab_cal_text(options, "lon"), &longitude) &&
+        lab_cal_number(string_c_str(parts[1]), &town_latitude) &&
+        lab_cal_number(string_c_str(parts[2]), &town_longitude) &&
+        fabs(latitude) <= 90 && fabs(longitude) <= 180 &&
+        fabs(latitude - town_latitude) <= 0.000001 && fabs(longitude - town_longitude) <= 0.000001;
+    string_split_free(parts, count);
+    string_free(town);
+    return matches;
+}
+
+/* Prefer geographic ownership, with a coordinate-matched selected town as a gap fallback. */
+const char *lab_cal_observer_jurisdiction(const json_t *options)
+{
+    const char *code = lab_cal_text(options, "country_code");
+    const char *selected = lab_cal_text(options, "jurisdiction");
+    size_t length = strlen(code);
+    if (!length) return lab_country_selected_town(options) ? selected : "";
+    if (!strcmp(selected, code) ||
+        (length == 2 && !strncmp(selected, code, length) && selected[length] == '-')) return selected;
+    return code;
+}
+
 /* Apply the same geographic policy to named towns, custom locations and asynchronous weather refreshes. */
 void lab_cal_surface(json_t *options)
 {
@@ -70,6 +102,10 @@ void lab_cal_surface(json_t *options)
     static const char *const names[] = {"Unknown", "Land", "Sea", "Inland water", "Coastal"};
     lab_cal_set(options, "observer_surface", names[surface]);
     lab_cal_set(options, "sea_horizon", surface == GLOBE_SEA ? "true" : "false");
+    if (!*lab_cal_text(options, "country_code")) {
+        const char *selected = lab_cal_observer_jurisdiction(options);
+        if (*selected) lab_country_catalogue(options, selected);
+    }
 }
 
 /* Resolve geographic or catalogue-owned metadata without astronomical calculations or weather requests. */
@@ -152,6 +188,7 @@ json_t *lab_cal_globe(const json_t *payload, unsigned *status)
     if (bounds[0] < -360 || bounds[0] > 180 || bounds[2] - bounds[0] < 0.0000001 || bounds[2] - bounds[0] > 360 ||
         bounds[1] < -90 || bounds[3] > 90 || bounds[3] - bounds[1] < 0.0000001)
         return lab_cal_error(status, 400, "Invalid globe bounds");
+    if (!strcmp(lab_cal_text(payload, "format"), "vectors")) return lab_cal_globe_vectors(bounds, status);
     lab_globe_paths_t paths = {
         .image = string_new_with("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1024\" height=\"1024\" "
                                  "viewBox=\"0 0 1024 1024\">"),

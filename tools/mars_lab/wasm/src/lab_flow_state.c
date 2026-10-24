@@ -10,6 +10,7 @@
 #include "lab_dom.h"
 #include "lab_events.h"
 #include "lab_persist.h"
+#include "lab_workspace.h"
 #include "lab_flow.h"
 #include "lab_flow_state.h"
 
@@ -124,7 +125,7 @@ static jsref lab_flow_state_editors_state_prepare(struct lab_flow_state_editors_
     lab_dom_set(ctx->frame, "flags", lab_dom_numeric(ctx->flags));
     if (!(ctx->flags & 1))
         return lab_flow_state_editors_advance(ctx);
-    if (ctx->flags & 2)
+    if ((ctx->flags & 2) && ctx->index == (unsigned)lab_workspace_mode())
         return lab_flow_call(ctx->frame, 3, "statePrepare", 0, 1, 1, ctx->text);
     /* Continue when no metadata preparation is needed. */
     return lab_flow_state_editors_state_canonical(ctx);
@@ -132,7 +133,7 @@ static jsref lab_flow_state_editors_state_prepare(struct lab_flow_state_editors_
 
 static jsref lab_flow_state_editors_state_canonical(struct lab_flow_state_editors_context *ctx)
 {
-    if (ctx->flags & 4)
+    if ((ctx->flags & 4) && ctx->index == (unsigned)lab_workspace_mode())
         return lab_flow_call(ctx->frame, 4, "stateCanonical", "canonical", 0, 1, ctx->text);
     lab_dom_set(ctx->frame, "canonical", ctx->text);
     /* Continue to the editor projection. */
@@ -327,6 +328,17 @@ static jsref lab_flow_state_saved_state_server_editors(struct lab_flow_state_sav
     return lab_flow_call(ctx->frame, 1, "stateServerEditors", 0, 1, 1, ctx->data);
 }
 
+/* Select the retained mode before touching any editor; inactive mathematics stays unevaluated. */
+static jsref lab_flow_state_saved_begin(struct lab_flow_state_saved_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 12, "stateMode", "selected", 0, 1, lab_dom_get(ctx->data, "lab_mode"));
+}
+
+static jsref lab_flow_state_saved_prime(struct lab_flow_state_saved_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 13, "statePrimeMode", 0, 0, 1, ctx->mode);
+}
+
 static jsref lab_flow_state_saved_state_server_controls(struct lab_flow_state_saved_context *ctx)
 {
     return lab_flow_call(ctx->frame, 2, "stateServerControls", 0, 1, 1, ctx->data);
@@ -400,7 +412,7 @@ static jsref lab_flow_state_saved(frame_jsref frame, view_jsref view)
         .mode = mode,
     };
     static jsref (*const handlers[])(struct lab_flow_state_saved_context *) = {
-        [0]  = lab_flow_state_saved_state_server_editors,
+        [0]  = lab_flow_state_saved_begin,
         [1]  = lab_flow_state_saved_state_server_controls,
         [2]  = lab_flow_state_saved_state_calendar,
         [3]  = lab_flow_state_saved_state_calendar_3,
@@ -411,6 +423,8 @@ static jsref lab_flow_state_saved(frame_jsref frame, view_jsref view)
         [8]  = lab_flow_state_saved_state_mode,
         [9]  = lab_flow_state_saved_state_prepare_mode,
         [10] = lab_flow_state_saved_state_apply_mode,
+        [12] = lab_flow_state_saved_prime,
+        [13] = lab_flow_state_saved_state_server_editors,
     };
     unsigned selected = lab_flow_state_stage(frame);
     return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](&ctx)
@@ -488,6 +502,11 @@ static jsref lab_flow_state_recovery_state_prepare(struct lab_flow_state_recover
 {
     if (!ctx->recovery)
         return lab_flow_state_recovery_advance(ctx);
+    if (ctx->index != (unsigned)lab_workspace_mode()) {
+        ctx->text = lab_dom_get(ctx->recovery, "text");
+        lab_dom_set(ctx->frame, "text", ctx->text);
+        return lab_flow_state_recovery_state_now(ctx);
+    }
     return lab_flow_call(ctx->frame, 3, "statePrepare", 0, 1, 1, lab_dom_get(ctx->recovery, "text"));
 }
 
@@ -602,11 +621,11 @@ struct lab_flow_state_load_context {
 static jsref lab_flow_state_load_state_local_calendar_8(struct lab_flow_state_load_context *ctx);
 
 /**
- * @brief Read the locally saved worksheet mode during storage fallback.
- * @param ctx Load state whose frame receives savedMode before selecting a valid mode.
- * @return Scoped local-mode read plan resuming at stage 17.
+ * @brief Synchronise towns after local editors and calendars have been restored.
+ * @param ctx Load state retaining the mode selected before editor restoration.
+ * @return Scoped town synchronisation plan resuming at stage 18.
  */
-static jsref lab_flow_state_load_state_local_mode(struct lab_flow_state_load_context *ctx);
+static jsref lab_flow_state_load_local_ready(struct lab_flow_state_load_context *ctx);
 
 /**
  * @brief Apply the mode selected by the local-storage fallback.
@@ -644,6 +663,24 @@ static jsref lab_flow_state_load_state_local_editors(struct lab_flow_state_load_
     return lab_flow_call(ctx->frame, 11, "stateLocalEditors", 0, 1, 0);
 }
 
+/* The local recovery path must establish mode ownership before restoring inactive editors too. */
+static jsref lab_flow_state_load_local_begin(struct lab_flow_state_load_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 31, "stateLocalMode", "savedMode", 0, 0);
+}
+
+static jsref lab_flow_state_load_local_select(struct lab_flow_state_load_context *ctx)
+{
+    if (!lab_dom_truth(lab_dom_get(ctx->frame, "savedMode")))
+        return lab_flow_state_load_state_local_editors(ctx);
+    return lab_flow_call(ctx->frame, 32, "stateMode", "selected", 0, 1, lab_dom_get(ctx->frame, "savedMode"));
+}
+
+static jsref lab_flow_state_load_local_prime(struct lab_flow_state_load_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 33, "statePrimeMode", 0, 0, 1, ctx->mode);
+}
+
 static jsref lab_flow_state_load_state_local_controls(struct lab_flow_state_load_context *ctx)
 {
     return lab_flow_call(ctx->frame, 12, "stateLocalControls", 0, 1, 0);
@@ -676,12 +713,13 @@ static jsref lab_flow_state_load_state_calendar_9(struct lab_flow_state_load_con
         return lab_flow_call(ctx->frame, 16, "stateCalendar", 0, 0, 2, lab_dom_string("almanac"),
                              lab_dom_get(ctx->frame, "almanac"));
     /* Continue for an absent local almanac. */
-    return lab_flow_state_load_state_local_mode(ctx);
+    return lab_flow_state_load_local_ready(ctx);
 }
 
-static jsref lab_flow_state_load_state_local_mode(struct lab_flow_state_load_context *ctx)
+static jsref lab_flow_state_load_local_ready(struct lab_flow_state_load_context *ctx)
 {
-    return lab_flow_call(ctx->frame, 17, "stateLocalMode", "savedMode", 0, 0);
+    /* The mode was read before editor restoration; retain that same selection. */
+    return lab_flow_call(ctx->frame, 18, "stateSyncTowns", 0, 1, 0);
 }
 
 static jsref lab_flow_state_load_state_sync_towns(struct lab_flow_state_load_context *ctx)
@@ -743,19 +781,22 @@ static jsref lab_flow_state_load(frame_jsref frame, view_jsref view)
         [1]  = lab_flow_state_load_state_decode,
         [2]  = lab_flow_state_load_state_apply_saved,
         [3]  = lab_flow_state_load_state_recover,
-        [10] = lab_flow_state_load_state_local_editors,
+        [10] = lab_flow_state_load_local_begin,
         [11] = lab_flow_state_load_state_local_controls,
         [12] = lab_flow_state_load_state_local_calendar,
         [13] = lab_flow_state_load_state_calendar,
         [14] = lab_flow_state_load_state_local_calendar_8,
         [15] = lab_flow_state_load_state_calendar_9,
-        [16] = lab_flow_state_load_state_local_mode,
+        [16] = lab_flow_state_load_local_ready,
         [17] = lab_flow_state_load_state_sync_towns,
         [18] = lab_flow_state_load_state_town,
         [19] = lab_flow_state_load_state_town_13,
         [20] = lab_flow_state_load_state_mode,
         [21] = lab_flow_state_load_state_prepare_mode,
         [22] = lab_flow_state_load_state_apply_mode,
+        [31] = lab_flow_state_load_local_select,
+        [32] = lab_flow_state_load_local_prime,
+        [33] = lab_flow_state_load_state_local_editors,
     };
     unsigned selected = lab_flow_state_stage(frame);
     return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](&ctx)

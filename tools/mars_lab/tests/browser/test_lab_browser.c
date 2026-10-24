@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/inotify.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -34,6 +35,39 @@ static file_t *lab_browser_file(const char *directory, const char *name)
     file_t *file = path ? file_new(path) : NULL;
     string_free(path);
     return file;
+}
+
+/* Listener creation must not open astronomy storage before it can serve the shell. */
+static bool lab_browser_listener_only(const char *directory)
+{
+    file_t *file = lab_browser_file(directory, "startup-catalogue.db");
+    string_t *empty = string_new();
+    const char *previous = getenv("MARS_ALMANAC_DB_PATH");
+    string_t *saved = previous ? string_new_with(previous) : NULL;
+    const char *previous_key = getenv("MARS_ALMANAC_DB_KEY");
+    string_t *saved_key = previous_key ? string_new_with(previous_key) : NULL;
+    bool ready = (!previous || saved) && (!previous_key || saved_key) && file && empty &&
+                 file_write_all_text(file, empty);
+    int monitor = ready ? inotify_init1(IN_NONBLOCK | IN_CLOEXEC) : -1;
+    int watch = monitor >= 0 ? inotify_add_watch(monitor, file_path(file), IN_OPEN) : -1;
+    ready = watch >= 0 && !setenv("MARS_ALMANAC_DB_PATH", file_path(file), 1) &&
+            !setenv("MARS_ALMANAC_DB_KEY", "startup-fixture-key", 1);
+    lab_server_t *server = ready ? lab_svr_new(NULL, 0, 100) : NULL;
+    char events[4096];
+    errno = 0;
+    ssize_t bytes = monitor >= 0 ? read(monitor, events, sizeof events) : 0;
+    bool ok = server && bytes < 0 && errno == EAGAIN;
+    lab_svr_free(server);
+    if (monitor >= 0) close(monitor);
+    bool restored = saved ? !setenv("MARS_ALMANAC_DB_PATH", string_c_str(saved), 1) :
+                            !unsetenv("MARS_ALMANAC_DB_PATH");
+    bool key_restored = saved_key ? !setenv("MARS_ALMANAC_DB_KEY", string_c_str(saved_key), 1) :
+                                   !unsetenv("MARS_ALMANAC_DB_KEY");
+    string_free(saved_key);
+    string_free(saved);
+    string_free(empty);
+    file_free(file);
+    return ok && restored && key_restored;
 }
 
 static bool lab_browser_prepare(const char *directory)
@@ -65,7 +99,8 @@ static bool lab_browser_prepare(const char *directory)
                                           "transport_flow_checks.js", "editor_checks.js",
                                           "worker_checks.js",         "mobile_layout_checks.js",
                                           "surface_hover_checks.js",   "surface_mesh_checks.js",
-                                          "surface_export_checks.js",  "surface_math_checks.js",
+                                          "surface_export_checks.js",  "globe_http_checks.js", "globe_gpu_checks.js",
+                                          "surface_math_checks.js",
                                           "memory_checks.js", "protobuf_wire_checks.js"};
     for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {
         file_t *module = lab_browser_file("tools/mars_lab/build/typescript_checks/tests/browser", modules[i]);
@@ -103,8 +138,16 @@ static bool lab_browser_prepare(const char *directory)
 
 static bool lab_browser_run(const char *directory)
 {
+    bool startup_check = getenv("MARS_LAB_STARTUP_CHECKS") && !strcmp(getenv("MARS_LAB_STARTUP_CHECKS"), "1");
     if (!lab_browser_prepare(directory) || !test_lab_catalogue_database(directory))
         return false;
+    if (startup_check) {
+        if (!lab_browser_listener_only(directory)) return false;
+        json_t *state = test_lab_json("{\"lab_mode\":\"almanac\"}");
+        bool saved = state && lab_state_save(state);
+        json_free(state);
+        if (!saved) return false;
+    }
     file_t *profile = lab_browser_file(directory, "profile");
     bool profile_ready = profile && file_create_directory(profile, 0700, false);
     file_t *preferences = profile_ready ? lab_browser_file(file_path(profile), "user.js") : NULL;
@@ -125,7 +168,8 @@ static bool lab_browser_run(const char *directory)
     bool select_check = getenv("MARS_LAB_SELECT_CHECKS") && !strcmp(getenv("MARS_LAB_SELECT_CHECKS"), "1");
     string_t *url =
         server ? string_sprintf("http://127.0.0.1:%u/%s", lab_svr_port(server),
-                                select_check ? "?select-check=1" : globe_check ? "?globe-check=1" :
+                                startup_check ? "?startup-check=1" : select_check ? "?select-check=1" :
+                                globe_check ? "?globe-check=1" :
                                 catalogue_check ? "?catalogue-check=success" :
                                 profiling ? "?profile=1" : "") : NULL;
     pid_t workers[4] = {-1, -1, -1, -1};

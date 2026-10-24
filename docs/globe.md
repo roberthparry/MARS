@@ -5,6 +5,169 @@ country and river readers behind a single public interface. Implementations live
 under `src/globe`; there are no separate public shoreline or river headers or guides.
 SVG and WebGL rendering remain application responsibilities.
 
+## Live SVG shoreline display
+
+MARS Lab's map surface uses filled SVG paths, not a shoreline image uploaded to
+a WebGL texture. The native calendar endpoint selects and clips installed shoreline
+polygons into geographic patches no larger than thirty degrees, preserving land,
+lake and island nesting. WebAssembly owns these polygons in `array_t` storage,
+projects them with the globe camera, clips the hidden hemisphere and constructs
+the displayed SVG. JavaScript only requests geometry and inserts the native output.
+The cache is a serially dispatched singleton; replacement is atomic and rejected
+input leaves the previous geometry intact.
+
+Cold regional reads intersect opposing spatial ray selections before decoding
+complete rings, retaining enclosing land while excluding distant rings on either
+side. A bounded 64 KiB page buffer reuses compressed database pages across their
+coordinate chunks. Thirty-degree transport patches avoid repeatedly reading the
+same continental rings for unnecessarily small cells; the WASM projector still
+subdivides edges before horizon clipping.
+
+A file-backed regional reader retains one padded local window of exact clipped
+coordinates, bounded to 524,288 events (approximately 16 MiB). Nearby requests
+inside it re-clip that bounded stream at their own display tolerance, avoiding
+repeated continental reads without retaining a coarse zoom's simplification.
+File and WAL identity changes invalidate it; anonymous databases do not share
+this cache. Oversized windows fall back to streamed selection. Cold loads still
+pay the database-selection and decoding cost; cached timing is not cold timing.
+
+`globe_reader_new`, `globe_reader_get` and `globe_reader_free` provide an explicitly
+owned, lazy configured session. `get` borrows a controller, reusing its configured
+connection while the resolved path/key and database/WAL metadata are unchanged.
+Missing files, changed keys or changed metadata discard the old connection before
+attempting a replacement. The borrowed controller expires on the next `get` or
+`free`; callers must serialise access and create sessions after forking. The Lab's
+single geometry service owns one such session and closes it on service exit.
+
+Closed display rings reduced to one or two vertices by simplification are discarded
+without rejecting the remaining coastline. Unclosed rings, invalid coordinates and
+invalid nesting levels still reject the replacement atomically. This distinction
+prevents tiny collapsed islands from forcing a whole regional view back to enlarged
+photographic imagery.
+
+Transport is bounded to 500,000 events and the 8 MiB Protobuf envelope budget,
+and generated SVG to 32 MiB. Live coordinates are packed binary64, not decimal
+text; the native projector validates the byte records before accepting them.
+The drawing worker receives its HTTP response through bounded WASM-owned storage
+and decodes Protobuf directly into native geometry admission. JavaScript provides
+browser Fetch and the unavoidable chunk copy, not coordinate parsing or a relay
+through the main page. Retained geometry remains projectable during the download;
+failed, cancelled and stale replacements cannot publish a partial response.
+Display simplification follows the requested geographic extent; it does not change
+the installed data or improve its source accuracy. Photographic wide views remain
+raster imagery, and gridlines and rivers remain WebGL overlays. While requested
+vector data is unavailable, the last rendered view is held with selection paused;
+the client does not substitute photographic ice or render missing coverage as sea.
+Gridlines default to off and change only through the user's toggle.
+
+Views centred at or beyond 60 degrees latitude use vectors at every zoom. Native
+SVG gradients fade Antarctic land colour between 55 and 80 degrees of absolute
+latitude, independently of zoom. The earlier decorative screen-sized floes have
+been removed: they were not geographically anchored ice coverage. This display
+represents the installed land/ice-front geometry, not current offshore sea ice.
+The photographic composite is not used to infer ice extent. The imagery and
+installed geographic database remain unchanged.
+
+## Allocation-free quaternion rotations
+
+`quaternion-t.h` provides caller-owned `quaternion_t` values: four binary64
+coefficients in `[x,y,z,w]` order. It requires no allocation, global state or
+JavaScript arithmetic. The same `src/quaternion` implementation builds natively
+and into the Lab's WASM module, replacing its private quaternion algebra,
+matrix conversion and spherical interpolation. Camera-specific screen mapping
+and persistence remain application responsibilities.
+
+`quaternion_identity`, `quaternion_normalise` and `quaternion_is_unit` initialise,
+normalise and validate values. `quaternion_multiply` is the unnormalised Hamilton
+product; `quaternion_conjugate` and `quaternion_inverse` retain general algebraic
+semantics. `quaternion_axis_angle` and `quaternion_from_vectors` construct unit
+rotations. `quaternion_matrix3` produces a row-major matrix for column vectors,
+`quaternion_rotate` applies it, and `quaternion_slerp` interpolates along the
+shortest rotation arc. Angles are radians; multiplication applies the right
+rotation first. Directions of exactly opposite vectors use a deterministic
+perpendicular axis. Interpolation accepts only fractions from zero to one.
+
+Inputs may overlap output storage of the documented extent. Boolean operations
+reject NULL, invalid inputs and non-finite results without changing the output.
+Zero is valid for algebraic multiplication and conjugation, but not as a rotation
+or inverse. Normalisation scales extreme magnitudes to avoid norm overflow or
+underflow. Precision is binary64, not arbitrary precision; this geometry API does
+not add symbolic expression operations. No operation guarantees a browser frame
+time. See the public header for individual parameter and failure contracts.
+
+The general Hamilton product uses 16 multiplications and 12 additions/subtractions,
+without an extra norm or implicit normalisation. Only pointers are checked before
+arithmetic: every input coefficient contributes to every output coefficient, so
+the final finite-result check also rejects non-finite inputs. Conjugation likewise
+needs only one finite-result check. Neither operation publishes a partial result.
+
+The developer benchmark `bench/quaternion/bench_quaternion.c` compares this kernel
+with the eight-product Howell–Lafon factorisation, including exact small-integer
+checks and floating-point counterexamples. Its eight variable multiplications
+require 28 additions/subtractions and four halvings: 40 ordinary scalar arithmetic
+operations when each halving is a multiplication. That is fewer variable products,
+not fewer total operations. Preparatory sums can also overflow or cancel tiny
+rotation components. The checked direct kernel remains the library implementation;
+timings are machine-dependent. The alternative is described in
+[Algorithm 41 of Dumas, Pernet and Sedoglavic](https://arxiv.org/abs/2101.01025).
+
+This README example rotates the positive x axis onto the positive y axis:
+
+```c
+#include <math.h>
+#include <stdio.h>
+
+#include "quaternion-t.h"
+
+int main(void)
+{
+    quaternion_t rotation;
+    double axis[] = {0, 0, 1}, vector[] = {1, 0, 0}, result[3];
+    bool ok = quaternion_axis_angle(rotation, axis, acos(-1) / 2) && quaternion_rotate(result, rotation, vector);
+    if (ok) printf("Rotated: %.0f %.0f %.0f\n", result[0], result[1], result[2]);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Rotated: 0 1 0
+```
+
+## Native GPU coverage plans
+
+The `webgl-t.h` API in `src/webgl` supplies a small, portable coverage-plan builder,
+not a browser context implementation. `webgl_mask_new` sets the vertex budget;
+`webgl_mask_begin`, `webgl_mask_point` and `webgl_mask_end` accept simple projected
+rings in nesting order. `webgl_mask_vertices` and `webgl_mask_batches` expose
+borrowed binary32 XY buffers and uint32 first/count/colour commands.
+`webgl_mask_reset` reuses allocations; `webgl_mask_free` releases them. A failed
+or incomplete frame is not readable until reset and successful reconstruction.
+`webgl_mask_vertex_shader` and `webgl_mask_fragment_shader` supply immutable
+WebGL 1 GLSL sources.
+
+The backend uses signed non-zero stencil winding, normalises ring orientation,
+and limits each batch to 127 rings to prevent eight-bit wraparound with overlapping
+simple polygons. Concave rings need no expensive triangulation; successive levels
+paint land, lakes and islands in order. Self-intersecting rings are outside this
+simple-ring contract. The Lab bounds the plan to 1,048,576 vertices and 16,384
+batches, and transfers binary buffers from its isolated WASM projection worker.
+
+Visible coastlines remain SVG. Their coverage texture is drawn directly from the
+same native projection into a GPU framebuffer; there is no SVG Blob, image decode
+or image upload in the production mask path. Horizon arcs are subdivided to
+subpixel error. Reusable GPU buffers and double-buffered textures keep the previous
+complete frame until replacement succeeds. Close-view gestures transform retained
+SVG and coverage rather than rebuilding geometry each animation frame. Clipboard
+capture still composites the visible SVG, labels and GPU image into a PNG.
+
+Globe compositing shaders also live in native application code. Browser code
+compiles GLSL once per context, caches uniform locations and submits numeric state.
+Binary geometry is not binary shader code, and WASM still uses browser WebGL APIs.
+Projection and CPU submission timings are separate from completed GPU frame time;
+neither cached geometry nor shader ownership guarantees a particular frame rate.
+
 ## Outstanding delivery priority — 22 October 2026
 
 The user's active implementation priority is to deliver and install the worldwide coastline and rivers with an
@@ -77,9 +240,12 @@ Neither candidate is installed. The old river candidate and journal remain untou
 
 `globe_country_at(globe, latitude, longitude)` returns an owned `string_t` country
 name, released with `string_free`, or NULL if unavailable or ambiguous. The
-existing shoreline must independently classify the point as land. Coastal
-uncertainty, sea, missing data and overlapping administrative polygons do not
-produce a guessed country. This does not change the selected jurisdiction.
+administrative polygons determine coverage independently of shoreline availability
+and land/water classification. Harbour water, inland water and the 500-metre
+near-shore band do not suppress a covered country's name or flag code. Missing,
+uncovered or overlapping administrative geometry still returns no country; there
+is no nearest-country fallback or invented maritime buffer. This does not change
+the selected jurisdiction or the land/water classification.
 `globe_has_layer(globe, GLOBE_LAYER_COUNTRIES)` reports administrative-layer availability.
 `globe_country_code_at()` returns the independently resolved ISO alpha-2 code, or a UK constituent-country code
 such as `GB-WLS` or `GB-SCT`.
@@ -105,7 +271,7 @@ and spatial indexes** in the isolated SQLite test. Encryption/page layout may ch
 slightly; no world-sized country geometry cache is allocated by lookup.
 
 New globe installations include the layer. Existing databases acquire it with
-`make update-globe-db`; simply reinstalling preserves an existing database.
+`make update-globe-db`, preserving other layers, or `make install-globe-db` for a fresh database.
 Restart MARS Lab afterwards. `/almanac-country` performs only the independent
 geographic lookup. The browser requests it asynchronously on selection changes,
 cancels superseded requests, ignores stale replies and caches at most 64 results,
@@ -114,8 +280,13 @@ Ordinary pointer movement never starts a country lookup. Shift-hover shows coord
 immediately, then requests country metadata after a 220 ms pause. Each new point
 cancels obsolete work and clears its old label; releasing Shift, dragging or leaving
 the globe cancels pending hover work. Hover and selection share the bounded cache,
-but retain separate request ownership. Sea and uncertain positions have no flag;
-failures leave coordinates usable and never trigger Almanac calculations.
+but retain separate request ownership. Only unidentified positions lack country
+metadata; water and coastal classifications do not erase a verified jurisdiction.
+Almanac evaluation returns the same verified country to the observer dropdown as
+to the result card, replacing an empty or stale selection even if the earlier
+asynchronous lookup failed. A compatible regional jurisdiction is retained.
+An unidentified evaluation clears stale country and town selections without moving
+the observer. Lookup failures leave coordinates usable and never trigger Almanac calculations.
 
 ### Optional country borders
 
@@ -178,6 +349,8 @@ The original two-connection API retains its existing behaviour for current calle
 `globe_open_configured()` owns an independent geometry connection and optionally
 borrows a jurisdiction connection for towns. It resolves `MARS_GLOBE_DB_PATH` and
 `MARS_GLOBE_DB_KEY` before literal values in `MARS_HOME/config/globe-db.env`.
+An empty or absent key selects plaintext SQLite; a non-empty key selects encrypted SQLCipher.
+An explicitly empty environment key overrides a saved key. A failed keyed open never retries without encryption.
 It opens only an existing database, with read queries enabled, and closes its
 owned connection after releasing layer readers. The almanac's surface APIs and
 the Lab's river adapter use this entry point; neither reads legacy geometry from
@@ -186,45 +359,85 @@ the jurisdiction town catalogue.
 
 ### Installation targets
 
-`make install-globe-db` creates a separate encrypted shoreline and country database
-from the packaged GSHHG and Natural Earth sources, with no download. Its default location is
+`make install-globe-db` creates a separate shoreline and country database
+from the complete validated OSM/GSHHG shoreline and Natural Earth country sources,
+with no download. Its default location is
 `$MARS_HOME/globe/globe.db` (normally `~/.mars/globe/globe.db`); settings are saved
 privately in `config/globe-db.env`. `MARS_GLOBE_DB_PATH` and `MARS_GLOBE_DB_KEY`
-override saved values. A terminal may prompt for a new password. Non-interactive
-installation requires a key. Existing destinations are validated and preserved,
-never rebuilt or silently replaced.
+override saved values. Fresh installations default to plaintext, without password prompts;
+non-empty configured keys retain encryption. Every installation builds a fresh staged database from the packaged
+sources, with import progress shown, even when a database already exists. The completed database replaces the
+destination only after validation. Existing river and custom tables are removed on successful reinstallation;
+failed builds leave the installed database unchanged. The selected path, storage mode and saved river staging
+key are retained. Separate river candidate files are not modified.
 Staged import, integrity checking and shoreline availability checks must succeed
 before publication. Missing packaged geometry is an error, not an empty installation.
 
 `make check-globe-db` checks integrity and shoreline availability with the saved
 settings. It does not prove positional accuracy or import other geographic layers.
-`make update-globe-db` replaces the shoreline and country tables in an existing globe
-database, using the packaged sources and reviewed shoreline corrections. Each layer import is
-transactional; source preparation failures leave the database untouched and
+`make update-globe-db` replaces only the shoreline and country tables in an existing globe
+database, using the packaged complete sources without geometry repairs. Both layer imports commit
+together; source preparation failures leave the database untouched and
 import failures roll back. The saved key, configuration and other layers are
 preserved. Stop MARS Lab before updating and restart it afterwards. This is
 not a river installation command. `make uninstall-globe-db` still refuses changes.
-`make install-mars-db` asks for one shared password before starting, with confirmation
-when entering a new password. An empty answer retains the saved almanac key.
-That selected key is passed directly to the globe, almanac and jurisdiction
-installers without further password prompts; calendar questions may still appear.
-Non-interactive invocation uses the configured almanac key. Standalone installers
-retain their separate configuration behaviour. An existing globe encrypted with a
-different key is rejected safely, not silently overwritten or re-keyed.
+`make install-mars-db` uses each database's own configured storage mode, defaulting to
+plaintext when no key is supplied. Calendar questions may still appear, but passwords
+are not prompted for. Standalone installers use the same rules. Installation creates a new database in the
+selected storage mode; it does not open or decrypt the previous database. Updating requires its correct key.
 The three installations run sequentially, stopping on failure. This is not a transaction spanning three files:
 an earlier successful installation remains if a later one fails. Stop the Lab
 before rebuilding databases and restart it afterwards. New almanac installations
 contain no shoreline geometry; existing copies are not deleted merely by opening
 the configured globe.
 
+### Plaintext conversion
+
+Stop the Lab and all database writers before running `mars_config databases-plaintext`. The command processes
+globe, jurisdiction and almanac sequentially, stopping at the first failure. Remove path/key environment overrides
+first: conversion deliberately uses saved configuration only and refuses overrides that would mask the new settings.
+Each encrypted database is exported to a new private file with `.plain.db` appended to its existing pathname.
+Schema, spatial indexes, data, `user_version` and `application_id` are copied; integrity is checked before selection.
+Only then are the saved path and key changed. No geographic sources are reimported and no river tables are removed.
+Other saved settings, including calendar choices, survive. Already-plaintext stores are verified and skipped.
+
+The original encrypted file remains intact. Its old configuration is retained alongside the configuration file
+with an `.encrypted-backup` suffix. Both outputs are owner-only. Existing export or backup paths are never overwritten;
+inspect retained files after a failed conversion before retrying. Switching configuration is atomic per file, not
+across all three databases. Restart the Lab after conversion. For rollback, stop database users and restore the old
+configuration; subsequent changes made only to the plaintext copy will not be present in the encrypted original.
+Conversion retains the globe's old key as `MARS_GLOBE_RIVER_DB_KEY` for unfinished encrypted river candidates.
+River staging/resume and candidate reading use that separate key when present; publication uses the installed
+globe's own mode. An explicitly empty `MARS_GLOBE_RIVER_DB_KEY` environment value selects plaintext candidates.
+Changing the installed globe does not convert or interrupt separate staging files.
+
 `globe_has_layer()` reports availability through `globe_layer_t`. Shoreline and
 future detailed geometry belong in the globe database; towns remain in the
-jurisdiction database. New installations include the packaged GSHHG shoreline
-with reviewed local corrections; existing installations require the explicit update.
+jurisdiction database. New installations include the complete validated shoreline.
+Managed globe revision 3 updates existing installations through `make update-mars-db`
+or the database-update stage of `make release` when the Lab launcher is installed.
+Subsequent release builds skip the already-current globe revision. Standalone
+`make update-globe-db` explicitly refreshes the data using the saved settings; `make install-globe-db`
+instead rebuilds a fresh database, removing other installed layers.
+
+The complete artifact contains **841,233 rings and 35,346,818 points**. The archive
+is packaged as seven sequential `packaging/globe-db/shoreline-20261023.cf64.zst.00`
+through `.06` files: six 64 MiB parts and one 14,916,563-byte part. These are byte
+segments of one archive, not geographic layers or a runtime source composition.
+The installer reassembles and verifies its SHA-256, decompresses at most 602,563,348
+bytes, verifies the decoded SHA-256 and imports the lossless `MARSCF64` coordinates.
+Missing, damaged or substituted parts fail before geometry replacement. It does
+not call offline repair tools, load the historical Sydney correction or silently
+fall back to GSHHG. Staging needs approximately 1.02 GB for the archive and decoded
+stream, in addition to database and rollback-journal space.
 
 Holding **Shift** while hovering over the globe shows the latitude and longitude
 beneath the pointer in degrees and decimal minutes, even with the coordinate grid
 disabled. Pressing or releasing Shift updates the tooltip without moving the mouse.
+When enabled, the grid retains every line at the selected zoom spacing. Stroke
+width is capped relative to that spacing so converging polar meridians cannot
+merge into a pale wash. Subtle dark strokes on bright ice and light strokes on
+darker surfaces improve contrast without replacing shoreline geometry or imagery.
 Hovering does not change the observer or trigger calculations; leaving the globe
 or switching windows clears the tooltip.
 Town-marker tooltips also include coordinates alongside the full name and country.
@@ -278,6 +491,10 @@ database connection.
 `globe_path_event_t` move, line and close events. Odd nesting levels are land;
 even levels are inland water. The Antarctic ice-front flag allows a renderer
 to colour Antarctica separately. Fill levels 1–4 over water in nesting order.
+Cold regions spanning at most 90° on each axis read indexed candidate rings directly;
+they do not first decode the global dataset or build its display resolutions. Candidate
+selection includes eastward ray crossings so enclosing land and lakes remain filled.
+Existing resident geometry is reused, and wider requests still prepare the shared cache.
 
 Bounds may cross the date line: west is between −360° and 180°, east is greater
 than west by at most 360°, and latitude bounds lie within −90° to 90° with north
@@ -302,6 +519,16 @@ Version 1 and its integer codecs remain readable. Each chunk still contains
 at most 257 points and each page at most 64 KiB; binary64 chunks are at most
 4,112 bytes. Non-finite or out-of-range coordinates are rejected. Import checks
 encoding and bounds, not topology: the source still requires geographic validation.
+
+For an exactly preserved polar-complete polygon, flag bit 24 marks an explicit
+virtual closure. Header words at byte offsets 28 and 32 give its first edge and
+edge count, wrapping modulo the number of non-duplicated ring vertices. This
+extension requires a closed level-1 polygon spanning both dateline edges and
+reaching 90°S. The importer splits chunks at physical/virtual transitions without
+moving vertices: virtual edges contribute to land filling but not coastline
+classification. Legacy level-5 ice-front streams retain their existing implicit
+polar-cap behaviour. Older importers do not understand the explicit marker and
+must not be used to install these new artifacts.
 
 Indexed hit-testing and resident full-resolution paths now retain coordinates
 in degrees without rounding through the microdegree grid. Spatial indexes use
@@ -333,18 +560,201 @@ sequentially for the native stream. The exporter performs no geometry repair.
 Its self-test covers exact tiny-ring preservation, the effective repair overlay,
 native import compatibility, rejection of stale and incomplete reviews, and
 refusal to overwrite an existing output. Failed outputs remain incomplete and
-must not be installed. This is a coastline-only intermediate: inland-water
-composition, nesting and polar-boundary acceptance, packaging and installation
-remain outstanding. The normal importer must consume a finished validated
+must not be installed. The initial coastline-only intermediate required inland-water
+composition, nesting and polar-boundary acceptance before packaging. The complete
+accepted artifact described below includes those stages. The normal importer consumes a finished validated
 artifact, not invoke these offline preparation tools or repair bad geometry.
+The exporter accepts completed boundary reviews produced before the optional
+`invalid_rings` quantisation-diagnostics table was introduced. When that table
+exists it must be empty; missing required review tables, unsuccessful status,
+non-zero contacts and geometry mismatches still reject the candidate. The first
+worldwide export stopped at preflight because it incorrectly required this newer
+table in the older fourth-pass review. Its empty output is retained; the retry
+uses a distinct output and log without modifying the accepted review database.
+
+The retry completed: 833,417 rings and 34,485,968 coastline coordinate pairs,
+verified against 924,803 reviewed chunks, occupy 588,445,844 bytes in the
+coastline-only intermediate. This is not yet the installed shoreline.
+Offline `coastline_compose` combines this intermediate with the existing GSHHG
+level-two to level-four inland rings in a separate, exclusively created staging
+database. It preserves closed coordinate sequences, closes open legacy rings
+without moving vertices, and records source identifiers, levels, orientation,
+area, polar bounds and invalid-ring diagnostics. It never repairs geometry or
+opens the installed globe. Its targeted self-test covers nested levels, invalid
+rings, exact binary64 coordinates, legacy longitude wrapping, level filtering,
+open legacy closure and truncated inputs (including skipped levels).
+Composition success means only that the candidate is ready for cross-ring and
+nesting review; it does not approve installation. The bounded background worker
+runs composition and the boundary reviewer sequentially, records input and
+executable checksums, and stops on failure. Nesting, polar interpretation and
+native-reader resource acceptance remain separate installation gates.
+
+The first composition completed with 841,524 rings and 35,377,402 coordinate
+pairs, but boundary review found 556 crossing-chunk records across 337 ring
+pairs. All involved legacy inland rings meeting the new coastline: 174 legacy
+rings and 255 coastline rings. No individual ring was invalid. The candidate
+was rejected and not installed.
+
+Offline `coastline_reconcile` implements the subsequently authorised policy that
+the reviewed coastline takes precedence at source conflicts. It works on an
+exclusive copy, supersedes crossing legacy rings, and records their original WKB,
+metadata and the corresponding coastline ring identifiers. This is whole-ring
+source replacement, not vertex snapping or a claim that every old water outline
+survives. Geographic coverage review of these replacements remains mandatory.
+All retained coordinate sequences remain unchanged. The tool builds nesting
+using R-tree envelope queries and prepared containment tests, including periodic
+longitude copies. Since crossing rings have been excluded, an interior sample
+establishes containment among the remaining non-crossing rings. Equal land/water
+classifications identify redundant legacy coverage. Nested coastline land rings
+require an additional full-polygon coverage proof: the enclosing high-resolution
+land must cover the entire inner polygon, including periodic longitude handling.
+Only then can its redundant inner outline be omitted without changing the union
+of land coverage. Its geometry and the containment proof remain in the audit,
+and its lakes and islands are reparented rather than discarded. No ring is flipped
+to water, no coordinate is moved, and older data does not override the new coastline.
+Nested levels are recomputed, and unsupported
+depth or inconsistent coastline orientation fails preparation. Removed ancestors
+are bypassed through indexed parent links so their useful descendants survive.
+Self-tests cover both directions of duplicate nesting, preserved islands and
+ponds, periodic longitudes, exact retained coordinates, original-geometry audit,
+full-polygon containment, preservation of descendants of redundant coastline land,
+and rejection of partial coverage, same-source crossings and inconsistent coastline nesting.
+The first reconciliation stopped at the first of 63 land-inside-land coastline
+pairs. An independent ray test confirmed that all nine vertices of ring 66168
+lie within ring 28012; this was not a containment-test error. The next pass requires
+the stronger full-polygon proof for each such redundancy and retains the failed
+candidate separately. Geographic acceptance remains outstanding.
+The second pass progressed through redundant land coverage but stopped at five
+clockwise, uncontained coastline shells. They map to closed source coastline ways
+1567122037, 1567122042, 1567122046, 1567136415 and 1567136428 from the 12 October
+extract; none came from the repair overlay. Their source edits date to 10 October.
+The preparer now treats an uncontained coastline shell as land independently of
+winding, recording the old and new classification in `classification_overrides`.
+This is a topology-based interpretation, not independent geographic verification.
+Coordinates and original winding remain unchanged, and enclosed clockwise water
+rings are not reclassified. Tests cover clockwise outer land containing a lake,
+exact geometry preservation, audit records and continued rejection of inconsistent
+nested water. The third pass uses new output paths; earlier failed candidates
+remain available for comparison. The normal importer performs none of this work.
+
+The third reconciliation and boundary review passed with 841,226 rings and
+35,340,423 points. Subsequent acceptance found the Antarctic polygon closed at
+approximately 85.051129°S rather than the South Pole. Offline `coastline_polar`
+therefore makes one candidate with the newer polygon retained north of its exact
+coverage limit and the packaged GSHHG ice-front coverage retained south of it.
+It checks equality of land coverage on each side and requires a valid single
+polygon without holes. Original geometry, source identifier and cutoff are
+recorded in `polar_completion`; a fresh global boundary review is required.
+The legacy source contains an irrelevant self-intersection near 75°S. Its ring
+is clipped to the required southern half-plane before validation, excluding that
+northern defect. The actual retained legacy fallback is a five-coordinate polar
+cap. No normal import performs this merge. Final export must distinguish synthetic
+polar closure from physical coastline, and a complete native trial import remains
+required before installation.
+
+The first polar completion correctly rejected a disconnected union: the source's
+synthetic southern closure slopes from 85.0511289°S to 85.05°S. Using its minimum
+latitude made the fallback meet it at only one point. The preparer now recognises
+the connected, full-width synthetic closure and uses its northernmost latitude,
+85.05°S, as the complete-coverage cutoff. It rejects an unrecognised closure rather
+than guessing. The northern and southern coverage comparisons still require zero
+area difference; no tolerance was relaxed and no coastline vertex was snapped.
+A regression reproduces the disconnected result and checks the corrected union.
+The read-only `--check-merge` diagnostic passed on the actual Antarctic geometry:
+one valid polygon, no holes, and equal regional coverage. The second full polar
+run completed successfully with 841,226 rings, 35,340,425 points and zero boundary
+contacts, retaining the failed first output.
+
+The offline exporter now supports complete compositions through its `--complete`
+mode, preserving nesting levels and positive legacy longitudes. It checks each
+coordinate against the fresh review and recognises the single artificial polar
+closure without changing the reviewed polygon. The optional `coastline_trial`
+tool imports into an exclusive encrypted database with an unrelated sentinel
+table, compares every stored coordinate and boundary flag against the artifact,
+checks integrity and representative geography, and prepares the full native
+surface cache. The capped export/trial worker has no runtime deadline and does
+not install anything. Successful export and trial results are required
+before packaging the artifact and changing the managed database revision; the
+second marine composition completed these checks on 23 October 2026.
+
+The first complete export and native import passed, including exact readback of
+all 35,340,425 points. Geographic acceptance then exposed an incorrect expectation:
+the Málaga centre probe is on land but 375.4 metres from the mapped coastline,
+inside the reader's intentional 500-metre uncertainty band. Acceptance now checks
+strict containment independently and verifies proximity-aware classification
+against that result; a coastal classification alone cannot pass the land/water
+check. All probe sites use this distinction. Small nested-polygon regressions
+cover both sides of land, lake and island boundaries before and after cache
+preparation. Read-only `--resume` mode repeats exact readback, integrity checks,
+geographic acceptance and cache checks on the existing trial database. No import
+or source preparation is repeated, and no installation occurs.
+
+The resumed trial passed Málaga and the polar checks but exposed missing Sydney
+Harbour water coverage. Both failed water probes lie inside the unsimplified OSM
+coastline shell as well as the simplified candidate. The separately retained OSM
+marine-water relation 1252425, version 123, covers both points. Its geometry was
+not part of the coastline-only source selection; the old Sydney correction is
+not automatically carried into a replacement coastline.
+
+The optional offline `coastline_water` preparer incorporates a supplied valid
+marine-water GeoJSON polygon into an exclusive candidate copy. It spatially
+selects intersecting level-1 shells, subtracts the water and assigns resulting
+shells and holes their nesting levels using a spatial tree. It rejects overlapping
+nested layers, polar edits, invalid geometry and nesting deeper than four levels.
+Source GeoJSON, original geometry and replacement identifiers are retained in
+`marine_source`, `marine_original` and `marine_replacements`. The input coordinates
+are not snapped or simplified; computed intersection coordinates retain binary64
+precision. A repeated-overlay coverage check permits only discrepancy area below
+1e-14 square degrees that is wholly within 1e-9 degrees (at most 0.12 mm) of the
+original input boundaries. This numerical verification allowance never changes
+output coordinates and is separate from the eight-metre simplification ceiling.
+
+The first full marine review rejected one contact: simplification had replaced
+the harbour-mouth source path with a straight edge, creating a false triangular
+island when the unsimplified water polygon was subtracted. The optional source-join
+GeoJSON restores the original nodes across exactly one matching simplified edge,
+in either direction. Every restored node must lie within a conservative eight-metre
+bound of that edge; endpoints must match exactly, and the resulting polygon must
+be valid. This is an offline source restoration, not snapping or removal of small
+islands. The source path is retained in `marine_join`; the original land geometry
+remains in `marine_original`. Sydney uses original OSM ways 576802264, 899661018
+and the first four nodes of 153496653. The preparer also rejects touching output
+boundaries locally, before the mandatory global review.
+
+Read-only Sydney composition with that restoration passes, replacing one mainland
+ring with eight rings. The second full run completed successfully on 23 October
+2026: global boundary review, lossless export, exact native readback of all
+35,346,818 points, all 16 geographic probes, full surface-cache construction and
+all 16 cached probes passed. Compression and archive verification also passed.
+Small regressions cover enclosed water with an island, sea-connected water with
+an island, database storage, preservation of unrelated tables and rollback of an
+unsupported nested-layer intersection, together with source-join direction,
+displacement and endpoint checks and rejection of touching components.
+The accepted complete candidate passed fresh
+global boundary review, complete export, exact native readback and geographic and
+surface-cache acceptance. All these stages ran sequentially under the capped
+marine-composition worker without a runtime deadline; normal import performs none
+of this source composition or repair work.
+
+The resident reader now permits up to 64 million stored chunk vertices only within
+a 1.5 GiB geometry-array budget. This includes vertices, boundary flags, ring
+metadata, tree compaction and simultaneous old/new display-index allocations.
+The budget is not a process RSS guarantee: SQLite, allocator overhead, other
+retained geometries and application working memory are additional. Targeted tests
+cover the higher-resolution count, oversized display-index growth and arithmetic
+overflow, alongside existing lossless, nested-ring and packaged-world regressions.
+The capped background worker then runs a fresh boundary review. Neither tool
+is called by the normal importer, and neither approves or performs installation.
 
 See [almanac data provenance](almanac-data-provenance.md#shoreline-data) for
 source, checksums and licence notices.
 
 ### Reviewed local shoreline corrections
 
-The installer applies `packaging/globe-db/shoreline-corrections.json` to a
-temporary copy of the upstream binary stream before import. The original archive
+The former GSHHG installer applied `packaging/globe-db/shoreline-corrections.json` to a
+temporary copy of the upstream binary stream before import. This historical
+correction and its tests are retained for provenance, but revision 3 does not use
+them: Sydney harbour water is already present in the complete artifact. The original archive
 is unchanged. Corrections are sorted by polygon ID and specify an original point
 count, a zero-based inclusive vertex span and replacement microdegree coordinates. Both
 endpoints must match the original exactly; coordinates must remain within its
@@ -445,11 +855,12 @@ That pass completed successfully on 23 October 2026: 833,417 effective rings,
 contacts. The 26 complementary date-line joins are recorded separately. Both
 original island records remain in the repair overlay. The result is explicitly
 `boundary_contacts_clear_not_install_approved`, not a delivered shoreline update.
-The installer still imports GSHHG plus the Sydney correction. The next delivery
-work must preserve inland waters, check nesting and microdegree quantisation,
-export the same effective overlay geometry, and address the resident reader's
-32-million-vertex ceiling and the installer's 128 MiB decompression limit before
-transactional installation and visual verification.
+At that stage the installer still imported GSHHG plus the Sydney correction.
+The subsequent complete-artifact work described above preserved inland waters,
+checked nesting, adopted lossless coordinates instead of microdegree quantisation,
+and raised the reader and decompression budgets before managed revision 3.
+Visual verification in the user's rebuilt Lab remains separate from the native
+acceptance checks.
 The review tool's optional final `--microdegrees` flag rounds the effective
 candidate to the globe's stored integer-microdegree grid before checking validity
 and cross-ring contacts. It retains the exact reviewed geometry in `quantized_rings`

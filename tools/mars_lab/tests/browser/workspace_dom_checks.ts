@@ -87,8 +87,8 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
                   'original action buttons move below the globe only in Almanac mode');
             if (mode === 6) {
                 check(actionHome.previousElementSibling?.id === 'almanacGlobe' &&
-                      actionHome.nextElementSibling?.classList.contains('almanac-briefing'),
-                      'Almanac actions sit between globe and worksheet introduction');
+                      actionHome.nextElementSibling?.classList.contains('datetime-field-groups'),
+                      'Almanac actions sit between globe and worksheet controls');
                 check(document.getElementById('workspaceActionsHome')!.getBoundingClientRect().height >= 48,
                       'former button area remains reserved for country and town dropdowns');
                 const backDisabled = WorksheetContext.back.disabled;

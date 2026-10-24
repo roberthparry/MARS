@@ -35,6 +35,12 @@ string_t *lab_cal_town_timezone(const json_t *options);
  */
 void lab_cal_surface(json_t *options);
 
+/** Return bounded geographic polygons for validated bounds, for projection by the WASM SVG renderer. */
+json_t *lab_cal_globe_vectors(const double bounds[4], unsigned *status);
+
+/** Return geographic ownership or a coordinate-matched selected town's fallback jurisdiction; borrowed text. */
+const char *lab_cal_observer_jurisdiction(const json_t *options);
+
 /**
  * @brief Render bounded shoreline imagery for the observer globe.
  * @param payload Borrowed west/south/east/north degree bounds.

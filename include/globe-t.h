@@ -11,6 +11,8 @@
  * tables with other data, including the encrypted almanac catalogue. No astronomical
  * engine, browser or network service is required. Display queries lazily retain immutable exact coordinates,
  * a spatial tree and four display resolutions; callers can prepare these before native workers fork.
+ * A serially owned globe_reader_t session lazily retains a configured connection, revalidates
+ * configuration and file metadata on acquisition, and must itself be created after forking.
  *
  * Cold hit-tests use indexed chunks; resident hit-tests use exact cached coordinates, never display simplifications.
  * Older compressed chunks remain readable. The 500-metre coastal uncertainty
@@ -18,7 +20,7 @@
  * establish safe navigation or public access to land. Callers own the database and input file; they must serialise
  * queries on an instance and close instances before replacing their dataset. Missing, malformed or unreadable
  * data produce an unknown result.
- * Optional administrative polygons supply selected-land country names through bounded indexed queries.
+ * Optional administrative polygons supply selected-position country names through bounded indexed queries.
  * Their generalised boundaries never replace the detailed shoreline or establish legal jurisdiction.
  */
 #ifndef MARS_GLOBE_H
@@ -51,7 +53,7 @@ typedef bool (*globe_path_fn)(globe_path_event_t event, double longitude, double
                                   unsigned level, bool antarctic, void *context);
 
 /**
- * @brief Stream clipped vector polygons from a shared resident geometry cache.
+ * @brief Stream clipped vector polygons from indexed regional data or a shared resident geometry cache.
  * @param shoreline Borrowed reader; serialise calls on it.
  * @param west Western longitude, between -360 and 180 degrees.
  * @param south Southern latitude, at least -90 degrees.
@@ -62,7 +64,8 @@ typedef bool (*globe_path_fn)(globe_path_event_t event, double longitude, double
  * @param context Borrowed visitor context.
  * @return True on success, false for invalid input, corrupt data or visitor cancellation. Discard partial output.
  * @note Group polygons by level and fill levels 1..4 over water. This API does not apply the hit-test uncertainty band.
- * @note Lazily retains exact coordinates, a spatial index and four display resolutions in native memory.
+ * @note Cold regions up to 90 degrees on each axis stream indexed candidate rings without a global cache.
+ * Wider queries lazily retain exact coordinates, a spatial index and four display resolutions in native memory.
  */
 bool globe_surface_paths(globe_t *shoreline, double west, double south, double east, double north,
                      double tolerance, globe_path_fn visit, void *context);
@@ -110,13 +113,31 @@ globe_t *globe_open_databases(sqlite_t *shore_db, sqlite_t *map_db, sqlite_t *to
 /**
  * @brief Open the configured independent globe database, optionally borrowing a town catalogue.
  * @param town_db Borrowed jurisdiction connection, or NULL; must outlive the controller.
- * @return Owned controller, or NULL if configuration, the existing database or its key is unavailable.
+ * @return Owned controller, or NULL if configuration or the existing database cannot be read in its selected mode.
  * Reads MARS_GLOBE_DB_PATH and MARS_GLOBE_DB_KEY before literal settings in MARS_HOME/config/globe-db.env.
  * MARS_HOME defaults to ~/.mars; the default database path is MARS_HOME/globe/globe.db.
+ * Empty or absent keys select plaintext; non-empty keys select encryption without fallback on failure.
  * The geometry connection is owned and closed by the controller. Opening never creates a missing database
  * and never falls back to geography in the almanac or jurisdiction database.
  */
 globe_t *globe_open_configured(sqlite_t *town_db);
+
+/** @brief Serially owned configured geometry session; not shared across threads or forks. */
+typedef struct _globe_reader_t globe_reader_t;
+
+/** @brief Allocate a lazy configured geometry session; release with globe_reader_free. */
+globe_reader_t *globe_reader_new(void);
+
+/**
+ * @brief Borrow the session's controller until the next get or free, or NULL on configuration/read failure.
+ * Reuses the selected-mode connection while configuration and database/WAL metadata remain unchanged.
+ * Changes close the old controller before opening the replacement, including invalid keys and missing files.
+ * Callers must serialise all access and must not close the borrowed controller or retain it across this call.
+ */
+globe_t *globe_reader_get(globe_reader_t *reader);
+
+/** @brief Close a session's owned connection and release the session; accepts NULL. */
+void globe_reader_free(globe_reader_t *reader);
 
 /**
  * @brief Release a geographic controller without closing its borrowed databases.
@@ -134,14 +155,20 @@ void globe_close(globe_t *shoreline);
 globe_surface_t globe_hit_test(globe_t *shoreline, double latitude_degrees, double longitude_degrees);
 
 /**
- * @brief Return an owned country name for a confirmed land point, or NULL when unavailable or ambiguous.
+ * @brief Return an owned country name for a covered point, or NULL when unavailable or ambiguous.
  * Uses indexed Natural Earth administrative boundaries, independently of the shoreline geometry.
+ * Water and near-shore classifications do not suppress administrative coverage. No nearest-country
+ * or maritime-distance inference is made; these generalised polygons are not legal maritime boundaries.
  * Border points and uncertain coastal classifications yield no name. This is not a legal boundary determination.
  * The caller releases the result with string_free; access to the borrowed database must be serialised.
  */
 string_t *globe_country_at(globe_t *globe, double latitude_degrees, double longitude_degrees);
 
-/** @brief Return an owned ISO country or UK constituent-country code for confirmed land, or NULL when unavailable; release with string_free. */
+/**
+ * @brief Return an owned ISO country or UK constituent-country code for a covered point; release with string_free.
+ * Independent of shoreline availability and land/water classification. Returns NULL for missing,
+ * ambiguous or uncovered administrative geometry; never guesses a nearby country's maritime extent.
+ */
 string_t *globe_country_code_at(globe_t *globe, double latitude_degrees, double longitude_degrees);
 
 /** @brief Visit one shared land-border segment in longitude/latitude degrees; false stops with failure. */

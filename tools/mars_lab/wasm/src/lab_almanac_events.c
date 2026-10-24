@@ -9,6 +9,8 @@
  * Also projects a pending observer summary from resident controls while calculations
  * run. No astronomical data or mathematical markup is parsed, reconstructed or rewritten.
  */
+#include <math.h>
+
 #include "lab_dom.h"
 #include "lab_result.h"
 #include "lab_almanac_events.h"
@@ -29,6 +31,21 @@ static jsref lab_almanac_preview_value(const char *selector)
     return lab_dom_read(lab_dom_query(0, selector), LAB_DOM_VALUE, "");
 }
 
+/* Match the completed native observer summary, including minute carry and hemisphere at zero. */
+static jsref lab_almanac_preview_angle(const char *selector, bool latitude)
+{
+    jsref input = lab_almanac_preview_value(selector);
+    double angle = lab_dom_to_number(input);
+    if (!lab_dom_length(input) || !isfinite(angle) || fabs(angle) > (latitude ? 90 : 180))
+        return lab_dom_string("Unavailable");
+    unsigned hundredths = (unsigned)floor(fabs(angle) * 6000 + 0.5), minutes = hundredths % 6000;
+    char suffix[] = {' ', '0' + minutes / 1000, '0' + minutes / 100 % 10, '.',
+                     '0' + minutes / 10 % 10, '0' + minutes % 10, 0};
+    const char *hemisphere = latitude ? (signbit(angle) ? "′ S" : "′ N") : (signbit(angle) ? "′ W" : "′ E");
+    jsref degrees = lab_dom_format(hundredths / 6000, "", "°");
+    return lab_dom_join(lab_dom_join(degrees, 0, suffix), 0, hemisphere);
+}
+
 /* Display only resident observer information; never reuse the previous observer's calculated results. */
 void lab_almanac_events_preview(jsref target, jsref country)
 {
@@ -43,15 +60,19 @@ void lab_almanac_events_preview(jsref target, jsref country)
     jsref summary = lab_almanac_preview_element(header, "dl", "almanac-summary", 0);
     jsref town_select = lab_dom_query(0, "#almanacTown");
     jsref town = lab_dom_length(lab_dom_read(town_select, LAB_DOM_VALUE, "")) ?
-                     lab_dom_read(lab_dom_selected(town_select), LAB_DOM_TEXT, "") : lab_dom_string("Custom");
+                     lab_dom_read(lab_dom_selected(town_select), LAB_DOM_TEXT, "") : 0;
     jsref name = lab_dom_get(country, "name");
     jsref pending = lab_dom_string("Updating…");
+    jsref location = lab_dom_length(name) ?
+        (lab_dom_length(town) ? lab_dom_join(lab_dom_join(town, 0, ", "), name, "") : name) :
+        (lab_dom_length(town) ? town : pending);
     jsref values[] = {
-        lab_dom_join(lab_almanac_preview_value("#almanacDate"), lab_almanac_preview_value("#almanacTime"), " "),
-        lab_dom_length(name) ? lab_dom_join(town, name, ", ") : town,
+        lab_dom_join(lab_dom_join(lab_almanac_preview_value("#almanacDate"), 0, " "),
+                     lab_almanac_preview_value("#almanacTime"), ""),
+        location,
         lab_almanac_preview_value("#almanacZone"),
-        lab_dom_join(lab_almanac_preview_value("#almanacLatitude"), lab_dom_string("°"), ""),
-        lab_dom_join(lab_almanac_preview_value("#almanacLongitude"), lab_dom_string("°"), ""),
+        lab_almanac_preview_angle("#almanacLatitude", true),
+        lab_almanac_preview_angle("#almanacLongitude", false),
         lab_dom_join(lab_almanac_preview_value("#almanacElevation"), lab_dom_string(" m · Updating…"), ""),
         pending, pending, pending,
     };

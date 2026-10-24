@@ -56,8 +56,8 @@ int lab_host_child_info(codec_jsref id, int index);
 int lab_host_key_text(codec_jsref id, int index, unsigned char *target, uint32_t capacity);
 
 /**
- * @brief Copy a string value as UTF-8.
- * @param id Scoped codec handle to the browser string to copy.
+ * @brief Copy a string as UTF-8 or an opaque byte value without conversion.
+ * @param id Scoped codec handle to the browser string or non-shared Uint8Array to copy.
  * @param[out] target Writable destination in WASM linear memory with at least capacity bytes available.
  * @param capacity Destination capacity in bytes; no NUL terminator is written.
  * @return UTF-8 byte count, or -1 for a non-string value, insufficient capacity or a failed UTF-8 round-trip;

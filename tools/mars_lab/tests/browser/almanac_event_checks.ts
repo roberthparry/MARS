@@ -149,6 +149,51 @@ window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
         check(target.textContent!.includes('Updating…') && target.dataset.copyText === '' &&
             target.querySelector('[role="status"]') !== null,
             'pending observer preview clears stale copied results and labels unresolved calculations');
+        const town = document.getElementById('almanacTown') as HTMLSelectElement;
+        const latitude = document.getElementById('almanacLatitude') as HTMLInputElement;
+        const longitude = document.getElementById('almanacLongitude') as HTMLInputElement;
+        const date = document.getElementById('almanacDate') as HTMLInputElement;
+        const time = document.getElementById('almanacTime') as HTMLInputElement;
+        const inputs = [town, latitude, longitude, date, time];
+        const saved = inputs.map(input => input.value);
+        const fixtureTown = new Option('Dublin', 'preview-dublin');
+        const cell = (label: string): string | null | undefined =>
+            Array.from(target.querySelectorAll('.almanac-summary-row'))
+                .find(row => row.querySelector('dt')?.textContent === label)?.querySelector('dd')?.textContent;
+        try {
+            town.value = '';
+            latitude.value = '53.3498';
+            longitude.value = '-6.2603';
+            date.value = '2026-10-24';
+            time.value = '12:34:56';
+            labDOM.call('lab_almanac_events_preview', target, {name: 'Ireland'});
+            check(cell('Location') === 'Ireland', 'known country without a town never gains a Custom prefix');
+            check(cell('Latitude') === '53° 20.99′ N' && cell('Longitude') === '6° 15.62′ W',
+                'first observer frame uses completed-summary coordinate formatting');
+            check(cell('GMT moment') === '2026-10-24 12:34:56', 'preview separates the date and time correctly');
+            town.append(fixtureTown);
+            town.value = fixtureTown.value;
+            labDOM.call('lab_almanac_events_preview', target, {name: 'Ireland'});
+            check(cell('Location') === 'Dublin, Ireland', 'preview separates a real town from its country');
+            town.value = '';
+            for (const [lat, lon, expectedLat, expectedLon] of [
+                ['-33.925', '18.4231666667', '33° 55.50′ S', '18° 25.39′ E'],
+                ['12.9999999', '-179.9999999', '13° 00.00′ N', '180° 00.00′ W'],
+                ['0', '0', '0° 00.00′ N', '0° 00.00′ E'],
+                ['90', '180', '90° 00.00′ N', '180° 00.00′ E'],
+                ['', '181', 'Unavailable', 'Unavailable']
+            ]) {
+                latitude.value = lat;
+                longitude.value = lon;
+                labDOM.call('lab_almanac_events_preview', target, {});
+                check(cell('Latitude') === expectedLat && cell('Longitude') === expectedLon,
+                    `preview coordinates handle hemispheres, rounding and invalid inputs: ${lat},${lon}`);
+                check(cell('Location') === 'Updating…', 'unknown country remains explicitly pending');
+            }
+        } finally {
+            fixtureTown.remove();
+            inputs.forEach((input, index) => { input.value = saved[index]; });
+        }
         labDOM.call('lab_almanac_events_preview', target, {name: '<unsafe>', flag: 'javascript:invalid'});
         check(target.textContent!.includes('<unsafe>') && target.querySelector('unsafe, img') === null,
             'preview treats country names as text and rejects non-image flag URLs');

@@ -3,6 +3,8 @@
  * @brief Small fixed-domain graphics operations for a freestanding WebAssembly viewport.
  *
  * Camera rotations and relative unit-volume scales need only display precision.
+ * Shared quaternion algebra and interpolation belong to quaternion-t.h; this
+ * adapter retains camera conventions and browser-value conversion only.
  * Standard maths functions are linked from WASI libc, without JavaScript maths
  * callbacks or WASI system imports. These are not mathematical expression
  * evaluators: native MARS retains all actual coordinate arithmetic and
@@ -15,6 +17,7 @@
 
 #include <math.h>
 
+#include "quaternion-t.h"
 #include "lab_dom.h"
 #include "lab_surface_math.h"
 
@@ -60,23 +63,17 @@ static jsref vector(const double *values, unsigned count)
 
 static void normalise(double q[4])
 {
-    double length = __builtin_sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
-    if (length > 0)
-        for (unsigned i = 0; i < 4; ++i)
-            q[i] /= length;
-    else
-        q[3] = 1;
+    if (quaternion_normalise(q, q)) return;
+    /* The legacy viewport treats a zero camera as identity, but invalid numbers remain invalid. */
+    if (q[0] == 0 && q[1] == 0 && q[2] == 0 && q[3] == 0) quaternion_identity(q);
+    else for (unsigned i = 0; i < 4; ++i) q[i] = NAN;
 }
 
 /* Compose display rotations without retaining intermediate quaternion drift. */
 void lab_surface_quaternion_multiply(const double a[4], const double b[4], double q[4])
 {
-    double result[] = {
-        a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
-        a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
-        a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
-        a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2]
-    };
+    quaternion_t result = {NAN, NAN, NAN, NAN};
+    quaternion_multiply(result, a, b);
     for (unsigned i = 0; i < 4; ++i)
         q[i] = result[i];
     normalise(q);
@@ -84,23 +81,23 @@ void lab_surface_quaternion_multiply(const double a[4], const double b[4], doubl
 
 static void from_angles(const double angles[3], double q[4])
 {
-    double a = angles[0] * M_PI / 360, e = M_PI / 4 + angles[1] * M_PI / 360, r = angles[2] * M_PI / 360;
-    double az[] = {0, 0, sin(a), cos(a)};
-    double el[] = {sin(e), 0, 0, cos(e)};
-    double ro[] = {0, 0, sin(r), cos(r)};
+    const double x[] = {1, 0, 0}, z[] = {0, 0, 1};
+    quaternion_t az, el, ro;
+    if (!quaternion_axis_angle(az, z, angles[0] * M_PI / 180) ||
+        !quaternion_axis_angle(el, x, M_PI / 2 + angles[1] * M_PI / 180) ||
+        !quaternion_axis_angle(ro, z, angles[2] * M_PI / 180)) {
+        for (unsigned i = 0; i < 4; ++i) q[i] = NAN;
+        return;
+    }
     lab_surface_quaternion_multiply(el, az, q);
     lab_surface_quaternion_multiply(ro, q, q);
 }
 
 static void rows(double q[4], double m[9])
 {
+    if (quaternion_matrix3(m, q)) return;
     normalise(q);
-    double x = q[0], y = q[1], z = q[2], w = q[3];
-    double values[] = {1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w),
-                       2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w),
-                       2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)};
-    for (unsigned i = 0; i < 9; ++i)
-        m[i] = values[i];
+    if (!quaternion_matrix3(m, q)) for (unsigned i = 0; i < 9; ++i) m[i] = NAN;
 }
 
 static double wrap(double angle)
@@ -135,8 +132,7 @@ static void to_angles(double q[4], const double previous[3], double out[3])
         a = previous[0] * M_PI / 180;
         double angles[] = {previous[0], e * 180 / M_PI, 0}, base[4], residual[4];
         from_angles(angles, base);
-        for (unsigned i = 0; i < 3; ++i)
-            base[i] = -base[i];
+        quaternion_conjugate(base, base);
         lab_surface_quaternion_multiply(q, base, residual);
         r = 2 * lab_surface_atan2(residual[2], residual[3]);
     }
@@ -200,22 +196,18 @@ static void camera_multiply(struct lab_surface_camera_context *ctx)
 /* Apply horizontal roll or the trackball gesture to the current quaternion. */
 static void camera_drag(struct lab_surface_camera_context *ctx)
 {
-    double from[2], to[2], b[4] = {0};
+    double from[2], to[2];
+    quaternion_t b = {NAN, NAN, NAN, NAN};
     read_vector(ctx->second, from, 2);
     read_vector(ctx->third, to, 2);
     if (ctx->roll) {
-        double half = (to[0] - from[0]) * M_PI / 720;
-        b[2] = sin(half);
-        b[3] = cos(half);
+        const double axis[] = {0, 0, 1};
+        quaternion_axis_angle(b, axis, (to[0] - from[0]) * M_PI / 360);
     } else {
         double u[3], v[3];
         ball(from, ctx->box, u);
         ball(to, ctx->box, v);
-        b[0] = u[1] * v[2] - u[2] * v[1];
-        b[1] = u[2] * v[0] - u[0] * v[2];
-        b[2] = u[0] * v[1] - u[1] * v[0];
-        b[3] = 1 + u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
-        normalise(b);
+        quaternion_from_vectors(b, u, v);
     }
     lab_surface_quaternion_multiply(b, ctx->first, ctx->result);
 }

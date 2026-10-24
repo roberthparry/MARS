@@ -1,6 +1,6 @@
 /**
  * @file http-t.h
- * @brief Synchronous C HTTP/HTTPS transport with opaque requests, responses and reusable clients.
+ * @brief C HTTP/HTTPS transport and bounded asynchronous response reception.
  *
  * Use this module to consume web services through reusable clients with configured
  * timeouts, size limits and authentication. Requests and responses support text,
@@ -19,6 +19,10 @@
  * destination URLs; this is not an SSRF sandbox. All handles require external synchronisation; callbacks must not
  * re-enter them. HTTP 4xx/5xx responses are returned normally: check http_response_ok separately from transport
  * success.
+ *
+ * The separate http_receive_t API supports asynchronous host transports, including browser Fetch, without
+ * libcurl. Hosts deliver chunks directly into receiver-owned memory and signal completion or cancellation;
+ * protocol decoding remains in C. This receiver does not itself open sockets or implement browser policies.
  */
 
 #ifndef MARS_HTTP_H
@@ -50,6 +54,9 @@ typedef struct _http_request_t http_request_t;
 /** @brief Opaque completed HTTP response. */
 typedef struct _http_response_t http_response_t;
 
+/** @brief Bounded response owner for an asynchronous host transport; externally serialised, without libcurl. */
+typedef struct _http_receive_t http_receive_t;
+
 /** @brief Transport failure categories, separate from HTTP status codes. */
 typedef enum {
     HTTP_ERROR_NONE,
@@ -62,6 +69,40 @@ typedef enum {
     HTTP_ERROR_IO,
     HTTP_ERROR_PROTOCOL
 } http_error_t;
+
+/** @brief Create a receiver with an explicit non-zero body limit; returns NULL on invalid input or allocation failure. */
+http_receive_t *http_receive_new(size_t max_body_bytes);
+
+/** @brief Destroy a receiver and its body; NULL is harmless. The host must first stop using borrowed write pointers. */
+void http_receive_free(http_receive_t *receiver);
+
+/**
+ * @brief Reserve a non-empty next chunk directly in receiver-owned storage, or return NULL and fail the transfer.
+ * Only one reservation may be outstanding. Write at most size bytes, then commit before any other operation.
+ * Borrowed pointers must not survive another receiver operation or WebAssembly memory growth in the host.
+ */
+unsigned char *http_receive_reserve(http_receive_t *receiver, size_t size);
+
+/** @brief Commit at most the outstanding reservation's size; false fails the transfer on a mismatched reservation. */
+bool http_receive_commit(http_receive_t *receiver, size_t size);
+
+/** @brief Complete a response with final HTTP status 200..599, including error statuses; false on invalid state. */
+bool http_receive_finish(http_receive_t *receiver, unsigned status);
+
+/** @brief Fail an incomplete transfer; NONE becomes TRANSPORT. Completed responses are unchanged; NULL is harmless. */
+void http_receive_fail(http_receive_t *receiver, http_error_t error);
+
+/** @brief Borrow the completed body until destruction; NULL before completion, on failure, or for an empty body. */
+const unsigned char *http_receive_data(const http_receive_t *receiver);
+
+/** @brief Return the completed body length, or zero before completion or on failure. */
+size_t http_receive_size(const http_receive_t *receiver);
+
+/** @brief Return the completed HTTP status, or zero before completion or on failure. */
+unsigned http_receive_status(const http_receive_t *receiver);
+
+/** @brief Return the transfer error, or ARGUMENT for NULL; HTTP error statuses do not imply transport failure. */
+http_error_t http_receive_error(const http_receive_t *receiver);
 
 /** @brief Transfer controls. Zero fields select the listed defaults, not unlimited values. */
 typedef struct {

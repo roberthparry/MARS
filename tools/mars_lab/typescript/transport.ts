@@ -448,6 +448,7 @@ class LabDOMBridge {
             typeof this.values[id] === 'boolean'    ? 1 :
             typeof this.values[id] === 'number'     ? 2 :
             typeof this.values[id] === 'string'     ? 3 :
+            this.values[id] instanceof Uint8Array  ? 6 :
             Array.isArray(this.values[id])          ? 4 :
                                                  5,
         lab_dom_truth: id => !!this.values[id],
@@ -456,6 +457,13 @@ class LabDOMBridge {
 
         // --- String and numeric conversion ---
         lab_dom_text: value => this.remember(String(this.values[value])),
+        lab_dom_bytes_copy: (value, target, capacity) => {
+            const bytes = this.values[value];
+            if (!(bytes instanceof Uint8Array) || !(bytes.buffer instanceof ArrayBuffer) || bytes.byteLength > capacity)
+                return -1;
+            new Uint8Array(this.nativeExports().memory.buffer, target, bytes.byteLength).set(bytes);
+            return bytes.byteLength;
+        },
         lab_dom_utf8_copy: (value, target, capacity) => {
             const text = String(this.values[value]);
             if (text.length > capacity)
@@ -623,12 +631,12 @@ class LabWireTransport {
     }
 
     /** @brief Load codec and job modules, initialise WASM and arrange worker cleanup when the page leaves outside the back-forward cache. */
-    public async start(): Promise<void> {
+    public async start(background = true): Promise<void> {
         this.lifetime.signal.throwIfAborted();
         // URLs remain runtime module locations; no static import changes the classic-script scope.
         const codecURL = '/js/codec.js', jobsURL = '/js/jobs.js';
-        const [codecModule, jobsModule]: [MarsTransportCodecModule, MarsTransportJobsModule] =
-            await Promise.all([import(codecURL), import(jobsURL)]);
+        const [codecModule, jobsModule]: [MarsTransportCodecModule, MarsTransportJobsModule | null] =
+            await Promise.all([import(codecURL), background ? import(jobsURL) : Promise.resolve(null)]);
         this.lifetime.signal.throwIfAborted();
         const response = await this.fetchResponse('/wasm/lab_browser.wasm', {cache: 'no-store', signal: this.lifetime.signal});
         this.lifetime.signal.throwIfAborted();
@@ -639,6 +647,7 @@ class LabWireTransport {
         await instance.start(bytes);
         this.lifetime.signal.throwIfAborted();
         this.codec = instance;
+        if (!jobsModule) return; // Drawing workers decode their own HTTP responses directly in native memory.
         const jobs = jobsModule.createJobs(instance.exports(), instance,
             new URL('/js/codec_worker.js', location.href).href,
             new URL('/wasm/lab_codec.wasm', location.href).href);

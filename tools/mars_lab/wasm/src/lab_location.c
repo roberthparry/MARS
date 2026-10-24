@@ -763,8 +763,9 @@ void lab_location_evaluation(lab_mode_t mode, jsref data, jsref context)
             lab_location_reset_offset(context, offset);
         }
     } else if (mode == LAB_MODE_ALMANAC) {
-        bool offshore = lab_location_is(lab_dom_get(data, "observer_surface"), "Sea");
-        if (offshore) {
+        int jurisdiction = lab_dom_get(fields, "jurisdiction");
+        bool unidentified = lab_dom_type(jurisdiction) == LAB_VALUE_STRING && !lab_dom_length(jurisdiction);
+        if (unidentified) {
             lab_location_write(lab_location_element(mode, 3), lab_dom_string(""));
             lab_location_populate(lab_location_element(mode, 4), lab_dom_object(LAB_VALUE_ARRAY), false);
             lab_location_write(lab_location_element(mode, 4), lab_dom_string(""));
@@ -775,7 +776,7 @@ void lab_location_evaluation(lab_mode_t mode, jsref data, jsref context)
         unsigned mark = lab_dom_mark();
         for (unsigned index = 0; index < sizeof projection / sizeof *projection; ++index) {
             unsigned field = projection[index];
-            if (field == 3 && offshore)
+            if (field == 3 && unidentified)
                 continue;
             int value = lab_dom_get(fields, lab_profile_text(mode, field, LAB_PROFILE_KEY));
             if (field == 3 && lab_dom_type(value) == LAB_VALUE_STRING && !lab_dom_length(value)) {

@@ -229,7 +229,7 @@ static bool route_contracts(const char *directory)
     bool placeholders_ok = page_has_no_placeholders(response);
     bool catalogue_ok = response && !response_contains(response, "MARS_LAB_DATA");
     bool stylesheet_ok = response_contains(response, "<link rel=\"stylesheet\" href=\"/index.css\">") &&
-                         !response_contains(response, "<style>");
+                         response_contains(response, "html[data-starting]");
     bool scripts_ok = response_contains(response, "<script defer src=\"/js/app.js\"></script>") &&
                       !response_contains(response, "id=\"lab-config\"") &&
                       !response_contains(response, "function evaluateExpression") &&
@@ -316,7 +316,7 @@ static bool route_contracts(const char *directory)
     ok = response && http_response_status(response) == 404 && ok;
     http_response_free(response);
     static const char *const scripts[] = {"codec", "codec_types", "jobs", "codec_worker", "transport",
-                                         "api", "app", "bindings", "bindings_controller", "locations", "globe", "results",
+                                         "api", "app", "bindings", "bindings_controller", "locations", "globe", "globe_gpu", "globe_worker", "results",
                                          "results_services", "state", "surface", "surface_camera", "surface_export",
                                          "surface_hover", "surface_volume", "workspace", "workspace_native",
                                          "workspace_controllers"};

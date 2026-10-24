@@ -96,6 +96,9 @@ LAB_WASM_WIRE_OBJ := $(LAB_BUILD_DIR)/wasm/marslib/protobuf_wire.o
 LAB_WASM_OBJS += $(LAB_WASM_WIRE_OBJ)
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/dictionary.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/array.o
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/http_receive.o
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/webgl_mask.o
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/quaternion.o
 LAB_WASM_ASM := $(LAB_WASM_OBJS:.o=.s)
 # Debian/Ubuntu's wasi-libc keeps musl maths in libc.a; libm.a is an empty compatibility archive.
 # Override both paths for another installation. Only referenced archive members are linked.
@@ -107,7 +110,33 @@ LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ff
                    -nostdlib -nostdlibinc -Wmissing-prototypes -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -Itools/mars_lab/wasm/include
 
 # Link generic containers separately; do not pull in the native libmars archive.
+$(LAB_BUILD_DIR)/wasm/marslib/quaternion.o: src/quaternion/quaternion.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/quaternion.s: src/quaternion/quaternion.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/webgl_mask.o: src/webgl/webgl_mask.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/webgl_mask.s: src/webgl/webgl_mask.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
 # array_t uses owner-thread locking in non-shared WASM, without a WASI pthread dependency.
+$(LAB_BUILD_DIR)/wasm/marslib/http_receive.o: src/http/http_receive.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/http_receive.s: src/http/http_receive.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/src/lab_globe_fetch.o $(LAB_BUILD_DIR)/wasm/src/lab_globe_fetch.s: LAB_WASM_CFLAGS += --target=wasm32-wasi
+
 $(LAB_BUILD_DIR)/wasm/marslib/array.o: src/array/array.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -D_GNU_SOURCE -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@

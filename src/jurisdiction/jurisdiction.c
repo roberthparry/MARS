@@ -14,9 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "file-t.h"
 #define MARS_JURISDICTION_INTERNAL_ACCESS
 #include "jurisdiction_internal.h"
-#include "file-t.h"
 
 void jurisdiction_set_error(jurisdiction_t *jurisdiction, const char *message)
 {
@@ -227,10 +227,10 @@ static char *jurisdiction_db_key_from_env(void)
     char *config_key;
 
     env_key = getenv("MARS_JURISDICTION_DB_KEY");
-    if (env_key && *env_key)
+    if (env_key)
         return jurisdiction_dup_c_string(env_key);
     env_key = getenv("MARS_HOLIDAY_DB_KEY");
-    if (env_key && *env_key)
+    if (env_key)
         return jurisdiction_dup_c_string(env_key);
     config_key = jurisdiction_config_lookup("MARS_JURISDICTION_DB_KEY");
     if (!config_key)
@@ -474,7 +474,7 @@ jurisdiction_t *jurisdict_open(const char *jurisdiction_code)
     string_t *key = NULL;
     const char *resolved_path = jurisdiction_db_path_from_env();
 
-    if (!resolved_path || !*resolved_path || !resolved_key || !*resolved_key) {
+    if (!resolved_path || !*resolved_path) {
         free((char *)resolved_path);
         free(resolved_key);
         return NULL;
@@ -503,8 +503,12 @@ jurisdiction_t *jurisdict_open(const char *jurisdiction_code)
         detect_default_jurisdiction(jurisdiction->jurisdiction);
     }
     path = jurisdiction_string_from_cstr(resolved_path);
-    key = jurisdiction_string_from_cstr(resolved_key);
-    jurisdiction->db = (path && key) ? sqlite_open_encrypted(path, key) : NULL;
+    key = resolved_key && *resolved_key ? jurisdiction_string_from_cstr(resolved_key) : string_new();
+    file_t *database = path ? file_new(path) : NULL;
+    jurisdiction->db = (database && key && (file_exists(database) ||
+                        string_view_equals_literal(string_view_all(path), ":memory:")))
+                          ? (string_byte_length(key) ? sqlite_open_encrypted(path, key) : sqlite_open_plain(path)) : NULL;
+    file_free(database);
     string_free(key);
     string_free(path);
     free((char *)resolved_path);

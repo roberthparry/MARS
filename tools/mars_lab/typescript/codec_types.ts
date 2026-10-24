@@ -8,7 +8,7 @@
  * invoking property getters, cycles are rejected and completed aliases are accepted.
  */
 /** Shared transport types and validation for the browser codec and its dedicated worker. */
-export type JsonValue = null | boolean | number | string | JsonValue[] | JsonObject;
+export type JsonValue = null | boolean | number | string | Uint8Array<ArrayBuffer> | JsonValue[] | JsonObject;
 
 /** @brief JSON object whose string-named members contain validated JSON values. */
 export interface JsonObject { [key: string]: JsonValue; }
@@ -177,6 +177,7 @@ class JsonValueValidator {
     }
 
     private visit(item: unknown): boolean {
+        if (item instanceof Uint8Array && item.buffer instanceof ArrayBuffer) return true;
         if (item === null || typeof item === 'boolean' || typeof item === 'string')
             return true;
         if (typeof item === 'number')

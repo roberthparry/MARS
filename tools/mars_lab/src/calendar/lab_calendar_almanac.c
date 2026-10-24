@@ -421,7 +421,7 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
         if (!visible_only || !strcmp(lab_cal_text(row, "visible"), "YES"))
             json_array_append(rows, row);
     }
-    lab_cal_set(fields, "jurisdiction", lab_cal_text(options, "jurisdiction"));
+    lab_cal_set(fields, "jurisdiction", lab_cal_observer_jurisdiction(options));
     lab_cal_set(fields, "town", lab_cal_text(options, "town"));
     lab_cal_set(fields, "timezone", lab_cal_text(options, "timezone"));
     lab_cal_set(fields, "visibility", lab_cal_text(options, "visibility"));

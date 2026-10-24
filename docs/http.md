@@ -84,6 +84,70 @@ MARS parser is rejected.
 
 ## Limits and streaming
 
+### Asynchronous host response reception
+
+`http_receive_t` in `http-t.h` is the portable response owner for event-driven
+transports such as browser Fetch. Unlike `http_client_send`, this component has
+no libcurl, socket or threading dependency. The host still performs networking;
+it is not a synchronous libcurl replacement or a way to bypass browser security.
+
+Create a receiver with `http_receive_new(max_body_bytes)`, using an explicit,
+non-zero decoded-body limit. For each non-empty chunk, reserve storage with
+`http_receive_reserve`, copy directly into that storage, then call
+`http_receive_commit` with the actual byte count. Only one reservation may be
+outstanding. Allocation grows geometrically within the limit. Never retain a
+write pointer across another receiver operation; browser adapters must also
+reacquire their memory view after WASM allocation or growth.
+
+At end of stream, `http_receive_finish` accepts a final status from 200 to 599.
+Only then do `http_receive_data`, `http_receive_size` and `http_receive_status`
+expose the complete response. HTTP error statuses remain inspectable; application
+code must check them before decoding. Use `http_receive_fail` for cancellation,
+timeout or transport failure, and `http_receive_error` for the first failure.
+Incomplete or failed bodies cannot be read through the completed-body API.
+`http_receive_free` releases the receiver and its storage.
+
+The host owns the request, deadlines, response headers, MIME checks, redirects,
+credentials and cancellation of the actual network operation. Stop that operation
+before destroying its receiver. Calls require external serialisation. In a
+browser worker, the host delivers opaque chunks into WASM memory; native protocol
+decoders can borrow the completed body without a second response copy. This does
+not eliminate the browser-to-WASM chunk copy. Browser TLS, origin and Fetch rules
+still apply; native libcurl certificate and cookie settings do not control Fetch.
+
+The complete offline example in `scratch/http_receive.c` simulates one delivered
+chunk; a real adapter runs the same operations from its asynchronous callbacks:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "http-t.h"
+
+int main(void)
+{
+    http_receive_t *receiver = http_receive_new(1024);
+    unsigned char *chunk = http_receive_reserve(receiver, 3);
+    if (!chunk) { http_receive_free(receiver); return EXIT_FAILURE; }
+    memcpy(chunk, "ABC", 3);
+    if (!http_receive_commit(receiver, 3) || !http_receive_finish(receiver, 200)) {
+        http_receive_free(receiver); return EXIT_FAILURE;
+    }
+    printf("%u: %zu bytes\n", http_receive_status(receiver), http_receive_size(receiver));
+    http_receive_free(receiver);
+    return EXIT_SUCCESS;
+}
+```
+
+Output:
+
+```text
+200: 3 bytes
+```
+
+### Synchronous libcurl limits
+
 Zero-initialise `http_limits_t`; zero fields select defaults, not infinity:
 
 | Field | Default | Meaning |

@@ -681,6 +681,9 @@ node_jsref lab_dom_value_id(jsref id);
  */
 int lab_dom_utf8_copy(jsref value, unsigned char *target, unsigned capacity);
 
+/** @brief Copy a borrowed, non-shared Uint8Array into bounded native memory, returning its length or -1. */
+int lab_dom_bytes_copy(jsref value, unsigned char *target, unsigned capacity);
+
 /**
  * @brief Wrap length-delimited UTF-8 bytes in a scoped browser string.
  * @param source Borrowed WebAssembly bytes; embedded NUL bytes are preserved.

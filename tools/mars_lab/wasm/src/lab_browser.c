@@ -138,12 +138,13 @@ static void lab_browser_write(int info, unsigned depth)
     }
     lab_value_kind_t kind = (lab_value_kind_t)(info & 7);
     int id = info >> 3;
-    if (info < 0 || kind > LAB_VALUE_OBJECT) {
+    if (info < 0 || kind > LAB_VALUE_BYTES) {
         lab_browser_failed = 1;
         return;
     }
     lab_browser_varint(8);
     lab_browser_varint((unsigned)kind);
+    if (kind == LAB_VALUE_BYTES) { lab_browser_text(id, 7, -1); return; }
     static void (*const scalar_writers[LAB_VALUE_OBJECT + 1])(codec_jsref) = {
         [LAB_VALUE_BOOLEAN] = lab_browser_write_boolean,
         [LAB_VALUE_NUMBER]  = lab_browser_write_number,
@@ -256,15 +257,16 @@ static codec_jsref lab_browser_read(lab_browser_reader_t reader, unsigned depth,
         lab_browser_reader_t slice = {0};
         if (!lab_browser_field(&reader, &field, &wire, &value, &slice))
             return -1;
-        if (field <= 4) {
+        if (field <= 4 || field == 7) {
             static const protobuf_wire_t wires[] = {
-                PROTOBUF_VARINT, PROTOBUF_VARINT, PROTOBUF_VARINT, PROTOBUF_FIXED64, PROTOBUF_BYTES
+                PROTOBUF_VARINT, PROTOBUF_VARINT, PROTOBUF_VARINT, PROTOBUF_FIXED64, PROTOBUF_BYTES,
+                PROTOBUF_BYTES, PROTOBUF_BYTES, PROTOBUF_BYTES
             };
             if (wire != wires[field] || (seen & (1u << field)))
                 return -1;
             seen |= 1u << field;
             if (field == 1) {
-                if (value > 5)
+                if (value > 6)
                     return -1;
                 kind = (lab_value_kind_t)value;
             } else if (field == 2) {
@@ -284,14 +286,15 @@ static codec_jsref lab_browser_read(lab_browser_reader_t reader, unsigned depth,
             containers |= 1u << field;
         }
     }
-    if (kind == LAB_VALUE_INVALID || kind > LAB_VALUE_OBJECT || !(seen & 2) ||
-        (seen & ~((kind >= LAB_VALUE_BOOLEAN && kind <= LAB_VALUE_STRING ? 1u << (kind + 1) : 0) | 2u)) ||
-        (containers & ~(kind >= LAB_VALUE_ARRAY ? 1u << (kind + 1) : 0)))
+    if (kind == LAB_VALUE_INVALID || kind > LAB_VALUE_BYTES || !(seen & 2) ||
+        (seen & ~((kind == LAB_VALUE_BYTES ? 128u :
+                   kind >= LAB_VALUE_BOOLEAN && kind <= LAB_VALUE_STRING ? 1u << (kind + 1) : 0) | 2u)) ||
+        (containers & ~(kind >= LAB_VALUE_ARRAY && kind <= LAB_VALUE_OBJECT ? 1u << (kind + 1) : 0)))
         return -1;
     int parent = lab_host_value(kind, kind == LAB_VALUE_BOOLEAN ? (double)boolean : number.number,
                                 text.bytes ? text.bytes + text.position : NULL, text.end - text.position, owner, key,
                                 key_length);
-    if (parent < 0 || kind < LAB_VALUE_ARRAY)
+    if (parent < 0 || kind < LAB_VALUE_ARRAY || kind == LAB_VALUE_BYTES)
         return parent;
     reader = original;
     while (reader.position < reader.end) {
@@ -321,7 +324,7 @@ unsigned char *lab_browser_input_buffer(void)
 /* Identify the complete browser ABI independently of the stable wire schema. */
 unsigned lab_browser_abi_version(void)
 {
-    return 45;
+    return 47;
 }
 
 /* Share the codec's staging bound with browser stream and buffer admission. */

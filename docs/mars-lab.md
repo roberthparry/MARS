@@ -1,7 +1,160 @@
 # MARS Lab
 
+Startup restores the saved worksheet before revealing mode-specific controls or
+starting the initial evaluation. A neutral, dark startup shell is shown meanwhile;
+Expression is not painted or evaluated as an intermediate mode when Almanac,
+Datetime or another mode was last used. The existing native restoration policy
+continues to resolve persisted state and browser-local recovery. Startup failures
+reveal the error rather than leaving the worksheet hidden.
+The globe also retains its camera orientation and zoom in browser-local storage,
+independently of the restored observer fields. Native camera validation runs before the
+first globe frame; invalid records fall back to observer centring. Startup town
+hydration does not recenter a restored camera.
+Writes are debounced during gestures and flushed when hiding or leaving the page,
+so reopening does not reset the zoom. This camera record is separate from the
+worksheet's Back/Forward history and does not change the selected observer.
+Native restoration establishes mode ownership before processing saved editors;
+inactive editor text is retained without metadata requests or canonicalisation
+evaluations. Its usual preparation occurs when that mode is selected.
+
+The HTTP listener starts without opening the astronomical catalogue or preparing
+the global shoreline. A separate, supervised native process prepares geometry on
+demand and owns the single resident shoreline cache. Each HTTP worker has a
+private, bounded anonymous socket channel to that owner; geometry is no longer
+decoded independently in every HTTP worker. Cold regional views stream indexed
+candidate rings without preparing the global cache. Wide views still pay that
+preparation cost; page and non-globe requests remain independent.
+Regional selection excludes rings wholly east or west of the requested window
+and reuses each compressed database page across adjacent chunks. Transport cells
+span at most thirty degrees, reducing repeated continental reads while retaining
+native edge subdivision and hemisphere clipping.
+Shoreline replies use the Protobuf `BYTES` value kind (6), with its payload in
+field 7. Coordinates are not decimal strings: the `MSH1` payload contains
+17-byte records, each with a command byte and two little-endian IEEE binary64
+coordinates. Command 0 closes a ring (zero coordinate bytes), 16 continues it,
+and 1–4 starts a nesting level, optionally ORed with 8 for Antarctic ice.
+The projection worker's WASM encodes the bounds request and owns response storage
+through the [HTTP module's asynchronous receiver](http.md#asynchronous-host-response-reception).
+The shoreline decoder requires a successful `ok` value and binary `vectors`, but skips unrelated
+response metadata, including the shared server's `presentation` member. Metadata order does not matter;
+missing, duplicated or invalid required members still reject the response without replacing accepted geometry.
+Worker-side Fetch supplies networking and copies opaque chunks straight into
+reserved native memory. WASM decodes the completed Protobuf directly there,
+validates structure, finite coordinates, bounds and nesting, then atomically
+publishes geometry. The page and generic codec worker never receive the shoreline
+response or construct geometry objects. Projection can continue while Fetch awaits
+more bytes; tokens and geometry revisions reject cancelled or stale work.
+The strict shoreline reply schema requires only `ok: true` and binary `vectors`.
+The native transport tree reserves the single-member `$lab_binary` wrapper for
+opaque bytes; the general browser codec represents those as `Uint8Array`, but
+the live shoreline receiver bypasses that host-value conversion. Text fixtures remain accepted by
+the projector, but the server no longer emits decimal shoreline coordinates.
+SVG path output still uses text because the browser SVG renderer requires it.
+Local coastline vectors are requested before the optional whole-world Map preview;
+Natural Earth does not request that preview. Vector loading starts at zoom four,
+before the close-view handoff at zoom eight. Sharper photographic imagery remains
+available when reopening directly at close zoom, and regional views blend towards
+a local land/water palette instead of magnifying photographic colour patches.
+The transition now follows projected source-pixel size: photography remains intact
+up to two CSS pixels per source pixel and blends towards the local palette by six.
+Drag samples predict up to 400 ms ahead with a bounded quarter-viewport lead;
+native coverage checks keep the current view inside each prefetched region.
+Natural Earth retains covered portions of the previous detailed frame while the
+next region loads. Outside its geographic and image bounds, the photographic
+fallback uses the same resolution-dependent colour treatment as the detailed
+surface, avoiding a rectangular switch between raw imagery and the local palette.
+The launcher uses `lab_surface_service_start` before forking HTTP workers and
+`lab_surface_service_select` to retain each worker's channel. Shoreline requests
+use `lab_surface_service_request`; failed channels report service unavailability
+rather than silently constructing another world cache. All children are reaped
+on shutdown. Direct adapter tests can run without starting the service.
+
+Globe rotation never changes the photographic/map style merely because the camera
+crosses a polar latitude. Explicit Map selection and the deep-zoom threshold still
+select detailed geometry, but only explicit Map selection uses flat olive fills.
+Natural Earth keeps the locally sampled photographic land and water colours at
+close zoom. An overscanned, display-resolution coverage mask is drawn directly
+from binary native projection buffers using `src/webgl`, not decoded from SVG
+or sampled from the coarse world shoreline texture. The GPU
+uses that mask to shade land and water independently without colouring mapped
+channels as land. Its camera transform follows the retained SVG during motion;
+the mask is rebuilt only with a new exact SVG projection, not on every drag frame.
+The mask is capped at 2048 pixels per side; it is a compositing aid, not a change
+to the stored coastline or a claim of fully vector terrain imagery.
+Shoreline admission and projection run in a dedicated worker
+using the native WASM implementation, with one operation in flight and stale camera
+results discarded. The main thread retains coverage metadata, not the shoreline
+geographic vertices. Binary projected GPU buffers are transferred for submission;
+the browser does not interpret or reformat their coordinates. Workers are terminated
+when leaving the page outside the back-forward cache. Coverage textures are double-buffered,
+and the backend retains its vertex buffers, shader program and uniform locations.
+The globe's GLSL sources are native-owned and compiled once per context.
+`data-shore-project-ms` measures worker projection and transfer-buffer preparation;
+`data-mask-submit-ms` measures CPU-side GPU mask submission, not completed GPU time.
+The single native surface service also retains its configured plaintext or encrypted database connection
+through `globe_reader_t`, checking configuration and database/WAL metadata before reuse.
+
+Native shoreline selection already omits unrelated rings and uses four cached
+display resolutions, selecting a coarser one as the geographic tolerance grows.
+Clipping also drops consecutive points below that tolerance. These display-only
+reductions avoid drawing every source vertex when zoomed out; the exact stored
+coordinates remain available for close views and geographic queries.
+WASM admission discards exactly collinear clipping remnants before projection.
+Such remnants have no land area, but stroking them would draw false lines across
+water, including in the terrain-colour coverage mask. No area threshold is used,
+so narrow, non-collinear islands remain available.
+
+At close zoom (8× and above), dragging and zooming retain the detailed local SVG.
+A constant-cost native WASM affine camera transform moves the existing paths,
+while the dedicated worker supplies exact orthographic redraws after motion settles. The affine step
+is a local tangent-plane approximation, not a change to the stored geography.
+The native `lab_globe_frame_transform` entry point takes previous and current
+quaternion/zoom/CSS-size frames and returns six SVG matrix coefficients, rejecting
+invalid frames and centres rotated behind the globe.
+Geometry requests follow a continuous drag with at most one request in flight.
+Dragging no longer substitutes the coarse world texture for available local vectors.
+Retained paths are shown only when their own geometry revision covers the current
+view. Their full-globe ocean background must never hide newly exposed, unloaded
+land. Requests include a larger geographical margin to accommodate nearby drags.
+Before local vectors are available, and at wide views, WebGL provides a preview. This preview uses a
+separate, native-generated global texture with the same flat land/water and polar
+palette. This temporary preview is coarser than the settled SVG; it does not replace
+the detailed shoreline database. Pending or failed detail requests do not freeze
+the camera or disable point selection. Wheel zoom follows delta magnitude and units
+rather than fixed percentage jumps per event.
+
+The Antarctic ice visible in the bundled historical photograph is retained as a
+separate GPU imagery overlay in photographic, movement-preview and detailed SVG
+views. It is not imported into the shoreline, used for land/sea classification or
+presented as current sea-ice coverage. Map view displays a flat, opaque ice colour
+instead of magnifying the photograph's shading. When source cells become visibly
+enlarged, a bounded nine-sample GPU filter with an oblique circular kernel reconstructs
+rounded contours. Geographically anchored undulation at three scales breaks up long
+straight edges as well as corners, in both Map and detailed Natural Earth views. This is an illustrative
+treatment, not higher-resolution ice data; small source-cell features may merge or disappear.
+It changes neither land/sea classification nor surveyed coastline geometry. The treatment
+uses no additional requests or CPU geometry work and remains stable during dragging.
+Edge antialiasing is approximately one screen pixel where
+standard GPU derivatives are available, with a narrow fixed threshold otherwise.
+This is a GPU-rendered imagery contour, not newly surveyed vector coastline. Its visibility
+depends on geographic position and the source colours, not zoom level. It also
+preserves photographed ice on offshore islands without relying on a mainland flag.
+
+Coordinate lines use consistent middle-light ink, contrasting with both ice and
+dark water. Their colour no longer depends on photographic pixels hidden beneath
+the SVG map, which previously made portions of the grid fade over dark water.
+
+The latitude/longitude toggle applies immediately while new shoreline geometry
+loads. SVG geographic patches use a one-screen-pixel
+overlap matching their fill, including polar gradients, to prevent dark
+antialiasing seams from resembling coordinate lines when the grid is off.
+
 The Almanac's Location cell combines an identified land country and its flag,
-with the town name when selected; there is no separate Country cell. Offshore
+with the town name when selected; there is no separate Country cell. If the country
+boundary layer misses a land, coastal or inland-water point, a selected town may
+supply its country only when its stored coordinates match the observer within
+one millionth of a degree. A geographic country match always takes precedence;
+stale town coordinates, unknown surfaces and offshore points cannot use this fallback. Offshore
 custom points read “Custom — Offshore”. The scientific surface classification
 remains “Sea” for horizon-dip calculations. Map clicks clear stale town/country
 selections immediately, then asynchronously select an identified land country
@@ -20,6 +173,9 @@ the clicked coordinates and does not wait for the town catalogue.
 
 Observer selections show a native-rendered summary immediately from the current
 controls and resident country/flag cache, before the almanac response arrives.
+The pending summary uses the completed worksheet's degrees-and-minutes coordinate
+format from its first frame. A known country without a selected town is displayed
+by itself, without a “Custom” prefix; an unresolved location remains “Updating…”.
 This pending summary clears the previous observer's results and copy text;
 surface classification, weather and calculated results remain explicitly pending.
 The validated response replaces it with the complete worksheet. This improves
@@ -587,6 +743,12 @@ Almanac evaluates automatically when a control selection changes or a field edit
 committed (for example, by pressing Tab). Its Evaluate button is hidden; other modes
 retain theirs. Globe location selections also evaluate automatically.
 
+The Almanac header's Copy button copies the visible globe as a PNG, including
+its vector overlays, place labels and observer marker, rather than the hidden
+expression editor. It preserves the displayed camera and does not request fresh
+shoreline data. Image copying requires browser clipboard-image support and
+clipboard permission; result cards retain their separate copy actions.
+
 The left-hand Almanac card includes an observer globe, initially centred on the
 entered town or coordinates. Drag or use arrow keys to rotate; scroll, pinch or
 use the plus/minus controls to zoom. Town markers appear at closer scales. Select
@@ -596,9 +758,11 @@ camera orientation and zoom, including after asynchronous country lookup and
 evaluation. Selecting a location through the dropdown still centres the globe.
 “Centre on observer” returns to the entered location without resetting zoom.
 “Borders: off/on” optionally adds indicative shared country land borders. Visible
-regions load asynchronously; borders fade at close zoom and are hidden at 64× zoom
-or when switched off. The last bounded native region remains cached, so switching
-back on or zooming back out reuses it immediately when it covers the view. Identical
+regions load asynchronously; enabled borders remain visible throughout the supported 1×–4096× zoom range
+at constant opacity and disappear only when switched off or outside the visible region. The last bounded
+native region remains cached, so switching back on reuses it immediately when suitable. Zooming in beyond
+1.5 times the cached request zoom selects a smaller region to avoid repeatedly projecting world-wide geometry;
+zooming out requests wider coverage when necessary. Identical
 in-flight requests are shared rather than restarted. Administrative coastlines are not drawn.
 Borders are a true SVG overlay with a one-CSS-pixel, non-scaling stroke, not a
 rasterised texture. Native WebAssembly owns the segment array and projects it using
@@ -609,7 +773,9 @@ replace the accepted geometry. Missing border data do not disable observer selec
 The `/almanac-borders` endpoint accepts `format: "segments"` for decimal geographic
 segments. `lab_globe_borders_load`, `lab_globe_borders_path` and
 `lab_globe_borders_clear` own, project and release this display-only WASM cache;
-input and generated path text each have a 16 MiB ceiling.
+input and generated path text each have a 16 MiB ceiling. Path storage grows with the
+visible output rather than allocating that ceiling for every frame, leaving room
+for world-wide border geometry alongside the other application caches.
 `lab_globe_borders_load_region` publishes geometry and coverage atomically;
 `lab_globe_borders_covers` makes the geographic reuse decision in WebAssembly,
 including longitude wrapping. JavaScript only coordinates transport and display.
@@ -829,8 +995,12 @@ during dragging or when the grid is switched off; they do not change the observe
 location.
 The browser reuses overscanned detail imagery during small pans. Detail requests are serialised, and
 WebGL backing resolution is capped at 1536 pixels and 1.5 device pixels per CSS pixel.
-Finer visible-window geometry loads asynchronously after zoom or rotation;
-late responses never move the camera, and detail imagery is only sampled within its
+Finer visible-window geometry loads asynchronously after zoom or rotation.
+Shoreline requests include a twofold zoom margin and refresh before the margin runs out.
+A published detailed frame retains
+its own native-checked coverage while replacement geometry is projected and its colour
+mask decoded, so cache replacement alone does not flash the coarse world preview.
+Late responses never move the camera, and detail imagery is only sampled within its
 geographic extent. No online map service is used.
 The native server prepares a resident shoreline cache before forking request
 workers. Full-resolution coordinates and a spatial tree are shared read-only;

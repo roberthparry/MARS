@@ -6,7 +6,37 @@ from third-party scientific inputs and generation tools.
 
 ## Shoreline data
 
-The independent shoreline module uses GSHHG 2.3.7, released 15 June 2017, from
+### Complete shoreline, managed globe revision 3
+
+Normal installation imports one complete, prevalidated `MARSCF64` artifact with
+841,233 rings and 35,346,818 binary64 coordinate pairs. The high-resolution coast
+comes from the 12 October 2026 OSM extract, with an eight-metre simplification
+ceiling, reconciled inland waters and retained GSHHG coverage where the new source
+does not cover Antarctica. Eight metres is a simplification tolerance, not a claim
+of surveyed accuracy or uniform vertex spacing. Sydney marine-water relation
+1252425, version 123, is incorporated offline; its original mouth nodes are restored
+before subtraction. No repair or source composition runs during installation.
+
+The artifact is © OpenStreetMap contributors under the Open Database Licence 1.0;
+retained GSHHG data also retain the LGPL notices below. These data are not covered
+by MARS's MIT licence. Source provenance and the preparation/acceptance sequence
+are recorded in [the globe guide](globe.md). The historical sources and notices
+below are retained rather than rewritten as if they were the new artifact.
+
+The seven sequential archive parts are named
+`packaging/globe-db/shoreline-20261023.cf64.zst.00` through `.06`.
+The first six are 67,108,864 bytes each; the last is 14,916,563 bytes.
+The reassembled archive is 417,569,747 bytes, SHA-256
+`6296a43c066718fa65f2bfdea8a55a7660c9b69dfd3e906b45734a5c8c9a3297`.
+The decoded artifact is 602,563,348 bytes, SHA-256
+`89b67b8d82bec49e6f28a3b55dc944e29d9c1a48e0beacb64550280a6c4f0d84`.
+Both hashes are checked before native import. The accepted second marine run
+passed global boundary review, exact native readback, all 16 geographic probes
+before and after surface-cache construction, and archive verification.
+
+### Retained GSHHG source and historical local correction
+
+The retained legacy source is GSHHG 2.3.7, released 15 June 2017, from
 the [official GSHHG release](https://github.com/GenericMappingTools/gshhg-gmt/releases/tag/2.3.7).
 The downloaded `gshhg-bin-2.3.7.zip` archive has SHA-256
 `28600e8f7a08645aab43079326df6504212ec5ccb2b4bcf3b5f4f12ed60e82bc`.
@@ -16,8 +46,8 @@ Its unmodified full-resolution binary `gshhs_f.b` has SHA-256
 The repository packages those identical binary bytes using the native MARS file
 module's Zstandard compression, as `packaging/almanac-db/gshhs_f.b.zst`, SHA-256
 `87a928d71cf7a05c8084905c72d4575065400e1d68103609497211e20096eafa`.
-Installation restores that source, applies the reviewed corrections described
-below, retains polygon levels 1–5 and builds bounded
+The former installer restored that source, applied the reviewed corrections described
+below, retained polygon levels 1–5 and built bounded
 uncompressed coordinate chunks and an integer spatial index. Existing databases
 with compressed chunks remain readable. Level 6 is the
 alternative Antarctic grounding-line representation and is not included in queries.
@@ -32,7 +62,7 @@ text is supplied as `GSHHG-COPYINGv3.txt`. The unmodified source remains availab
 in the packaged compressed binary. No Python interpreter or download is required
 to install, query or rebuild the index.
 
-The globe installer also applies the versioned span replacements in
+The former globe installer also applied the versioned span replacements in
 `packaging/globe-db/shoreline-corrections.json`. Revision 1 replaces GSHHG polygon
 6 zero-based vertices 13,104–13,212 inclusive with 1,474 vertices, including its unchanged
 endpoints. The southern Sydney Harbour bank comes from

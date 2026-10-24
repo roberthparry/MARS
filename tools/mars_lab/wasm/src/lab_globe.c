@@ -4,9 +4,12 @@
  *
  * These double-precision screen calculations do not replace the native geographic database or astronomical
  * calculations. The GPU uses the same orthographic equations to sample native-produced shoreline imagery.
+ * A constant-cost tangent-plane camera transform retains detailed local SVG during gestures while worker
+ * projections refresh the exact geometry; it never alters the geographic source data.
  */
 #include <math.h>
 
+#include "quaternion-t.h"
 #include "lab_dom.h"
 #include "lab_globe.h"
 
@@ -39,8 +42,12 @@ void lab_globe_centre(double latitude, double longitude)
         lab_dom_return(0);
         return;
     }
-    double p = latitude * globe_radian / 2, l = globe_longitude(longitude) * globe_radian / 2;
-    double north[] = {sin(p), 0, 0, cos(p)}, east[] = {0, -sin(l), 0, cos(l)}, result[4];
+    const double x[] = {1, 0, 0}, y[] = {0, 1, 0};
+    quaternion_t north, east, result;
+    if (!quaternion_axis_angle(north, x, latitude * globe_radian) ||
+        !quaternion_axis_angle(east, y, -globe_longitude(longitude) * globe_radian)) {
+        lab_dom_return(0); return;
+    }
     lab_surface_quaternion_multiply(north, east, result);
     globe_result(result, 4);
 }
@@ -54,14 +61,11 @@ void lab_globe_rotate(quaternion_jsref orientation, double zoom, double dx, doub
     }
     dx /= zoom;
     dy /= zoom;
-    double q[4], result[4], delta[] = {0, 0, 0, 1}, distance = hypot(hypot(dx, dy), roll);
+    quaternion_t q, result, delta = {0, 0, 0, 1};
+    double distance = hypot(hypot(dx, dy), roll), axis[] = {dy, dx, roll};
     for (unsigned i = 0; i < 4; ++i) q[i] = lab_dom_to_number(lab_dom_item(orientation, i));
-    if (distance > 0) {
-        double half = distance * 30 * globe_radian, scale = sin(half) / distance;
-        delta[0] = dy * scale;
-        delta[1] = dx * scale;
-        delta[2] = roll * scale;
-        delta[3] = cos(half);
+    if (distance > 0 && !quaternion_axis_angle(delta, axis, distance * 60 * globe_radian)) {
+        lab_dom_return(0); return;
     }
     lab_surface_quaternion_multiply(delta, q, result);
     globe_result(result, 4);
@@ -77,6 +81,31 @@ void lab_globe_project(double latitude, double longitude, quaternion_jsref orien
         for (unsigned col = 0; col < 3; ++col) values[row] += matrix[row * 3 + col] * point[col];
     values[1] = -values[1];
     globe_result(values, 3);
+}
+
+/* Reproject retained local vectors without scanning or reparsing any shoreline vertices. */
+void lab_globe_frame_transform(jsref previous, jsref current)
+{
+    if (lab_dom_count(previous) != 6 || lab_dom_count(current) != 6) { lab_dom_return(0); return; }
+    double old[6], now[6], a[9], b[9], relative[9] = {0};
+    for (unsigned i = 0; i < 6; ++i) {
+        old[i] = lab_dom_to_number(lab_dom_item(previous, i));
+        now[i] = lab_dom_to_number(lab_dom_item(current, i));
+        if (!isfinite(old[i]) || !isfinite(now[i])) { lab_dom_return(0); return; }
+    }
+    if (old[4] < 1 || now[4] < 1 || old[4] > 4096 || now[4] > 4096 ||
+        old[5] <= 0 || now[5] <= 0 || old[5] > 16384 || now[5] > 16384) { lab_dom_return(0); return; }
+    if (!quaternion_matrix3(a, old) || !quaternion_matrix3(b, now)) { lab_dom_return(0); return; }
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned col = 0; col < 3; ++col)
+            for (unsigned k = 0; k < 3; ++k) relative[row * 3 + col] += b[row * 3 + k] * a[col * 3 + k];
+    if (relative[8] <= 0) { lab_dom_return(0); return; }
+    double scale = now[4] * now[5] / 2.24, ratio = now[4] * now[5] / (old[4] * old[5]);
+    double result[6] = {ratio * relative[0], -ratio * relative[3], -ratio * relative[1], ratio * relative[4]};
+    result[4] = now[5] / 2 + scale * relative[2] - (result[0] + result[2]) * old[5] / 2;
+    result[5] = now[5] / 2 - scale * relative[5] - (result[1] + result[3]) * old[5] / 2;
+    for (unsigned i = 0; i < 6; ++i) if (!isfinite(result[i])) { lab_dom_return(0); return; }
+    globe_result(result, 6);
 }
 
 /* Ignore clicks beyond the limb rather than selecting a point on the far side. */
@@ -135,15 +164,13 @@ void lab_globe_view(quaternion_jsref orientation, double zoom, double factor)
 static bool globe_camera_read(jsref camera, double values[5])
 {
     if (lab_dom_type(camera) != LAB_VALUE_ARRAY || lab_dom_count(camera) != 5) return false;
-    double norm = 0;
     for (unsigned i = 0; i < 5; ++i) {
         jsref value = lab_dom_item(camera, i);
         if (lab_dom_type(value) != LAB_VALUE_NUMBER) return false;
         values[i] = lab_dom_to_number(value);
         if (!isfinite(values[i])) return false;
-        if (i < 4) norm += values[i] * values[i];
     }
-    return fabs(norm - 1) < 1e-6 && values[4] >= 1 && values[4] <= 4096;
+    return quaternion_is_unit(values, 1e-6) && values[4] >= 1 && values[4] <= 4096;
 }
 
 static double globe_ease(double t)
@@ -164,25 +191,8 @@ void lab_globe_flight(jsref start, jsref target, double progress)
         globe_result(progress <= 0 ? a : b, 5);
         return;
     }
-    double dot = 0;
-    for (unsigned i = 0; i < 4; ++i) dot += a[i] * b[i];
-    if (dot < 0) {
-        dot = -dot;
-        for (unsigned i = 0; i < 4; ++i) b[i] = -b[i];
-    }
     double turn = globe_ease((progress - 0.25) / 0.5);
-    double left = 1 - turn, right = turn;
-    if (dot < 0.9995) {
-        double angle = acos(fmax(0, fmin(1, dot))), divisor = sin(angle);
-        left = sin((1 - turn) * angle) / divisor;
-        right = sin(turn * angle) / divisor;
-    }
-    double norm = 0;
-    for (unsigned i = 0; i < 4; ++i) {
-        result[i] = left * a[i] + right * b[i];
-        norm += result[i] * result[i];
-    }
-    for (unsigned i = 0; i < 4; ++i) result[i] /= sqrt(norm);
+    if (!quaternion_slerp(result, a, b, turn)) { lab_dom_return(0); return; }
     /* Logarithmic zoom gives consistent pacing at both street and continental scales. */
     result[4] = progress < 0.25 ? exp(log(a[4]) * (1 - globe_ease(progress / 0.25))) :
                 progress > 0.75 ? exp(log(b[4]) * globe_ease((progress - 0.75) / 0.25)) : 1;

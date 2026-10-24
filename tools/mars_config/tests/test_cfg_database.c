@@ -6,6 +6,7 @@
  * trigger completeness, private publication and literal credential precedence.
  * Packaged almanac coverage checks the complete coefficient imports and encrypted
  * reopening. The jurisdiction fixture checks saved choices and failed replacements.
+ * Globe fixtures distinguish fresh reinstallation from layer-preserving updates in both storage modes.
  * Every fixture runs beneath the
  * disposable test_cfg_isolated home; no user's configuration is accessed.
  */
@@ -15,6 +16,7 @@
 #include <string.h>
 
 #include "file-t.h"
+#include "almanac-t.h"
 #include "globe-t.h"
 #include "jurisdiction-t.h"
 #include "sqlite-t.h"
@@ -68,7 +70,7 @@ static bool test_cfg_database_setting(file_t *file, const char *name, const char
 static sqlite_t *test_cfg_database_open(file_t *file, const char *password)
 {
     string_t *path = string_new_with(file_path(file)), *key = string_new_with(password);
-    sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    sqlite_t *db = path && key ? cfg_database_open(path, key) : NULL;
     string_free(key);
     string_free(path);
     return db;
@@ -200,7 +202,25 @@ static bool test_cfg_database_towns_fixture(const char *directory)
     ok = ok && db && entry &&
          sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
          cfg_database_import(db, root, entry) &&
-         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50004") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50033") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town t JOIN jurisdiction_town_timezone z USING(jurisdiction_town_id) "
+             "WHERE jurisdiction_id='PT-20' AND z.timezone_code=211", "10") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town WHERE jurisdiction_id='PT-20' "
+             "AND town_name IN('Horta','Madalena (GeoNames 3372908)')", "2") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town t JOIN jurisdiction_town_timezone z USING(jurisdiction_town_id) "
+             "WHERE jurisdiction_id='PT-30' AND z.timezone_code=216", "19") &&
+         test_cfg_database_query(db,
+             "SELECT group_concat(jurisdiction_id||':'||town_name,'|') FROM "
+             "(SELECT d.jurisdiction_id,t.town_name FROM jurisdiction_default_town d "
+             "JOIN jurisdiction_town t USING(jurisdiction_town_id) "
+             "WHERE d.jurisdiction_id IN('PT','PT-20','PT-30') ORDER BY d.jurisdiction_id)",
+             "PT:Lisbon|PT-20:Ponta Delgada|PT-30:Funchal") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town WHERE jurisdiction_id IN('PT-20','PT-30') "
+             "AND town_name='Lisbon'", "0") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town_elevation WHERE elevation_metres='-9999'", "0") &&
          test_cfg_database_query(db,
@@ -341,7 +361,7 @@ static bool test_cfg_database_precedence_fixture(const char *directory)
 static bool test_cfg_database_failure_fixture(const char *directory)
 {
     bool ok = test_cfg_database_fixture(directory, "CREATE TABLE fixture(value); INSERT INTO fixture VALUES(7);\n") &&
-              cfg_database_run(false, NULL, NULL, NULL, NULL, false) == 1 &&
+              cfg_database_run(false, "", NULL, NULL, NULL, false) == 1 &&
               !cfg_database_run(false, NULL, "original-key", NULL, NULL, false);
     file_t *database = test_cfg_database_file(directory, "almanac/almanac.db");
     file_t *configuration = test_cfg_database_file(directory, "config/almanac-db.env");
@@ -608,16 +628,16 @@ static bool test_cfg_database_packaged_almanac_fixture(const char *directory)
     return ok;
 }
 
-static bool test_cfg_database_jurisdiction_fixture(const char *directory)
+static bool test_cfg_database_jurisdiction_mode(const char *directory, const char *password)
 {
     bool ok = !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && !unsetenv("MARS_CALENDAR_LOCATION_ARGUMENT") &&
               !unsetenv("MARS_CALENDAR_LANGUAGE_ARGUMENT") && !setenv("LANG", "en_GB.UTF-8", 1) &&
-              !cfg_database_run(true, NULL, "jurisdiction-'fixture", "limmen", NULL, false);
+              !cfg_database_run(true, NULL, password, "limmen", NULL, false);
     file_t *database = test_cfg_database_file(directory, "jurisdiction/mars_jurisdiction_rules.db");
     file_t *configuration = test_cfg_database_file(directory, "config/jurisdiction-db.env");
     file_t *snapshot = test_cfg_database_file(directory, "snapshot.db");
     file_t *saved_config = test_cfg_database_file(directory, "snapshot.env");
-    sqlite_t *db = ok ? test_cfg_database_open(database, "jurisdiction-'fixture") : NULL;
+    sqlite_t *db = ok ? test_cfg_database_open(database, password) : NULL;
     ok = ok && db && test_cfg_database_setting(configuration, "MARS_CALENDAR_LOCATION", "Limmen, NL") &&
          test_cfg_database_setting(configuration, "MARS_CALENDAR_LANGUAGE", "nl_NL") &&
          test_cfg_database_query(db,
@@ -651,6 +671,43 @@ static bool test_cfg_database_jurisdiction_fixture(const char *directory)
     file_free(configuration);
     file_free(database);
     return ok;
+}
+
+static bool test_cfg_database_jurisdiction_fixture(const char *directory)
+{
+    return test_cfg_database_jurisdiction_mode(directory, "jurisdiction-'fixture");
+}
+
+static bool test_cfg_database_jurisdiction_plain_fixture(const char *directory)
+{
+    return test_cfg_database_jurisdiction_mode(directory, "");
+}
+
+static void test_cfg_database_jurisdiction_plain(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_jurisdiction_plain_fixture),
+                     "plaintext jurisdiction installation supports calendar generation and rollback");
+}
+
+static bool test_cfg_database_almanac_plain_fixture(const char *directory)
+{
+    bool ok = test_cfg_database_fixture(directory, "create table fixture(value);insert into fixture values(7);\n") &&
+              !cfg_database_run(false, NULL, "saved-encrypted-key", NULL, NULL, false) &&
+              !setenv("MARS_ALMANAC_DB_KEY", "", 1) && !cfg_database_run(false, NULL, NULL, NULL, NULL, false);
+    file_t *database = test_cfg_database_file(directory, "almanac/almanac.db");
+    sqlite_t *db = ok ? test_cfg_database_open(database, "") : NULL;
+    ok = ok && db && test_cfg_database_query(db, "select value from fixture", "7");
+    sqlite_close(db); file_free(database);
+    almanac_t *almanac = ok ? almanac_open() : NULL;
+    ok = ok && almanac && !*almanac_last_error(almanac);
+    almanac_close(almanac);
+    return ok;
+}
+
+static void test_cfg_database_almanac_plain(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_almanac_plain_fixture),
+                     "an explicitly empty key overrides saved encryption for a new installation");
 }
 
 static void test_cfg_database_stream(void)
@@ -1012,17 +1069,17 @@ static void test_cfg_database_coast_corrections(void)
                      "bounded shoreline corrections preserve source and reject invalid spans and endpoints");
 }
 
-static bool test_cfg_database_globe_packaged_fixture(const char *directory)
+static bool test_cfg_database_globe_packaged_mode(const char *directory, const char *key)
 {
     bool ok = !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) &&
               !setenv("MARS_GLOBE_DB_KEY", "ignored-per-database-key", 1) && !unsetenv("MARS_GLOBE_DB_PATH") &&
-              !cfg_globe_install_key("packaged-globe-fixture") && !unsetenv("MARS_GLOBE_DB_KEY") &&
-              !cfg_globe_run("globe-check") && !cfg_globe_install_key("packaged-globe-fixture");
+              !cfg_globe_install_key(key) && !unsetenv("MARS_GLOBE_DB_KEY") && !cfg_globe_run("globe-check");
     file_t *database = test_cfg_database_file(directory, "globe/globe.db");
-    sqlite_t *db = ok && database ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
+    sqlite_t *db = ok && database ? test_cfg_database_open(database, key) : NULL;
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "SELECT count(*) FROM country_name", "298") &&
-         test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "10589219") &&
+         test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "35346818") &&
+         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "3") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
                                     "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
          test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
@@ -1030,37 +1087,138 @@ static bool test_cfg_database_globe_packaged_fixture(const char *directory)
              "create table rivers_dataset(id,source);insert into rivers_dataset values(1,'retained fixture')");
     sqlite_close(db);
     ok = ok && !cfg_databases_update() && !cfg_databases_update() && !cfg_globe_run("globe-update");
-    db = ok ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
+    db = ok ? test_cfg_database_open(database, key) : NULL;
     ok = ok && db && test_cfg_coast_sydney(db) &&
          test_cfg_database_query(db, "select value from retained", "42") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
-         test_cfg_database_query(db, "select point_count from shoreline_dataset", "10589219");
+         test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "3");
     sqlite_close(db);
-    /* Country metadata is independent of town selection and requires verified land. */
-    db = ok ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
+    /* Country metadata is independent of town selection and land/water classification. */
+    db = ok ? test_cfg_database_open(database, key) : NULL;
     globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
     string_t *country = globe_country_at(globe, 52.7077, -2.7541);
     string_t *sea_country = globe_country_at(globe, 0, -30);
     ok = ok && country && !strcmp(string_c_str(country), "England") && !sea_country;
     string_free(country); string_free(sea_country); globe_close(globe); sqlite_close(db);
-    /* Missing correction/source data must not destroy an already working globe. */
-    ok = ok && !setenv("MARS_ROOT", directory, 1) && cfg_globe_run("globe-update") == 1;
-    db = ok ? test_cfg_database_open(database, "packaged-globe-fixture") : NULL;
-    ok = ok && db && test_cfg_coast_sydney(db);
+    file_t *config = test_cfg_database_file(directory, "config/globe-db.env");
+    string_t *body = config ? cfg_storage_read_configuration(config) : NULL;
+    ok = ok && body && string_append_cstr(body, "export MARS_GLOBE_RIVER_DB_KEY='separate-staging-key'\n") >= 0 &&
+         file_write_all_text(config, body);
+    string_free(body);
+    /* Missing archive parts must preserve the installed database and its separate staging credentials. */
+    ok = ok && !setenv("MARS_ROOT", directory, 1) && cfg_globe_run("globe-update") == 1 &&
+         cfg_globe_run("globe-install") == 1;
+    db = ok ? test_cfg_database_open(database, key) : NULL;
+    ok = ok && db && test_cfg_coast_sydney(db) &&
+         test_cfg_database_query(db, "select value from retained", "42") &&
+         test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
+         test_cfg_database_setting(config, "MARS_GLOBE_RIVER_DB_KEY", "separate-staging-key");
     sqlite_close(db);
+    /* Reinstallation is a fresh build, unlike an update: unrelated installed tables must disappear. */
+    ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && !cfg_globe_run("globe-install");
+    db = ok ? test_cfg_database_open(database, key) : NULL;
+    ok = ok && db && test_cfg_coast_sydney(db) && test_cfg_database_mode(database, 0600) &&
+         test_cfg_database_query(db, "select count(*) from country_name", "298") &&
+         test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "3") &&
+         test_cfg_database_query(db, "select count(*) from sqlite_master where name in ('retained','rivers_dataset')", "0") &&
+         test_cfg_database_setting(config, "MARS_GLOBE_DB_KEY", key) &&
+         test_cfg_database_setting(config, "MARS_GLOBE_DB_PATH", file_path(database)) &&
+         test_cfg_database_setting(config, "MARS_GLOBE_RIVER_DB_KEY", "separate-staging-key");
+    sqlite_close(db);
+    file_free(config);
     file_free(database);
     return ok;
+}
+
+static bool test_cfg_database_globe_packaged_fixture(const char *directory)
+{
+    return test_cfg_database_globe_packaged_mode(directory, "packaged-globe-fixture");
+}
+
+static bool test_cfg_database_globe_plain_fixture(const char *directory)
+{
+    return test_cfg_database_globe_packaged_mode(directory, "");
 }
 
 static void test_cfg_database_globe_packaged(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_globe_packaged_fixture),
-                     "independent shoreline-only install is verified and repeat installation preserves it");
+                     "encrypted globe reinstallation builds afresh; updates and failed installs preserve existing data");
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_globe_plain_fixture),
+                     "plaintext globe reinstallation builds afresh and retains separate river staging credentials");
 }
 
 /* Called only by the parent's sequential native configuration test runner. */
+static bool test_cfg_database_plain_fixture(const char *directory)
+{
+    static const char *const names[][2] = {{"globe", "GLOBE"}, {"jurisdiction", "JURISDICTION"}, {"almanac", "ALMANAC"}};
+    file_t *folder = test_cfg_database_file(directory, "config");
+    bool ok = folder && file_create_directory(folder, 0700, true) && !unsetenv("MARS_GLOBE_DB_PATH") &&
+              !unsetenv("MARS_GLOBE_DB_KEY");
+    file_free(folder);
+    string_t *key = string_new_with("conversion fixture");
+    for (size_t i = 0; ok && i < 3; ++i) {
+        string_t *path = string_sprintf("%s/%s.db", directory, names[i][0]);
+        sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+        ok = db && sqlite_exec_cstr(db,
+            "PRAGMA user_version=23;PRAGMA application_id=42;"
+            "create table retained(id integer primary key,value blob);insert into retained values(1,x'0001ff');"
+            "create index retained_value on retained(value);create view retained_view as select id from retained;"
+            "create trigger retained_trigger after insert on retained begin select 1;end;"
+            "create virtual table bounds using rtree(id,x0,x1,y0,y1);insert into bounds values(1,-1,1,-2,2);");
+        sqlite_close(db);
+        string_t *filename = string_sprintf("config/%s-db.env", names[i][0]);
+        string_t *body = path ? string_sprintf(
+            "export MARS_%s_DB_PATH='%s'\nexport MARS_%s_DB_KEY='conversion fixture'\n"
+            "export MARS_CALENDAR_LOCATION='Retained town'\n", names[i][1], string_c_str(path), names[i][1]) : NULL;
+        ok = ok && body && filename && test_cfg_database_write(directory, string_c_str(filename), string_c_str(body));
+        string_free(body); string_free(filename); string_free(path);
+    }
+    ok = ok && !setenv("MARS_GLOBE_DB_KEY", "override", 1) && cfg_databases_plain() == 1 &&
+         !unsetenv("MARS_GLOBE_DB_KEY") && cfg_databases_plain() == 0 && cfg_databases_plain() == 0;
+    for (size_t i = 0; ok && i < 3; ++i) {
+        string_t *path = string_sprintf("%s/%s.db.plain.db", directory, names[i][0]);
+        sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+        ok = db && test_cfg_database_query(db, "select hex(value) from retained", "0001FF") &&
+             test_cfg_database_query(db, "select count(*) from bounds", "1") &&
+             test_cfg_database_query(db, "select count(*) from retained_view", "1") &&
+             test_cfg_database_query(db, "PRAGMA user_version", "23") &&
+             test_cfg_database_query(db, "PRAGMA application_id", "42");
+        sqlite_close(db); string_free(path);
+        path = string_sprintf("%s/%s.db", directory, names[i][0]);
+        db = path ? sqlite_open_encrypted(path, key) : NULL;
+        ok = ok && db && test_cfg_database_query(db, "select hex(value) from retained", "0001FF");
+        sqlite_close(db); string_free(path);
+        string_t *filename = string_sprintf("config/%s-db.env", names[i][0]);
+        file_t *config = filename ? test_cfg_database_file(directory, string_c_str(filename)) : NULL;
+        string_t *key_name = string_sprintf("MARS_%s_DB_KEY", names[i][1]);
+        ok = ok && config && key_name && test_cfg_database_setting(config, string_c_str(key_name), "") &&
+             test_cfg_database_setting(config, "MARS_CALENDAR_LOCATION", "Retained town");
+        if (ok && i == 0)
+            ok = test_cfg_database_setting(config, "MARS_GLOBE_RIVER_DB_KEY", "conversion fixture");
+        file_free(config); string_free(key_name); string_free(filename);
+    }
+    almanac_t *almanac = ok ? almanac_open() : NULL;
+    jurisdiction_t *jurisdiction = ok ? jurisdict_open("ZA") : NULL;
+    ok = ok && almanac && !*almanac_last_error(almanac) && jurisdiction;
+    almanac_close(almanac); jurisdict_close(jurisdiction);
+    string_free(key);
+    return ok;
+}
+
+static void test_cfg_database_plain(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_plain_fixture),
+                     "plaintext conversion retains originals, metadata, spatial indexes and other settings");
+}
+
 void test_cfg_database_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_cfg_database_plain, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_database_almanac_plain, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_database_jurisdiction_plain, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_globe, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_country_flags, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_update, tests, NULL);

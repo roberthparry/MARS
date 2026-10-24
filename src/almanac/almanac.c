@@ -216,10 +216,10 @@ almanac_t *almanac_open(void)
     key_text = configured;
 
     path = almanac_string_from_cstr(path_text);
-    key = almanac_string_from_cstr(key_text);
+    key = key_text && *key_text ? almanac_string_from_cstr(key_text) : string_new();
     if (!path || !key) {
         almanac_set_error(almanac,
-                          "almanac configuration is incomplete; provide MARS_ALMANAC_DB_KEY and an almanac database");
+                          "almanac configuration is incomplete; provide an almanac database path");
         string_free(path);
         string_free(key);
         free(path_text);
@@ -227,9 +227,12 @@ almanac_t *almanac_open(void)
         return almanac;
     }
 
-    almanac->db = sqlite_open_encrypted(path, key);
+    file_t *database = file_new(path);
+    if (database && (file_exists(database) || string_view_equals_literal(string_view_all(path), ":memory:")))
+        almanac->db = string_byte_length(key) ? sqlite_open_encrypted(path, key) : sqlite_open_plain(path);
+    file_free(database);
     if (!almanac->db)
-        almanac_set_error(almanac, "failed to open encrypted almanac database");
+        almanac_set_error(almanac, "failed to open almanac database in the configured storage mode");
 
     string_free(path);
     string_free(key);

@@ -25,7 +25,7 @@ interface is `include/globe-t.h`; see the globe guide for ownership, classificat
 resident geometry and import contracts.
 
 Calls on one reader must be serialised. `almanac_surface_at(engine, latitude,
-longitude)` lazily owns a reader for the independent configured encrypted globe database.
+longitude)` lazily owns a reader for the independent configured globe database.
 `almanac_surface_paths()` exposes the same vector visitor through that engine.
 `almanac_surface_prepare()` prepares its resident geometry. The Lab invokes this
 before native request workers fork; unavailable data do not prevent the server
@@ -112,7 +112,7 @@ prove an exhaustive nearest-land solution. Release the event-local samples with
 
 ## Capabilities
 
-- open the configured encrypted ephemeris database
+- open the configured plaintext or encrypted ephemeris database
 - compute Greenwich Hour Angle of Aries for a civil moment
 - resolve SHA, declination, and right ascension for one catalogued body
 - return snapshot rows for all enabled bodies in configured catalogue order
@@ -139,6 +139,9 @@ configuration file:
 - `~/.mars/config/almanac-db.env`
 
 With `MARS_HOME` set, its `config/almanac-db.env` is used instead.
+An absent or empty database key selects plaintext SQLite; a non-empty key retains encrypted SQLCipher.
+An explicitly empty environment key overrides a saved key. Opening does not convert files or retry a failed keyed open.
+Use the explicit [plaintext conversion](globe.md#plaintext-conversion) to preserve existing data and rollback copies.
 Configuration files are read through `file_t`, explicitly following symbolic
 links to regular files. Complete UTF-8 lines are parsed using `string_t`,
 without the former 4 KiB line limit. A leading BOM and LF, CRLF or CR line

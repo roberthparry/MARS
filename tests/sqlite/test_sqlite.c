@@ -171,6 +171,53 @@ static void test_sqlite_requires_key(void)
     string_free(path);
 }
 
+static void test_sqlite_plain_storage(void)
+{
+    const char *filename = test_case_temp_path("mars-plain.db");
+    string_t *path = s(filename), *key = s("must not select encryption");
+    sqlite_t *db = sqlite_open_plain(path);
+    TEST_ASSERT_NOT_NULL(db);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db,
+        "create table parent(id integer primary key);create table child(id integer references parent);"
+        "insert into parent values(7);insert into child values(7)"), "plain schema and data");
+    TEST_ASSERT_TRUE(!sqlite_exec_cstr(db, "insert into child values(8)"), "plain mode retains foreign keys");
+    sqlite_close(db);
+    TEST_ASSERT_TRUE(file_contains(filename, "SQLite format 3"), "ordinary SQLite header");
+    db = sqlite_open_plain(path);
+    TEST_ASSERT_NOT_NULL(db);
+    sqlite_stmt_t *stmt = sqlite_stmt_prepare(db, "select id from child");
+    TEST_ASSERT_TRUE(stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW, "plain data reopens");
+    ASSERT_EQ_INT(sqlite_stmt_column_int(stmt, 0), 7);
+    sqlite_stmt_finalize(stmt);
+    sqlite_close(db);
+    db = sqlite_open_encrypted(path, key);
+    TEST_ASSERT_NULL(db);
+    string_free(path);
+    path = s(test_case_temp_path("mars-encrypted-not-plain.db"));
+    db = sqlite_open_encrypted(path, key);
+    TEST_ASSERT_NOT_NULL(db);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "create table retained(value)"), "persist encrypted file");
+    sqlite_close(db);
+    db = sqlite_open_plain(path);
+    TEST_ASSERT_NULL(db);
+    TEST_ASSERT_NULL(sqlite_open_plain(NULL));
+    string_free(path); string_free(key);
+}
+
+/* README example: the same prepared-statement API works without a database key. */
+static void example_sqlite_readme_plain(void)
+{
+    string_t *path = s(":memory:");
+    sqlite_t *db = sqlite_open_plain(path);
+    TEST_ASSERT_NOT_NULL(db);
+    sqlite_stmt_t *stmt = sqlite_stmt_prepare(db, "SELECT 42");
+    TEST_ASSERT_TRUE(stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW, "README plain query");
+    printf("%d\n", sqlite_stmt_column_int(stmt, 0));
+    sqlite_stmt_finalize(stmt);
+    sqlite_close(db);
+    string_free(path);
+}
+
 static void example_sqlite_readme_prepared_statement_query(void)
 {
     string_t *path = s(test_case_temp_path("mars-readme-query.db"));
@@ -427,6 +474,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_sqlite_rejects_wrong_key, tests, NULL);
     TEST_RUN_IN_GROUP(test_sqlite_object_blob_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_sqlite_requires_key, tests, NULL);
+    TEST_RUN_IN_GROUP(test_sqlite_plain_storage, tests, NULL);
     test_sqlite_csv_cases();
 
     TEST_SECTION("README Output Examples");
@@ -441,6 +489,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_prepared_statement_query, readme_examples,
                                   "sqlite,readme,output");
     test_sqlite_csv_examples();
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_sqlite_readme_plain, readme_examples, "sqlite,readme,output");
 
     return TEST_EXIT_CODE();
 }

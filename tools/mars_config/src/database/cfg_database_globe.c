@@ -3,7 +3,9 @@
  * @brief Globe database configuration, shoreline and country import, and river data preparation.
  *
  * Owns the globe installer and offline OSM river conversion, candidate staging and
- * transactional river publication. Stored centrelines have a conservative eight-metre
+ * transactional river publication. Installation always builds and validates a fresh
+ * database before replacing the destination; updates retain unrelated installed layers.
+ * Stored centrelines have a conservative eight-metre
  * error ceiling with junctions fixed; the separate source extract retains full detail.
  * Staging and publication enforce a 3.8 GB river-layer limit, including indexes.
  * Source selection and geographic acceptance remain separate; no network download is performed.
@@ -155,47 +157,6 @@ bool cfg_database_coast_correct(file_t *input, file_t *output, file_t *correctio
     ok = file_close(input) && ok;
     ok = file_close(output) && ok && next == count;
     json_free(document);
-    return ok;
-}
-
-/* Keep the optional geographic import separate from SQL statement ingestion. */
-bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *staging)
-{
-    string_t *packed_path = string_sprintf("%s/packaging/almanac-db/gshhs_f.b.zst", string_c_str(root));
-    string_t *plain_path = string_sprintf("%s/shoreline.bin", string_c_str(staging));
-    string_t *corrected_path = string_sprintf("%s/shoreline-corrected.bin", string_c_str(staging));
-    string_t *patch_path = string_sprintf("%s/packaging/globe-db/shoreline-corrections.json", string_c_str(root));
-    file_t *packed = packed_path ? file_new(packed_path) : NULL;
-    file_t *plain = plain_path ? file_new(plain_path) : NULL;
-    file_t *corrected = corrected_path ? file_new(corrected_path) : NULL;
-    file_t *patch = patch_path ? file_new(patch_path) : NULL;
-    bool exists = packed && file_exists(packed);
-    bool ok = packed && plain && corrected && patch && exists && !file_last_error(packed);
-    if (ok && exists) {
-        cfg_progress_t *progress = cfg_progress_start("Indexing shorelines");
-        ok = file_decompress_zstd(packed, plain, 128 * 1024 * 1024, false) &&
-             cfg_database_coast_correct(plain, corrected, patch) &&
-             file_open_read(corrected);
-        bool transaction = ok && sqlite_exec_cstr(db, "savepoint globe_coast");
-        ok = transaction && globe_import_shoreline(db, corrected) && sqlite_exec_cstr(db,
-                 "update shoreline_dataset set source='GSHHG 2.3.7 + reviewed OSM shoreline corrections r1' where id=1") &&
-             sqlite_exec_cstr(db, "release globe_coast");
-        if (transaction && !ok) sqlite_exec_cstr(db, "rollback to globe_coast; release globe_coast");
-        if (!ok)
-            fprintf(stderr, "Shoreline import failed (source error %d, staging error %d): %s\n",
-                    file_last_error(packed), file_last_error(plain), string_c_str(sqlite_last_error(db)));
-        file_close(plain);
-        file_close(corrected);
-        if (file_exists(plain) && !file_delete(plain)) ok = false;
-        if (file_exists(corrected) && !file_delete(corrected)) ok = false;
-        cfg_progress_finish(progress, ok);
-    }
-    file_free(packed);
-    file_free(plain);
-    file_free(corrected); file_free(patch);
-    string_free(packed_path);
-    string_free(plain_path);
-    string_free(corrected_path); string_free(patch_path);
     return ok;
 }
 
@@ -1052,22 +1013,31 @@ static bool osm_stage_run(sqlite_t *db, file_t *source, const char *digest, bool
     return ok;
 }
 
+static string_t *cfg_river_key(file_t *config)
+{
+    const char *environment = getenv("MARS_GLOBE_RIVER_DB_KEY");
+    if (environment) return string_new_with(environment);
+    string_t *key = config ? cfg_storage_setting(config, "MARS_GLOBE_RIVER_DB_KEY") : NULL;
+    if (!key || string_byte_length(key)) return key;
+    string_free(key);
+    environment = getenv("MARS_GLOBE_DB_KEY");
+    return environment ? string_new_with(environment) : cfg_storage_setting(config, "MARS_GLOBE_DB_KEY");
+}
+
 static int cfg_globe_river_stage_run(const char *input_path, const char *output_path, bool resume)
 {
     string_t *home = cfg_storage_home();
     string_t *config_path = home ? string_sprintf("%s/config/globe-db.env", string_c_str(home)) : NULL;
     file_t *config = config_path ? file_new(config_path) : NULL;
-    const char *environment = getenv("MARS_GLOBE_DB_KEY");
-    string_t *key = environment && *environment ? string_new_with(environment) :
-                    config ? cfg_storage_setting(config, "MARS_GLOBE_DB_KEY") : NULL;
+    string_t *key = cfg_river_key(config);
     file_t *input = file_new_cstr(input_path), *output = file_new_cstr(output_path);
     string_t *path = string_new_with(output_path);
     string_t *digest = input ? file_sha256(input) : NULL;
-    bool ok = key && string_byte_length(key) && input && output && path && digest && file_open_read(input);
+    bool ok = key && input && output && path && digest && file_open_read(input);
     if (ok) ok = resume ? file_exists(output) : file_open(output, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
     if (output && file_is_open(output)) ok = file_close(output) && ok;
     if (ok && !resume) ok = file_chmod(output, 0600);
-    sqlite_t *db = ok ? sqlite_open_encrypted(path, key) : NULL;
+    sqlite_t *db = ok ? cfg_database_open(path, key) : NULL;
     ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-8192;PRAGMA temp_store=FILE;PRAGMA temp.cache_size=-1024;");
     if (ok) {
         puts("Staging rivers with an 8 m error ceiling and a 3.8 GB final size limit; installed globe unchanged.");
@@ -1220,7 +1190,7 @@ bool cfg_database_publish_rivers(sqlite_t *destination, sqlite_t *source)
 static string_t *cfg_river_setting(file_t *config, const char *name)
 {
     const char *environment = getenv(name);
-    return environment && *environment ? string_new_with(environment) : cfg_storage_setting(config, name);
+    return environment ? string_new_with(environment) : cfg_storage_setting(config, name);
 }
 
 /* An explicit install reuses the saved key and preserves all non-river tables. */
@@ -1230,6 +1200,7 @@ int cfg_globe_river_install(const char *candidate_path)
     string_t *config_path = home ? string_sprintf("%s/config/globe-db.env", string_c_str(home)) : NULL;
     file_t *config = config_path ? file_new(config_path) : NULL;
     string_t *key = config ? cfg_river_setting(config, "MARS_GLOBE_DB_KEY") : NULL;
+    string_t *source_key = cfg_river_key(config);
     string_t *raw = config ? cfg_river_setting(config, "MARS_GLOBE_DB_PATH") : NULL;
     if (raw && !string_byte_length(raw)) {
         string_free(raw);
@@ -1239,11 +1210,11 @@ int cfg_globe_river_install(const char *candidate_path)
     string_t *candidate = candidate_path ? string_new_with(candidate_path) : NULL;
     file_t *target_file = path ? file_new(path) : NULL, *source_file = candidate ? file_new(candidate) : NULL;
     bool target_exists = false, source_exists = false;
-    bool ok = key && string_byte_length(key) && target_file && source_file &&
+    bool ok = key && source_key && target_file && source_file &&
               cfg_storage_safe_regular(target_file, &target_exists) && target_exists &&
               cfg_storage_safe_regular(source_file, &source_exists) && source_exists;
-    sqlite_t *source = ok ? sqlite_open_encrypted(candidate, key) : NULL;
-    sqlite_t *target = source ? sqlite_open_encrypted(path, key) : NULL;
+    sqlite_t *source = ok ? cfg_database_open(candidate, source_key) : NULL;
+    sqlite_t *target = source ? cfg_database_open(path, key) : NULL;
     ok = ok && source && target &&
          sqlite_exec_cstr(source, "PRAGMA query_only=ON;PRAGMA cache_size=-8192;") &&
          sqlite_exec_cstr(target, "PRAGMA cache_size=-8192;");
@@ -1252,6 +1223,7 @@ int cfg_globe_river_install(const char *candidate_path)
     globe_close(globe);
     if (ok) ok = cfg_database_publish_rivers(target, source);
     sqlite_close(target); sqlite_close(source);
+    string_free(source_key);
     file_free(target_file); file_free(source_file); file_free(config);
     string_free(candidate); string_free(path); string_free(raw); string_free(key); string_free(config_path); string_free(home);
     if (ok) puts("River tables installed in the globe database; shoreline and configuration preserved.");
@@ -1262,7 +1234,7 @@ int cfg_globe_river_install(const char *candidate_path)
 static string_t *cfg_globe_setting(file_t *config, const char *name, const string_t *fallback)
 {
     const char *environment = getenv(name);
-    string_t *value = environment && *environment ? cfg_storage_value(environment) : cfg_storage_setting(config, name);
+    string_t *value = environment ? cfg_storage_value(environment) : cfg_storage_setting(config, name);
     if (value && !string_byte_length(value) && fallback) {
         string_free(value);
         value = string_clone(fallback);
@@ -1336,21 +1308,11 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
     string_t *path = config ? cfg_globe_setting(config, "MARS_GLOBE_DB_PATH", default_path) : NULL;
     string_t *key = explicit_key ? string_new_with(explicit_key) :
                     config ? cfg_globe_setting(config, "MARS_GLOBE_DB_KEY", NULL) : NULL;
-    if (install && !explicit_key && key && !string_byte_length(key) && isatty(STDIN_FILENO)) {
-        string_free(key);
-        key = cfg_prompt_read("Password for the new globe database: ", true);
-        string_t *repeat = key ? cfg_prompt_read("Confirm password: ", true) : NULL;
-        if (!repeat || string_compare(key, repeat)) {
-            string_free(key);
-            key = NULL;
-        }
-        string_free(repeat);
-    }
     string_t *expanded = path ? cfg_storage_expand_path(path) : NULL;
     string_t *parent = expanded ? cfg_storage_parent(expanded) : NULL;
     file_t *destination = expanded ? file_new(expanded) : NULL;
     bool exists = false;
-    bool ok = config_dir && config && parent && destination && key && string_byte_length(key) &&
+    bool ok = config_dir && config && parent && destination && key &&
               cfg_storage_safe_regular(destination, &exists);
     string_t *staging = NULL, *temporary_path = NULL, *root = NULL, *body = NULL;
     file_t *temporary = NULL;
@@ -1363,28 +1325,28 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
     if (ok && update) {
         /* Publish both layers together; credentials and rivers are untouched. */
         staging = exists ? cfg_database_stage(parent) : NULL;
-        db = staging ? sqlite_open_encrypted(expanded, key) : NULL;
+        db = staging ? cfg_database_open(expanded, key) : NULL;
         bool transaction = db && root &&
             sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
             cfg_globe_valid(db) && sqlite_exec_cstr(db, "begin immediate");
         ok = transaction && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
-             cfg_globe_valid(db) && cfg_database_revision(db, "globe", 2) && sqlite_exec_cstr(db, "commit");
+             cfg_globe_valid(db) && cfg_database_revision(db, "globe", 3) && sqlite_exec_cstr(db, "commit");
         if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
         sqlite_close(db);
-    } else if (ok && (check || exists)) {
-        db = exists ? sqlite_open_encrypted(expanded, key) : NULL;
+    } else if (ok && check) {
+        db = exists ? cfg_database_open(expanded, key) : NULL;
         ok = db && sqlite_exec_cstr(db, "PRAGMA query_only=ON; PRAGMA cache_size=-512;") && cfg_globe_valid(db);
         sqlite_close(db);
     } else if (ok && install) {
-        ok = !exists && cfg_storage_private_directory(home, true) && cfg_storage_private_directory(parent, true) &&
+        ok = cfg_storage_private_directory(home, true) && cfg_storage_private_directory(parent, true) &&
              cfg_storage_private_directory(config_dir, true);
         staging = ok ? cfg_database_stage(parent) : NULL;
         temporary_path = staging ? string_sprintf("%s/database.db", string_c_str(staging)) : NULL;
         temporary = temporary_path ? file_new(temporary_path) : NULL;
-        db = temporary && root ? sqlite_open_encrypted(temporary_path, key) : NULL;
+        db = temporary && root ? cfg_database_open(temporary_path, key) : NULL;
         ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
-             cfg_database_revision(db, "globe", 2);
+             cfg_database_revision(db, "globe", 3);
         sqlite_close(db);
         string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
         string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;
@@ -1393,10 +1355,15 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
             string_c_str(quoted_path), string_c_str(quoted_key)) : NULL;
         string_free(quoted_path);
         string_free(quoted_key);
+        /* Separate encrypted river candidates must remain readable after a fresh globe installation. */
+        string_t *river_key = body ? cfg_storage_setting(config, "MARS_GLOBE_RIVER_DB_KEY") : NULL;
+        ok = ok && river_key && (!string_byte_length(river_key) ||
+                                cfg_database_export(body, "MARS_GLOBE_RIVER_DB_KEY", river_key));
+        string_free(river_key);
         ok = ok && body && cfg_database_publish(temporary, destination, config, config_dir, staging, body);
     }
     if (ok) puts(update ? "Globe shoreline and countries updated; other layers and settings preserved. Restart MARS Lab."
-                        : install ? "Globe database ready: existing data preserved; shoreline available."
+                        : install ? "Fresh globe database installed: shoreline and countries imported. Restart MARS Lab."
                         : "Globe database integrity and shoreline availability verified.");
     else fputs("Globe database operation failed; check its path, key and packaged geographic sources.\n", stderr);
     file_free(temporary);
@@ -1414,8 +1381,8 @@ int cfg_globe_run(const char *action)
     return cfg_globe_execute(action, NULL);
 }
 
-/* The umbrella installer owns password selection; never prompt again here. */
+/* An explicit empty key selects plaintext; NULL is not an explicit selection. */
 int cfg_globe_install_key(const char *key)
 {
-    return key && *key ? cfg_globe_execute("globe-install", key) : 1;
+    return key ? cfg_globe_execute("globe-install", key) : 1;
 }

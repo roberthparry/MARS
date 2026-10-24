@@ -1,10 +1,10 @@
 /**
  * @file cfg_database.c
- * @brief Shared encrypted database installation, versioned migrations and bounded SQL services.
+ * @brief Shared plaintext or encrypted database installation, versioned migrations and bounded SQL services.
  *
- * Owns setting precedence, password prompting, streaming SQL imports, staging and
+ * Owns setting precedence, explicit storage-mode selection, streaming SQL imports, staging and
  * rollback-safe publication. Dispatches to the almanac and jurisdiction policies;
- * the combined installer shares one chosen key with the globe installer.
+ * the combined installer preserves each database's individually configured mode.
  *
  * Fixed-size file-module reads preserve UTF-8 SQL in string_t. SQLCipher checks
  * statement completeness, including quotes, comments and trigger bodies. Input
@@ -41,6 +41,12 @@ typedef struct cfg_database_scan {
     string_view_t view;
     size_t pos;
 } cfg_database_scan;
+
+/* Keep mode selection explicit, with no retry after an encrypted open fails. */
+sqlite_t *cfg_database_open(const string_t *path, const string_t *key)
+{
+    return key ? (string_byte_length(key) ? sqlite_open_encrypted(path, key) : sqlite_open_plain(path)) : NULL;
+}
 
 /* Keep migration revisions explicit: changing an importer alone must not silently rewrite installed data. */
 typedef struct cfg_database_migration {
@@ -100,7 +106,7 @@ static bool cfg_database_update_one(const cfg_database_migration *migration)
     bool exists = false;
     bool ok = destination && cfg_storage_safe_regular(destination, &exists);
     string_t *key = ok && exists ? cfg_database_setting(config, NULL, migration->key_variable, NULL) : NULL;
-    sqlite_t *db = key && string_byte_length(key) ? sqlite_open_encrypted(path, key) : NULL;
+    sqlite_t *db = cfg_database_open(path, key);
     int64_t revision = 0;
     if (ok && exists)
         ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
@@ -136,7 +142,7 @@ static bool cfg_database_update_one(const cfg_database_migration *migration)
 int cfg_databases_update(void)
 {
     static const cfg_database_migration migrations[] = {
-        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 2, cfg_database_globe_refresh},
+        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 3, cfg_database_globe_refresh},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
          "jurisdiction/mars_jurisdiction_rules.db", 2, cfg_database_flags_refresh},
@@ -689,7 +695,7 @@ void cfg_database_cleanup(const string_t *staging)
     if (!staging)
         return;
     static const char *const names[] = {"database.db", "database.db-journal", "database.db-wal", "database.db-shm",
-                                        "configuration.env", "shoreline.bin", "shoreline-corrected.bin", "rivers.bin"};
+                                        "configuration.env", "shoreline.bin", "shoreline.zst", "shoreline-corrected.bin", "rivers.bin"};
     for (size_t i = 0; i < sizeof(names) / sizeof(*names); ++i) {
         file_t *file = cfg_database_stage_file(staging, names[i]);
         if (file)
@@ -799,11 +805,11 @@ string_t *cfg_database_setting(file_t *configuration, const char *explicit_value
 {
     string_t *saved = cfg_storage_setting(configuration, name);
     string_t *value = cfg_storage_value(explicit_value);
-    if (value && !string_byte_length(value)) {
+    if (value && !explicit_value) {
         string_free(value);
         value = cfg_storage_value(getenv(name));
     }
-    if (value && !string_byte_length(value)) {
+    if (value && !explicit_value && !getenv(name)) {
         string_free(value);
         value = saved ? string_clone(string_byte_length(saved) || !fallback ? saved : fallback) : NULL;
     }
@@ -837,44 +843,6 @@ static bool cfg_database_options_read(cfg_database_options *options, const cfg_d
               profile->read_options(options, default_path, location, language);
     string_free(default_path);
     return ok;
-}
-
-static string_t *cfg_database_password(const string_t *saved, const char *label)
-{
-    string_t *prompt = string_sprintf(
-        "Choose a password to protect %s%s: ", label,
-        string_byte_length(saved) ? " [leave blank to keep current key]" : "");
-    if (!prompt)
-        return NULL;
-    string_t *answer = NULL;
-    for (;;) {
-        answer = cfg_prompt_read(string_c_str(prompt), true);
-        if (!answer)
-            break;
-        if (!string_byte_length(answer) && string_byte_length(saved)) {
-            string_free(answer);
-            answer = string_clone(saved);
-            break;
-        }
-        if (!string_byte_length(answer)) {
-            fputs("A database password is required.\n", stderr);
-            string_free(answer);
-            continue;
-        }
-        string_t *repeat = cfg_prompt_read("Confirm password: ", true);
-        bool cancelled = !repeat;
-        bool matches = repeat && !string_compare(answer, repeat);
-        string_free(repeat);
-        if (matches)
-            break;
-        string_free(answer);
-        answer = NULL;
-        if (cancelled)
-            break;
-        fputs("Passwords did not match. Please try again.\n", stderr);
-    }
-    string_free(prompt);
-    return answer;
 }
 
 bool cfg_database_export(string_t *body, const char *name, const string_t *value)
@@ -936,14 +904,15 @@ static bool cfg_database_build(cfg_database_options *options, const cfg_database
         string_free(root);
         root = string_new_with(MARS_CONFIG_ROOT_DIR);
     }
-    cfg_progress_t *progress = cfg_progress_start("Preparing encrypted database");
-    sqlite_t *db = temporary && root ? sqlite_open_encrypted(temporary_path, options->key) : NULL;
+    cfg_progress_t *progress = cfg_progress_start("Preparing database");
+    sqlite_t *db = temporary && root ? cfg_database_open(temporary_path, options->key) : NULL;
     /* Bound both working caches as catalogues grow; their pages are locked by SQLCipher. */
     ok = ok && db && destination &&
          sqlite_exec_cstr(db, "PRAGMA foreign_keys = ON; PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;");
     cfg_progress_finish(progress, ok);
     if (ok) {
-        fprintf(stderr, "Building encrypted %s database...\n", profile->name);
+        fprintf(stderr, "Building %s %s database...\n",
+                string_byte_length(options->key) ? "encrypted" : "plaintext", profile->name);
         ok = profile->import_sources(db, root, staging);
     }
     /* Commit for calendar's separate reader, then release the import cache so its locked pages do not
@@ -986,24 +955,14 @@ static bool cfg_database_build(cfg_database_options *options, const cfg_database
 
 /* Configure only the selected private database, using literal settings and native SQLCipher. */
 static int cfg_database_install(const cfg_database_profile *profile, const char *path, const char *key, const char *location,
-                                const char *language, bool interactive, bool prompt_password)
+                                const char *language, bool interactive)
 {
     cfg_database_options options = {0};
     bool ok = cfg_database_options_read(&options, profile, path, key, location, language);
     interactive = interactive && isatty(STDIN_FILENO);
-    if (ok && interactive && prompt_password) {
-        printf("%s database setup\nConfig file: %s\n", profile->title,
-               string_c_str(options.configuration_path));
-        string_t *label = string_sprintf("the %s database", profile->name);
-        string_t *chosen = label ? cfg_database_password(options.key, string_c_str(label)) : NULL;
-        string_free(label);
-        string_free(options.key);
-        options.key = chosen;
-        ok = chosen != NULL;
-    }
     string_t *quoted_key = ok ? cfg_storage_quote(options.key) : NULL;
     string_t *quoted_path = ok ? cfg_storage_quote(options.path) : NULL;
-    ok = ok && quoted_key && quoted_path && string_byte_length(options.key) && string_byte_length(options.path);
+    ok = ok && quoted_key && quoted_path && string_byte_length(options.path);
     string_free(quoted_key);
     string_free(quoted_path);
     if (ok)
@@ -1015,32 +974,24 @@ static int cfg_database_install(const cfg_database_profile *profile, const char 
     return ok ? 0 : 1;
 }
 
-/* Preserve standalone password and calendar prompting. */
+/* Use saved storage mode and preserve interactive calendar prompting. */
 int cfg_database_run(bool jurisdiction, const char *path, const char *key, const char *location, const char *language,
                      bool interactive)
 {
     const cfg_database_profile *profile = jurisdiction ? &cfg_database_jurisdiction : &cfg_database_almanac;
-    return cfg_database_install(profile, path, key, location, language, interactive, true);
+    return cfg_database_install(profile, path, key, location, language, interactive);
 }
 
-/* Select one credential before any database is installed; do not expose it through child arguments or environment. */
+/* Install each database in its saved mode; fresh configurations default to plaintext. */
 int cfg_databases_run(void)
 {
-    cfg_database_options options = {0};
     bool interactive = isatty(STDIN_FILENO);
-    bool ok = cfg_database_options_read(&options, &cfg_database_almanac, NULL, NULL, NULL, NULL);
-    string_t *key = ok ? (interactive ? cfg_database_password(options.key, "all three MARS databases")
-                                     : string_clone(options.key)) : NULL;
-    ok = ok && key && string_byte_length(key);
+    bool ok = cfg_globe_run("globe-install") == 0;
     if (ok)
-        ok = cfg_globe_install_key(string_c_str(key)) == 0;
+        ok = cfg_database_install(&cfg_database_almanac, NULL, NULL, NULL, NULL, interactive) == 0;
     if (ok)
-        ok = cfg_database_install(&cfg_database_almanac, NULL, string_c_str(key), NULL, NULL, interactive, false) == 0;
-    if (ok)
-        ok = cfg_database_install(&cfg_database_jurisdiction, NULL, string_c_str(key), NULL, NULL, interactive, false) == 0;
+        ok = cfg_database_install(&cfg_database_jurisdiction, NULL, NULL, NULL, NULL, interactive) == 0;
     if (!ok)
         fputs("Combined database installation stopped; later databases were not changed.\n", stderr);
-    string_free(key);
-    cfg_database_options_free(&options);
     return ok ? 0 : 1;
 }

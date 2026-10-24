@@ -163,6 +163,7 @@ int checks_markdown_api(const string_t *root)
                                                  {"qcomplex-t.h", "qcomplex.md"},
                                                  {"qfloat-t.h", "qfloat.md"},
                                                  {"quantity-t.h", "quantity.md"},
+                                                 {"quaternion-t.h", "globe.md"},
                                                  {"regex-t.h", "regex.md"},
                                                  {"sampler-t.h", "sampler.md"},
                                                  {"set-t.h", "set.md"},
@@ -170,6 +171,7 @@ int checks_markdown_api(const string_t *root)
                                                  {"string-t.h", "string.md"},
                                                  {"thread-t.h", "thread.md"},
                                                  {"timeseries-t.h", "timeseries.md"},
+                                                 {"webgl-t.h", "globe.md"},
                                                  {"webserver-t.h", "webserver.md"},
                                                  {"xml-t.h", "xml.md"}};
     checks_strings_t *paths = checks_files(root, "include", ".h", false), *missing = checks_strings_new();

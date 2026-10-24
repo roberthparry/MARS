@@ -24,4 +24,10 @@
  */
 json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *status);
 
+/** @brief Begin lazy geometry connection reuse in the single-owner service, after forking; false on allocation failure. */
+bool lab_cal_surface_open(void);
+
+/** @brief End single-owner geometry connection reuse; call before leaving the service or forking again. */
+void lab_cal_surface_close(void);
+
 #endif

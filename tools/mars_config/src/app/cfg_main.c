@@ -34,7 +34,7 @@ int main(int argc, char **argv)
              "                                [--db-key KEY] [--noninteractive]\n"
              "       mars_config locales [--check | --output PATH] [--data-dir DIR]");
         puts("       mars_config globe-install | globe-check | globe-update | globe-uninstall");
-        puts("       mars_config databases | databases-update");
+        puts("       mars_config databases | databases-update | databases-plaintext");
         puts("       mars_config globe-stage-rivers INPUT.geojsonseq[.zst] NEW-CANDIDATE.db");
         puts("       mars_config globe-resume-rivers INPUT.geojsonseq[.zst] CANDIDATE.db");
         puts("       mars_config globe-install-rivers CANDIDATE.db");
@@ -50,6 +50,8 @@ int main(int argc, char **argv)
         return argc == 2 ? cfg_databases_run() : 2;
     if (cfg_app_is(argv[1], "databases-update"))
         return argc == 2 ? cfg_databases_update() : 2;
+    if (cfg_app_is(argv[1], "databases-plaintext"))
+        return argc == 2 ? cfg_databases_plain() : 2;
     if (cfg_app_is(argv[1], "globe-stage-rivers"))
         return argc == 4 ? cfg_globe_river_stage(argv[2], argv[3]) : 2;
     if (cfg_app_is(argv[1], "globe-resume-rivers"))

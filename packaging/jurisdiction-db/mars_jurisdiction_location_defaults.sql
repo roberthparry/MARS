@@ -225,6 +225,8 @@ insert into jurisdiction_location_default_seed(
     ('PR', '18.4683', '-66.1061', 'America/Puerto_Rico', 'Puerto Rico'),
     ('PS', '31.5000', '34.4667', 'Asia/Gaza', 'Gaza Strip'),
     ('PT', '38.7223', '-9.1393', 'Europe/Lisbon', 'Lisbon'),
+    ('PT-20', '37.7412', '-25.6756', 'Atlantic/Azores', 'Ponta Delgada'),
+    ('PT-30', '32.6657', '-16.9255', 'Atlantic/Madeira', 'Funchal'),
     ('PT-11', '38.7223', '-9.1393', 'Europe/Lisbon', 'Lisbon'),
     ('PT-13', '41.1579', '-8.6291', 'Europe/Lisbon', 'Porto'),
     ('PW', '7.3333', '134.4833', 'Pacific/Palau', 'Palau'),

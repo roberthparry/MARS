@@ -93,19 +93,19 @@ globe_surface_t globe_hit_test(globe_t *g, double latitude, double longitude)
     return shoreline_hit_test(g ? g->shoreline : NULL, latitude, longitude);
 }
 
-/* Require independently verified land; never substitute the selected jurisdiction or a nearby town. */
+/* Administrative coverage is independent of land/water; never infer it from a nearby town. */
 string_t *globe_country_at(globe_t *g, double latitude, double longitude)
 {
-    if (!g || !g->countries || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180 ||
-        globe_hit_test(g, latitude, longitude) != GLOBE_LAND) return NULL;
+    if (!g || !g->countries || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180)
+        return NULL;
     return countries_at(g->geometry, latitude, longitude);
 }
 
 /* Geographic codes link to jurisdiction metadata without using the selected form jurisdiction. */
 string_t *globe_country_code_at(globe_t *g, double latitude, double longitude)
 {
-    if (!g || !g->countries || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180 ||
-        globe_hit_test(g, latitude, longitude) != GLOBE_LAND) return NULL;
+    if (!g || !g->countries || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180)
+        return NULL;
     string_t *code = countries_lookup(g->geometry, latitude, longitude, true);
     if (code && string_byte_length(code) != 2 && string_byte_length(code) != 6) { string_free(code); return NULL; }
     return code;

@@ -19,6 +19,9 @@
  */
 array_t *lab_wire_encode(const json_t *value);
 
+/** @brief Wrap owned-copy binary data for transport as a byte value, not UTF-8 or decimal text. */
+json_t *lab_wire_binary(const void *bytes, size_t size);
+
 /** @brief Encode a response with one canonical plot image; on failure encode a bounded diagnostic and set failed. */
 array_t *lab_wire_encode_response(const json_t *value, bool *failed);
 

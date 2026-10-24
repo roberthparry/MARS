@@ -50,6 +50,20 @@ static void test_lab_wire_roundtrip(void)
     json_free(output);
     json_free(input);
     TEST_ASSERT_TRUE(ok, "nested values preserve Unicode, NUL, numbers, booleans and mathematical text");
+    unsigned char binary[256];
+    for (unsigned i = 0; i < sizeof binary; ++i) binary[i] = (unsigned char)i;
+    input = json_new_object();
+    json_t *blob = lab_wire_binary(binary, sizeof binary);
+    string_t *blob_key = string_new_with("bytes"), *raw_key = string_new_with("$lab_binary");
+    ok = input && blob && json_object_set(input, blob_key, blob);
+    bytes = ok ? lab_wire_encode(input) : NULL;
+    output = bytes ? lab_wire_decode(array_get(bytes, 0), array_size(bytes)) : NULL;
+    const json_t *wrapper = output ? json_object_get(output, blob_key) : NULL;
+    const string_t *raw = wrapper ? json_string_value(json_object_get(wrapper, raw_key)) : NULL;
+    ok = raw && string_byte_length(raw) == sizeof binary && !memcmp(string_c_str(raw), binary, sizeof binary);
+    string_free(blob_key); string_free(raw_key);
+    json_free(blob); json_free(input); json_free(output); array_destroy(bytes);
+    TEST_ASSERT_TRUE(ok, "opaque binary payload preserves every byte without UTF-8 or decimal conversion");
 }
 
 static void test_lab_wire_rejections(void)

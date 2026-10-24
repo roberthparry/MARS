@@ -41,6 +41,16 @@ typedef struct _coast_geometry_t {
 } coast_geometry_t;
 
 /**
+ * @brief Checks one geometry's 1.5 GiB array budget, including overlapping growth allocations.
+ * @details Includes vertices, boundary flags, ring metadata, tree compaction and old/new LOD arrays.
+ * Excludes allocator overhead, SQLite storage, other retained geometries and process working memory.
+ */
+bool coast_geometry_budget(size_t vertices, size_t rings, size_t lod_capacity, size_t previous_capacity);
+
+/** @brief Return an owned database identity including file and WAL changes; report whether it is file-backed. */
+string_t *coast_database_key(sqlite_t *db, bool *shared);
+
+/**
  * @brief Visit one spatially selected ring.
  * @param geometry Borrowed retained geometry containing the ring's coordinate and display arrays.
  * @param ring Borrowed immutable ring metadata.

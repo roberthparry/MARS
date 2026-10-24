@@ -416,6 +416,7 @@ class LabApplication {
             labDOM.call('lab_country_cache_clear');
             labDOM.call('lab_menu_index_clear');
             labDOM.call('lab_globe_borders_clear');
+            labDOM.call('lab_globe_shore_clear');
         }
         labWire.dispose();
     }
@@ -632,9 +633,6 @@ class LabApplication {
 
     /** Initialise worksheet controls and periodic services, exposing the initial calculation promise on window. */
     private initialiseWorksheet(): void {
-        WorksheetWorkspace.presentation.syncModeTabs();
-        WorksheetWorkspace.presentation.syncModeUI();
-        WorksheetWorkspace.presentation.setStatus('Ready');
         WorksheetRequests.calendarRequests.refreshMobileAccess();
         this.startRefresh();
         window.labInitialEvaluation = WorksheetRequests.runtime.continue(62, {});
@@ -642,6 +640,7 @@ class LabApplication {
 
     /** @brief Present startup failure without requiring transport or native initialisation. */
     public startupFailed(error: unknown): never {
+        document.documentElement.removeAttribute('data-starting');
         const status = document.getElementById('status');
         const output = document.getElementById('rendered');
         const button = document.getElementById('run');

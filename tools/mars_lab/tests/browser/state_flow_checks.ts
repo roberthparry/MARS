@@ -251,7 +251,7 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
         await WorksheetPersistence.restoration.load();
         equal(
             events.join(','),
-            'server-failed,editors:true,controls:true,mars.exprLab.lastDatetimeState,mars.exprLab.lastAlmanacState,local-mode,towns,town,town',
+            'server-failed,local-mode,editors:true,controls:true,mars.exprLab.lastDatetimeState,mars.exprLab.lastAlmanacState,towns,town,town',
             'server installation failure restores local controls and towns without inventing a saved mode');
 
         events.length = 0;
@@ -263,7 +263,7 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
             throw new Error('storage denied');
         });
         await WorksheetPersistence.restoration.load();
-        equal(events.join(','), 'local-failed', 'local failure terminates fallback without later reads');
+        equal(events.join(','), 'local-mode,local-failed', 'local failure terminates fallback after the early mode read');
 
         const commit = labStateDeferred();
         const commitEntered = labStateDeferred();

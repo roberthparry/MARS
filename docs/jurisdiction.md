@@ -130,6 +130,10 @@ AD: Andorra (42.5000, 1.5167), Europe/Andorra
 
 ## Configuration files
 
+An empty or absent database key selects plaintext SQLite; a non-empty key retains encrypted SQLCipher.
+An explicitly empty modern environment key overrides saved and legacy keys. Opening never retries a failed keyed
+connection as plaintext. Existing files require explicit [conversion](globe.md#plaintext-conversion), not a key deletion.
+
 Database path and key resolution retains its existing precedence: modern
 `MARS_JURISDICTION_DB_PATH` / `MARS_JURISDICTION_DB_KEY` environment values,
 legacy `MARS_HOLIDAY_DB_PATH` / `MARS_HOLIDAY_DB_KEY` values, then configuration
@@ -248,12 +252,12 @@ regardless of the selected town.
 
 Before generating the calendar, the installer releases unused SQLCipher import-cache
 memory. This avoids retaining locked cache pages while opening the calendar reader
-and building the snapshot; encryption and SQLCipher memory protection remain enabled.
+and building the snapshot; encrypted mode retains encryption and SQLCipher memory protection.
 The installer's main and temporary page caches are each limited to a suggested
 512 KiB working size, keeping larger town imports within the same memory-lock budget.
-Large town-import and normalised-selection tables live in the encrypted staging
+Large town-import and normalised-selection tables live in the selected-mode staging
 database rather than memory-only temporary storage. They are removed before the
-database is published; no unencrypted spill files are needed.
+database is published. Plaintext mode skips key derivation for the separate calendar reader too.
 The bounded SQL importer accepts blank lines and standalone `--` comments between
 literal tuples, including after a batch has been flushed. Import failures identify
 the packaged source and line number without printing SQL or credentials.
@@ -296,12 +300,17 @@ existing `0` metre fallback. This is an assumed starting value, not a surveyed
 height; set the actual observer altitude when known. Genuine negative elevations
 are preserved, and manually entered observer heights remain subject to validation.
 
-Targeted Sunshine Coast additions bring the current packaged total to **50,004
+Targeted Sunshine Coast additions brought the packaged total to **50,004
 records**: Mooloolaba and Maroochydore each appear under Australia (`AU`) and
 Queensland (`AU-QLD`), with the `Australia/Brisbane` timezone. GeoNames classifies
 these as urban sections (`PPLX`), normally excluded by the worldwide generator;
 explicit seeds retain these useful coastal locations without importing every
 suburb. The existing Sunshine Coast entry and all other towns are retained.
+The Azores (`PT-20`) and Madeira (`PT-30`) also have explicit regional lists,
+selected from Portugal's towns by their respective `Atlantic/Azores` and
+`Atlantic/Madeira` timezones. Their defaults are Ponta Delgada and Funchal, not
+Lisbon. These 29 regional entries bring the packaged total to **50,033 records**;
+the original Portugal-wide entries remain available for existing selections.
 Reinstall the jurisdiction database and restart MARS Lab to load catalogue changes;
 updating the globe database alone does not update towns.
 

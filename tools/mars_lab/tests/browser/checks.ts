@@ -7,6 +7,24 @@
 
 /** Real-browser regressions injected only into a private test copy of the page. */
 (function installBrowserChecks() {
+    const startupCheck = new URLSearchParams(location.search).get('startup-check') === '1';
+    const startupRequests: string[] = [];
+    const startupReveals: string[] = [];
+    if (startupCheck) {
+        localStorage.setItem('mars.exprLab.lastMode', 'almanac');
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = (input, options) => {
+            startupRequests.push(String(input));
+            return originalFetch(input, options);
+        };
+        const observer = new MutationObserver(() => {
+            if (!document.documentElement.hasAttribute('data-starting')) {
+                startupReveals.push(document.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('data-mode') || '');
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.documentElement, {attributes: true, attributeFilter: ['data-starting']});
+    }
     const failures: string[] = [];
     const nativeFetch = window.fetch.bind(window);
     const nativeSetTimeout = window.setTimeout.bind(window);
@@ -3044,6 +3062,66 @@
             }
             await window.labReady;
             await labApplication.townsReady;
+            if (startupCheck) {
+                check(WorksheetWorkspace.mode.currentMode() === 'almanac' && startupReveals.join(',') === 'almanac',
+                      `first restored mode: ${WorksheetWorkspace.mode.currentMode()}; reveals: ${startupReveals.join(',')}; ` +
+                      `pending: ${document.documentElement.getAttribute('data-starting')}; requests: ${startupRequests.join(',')}`);
+                check(!startupRequests.some(url => /\/(eval|equation-eval|diffequation-eval|matrix-eval|integrator-eval)(?:\?|$)/.test(url)),
+                      'Almanac startup never evaluates an unrelated mathematical mode');
+                check(!document.documentElement.hasAttribute('data-starting'), 'saved mode becomes visible after restoration');
+                check(startupRequests.some(url => /\/almanac-eval(?:\?|$)/.test(url)),
+                      'the restored Almanac receives its own initial evaluation');
+                const savedCamera = sessionStorage.getItem('startup-globe-camera');
+                if (!savedCamera) {
+                    const zoom = document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!;
+                    for (let i = 0; i < 3; ++i) {
+                        zoom.click();
+                        await new Promise(requestAnimationFrame);
+                    }
+                    const canvas = document.querySelector<HTMLCanvasElement>('#almanacGlobe canvas')!;
+                    const capture = canvas.setPointerCapture;
+                    canvas.setPointerCapture = () => {};
+                    try {
+                        const box = canvas.getBoundingClientRect();
+                        const x = box.left + box.width / 2, y = box.top + box.height / 2;
+                        canvas.dispatchEvent(new PointerEvent('pointerdown', {pointerId: 82, button: 0, clientX: x, clientY: y}));
+                        canvas.dispatchEvent(new PointerEvent('pointermove', {pointerId: 82, clientX: x + 30, clientY: y + 15}));
+                        canvas.dispatchEvent(new PointerEvent('pointerup', {pointerId: 82}));
+                    } finally { canvas.setPointerCapture = capture; }
+                    const camera = MarsAlmanacGlobe.captureHistory();
+                    check(Boolean(camera && camera[4] > 1), 'startup fixture zooms the actual globe');
+                    const latitude = document.getElementById('almanacLatitude') as HTMLInputElement;
+                    const previousLatitude = latitude.value;
+                    latitude.value = '12.345';
+                    window.dispatchEvent(new PageTransitionEvent('pagehide', {persisted: true}));
+                    latitude.value = previousLatitude;
+                    const bookmark = JSON.parse(localStorage.getItem('mars.exprLab.globeCamera.v1') || 'null');
+                    check(Boolean(bookmark && camera!.every((value, i) => Math.abs(value - bookmark.camera[i]) < 1e-10)),
+                          'exit flush saves the displayed camera before debounce even while observer fields differ');
+                    window.addEventListener('pagehide', () => {
+                        const record = JSON.parse(localStorage.getItem('mars.exprLab.globeCamera.v1')!);
+                        record.observer = JSON.stringify(['12.345', '67.890', '', '']);
+                        localStorage.setItem('mars.exprLab.globeCamera.v1', JSON.stringify(record));
+                    }, {once: true});
+                    sessionStorage.setItem('startup-globe-camera', JSON.stringify(camera));
+                    location.reload();
+                    return;
+                }
+                const expectedCamera = JSON.parse(savedCamera) as number[];
+                const restoredCamera = MarsAlmanacGlobe.captureHistory();
+                check(Boolean(restoredCamera && expectedCamera.every((value, i) => Math.abs(value - restoredCamera[i]) < 1e-10)),
+                      `a real page reload restores the globe orientation and zoom: expected ${savedCamera}; ` +
+                      `actual ${JSON.stringify(restoredCamera)}; stored ${localStorage.getItem('mars.exprLab.globeCamera.v1')}; ` +
+                      `observer ${JSON.stringify(['Latitude', 'Longitude', 'Town', 'Jurisdiction'].map(name =>
+                          (document.getElementById('almanac' + name) as HTMLInputElement).value))}`);
+                sessionStorage.removeItem('startup-globe-camera');
+                initialiseLabTestAdapters();
+                WorksheetWorkspace.mode.setMode('expression');
+                try { await window.checkLabStateFlow(); }
+                finally { WorksheetWorkspace.mode.setMode('almanac'); }
+                await report('PASS: saved Almanac is the first visible and evaluated mode');
+                return;
+            }
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('select-check') === '1') {
                 await runBrowserGroup('real DateTime sky header', async () => {

@@ -626,7 +626,18 @@ namespace WorksheetResults {
         }
 
         /** @brief Copy after outstanding binding commits, using the browser clipboard. */
-        copyInputFromEvent(): Promise<unknown> {
+        async copyInputFromEvent(): Promise<unknown> {
+            if (WorksheetWorkspace.mode.currentMode() === 'almanac') {
+                const button = this.dependencies.context().inputCopy;
+                try {
+                    await MarsAlmanacGlobe.copyImage();
+                    WorksheetResults.clipboard.flash(button, true);
+                } catch (error) {
+                    WorksheetResults.clipboard.flash(button, false);
+                    this.statusLater(String(error), 5000);
+                }
+                return;
+            }
             return this.dependencies.flow().continue(ResultFlowKind.copyInput, {button: this.dependencies.context().inputCopy});
         }
 

@@ -277,7 +277,6 @@ static bool test_calendar_pty_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && test_calendar_pty_sources(directory);
     static const test_calendar_dialogue_t choose[] = {
-        {"[leave blank to keep current key]: ", "\n"},
         {"Choice: ", "/\n"},
         {"Choice: ", "n\n"},
         {"Choice: ", "p\n"},
@@ -292,6 +291,7 @@ static bool test_calendar_pty_fixture(const char *directory)
          string_find(output, "Generating local calendar") >= 0 &&
          string_find(output, "Finalising and publishing database — done") >= 0 &&
          string_find(output, "\033[2K[") >= 0 &&
+         string_find(output, "keep current key") < 0 &&
          string_find(output, test_calendar_password) < 0;
     string_free(output);
     db = ok ? sqlite_open_encrypted(path, key) : NULL;
@@ -309,12 +309,10 @@ static bool test_calendar_pty_fixture(const char *directory)
     ok = ok && test_calendar_text(language, "la_VA") && test_calendar_text(location, "Vatican City, VA") && copy &&
          config_copy && file_copy(database, copy, false) && file_copy(config, config_copy, false);
     static const test_calendar_dialogue_t cancel[] = {
-        {"[leave blank to keep current key]: ", "\n"},
         {"Choice: ", "\n"},
         {"Language number or name [Enter = default; q = cancel]: ", "q\n"}};
-    static const test_calendar_dialogue_t eof[] = {{"[leave blank to keep current key]: ", "\n"}, {"Choice: ", "\004"}};
-    static const test_calendar_dialogue_t interrupt[] = {{"[leave blank to keep current key]: ", "\n"},
-                                                         {"Choice: ", "\003"}};
+    static const test_calendar_dialogue_t eof[] = {{"Choice: ", "\004"}};
+    static const test_calendar_dialogue_t interrupt[] = {{"Choice: ", "\003"}};
     const struct {
         const test_calendar_dialogue_t *steps;
         size_t count;

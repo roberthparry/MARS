@@ -57,6 +57,9 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
         const originalClasses = doc.body.className;
         for (const width of [390, 900, 1280, 1870]) {
             frame.style.width = width + 'px';
+            for (const note of doc.querySelectorAll<HTMLElement>('#almanacGlobeStatus, .globe-credit'))
+                check(frame.contentWindow!.getComputedStyle(note).display === 'none',
+                      `${width}px: globe footer notes occupy no space on desktop or mobile`);
             for (const mode of ['', 'equation-mode', 'diffequation-mode', 'matrix-mode', 'integrator-mode',
                                 'datetime-mode', 'almanac-mode']) {
                 doc.body.className = mode;
@@ -379,7 +382,7 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                 check(visible(almanac.querySelector<HTMLElement>('.almanac-accuracy-note')!) === (width > 560),
                       `${width}px: ephemeris coverage and accuracy note should appear only on larger screens`);
                 if (width <= 560) {
-                    check(!visible(almanac.querySelector<HTMLElement>('.almanac-briefing')!),
+                    check(!almanac.querySelector('.almanac-briefing'),
                           `${width}px: repeated Almanac introduction takes up phone space`);
                     const globe = bounds('almanacGlobe');
                     check(date.top >= globe.bottom && date.bottom - globe.bottom < 160,

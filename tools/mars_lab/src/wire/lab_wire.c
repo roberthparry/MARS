@@ -72,13 +72,40 @@ static bool lab_wire_number(const json_t *value, double *converted)
     return ok;
 }
 
+/* Wrap opaque bytes in the native tree; the reserved wrapper never reaches the browser. */
+json_t *lab_wire_binary(const void *bytes, size_t size)
+{
+    string_t *raw = string_new();
+    json_t *object = json_new_object();
+    bool ok = raw && object && size <= lab_wire_limit && string_append_bytes(raw, bytes, size) == 0;
+    json_t *value = ok ? json_new_string(raw) : NULL;
+    string_t *key = string_new_with("$lab_binary");
+    ok = value && key && json_object_set(object, key, value);
+    string_free(key);
+    json_free(value);
+    string_free(raw);
+    if (!ok) { json_free(object); return NULL; }
+    return object;
+}
+
 static protobuf_t *lab_wire_write(const json_t *value, unsigned depth, unsigned *nodes)
 {
     if (!value || depth > lab_wire_depth || ++*nodes > lab_wire_nodes)
         return NULL;
     unsigned kind = (unsigned)json_type(value);
+    string_t *binary_key = kind == JSON_OBJECT && json_object_size(value) == 1 ? string_new_with("$lab_binary") : NULL;
+    const json_t *binary = binary_key
+        ? json_object_get(value, binary_key) : NULL;
+    string_free(binary_key);
+    if (binary && json_type(binary) == JSON_STRING) kind = 6;
+    if (kind == 6 && depth == 0) return NULL;
     protobuf_t *message = protobuf_new(lab_wire_limit, lab_wire_nodes);
-    bool ok = message && kind <= 5 && protobuf_add_integer(message, 1, PROTOBUF_VARINT, kind);
+    bool ok = message && kind <= 6 && protobuf_add_integer(message, 1, PROTOBUF_VARINT, kind);
+    if (ok && kind == 6) {
+        ok = lab_wire_text(message, 7, json_string_value(binary));
+        if (!ok) { protobuf_free(message); return NULL; }
+        return message;
+    }
     if (ok && kind == JSON_BOOL) {
         bool flag;
         ok = json_bool_value(value, &flag) && protobuf_add_integer(message, 2, PROTOBUF_VARINT, flag);
@@ -169,13 +196,14 @@ static json_t *lab_wire_read(const protobuf_t *message, unsigned depth, unsigned
 {
     if (!message || depth > lab_wire_depth || ++*nodes > lab_wire_nodes)
         return NULL;
-    size_t indexes[5] = {0};
+    size_t indexes[8] = {0};
     unsigned seen = 0, containers = 0;
     uint64_t kind = 99;
     for (size_t i = 0; i < protobuf_count(message); ++i) {
         unsigned field = protobuf_field(message, i);
-        if (field <= 4) {
-            static const int wires[] = {0, PROTOBUF_VARINT, PROTOBUF_VARINT, PROTOBUF_FIXED64, PROTOBUF_BYTES};
+        if (field <= 4 || field == 7) {
+            static const int wires[] = {0, PROTOBUF_VARINT, PROTOBUF_VARINT, PROTOBUF_FIXED64, PROTOBUF_BYTES,
+                                       0, 0, PROTOBUF_BYTES};
             if ((seen & (1u << field)) || protobuf_wire(message, i) != wires[field])
                 return NULL;
             seen |= 1u << field;
@@ -186,10 +214,16 @@ static json_t *lab_wire_read(const protobuf_t *message, unsigned depth, unsigned
             containers |= 1u << field;
         }
     }
-    if (!(seen & 2) || !protobuf_integer(message, indexes[1], &kind) || kind > 5 ||
-        (seen & ~((kind >= 1 && kind <= 3 ? 1u << (kind + 1) : 0) | 2u)) ||
-        (containers & ~(kind >= 4 ? 1u << (kind + 1) : 0)))
+    if (!(seen & 2) || !protobuf_integer(message, indexes[1], &kind) || kind > 6 ||
+        (seen & ~((kind == 6 ? 128u : kind >= 1 && kind <= 3 ? 1u << (kind + 1) : 0) | 2u)) ||
+        (containers & ~(kind >= 4 && kind <= 5 ? 1u << (kind + 1) : 0)))
         return NULL;
+    if (kind == 6) {
+        if (depth == 0) return NULL;
+        size_t length = 0;
+        const void *bytes = seen & 128 ? protobuf_bytes(message, indexes[7], &length) : NULL;
+        return lab_wire_binary(bytes, length);
+    }
     json_t *value = NULL;
     if (kind == JSON_NULL)
         value = json_new_null();

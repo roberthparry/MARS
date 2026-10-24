@@ -2,7 +2,7 @@
  * @file cfg_calendar.h
  * @brief Native installer selection and population of location-specific SQL calendars.
  *
- * Selects a town and supported display locale from an encrypted staging database,
+ * Selects a town and supported display locale from a plaintext or encrypted staging database,
  * expands native holiday and weekend policy, and fills the calendar's daily rows.
  * The supplied connection remains caller-owned. Its imported schema and rules
  * must be committed so a separate public jurisdiction engine can read them.
@@ -30,9 +30,9 @@ string_t *cfg_calendar_key(const string_t *text, bool language);
 
 /**
  * @brief Select and populate a complete native calendar in a staging database.
- * @param db Borrowed encrypted staging connection with committed imported rules.
+ * @param db Borrowed staging connection with committed imported rules.
  * @param path Borrowed staging filename used by the native jurisdiction engine.
- * @param key Borrowed encryption key; never printed or placed in a subprocess argument.
+ * @param key Borrowed encryption key, empty for plaintext; never printed or placed in a subprocess argument.
  * @param requested Optional requested town, optionally followed by a jurisdiction.
  * @param saved Optional previously selected location.
  * @param interactive Enable paginated location and language prompts.

@@ -92,6 +92,9 @@ void test_lab_syntax_cases(void);
 /** @brief Run native almanac display and clipboard regressions. @return No value. */
 void test_lab_almanac_presentation_cases(void);
 
+/** Register isolated native shoreline-vector transport tests. */
+void test_lab_vector_cases(void);
+
 /** @brief Register native mathematical worker regressions. @return No value. */
 void test_lab_math_cases(void);
 

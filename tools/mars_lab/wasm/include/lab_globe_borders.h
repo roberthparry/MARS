@@ -24,7 +24,7 @@ bool lab_globe_borders_covers(jsref view);
 /** @brief Release the optional border geometry. */
 void lab_globe_borders_clear(void);
 
-/** @brief Return a horizon- and viewport-clipped SVG path in CSS pixels, or null on resource failure. */
+/** @brief Return a horizon- and viewport-clipped CSS-pixel SVG path for zoom 1–4096, or null on invalid input or failure. */
 void lab_globe_borders_path(quaternion_jsref orientation, double zoom, double size);
 
 #endif

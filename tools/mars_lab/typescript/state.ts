@@ -813,6 +813,11 @@ namespace WorksheetPersistence {
             return statePolicy.mode(value);
         },
 
+        /** @brief Establish native mode ownership before restoring editor text, without rendering or evaluating it. */
+        statePrimeMode(mode: WorksheetMode) {
+            WorksheetWorkspace.mode.setMode(mode);
+        },
+
         /** @brief Prepare metadata for a mode's retained editor text. */
         statePrepareMode(mode: WorksheetMode) {
             return WorksheetRequests.presentation.prepareLabEditor(WorksheetContext.modeEditorText[mode]);

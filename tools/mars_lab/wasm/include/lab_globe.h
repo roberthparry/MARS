@@ -38,6 +38,14 @@ void lab_globe_rotate(quaternion_jsref orientation, double zoom, double dx, doub
  */
 void lab_globe_project(double latitude, double longitude, quaternion_jsref orientation);
 
+/**
+ * @brief Return a constant-cost local affine reprojection of retained SVG geometry.
+ * Frames contain [quaternion x,y,z,w, zoom, CSS size]. Returns SVG matrix coefficients
+ * [a,b,c,d,e,f], or null for invalid frames or a centre rotated behind the globe.
+ * This tangent-plane preview is for close views; worker projection supplies exact updates.
+ */
+void lab_globe_frame_transform(jsref previous, jsref current);
+
 /** @brief Test whether a completed nearby-town query covers a centre within one degree, including the date line. */
 bool lab_globe_nearby_covers(double latitude, double longitude, double cached_latitude, double cached_longitude);
 

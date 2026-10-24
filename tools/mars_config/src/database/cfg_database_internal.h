@@ -19,6 +19,9 @@
 #include "file-t.h"
 #include "sqlite-t.h"
 
+/** Open the selected format: an empty key means plaintext; NULL is a configuration failure. */
+sqlite_t *cfg_database_open(const string_t *path, const string_t *key);
+
 /** @brief Import optional bundled country flags into the jurisdiction catalogue, preserving other tables. */
 bool cfg_database_flags(sqlite_t *db, const string_t *root);
 
@@ -43,7 +46,7 @@ typedef struct cfg_database_options {
     string_t *saved_language;
 } cfg_database_options;
 
-/** Database-specific policy consumed by the common encrypted installation lifecycle. */
+/** Database-specific policy consumed by the common plaintext or encrypted installation lifecycle. */
 typedef struct cfg_database_profile {
     const char *name;
     const char *title;
@@ -105,11 +108,11 @@ void cfg_database_values_free(sqlite_t *db, cfg_database_values *values);
 bool cfg_database_import(sqlite_t *db, const string_t *root, const string_t *path);
 
 /**
- * @brief Import the optional packaged shoreline source without network access.
- * @param db Borrowed writable database with no active transaction.
+ * @brief Import the required complete, hash-verified shoreline artifact without repairs or network access.
+ * @param db Borrowed writable database; an enclosing transaction is preserved.
  * @param root Borrowed repository root containing the packaged source.
  * @param staging Borrowed installer-owned directory for bounded decompression.
- * @return True on import or absent optional source; false on invalid data or I/O failure.
+ * @return True on import; false on missing or invalid archive parts, hash mismatch or I/O failure.
  */
 bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *staging);
 

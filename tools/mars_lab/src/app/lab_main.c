@@ -21,6 +21,7 @@
 #include "lab_process.h"
 #include "lab_runtime.h"
 #include "lab_server.h"
+#include "lab_surface_service.h"
 #include "lab_worker.h"
 
 static volatile sig_atomic_t stopping;
@@ -98,11 +99,12 @@ static int lab_app_worker(lab_server_t *server)
     return 0;
 }
 
-static pid_t lab_app_start_worker(lab_server_t *server)
+static pid_t lab_app_start_worker(lab_server_t *server, unsigned index)
 {
     pid_t parent = getpid();
     pid_t pid = fork();
     if (pid == 0) {
+        lab_surface_service_select(index);
         if (prctl(PR_SET_PDEATHSIG, SIGTERM) != 0 || getppid() != parent)
             _exit(1);
         _exit(lab_app_worker(server));
@@ -183,16 +185,22 @@ int main(int argc, char **argv)
         return 1;
     }
     lab_proc_plot_cache_init();
-    pid_t children[8] = {0};
+    pid_t children[9] = {0};
+    children[workers] = lab_surface_service_start(workers);
+    if (children[workers] < 0) {
+        lab_svr_free(server);
+        return 1;
+    }
     bool failed = false;
     for (unsigned i = 0; i < workers; ++i) {
-        children[i] = lab_app_start_worker(server);
+        children[i] = lab_app_start_worker(server, i);
         if (children[i] < 0) {
             failed = true;
             stopping = 1;
             break;
         }
     }
+    lab_surface_service_select(workers);
     string_t *host_text = string_new_with(host);
     bool ipv6 = host_text && string_find(host_text, ":") >= 0;
     const char *access = lab_app_option(host, "0.0.0.0") ? "127.0.0.1" : lab_app_option(host, "::") ? "::1" : host;
@@ -222,20 +230,20 @@ int main(int argc, char **argv)
             break;
         }
         /* A worker failure closes the service instead of spawning an unbounded restart loop. */
-        for (unsigned i = 0; i < workers; ++i)
+        for (unsigned i = 0; i <= workers; ++i)
             if (children[i] == done)
                 children[i] = 0;
         failed = true;
         break;
     }
-    for (unsigned i = 0; i < workers; ++i)
+    for (unsigned i = 0; i <= workers; ++i)
         if (children[i] > 0)
             kill(children[i], SIGTERM);
     /* Allow cancellation-aware helpers to reap their children, but do not wait
        for a slow HTTP peer's complete request deadline during shutdown. */
     for (unsigned attempt = 0; attempt < 600; ++attempt) {
         bool remaining = false;
-        for (unsigned i = 0; i < workers; ++i) {
+        for (unsigned i = 0; i <= workers; ++i) {
             if (children[i] <= 0)
                 continue;
             pid_t done = waitpid(children[i], NULL, WNOHANG);
@@ -249,7 +257,7 @@ int main(int argc, char **argv)
         struct timespec interval = {.tv_nsec = 10000000};
         nanosleep(&interval, NULL);
     }
-    for (unsigned i = 0; i < workers; ++i) {
+    for (unsigned i = 0; i <= workers; ++i) {
         if (children[i] <= 0)
             continue;
         kill(children[i], SIGKILL);

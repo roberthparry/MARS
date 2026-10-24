@@ -3585,6 +3585,21 @@ select jurisdiction_id, min(town_name) as town_name from jurisdiction_town_seed 
 .read packaging/jurisdiction-db/mars_jurisdiction_world_towns.sql
 create index jurisdiction_town_seed_name on jurisdiction_town_seed(jurisdiction_id, town_name);
 
+-- Island regions need their own town lists and defaults, not the mainland capital.
+-- Retain the country entries for existing selections and country-wide searches.
+with island_region(jurisdiction_id, timezone_name, default_town) as (
+    values ('PT-20', 'Atlantic/Azores', 'Ponta Delgada'),
+           ('PT-30', 'Atlantic/Madeira', 'Funchal')
+)
+insert into jurisdiction_town_seed
+select region.jurisdiction_id, town.town_name, town.latitude, town.longitude,
+       town.elevation_metres, town.timezone_code,
+       case when town.town_name = region.default_town then 'Y' else 'N' end
+from jurisdiction_town_seed as town
+join timezone_code as zone on zone.timezone_code = town.timezone_code
+join island_region as region on region.timezone_name = zone.timezone_name
+where town.jurisdiction_id = 'PT';
+
 create temp table jurisdiction_town_totality_seed(
     jurisdiction_id,
     town_name,

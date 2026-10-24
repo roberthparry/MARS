@@ -74,6 +74,7 @@ lab_dom_to_number
 lab_dom_truth
 lab_dom_type
 lab_dom_utf8_copy
+lab_dom_bytes_copy
 lab_dom_utf8_string
 lab_dom_value_id
 lab_dom_wrap

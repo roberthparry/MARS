@@ -150,7 +150,8 @@ static bool write_bytes(file_t *file, const void *bytes, size_t size)
     return file_write(file, bytes, size, &written) && written == size;
 }
 
-static bool write_precise_ring(file_t *file, int id, const double (*vertices)[2], size_t count)
+static bool write_precise_marked_ring(file_t *file, int id, const double (*vertices)[2], size_t count,
+                                      unsigned virtual_first, unsigned virtual_count)
 {
     unsigned char header[44] = {0}, point[16];
     double west = INFINITY, east = -INFINITY, south = INFINITY, north = -INFINITY;
@@ -159,6 +160,10 @@ static bool write_precise_ring(file_t *file, int id, const double (*vertices)[2]
         south = fmin(south, vertices[i][1]); north = fmax(north, vertices[i][1]);
     }
     put_integer(header, id); put_integer(header + 4, (int)count); put_integer(header + 8, 15 * 256 + 1);
+    if (virtual_count) {
+        put_integer(header + 8, (1 << 24) | (15 << 8) | 1);
+        put_integer(header + 28, (int)virtual_first); put_integer(header + 32, (int)virtual_count);
+    }
     put_integer(header + 12, (int32_t)floor(west * 1000000));
     put_integer(header + 16, (int32_t)ceil(east * 1000000));
     put_integer(header + 20, (int32_t)floor(south * 1000000));
@@ -169,6 +174,11 @@ static bool write_precise_ring(file_t *file, int id, const double (*vertices)[2]
         ok = write_bytes(file, point, sizeof point);
     }
     return ok;
+}
+
+static bool write_precise_ring(file_t *file, int id, const double (*vertices)[2], size_t count)
+{
+    return write_precise_marked_ring(file, id, vertices, count, 0, 0);
 }
 
 typedef struct _coast_exact_probe_t {
@@ -202,7 +212,7 @@ static void test_shoreline_lossless_coordinates(void)
     }
     const double tiny[][2] = {{100.5934961, 2.9196721}, {100.5934962, 2.9196721},
                              {100.5934962, 2.9196722}, {100.5934961, 2.9196721}};
-    TEST_ASSERT_TRUE(file_open_write(source) && write_bytes(source, "MARSCF64", 8) &&
+    TEST_ASSERT_TRUE(file_open(source, FILE_MODE_CREATE, FILE_ACCESS_WRITE) && write_bytes(source, "MARSCF64", 8) &&
         write_precise_ring(source, 1, square, 1025) && write_precise_ring(source, 2, tiny, 4) &&
         file_close(source) && file_open_read(source) && globe_import_shoreline(db, source), "lossless import");
     file_close(source);
@@ -222,13 +232,51 @@ static void test_shoreline_lossless_coordinates(void)
     TEST_ASSERT_INT_EQ(globe_hit_test(globe, 0, 0), GLOBE_LAND);
     globe_close(globe);
     const double invalid[][2] = {{NAN, 0}, {1, 1}, {2, 0}, {NAN, 0}};
-    TEST_ASSERT_TRUE(file_open_write(source) && write_bytes(source, "MARSCF64", 8) &&
+    TEST_ASSERT_TRUE(file_open(source, FILE_MODE_CREATE, FILE_ACCESS_WRITE) && write_bytes(source, "MARSCF64", 8) &&
         write_precise_ring(source, 3, invalid, 4) && file_close(source) && file_open_read(source) &&
         !globe_import_shoreline(db, source), "non-finite lossless input rolls back");
     file_close(source);
     globe = globe_open(db, NULL);
     TEST_ASSERT_INT_EQ(globe_hit_test(globe, 0, 0), GLOBE_LAND);
     globe_close(globe);
+    /* The exact reviewed cap is retained for filling but never reported as physical shoreline. */
+    const double cap[][2] = {{-180, -77}, {-60, -72}, {60, -72}, {180, -77},
+                            {180, -90}, {-180, -90}, {-180, -77}};
+    TEST_ASSERT_TRUE(file_open(source, FILE_MODE_CREATE, FILE_ACCESS_WRITE) && write_bytes(source, "MARSCF64", 8) &&
+        write_precise_marked_ring(source, 1, cap, 7, 3, 3) && file_close(source) && file_open_read(source) &&
+        globe_import_shoreline(db, source), "explicit polar cap import");
+    file_close(source);
+    sqlite_stmt_t *marked = sqlite_stmt_prepare(db,
+        "SELECT sum(CASE WHEN boundary=0 THEN point_count-1 ELSE 0 END),"
+        "sum(CASE WHEN boundary=1 THEN point_count-1 ELSE 0 END) FROM shoreline_chunk");
+    TEST_ASSERT_TRUE(marked && sqlite_stmt_step(marked) == SQLITE_STEP_ROW, "polar chunk metadata");
+    TEST_ASSERT_INT_EQ(sqlite_stmt_column_int(marked, 0), 3);
+    TEST_ASSERT_INT_EQ(sqlite_stmt_column_int(marked, 1), 3);
+    sqlite_stmt_finalize(marked);
+    globe = globe_open(db, NULL);
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, -89, 0), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, -85, 180), GLOBE_LAND);
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, -60, 0), GLOBE_SEA);
+    TEST_ASSERT_TRUE(globe_surface_prepare(globe), "explicit polar cap resident geometry");
+    globe_close(globe);
+    for (unsigned rotation = 1; rotation < 6; ++rotation) {
+        double rotated[7][2];
+        for (unsigned i = 0; i < 7; ++i) memcpy(rotated[i], cap[(rotation + i) % 6], sizeof rotated[i]);
+        TEST_ASSERT_TRUE(file_open(source, FILE_MODE_CREATE, FILE_ACCESS_WRITE) && write_bytes(source, "MARSCF64", 8) &&
+            write_precise_marked_ring(source, 1, rotated, 7, (9 - rotation) % 6, 3) && file_close(source) &&
+            file_open_read(source) && globe_import_shoreline(db, source), "wrapped polar virtual-edge range");
+        file_close(source);
+        globe = globe_open(db, NULL);
+        TEST_ASSERT_INT_EQ(globe_hit_test(globe, -89, 0), GLOBE_LAND);
+        TEST_ASSERT_INT_EQ(globe_hit_test(globe, -85, 180), GLOBE_LAND);
+        TEST_ASSERT_INT_EQ(globe_hit_test(globe, -72, 0), GLOBE_COAST);
+        TEST_ASSERT_TRUE(globe_surface_prepare(globe), "rotated polar resident geometry");
+        globe_close(globe);
+    }
+    TEST_ASSERT_TRUE(file_open(source, FILE_MODE_CREATE, FILE_ACCESS_WRITE) && write_bytes(source, "MARSCF64", 8) &&
+        write_precise_marked_ring(source, 1, cap, 7, 6, 3) && file_close(source) && file_open_read(source) &&
+        !globe_import_shoreline(db, source), "invalid explicit polar edge range rolls back");
+    file_close(source);
     sqlite_close(db);
     file_delete(source); file_free(source); file_remove_directory(directory); file_free(directory);
 }
@@ -289,6 +337,17 @@ static void test_shoreline_nested_rings_and_rollback(void)
     path = (coast_test_path_t){.x = 180, .y = 0, .valid = true};
     TEST_ASSERT_TRUE(globe_surface_paths(shoreline, 160, -16, 200, 16, 0, check_path, &path), "date-line vectors");
     TEST_ASSERT_TRUE(path.land, "date-line island filled");
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db,
+        "SAVEPOINT distant_ring; UPDATE shoreline_chunk SET codec=999 WHERE polygon_id=4"),
+        "make an unrelated distant ring unreadable");
+    path = (coast_test_path_t){.x = 0, .y = 15, .valid = true};
+    TEST_ASSERT_TRUE(globe_surface_paths(shoreline, -1, 14, 1, 16, 0, check_path, &path) && path.land,
+                     "cold regional drawing reads only relevant rings, retaining enclosing land");
+    path = (coast_test_path_t){.x = 15, .y = 0, .valid = true};
+    TEST_ASSERT_TRUE(globe_surface_paths(shoreline, 14, -1, 16, 1, 0, check_path, &path) && path.land,
+                     "opposing rays exclude unreadable distant rings in the same latitude band");
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "ROLLBACK TO distant_ring; RELEASE distant_ring"),
+                     "restore the distant ring before whole-world preparation");
     TEST_ASSERT_TRUE(globe_surface_prepare(shoreline), "reusable resident geometry");
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 20.003, 0), GLOBE_COAST);
     TEST_ASSERT_INT_EQ(globe_hit_test(shoreline, 0, -179), GLOBE_LAND);
@@ -338,10 +397,9 @@ static void test_shoreline_packaged_world(void)
     file_t *packed = file_new(path);
     string_free(path);
     file_t *database = temporary_file(directory, "world.db");
-    string_t *database_path = string_new_with(file_path(database)), *key = string_new_with("shoreline-test");
-    sqlite_t *db = sqlite_open_encrypted(database_path, key);
+    string_t *database_path = string_new_with(file_path(database));
+    sqlite_t *db = sqlite_open_plain(database_path);
     string_free(database_path);
-    string_free(key);
     TEST_ASSERT_NOT_NULL(db);
     bool imported = file_decompress_zstd(packed, source, 128 * 1024 * 1024, false) &&
                     file_open_read(source) && globe_import_shoreline(db, source) && file_close(source);
@@ -351,6 +409,14 @@ static void test_shoreline_packaged_world(void)
     TEST_ASSERT_TRUE(imported, "import GSHHG");
     globe_t *shoreline = globe_open(db, NULL);
     TEST_ASSERT_NOT_NULL(shoreline);
+    for (unsigned pass = 0; pass < 3; ++pass) {
+        coast_test_path_t local = {.x = -4.43, .y = 36.73, .valid = true};
+        double inset = pass ? 0.1 : 0;
+        TEST_ASSERT_TRUE(globe_surface_paths(shoreline, -6 + inset, 35 + inset, -3, 38,
+                                             pass == 1 ? 0.01 : 0, check_path, &local),
+                         "cold and reused regional geometry supports changing extents and tolerances");
+        TEST_ASSERT_TRUE(local.valid && local.land, "regional reuse retains land near Malaga");
+    }
     const struct { double latitude, longitude; globe_surface_t surface; } sites[] = {
         {52.7077, -2.7541, GLOBE_LAND},
         {36.7202, -4.4203, GLOBE_COAST},
@@ -396,7 +462,7 @@ static void test_shoreline_packaged_world(void)
     string_t *saved[4] = {0};
     for (size_t i = 0; i < 4; ++i)
         if (getenv(names[i])) saved[i] = string_new_with(getenv(names[i]));
-    bool configured = !setenv(names[0], file_path(database), 1) && !setenv(names[1], "shoreline-test", 1) &&
+    bool configured = !setenv(names[0], file_path(database), 1) && !setenv(names[1], "", 1) &&
                       !setenv(names[2], ":memory:", 1) && !setenv(names[3], "empty-almanac-test", 1);
     globe_t *independent = configured ? globe_open_configured(NULL) : NULL;
     almanac_t *empty_almanac = configured ? almanac_open() : NULL;
@@ -405,6 +471,12 @@ static void test_shoreline_packaged_world(void)
                     almanac_surface_at(empty_almanac, 52.7077, -2.7541) == GLOBE_LAND;
     globe_close(independent);
     almanac_close(empty_almanac);
+    globe_reader_t *reader = globe_reader_new();
+    globe_t *first = configured ? globe_reader_get(reader) : NULL;
+    separate = separate && first && globe_reader_get(reader) == first;
+    bool rejected = !setenv(names[1], "wrong-format-key", 1) && !globe_reader_get(reader);
+    separate = separate && rejected && !setenv(names[1], "", 1) && globe_reader_get(reader);
+    globe_reader_free(reader);
     bool missing = !setenv(names[0], "/nonexistent/mars-globe-test.db", 1);
     independent = globe_open_configured(NULL);
     missing = missing && !independent;
@@ -431,7 +503,7 @@ static void test_shoreline_packaged_world(void)
     sqlite_close(db);
     file_info_t *info = file_get_info(database);
     TEST_ASSERT_NOT_NULL(info);
-    printf("Encrypted shoreline database, including indexes: %llu bytes\n",
+    printf("Plaintext shoreline database, including indexes: %llu bytes\n",
            (unsigned long long)file_info_size(info));
     file_info_free(info);
     TEST_ASSERT_TRUE(file_delete(source) && file_delete(database) && file_remove_directory(directory),
@@ -510,8 +582,40 @@ static void test_country_packaged_boundaries(void)
     }
     globe_t *globe = globe_open_databases(db, db, NULL);
     TEST_ASSERT_TRUE(globe_has_layer(globe, GLOBE_LAYER_COUNTRIES), "country layer reports availability");
-    TEST_ASSERT_TRUE(!globe_country_at(globe, 52.7077, -2.7541), "country polygons cannot replace missing shoreline");
+    string_t *independent = globe_country_at(globe, 52.7077, -2.7541);
+    TEST_ASSERT_TRUE(independent && !strcmp(string_c_str(independent), "England"),
+                     "administrative coverage does not depend on shoreline availability");
+    string_free(independent);
+    independent = globe_country_at(globe, -33.8665, 151.2010);
+    TEST_ASSERT_TRUE(independent && !strcmp(string_c_str(independent), "Australia"), "Darling Harbour is in Australia");
+    string_free(independent);
     globe_close(globe);
+    file_t *surface = temporary_file(directory, "surface.cf64");
+    const double sea_fixture[][2] = {{-1,-1},{1,-1},{1,1},{-1,1},{-1,-1}};
+    const double coast_fixture[][2] = {{151.200,-33.868},{151.202,-33.868},{151.202,-33.865},
+                                     {151.200,-33.865},{151.200,-33.868}};
+    const double lake_fixture[][2] = {{151,-34},{152,-34},{152,-33},{151,-33},{151,-34}};
+    const double (*fixtures[])[2] = {sea_fixture, coast_fixture, lake_fixture};
+    const globe_surface_t expected[] = {GLOBE_SEA, GLOBE_COAST, GLOBE_INLAND_WATER};
+    for (unsigned i = 0; i < 3; ++i) {
+        TEST_ASSERT_TRUE(file_open(surface, FILE_MODE_CREATE, FILE_ACCESS_WRITE) && write_bytes(surface, "MARSCF64", 8) &&
+            write_precise_ring(surface, 1, fixtures[i], 5) && file_close(surface) && file_open_read(surface) &&
+            globe_import_shoreline(db, surface) && file_close(surface), "independent surface fixture");
+        if (i == 2) TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "UPDATE shoreline_chunk SET level=2"), "inland-water fixture");
+        globe = globe_open_databases(db, db, NULL);
+        TEST_ASSERT_INT_EQ(globe_hit_test(globe, -33.8665, 151.2010), expected[i]);
+        independent = globe_country_at(globe, -33.8665, 151.2010);
+        iso = globe_country_code_at(globe, -33.8665, 151.2010);
+        TEST_ASSERT_TRUE(independent && !strcmp(string_c_str(independent), "Australia") &&
+                         iso && !strcmp(string_c_str(iso), "AU"), "water and near-shore points retain country and flag code");
+        string_free(independent); string_free(iso);
+        TEST_ASSERT_TRUE(!globe_country_at(globe, 0, -30) && !globe_country_code_at(globe, 0, -30),
+                         "open ocean does not acquire a guessed jurisdiction");
+        globe_close(globe);
+    }
+    file_delete(surface); file_free(surface);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "DROP TABLE shoreline_bounds;DROP TABLE shoreline_chunk;"
+                                        "DROP TABLE shoreline_blob;DROP TABLE shoreline_dataset"), "remove surface fixtures");
     TEST_ASSERT_TRUE(!globe_import_countries(db, source[0], source[1]), "truncated source rejected");
     file_t *broken = temporary_file(directory, "broken.shp");
     unsigned char header[100];
@@ -553,9 +657,22 @@ static void test_country_packaged_boundaries(void)
     file_remove_directory(directory); file_free(directory);
 }
 
+static void test_shoreline_geometry_budget(void)
+{
+    TEST_ASSERT_TRUE(coast_geometry_budget(36000000, 850000, 16000000, 8000000),
+                     "higher-resolution candidate and chunk overlaps fit the geometry budget");
+    TEST_ASSERT_TRUE(!coast_geometry_budget(64000000, 1000000, 256000000, 128000000),
+                     "LOD growth cannot exceed the byte budget");
+    TEST_ASSERT_TRUE(!coast_geometry_budget(SIZE_MAX, 1, 0, 0), "vertex arithmetic overflow rejected");
+    TEST_ASSERT_TRUE(!coast_geometry_budget(10, SIZE_MAX, 0, 0), "ring arithmetic overflow rejected");
+    TEST_ASSERT_TRUE(!coast_geometry_budget(10, 1, SIZE_MAX, 0), "LOD arithmetic overflow rejected");
+    TEST_ASSERT_TRUE(!coast_geometry_budget(10, 1, 0, SIZE_MAX), "old LOD arithmetic overflow rejected");
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Indexed shorelines");
+    TEST_RUN_IN_GROUP(test_shoreline_geometry_budget, tests, NULL);
     TEST_RUN_IN_GROUP(test_country_packaged_boundaries, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_lossless_coordinates, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_nested_rings_and_rollback, tests, NULL);

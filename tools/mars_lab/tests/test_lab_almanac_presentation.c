@@ -343,6 +343,35 @@ static void test_lab_calendar_markup_escaping(void)
 
 static void test_lab_country_presentation(void)
 {
+    json_t *coastal = test_lab_json("{\"jurisdiction\":\"ZA\",\"country_code\":\"\","
+        "\"town\":\"Mossel Bay|-34.183|22.146\",\"lat\":\"-34.183000\",\"lon\":\"22.146000\","
+        "\"observer_surface\":\"Coastal\"}");
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_observer_jurisdiction(coastal), "ZA"),
+                     "coordinate-matched coastal town retains country when boundary geometry has a gap");
+    lab_cal_set(coastal, "country_code", "AU");
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_observer_jurisdiction(coastal), "AU"),
+                     "geographic country takes priority over a selected town");
+    lab_cal_set(coastal, "country_code", "");
+    lab_cal_set(coastal, "lat", "-34.19");
+    TEST_ASSERT_TRUE(!*lab_cal_observer_jurisdiction(coastal), "stale town coordinates cannot supply a flag");
+    lab_cal_set(coastal, "lat", "-34.183");
+    lab_cal_set(coastal, "observer_surface", "Sea");
+    TEST_ASSERT_TRUE(!*lab_cal_observer_jurisdiction(coastal), "offshore points do not inherit town nationality");
+    lab_cal_set(coastal, "observer_surface", "Unknown");
+    TEST_ASSERT_TRUE(!*lab_cal_observer_jurisdiction(coastal), "missing surface data does not infer nationality");
+    json_free(coastal);
+    const struct { const char *selected, *code, *expected; } cases[] = {
+        {"", "AU", "AU"}, {"ZA", "AU", "AU"}, {"AU-NSW", "AU", "AU-NSW"},
+        {"AU", "AU", "AU"}, {"AU", "", ""}, {"AU", "GB-ENG", "GB-ENG"}
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        json_t *options = json_new_object();
+        lab_cal_set(options, "jurisdiction", cases[i].selected);
+        lab_cal_set(options, "country_code", cases[i].code);
+        TEST_ASSERT_TRUE(!strcmp(lab_cal_observer_jurisdiction(options), cases[i].expected),
+                         "observer controls use verified geography rather than stale jurisdiction input");
+        json_free(options);
+    }
     json_t *response = test_lab_json("{\"observer_summary\":[{\"label\":\"Location\",\"value\":\"Britain & <UK>\","
                                     "\"flag\":\"data:image/svg+xml;base64,PHN2Zy8+\"}],\"rows\":[],\"events\":[]}");
     string_t *html = lab_cal_almanac_markup(response, test_lab_member(response, "rows"),

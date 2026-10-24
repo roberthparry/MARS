@@ -12,7 +12,6 @@
 #include <string.h>
 
 #include "array-t.h"
-#include "almanac-t.h"
 #include "file-t.h"
 #include "lab_process_request.h"
 #include "lab_calendar.h"
@@ -22,6 +21,7 @@
 #include "lab_page.h"
 #include "lab_presentation.h"
 #include "lab_state.h"
+#include "lab_surface_service.h"
 #include "lab_wire.h"
 #include "lab_server.h"
 #define MARS_LAB_SERVER_INTERNAL_ACCESS
@@ -145,6 +145,8 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/bindings_controller.js", "tools/mars_lab/build/typescript/bindings_controller.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/locations.js", "tools/mars_lab/build/typescript/locations.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/globe.js", "tools/mars_lab/build/typescript/globe.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/globe_gpu.js", "tools/mars_lab/build/typescript/globe_gpu.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/globe_worker.js", "tools/mars_lab/build/typescript/globe_worker.js", "text/javascript; charset=utf-8", 4194304},
     {"/earth_surface.jpg", "tools/mars_lab/assets/earth_surface.jpg", "image/jpeg", 4194304},
     {"/earth_surface_detail.png", "tools/mars_lab/assets/earth_surface_detail.png", "image/png", 33554432},
     {"/js/results.js", "tools/mars_lab/build/typescript/results.js", "text/javascript; charset=utf-8", 4194304},
@@ -332,8 +334,9 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
     lab_proc_set_cancel_check(lab_svr_calculation_cancelled, (void *)request);
     json_t *result = presentation ? lab_presentation_request(payload, &status)
                                  : forms ? lab_forms_request(payload, &status) : lab_eval_request(path, payload, &status);
+    bool surface = lab_svr_equal(path, "/almanac-globe");
     if (!result)
-        result = lab_cal_request(path, payload, &status);
+        result = surface ? lab_surface_service_request(payload, &status) : lab_cal_request(path, payload, &status);
     lab_proc_set_cancel_check(NULL, NULL);
     if (result && !presentation && !forms && !lab_presentation_adapt(result)) {
         json_free(result);
@@ -342,7 +345,8 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
         return lab_svr_message(request, response, 500, "Could not prepare native presentation metadata");
     }
     bool ok = result ? websrv_response_status(response, status) && lab_svr_value(request, response, result)
-                     : lab_svr_message(request, response, 404, "Unknown Lab operation");
+                     : lab_svr_message(request, response, surface ? 503 : 404,
+                                       surface ? "Shoreline service unavailable" : "Unknown Lab operation");
     json_free(result);
     json_free(payload);
     return ok;
@@ -427,10 +431,8 @@ lab_server_t *lab_svr_new(const string_t *address, uint16_t port, unsigned timeo
         errno = error;
         return NULL;
     }
-    /* Prepare once before the webserver forks; immutable geometry pages are shared by its workers. */
-    almanac_t *almanac = almanac_open();
-    almanac_surface_prepare(almanac);
-    almanac_close(almanac);
+    /* Serve the shell immediately. Globe requests lazily prepare their native geometry;
+     * opening a listener must not decode the world shoreline before serving HTML. */
     return server;
 }
 

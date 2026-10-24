@@ -181,11 +181,16 @@ static bool coast_precise_ring(coast_import_t *state, file_t *source, const unsi
     int32_t west = coast_signed(header + 12), east = coast_signed(header + 16);
     int32_t south = coast_signed(header + 20), north = coast_signed(header + 24);
     int polygon = coast_signed(header);
+    bool explicit_cap = (flag & (1u << 24)) != 0;
+    uint32_t virtual_first = coast_unsigned(header + 28), virtual_count = coast_unsigned(header + 32);
     if (polygon < 0 || n < 2 || n > 20000000 || level < 1 || level > 6 || ((flag >> 8) & 255) != 15 ||
         west < -180000000 || east > 360000000 || east < west ||
         south < -90000000 || north > 90000000 || north < south) return false;
+    if (explicit_cap && (level != 1 || west != -180000000 || east != 180000000 || south != -90000000 ||
+                         n < 5 || virtual_first >= n - 1 || virtual_count < 3 || virtual_count >= n - 1)) return false;
     unsigned char points[4112], first[16], point[16], input[16384];
     size_t used = 0, count;
+    bool boundary = true;
     for (uint32_t i = 0; i < n; ++i) {
         if (i % 1024 == 0) {
             size_t remaining = n - i, length = (remaining < 1024 ? remaining : 1024) * 16;
@@ -198,21 +203,31 @@ static bool coast_precise_ring(coast_import_t *state, file_t *source, const unsi
             vertex.y * 1000000 < south - 0.001 || vertex.y * 1000000 > north + 0.001) return false;
         if (level == 6) continue;
         if (!i) memcpy(first, point, sizeof first);
+        if (i && explicit_cap) {
+            bool next_boundary = ((i - 1 + n - 1 - virtual_first) % (n - 1)) >= virtual_count;
+            if (next_boundary != boundary && used > 16) {
+                if (!coast_chunk(state, points, used, polygon, level, boundary)) return false;
+                memcpy(points, points + used - 16, 16);
+                used = 16;
+            }
+            boundary = next_boundary;
+        }
         memcpy(points + used, point, sizeof point);
         used += sizeof point;
         if (used == sizeof points) {
-            if (!coast_chunk(state, points, used, polygon, level, true)) return false;
+            if (!coast_chunk(state, points, used, polygon, level, boundary)) return false;
             memcpy(points, point, sizeof point);
             used = sizeof point;
         }
     }
     if (level == 6) return true;
+    if (explicit_cap && memcmp(first, point, sizeof first)) return false;
     bool polar = level == 5 && west == -180000000 && east == 180000000 && south == -90000000;
     if (!polar && memcmp(first, point, sizeof first)) {
         memcpy(points + used, first, sizeof first);
         used += sizeof first;
     }
-    if (used > 16 && !coast_chunk(state, points, used, polygon, level, true)) return false;
+    if (used > 16 && !coast_chunk(state, points, used, polygon, level, boundary)) return false;
     if (polar) {
         unsigned char cap[64];
         memcpy(cap, point, 16); memcpy(cap + 16, point, 16);

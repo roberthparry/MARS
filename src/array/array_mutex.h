@@ -7,10 +7,9 @@
  * rather than silently disabling synchronisation. Only array.c consumes this header;
  * applications use array-t.h.
  */
-#ifndef MARS_ARRAY_INTERNAL_ACCESS
-#if !defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0
+#if !defined(MARS_ARRAY_INTERNAL_ACCESS) && \
+    (!defined(__INTELLISENSE__) || !defined(__INCLUDE_LEVEL__) || __INCLUDE_LEVEL__ > 0)
 #error "Private header requires MARS_ARRAY_INTERNAL_ACCESS."
-#endif
 #endif
 #ifndef MARS_ARRAY_MUTEX_H
 #define MARS_ARRAY_MUTEX_H

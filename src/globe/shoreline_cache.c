@@ -30,6 +30,17 @@ static pthread_mutex_t coast_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 static coast_geometry_t *coast_shared_geometry;
 static const double coast_lod_steps[] = {0.005, 0.02, 0.08, 0.32};
 
+bool coast_geometry_budget(size_t vertices, size_t rings, size_t lod_capacity, size_t previous_capacity)
+{
+    if (vertices < 2 || vertices > 64000000 || rings < 1 || rings > 1000000 ||
+        lod_capacity > 4 * vertices || previous_capacity > 4 * vertices) return false;
+    /* Reserve tree compaction and old/new LOD allocations together, not only final resident storage. */
+    uint64_t bytes = (uint64_t)vertices * (sizeof(coast_vertex_t) + 1) +
+        (uint64_t)rings * (sizeof(coast_ring_t) + 4 * sizeof(coast_node_t)) +
+        ((uint64_t)lod_capacity + previous_capacity) * sizeof(uint32_t);
+    return bytes <= UINT64_C(1536) * 1048576;
+}
+
 static void coast_geometry_free(coast_geometry_t *geometry)
 {
     if (!geometry) return;
@@ -59,7 +70,7 @@ static bool coast_key_file(string_t *key, const char *path, const char *suffix, 
     return ok;
 }
 
-static string_t *coast_geometry_key(sqlite_t *db, bool *shared)
+string_t *coast_database_key(sqlite_t *db, bool *shared)
 {
     const char *path = sqlite_database_path(db);
     *shared = path && *path;
@@ -94,8 +105,8 @@ static bool coast_geometry_read(sqlite_t *db, coast_geometry_t *geometry)
     int64_t vertices = ok ? sqlite_stmt_column_int64(query, 0) : 0;
     int64_t rings = ok ? sqlite_stmt_column_int64(query, 1) : 0;
     sqlite_stmt_finalize(query);
-    /* Explicit limits bound corrupt-data allocation; the packaged dataset has about eleven million vertices. */
-    if (vertices < 2 || vertices > 32000000 || rings < 1 || rings > 1000000) return false;
+    if (vertices < 2 || vertices > 64000000 || rings < 1 || rings > 1000000 ||
+        !coast_geometry_budget((size_t)vertices, (size_t)rings, 0, 0)) return false;
     geometry->vertices = malloc((size_t)vertices * sizeof *geometry->vertices);
     geometry->boundary = malloc((size_t)vertices);
     geometry->rings = calloc((size_t)rings, sizeof *geometry->rings);
@@ -172,6 +183,7 @@ static bool coast_lod_append(coast_geometry_t *geometry, size_t *capacity, uint3
         size_t next = *capacity ? *capacity * 2 : 4096;
         if (next > 4 * geometry->vertex_count) next = 4 * geometry->vertex_count;
         if (next <= *capacity) return false;
+        if (!coast_geometry_budget(geometry->vertex_count, geometry->ring_count, next, *capacity)) return false;
         uint32_t *items = realloc(geometry->lod, next * sizeof *items);
         if (!items) return false;
         geometry->lod = items;
@@ -201,7 +213,8 @@ static bool coast_geometry_resolutions(coast_geometry_t *geometry)
             ring->lod_count[lod] = (uint32_t)geometry->lod_count - ring->lod_first[lod];
         }
     }
-    uint32_t *tight = realloc(geometry->lod, geometry->lod_count * sizeof *tight);
+    uint32_t *tight = coast_geometry_budget(geometry->vertex_count, geometry->ring_count, geometry->lod_count, capacity)
+        ? realloc(geometry->lod, geometry->lod_count * sizeof *tight) : NULL;
     if (tight) geometry->lod = tight;
     return true;
 }
@@ -249,7 +262,7 @@ coast_geometry_t *coast_geometry_acquire(shoreline_t *shoreline, bool load)
 {
     if (!shoreline) return NULL;
     bool shared = false;
-    string_t *key = coast_geometry_key(shoreline->db, &shared);
+    string_t *key = coast_database_key(shoreline->db, &shared);
     if (!key) return NULL;
     pthread_mutex_lock(&coast_cache_mutex);
     coast_geometry_t **slot = shared ? &coast_shared_geometry : &shoreline->local_geometry;
@@ -260,7 +273,7 @@ coast_geometry_t *coast_geometry_acquire(shoreline_t *shoreline, bool load)
             geometry = calloc(1, sizeof *geometry);
             if (geometry && coast_geometry_read(shoreline->db, geometry) && coast_geometry_resolutions(geometry)) {
                 bool same_kind = false;
-                string_t *after = coast_geometry_key(shoreline->db, &same_kind);
+                string_t *after = coast_database_key(shoreline->db, &same_kind);
                 bool unchanged = after && same_kind == shared && !strcmp(string_c_str(after), string_c_str(key));
                 string_free(after);
                 if (!unchanged) {

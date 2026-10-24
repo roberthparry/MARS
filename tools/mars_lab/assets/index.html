@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-starting="true">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,6 +10,10 @@
   <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="__THEME_COLOR__">
+  <style>
+    html { background: #071913; color: #f3f8f2; }
+    html[data-starting] #labWorkspace, html[data-starting] #subtitle { visibility: hidden; }
+  </style>
   <link rel="stylesheet" href="/index.css">
 </head>
 <body>
@@ -31,7 +35,7 @@
       <p class="subtitle" id="subtitle">__LAB_SUBTITLE__</p>
     </div>
     <div class="header-side">
-      <div class="status" id="status">Ready</div>
+      <div class="status" id="status" role="status">Restoring your worksheet…</div>
       <details class="mobile-card __MOBILE_CARD_CLASS__" id="mobileAccess">
         <summary>Mobile</summary>
         <div class="mobile-panel">
@@ -240,13 +244,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <p class="globe-credit">Imagery: NASA Blue Marble (2002 composite) · not current ice coverage</p>
         </section>
         <div id="almanacActions"></div>
-        <div class="almanac-briefing" aria-hidden="true">
-          <div>
-            <div class="datetime-briefing-kicker">AstroNav worksheet</div>
-            <div class="datetime-briefing-title">Location of Navigational Bodies</div>
-            <div class="datetime-briefing-copy">Enter date and time in GMT, then zone, latitude, and longitude. The worksheet uses the live almanac engine underneath, with ephemeris coverage for __ALMANAC_COVERAGE_TEXT__.</div>
-          </div>
-        </div>
         <div class="datetime-field-groups">
           <div class="datetime-field-group">
             <div class="datetime-field-group-title">Set the moment</div>

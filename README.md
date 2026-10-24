@@ -499,9 +499,11 @@ To install the desktop MARS Lab launcher, run:
 make install-mars-lab
 ```
 
-That setup asks for a password to protect the private jurisdiction database, stores
+That setup uses plaintext SQLite when no database key is configured, stores
 the resulting configuration in `~/.mars/config/jurisdiction-db.env`, and builds the
-encrypted jurisdiction database at `~/.mars/jurisdiction/mars_jurisdiction_rules.db`.
+jurisdiction database at `~/.mars/jurisdiction/mars_jurisdiction_rules.db`.
+A non-empty configured key retains encryption without a password prompt. Existing encrypted files require
+explicit [plaintext conversion](docs/globe.md#plaintext-conversion), not merely removing their key.
 MARS supplies no shared WeatherAPI account or key. If you choose to enable
 weather lookups, create your own WeatherAPI account; its key is stored in
 `~/.mars/config/weather.env`. Reinstalling replaces the selected jurisdiction

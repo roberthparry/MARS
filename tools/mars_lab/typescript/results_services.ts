@@ -407,7 +407,12 @@ namespace WorksheetResults {
         },
 
         /** @brief Restore persisted worksheet state. */
-        resultLoadState() { return WorksheetPersistence.restoration.load(); },
+        async resultLoadState() {
+            await WorksheetPersistence.restoration.load();
+            WorksheetWorkspace.presentation.syncModeTabs();
+            WorksheetWorkspace.presentation.syncModeUI();
+            document.documentElement.removeAttribute('data-starting');
+        },
 
         /** @brief Evaluate the restored mode when native startup policy requests it. */
         resultInitialEvaluation() { return WorksheetRequests.evaluation.evaluateActiveModeOnLoad(); }

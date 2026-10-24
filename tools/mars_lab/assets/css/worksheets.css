@@ -556,5 +556,5 @@ body.almanac-mode #workspaceActionsHome { min-height: 4rem; }
 .almanac-globe .globe-town.selected { color: #ffd379; border-color: #ffd379; z-index: 2; }
 .almanac-globe .globe-town:active:not(:disabled) { transform: translate(-4px, -50%); }
 .globe-observer { color: #ffd379; font-size: 24px; transform: translate(-50%, -50%); text-shadow: 0 1px 3px #000; }
-.almanac-globe .mode-hint { padding: .5rem .8rem; margin: 0; min-height: 2.4em; }
-.almanac-globe .globe-credit { padding: 0 .8rem .6rem; margin: 0; color: #c5d4d2; font-size: .75rem; }
+.almanac-globe .mode-hint,
+.almanac-globe .globe-credit { display: none; }

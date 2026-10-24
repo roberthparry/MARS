@@ -1,15 +1,15 @@
 # `sqlite_t`
 
-`sqlite_t` is MARS's opaque SQLCipher-backed SQLite handle. It opens encrypted
+`sqlite_t` is MARS's opaque SQLCipher-backed SQLite handle. It opens plaintext or encrypted
 database files, exposes a small amount of direct SQL execution, provides a
-built-in encrypted object store, and now includes a public prepared-statement
+built-in object store in the selected storage mode, and includes a public prepared-statement
 API for higher-level modules such as `jurisdiction_t` and `almanac_t`.
 
 The wrapper is intentionally modest. It does not try to hide SQLite concepts or
 replace SQLite with a MARS-specific query language. Instead, it gives the rest
 of the codebase:
 
-- encrypted database opening with key validation
+- explicit plaintext opening or encrypted opening with key validation
 - a small convenience object store for named blobs and strings
 - a safe public prepared-statement layer so other modules do not need sqlite
   internals
@@ -19,7 +19,7 @@ The file module's `file_import_sqlite` and `file_export_sqlite` helpers store
 contents and selected metadata, not live handles or descriptors. The object
 store initialiser also creates the chunk table and replacement-cleanup trigger.
 Transfers use savepoints and bounded 64 KiB chunks, with a content hash checked
-before export publication. Database encryption already protects payloads;
+before export publication. Encrypted-mode database storage protects payloads;
 additional file encryption is explicit and optional. See the
 [file guide](file.md#transactional-sqlcipher-file-storage) for details and examples.
 
@@ -31,8 +31,9 @@ pointer is NULL. Database-specific size limits still apply.
 
 ## Capabilities
 
-- open or create an encrypted SQLCipher database
-- reject empty keys
+- open or create ordinary SQLite files with `sqlite_open_plain`, without key derivation or page encryption
+- open or create an encrypted SQLCipher database with `sqlite_open_encrypted`
+- reject empty keys in encrypted mode; never silently downgrade a failed encrypted open
 - reject databases opened with the wrong key
 - enable foreign-key checks for each connection
 - run SQL text through `sqlite_exec()` or `sqlite_exec_cstr()`
@@ -46,6 +47,46 @@ pointer is NULL. Database-specific size limits still apply.
 - report statement-level errors
 - import CSV files with full-file type inference, or explicitly typed streams
 - export read-only query results through the CSV writer
+
+## Storage mode
+
+`sqlite_open_plain(path)` uses SQLCipher without configuring a key. It produces standard SQLite files and skips
+key derivation and per-page encryption. Foreign-key checking, statements, transactions and object storage work
+in both modes. Plaintext files are not protected at rest; use filesystem permissions and encrypted mode where required.
+Plaintext opening does not disable process-wide memory protection enabled by an encrypted connection.
+
+Neither opener converts an existing file: encrypted files fail in plaintext mode and keyed opens reject plaintext
+files. Use an explicit export to a different file for conversion. The native configurator's `databases-plaintext`
+command converts globe, jurisdiction and almanac storage; see [conversion and rollback](globe.md#plaintext-conversion).
+
+## Example: Plaintext query
+
+```c
+#include <stdio.h>
+
+#include "sqlite-t.h"
+
+int main(void) {
+    string_t *path = string_new_with(":memory:");
+    sqlite_t *db = sqlite_open_plain(path);
+    sqlite_stmt_t *stmt = db ? sqlite_stmt_prepare(db, "SELECT 42") : NULL;
+    int result = 1;
+    if (stmt && sqlite_stmt_step(stmt) == SQLITE_STEP_ROW) {
+        printf("%d\n", sqlite_stmt_column_int(stmt, 0));
+        result = 0;
+    }
+    sqlite_stmt_finalize(stmt);
+    sqlite_close(db);
+    string_free(path);
+    return result;
+}
+```
+
+Output:
+
+```text
+42
+```
 
 ## Example: Encrypted String Storage
 
@@ -156,7 +197,7 @@ Manchester: 395500
 Both must contain at least one encoded byte. The key is passed to SQLCipher
 using the string's UTF-8 byte length, not its character count.
 
-The wrapper enables SQLCipher memory security where supported and checks the
+The encrypted opener enables SQLCipher memory security where supported and checks the
 database by reading `sqlite_master`. Opening with the wrong key therefore fails
 early instead of producing confusing errors later.
 
@@ -453,7 +494,7 @@ broader connection errors, use `sqlite_last_error()`.
 
 ## Ownership
 
-Every successful `sqlite_open_encrypted()` result must be released with
+Every successful `sqlite_open_encrypted()` or `sqlite_open_plain()` result must be released with
 `sqlite_close()`. Loaded strings are ordinary `string_t` values owned by the
 caller and must be released with `string_free()`.
 
@@ -473,13 +514,14 @@ All declarations are in `include/sqlite-t.h`.
 
 ### Types
 
-- `sqlite_t` — opaque encrypted SQLite connection
+- `sqlite_t` — opaque plaintext or encrypted SQLite connection
 - `sqlite_stmt_t` — opaque prepared statement
 - `sqlite_step_result_t` — result of stepping a prepared statement
 
 ### Connection
 
 - `sqlite_open_encrypted(path, key)` — open or create an encrypted database
+- `sqlite_open_plain(path)` — open or create an unencrypted database without key derivation
 - `sqlite_close(db)` — close the connection and release the handle
 - `sqlite_last_error(db)` — return the most recent error string held by the handle
 
@@ -662,7 +704,7 @@ A header-only file is emitted for an empty result when headers are enabled.
 Export calls `csv_finish` but does not free the writer or close its file.
 Failures can leave partial output. Choose file-module staging when atomic
 publication is required. Reading/writing source CSV is not itself encrypted;
-only storage in the SQLCipher database is encrypted at rest.
+only storage opened in encrypted mode is encrypted at rest.
 
 ### Example: infer a CSV file
 

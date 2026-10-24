@@ -196,8 +196,9 @@ typedef bool (*jurisdict_visit_fn)(const holiday_event_t *event, void *ctx);
  * to @c GB-ENG. If no usable default can be derived, @c GB-ENG is used as the
  * final fallback.
  *
- * @return newly allocated jurisdiction engine, or @c NULL on allocation
- *         failure.
+ * An empty or absent configured database key selects plaintext SQLite. A non-empty key selects encrypted
+ * storage and never falls back to plaintext after failure. Existing files are not converted when opening.
+ * @return newly allocated jurisdiction engine, or @c NULL on allocation or database-open failure.
  */
 jurisdiction_t *jurisdict_open(const char *jurisdiction_code);
 

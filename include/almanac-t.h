@@ -35,7 +35,7 @@
  * @brief Opaque astronomical almanac engine backed by configured ephemeris data.
  *
  * An @c almanac_t owns the private resources needed to resolve catalogued stars,
- * planets, and Greenwich Hour Angle of Aries from a configured encrypted
+ * planets, and Greenwich Hour Angle of Aries from a configured plaintext or encrypted
  * almanac database.
  */
 typedef struct _almanac_t almanac_t;
@@ -448,6 +448,8 @@ typedef struct _almanac_solar_transit_t almanac_solar_transit_t;
  * The engine resolves its own configured backing store, using
  * @c MARS_ALMANAC_DB_PATH and @c MARS_ALMANAC_DB_KEY when available, otherwise
  * falling back to @c ~/.mars/almanac/almanac.db and any configured key file.
+ * An empty or absent key selects plaintext SQLite. A non-empty key selects encryption;
+ * unreadable databases never trigger an unencrypted retry.
  *
  * @return newly allocated almanac engine, or @c NULL on failure.
  */

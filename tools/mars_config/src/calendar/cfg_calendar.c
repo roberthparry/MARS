@@ -2,7 +2,7 @@
  * @file cfg_calendar.c
  * @brief Calendar installer entry point and ownership-safe selection orchestration.
  *
- * A borrowed encrypted staging connection supplies the catalogue and locale data.
+ * A borrowed plaintext or encrypted staging connection supplies the catalogue and locale data.
  * Selection errors and cancellation leave its existing snapshot untouched. The
  * successful caller receives canonical owned town and locale strings.
  */
@@ -22,7 +22,7 @@ bool cfg_calendar_populate(sqlite_t *db, const string_t *path, const string_t *k
     *chosen_location = NULL;
     *chosen_language = NULL;
     const string_t *inputs[] = {path, key, requested, saved, language, saved_language};
-    bool ok = db && path && key && string_byte_length(path) && string_byte_length(key);
+    bool ok = db && path && key && string_byte_length(path);
     for (size_t i = 0; i < sizeof(inputs) / sizeof(*inputs) && ok; ++i)
         ok = cfg_calendar_text_valid(inputs[i]);
     cfg_calendar_place_t place = {0};
@@ -34,7 +34,7 @@ bool cfg_calendar_populate(sqlite_t *db, const string_t *path, const string_t *k
     string_t *label =
         locale ? string_sprintf("%s, %s", string_c_str(place.name), string_c_str(place.jurisdiction)) : NULL;
     ok = ok && locale && label;
-    /* Selection is finished: release its encrypted working table before calendar expansion. */
+    /* Selection is finished: release its working table before calendar expansion. */
     bool cleared = db && sqlite_exec_cstr(db, "DROP TABLE IF EXISTS main.cfg_calendar_places; PRAGMA shrink_memory;");
     ok = ok && cleared;
     progress = ok ? cfg_progress_start("Generating local calendar") : NULL;
