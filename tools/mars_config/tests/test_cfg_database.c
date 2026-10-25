@@ -804,6 +804,14 @@ static void test_cfg_database_trace(void)
         "packaging/almanac-db/mars_almanac.sql",
         "packaging/almanac-db/mars_almanac_chebyshev.sql",
         "packaging/almanac-db/mars_almanac_frame_rotation.sql",
+        "packaging/globe-db/jurisdiction_subdivisions.sql",
+        "packaging/jurisdiction-db/flag_emblems.sql",
+        "packaging/jurisdiction-db/flag_regions.sql",
+        "packaging/jurisdiction-db/location_additions.sql",
+        "packaging/jurisdiction-db/location_subdivisions.sql",
+        "packaging/jurisdiction-db/mars_generated_holiday_instances.sql",
+        "packaging/jurisdiction-db/mars_manual_holiday_instance_overrides.sql",
+        "packaging/jurisdiction-db/mars_holiday_rules_queries.sql",
         "packaging/jurisdiction-db/mars_holiday_rules.sql",
         "packaging/jurisdiction-db/mars_country_jurisdictions.sql",
         "packaging/jurisdiction-db/mars_target_subdivisions.sql",
@@ -821,10 +829,12 @@ static void test_cfg_database_trace(void)
     for (size_t i = 0; i < sizeof(sources) / sizeof(*sources); ++i) {
         string_t *path = string_new_with(sources[i]);
         recognised = recognised && path && strcmp(cfg_database_trace_label(path), sources[i]) == 0;
+        recognised = recognised && path && strcmp(cfg_database_progress_label(path), "Importing custom SQL") != 0;
         string_free(path);
-        /* Changing only the first byte preserves both hash inputs. */
+        /* A similar basename must not disclose a caller-controlled source path. */
         path = string_sprintf("X%s", sources[i] + 1);
         redacted = redacted && path && strcmp(cfg_database_trace_label(path), "unlisted SQL source") == 0;
+        redacted = redacted && path && strcmp(cfg_database_progress_label(path), "Importing custom SQL") == 0;
         string_free(path);
     }
     static const char *const unknown[] = {
@@ -841,6 +851,20 @@ static void test_cfg_database_trace(void)
     TEST_ASSERT_TRUE(redacted, "colliding, unknown and out-of-range source paths remain redacted");
     TEST_ASSERT_TRUE(strcmp(cfg_database_trace_label(NULL), "unlisted SQL source") == 0,
                      "a missing source path remains redacted");
+    static const char *const updates[][2] = {
+        {"packaging/globe-db/jurisdiction_subdivisions.sql", "Identifying Kaliningrad Oblast on the globe"},
+        {"packaging/jurisdiction-db/location_additions.sql", "Adding South African island locations"},
+        {"packaging/jurisdiction-db/location_subdivisions.sql", "Updating Kaliningrad towns and location defaults"}
+    };
+    bool described = true;
+    for (size_t i = 0; i < sizeof updates / sizeof *updates; ++i) {
+        string_t *path = string_new_with(updates[i][0]);
+        described = described && path && !strcmp(cfg_database_progress_label(path), updates[i][1]);
+        string_free(path);
+    }
+    TEST_ASSERT_TRUE(described, "managed updates describe their actual geographic operations");
+    TEST_ASSERT_TRUE(!strcmp(cfg_database_progress_label(NULL), "Importing custom SQL"),
+                     "missing custom input has an explicit progress description");
 }
 
 static bool test_cfg_database_rivers_fixture(const char *directory)

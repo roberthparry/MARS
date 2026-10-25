@@ -100,6 +100,13 @@ typedef struct cfg_database_values {
  */
 const char *cfg_database_trace_label(const string_t *path);
 
+/**
+ * @brief Describe a packaged SQL operation without exposing arbitrary source paths.
+ * @param[in] path Borrowed repository-relative path; NULL is treated as custom input.
+ * @return Static operation description, or "Importing custom SQL". Never caller-owned.
+ */
+const char *cfg_database_progress_label(const string_t *path);
+
 /** Execute SQL and optionally accumulate execution CPU time and call count for the source trace. */
 bool cfg_database_execute(sqlite_t *db, cfg_database_values *values, const char *sql);
 

@@ -415,39 +415,67 @@ typedef struct cfg_database_lexer {
 static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const string_t *path, unsigned depth,
                                   cfg_database_values *parent, cfg_progress_t *progress);
 
-/* Select one candidate through a perfect hash, then verify exact allowlist membership. */
-const char *cfg_database_trace_label(const string_t *path)
+typedef struct _cfg_database_source_label_t {
+    const char *path;
+    const char *operation;
+} cfg_database_source_label_t;
+
+/* Sorted catalogue: binary lookup avoids a fragile hash tied to a fixed set of filenames. */
+static const cfg_database_source_label_t *cfg_database_source_label(const string_t *path)
 {
-    static const char *const sources[28] = {
-        [ 0] = "packaging/jurisdiction-db/mars_timezone_rules.sql",
-        [ 1] = "packaging/jurisdiction-db/mars_generated_first_class_rules.sql",
-        [ 4] = "packaging/jurisdiction-db/mars_calendar_local.sql",
-        [ 8] = "packaging/almanac-db/mars_almanac_chebyshev.sql",
-        [ 9] = "packaging/jurisdiction-db/mars_target_subdivisions.sql",
-        [11] = "packaging/jurisdiction-db/mars_calendar_locale_names.sql",
-        [12] = "packaging/jurisdiction-db/mars_jurisdiction_towns.sql",
-        [13] = "packaging/almanac-db/mars_almanac_frame_rotation.sql",
-        [14] = "packaging/jurisdiction-db/mars_manual_first_class_rules.sql",
-        [17] = "packaging/jurisdiction-db/mars_holiday_rules.sql",
-        [18] = "packaging/jurisdiction-db/mars_jurisdiction_world_towns.sql",
-        [24] = "packaging/jurisdiction-db/mars_jurisdiction_location_defaults.sql",
-        [25] = "packaging/jurisdiction-db/mars_country_jurisdictions.sql",
-        [26] = "packaging/almanac-db/mars_almanac.sql",
-        [27] = "packaging/jurisdiction-db/mars_holiday_localized_names.sql"
+    static const cfg_database_source_label_t sources[] = {
+        {"packaging/almanac-db/mars_almanac.sql", "Installing almanac tables"},
+        {"packaging/almanac-db/mars_almanac_chebyshev.sql", "Installing almanac ephemeris coefficients"},
+        {"packaging/almanac-db/mars_almanac_frame_rotation.sql", "Installing almanac frame rotations"},
+        {"packaging/globe-db/jurisdiction_subdivisions.sql", "Identifying Kaliningrad Oblast on the globe"},
+        {"packaging/jurisdiction-db/flag_emblems.sql", "Installing flag emblems"},
+        {"packaging/jurisdiction-db/flag_regions.sql", "Installing regional flag definitions"},
+        {"packaging/jurisdiction-db/location_additions.sql", "Adding South African island locations"},
+        {"packaging/jurisdiction-db/location_subdivisions.sql", "Updating Kaliningrad towns and location defaults"},
+        {"packaging/jurisdiction-db/mars_calendar_local.sql", "Installing local calendar settings"},
+        {"packaging/jurisdiction-db/mars_calendar_locale_names.sql", "Installing translated calendar names"},
+        {"packaging/jurisdiction-db/mars_country_jurisdictions.sql", "Installing country jurisdictions"},
+        {"packaging/jurisdiction-db/mars_generated_first_class_rules.sql", "Installing generated calendar rules"},
+        {"packaging/jurisdiction-db/mars_generated_holiday_instances.sql", "Installing generated holiday dates"},
+        {"packaging/jurisdiction-db/mars_holiday_localized_names.sql", "Installing translated holiday names"},
+        {"packaging/jurisdiction-db/mars_holiday_rules.sql", "Installing jurisdiction and holiday tables"},
+        {"packaging/jurisdiction-db/mars_holiday_rules_queries.sql", "Running packaged holiday queries"},
+        {"packaging/jurisdiction-db/mars_jurisdiction_location_defaults.sql", "Installing jurisdiction location defaults"},
+        {"packaging/jurisdiction-db/mars_jurisdiction_towns.sql", "Installing town catalogue"},
+        {"packaging/jurisdiction-db/mars_jurisdiction_world_towns.sql", "Installing worldwide town locations"},
+        {"packaging/jurisdiction-db/mars_manual_first_class_rules.sql", "Installing maintained calendar rules"},
+        {"packaging/jurisdiction-db/mars_manual_holiday_instance_overrides.sql", "Installing holiday date overrides"},
+        {"packaging/jurisdiction-db/mars_target_subdivisions.sql", "Installing jurisdiction subdivisions"},
+        {"packaging/jurisdiction-db/mars_timezone_rules.sql", "Installing time zone rules"},
     };
     if (!path)
-        return "unlisted SQL source";
-    string_view_t view = string_view_all(path);
-    size_t length = string_view_length(view);
-    unsigned char discriminator = 0;
-    if (length < 37 || length > 65 || !string_view_peek_ascii(view, 32, &discriminator))
-        return "unlisted SQL source";
+        return NULL;
+    size_t first = 0, end = sizeof sources / sizeof *sources;
+    while (first < end) {
+        size_t middle = first + (end - first) / 2;
+        int order = strcmp(string_c_str(path), sources[middle].path);
+        if (order < 0)
+            end = middle;
+        else if (order > 0)
+            first = middle + 1;
+        else
+            return string_view_equals_literal(string_view_all(path), sources[middle].path) ? &sources[middle] : NULL;
+    }
+    return NULL;
+}
 
-    /* Collision-free for the fixed catalogue above; regression tests cover every entry.
-     * Unknown paths can collide, so the final exact comparison must not be omitted. */
-    size_t slot = (length + 3 * discriminator) % 28;
-    const char *label = sources[slot];
-    return label && string_view_equals_literal(view, label) ? label : "unlisted SQL source";
+/* Expose only repository-owned filenames in diagnostic output. */
+const char *cfg_database_trace_label(const string_t *path)
+{
+    const cfg_database_source_label_t *source = cfg_database_source_label(path);
+    return source ? source->path : "unlisted SQL source";
+}
+
+/* Describe the operation while keeping arbitrary caller paths out of the progress display. */
+const char *cfg_database_progress_label(const string_t *path)
+{
+    const cfg_database_source_label_t *source = cfg_database_source_label(path);
+    return source ? source->operation : "Importing custom SQL";
 }
 
 static double cfg_database_trace_seconds(clockid_t clock)
@@ -579,8 +607,7 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
     const char *trace_option = getenv("MARS_CONFIG_IMPORT_TRACE");
     bool trace = trace_option && trace_option[0] == '1' && trace_option[1] == '\0';
     const char *label = cfg_database_trace_label(path);
-    const char *progress_label = strrchr(label, '/');
-    progress_label = progress_label ? progress_label + 1 : label;
+    const char *progress_label = cfg_database_progress_label(path);
     double wall_start = trace ? cfg_database_trace_seconds(CLOCK_MONOTONIC) : 0;
     double cpu_start = trace ? cfg_database_trace_seconds(CLOCK_PROCESS_CPUTIME_ID) : 0;
     if (trace) {

@@ -36,6 +36,9 @@ Live source-byte progress bars and elapsed-time indicators distinguish measured
 imports from work without a known total. Redirected output receives periodic
 status lines instead of terminal animation. The desktop installer also labels
 its stages; progress never claims successful completion after a failed stage.
+Packaged SQL steps name the operation being performed, such as adding island
+locations or updating subdivision membership and location defaults. Import traces
+identify the corresponding packaged SQL filename.
 
 For import diagnostics, set `MARS_CONFIG_IMPORT_TRACE=1` when running an
 installer. It reports bounded-source byte counts and wall/CPU timings, separating
