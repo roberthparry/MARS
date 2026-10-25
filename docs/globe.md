@@ -1376,14 +1376,28 @@ separate width tags would require further riverbank geometry analysis. Neither
 tagged width nor inclusion in the globe establishes navigability.
 
 Shortcuts are checked against retained segments and spatially indexed neighbouring
-chunks, including across the date line. Conflicts or more than 128 neighbouring
-chunks cause the affected chunk to retain its original geometry. These checks do
+chunks, including across the date line. A bounded per-chunk cache decodes neighbours
+once and reuses them across its shortcuts, avoiding repeated encrypted database
+reads. It holds at most 128 chunks in each of three longitude frames (under 2 MiB).
+If the whole-chunk envelope exceeds that capacity, queries fall back to individual
+shortcut bounds; a crowded envelope alone does not prevent simplification.
+Conflicts or more than 128 neighbours for an individual shortcut cause the affected
+chunk to retain its original geometry. These checks do
 not prove that a centreline stays within riverbanks: bank polygons remain a separate
 acceptance requirement. Each chunk holds at most 257 points. Temporary node counts
 are removed and the candidate is compacted before measuring its size. Metadata
 records source and retained point totals and the storage tolerance; staging prints
 the totals instead of extrapolating a worldwide size from incomplete export data.
 Neither the PBF nor the complete network is held in application memory.
+On 25 October, a 20,000-record source replay completed in 34.76 seconds with this
+cache, compared with 69.81 seconds before it. All 18,815 output chunks had identical
+coordinates, anchors and feature identities; both runs retained 565,772 points.
+This measures the bounded replay, not an estimated completion time for the full
+dataset. The nine focused river regressions also passed, including crowded-cache
+fallback and date-line crossing checks. The full candidate remains stopped at
+phase 2, chunk 4,344,000 of 32,780,598. Resuming the system service requires
+administrator authentication and sufficient free space for its existing launch
+guard; the installed river layer has not changed.
 After compaction, staging rejects a candidate larger than 3,800,000,000 bytes.
 The limit applies to the installed derivative, not temporary conversion files,
 the retained source extract or the existing shoreline layer.

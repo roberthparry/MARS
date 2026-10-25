@@ -205,6 +205,46 @@ static void test_cfg_rivers_storage_detail(void)
     file_free(source); file_free(directory);
 }
 
+static void test_cfg_rivers_neighbourhoods(void)
+{
+    static const unsigned counts[] = {0, 128, 129};
+    file_t *directory = temporary_directory(), *source = child(directory, "neighbours.geojsonseq");
+    for (size_t c = 0; c < sizeof counts / sizeof *counts; ++c) {
+        for (unsigned crossing = 0; crossing < 2; ++crossing) {
+            string_t *text = string_new_with(
+                "{\"type\":\"Feature\",\"geometry\":{\"type\":\"LineString\",\"coordinates\":"
+                "[[0,0],[0.0005,0.00001],[0.001,0],[0.001,0.001],[0.001,0.002]]},"
+                "\"properties\":{\"@type\":\"way\",\"@id\":1,\"@way_nodes\":[1,2,3,4,5],\"waterway\":\"river\"}}\n");
+            /* These neighbours fill the chunk envelope but touch neither shortcut. */
+            for (unsigned i = 0; i < counts[c]; ++i)
+                TEST_ASSERT_TRUE(string_append_format(text,
+                    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"LineString\",\"coordinates\":"
+                    "[[0.0001,0.0005],[0.0009,0.0005]]},\"properties\":{\"@type\":\"way\",\"@id\":%u,"
+                    "\"@way_nodes\":[%u,%u],\"waterway\":\"river\"}}\n", i + 10, i * 2 + 10, i * 2 + 11) >= 0,
+                    "append neighbours outside the proposed shortcuts");
+            if (crossing)
+                TEST_ASSERT_TRUE(string_append_cstr(text,
+                    "{\"type\":\"Feature\",\"geometry\":{\"type\":\"LineString\",\"coordinates\":"
+                    "[[0.0005,-0.0001],[0.0005,0.000005]]},\"properties\":{\"@type\":\"way\",\"@id\":1000,"
+                    "\"@way_nodes\":[2000,2001],\"waterway\":\"river\"}}\n") >= 0,
+                    "append a neighbour crossed only by a shortcut");
+            sqlite_t *db = test_database();
+            TEST_ASSERT_TRUE(db && text && file_write_all_text(source, text) && file_open_read(source) &&
+                             cfg_database_import_osm_rivers(db, source), "import bounded and crowded neighbourhoods");
+            file_close(source);
+            sqlite_stmt_t *q = sqlite_stmt_prepare(db, "select length(vertices)/8 from rivers_chunk where feature_id=1");
+            TEST_ASSERT_TRUE(q && sqlite_stmt_step(q) == SQLITE_STEP_ROW &&
+                             sqlite_stmt_column_int(q, 0) == (crossing ? 5 : 3),
+                             "crowded envelopes still simplify safe shortcuts and preserve crossing geometry");
+            sqlite_stmt_finalize(q);
+            sqlite_close(db);
+            string_free(text);
+        }
+    }
+    TEST_ASSERT_TRUE(file_delete(source) && file_remove_directory(directory), "remove neighbourhood fixtures");
+    file_free(source); file_free(directory);
+}
+
 static void test_cfg_rivers_storage_chunks(void)
 {
     string_t *text = string_new_with("{\"type\":\"Feature\",\"geometry\":{\"type\":\"LineString\",\"coordinates\":[");
@@ -627,6 +667,7 @@ void test_cfg_rivers_cases(void)
 {
     TEST_RUN_IN_GROUP(test_cfg_rivers_osm_import_and_display, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_storage_detail, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_rivers_neighbourhoods, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_storage_chunks, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_storage_budget, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_section_widths, tests, NULL);

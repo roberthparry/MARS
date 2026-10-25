@@ -725,6 +725,78 @@ static bool cfg_river_neighbours(sqlite_stmt_t *query, int64_t chunk, cfg_river_
     return true;
 }
 
+typedef struct {
+    cfg_river_point points[257], low, high;
+    size_t count;
+} cfg_river_neighbour_t;
+
+typedef struct {
+    cfg_river_neighbour_t chunks[384];
+    size_t count;
+    bool complete;
+} cfg_river_neighbourhood_t;
+
+/* Decode each neighbour once per chunk, rather than repeating encrypted reads for every shortcut. */
+static bool cfg_river_neighbourhood_load(sqlite_stmt_t *query, int64_t chunk, const cfg_river_point *points,
+                                         size_t count, cfg_river_neighbourhood_t *cache)
+{
+    static const int64_t shifts[] = {0, -360000000, 360000000};
+    cfg_river_point low = points[0], high = points[0];
+    for (size_t i = 1; i < count; ++i) {
+        if (points[i].x < low.x) low.x = points[i].x;
+        if (points[i].x > high.x) high.x = points[i].x;
+        if (points[i].y < low.y) low.y = points[i].y;
+        if (points[i].y > high.y) high.y = points[i].y;
+    }
+    cache->count = 0;
+    cache->complete = true;
+    for (size_t k = 0; k < sizeof shifts / sizeof *shifts; ++k) {
+        if (high.x + shifts[k] < -180000000 || low.x + shifts[k] > 360000000) continue;
+        bool ok = sqlite_stmt_bind_int64(query, 1, chunk) &&
+                  sqlite_stmt_bind_int64(query, 2, high.x + shifts[k]) &&
+                  sqlite_stmt_bind_int64(query, 3, low.x + shifts[k]) &&
+                  sqlite_stmt_bind_int64(query, 4, high.y) && sqlite_stmt_bind_int64(query, 5, low.y);
+        sqlite_step_result_t step = SQLITE_STEP_DONE;
+        unsigned seen = 0;
+        while (ok && (step = sqlite_stmt_step(query)) == SQLITE_STEP_ROW) {
+            /* A wide chunk can have many neighbours while each shortcut has few. Preserve the finer query. */
+            if (++seen > 128) { cache->complete = false; break; }
+            const unsigned char *v = sqlite_stmt_column_blob(query, 0);
+            size_t bytes = sqlite_stmt_column_bytes(query, 0);
+            if (!v || bytes < 16 || bytes > 2056 || bytes % 8) { ok = false; break; }
+            cfg_river_neighbour_t *entry = &cache->chunks[cache->count++];
+            entry->count = bytes / 8;
+            for (size_t j = 0; j < entry->count; ++j) {
+                cfg_river_point p = {cfg_river_coordinate(v + j * 8) - shifts[k],
+                                     cfg_river_coordinate(v + j * 8 + 4)};
+                entry->points[j] = p;
+                if (!j) { entry->low = p; entry->high = p; }
+                if (p.x < entry->low.x) entry->low.x = p.x;
+                if (p.x > entry->high.x) entry->high.x = p.x;
+                if (p.y < entry->low.y) entry->low.y = p.y;
+                if (p.y > entry->high.y) entry->high.y = p.y;
+            }
+        }
+        ok = ok && (!cache->complete || step == SQLITE_STEP_DONE);
+        sqlite_stmt_reset(query);
+        if (!ok || !cache->complete) return ok;
+    }
+    return true;
+}
+
+/* The cache has at most 128 neighbours in each of three longitude frames, independent of dataset size. */
+static bool cfg_river_neighbourhood_safe(const cfg_river_neighbourhood_t *cache, cfg_river_point a, cfg_river_point b)
+{
+    for (size_t i = 0; i < cache->count; ++i) {
+        const cfg_river_neighbour_t *entry = &cache->chunks[i];
+        if ((a.x < entry->low.x && b.x < entry->low.x) || (a.x > entry->high.x && b.x > entry->high.x) ||
+            (a.y < entry->low.y && b.y < entry->low.y) || (a.y > entry->high.y && b.y > entry->high.y)) continue;
+        for (size_t j = 1; j < entry->count; ++j)
+            if (cfg_river_conflict(a, b, entry->points[j - 1], entry->points[j])) return false;
+    }
+    return true;
+}
+
 /* Reduce the candidate, never the source extract; anchors and whole-feature identities survive unchanged. */
 static bool cfg_river_simplify(sqlite_t *db, osm_river_import_t *state)
 {
@@ -733,7 +805,8 @@ static bool cfg_river_simplify(sqlite_t *db, osm_river_import_t *state)
     sqlite_stmt_t *neighbours = sqlite_stmt_prepare(db,
         "select c.vertices from rivers_bounds b join rivers_chunk c on c.id=b.id "
         "where b.id<>?1 and b.min_x<=?2 and b.max_x>=?3 and b.min_y<=?4 and b.max_y>=?5 limit 129");
-    bool ok = rows && update && neighbours && sqlite_stmt_bind_int64(rows, 1, state->last_chunk);
+    cfg_river_neighbourhood_t *cache = malloc(sizeof *cache);
+    bool ok = rows && update && neighbours && cache && sqlite_stmt_bind_int64(rows, 1, state->last_chunk);
     sqlite_step_result_t step = SQLITE_STEP_DONE;
     while (ok && (step = sqlite_stmt_step(rows)) == SQLITE_STEP_ROW) {
         if (state->last_chunk && state->last_chunk % 1000 == 0 && !osm_checkpoint(state)) { ok = false; break; }
@@ -761,7 +834,13 @@ static bool cfg_river_simplify(sqlite_t *db, osm_river_import_t *state)
             if (cfg_river_same(start, end)) { safe = false; break; }
             for (size_t j = 1; safe && j < used; ++j)
                 if (j != i && cfg_river_conflict(start, end, p[selected[j - 1]], p[selected[j]])) safe = false;
-            if (safe) ok = cfg_river_neighbours(neighbours, sqlite_stmt_column_int64(rows, 0), start, end, &safe);
+        }
+        if (safe) ok = cfg_river_neighbourhood_load(neighbours, state->last_chunk, p, n, cache);
+        for (size_t i = 1; ok && safe && i < used; ++i) {
+            if (selected[i] == selected[i - 1] + 1) continue;
+            cfg_river_point start = p[selected[i - 1]], end = p[selected[i]];
+            if (cache->complete) safe = cfg_river_neighbourhood_safe(cache, start, end);
+            else ok = cfg_river_neighbours(neighbours, state->last_chunk, start, end, &safe);
             if (!ok) break;
         }
         if (!ok || !safe) continue;
@@ -775,6 +854,7 @@ static bool cfg_river_simplify(sqlite_t *db, osm_river_import_t *state)
         if (ok) state->points -= (int64_t)(n - used);
     }
     sqlite_stmt_finalize(rows); sqlite_stmt_finalize(update); sqlite_stmt_finalize(neighbours);
+    free(cache);
     return ok && step == SQLITE_STEP_DONE;
 }
 
