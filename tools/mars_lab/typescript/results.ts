@@ -56,7 +56,8 @@ namespace WorksheetResults {
                     if (controller.signal.aborted || !response.ok || !data.ok) throw new Error('Flag unavailable');
                     const name = typeof data.country === 'string' ? data.country : '';
                     const flag = typeof data.country_flag === 'string' &&
-                        data.country_flag.startsWith('data:image/svg+xml;base64,') ? data.country_flag : '';
+                        (data.country_flag.startsWith('data:image/svg+xml;base64,') ||
+                         data.country_flag === '/offshore_flag.svg') ? data.country_flag : '';
                     if (!this.cacheFlag(code, name, flag)) throw new Error('Flag cache rejected metadata');
                     return {name, flag};
                 })();
@@ -90,7 +91,7 @@ namespace WorksheetResults {
         }
 
         private countryArtwork(button: HTMLElement, flag: string): void {
-            if (button.dataset.countryOption !== '1' || !flag) return;
+            if ((button.dataset.countryOption !== '1' && button.dataset.selectedFlagCode !== 'ZZ-SEA') || !flag) return;
             let image = button.querySelector<HTMLImageElement>('img.country-flag');
             if (!image) {
                 image = document.createElement('img');
@@ -127,9 +128,24 @@ namespace WorksheetResults {
         }
 
         private selectedCountryArtwork(button: HTMLElement): void {
-            const flag = this.cachedCountry(button.dataset.countryCode || '')?.flag;
+            const flag = this.cachedCountry(this.displayCountryCode(button))?.flag;
             if (flag) this.countryArtwork(button, flag);
             else button.querySelector('img.country-flag')?.remove();
+        }
+
+        private displayCountryCode(button: HTMLElement): string {
+            return button.dataset.selectedFlagCountry === button.dataset.countryCode && button.dataset.selectedFlagCode
+                ? button.dataset.selectedFlagCode : button.dataset.countryCode || '';
+        }
+
+        /** @brief Apply resolved observer artwork to the selected control without changing its jurisdiction value. */
+        selectedObserverFlag(code: string): void {
+            const select = document.getElementById('almanacJurisdiction') as HTMLSelectElement | null;
+            const button = select?.closest('.select-shell')?.querySelector<HTMLElement>('.select-button');
+            if (!button) return;
+            button.dataset.selectedFlagCountry = button.dataset.countryCode || '';
+            button.dataset.selectedFlagCode = code;
+            this.selectedCountryArtwork(button);
         }
 
         /** @brief Share completed globe metadata with selected-country controls and tooltip consumers. */
@@ -181,12 +197,12 @@ namespace WorksheetResults {
         private async fillCountryMenu(): Promise<void> {
             // Selection rebuilds the button's text; restore resident artwork before waiting on any other country.
             for (const item of this.visibleCountries) {
-                const cached = this.cachedCountry(item.dataset.countryCode || '');
+                const cached = this.cachedCountry(this.displayCountryCode(item));
                 if (cached) this.countryArtwork(item, cached.flag);
             }
             if (this.menuRequest) return;
             for (const item of this.visibleCountries) {
-                const code = item.dataset.countryCode || '';
+                const code = this.displayCountryCode(item);
                 if (!/^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(code)) continue;
                 if (this.cachedCountry(code)) continue;
                 const request = new AbortController();
@@ -195,7 +211,7 @@ namespace WorksheetResults {
                 try {
                     const {flag} = await this.fetchFlag(code, request.signal);
                     if (request.signal.aborted) return;
-                    if (this.visibleCountries.has(item) && item.dataset.countryCode === code) this.countryArtwork(item, flag);
+                    if (this.visibleCountries.has(item) && this.displayCountryCode(item) === code) this.countryArtwork(item, flag);
                 } catch { return; }
                 finally {
                     window.clearTimeout(timer);
@@ -206,7 +222,7 @@ namespace WorksheetResults {
 
         private loadFlag(button: WorksheetCopyButton): void {
             this.observeCountryMenu(button);
-            const code = button.dataset.countryCode || '';
+            const code = this.displayCountryCode(button);
             if (this.flagRequest?.code !== code) {
                 this.flagRequest?.controller.abort();
                 this.flagRequest = null;
@@ -230,7 +246,7 @@ namespace WorksheetResults {
                     const {name, flag} = await this.fetchFlag(code, request.controller.signal);
                     if (request.controller.signal.aborted || this.flagRequest !== request) return;
                     const active = this.activeButton;
-                    if (active?.isConnected && active.dataset.countryCode === code) {
+                    if (active?.isConnected && this.displayCountryCode(active) === code) {
                         active.dataset.countryFlag = flag;
                         active.dataset.countryName = name;
                         this.countryArtwork(active, flag);

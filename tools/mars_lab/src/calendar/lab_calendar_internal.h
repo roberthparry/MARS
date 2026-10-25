@@ -28,12 +28,18 @@ json_t *lab_cal_home_sky(void);
 /** @brief Resolve submitted town metadata or the packaged catalogue to an owned IANA zone name. */
 string_t *lab_cal_town_timezone(const json_t *options);
 
+/** @brief Refresh an explicitly automatic observer zone at its UTC instant, retaining manual and legacy offsets. */
+void lab_cal_resolve_observer_zone(json_t *options);
+
 /**
  * @brief Set observer classification and sea-horizon policy from the native shoreline hit-test.
  * @param options Borrowed mutable request options with validated latitude and longitude.
  * @note Missing or uncertain shoreline data do not enable horizon dip; no weather request is made.
  */
 void lab_cal_surface(json_t *options);
+
+/** @brief Add display-only offshore artwork for confirmed open sea without an identified jurisdiction. */
+void lab_cal_offshore_flag(json_t *options);
 
 /** Return bounded geographic polygons for validated bounds, for projection by the WASM SVG renderer. */
 json_t *lab_cal_globe_vectors(const double bounds[4], unsigned *status);

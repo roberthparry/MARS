@@ -108,6 +108,27 @@ bool test_lab_catalogue_database(const char *directory)
     return ok;
 }
 
+/* Add real packaged artwork only to a caller-owned, disposable catalogue. */
+bool test_lab_offshore_database(void)
+{
+    string_t *path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    string_t *key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
+    sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    file_t *metadata = file_new_cstr("packaging/jurisdiction-db/flag_emblems.sql");
+    file_t *artwork = file_new_cstr("packaging/jurisdiction-db/flags/zz-sea.svg");
+    string_t *sql = metadata ? file_read_all_text(metadata) : NULL;
+    string_t *svg = artwork ? file_read_all_text(artwork) : NULL;
+    bool ok = db && sql && svg && sqlite_exec(db, sql) && sqlite_exec_cstr(db,
+        "create table if not exists jurisdiction_country_flag(iso_country_code text primary key,svg text not null)");
+    sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db,
+        "insert or replace into jurisdiction_country_flag values('ZZ-SEA',?1)") : NULL;
+    ok = ok && insert && sqlite_stmt_bind_text(insert, 1, string_c_str(svg)) &&
+         sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
+    sqlite_stmt_finalize(insert); sqlite_close(db); string_free(path); string_free(key);
+    file_free(metadata); file_free(artwork); string_free(sql); string_free(svg);
+    return ok;
+}
+
 /* Isolate state and environment changes in a disposable, sequential child fixture. */
 bool test_lab_isolated(bool (*callback)(const char *directory))
 {

@@ -142,6 +142,28 @@ static bool location_fixture(const char *directory)
         json_free(options);
     }
     json_free(fields);
+    static const struct {
+        const char *zone, *date, *time, *mode, *expected;
+    } automatic[] = {
+        {"Africa/Dar_es_Salaam", "2026-10-24", "17:46:18", "auto", "3"},
+        {"Europe/London", "2026-10-25", "00:59:00", "auto", "1"},
+        {"Europe/London", "2026-10-25", "01:00:00", "auto", "0"},
+        {"America/Los_Angeles", "2026-07-15", "12:00:00", "auto", "-7"},
+        {"America/Does_Not_Exist", "2026-07-15", "12:00:00", "auto", "10"},
+        {"Africa/Dar_es_Salaam", "2026-10-24", "17:46:18", "manual", "10"},
+        {"Africa/Dar_es_Salaam", "2026-10-24", "17:46:18", "", "10"},
+    };
+    for (size_t i = 0; i < sizeof automatic / sizeof *automatic; ++i) {
+        json_t *options = json_new_object();
+        lab_cal_set(options, "timezone", automatic[i].zone);
+        lab_cal_set(options, "date", automatic[i].date);
+        lab_cal_set(options, "time", automatic[i].time);
+        lab_cal_set(options, "zone_mode", automatic[i].mode);
+        lab_cal_set(options, "zone", "10");
+        lab_cal_resolve_observer_zone(options);
+        passed = passed && !strcmp(lab_cal_text(options, "zone"), automatic[i].expected);
+        json_free(options);
+    }
     return passed;
 }
 

@@ -140,7 +140,7 @@ window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
 
         // Native rendering validates first, preserves exact HTML/copy text and uses the visibility fallback.
         labDOM.call('lab_almanac_events_preview', target, {
-            name: 'England', flag: 'data:image/svg+xml;base64,PHN2Zy8+'
+            name: 'England', flag: 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg"/>')
         });
         check(target.querySelectorAll('.almanac-summary-row').length === 9,
             'immediate observer preview includes all summary fields');

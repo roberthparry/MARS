@@ -925,7 +925,7 @@ namespace WorksheetRequests {
         installEvaluation(mode: number, data: unknown, context?: MarsApiInstallContext, outcome?: number, request?: MarsApiRequest | null): Promise<unknown>;
 
         /** @brief Ask native policy to admit evaluation of the supplied mode. */
-        evaluate(mode: WorksheetMode): Promise<unknown> | undefined;
+        evaluate(mode: WorksheetMode, options?: WorksheetEvaluationOptions): Promise<unknown> | undefined;
 
         /** @brief Read the requested numerical precision. */
         precision(): number;
@@ -1011,6 +1011,9 @@ namespace WorksheetRequests {
 
         /** @brief Return a value unchanged so the native continuation can await it. */
         awaitValue(value: unknown): unknown;
+
+        /** @brief Give drawing and input a browser turn before installing worksheet results. */
+        yieldToDrawing(): Promise<void>;
     }
 
     /** @brief Native-selected cancellation and exception propagation without payload reinterpretation. */

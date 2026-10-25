@@ -584,6 +584,7 @@ int tests_main(void)
     test_lab_function_cases();
     test_lab_calendar_extra_cases();
     test_lab_state_cases();
+    test_lab_history_cases();
     test_lab_mobile_cases();
     test_lab_runtime_cases();
     test_lab_wasm_build_cases();

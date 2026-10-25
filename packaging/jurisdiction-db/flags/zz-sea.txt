@@ -1,0 +1,51 @@
+Generated with the built-in image-generation tool on 2026-10-24.
+Edit target: the user-supplied Pioneer plaque image.
+This is an adapted illustration, not a scientific transcription or official flag.
+Original-design credits and source terms: THIRD_PARTY_NOTICES.md.
+
+Use case: style-transfer and precise-object-edit.
+Asset type: offshore-location emblem for the MARS app, with a small flag and a 240 by 180 pixel enlarged preview.
+Input image 1 is the edit target: the supplied Pioneer plaque.
+Change its brown lines and tan background into crisp fine gold etched linework (MARS accent #cfa052 with restrained light-gold highlights) on a uniform deep forest-green background #071913. Flat face-on rectangular artwork, no photograph of an object, no metallic slab, no frame, no shadows, no fabric or waving flag. Retain the original complete composition: hydrogen diagram upper left, pulsar radial map left, spacecraft outline behind the people, solar system and trajectory along bottom. Keep all existing diagram strokes and symbolic marks as faithfully as possible and all content inside the canvas with narrow margins. Preserve the original landscape aspect ratio approximately 1.26:1; no crop.
+Replace the two nude adult figures on the right with two dignified clothed Black African adults, a man and a woman, in the same relative sizes, positions and poses: the man raising his open right hand in greeting, the woman standing alongside. Natural African facial features and tightly curled natural hair, sensitively depicted without caricature or generic tribal accessories. Give the man a simple plain short-sleeved shirt and full-length trousers; give the woman a simple modest short-sleeved ankle-length dress. Clothing and people must be rendered in the SAME gold outline engraving style as the rest, not photorealistic and not filled golden silhouettes. No nudity. Do not add objects, slogans, lettering, logos or watermarks. Clean high-resolution engraved lines, high contrast, no noisy texture.
+
+
+Refinement 1 (sharpness and African-Caribbean figures):
+Use case: precise-object-edit.
+Edit target: the generated gold-on-green offshore emblem in the attached local image. This is a refinement of that exact image, not a redesign.
+Make the entire engraving markedly sharper: very crisp, clean, high-definition gold lines, consistent finely cut edges, no blur, no glow, no grain or fuzzy texture. Use a high-resolution landscape canvas around 2800 pixels wide or greater, preserving the original aspect ratio and full composition. Retain the deep MARS forest-green background (#071913) and restrained warm gold palette (#cfa052 and pale gold highlights).
+Refine the two adult figures to have a natural African-Caribbean appearance, with individual dignified faces, natural proportions and relaxed welcoming expressions, not caricatures. The man has short neat textured twists; the woman has natural textured braids gathered back. They remain fully clothed: the man's same plain short-sleeved collared shirt and full-length trousers, and the woman's same modest short-sleeved long dress. Preserve exactly their full-body poses and placement: the man with his open right hand raised and the woman standing next to him. Keep all people and clothing as fine gold etched outlines, no photographic or filled silhouettes.
+Invariants: do not change the rest of the plaque layout, sizes or positions. Keep the hydrogen diagram upper left, pulsar map left, spacecraft outline behind the figures, solar system and trajectory at the bottom and all symbolic marks as in the edit target. Preserve the narrow margins and complete uncropped composition. No new objects, no lettering, no border, no shadows, no fabric, no waving flag, no watermark.
+
+Refinement 2 (Caribbean clothing):
+Use case: precise-object-edit.
+Edit target: the latest gold-on-dark-green offshore emblem, supplied as the local reference image.
+Change ONLY the clothing of the two African-Caribbean adults. Keep their exact faces, hair, body proportions, friendly expressions and poses. The man keeps his right hand raised in greeting. Give him a tasteful Caribbean guayabera shirt: lightweight, open collar, short sleeves, characteristic vertical pintuck/pleat panels and four simple patch pockets, worn untucked over relaxed full-length linen trousers. Give the woman a modest Caribbean Creole-inspired light cotton dress with short softly ruffled sleeves, fitted bodice, sash at the waist, and a fuller flowing ankle-length skirt with a restrained embroidered hem detail. This should feel natural and dignified, not a carnival costume. No new props, headwear or accessories. Retain their shoes and all non-clothing artwork.
+Style invariants: exceedingly crisp, sharp high-definition GOLD ETCHED OUTLINE LINEWORK, not filled shapes or coloured textiles. MARS warm gold #cfa052 and restrained light-gold highlights on uniform deep forest-green #071913. No blur, no glow, no grain, no noisy texture. Keep the complete landscape composition and original aspect ratio, all hydrogen symbols, pulsar map, spacecraft outline, solar system and trajectory exactly in place. No new marks, no lettering, no border, no watermark. Full uncropped frame with the same narrow margins.
+
+
+Refinement 3 (reggae-inspired clothing):
+Use case: precise-object-edit.
+Edit target: the gold-on-deep-green offshore emblem supplied as the local reference. Refine ONLY the two African-Caribbean adults' clothing and hair into a recognisably relaxed reggae-inspired style. Preserve their faces, dignified friendly expressions, anatomy, full-body proportions, positions and poses, including the man's raised right hand.
+Man: a soft knitted tam with natural locs loosely gathered underneath; a relaxed open short-sleeved overshirt over a simple crew-neck shirt with a few horizontal stripe outlines, loose full-length trousers and simple shoes. Woman: a wrapped headscarf with natural locs visible, a modest lined crochet-inspired short-sleeved top with a restrained openwork pattern over an opaque bodice, and a long flowing skirt with a subtle banded border, simple shoes. Tasteful everyday reggae-inspired dress, no costume exaggeration, no smoking, no cannabis imagery, no political or religious symbols, no new props.
+Keep ALL artwork exclusively crisp gold etched outlines on uniform deep MARS green #071913, warm gold #cfa052 with restrained lighter gold accents. Do not introduce red, yellow or green coloured clothing blocks; clothing stripes and crochet texture must be drawn as gold linework, not colour fills. Avoid excessive tiny detail so the enlarged app preview stays clear. No glow, blur, grain or fuzzy edges.
+Invariants: the complete plaque composition remains EXACTLY unchanged outside the two people: hydrogen diagram, pulsar map, spacecraft outline, solar system and trajectory, symbolic marks, margins and aspect ratio. Do not add text, border, watermark, background texture or any other objects. Flat face-on uncropped high-definition line illustration, not a photo of an engraved object.
+
+
+Refinement 4 (smooth trousers; approved raster source for the installed SVG):
+Use case: precise-object-edit.
+Edit target: the supplied gold-on-green offshore emblem.
+Make ONE very local clothing correction: remove the conspicuous radiating crotch wrinkles and the pointed V/starburst of crease lines around the man's groin and upper inner thighs. Redraw that small area of his trousers as smooth, modest, relaxed-fitting fabric with a simple unobtrusive seam and clean drape. No anatomical emphasis, no bunching, no tightly fitted outline. Retain the overall trouser silhouette and the natural low folds further down his legs.
+Preserve EVERYTHING ELSE exactly: both African-Caribbean adults' faces and hair, the man's knitted tam and raised hand, his reggae-inspired shirt, the woman's headwrap and crochet-style top and flowing skirt, their shoes, positions and proportions. Preserve every diagram, symbol, line and margin outside this tiny trouser edit. Same crisp gold etched linework on dark MARS green, same image size and full composition. Do not add or remove any other feature, text, prop or colour.
+
+Vector conversion (2026-10-24):
+The approved raster source has SHA-256 c59f2a69eb6600c65b4efa0c8c8f645ba3408652b7f8b20ecb2ce7d160f6bb8c.
+One-off conversion with Netpbm pngtopnm and Potrace 1.16:
+pngtopnm offshore_flag.png | potrace --svg --invert --blacklevel 0.40 --turdsize 2 --opttolerance 0.15 --color '#edb650' --output traced.svg
+Remove the generated XML declaration/DTD; keep the 1409 by 1117 viewBox with pixel dimensions;
+add title/description and a background rectangle in MARS green #071913.
+The packaged zz-sea.svg contains true filled vector paths, not an embedded raster.
+It is imported into jurisdiction_country_flag under the display-only key ZZ-SEA;
+Lab serves it from the jurisdiction database at /offshore_flag.svg.
+The larger Location preview is 336 by 252 pixels, proportionally capped to the viewport.
+Conversion tools are not required to build, install or run MARS.

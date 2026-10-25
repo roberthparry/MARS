@@ -10,8 +10,11 @@
 #include <math.h>
 #include <string.h>
 
+#include "jurisdiction-t.h"
 #define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
+#include "calendar/lab_calendar_solar.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
@@ -365,6 +368,23 @@ static void test_lab_country_presentation(void)
     }
     TEST_ASSERT_TRUE(!strcmp(lab_cal_text(suggestion, "zone"), "5.5"), "suggestions never overwrite authored offsets");
     json_free(suggestion);
+    const struct { const char *surface, *horizon, *country; bool offshore; } flag_cases[] = {
+        {"Sea", "true", "", true}, {"Sea", "false", "", false}, {"Sea", "true", "GB", false},
+        {"Coastal water", "false", "", false}, {"Inland water", "false", "", false},
+        {"Land", "false", "", false}, {"Unknown", "false", "", false}
+    };
+    for (size_t i = 0; i < sizeof flag_cases / sizeof *flag_cases; ++i) {
+        json_t *point = json_new_object();
+        lab_cal_set(point, "observer_surface", flag_cases[i].surface);
+        lab_cal_set(point, "sea_horizon", flag_cases[i].horizon);
+        lab_cal_set(point, "country_code", flag_cases[i].country);
+        lab_cal_offshore_flag(point);
+        TEST_ASSERT_TRUE(flag_cases[i].offshore ?
+            !strcmp(lab_cal_text(point, "country_flag"), "/offshore_flag.svg") &&
+            !strcmp(lab_cal_text(point, "flag_code"), "ZZ-SEA") && !*lab_cal_observer_jurisdiction(point) :
+            !*lab_cal_text(point, "country_flag"), "offshore artwork requires confirmed open sea and is never a country");
+        json_free(point);
+    }
     json_t *water = test_lab_json("{\"location_name\":\"Caspian Sea\",\"observer_surface\":\"Inland water\"}");
     string_t *location = lab_cal_observer_location(water, "", false);
     TEST_ASSERT_TRUE(location && !strcmp(string_c_str(location), "Caspian Sea") &&
@@ -448,7 +468,19 @@ static void test_lab_country_presentation(void)
                      !strcmp(lab_cal_text(updates, "datetime_jdn"), "2461339") &&
                      !strcmp(lab_cal_text(updates, "datetime_jurisdiction"), "RU"),
                      "DateTime retains its explicit calendar jurisdiction and canonical date projection");
-    json_free(updates); json_free(observer_response); json_free(fields); json_free(options);
+    json_free(updates); json_free(observer_response);
+    lab_cal_set(options, "town", ""); lab_cal_set(options, "country", "");
+    lab_cal_set(options, "country_code", ""); lab_cal_set(options, "jurisdiction", "");
+    lab_cal_set(options, "observer_surface", "Sea"); lab_cal_set(options, "sea_horizon", "true");
+    lab_cal_offshore_flag(options);
+    observer_response = lab_cal_almanac(fields, options, &status);
+    location_cell = json_array_get(lab_cal_get(observer_response, "observer_summary"), 1);
+    rendered = lab_cal_get(lab_cal_get(observer_response, "almanac_presentation"), "all");
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_text(location_cell, "flag"), "/offshore_flag.svg") &&
+                     strstr(lab_cal_text(rendered, "html"), "almanac-location-flag") &&
+                     strstr(lab_cal_text(rendered, "html"), "/offshore_flag.svg") &&
+                     !*lab_cal_observer_jurisdiction(options), "offshore card has a previewable emblem without a jurisdiction");
+    json_free(observer_response); json_free(fields); json_free(options);
     json_t *coastal = test_lab_json("{\"jurisdiction\":\"ZA\",\"country_code\":\"\","
         "\"town\":\"Mossel Bay|-34.183|22.146\",\"lat\":\"-34.183000\",\"lon\":\"22.146000\","
         "\"observer_surface\":\"Coastal\"}");
@@ -483,6 +515,8 @@ static void test_lab_country_presentation(void)
     string_t *html = lab_cal_almanac_markup(response, test_lab_member(response, "rows"),
                                            test_lab_member(response, "events"), false);
     bool ok = html && strstr(string_c_str(html), "class=\"country-flag\" alt=\"\"") &&
+              strstr(string_c_str(html), "type=\"button\" class=\"almanac-location-flag\"") &&
+              strstr(string_c_str(html), "aria-label=\"Flag for Britain &amp; &lt;UK&gt;\"") &&
               strstr(string_c_str(html), "Britain &amp; &lt;UK&gt;") && strstr(string_c_str(html), "<dt>Location</dt>") &&
               !strstr(string_c_str(html), "<dt>Country</dt>");
     string_free(html);
@@ -490,6 +524,7 @@ static void test_lab_country_presentation(void)
     lab_cal_set(cell, "flag", "javascript:alert(1)");
     html = lab_cal_almanac_markup(response, test_lab_member(response, "rows"), test_lab_member(response, "events"), false);
     ok = ok && html && !strstr(string_c_str(html), "javascript:") && !strstr(string_c_str(html), "country-flag") &&
+         !strstr(string_c_str(html), "almanac-location-flag") &&
          strstr(string_c_str(html), "Britain &amp; &lt;UK&gt;");
     string_free(html); json_free(response);
     TEST_ASSERT_TRUE(ok, "country text remains accessible and escaped; only offline SVG image URIs are accepted");
@@ -575,6 +610,67 @@ static void test_lab_eclipse_previews(void)
     TEST_ASSERT_TRUE(ok, "solar/lunar overlap geometry, observer tilt and missing-data handling remain native SVG");
 }
 
+static void test_lab_solar_times(void)
+{
+    almanac_t *engine = almanac_open();
+    jurisdiction_t *jurisdiction = jurisdict_open("GB-ENG");
+    string_t *zone = string_new_with("Europe/London");
+    almanac_observer_t observer = {.latitude_degrees = 52.7077, .longitude_degrees = -2.7541, .elevation_metres = 39};
+    const char *dates[] = {"2026-03-28", "2026-03-29", "2026-10-24", "2026-10-25", "2026-12-22"};
+    bool ok = engine && jurisdiction && zone;
+    for (unsigned i = 0; ok && i < sizeof dates / sizeof *dates; ++i) {
+        datetime_t *date = datetime_from_string(dates[i]);
+        almanac_sun_times_t expected, actual = {.rise.status = ALMANAC_RISE_SET_UNAVAILABLE,
+                                               .set.status = ALMANAC_RISE_SET_UNAVAILABLE};
+        ok = almanac_sunrise_sunset(engine, jurisdiction, date, &observer, &expected) &&
+             lab_cal_solar_times(engine, "GB-ENG", date, &observer, zone, &actual) &&
+             actual.rise.status == ALMANAC_RISE_SET_OK && actual.set.status == ALMANAC_RISE_SET_OK &&
+             fabs(actual.rise.time.jd - expected.rise.time.jd) < 1.0 / 86400 &&
+             fabs(actual.set.time.jd - expected.set.time.jd) < 1.0 / 86400;
+        string_t *rise = lab_cal_solar_clock(&actual.rise, zone), *set = lab_cal_solar_clock(&actual.set, zone);
+        if (ok) string_fprintf(stdout, "%s: sunrise %S, sunset %S\n", dates[i], rise, set);
+        ok = ok && rise && set && string_byte_length(rise) == 5 && string_byte_length(set) == 5;
+        string_free(rise); string_free(set); datetime_dealloc(date);
+    }
+    TEST_ASSERT_TRUE(ok, "sky clocks match DateTime's ephemeris solver across both DST changes and seasons");
+    string_free(zone);
+    const struct { const char *zone; double lat, lon; } places[] = {
+        {"Pacific/Honolulu", 21.3069, -157.8583}, {"Pacific/Kiritimati", 1.8721, -157.4278}
+    };
+    datetime_t *date = datetime_from_string("2026-10-24");
+    for (unsigned i = 0; i < sizeof places / sizeof *places; ++i) {
+        zone = string_new_with(places[i].zone);
+        observer.latitude_degrees = places[i].lat; observer.longitude_degrees = places[i].lon;
+        almanac_sun_times_t times;
+        ok = lab_cal_solar_times(engine, "GB-ENG", date, &observer, zone, &times);
+        const almanac_rise_set_event_t *events[] = {&times.rise, &times.set};
+        for (unsigned j = 0; ok && j < 2; ++j) {
+            struct tm local = {0};
+            double offset;
+            ok = events[j]->status == ALMANAC_RISE_SET_OK &&
+                 lab_cal_timezone_at(zone, events[j]->time.jd, &local, &offset) &&
+                 local.tm_year == 126 && local.tm_mon == 9 && local.tm_mday == 24;
+        }
+        TEST_ASSERT_TRUE(ok, "solar events stay on the town's civil date despite a different representative zone");
+        string_free(zone);
+    }
+    zone = string_new_with("Etc/UTC");
+    datetime_t *summer = datetime_from_string("2026-06-21");
+    observer.latitude_degrees = 90; observer.longitude_degrees = 0;
+    almanac_sun_times_t polar;
+    TEST_ASSERT_TRUE(lab_cal_solar_times(engine, "GB-ENG", summer, &observer, zone, &polar) &&
+                     polar.rise.status == ALMANAC_RISE_SET_NEVER_SETS &&
+                     polar.set.status == ALMANAC_RISE_SET_NEVER_SETS, "polar daylight is explicit, without invented clocks");
+    datetime_dealloc(summer);
+    almanac_sun_times_t missing;
+    TEST_ASSERT_TRUE(!lab_cal_solar_times(NULL, "GB-ENG", date, &observer, zone, &missing) &&
+                     missing.rise.status == ALMANAC_RISE_SET_UNAVAILABLE &&
+                     missing.set.status == ALMANAC_RISE_SET_UNAVAILABLE, "missing ephemerides never publish estimates");
+    string_t *clock = lab_cal_solar_clock(&missing.rise, zone);
+    TEST_ASSERT_TRUE(clock && !strcmp(string_c_str(clock), "unavailable"), "missing solar time is explicit");
+    string_free(clock); string_free(zone); datetime_dealloc(date); jurisdict_close(jurisdiction); almanac_close(engine);
+}
+
 static void test_lab_sky_status(void)
 {
     json_t *response = test_lab_json(
@@ -592,7 +688,8 @@ static void test_lab_sky_status(void)
     const char *flag = strstr(text, "class=\"country-flag\"");
     bool ok = moon && set && rise && moment && flag && moon < set && set < rise && rise < moment && moment < flag &&
               strstr(text, "England &amp; point") && strstr(text, "75.0% illuminated") &&
-              strstr(text, "Selected time") && strstr(text, "sky-status-value") && !strstr(text, "19:00:20.0");
+              strstr(text, "Selected time") && strstr(text, "sky-status-value") && !strstr(text, "19:00:20.0") &&
+              !strstr(text, "≈");
     string_free(html);
     lab_cal_set(response, "observer_latitude", "90");
     html = lab_cal_sky_markup(response, true);
@@ -600,7 +697,8 @@ static void test_lab_sky_status(void)
     string_free(html);
     lab_cal_set(response, "observer_latitude", "nan");
     html = lab_cal_sky_markup(response, true);
-    ok = ok && html && strstr(string_c_str(html), "unavailable");
+    ok = ok && html && strstr(string_c_str(html), "Sunset </span><span class=\"sky-status-value\">unavailable") &&
+         strstr(string_c_str(html), "Sunrise </span><span class=\"sky-status-value\">unavailable");
     string_free(html);
     json_free(response);
     response = test_lab_json("{\"fields\":{\"date\":\"2026-10-22\",\"sunset\":\"18:20\","
@@ -617,7 +715,8 @@ static void test_lab_sky_status(void)
          strstr(string_c_str(html), "Home &amp; origin") && strstr(string_c_str(html), "Sunset · local") &&
          strstr(string_c_str(html), "almanac-moon-phase") &&
          strstr(string_c_str(html), "local zenith up") &&
-         !strstr(string_c_str(html), "Selected time");
+         !strstr(string_c_str(html), "Selected time") && !strstr(string_c_str(html), "≈") &&
+         !strstr(string_c_str(html), "unavailable");
     string_free(html);
     html = lab_cal_home_markup(origin, (time_t)1797940800);
     ok = ok && html && strstr(string_c_str(html), "2026-12-22 12:00:00 GMT+00:00") &&
@@ -634,6 +733,7 @@ static void test_lab_sky_status(void)
 /* Register bounded almanac presentation checks before README examples. */
 void test_lab_almanac_presentation_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_lab_solar_times, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_sky_status, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_variants, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_almanac_symbols, tests, NULL);

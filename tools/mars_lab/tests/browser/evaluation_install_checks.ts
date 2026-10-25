@@ -21,6 +21,15 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
         return plan.calls.find(call => call.service === name)!;
     }
     const modes = ['expression', 'equation', 'diffequation', 'matrix', 'integrator', 'datetime', 'almanac'] as const;
+    for (let mode = 0; mode < modes.length; ++mode) {
+        const frame = {mode, request: {token: 17}, current: false};
+        const step = () => labDOM.call<EvaluationFixturePlan>('lab_flow_step', 5, frame, {});
+        const scheduled = step();
+        equal(scheduled.calls[0].service, 'yieldToDrawing', `${modes[mode]} installation yields to drawing`);
+        equal(scheduled.wait, true, 'installation waits for a browser turn, not merely a promise microtask');
+        equal(step().calls[0].service, 'requestCurrent', 'ownership is checked after the drawing opportunity');
+        equal(step().done, true, 'superseded results finish without creating cards or mutating the DOM');
+    }
     const bindings = Object.freeze([
         Object.freeze({name: ' x ', value: 'π/7'}), Object.freeze({name: 'c', kind: 'constant', value: '?'}),
         Object.freeze({name: '__proto__', value: 'opaque native value'})
@@ -275,6 +284,33 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
             'real wrapper preserves the native workspace accessor');
 
         mode = 'almanac';
+        WorksheetRequests.labRequests.modeChanged(mode);
+        events.length = 0;
+        let painted = false;
+        requestAnimationFrame(() => { painted = true; });
+        replace('renderAlmanacWorksheet', (...args: unknown[]) => {
+            check(painted, 'the drawing callback runs before result installation');
+            events.push({name: 'renderAlmanacWorksheet', args});
+        });
+        const drawingRequest = WorksheetRequests.labRequests.begin('evaluate', mode);
+        requests.push(drawingRequest);
+        const drawingTask = WorksheetRequests.evaluation.installEvaluationResult(6, data, context, 2, drawingRequest);
+        equal(calls('renderAlmanacWorksheet').length, 0, 'a ready result does not render synchronously');
+        await drawingTask;
+        equal(calls('renderAlmanacWorksheet').length, 1, 'current result installs once after drawing');
+        WorksheetRequests.labRequests.finish(drawingRequest);
+
+        const staleRequest = WorksheetRequests.labRequests.begin('evaluate', mode);
+        requests.push(staleRequest);
+        events.length = 0;
+        const staleTask = WorksheetRequests.evaluation.installEvaluationResult(6, data, context, 2, staleRequest);
+        const newerRequest = WorksheetRequests.labRequests.begin('evaluate', mode);
+        requests.push(newerRequest);
+        await staleTask;
+        equal(calls('renderAlmanacWorksheet').length + calls('saveLastAlmanacState').length, 0,
+              'a selection superseded during the drawing yield cannot render or persist');
+        WorksheetRequests.labRequests.finish(newerRequest);
+        WorksheetRequests.labRequests.finish(staleRequest);
         events.length = 0;
         const previousAlmanac = WorksheetContext.worksheetSession.calendar.almanacLastWorksheetData;
         function failRender(): never {

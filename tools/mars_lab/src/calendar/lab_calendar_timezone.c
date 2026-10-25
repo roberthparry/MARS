@@ -9,11 +9,13 @@
  * local-time functions. Town catalogue lookups are indexed once per worker.
  */
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "datetime-t.h"
 #include "file-t.h"
+#include "jurisdiction-t.h"
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 #include "lab_page.h"
@@ -242,4 +244,36 @@ string_t *lab_cal_town_timezone(const json_t *options)
     string_split_free(town_parts, town_count);
     string_free(town);
     return zone;
+}
+
+/* Recompute only offsets known to be derived, using the exact saved UTC instant. */
+void lab_cal_resolve_observer_zone(json_t *options)
+{
+    if (strcmp(lab_cal_text(options, "zone_mode"), "auto")) return;
+    datetime_t *moment = datetime_from_string(lab_cal_text(options, "date"));
+    unsigned hour = 0, minute = 0, second = 0;
+    int parts = sscanf(lab_cal_text(options, "time"), "%u:%u:%u", &hour, &minute, &second);
+    if (!moment || parts < 2 || hour > 23 || minute > 59 || second > 59) {
+        datetime_dealloc(moment);
+        return;
+    }
+    double jd = datetime_jdn(moment) - 0.5 + (hour * 3600 + minute * 60 + second) / 86400.0;
+    datetime_init_jd(moment, jd);
+    string_t *zone = lab_cal_town_timezone(options);
+    struct tm local;
+    double offset = 0;
+    bool resolved = lab_cal_timezone_at(zone, jd, &local, &offset);
+    if (!resolved) {
+        const char *code = lab_cal_observer_jurisdiction(options);
+        jurisdiction_t *engine = *code ? jurisdict_open(code) : NULL;
+        resolved = engine && jurisdict_default_gmt_offset(engine, moment, &offset);
+        jurisdict_close(engine);
+    }
+    if (resolved && isfinite(offset) && offset >= -14 && offset <= 14) {
+        string_t *text = string_sprintf("%.10g", offset);
+        lab_cal_set(options, "zone", string_c_str(text));
+        string_free(text);
+    }
+    string_free(zone);
+    datetime_dealloc(moment);
 }

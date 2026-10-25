@@ -91,6 +91,12 @@ static bool cfg_database_flags_refresh(sqlite_t *db, const string_t *root, const
     string_t *path = string_sprintf("%s/packaging/jurisdiction-db/flags/LICENSE", string_c_str(root));
     file_t *source = path ? file_new(path) : NULL;
     bool ok = source && file_exists(source) && cfg_database_flags(db, root);
+    sqlite_stmt_t *emblem = ok ? sqlite_stmt_prepare(db,
+        "select 1 from jurisdiction_flag_emblem e join jurisdiction_country_flag f on f.iso_country_code=e.code "
+        "where e.code='ZZ-SEA' and length(f.svg)>0 "
+        "and exists(select 1 from jurisdiction_country_flag_source where id=3)") : NULL;
+    ok = ok && emblem && sqlite_stmt_step(emblem) == SQLITE_STEP_ROW;
+    sqlite_stmt_finalize(emblem);
     file_free(source); string_free(path);
     return ok;
 }
@@ -143,10 +149,10 @@ static bool cfg_database_update_one(const cfg_database_migration *migration)
 int cfg_databases_update(void)
 {
     static const cfg_database_migration migrations[] = {
-        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 4, cfg_database_globe_refresh},
+        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 5, cfg_database_globe_refresh},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 2, cfg_database_flags_refresh},
+         "jurisdiction/mars_jurisdiction_rules.db", 4, cfg_database_flags_refresh},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)

@@ -83,9 +83,45 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root)
     ok = ok && provenance && sqlite_stmt_bind_text(provenance, 1, string_c_str(terms)) &&
          sqlite_stmt_step(provenance) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(provenance); string_free(terms);
-    sqlite_stmt_t *countries = ok ? sqlite_stmt_prepare(db,
-        "select jurisdiction_id from jurisdiction where jurisdiction_type in ('country','subdivision') "
-        "order by jurisdiction_id") : NULL;
+    string_t *regions_path = string_sprintf("%s/packaging/jurisdiction-db/flag_regions.sql", string_c_str(root));
+    file_t *regions = regions_path ? file_new(regions_path) : NULL;
+    bool regional = regions && file_exists(regions);
+    string_t *region_sql = regional ? file_read_all_text(regions) : NULL;
+    if (regional) ok = ok && region_sql && sqlite_exec(db, region_sql);
+    file_free(regions); string_free(regions_path); string_free(region_sql);
+    if (regional) {
+        string_t *path = string_sprintf("%s/packaging/jurisdiction-db/flags/REGIONAL-NOTICES.txt", string_c_str(root));
+        file_t *source = path ? file_new(path) : NULL;
+        string_t *notice = source ? file_read_all_text(source) : NULL;
+        sqlite_stmt_t *record = notice ? sqlite_stmt_prepare(db,
+            "insert or replace into jurisdiction_country_flag_source values(2,'2026-10-24','REGIONAL-NOTICES.txt',?1)") : NULL;
+        ok = ok && record && sqlite_stmt_bind_text(record, 1, string_c_str(notice)) &&
+             sqlite_stmt_step(record) == SQLITE_STEP_DONE;
+        sqlite_stmt_finalize(record); string_free(notice); file_free(source); string_free(path);
+    }
+    string_t *emblems_path = string_sprintf("%s/packaging/jurisdiction-db/flag_emblems.sql", string_c_str(root));
+    file_t *emblems = emblems_path ? file_new(emblems_path) : NULL;
+    bool emblem = emblems && file_exists(emblems);
+    string_t *emblem_sql = emblem ? file_read_all_text(emblems) : NULL;
+    if (emblem) ok = ok && emblem_sql && sqlite_exec(db, emblem_sql);
+    file_free(emblems); string_free(emblems_path); string_free(emblem_sql);
+    if (emblem) {
+        string_t *path = string_sprintf("%s/packaging/jurisdiction-db/flags/OFFSHORE-NOTICES.txt", string_c_str(root));
+        file_t *source = path ? file_new(path) : NULL;
+        string_t *notice = source ? file_read_all_text(source) : NULL;
+        sqlite_stmt_t *record = notice ? sqlite_stmt_prepare(db,
+            "insert or replace into jurisdiction_country_flag_source values(3,'2026-10-24','OFFSHORE-NOTICES.txt',?1)") : NULL;
+        ok = ok && record && sqlite_stmt_bind_text(record, 1, string_c_str(notice)) &&
+             sqlite_stmt_step(record) == SQLITE_STEP_DONE;
+        sqlite_stmt_finalize(record); string_free(notice); file_free(source); string_free(path);
+    }
+    string_t *query = string_new_with("select jurisdiction_id,0 from jurisdiction "
+                                      "where jurisdiction_type in ('country','subdivision')");
+    ok = ok && query && (!regional || !string_append_cstr(query,
+        " union select artwork_code,0 from jurisdiction_flag_region union select parent_code,0 from jurisdiction_flag_region")) &&
+        (!emblem || !string_append_cstr(query, " union select code,1 from jurisdiction_flag_emblem"));
+    sqlite_stmt_t *countries = ok ? sqlite_stmt_prepare(db, string_c_str(query)) : NULL;
+    string_free(query);
     sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db,
         "insert into jurisdiction_country_flag values(?1,?2) on conflict(iso_country_code) do update set svg=excluded.svg") : NULL;
     ok = ok && countries && insert;
@@ -113,6 +149,8 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root)
                  sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
             sqlite_stmt_reset(insert);
         }
+        /* A declared emblem must not silently disappear from an otherwise successful migration. */
+        if (sqlite_stmt_column_int64(countries, 1) && !svg) ok = false;
         string_free(svg); file_info_free(info); file_free(source); string_free(path);
     }
     ok = ok && step == SQLITE_STEP_DONE;

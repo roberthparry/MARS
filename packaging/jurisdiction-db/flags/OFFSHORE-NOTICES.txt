@@ -1,0 +1,21 @@
+Offshore emblem (ZZ-SEA)
+
+The SVG is a vector tracing of an image generated on 24 October 2026 with the
+built-in image-generation tool from a user-supplied Pioneer plaque reference.
+It depicts clothed African-Caribbean adults in reggae-inspired clothing and
+gold etched diagrams on MARS green. It is decorative, not a scientifically
+faithful transcription or an official flag. No NASA endorsement is implied.
+
+Underlying NASA Pioneer plaque: design by Carl Sagan and Frank Drake;
+artwork by Linda Salzman Sagan. Public-domain source record:
+https://commons.wikimedia.org/wiki/File:Pioneer_plaque.svg
+The vector transcription credited there to Oona Räisänen (Mysid) was not used.
+No exclusive copyright is asserted for the generated additions.
+
+Potrace 1.16 by Peter Selinger and Netpbm were used only for the one-off tracing;
+neither is redistributed or required to build, install or run MARS.
+Exact generation prompts and conversion parameters: zz-sea.txt.
+SHA-256: 2d9e562545e85caea21aca57e052228f816bb146217f8489695d9b92426fa375
+
+This notice and SVG are imported into the jurisdiction database. ZZ-SEA is an
+artwork key only and must not be inserted into the jurisdiction catalogue.

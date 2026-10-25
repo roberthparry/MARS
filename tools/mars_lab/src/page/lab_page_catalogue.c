@@ -83,6 +83,7 @@ static const lab_page_setting_t lab_page_default_settings[] = {
     {"almanac_town", "Shrewsbury|52.7077|-2.7541|75", 0},
     {"almanac_visibility", "visible", 0},
     {"almanac_zone", "1.00", 0},
+    {"almanac_zone_mode", "manual", 0},
     {"datetime_date", "2026-10-05", 0},
     {"datetime_elevation", "75", 0},
     {"datetime_end", "2027-01-01", 0},

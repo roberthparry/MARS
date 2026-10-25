@@ -27,11 +27,19 @@ static void lab_country_catalogue(json_t *result, const char *code)
     lab_cal_set(result, "country", "");
     lab_cal_set(result, "country_code", "");
     lab_cal_set(result, "country_flag", "");
+    lab_cal_set(result, "flag_code", "");
+    if (code && !strcmp(code, "ZZ-SEA")) {
+        lab_cal_set(result, "country", "Offshore");
+        lab_cal_set(result, "country_flag", "/offshore_flag.svg");
+        lab_cal_set(result, "flag_code", "ZZ-SEA");
+        return;
+    }
     string_t *name = NULL, *svg = NULL;
     jurisdiction_t *jurisdiction = code ? jurisdict_open(NULL) : NULL;
     if (code && jurisdict_country(jurisdiction, code, &name, &svg)) {
         lab_cal_set(result, "country", string_c_str(name));
         lab_cal_set(result, "country_code", code);
+        lab_cal_set(result, "flag_code", code);
         size_t length = svg ? string_byte_length(svg) : 0;
         size_t capacity = sodium_base64_ENCODED_LEN(length, sodium_base64_VARIANT_ORIGINAL);
         char *encoded = length ? malloc(capacity) : NULL;
@@ -51,8 +59,29 @@ static bool lab_country_metadata(json_t *result, globe_t *globe, double latitude
     string_t *code = globe_country_code_at(globe, latitude, longitude);
     bool identified = code && string_byte_length(code);
     lab_country_catalogue(result, code ? string_c_str(code) : NULL);
+    string_t *region = globe_region_code_at(globe, latitude, longitude);
+    if (region && (!identified || !strncmp(string_c_str(region), string_c_str(code), 2))) {
+        json_t *display = json_new_object();
+        lab_country_catalogue(display, string_c_str(region));
+        if (*lab_cal_text(display, "country_flag")) {
+            lab_cal_set(result, "country", lab_cal_text(display, "country"));
+            lab_cal_set(result, "country_flag", lab_cal_text(display, "country_flag"));
+            lab_cal_set(result, "flag_code", string_c_str(region));
+        }
+        json_free(display);
+    }
+    string_free(region);
     string_free(code);
     return identified;
+}
+
+/* Artwork is a display marker, never a jurisdiction or a substitute for missing geography. */
+void lab_cal_offshore_flag(json_t *options)
+{
+    if (*lab_cal_text(options, "country_code") || strcmp(lab_cal_text(options, "observer_surface"), "Sea") ||
+        strcmp(lab_cal_text(options, "sea_horizon"), "true")) return;
+    lab_cal_set(options, "country_flag", "/offshore_flag.svg");
+    lab_cal_set(options, "flag_code", "ZZ-SEA");
 }
 
 /* Suggest a nautical UTC offset only for positively classified, administratively unassigned inland water. */
@@ -106,6 +135,7 @@ void lab_cal_surface(json_t *options)
     lab_cal_set(options, "country", "");
     lab_cal_set(options, "country_code", "");
     lab_cal_set(options, "country_flag", "");
+    lab_cal_set(options, "flag_code", "");
     lab_cal_set(options, "location_name", "");
     double latitude = 0, longitude = 0;
     globe_surface_t surface = GLOBE_UNKNOWN;
@@ -132,8 +162,13 @@ void lab_cal_surface(json_t *options)
     lab_cal_set(options, "sea_horizon", sea_horizon ? "true" : "false");
     if (!*lab_cal_text(options, "country_code")) {
         const char *selected = lab_cal_observer_jurisdiction(options);
-        if (*selected) lab_country_catalogue(options, selected);
+        if (*selected) {
+            const char *display = lab_cal_text(options, "flag_code");
+            if (*display && !strncmp(display, selected, 2)) lab_cal_set(options, "country_code", selected);
+            else lab_country_catalogue(options, selected);
+        }
     }
+    lab_cal_offshore_flag(options);
 }
 
 /* Resolve geographic or catalogue-owned metadata without astronomical calculations or weather requests. */
@@ -164,6 +199,8 @@ json_t *lab_cal_country(const json_t *payload, unsigned *status)
     bool boundaries = globe_has_layer(globe, GLOBE_LAYER_COUNTRIES);
     bool inland_water = !identified && boundaries && globe_hit_test(globe, latitude, longitude) == GLOBE_INLAND_WATER;
     lab_cal_nautical_zone(response, inland_water, identified, boundaries, longitude);
+    if (!identified && globe_hit_test_radius(globe, latitude, longitude, 5000) == GLOBE_SEA)
+        lab_country_catalogue(response, "ZZ-SEA");
     globe_close(globe);
     return response;
 }

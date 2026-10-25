@@ -10,6 +10,7 @@
  * towns, retaining stored coordinate precision and explicit default-town markers.
  * A separate visitor exposes the machine's installed calendar origin without substituting a selected jurisdiction.
  * Indexed country presentation metadata supplies catalogue-owned names and offline flag artwork by ISO code.
+ * Optional local cultural display codes supply regional/parent flag sequences without changing jurisdiction rules.
  * Geographic country identification belongs to globe_t; choosing a jurisdiction does not establish a point's country.
  * A geographic adapter opens independent globe_t readers on the same catalogue;
  * river geometry remains separate from calendar policy and shoreline classification.
@@ -52,6 +53,10 @@ globe_t *jurisdict_globe_open(jurisdiction_t *jurisdiction);
 /**
  * @brief Read presentation metadata by uppercase ISO country or subdivision code.
  * Subdivisions without artwork fall back to their parent country's name and flag.
+ * Optional cultural display codes return regional metadata independently of jurisdiction membership.
+ * Display-only emblem codes such as ZZ-SEA (Offshore) return static database artwork, not a jurisdiction.
+ * Their self-contained SVG uses a fifteen-second cycle with 2.5-second cross-fades and five-second holds.
+ * Reduced-motion viewers keep the regional frame. Other flags, including constituent-country flags, remain static.
  * Required name and flag outputs receive owned strings, released with string_free. A missing optional
  * flag gives NULL while the country name remains available. False clears both outputs. This does not
  * infer a country from the selected jurisdiction, coordinates or a nearby town.

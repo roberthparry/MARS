@@ -3,7 +3,7 @@
  * @brief Current home-origin sky header, independent of worksheet dates and observers.
  *
  * Reads the installed calendar setup through the jurisdiction API. Native ephemerides
- * supply the Moon; native solar approximations and zoneinfo supply today's local solar
+ * supply the Moon and accurate solar crossings; zoneinfo supplies today's local solar
  * clocks. No weather, eclipse search, browser geolocation or mutable global state is used.
  */
 #include <math.h>
@@ -14,6 +14,8 @@
 #include "jurisdiction-t.h"
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
+#include "lab_calendar_solar.h"
 
 static bool home_origin(const jurisdict_place_t *place, void *context)
 {
@@ -22,6 +24,7 @@ static bool home_origin(const jurisdict_place_t *place, void *context)
     lab_cal_set(origin, "jurisdiction", place->jurisdiction_code);
     lab_cal_set(origin, "latitude", place->latitude);
     lab_cal_set(origin, "longitude", place->longitude);
+    lab_cal_set(origin, "elevation", place->elevation);
     lab_cal_set(origin, "timezone", place->timezone);
     return true;
 }
@@ -57,26 +60,12 @@ static json_t *home_body(almanac_t *almanac, datetime_t *moment, const char *cod
     return row;
 }
 
-static bool home_solar(string_t *out, const string_t *zone, const struct tm *today,
-                       long jdn, double latitude, double longitude, bool rising)
+static bool home_solar(string_t *out, const string_t *zone, const almanac_rise_set_event_t *event, bool rising)
 {
-    const char *missing = "unavailable";
-    char clock[32] = "";
-    for (int day = -1; day <= 1; ++day) {
-        double hours = datetime_sun_time(jdn + day, latitude, longitude, rising);
-        if (hours < 0 || !isfinite(hours)) {
-            if (day == 0) missing = hours == -1 ? "polar night" : hours == -2 ? "midnight sun" : "unavailable";
-            continue;
-        }
-        struct tm local = {0};
-        double offset;
-        if (lab_cal_timezone_at(zone, jdn + day - 0.5 + hours / 24, &local, &offset) &&
-            local.tm_year == today->tm_year && local.tm_yday == today->tm_yday) {
-            strftime(clock, sizeof clock, "≈%H:%M", &local);
-            break;
-        }
-    }
-    return home_item(out, rising ? "Sunrise · local" : "Sunset · local", *clock ? clock : missing);
+    string_t *clock = lab_cal_solar_clock(event, zone);
+    bool ok = clock && home_item(out, rising ? "Sunrise · local" : "Sunset · local", string_c_str(clock));
+    string_free(clock);
+    return ok;
 }
 
 static bool home_flag(string_t *out, const char *code)
@@ -122,6 +111,11 @@ string_t *lab_cal_home_markup(const json_t *origin, time_t now)
         moment = NULL;
     }
     almanac_t *almanac = moment ? almanac_open() : NULL;
+    almanac_observer_t position = {.latitude_degrees = latitude, .longitude_degrees = longitude};
+    const char *elevation = lab_cal_text(origin, "elevation");
+    if (*elevation && !lab_cal_number(elevation, &position.elevation_metres)) position.elevation_metres = NAN;
+    almanac_sun_times_t solar;
+    lab_cal_solar_times(almanac, lab_cal_text(origin, "jurisdiction"), day, &position, zone, &solar);
     json_t *moon = home_body(almanac, moment, "MOON"), *sun = home_body(almanac, moment, "SUN");
     json_t *observer = json_new_object();
     lab_cal_set(observer, "observer_latitude", lab_cal_text(origin, "latitude"));
@@ -130,8 +124,7 @@ string_t *lab_cal_home_markup(const json_t *origin, time_t now)
     bool moon_ready = *lab_cal_text(moon, "phase") && *lab_cal_text(sun, "phase");
     ok = out && day && (moon_ready ? lab_cal_body_symbol(out, moon, sun, observer) :
                                    home_item(out, "Moon", "unavailable")) &&
-         home_solar(out, zone, &local, datetime_jdn(day), latitude, longitude, false) &&
-         home_solar(out, zone, &local, datetime_jdn(day), latitude, longitude, true) &&
+         home_solar(out, zone, &solar.set, false) && home_solar(out, zone, &solar.rise, true) &&
          !string_append_cstr(out, "</span><span class=\"sky-status-selection\">");
     int minutes = (int)lround(fabs(offset) * 60);
     string_t *clock = string_sprintf("%s GMT%c%02d:%02d", local_clock, offset < 0 ? '-' : '+', minutes / 60, minutes % 60);

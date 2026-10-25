@@ -255,6 +255,8 @@ void lab_location_dispatch(lab_location_action_t action, event_jsref event, node
     lab_dom_set(plan, "calls", lab_dom_object(LAB_VALUE_ARRAY));
     if (select && action == LAB_LOCATION_SELECTION_CHANGED && lab_dom_equal(lab_dom_get(event, "target"), select))
         lab_dom_set(select, "labTownGeneration", lab_dom_object(LAB_VALUE_OBJECT));
+    if (select && action == LAB_LOCATION_ZONE_EDITED && lab_dom_equal(lab_dom_get(event, "target"), select))
+        lab_dom_write(select, LAB_DOM_DATASET, "automaticZone", lab_dom_string(""));
     lab_dom_return(plan);
 }
 
@@ -417,8 +419,10 @@ bool lab_location_apply_town(jsref controls, jsref offset, jsref context)
             lab_dom_write(lab_dom_get(controls, inputs[field]), LAB_DOM_VALUE, "", value);
     }
     int zone = lab_dom_get(controls, "zoneInput");
-    if (lab_dom_length(offset))
+    if (lab_dom_length(offset)) {
         lab_dom_write(zone, LAB_DOM_VALUE, "", offset);
+        lab_dom_write(zone, LAB_DOM_DATASET, "automaticZone", offset);
+    }
     if (lab_dom_truth(lab_dom_get(controls, "resetOffsetTouched")))
         lab_location_reset_offset(context, zone);
     lab_select_sync(select);
@@ -455,6 +459,14 @@ static jsref lab_location_read_controls(lab_mode_t mode, jsref context)
                         : lab_dom_get(context, "visibility");
         lab_dom_set(result, lab_profile_text(mode, field, LAB_PROFILE_KEY), value);
         lab_dom_release(mark);
+    }
+    if (mode == LAB_MODE_ALMANAC) {
+        int zone = lab_location_element(mode, 2);
+        lab_dom_subscribe(zone, "input", "lab_location_dispatch", LAB_LOCATION_ZONE_EDITED, zone, 0);
+        lab_dom_subscribe(zone, "change", "lab_location_dispatch", LAB_LOCATION_ZONE_EDITED, zone, 0);
+        int automatic = lab_dom_read(zone, LAB_DOM_DATASET, "automaticZone");
+        lab_dom_set(result, "zone_mode", lab_dom_string(lab_dom_length(automatic) &&
+            lab_dom_equal(automatic, lab_location_value(zone)) ? "auto" : "manual"));
     }
     return result;
 }
@@ -509,6 +521,11 @@ static jsref lab_location_resolve(lab_mode_t mode, lab_calendar_operation_t oper
         lab_dom_set(result, key, chosen);
         lab_dom_release(mark);
     }
+    if (mode == LAB_MODE_ALMANAC) {
+        int provenance = lab_dom_key_get(source, lab_dom_join(prefix, lab_dom_string("zone_mode"), ""));
+        /* Older histories have no provenance: never guess that an authored zone was automatic. */
+        lab_dom_set(result, "zone_mode", lab_dom_string(lab_location_is(provenance, "auto") ? "auto" : "manual"));
+    }
     return result;
 }
 
@@ -530,6 +547,10 @@ static void lab_location_project(lab_mode_t mode, lab_calendar_operation_t opera
     }
     if (mode == LAB_MODE_DATETIME && (operation == LAB_CALENDAR_RESTORE || operation == LAB_CALENDAR_RESET))
         lab_location_reset_offset(context, lab_location_element(mode, 10));
+    if (mode == LAB_MODE_ALMANAC)
+        lab_dom_write(lab_location_element(mode, 2), LAB_DOM_DATASET, "automaticZone",
+                      lab_location_is(lab_dom_get(state, "zone_mode"), "auto") ? lab_dom_get(state, "zone")
+                                                                            : lab_dom_string(""));
 }
 
 /* Resolve or apply state with native restore/capture/fill/reset policy; invalid operations return null. */
@@ -701,6 +722,8 @@ void lab_location_response(lab_mode_t mode, jsref data, jsref context, bool upda
                                                 : lab_location_text(suggested));
         if (mode == LAB_MODE_DATETIME)
             lab_location_reset_offset(context, offset);
+        else
+            lab_dom_write(offset, LAB_DOM_DATASET, "automaticZone", lab_location_value(offset));
     }
 }
 
@@ -764,6 +787,9 @@ void lab_location_evaluation(lab_mode_t mode, jsref data, jsref context)
             lab_location_reset_offset(context, offset);
         }
     } else if (mode == LAB_MODE_ALMANAC) {
+        if (lab_location_is(lab_dom_get(fields, "zone_mode"), "auto"))
+            lab_dom_write(lab_location_element(mode, 2), LAB_DOM_DATASET, "automaticZone",
+                          lab_dom_clean(lab_dom_get(fields, "zone"), LAB_DOM_CLEAN_TRIM));
         int jurisdiction = lab_dom_get(fields, "jurisdiction");
         bool unidentified = lab_dom_type(jurisdiction) == LAB_VALUE_STRING && !lab_dom_length(jurisdiction);
         if (unidentified) {

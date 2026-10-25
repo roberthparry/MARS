@@ -1,4 +1,26 @@
 /* Calendar and almanac worksheets, tables and basic mode fields. */
+.worksheet-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    white-space: nowrap;
+}
+.worksheet-heading > #renderedTitle {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.worksheet-pending {
+    flex: none;
+    color: #edb650;
+    font-size: 0.9em;
+    letter-spacing: normal;
+    text-transform: none;
+}
+.worksheet-pending.hidden {
+    display: inline-block !important;
+    visibility: hidden;
+}
 .datetime-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(9rem, 1fr));
@@ -161,6 +183,31 @@
   object-fit: contain;
   vertical-align: middle;
   margin-inline-end: 0.35em;
+}
+
+.almanac-summary .almanac-location-flag {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 0.35em 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  filter: none;
+  cursor: zoom-in;
+}
+
+.almanac-summary .almanac-location-flag:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.almanac-location-flag > .country-flag,
+.mars-flag-tooltip > .country-flag {
+  display: block;
+  margin: 0;
 }
 
 .select-button[data-country-option="1"] {

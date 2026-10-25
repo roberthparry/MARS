@@ -87,12 +87,14 @@ static bool lab_page_town_flush(struct lab_page_places *places)
     return !places->group || (places->group_code && json_object_set(places->towns, places->group_code, places->group));
 }
 
-/* Preserve catalogue membership, but use the constituent country for UK town artwork. */
+/* Preserve catalogue membership; resolve independent regional artwork and UK constituent countries. */
 static bool lab_page_town_country(struct lab_page_places *places, json_t *row, const jurisdict_place_t *place)
 {
     const char *code = place->jurisdiction_code;
     string_t *geographic = NULL;
-    if (!strcmp(code, "GB") && place->latitude && place->longitude) {
+    bool eligible = !strncmp(code, "GB", 2) || !strncmp(code, "FR", 2) || !strncmp(code, "ES", 2) ||
+                    !strncmp(code, "IT", 2) || !strncmp(code, "NL", 2) || !strncmp(code, "DE", 2);
+    if (eligible && place->latitude && place->longitude) {
         if (!places->globe_attempted) {
             places->globe = globe_open_configured(NULL);
             places->globe_attempted = true;
@@ -100,9 +102,11 @@ static bool lab_page_town_country(struct lab_page_places *places, json_t *row, c
         char *lat_end, *lon_end;
         double lat = strtod(place->latitude, &lat_end), lon = strtod(place->longitude, &lon_end);
         if (lat_end != place->latitude && lon_end != place->longitude && !*lat_end && !*lon_end &&
-            isfinite(lat) && isfinite(lon))
-            geographic = globe_country_code_at(places->globe, lat, lon);
-        if (geographic && !strncmp(string_c_str(geographic), "GB-", 3)) code = string_c_str(geographic);
+            isfinite(lat) && isfinite(lon)) {
+            geographic = globe_region_code_at(places->globe, lat, lon);
+            if (!geographic && !strcmp(code, "GB")) geographic = globe_country_code_at(places->globe, lat, lon);
+        }
+        if (geographic && !strncmp(string_c_str(geographic), code, 2)) code = string_c_str(geographic);
     }
     bool ok = lab_page_catalogue_text(row, "country_code", code);
     string_free(geographic);

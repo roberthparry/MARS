@@ -23,6 +23,9 @@ string_t *countries_at(sqlite_t *db, double latitude, double longitude);
 /** @brief Resolve an owned country name or ISO code, without inferring codes for unrecognised territories. */
 string_t *countries_lookup(sqlite_t *db, double latitude, double longitude, bool code);
 
+/** @brief Return an owned cultural display code from the independent indexed region layer, or NULL. */
+string_t *regions_lookup(sqlite_t *db, double latitude, double longitude);
+
 /** @brief Stream bounded indexed shared borders, preserving the detailed shoreline independently. */
 bool countries_borders(sqlite_t *db, double west, double south, double east, double north,
                         globe_border_segment_fn visitor, void *context);

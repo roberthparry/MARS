@@ -261,12 +261,29 @@ static jsref lab_flow_location_history_otherwise(frame_jsref frame)
     return lab_flow_done(0);
 }
 
+static jsref lab_flow_location_history_current(frame_jsref frame)
+{
+    return lab_flow_call(frame, 4, "locCurrent", "current", 0, 1, lab_dom_get(frame, "isCurrent"));
+}
+
+static jsref lab_flow_location_history_fields(frame_jsref frame)
+{
+    if (!lab_dom_truth(lab_dom_get(frame, "current"))) return lab_flow_done(0);
+    /* Catalogue hydration may refresh a town key, but must not replace authored
+     * altitude, coordinates or zone with the town's defaults during history restore. */
+    jsref state = lab_dom_get(frame, "state"), elements = lab_dom_get(frame, "elements");
+    lab_dom_set(state, "town", lab_dom_read(lab_dom_get(elements, "town"), LAB_DOM_VALUE, ""));
+    return lab_flow_call(frame, 5, "locApplyState", 0, 0, 2, lab_dom_get(frame, "mode"), state);
+}
+
 static jsref lab_flow_location_history(frame_jsref frame)
 {
     static jsref (*const handlers[])(jsref) = {
         [0] = lab_flow_location_history_loc_apply_state,
         [1] = lab_flow_location_history_loc_elements,
         [2] = lab_flow_location_history_loc_restore,
+        [3] = lab_flow_location_history_current,
+        [4] = lab_flow_location_history_fields,
     };
     unsigned selected = lab_flow_location_stage(frame);
     return selected < sizeof handlers / sizeof *handlers && handlers[selected]

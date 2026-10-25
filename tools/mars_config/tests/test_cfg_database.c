@@ -870,14 +870,31 @@ static bool test_cfg_country_flags_fixture(const char *directory)
                              "('GB-SCT','subdivision','GB','GB','Scotland'),"
                              "('GB-NIR','subdivision','GB','GB','Northern Ireland')") &&
         cfg_database_flags(db, root) && cfg_database_flags(db, root) &&
-        test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "253") &&
+        test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "263") &&
+        test_cfg_database_query(db, "select count(*) from jurisdiction_flag_region", "14") &&
+        test_cfg_database_query(db, "select name from jurisdiction_flag_emblem where code='ZZ-SEA'", "Offshore") &&
+        test_cfg_database_query(db, "select count(*) from jurisdiction where jurisdiction_id='ZZ-SEA'", "0") &&
+        test_cfg_database_query(db, "select source from jurisdiction_country_flag_source where id=3", "OFFSHORE-NOTICES.txt") &&
         test_cfg_database_query(db, "select value from retained", "42") &&
-        test_cfg_database_query(db, "select version from jurisdiction_country_flag_source", "7.3.2");
+        test_cfg_database_query(db, "select version from jurisdiction_country_flag_source where id=1", "7.3.2");
     sqlite_stmt_t *q = ok ? sqlite_stmt_prepare(db,
         "select sum(length(svg)) from jurisdiction_country_flag") : NULL;
     if (q && sqlite_stmt_step(q) == SQLITE_STEP_ROW)
         printf("Offline jurisdiction flag SVG bytes: %lld\n", (long long)sqlite_stmt_column_int64(q, 0));
-    sqlite_stmt_finalize(q); sqlite_close(db); string_free(root);
+    sqlite_stmt_finalize(q);
+    file_t *incomplete = test_cfg_database_file(directory, "packaging/jurisdiction-db/flags");
+    string_t *incomplete_root = string_new_with(directory);
+    ok = ok && incomplete && incomplete_root && file_create_directory(incomplete, 0700, true) &&
+         test_cfg_database_write(directory, "packaging/jurisdiction-db/flags/LICENSE", "fixture licence") &&
+         test_cfg_database_write(directory, "packaging/jurisdiction-db/flags/OFFSHORE-NOTICES.txt", "fixture notice") &&
+         test_cfg_database_write(directory, "packaging/jurisdiction-db/flag_emblems.sql",
+             "insert into jurisdiction_flag_emblem values('ZZ-MIS','Missing artwork')") &&
+         !cfg_database_flags(db, incomplete_root) &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_flag_emblem where code='ZZ-MIS'", "0") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "263") &&
+         test_cfg_database_query(db, "select value from retained", "42");
+    file_free(incomplete); string_free(incomplete_root);
+    sqlite_close(db); string_free(root);
     ok = ok && !setenv("MARS_JURISDICTION_DB_PATH", file_path(database), 1) &&
          !setenv("MARS_JURISDICTION_DB_KEY", "country-flags-fixture", 1);
     jurisdiction_t *j = ok ? jurisdict_open("FR") : NULL;
@@ -885,16 +902,38 @@ static bool test_cfg_country_flags_fixture(const char *directory)
     ok = ok && jurisdict_country(j, "GB", &name, &svg) && name && svg &&
          strstr(string_c_str(svg), "<svg") && !strcmp(string_c_str(name), "Britain (UK)");
     string_free(name); string_free(svg);
-    const char *const codes[] = {"GB-WLS", "GB-SCT", "IM"};
-    const char *const names[] = {"Wales", "Scotland", "Isle of Man"};
-    const char *const artwork[] = {"flag-icons-gb-wls", "flag-icons-gb-sct", "flag-icons-im"};
-    for (unsigned i = 0; i < 3; ++i) {
+    const char *const codes[] = {"GB-WLS", "GB-SCT", "IM", "GB-ENG", "GB-NIR", "JE"};
+    const char *const names[] = {"Wales", "Scotland", "Isle of Man", "England", "Northern Ireland", "Jersey"};
+    const char *const artwork[] = {"flag-icons-gb-wls", "flag-icons-gb-sct", "flag-icons-im",
+                                    "flag-icons-gb-eng", "flag-icons-gb-nir", "flag-icons-je"};
+    for (unsigned i = 0; i < 6; ++i) {
         name = NULL; svg = NULL;
         ok = ok && jurisdict_country(j, codes[i], &name, &svg) && name && svg &&
-             !strcmp(string_c_str(name), names[i]) && strstr(string_c_str(svg), artwork[i]);
+             !strcmp(string_c_str(name), names[i]) && strstr(string_c_str(svg), artwork[i]) &&
+             !strstr(string_c_str(svg), "@keyframes");
+        string_free(name); string_free(svg);
+    }
+    const char *const regions[] = {"GB-CON", "FR-BRE", "FR-COR", "IT-88", "NL-FR", "DE-OFR", "DE-NFR",
+                                    "ES-CT", "ES-VC", "ES-IB", "ES-PV", "ES-NA", "FR-BAS", "FR-CAT"};
+    for (unsigned i = 0; i < sizeof regions / sizeof *regions; ++i) {
+        name = NULL; svg = NULL;
+        bool valid = jurisdict_country(j, regions[i], &name, &svg) && name && svg &&
+                     strstr(string_c_str(svg), "regionalFlag 15s ease-in-out infinite") &&
+                     strstr(string_c_str(svg), "0%,33.333333%,100%{opacity:1}50%,83.333333%{opacity:0}") &&
+                     strstr(string_c_str(svg), "prefers-reduced-motion:reduce") &&
+                     !strstr(string_c_str(svg), "<image");
+        if (!valid) fprintf(stderr, "Regional SVG failed: %s\n", regions[i]);
+        ok = valid && ok;
         string_free(name); string_free(svg);
     }
     ok = !jurisdict_country(j, "../GB", &name, &svg) && !name && !svg && ok;
+    ok = ok && jurisdict_country(j, "ZZ-SEA", &name, &svg) && name && svg &&
+         !strcmp(string_c_str(name), "Offshore") && strstr(string_c_str(svg), "<path") &&
+         !strstr(string_c_str(svg), "<image") && !strstr(string_c_str(svg), "@keyframes");
+    file_t *source = file_new_cstr(MARS_CONFIG_ROOT_DIR "/packaging/jurisdiction-db/flags/zz-sea.svg");
+    string_t *expected = source ? file_read_all_text(source) : NULL;
+    ok = ok && expected && !string_compare(svg, expected);
+    string_free(expected); file_free(source); string_free(name); string_free(svg);
     jurisdict_close(j); file_free(database);
     return ok;
 }
@@ -932,15 +971,17 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && db && test_cfg_database_query(db,
         "select count(*) from sqlite_master where name in ('mars_database_revision','jurisdiction_country_flag',"
         "'jurisdiction_country_flag_source')", "0") &&
-        sqlite_exec_cstr(db, "alter table saved_jurisdiction rename to jurisdiction");
+        sqlite_exec_cstr(db, "alter table saved_jurisdiction rename to jurisdiction") &&
+        cfg_database_revision(db, "jurisdiction", 3);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 0 &&
          !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "2") &&
-         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "1") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "4") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "17") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction where jurisdiction_id='ZZ-SEA'", "0") &&
          test_cfg_database_query(db, "select value from retained", "42") &&
-         cfg_database_revision(db, "jurisdiction", 3);
+         cfg_database_revision(db, "jurisdiction", 5);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
          cfg_databases_update() == 1;
@@ -1015,13 +1056,18 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
         ok = source && target && file_copy(source, target, false);
         file_free(source); file_free(target); string_free(relative);
     }
-    /* No shoreline archive exists here: revision three must only rebuild country geometry. */
+    file_t *region_source = test_cfg_database_file(MARS_CONFIG_ROOT_DIR, "packaging/globe-db/flag_regions.geojson");
+    file_t *region_target = test_cfg_database_file(directory, "packaging/globe-db/flag_regions.geojson");
+    ok = ok && region_source && region_target && file_copy(region_source, region_target, false);
+    file_free(region_source); file_free(region_target);
+    /* No shoreline archive exists here: revision three updates only country and display-region geometry. */
     ok = ok && !cfg_databases_update();
     db = ok ? test_cfg_database_open(database, key) : NULL;
     globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
     string_t *code = globe_country_code_at(globe, 44.95, 34.1);
     ok = ok && code && !strcmp(string_c_str(code), "UA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "4") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "5") &&
+         test_cfg_database_query(db, "select count(distinct iso_country_code) from region_name", "14") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "7") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained") &&
          test_cfg_database_query(db, "select count(*) from country_name", "298");
@@ -1161,7 +1207,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "SELECT count(*) FROM country_name", "298") &&
          test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "4") &&
+         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "5") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
                                     "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
          test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
@@ -1174,7 +1220,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
          test_cfg_database_query(db, "select value from retained", "42") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "4");
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "5");
     sqlite_close(db);
     /* Country metadata is independent of town selection and land/water classification. */
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1203,7 +1249,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_coast_sydney(db) && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "select count(*) from country_name", "298") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "4") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "5") &&
          test_cfg_database_query(db, "select count(*) from sqlite_master where name in ('retained','rivers_dataset')", "0") &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_KEY", key) &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_PATH", file_path(database)) &&

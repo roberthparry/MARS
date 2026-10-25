@@ -35,6 +35,9 @@ bool test_lab_isolated(bool (*callback)(const char *directory));
 /** Create and configure a private encrypted jurisdiction fixture beneath the supplied test directory. */
 bool test_lab_catalogue_database(const char *directory);
 
+/** @brief Import the packaged offshore SVG into the active disposable catalogue fixture. */
+bool test_lab_offshore_database(void);
+
 /** Register and run mathematical and calendar adapter integration assertions. */
 void test_lab_evaluation_cases(void);
 
@@ -61,6 +64,9 @@ void test_lab_calendar_extra_cases(void);
 
 /** Register and run state persistence and page escaping assertions. */
 void test_lab_state_cases(void);
+
+/** @brief Register browser-separated history persistence and quota regressions. */
+void test_lab_history_cases(void);
 
 /** Register native QR geometry, input bounds and local-only mobile metadata assertions. */
 void test_lab_mobile_cases(void);

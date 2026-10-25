@@ -133,6 +133,8 @@ void lab_persist_calendar(lab_mode_t mode, jsref state, jsref precision)
     int patch = lab_dom_object(LAB_VALUE_OBJECT);
     if (mode == LAB_MODE_DATETIME || mode == LAB_MODE_ALMANAC) {
         int prefix = lab_dom_string(mode == LAB_MODE_DATETIME ? "datetime_" : "almanac_");
+        if (mode == LAB_MODE_ALMANAC)
+            lab_dom_set(patch, "almanac_zone_mode", lab_dom_get(state, "zone_mode"));
         unsigned mark = lab_dom_mark();
         for (unsigned field = 0; field < lab_profile_count(mode); ++field) {
             const char *key = lab_profile_text(mode, field, LAB_PROFILE_KEY);

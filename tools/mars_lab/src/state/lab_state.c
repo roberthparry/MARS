@@ -149,6 +149,23 @@ static file_t *lab_state_lock_store(const string_t *path, bool exclusive, file_t
     return lock;
 }
 
+/* Keep auxiliary stores beside the configured state without changing existing directory permissions. */
+string_t *lab_state_private_path(const char *name)
+{
+    if (!name || !*name || strchr(name, '/') || !strcmp(name, ".") || !strcmp(name, "..")) return NULL;
+    string_t *state = lab_state_path();
+    if (!state) return NULL;
+    const char *text = state ? string_c_str(state) : NULL, *slash = text ? strrchr(text, '/') : NULL;
+    string_t *parent = slash == text ? string_new_with("/") :
+        slash ? string_sprintf("%.*s", (int)(slash - text), text) : string_new_with(".");
+    file_t *directory = parent ? file_new(parent) : NULL;
+    string_t *path = directory && file_create_directory(directory, 0700, true) ? string_sprintf("%S/%s", parent, name) : NULL;
+    file_free(directory);
+    string_free(parent);
+    string_free(state);
+    return path;
+}
+
 static bool lab_state_integer(const json_t *value, long long *out)
 {
     const string_t *text = json_type(value) == JSON_NUMBER ? json_number_text(value) : json_string_value(value);
@@ -327,6 +344,8 @@ static bool lab_state_merge(json_t *state, const json_t *updates, const json_t *
                 text, "|eval|inverse|multiply|eigenvalues|eigendecompose|charpoly|det|trace|rank|simplify|solve|");
         else if (!strcmp(name, "almanac_visibility"))
             valid = lab_state_one_of(text, "|all|visible|");
+        else if (!strcmp(name, "almanac_zone_mode"))
+            valid = lab_state_one_of(text, "|auto|manual|");
         else if (!strcmp(name, "matrix") || !strcmp(name, "diffequation") || !strcmp(name, "integrator_expression"))
             valid = string_byte_length(text) && string_find(text, "...") < 0;
         else if (!strcmp(name, "integrator_bounds") || !strcmp(name, "equation_variable"))

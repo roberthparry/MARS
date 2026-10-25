@@ -80,5 +80,5 @@ interface LabTestAlmanacReply {
 }
 
 interface Window {
-    labAlmanacFixtures(): [LabTestAlmanacFixture, LabTestAlmanacFixture, LabTestCalendarSection[]];
+    labAlmanacFixtures(): [LabTestAlmanacFixture, LabTestAlmanacFixture, LabTestCalendarSection[], string, LabTestAlmanacFixture];
 }

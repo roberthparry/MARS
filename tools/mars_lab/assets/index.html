@@ -229,7 +229,6 @@ __HOLIDAY_JURISDICTION_OPTIONS__
         <section class="almanac-globe" id="almanacGlobe" aria-label="Observer location globe">
           <div class="almanac-globe-toolbar">
             <strong>Observer globe</strong>
-            <button type="button" class="secondary" data-globe-action="map" aria-label="Map view" aria-pressed="false">Natural Earth</button>
             <button type="button" class="secondary" data-globe-action="grid" aria-label="Latitude and longitude lines" aria-pressed="false">Lat/long: off</button>
             <button type="button" class="secondary" data-globe-action="borders" aria-label="Indicative country land borders" aria-pressed="false">Borders: off</button>
             <button type="button" class="secondary" data-globe-action="out" aria-label="Zoom globe out">−</button>
@@ -241,7 +240,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
             <div class="almanac-globe-markers"></div>
           </div>
           <p class="mode-hint" id="almanacGlobeStatus" role="status">Drag to rotate · drag vertically at either side to roll · scroll or pinch to zoom · select a town or point</p>
-          <p class="globe-credit">Imagery: NASA Blue Marble (2002 composite) · not current ice coverage</p>
+          <p class="globe-credit">Imagery: NASA Earth Observatory · Blue Marble Next Generation, July 2004 · reference imagery</p>
         </section>
         <div id="almanacActions"></div>
         <div class="datetime-field-groups">
@@ -344,7 +343,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
       <div class="output-grid" id="resultPane">
         <div class="card result-card">
           <div class="card-title expandable-title">
-            <span id="renderedTitle">Rendered TeX</span>
+            <span class="worksheet-heading">
+              <span id="renderedTitle">Rendered TeX</span>
+              <span id="worksheetPending" class="worksheet-pending hidden" role="status" aria-label="Updating. Results are from the previous calculation." title="Results are from the previous calculation.">Updating…</span>
+            </span>
             <span class="card-actions digit-actions">
               <button class="card-action more-digits hidden" id="renderedMore">Show more digits</button>
             </span>

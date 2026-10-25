@@ -30,7 +30,8 @@ jsref lab_location_town_text(jsref text);
 
 /** @brief Native event emitted by a town selector. */
 typedef enum {
-    LAB_LOCATION_SELECTION_CHANGED = 1 /**< Invalidate pending restoration after a select change. */
+    LAB_LOCATION_SELECTION_CHANGED = 1, /**< Invalidate pending restoration after a select change. */
+    LAB_LOCATION_ZONE_EDITED = 2 /**< Preserve a manually authored offset against automatic refresh. */
 } lab_location_action_t;
 
 /** @brief Guarded town-restoration phase around a compatibility lookup. */
@@ -75,10 +76,10 @@ void lab_location_option_value(jsref town);
  */
 void lab_location_populate(node_jsref select, jsref towns, bool select_default);
 
-/** @brief Invalidate restoration on a select change without consuming the event.
- * @param action LAB_LOCATION_SELECTION_CHANGED invalidates restoration; unknown actions do nothing.
- * @param event Scoped browser event whose target must be the supplied select.
- * @param select Scoped select node, borrowed again for each subscribed callback.
+/** @brief Invalidate restoration or retain an authored offset without consuming the event.
+ * @param action Selection change or zone edit; unknown actions do nothing.
+ * @param event Scoped browser event whose target must be the supplied control.
+ * @param select Scoped control node, borrowed again for each subscribed callback.
  * @post Publishes an empty event plan through lab_dom_return, without browser service calls.
  */
 void lab_location_dispatch(lab_location_action_t action, event_jsref event, node_jsref select);

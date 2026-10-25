@@ -36,6 +36,24 @@ observer globe, with its attribution visible below the globe. The underlying
 imagery retains the provenance and terms recorded in
 `THIRD_PARTY_NOTICES.md`; the screenshot does not change those terms.
 
+## Offshore emblem
+
+`packaging/jurisdiction-db/flags/zz-sea.svg` is a vector tracing of the illustration
+generated on 24 October 2026 with the built-in image-generation tool, using the
+user-supplied Pioneer plaque as the edit target. The requested adaptation uses gold etched lines on MARS green
+and replaces the unclothed figures with clothed African-Caribbean adults in
+reggae-inspired clothing, with a knitted tam and headwrap. Potrace 1.16 traced
+the approved raster's gold shapes into scalable paths on a flat green background.
+The bundled SVG contains no bitmap, external resource or active content. It is
+decorative artwork, not a faithful scientific transcription. The one-off tracing
+tools are not build, installation or runtime dependencies.
+The original design credits and public-domain source record are retained in
+`THIRD_PARTY_NOTICES.md`; the exact prompt is in
+`packaging/jurisdiction-db/flags/zz-sea.txt`. This adapted artwork must not be
+confused with an official national or NASA flag. The packaged source and
+`OFFSHORE-NOTICES.txt` are imported into the jurisdiction database; Lab serves
+the stored SVG rather than reading the packaged source at runtime.
+
 ## Future assets
 
 Any future visual asset copied or adapted from another source must be recorded

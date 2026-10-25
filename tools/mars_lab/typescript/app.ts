@@ -474,6 +474,7 @@ class LabApplication {
 
     /** @brief Disconnect owned observers, timers and resize listeners without unloading scripts or native state. */
     public dispose(): void {
+        if (typeof worksheetHistoryPersistence !== 'undefined') worksheetHistoryPersistence.dispose();
         this.lifetime.abort();
         for (const observer of this.observers) observer.disconnect();
         this.observers.length = 0;

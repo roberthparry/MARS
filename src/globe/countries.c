@@ -278,11 +278,13 @@ bool globe_import_countries(sqlite_t *db, file_t *shapes, file_t *attributes)
 }
 
 /* Accumulate parity across outer rings and holes, rejecting overlaps and boundary points. */
-string_t *countries_lookup(sqlite_t *db, double latitude, double longitude, bool code)
+static string_t *country_lookup(sqlite_t *db, double latitude, double longitude, bool code, bool regional)
 {
     if (!db || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180) return NULL;
     double x = longitude * 1000000, y = latitude * 1000000;
-    sqlite_stmt_t *q = sqlite_stmt_prepare(db,
+    sqlite_stmt_t *q = sqlite_stmt_prepare(db, regional ?
+        "select c.country,c.points from region_bounds b join region_chunk c on c.id=b.id "
+        "where b.east>=?1 and b.south<=?2 and b.north>=?3 limit 10001" :
         "select c.country,c.points from country_bounds b join country_chunk c on c.id=b.id "
         "where b.east>=?1 and b.south<=?2 and b.north>=?3 limit 10001");
     bool ok = q && sqlite_stmt_bind_int(q, 1, (int)floor(x)) && sqlite_stmt_bind_int(q, 2, (int)ceil(y)) &&
@@ -312,12 +314,25 @@ string_t *countries_lookup(sqlite_t *db, double latitude, double longitude, bool
         if (found) ok = false;
         found = id;
     }
-    q = ok && found ? sqlite_stmt_prepare(db, code ? "select iso_country_code from country_name where id=?1" :
+    q = ok && found ? sqlite_stmt_prepare(db, regional ? "select iso_country_code from region_name where id=?1" :
+                                                  code ? "select iso_country_code from country_name where id=?1" :
                                                         "select name from country_name where id=?1") : NULL;
     string_t *name = q && sqlite_stmt_bind_int(q, 1, found) && sqlite_stmt_step(q) == SQLITE_STEP_ROW ?
                      string_new_with(sqlite_stmt_column_text(q, 0)) : NULL;
     sqlite_stmt_finalize(q);
     return name;
+}
+
+/* Keep regional display overlays separate from administrative country identification. */
+string_t *regions_lookup(sqlite_t *db, double latitude, double longitude)
+{
+    return country_lookup(db, latitude, longitude, true, true);
+}
+
+/* Reuse bounded indexed parity for the independent country layer. */
+string_t *countries_lookup(sqlite_t *db, double latitude, double longitude, bool code)
+{
+    return country_lookup(db, latitude, longitude, code, false);
 }
 
 /* Retain the descriptive lookup for existing callers and data without ISO metadata. */

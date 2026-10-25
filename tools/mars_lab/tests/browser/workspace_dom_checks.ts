@@ -240,9 +240,21 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             check(WorksheetContext.goalSeek.disabled === (mode !== 0), 'goal availability follows mode');
             labDOM.call('lab_workspace_dom_controls', mode, 1, 1, 1, 1, 1, 0, 0);
             check(
-                [WorksheetContext.run, WorksheetContext.back, WorksheetContext.forward, WorksheetContext.goalSeek, WorksheetContext.precisionSlider].every(button => button.disabled),
-                'busy disables every worksheet action');
+                [WorksheetContext.run, WorksheetContext.back, WorksheetContext.forward].every(button => !button.disabled) &&
+                WorksheetContext.goalSeek.disabled && WorksheetContext.precisionSlider.disabled,
+                'busy retains replacement actions while locking calculation-dependent controls');
             check(WorksheetContext.goalSeek.title === '' && WorksheetContext.precisionSlider.title.includes('bits'), 'busy retains the precision description');
+            for (const busy of [0, 1]) {
+                labDOM.call('lab_workspace_dom_controls', mode, busy, 0, 0, 0, 0, 1, 1);
+                check(WorksheetContext.back.disabled && WorksheetContext.forward.disabled && WorksheetContext.run.disabled,
+                      'empty history buttons are disabled in every mode, idle or calculating');
+                for (const [back, forward] of [[2, 0], [0, 3]]) {
+                    labDOM.call('lab_workspace_dom_controls', mode, busy, 0, back, forward, 0, 1, 1);
+                    check(WorksheetContext.back.disabled === (back === 0) &&
+                          WorksheetContext.forward.disabled === (forward === 0),
+                          'each history direction follows its own entry count, idle or calculating');
+                }
+            }
         }
         labDOM.call('lab_workspace_dom_controls', 0, 0, 0, 0, 0, 0, 1, 1);
         check(
@@ -255,6 +267,15 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         WorksheetContext.integratorBoundStack.append(enabled, disabled);
         const detachedCopy = document.createElement('button');
         labDOM.call('lab_workspace_dom_busy', 1, null, [detachedCopy], []);
+        const pendingNotice = document.getElementById('worksheetPending')!;
+        const worksheetHeader = pendingNotice.closest('.card-title')!;
+        const worksheetBody = document.getElementById('rendered')!;
+        check(worksheetHeader && worksheetHeader.nextElementSibling === worksheetBody,
+              'pending status belongs to the header with no spacer before the worksheet');
+        const headerHeight = worksheetHeader.getBoundingClientRect().height;
+        const worksheetTop = worksheetBody.getBoundingClientRect().top;
+        check(!hidden(document.getElementById('worksheetPending')!),
+              'pending worksheet results are explicitly labelled as belonging to the previous calculation');
         const busyMutations = new MutationObserver(() => {});
         busyMutations.observe(
             WorksheetContext.integratorBoundStack, {subtree: true, attributes: true, attributeFilter: ['disabled']});
@@ -270,11 +291,17 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         } finally {
             busyMutations.disconnect();
         }
-        check(enabled.disabled && disabled.disabled && detachedCopy.disabled, 'busy is idempotent for repeated starts');
+        check(enabled.disabled && disabled.disabled && !detachedCopy.disabled,
+              'busy is idempotent and never locks copying the displayed result');
         check(
             enabled.dataset.busyDisabled === '1' && !disabled.dataset.busyDisabled,
             'only newly disabled controls owned');
         labDOM.call('lab_workspace_dom_busy', 0, null, [detachedCopy], []);
+        check(hidden(document.getElementById('worksheetPending')!), 'completed worksheet removes the pending notice');
+        check(worksheetHeader.getBoundingClientRect().height === headerHeight &&
+              worksheetBody.getBoundingClientRect().top === worksheetTop &&
+              getComputedStyle(pendingNotice).visibility === 'hidden',
+              'hiding the header status does not move the worksheet or leave visible text');
         check(
             !enabled.disabled && disabled.disabled && !detachedCopy.disabled,
             'busy completion preserves prior disabled');

@@ -29,4 +29,7 @@ json_t *lab_state_load(void);
  */
 bool lab_state_save(const json_t *updates);
 
+/** @brief Resolve an owned sibling path beside the state file, creating private parents; name must be a basename. */
+string_t *lab_state_private_path(const char *name);
+
 #endif

@@ -3,8 +3,9 @@
  * @brief Accessible control hints and their DOM projection for the WASM client.
  *
  * Owns label precedence, authored-title caching, description restoration and
- * viewport placement. The host retains only the active node for event delivery,
- * including restoration after detachment. No scoped DOM handles survive a call.
+ * viewport placement, including a fourteenfold preview of the Location summary flag.
+ * The host retains only the active node for event delivery and restoration after
+ * detachment. No scoped DOM handles survive a call.
  * Browser primitives supply Unicode casing/whitespace and measured rectangles;
  * this module never interprets mathematical content.
  */
@@ -105,6 +106,34 @@ static jsref lab_tooltip_node(void)
     return node;
 }
 
+/* Reuse the exact artwork, including SVG animation and reduced-motion policy. */
+static bool lab_tooltip_flag_preview(jsref node, jsref button, double viewport_width, double viewport_height)
+{
+    if (!lab_dom_has_class(button, "almanac-location-flag") || !lab_dom_closest(button, ".almanac-summary"))
+        return false;
+    int source = lab_dom_query(button, "img.country-flag");
+    int flag = lab_dom_read(source, LAB_DOM_ATTRIBUTE, "src");
+    double width = lab_dom_measure(source, LAB_DOM_MEASURE_RECT_WIDTH);
+    double height = lab_dom_measure(source, LAB_DOM_MEASURE_RECT_HEIGHT);
+    if ((!lab_dom_starts_with(flag, "data:image/svg+xml;base64,") &&
+         !lab_dom_equal(flag, lab_dom_string("/offshore_flag.svg"))) || width <= 0 || height <= 0)
+        return false;
+    /* Leave room for the popup's padding and viewport margins on small screens. */
+    double scale = 14;
+    if (width * scale > viewport_width - 48) scale = (viewport_width - 48) / width;
+    if (height * scale > viewport_height - 48) scale = (viewport_height - 48) / height;
+    if (scale <= 0) return false;
+    int image = lab_dom_create("img");
+    lab_dom_class(image, "country-flag", 1);
+    lab_dom_write(image, LAB_DOM_ATTRIBUTE, "alt", lab_dom_read(button, LAB_DOM_ATTRIBUTE, "aria-label"));
+    lab_dom_write(image, LAB_DOM_ATTRIBUTE, "src", flag);
+    lab_dom_write(image, LAB_DOM_STYLE, "width", lab_dom_format(width * scale, "", "px"));
+    lab_dom_write(image, LAB_DOM_STYLE, "height", lab_dom_format(height * scale, "", "px"));
+    lab_dom_write(node, LAB_DOM_TEXT, "", lab_dom_string(""));
+    lab_dom_append(node, image);
+    return true;
+}
+
 
 /* Restore exact original spelling, whitespace and absent/empty attribute distinction. */
 void lab_tooltip_hide(jsref button)
@@ -146,7 +175,8 @@ bool lab_tooltip_show(jsref button, jsref previous, double width, double height)
         lab_dom_write(node, LAB_DOM_TEXT, "", lab_location_town_text(lab_dom_read(node, LAB_DOM_TEXT, "")));
     int flag = lab_dom_read(button, LAB_DOM_DATASET, "countryFlag");
     if (lab_dom_length(lab_dom_read(button, LAB_DOM_DATASET, "countryCode")) &&
-        lab_dom_starts_with(flag, "data:image/svg+xml;base64,")) {
+        (lab_dom_starts_with(flag, "data:image/svg+xml;base64,") ||
+         lab_dom_equal(flag, lab_dom_string("/offshore_flag.svg")))) {
         int text = lab_dom_read(node, LAB_DOM_TEXT, "");
         lab_dom_write(node, LAB_DOM_TEXT, "", lab_dom_string(""));
         int image = lab_dom_create("img"), label = lab_dom_create("span");
@@ -157,6 +187,8 @@ bool lab_tooltip_show(jsref button, jsref previous, double width, double height)
         lab_dom_append(node, image);
         lab_dom_append(node, label);
     }
+    bool flag_preview = lab_tooltip_flag_preview(node, button, width, height);
+    lab_dom_class(node, "mars-flag-tooltip", flag_preview);
     lab_dom_remove(button, "title");
     if (!lab_dom_has(button, "data-mars-tooltip-description")) {
         if (lab_dom_has(button, "aria-describedby"))
@@ -169,14 +201,20 @@ bool lab_tooltip_show(jsref button, jsref previous, double width, double height)
     if (!lab_dom_contains(tokens, lab_dom_string(" marsButtonTooltip ")))
         original = lab_dom_join(original, lab_dom_string(lab_dom_length(original) ? " " : ""), "marsButtonTooltip");
     lab_dom_write(button, LAB_DOM_ATTRIBUTE, "aria-describedby", original);
+    double anchor_top = lab_dom_measure(button, LAB_DOM_MEASURE_RECT_TOP);
+    double tooltip_height = lab_dom_measure(node, LAB_DOM_MEASURE_RECT_HEIGHT);
     const double *position = lab_view_tooltip_rect(
         width, height, lab_dom_measure(button, LAB_DOM_MEASURE_RECT_LEFT),
-        lab_dom_measure(button, LAB_DOM_MEASURE_RECT_TOP), lab_dom_measure(button, LAB_DOM_MEASURE_RECT_WIDTH),
+        anchor_top, lab_dom_measure(button, LAB_DOM_MEASURE_RECT_WIDTH),
         lab_dom_measure(button, LAB_DOM_MEASURE_RECT_BOTTOM), lab_dom_measure(node, LAB_DOM_MEASURE_RECT_WIDTH),
-        lab_dom_measure(node, LAB_DOM_MEASURE_RECT_HEIGHT));
+        tooltip_height);
     if (position) {
+        /* Only flag previews prefer above; viewport coordinates already account for scrolling.
+         * The body-owned popup may overlap its card, retaining the usual eight-pixel gap and margin. */
+        double above = anchor_top - tooltip_height - 8;
+        double top = flag_preview && above >= 8 && above + tooltip_height <= height - 8 ? above : position[1];
         lab_dom_write(node, LAB_DOM_STYLE, "left", lab_dom_format(position[0], "", "px"));
-        lab_dom_write(node, LAB_DOM_STYLE, "top", lab_dom_format(position[1], "", "px"));
+        lab_dom_write(node, LAB_DOM_STYLE, "top", lab_dom_format(top, "", "px"));
     }
     lab_dom_class(node, "visible", 1);
     return true;

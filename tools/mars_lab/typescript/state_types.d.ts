@@ -292,6 +292,9 @@ interface WorksheetHistoryNavigationPort {
     /** @brief Read the selected mode before acquiring navigation ownership. */
     mode(): WorksheetMode;
 
+    /** @brief Read the native history count before replacing any active request. */
+    count(direction: number): number;
+
     /** @brief Run navigation inside an owned evaluation request. */
     run(mode: WorksheetMode, action: WorksheetHistoryAction): Promise<unknown>;
 }

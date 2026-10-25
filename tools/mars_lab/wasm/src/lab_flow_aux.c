@@ -188,13 +188,18 @@ static jsref lab_flow_startup_context(frame_jsref frame, view_jsref view)
 static jsref lab_flow_startup_evaluate_mode(frame_jsref frame)
 {
     int mode = lab_dom_get(frame, "mode");
+    /* Recalculation on reopening is not a new navigation step, even if catalogue
+     * hydration or input normalisation has refreshed the restored snapshot. */
+    int options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "skipHistoryUpdate", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
     /* This startup-only membership check has exactly seven fixed worksheet labels, never user-sized data. */
     static const char *const modes[] = {"expression", "equation", "diffequation", "matrix",
                                         "integrator", "datetime", "almanac"};
     for (unsigned i = 0; i < sizeof modes / sizeof *modes; ++i)
         if (lab_dom_equal(mode, lab_dom_string(modes[i])))
-            return lab_flow_call(frame, LAB_FLOW_STARTUP_DONE, "evaluate", "result", 1, 1, mode);
-    return lab_flow_call(frame, LAB_FLOW_STARTUP_DONE, "evaluate", "result", 1, 1, lab_dom_string("expression"));
+            return lab_flow_call(frame, LAB_FLOW_STARTUP_DONE, "evaluate", "result", 1, 2, mode, options);
+    return lab_flow_call(frame, LAB_FLOW_STARTUP_DONE, "evaluate", "result", 1, 2,
+                         lab_dom_string("expression"), options);
 }
 
 static jsref lab_flow_startup_refresh(frame_jsref frame, view_jsref view)

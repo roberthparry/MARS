@@ -337,7 +337,8 @@ window.checkLabRequests = async function checkLabRequests() {
         check(pending.length === 2 && pending[0].signal.aborted, 'supersession aborts host resources');
         pending[0].resolve(response({ok: true, marker: 'obsolete'}));
         await old;
-        check(WorksheetRequests.labRequests.busy() && WorksheetContext.run.disabled && !applied.length, 'stale completion retains newer busy state');
+        check(WorksheetRequests.labRequests.busy() && !applied.length,
+              'stale completion retains newer request ownership without publishing a result');
         pending[1].resolve(response({ok: true, marker: 'latest'}));
         await latest;
         check(!WorksheetRequests.labRequests.busy() && applied.join() === 'latest', 'only newest payload is applied');

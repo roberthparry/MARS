@@ -315,10 +315,10 @@ json_t *lab_cal_state_updates(bool is_datetime, const json_t *options, const jso
 {
     static const char *source_keys[] = {"date", "start", "end",       "year",      "jurisdiction",
                                         "town", "lat",   "lon",       "elevation", "gmt_offset",
-                                        "time", "zone",  "visibility"};
+                                        "time", "zone",  "visibility", "zone_mode"};
     static const char *state_keys[] = {"date", "start",    "end",       "year",      "jurisdiction",
                                        "town", "latitude", "longitude", "elevation", "gmt_offset",
-                                       "time", "zone",     "visibility"};
+                                       "time", "zone",     "visibility", "zone_mode"};
     json_t *updates = json_new_object();
     for (size_t i = 0; i < sizeof(source_keys) / sizeof(*source_keys); ++i) {
         if (!lab_cal_get(options, source_keys[i]))
@@ -448,6 +448,7 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
         if (!lab_cal_numeric(lab_cal_text(options, "elevation"), -500, 11000))
             error = "Bad request: observer elevation must be between -500 and 11000 metres";
         lab_cal_option(options, payload, "zone", "zone", "0");
+        lab_cal_option(options, payload, "zone_mode", "zone_mode", "manual");
         lab_cal_option(options, payload, "time", "time", clock);
         lab_cal_option(options, payload, "visibility", "visibility", "all");
         lab_cal_option(options, payload, "town", "town", "");
@@ -481,6 +482,7 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
     }
     string_t *timezone = lab_cal_town_timezone(options);
     lab_cal_set(options, "timezone", string_c_str(timezone));
+    if (is_almanac) lab_cal_resolve_observer_zone(options);
     if (is_datetime && !*lab_cal_text(options, "gmt_offset")) {
         string_t *date = string_new_with(lab_cal_text(options, "date"));
         double offset;

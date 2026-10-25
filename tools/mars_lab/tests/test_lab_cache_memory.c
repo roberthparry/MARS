@@ -91,8 +91,8 @@ static void populate(void)
         lab_flag_cache_get(1); assert(fixture()->returned == 10);
         snprintf(key, sizeof key, "town-%u", i);
         fixture()->input[1] = key; fixture()->input[3] = code;
-        assert(lab_country_cache_put(1, 2, 3, 0));
-        assert(lab_country_cache_put(1, 2, 3, 0));
+        assert(lab_country_cache_put(1, 2, 3, 0, 0));
+        assert(lab_country_cache_put(1, 2, 3, 0, 0));
         lab_country_cache_get(1); assert(fixture()->returned == 10);
     }
     fixture()->input[1] = "AA";
@@ -120,7 +120,7 @@ int main(void)
     fixture()->input[1] = "GB";
     lab_flag_cache_get(1); assert(!fixture()->returned);
     fixture()->input[3] = "GB";
-    assert(!lab_country_cache_put(1, 2, 3, 0));
+    assert(!lab_country_cache_put(1, 2, 3, 0, 0));
     fixture()->input[1] = "invalid";
     assert(!lab_flag_cache_put(1, 2, 3));
     fixture()->input[1] = "GB"; fixture()->input[3] = "invalid image";

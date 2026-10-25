@@ -1,17 +1,70 @@
 /**
  * @file globe_gpu.ts
- * @brief Thin WebGL backend for WASM-owned binary polygon coverage plans.
+ * @brief Thin WebGL backend for native-owned coverage and colour correction plans.
  *
  * No geographic coordinates, projection or shader generation lives here. The
  * backend retains GPU buffers and double-buffers coverage textures. A failed
  * render never replaces the visible texture. Eight-bit stencil batches use
  * signed non-zero winding, including concave rings and overlapping patches.
+ * Native-shader colour correction palettes are rendered once per photographic
+ * source, keeping neighbourhood sampling out of the animation loop.
  */
 export interface GlobeMaskFrame {
     svg: string;
     vertices: Float32Array<ArrayBuffer>;
     batches: Uint32Array<ArrayBuffer>;
     projectMs?: number;
+}
+
+/** Build native-shader colour lookup textures once per photographic source, outside animation frames. */
+export function buildGlobePalettes(gl: WebGLRenderingContext, program: WebGLProgram, resolution = 2048): WebGLTexture[] {
+    if (!Number.isInteger(resolution) || resolution < 32 || resolution > 2048 || (resolution & (resolution - 1)))
+        throw new Error('Invalid GPU palette dimensions');
+    const framebuffer = gl.createFramebuffer();
+    if (!framebuffer) throw new Error('GPU palette framebuffer unavailable');
+    const viewport = gl.getParameter(gl.VIEWPORT) as Int32Array;
+    const active = gl.getParameter(gl.ACTIVE_TEXTURE) as number;
+    const textures: WebGLTexture[] = [];
+    gl.activeTexture(gl.TEXTURE7);
+    const photo = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null;
+    const pass = gl.getUniformLocation(program, 'palettePass');
+    try {
+        gl.useProgram(program);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        const width = Math.min(resolution, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);
+        gl.viewport(0, 0, width, width / 2);
+        // Restore the input binding before drawing: the output must never feed back into a sampler.
+        gl.activeTexture(gl.TEXTURE7);
+        for (let i = 0; i < 2; ++i) {
+            const texture = gl.createTexture();
+            if (!texture) throw new Error('GPU palette allocation unavailable');
+            textures.push(texture);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, width / 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+            gl.bindTexture(gl.TEXTURE_2D, photo);
+            if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+                throw new Error('GPU palette framebuffer incomplete');
+            gl.uniform1i(pass, i + 1);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            if (gl.getError() !== gl.NO_ERROR || gl.isContextLost()) throw new Error('GPU palette draw unavailable');
+        }
+        return textures;
+    } catch (error) {
+        textures.forEach(texture => gl.deleteTexture(texture));
+        throw error;
+    } finally {
+        gl.uniform1i(pass, 0);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.deleteFramebuffer(framebuffer);
+        gl.bindTexture(gl.TEXTURE_2D, photo);
+        gl.activeTexture(active);
+        gl.viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    }
 }
 
 export class MarsGlobeMask {

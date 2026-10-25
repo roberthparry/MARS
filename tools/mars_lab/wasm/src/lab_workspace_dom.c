@@ -510,6 +510,7 @@ static void lab_workspace_dom_disable_list(jsref controls, int busy, int preserv
 /* Repeated busy notifications preserve the initial disabled state of calendar and bounds controls. */
 void lab_workspace_dom_busy(bool busy, jsref equation_variable, jsref copies, jsref digits)
 {
+    lab_dom_class(lab_dom_id("worksheetPending"), "hidden", !busy);
     static const char *const retained[] = {"#integratorBoundStack", "#datetimeControls", "#almanacControls"};
     /* Scope each bounded control group so large result SVGs are never traversed. */
     for (unsigned i = 0; i < sizeof retained / sizeof *retained; ++i) {
@@ -531,7 +532,8 @@ void lab_workspace_dom_busy(bool busy, jsref equation_variable, jsref copies, js
     if (derivatives)
         lab_workspace_dom_disable_list(lab_dom_all(derivatives, "button"), busy, 0);
     lab_dom_disabled(equation_variable, busy);
-    lab_workspace_dom_disable_list(copies, busy, 0);
+    /* Copy reads the displayed result; it never consumes the unfinished calculation. */
+    lab_workspace_dom_disable_list(copies, 0, 0);
     lab_workspace_dom_disable_list(digits, busy, 0);
 }
 

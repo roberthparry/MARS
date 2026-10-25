@@ -13,6 +13,7 @@
 
 #include "array-t.h"
 #include "file-t.h"
+#include "jurisdiction-t.h"
 #include "lab_process_request.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
@@ -21,6 +22,7 @@
 #include "lab_page.h"
 #include "lab_presentation.h"
 #include "lab_state.h"
+#include "lab_history.h"
 #include "lab_surface_service.h"
 #include "lab_wire.h"
 #include "lab_server.h"
@@ -146,9 +148,82 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/locations.js", "tools/mars_lab/build/typescript/locations.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/globe.js", "tools/mars_lab/build/typescript/globe.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/globe_gpu.js", "tools/mars_lab/build/typescript/globe_gpu.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/globe_photo.js", "tools/mars_lab/build/typescript/globe_photo.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/globe_worker.js", "tools/mars_lab/build/typescript/globe_worker.js", "text/javascript; charset=utf-8", 4194304},
     {"/earth_surface.jpg", "tools/mars_lab/assets/earth_surface.jpg", "image/jpeg", 4194304},
-    {"/earth_surface_detail.png", "tools/mars_lab/assets/earth_surface_detail.png", "image/png", 33554432},
+    {"/earth_surface_detail.jpg", "tools/mars_lab/assets/earth_surface_detail.jpg", "image/jpeg", 16777216},
+    {"/earth_tiles/00-00.jpg", "tools/mars_lab/assets/earth_tiles/00-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/01-00.jpg", "tools/mars_lab/assets/earth_tiles/01-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/02-00.jpg", "tools/mars_lab/assets/earth_tiles/02-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/03-00.jpg", "tools/mars_lab/assets/earth_tiles/03-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/04-00.jpg", "tools/mars_lab/assets/earth_tiles/04-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/05-00.jpg", "tools/mars_lab/assets/earth_tiles/05-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/06-00.jpg", "tools/mars_lab/assets/earth_tiles/06-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/07-00.jpg", "tools/mars_lab/assets/earth_tiles/07-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/08-00.jpg", "tools/mars_lab/assets/earth_tiles/08-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/09-00.jpg", "tools/mars_lab/assets/earth_tiles/09-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/10-00.jpg", "tools/mars_lab/assets/earth_tiles/10-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/11-00.jpg", "tools/mars_lab/assets/earth_tiles/11-00.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/00-01.jpg", "tools/mars_lab/assets/earth_tiles/00-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/01-01.jpg", "tools/mars_lab/assets/earth_tiles/01-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/02-01.jpg", "tools/mars_lab/assets/earth_tiles/02-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/03-01.jpg", "tools/mars_lab/assets/earth_tiles/03-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/04-01.jpg", "tools/mars_lab/assets/earth_tiles/04-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/05-01.jpg", "tools/mars_lab/assets/earth_tiles/05-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/06-01.jpg", "tools/mars_lab/assets/earth_tiles/06-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/07-01.jpg", "tools/mars_lab/assets/earth_tiles/07-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/08-01.jpg", "tools/mars_lab/assets/earth_tiles/08-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/09-01.jpg", "tools/mars_lab/assets/earth_tiles/09-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/10-01.jpg", "tools/mars_lab/assets/earth_tiles/10-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/11-01.jpg", "tools/mars_lab/assets/earth_tiles/11-01.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/00-02.jpg", "tools/mars_lab/assets/earth_tiles/00-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/01-02.jpg", "tools/mars_lab/assets/earth_tiles/01-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/02-02.jpg", "tools/mars_lab/assets/earth_tiles/02-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/03-02.jpg", "tools/mars_lab/assets/earth_tiles/03-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/04-02.jpg", "tools/mars_lab/assets/earth_tiles/04-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/05-02.jpg", "tools/mars_lab/assets/earth_tiles/05-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/06-02.jpg", "tools/mars_lab/assets/earth_tiles/06-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/07-02.jpg", "tools/mars_lab/assets/earth_tiles/07-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/08-02.jpg", "tools/mars_lab/assets/earth_tiles/08-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/09-02.jpg", "tools/mars_lab/assets/earth_tiles/09-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/10-02.jpg", "tools/mars_lab/assets/earth_tiles/10-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/11-02.jpg", "tools/mars_lab/assets/earth_tiles/11-02.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/00-03.jpg", "tools/mars_lab/assets/earth_tiles/00-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/01-03.jpg", "tools/mars_lab/assets/earth_tiles/01-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/02-03.jpg", "tools/mars_lab/assets/earth_tiles/02-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/03-03.jpg", "tools/mars_lab/assets/earth_tiles/03-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/04-03.jpg", "tools/mars_lab/assets/earth_tiles/04-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/05-03.jpg", "tools/mars_lab/assets/earth_tiles/05-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/06-03.jpg", "tools/mars_lab/assets/earth_tiles/06-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/07-03.jpg", "tools/mars_lab/assets/earth_tiles/07-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/08-03.jpg", "tools/mars_lab/assets/earth_tiles/08-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/09-03.jpg", "tools/mars_lab/assets/earth_tiles/09-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/10-03.jpg", "tools/mars_lab/assets/earth_tiles/10-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/11-03.jpg", "tools/mars_lab/assets/earth_tiles/11-03.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/00-04.jpg", "tools/mars_lab/assets/earth_tiles/00-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/01-04.jpg", "tools/mars_lab/assets/earth_tiles/01-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/02-04.jpg", "tools/mars_lab/assets/earth_tiles/02-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/03-04.jpg", "tools/mars_lab/assets/earth_tiles/03-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/04-04.jpg", "tools/mars_lab/assets/earth_tiles/04-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/05-04.jpg", "tools/mars_lab/assets/earth_tiles/05-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/06-04.jpg", "tools/mars_lab/assets/earth_tiles/06-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/07-04.jpg", "tools/mars_lab/assets/earth_tiles/07-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/08-04.jpg", "tools/mars_lab/assets/earth_tiles/08-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/09-04.jpg", "tools/mars_lab/assets/earth_tiles/09-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/10-04.jpg", "tools/mars_lab/assets/earth_tiles/10-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/11-04.jpg", "tools/mars_lab/assets/earth_tiles/11-04.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/00-05.jpg", "tools/mars_lab/assets/earth_tiles/00-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/01-05.jpg", "tools/mars_lab/assets/earth_tiles/01-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/02-05.jpg", "tools/mars_lab/assets/earth_tiles/02-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/03-05.jpg", "tools/mars_lab/assets/earth_tiles/03-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/04-05.jpg", "tools/mars_lab/assets/earth_tiles/04-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/05-05.jpg", "tools/mars_lab/assets/earth_tiles/05-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/06-05.jpg", "tools/mars_lab/assets/earth_tiles/06-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/07-05.jpg", "tools/mars_lab/assets/earth_tiles/07-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/08-05.jpg", "tools/mars_lab/assets/earth_tiles/08-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/09-05.jpg", "tools/mars_lab/assets/earth_tiles/09-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/10-05.jpg", "tools/mars_lab/assets/earth_tiles/10-05.jpg", "image/jpeg", 4194304},
+    {"/earth_tiles/11-05.jpg", "tools/mars_lab/assets/earth_tiles/11-05.jpg", "image/jpeg", 4194304},
     {"/js/results.js", "tools/mars_lab/build/typescript/results.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/results_services.js", "tools/mars_lab/build/typescript/results_services.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/surface.js", "tools/mars_lab/build/typescript/surface.js", "text/javascript; charset=utf-8", 4194304},
@@ -157,6 +232,7 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/surface_hover.js", "tools/mars_lab/build/typescript/surface_hover.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/surface_volume.js", "tools/mars_lab/build/typescript/surface_volume.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/state.js", "tools/mars_lab/build/typescript/state.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/history.js", "tools/mars_lab/build/typescript/history.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/workspace.js", "tools/mars_lab/build/typescript/workspace.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/workspace_controllers.js", "tools/mars_lab/build/typescript/workspace_controllers.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/workspace_native.js", "tools/mars_lab/build/typescript/workspace_native.js", "text/javascript; charset=utf-8", 4194304},
@@ -189,6 +265,16 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
         return lab_svr_message(request, response, 403, "MARS Lab is private; use this machine or a private network.");
     const string_t *path = websrv_request_path(request);
     if (websrv_request_method(request) == HTTP_GET) {
+        if (lab_svr_equal(path, "/offshore_flag.svg")) {
+            jurisdiction_t *catalogue = jurisdict_open(NULL);
+            string_t *name = NULL, *svg = NULL;
+            bool found = jurisdict_country(catalogue, "ZZ-SEA", &name, &svg) && svg;
+            bool ok = found ? lab_svr_header(response, "Content-Type", "image/svg+xml") &&
+                              websrv_response_text(response, svg)
+                            : lab_svr_message(request, response, 404, "Offshore artwork is not installed");
+            string_free(name); string_free(svg); jurisdict_close(catalogue);
+            return ok;
+        }
         if (lab_svr_equal(path, "/") || lab_svr_equal(path, "/index.html")) {
             json_t *state = lab_state_load();
             json_t *mobile = lab_mobile_details(lab_svr_request_header(request, "Host"), lab_svr_port(server));
@@ -319,6 +405,14 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
         json_free(payload);
         return lab_svr_message(request, response, 400, "Expected a valid versioned Protobuf request object");
     }
+    if (lab_svr_equal(path, "/history")) {
+        unsigned status = 400;
+        json_t *result = lab_history_request(payload, &status);
+        json_free(payload);
+        bool ok = result && websrv_response_status(response, status) && lab_svr_value(request, response, result);
+        json_free(result);
+        return ok;
+    }
     if (lab_svr_equal(path, "/state")) {
         bool saved = lab_state_save(payload);
         json_free(payload);
@@ -364,11 +458,13 @@ static bool lab_svr_register_routes(lab_server_t *server)
                                              "/towns",
                                              "/mobile-access",
                                              "/favicon.svg",
+                                             "/offshore_flag.svg",
                                              "/apple-touch-icon.png",
                                              "/icon-192.png",
                                              "/icon-512.png",
                                              "/manifest.webmanifest"};
     static const char *const post_routes[] = {"/state",
+                                              "/history",
                                               "/presentation",
                                               "/forms",
                                               "/eval",

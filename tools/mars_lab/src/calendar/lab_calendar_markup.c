@@ -284,10 +284,12 @@ string_t *lab_cal_almanac_markup(const json_t *response, const json_t *rows, con
             const json_t *cell = json_array_get(summary, i);
             const char *flag = lab_cal_text(cell, "flag");
             if (!strcmp(lab_cal_text(cell, "label"), "Location") &&
-                !strncmp(flag, "data:image/svg+xml;base64,", 26)) {
+                (!strncmp(flag, "data:image/svg+xml;base64,", 26) || !strcmp(flag, "/offshore_flag.svg"))) {
                 ok = !string_append_cstr(out, "<div class=\"almanac-summary-row\"><dt>Location</dt><dd>"
-                                              "<img class=\"country-flag\" alt=\"\" src=\"") &&
-                     lab_cal_markup_text(out, flag) && !string_append_cstr(out, "\"> ") &&
+                                              "<button type=\"button\" class=\"almanac-location-flag\" aria-label=\"Flag for ") &&
+                     lab_cal_markup_text(out, lab_cal_text(cell, "value")) &&
+                     !string_append_cstr(out, "\"><img class=\"country-flag\" alt=\"\" src=\"") &&
+                     lab_cal_markup_text(out, flag) && !string_append_cstr(out, "\"></button> ") &&
                      lab_cal_markup_text(out, lab_cal_text(cell, "value")) && !string_append_cstr(out, "</dd></div>");
             } else
                 ok = lab_cal_markup_summary_row(out, lab_cal_text(cell, "label"), lab_cal_text(cell, "value"), "");

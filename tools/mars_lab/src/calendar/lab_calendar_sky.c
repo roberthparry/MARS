@@ -3,7 +3,7 @@
  * @brief Compact native Sun, Moon and selected-observer status markup.
  *
  * Reuses ephemeris-oriented lunar vectors from Almanac results and existing DateTime solar fields.
- * Almanac solar clocks use the fast native calendar approximation, explicitly marked approximate,
+ * Almanac solar clocks use the same ephemeris rise/set engine as DateTime,
  * on the selected GMT date. Polar conditions remain explicit. DateTime's categorical Moon phase
  * is a schematic when precise lunar vectors are unavailable. No browser astronomy is required.
  */
@@ -13,6 +13,8 @@
 #include "datetime-t.h"
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
+#define MARS_LAB_CALENDAR_INTERNAL_ACCESS
+#include "lab_calendar_solar.h"
 
 static bool sky_text(string_t *out, const char *label, const char *value)
 {
@@ -22,23 +24,11 @@ static bool sky_text(string_t *out, const char *label, const char *value)
            !string_append_cstr(out, "</span></span>");
 }
 
-static bool sky_solar(string_t *out, const json_t *response, bool rising)
+static bool sky_solar(string_t *out, const almanac_rise_set_event_t *event, const string_t *zone, bool rising)
 {
-    const json_t *fields = lab_cal_get(response, "fields");
-    datetime_t *date = datetime_from_string(lab_cal_text(fields, "date"));
-    double latitude, longitude, hours = -3;
-    if (date && lab_cal_number(lab_cal_text(response, "observer_latitude"), &latitude) &&
-        lab_cal_number(lab_cal_text(response, "observer_longitude"), &longitude) &&
-        isfinite(latitude) && fabs(latitude) <= 90 && isfinite(longitude) && fabs(longitude) <= 180)
-        hours = datetime_sun_time(datetime_jdn(date), latitude, longitude, rising);
-    datetime_dealloc(date);
-    string_t *clock = NULL;
-    if (isfinite(hours) && hours >= 0 && hours < 24) {
-        unsigned minutes = (unsigned)floor(hours * 60 + 0.5) % 1440;
-        clock = string_sprintf("≈%02u:%02u GMT", minutes / 60, minutes % 60);
-    }
-    const char *missing = hours == -1 ? "polar night" : hours == -2 ? "midnight sun" : "unavailable";
-    bool ok = sky_text(out, rising ? "Sunrise " : "Sunset ", clock ? string_c_str(clock) : missing);
+    string_t *clock = lab_cal_solar_clock(event, zone);
+    if (clock && event->status == ALMANAC_RISE_SET_OK) string_append_cstr(clock, " GMT");
+    bool ok = clock && sky_text(out, rising ? "Sunrise " : "Sunset ", string_c_str(clock));
     string_free(clock);
     return ok;
 }
@@ -70,7 +60,8 @@ static bool sky_flag(string_t *out, const json_t *response)
     for (size_t i = 0; i < json_array_size(summary) && i < 10; ++i) {
         const json_t *cell = json_array_get(summary, i);
         const char *flag = lab_cal_text(cell, "flag");
-        if (!strcmp(lab_cal_text(cell, "label"), "Location") && !strncmp(flag, "data:image/svg+xml;base64,", 26))
+        if (!strcmp(lab_cal_text(cell, "label"), "Location") &&
+            (!strncmp(flag, "data:image/svg+xml;base64,", 26) || !strcmp(flag, "/offshore_flag.svg")))
             return !string_append_cstr(out, "<img class=\"country-flag\" alt=\"") &&
                    lab_cal_markup_text(out, lab_cal_text(cell, "value")) &&
                    !string_append_cstr(out, "\" src=\"") && lab_cal_markup_text(out, flag) &&
@@ -87,7 +78,18 @@ string_t *lab_cal_sky_markup(const json_t *response, bool almanac)
                                     "<span class=\"sky-status-events\">");
     bool ok = out && sky_moon(out, response, almanac);
     if (almanac) {
-        ok = ok && sky_solar(out, response, false) && sky_solar(out, response, true);
+        datetime_t *date = datetime_from_string(lab_cal_text(fields, "date"));
+        string_t *zone = string_new_with("Etc/UTC");
+        almanac_observer_t observer = {.latitude_degrees = NAN, .longitude_degrees = NAN};
+        bool positioned = lab_cal_number(lab_cal_text(response, "observer_latitude"), &observer.latitude_degrees) &&
+                          lab_cal_number(lab_cal_text(response, "observer_longitude"), &observer.longitude_degrees);
+        const char *elevation = lab_cal_text(response, "observer_elevation");
+        if (*elevation) positioned = lab_cal_number(elevation, &observer.elevation_metres) && positioned;
+        almanac_t *engine = positioned ? almanac_open() : NULL;
+        almanac_sun_times_t solar;
+        lab_cal_solar_times(engine, lab_cal_text(fields, "jurisdiction"), date, &observer, zone, &solar);
+        ok = ok && sky_solar(out, &solar.set, zone, false) && sky_solar(out, &solar.rise, zone, true);
+        almanac_close(engine); string_free(zone); datetime_dealloc(date);
         ok = ok && !string_append_cstr(out, "</span><span class=\"sky-status-selection\">");
         const char *time = lab_cal_text(fields, "time");
         string_t *moment = string_sprintf("%s %.*s GMT", lab_cal_text(fields, "date"), (int)strcspn(time, "."), time);

@@ -362,6 +362,7 @@ function labTestModuleOwner(name: string): object {
 
 /** @brief Read native fixture defaults after the application has finished starting. */
 function initialiseLabTestAdapters(): void {
+    worksheetHistoryPersistence.dispose();
     integratorCandidateNames = Object.freeze(labDOM.call<string[]>('lab_binding_row_names'));
     DEFAULT_EQUATION_VARIABLE_TEXT = labApplication.configuration.DEFAULT_EQUATION_VARIABLE;
 }

@@ -19,6 +19,7 @@ typedef struct _globe_t {
     sqlite_t *owned_geometry;
     bool towns;
     bool countries;
+    bool regions;
 } globe_t;
 
 static bool globe_table(sqlite_t *db, const char *name)
@@ -48,6 +49,8 @@ globe_t *globe_open_databases(sqlite_t *shore_db, sqlite_t *map_db, sqlite_t *to
     g->countries = globe_table(shore_db, "country_bounds") && globe_table(shore_db, "country_chunk") &&
                    globe_table(shore_db, "country_name");
     g->towns = globe_table(town_db, "jurisdiction_town");
+    g->regions = globe_table(shore_db, "region_bounds") && globe_table(shore_db, "region_chunk") &&
+                 globe_table(shore_db, "region_name");
     if (globe_table(map_db, "rivers_dataset")) {
         sqlite_stmt_t *q = sqlite_stmt_prepare(map_db,
             "select 1 from rivers_dataset where id=1 and source not like 'WDBII%'");
@@ -122,6 +125,12 @@ string_t *globe_country_code_at(globe_t *g, double latitude, double longitude)
     string_t *code = countries_lookup(g->geometry, latitude, longitude, true);
     if (code && string_byte_length(code) != 2 && string_byte_length(code) != 6) { string_free(code); return NULL; }
     return code;
+}
+
+/* Resolve an independent cultural display overlay without replacing country ownership. */
+string_t *globe_region_code_at(globe_t *g, double latitude, double longitude)
+{
+    return g && g->regions ? regions_lookup(g->geometry, latitude, longitude) : NULL;
 }
 
 /* Borders are a separate display layer; availability never changes land/sea classification. */

@@ -270,8 +270,10 @@ bool lab_view_wrapped(double width, double scale, double available, bool has_var
 unsigned lab_view_controls(lab_mode_t mode, bool busy, bool ready, unsigned back, unsigned forward, bool can_goal,
                            bool minimum, bool maximum)
 {
+    /* Run and history replace the active request; waiting for it would defeat cancellation. */
+    unsigned replacement = (!!ready) | ((back != 0) << 1) | ((forward != 0) << 2);
     if (busy)
-        return 0;
-    return (!!ready) | ((back > 0) << 1) | ((forward > 0) << 2) | ((mode == LAB_MODE_EXPRESSION && can_goal) << 3) |
+        return replacement;
+    return replacement | ((mode == LAB_MODE_EXPRESSION && can_goal) << 3) |
            ((!minimum) << 4) | ((!maximum) << 5);
 }

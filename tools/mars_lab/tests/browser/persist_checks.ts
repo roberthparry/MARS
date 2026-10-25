@@ -30,7 +30,7 @@ window.checkLabPersistence = async function checkLabPersistence() {
             throw new Error('Persistence: ' + message);
     }
     function equal(actual: unknown, expected: unknown, message: string): void {
-        check(Object.is(actual, expected), message);
+        check(Object.is(actual, expected), `${message}: expected=${String(expected)}, actual=${String(actual)}`);
     }
     const saved = {
         store: WorksheetPersistence.persistence.publish,
@@ -126,8 +126,17 @@ window.checkLabPersistence = async function checkLabPersistence() {
             integrator_expression: '  exp(x)  '
         };
         WorksheetContext.modeEditorText.diffequation = 'retained';
-        await WorksheetPersistence.restoration.restoreEditors(key => restored[key]);
-        equal(prepared.join('|'), 'μ + σ|x = 1', 'only native binding-aware editors prepared');
+        const activeMode = native.lab_workspace_mode();
+        try {
+            native.lab_workspace_select(0);
+            await WorksheetPersistence.restoration.restoreEditors(key => restored[key]);
+            equal(prepared.join('|'), 'μ + σ', 'only the active expression editor is prepared');
+            native.lab_workspace_select(1);
+            await WorksheetPersistence.restoration.restoreEditors(key => restored[key]);
+            equal(prepared.join('|'), 'μ + σ|x = 1', 'equation metadata is prepared when its mode is active');
+        } finally {
+            native.lab_workspace_select(activeMode);
+        }
         equal(displayed[0], 'μ + σ', 'server expression display trimmed');
         equal(WorksheetContext.worksheetSession.editor.lastExpressionUpdatedAt, 1234, 'server timestamp restored');
         equal(WorksheetContext.modeEditorText.diffequation, 'retained', 'partial editor does not overwrite useful text');

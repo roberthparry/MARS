@@ -14,7 +14,7 @@ this file do not replace those obligations.
 
 ## Offline country flags and boundaries
 
-The SVG country flags in `packaging/jurisdiction-db/flags` come from
+Except for the regional additions listed below, SVG country flags in `packaging/jurisdiction-db/flags` come from
 [flag-icons 7.3.2](https://github.com/lipis/flag-icons/tree/v7.3.2).
 Copyright (c) 2013 Panayiotis Lipiridis. They are redistributed under the
 [MIT licence supplied with the artwork](packaging/jurisdiction-db/flags/LICENSE).
@@ -26,6 +26,37 @@ come from Natural Earth admin-0 map units 5.1.1, at 1:10 million map scale.
 Natural Earth provides them under its [public-domain terms](https://www.naturalearthdata.com/about/terms-of-use/).
 See [the globe guide](docs/globe.md#selected-position-countries) for provenance,
 checksums, generalisation limits and the source's de facto boundary policy.
+
+## Regional flag artwork and coverage
+
+The additional SVGs and per-file authorship/licences are recorded in
+[`REGIONAL-NOTICES.txt`](packaging/jurisdiction-db/flags/REGIONAL-NOTICES.txt),
+also retained in the jurisdiction database. Brittany, Corsica and West Frisian
+SVGs are public-domain artwork. The unchanged Sardinian SVG by icnussa and
+Xander89 is distributed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/legalcode),
+not MIT. Cornish, East Frisian and North Frisian simple geometric SVG encodings
+are original MARS code. Catalan and Basque images reuse the existing flag-icons assets.
+
+`packaging/globe-db/flag_regions.geojson` is a selected-coordinate compilation
+prepared by `tools/mars_config/region_extract.c`. Source geometry is unchanged;
+properties are replaced by local display codes. Retrieved 24 October 2026:
+
+- [Natural Earth admin-1 5.1.1](https://github.com/nvkelso/natural-earth-vector/blob/v5.1.1/geojson/ne_10m_admin_1_states_provinces.geojson),
+  public domain, supplies the selected European provinces/regions.
+- German districts: © GeoBasis-DE / BKG (2021), via
+  [geoBoundaries DEU ADM3, revision 9469f09](https://github.com/wmgeolab/geoBoundaries/tree/9469f09/releaseData/gbOpen/DEU/ADM3),
+  [Data licence Germany – attribution – version 2.0](https://www.govdata.de/dl-de/by-2-0).
+  Selected East/North Frisian district features only; no endorsement implied.
+- [Frontière du Pays Basque 2021](https://www.data.gouv.fr/datasets/capb-contour-du-pays-basque),
+  Communauté Pays Basque – DGA Economie – Direction Agriculture, Pêche et
+  Agroalimentaire, [Licence Ouverte 2.0](https://www.etalab.gouv.fr/licence-ouverte-open-licence/).
+- French departments and department 66 communes from [france-geojson](https://github.com/gregoiredavid/france-geojson),
+  Grégoire David, derived from IGN Admin Express COG 2018 and distributed under Licence Ouverte.
+  The 28 Fenouillèdes communes are excluded by INSEE code; geometry is not redrawn.
+
+The sources' licence terms apply to their respective portions of the compilation.
+Local cultural codes do not assert sovereignty. Coverage and limitations are in
+the [globe guide](docs/globe.md#regional-flag-coverage).
 
 ## GeoNames Sardinian town catalogue
 
@@ -124,9 +155,36 @@ sections (`PPLX`) as well as populated places (`PPL`); it does not globally impo
 every suburb. Reference points and DEM elevations are not harbour entrance or
 surveyed observer positions.
 
+## Offshore emblem adapted from the Pioneer plaque
+
+`packaging/jurisdiction-db/flags/zz-sea.svg` is a vector tracing of an AI-generated
+adaptation of the user-supplied Pioneer plaque image, created with the built-in
+image-generation tool on 24 October 2026. It changes the palette to gold on dark green and depicts
+clothed African-Caribbean adults in place of the original figures, with relaxed
+reggae-inspired clothing, a knitted tam and a headwrap. It is decorative artwork,
+not a scientifically faithful reproduction of the original encoded diagram.
+
+The underlying NASA plaque was designed by Carl Sagan and Frank Drake, with
+artwork by Linda Salzman Sagan. See the [Pioneer plaque source and public-domain
+record](https://commons.wikimedia.org/wiki/File:Pioneer_plaque.svg). The vector
+transcription credited there to Oona Räisänen (Mysid) is not bundled or used here.
+The adaptation is not an official flag and implies no NASA endorsement. No
+exclusive copyright is asserted for the generated additions. The generation
+prompt and conversion parameters are retained in `packaging/jurisdiction-db/flags/zz-sea.txt`.
+Potrace 1.16 (Peter Selinger) traced the approved gold shapes into scalable paths;
+the SVG has a flat MARS-green background and no embedded bitmap. Potrace and
+Netpbm were used only for this conversion and are not redistributed or required
+to build, install or run MARS.
+
+SHA-256: `2d9e562545e85caea21aca57e052228f816bb146217f8489695d9b92426fa375`.
+Size: 126,061 bytes. The packaged source is imported into `jurisdiction_country_flag`
+under the display-only key `ZZ-SEA`; its notice is stored in
+`jurisdiction_country_flag_source`. Lab reads the artwork from the jurisdiction
+database, with no runtime asset-file dependency or external image requests.
+
 ## NASA Blue Marble globe imagery
 
-`tools/mars_lab/assets/earth_surface.jpg` is the unmodified 2048 × 1024 NASA
+Historical provenance: before the July 2004 replacement, the overview was the unmodified 2048 × 1024 NASA
 Blue Marble composite, *Land Surface, Ocean Color and Sea Ice*, published
 8 February 2002. It is reference imagery, not current or selected-date ice coverage.
 
@@ -140,19 +198,41 @@ The image was obtained directly from NASA, under its
 [Earth imagery reuse policy](https://science.nasa.gov/earth/faq/), which permits
 reuse, including commercial reuse, except where another copyright is indicated,
 and requests NASA credit. NASA branding and endorsement restrictions remain
-separate. The bundled file is unchanged; the Lab adds display-time lighting and
+separate. That previously bundled file was unchanged; the Lab adds display-time lighting and
 independent shoreline and town overlays.
 
 SHA-256: `d4dc80a6ef571939d0abe04a9bed3d3d1e6cd63e59514be1c5e43a6b069e6f1e`.
 Size: 266,599 bytes. No online map service is required at runtime.
 
-The optional zoom asset, `tools/mars_lab/assets/earth_surface_detail.png`, is the
+The previous zoom asset, `tools/mars_lab/assets/earth_surface_detail.png`, was the
 unmodified [8192 × 4096 NASA PNG](https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57730/land_ocean_ice_8192.png)
 of the same composite, with the same credits, reuse terms and reference-date limitations.
 Size: 24,147,269 bytes. SHA-256:
 `aaddcd967a9f09fb2d7ef50ff452bebfcf10192c520465d5eb1ad8446c716e98`.
-Lower-capability graphics hardware may receive a display-time reduced-resolution texture;
-neither packaged source image is modified.
+These older assets have been replaced; their credits and checksums are retained here as provenance.
+
+The current global textures and close-view tiles in `tools/mars_lab/assets/earth_tiles/` are derived from
+[NASA's July 2004 Blue Marble: Next Generation image with topography and bathymetry](https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july/world.topo.bathy.200407.3x21600x10800.jpg).
+Credit: **NASA Earth Observatory**, produced by Reto Stöckli, NASA Goddard Space
+Flight Center. [Dataset description and acknowledgements](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/).
+The NASA imagery reuse policy linked above applies; no endorsement is implied.
+
+Source dimensions: 21600 × 10800. Source size: 27,201,049 bytes.
+Source SHA-256: `d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0`.
+The native `tools/mars_lab/texture_tiles.c` utility crops a 12 × 6 grid without
+resampling, then encodes each 1800 × 1800 tile as JPEG quality 95, 4:4:4 sampling.
+Filenames contain zero-based column and row numbers, west to east and north to south.
+This is historical reference imagery; it does not assert current surface or ice
+conditions. Both global textures use area-weighted resampling of this same source,
+with JPEG quality 95 and 4:4:4 sampling:
+
+- `tools/mars_lab/assets/earth_surface.jpg`: 2048 × 1024, 832,192 bytes;
+  SHA-256 `7e9f55f01df03a826fa7106e7fb55e4ae5c2974371dd55be6f3b8ea0cea0f184`.
+- `tools/mars_lab/assets/earth_surface_detail.jpg`: 8192 × 4096, 9,361,205 bytes;
+  SHA-256 `ceb97696df39d72cac710158c4d1613948006c79cf303a8bfe91df721ff94aab`.
+
+The utility accepts an optional overview output directory after the tile directory.
+Rendering blends these matching images with independent shoreline layers.
 
 ## WASI libc maths, memory and strings
 

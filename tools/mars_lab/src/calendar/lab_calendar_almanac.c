@@ -354,7 +354,7 @@ static json_t *lab_cal_observer_summary(const json_t *options, const char *town,
         lab_cal_summary_cell(summary, labels[i], values[i]);
         string_free(values[i]);
     }
-    if (*lab_cal_text(options, "country"))
+    if (*lab_cal_text(options, "country_flag"))
         lab_cal_set((json_t *)json_array_get(summary, 1), "flag", lab_cal_text(options, "country_flag"));
     return summary;
 }
@@ -450,6 +450,7 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
     lab_cal_set(fields, "jurisdiction", lab_cal_observer_jurisdiction(options));
     lab_cal_set(fields, "town", lab_cal_text(options, "town"));
     lab_cal_set(fields, "timezone", lab_cal_text(options, "timezone"));
+    lab_cal_set(fields, "zone_mode", lab_cal_text(options, "zone_mode"));
     lab_cal_set(fields, "visibility", lab_cal_text(options, "visibility"));
     json_t *response = json_new_object();
     lab_cal_take(response, "ok", json_new_bool(true));

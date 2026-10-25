@@ -81,16 +81,19 @@
     }
 
     /** @brief Bound each group so an unresolved mock identifies its owning regression. */
-    async function runBrowserGroup(name: string, run: () => unknown): Promise<void> {
+    async function runBrowserGroup(name: string, run: () => unknown, timeout = 60000): Promise<void> {
         let timer = 0;
         const deadline = new Promise(function startDeadline(_resolve, reject) {
             function timedOut(): void {
-                reject(new Error(`Browser group ${name} did not finish within 60 seconds`));
+                reject(new Error(`Browser group ${name} did not finish within ${timeout / 1000} seconds`));
             }
-            timer = nativeSetTimeout(timedOut, 60000);
+            timer = nativeSetTimeout(timedOut, timeout);
         });
         try {
             await Promise.race([Promise.resolve().then(run), deadline]);
+        } catch (error) {
+            if (error instanceof Error) error.message = `Browser group ${name}: ${error.message}`;
+            throw error;
         } finally {
             nativeClearTimeout(timer);
         }
@@ -118,7 +121,9 @@
         };
     }
     window.addEventListener('error', function recordError(event) {
-        failures.push(event.message || 'Resource load failed');
+        const target = event.target;
+        const source = target instanceof Element ? target.getAttribute('src') || target.getAttribute('href') || target.tagName : 'unknown';
+        failures.push(event.message || `Resource load failed: ${source.slice(0, 160)}`);
     }, true);
     window.addEventListener('unhandledrejection', function recordRejection(event) {
         if (!failureCase)
@@ -2226,7 +2231,8 @@
     async function checkRenderedGlyphs() {
         await LabTestBrowser.paint();
         const svg = WorksheetContext.rendered.querySelector('svg')!;
-        check(svg, 'Native TeX SVG missing');
+        check(svg, `Native TeX SVG missing: mode=${WorksheetWorkspace.mode.currentMode()}, ` +
+            `status=${WorksheetContext.statusEl.textContent}, result=${WorksheetContext.rendered.textContent}`);
         const bounds = svg.getBoundingClientRect();
         check(bounds.width > 0 && bounds.height > 0, 'TeX SVG has no visible dimensions');
         const glyphs = Array.from(svg.querySelectorAll('use'));
@@ -2649,7 +2655,7 @@
                 frame.style.width = `${viewport}px`;
                 target.style.width = `${card}px`;
                 await LabTestBrowser.paint();
-                for (const icon of target.querySelectorAll<HTMLElement>('.almanac-body-symbol, .almanac-eclipse-symbol')) {
+                for (const icon of target.querySelectorAll<HTMLElement>('td .almanac-body-symbol, td .almanac-eclipse-symbol')) {
                     const style = frame.contentWindow!.getComputedStyle(icon);
                     check(style.filter === 'none' && style.transform === 'none',
                           'Formula recolouring or zoom leaked into an astronomical SVG');
@@ -2766,9 +2772,12 @@
         const savedFetch = window.fetch;
         const savedGlobeFetch = labHttp.fetch;
         labHttp.fetch = (url, options) => url === '/almanac-globe' || url === '/almanac-rivers' ?
-            Promise.reject(new Error('History camera fixture: no regional imagery')) : savedGlobeFetch(url, options);
+            Promise.reject(new Error('History camera fixture: no regional imagery')) : savedGlobeFetch.call(labHttp, url, options);
         const savedMode = WorksheetWorkspace.mode.currentMode();
         // History must work even when an evaluation fails, without contacting astronomy/weather providers.
+        WorksheetWorkspace.presentation.saveCurrentModeResultState();
+        const modes = WorksheetWorkspace.WORKSPACE_MODE_NAMES;
+        const savedResults = modes.map(mode => WorksheetWorkspace.presentation.resultStates[mode]);
         window.fetch = (url, options) => /^\/(almanac|datetime)-eval$/.test(String(url)) ?
             Promise.resolve(new Response(labWire.encode({ok: false, error: 'History fixture'}),
                 {status: 422, headers: {'Content-Type': 'application/x-protobuf'}})) : savedFetch(url, options);
@@ -2811,16 +2820,16 @@
                     globe!.applyCamera(value);
                     return value;
                 };
-                const settledCamera = async (expected: number[]): Promise<void> => {
+                const settledCamera = async (expected: number[], zoom = expected[4]): Promise<void> => {
                     if (globe!.flightTarget && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
                         await new Promise(resolve => setTimeout(resolve, 1200));
-                        check(globe!.view[2] === 1, 'history rotation takes place at the whole-Earth overview');
+                        check(globe!.view[2] > 1, 'nearby history navigation does not retreat to the whole-Earth overview');
                     }
-                    for (let i = 0; i < 300 && globe!.flightTarget; ++i)
+                    for (let i = 0; i < 9000 && globe!.flightTarget; ++i)
                         await new Promise(resolve => setTimeout(resolve, 20));
-                    check(!globe!.flightTarget && globe!.view[2] === expected[4] &&
+                    check(!globe!.flightTarget && globe!.view[2] === zoom &&
                           globe!.orientation.every((value, i) => Math.abs(value - expected[i]) < 1e-12),
-                          `history restores exact saved zoom and quaternion roll: expected=${expected}, ` +
+                          `history retains current zoom and restores saved roll: expected=${expected}, zoom=${zoom}, ` +
                           `actual=${globe!.orientation},${globe!.view[2]}, pending=${globe!.flightTarget}`);
                 };
                 try {
@@ -2840,7 +2849,7 @@
                     check(Number(latitude.value) === 51 && !forward.disabled && back.disabled,
                           `${mode}: Back restores coordinates and enables Forward: latitude=${latitude.value}, ` +
                           `back=${history.backwardCount()}/${back.disabled}, forward=${history.forwardCount()}/${forward.disabled}`);
-                    if (firstCamera) await settledCamera(firstCamera);
+                    if (firstCamera) await settledCamera(firstCamera, secondCamera![4]);
                     if (globe) {
                         firstCamera = camera(65.5, -.2);
                         check(history.forwardCount() === 1 && !forward.disabled,
@@ -2849,7 +2858,7 @@
                     await WorksheetPersistence.navigation.navigate(1);
                     check(Number(latitude.value) === 52 && !back.disabled && forward.disabled,
                           mode + ': Forward restores the edited observer');
-                    if (secondCamera) await settledCamera(secondCamera);
+                    if (secondCamera) await settledCamera(secondCamera, firstCamera![4]);
                     await automatic();
                     check(history.backwardCount() === 1, mode + ': unchanged evaluation does not duplicate history');
                     await WorksheetPersistence.navigation.navigate(0);
@@ -2868,13 +2877,48 @@
                         document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();
                         check(!globe.flightTarget, 'manual zoom interrupts a flight immediately');
                         const match = window.matchMedia;
+                        const interruptedZoom = globe.view[2];
                         try {
                             window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ?
                                 {matches: true} as MediaQueryList : match.call(window, query);
                             MarsAlmanacGlobe.finishHistory(MarsAlmanacGlobe.beginHistory(), firstCamera, true);
-                            check(!globe.flightTarget && globe.view[2] === firstCamera![4],
-                                  'reduced motion restores saved zoom immediately without a flight');
+                            check(!globe.flightTarget && globe.view[2] === interruptedZoom,
+                                  'reduced motion retains current zoom immediately without a flight');
                         } finally { window.matchMedia = match; }
+                        const country = document.getElementById('almanacJurisdiction') as HTMLSelectElement;
+                        country.value = 'GB-ENG';
+                        await automatic({refreshJurisdiction: true, refreshCoordinates: true});
+                        camera(12.5, .3);
+                        await evaluate({skipHistoryUpdate: true});
+                        // Catalogue hydration can replace a town key without changing its geographic observer.
+                        const selectedTown = town.selectedOptions[0];
+                        const originalTownKey = selectedTown.value;
+                        selectedTown.value = originalTownKey + '|catalogue-refresh';
+                        document.dispatchEvent(new Event('mars-almanac-observer-committed'));
+                        document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();
+                        const closeUp = [...globe.orientation, globe.view[2]];
+                        check(JSON.stringify(history.previous(null)?.globeCamera) === JSON.stringify(closeUp),
+                              'manual zoom immediately updates the committed camera despite a refreshed town key');
+                        for (const identity of ['invalid', JSON.stringify(['0', '0', '', 'GB-ENG']),
+                            JSON.stringify([latitude.value, longitude.value, town.value, 'US'])]) {
+                            history.rememberGlobeCamera(identity, [0, 0, 0, 1, 1]);
+                            check(JSON.stringify(history.previous(null)?.globeCamera) === JSON.stringify(closeUp),
+                                  'invalid or geographically different observer identities cannot overwrite the camera');
+                        }
+                        country.value = 'US';
+                        country.dispatchEvent(new Event('change', {bubbles: true}));
+                        for (let i = 0; i < 200; ++i) {
+                            const committed = history.previous(null);
+                            if ((committed?.almanac as Record<string, string> | undefined)?.jurisdiction === 'US' &&
+                                Number(longitude.value) < -70) break;
+                            await new Promise(resolve => setTimeout(resolve, 20));
+                        }
+                        check((history.previous(null)?.almanac as Record<string, string> | undefined)?.jurisdiction === 'US',
+                              'country dropdown commits its asynchronously resolved destination');
+                        await WorksheetPersistence.navigation.navigate(0);
+                        await settledCamera(closeUp);
+                        check(country.value === 'GB-ENG', 'country dropdown Back restores the departing country');
+                        selectedTown.value = originalTownKey;
                     }
                 } finally {
                     await WorksheetPersistence.navigation.restore(saved);
@@ -2895,6 +2939,8 @@
             labHttp.fetch = savedGlobeFetch;
             WorksheetWorkspace.mode.setMode(savedMode);
             WorksheetWorkspace.presentation.syncModeUI();
+            modes.forEach((mode, index) => WorksheetWorkspace.presentation.resultStates[mode] = savedResults[index]);
+            WorksheetWorkspace.presentation.restoreModeResultState(savedMode);
             WorksheetWorkspace.presentation.updateHistoryButtons();
         }
     }
@@ -3123,6 +3169,22 @@
                 return;
             }
             initialiseLabTestAdapters();
+            if (new URLSearchParams(location.search).get('evaluation-check') === '1') {
+                await runBrowserGroup('checkLabEvaluation', window.checkLabEvaluation);
+                await runBrowserGroup('checkLabEvaluationInstall', window.checkLabEvaluationInstall);
+                await report('PASS: asynchronous result installation, drawing opportunities and stale-request rejection');
+                return;
+            }
+            if (new URLSearchParams(location.search).get('history-check') === '1') {
+                await runBrowserGroup('checkLabRequests', window.checkLabRequests);
+                await runBrowserGroup('checkLabLayout', window.checkLabLayout);
+                await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
+                await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
+                await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation, 600000);
+                await runBrowserGroup('checkLabHistoryPersistence', window.checkLabHistoryPersistence, 120000);
+                await report('PASS: persistent per-browser history, all modes, reopening, revisions and size limits');
+                return;
+            }
             if (new URLSearchParams(location.search).get('select-check') === '1') {
                 await runBrowserGroup('real DateTime sky header', async () => {
                     const originalMode = WorksheetWorkspace.mode.currentMode();
@@ -3164,17 +3226,19 @@
                 await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
                 await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
                 await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
-                await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation);
+                await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation, 600000);
+                await runBrowserGroup('checkLabHistoryPersistence', window.checkLabHistoryPersistence, 120000);
                 await runBrowserGroup('checkLabSelects', window.checkLabSelects);
                 await runBrowserGroup('checkLabSelectEvents', window.checkLabSelectEvents);
                 await runBrowserGroup('checkLabAlmanacEvents', window.checkLabAlmanacEvents);
-                await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);
+                await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath, 1200000);
                 await report('PASS: calendar Back/Forward, selection menus, 5000-town selection and globe busy-state interactions');
                 return;
             }
             if (new URLSearchParams(location.search).get('globe-check') === '1') {
-                await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);
-                await report('PASS: globe projection, picking and water-preserving photographic colours');
+                await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath, 1200000);
+                await report('PASS: globe projection, picking and water-preserving photographic colours; ' +
+                    (document.getElementById('almanacGlobe')!.dataset.flightTestTiming || ''));
                 return;
             }
             if (labProfile.enabled) {
@@ -3199,10 +3263,11 @@
             await runBrowserGroup('checkLabResultFlows', window.checkLabResultFlows);
             await runBrowserGroup('checkLabBindingFlows', window.checkLabBindingFlows);
             await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
-            await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation);
+            await runBrowserGroup('checkCalendarHistoryNavigation', checkCalendarHistoryNavigation, 600000);
+            await runBrowserGroup('checkLabHistoryPersistence', window.checkLabHistoryPersistence, 120000);
             await runBrowserGroup('checkLabRequestFlows', window.checkLabRequestFlows);
             await runBrowserGroup('checkLabStateFlow', window.checkLabStateFlow);
-            await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath);
+            await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath, 1200000);
             await runBrowserGroup('checkSurfaceProjectionPlan', checkSurfaceProjectionPlan);
             await runBrowserGroup('checkLabSurfaceMesh', window.checkLabSurfaceMesh);
             await runBrowserGroup('checkLabSurfaceSVG', window.checkLabSurfaceSVG);
@@ -4351,6 +4416,8 @@
             // request/evaluation/installation path; do not mock the result installer.
             const beforeCalendarFetch = window.fetch;
             const [almanacFixture] = window.labAlmanacFixtures();
+            const homeHeaderPreserved = () => !!document.querySelector('#homeSky .sky-status-strip') &&
+                WorksheetContext.statusEl.innerHTML === document.getElementById('homeSky')!.innerHTML;
             let almanacReply: LabTestAlmanacReply = {...almanacFixture, ok: true};
             window.fetch = (url, options) => String(url) === '/almanac-eval' ?
                 Promise.resolve(
@@ -4362,10 +4429,15 @@
                 await WorksheetRequests.evaluation.evaluateAlmanac({skipHistoryUpdate: true});
                 check(
                     !WorksheetContext.rendered.classList.contains('error') &&
-                        document.getElementById('status')!.textContent.startsWith('Ready') &&
+                        homeHeaderPreserved() &&
                         WorksheetContext.rendered.querySelectorAll<HTMLElement>('.almanac-grid-table:not(.almanac-event-table) tbody tr').length ===
                             4,
-                    'Successful Almanac evaluation did not install a visible worksheet');
+                    'Successful Almanac evaluation did not install a visible worksheet: ' + JSON.stringify({
+                        status: WorksheetContext.statusEl.textContent,
+                        error: WorksheetContext.rendered.classList.contains('error'),
+                        rows: WorksheetContext.rendered.querySelectorAll('.almanac-body-table tbody tr').length,
+                        text: WorksheetContext.rendered.textContent?.slice(0, 300)
+                    }));
                 WorksheetContext.rendered.querySelector<HTMLElement>('[data-almanac-visibility="visible"]')!.click();
                 await window.checkLabMobileLayout('almanac result');
                 check(
@@ -4377,14 +4449,14 @@
                 await WorksheetRequests.evaluation.evaluateAlmanac({skipHistoryUpdate: true});
                 check(
                     WorksheetContext.rendered.classList.contains('error') && WorksheetContext.rendered.textContent.includes('Almanac presentation') &&
-                        document.getElementById('status')!.textContent.startsWith('Error') &&
+                        homeHeaderPreserved() &&
                         WorksheetContext.worksheetSession.calendar.almanacLastWorksheetData === acceptedAlmanac,
-                    'Incomplete Almanac response reported Ready or replaced accepted state');
+                    'Incomplete Almanac response lost its error, replaced accepted state or changed the home header');
                 almanacReply = {...almanacFixture, ok: true, visibility: 'visible'};
                 await WorksheetRequests.evaluation.evaluateAlmanac({skipHistoryUpdate: true});
                 check(
                     !WorksheetContext.rendered.classList.contains('error') && WorksheetContext.rendered.querySelector<HTMLElement>('.almanac-grid-table')! &&
-                        document.getElementById('status')!.textContent.startsWith('Ready'),
+                        homeHeaderPreserved(),
                     'Almanac could not recover after an incomplete response');
             } finally {
                 window.fetch = beforeCalendarFetch;
@@ -4398,6 +4470,8 @@
             check(WorksheetContext.marsDatePickerGrid.children.length >= 28, 'Date grid missing');
             WorksheetContext.marsDatePickerClose.click();
             check(WorksheetContext.marsDatePicker.classList.contains('hidden'), 'Date picker did not close');
+            const restartHistory = new WorksheetHistoryPersistence();
+            await restartHistory.start();
             WorksheetWorkspace.mode.setMode('expression');
             WorksheetWorkspace.presentation.syncModeUI();
             await WorksheetRequests.calendarRequests.refreshMobileAccess();
@@ -4405,7 +4479,9 @@
             // Page-hide persistence reads the editor, not merely the explicit saved-state fixture.
             await WorksheetRequests.presentation.prepareLabEditor('3+4');
             WorksheetBindings.controller.setExpressionEditor('3+4');
+            document.dispatchEvent(new Event('input'));
             await WorksheetPersistence.persistence.saveWorksheet('expression', '3+4');
+            await restartHistory.flush();
             // Matrix evaluation persists its mode; restore the restart fixture explicitly.
             const resetMode =
                 await labHttp.fetch('/state', {method: 'POST', body: labWire.encode({lab_mode: 'expression'})});

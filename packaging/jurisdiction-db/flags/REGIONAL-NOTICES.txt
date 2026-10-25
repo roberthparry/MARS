@@ -1,0 +1,35 @@
+Regional artwork additions, retrieved 24 October 2026
+
+These files are NOT part of the adjacent flag-icons MIT licence grant.
+
+fr-bre.svg: Gwenn ha du, original design Morvan Marchal; SVG from OpenClipart,
+Gryffindor and Alkari (25 August 2012), public domain. Unchanged SVG.
+https://commons.wikimedia.org/wiki/File:Flag_of_Brittany_(Gwenn_ha_du).svg
+
+fr-cor.svg: Corsican flag, Patricia.fidi/OpenClipart, public-domain dedication
+(CC0). The unused external SVG DOCTYPE was removed; artwork is unchanged.
+https://commons.wikimedia.org/wiki/File:Flag_of_Corsica.svg
+https://creativecommons.org/publicdomain/zero/1.0/
+
+it-88.svg: Sardinian flag, icnussa; derivative Xander89. Unchanged SVG,
+distributed under Creative Commons Attribution-ShareAlike 3.0 Unported.
+Credit the authors, retain this licence link, and distribute adaptations under
+the same or a compatible licence. No endorsement is implied.
+https://commons.wikimedia.org/wiki/File:Flag_of_Sardinia.svg
+https://creativecommons.org/licenses/by-sa/3.0/legalcode
+
+nl-fr.svg: Frisian flag, P.H. Wagemakers and Joh. Koopmans; SVG by Magna Frisia,
+28 May 2026, released into the public domain by its author. Unchanged SVG.
+https://commons.wikimedia.org/wiki/File:Frisian_flag.svg
+
+gb-con.svg, de-ofr.svg, de-nfr.svg: original MARS SVG encodings of traditional
+simple geometric flags (St Piran, East Frisia black/red/blue, North Frisia
+yellow/red/blue). The encodings are under the repository MIT Licence.
+Design references:
+https://www.flaginstitute.org/wp/flags/cornwall-flag/
+https://commons.wikimedia.org/wiki/File:Flag_of_East_Frisia.svg
+https://commons.wikimedia.org/wiki/File:Nordfriesischeflagge.svg
+
+Catalan and Basque artwork reuses es-ct.svg and es-pv.svg from flag-icons 7.3.2,
+under the adjacent MIT LICENSE. Normalised display proportions and animation
+are applied at runtime; source SVGs are retained without modification.

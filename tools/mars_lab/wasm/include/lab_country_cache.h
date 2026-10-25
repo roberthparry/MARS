@@ -14,11 +14,11 @@
 
 #include "lab_handle.h"
 
-/** @brief Return a scoped name/code/nauticalZone record or null for an absent lookup key. */
+/** @brief Return a scoped name/code/flagCode/nauticalZone record or null for an absent lookup key. */
 void lab_country_cache_get(jsref key);
 
-/** @brief Insert copied metadata and optional zone text (zero handle means absent), evicting beyond 64 entries or 1 MiB. */
-bool lab_country_cache_put(jsref key, jsref name, jsref code, jsref nautical_zone);
+/** @brief Cache metadata; zero flag-code handle uses country code, zero zone means absent. Limit: 64 entries or 1 MiB. */
+bool lab_country_cache_put(jsref key, jsref name, jsref code, jsref nautical_zone, jsref flag_code);
 
 /** @brief Release all retained metadata and indexes. */
 void lab_country_cache_clear(void);

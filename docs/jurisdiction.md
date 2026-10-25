@@ -28,10 +28,17 @@ while the country name remains usable. Invalid or unknown codes return false and
 clear both outputs; the selected jurisdiction is never used as a fallback.
 
 `jurisdiction_country_flag` owns offline SVG artwork, keyed by country code.
-`jurisdiction_country_flag_source` retains its version, upstream address and full
-MIT licence. The bundled flag-icons 7.3.2 artwork imports for all 249 ISO countries
-and the four UK constituent-country entries;
-the SVG contents total approximately 1.64 MB before SQLite page overhead.
+`jurisdiction_country_flag_source` retains version, upstream address and licence
+records. The bundled flag-icons 7.3.2 artwork imports for all 249 ISO countries
+and the four UK constituent-country entries, alongside the separately attributed
+regional additions. Display-only emblems use the same SVG table and the separate
+`jurisdiction_flag_emblem` name catalogue. `jurisdict_country` resolves `ZZ-SEA`
+to the static Offshore emblem without adding a jurisdiction, town or calendar.
+Its source SVG and generation record are packaged under `flags/zz-sea.svg` and
+`flags/zz-sea.txt`; `OFFSHORE-NOTICES.txt` is imported into the provenance table.
+Managed-data revision 4 imports this artwork into existing installations without
+rebuilding their towns or calendars. Missing required emblem artwork rolls back
+the import instead of marking an incomplete migration successful.
 Running `make update-mars-db` applies pending flag metadata migrations to an
 existing database without rebuilding its calendar or town tables. The separate
 `make install-jurisdiction-db` command rebuilds the packaged database. Custom older
@@ -47,6 +54,31 @@ they are not evidence of legal jurisdiction. No network request is required.
 Artwork: [flag-icons 7.3.2](https://github.com/lipis/flag-icons/tree/v7.3.2),
 [bundled MIT licence](../packaging/jurisdiction-db/flags/LICENSE).
 Source archive SHA-256: `6a5497e1029e66415c3941a5e5ee001944b0a7e46bf365c6d5a91a033acee87e`.
+
+### Regional display flags
+
+`jurisdict_country` also accepts the local display codes in
+`jurisdiction_flag_region`, whose indexed rows define a display name, parent
+flag and regional artwork. They are not additional sovereign jurisdictions.
+Returned self-contained SVGs cross-fade regional and parent artwork over a
+fifteen-second cycle: hold each flag for five seconds, then fade to the other over
+2.5 seconds, easing smoothly at either end. CSS reduced-motion preference retains the
+regional image. No JavaScript interval, external image request or persistent
+animation state is needed. Missing parent artwork leaves the regional flag static.
+
+Ordinary England, Wales, Scotland, Isle of Man, Northern Ireland and Jersey
+flags remain static. Cornwall alternates St Piran's flag with England's cross,
+not the Union flag. Catalan artwork is also used for Valencia and the Balearics;
+their display names remain distinct. West, East and North Frisia have distinct
+artwork. Cultural coverage, including historical Brittany and both sides of the
+Basque border, is defined by the independent [globe region layer](globe.md#regional-flag-coverage).
+
+Flag-cache identifiers remain separate from geographic country identifiers.
+A regional reply therefore cannot change a country's cached national flag or
+the observer's jurisdiction/time-zone selection. The same artwork is used in
+town tooltips, the location summary card and the selected jurisdiction dropdown;
+the dropdown retains its actual jurisdiction value. Additional artwork and its
+licences are recorded in [regional notices](../packaging/jurisdiction-db/flags/REGIONAL-NOTICES.txt).
 
 ## River network
 

@@ -293,8 +293,13 @@ namespace WorksheetPersistence {
             const index = this.port.modeIndex('almanac');
             const state = this.port.read(this.port.previous(index, this.port.stage(null)));
             const location = state?.almanac as Record<string, string> | undefined;
-            if (!state || !location || observer !== JSON.stringify(
-                ['latitude', 'longitude', 'town', 'jurisdiction'].map(field => location[field]))) return;
+            if (!state || !location) return;
+            // Catalogue hydration may replace a town key without changing the geographic observer.
+            // Match the same identity as the globe camera, not an asynchronously populated menu value.
+            let identity: unknown;
+            try { identity = JSON.parse(observer); } catch { return; }
+            if (!Array.isArray(identity) || identity.length !== 4 || identity[0] !== location.latitude ||
+                identity[1] !== location.longitude || identity[3] !== location.jurisdiction) return;
             if (state.globeCamera?.every((value, i) => value === camera[i])) return;
             state.globeCamera = camera;
             if (!this.port.commit(index, this.port.stage(state)))
@@ -321,8 +326,9 @@ namespace WorksheetPersistence {
             return this.runtime.restore(21, {state, isCurrent});
         }
 
-        /** @brief Acquire evaluation ownership before executing native history navigation. */
+        /** @brief Leave empty history untouched; otherwise acquire ownership before navigation. */
         async navigate(direction: number): Promise<unknown> {
+            if (!this.requests.count(direction)) return;
             return this.requests.run(this.requests.mode(), this.navigateRequest.bind(this, direction));
         }
 
@@ -596,6 +602,11 @@ namespace WorksheetPersistence {
         /** @brief Resolve the current worksheet mode. */
         mode() {
             return WorksheetWorkspace.mode.currentMode();
+        },
+
+        /** @brief Query native history without capturing or modifying the current worksheet. */
+        count(direction) {
+            return history.cursor(direction).length;
         },
 
         /** @brief Acquire request ownership for history navigation. */

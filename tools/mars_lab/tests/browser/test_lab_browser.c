@@ -100,7 +100,7 @@ static bool lab_browser_prepare(const char *directory)
                                           "worker_checks.js",         "mobile_layout_checks.js",
                                           "surface_hover_checks.js",   "surface_mesh_checks.js",
                                           "surface_export_checks.js",  "globe_http_checks.js", "globe_gpu_checks.js",
-                                          "surface_math_checks.js",
+                                          "globe_flight_checks.js", "globe_photo_checks.js", "surface_math_checks.js", "history_checks.js",
                                           "memory_checks.js", "protobuf_wire_checks.js"};
     for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {
         file_t *module = lab_browser_file("tools/mars_lab/build/typescript_checks/tests/browser", modules[i]);
@@ -139,7 +139,7 @@ static bool lab_browser_prepare(const char *directory)
 static bool lab_browser_run(const char *directory)
 {
     bool startup_check = getenv("MARS_LAB_STARTUP_CHECKS") && !strcmp(getenv("MARS_LAB_STARTUP_CHECKS"), "1");
-    if (!lab_browser_prepare(directory) || !test_lab_catalogue_database(directory))
+    if (!test_lab_catalogue_database(directory) || !lab_browser_prepare(directory))
         return false;
     if (startup_check) {
         if (!lab_browser_listener_only(directory)) return false;
@@ -159,6 +159,9 @@ static bool lab_browser_run(const char *directory)
                                          "user_pref(\"datareporting.policy.dataSubmissionEnabled\", false);\n"
                                          "user_pref(\"toolkit.telemetry.enabled\", false);\n");
     profile_ready = preferences && settings && file_write_all_text(preferences, settings);
+    if (getenv("MARS_LAB_REDUCED_MOTION"))
+        profile_ready = profile_ready && !string_append_cstr(settings, "user_pref(\"ui.prefersReducedMotion\", 1);\n") &&
+                        file_write_all_text(preferences, settings);
     string_free(settings);
     file_free(preferences);
     lab_server_t *server = profile_ready ? lab_svr_new(NULL, 0, 30000) : NULL;
@@ -166,9 +169,13 @@ static bool lab_browser_run(const char *directory)
     bool catalogue_check = getenv("MARS_LAB_CATALOGUE_CHECKS") && !strcmp(getenv("MARS_LAB_CATALOGUE_CHECKS"), "1");
     bool globe_check = getenv("MARS_LAB_GLOBE_CHECKS") && !strcmp(getenv("MARS_LAB_GLOBE_CHECKS"), "1");
     bool select_check = getenv("MARS_LAB_SELECT_CHECKS") && !strcmp(getenv("MARS_LAB_SELECT_CHECKS"), "1");
+    bool history_check = getenv("MARS_LAB_HISTORY_CHECKS") && !strcmp(getenv("MARS_LAB_HISTORY_CHECKS"), "1");
+    bool evaluation_check = getenv("MARS_LAB_EVALUATION_CHECKS") && !strcmp(getenv("MARS_LAB_EVALUATION_CHECKS"), "1");
     string_t *url =
         server ? string_sprintf("http://127.0.0.1:%u/%s", lab_svr_port(server),
-                                startup_check ? "?startup-check=1" : select_check ? "?select-check=1" :
+                                startup_check ? "?startup-check=1" : evaluation_check ? "?evaluation-check=1" :
+                                history_check ? "?history-check=1" :
+                                select_check ? "?select-check=1" :
                                 globe_check ? "?globe-check=1" :
                                 catalogue_check ? "?catalogue-check=success" :
                                 profiling ? "?profile=1" : "") : NULL;
@@ -218,7 +225,7 @@ static bool lab_browser_run(const char *directory)
             break;
         }
         clock_gettime(CLOCK_MONOTONIC, &now);
-        if (now.tv_sec - start.tv_sec > 360)
+        if (now.tv_sec - start.tv_sec > 1800)
             break;
         struct timespec pause = {.tv_nsec = 100000000};
         nanosleep(&pause, NULL);

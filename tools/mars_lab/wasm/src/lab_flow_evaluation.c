@@ -9,6 +9,8 @@
  * retaining scoped handles or sharing mutable state between concurrent requests.
  * All evaluation modes use one fetch capability with a native-selected kind;
  * only expression evaluation passes captured text to that capability.
+ * Result installation yields to browser drawing before atomically projecting
+ * cards, with native request ownership rechecked after that asynchronous boundary.
  */
 #include "lab_mode.h"
 #include "lab_dom.h"
@@ -473,6 +475,22 @@ static jsref lab_flow_install_native(struct lab_flow_install_context *ctx)
                          ctx->data, lab_dom_get(ctx->context, "text"), lab_dom_get(ctx->view, "caches"));
 }
 
+static jsref lab_flow_install_yield(struct lab_flow_install_context *ctx)
+{
+    return lab_flow_call(ctx->frame, 10, "yieldToDrawing", 0, 1, 0);
+}
+
+static jsref lab_flow_install_guard(struct lab_flow_install_context *ctx)
+{
+    if (!lab_dom_truth(ctx->request)) return lab_flow_install_native(ctx);
+    return lab_flow_eval_current(ctx->frame, 11);
+}
+
+static jsref lab_flow_install_current(struct lab_flow_install_context *ctx)
+{
+    return lab_dom_truth(lab_dom_get(ctx->frame, "current")) ? lab_flow_install_native(ctx) : lab_flow_done(0);
+}
+
 static jsref lab_flow_install_native_1(struct lab_flow_install_context *ctx)
 {
     return lab_flow_call(ctx->frame, 2, "native", "plan", 0, 8, lab_dom_string("lab_evaluation_install"), ctx->mode,
@@ -562,15 +580,17 @@ jsref lab_flow_install(frame_jsref frame, view_jsref view)
         .request = request,
     };
     static jsref (*const handlers[])(struct lab_flow_install_context *) = {
-        [0] = lab_flow_install_native,
-        [1] = lab_flow_install_native_1,
-        [2] = lab_flow_install_apply_initial,
-        [3] = lab_flow_install_render_solver,
-        [4] = lab_flow_install_solver_current,
-        [5] = lab_flow_install_solver_failed,
-        [6] = lab_flow_install_solver_svg,
-        [7] = lab_flow_install_native_7,
-        [8] = lab_flow_install_apply_final,
+        [ 0] = lab_flow_install_yield,
+        [ 1] = lab_flow_install_native_1,
+        [ 2] = lab_flow_install_apply_initial,
+        [ 3] = lab_flow_install_render_solver,
+        [ 4] = lab_flow_install_solver_current,
+        [ 5] = lab_flow_install_solver_failed,
+        [ 6] = lab_flow_install_solver_svg,
+        [ 7] = lab_flow_install_native_7,
+        [ 8] = lab_flow_install_apply_final,
+        [10] = lab_flow_install_guard,
+        [11] = lab_flow_install_current,
     };
     unsigned selected = stage;
     return selected < sizeof handlers / sizeof *handlers && handlers[selected] ? handlers[selected](&ctx)

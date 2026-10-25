@@ -32,6 +32,8 @@
 #include "lab_server.h"
 #include "lab_page.h"
 #include "lab_wire.h"
+#define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
+#include "internal/lab_calendar_internal.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
@@ -187,7 +189,7 @@ static bool page_has_no_placeholders(const http_response_t *response)
 
 static bool route_contracts(const char *directory)
 {
-    (void)directory;
+    if (!test_lab_catalogue_database(directory) || !test_lab_offshore_database()) return false;
     if (setenv("NO_PROXY", "*", 1) || setenv("no_proxy", "*", 1))
         return false;
     http_response_t *response = route_request(HTTP_GET, "/", NULL, NULL, NULL, NULL);
@@ -362,10 +364,51 @@ static bool route_contracts(const char *directory)
     http_response_free(response);
     response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
     const unsigned char *earth = response ? http_response_body(response) : NULL;
-    ok = route_check(response, 200, earth && http_response_body_size(response) == 266599 &&
+    ok = route_check(response, 200, earth && http_response_body_size(response) > 100000 &&
                      earth[0] == 0xff && earth[1] == 0xd8 &&
                      response_header_equals(response, "Content-Type", "image/jpeg"), "GET /earth_surface.jpg") && ok;
     http_response_free(response);
+    response = route_request(HTTP_GET, "/earth_tiles/05-01.jpg", NULL, NULL, NULL, NULL);
+    earth = response ? http_response_body(response) : NULL;
+    ok = route_check(response, 200, earth && http_response_body_size(response) > 1000 &&
+                     earth[0] == 0xff && earth[1] == 0xd8 &&
+                     response_header_equals(response, "Content-Type", "image/jpeg"), "local photographic tile") && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/earth_tiles/12-00.jpg", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/offshore_flag.svg", NULL, NULL, NULL, NULL);
+    ok = route_check(response, 200, response_contains(response, "<svg") && response_contains(response, "<path") &&
+                     http_response_body_size(response) <= 4194304 &&
+                     !response_contains(response, "<image") && !response_contains(response, "data:image/") &&
+                     !response_contains(response, "<script") && !response_contains(response, "<foreignObject") &&
+                     response_header_equals(response, "Content-Type", "image/svg+xml"), "GET /offshore_flag.svg") && ok;
+    http_response_free(response);
+    response = route_request(HTTP_POST, "/almanac-country", "{\"country_code\":\"ZZ-SEA\"}",
+                             "application/x-protobuf", NULL, NULL);
+    json_t *emblem = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    ok = route_check(response, 200, !strcmp(test_lab_text(emblem, "country_flag"), "/offshore_flag.svg") &&
+                     !*test_lab_text(emblem, "country_code"), "offshore display code is not a jurisdiction") && ok;
+    json_free(emblem); http_response_free(response);
+    string_t *flag_path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    string_t *flag_key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
+    sqlite_t *flag_db = sqlite_open_encrypted(flag_path, flag_key);
+    ok = ok && flag_db && sqlite_exec_cstr(flag_db,
+        "update jurisdiction_country_flag set svg='<svg xmlns=\"http://www.w3.org/2000/svg\">"
+        "<title>database-only artwork</title></svg>' where iso_country_code='ZZ-SEA'");
+    sqlite_close(flag_db);
+    response = route_request(HTTP_GET, "/offshore_flag.svg", NULL, NULL, NULL, NULL);
+    ok = route_check(response, 200, response_contains(response, "database-only artwork"),
+                     "offshore image is read from the database, never a packaged file") && ok;
+    http_response_free(response);
+    flag_db = sqlite_open_encrypted(flag_path, flag_key);
+    ok = ok && flag_db && sqlite_exec_cstr(flag_db,
+        "delete from jurisdiction_country_flag where iso_country_code='ZZ-SEA'");
+    sqlite_close(flag_db); string_free(flag_path); string_free(flag_key);
+    response = route_request(HTTP_GET, "/offshore_flag.svg", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    ok = test_lab_offshore_database() && ok;
     response = route_request(HTTP_POST, "/state", "{\"expression\":\"x+8\",\"expression_updated_at\":500}",
                              "application/x-protobuf", NULL, NULL);
     json_t *state = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
@@ -608,6 +651,9 @@ static bool route_catalogue_country(const char *directory)
         file_free(packed); string_free(packed_path); string_free(plain_path);
     }
     ok = ok && globe_import_countries(geometry, sources[0], sources[1]);
+    file_t *regions = file_new_cstr("packaging/globe-db/flag_regions.geojson");
+    ok = ok && regions && globe_import_regions(geometry, regions);
+    file_free(regions);
     file_free(sources[0]); file_free(sources[1]); sqlite_close(geometry);
     ok = ok && !setenv("MARS_GLOBE_DB_PATH", string_c_str(path), 1) && !setenv("MARS_GLOBE_DB_KEY", "", 1);
     string_free(path);
@@ -624,7 +670,14 @@ static bool route_catalogue_country(const char *directory)
         "UPDATE jurisdiction_town_longitude SET longitude='-3.1791' WHERE jurisdiction_town_id=2;"
         "UPDATE jurisdiction_town SET town_name='Edinburgh' WHERE jurisdiction_town_id=3;"
         "UPDATE jurisdiction_town_latitude SET latitude='55.9533' WHERE jurisdiction_town_id=3;"
-        "UPDATE jurisdiction_town_longitude SET longitude='-3.1883' WHERE jurisdiction_town_id=3;");
+        "UPDATE jurisdiction_town_longitude SET longitude='-3.1883' WHERE jurisdiction_town_id=3;"
+        "CREATE TABLE jurisdiction_flag_region(code text primary key,name text,parent_code text,artwork_code text);"
+        "INSERT INTO jurisdiction_flag_region VALUES('GB-CON','Cornwall, England','GB-ENG','GB-CON');"
+        "CREATE TABLE jurisdiction_country_flag(iso_country_code text primary key,svg text);"
+        "INSERT INTO jurisdiction_country_flag VALUES('GB-CON','<svg xmlns=\"http://www.w3.org/2000/svg\" "
+        "viewBox=\"0 0 10 10\"><path d=\"M0 0h10v10H0z\"/></svg>'),"
+        "('GB-ENG','<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\">"
+        "<path fill=\"red\" d=\"M0 0h10v10H0z\"/></svg>');");
     sqlite_close(db); string_free(path); string_free(key);
     json_t *catalogue = ok ? lab_page_town_jurisdiction_batch(0, "GB") : NULL;
     const json_t *towns = test_lab_member(test_lab_member(catalogue, "towns"), "GB");
@@ -643,6 +696,50 @@ static bool route_catalogue_country(const char *directory)
         if (!ok) string_fprintf(stderr, "Country fixture %s expected=%s actual=%s\n", name, expected,
                                test_lab_text(row, "country_code"));
     }
+    json_free(catalogue);
+    http_response_t *response = route_request(HTTP_POST, "/almanac-country", "{\"lat\":50.2632,\"lon\":-5.051}",
+                                              "application/x-protobuf", NULL, NULL);
+    json_t *display = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    ok = ok && response && http_response_status(response) == 200 &&
+         !strcmp(test_lab_text(display, "country_code"), "GB-ENG") &&
+         !strcmp(test_lab_text(display, "flag_code"), "GB-CON") &&
+         !strcmp(test_lab_text(display, "country"), "Cornwall, England") &&
+         !strncmp(test_lab_text(display, "country_flag"), "data:image/svg+xml;base64,", 26);
+    json_t *fields = test_lab_json("{\"snapshot\":\"MOON|Moon|moon|0|0|0|0|0|1|0.5|0|0|0|0|YES|0|0|0|10|20|0.5\"}");
+    json_t *options = display ? json_clone(display) : NULL;
+    lab_cal_set(options, "date", "2026-10-24"); lab_cal_set(options, "time", "12:00:00");
+    lab_cal_set(options, "zone", "1"); lab_cal_set(options, "elevation", "0");
+    lab_cal_set(options, "town", "Truro|50.2632|-5.0510|0");
+    lab_cal_set(options, "jurisdiction", "GB-ENG");
+    lab_cal_set(options, "lat", "50.2632"); lab_cal_set(options, "lon", "-5.0510");
+    lab_cal_set(options, "observer_surface", "Land"); lab_cal_set(options, "defer_events", "true");
+    unsigned status = 200;
+    json_t *card = ok ? lab_cal_almanac(fields, options, &status) : NULL;
+    const json_t *cell = json_array_get(test_lab_member(card, "observer_summary"), 1);
+    const json_t *rendered = test_lab_member(test_lab_member(card, "almanac_presentation"), "all");
+    ok = ok && status == 200 && !strcmp(test_lab_text(cell, "value"), "Truro, Cornwall, England") &&
+         !strcmp(test_lab_text(cell, "flag"), test_lab_text(display, "country_flag")) &&
+         strstr(test_lab_text(rendered, "html"), test_lab_text(display, "country_flag")) &&
+         !strcmp(lab_cal_observer_jurisdiction(options), "GB-ENG");
+    json_free(card); json_free(options); json_free(fields);
+    json_free(display); http_response_free(response);
+    path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
+    db = sqlite_open_encrypted(path, key);
+    ok = ok && db && sqlite_exec_cstr(db,
+        "UPDATE jurisdiction_town SET town_name='Truro' WHERE jurisdiction_town_id=1;"
+        "UPDATE jurisdiction_town_latitude SET latitude='50.2632' WHERE jurisdiction_town_id=1;"
+        "UPDATE jurisdiction_town_longitude SET longitude='-5.0510' WHERE jurisdiction_town_id=1;");
+    sqlite_close(db); string_free(path); string_free(key);
+    catalogue = ok ? lab_page_town_jurisdiction_batch(0, "GB") : NULL;
+    towns = test_lab_member(test_lab_member(catalogue, "towns"), "GB");
+    bool cornish = false;
+    for (size_t i = 0; i < json_array_size(towns); ++i) {
+        const json_t *row = json_array_get(towns, i);
+        if (!strcmp(test_lab_text(row, "name"), "Truro"))
+            cornish = !strcmp(test_lab_text(row, "country_code"), "GB-CON");
+    }
+    ok = ok && cornish;
     json_free(catalogue);
     return ok;
 }

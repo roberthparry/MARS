@@ -409,6 +409,7 @@ namespace WorksheetResults {
         /** @brief Restore persisted worksheet state. */
         async resultLoadState() {
             await WorksheetPersistence.restoration.load();
+            await worksheetHistoryPersistence.start();
             WorksheetWorkspace.presentation.syncModeTabs();
             WorksheetWorkspace.presentation.syncModeUI();
             document.documentElement.removeAttribute('data-starting');

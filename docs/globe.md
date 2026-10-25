@@ -5,6 +5,55 @@ country and river readers behind a single public interface. Implementations live
 under `src/globe`; there are no separate public shoreline or river headers or guides.
 SVG and WebGL rendering remain application responsibilities.
 
+## Regional flag coverage
+
+`globe_import_regions(db, source)` transactionally imports a bounded GeoJSON
+FeatureCollection into independent `region_name`, `region_chunk` and integer
+R-tree tables. Features require Polygon/MultiPolygon geometry, closed rings and
+a local display identifier in `properties.code`. Limits are 16 MiB, 1,023 features
+and one million vertices. Invalid replacement data rolls back without affecting
+the previous layer. Country, coastline, river and town tables are untouched.
+
+`globe_region_code_at(globe, latitude, longitude)` returns an owned display code
+or `NULL` for absent data, invalid coordinates, ambiguous overlaps or points
+within one microdegree of an edge. Release results with `string_free`.
+This is an indexed display lookup, not a jurisdiction or time-zone lookup.
+Reopen a controller after replacing its data. Existing country APIs are unchanged.
+
+The offline `packaging/globe-db/flag_regions.geojson` package covers Cornwall;
+historical Brittany (including Loire-Atlantique); Catalonia, Valencia, Balearics;
+Northern Catalonia excluding the 28 Occitan Fenouillèdes communes; Corsica;
+Sardinia; Spanish Basque Country and Navarre; the French Pays Basque outline;
+Dutch Fryslân; East Frisia (Aurich, Leer, Wittmund, Emden); and North Frisia
+(Nordfriesland district and islands). It does not assign all of Lower Saxony,
+Schleswig-Holstein or Pyrénées-Atlantiques to those cultural areas. Heligoland
+and other disputed or wider historical extensions are not inferred.
+
+These are explicit display conventions, not definitive cultural boundaries.
+Generalised source coastlines can omit very small coastal places. The French
+Basque authority outline and administrative district/commune polygons provide
+reviewable proxies; nearby unrecognised places retain their ordinary flag.
+
+`tools/mars_config/region_extract.c` prepares the package from five offline
+GeoJSON inputs (Natural Earth admin-1, German districts, French Basque outline,
+department 66 communes and French departments), followed by the output path. It uses native MARS JSON
+and file APIs, retains selected source coordinates and requires no Python or
+runtime downloads. `make update-mars-db` applies the independent geometry and
+artwork migrations, preserving installed coastline and river data. Fresh globe
+and jurisdiction installations include their respective parts.
+Sources, licences and attribution are in [third-party notices](../THIRD_PARTY_NOTICES.md#regional-flag-artwork-and-coverage).
+
+Package SHA-256: `6a169009101199bdeb1c541453fcc2d16be0413e32f87c4bf2273da343add145`.
+Preparation input SHA-256 values, in argument order:
+
+| Input | SHA-256 |
+| --- | --- |
+| Natural Earth admin-1 | `22d0e3ad85eb3e27f17cabf8ba2d50e554fbc27a87796ff891d958185da62fb5` |
+| German districts | `bd81935bfad67f377bda3edfd2972e48df76df7dbd200dff1b1e107ab4e07ce0` |
+| French Basque outline | `825adbd166ac5ecaf9d2f472666026c14d594d051e90f809d34f5f01125fcb46` |
+| Department 66 communes | `6d5dcdb4c63b5e8ae2b13e1cf80a3d85da97836e1fdb736359065e2211189a96` |
+| French departments | `6f551c26ebe6a02ebbab47ca4309b03a8a6c5b24d454713a00d921210c105279` |
+
 ## Named inland waters
 
 `globe_water_name_at` returns an owned geographic name independently of country

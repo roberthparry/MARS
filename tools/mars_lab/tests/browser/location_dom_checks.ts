@@ -219,6 +219,18 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
         equal(captured.start, ' 2024-02-29 ', 'capture range fallback follows the raw date');
         equal(captured.latitude, '1', 'capture trims coordinates');
         equal(captured.gmt_offset, '', 'capture does not force an automatic offset');
+        const savedAlmanac = WorksheetLocations.calendar.readCalendarControls('almanac');
+        try {
+            WorksheetLocations.calendar.applyCalendarState('almanac', {...savedAlmanac, zone: '10', zone_mode: 'auto'});
+            equal(WorksheetLocations.calendar.currentAlmanacState().zone_mode, 'auto',
+                  'history retains explicit automatic zone provenance');
+            labDOM.call('lab_location_dispatch', 2, {target: WorksheetContext.almanacZone}, WorksheetContext.almanacZone);
+            equal(WorksheetLocations.calendar.currentAlmanacState().zone_mode, 'manual',
+                  'typing an offset opts out of automatic updates even when its number is unchanged');
+            WorksheetLocations.calendar.applyCalendarState('almanac', {...savedAlmanac, zone: '5.5', zone_mode: undefined});
+            equal(WorksheetLocations.calendar.currentAlmanacState().zone_mode, 'manual',
+                  'legacy histories with no provenance retain authored offsets');
+        } finally { WorksheetLocations.calendar.applyCalendarState('almanac', savedAlmanac); }
         const beforeInvalid = JSON.stringify(WorksheetLocations.calendar.readCalendarControls('datetime'));
         let rejected = false;
         try {

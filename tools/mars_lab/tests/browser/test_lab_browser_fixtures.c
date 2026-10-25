@@ -7,11 +7,43 @@
  * test text cannot become script source. Kept separate from process/signal code
  * because the library and POSIX stack types occupy the same C namespace.
  */
+#include <stdlib.h>
+
+#include "jurisdiction-t.h"
 #define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
 #include "lab_wire.h"
 #include "test_lab_browser_fixtures.h"
 #include "test_lab_support.h"
+
+static json_t *lab_browser_flag_fixture(void)
+{
+    string_t *path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    string_t *key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
+    sqlite_t *db = sqlite_open_encrypted(path, key);
+    file_t *source = file_new_cstr("packaging/jurisdiction-db/flag_regions.sql");
+    string_t *sql = file_read_all_text(source);
+    bool ok = db && sql && sqlite_exec(db, sql) && sqlite_exec_cstr(db,
+        "create table jurisdiction_country_flag(iso_country_code text primary key,svg text not null)");
+    sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db, "insert into jurisdiction_country_flag values(?1,?2)") : NULL;
+    const char *codes[] = {"GB-CON", "GB-ENG"}, *files[] = {"gb-con", "gb-eng"};
+    for (unsigned i = 0; ok && i < 2; ++i) {
+        string_t *filename = string_sprintf("packaging/jurisdiction-db/flags/%s.svg", files[i]);
+        file_t *image = file_new(filename);
+        string_t *svg = file_read_all_text(image);
+        ok = insert && svg && sqlite_stmt_bind_text(insert, 1, codes[i]) &&
+             sqlite_stmt_bind_text(insert, 2, string_c_str(svg)) && sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
+        sqlite_stmt_reset(insert); string_free(svg); file_free(image); string_free(filename);
+    }
+    sqlite_stmt_finalize(insert); sqlite_close(db); string_free(path); string_free(key); string_free(sql); file_free(source);
+    ok = ok && test_lab_offshore_database();
+    jurisdiction_t *j = ok ? jurisdict_open(NULL) : NULL;
+    string_t *name = NULL, *svg = NULL;
+    ok = ok && jurisdict_country(j, "GB-CON", &name, &svg) && svg;
+    json_t *result = ok ? json_new_string(svg) : NULL;
+    string_free(name); string_free(svg); jurisdict_close(j);
+    return result;
+}
 
 /* Append native, binary fixtures for consumption after WebAssembly startup. */
 bool lab_browser_almanac_fixture(string_t *script)
@@ -39,7 +71,8 @@ bool lab_browser_almanac_fixture(string_t *script)
         "\"longitude\":\"-4.4203\",\"elevation\":\"0\"}}]}");
     json_t *summary = test_lab_json(
         "[{\"label\":\"GMT moment\",\"value\":\"2026-10-18 18:10:39\"},"
-        "{\"label\":\"Location\",\"value\":\"Shrewsbury, GB-ENG\"},"
+        "{\"label\":\"Location\",\"value\":\"Shrewsbury, GB-ENG\","
+        "\"flag\":\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=\"},"
         "{\"label\":\"Zone\",\"value\":\"1.00\"},"
         "{\"label\":\"Latitude\",\"value\":\"52° 42.46′ N\"},"
         "{\"label\":\"Longitude\",\"value\":\"2° 45.25′ W\"},"
@@ -62,6 +95,19 @@ bool lab_browser_almanac_fixture(string_t *script)
     bool ok = fixture && pending && fixtures && lab_cal_almanac_presentation(fixture) &&
               lab_cal_almanac_presentation(pending) && json_array_append(fixtures, fixture) &&
               json_array_append(fixtures, pending) && rows && sections && json_array_append(fixtures, sections);
+    json_t *flag = lab_browser_flag_fixture();
+    ok = ok && flag && json_array_append(fixtures, flag);
+    json_free(flag);
+    json_t *destination = json_clone(fixture);
+    json_t *destination_summary = test_lab_json(
+        "[{\"label\":\"Location\",\"value\":\"Santiago, Chile\"},"
+        "{\"label\":\"Latitude\",\"value\":\"33° 26.93′ S\"},"
+        "{\"label\":\"Longitude\",\"value\":\"70° 40.16′ W\"}]");
+    lab_cal_take(destination, "observer_summary", destination_summary);
+    lab_cal_set(destination, "observer_latitude", "-33.4489");
+    lab_cal_set(destination, "observer_longitude", "-70.6693");
+    ok = ok && destination && lab_cal_almanac_presentation(destination) && json_array_append(fixtures, destination);
+    json_free(destination);
     json_free(rows);
     json_free(sections);
     json_t *envelope = json_new_object();

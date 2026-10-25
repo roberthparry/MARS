@@ -24,7 +24,7 @@ typedef struct {
 typedef struct {
     lab_workspace_entry_t entries[2][LAB_WS_ENTRIES];
     lab_workspace_entry_t editor, committed;
-    unsigned count[2], precision;
+    unsigned count[2], precision, revision;
 } lab_workspace_mode_t;
 
 static lab_workspace_mode_t lab_workspace_modes[LAB_WS_MODES];
@@ -68,6 +68,7 @@ static void lab_workspace_remove(lab_workspace_mode_t *state, lab_workspace_hist
     unsigned offset = state->entries[direction][index].offset;
     unsigned length = state->entries[direction][index].length;
     --state->count[direction];
+    ++state->revision;
     for (unsigned i = index; i < state->count[direction]; ++i) {
         state->entries[direction][i].offset = state->entries[direction][i + 1].offset;
         state->entries[direction][i].length = state->entries[direction][i + 1].length;
@@ -125,6 +126,7 @@ static int lab_workspace_replace(lab_workspace_entry_t *entry, unsigned length)
 /* A preflighted append cannot fail. Apply mandatory entry eviction before byte-budget eviction. */
 static void lab_workspace_append(lab_workspace_mode_t *state, lab_workspace_history_t direction, unsigned length)
 {
+    ++state->revision;
     if (state->count[direction] == LAB_WS_ENTRIES)
         lab_workspace_remove(state, direction, 0);
     lab_workspace_reclaim(length, 0);
@@ -146,6 +148,7 @@ void lab_workspace_reset(void)
         lab_workspace_mode_t *state = &lab_workspace_modes[mode];
         state->count[LAB_WORKSPACE_BACK] = state->count[LAB_WORKSPACE_FORWARD] = 0;
         state->editor.length = state->committed.length = 0;
+        ++state->revision;
         state->precision = lab_workspace_default_precision(mode);
     }
 }
@@ -393,7 +396,66 @@ bool lab_workspace_commit(lab_mode_t mode, unsigned length)
 {
     if ((unsigned)mode >= LAB_WS_MODES || !length || length > LAB_WS_BYTES)
         return false;
-    return lab_workspace_replace(&lab_workspace_modes[mode].committed, length);
+    lab_workspace_mode_t *state = &lab_workspace_modes[mode];
+    bool changed = !lab_workspace_bytes_equal(lab_workspace_storage + state->committed.offset,
+                                               state->committed.length, lab_workspace_staging[0], length);
+    bool ok = lab_workspace_replace(&state->committed, length);
+    if (ok && changed) ++state->revision;
+    return ok;
+}
+
+/* Revision polling copies no snapshot bytes. */
+unsigned lab_workspace_history_revision(lab_mode_t mode)
+{
+    return (unsigned)mode < LAB_WS_MODES ? lab_workspace_modes[mode].revision : 0;
+}
+
+/* Read-only enumeration preserves the live navigation cursor. */
+int lab_workspace_history_read(lab_mode_t mode, unsigned side, unsigned index)
+{
+    if ((unsigned)mode >= LAB_WS_MODES || side > 2) return -1;
+    lab_workspace_mode_t *state = &lab_workspace_modes[mode];
+    if (side < 2 && index >= state->count[side]) return 0;
+    lab_workspace_entry_t entry = side == 2 ? state->committed : state->entries[side][index];
+    memcpy(lab_workspace_result, lab_workspace_storage + entry.offset, entry.length);
+    return (int)entry.length;
+}
+
+/* Validate and reserve the whole replacement before altering any retained snapshot. */
+bool lab_workspace_history_replace(lab_mode_t mode, unsigned back, unsigned forward, unsigned length)
+{
+    if ((unsigned)mode >= LAB_WS_MODES || back > LAB_WS_ENTRIES || forward > LAB_WS_ENTRIES || length > LAB_WS_BYTES)
+        return false;
+    lab_workspace_entry_t records[1 + 2 * LAB_WS_ENTRIES];
+    unsigned position = 0, total = 0, count = 1 + back + forward;
+    for (unsigned i = 0; i < count; ++i) {
+        if (length - position < 4) return false;
+        const unsigned char *p = lab_workspace_staging[0] + position;
+        unsigned size = (unsigned)p[0] | (unsigned)p[1] << 8 | (unsigned)p[2] << 16 | (unsigned)p[3] << 24;
+        position += 4;
+        if (!size || size > length - position) return false;
+        records[i] = (lab_workspace_entry_t){position, size};
+        position += size;
+        total += size;
+    }
+    if (position != length) return false;
+    lab_workspace_mode_t *state = &lab_workspace_modes[mode];
+    if (!lab_workspace_can_reserve(total, state->committed.length)) return false;
+    lab_workspace_history_clear(mode, LAB_WORKSPACE_BACK);
+    lab_workspace_history_clear(mode, LAB_WORKSPACE_FORWARD);
+    unsigned old_length = state->committed.length, old_offset = state->committed.offset;
+    state->committed.length = 0;
+    if (old_length) lab_workspace_remove_bytes(old_offset, old_length);
+    lab_workspace_reclaim(total, 0);
+    for (unsigned i = 0; i < count; ++i) {
+        lab_workspace_entry_t *entry = i == 0 ? &state->committed : i <= back ?
+            &state->entries[0][state->count[0]++] : &state->entries[1][state->count[1]++];
+        *entry = (lab_workspace_entry_t){lab_workspace_used, records[i].length};
+        memcpy(lab_workspace_storage + lab_workspace_used, lab_workspace_staging[0] + records[i].offset, records[i].length);
+        lab_workspace_used += records[i].length;
+    }
+    ++state->revision;
+    return true;
 }
 
 /* Unchanged evaluations do not create an extra history item. */

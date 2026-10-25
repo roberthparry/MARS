@@ -1018,7 +1018,7 @@ namespace WorksheetRequests {
                 installEvaluation: (mode: number, data: unknown, context?: MarsApiInstallContext,
                                     outcome?: number, request?: MarsApiRequest | null) =>
                     this.installEvaluationResult(mode, data, context, outcome, request),
-                evaluate: (mode: WorksheetMode) => this.evaluateLabMode(mode),
+                evaluate: (mode: WorksheetMode, options?: WorksheetEvaluationOptions) => this.evaluateLabMode(mode, options),
                 precision: () => this.dependencies.workspace.requestedValuePrecision(),
                 captureBindings: (context: MarsApiEvaluationContext) => context.enteredBindings = this.dependencies.bindings.visibleBindingValues(),
                 commitBindings: () => this.dependencies.bindings.commitVisibleBindingInputs(),
@@ -1162,7 +1162,8 @@ namespace WorksheetRequests {
             return {
                 native: this.callNative.bind(this),
                 effects: this.applyEffects.bind(this),
-                awaitValue: this.awaitValue.bind(this)
+                awaitValue: this.awaitValue.bind(this),
+                yieldToDrawing: this.yieldToDrawing.bind(this)
             } satisfies MarsApiNativeServices;
         }
 
@@ -1242,6 +1243,28 @@ namespace WorksheetRequests {
 
         private awaitValue(value: unknown): unknown {
             return value;
+        }
+
+        private yieldToDrawing(): Promise<void> {
+            const signal = this.lifetime.signal;
+            return new Promise(resolve => {
+                let frame = 0, timer = 0;
+                const finish = (): void => {
+                    cancelAnimationFrame(frame);
+                    clearTimeout(timer);
+                    signal.removeEventListener('abort', finish);
+                    resolve();
+                };
+                signal.addEventListener('abort', finish, {once: true});
+                if (signal.aborted) { finish(); return; }
+                // Hidden or suspended pages must not leave a completed request pending forever.
+                timer = window.setTimeout(finish, document.hidden ? 0 : 100);
+                if (!document.hidden) frame = requestAnimationFrame(() => {
+                    clearTimeout(timer);
+                    // An awaited promise inside rAF would resume before paint. Use a following task.
+                    timer = window.setTimeout(finish, 0);
+                });
+            });
         }
 
         private abortRequest(message: string): never {

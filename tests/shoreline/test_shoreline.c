@@ -821,9 +821,60 @@ static void test_shoreline_geometry_budget(void)
     TEST_ASSERT_TRUE(!coast_geometry_budget(10, 1, 0, SIZE_MAX), "old LOD arithmetic overflow rejected");
 }
 
+static void test_globe_regional_flags(void)
+{
+    sqlite_t *db = memory_database();
+    string_t *path = string_new_with("packaging/globe-db/flag_regions.geojson");
+    file_t *source = file_new(path);
+    string_free(path);
+    TEST_ASSERT_TRUE(db && globe_import_regions(db, source), "import independent regional polygons");
+    globe_t *globe = globe_open_databases(db, db, NULL);
+    static const struct { double lat, lon; const char *code; } places[] = {
+        {48.3904, -4.4861, "FR-BRE"}, {47.2184, -1.5536, "FR-BRE"}, /* Brest, historical Brittany: Nantes */
+        {50.2632, -5.0510, "GB-CON"}, {41.3874, 2.1686, "ES-CT"},
+        {39.4699, -0.3763, "ES-VC"}, {39.5696, 2.6502, "ES-IB"},
+        {42.6887, 2.8948, "FR-CAT"}, {41.9192, 8.7386, "FR-COR"},
+        {39.2238, 9.1217, "IT-88"}, {43.2630, -2.9350, "ES-PV"},
+        {42.8125, -1.6458, "ES-NA"}, {43.4929, -1.4748, "FR-BAS"},
+        {53.2012, 5.7999, "NL-FR"}, {53.4690, 7.4820, "DE-OFR"},
+        {53.3675, 7.2060, "DE-OFR"}, {54.4858, 9.0533, "DE-NFR"},
+        {54.9079, 8.3096, "DE-NFR"}, /* Sylt */
+        {51.5074, -0.1278, NULL}, {50.3755, -4.1427, NULL}, /* England, Devon not Cornwall */
+        {48.0061, 0.1996, NULL}, {43.2951, -0.3708, NULL}, /* Le Mans, Bearn not Basque */
+        {42.8105, 2.5040, NULL}, /* Saint-Paul-de-Fenouillet: Occitan */
+        {53.2194, 6.5665, NULL}, {53.1435, 8.2146, NULL}, {54.3233, 10.1228, NULL},
+        {0, 0, NULL}, {NAN, 0, NULL}, {91, 0, NULL}
+    };
+    bool matches = true;
+    for (size_t i = 0; i < sizeof places / sizeof *places; ++i) {
+        string_t *code = globe_region_code_at(globe, places[i].lat, places[i].lon);
+        if (places[i].code && (!code || strcmp(string_c_str(code), places[i].code)))
+            fprintf(stderr, "region %.4f %.4f: expected %s, got %s\n", places[i].lat, places[i].lon,
+                    places[i].code, code ? string_c_str(code) : "none");
+        matches = (places[i].code ? code && !strcmp(string_c_str(code), places[i].code) : !code) && matches;
+        TEST_ASSERT_TRUE(!globe_country_code_at(globe, places[i].lat, places[i].lon),
+                         "cultural regions never manufacture country ownership");
+        string_free(code);
+    }
+    TEST_ASSERT_TRUE(matches, "regional coverage and neighbouring exclusions");
+    globe_close(globe);
+    file_t *directory = temporary_directory(), *invalid = temporary_file(directory, "bad-regions.json");
+    string_t *bad = string_new_with("{\"type\":\"FeatureCollection\",\"features\":[{\"type\":\"Feature\","
+        "\"properties\":{\"code\":\"FR-BRE\"},"
+        "\"geometry\":{\"type\":\"Polygon\",\"coordinates\":[[[0,0],[1,0],[1,1],[0,2]]]}}]}");
+    TEST_ASSERT_TRUE(file_write_all_text(invalid, bad) && !globe_import_regions(db, invalid),
+                     "invalid open ring rolls back the replacement");
+    globe = globe_open_databases(db, db, NULL);
+    string_t *retained = globe_region_code_at(globe, 47.2184, -1.5536);
+    TEST_ASSERT_TRUE(retained && !strcmp(string_c_str(retained), "FR-BRE"), "previous region data survives failure");
+    string_free(retained); string_free(bad); globe_close(globe); file_free(source); sqlite_close(db);
+    file_delete(invalid); file_free(invalid); file_delete(directory); file_free(directory);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Indexed shorelines");
+    TEST_RUN_IN_GROUP(test_globe_regional_flags, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_geometry_budget, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_clipping_preserves_boundaries, tests, NULL);
     TEST_RUN_IN_GROUP(test_shoreline_named_water, tests, NULL);

@@ -333,10 +333,16 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                 const slider = doc.getElementById('precisionSlider')! as HTMLInputElement;
                 const track = slider.getBoundingClientRect();
                 const expressionTab = doc.getElementById('modeTabExpression')!.getBoundingClientRect();
-                const precision = doc.querySelector<HTMLElement>('.precision-toolbar')!.getBoundingClientRect();
-                check(precision.right < expressionTab.left &&
-                      Math.abs((precision.top + precision.bottom) - (expressionTab.top + expressionTab.bottom)) < 2,
-                      `${width}px: precision controls should sit to the left of Expression on the first row`);
+                const precisionControl = doc.querySelector<HTMLElement>('.precision-toolbar')!;
+                const precision = precisionControl.getBoundingClientRect();
+                const precisionVisible = visible(precisionControl);
+                check(precisionVisible === !doc.body.matches('.datetime-mode, .almanac-mode'),
+                      `${width}px: calendar modes hide the precision controls`);
+                if (precisionVisible) {
+                    check(precision.right < expressionTab.left &&
+                          Math.abs((precision.top + precision.bottom) - (expressionTab.top + expressionTab.bottom)) < 2,
+                          `${width}px: precision controls should sit to the left of Expression on the first row`);
+                }
                 const otherTabs = [...doc.querySelectorAll<HTMLElement>('.mode-tab')].slice(1);
                 const rowTops = new Set<number>();
                 let belowExpression = true;
@@ -348,16 +354,20 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                 }
                 check(rowTops.size === 2 && belowExpression,
                       `${width}px: remaining modes should form two rows below Expression`);
-                check(track.width >= precision.width - 2 && track.height <= 24 && precision.height <= 52,
-                      `${width}px: precision slider fills its compact two-column slot`);
+                if (precisionVisible) {
+                    check(track.width >= precision.width - 2 && track.height <= 24 && precision.height <= 52,
+                          `${width}px: precision slider fills its compact two-column slot`);
+                }
                 check(slider.type === 'range' && slider.labels?.[0]?.textContent === 'Precision' &&
                       slider.getAttribute('aria-describedby') === 'precisionValue',
                       `${width}px: precision slider retains its label and value description`);
                 const precisionValue = doc.getElementById('precisionValue')!;
                 precisionValue.textContent = '2004 digits';
-                inside(precisionValue, 'maximum precision readout');
-                check(precisionValue.getBoundingClientRect().left >= doc.querySelector<HTMLElement>('.precision-label')!.getBoundingClientRect().right,
-                      `${width}px: maximum precision readout does not overlap its label`);
+                if (precisionVisible) {
+                    inside(precisionValue, 'maximum precision readout');
+                    check(precisionValue.getBoundingClientRect().left >= doc.querySelector<HTMLElement>('.precision-label')!.getBoundingClientRect().right,
+                          `${width}px: maximum precision readout does not overlap its label`);
+                }
                 check(doc.querySelector<HTMLElement>('.lab-topbar')!.getBoundingClientRect().bottom < 290,
                       `${width}px: header/navigation takes too much vertical space`);
             }
@@ -385,8 +395,11 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                     check(!almanac.querySelector('.almanac-briefing'),
                           `${width}px: repeated Almanac introduction takes up phone space`);
                     const globe = bounds('almanacGlobe');
-                    check(date.top >= globe.bottom && date.bottom - globe.bottom < 160,
-                          `${width}px: Almanac moment controls should sit compactly below the globe`);
+                    const actions = bounds('almanacActions');
+                    check(actions.top >= globe.bottom && actions.top - globe.bottom < 32 && actions.height < 120,
+                          `${width}px: navigation should sit compactly below the globe`);
+                    check(date.top >= actions.bottom && date.bottom - actions.bottom < 160,
+                          `${width}px: Almanac moment controls should sit compactly below navigation`);
                     check(zone.bottom - date.top < 124, `${width}px: moment controls are too tall`);
                 }
             }

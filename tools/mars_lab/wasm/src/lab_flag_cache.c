@@ -119,7 +119,8 @@ static bool lab_flag_cache_put_owned(jsref code, jsref name, jsref flag)
 {
     flag_cache_t *state = flag_cache();
     char key[7] = {0};
-    if (!flag_code(code, key) || (lab_dom_length(flag) && !lab_dom_starts_with(flag, "data:image/svg+xml;base64,")))
+    if (!flag_code(code, key) || (lab_dom_length(flag) && !lab_dom_starts_with(flag, "data:image/svg+xml;base64,") &&
+                                !lab_dom_equal(flag, lab_dom_string("/offshore_flag.svg"))))
         return false;
     flag_entry_t *entry = calloc(1, sizeof *entry);
     if (!entry) return false;

@@ -22,6 +22,165 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
 
     await checkGlobeHTTP(check);
     await checkGlobeGPU(check);
+    await checkGlobePhoto(check);
+    const regionalSvg = window.labAlmanacFixtures()[3];
+    const regionalFlag = 'data:image/svg+xml;base64,' + btoa(regionalSvg);
+    const existingCountry = document.getElementById('almanacJurisdiction');
+    if (existingCountry) existingCountry.id = 'regional-test-saved-jurisdiction';
+    const shell = document.createElement('div');
+    shell.className = 'select-shell';
+    shell.innerHTML = '<select id="almanacJurisdiction"><option value="GB-ENG">England</option></select>' +
+        '<button class="select-button" data-country-option="1" data-country-code="GB-ENG">England</button>';
+    document.body.append(shell);
+    const selected = shell.querySelector<HTMLButtonElement>('button')!;
+    try {
+        const parentFlag = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg"/>');
+        WorksheetResults.tooltip.rememberCountry('GB-ENG', 'England', parentFlag);
+        WorksheetResults.tooltip.rememberCountry('GB-CON', 'Cornwall, England', regionalFlag);
+        WorksheetResults.tooltip.selectedObserverFlag('GB-CON');
+        check(selected.querySelector('img')?.getAttribute('src') === regionalFlag &&
+              shell.querySelector('select')!.value === 'GB-ENG',
+              'selected country control shows regional animation without changing jurisdiction');
+        WorksheetResults.tooltip.show(selected);
+        check(selected.querySelector('img')?.getAttribute('src') === regionalFlag &&
+              selected.dataset.countryFlag === regionalFlag,
+              'hovering the selected dropdown preserves its resolved regional artwork');
+        WorksheetResults.tooltip.selectedObserverFlag('');
+        check(selected.querySelector('img')?.getAttribute('src') === parentFlag,
+              'changing location replaces stale regional selection artwork with the cached parent flag');
+        shell.querySelector('select')!.append(new Option('Country not identified', ''));
+        shell.querySelector('select')!.value = '';
+        selected.dataset.countryCode = '';
+        selected.dataset.countryOption = '';
+        WorksheetResults.tooltip.rememberCountry('ZZ-SEA', 'Offshore', '/offshore_flag.svg');
+        WorksheetResults.tooltip.selectedObserverFlag('ZZ-SEA');
+        check(selected.querySelector('img')?.getAttribute('src') === '/offshore_flag.svg' &&
+              shell.querySelector('select')!.value === '', 'offshore artwork never selects a fictitious country');
+        check(!labDOM.call('lab_flag_cache_put', 'ZZ-SEA', 'Offshore', 'https://example.invalid/flag.png') &&
+              !labDOM.call('lab_flag_cache_put', 'ZZ-SEA', 'Offshore', '/other.svg') &&
+              !labDOM.call('lab_flag_cache_put', 'ZZ-SEA', 'Offshore', '/offshore_flag.png'),
+              'local vector artwork permits only the bundled SVG, not raster or arbitrary sources');
+    } finally {
+        WorksheetResults.tooltip.hide(); shell.remove();
+        if (existingCountry) existingCountry.id = 'almanacJurisdiction';
+        labDOM.call('lab_flag_cache_clear');
+    }
+    const previewCard = document.createElement('div');
+    previewCard.style.cssText = 'position:fixed;left:20px;top:20px;width:700px';
+    previewCard.innerHTML = window.labAlmanacFixtures()[0].almanac_presentation.all.html;
+    document.body.append(previewCard);
+    const previewButton = previewCard.querySelector<HTMLButtonElement>('.almanac-location-flag')!;
+    const smallFlag = previewButton.querySelector<HTMLImageElement>('img.country-flag')!;
+    smallFlag.src = regionalFlag;
+    try {
+        previewButton.setAttribute('aria-describedby', 'original-description');
+        smallFlag.dispatchEvent(new MouseEvent('pointerover', {bubbles: true}));
+        const popup = document.querySelector<HTMLElement>('#marsButtonTooltip')!;
+        check(popup.classList.contains('visible') && popup.classList.contains('mars-flag-tooltip'),
+              'hovering only the Location flag opens its image preview through native event dispatch');
+        // Headless Firefox reports no hover device; keyboard focus permits tooltip layout there too.
+        previewButton.focus({focusVisible: true} as FocusOptions);
+        const image = popup.querySelector<HTMLImageElement>('img.country-flag')!;
+        await image.decode();
+        const smallRect = smallFlag.getBoundingClientRect(), largeRect = image.getBoundingClientRect();
+        check(smallRect.width === 24 && smallRect.height === 18 &&
+              largeRect.width === smallRect.width * 14 && largeRect.height === smallRect.height * 14 &&
+              image.src === smallFlag.src && popup.textContent === '',
+              'preview is exactly 336 by 252 pixels and reuses the same SVG without enlarging the original: ' +
+              JSON.stringify({small: [smallRect.width, smallRect.height], large: [largeRect.width, largeRect.height],
+                  sameSource: image.src === smallFlag.src, text: popup.textContent}));
+        check(image.alt === previewButton.getAttribute('aria-label') &&
+              previewButton.getAttribute('aria-describedby')!.includes('marsButtonTooltip'),
+              'image preview has an accessible description');
+        const canvas = document.createElement('canvas');
+        canvas.width = 100; canvas.height = 75;
+        const context = canvas.getContext('2d')!;
+        const pixel = () => {
+            context.clearRect(0, 0, 100, 75);
+            context.drawImage(image, 0, 0, 100, 75);
+            return context.getImageData(10, 10, 1, 1).data;
+        };
+        const first = pixel();
+        check(first[3] > 240 && first[0] < 25, 'native regional SVG renders St Piran first inside an image');
+        const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        await new Promise(resolve => window.setTimeout(resolve, 3750));
+        check(pixel()[0] < 25, 'regional flag holds for five seconds before the unchanged 2.5-second fade');
+        await new Promise(resolve => window.setTimeout(resolve, 2500));
+        const outward = pixel();
+        check(outward[3] > 240 && (reduced ? outward[0] < 25 : outward[0] > 50 && outward[0] < 205),
+              'regional artwork gradually blends with England halfway through the outward fade');
+        await new Promise(resolve => window.setTimeout(resolve, 2500));
+        const second = pixel();
+        check(second[3] > 240 && (reduced ? second[0] < 25 : second[0] > 230),
+              'parent flag holds after the fade, or stays regional with reduced motion');
+        await new Promise(resolve => window.setTimeout(resolve, 5000));
+        const inward = pixel();
+        check(inward[3] > 240 && (reduced ? inward[0] < 25 : inward[0] > 30 && inward[0] < 200),
+              'parent artwork gradually blends back into the regional flag');
+        await new Promise(resolve => window.setTimeout(resolve, 1500));
+        check(pixel()[0] < 25, 'enlarged preview retains the same fifteen-second flag sequence');
+        smallFlag.src = '/offshore_flag.svg';
+        WorksheetResults.tooltip.show(previewButton);
+        const offshorePreview = popup.querySelector<HTMLImageElement>('img')!;
+        await offshorePreview.decode();
+        const offshoreResponse = await fetch('/offshore_flag.svg');
+        const offshoreSvg = new DOMParser().parseFromString(await offshoreResponse.text(), 'image/svg+xml');
+        check(offshoreResponse.ok && offshoreResponse.headers.get('Content-Type') === 'image/svg+xml' &&
+              offshoreSvg.documentElement.localName === 'svg' && !!offshoreSvg.querySelector('path') &&
+              !offshoreSvg.querySelector('image, script, foreignObject, parsererror'),
+              'offshore emblem is genuine vector artwork, with no embedded bitmap or active content');
+        check(offshorePreview.getAttribute('src') === '/offshore_flag.svg' && offshorePreview.naturalWidth > 1000 &&
+              offshorePreview.getBoundingClientRect().width === 336 && offshorePreview.getBoundingClientRect().height === 252,
+              'bundled offshore artwork decodes and uses the same enlarged preview');
+        for (const [width, height] of [[320, 640], [640, 240]]) {
+            labDOM.call('lab_tooltip_show', previewButton, previewButton, width, height);
+            const fitted = popup.querySelector<HTMLImageElement>('img')!.getBoundingClientRect();
+            check(fitted.width <= width - 48 && fitted.height <= height - 48 &&
+                  Math.abs(fitted.width / fitted.height - 4 / 3) < .001,
+                  'enlarged flag scales proportionally to fit narrow or short viewports');
+        }
+        WorksheetResults.tooltip.show(previewButton);
+        const spacer = document.createElement('div');
+        spacer.style.height = '300px';
+        previewCard.prepend(spacer);
+        previewCard.style.height = '400px';
+        previewCard.style.overflow = 'auto';
+        WorksheetResults.tooltip.show(previewButton);
+        const popupHeight = popup.getBoundingClientRect().height;
+        check(Math.abs(parseFloat(popup.style.top) + popupHeight + 8 -
+              previewButton.getBoundingClientRect().top) < .1 && popup.parentElement === document.body,
+              'flag preview prefers above and can overlap its scrollable card without being clipped');
+        previewCard.scrollTop = previewButton.getBoundingClientRect().top - 20;
+        WorksheetResults.tooltip.show(previewButton);
+        check(previewButton.getBoundingClientRect().top < popupHeight + 16 &&
+              Math.abs(parseFloat(popup.style.top) - previewButton.getBoundingClientRect().bottom - 8) < .1,
+              'scrolling the flag near the viewport top puts the preview below when above cannot fit');
+        previewCard.scrollTop = 0;
+        WorksheetResults.tooltip.show(previewButton);
+        check(Math.abs(parseFloat(popup.style.top) + popupHeight + 8 -
+              previewButton.getBoundingClientRect().top) < .1,
+              'reopening after scrolling back prefers above again');
+        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+        check(!popup.classList.contains('visible') &&
+              previewButton.getAttribute('aria-describedby') === 'original-description',
+              'Escape dismisses the flag preview and restores its original description');
+        previewButton.blur();
+        previewButton.focus();
+        check(popup.classList.contains('visible') && popup.classList.contains('mars-flag-tooltip'),
+              'keyboard focus also opens the flag preview');
+        previewButton.blur();
+        check(!popup.classList.contains('visible'), 'leaving keyboard focus dismisses the preview');
+        smallFlag.dispatchEvent(new MouseEvent('pointerover', {bubbles: true}));
+        smallFlag.dispatchEvent(new MouseEvent('pointerout', {bubbles: true}));
+        check(!popup.classList.contains('visible'), 'leaving the flag dismisses its hover preview');
+        previewCard.append(previewButton);
+        WorksheetResults.tooltip.show(previewButton);
+        check(!popup.classList.contains('mars-flag-tooltip') && !popup.querySelector('img'),
+              'the same flag control outside the summary never gets an enlarged preview');
+    } finally {
+        WorksheetResults.tooltip.hide();
+        previewCard.remove();
+    }
 
     const borderCamera = [0, 0, 0, 1];
     const localFrame = [0, 0, 0, 1, 64, 800];
@@ -445,6 +604,10 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         .fullName === 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch',
         'native exception dictionary supplies the full Welsh town name');
     labDOM.call('lab_country_cache_clear');
+    labDOM.call('lab_country_cache_put', 'region:truro', 'Cornwall, England', 'GB-ENG', '', 'GB-CON');
+    const regionCache = labDOM.call('lab_country_cache_get', 'region:truro') as {code: string; flagCode: string};
+    check(regionCache.code === 'GB-ENG' && regionCache.flagCode === 'GB-CON',
+          'native cache separates cultural artwork from geographic ownership');
     for (let i = 0; i < 65; ++i) labDOM.call('lab_country_cache_put', `test:${i}`, 'Country — 巴西', 'BR', '');
     check(!labDOM.call('lab_country_cache_get', 'test:0') &&
         (labDOM.call('lab_country_cache_get', 'test:64') as {name: string}).name === 'Country — 巴西',
@@ -458,7 +621,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     let deferredRequest = false;
     try {
         labHttp.fetch = async (url, options) => {
-            if (url !== '/almanac-eval') return initialFetch(url, options);
+            if (url !== '/almanac-eval') return initialFetch.call(labHttp, url, options);
             const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {defer_events?: string};
             deferredRequest = payload.defer_events === 'true';
             return Object.assign(new Response(), {async labData() { return {ok: true}; }});
@@ -481,7 +644,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     const borderRequests: Array<{country_code?: string}> = [];
     try {
         labHttp.fetch = async (url, options) => {
-            if (url !== '/almanac-country') return borderFetch(url, options);
+            if (url !== '/almanac-country') return borderFetch.call(labHttp, url, options);
             const request = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {country_code?: string};
             borderRequests.push(request);
             return Object.assign(new Response(), {async labData() { return {
@@ -574,6 +737,17 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         }
     }
     check(labDOM.call('lab_globe_pick', 2, 0, [0, 0, 0, 1]) === null, 'globe limb rejects outside clicks');
+    {
+        const juneau = [...labDOM.call('lab_globe_centre', 58.3019, -134.4197) as number[], 150];
+        const repaired = labDOM.call('lab_globe_history_camera', juneau, -33.4489, -70.6693, 20) as number[];
+        const centre = labDOM.call('lab_globe_pick', 0, 0, repaired.slice(0, 4)) as number[];
+        check(Math.abs(centre[0] + 33.4489) < 1e-8 && Math.abs(centre[1] + 70.6693) < 1e-8 && repaired[4] === 150,
+              'Santiago history cannot restore Juneau geometry; valid magnification survives legacy camera repair');
+        check((labDOM.call('lab_globe_history_camera', juneau, 58.3019, -134.4197, 20) as number[])
+            .every((value, i) => value === juneau[i]), 'matching saved cameras retain their exact orientation and zoom');
+        check(labDOM.call('lab_globe_history_camera', juneau, 91, 0, 20) === null,
+              'history camera repair rejects invalid geographic observers');
+    }
     for (const [lat, lon] of [[52, -2], [-33, 151], [89.99, -179.9], [0, 180]]) {
         const start = [...labDOM.call('lab_globe_centre', 0, 179.9) as number[], 150];
         const end = [...labDOM.call('lab_globe_rotate',
@@ -581,8 +755,18 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         const frame = (progress: number): number[] => labDOM.call('lab_globe_flight', start, end, progress) as number[];
         check(JSON.stringify(frame(0)) === JSON.stringify(start) && JSON.stringify(frame(1)) === JSON.stringify(end),
               'history flight retains exact endpoints including zoom and roll');
-        check(frame(.125)[4] > 1 && frame(.125)[4] < 150 && frame(.5)[4] === 1 &&
-              frame(.875)[4] > 1 && frame(.875)[4] < 4096, 'flight zooms out before rotating and then zooms in');
+        const destination = labDOM.call('lab_globe_project', lat, lon, start.slice(0, 4)) as number[];
+        const extent = Math.max(Math.abs(destination[0]), Math.abs(destination[1]));
+        const visible = destination[2] > 0 && extent * 150 <= 1.12;
+        const cruise = visible ? 150 : Math.min(150, 1.05 / Math.sqrt((1 - destination[2]) / 2));
+        if (cruise < 150) {
+            check(Math.abs(frame(.5)[4] - cruise) < 1e-8 && frame(.25)[4] > cruise &&
+                  frame(.25)[4] < 150 && frame(.75)[4] > cruise && frame(.75)[4] < 4096,
+                  'flight uses a distance-appropriate overview rather than always showing the entire globe');
+        } else {
+            check(frame(.125)[4] >= 150 && frame(.5)[4] >= 150,
+                  'an already visible destination never causes a preliminary zoom-out');
+        }
         for (const progress of [.125, .25, .4, .5, .6, .75, .875]) {
             const camera = frame(progress);
             check(camera.every(Number.isFinite) && Math.abs(Math.hypot(...camera.slice(0, 4)) - 1) < 1e-12,
@@ -628,6 +812,135 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                   'opposite edge rolls turn the globe in opposite directions without zoom attenuation');
         }
     }
+    const direction = (latitude: number, longitude: number): number[] => {
+        const p = latitude * Math.PI / 180, l = longitude * Math.PI / 180;
+        return [Math.cos(p) * Math.sin(l), Math.sin(p), Math.cos(p) * Math.cos(l)];
+    };
+    const separation = (a: number[], b: number[]): number => Math.atan2(Math.hypot(
+        a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]),
+        a.reduce((sum, value, i) => sum + value * b[i], 0));
+    for (const [fromLat, fromLon, toLat, toLon, zoom] of [
+        [51, -2, 51.1, -1.9, 150], [51, -2, 52, -1, 4096], [70, -60, 70, 60, 128],
+        [0, 179.9, 0, -179.9, 150], [89.9, 0, 89.9, 180, 150],
+        [0, 0, 0, 180, 150], [0, 0, .000001, 179.999999, 150], [51, -2, 51, -2, 150],
+        ...globeFlightRoutes.map(([, a, b, c, d]) => [a, b, c, d, 150])
+    ]) {
+        const camera = (lat: number, lon: number, roll: number): number[] => [
+            ...labDOM.call('lab_globe_rotate', labDOM.call('lab_globe_centre', lat, lon), 1, 0, 0, roll) as number[], zoom
+        ];
+        const start = camera(fromLat, fromLon, .7), end = camera(toLat, toLon, -1.1);
+        const from = direction(fromLat, fromLon), to = direction(toLat, toLon), distance = separation(from, to);
+        const projected = labDOM.call('lab_globe_project', toLat, toLon, start.slice(0, 4)) as number[];
+        const extent = Math.max(Math.abs(projected[0]), Math.abs(projected[1]));
+        const visible = projected[2] > 0 && extent * zoom <= 1.12;
+        const cruise = visible ? zoom : Math.min(zoom, 1.05 / Math.sqrt((1 - projected[2]) / 2));
+        const alignsHeading = projected[2] <= 0 || Math.hypot(projected[0], projected[1]) * zoom > 1.12 * Math.SQRT2;
+        let previousDistance = 0;
+        for (const progress of [.01, .125, .25, .375, .5, .625, .75, .875, .99]) {
+            const frame = labDOM.call('lab_globe_flight', start, end, progress) as number[];
+            const location = labDOM.call('lab_globe_pick', 0, 0, frame.slice(0, 4)) as number[];
+            const centre = direction(location[0], location[1]);
+            const travelled = separation(from, centre);
+            check(Math.abs(travelled + separation(centre, to) - distance) < 1e-8 &&
+                  travelled >= previousDistance - 1e-8,
+                  'different saved rolls cannot bend or reverse the shortest great-circle route');
+            previousDistance = travelled;
+            check(frame.every(Number.isFinite) && frame[4] >= 1 && frame[4] <= zoom + 1e-8,
+                  'flight is finite and bounded, including coincident and antipodal centres');
+            if (visible) {
+                check(frame[4] === zoom, 'visible destinations keep identical saved zoom throughout the rotation');
+                if (distance > 1e-8 && progress === .25)
+                    check(travelled > 0, 'visible destinations travel after the departure heading alignment');
+            } else if (progress === .5) {
+                check(Math.abs(frame[4] - cruise) < 1e-7,
+                      'the overview fits the remaining half-route, including far-side destinations');
+            }
+            if (progress <= .125)
+                check(travelled < 1e-8 && frame[4] === zoom, 'departure heading alignment keeps the centre and zoom fixed');
+            if (progress >= .875)
+                check(separation(centre, to) < 1e-8 && frame[4] === zoom,
+                      'arrival roll correction keeps the destination centre and departure zoom fixed');
+            if (progress === .5)
+                check(Math.abs(travelled - distance / 2) < 1e-8, 'widest view coincides with the geographic halfway point');
+            const opposite = labDOM.call('lab_globe_flight', start, end, 1 - progress) as number[];
+            check(Math.abs(frame[4] - opposite[4]) < 1e-7, 'zoom-out and zoom-in have symmetric pacing');
+            if (alignsHeading && progress >= .125 && progress <= .875 && distance > 1e-6 && distance < Math.PI - 1e-6) {
+                // The great-circle tangent is positive screen Y throughout travel, not north-up.
+                const axis = [from[1] * to[2] - from[2] * to[1], from[2] * to[0] - from[0] * to[2],
+                    from[0] * to[1] - from[1] * to[0]];
+                const tangent = [axis[1] * centre[2] - axis[2] * centre[1],
+                    axis[2] * centre[0] - axis[0] * centre[2], axis[0] * centre[1] - axis[1] * centre[0]];
+                const matrix = (labDOM.call('lab_surface_camera', 1, frame.slice(0, 4), null, null, null, 0) as number[][]).flat();
+                const x = tangent.reduce((sum, value, i) => sum + value * matrix[i], 0);
+                const y = tangent.reduce((sum, value, i) => sum + value * matrix[i + 3], 0);
+                check(Math.abs(x) < 1e-8 && y > 0, 'transported heading faces the route throughout travel');
+                const otherRoll = camera(toLat, toLon, .4);
+                const other = labDOM.call('lab_globe_flight', start, otherRoll, progress) as number[];
+                check(Math.abs(Math.abs(frame.slice(0, 4).reduce((sum, v, i) => sum + v * other[i], 0)) - 1) < 1e-12,
+                      'destination roll has no influence before arrival');
+            }
+        }
+        let seen = false, stayedVisible = true;
+        for (let i = 0; i <= 1000; ++i) {
+            const frame = labDOM.call('lab_globe_flight', start, end, i / 1000) as number[];
+            const point = labDOM.call('lab_globe_project', toLat, toLon, frame.slice(0, 4)) as number[];
+            const inView = point[2] >= -1e-10 && Math.max(Math.abs(point[0]), Math.abs(point[1])) * frame[4] <= 1.12 + 1e-8;
+            if (seen && !inView) stayedVisible = false;
+            seen ||= inView;
+        }
+        check(seen && stayedVisible,
+              `once the destination enters the viewport it never leaves: ${fromLat},${fromLon} to ${toLat},${toLon}`);
+    }
+    {
+        const start = [...labDOM.call('lab_globe_centre', 0, 0) as number[], 1];
+        let previousStep = Infinity;
+        for (const longitude of [10, 60, 120, 179]) {
+            const target = [...labDOM.call('lab_globe_centre', 0, longitude) as number[], 1];
+            const advance = (elapsed: number): number =>
+                labDOM.call('lab_globe_flight_advance', start, target, .4, elapsed, 800) as number;
+            const step = advance(16) - .4;
+            check(step > 0 && step < previousStep, 'longer journeys advance more slowly at the same zoom');
+            previousStep = step;
+            check(advance(5000) === advance(50), 'stalled animation frames cannot cause a catch-up jump');
+            check(advance(0) === .4, 'waiting for imagery does not advance the travel clock');
+            check(labDOM.call('lab_globe_flight_advance', start, target, .4, -1, 800) === null,
+                  'negative animation time is rejected');
+            const departure = labDOM.call('lab_globe_flight_advance', start, target, 0, 16, 800) as number;
+            check(Math.abs(departure - .016 / (1.2 / .125)) < 1e-12,
+                  'departure heading has a fixed short duration, independent of the route length');
+        }
+        const maxStart = [...labDOM.call('lab_globe_centre', 55.9533, -3.1883) as number[], 4096];
+        const maxEnd = [...labDOM.call('lab_globe_centre', 58.3019, -134.4197) as number[], 4096];
+        for (const redirect of [0, 1]) {
+            for (const progress of [.02, .12, .13, .2, .4, .5, .6, .8, .86, .88, .98]) {
+                const next = labDOM.call('lab_globe_flight_advance', maxStart, maxEnd, progress, 50, 800, redirect) as number;
+                const a = labDOM.call('lab_globe_flight', maxStart, maxEnd, progress, redirect) as number[];
+                const b = labDOM.call('lab_globe_flight', maxStart, maxEnd, next, redirect) as number[];
+                const centre = labDOM.call('lab_globe_pick', 0, 0, a.slice(0, 4)) as number[];
+                const shifted = labDOM.call('lab_globe_project', centre[0], centre[1], b.slice(0, 4)) as number[];
+                const pixels = Math.hypot(shifted[0], shifted[1]) * b[4] * 800 / 2.24;
+                const scale = Math.abs(Math.log(b[4] / a[4])) * 400;
+                check(next > progress && pixels + scale <= 6.001,
+                      'ordinary and redirected flights bound motion to six pixels even after a slow frame');
+            }
+        }
+        for (const [name, fromLat, fromLon, toLat, toLon] of globeFlightRoutes) {
+            for (const [fromZoom, toZoom] of [[1, 150], [150, 20], [150, 512]]) {
+                const a = [...labDOM.call('lab_globe_centre', fromLat, fromLon) as number[], fromZoom];
+                const b = [...labDOM.call('lab_globe_centre', toLat, toLon) as number[], toZoom];
+                let progress = 0, frames = 0;
+                while (progress < 1 && frames < 1800) {
+                    progress = labDOM.call('lab_globe_flight_advance', a, b, progress, 1000 / 60, 800) as number;
+                    ++frames;
+                }
+                check(progress === 1 && frames / 60 < 30,
+                      `${name}: bounded 60 Hz travel completes within 30 display seconds (${fromZoom} to ${toZoom}: ${frames / 60})`);
+                const arrived = labDOM.call('lab_globe_flight', a, b, progress) as number[];
+                check(arrived.every((value, i) => value === b[i]),
+                      `${name}: faster travel reaches the exact saved camera without dropping its zoom`);
+            }
+        }
+    }
     for (const [lat, lon, zoom, expected] of [[60, 15, 1, 3], [61, 16, 1, 0],
         [-60, -30, 1, 3], [0.25, 0.25, 100, 3], [0, 180, 1, 3]]) {
         const grid = labDOM.call('lab_globe_grid', lat, lon, zoom, 800) as number[];
@@ -647,7 +960,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     earth.src = '/earth_surface.jpg';
     await earth.decode();
     check(earth.naturalWidth === 2048 && earth.naturalHeight === 1024,
-          'bundled NASA surface texture decodes at its original resolution');
+          'bundled NASA overview decodes at its prepared resolution');
     if (globeCanvas.getContext('webgl')) {
         const originalWorker = globalThis.Worker;
         const httpFixture = globeHTTPFixture(async body => {
@@ -673,6 +986,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         const town = document.getElementById('almanacTown') as HTMLSelectElement, savedTown = town.value;
         const saved = [latitude.value, longitude.value, elevation.value], hidden = panel.classList.contains('hidden');
         const scroll = [window.scrollX, window.scrollY];
+        const highResolutionAlreadyRequested = Boolean(Reflect.get(
+            Reflect.get(MarsAlmanacGlobe, 'instance'), 'highResolutionRequested'));
         const evaluate = WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation;
         let evaluations = 0;
         WorksheetLocations.calendarActions.triggerAlmanacAutoEvaluation = async () => { ++evaluations; };
@@ -686,8 +1001,12 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 await new Promise(resolve => setTimeout(resolve, 50));
             check(document.getElementById('almanacGlobe')!.dataset.surface === 'blue-marble',
                   'Earth texture is uploaded to the live globe');
-            check(document.getElementById('almanacGlobe')!.dataset.resolution === '2048',
-                  'initial overview does not eagerly load the large texture');
+            if (!highResolutionAlreadyRequested)
+                check(document.getElementById('almanacGlobe')!.dataset.resolution === '2048',
+                      'initial overview does not eagerly load the large texture');
+            else
+                check(Number(document.getElementById('almanacGlobe')!.dataset.resolution) >= 2048,
+                      'earlier navigation may retain its already-requested higher-resolution texture');
             document.querySelector<HTMLButtonElement>('[data-globe-action="centre"]')!.click();
             await new Promise(requestAnimationFrame);
             const marker = document.querySelector<HTMLElement>('.globe-observer');
@@ -732,7 +1051,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             const originalLatitude = latitude.value;
             try {
                 labHttp.fetch = (url, options) => {
-                    if (url !== '/almanac-country') return countryFetch(url, options);
+                    if (url !== '/almanac-country') return countryFetch.call(labHttp, url, options);
                     return new Promise(resolve => countryReplies.push({resolve, signal: options?.signal}));
                 };
                 const selectCountryPoint = async (value: string): Promise<void> => {
@@ -867,15 +1186,19 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
             // Exercise the actual globe shader with controlled local imagery and shoreline colours.
+            const paletteModuleURL = '/js/globe_gpu.js';
+            const paletteBackend = await import(paletteModuleURL) as typeof import('../../typescript/globe_gpu.js');
             const activeTexture = gl.getParameter(gl.ACTIVE_TEXTURE) as number;
             const savedTextures: (WebGLTexture | null)[] = [], paletteTextures: WebGLTexture[] = [];
-            const paletteUniforms = ['mapMode', 'detailReady', 'grid', 'riverReady', 'vectorReady', 'naturalShore'];
+            const paletteUniforms = ['mapMode', 'detailReady', 'grid', 'riverReady', 'vectorReady', 'naturalShore', 'palettesReady', 'photoReady'];
             const savedUniforms = paletteUniforms.map(name => gl.getUniform(program, gl.getUniformLocation(program, name)!));
             const savedCamera = gl.getUniform(program, gl.getUniformLocation(program, 'camera')!) as Float32Array;
             const savedGridMatrix = gl.getUniform(program, gl.getUniformLocation(program, 'cameraToWorld')!) as Float32Array;
             const savedRiverBounds = gl.getUniform(program, gl.getUniformLocation(program, 'riverBounds')!) as Float32Array;
             const savedPhotoPixels = gl.getUniform(program, gl.getUniformLocation(program, 'photoPixels')!) as number;
             try {
+                gl.uniform1i(gl.getUniformLocation(program, 'palettesReady'), 0);
+                gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), 0);
                 for (const unit of [0, 2, 3, 4]) {
                     gl.activeTexture(gl.TEXTURE0 + unit);
                     savedTextures.push(gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null);
@@ -914,6 +1237,32 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     const light = .8 + .2 / Math.hypot(.35, .45, 1);
                     check(expected.every((channel, index) => Math.abs(pixel[index] - channel * light) <= 2),
                           `local photographic ${kind} retains its sampled colour in the shoreline map`);
+                    const cachedTextures: (WebGLTexture | null)[] = [];
+                    for (const unit of [5, 6]) {
+                        gl.activeTexture(gl.TEXTURE0 + unit);
+                        cachedTextures.push(gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null);
+                    }
+                    const palettes = paletteBackend.buildGlobePalettes(gl, program, 32);
+                    try {
+                        palettes.forEach((texture, i) => {
+                            gl.activeTexture(gl.TEXTURE5 + i);
+                            gl.bindTexture(gl.TEXTURE_2D, texture);
+                        });
+                        gl.uniform1i(gl.getUniformLocation(program, 'palettesReady'), 1);
+                        gl.drawArrays(gl.TRIANGLES, 0, 6);
+                        const cached = new Uint8Array(4);
+                        gl.readPixels(Math.floor(globeCanvas.width / 2), Math.floor(globeCanvas.height / 2),
+                                      1, 1, gl.RGBA, gl.UNSIGNED_BYTE, cached);
+                        check(cached.every((channel, i) => Math.abs(channel - pixel[i]) <= 2),
+                              `cached GPU photographic ${kind} agrees with direct correction`);
+                    } finally {
+                        gl.uniform1i(gl.getUniformLocation(program, 'palettesReady'), 0);
+                        palettes.forEach((texture, i) => {
+                            gl.activeTexture(gl.TEXTURE5 + i);
+                            gl.bindTexture(gl.TEXTURE_2D, cachedTextures[i]);
+                            gl.deleteTexture(texture);
+                        });
+                    }
                 }
                 // Cross the photograph's blue-dominance threshold without changing the geographic mask.
                 // A binary sample filter jumps straight from the fallback to turquoise at this boundary.
@@ -937,7 +1286,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 }
                 gl.uniform3f(gl.getUniformLocation(program, 'camera'), savedCamera[0], savedCamera[1], 16);
                 gl.uniform1f(gl.getUniformLocation(program, 'photoPixels'), 2048);
-                // Regional zoom must already avoid magnifying photographic stripes into apparent geography.
+                // Photographic variation must survive close zoom instead of becoming a camera-centred flat fill.
                 const stripes = new Uint8Array(1024 * 4);
                 for (let x = 0; x < 1024; ++x)
                     stripes.set(x % 4 < 2 ? [7, 20, 64, 255] : [12, 145, 175, 255], x * 4);
@@ -950,13 +1299,14 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 const localCentre = new Uint8Array(4);
                 gl.readPixels(Math.floor(globeCanvas.width / 2), Math.floor(globeCanvas.height / 2),
                               1, 1, gl.RGBA, gl.UNSIGNED_BYTE, localCentre);
-                for (const fraction of [.25, .75]) {
+                let closeVariation = 0;
+                for (const fraction of [.2, .3, .4, .6, .7, .8]) {
                     const pixel = new Uint8Array(4);
                     gl.readPixels(Math.floor(globeCanvas.width * fraction), Math.floor(globeCanvas.height / 2),
                                   1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
-                    check(pixel.every((channel, i) => Math.abs(channel - localCentre[i]) <= 2),
-                          'town-scale water uses a consistent local photographic colour, not raster patches');
+                    closeVariation = Math.max(closeVariation, ...pixel.map((channel, i) => Math.abs(channel - localCentre[i])));
                 }
+                check(closeVariation > 4, 'close zoom preserves geographical photographic colour variation');
                 const shoreNames = ['shoreBounds', 'shoreTransform', 'shoreOffset'];
                 const shoreSaved = shoreNames.map(name =>
                     gl.getUniform(program, gl.getUniformLocation(program, name)!) as Float32Array);
@@ -971,7 +1321,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     gl.readPixels(Math.floor(globeCanvas.width / 2), Math.floor(globeCanvas.height / 2),
                                   1, 1, gl.RGBA, gl.UNSIGNED_BYTE, outside);
                     check(outside.every((channel, i) => Math.abs(channel - localCentre[i]) <= 2),
-                          'outside a retained patch uses the same palette instead of raw photographic stripes');
+                          'outside a retained patch preserves the same world-anchored photograph');
                 } finally {
                     gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), naturalSaved);
                     shoreNames.forEach((name, i) => {
@@ -1042,13 +1392,13 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                           'polar meridians remain visible as restrained dark strokes on ice');
                 }
                 // Historical sea ice must not disappear when zoom selects the independent SVG map.
-                for (const zoom of [7.99, 8, 8.01, 16]) {
-                    gl.uniform3f(gl.getUniformLocation(program, 'camera'), -70, -90, zoom);
+                for (const lat of [-70, 70]) for (const zoom of [7.99, 8, 8.01, 16]) {
+                    gl.uniform3f(gl.getUniformLocation(program, 'camera'), lat, -90, zoom);
                     for (const vectors of [false, true]) {
                         gl.uniform1i(gl.getUniformLocation(program, 'vectorReady'), Number(vectors));
-                        const ice = polarPixel(-70, -90, false);
+                        const ice = polarPixel(lat, -90, false);
                         check(ice[0] >= 240 && ice[1] >= 240 && ice[2] >= 240 && ice[3] === 255,
-                              'historical Antarctic ice remains visible across zoom and SVG transitions');
+                              'source-imaged ice in both hemispheres remains visible across zoom and SVG transitions');
                     }
                 }
                 gl.uniform1i(gl.getUniformLocation(program, 'vectorReady'), 1);
@@ -1171,9 +1521,10 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 gl.activeTexture(activeTexture);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
-            const map = document.querySelector<HTMLButtonElement>('[data-globe-action="map"]')!;
             check(gl.getError() === gl.NO_ERROR, 'shader probes restore valid uniform state before live interaction');
-            check(map.getAttribute('aria-pressed') === 'false', 'photographic view is the default');
+            check(!document.querySelector('[data-globe-action="map"]') &&
+                  Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'naturalStyle')!)),
+                  'Natural Earth is the only display style and there is no map toggle');
             const savedLatitude = latitude.value;
             for (const lat of [61, 59, -61, -59]) {
                 latitude.value = String(lat);
@@ -1195,6 +1546,10 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             await new Promise(requestAnimationFrame);
             const mapFetch = labHttp.fetch;
             const mapNative = labDOM.call;
+            const detailGlobe = Reflect.get(MarsAlmanacGlobe, 'instance') as {
+                orientation: number[]; view: number[]; applyCamera(camera: number[]): void;
+            };
+            const overviewZoom = detailGlobe.view[2];
             let rejectMask: ((reason: Error) => void) | undefined;
             let maskRequests = 0;
             let holdVectors = false;
@@ -1214,7 +1569,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     return mapNative(entry, ...args);
                 }) as typeof labDOM.call;
                 labHttp.fetch = (url, options) => {
-                    if (url !== '/almanac-globe') return mapFetch(url, options);
+                    if (url !== '/almanac-globe') return mapFetch.call(labHttp, url, options);
                     const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {
                         format?: string; west: number; south: number; east: number; north: number
                     };
@@ -1245,24 +1600,23 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                         return {ok: true, image: '<svg xmlns="http://www.w3.org/2000/svg" width="2" height="1"><path fill="#465522" d="M0 0H2V1H0Z"/></svg>'};
                     }}));
                 };
-                map.click();
+                detailGlobe.applyCamera([...detailGlobe.orientation, 12]);
                 for (let i = 0; i < 100 && !rejectMask; ++i) await new Promise(resolve => setTimeout(resolve, 25));
-                check(Boolean(rejectMask), 'detailed SVG loads independently of the movement preview');
-                check(previewRequests === 0, 'local vectors take priority over expensive whole-world preview rendering');
+                check(Boolean(rejectMask), 'close Natural Earth views load detailed SVG');
+                check(previewRequests === 0, 'Natural Earth never requests the coarse whole-world map preview');
                 rejectMask!(new Error('delayed shoreline fixture'));
                 await new Promise(resolve => setTimeout(resolve, 50));
                 await new Promise(requestAnimationFrame);
-                check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'interactionPreview')!)) ||
-                      !gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!) ||
-                      (Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'vectorReady')!)) &&
-                       Boolean(document.querySelector('.globe-shore-overlay path'))),
-                      'failed detail request leaves the interactive preview available');
-                map.click();
-                map.click();
+                check(!gl.getUniform(program, gl.getUniformLocation(program, 'interactionPreview')!) &&
+                      Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'naturalStyle')!)),
+                      'failed detail requests retain photography, never the coarse flat map');
+                grid.click();
+                grid.click();
                 for (let i = 0; i < 100 && !gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!); ++i)
                     await new Promise(resolve => setTimeout(resolve, 25));
-                check(map.textContent === 'Map' && Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!)),
-                      `retry switches to map rendering only after native SVG geometry is ready: ${maskRequests}; ${document.getElementById('almanacGlobe')?.dataset.shoreline}; ${document.getElementById('almanacGlobeStatus')?.textContent}; ${document.querySelector('.globe-shore-overlay')?.outerHTML.slice(0, 250)}`);
+                check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'naturalShore')!)),
+                      `retry restores detailed photographic colouring: ${maskRequests}; ` +
+                      `${document.getElementById('almanacGlobeStatus')?.textContent}`);
                 for (let i = 0; i < 100 && !gl.getUniform(program, gl.getUniformLocation(program, 'vectorReady')!); ++i)
                     await new Promise(resolve => setTimeout(resolve, 25));
                 const shoreOverlay = document.querySelector<SVGSVGElement>('.globe-shore-overlay')!;
@@ -1270,18 +1624,19 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                       Boolean(shoreOverlay.querySelector('path')) && !shoreOverlay.querySelector('image'),
                       'collapsed islands do not prevent live SVG; the canvas retains only grid and river overlays: ' +
                       document.getElementById('almanacGlobeStatus')?.textContent);
-                const priorPaths = shoreOverlay.innerHTML;
+                const priorPaths = shoreOverlay.querySelector('g')!.innerHTML;
                 const priorCamera = Array.from(gl.getUniform(program, gl.getUniformLocation(program, 'camera')!) as Float32Array);
                 check(!gl.getUniform(program, gl.getUniformLocation(program, 'grid')!), 'gridlines remain off unless requested');
                 holdVectors = true;
                 labDOM.call('lab_globe_shore_clear');
                 document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();
                 for (let i = 0; i < 60 && !releaseVectors; ++i) await new Promise(resolve => setTimeout(resolve, 25));
-                check(Boolean(releaseVectors) && shoreOverlay.innerHTML === priorPaths && shoreOverlay.style.display === 'none' &&
-                      !gl.getUniform(program, gl.getUniformLocation(program, 'vectorReady')!) &&
+                check(Boolean(releaseVectors) && shoreOverlay.querySelector('g')!.innerHTML === priorPaths &&
+                      shoreOverlay.style.display === 'none' &&
+                      Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'naturalShore')!)) &&
                       (gl.getUniform(program, gl.getUniformLocation(program, 'camera')!) as Float32Array)[2] > priorCamera[2] &&
                       !gl.getUniform(program, gl.getUniformLocation(program, 'grid')!),
-                      'zoom awaiting vectors advances the camera immediately without showing misaligned SVG or automatic gridlines');
+                      'zoom retains aligned GPU detail without duplicate SVG painting or automatic gridlines');
                 grid.click();
                 await new Promise(requestAnimationFrame);
                 check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'grid')!)),
@@ -1305,17 +1660,23 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     await new Promise(resolve => setTimeout(resolve, 25));
                 check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'vectorReady')!)),
                       'close view has detailed vectors before starting a drag');
-                map.click();
                 for (let i = 0; i < 100 && !gl.getUniform(program, gl.getUniformLocation(program, 'naturalShore')!); ++i)
                     await new Promise(resolve => setTimeout(resolve, 25));
                 check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'naturalShore')!)),
-                      `Natural Earth retains photographic colouring at close vector zoom: ${map.textContent}; ` +
+                      'Natural Earth retains photographic colouring at close vector zoom: ' +
                       `${gl.getUniform(program, gl.getUniformLocation(program, 'camera')!)}; ` +
                       `${document.getElementById('almanacGlobeStatus')?.textContent}`);
                 gl.activeTexture(gl.TEXTURE0);
                 const naturalTexture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
                 const sandTexture = gl.createTexture()!;
+                const photoReady = gl.getUniform(program, gl.getUniformLocation(program, 'photoReady')!);
+                const photoBounds = gl.getUniform(program, gl.getUniformLocation(program, 'photoBounds')!) as Float32Array;
+                gl.activeTexture(gl.TEXTURE7);
+                const naturalPatch = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
+                const patchTexture = gl.createTexture()!;
+                gl.activeTexture(gl.TEXTURE0);
                 try {
+                    gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), 0);
                     gl.bindTexture(gl.TEXTURE_2D, sandTexture);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -1328,7 +1689,37 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     const light = .8 + .2 / Math.hypot(.35, .45, 1);
                     check([190, 165, 100].every((channel, i) => Math.abs(sand[i] - channel * light) <= 2),
                           'actual SVG land coverage uses sandy photographic RGB instead of the olive map fill');
+                    gl.activeTexture(gl.TEXTURE7);
+                    gl.bindTexture(gl.TEXTURE_2D, patchTexture);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                                  new Uint8Array([95, 125, 45, 255]));
+                    const camera = gl.getUniform(program, gl.getUniformLocation(program, 'camera')!) as Float32Array;
+                    const patch = labDOM.call('lab_globe_photo_patch', camera[0], camera[1]) as number[];
+                    gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), 1);
+                    for (const offset of [0, 360]) {
+                        gl.uniform4f(gl.getUniformLocation(program, 'photoBounds'),
+                                     patch[3] + offset, patch[4], patch[5] + offset, patch[6]);
+                        gl.drawArrays(gl.TRIANGLES, 0, 6);
+                        gl.readPixels(Math.floor(globeCanvas.width / 2), Math.floor(globeCanvas.height / 2),
+                                      1, 1, gl.RGBA, gl.UNSIGNED_BYTE, sand);
+                        check([95, 125, 45].every((channel, i) => Math.abs(sand[i] - channel * light) <= 2),
+                              'higher-resolution patch supplies shoreline colour with wrapped longitude');
+                    }
+                    gl.uniform4f(gl.getUniformLocation(program, 'photoBounds'), 60, -30, 120, 30);
+                    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                    gl.readPixels(Math.floor(globeCanvas.width / 2), Math.floor(globeCanvas.height / 2),
+                                  1, 1, gl.RGBA, gl.UNSIGNED_BYTE, sand);
+                    check([190, 165, 100].every((channel, i) => Math.abs(sand[i] - channel * light) <= 2),
+                          'outside the photographic patch the overview remains intact');
                 } finally {
+                    gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), Number(photoReady));
+                    gl.uniform4fv(gl.getUniformLocation(program, 'photoBounds'), photoBounds);
+                    gl.activeTexture(gl.TEXTURE7);
+                    gl.bindTexture(gl.TEXTURE_2D, naturalPatch);
+                    gl.deleteTexture(patchTexture);
+                    gl.activeTexture(gl.TEXTURE0);
                     gl.bindTexture(gl.TEXTURE_2D, naturalTexture);
                     gl.deleteTexture(sandTexture);
                 }
@@ -1345,10 +1736,9 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 releaseVectors?.();
                 grid.click();
                 await new Promise(resolve => setTimeout(resolve, 400));
-                map.click();
                 await new Promise(requestAnimationFrame);
-                check(!gl.getUniform(program, gl.getUniformLocation(program, 'naturalShore')!),
-                      'explicit Map mode retains flat vector fills');
+                check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'naturalShore')!)),
+                      'replacing coverage never switches photographic detail to flat fills');
                 await new Promise(resolve => setTimeout(resolve, 400));
                 holdVectors = true;
                 refreshCoverage = true;
@@ -1385,10 +1775,10 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     for (let i = 1; i <= 5; ++i) {
                         globeCanvas.dispatchEvent(new PointerEvent('pointermove', {pointerId: 71, clientX: x + i * 10, clientY: y + i * 2}));
                         await new Promise(requestAnimationFrame);
-                        check(shoreOverlay.style.display !== 'none' && Boolean(shoreOverlay.querySelector('path')) &&
+                        check(shoreOverlay.style.display === 'none' && Boolean(shoreOverlay.querySelector('path')) &&
                               Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'vectorReady')!)) &&
                               !gl.getUniform(program, gl.getUniformLocation(program, 'interactionPreview')!),
-                              'every close-view drag frame retains detailed SVG instead of the coarse world texture');
+                              'every close-view drag frame retains GPU detail without repainting the duplicate SVG');
                     }
                     check(Boolean(shoreOverlay.querySelector('g')!.getAttribute('transform')),
                           'retained detailed paths move through the native camera transform during drag');
@@ -1405,9 +1795,9 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 missingCoverage = true;
                 grid.click();
                 await new Promise(requestAnimationFrame);
-                check(shoreOverlay.style.display === 'none' &&
-                      !gl.getUniform(program, gl.getUniformLocation(program, 'vectorReady')!),
-                      'an old local patch never paints unloaded surrounding land as empty ocean');
+                check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'naturalStyle')!)) &&
+                      !gl.getUniform(program, gl.getUniformLocation(program, 'interactionPreview')!),
+                      'missing surrounding coverage cannot switch the view to a blocky map preview');
                 missingCoverage = false;
                 holdVectors = false;
                 releaseVectors?.();
@@ -1415,10 +1805,15 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 for (let i = 0; i < 6; ++i) { zoomOut.click(); await new Promise(requestAnimationFrame); }
                 document.querySelector<HTMLButtonElement>('[data-globe-action="centre"]')!.click();
                 await new Promise(resolve => setTimeout(resolve, 400));
-            } finally { labHttp.fetch = mapFetch; labDOM.call = mapNative; }
-            map.click();
+                check(previewRequests === 0, 'no map-preview requests are made during zoom, drag or detail replacement');
+            } finally {
+                labHttp.fetch = mapFetch;
+                labDOM.call = mapNative;
+                detailGlobe.applyCamera([...detailGlobe.orientation, overviewZoom]);
+            }
             await new Promise(requestAnimationFrame);
-            check(map.textContent === 'Natural Earth' && !gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!) &&
+            check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'naturalStyle')!)) &&
+                  !gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!) &&
                   latitude.value === beforeGrid[0] && longitude.value === beforeGrid[1] && evaluations === beforeGrid[2],
                   'photographic view restores without changing or evaluating the observer');
             grid.click();
@@ -1526,7 +1921,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             try {
                 labHttp.fetch = (url, options) => url === '/almanac-country'
                     ? new Promise(resolve => townFlagReplies.push({resolve, signal: options?.signal}))
-                    : townFlagFetch(url, options);
+                    : townFlagFetch.call(labHttp, url, options);
                 selectedLabel!.dispatchEvent(new PointerEvent('pointerover', {bubbles: true}));
                 const tooltip = document.querySelector<HTMLElement>('#marsButtonTooltip')!;
                 check(townFlagReplies.length === 1 && tooltip.textContent!.includes(place!.name),
@@ -1716,8 +2111,9 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             for (let i = 0; i < 4; ++i)
                 document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();
             await new Promise(requestAnimationFrame);
-            check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'mapMode')!)) &&
-                  map.getAttribute('aria-pressed') === 'false', 'deep zoom automatically replaces imagery with shoreline map');
+            check(Boolean(gl.getUniform(program, gl.getUniformLocation(program, 'naturalStyle')!)) &&
+                  !gl.getUniform(program, gl.getUniformLocation(program, 'interactionPreview')!),
+                  'deep zoom remains Natural Earth while detailed shoreline loads');
             for (let i = 0; i < 4; ++i)
                 document.querySelector<HTMLButtonElement>('[data-globe-action="out"]')!.click();
             await new Promise(requestAnimationFrame);
@@ -1733,7 +2129,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             labHttp.fetch = (url, options) => url === '/almanac-country'
                 ? Promise.resolve(Object.assign(new Response(), {async labData() {
                     return {ok: true, country: '', country_code: '', country_flag: '', nautical_zone: '3'};
-                }})) : pointFetch(url, options);
+                }})) : pointFetch.call(labHttp, url, options);
             const waterFetch = labHttp.fetch;
             globeCanvas.dispatchEvent(new MouseEvent('click', click));
             check((document.getElementById('almanacJurisdiction') as HTMLSelectElement).value === '',
@@ -1745,7 +2141,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             labDOM.call('lab_country_cache_clear');
             let resolveZone!: (response: MarsTransportResponse) => void;
             labHttp.fetch = (url, options) => url === '/almanac-country'
-                ? new Promise<MarsTransportResponse>(resolve => { resolveZone = resolve; }) : pointFetch(url, options);
+                ? new Promise<MarsTransportResponse>(resolve => { resolveZone = resolve; }) : pointFetch.call(labHttp, url, options);
             globeCanvas.dispatchEvent(new MouseEvent('click', click));
             observerZone.value = '5.5';
             observerZone.dispatchEvent(new Event('input', {bubbles: true}));
@@ -1818,9 +2214,19 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             } finally { globeCanvas.setPointerCapture = capture; labHttp.fetch = pointFetch; }
             try {
                 let countryCalls = 0;
+                let civilCalls = 0;
+                let civilOffset = '1';
+                let releaseCivil: ((response: MarsTransportResponse) => void) | undefined;
+                let delayCivil = false;
+                const civilReply = () => Object.assign(new Response(), {async labData() {
+                    return {ok: true, gmt_offset: civilOffset, latitude: '53.3190', longitude: '-3.4916'};
+                }});
                 let resolveCountry!: (response: MarsTransportResponse) => void;
                 labHttp.fetch = (url, options) => url === '/almanac-country'
-                    ? (++countryCalls, new Promise(resolve => { resolveCountry = resolve; })) : pointFetch(url, options);
+                    ? (++countryCalls, new Promise(resolve => { resolveCountry = resolve; }))
+                    : url === '/datetime-jurisdiction-location'
+                        ? (++civilCalls, delayCivil ? new Promise(resolve => { releaseCivil = resolve; })
+                            : Promise.resolve(civilReply())) : pointFetch.call(labHttp, url, options);
                 const clickedCamera = MarsAlmanacGlobe.captureHistory()!;
                 const landClick = {...click, clientX: click.clientX + 14};
                 globeCanvas.dispatchEvent(new MouseEvent('click', landClick));
@@ -1834,7 +2240,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 check((document.getElementById('almanacJurisdiction') as HTMLSelectElement).value === 'GB-WLS' &&
                       town.value === '' && latitude.value === pickedCoordinates[0] && longitude.value === pickedCoordinates[1],
                       'identified land changes the country menu without snapping the clicked point to a town');
-                check(observerZone.value === '3', 'an identified jurisdiction rejects a nautical-zone suggestion');
+                check(observerZone.value === '1' && civilCalls === 1,
+                      'an identified jurisdiction uses its native civil offset instead of the inherited or nautical offset');
                 globeCanvas.dispatchEvent(new MouseEvent('click', landClick));
                 await new Promise(resolve => setTimeout(resolve, 0));
                 check(countryCalls === 1 && jurisdictionSelect.value === 'GB-WLS',
@@ -1847,6 +2254,40 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 document.dispatchEvent(new Event('mars-almanac-observer-committed'));
                 check(MarsAlmanacGlobe.captureHistory()!.every((value, index) => value === clickedCamera[index]),
                       'evaluation metadata changes do not recentre a clicked position');
+                const dateInput = document.getElementById('almanacDate') as HTMLInputElement;
+                const originalDate = dateInput.value;
+                dateInput.value = '2026-12-01';
+                civilOffset = '0';
+                globeCanvas.dispatchEvent(new MouseEvent('click', landClick));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(observerZone.value === '0' && civilCalls === 3 && countryCalls === 1,
+                      'cached geography obtains a fresh civil offset for the selected date, including zero');
+                delayCivil = true;
+                globeCanvas.dispatchEvent(new MouseEvent('click', landClick));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                observerZone.value = '5.5';
+                observerZone.dispatchEvent(new Event('input', {bubbles: true}));
+                releaseCivil!(civilReply());
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(observerZone.value === '5.5', 'a pending civil offset cannot overwrite a manual zone edit');
+                globeCanvas.dispatchEvent(new MouseEvent('click', landClick));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                dateInput.value = originalDate;
+                releaseCivil!(civilReply());
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(observerZone.value === '5.5', 'an obsolete date cannot install its civil offset');
+                globeCanvas.dispatchEvent(new MouseEvent('click', landClick));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                const oldCivil = releaseCivil!;
+                globeCanvas.dispatchEvent(new MouseEvent('click', {...landClick, clientX: landClick.clientX + 5}));
+                oldCivil(civilReply());
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(observerZone.value === '5.5', 'an obsolete point cannot install its civil offset');
+                resolveCountry(Object.assign(new Response(), {async labData() {
+                    return {ok: true, country: '', country_code: '', country_flag: ''};
+                }}));
+                await new Promise(resolve => setTimeout(resolve, 0));
+                check(observerZone.value === '5.5', 'unassigned points without a native suggestion retain the authored zone');
                 latitude.value = String(Number(latitude.value) + 1);
                 town.dispatchEvent(new Event('change', {bubbles: true}));
                 await new Promise(requestAnimationFrame);
@@ -1878,7 +2319,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 };
                 labHttp.fetch = (url, options) => {
                     if (url === '/almanac-globe') return new Promise(resolve => pendingSurface.push(resolve));
-                    if (url !== '/almanac-rivers') return originalFetch(url, options);
+                    if (url !== '/almanac-rivers') return originalFetch.call(labHttp, url, options);
                     return new Promise(resolve => pending.push({resolve, signal: options?.signal}));
                 };
                 for (let i = 0; i < 24; ++i) zoomOut.click();
@@ -1947,7 +2388,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             try {
                 check(bordersButton.getAttribute('aria-pressed') === 'false', 'country borders default to off');
                 labHttp.fetch = (url, options) => {
-                    if (url !== '/almanac-borders') return borderFetch(url, options);
+                    if (url !== '/almanac-borders') return borderFetch.call(labHttp, url, options);
                     const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {
                         format: string; west: number; south: number; east: number; north: number
                     };
@@ -2016,6 +2457,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 labHttp.fetch = borderFetch;
                 for (let i = 0; i < 24; ++i) zoomOut.click();
             }
+            await checkGlobeFlights(check);
         } finally {
             globalThis.Worker = originalWorker;
             resetGlobeWorker();

@@ -50,28 +50,26 @@ opaque bytes; the general browser codec represents those as `Uint8Array`, but
 the live shoreline receiver bypasses that host-value conversion. Text fixtures remain accepted by
 the projector, but the server no longer emits decimal shoreline coordinates.
 SVG path output still uses text because the browser SVG renderer requires it.
-Local coastline vectors are requested before the optional whole-world Map preview;
-Natural Earth does not request that preview. Vector loading starts at zoom four,
+Natural Earth is the only globe display style; the coarse whole-world map preview
+is never requested or displayed. Vector loading starts at zoom four,
 before the close-view handoff at zoom eight. Sharper photographic imagery remains
-available when reopening directly at close zoom, and regional views blend towards
-a local land/water palette instead of magnifying photographic colour patches.
-The transition now follows projected source-pixel size: photography remains intact
-up to two CSS pixels per source pixel and blends towards the local palette by six.
+available when reopening directly at close zoom. Photography stays world-anchored
+at every zoom; a local land/water palette corrects only pixels that disagree with
+the detailed shoreline, rather than flattening the entire view.
 Drag samples predict up to 400 ms ahead with a bounded quarter-viewport lead;
 native coverage checks keep the current view inside each prefetched region.
 Natural Earth retains covered portions of the previous detailed frame while the
-next region loads. Outside its geographic and image bounds, the photographic
-fallback uses the same resolution-dependent colour treatment as the detailed
-surface, avoiding a rectangular switch between raw imagery and the local palette.
+next region loads. Outside its geographic and image bounds, the original photograph
+remains visible. Corrections fade near the retained image edge and over 350 milliseconds
+when detail first arrives, avoiding an abrupt rectangular handoff.
 The launcher uses `lab_surface_service_start` before forking HTTP workers and
 `lab_surface_service_select` to retain each worker's channel. Shoreline requests
 use `lab_surface_service_request`; failed channels report service unavailability
 rather than silently constructing another world cache. All children are reaped
 on shutdown. Direct adapter tests can run without starting the service.
 
-Globe rotation never changes the photographic/map style merely because the camera
-crosses a polar latitude. Explicit Map selection and the deep-zoom threshold still
-select detailed geometry, but only explicit Map selection uses flat olive fills.
+Globe rotation never changes the photographic style when the camera crosses a polar
+latitude. The deep-zoom threshold selects detailed geometry without changing style.
 Natural Earth keeps the locally sampled photographic land and water colours at
 close zoom. An overscanned, display-resolution coverage mask is drawn directly
 from binary native projection buffers using `src/webgl`, not decoded from SVG
@@ -129,21 +127,20 @@ including rolled cameras, poles and date-line crossings. This avoids inflating
 regional requests into near-hemisphere downloads which exceed the transport budget.
 Multi-patch regions prepare and reuse the native spatial index once, rather than
 rereading the same continental polygons for each patch on a cold connection.
-Before local vectors are available, and at wide views, WebGL provides a preview. This preview uses a
-separate, native-generated global texture with the same flat land/water and polar
-palette. This temporary preview is coarser than the settled SVG; it does not replace
-the detailed shoreline database. Pending or failed detail requests do not freeze
+Before local vectors are available, and at wide views, WebGL retains the photographic
+reference texture. A pending or failed request never selects the coarse flat-colour
+map preview. Pending or failed detail requests do not freeze
 the camera or disable point selection. Wheel zoom follows delta magnitude and units
 rather than fixed percentage jumps per event.
 
-The Antarctic ice visible in the bundled historical photograph is retained as a
-separate GPU imagery overlay in photographic, movement-preview and detailed SVG
+The polar ice visible in the bundled historical photograph is retained as a
+separate GPU imagery overlay in photographic and detailed SVG
 views. It is not imported into the shoreline, used for land/sea classification or
-presented as current sea-ice coverage. Map view displays a flat, opaque ice colour
+presented as current sea-ice coverage. Detailed views display a flat, opaque ice colour
 instead of magnifying the photograph's shading. When source cells become visibly
 enlarged, a bounded nine-sample GPU filter with an oblique circular kernel reconstructs
 rounded contours. Geographically anchored undulation at three scales breaks up long
-straight edges as well as corners, in both Map and detailed Natural Earth views. This is an illustrative
+straight edges as well as corners in detailed Natural Earth views. This is an illustrative
 treatment, not higher-resolution ice data; small source-cell features may merge or disappear.
 It changes neither land/sea classification nor surveyed coastline geometry. The treatment
 uses no additional requests or CPU geometry work and remains stable during dragging.
@@ -174,9 +171,15 @@ selections immediately, then asynchronously select an identified land country
 without replacing the clicked coordinates with a town's coordinates. Uncertain
 or offshore points leave the country menu at “Country not identified”. Offshore
 evaluation replies also clear stale country and town selections; an empty returned
-jurisdiction never restores a default country. An authored
-time zone and observer altitude are preserved; a country alone cannot establish
-a precise time zone or elevation.
+jurisdiction never restores a default country. Once a custom point's jurisdiction
+is identified, its date-specific default civil UTC offset replaces the previous
+location's offset, without moving the observer or changing the authored altitude.
+The native location service supplies this offset; geographic caches do not retain
+date-dependent offsets. Zone edits made while lookup is pending take precedence,
+and replies for an obsolete point, date or selection are ignored. A jurisdiction's
+default is representative, not a coordinate-level time-zone boundary lookup for
+countries spanning multiple time zones; the zone remains editable. Nautical
+offsets apply only to positively identified inland water outside any jurisdiction.
 
 Explicit country-menu selections await the country's first town page asynchronously
 before applying the default town. Further pages continue loading in the background;
@@ -494,6 +497,47 @@ Child processes use argument vectors rather than a shell, with deadlines,
 bounded captured output and process-group cancellation. State retains the
 existing `MARS_HOME` and `MARS_LAB_STATE_FILE` locations, uses private files and
 atomic replacement, and serialises concurrent updates with an advisory lock.
+Back/Forward histories for all seven worksheet modes are stored separately in
+`$MARS_HOME/lab/mars_lab_history.db` (normally
+`~/.mars/lab/mars_lab_history.db`). An overridden `MARS_LAB_STATE_FILE` places
+the history database beside that file instead. This is an owner-only, unencrypted
+SQLite database containing versioned binary Protobuf snapshot bundles; worksheet
+inputs and bindings may be sensitive, and file permissions are not encryption.
+
+Each browser profile, for each site origin, retains a random client identifier.
+Its seven mode records contain the current snapshot and both navigation stacks;
+mobile and desktop profiles do not overwrite one another. Each page lifetime has
+a separate session identifier. Revision and incarnation comparisons reject stale
+tab writes, including writes arriving after an older record has been evicted and
+recreated. A conflict leaves the tab's live navigation intact and asks for a reload;
+histories are not silently merged. Identifiers select histories, not permissions:
+the existing server access controls still apply.
+
+Changes are checkpointed incrementally, with an exit/visibility-change save attempt
+and one bounded IndexedDB recovery record per mode. Exit delivery is best-effort;
+already acknowledged checkpoints survive a process or browser shutdown. Offline
+recovery never replaces a newer server revision. Clearing browser storage loses
+that profile's association with its saved history, but does not erase other profiles.
+The last mode and its current snapshot are restored before initial evaluation;
+Almanac also restores its saved orientation and zoom without an arrival animation.
+Results are recalculated rather than retaining plot images or geography caches.
+
+Persistent history has these fixed limits:
+
+- 64 Back and 64 Forward entries per mode, retaining the nearest contiguous entries.
+- 256 KiB per encoded snapshot; an oversized current worksheet is not persisted and
+  produces a warning, while its existing saved history and live session remain intact.
+- 1 MiB per mode, hence at most 7 MiB of recovery snapshots per browser profile.
+- 16 MiB of server payloads and 448 mode records across all profiles. The
+  least-recently-updated mode records are evicted first when either limit is reached.
+- A 32 MiB main database. A rollback journal can temporarily require roughly another
+  32 MiB plus journal headers; no persistent, unbounded WAL is used. Freed database
+  pages are reused, so eviction does not necessarily reduce the file's current size.
+
+These persistence bounds do not pop entries from a running worksheet's native
+history, which retains its existing independent memory limits. Browser storage
+quotas or server I/O failures are reported without preventing normal navigation.
+
 The existing object-store key in `MARS_HOME/config/mars-lab.env` is reused;
 first-run key creation is locked and atomic, and never replaces an existing key.
 The native server uses four separate request processes by default, not threads.
@@ -808,9 +852,14 @@ Wide calendar layouts place this pair beside the toolbar's unused right-hand are
 reducing the gap above the result panel; narrower layouts retain normal document flow.
 Mobile layouts (900 pixels wide or less) omit the home-sky card entirely.
 Native ephemerides supply the current Moon's phase and home-relative orientation. Solar
-clocks use the native approximation, marked “≈”, with zoneinfo conversion at each event
-and local-date matching across midnight and daylight-saving changes. Polar conditions
-remain explicit. An absent setup origin is reported rather than guessed from a dropdown.
+clocks use the same accurate rise/set engine as DateTime, including topocentric position,
+solar radius, standard horizon refraction and the setup origin's elevation. Times are
+rounded to the nearest minute without an approximation mark. Zoneinfo conversion at
+each event and local-date matching retain midnight and daylight-saving behaviour.
+The selected-observer strip uses the same solver on its GMT date. Polar conditions and
+unavailable ephemerides remain explicit; there is no approximate fallback. These are
+standard-horizon predictions, not a model of local terrain or actual atmospheric variations.
+An absent setup origin is reported rather than guessed from a dropdown.
 The browser fetches opaque native markup from `/home-sky` on startup and once per minute;
 no browser astronomy is performed. Refreshes do not overlap and stop at page disposal.
 Transient transport failures retain the last reading. Worksheet selections and weather
@@ -842,6 +891,28 @@ the observer tooltip and AstroNav Navigation Almanac card show its country name
 and an offline flag. Both come from the jurisdiction catalogue, joined by the
 geographically resolved ISO code, not the form's jurisdiction choice. Missing
 flags leave the name readable; uncertain or sea positions do not inherit a country.
+Only the Location row's flag in the summary card offers an enlarged preview on
+hover or keyboard focus. The preview is fourteen times the displayed flag's width
+and height (336 × 252 pixels), scaled down proportionally on narrow or short
+viewports. It reuses its animated artwork with the same cycle and fades, and respects
+reduced-motion preferences. It prefers the space above the flag when it fits in
+the viewport at the current scroll position, otherwise falling below. It can
+overlap both the summary and worksheet cards without being clipped. Escape dismisses it. Other flag displays
+are unchanged.
+Confirmed offshore points without an identified jurisdiction use the jurisdiction
+database's `ZZ-SEA` vector emblem: gold Pioneer-plaque-inspired linework on dark green,
+with clothed African-Caribbean figures. The card, observer tooltip and selected jurisdiction
+control share this artwork; the card retains its enlarged preview. The artwork uses
+scalable paths rather than an embedded bitmap. It is a display emblem, not
+a national flag: `ZZ-SEA` is an internal artwork key and never a selected or saved
+jurisdiction. Harbour/coastal water, inland water, land and unknown geography do
+not acquire it. The `/offshore_flag.svg` endpoint reads the SVG through the
+jurisdiction API; it does not read a runtime asset file or fall back to one when
+the database artwork is missing. `make update-mars-db` installs the artwork into
+an existing database without rebuilding towns or calendars.
+Only the exact local image path is permitted alongside the
+existing embedded SVG flags; arbitrary image URLs remain rejected. The original
+design and generated adaptation are recorded in the visual-asset provenance guide.
 Town-marker tooltips also display an offline flag, using the town's catalogue
 jurisdiction country code rather than a coastal geometry hit-test. Broad UK (`GB`)
 town entries carry a separate native display code resolved from the country boundary
@@ -862,11 +933,11 @@ Update globe geometry with `make update-globe-db`, and refresh flag metadata wit
 `make update-mars-db`, then restart the Lab. See the
 [jurisdiction guide](jurisdiction.md#country-names-and-flags) for ownership and licensing.
 
-“Natural Earth / Map” switches between the photographic reference texture and a
-filled shoreline map. The map loads visible-window vector detail as you zoom;
-it does not magnify the photographic texture. Switching views preserves the observer,
-camera and grid setting. Map mode requires the installed shoreline database;
-photographic detail loads separately on zoom. Space is black with faint stars.
+The globe always uses Natural Earth, including when reopening or navigating saved
+history. There is no display-style toggle. History contains camera orientation and
+zoom, not a map-style selection, so existing entries need no database migration.
+Close views combine photographic colouring with visible-window coastline vectors
+from the installed shoreline database. Space is black with faint stars.
 “Lat/long: off/on” toggles a subtle latitude/longitude grid, initially off. Grid spacing
 becomes finer as the globe is zoomed in; toggling it does not change the observer or evaluate.
 One left click on a town immediately applies its observer location; one left click on
@@ -874,22 +945,42 @@ the globe selects a custom point. Both start evaluation once and preserve entere
 observer elevation. Small pointer movement is tolerated; dragging, cancelled gestures
 and right clicks do not select a location.
 
-The surface uses NASA's Blue Marble land, ocean-colour and sea-ice composite,
-published in 2002. The unmodified 2048 × 1024 JPEG is bundled locally (266,599 bytes),
-with no external imagery requests. Vegetation, deserts and irregular ice boundaries
-come from that reference image, not latitude-based colour bands. It is not current
-or date-specific ice coverage and does not affect land/sea classification.
+The surface uses NASA's July 2004 Blue Marble: Next Generation image with shaded
+topography and bathymetry at every zoom level. The 2048 × 1024 overview and
+8192 × 4096 global detail textures are area-resampled from the same source as
+the full-resolution local tiles, avoiding a change of colour or season on zoom.
+All images are bundled locally, with no external imagery requests. This fixed
+reference imagery does not affect land/sea classification.
 See the [imagery notice](../THIRD_PARTY_NOTICES.md#nasa-blue-marble-globe-imagery)
 for source, credit, reuse terms and checksum.
 At 2× zoom, Natural Earth asynchronously loads the bundled 8192 × 4096 version
-(24,147,269 bytes), replacing the overview only after a successful GPU upload.
+as JPEG, replacing the overview only after a successful GPU upload.
 That provides four times the linear resolution and sixteen times the pixels.
-The upgrade is requested once per globe instance, not during the initial overview
-or in Map mode. Graphics limits or allocation failure select 4096 × 2048 where
+The upgrade is requested once per globe instance, on closer zoom or before a
+history journey. Graphics limits or allocation failure select 4096 × 2048 where
 possible, otherwise the existing overview remains available. The full texture uses
 128 MiB of GPU storage, plus temporary image decoding memory; no extra WASM memory
 or build-time image-processing dependency is introduced. This is still global
 reference imagery, not street-level satellite tiles.
+From 6× zoom, a local four-tile patch adds the 21600 × 10800 NASA Blue Marble:
+Next Generation image for July 2004, with shaded topography and bathymetry.
+Its source has 2.64 times the linear resolution and about seven times the pixels
+of the 8192-pixel image. Each of the 72 bundled tiles is 1800 × 1800 pixels;
+tiles are cropped without resampling and JPEG-encoded at quality 95 with full
+colour sampling. They are served locally, including when offline.
+The native `lab_globe_photo_patch` planner wraps longitude at the date line and
+clamps tile rows at the poles. The browser retains at most four decoded tiles
+and one 3600 × 3600 GPU patch (about 49.4 MiB each), plus transient replacement
+storage. Devices whose texture limit is below 3600 retain the existing image.
+Downloads and decoding are asynchronous; failed or cancelled work cannot replace
+the last complete patch. New patches load after movement settles, keeping uploads
+out of history flights. The shader blends the patch edges and zoom transition;
+surveyed shorelines remain independent, and ice comes from the same reference image.
+This is fixed reference imagery, not live imagery or selected-date vegetation.
+The optional `tools/mars_lab/texture_tiles.c` maintainer utility reproduces the
+tiles from the credited NASA source using libjpeg development files. It is not
+part of ordinary builds or releases; no image-processing installation is required
+to run the Lab. Source URL, checksum and attribution are in the imagery notice.
 At 12× zoom or closer, once the requested longitude and latitude spans are each
 at most 30°, an independent asynchronous request loads a river SVG overlay from
 the **jurisdiction database**. The initial globe, towns and observer selection
@@ -922,36 +1013,28 @@ share a serial refresh queue, coalescing overlapping updates and yielding to
 browser input between menu rebuilds. Duplicate or unrelated batches do not rebuild
 the menus; the existing coordinate-selection policy remains native-owned.
 
-The photograph remains visible while the initial shoreline mask loads, including
-when map mode is selected manually. A failed mask request leaves the photograph
-in place; subsequent map requests can retry. Regional map masks are not blended
+The photograph remains visible while the initial shoreline mask loads. A failed
+mask request leaves the photograph in place; subsequent detail requests can retry.
+Regional map masks are not blended
 into the photograph while the map base is unavailable.
 
-At 8× zoom the photographic view automatically switches to the native filled
-shoreline map. Simplified fills use locally sampled photographic RGB colours,
-including differing greens, deep blue and turquoise water, and white ice, rather
-than a fixed palette. A continuously moving, bounded weighted neighbourhood of
-photographic samples smooths raster detail without forming colour tiles and
-rejects opposite-surface colours at shorelines. These are approximate historical colours, not current snow or ice
-observations; they never change shoreline geometry or land/sea classification.
-Sample eligibility and the fallback blend fade continuously near photographic
-colour thresholds, avoiding abrupt colour patches when the last matching sample
-disappears. This smoothing affects only fill colours: mapped waterways and
-shoreline boundaries remain unchanged, and ice-coloured samples apply only to land.
-Between 8× and 32× zoom, sampling gradually centres on the viewed location.
-At town scale, land and water each use a consistent locally sampled colour
-across the view, instead of magnifying photographic variations into bands or
-patches. The palette follows the view as it moves; it is not a fixed world palette.
-Small features absent from the photograph cannot acquire additional photographic
-detail from this sampling. When no matching photographic samples exist, the fill
-retains the shoreline mask's water or land colour, never the opposite surface's
-photographic colour. Filled masks use nearest-neighbour texture sampling so their
-land and water colours are not interpolated together. The GPU uses the existing texture without another
-image download or additional WASM storage.
-Visible-region SVG geometry is regenerated as the view changes instead of
-magnifying the photograph. Zooming out restores the photograph; the explicit
-Map toggle still selects map colours at any zoom. The photographic GPU texture
-is retained for that return, not freed at each zoom transition.
+At 8× zoom the native shoreline mask refines coastal boundaries without switching
+away from photographic terrain. Matching land and water pixels keep their original,
+world-anchored colours at every zoom; the camera no longer averages entire regions
+into flat fills. Only disagreements between the coarse photograph and detailed
+shoreline use a bounded neighbourhood of matching photographic samples. If no
+matching samples exist, the correction uses the corresponding land or water colour,
+never the opposite surface. This does not invent additional photographic detail:
+the global reference image still has finite resolution at very close zoom.
+Newly available corrections fade in over 350 milliseconds; outside retained coverage
+the original photograph remains unchanged. The GPU retains the image throughout.
+Two bounded 2048 × 1024 GPU lookup textures cache the land and water neighbourhood
+colours once per photographic image, using at most 16 MiB together. Animation uses
+lookups instead of repeating the 25-sample calculation for every pixel on every frame.
+Allocation failure retains the direct shader path. Original photographic pixels
+still come from the full-resolution image, not these correction textures.
+Historical ice reconstruction is independent of the land mask and does not claim
+current snow or ice coverage.
 The image stays on disk until requested; the server does not retain an imagery
 cache. Its HTTP body budget is 32 MiB to transfer this asset, while calculation
 payloads remain limited to 8 MiB and other static assets to 4 MiB.
@@ -974,17 +1057,66 @@ rotation; extracted centre coordinates only determine geographic coverage.
 “Centre on observer” explicitly restores a north-up view of the selected location.
 Using an eclipse location also recentres the globe without starting an additional
 evaluation. Almanac history retains five camera numbers (quaternion and zoom), not
-textures or geographical data. **Back** and **Forward** zoom out, rotate along the
-shortest quaternion path, then restore the saved zoom and roll over 3.6 seconds.
+textures or geographical data. **Back** and **Forward** follow the shortest great
+circle between the saved view centres at a distance-dependent pace: longer routes
+take longer, with separate departure-heading, travel and arrival-roll phases. The
+departure and arrival turns have nominal durations of 1.2 and 2.5 seconds, independent
+of route length. Travel takes two seconds plus six seconds per radian;
+screen-motion limits and loading can extend these durations.
+The heading follows the route without north-up correction during travel. Zoom
+changes continuously while travelling, reaching its widest view at the geographic
+midpoint and returning to the **current departure zoom** on arrival, rather than
+restoring the destination's saved zoom. A destination already in view needs no
+zoom-out. Other routes use an overview sized to the remaining half-route, not an
+automatic whole-globe view. Visible nearby destinations retain the departure
+heading to avoid rotating them out of the viewport. Reciprocal magnification
+interpolation follows angular progress rather than a separate zoom clock, preventing
+zoom-in overtaking the approach. Quintic easing brings ordinary phase boundaries to rest.
+Redirected travel starts with a non-zero route slope and eases to rest on arrival,
+rather than restarting the stationary departure easing. Antipodal centres have multiple
+equally short routes; the quaternion module chooses one deterministically.
 The departing location retains the latest zoom and rotation, including adjustments
-made after selecting it. Camera adjustments refresh that entry without adding
-history steps or clearing the forward branch.
-Regional shoreline, river and town requests wait until the flight settles; only
-the selected marker is drawn during flight. New navigation or manual globe input
+made after selecting it. Manual camera adjustments refresh that entry immediately
+without adding history steps or clearing the forward branch. Camera ownership is
+matched by coordinates and jurisdiction, not the town dropdown's replaceable
+catalogue key. Animation frames do not overwrite the retained destination camera.
+Capturing a different observer during a flight never borrows that flight's target.
+Repeated Back/Forward clicks retain the zoom chosen before travel, not an intermediate
+zoom-out. Redirected journeys start from the displayed camera and transport its existing
+orientation, skipping a second stationary departure turn; arrival roll remains separate.
+The current route continues drawing while the replacement history entry resolves;
+only the newest completed restoration may replace it. Failed restorations leave the
+existing route running. Camera orientation is continuous on redirection, but a new
+great-circle bearing need not have the same velocity direction as the old route.
+Manual zoom or dragging ends that retained travel intent. Browser camera bookmarks saved
+during travel retain the intended destination camera, not a temporary overview.
+Town catalogue key refreshes alone cannot interrupt an active journey.
+`lab_globe_history_camera()` checks that a saved camera actually shows the accompanying
+observer. A mismatched legacy camera recentres north-up while retaining its valid zoom;
+matching cameras retain their pan and roll. This repair occurs on restoration without
+rewriting the history database or removing entries.
+Destination shoreline detail is prefetched and projected before the approach, not
+repeatedly rebuilt for intermediate viewpoints. The global photograph covers the
+journey; flight rendering does not parse invisible SVG paths. The duplicate SVG
+surface is hidden whenever WebGL supplies the full surface, avoiding compositor
+repaints beneath its alpha canvas. Travel waits for
+the photographic texture before departure, then accelerates gently. Local vector
+requests do not brake and restart the camera: photographic coverage remains visible
+while they refine it. Slow rendering still limits the display clock and frame steps.
+River and town requests and border projection wait until arrival; only the selected
+marker is drawn during flight. Flight camera updates render in the same animation frame.
+The native pacing bridge limits combined translation, roll and scale motion to
+360 CSS pixels per second, with at most six pixels of motion per frame. It also
+caps elapsed time at 50 milliseconds per frame;
+slow rendering never creates catch-up jumps. The global photographic textures load
+before departure, and source-imaged polar ice is preserved
+in both hemispheres. This historical imagery does not represent current sea-ice coverage.
+New navigation or manual globe input
 cancels the previous flight. Reduced-motion preferences skip the animation, and
 older history entries without camera data centre the observer at the current zoom.
 The native `lab_globe_flight()` bridge validates the five-number camera records and
-interpolates zoom and quaternion orientation; the browser only schedules frames.
+interpolates zoom and quaternion orientation. `lab_globe_flight_advance()` supplies
+the bounded display clock; the browser schedules frames and reports loading readiness.
 Saving an unchanged observer does not reset a rotated view.
 
 In Almanac mode, **Back**, **Forward**, **Help** and **Clear** sit directly below
@@ -1693,6 +1825,15 @@ and workspace snapshots have been removed. Their browser regression assertions
 call the owning C exports directly; production no longer carries wrappers solely
 for test access.
 
+Calculations run in native server workers and Protobuf responses decode in a browser
+worker. Before installing a completed result in any worksheet mode, the browser gives
+animation and input a turn: a frame callback schedules installation in a subsequent
+task, rather than resuming a promise inside the drawing callback. Hidden or suspended
+pages use a bounded timer fallback. Native policy rechecks request ownership after
+this yield, so an intervening selection cannot receive an obsolete result or save.
+This does not move DOM work to a worker; individual DOM updates remain synchronous.
+Globe travel does not wait for worksheet calculation or result installation.
+
 Completion has two phases: initial card/editor projection, then persistence and
 derivative controls. The second phase reads the live editor after the first has
 finished, rather than saving a pre-projection snapshot. Differential equations
@@ -2108,6 +2249,23 @@ Custom entries accept 53–262,144 bits or 17–78,913 requested decimal digits;
 decimal requests round upwards to whole bits. This is the current application
 ceiling, not MPFR's theoretical limit. Existing calculation time limits still apply.
 The current result stays visible while a calculation is pending.
+A compact “Updating…” status appears in the card header until the latest result arrives;
+its tooltip explains that the displayed result belongs to the previous calculation.
+The status reserves only inline header space, with no blank notice above the worksheet,
+so starting or finishing a calculation does not move the worksheet vertically.
+Back and Forward are enabled whenever their respective history direction has an entry,
+in every mode, including during calculation. At an empty history endpoint, that
+direction's button is disabled; navigation attempts leave any active calculation
+alone. Run remains responsive when its input is ready; Run or navigation to an existing
+history entry cancels and supersedes unfinished work, and late results
+cannot overwrite the latest selection. Copy remains available for the displayed
+result. Actions that depend on an unfinished calculation, including precision
+changes and goal seeking, remain disabled until it completes.
+New Almanac history records distinguish automatically supplied zones from manually
+entered offsets. Automatic zones are resolved at the saved UTC instant using the town's
+IANA rules, or the identified jurisdiction's rules when town rules are unavailable.
+Typing a zone makes it manual. Older records without this provenance retain their
+explicit offsets; the application does not guess whether they were intentional.
 Each mode retains its own precision. Values above the slider maximum show a
 Custom readout; moving the slider selects a value within its ordinary range again.
 Loading a saved precision does not round it to a slider step, although values

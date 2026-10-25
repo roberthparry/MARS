@@ -196,10 +196,10 @@ bool lab_view_wrapped(double width, double scale, double available, bool has_var
 /**
  * @brief Resolve the enabled worksheet controls.
  * @param mode Current mode index; only zero supports goal seek.
- * @param busy Whether an operation disables the controls.
+ * @param busy Whether calculation-dependent actions are locked; Run and history can replace active work.
  * @param ready Whether input is ready to evaluate.
- * @param back Number of previous history entries.
- * @param forward Number of forward history entries.
+ * @param back Number of previous history entries; zero disables the Back button.
+ * @param forward Number of forward history entries; zero disables the Forward button.
  * @param can_goal Whether variable bindings permit goal seek.
  * @param minimum Whether precision is at its minimum.
  * @param maximum Whether precision is at its maximum.

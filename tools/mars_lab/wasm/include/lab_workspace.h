@@ -292,6 +292,24 @@ int lab_workspace_previous(lab_mode_t mode, unsigned length);
  */
 unsigned lab_workspace_history_count(lab_mode_t mode, lab_workspace_history_t direction);
 
+/** @brief Return a mode's mutation counter for incremental persistence; invalid modes return zero. */
+unsigned lab_workspace_history_revision(lab_mode_t mode);
+
+/** @brief Copy an indexed snapshot to the output buffer without mutation; side 2 selects the committed state. */
+int lab_workspace_history_read(lab_mode_t mode, unsigned side, unsigned index);
+
+/**
+ * @brief Atomically replace one mode's committed state and two history stacks from staged bytes.
+ * @param mode Valid worksheet mode.
+ * @param back Number of oldest-first backward records, at most 128.
+ * @param forward Number of oldest-first forward records, at most 128.
+ * @param length Staged byte count: committed record followed by both stacks, each prefixed by a little-endian u32 size.
+ * @return True on success; malformed lengths or insufficient space leave existing state untouched.
+ * @details The caller validates the contained Protobuf snapshots before staging. Other modes' oldest
+ * history entries may be evicted under the existing shared arena budget, but pinned sources remain intact.
+ */
+bool lab_workspace_history_replace(lab_mode_t mode, unsigned back, unsigned forward, unsigned length);
+
 /**
  * @brief Clear one history stack without affecting committed or other-mode state.
  * @param mode Worksheet index: expression 0, equation 1, differential equation 2, matrix 3, integrator 4,

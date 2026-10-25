@@ -23,6 +23,7 @@
  * data produce an unknown result.
  * Optional administrative polygons supply selected-position country names through bounded indexed queries.
  * Their generalised boundaries never replace the detailed shoreline or establish legal jurisdiction.
+ * Independent cultural display polygons supply regional flag identifiers, never country ownership or time zones.
  * Named-water lookup currently recognises the Caspian Sea through exact shoreline containment, independently
  * of country ownership; it is not a comprehensive water-name gazetteer.
  */
@@ -218,6 +219,24 @@ bool globe_border_segments(globe_t *globe, double west, double south, double eas
  * SQLCipher temporary table is used. The buffer and sorting workspace are released before returning.
  */
 bool globe_import_countries(sqlite_t *db, file_t *shapes, file_t *attributes);
+
+/**
+ * @brief Import a bounded GeoJSON collection of independent cultural display regions atomically.
+ * Features require Polygon or MultiPolygon geometry and a properties.code display identifier.
+ * The input is limited to 16 MiB, 1,023 features and one million vertices. Coordinates are retained
+ * at integer-microdegree precision. Country, shoreline and river tables are never modified.
+ * @return True on complete publication; malformed input and write failures retain the previous layer.
+ */
+bool globe_import_regions(sqlite_t *db, file_t *source);
+
+/**
+ * @brief Return an owned cultural display-region code for a coordinate, independently of jurisdiction.
+ * Queries the optional indexed region layer, including polygon holes. Ambiguous overlaps, exact
+ * boundaries, invalid coordinates and unavailable data return NULL; no nearest-region inference is made.
+ * Display codes are local presentation identifiers, not assertions of sovereignty or ISO registration.
+ * Release a returned string with string_free(). This operation does not change country identification.
+ */
+string_t *globe_region_code_at(globe_t *globe, double latitude, double longitude);
 
 /**
  * @brief Transactionally replace shoreline tables from legacy GSHHG or lossless binary64 rings.

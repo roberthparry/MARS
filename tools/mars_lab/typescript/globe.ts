@@ -9,7 +9,7 @@
  */
 type GlobeView = [number, number, number, number, number, number, number];
 interface GlobeTown { town: LabTown; jurisdiction: string; country: string; fullName?: string; }
-interface GlobeCountry { name: string; flag: string; code: string; nauticalZone: string; }
+interface GlobeCountry { name: string; flag: string; code: string; flagCode: string; nauticalZone: string; }
 
 class MarsAlmanacGlobe {
     /** @brief Copy a snapshot of the displayed camera, without requesting new map data. */
@@ -118,9 +118,12 @@ class MarsAlmanacGlobe {
     private dragPrediction: number[] | null = null;
     private dragSampleTime = 0;
     private shoreRevision = 0;
+    private shoreFrameRevision = 0;
     private shoreBounds: number[] = [];
     private shoreFrameBounds: number[] = [];
     private shoreColourFrame: number[] | null = null;
+    private shoreBlendStarted = 0;
+    private shoreWasReady = false;
     private shoreRequest: AbortController | null = null;
     private shoreZoom = 0;
     private shoreSignature = '';
@@ -131,12 +134,10 @@ class MarsAlmanacGlobe {
     private readonly shoreJobs = new Map<number, (value: unknown, error?: Error) => void>();
     private shoreDrawing = false;
     private shoreFailed = '';
+    private shoreRetryAfter = 0;
     private shoreClosed = false;
     private movingUntil = 0;
     private settleTimer = 0;
-    private mapPreviewReady = false;
-    private mapPreviewRequest: Promise<void> | null = null;
-    private readonly previewLifetime = new AbortController();
     private readonly borderPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     private borderSignature = '';
     private readonly status: HTMLElement;
@@ -153,8 +154,12 @@ class MarsAlmanacGlobe {
     private detailBounds = [-180, -90, 180, 90];
     private detailReady = false;
     private grid = false;
-    private map = false;
     private highResolutionRequested = false;
+    private worldLoading = false;
+    private highResolutionLoading = false;
+    private palettesReady = false;
+    private photo: import('./globe_photo.js').GlobePhoto | null = null;
+    private photoModule: Promise<typeof import('./globe_photo.js')> | null = null;
     private detailZoom = 0;
     private requestBounds: number[] | null = null;
     private readonly markerNodes = new Map<string | null, HTMLElement>();
@@ -203,25 +208,34 @@ class MarsAlmanacGlobe {
     private flightFrame = 0;
     private flightGeneration = 0;
     private flightTarget: number[] | null = null;
+    private flightSpeed = 0;
+    private historyZoom: number | null = null;
+    private historyRedirect = false;
     private historyRestoring = false;
 
     /** Capture only five camera numbers; imagery and catalogues remain outside worksheet history. */
     public static captureHistory(): number[] | undefined {
         const globe = this.instance;
         if (!globe) return undefined;
-        if (globe.flightTarget) return globe.flightTarget.slice();
+        if (globe.flightTarget && globe.sameCameraObserver(globe.observerSignature)) return globe.flightTarget.slice();
         globe.rememberHistory();
         const orientation = globe.sameCameraObserver(globe.observerSignature) || globe.retainsClickedView() ? globe.orientation :
             labDOM.call('lab_globe_centre', Number(globe.input('Latitude').value),
                 Number(globe.input('Longitude').value)) as number[] | null;
-        return orientation ? [...orientation, globe.view[2]] : undefined;
+        return orientation ? [...orientation, globe.historyZoom ?? globe.view[2]] : undefined;
     }
 
     /** Suspend automatic centring while asynchronous history restoration resolves the destination. */
     public static beginHistory(): number | undefined {
         const globe = this.instance;
         if (!globe) return undefined;
-        globe.cancelFlight();
+        const zoom = globe.historyZoom ?? globe.flightTarget?.[4] ?? globe.view[2];
+        const redirect = Boolean(globe.flightTarget) || globe.historyRestoring;
+        // Keep submitting the current route while the replacement restores its controls.
+        // Generation owns restoration; the target identity separately owns animation.
+        ++globe.flightGeneration;
+        globe.historyZoom = zoom;
+        globe.historyRedirect = redirect;
         globe.historyRestoring = true;
         globe.clickedObserver = null;
         globe.stopRegionRequests();
@@ -236,16 +250,35 @@ class MarsAlmanacGlobe {
         const globe = this.instance;
         if (!globe || token !== globe.flightGeneration) return;
         globe.historyRestoring = false;
-        if (!accepted) { globe.move(0, 0, 1); return; }
+        if (!accepted) {
+            if (!globe.flightTarget) { globe.cancelFlight(); globe.move(0, 0, 1); }
+            return;
+        }
+        cancelAnimationFrame(globe.flightFrame);
+        globe.flightFrame = 0;
         const start = [...globe.orientation, globe.view[2]];
-        const saved = labDOM.call('lab_globe_flight', start, camera, 1) as number[] | null;
-        const target = saved || MarsAlmanacGlobe.captureHistory();
-        if (!target) return;
+        const zoom = globe.historyZoom ?? start[4], redirect = globe.historyRedirect;
+        let target = labDOM.call('lab_globe_history_camera', camera,
+            Number(globe.input('Latitude').value), Number(globe.input('Longitude').value), zoom) as number[] | null;
+        if (!target) { globe.cancelFlight(); return; }
+        // Navigation keeps the current viewing scale; saved pan and roll remain useful only
+        // if they still show the observer at that scale. Revalidate after applying it.
+        target[4] = zoom;
+        target = labDOM.call('lab_globe_history_camera', target,
+            Number(globe.input('Latitude').value), Number(globe.input('Longitude').value), zoom) as number[];
         globe.observerSignature = globe.observerState();
         globe.flightTarget = target;
+        // Fetch the destination once, before zooming towards it, rather than chasing intermediate regions.
+        void globe.loadShore();
         globe.hideGridHover();
         const complete = (): void => {
             globe.applyCamera(target);
+            if (globe.historyRestoring) {
+                globe.flightTarget = null;
+                globe.flightFrame = 0;
+                globe.draw();
+                return;
+            }
             globe.cancelFlight();
             globe.move(0, 0, 1);
         };
@@ -254,18 +287,35 @@ class MarsAlmanacGlobe {
             complete();
             return;
         }
-        const began = performance.now();
+        void globe.loadHighResolution();
+        globe.draw(true);
+        let previous = performance.now(), progress = 0, speed = redirect ? globe.flightSpeed : 0;
         const tick = (now: number): void => {
-            if (token !== globe.flightGeneration) return;
+            if (globe.flightTarget !== target) return;
             if (WorksheetWorkspace.mode.currentMode() !== 'almanac') { globe.cancelFlight(); return; }
             globe.flightFrame = 0;
-            const progress = (now - began) / 3600;
+            // A delayed paint or worker result is not elapsed travel time: never jump to catch up.
+            const elapsed = Math.max(0, Math.min(50, now - previous));
+            previous = now;
             if (progress >= 1 || document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) {
                 complete();
                 return;
             }
-            const next = labDOM.call('lab_globe_flight', start, target, progress) as number[];
-            globe.applyCamera(next);
+            const loading = globe.worldLoading || globe.highResolutionLoading;
+            // Warm the photographic surface before departure. Local vectors refine that complete
+            // surface asynchronously, without braking and restarting at each coverage boundary.
+            speed += Math.max(-elapsed / 600, Math.min(elapsed / 1200, (loading ? 0 : 1) - speed));
+            const ready = !loading;
+            if (!ready) speed = 0;
+            globe.flightSpeed = speed;
+            if (ready && speed > 0) {
+                const advanced = labDOM.call('lab_globe_flight_advance', start, target, progress,
+                    elapsed * speed, Math.max(1, globe.canvas.clientWidth), Number(redirect)) as number | null;
+                if (advanced === null) { complete(); return; }
+                progress = advanced;
+                const next = labDOM.call('lab_globe_flight', start, target, progress, Number(redirect)) as number[];
+                globe.applyCamera(next);
+            }
             globe.flightFrame = requestAnimationFrame(tick);
         };
         globe.flightFrame = requestAnimationFrame(tick);
@@ -276,10 +326,14 @@ class MarsAlmanacGlobe {
         cancelAnimationFrame(this.flightFrame);
         this.flightFrame = 0;
         this.flightTarget = null;
+        this.flightSpeed = 0;
+        this.historyZoom = null;
+        this.historyRedirect = false;
         this.historyRestoring = false;
     }
 
     private stopRegionRequests(): void {
+        this.photo?.cancel();
         this.shoreRequest?.abort();
         this.shoreRequest = null;
         window.clearTimeout(this.timer);
@@ -300,7 +354,7 @@ class MarsAlmanacGlobe {
         this.orientation = camera.slice(0, 4);
         this.view = labDOM.call('lab_globe_view', this.orientation, camera[4], 1) as GlobeView;
         this.rotation = (labDOM.call('lab_surface_camera', 1, this.orientation, null, null, null, 0) as number[][]).flat();
-        this.draw();
+        this.draw(Boolean(this.flightTarget));
         this.scheduleCameraSave();
     }
 
@@ -343,7 +397,7 @@ class MarsAlmanacGlobe {
         const position = gl.getAttribLocation(this.program, 'position');
         gl.enableVertexAttribArray(position);
         gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-        for (let i = 0; i < 5; ++i) {
+        for (let i = 0; i < 8; ++i) {
             const texture = gl.createTexture();
             if (!texture) throw new Error('Could not allocate globe imagery.');
             this.textures.push(texture);
@@ -360,6 +414,9 @@ class MarsAlmanacGlobe {
         gl.uniform1i(this.uniform('mapWorld'), 2);
         gl.uniform1i(this.uniform('rivers'), 3);
         gl.uniform1i(this.uniform('shoreMask'), 4);
+        gl.uniform1i(this.uniform('landPalette'), 5);
+        gl.uniform1i(this.uniform('waterPalette'), 6);
+        gl.uniform1i(this.uniform('photoPatch'), 7);
         void window.labReady.then(async () => {
             this.restoreCamera();
             this.cameraRestored = true;
@@ -374,8 +431,8 @@ class MarsAlmanacGlobe {
             this.saveCamera();
             if (event.persisted) return;
             this.shoreClosed = true;
+            this.photo?.dispose();
             void this.maskRenderer?.then(renderer => renderer.dispose()).catch(() => {});
-            this.previewLifetime.abort();
             this.stopShoreWorker(new Error('Globe closed'));
             window.clearTimeout(this.settleTimer);
         });
@@ -441,14 +498,13 @@ class MarsAlmanacGlobe {
 
     private input(name: string): HTMLInputElement { return document.getElementById(`almanac${name}`) as HTMLInputElement; }
 
-    private usesMap(): boolean {
-        return this.map || this.view[2] >= 8;
+    private usesShoreDetail(): boolean {
+        return this.view[2] >= 8;
     }
 
     private resetDetail(): void {
-        // Geometry is shared by both styles: crossing the close-view threshold
-        // must not cancel the prefetch that was started before reaching it.
-        if (!this.map && this.view[2] < 4) {
+        // Crossing the close-view threshold must not cancel the earlier prefetch.
+        if (this.view[2] < 4) {
             this.shoreRequest?.abort();
             this.shoreRequest = null;
         }
@@ -456,7 +512,7 @@ class MarsAlmanacGlobe {
         this.request?.abort();
         this.requestBounds = null;
         this.detailReady = false;
-        if (this.usesMap()) void this.loadMap();
+        if (this.usesShoreDetail()) void this.loadShore();
     }
 
     private observerState(): string {
@@ -466,10 +522,12 @@ class MarsAlmanacGlobe {
 
     private restoreCamera(): void {
         try {
-            const saved = JSON.parse(localStorage.getItem(MarsAlmanacGlobe.cameraStorageKey) || 'null');
+            const restored = worksheetHistoryPersistence.restoredGlobeCamera;
+            const saved = restored ? {camera: restored} : JSON.parse(localStorage.getItem(MarsAlmanacGlobe.cameraStorageKey) || 'null');
             if (!saved) return;
             // Native validation rejects malformed quaternions and out-of-range zooms.
-            const camera = labDOM.call('lab_globe_flight', [0, 0, 0, 1, 1], saved.camera, 1) as number[] | null;
+            const camera = labDOM.call('lab_globe_history_camera', saved.camera,
+                Number(this.input('Latitude').value), Number(this.input('Longitude').value), this.view[2]) as number[] | null;
             if (!camera) return;
             this.orientation = camera.slice(0, 4);
             this.view = labDOM.call('lab_globe_view', this.orientation, camera[4], 1) as GlobeView;
@@ -491,10 +549,11 @@ class MarsAlmanacGlobe {
     private saveCamera(): void {
         window.clearTimeout(this.cameraSaveTimer);
         if (!this.cameraRestored || !this.started || this.historyRestoring) return;
+        if (this.flightTarget && !this.sameCameraObserver(this.observerSignature)) return;
         try {
             localStorage.setItem(MarsAlmanacGlobe.cameraStorageKey, JSON.stringify({
                 observer: this.observerState(),
-                camera: [...this.orientation, this.view[2]]
+                camera: this.flightTarget ?? [...this.orientation, this.view[2]]
             }));
         } catch { /* Storage restrictions must not interrupt globe interaction. */ }
     }
@@ -532,6 +591,7 @@ class MarsAlmanacGlobe {
 
     private move(dx: number, dy: number, factor: number, roll = 0): void {
         this.cancelFlight();
+        this.photo?.cancel();
         this.noteMotion();
         this.hideGridHover();
         window.clearTimeout(this.detailTimer);
@@ -540,7 +600,7 @@ class MarsAlmanacGlobe {
         this.riverRequest = null;
         this.borderRequest?.abort();
         this.borderRequest = null;
-        const wasMap = this.usesMap();
+        const hadShoreDetail = this.usesShoreDetail();
         if (dx || dy || roll)
             this.orientation = labDOM.call('lab_globe_rotate', this.orientation, this.view[2], dx, dy, roll) as number[];
         if (dx || dy) {
@@ -553,28 +613,30 @@ class MarsAlmanacGlobe {
         } else this.dragPrediction = null;
         this.rotation = (labDOM.call('lab_surface_camera', 1, this.orientation, null, null, null, 0) as number[][]).flat();
         this.view = labDOM.call('lab_globe_view', this.orientation, this.view[2], factor) as GlobeView;
+        // Retain authored camera changes before a dropdown refresh can change the observer controls.
+        // Flight frames use applyCamera instead, so animation cannot replace the saved destination.
+        if (dx || dy || roll || factor !== 1) this.rememberHistory();
         this.scheduleCameraSave();
         this.scheduleRiverUnload();
         if (!this.borders) this.unloadBorders();
-        if (wasMap !== this.usesMap()) this.resetDetail();
+        if (hadShoreDetail !== this.usesShoreDetail()) this.resetDetail();
         this.draw();
         window.clearTimeout(this.timer);
         this.timer = window.setTimeout(() => {
-            if (this.usesMap() || this.view[2] > 1.5) void this.loadDetail();
+            if (this.usesShoreDetail() || this.view[2] > 1.5) void this.loadDetail();
             void this.loadRivers();
             void this.loadBorders();
             if (this.view[2] >= 3) void labApplication.loadNearbyTowns(this.view[0], this.view[1]);
         }, 300);
     }
 
-    private async image(bounds: number[], signal?: AbortSignal, map = this.usesMap(),
-                        route = '/almanac-globe'): Promise<HTMLImageElement> {
+    private async riverImage(bounds: number[], signal?: AbortSignal): Promise<HTMLImageElement> {
         const [west, south, east, north] = bounds;
-        const response = await labHttp.fetch(route, {
-            method: 'POST', body: labWire.encode({west, south, east, north, view: map ? 'map' : 'natural'}), signal
+        const response = await labHttp.fetch('/almanac-rivers', {
+            method: 'POST', body: labWire.encode({west, south, east, north, view: 'natural'}), signal
         });
         const result = await response.labData() as {ok: boolean; image?: string; error?: string};
-        if (!response.ok || !result.ok || !result.image) throw new Error(result.error || 'Shoreline imagery unavailable.');
+        if (!response.ok || !result.ok || !result.image) throw new Error(result.error || 'River imagery unavailable.');
         const url = URL.createObjectURL(new Blob([result.image], {type: 'image/svg+xml'}));
         try {
             const image = new Image();
@@ -588,7 +650,7 @@ class MarsAlmanacGlobe {
         const gl = this.gl;
         gl.activeTexture(gl.TEXTURE0 + index);
         gl.bindTexture(gl.TEXTURE_2D, this.textures[index]);
-        const filter = index === 2 || (index === 1 && this.usesMap()) ? gl.NEAREST : gl.LINEAR;
+        const filter = index === 2 || (index === 1 && this.usesShoreDetail()) ? gl.NEAREST : gl.LINEAR;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
@@ -596,6 +658,7 @@ class MarsAlmanacGlobe {
     }
 
     private async loadWorld(): Promise<void> {
+        this.worldLoading = true;
         this.status.textContent = 'Loading Earth imagery…';
         try {
             const image = new Image();
@@ -604,21 +667,24 @@ class MarsAlmanacGlobe {
             this.upload(0, image);
             this.root.dataset.surface = 'blue-marble';
             this.root.dataset.resolution = '2048';
+            await this.refreshPalettes();
             this.status.textContent = 'Drag to rotate · drag vertically at either side to roll · scroll or pinch to zoom · select a town or point';
             void this.loadHighResolution();
         } catch (error) { this.status.textContent = String(error); }
+        finally { this.worldLoading = false; }
     }
 
     private async loadHighResolution(): Promise<void> {
-        if (this.highResolutionRequested || this.map || this.view[2] < 2 || !this.root.dataset.surface) return;
+        if (this.highResolutionRequested || this.view[2] < 2 || !this.root.dataset.surface) return;
         const gl = this.gl, limit = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
         let width = 8192;
         while (width > limit) width /= 2;
         if (width <= 2048) return;
         this.highResolutionRequested = true;
+        this.highResolutionLoading = true;
         try {
             const image = new Image();
-            image.src = '/earth_surface_detail.png';
+            image.src = '/earth_surface_detail.jpg';
             await image.decode();
             if (image.naturalWidth !== 8192 || image.naturalHeight !== 4096) throw new Error('Invalid Earth detail image');
             while (width > 2048 && !gl.isContextLost()) {
@@ -638,6 +704,7 @@ class MarsAlmanacGlobe {
                         gl.deleteTexture(this.textures[0]);
                         this.textures[0] = texture;
                         this.root.dataset.resolution = String(width);
+                        await this.refreshPalettes();
                         this.draw();
                         return;
                     }
@@ -650,28 +717,29 @@ class MarsAlmanacGlobe {
             }
             throw new Error('Higher-resolution imagery exceeds graphics capacity; retaining overview.');
         } catch (error) {
-            if (!this.map) this.status.textContent = `Earth detail unavailable; overview retained. ${String(error)}`;
+            this.status.textContent = `Earth detail unavailable; overview retained. ${String(error)}`;
+        } finally { this.highResolutionLoading = false; }
+    }
+
+    private async refreshPalettes(): Promise<void> {
+        this.palettesReady = false;
+        try {
+            const module = await import('./globe_gpu.js');
+            const gl = this.gl;
+            gl.useProgram(this.program);
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
+            gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+            const textures = module.buildGlobePalettes(gl, this.program);
+            textures.forEach((texture, i) => {
+                gl.deleteTexture(this.textures[5 + i]);
+                this.textures[5 + i] = texture;
+                gl.activeTexture(gl.TEXTURE5 + i);
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+            });
+            this.palettesReady = true;
+        } catch {
+            // Small graphics budgets retain the direct shader calculation, never incomplete textures.
         }
-    }
-
-    private async loadMap(): Promise<void> {
-        await this.loadShore();
-        if (this.map && !this.shoreRequest) void this.loadMapPreview();
-    }
-
-    private async loadMapPreview(): Promise<void> {
-        if (this.shoreClosed || this.mapPreviewReady || this.mapPreviewRequest) return;
-        this.mapPreviewRequest = (async () => {
-            try {
-                const image = await this.image([-180, -90, 180, 90], this.previewLifetime.signal, true);
-                if (this.shoreClosed) return;
-                this.upload(2, image);
-                this.mapPreviewReady = true;
-                this.draw();
-            } catch { /* Detailed SVG remains available if the optional movement preview fails. */ }
-            finally { this.mapPreviewRequest = null; }
-        })();
-        await this.mapPreviewRequest;
     }
 
     private stopShoreWorker(error: Error): void {
@@ -722,11 +790,21 @@ class MarsAlmanacGlobe {
     private async loadDetail(): Promise<void> {
         if (!this.root.getClientRects().length || this.gl.isContextLost()) return;
         void this.loadHighResolution();
-        if (this.usesMap()) {
-            await this.loadShore();
-            if (this.map && !this.shoreRequest) void this.loadMapPreview();
-        }
-        else if (this.view[2] >= 4) await this.loadShore();
+        void this.loadPhoto();
+        if (this.view[2] >= 4) await this.loadShore();
+    }
+
+    private async loadPhoto(): Promise<void> {
+        if (this.view[2] < 6 || this.shoreClosed || this.flightTarget) return;
+        try {
+            const module = await (this.photoModule ||= import('./globe_photo.js'));
+            if (this.shoreClosed || this.view[2] < 6 || this.flightTarget) return;
+            this.photo ||= new module.GlobePhoto(this.gl, () => {
+                this.root.dataset.photoResolution = '21600';
+                this.draw();
+            });
+            await this.photo.load(labDOM.call('lab_globe_photo_patch', this.view[0], this.view[1]) as number[]);
+        } catch { /* Retain the existing photographic surface if optional tiles are unavailable. */ }
     }
 
     private noteMotion(): void {
@@ -818,7 +896,7 @@ class MarsAlmanacGlobe {
         const request = this.riverRequest = new AbortController();
         const timeout = window.setTimeout(() => request.abort(), 15000);
         try {
-            const image = await this.image(bounds, request.signal, false, '/almanac-rivers');
+            const image = await this.riverImage(bounds, request.signal);
             if (generation !== this.riverGeneration || request.signal.aborted) return;
             this.riverBounds = bounds;
             this.riverZoom = zoom;
@@ -835,16 +913,19 @@ class MarsAlmanacGlobe {
     }
 
     private async loadShore(): Promise<void> {
-        if (this.shoreRequest || (!this.map && this.view[2] < 4)) return;
-        const reserve = labDOM.call('lab_globe_view', this.orientation, this.view[2] / 1.5, 1) as GlobeView;
-        const prediction = performance.now() - this.dragSampleTime < 200 ? this.dragPrediction : null;
-        const ahead = prediction ? labDOM.call('lab_globe_view', prediction, this.view[2] / 1.5, 1) as GlobeView : reserve;
+        if (this.historyRestoring || (this.flightTarget && performance.now() < this.shoreRetryAfter)) return;
+        const orientation = this.flightTarget?.slice(0, 4) || this.orientation;
+        const zoom = this.flightTarget?.[4] || this.view[2];
+        if (this.shoreRequest || zoom < 4) return;
+        const view = labDOM.call('lab_globe_view', orientation, zoom, 1) as GlobeView;
+        const reserve = labDOM.call('lab_globe_view', orientation, zoom / 1.5, 1) as GlobeView;
+        const prediction = !this.flightTarget && performance.now() - this.dragSampleTime < 200 ? this.dragPrediction : null;
+        const ahead = prediction ? labDOM.call('lab_globe_view', prediction, zoom / 1.5, 1) as GlobeView : reserve;
         if (labDOM.call('lab_globe_shore_covers', reserve) && labDOM.call('lab_globe_shore_covers', ahead) &&
-            this.view[2] <= this.shoreZoom * 1.5) return;
-        const zoom = this.view[2];
-        let bounds = (labDOM.call('lab_globe_view', prediction || this.orientation, zoom / 2, 1) as GlobeView).slice(3);
-        if (!labDOM.call('lab_globe_shore_frame_covers', this.view, bounds))
-            bounds = (labDOM.call('lab_globe_view', this.orientation, zoom / 2, 1) as GlobeView).slice(3);
+            zoom <= this.shoreZoom * 1.5) return;
+        let bounds = (labDOM.call('lab_globe_view', prediction || orientation, zoom / 2, 1) as GlobeView).slice(3);
+        if (!labDOM.call('lab_globe_shore_frame_covers', view, bounds))
+            bounds = (labDOM.call('lab_globe_view', orientation, zoom / 2, 1) as GlobeView).slice(3);
         const request = this.shoreRequest = new AbortController();
         let loaded = false;
         this.root.dataset.shoreline = 'loading';
@@ -866,22 +947,36 @@ class MarsAlmanacGlobe {
             this.shoreFailed = '';
             this.draw();
         } catch (error) {
+            if (!request.signal.aborted) this.shoreRetryAfter = performance.now() + 30000;
             if (!request.signal.aborted) this.root.dataset.shoreline = 'unavailable';
             if (!request.signal.aborted) this.status.textContent = `Vector shoreline pending: ${String(error)}`;
         } finally {
             if (this.shoreRequest === request) this.shoreRequest = null;
-            if (loaded && this.usesMap() && !labDOM.call('lab_globe_shore_covers', this.view)) void this.loadShore();
+            if (loaded && !this.flightTarget && this.usesShoreDetail() && !labDOM.call('lab_globe_shore_covers', this.view))
+                void this.loadShore();
         }
     }
 
     private drawShore(size: number): boolean {
-        const visible = this.usesMap() && Boolean(labDOM.call('lab_globe_shore_covers', this.view));
+        if (this.flightTarget && !this.historyRestoring) {
+            void this.loadShore();
+            const targetView = labDOM.call('lab_globe_view', this.flightTarget.slice(0, 4), this.flightTarget[4], 1);
+            // Retain departure coverage until the photograph can carry the overview, or the old
+            // patch leaves the view. Upload the prepared destination once, before the final zoom.
+            const retainDeparture = this.view[2] >= 8 && this.shoreFrame &&
+                labDOM.call('lab_globe_shore_frame_covers', this.view, this.shoreFrameBounds);
+            if (!retainDeparture && this.flightTarget[4] >= 8 && labDOM.call('lab_globe_shore_covers', targetView))
+                this.projectShore(this.flightTarget, size);
+        }
+        const visible = this.usesShoreDetail() && Boolean(labDOM.call('lab_globe_shore_covers', this.view));
         this.shoreOverlay.style.display = 'none';
-        if (!this.usesMap()) return false;
+        if (!this.usesShoreDetail()) return false;
+        // The global photograph is already projected by the GPU. At overview scale it avoids
+        // serialising a new world-sized vector frame for every animation step.
+        if (this.flightTarget && this.view[2] < 8) return false;
         const frame = [...this.orientation, this.view[2], size];
         let retained = false;
-        if ((!this.map || Boolean(labDOM.call('lab_globe_shore_frame_covers', this.view, this.shoreFrameBounds))) &&
-            this.shoreFrame && this.shoreFrame[4] >= 8 && this.view[2] >= 8) {
+        if (this.shoreFrame && this.shoreFrame[4] >= 8 && this.view[2] >= 8) {
             const transform = labDOM.call('lab_globe_frame_transform', this.shoreFrame, frame) as number[] | null;
             if (transform) {
                 this.shoreOverlay.setAttribute('viewBox', `0 0 ${size} ${size}`);
@@ -890,66 +985,64 @@ class MarsAlmanacGlobe {
                 retained = true;
             }
         }
+        if (this.historyRestoring || this.flightTarget) return retained;
         // One bounded request follows the camera even throughout a continuous drag.
         void this.loadShore();
         if (!visible) return retained;
         // Pointer motion only transforms existing paths. Rebuilding thousands of SVG
         // commands on each worker completion competes with the next input frame.
+        // Publish replacement geometry before leaving the old coverage, not after it disappears.
         if (retained && performance.now() < this.movingUntil) return true;
-        const signature = `${size},${this.view[2]},${this.orientation.join(',')}`;
-        if (this.shoreClosed || signature === this.shoreFailed) return retained;
-        if (signature !== this.shoreSignature) {
-            if (!this.shoreDrawing) {
-                this.shoreDrawing = true;
-                const revision = this.shoreRevision;
-                const frameBounds = this.shoreBounds;
-                void this.shoreJob('lab_globe_shore_frame', [[...this.orientation], this.view[2], size]).then(async value => {
-                    const current = `${this.canvas.clientWidth},${this.view[2]},${this.orientation.join(',')}`;
-                    if (value === null) return; // A newer geometry revision won the race with this projection.
-                    const result = value as import('./globe_gpu.js').GlobeMaskFrame;
-                    if (!result || typeof result.svg !== 'string') throw new Error('Shoreline projection unavailable');
-                    if (revision !== this.shoreRevision) return;
-                    // Close-view results remain useful: the native affine preview advances them
-                    // to the latest camera until the worker's next exact projection arrives.
-                    if (current !== signature && (frame[4] < 8 || this.view[2] < 8)) return;
-                    this.maskRenderer ??= import('./globe_gpu.js').then(module => new module.MarsGlobeMask(this.gl,
-                        labDOM.call('lab_globe_mask_shader', 0) as string, labDOM.call('lab_globe_mask_shader', 1) as string));
-                    const renderer = await this.maskRenderer;
-                    if (this.shoreClosed || revision !== this.shoreRevision) return;
-                    if ((frame[4] < 8 || this.view[2] < 8) &&
-                        signature !== `${this.canvas.clientWidth},${this.view[2]},${this.orientation.join(',')}`) return;
-                    const pixels = Math.min(2048, Math.round(size * 2 * Math.min(devicePixelRatio, 1.5)));
-                    const started = performance.now(), gl = this.gl;
-                    try { this.textures[4] = renderer.render(result, pixels, this.quad, this.textures[4]); }
-                    finally {
-                        gl.useProgram(this.program);
-                        gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
-                        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-                        gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.textures[4]);
-                        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-                    }
-                    this.root.dataset.maskSubmitMs = (performance.now() - started).toFixed(2);
-                    this.root.dataset.shoreProjectMs = String(result.projectMs);
-                    this.shoreColourFrame = frame;
-                    this.shoreOverlay.setAttribute('viewBox', `0 0 ${size} ${size}`);
-                    this.shoreGroup.innerHTML = result.svg;
-                    this.shoreFrame = frame;
-                    this.shoreFrameBounds = frameBounds;
-                    this.shoreGroup.removeAttribute('transform');
-                    this.shoreSignature = signature;
-                }).catch(error => {
-                    this.shoreFailed = signature;
-                    this.status.textContent = String(error);
-                }).finally(() => {
-                    this.shoreDrawing = false;
-                    if (!this.shoreClosed) this.draw();
-                });
+        this.projectShore([...this.orientation, this.view[2]], size);
+        return retained;
+    }
+
+    private projectShore(camera: number[], size: number): void {
+        const frame = [...camera, size], orientation = camera.slice(0, 4);
+        const signature = `${size},${camera[4]},${orientation.join(',')}`;
+        if (this.shoreClosed || this.shoreDrawing || signature === this.shoreSignature ||
+            signature === this.shoreFailed || (this.flightTarget && performance.now() < this.shoreRetryAfter)) return;
+        this.shoreDrawing = true;
+        const revision = this.shoreRevision, frameBounds = this.shoreBounds, flight = this.flightTarget;
+        void this.shoreJob('lab_globe_shore_frame', [orientation, camera[4], size]).then(async value => {
+            if (value === null || this.historyRestoring || (flight && this.flightTarget !== flight)) return;
+            const result = value as import('./globe_gpu.js').GlobeMaskFrame;
+            if (!result || typeof result.svg !== 'string') throw new Error('Shoreline projection unavailable');
+            if (revision !== this.shoreRevision) return;
+            this.maskRenderer ??= import('./globe_gpu.js').then(module => new module.MarsGlobeMask(this.gl,
+                labDOM.call('lab_globe_mask_shader', 0) as string, labDOM.call('lab_globe_mask_shader', 1) as string));
+            const renderer = await this.maskRenderer;
+            if (this.shoreClosed || revision !== this.shoreRevision || this.historyRestoring ||
+                (flight && this.flightTarget !== flight)) return;
+            const pixels = Math.min(2048, Math.round(size * 2 * Math.min(devicePixelRatio, 1.5)));
+            const started = performance.now(), gl = this.gl;
+            try { this.textures[4] = renderer.render(result, pixels, this.quad, this.textures[4]); }
+            finally {
+                gl.useProgram(this.program);
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
+                gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+                gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.textures[4]);
+                gl.viewport(0, 0, this.canvas.width, this.canvas.height);
             }
-            return retained;
-        }
-        this.shoreGroup.removeAttribute('transform');
-        this.shoreOverlay.style.display = '';
-        return true;
+            this.root.dataset.maskSubmitMs = (performance.now() - started).toFixed(2);
+            this.root.dataset.shoreProjectMs = String(result.projectMs);
+            this.shoreColourFrame = frame;
+            this.shoreOverlay.setAttribute('viewBox', `0 0 ${size} ${size}`);
+            // The opaque GPU surface owns flight rendering; do not parse thousands of invisible SVG commands.
+            this.shoreGroup.innerHTML = flight ? '' : result.svg;
+            this.shoreFrame = frame;
+            this.shoreFrameRevision = revision;
+            this.shoreFrameBounds = frameBounds;
+            this.shoreGroup.removeAttribute('transform');
+            this.shoreSignature = signature;
+        }).catch(error => {
+            this.shoreFailed = signature;
+            this.shoreRetryAfter = performance.now() + 30000;
+            this.status.textContent = String(error);
+        }).finally(() => {
+            this.shoreDrawing = false;
+            if (!this.shoreClosed) this.draw();
+        });
     }
 
     private uniform(name: string): WebGLUniformLocation | null {
@@ -957,25 +1050,37 @@ class MarsAlmanacGlobe {
         return this.uniforms.get(name)!;
     }
 
-    private draw(): void {
-        if (this.frame) return;
-        this.frame = requestAnimationFrame(() => {
+    private draw(immediate = false): void {
+        if (immediate) cancelAnimationFrame(this.frame);
+        else if (this.frame) return;
+        const render = (): void => {
             this.frame = 0;
             const size = this.canvas.clientWidth;
             if (!size || !this.started || !this.cameraRestored || this.gl.isContextLost()) return;
             const mapReady = this.drawShore(size);
-            this.surfacePending = this.usesMap() && !mapReady;
+            this.surfacePending = this.usesShoreDetail() && !mapReady;
             this.root.dataset.surfacePending = String(this.surfacePending);
             const pixels = Math.min(1536, Math.round(size * Math.min(devicePixelRatio, 1.5)));
             if (this.canvas.width !== pixels || this.canvas.height !== pixels)
                 this.canvas.width = this.canvas.height = pixels;
             const gl = this.gl;
-            const colourTransform = mapReady && !this.map && this.shoreColourFrame === this.shoreFrame
+            const colourTransform = mapReady && this.shoreColourFrame === this.shoreFrame
                 ? labDOM.call('lab_globe_frame_transform', this.shoreFrame, [...this.orientation, this.view[2], size]) as number[] | null
                 : null;
+            // An alpha canvas does not let the compositor discard opaque SVG beneath it.
+            // Hide the duplicate vector paint whenever WebGL already owns the complete surface.
+            this.shoreOverlay.style.display = mapReady && !colourTransform ? '' : 'none';
             gl.uniform1i(this.uniform('naturalShore'), Number(Boolean(colourTransform)));
-            gl.uniform1i(this.uniform('naturalStyle'), Number(!this.map));
+            const now = performance.now();
+            if (colourTransform && !this.shoreWasReady) this.shoreBlendStarted = now;
+            this.shoreWasReady = Boolean(colourTransform);
+            const blend = colourTransform ? Math.min(1, (now - this.shoreBlendStarted) / 350) : 0;
+            gl.uniform1f(this.uniform('shoreBlend'), blend);
+            gl.uniform1i(this.uniform('naturalStyle'), 1);
+            gl.uniform1i(this.uniform('palettesReady'), Number(this.palettesReady));
             gl.uniform1f(this.uniform('photoPixels'), Number(this.root.dataset.resolution) || 0);
+            gl.uniform1i(this.uniform('photoReady'), Number(Boolean(this.photo?.ready)));
+            if (this.photo?.ready) gl.uniform4fv(this.uniform('photoBounds'), this.photo.bounds);
             if (colourTransform) {
                 gl.uniform4fv(this.uniform('shoreBounds'), this.shoreFrameBounds);
                 gl.uniform4fv(this.uniform('shoreTransform'), colourTransform.slice(0, 4));
@@ -990,22 +1095,26 @@ class MarsAlmanacGlobe {
             // A regional mask must not be composited as photographic detail while the map base is pending.
             gl.uniform1i(this.uniform('vectorReady'), Number(mapReady));
             gl.uniform1i(this.uniform('detailReady'),
-                         Number(this.detailReady && (!this.usesMap() || mapReady)));
+                         Number(this.detailReady && (!this.usesShoreDetail() || mapReady)));
             gl.uniform4fv(this.uniform('riverBounds'), this.riverBounds);
             gl.uniform1i(this.uniform('riverReady'), Number(this.riverReady));
             gl.uniform1i(this.uniform('grid'), Number(this.grid));
-            gl.uniform1i(this.uniform('mapMode'),
-                         Number(mapReady || (this.usesMap() && this.mapPreviewReady)));
-            gl.uniform1i(this.uniform('interactionPreview'),
-                         Number(!mapReady && this.usesMap() && this.mapPreviewReady));
+            gl.uniform1i(this.uniform('mapMode'), Number(mapReady));
+            gl.uniform1i(this.uniform('interactionPreview'), 0);
             gl.uniform1f(this.uniform('viewport'), size);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
             this.drawBorders(size);
             this.drawMarkers(size);
-        });
+            if (colourTransform && blend < 1 && !this.flightTarget) this.frame = requestAnimationFrame(render);
+        };
+        // Flight ticks already run on the animation clock; submit their camera in the same frame.
+        if (immediate) render();
+        else this.frame = requestAnimationFrame(render);
     }
 
     private drawBorders(size: number): void {
+        this.borderOverlay.style.display = this.flightTarget ? 'none' : '';
+        if (this.flightTarget) return;
         if (!this.borders || !this.borderReady) return;
         const signature = `${size},${this.view[2]},${this.orientation.join(',')}`;
         if (signature === this.borderSignature) return;
@@ -1025,7 +1134,7 @@ class MarsAlmanacGlobe {
     private cachedCountry(key: string): GlobeCountry | undefined {
         const place = labDOM.call('lab_country_cache_get', key) as Omit<GlobeCountry, 'flag'> | null;
         if (!place) return undefined;
-        const metadata = place.code ? WorksheetResults.tooltip.cachedCountry(place.code) : {flag: ''};
+        const metadata = place.flagCode ? WorksheetResults.tooltip.cachedCountry(place.flagCode) : {flag: ''};
         return metadata ? {...place, flag: metadata.flag} : undefined;
     }
 
@@ -1042,19 +1151,23 @@ class MarsAlmanacGlobe {
                     signal: controller.signal
                 });
                 const result = await response.labData() as {
-                    ok?: boolean; country?: string; country_flag?: string; country_code?: string; nautical_zone?: string
+                    ok?: boolean; country?: string; country_flag?: string; country_code?: string;
+                    flag_code?: string; nautical_zone?: string
                 };
                 if (!response.ok || !result.ok || typeof result.country !== 'string' || controller.signal.aborted)
                     throw new Error('Country unavailable');
                 const flag = typeof result.country_flag === 'string' &&
-                    result.country_flag.startsWith('data:image/svg+xml;base64,') ? result.country_flag : '';
+                    (result.country_flag.startsWith('data:image/svg+xml;base64,') ||
+                     result.country_flag === '/offshore_flag.svg') ? result.country_flag : '';
                 const code = typeof result.country_code === 'string' && /^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(result.country_code)
                     ? result.country_code : '';
                 const nauticalZone = !code && typeof result.nautical_zone === 'string' &&
                     /^-?(?:[0-9]|1[0-2])$/.test(result.nautical_zone) ? result.nautical_zone : '';
-                const value = {name: result.country, flag, code, nauticalZone};
-                WorksheetResults.tooltip.rememberCountry(code, value.name, flag);
-                labDOM.call('lab_country_cache_put', key, value.name, code, nauticalZone);
+                const flagCode = typeof result.flag_code === 'string' && /^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(result.flag_code)
+                    ? result.flag_code : code;
+                const value = {name: result.country, flag, code, flagCode, nauticalZone};
+                WorksheetResults.tooltip.rememberCountry(flagCode, value.name, flag);
+                labDOM.call('lab_country_cache_put', key, value.name, code, nauticalZone, flagCode);
                 return value;
             })();
             pending = {controller, users: 0, promise};
@@ -1109,6 +1222,7 @@ class MarsAlmanacGlobe {
         } else {
             this.country = cached?.name || town?.country || '';
             this.countryFlag = cached?.flag || '';
+            WorksheetResults.tooltip.selectedObserverFlag(cached?.flagCode || '');
         }
         if (cached || !Number.isFinite(lat) || !Number.isFinite(lon) ||
             Math.abs(lat) > 90 || Math.abs(lon) > 180) return;
@@ -1126,6 +1240,7 @@ class MarsAlmanacGlobe {
                 } else {
                     this.country = result.name;
                     this.countryFlag = result.flag;
+                    WorksheetResults.tooltip.selectedObserverFlag(result.flagCode);
                     this.markerSignature = '';
                     this.draw();
                 }
@@ -1261,7 +1376,10 @@ class MarsAlmanacGlobe {
                         this.input('Longitude').value !== String(longitude) || jurisdiction.value || select.value) return;
                     const code = !request.signal.aborted ? data.code : '';
                     if (!request.signal.aborted && !zoneEdited && zone.value === previousZone &&
-                        data.nauticalZone !== '' && !code) zone.value = data.nauticalZone;
+                        data.nauticalZone !== '' && !code) {
+                        zone.value = data.nauticalZone;
+                        zone.dataset.automaticZone = data.nauticalZone;
+                    }
                     if (code && jurisdiction.querySelector(`option[value="${CSS.escape(code)}"]`)) {
                         jurisdiction.value = code;
                         labDOM.call('lab_location_populate', select,
@@ -1269,6 +1387,23 @@ class MarsAlmanacGlobe {
                         select.value = '';
                         WorksheetLocations.selects.syncSelection(select);
                         WorksheetLocations.selects.syncSelection(jurisdiction);
+                        WorksheetResults.tooltip.selectedObserverFlag(data.flagCode);
+                        if (!zoneEdited && zone.value === previousZone) {
+                            const date = this.input('Date').value;
+                            const response = await labHttp.fetch('/datetime-jurisdiction-location', {
+                                method: 'POST', body: labWire.encode({jurisdiction: code, date}), signal: request.signal
+                            });
+                            const location = await response.labData() as WorksheetEvaluationData;
+                            if (request.signal.aborted || generation !== this.selection ||
+                                this.input('Latitude').value !== String(latitude) ||
+                                this.input('Longitude').value !== String(longitude) ||
+                                jurisdiction.value !== code || select.value || this.input('Date').value !== date) return;
+                            if (response.ok && location.ok && !zoneEdited && zone.value === previousZone) {
+                                // Native civil-time rules supply the date-specific offset, not town coordinates.
+                                labDOM.call('lab_location_response', 6, location,
+                                    WorksheetLocations.calendar.calendarLocationContext(), 0, 0);
+                            }
+                        }
                     }
                 } catch {
                     // Unavailable geography must not restore the previous country or change the chosen point.
@@ -1391,14 +1526,7 @@ class MarsAlmanacGlobe {
         this.root.querySelectorAll<HTMLButtonElement>('[data-globe-action]').forEach(button => {
             button.addEventListener('click', () => {
                 this.cancelFlight();
-                if (button.dataset.globeAction === 'map') {
-                    this.map = !this.map;
-                    button.setAttribute('aria-pressed', String(this.map));
-                    button.textContent = this.map ? 'Map' : 'Natural Earth';
-                    this.resetDetail();
-                    if (this.usesMap() || this.view[2] > 1.5) void this.loadDetail();
-                    this.draw();
-                } else if (button.dataset.globeAction === 'grid') {
+                if (button.dataset.globeAction === 'grid') {
                     this.grid = !this.grid;
                     this.hideGridHover();
                     button.setAttribute('aria-pressed', String(this.grid));
@@ -1489,6 +1617,13 @@ class MarsAlmanacGlobe {
             if (this.retainsClickedView()) {
                 this.observerSignature = this.observerState();
                 this.scheduleCameraSave();
+                this.draw();
+                return;
+            }
+            // During travel, catalogue hydration is not a new destination. Idle commits
+            // still honour explicit location actions which request centring on the observer.
+            if (this.flightTarget && this.sameCameraObserver(this.observerSignature)) {
+                this.observerSignature = this.observerState();
                 this.draw();
                 return;
             }

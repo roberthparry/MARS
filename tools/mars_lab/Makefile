@@ -78,6 +78,12 @@ LAB_TSC ?= $(TSC)
 LAB_TS_CONFIG := tools/mars_lab/tsconfig.json
 LAB_TEST_TS_CONFIG := tools/mars_lab/tsconfig.tests.json
 
+# Optional offline asset preparation only; ordinary builds use the bundled tiles.
+LAB_JPEG_CFLAGS ?=
+LAB_JPEG_LIBS ?= -ljpeg
+$(LAB_BUILD_DIR)/texture_tiles: tools/mars_lab/texture_tiles.c $(STATIC_LIB)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LAB_JPEG_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) $(LAB_JPEG_LIBS)
+
 .PHONY: lab-typescript lab-test-typescript lab-typecheck
 lab-typescript: check-lab-typescript-deps
 	"$(LAB_TSC)" --project $(LAB_TS_CONFIG)

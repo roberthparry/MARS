@@ -402,11 +402,18 @@ window.checkLabLayout = async function checkLabLayout(): Promise<void> {
     equal(labDOM.call<string[]>('lab_workspace_dom_labels', 4)[4], 'Exact result', 'integrator card label from C');
     equal(view.lab_view_text_length(0, 99), 0, 'invalid label is empty');
     for (let mode = 0; mode < 7; ++mode) {
-        equal(view.lab_view_controls(mode, true, true, 1, 1, true, false, false), 0, 'busy disables controls');
+        equal(view.lab_view_controls(mode, true, true, 1, 1, true, false, false), 7,
+              'busy retains Run and both history directions in every mode');
+        equal(view.lab_view_controls(mode, true, false, 0, 0, true, false, false), 0,
+              'busy disables empty history without enabling unavailable input');
+        equal(view.lab_view_controls(mode, true, false, 2, 0, true, false, false), 2,
+              'Back remains usable even when the current input is not ready');
+        equal(view.lab_view_controls(mode, true, false, 0, 3, true, false, false), 4,
+              'Forward remains usable when it has history, independently of calculation completion');
         equal(
             view.lab_view_controls(mode, false, true, 1, 1, true, false, false), mode ? 55 : 63,
             'only expression mode enables goal seek');
-        equal(view.lab_view_controls(mode, false, false, 0, 0, false, true, true), 0, 'unavailable controls disabled');
+        equal(view.lab_view_controls(mode, false, false, 0, 0, false, true, true), 0, 'empty history is disabled while idle');
         equal(view.lab_view_controls(mode, false, true, 2, 4, true, false, false), mode ? 55 : 63,
               'history counts remain counts, independently of boolean control options');
     }
