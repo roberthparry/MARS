@@ -866,6 +866,14 @@ help:
 	@printf '\n%s\n' "Library installation"
 	@printf '  %-40s %s\n' "make install" "Install libraries and headers under PREFIX (default /usr/local)"
 	@printf '  %-40s %s\n' "make uninstall" "Remove installed libraries and headers from PREFIX"
+	@printf '%s\n' \
+	    '    PREFIX is a Make variable: the installation base directory (default /usr/local).' \
+	    '    Libraries go in PREFIX/lib; C headers go in PREFIX/include/mars.' \
+	    '    Set it for one command: make install PREFIX="$$HOME/.local"' \
+	    '    Or set an environment variable: export PREFIX="$$HOME/.local", then run make install.' \
+	    '    A PREFIX value on the make command line overrides the environment variable.' \
+	    '    Use the same value to remove it: make uninstall PREFIX="$$HOME/.local"' \
+	    '    PREFIX controls library installation, not MARS Lab or its databases.'
 	@printf '\n%s\n' "Private Lab"
 	@printf '  %-40s %s\n' "make to-be-announced-lab" "Launch the local To-Be-Announced Lab"
 	@printf '  %-40s %s\n' "make install-to-be-announced-lab" "Install a user desktop launcher for To-Be-Announced Lab"
