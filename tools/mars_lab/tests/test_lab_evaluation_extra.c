@@ -16,6 +16,8 @@
 #include "xml-t.h"
 #include "lab_presentation.h"
 #include "lab_wire.h"
+#define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
+#include "internal/lab_calendar_internal.h"
 #define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
 #include "internal/lab_evaluate_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
@@ -1875,6 +1877,37 @@ static void test_lab_screenshots_readme(void)
     TEST_ASSERT_TRUE(ok, "README screenshot Gaussian integral evaluates its infinite endpoint");
     string_printf("README Integrator screenshot: %s\n", lab_eval_text(fields, "symbolic"));
     json_free(fields);
+
+    json_t *observer = test_lab_json(
+        "{\"date\":\"2026-10-25\",\"time\":\"12:00:00\",\"lat\":\"51.5085\",\"lon\":\"-0.1257\","
+        "\"elevation\":\"25\",\"zone\":\"0\",\"jurisdiction\":\"GB-ENG\","
+        "\"country\":\"England\",\"observer_surface\":\"Land\",\"sea_horizon\":\"false\","
+        "\"town\":\"London|51.5085|-0.1257|25\",\"visibility\":\"all\",\"defer_events\":\"true\"}");
+    lab_cal_observing_conditions(observer, NULL);
+    string_t *diagnostic = NULL;
+    json_t *arguments = json_new_object();
+    static const char *const keys[] = {"date", "time", "lat", "lon", "elevation", "zone",
+                                       "temperature_c", "pressure_hpa", "sea_horizon"};
+    for (unsigned i = 0; i < sizeof keys / sizeof *keys; ++i)
+        lab_cal_set(arguments, keys[i], lab_cal_text(observer, keys[i]));
+    json_t *snapshot = lab_cal_run("almanac_lab", arguments, 10000, &diagnostic);
+    json_free(arguments);
+    status = 200;
+    fields = snapshot ? lab_cal_almanac(snapshot, observer, &status) : NULL;
+    const json_t *summary = test_lab_member(fields, "observer_summary");
+    const json_t *presentation = test_lab_member(test_lab_member(fields, "almanac_presentation"), "all");
+    ok = status == 200 && test_lab_ok(fields, true) &&
+         strstr(test_lab_text(json_array_get(summary, 0), "value"), "2026-10-25 12:00:00") &&
+         strstr(test_lab_text(json_array_get(summary, 1), "value"), "London") &&
+         !strcmp(test_lab_text(json_array_get(summary, 5), "value"), "25 m · Land") &&
+         strstr(test_lab_text(presentation, "html"), "hPa (observer)");
+    if (!ok) show_failure(fields);
+    TEST_ASSERT_TRUE(ok, "README Almanac screenshot retains London's GMT moment, whole-metre altitude and pressure reference");
+    string_printf("README Almanac screenshot: London; 2026-10-25 12:00:00 GMT; 25 m; estimated observer pressure\n");
+    json_free(fields);
+    json_free(snapshot);
+    json_free(observer);
+    string_free(diagnostic);
 }
 
 /* Run the documented plot inputs after the ordinary Lab regressions. */

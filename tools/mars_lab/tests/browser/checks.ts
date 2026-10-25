@@ -2958,8 +2958,12 @@
             towns: selection.townsForJurisdiction,
             populate: selection.populateTownSelect,
             coordinates: selection.selectTownByCoordinates,
-            sync: WorksheetLocations.selects.syncSelection
+            sync: WorksheetLocations.selects.syncSelection,
+            evaluate: WorksheetWorkspace.mode.evaluateCurrentMode,
+            mode: WorksheetWorkspace.mode.currentMode
         };
+        const observerTown = WorksheetContext.almanacTown;
+        const observerChildren = Array.from(observerTown.childNodes), observerIndex = observerTown.selectedIndex;
         const row = (value: string): LabTown => ({
             name: value, value, latitude: 'invalid', longitude: 'invalid', elevation: '0',
             timezone: 'Europe/London', default: false, detail: ''
@@ -2993,11 +2997,33 @@
                   'duplicate batches neither rebuild menus nor duplicate towns');
             await fixture.publishTowns({GB: [row('third')]});
             check(Number(builds) === 4, 'later arrivals start a fresh refresh after the queue drains');
+            let evaluations = 0;
+            WorksheetWorkspace.mode.currentMode = () => 'almanac';
+            WorksheetWorkspace.mode.evaluateCurrentMode = async options => {
+                check(options?.skipHistoryUpdate, 'catalogue resolution does not append history');
+                ++evaluations;
+            };
+            observerTown.value = '';
+            selection.selectTownByCoordinates = select => {
+                if (select === observerTown) {
+                    observerTown.append(new Option('Recovered town', 'recovered-town'));
+                    observerTown.value = 'recovered-town';
+                }
+                return true;
+            };
+            await fixture.publishTowns({GB: [row('fourth')]});
+            check(evaluations === 1, 'a town resolved after startup refreshes the active worksheet');
+            await fixture.publishTowns({GB: [row('fifth')]});
+            check(evaluations === 1, 'later pages do not repeatedly evaluate an already named observer');
         } finally {
             selection.townsForJurisdiction = saved.towns;
             selection.populateTownSelect = saved.populate;
             selection.selectTownByCoordinates = saved.coordinates;
             WorksheetLocations.selects.syncSelection = saved.sync;
+            WorksheetWorkspace.mode.evaluateCurrentMode = saved.evaluate;
+            WorksheetWorkspace.mode.currentMode = saved.mode;
+            observerTown.replaceChildren(...observerChildren);
+            observerTown.selectedIndex = observerIndex;
         }
     }
 
@@ -3038,9 +3064,10 @@
                 check(MarsAlmanacGlobe.coordinate(-4.97631, 'E', 'W') === '4° 58.58′ W', 'Decimal-minute longitude');
                 check(MarsAlmanacGlobe.coordinate(89.999999, 'N', 'S') === '90° N', 'Minutes carry into degrees');
                 check(MarsAlmanacGlobe.coordinate(0, 'E', 'W') === '0°', 'Zero coordinate');
-                if (catalogueCheck === 'success') {
+                if (catalogueCheck === 'success' || catalogueCheck === 'fail') {
                     check(document.querySelector('[data-jurisdiction-notice]:not(.hidden)') === null,
                         'Routine town loading stays silent while a country page is pending');
+                    // Each navigation starts a new catalogue; establish the retained row before inducing page failure.
                     await labApplication.loadNearbyTowns(53.319, -3.4916);
                     check((labDOM.call('lab_town_store_list', 'GB-WLS') as LabTown[] | null)?.[0].name === 'Rhyl',
                         'Local towns appear while selected-jurisdiction loading is still blocked');
@@ -3172,6 +3199,10 @@
             if (new URLSearchParams(location.search).get('evaluation-check') === '1') {
                 await runBrowserGroup('checkLabEvaluation', window.checkLabEvaluation);
                 await runBrowserGroup('checkLabEvaluationInstall', window.checkLabEvaluationInstall);
+                await runBrowserGroup('checkLabEvaluationCards', window.checkLabEvaluationCards);
+                await runBrowserGroup('checkLabWeather', window.checkLabWeather);
+                await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
+                await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
                 await report('PASS: asynchronous result installation, drawing opportunities and stale-request rejection');
                 return;
             }

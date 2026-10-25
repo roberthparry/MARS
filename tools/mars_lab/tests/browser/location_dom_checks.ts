@@ -298,6 +298,14 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
         responseContext.offsetTouched = false;
         labDOM.call('lab_location_response', 5, {}, responseContext, 0, 0);
         equal(WorksheetContext.datetimeGmtOffset.value, '', 'missing suggested DateTime offset clears automatic value');
+        WorksheetContext.almanacLatitude.value = '-1.03';
+        WorksheetContext.almanacLongitude.value = '32.85';
+        WorksheetContext.almanacZone.value = '11';
+        labDOM.call('lab_location_response', 6,
+            {latitude: '-6.16', longitude: '35.75', gmt_offset: '3'}, responseContext, 0, 0);
+        equal(WorksheetContext.almanacZone.value, '3', 'explicit custom-point lookup still accepts its identified country offset');
+        equal(WorksheetContext.almanacLatitude.value, '-1.03', 'custom-point lookup preserves the clicked coordinates');
+        equal(WorksheetContext.almanacZone.dataset.automaticZone, '3', 'custom-point lookup marks its resolved offset automatic');
 
         const button = document.createElement('button');
         Object.assign(button.dataset, {
@@ -473,6 +481,51 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
                 equal(fallback.restored, true, 'native coordinate restoration succeeds');
                 equal(fallback.controls, undefined, 'coordinate fallback does not overwrite authored controls');
             } finally {
+                townSelect.replaceChildren(...children);
+                townSelect.selectedIndex = selectedIndex;
+                WorksheetLocations.selects.sync(townSelect);
+            }
+        }
+
+        // Startup has jurisdiction metadata but no town pages yet. Keep the saved observer usable immediately.
+        const juneau = {
+            name: 'Juneau', latitude: '58.301830', longitude: '-134.419720', elevation: '18',
+            value: 'Juneau|58.301830|-134.419720|18', detail: 'Juneau', timezone: 'America/Juneau'
+        };
+        Reflect.set(WorksheetLocations.townSelection, 'townsForJurisdiction', () => []);
+        Reflect.set(WorksheetRequests.presentation, 'requestLabForms', () => Promise.resolve({
+            match_index: -1, town: juneau, detail: juneau.detail
+        }));
+        for (const mode of ['datetime', 'almanac'] as const) {
+            const townSelect = document.getElementById(`${mode}Town`) as WorksheetSelect;
+            const jurisdiction = document.getElementById(`${mode}Jurisdiction`) as HTMLSelectElement;
+            const children = Array.from(townSelect.childNodes), selectedIndex = townSelect.selectedIndex;
+            const country = jurisdiction.value;
+            const option = new Option('Alaska', 'US-AK');
+            jurisdiction.append(option);
+            jurisdiction.value = 'US-AK';
+            try {
+                equal(await WorksheetLocations.townSelection.restoreTownSelection(townSelect, 'US-AK',
+                    juneau.value, juneau.latitude, juneau.longitude), true, `${mode} restores Juneau before catalogue arrival`);
+                equal(townSelect.value, juneau.value, `${mode} keeps the saved town key`);
+                equal(townSelect.selectedOptions[0].dataset.countryCode, 'US-AK', `${mode} keeps the saved jurisdiction`);
+                labDOM.call('lab_location_populate', townSelect, towns, 0);
+                equal(townSelect.value, juneau.value, `${mode} partial pages retain the saved town`);
+                labDOM.call('lab_location_populate', townSelect, [juneau], 0);
+                equal(townSelect.options.length, 1, `${mode} full catalogue replaces the temporary option`);
+                equal(townSelect.selectedOptions[0].dataset.restoredTown, undefined, `${mode} uses official town metadata`);
+                equal(townSelect.selectedOptions[0].dataset.timezone, 'America/Juneau', `${mode} receives the catalogue timezone`);
+                equal(await WorksheetLocations.townSelection.restoreTownSelection(townSelect, 'US-AK',
+                    juneau.value, '0', '0'), false, `${mode} rejects a saved town at different coordinates`);
+                equal(townSelect.value, '', `${mode} mismatched coordinates stay custom`);
+                await WorksheetLocations.townSelection.restoreTownSelection(townSelect, 'US-AK',
+                    juneau.value, juneau.latitude, juneau.longitude);
+                jurisdiction.value = country;
+                labDOM.call('lab_location_populate', townSelect, towns, 0);
+                check(townSelect.value !== juneau.value, `${mode} changing country drops the temporary town`);
+            } finally {
+                option.remove();
+                jurisdiction.value = country;
                 townSelect.replaceChildren(...children);
                 townSelect.selectedIndex = selectedIndex;
                 WorksheetLocations.selects.sync(townSelect);

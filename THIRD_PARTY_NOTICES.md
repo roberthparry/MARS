@@ -27,6 +27,27 @@ Natural Earth provides them under its [public-domain terms](https://www.naturale
 See [the globe guide](docs/globe.md#selected-position-countries) for provenance,
 checksums, generalisation limits and the source's de facto boundary policy.
 
+The ZA country record additionally contains the unchanged Robben Island and False Bay
+Seal Island rings from MARS's packaged October 2026 shoreline, retaining that shoreline's
+OpenStreetMap contributor attribution and ODbL provenance. These additions alter country
+coverage, not the shoreline. Robben Island's South African ownership and spelling are
+recorded by [UNESCO](https://whc.unesco.org/en/list/916/maps/).
+Its named reference point and approximate elevation are taken from
+[GeoNames 3362356, as presented by Mapcarta](https://mapcarta.com/Robben_Island),
+with GeoNames credit under CC BY 4.0. Seal Island's reference point is
+S34°08.25′ E18°34.95′ from
+[Wikivoyage's False Bay entry](https://en.wikivoyage.org/wiki/Diving_the_Cape_Peninsula_and_False_Bay/Seal_Island),
+credited to Wikivoyage contributors under CC BY-SA 4.0. No surveyed elevation is
+provided for Seal Island. Both are named locations in the South African catalogue;
+inclusion does not imply that Seal Island is an inhabited town. Sources checked 25 October 2026.
+
+Duiker Island near Hout Bay is a separate named location, also locally called Seal Island
+([Wikivoyage](https://en.wikivoyage.org/wiki/Diving_the_Cape_Peninsula_and_False_Bay/Duiker_Island)).
+Its reference point, −34.05861, 18.32694, follows
+[Wikipedia's Duiker Island entry](https://en.wikipedia.org/wiki/Duiker_Island), credited
+to Wikipedia contributors under CC BY-SA 4.0, checked 25 October 2026. No surveyed
+elevation is supplied. Its existing South African land coverage and shoreline are unchanged.
+
 ## Regional flag artwork and coverage
 
 The additional SVGs and per-file authorship/licences are recorded in

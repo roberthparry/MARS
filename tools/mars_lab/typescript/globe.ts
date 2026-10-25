@@ -8,7 +8,7 @@
  * Gestures use a GPU preview; JavaScript transports results and discards stale camera frames.
  */
 type GlobeView = [number, number, number, number, number, number, number];
-interface GlobeTown { town: LabTown; jurisdiction: string; country: string; fullName?: string; }
+interface GlobeTown { town: LabTown; jurisdiction: string; country: string; displayName?: string; fullName?: string; }
 interface GlobeCountry { name: string; flag: string; code: string; flagCode: string; nauticalZone: string; }
 
 class MarsAlmanacGlobe {
@@ -101,9 +101,10 @@ class MarsAlmanacGlobe {
     private cameraBookmarkRestored = false;
     private observerStartupReady = false;
     private static townLabel(place: GlobeTown, zoom: number, available: number): {name: string; full: string; width: number} {
-        const full = place.fullName || place.town.name;
-        const expanded = full !== place.town.name && zoom >= 12 && available >= 430;
-        return {name: expanded ? full : place.town.name, full, width: expanded ? 430 : 128};
+        const name = place.displayName || place.town.name;
+        const full = place.fullName || name;
+        const expanded = full !== name && zoom >= 12 && available >= 430;
+        return {name: expanded ? full : name, full, width: expanded ? 430 : 128};
     }
 
     private view: GlobeView = [0, 0, 1, -180, -90, 180, 90];
@@ -150,6 +151,9 @@ class MarsAlmanacGlobe {
     private readonly quad: WebGLBuffer;
     private readonly uniforms = new Map<string, WebGLUniformLocation | null>();
     private maskRenderer: Promise<import('./globe_gpu.js').MarsGlobeMask> | null = null;
+    private travelBorders: import('./globe_gpu.js').MarsGlobeBorders | null = null;
+    private travelBordersLoading = false;
+    private travelBordersRequest: AbortController | null = null;
     private readonly textures: WebGLTexture[] = [];
     private detailBounds = [-180, -90, 180, 90];
     private detailReady = false;
@@ -270,6 +274,7 @@ class MarsAlmanacGlobe {
         globe.flightTarget = target;
         // Fetch the destination once, before zooming towards it, rather than chasing intermediate regions.
         void globe.loadShore();
+        void globe.loadTravelBorders();
         globe.hideGridHover();
         const complete = (): void => {
             globe.applyCamera(target);
@@ -301,7 +306,7 @@ class MarsAlmanacGlobe {
                 complete();
                 return;
             }
-            const loading = globe.worldLoading || globe.highResolutionLoading;
+            const loading = globe.worldLoading || globe.highResolutionLoading || (progress === 0 && globe.travelBordersLoading);
             // Warm the photographic surface before departure. Local vectors refine that complete
             // surface asynchronously, without braking and restarting at each coverage boundary.
             speed += Math.max(-elapsed / 600, Math.min(elapsed / 1200, (loading ? 0 : 1) - speed));
@@ -432,6 +437,8 @@ class MarsAlmanacGlobe {
             if (event.persisted) return;
             this.shoreClosed = true;
             this.photo?.dispose();
+            this.travelBordersRequest?.abort();
+            this.travelBorders?.dispose();
             void this.maskRenderer?.then(renderer => renderer.dispose()).catch(() => {});
             this.stopShoreWorker(new Error('Globe closed'));
             window.clearTimeout(this.settleTimer);
@@ -884,6 +891,37 @@ class MarsAlmanacGlobe {
         }
     }
 
+    private async loadTravelBorders(): Promise<void> {
+        if (!this.borders || this.travelBorders || this.travelBordersLoading) return;
+        this.travelBordersLoading = true;
+        const request = this.travelBordersRequest = new AbortController();
+        const timeout = window.setTimeout(() => request.abort(), 15000);
+        try {
+            const response = await labHttp.fetch('/almanac-borders', {
+                method: 'POST', signal: request.signal,
+                body: labWire.encode({west: -180, south: -90, east: 180, north: 90, format: 'segments'})
+            });
+            const data = await response.labData() as {ok?: boolean; segments?: string};
+            if (!response.ok || !data.ok || typeof data.segments !== 'string' || request.signal.aborted)
+                throw new Error('Travel borders unavailable');
+            const vertices = await this.shoreJob('lab_globe_borders_mesh', [data.segments], request.signal) as Float32Array;
+            const module = await import('./globe_gpu.js');
+            if (request.signal.aborted || this.shoreClosed) return;
+            try {
+                this.travelBorders = new module.MarsGlobeBorders(this.gl,
+                    labDOM.call('lab_globe_borders_shader', 0) as string,
+                    labDOM.call('lab_globe_borders_shader', 1) as string, vertices);
+                this.root.dataset.travelBorders = 'ready';
+            } finally { this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.quad); }
+        } catch {
+            this.root.dataset.travelBorders = 'unavailable';
+        } finally {
+            window.clearTimeout(timeout);
+            this.travelBordersLoading = false;
+            this.travelBordersRequest = null;
+        }
+    }
+
     private async loadRivers(): Promise<void> {
         if (this.view[2] < 12 || !this.root.getClientRects().length || this.gl.isContextLost()) return;
         const bounds = (labDOM.call('lab_globe_view', this.orientation, this.view[2] / 1.15, 1) as GlobeView).slice(3);
@@ -960,13 +998,8 @@ class MarsAlmanacGlobe {
     private drawShore(size: number): boolean {
         if (this.flightTarget && !this.historyRestoring) {
             void this.loadShore();
-            const targetView = labDOM.call('lab_globe_view', this.flightTarget.slice(0, 4), this.flightTarget[4], 1);
-            // Retain departure coverage until the photograph can carry the overview, or the old
-            // patch leaves the view. Upload the prepared destination once, before the final zoom.
-            const retainDeparture = this.view[2] >= 8 && this.shoreFrame &&
-                labDOM.call('lab_globe_shore_frame_covers', this.view, this.shoreFrameBounds);
-            if (!retainDeparture && this.flightTarget[4] >= 8 && labDOM.call('lab_globe_shore_covers', targetView))
-                this.projectShore(this.flightTarget, size);
+            // Fetch geometry off-thread, but defer large stencil textures until arrival.
+            // Uploading them during travel can stall the GPU despite a fast JavaScript frame.
         }
         const visible = this.usesShoreDetail() && Boolean(labDOM.call('lab_globe_shore_covers', this.view));
         this.shoreOverlay.style.display = 'none';
@@ -1005,15 +1038,14 @@ class MarsAlmanacGlobe {
         this.shoreDrawing = true;
         const revision = this.shoreRevision, frameBounds = this.shoreBounds, flight = this.flightTarget;
         void this.shoreJob('lab_globe_shore_frame', [orientation, camera[4], size]).then(async value => {
-            if (value === null || this.historyRestoring || (flight && this.flightTarget !== flight)) return;
+            if (value === null || this.historyRestoring || this.flightTarget) return;
             const result = value as import('./globe_gpu.js').GlobeMaskFrame;
             if (!result || typeof result.svg !== 'string') throw new Error('Shoreline projection unavailable');
             if (revision !== this.shoreRevision) return;
             this.maskRenderer ??= import('./globe_gpu.js').then(module => new module.MarsGlobeMask(this.gl,
                 labDOM.call('lab_globe_mask_shader', 0) as string, labDOM.call('lab_globe_mask_shader', 1) as string));
             const renderer = await this.maskRenderer;
-            if (this.shoreClosed || revision !== this.shoreRevision || this.historyRestoring ||
-                (flight && this.flightTarget !== flight)) return;
+            if (this.shoreClosed || revision !== this.shoreRevision || this.historyRestoring || this.flightTarget) return;
             const pixels = Math.min(2048, Math.round(size * 2 * Math.min(devicePixelRatio, 1.5)));
             const started = performance.now(), gl = this.gl;
             try { this.textures[4] = renderer.render(result, pixels, this.quad, this.textures[4]); }
@@ -1060,7 +1092,7 @@ class MarsAlmanacGlobe {
             const mapReady = this.drawShore(size);
             this.surfacePending = this.usesShoreDetail() && !mapReady;
             this.root.dataset.surfacePending = String(this.surfacePending);
-            const pixels = Math.min(1536, Math.round(size * Math.min(devicePixelRatio, 1.5)));
+            const pixels = Math.min(1536, Math.round(size * Math.min(devicePixelRatio, this.flightTarget ? 1 : 1.5)));
             if (this.canvas.width !== pixels || this.canvas.height !== pixels)
                 this.canvas.width = this.canvas.height = pixels;
             const gl = this.gl;
@@ -1114,7 +1146,16 @@ class MarsAlmanacGlobe {
 
     private drawBorders(size: number): void {
         this.borderOverlay.style.display = this.flightTarget ? 'none' : '';
-        if (this.flightTarget) return;
+        if (this.flightTarget) {
+            if (this.borders && this.travelBorders) {
+                const gl = this.gl;
+                this.travelBorders.draw(this.rotation, this.view[2], this.canvas.width / size);
+                gl.useProgram(this.program);
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
+                gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+            }
+            return;
+        }
         if (!this.borders || !this.borderReady) return;
         const signature = `${size},${this.view[2]},${this.orientation.join(',')}`;
         if (signature === this.borderSignature) return;
@@ -1335,7 +1376,6 @@ class MarsAlmanacGlobe {
         this.selectionCountryRequest = null;
         const select = document.getElementById('almanacTown') as WorksheetSelect;
         const jurisdiction = document.getElementById('almanacJurisdiction') as WorksheetSelect;
-        const elevation = this.input('Elevation').value;
         const zone = this.input('Zone'), previousZone = zone.value;
         let zoneEdited = false;
         const changedZone = () => { zoneEdited = true; };
@@ -1350,8 +1390,7 @@ class MarsAlmanacGlobe {
                 select.value = place.town.value;
                 WorksheetLocations.selects.syncSelection(select);
                 WorksheetLocations.selects.syncSelection(document.getElementById('almanacJurisdiction') as WorksheetSelect);
-                WorksheetLocations.townSelection.applySelectedTown(WorksheetLocations.calendar.calendarTownControls('almanac', false));
-                this.input('Elevation').value = elevation;
+                WorksheetLocations.townSelection.applySelectedTown(WorksheetLocations.calendar.calendarTownControls('almanac'));
             } else {
                 jurisdiction.value = '';
                 labDOM.call('lab_location_populate', select, [], false);
@@ -1362,8 +1401,8 @@ class MarsAlmanacGlobe {
             this.input('Latitude').value = place ? place.town.latitude : String(latitude);
             this.input('Longitude').value = place ? place.town.longitude : String(longitude);
             this.clickedObserver = [Number(this.input('Latitude').value), Number(this.input('Longitude').value)];
-            // Deliberately leave the authored observer altitude untouched.
-            this.status.textContent = place ? `Selected ${place.town.name}` : 'Selected custom observer location';
+            // Named towns supply their reference elevation; custom points retain the authored altitude.
+            this.status.textContent = place ? `Selected ${place.displayName || place.town.name}` : 'Selected custom observer location';
             this.observerSignature = this.observerState();
             this.draw();
             if (!place) {
@@ -1536,7 +1575,10 @@ class MarsAlmanacGlobe {
                     this.borders = !this.borders;
                     button.setAttribute('aria-pressed', String(this.borders));
                     button.textContent = `Borders: ${this.borders ? 'on' : 'off'}`;
-                    if (this.borders) void this.loadBorders();
+                    if (this.borders) {
+                        void this.loadBorders();
+                        if (this.flightTarget) void this.loadTravelBorders();
+                    }
                     else this.unloadBorders();
                     this.draw();
                 } else if (button.dataset.globeAction === 'centre') this.centre();

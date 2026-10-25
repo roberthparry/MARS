@@ -38,6 +38,10 @@ bool countries_borders(sqlite_t *db, double west, double south, double east, dou
 
 /** @brief Private shoreline reader. */
 typedef struct _shoreline_t shoreline_t;
+
+/** @brief Resolve an owned country name/code, reconciling small unambiguous outline gaps only on confirmed land. */
+string_t *countries_resolve(sqlite_t *db, shoreline_t *shoreline, double latitude, double longitude, bool code);
+
 /** @brief Open a shoreline reader on a borrowed connection. */
 shoreline_t *shoreline_open(sqlite_t *db);
 /** @brief Release a shoreline reader. */

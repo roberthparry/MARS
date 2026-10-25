@@ -8,6 +8,7 @@
  * accounts for copied text plus a conservative per-record index allowance.
  * Mutable resident state belongs to a private singleton. Public operations enter its serial dispatcher;
  * internal helpers execute only within that ownership boundary. No scoped browser handles are retained.
+ * Place snapshots provide formatted display names separately from unchanged catalogue names and selection keys.
  */
 #include <math.h>
 #include <stdlib.h>
@@ -16,6 +17,7 @@
 #include "array-t.h"
 #include "dictionary-t.h"
 #include "lab_dom.h"
+#include "lab_location.h"
 #include "lab_serial.h"
 #include "lab_town_store.h"
 
@@ -136,10 +138,11 @@ static jsref town_value(const town_record_t *record, bool place)
     jsref result = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(result, "town", town);
     lab_dom_set(result, "jurisdiction", text_value(record->code));
+    lab_dom_set(result, "displayName", lab_location_town_text(text_value(record->fields[0])));
     char *key = record_key(record->code, record->fields[0]);
     const char *full = record->fields[0];
     if (key && state->long_names) dictionary_get(state->long_names, &key, &full);
-    lab_dom_set(result, "fullName", text_value(full));
+    lab_dom_set(result, "fullName", lab_location_town_text(text_value(full)));
     free(key);
     return result;
 }

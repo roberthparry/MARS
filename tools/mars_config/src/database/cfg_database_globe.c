@@ -1380,8 +1380,9 @@ bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string
     int64_t revision = 0;
     return cfg_database_current_revision(db, "globe", &revision) && cfg_globe_valid(db) &&
            (revision >= 3 || cfg_database_coast(db, root, staging)) &&
-           (revision >= 4 || cfg_globe_countries(db, root, staging)) &&
-           (revision >= 5 || cfg_globe_regions(db, root)) && cfg_database_textures(db, root) && cfg_globe_valid(db);
+           (revision >= 7 || cfg_globe_countries(db, root, staging)) &&
+           (revision >= 5 || cfg_globe_regions(db, root)) &&
+           (revision >= 6 || cfg_database_textures(db, root)) && cfg_globe_valid(db);
 }
 
 /* Keep globe setup independent; unsupported operations fail without changing storage. */
@@ -1426,7 +1427,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
             cfg_globe_valid(db) && sqlite_exec_cstr(db, "begin immediate");
         ok = transaction && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
              cfg_globe_regions(db, root) && cfg_database_textures(db, root) && cfg_globe_valid(db) &&
-             cfg_database_revision(db, "globe", 6) &&
+             cfg_database_revision(db, "globe", 7) &&
              sqlite_exec_cstr(db, "commit");
         if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
         sqlite_close(db);
@@ -1444,7 +1445,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         db = temporary && root ? cfg_database_open(temporary_path, key) : NULL;
         ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
-             cfg_globe_regions(db, root) && cfg_database_textures(db, root) && cfg_database_revision(db, "globe", 6);
+             cfg_globe_regions(db, root) && cfg_database_textures(db, root) && cfg_database_revision(db, "globe", 7);
         sqlite_close(db);
         string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
         string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;

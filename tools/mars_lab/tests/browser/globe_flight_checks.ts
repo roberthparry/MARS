@@ -17,6 +17,8 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
         orientation: number[]; view: number[]; flightTarget: number[] | null; gl: WebGLRenderingContext;
         worldLoading: boolean; shoreRetryAfter: number; palettesReady: boolean;
         flightGeneration: number; historyRedirect: boolean; saveCamera(): void;
+        borders: boolean;
+        travelBorders: import('../../typescript/globe_gpu.js').MarsGlobeBorders | null;
         applyCamera(camera: number[]): void; stopRegionRequests(): void;
         shoreJob(entry: GlobeWorkerRequest['entry'], args: GlobeWorkerRequest['args'], signal?: AbortSignal): Promise<unknown>;
     };
@@ -28,12 +30,23 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
     const savedRetry = globe.shoreRetryAfter;
     const applyCamera = globe.applyCamera, native = labDOM.call, shoreJob = globe.shoreJob;
     const matchMedia = window.matchMedia, drawArrays = globe.gl.drawArrays;
+    const fetch = labHttp.fetch, savedBorders = globe.borders;
+    const savedTravelBorders = globe.travelBorders;
     const timings: string[] = [];
     let bordersDuringFlight = 0, geometryDuringFlight = 0, submissions = 0, flightProgress = 0;
+    let gpuBorders = 0, projectionsDuringFlight = 0, worldBorderRequests = 0;
     let delayNextGeometry = false, waitingForGeometry = false;
     let releaseGeometry = (): void => {};
     try {
         WorksheetWorkspace.mode.setMode('almanac');
+        globe.borders = true;
+        globe.travelBorders = null;
+        labHttp.fetch = async (url, options) => {
+            if (url !== '/almanac-borders') return fetch.call(labHttp, url, options);
+            const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {west: number; east: number};
+            if (payload.east - payload.west === 360) ++worldBorderRequests;
+            return {ok: true, status: 200, labData: async () => ({ok: true, segments: '-10 0 10 0\n'})} as MarsTransportResponse;
+        };
         window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ?
             {matches: false} as MediaQueryList : matchMedia.call(window, query);
         labDOM.call = <T>(name: string, ...args: unknown[]): T => {
@@ -44,6 +57,7 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
         };
         globe.shoreJob = async (entry, args, signal) => {
             if (globe.flightTarget) ++geometryDuringFlight;
+            if (globe.flightTarget && entry === 'lab_globe_shore_frame') ++projectionsDuringFlight;
             if (globe.flightTarget && entry === 'fetch' && delayNextGeometry) {
                 delayNextGeometry = false;
                 waitingForGeometry = true;
@@ -54,9 +68,11 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
         };
         globe.gl.drawArrays = (mode, first, count) => {
             ++submissions;
+            if (globe.flightTarget && mode === globe.gl.LINES) ++gpuBorders;
             drawArrays.call(globe.gl, mode, first, count);
         };
         for (const [name, fromLat, fromLon, toLat, toLon] of globeFlightRoutes) {
+            const previousBorders = gpuBorders;
             flightProgress = 0;
             delayNextGeometry = name === 'Edinburgh–Juneau';
             const from = [...labDOM.call('lab_globe_centre', fromLat, fromLon) as number[],
@@ -123,6 +139,8 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
                   `${name}: retains the current zoom while restoring destination orientation`);
             check(deferredFrames === 0, `${name}: camera updates submit to the GPU in the same frame`);
             check(bordersDuringFlight === 0, `${name}: optional border projection waits until arrival`);
+            check(gpuBorders > previousBorders, `${name}: enabled borders draw on the GPU during travel`);
+            check(projectionsDuringFlight === 0, `${name}: large coastline masks wait until arrival`);
             check(destinationSeen && !destinationLost, `${name}: the destination remains visible once approached`);
             const gaps = frameTimes.slice(1).map((time, i) => time - frameTimes[i]).sort((a, b) => a - b);
             submissionTimes.sort((a, b) => a - b);
@@ -132,6 +150,7 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
                 `${submissionTimes[Math.floor(submissionTimes.length * .95)].toFixed(1)} ms`);
         }
         check(geometryDuringFlight > 0, 'shoreline detail can refresh during travel instead of waiting until arrival');
+        check(worldBorderRequests === 1, 'world travel borders are reused across journeys');
         globe.applyCamera = applyCamera;
         const bookmarkKey = 'mars.exprLab.globeCamera.v1';
         const bookmark = localStorage.getItem(bookmarkKey);
@@ -221,6 +240,10 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
         globe.shoreJob = shoreJob;
         globe.shoreRetryAfter = savedRetry;
         globe.gl.drawArrays = drawArrays;
+        globe.borders = savedBorders;
+        if (globe.travelBorders !== savedTravelBorders) globe.travelBorders?.dispose();
+        globe.travelBorders = savedTravelBorders;
+        labHttp.fetch = fetch;
         labDOM.call = native;
         window.matchMedia = matchMedia;
         document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();

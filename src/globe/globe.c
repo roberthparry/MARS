@@ -127,7 +127,7 @@ string_t *globe_country_at(globe_t *g, double latitude, double longitude)
 {
     if (!g || !g->countries || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180)
         return NULL;
-    return countries_at(g->geometry, latitude, longitude);
+    return countries_resolve(g->geometry, g->shoreline, latitude, longitude, false);
 }
 
 /* Geographic codes link to jurisdiction metadata without using the selected form jurisdiction. */
@@ -135,7 +135,7 @@ string_t *globe_country_code_at(globe_t *g, double latitude, double longitude)
 {
     if (!g || !g->countries || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180)
         return NULL;
-    string_t *code = countries_lookup(g->geometry, latitude, longitude, true);
+    string_t *code = countries_resolve(g->geometry, g->shoreline, latitude, longitude, true);
     if (code && string_byte_length(code) != 2 && string_byte_length(code) != 6) { string_free(code); return NULL; }
     return code;
 }

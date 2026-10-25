@@ -1,6 +1,6 @@
 /**
  * @file globe_gpu.ts
- * @brief Thin WebGL backend for native-owned coverage and colour correction plans.
+ * @brief Thin WebGL backend for native-owned coverage, travel borders and colour correction plans.
  *
  * No geographic coordinates, projection or shader generation lives here. The
  * backend retains GPU buffers and double-buffers coverage textures. A failed
@@ -8,12 +8,69 @@
  * signed non-zero winding, including concave rings and overlapping patches.
  * Native-shader colour correction palettes are rendered once per photographic
  * source, keeping neighbourhood sampling out of the animation loop.
+ * Travel borders retain one native-generated vertex buffer and rotate it using shader uniforms.
  */
 export interface GlobeMaskFrame {
     svg: string;
     vertices: Float32Array<ArrayBuffer>;
     batches: Uint32Array<ArrayBuffer>;
     projectMs?: number;
+}
+
+/** Rotate native world-border vertices on the GPU without per-frame SVG generation. */
+export class MarsGlobeBorders {
+    private readonly program: WebGLProgram;
+    private readonly buffer: WebGLBuffer;
+    private readonly camera: WebGLUniformLocation | null;
+    private readonly zoom: WebGLUniformLocation | null;
+    private readonly count: number;
+
+    constructor(private readonly gl: WebGLRenderingContext, vertex: string, fragment: string, vertices: Float32Array) {
+        if (!(vertices instanceof Float32Array) || !vertices.length || vertices.length % 6 || vertices.length > 6000000)
+            throw new Error('Invalid border mesh');
+        const program = gl.createProgram(), buffer = gl.createBuffer();
+        if (!program || !buffer) {
+            gl.deleteProgram(program); gl.deleteBuffer(buffer);
+            throw new Error('GPU borders unavailable');
+        }
+        this.program = program; this.buffer = buffer; this.count = vertices.length / 3;
+        try {
+            for (const [type, source] of [[gl.VERTEX_SHADER, vertex], [gl.FRAGMENT_SHADER, fragment]] as const) {
+                const shader = gl.createShader(type);
+                if (!shader) throw new Error('Border shader allocation failed');
+                gl.shaderSource(shader, source); gl.compileShader(shader);
+                const compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+                if (compiled) gl.attachShader(program, shader);
+                gl.deleteShader(shader);
+                if (!compiled) throw new Error('Border shader compilation failed');
+            }
+            gl.bindAttribLocation(program, 0, 'position');
+            gl.linkProgram(program);
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('Border shader link failed');
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        } catch (error) { this.dispose(); throw error; }
+        this.camera = gl.getUniformLocation(program, 'cameraToWorld');
+        this.zoom = gl.getUniformLocation(program, 'zoom');
+    }
+
+    draw(rotation: number[], zoom: number, pixelRatio: number): void {
+        const gl = this.gl;
+        gl.useProgram(this.program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+        gl.uniformMatrix3fv(this.camera, false, rotation);
+        gl.uniform1f(this.zoom, zoom);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.lineWidth(pixelRatio);
+        gl.drawArrays(gl.LINES, 0, this.count);
+        gl.disable(gl.BLEND);
+    }
+
+    dispose(): void {
+        this.gl.deleteProgram(this.program); this.gl.deleteBuffer(this.buffer);
+    }
 }
 
 /** Build native-shader colour lookup textures once per photographic source, outside animation frames. */

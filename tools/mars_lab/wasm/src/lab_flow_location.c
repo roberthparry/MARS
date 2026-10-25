@@ -528,7 +528,8 @@ static jsref lab_flow_location_refresh_loc_refresh_populate(struct lab_flow_loca
         return lab_flow_call(ctx->frame, LOC_REFRESH_CURRENT, "locPopulate", 0, 1, 3,
                              lab_dom_get(ctx->elements, "town"), lab_dom_get(ctx->frame, "jurisdiction"), options);
     }
-    return lab_flow_call(ctx->frame, LOC_REFRESH_STATUS, "locApplyTown", 0, 0, 1, lab_dom_get(ctx->frame, "controls"));
+    return lab_flow_call(ctx->frame, LOC_REFRESH_STATUS, "locApplyTown", "townApplied", 0, 1,
+                         lab_dom_get(ctx->frame, "controls"));
 }
 
 static jsref lab_flow_location_refresh_loc_refresh_current(struct lab_flow_location_refresh_context *ctx)
@@ -573,6 +574,10 @@ static jsref lab_flow_location_refresh_loc_refresh_apply(struct lab_flow_locatio
 
 static jsref lab_flow_location_refresh_loc_refresh_status(struct lab_flow_location_refresh_context *ctx)
 {
+    /* Date refreshes retain the existing observer. Its native evaluation resolves
+     * automatic offsets; a country-capital default could overwrite the town's zone. */
+    if (!ctx->update && lab_dom_equal(ctx->mode, lab_dom_string("almanac")))
+        return lab_flow_location_jump(ctx->frame, LOC_REFRESH_FINISH);
     if (lab_dom_equal(ctx->mode, lab_dom_string("almanac")))
         return lab_flow_call(ctx->frame, LOC_REFRESH_POST, "locStatus", 0, 0, 1,
                              lab_dom_string("Updating almanac location..."));

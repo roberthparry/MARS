@@ -340,7 +340,9 @@ void lab_globe_flight_advance(jsref start, jsref target, double progress, double
     double dot = am[6] * bm[6] + am[7] * bm[7] + am[8] * bm[8];
     double angle = acos(fmax(-1, fmin(1, dot)));
     double seconds = fmin(elapsed_ms, 50) / 1000;
-    double budget = fmin(6, 360 * seconds);
+    /* Keep the same travel speed at 20, 30 and 60 Hz. The elapsed-time clamp
+     * still bounds a stalled frame to 18 pixels, without halving speed at 30 Hz. */
+    double budget = 360 * seconds;
     /* Heading and arrival roll are short local operations, not fractions of a long route. */
     double duration = !redirect && progress < .125 ? 1.2 / .125 :
                       progress >= .875 ? 2.5 / .125 : (2 + 6 * angle) / (redirect ? .875 : .75);

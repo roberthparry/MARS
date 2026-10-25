@@ -183,6 +183,12 @@ void lab_cal_weather_remember(const json_t *options, const json_t *weather, time
  */
 json_t *lab_cal_weather_recent(const json_t *options, time_t now);
 
+/** @brief Retain provider conditions for 15 minutes in 64 bounded slots, keyed by coordinates, UTC moment and elevation. */
+void lab_cal_weather_conditions_remember(const json_t *options, time_t now);
+
+/** @brief Restore exact matching provider conditions without network access; return false for missing or expired records. */
+bool lab_cal_weather_conditions_restore(json_t *options, time_t now);
+
 /** @brief Prepare navigation body rows and upcoming events. */
 json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status);
 

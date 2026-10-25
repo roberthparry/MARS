@@ -219,18 +219,19 @@ string_t *globe_water_name_at(globe_t *globe, double latitude_degrees, double lo
 
 /**
  * @brief Return an owned country name for a covered point, or NULL when unavailable or ambiguous.
- * Uses indexed Natural Earth administrative boundaries, independently of the shoreline geometry.
- * Water and near-shore classifications do not suppress administrative coverage. No nearest-country
- * or maritime-distance inference is made; these generalised polygons are not legal maritime boundaries.
- * Border points and uncertain coastal classifications yield no name. This is not a legal boundary determination.
+ * Uses indexed Natural Earth administrative boundaries. Water and near-shore classifications do not suppress
+ * administrative coverage. For uncovered points only, detailed shoreline-confirmed land can bridge an outline
+ * gap of up to one kilometre if exactly one country occurs within that distance. Missing shoreline, water,
+ * administrative border points and competing countries cannot use this fallback. Distances use a local tangent
+ * plane; these generalised polygons and the gap policy are not legal or navigational boundary determinations.
  * The caller releases the result with string_free; access to the borrowed database must be serialised.
  */
 string_t *globe_country_at(globe_t *globe, double latitude_degrees, double longitude_degrees);
 
 /**
  * @brief Return an owned ISO country or UK constituent-country code for a covered point; release with string_free.
- * Independent of shoreline availability and land/water classification. Returns NULL for missing,
- * ambiguous or uncovered administrative geometry; never guesses a nearby country's maritime extent.
+ * Shares globe_country_at() coverage and its bounded, confirmed-land outline-gap policy. Returns NULL for
+ * missing or ambiguous administrative geometry; never extends country coverage over uncovered water.
  */
 string_t *globe_country_code_at(globe_t *globe, double latitude_degrees, double longitude_degrees);
 

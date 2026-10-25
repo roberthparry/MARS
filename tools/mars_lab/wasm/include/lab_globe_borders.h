@@ -1,8 +1,10 @@
 /**
  * @file lab_globe_borders.h
- * @brief Native ownership and screen projection of optional globe border vectors.
+ * @brief Native ownership, screen projection and GPU meshes for optional globe border vectors.
  *
- * The browser supplies bounded geographic segments and receives an SVG path, not retained geometry.
+ * The browser supplies bounded geographic segments and receives an SVG path for stationary views.
+ * A worker can build bounded packed xyz vertices for a retained GPU travel layer; the browser copies
+ * these before yielding, and native shaders keep projection policy out of JavaScript.
  * This display-only adapter shares the globe camera and does not classify geographic positions.
  * Each entry point dispatches synchronously through the service's private singleton. Browser handles
  * require the owning non-shared WASM instance; native dispatch serialises complete operations with a mutex.
@@ -26,5 +28,14 @@ void lab_globe_borders_clear(void);
 
 /** @brief Return a horizon- and viewport-clipped CSS-pixel SVG path for zoom 1–4096, or null on invalid input or failure. */
 void lab_globe_borders_path(quaternion_jsref orientation, double zoom, double size);
+
+/** @brief Build at most one million short spherical segments for GPU travel rendering; return vertex count or zero. */
+unsigned lab_globe_borders_mesh(jsref text);
+
+/** @brief Borrow the packed xyz float vertices until the next mesh build or clear; copy before yielding. */
+const float *lab_globe_borders_vertices(void);
+
+/** @brief Return native-owned GPU border vertex (0) or fragment (1) shader source. */
+void lab_globe_borders_shader(unsigned fragment);
 
 #endif

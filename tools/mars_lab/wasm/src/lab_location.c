@@ -199,6 +199,26 @@ void lab_location_option_value(jsref town)
     lab_dom_return(lab_location_text(lab_dom_get(town, "value")));
 }
 
+static jsref lab_location_menu_jurisdiction(node_jsref select)
+{
+    return lab_dom_read(lab_dom_query(lab_dom_closest(select, ".mode-panel"),
+                                      "select[id$='Jurisdiction']"), LAB_DOM_VALUE, "");
+}
+
+static node_jsref lab_location_town_option(jsref town, jsref value, jsref jurisdiction)
+{
+    static const char *const attributes[] = {"latitude", "longitude", "elevation", "timezone", "detail"};
+    int option = lab_dom_create("option"), name = lab_dom_get(town, "name");
+    lab_dom_write(option, LAB_DOM_VALUE, "", value);
+    lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_truth(name) ?
+                  lab_location_town_text(lab_location_text(name)) : lab_dom_string("Location"));
+    int country = lab_dom_get(town, "country_code");
+    lab_dom_write(option, LAB_DOM_DATASET, "countryCode", lab_dom_length(country) ? country : jurisdiction);
+    for (unsigned field = 0; field < sizeof attributes / sizeof *attributes; ++field)
+        lab_dom_write(option, LAB_DOM_DATASET, attributes[field], lab_location_text(lab_dom_get(town, attributes[field])));
+    return option;
+}
+
 /* Build town options and select the default or surviving previous value. */
 void lab_location_populate(node_jsref select, jsref towns, bool select_default)
 {
@@ -206,27 +226,22 @@ void lab_location_populate(node_jsref select, jsref towns, bool select_default)
         return;
     lab_dom_set(select, "labTownGeneration", lab_dom_object(LAB_VALUE_OBJECT));
     lab_dom_subscribe(select, "change", "lab_location_dispatch", LAB_LOCATION_SELECTION_CHANGED, select, 0);
-    static const char *const attributes[] = {"latitude", "longitude", "elevation", "timezone", "detail"};
     int previous = lab_location_value(select), empty = lab_dom_string("");
+    int retained = lab_dom_item(lab_dom_get(select, "selectedOptions"), 0);
+    int jurisdiction = lab_location_menu_jurisdiction(select);
+    bool pending = !select_default && retained &&
+        lab_dom_truth(lab_dom_read(retained, LAB_DOM_DATASET, "restoredTown")) &&
+        lab_dom_equal(lab_dom_read(retained, LAB_DOM_DATASET, "restoredJurisdiction"), jurisdiction);
     lab_dom_write(select, LAB_DOM_TEXT, "", empty);
-    int jurisdiction = lab_dom_read(lab_dom_query(lab_dom_closest(select, ".mode-panel"),
-                                                 "select[id$='Jurisdiction']"), LAB_DOM_VALUE, "");
     unsigned count = lab_dom_count(towns), default_index = 0, found_default = 0, previous_exists = 0;
     unsigned mark = lab_dom_mark();
     for (unsigned index = 0; index < count; ++index) {
-        int town = lab_dom_item(towns, index), option = lab_dom_create("option");
+        int town = lab_dom_item(towns, index);
         int value = lab_location_text(lab_dom_get(town, "value"));
         if (!lab_dom_length(value))
             value = lab_dom_format(index, "", "");
-        lab_dom_write(option, LAB_DOM_VALUE, "", value);
+        int option = lab_location_town_option(town, value, jurisdiction);
         previous_exists |= lab_dom_equal(previous, value);
-        int name = lab_dom_get(town, "name");
-        lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_truth(name) ?
-                      lab_location_town_text(lab_location_text(name)) : lab_dom_string("Location"));
-        int country = lab_dom_get(town, "country_code");
-        lab_dom_write(option, LAB_DOM_DATASET, "countryCode", lab_dom_length(country) ? country : jurisdiction);
-        for (unsigned field = 0; field < sizeof attributes / sizeof *attributes; ++field)
-            lab_dom_write(option, LAB_DOM_DATASET, attributes[field], lab_location_text(lab_dom_get(town, attributes[field])));
         if (lab_dom_truth(lab_dom_get(town, "default"))) {
             lab_dom_write(option, LAB_DOM_DATASET, "default", lab_dom_string("1"));
             if (!found_default) {
@@ -236,6 +251,10 @@ void lab_location_populate(node_jsref select, jsref towns, bool select_default)
         }
         lab_dom_append(select, option);
         lab_dom_release(mark);
+    }
+    if (pending && !previous_exists) {
+        lab_dom_append(select, retained);
+        previous_exists = 1;
     }
     int chosen = empty;
     if (select_default && count)
@@ -599,7 +618,29 @@ void lab_location_controls(lab_mode_t mode, bool coordinates)
     lab_dom_return(lab_location_control_nodes(mode, coordinates));
 }
 
-/* Resolve restoration precedence and return only required asynchronous or timezone work to the host. */
+/* Retain a coordinate-validated saved town while its catalogue pages are still unavailable. */
+static bool lab_location_retain_town(node_jsref select, jsref selection, jsref response)
+{
+    int town = lab_dom_get(response, "town");
+    if (!lab_dom_length(lab_dom_get(town, "name")) || !lab_dom_length(lab_dom_get(selection, "value"))) return false;
+    double latitude = lab_menu_index_number(lab_dom_get(town, "latitude"));
+    double longitude = lab_menu_index_number(lab_dom_get(town, "longitude"));
+    if (!(latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180) ||
+        !lab_forms_nearly_equal(latitude, lab_menu_index_number(lab_dom_get(selection, "latitude")), 0.000001) ||
+        !lab_forms_nearly_equal(longitude, lab_menu_index_number(lab_dom_get(selection, "longitude")), 0.000001))
+        return false;
+    int jurisdiction = lab_location_menu_jurisdiction(select);
+    int option = lab_location_town_option(town, lab_dom_get(selection, "value"), jurisdiction);
+    lab_dom_write(option, LAB_DOM_DATASET, "detail", lab_dom_get(response, "detail"));
+    lab_dom_write(option, LAB_DOM_DATASET, "restoredTown", lab_dom_string("1"));
+    lab_dom_write(option, LAB_DOM_DATASET, "restoredJurisdiction", jurisdiction);
+    lab_dom_append(select, option);
+    lab_dom_write(select, LAB_DOM_VALUE, "", lab_dom_get(selection, "value"));
+    lab_select_rebuild(select, 1);
+    return true;
+}
+
+/* Restore selection without dropping saved towns before catalogue hydration. */
 void lab_location_restore(lab_location_restore_stage_t stage, node_jsref select, snapshot_jsref snapshot,
                           jsref selection, jsref response)
 {
@@ -636,6 +677,8 @@ void lab_location_restore(lab_location_restore_stage_t stage, node_jsref select,
                 lab_dom_set(result, "controls", lab_location_control_nodes(mode, 1));
         } else {
             chosen = lab_location_coordinates(select, selection);
+            if (!chosen && stage == LAB_LOCATION_RESTORE_RESPONSE)
+                chosen = lab_location_retain_town(select, selection, response);
             if (!chosen)
                 lab_location_write(select, lab_dom_string(""));
         }

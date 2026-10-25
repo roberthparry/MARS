@@ -9,7 +9,10 @@ reveal the error rather than leaving the worksheet hidden.
 The globe also retains its camera orientation and zoom in browser-local storage,
 independently of the restored observer fields. Native camera validation runs before the
 first globe frame; invalid records fall back to observer centring. Startup town
-hydration does not recenter a restored camera.
+hydration does not recenter a restored camera. Both calendar modes retain a saved
+town whose coordinates match the observer while catalogue pages load. Its official
+metadata replaces the temporary menu entry when available. A newly resolved town
+name refreshes the active worksheet without adding a history entry.
 Writes are debounced during gestures and flushed when hiding or leaving the page,
 so reopening does not reset the zoom. This camera record is separate from the
 worksheet's Back/Forward history and does not change the selected observer.
@@ -160,7 +163,10 @@ overlap matching their fill, including polar gradients, to prevent dark
 antialiasing seams from resembling coordinate lines when the grid is off.
 
 The Almanac's Location cell combines an identified land country and its flag,
-with the town name when selected; there is no separate Country cell. If the country
+with the town name when selected; there is no separate Country cell. Country lookup
+uses the coordinates even without a saved town. Detailed land geometry can resolve
+small gaps in the generalised country outline under the
+[bounded land-gap policy](globe.md#selected-position-countries). If the country
 boundary layer misses a land, coastal or inland-water point, a selected town may
 supply its country only when its stored coordinates match the observer within
 one millionth of a degree. A geographic country match always takes precedence;
@@ -180,6 +186,8 @@ and replies for an obsolete point, date or selection are ignored. A jurisdiction
 default is representative, not a coordinate-level time-zone boundary lookup for
 countries spanning multiple time zones; the zone remains editable. Nautical
 offsets apply only to positively identified inland water outside any jurisdiction.
+Date refreshes for an existing Almanac observer use its town timezone and native
+evaluation, without requesting a capital-city offset that could overwrite it.
 
 Explicit country-menu selections await the country's first town page asynchronously
 before applying the default town. Further pages continue loading in the background;
@@ -212,8 +220,9 @@ Town labels on the globe and Town/Location dropdown rows use the same asynchrono
 flag tooltip cache, including keyboard focus. Rows carry small jurisdiction codes,
 not copies of flag artwork. Globe redraws retain the custom accessible tooltip
 without reintroducing a competing plain browser title.
-Town dropdown labels and tooltips omit GeoNames disambiguation IDs; stored town identities and source
-attribution remain unchanged. Other descriptive parts of a town name are retained.
+Town dropdown labels, globe markers, selection status and tooltips omit GeoNames
+disambiguation IDs; stored town identities and source attribution remain unchanged.
+Other descriptive parts of a town name are retained.
 For a selected catalogue town, the observer crosshair and town label use the same
 catalogue country and flag, avoiding approximate-boundary disagreements at border
 towns. This applies only while the observer coordinates match that town. Custom
@@ -810,7 +819,8 @@ The left-hand Almanac card includes an observer globe, initially centred on the
 entered town or coordinates. Drag or use arrow keys to rotate; scroll, pinch or
 use the plus/minus controls to zoom. Town markers appear at closer scales. Select
 a marker to choose its town, or a point on the globe to use custom coordinates.
-Enter selects the centre point. These selections preserve observer altitude,
+Enter selects the centre point. Town markers apply the selected town's reference
+elevation; custom points preserve the entered observer altitude. Both preserve
 camera orientation and zoom, including after asynchronous country lookup and
 evaluation. Selecting a location through the dropdown still centres the globe.
 “Centre on observer” returns to the entered location without resetting zoom.
@@ -821,8 +831,12 @@ native region remains cached, so switching back on reuses it immediately when su
 1.5 times the cached request zoom selects a smaller region to avoid repeatedly projecting world-wide geometry;
 zooming out requests wider coverage when necessary. Identical
 in-flight requests are shared rather than restarted. Administrative coastlines are not drawn.
-Borders are a true SVG overlay with a one-CSS-pixel, non-scaling stroke, not a
-rasterised texture. Native WebAssembly owns the segment array and projects it using
+Stationary borders use an SVG overlay with a one-CSS-pixel, non-scaling stroke.
+During travel, a separate world layer uses native-generated GPU line geometry,
+so enabled borders remain visible throughout rotation and zoom. The worker prepares
+at most one million short spherical segments (24 MB of vertex data); the GPU cache
+is reused across journeys. GPU shaders clip the hidden hemisphere without generating
+SVG on each frame. Native WebAssembly owns the segment array and projects it using
 the globe camera, including roll, clipping at the horizon and viewport. Long arcs
 are subdivided according to zoom; unchanged camera frames reuse the path. Requests
 are cancellable and bounded to 250,000 segments; malformed or oversized data cannot
@@ -830,7 +844,10 @@ replace the accepted geometry. Missing border data do not disable observer selec
 The `/almanac-borders` endpoint accepts `format: "segments"` for decimal geographic
 segments. `lab_globe_borders_load`, `lab_globe_borders_path` and
 `lab_globe_borders_clear` own, project and release this display-only WASM cache;
-input and generated path text each have a 16 MiB ceiling. Path storage grows with the
+`lab_globe_borders_mesh`, `lab_globe_borders_vertices` and `lab_globe_borders_shader`
+prepare the worker's packed travel layer and its native-owned shader sources.
+The worker releases its temporary geometry after transferring the vertex buffer.
+Input and generated path text each have a 16 MiB ceiling. Path storage grows with the
 visible output rather than allocating that ceiling for every frame, leaving room
 for world-wide border geometry alongside the other application caches.
 `lab_globe_borders_load_region` publishes geometry and coverage atomically;
@@ -1095,19 +1112,25 @@ Town catalogue key refreshes alone cannot interrupt an active journey.
 observer. A mismatched legacy camera recentres north-up while retaining its valid zoom;
 matching cameras retain their pan and roll. This repair occurs on restoration without
 rewriting the history database or removing entries.
-Destination shoreline detail is prefetched and projected before the approach, not
-repeatedly rebuilt for intermediate viewpoints. The global photograph covers the
+Destination shoreline detail is prefetched off-thread. Projection and large stencil
+texture uploads wait until arrival so they cannot stall GPU travel rendering.
+The global photograph covers the
 journey; flight rendering does not parse invisible SVG paths. The duplicate SVG
 surface is hidden whenever WebGL supplies the full surface, avoiding compositor
 repaints beneath its alpha canvas. Travel waits for
 the photographic texture before departure, then accelerates gently. Local vector
 requests do not brake and restart the camera: photographic coverage remains visible
 while they refine it. Slow rendering still limits the display clock and frame steps.
-River and town requests and border projection wait until arrival; only the selected
-marker is drawn during flight. Flight camera updates render in the same animation frame.
+River and town requests and local SVG border projection wait until arrival; enabled
+world borders rotate on the GPU throughout travel, alongside the selected marker.
+Travel starts after its first border buffer is prepared, and later journeys reuse it.
+Flight camera updates render in the same animation frame at up to one drawing pixel
+per CSS pixel; stationary views restore up to 1.5 pixels per CSS pixel. Photographic
+source resolution is unchanged by this reduction in moving-frame GPU work.
 The native pacing bridge limits combined translation, roll and scale motion to
-360 CSS pixels per second, with at most six pixels of motion per frame. It also
-caps elapsed time at 50 milliseconds per frame;
+360 CSS pixels per second, allowing six pixels at 60 Hz, twelve at 30 Hz and at
+most eighteen at 20 Hz. This avoids multiplying journey time on slower displays.
+It caps elapsed time at 50 milliseconds per frame;
 slow rendering never creates catch-up jumps. The global photographic textures load
 before departure, and source-imaged polar ice is preserved
 in both hemispheres. This historical imagery does not represent current sea-ice coverage.
@@ -3478,7 +3501,7 @@ variables from −3 to 3. The output is the principal-value surface
 `u(x,y) = acos(sin(2-x*y))`, with equal coordinate units and the compact
 azimuth, elevation, roll and coordinate-volume zoom controls beneath it.
 
-[![MARS Lab expression mode plotting the principal-value inverse-cosine surface with compact 3-D controls](images/mars-lab/expression.png?v=20261016-full)](images/mars-lab/expression.png?v=20261016-full)
+[![MARS Lab expression mode plotting the principal-value inverse-cosine surface with compact 3-D controls](images/mars-lab/expression.png?v=20261025-full-page)](images/mars-lab/expression.png?v=20261025-full-page)
 
 Function cards use MARS syntax rather than C syntax. A full stop terminates a
 statement, `.` within a statement denotes multiplication, and `/` is printed
@@ -3870,7 +3893,7 @@ The captured input is `(sqrt(x^2+y^2)-2)^2+z^2=1`. The symbolic output is
 `z = ±sqrt(1-(sqrt(x^2+y^2)-2)^2)`; the automatic implicit plot shows the
 complete torus, with equal coordinate units and the retained 3-D controls.
 
-[![MARS Lab equation mode showing a torus and its symbolic height branches in automatic mode](images/mars-lab/equation.png?v=20261016-full)](images/mars-lab/equation.png?v=20261016-full)
+[![MARS Lab equation mode showing a torus and its symbolic height branches in automatic mode](images/mars-lab/equation.png?v=20261025-full-page)](images/mars-lab/equation.png?v=20261025-full-page)
 
 ## Differential-equation mode
 
@@ -3887,7 +3910,7 @@ $\quad\begin{array}{l}\displaystyle y = \frac{C_1(2C_1x+1)}{2C_1x(C_1x+1)+1}.\en
 The zero-slope condition removes one arbitrary constant. The compact TeX
 fraction, representative real solution curves and solver working are shown together.
 
-[![MARS Lab differential-equation mode displaying the modified Emden solution family, representative curves and solver working](images/mars-lab/differential-equation.png?v=20261016-full)](images/mars-lab/differential-equation.png?v=20261016-full)
+[![MARS Lab differential-equation mode displaying the modified Emden solution family, representative curves and solver working](images/mars-lab/differential-equation.png?v=20261025-full-page)](images/mars-lab/differential-equation.png?v=20261025-full-page)
 
 Select **Help** in this mode for the accepted prime, `D`, partial-derivative and
 differential-form notation. Arbitrary constants are preserved when the problem
@@ -4007,21 +4030,21 @@ ordered higher and mixed derivatives and iterated integrals, and is not limited
 to `2 x 2` matrices.
 
 <figure>
-  <a href="images/mars-lab/matrix.png?v=20261016-full"><img src="images/mars-lab/matrix.png?v=20261016-full" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
+  <a href="images/mars-lab/matrix.png?v=20261025-full-page"><img src="images/mars-lab/matrix.png?v=20261025-full-page" alt="MARS Lab evaluating the symbolic matrix power (1 2; 3 4) raised to x"></a>
   <figcaption><em>After clicking <strong>Evaluate</strong>.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-derivative.png?v=20261016-full"><img src="images/mars-lab/matrix-power-derivative.png?v=20261016-full" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
+  <a href="images/mars-lab/matrix-power-derivative.png?v=20261025-full-page"><img src="images/mars-lab/matrix-power-derivative.png?v=20261025-full-page" alt="MARS Lab differentiating the symbolic matrix power with respect to x"></a>
   <figcaption><em>After clicking <strong>x derivative</strong>, with the TeX card at 67% to show the complete matrix.</em></figcaption>
 </figure>
 
 <br>
 
 <figure>
-  <a href="images/mars-lab/matrix-power-integral.png?v=20261016-full"><img src="images/mars-lab/matrix-power-integral.png?v=20261016-full" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
+  <a href="images/mars-lab/matrix-power-integral.png?v=20261025-full-page"><img src="images/mars-lab/matrix-power-integral.png?v=20261025-full-page" alt="MARS Lab integrating the symbolic matrix power with respect to x and displaying the constant matrix"></a>
   <figcaption><em>After clicking <strong>x integral</strong>.</em></figcaption>
 </figure>
 
@@ -4125,7 +4148,7 @@ use the same native beautification pass, including rational radical cancellation
 The infinite endpoint has reduced to its exact limit; the plot shades the
 visible portion of the integration interval under the Gaussian curve.
 
-[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261016-simplified)](images/mars-lab/integrator.png?v=20261016-simplified)
+[![MARS Lab integrator mode showing the Gaussian improper integral with its simplified endpoint and shaded plot](images/mars-lab/integrator.png?v=20261025-full-page)](images/mars-lab/integrator.png?v=20261025-full-page)
 
 ## Datetime mode
 
@@ -4154,7 +4177,7 @@ The native presentation layer supplies and escapes these tooltips for fresh and
 cached results alike; copied text, dates and estimation qualifiers are unchanged.
 No database migration is needed, and unknown names receive no guessed translation.
 
-[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 16 October 2026](images/mars-lab/datetime.png?v=20261016-full)](images/mars-lab/datetime.png?v=20261016-full)
+[![MARS Lab datetime mode showing Shrewsbury calendar and astronomical results for 16 October 2026](images/mars-lab/datetime.png?v=20261025-full-page)](images/mars-lab/datetime.png?v=20261025-full-page)
 
 MARS supplies no shared WeatherAPI account or key. Weather is shown only when
 the person installing MARS Lab creates their own WeatherAPI account, configures
@@ -4183,8 +4206,14 @@ from the local Lab server to WeatherAPI.com over HTTPS. The key is not sent to
 the browser. MARS retains only validated current temperatures in a bounded local
 cache for up to 48 hours, but reuses them only within one hour of both the current
 time and selected moment when a later request fails;
-it does not cache complete responses, forecast arrays, pressure readings or API
-keys. The date and coordinates remain in private local Lab state so that its
+it does not cache complete responses, forecast arrays or API keys. A separate
+64-slot cache retains provider-derived almanac temperature and pressure for
+15 minutes, matching the exact coordinates, GMT moment and elevation. Returning
+to that worksheet uses these conditions immediately while an asynchronous refresh
+runs; a failed refresh retains them until expiry. Each slot is limited to 2 KiB.
+The follow-up uses the initial result's resolved observer fields, including its
+time-zone offset and jurisdiction, so weather cannot restore superseded defaults.
+The date and coordinates remain in private local Lab state so that its
 inputs can be restored. The weather card identifies WeatherAPI.com as its
 source and displays the required end-user warning. Forecasts and conditions are
 probabilistic and may be inaccurate for an exact place or time. Do not use them
@@ -4244,9 +4273,26 @@ model. Without a recent reading, a deliberately rough latitude/season estimate i
 6.5 °C per kilometre of elevation. Its northern seasonal maximum is in July,
 reversed in the southern hemisphere. This has no time-of-day information: it is
 labelled **Rough seasonal assumption** and displayed as an approximate whole-degree
-value, not a local weather prediction. Missing pressure is estimated from elevation
-using a standard atmosphere; available provider pressure is not adjusted a second time.
-[WeatherAPI describes its pressure field as station pressure](https://blog.weatherapi.com/density-altitude-real-time-calculation-weatherapi/).
+value, not a local weather prediction.
+[WeatherAPI describes hourly forecast pressure as mean sea-level pressure](https://blog.weatherapi.com/pressure-tendency-short-term-forecast-logic/).
+Lab interpolates valid bracketing hourly pressures at the selected GMT moment,
+without crossing gaps greater than one hour; otherwise it uses the containing hour.
+It converts this to pressure at the observer's elevation using the tropospheric
+barometric formula, `P = P0 × (1 − Lh/T0)^(gM/(RL))`, with height `h` in metres,
+`L = 0.0065 K/m`, `T0 = 288.15 K`, `g = 9.80665 m/s²`,
+`M = 0.0289644 kg/mol` and `R = 8.31432 J/(mol·K)`.
+`P0` is the provider's sea-level pressure; without it, the fallback is 1013.25 hPa.
+This assumes the standard tropospheric temperature lapse rate, rather than a
+measured vertical temperature profile, and is labelled **estimated pressure at
+observer altitude**. The local weather temperature remains a separate input to refraction.
+The pressure cell shows observer pressure (used for refraction) and the provider's
+sea-level pressure on separate lines, when available; copied results retain both.
+The weather-source cell puts the pressure-estimate note on a separate line beneath the provider description.
+Below-sea-level elevations increase pressure; at sea level it remains unchanged.
+Current-observation pressure is not substituted: its station elevation is unavailable,
+so it cannot reliably be transferred to the observer. Missing hourly pressure uses
+the separately labelled standard-atmosphere estimate. Conditions cached under the
+previous pressure interpretation are not reused.
 The provider's observation site may differ from the observer's exact location or
 elevation. The summary card shows temperature and atmospheric pressure on their
 own line, identifying whether each input comes from weather or an estimate. A
@@ -4262,6 +4308,7 @@ The summary uses nine separate cells in three columns (two on phones): GMT momen
 location, zone, latitude, longitude, observer altitude, temperature, pressure and
 weather source. Coordinates display degrees and decimal minutes to two decimal
 places with compass directions; the calculation retains the original precision.
+Observer altitude is displayed to the nearest whole metre; native calculations use the unrounded `double` value.
 Corrections appear below a subtle divider; copying retains the plain-text summary.
 Location labels omit trailing numeric GeoNames identifiers in the card, observer
 text and clipboard output. Full catalogue names and selection keys retain those
@@ -4270,8 +4317,11 @@ the resolved jurisdiction returned in the result, including an empty jurisdictio
 for an unidentified location, rather than restoring an obsolete submitted country.
 Editing observer altitude still switches a mismatched named town to Custom.
 Evaluate and background weather refresh retain that entered altitude; returned
-calculation fields cannot overwrite it. Selecting a town or an explicit location
-action can still supply a new observer altitude.
+calculation fields cannot overwrite it. Selecting a town from the globe, town list
+or jurisdiction controls applies that town's catalogue reference elevation, replacing
+the previous location's altitude. Selecting a custom globe point retains the entered
+altitude. Catalogue heights describe reference coordinates, not every point in a town;
+an explicit location action can also supply a new observer altitude.
 
 Temperature changes refraction, not parallax. Below −0.575° the displayed altitude
 receives no refraction correction. The native globe hit-test classifies the
@@ -4379,14 +4429,15 @@ date and time in GMT, matching the worksheet inputs. Its label and event contact
 times remain local civil time, and the destination's zone remains selected for
 display. A non-zero zone must not shift the observation away from totality.
 
-The captured request is for London at `2026-10-16 12:00:00` GMT, at an observer
+The captured request is for London at `2026-10-25 12:00:00` GMT, at an observer
 elevation of 25 metres. The globe and observer controls appear beside the
 navigational-body table, including bodies below the horizon. The summary identifies
-London as land and shows the weather inputs used for refraction; sea-horizon dip
-is therefore excluded. Weather values reflect the captured response and may vary
+London as land and shows both the estimated observer pressure used for refraction
+and WeatherAPI's sea-level pressure; sea-horizon dip is therefore excluded.
+Weather values reflect the captured response and may vary
 when the request is repeated.
 
-[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261019-full-page)](images/mars-lab/almanac.png?v=20261019-full-page)
+[![Full-page MARS Lab Almanac showing the London observer globe, land classification, weather inputs, corrected body altitudes and upcoming events](images/mars-lab/almanac.png?v=20261025-pressure-lines)](images/mars-lab/almanac.png?v=20261025-pressure-lines)
 
 ## Mobile and private remote access
 

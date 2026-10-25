@@ -410,10 +410,16 @@ Neither candidate is installed. The old river candidate and journal remain untou
 name, released with `string_free`, or NULL if unavailable or ambiguous. The
 administrative polygons determine coverage independently of shoreline availability
 and land/water classification. Harbour water, inland water and the 500-metre
-near-shore band do not suppress a covered country's name or flag code. Missing,
-uncovered or overlapping administrative geometry still returns no country; there
-is no nearest-country fallback or invented maritime buffer. This does not change
-the selected jurisdiction or the land/water classification.
+near-shore band do not suppress a covered country's name or flag code. If a point
+falls outside every administrative polygon, an exact detailed-shoreline test can
+confirm that it is land despite the generalised country outline. An indexed search
+then accepts a country only if its outline is within one kilometre and no other
+country's outline occurs within that distance. This covers small coastal gaps such
+as central Juneau without a saved town or selected jurisdiction. Water, missing
+shoreline, administrative border points, overlapping polygons and competing nearby
+countries do not use this fallback. Distances use the same local tangent-plane
+approximation as shoreline proximity queries. No maritime buffer is introduced,
+and the land/water classification remains unchanged.
 `globe_has_layer(globe, GLOBE_LAYER_COUNTRIES)` reports administrative-layer availability.
 `globe_country_code_at()` returns the independently resolved ISO alpha-2 code, or a UK constituent-country code
 such as `GB-WLS` or `GB-SCT`.
@@ -429,8 +435,9 @@ Other map units retain the source's de facto boundary policy; this is not a
 worldwide conversion to UN-recognised boundaries. Names are indicative and are
 not legal or navigational determinations. This country correction does not
 alter civil time-zone rules or reinterpret occupation as sovereignty.
-The detailed shoreline remains unchanged. Small islands and border locations
-can lack an answer at this administrative scale.
+The detailed shoreline remains unchanged. Robben Island and Seal Island in False Bay
+have their complete packaged shoreline rings added to South Africa's country polygon.
+Other small islands and border locations can still lack an answer at this administrative scale.
 
 `globe_import_countries(db, shapes, attributes)` imports open SHP/DBF streams in
 a savepoint, preserving unrelated tables and rolling back malformed input.
@@ -500,7 +507,7 @@ data and revision. Restart the Lab and reload the page to discard cached country
 Source: [Natural Earth admin-0 map units](https://naturalearth.s3.amazonaws.com/10m_cultural/ne_10m_admin_0_map_units.zip),
 [public-domain terms](https://www.naturalearthdata.com/about/terms-of-use/).
 The DBF attribute stream remains unchanged. The SHP retains all 298 map-unit
-records and their ordering; only the UA and RU geometries are replaced from the
+records and their ordering; the UA and RU geometries are replaced from the
 pinned [5.1.1 Ukrainian viewpoint SHP](https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.1/10m_cultural/ne_10m_admin_0_countries_ukr.shp)
 and [matching DBF](https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.1/10m_cultural/ne_10m_admin_0_countries_ukr.dbf).
 `tools/mars_config/country_compose.c` performs this offline composition using the
@@ -511,11 +518,26 @@ the original map-unit DBF and compress the resulting SHP with Zstandard level 19
 It neither downloads data nor opens installed databases. The globe importer and
 country regression tests validate the composed polygons before publication.
 
+`tools/mars_config/country_islands.c` appends the complete Robben Island and False Bay
+Seal Island rings from the packaged October 2026 shoreline to the ZA record. It reads
+a plain globe database without writing to it, rejects clipped or multiple rings and
+duplicate additions, and writes a new SHP. The preparation windows are
+18.34, −33.83, 18.39, −33.78 and 18.578, −34.14, 18.587, −34.13
+(west, south, east, north). These windows select geometry; they are not country boundaries.
+The two additions contain 119 and 21 closed-ring vertices respectively. All existing
+vertices, record ordering and DBF attributes are retained. Managed globe revision 7
+imports the updated countries without rebuilding shoreline, rivers or textures;
+jurisdiction revision 5 adds both names with Africa/Johannesburg time rules while
+preserving existing town IDs and defaults.
+Jurisdiction revision 6 adds Duiker Island near Hout Bay as a separate location,
+also using Africa/Johannesburg; its mapped land already resolves to South Africa.
+
 Original map-unit archive SHA-256: `45bebe2aaf8bf42b9daf4428594925bcb11eabd32fe9dc6e0acf681438053eb5`.
 Original compressed SHP SHA-256: `58c3b3b36ebb1ef48d9e375f7c743db90a8b82fae093c64c1d1e269a808a7729`.
 Viewpoint SHP SHA-256: `ec923b81a27e36efce7bb293c45ce87134f967330ef137d04e1be9c4940b6d82`.
 Viewpoint DBF SHA-256: `4fe3184c24f5cb7516aee1c20ebc6326a3ad6c2158cf844bcb5a1620c3670862`.
-Corrected compressed SHP SHA-256: `b7deb7448e69864e898728530a5df345d492fd2db7d4a6e8f4531e12ad7cb66c`.
+Ukraine-viewpoint compressed SHP SHA-256: `b7deb7448e69864e898728530a5df345d492fd2db7d4a6e8f4531e12ad7cb66c`.
+Packaged SHP including the two South African islands SHA-256: `b1e2a1359e29dd4a35a4b2f482e84f3705295f3bf8e0b41d7ab4f44b0e38fb83`.
 Packaged DBF SHA-256: `49b3ac0ff0d35a70d6a2d9502a32f45d2df460c7224988e4fe34942401c3c99f`.
 
 Town batches use the same elevation fallback as the jurisdiction catalogue:

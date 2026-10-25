@@ -1,15 +1,16 @@
 /**
  * @file globe_worker.ts
- * @brief Isolated WASM shoreline admission and SVG projection worker.
+ * @brief Isolated WASM shoreline admission, projection and travel-border preparation.
  *
  * Reuses the native host bridge without accessing the DOM. Fetch delivers opaque chunks directly into
  * native HTTP receiver storage; requests, Protobuf decoding and geometry admission remain native.
  * Message identifiers allow projections of retained geometry while an asynchronous download is pending.
+ * World-border meshes use separate native storage and transfer packed vertices without main-thread parsing.
  */
 interface GlobeWorkerRequest {
     id: number;
-    entry: 'fetch' | 'cancel' | 'lab_globe_shore_svg' | 'lab_globe_shore_frame';
-    args: (number | number[])[];
+    entry: 'fetch' | 'cancel' | 'lab_globe_shore_svg' | 'lab_globe_shore_frame' | 'lab_globe_borders_mesh';
+    args: (number | number[] | string)[];
     geometry?: number;
 }
 
@@ -33,13 +34,22 @@ class GlobeProjectionWorker {
         try {
             await this.ready;
             if (!request || !Number.isSafeInteger(request.id) || request.id < 1 || !Array.isArray(request.args) ||
-                !['fetch', 'cancel', 'lab_globe_shore_svg', 'lab_globe_shore_frame'].includes(request.entry))
+                !['fetch', 'cancel', 'lab_globe_shore_svg', 'lab_globe_shore_frame', 'lab_globe_borders_mesh'].includes(request.entry))
                 throw new Error('Invalid shoreline worker operation');
             if (request.entry === 'cancel') {
                 if (this.active?.id === request.id) this.cancel();
                 return;
             }
             const started = performance.now();
+            if (request.entry === 'lab_globe_borders_mesh') {
+                const count = labDOM.call('lab_globe_borders_mesh', ...request.args) as number;
+                if (!count) throw new Error('Travel borders unavailable');
+                const native = labWire.exports();
+                const vertices = new Float32Array(native.memory.buffer, native.lab_globe_borders_vertices(), count * 3).slice();
+                labDOM.call('lab_globe_borders_clear');
+                this.port.postMessage({id: request.id, value: vertices}, [vertices.buffer]);
+                return;
+            }
             const value = request.entry === 'fetch' ? await this.fetchRegion(request) :
                 request.geometry === this.geometry ? labDOM.call(request.entry, ...request.args) : null;
             if (request.entry === 'lab_globe_shore_frame' && typeof value === 'string') {

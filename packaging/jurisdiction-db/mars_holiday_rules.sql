@@ -1465,6 +1465,7 @@ values
 .read packaging/jurisdiction-db/mars_timezone_rules.sql
 .read packaging/jurisdiction-db/mars_jurisdiction_location_defaults.sql
 .read packaging/jurisdiction-db/mars_jurisdiction_towns.sql
+.read packaging/jurisdiction-db/location_additions.sql
 
 insert into source_document(
     source_document_id,

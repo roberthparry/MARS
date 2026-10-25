@@ -346,6 +346,7 @@ class LabApplication {
     }
 
     private async refreshTownMenus(): Promise<void> {
+        const resolved = new Set<string>();
         try {
             while (this.pendingTownCodes.size) {
                 // Yield to browser input/painting even when catalogue fetches are satisfied immediately.
@@ -359,6 +360,7 @@ class LabApplication {
                     const selection = WorksheetLocations.townSelection;
                     if (!changed.has(code) && !changed.has(code.split('-')[0])) continue;
                     const select = document.getElementById(`${mode}Town`) as WorksheetSelect;
+                    const previous = select.value;
                     const current = () => !this.lifetime.signal.aborted && jurisdiction.value === code;
                     await selection.populateTownSelect(select, code, {selectDefault: false, isCurrent: current});
                     if (!current()) continue;
@@ -366,10 +368,13 @@ class LabApplication {
                     const longitude = document.getElementById(`${mode}Longitude`) as HTMLInputElement;
                     if (!selection.selectTownByCoordinates(select, latitude.value, longitude.value)) select.value = '';
                     WorksheetLocations.selects.syncSelection(select);
+                    if (!previous && select.value) resolved.add(mode);
                     await new Promise<void>(resolve => window.setTimeout(resolve, 0));
                 }
             }
         } finally { this.townRefresh = null; }
+        if (resolved.has(WorksheetWorkspace.mode.currentMode()))
+            void WorksheetWorkspace.mode.evaluateCurrentMode({skipHistoryUpdate: true});
     }
 
     private decodeResponse(response: MarsTransportResponse): Promise<unknown> {

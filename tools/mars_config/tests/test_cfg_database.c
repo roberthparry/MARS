@@ -211,7 +211,23 @@ static bool test_cfg_database_towns_fixture(const char *directory)
     ok = ok && db && entry &&
          sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
          cfg_database_import(db, root, entry) &&
-         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50033") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50036") &&
+         cfg_database_source(db, root, "packaging/jurisdiction-db/location_additions.sql", false) &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town", "50036") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town t JOIN jurisdiction_town_timezone z USING(jurisdiction_town_id) "
+             "WHERE t.jurisdiction_id='ZA' AND t.town_name IN('Robben Island','Seal Island','Duiker Island') "
+             "AND z.timezone_code=24", "3") &&
+         test_cfg_database_query(db,
+             "SELECT a.latitude||'|'||b.longitude FROM jurisdiction_town t "
+             "JOIN jurisdiction_town_latitude a USING(jurisdiction_town_id) "
+             "JOIN jurisdiction_town_longitude b USING(jurisdiction_town_id) "
+             "WHERE t.jurisdiction_id='ZA' AND t.town_name='Duiker Island'", "-34.05861|18.32694") &&
+         test_cfg_database_query(db,
+             "SELECT a.latitude||'|'||b.longitude FROM jurisdiction_town t "
+             "JOIN jurisdiction_town_latitude a USING(jurisdiction_town_id) "
+             "JOIN jurisdiction_town_longitude b USING(jurisdiction_town_id) "
+             "WHERE t.jurisdiction_id='ZA' AND t.town_name='Seal Island'", "-34.1375|18.5825") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town t JOIN jurisdiction_town_timezone z USING(jurisdiction_town_id) "
              "WHERE z.timezone_code=268 AND t.jurisdiction_id='UA'", "45") &&
@@ -242,7 +258,7 @@ static bool test_cfg_database_towns_fixture(const char *directory)
              "SELECT count(*) FROM jurisdiction_town_elevation WHERE elevation_metres='-9999'", "0") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town t LEFT JOIN jurisdiction_town_elevation e "
-             "USING(jurisdiction_town_id) WHERE e.jurisdiction_town_id IS NULL", "10") &&
+             "USING(jurisdiction_town_id) WHERE e.jurisdiction_town_id IS NULL", "12") &&
          test_cfg_database_query(db,
              "SELECT latitude||'|'||longitude||'|'||coalesce(elevation_metres,'0') FROM jurisdiction_town "
              "JOIN jurisdiction_town_latitude USING(jurisdiction_town_id) "
@@ -952,6 +968,14 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && db && sqlite_exec_cstr(db,
         "create table jurisdiction(jurisdiction_id text primary key,jurisdiction_type text,iso_country_code text);"
         "insert into jurisdiction values('GB','country','GB');"
+        "insert into jurisdiction values('ZA','country','ZA');"
+        "create table jurisdiction_town(jurisdiction_town_id integer primary key,jurisdiction_id,town_name);"
+        "create table jurisdiction_town_latitude(jurisdiction_town_id integer primary key,latitude);"
+        "create table jurisdiction_town_longitude(jurisdiction_town_id integer primary key,longitude);"
+        "create table jurisdiction_town_elevation(jurisdiction_town_id integer primary key,elevation_metres);"
+        "create table jurisdiction_town_timezone(jurisdiction_town_id integer primary key,timezone_code);"
+        "create table timezone_code(timezone_name,timezone_code);"
+        "insert into timezone_code values('Africa/Johannesburg',24);"
         "create table retained(value);insert into retained values(42)");
     sqlite_close(db);
     file_t *config_directory = test_cfg_database_file(directory, "config");
@@ -977,11 +1001,14 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && cfg_databases_update() == 0 &&
          !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "4") &&
-         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "17") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "6") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "18") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_town where jurisdiction_id='ZA' "
+                                   "and town_name in ('Robben Island','Seal Island','Duiker Island')", "3") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_town_timezone where timezone_code=24", "3") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction where jurisdiction_id='ZZ-SEA'", "0") &&
          test_cfg_database_query(db, "select value from retained", "42") &&
-         cfg_database_revision(db, "jurisdiction", 5);
+         cfg_database_revision(db, "jurisdiction", 7);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
          cfg_databases_update() == 1;
@@ -1066,11 +1093,26 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
     string_t *code = globe_country_code_at(globe, 44.95, 34.1);
     ok = ok && code && !strcmp(string_c_str(code), "UA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "6") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "7") &&
          test_cfg_database_query(db, "select count(distinct iso_country_code) from region_name", "14") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "7") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained") &&
          test_cfg_database_query(db, "select count(*) from country_name", "298");
+    string_free(code); globe_close(globe); sqlite_close(db);
+    /* A revision-six installation already owns its images: refresh countries without importing them again. */
+    db = ok ? test_cfg_database_open(database, key) : NULL;
+    ok = ok && db && cfg_database_revision(db, "globe", 6) && sqlite_exec_cstr(db,
+        "update country_name set iso_country_code='' where iso_country_code='ZA'");
+    sqlite_close(db);
+    file_t *manifest = test_cfg_database_file(directory, "packaging/globe-db/textures/manifest.json");
+    ok = ok && manifest && file_delete(manifest) && !cfg_databases_update();
+    file_free(manifest);
+    db = ok ? test_cfg_database_open(database, key) : NULL;
+    globe = db ? globe_open_databases(db, db, NULL) : NULL;
+    code = globe_country_code_at(globe, -33.8064, 18.3688);
+    ok = ok && code && !strcmp(string_c_str(code), "ZA") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "7") &&
+         test_cfg_database_query(db, "select source from rivers_dataset", "retained");
     string_free(code); globe_close(globe); sqlite_close(db);
     /* A current database must remain usable even when the migration sources are no longer available. */
     string_t *missing = string_sprintf("%s/missing", directory);
@@ -1207,7 +1249,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "SELECT count(*) FROM country_name", "298") &&
          test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "6") &&
+         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "7") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
                                     "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
          test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
@@ -1220,7 +1262,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
          test_cfg_database_query(db, "select value from retained", "42") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "6");
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "7");
     sqlite_close(db);
     /* Country metadata is independent of town selection and land/water classification. */
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1249,7 +1291,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_coast_sydney(db) && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "select count(*) from country_name", "298") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "6") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "7") &&
          test_cfg_database_query(db, "select count(*) from sqlite_master where name in ('retained','rivers_dataset')", "0") &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_KEY", key) &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_PATH", file_path(database)) &&

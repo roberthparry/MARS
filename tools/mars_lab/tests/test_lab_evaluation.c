@@ -16,11 +16,13 @@
 #include <string.h>
 #include <time.h>
 
-#define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
-#include "internal/lab_evaluate_internal.h"
+#include "almanac-t.h"
+#include "file-t.h"
+#include "number-t.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
-#include "number-t.h"
+#define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
+#include "internal/lab_evaluate_internal.h"
 #define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
 #include "test_harness.h"
@@ -201,8 +203,10 @@ static void check_weather_local_day(void)
         "{\"time_epoch\":1792800000,\"temp_c\":12,\"pressure_mb\":1009}]}]}}");
     TEST_ASSERT_INT_EQ(lab_cal_weather_day_shift(options, weather), 0);
     lab_cal_observing_conditions(options, weather);
+    double pressure = 0;
     TEST_ASSERT_TRUE(strstr(lab_cal_text(options, "weather_source"), "hourly interpolation") &&
-                     !strcmp(lab_cal_text(options, "pressure_hpa"), "1008.000000") &&
+                     lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) &&
+                     pressure > 1003.3 && pressure < 1003.5 &&
                      !strcmp(lab_cal_text(options, "date"), "2026-10-23") &&
                      !strcmp(lab_cal_text(options, "time"), "23:06:19"),
                      "next local day supplies conditions without changing the selected GMT moment");
@@ -217,22 +221,88 @@ static void check_weather_local_day(void)
     json_free(weather); json_free(options);
 }
 
+/* Known highland and coastal cases distinguish sea-level input from the pressure used by refraction. */
+static void check_weather_observer_pressure(void)
+{
+    json_t *options = test_lab_json(
+        "{\"date\":\"2000-01-01\",\"time\":\"12:30:00\",\"lat\":\"-26.2023\",\"elevation\":\"1767\","
+        "\"lon\":\"28.0436\",\"zone\":\"2\",\"visibility\":\"all\",\"defer_events\":\"true\"}");
+    json_t *weather = test_lab_json(
+        "{\"current\":{\"last_updated_epoch\":946729800,\"temp_c\":30.4,\"pressure_mb\":850},"
+        "\"forecast\":{\"forecastday\":[{\"hour\":["
+        "{\"time_epoch\":946728000,\"temp_c\":30,\"pressure_mb\":1012},"
+        "{\"time_epoch\":946731600,\"temp_c\":30.8,\"pressure_mb\":1014}]}]}}");
+    double pressure = 0;
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) &&
+                     pressure > 818.0 && pressure < 818.1 &&
+                     !strcmp(lab_cal_text(options, "temperature_c"), "30.400000"),
+                     "Johannesburg uses interpolated sea-level pressure and current temperature at 1767 metres");
+    double refraction = almanac_refraction_degrees(5, 30.4, pressure);
+    double sea_level_refraction = almanac_refraction_degrees(5, 30.4, 1013);
+    TEST_ASSERT_TRUE(refraction > 0 && refraction < sea_level_refraction * 0.82 &&
+                     refraction > sea_level_refraction * 0.80,
+                     "observer pressure reduces Johannesburg refraction by about nineteen per cent");
+    json_t *fields = test_lab_json("{\"snapshot\":\"MOON|Moon|moon|0|0|0|0|0|1|0.5|0|0|0|0|YES|0|0|0|10|20|0.5\"}");
+    unsigned status = 200;
+    json_t *response = lab_cal_almanac(fields, options, &status);
+    const char *pressures = "818 hPa (observer)\n1013 hPa (sea level)";
+    const json_t *cell = json_array_get(lab_cal_get(response, "observer_summary"), 7);
+    TEST_ASSERT_TRUE(status == 200 && !strcmp(lab_cal_text(cell, "value"), pressures),
+                     "summary distinguishes estimated observer pressure from sea-level pressure");
+    const char *variants[] = {"all", "visible"};
+    for (unsigned i = 0; i < sizeof variants / sizeof *variants; ++i) {
+        const json_t *rendered = lab_cal_get(lab_cal_get(response, "almanac_presentation"), variants[i]);
+        TEST_ASSERT_TRUE(strstr(lab_cal_text(rendered, "html"), pressures) &&
+                         strstr(lab_cal_text(rendered, "copy_text"), pressures),
+                         "both body-list variants and copied worksheet retain both pressure references");
+    }
+    json_free(response);
+    json_free(fields);
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) &&
+                     pressure > 818.0 && pressure < 818.1,
+                     "repeated evaluations do not apply elevation twice");
+    lab_cal_set(options, "elevation", "0");
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(!strcmp(lab_cal_text(options, "pressure_hpa"), "1013.000000"),
+                     "sea-level observer retains interpolated hourly pressure, not nearby station pressure");
+    lab_cal_set(options, "elevation", "-400");
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) && pressure > 1013,
+                     "below-sea-level observer pressure increases");
+    lab_cal_set(options, "elevation", "1767");
+    lab_cal_set(options, "time", "15:00:00");
+    lab_cal_observing_conditions(options, weather);
+    TEST_ASSERT_TRUE(lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) &&
+                     pressure > 818 && pressure < 819 &&
+                     !*lab_cal_text(options, "pressure_msl_hpa") &&
+                     strstr(lab_cal_text(options, "weather_source"), "standard atmosphere"),
+                     "out-of-hour pressure falls back to the standard atmosphere at observer elevation");
+    json_free(weather);
+    json_free(options);
+}
+
 static void test_lab_observing_conditions(void)
 {
     check_weather_local_day();
+    check_weather_observer_pressure();
     json_t *options = test_lab_json(
         "{\"date\":\"2000-01-01\",\"time\":\"12:30:00\",\"lat\":\"50\",\"elevation\":\"2000\"}");
     json_t *weather = test_lab_json(
         "{\"forecast\":{\"forecastday\":[{\"hour\":["
         "{\"time_epoch\":946724400,\"temp_c\":40,\"pressure_mb\":1000},"
-        "{\"time_epoch\":946728000,\"temp_c\":3,\"pressure_mb\":790}]}]}}");
+        "{\"time_epoch\":946728000,\"temp_c\":3,\"pressure_mb\":1000}]}]}}");
     lab_cal_observing_conditions(options, weather);
     double temperature = NAN, pressure = NAN;
     bool ok = lab_cal_number(lab_cal_text(options, "temperature_c"), &temperature) && temperature == 3 &&
-              lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) && pressure == 790 &&
+              lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) &&
+              pressure > 784.5 && pressure < 784.6 &&
               !strcmp(lab_cal_text(options, "atmosphere_note"),
-                      "Temperature: 3.0 °C · Pressure: 790 hPa · Source: WeatherAPI hourly value");
-    TEST_ASSERT_TRUE(ok, "UTC observation hour supplies both temperature and unmodified station pressure");
+                      "Temperature: 3.0 °C · Pressure: 785 hPa (observer)\n1000 hPa (sea level) · "
+                      "Source: WeatherAPI hourly value\n"
+                      "estimated pressure at observer altitude");
+    TEST_ASSERT_TRUE(ok, "UTC hourly sea-level pressure is converted before display and refraction");
     json_free(weather);
     weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"hour\":["
                             "{\"time_epoch\":946728000,\"temp_c\":3,\"pressure_mb\":-1}]}]}}");
@@ -246,15 +316,16 @@ static void test_lab_observing_conditions(void)
     TEST_ASSERT_TRUE(ok, "weather for a different hour is not reused");
     json_free(weather);
     weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"hour\":["
-                            "{\"time_epoch\":946728000,\"temp_c\":999,\"pressure_mb\":790}]}]}}");
+                            "{\"time_epoch\":946728000,\"temp_c\":999,\"pressure_mb\":1000}]}]}}");
     lab_cal_set(options, "time", "12:30:00");
     lab_cal_observing_conditions(options, weather);
-    ok = lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) && pressure == 790 &&
+    ok = lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure) && pressure > 700 && pressure < 800 &&
+         strstr(lab_cal_text(options, "weather_source"), "estimated pressure at observer altitude") &&
          strstr(lab_cal_text(options, "atmosphere_note"), "Rough seasonal assumption") && ok;
-    TEST_ASSERT_TRUE(ok, "invalid temperature alone retains provider pressure");
+    TEST_ASSERT_TRUE(ok, "invalid temperature does not prevent the lapse-rate conversion of valid sea-level pressure");
     json_free(weather);
     weather = test_lab_json("{\"forecast\":{\"forecastday\":[{\"hour\":["
-                            "{\"time_epoch\":946728000,\"temp_c\":10,\"pressure_mb\":790}]},"
+                            "{\"time_epoch\":946728000,\"temp_c\":10,\"pressure_mb\":1000}]},"
                             "{\"hour\":[{\"time_epoch\":946731600,\"temp_c\":20}]}]}}");
     lab_cal_observing_conditions(options, weather);
     TEST_ASSERT_TRUE(!strcmp(lab_cal_text(options, "temperature_c"), "15.000000") &&
@@ -318,7 +389,8 @@ static bool weather_cache_fixture(const char *directory)
     json_t *weather = json_from_text(source);
     string_free(source);
     lab_cal_observing_conditions(options, weather);
-    bool ok = !strcmp(lab_cal_text(options, "weather_source"), "WeatherAPI") &&
+    bool ok = !strcmp(lab_cal_text(options, "weather_source"),
+                      "WeatherAPI\nestimated pressure (standard atmosphere)") &&
               !strcmp(lab_cal_text(options, "temperature_c"), "8.300000");
     if (!ok) string_fprintf(stderr, "Current observation failed: %s\n", lab_cal_text(options, "weather_source"));
     lab_cal_weather_remember(options, weather, now);
@@ -375,6 +447,70 @@ static void test_lab_weather_recent_estimate(void)
 {
     TEST_ASSERT_TRUE(test_lab_isolated(weather_cache_fixture),
                      "current UTC observations and location-matched estimates expire strictly at 48 hours");
+}
+
+static bool weather_conditions_fixture(const char *directory)
+{
+    time_t now = time(NULL);
+    json_t *options = test_lab_json("{\"lat\":\"58.30183\",\"lon\":\"-134.41972\",\"elevation\":\"18\","
+                                    "\"date\":\"2026-10-25\",\"time\":\"10:13:46\",\"temperature_c\":\"-0.4\","
+                                    "\"pressure_hpa\":\"1025\",\"pressure_msl_hpa\":\"1027\","
+                                    "\"weather_source\":\"WeatherAPI hourly interpolation\","
+                                    "\"atmosphere_note\":\"Provider conditions\"}");
+    /* A legacy entry must be rejected even when fresh and otherwise matched exactly. */
+    string_t *legacy_key = string_sprintf("%.17g|%.17g|%.17g|%.17g", 58.30183, -134.41972, 18.0,
+                                          lab_cal_weather_epoch(options));
+    string_t *cache_path = string_sprintf("%s/lab/weather-cache", directory);
+    file_t *cache = file_new(cache_path);
+    bool ok = file_create_directory(cache, 0700, true);
+    string_t *legacy_path = string_sprintf("%s/conditions-%02lu.json", string_c_str(cache_path),
+                                           string_hash(legacy_key) % 64);
+    file_t *legacy_file = file_new(legacy_path);
+    lab_cal_set(options, "key", string_c_str(legacy_key));
+    string_t *retrieved = string_sprintf("%lld", (long long)now);
+    lab_cal_set(options, "retrieved", string_c_str(retrieved));
+    string_t *legacy_record = json_to_string(options);
+    ok = ok && file_write_all_text(legacy_file, legacy_record) &&
+         !lab_cal_weather_conditions_restore(options, now);
+    file_free(legacy_file);
+    file_free(cache);
+    string_free(legacy_record);
+    string_free(retrieved);
+    string_free(legacy_path);
+    string_free(cache_path);
+    string_free(legacy_key);
+    lab_cal_weather_conditions_remember(options, now);
+    lab_cal_observing_conditions(options, NULL);
+    ok = ok && lab_cal_weather_conditions_restore(options, now + 899) &&
+              !strcmp(lab_cal_text(options, "temperature_c"), "-0.4") &&
+              !strcmp(lab_cal_text(options, "pressure_hpa"), "1025") &&
+              !strcmp(lab_cal_text(options, "pressure_msl_hpa"), "1027") &&
+              !strcmp(lab_cal_text(options, "weather_source"), "WeatherAPI hourly interpolation");
+    ok = ok && !lab_cal_weather_conditions_restore(options, now + 900) &&
+         !lab_cal_weather_conditions_restore(options, now - 1);
+    static const char *const keys[] = {"lat", "lon", "elevation", "date", "time"};
+    static const char *const changed[] = {"58.30184", "-134.41973", "19", "2026-10-24", "10:13:47"};
+    for (unsigned i = 0; i < sizeof keys / sizeof *keys; ++i) {
+        string_t *saved = string_new_with(lab_cal_text(options, keys[i]));
+        lab_cal_set(options, keys[i], changed[i]);
+        ok = ok && !lab_cal_weather_conditions_restore(options, now);
+        lab_cal_set(options, keys[i], string_c_str(saved));
+        string_free(saved);
+    }
+    lab_cal_set(options, "weather_source", "Rough seasonal assumption");
+    lab_cal_set(options, "temperature_c", "7");
+    lab_cal_weather_conditions_remember(options, now + 100);
+    ok = ok && lab_cal_weather_conditions_restore(options, now + 101) &&
+         !strcmp(lab_cal_text(options, "temperature_c"), "-0.4") &&
+         !lab_cal_weather_conditions_restore(options, now + 900);
+    json_free(options);
+    return ok;
+}
+
+static void test_lab_weather_conditions_cache(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(weather_conditions_fixture),
+                     "exact provider conditions survive history revisits and failed refreshes, but expire after 15 minutes");
 }
 
 static void test_lab_integrator_deadline_policy(void)
@@ -490,4 +626,5 @@ void test_lab_evaluation_cases(void)
     TEST_RUN_IN_GROUP(test_lab_calendar_validation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_observing_conditions, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_weather_recent_estimate, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_weather_conditions_cache, tests, NULL);
 }

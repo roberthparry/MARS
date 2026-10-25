@@ -5,6 +5,8 @@
  * Owns copied town records in array_t and dictionary_t. Browser consumers receive
  * transient snapshots; no scoped browser handles survive a call. Each page owns
  * one catalogue, shared by menus and the globe.
+ * Globe place snapshots expose displayName and fullName without numeric GeoNames suffixes;
+ * the nested town record keeps its original name and selection key for identity and restoration.
  * Each entry point dispatches synchronously through the service's private singleton. Browser handles
  * require the owning non-shared WASM instance; native dispatch serialises complete operations with a mutex.
  */

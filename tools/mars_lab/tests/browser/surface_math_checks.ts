@@ -511,6 +511,25 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
           'native array stores a town batch');
     check(labDOM.call('lab_town_store_add', 'ZZ', townBatch) === 0,
           'native dictionary deduplicates catalogue rows');
+    const sourceNames = ['Heidelberg (GeoNames 123)', 'Heidelberg (GeoNames 456)',
+        'Newport (Harbour) (GeoNames 789)'];
+    check(labDOM.call('lab_town_store_add', 'ZA', sourceNames.map(name => town(name, '-34', '18'))) === 3,
+          'same-name towns retain independent catalogue keys');
+    const labelledGlobe = MarsAlmanacGlobe as unknown as {
+        townLabel(place: GlobeTown, zoom: number, available: number): {name: string; full: string; width: number}
+    };
+    for (const [i, sourceName] of sourceNames.entries()) {
+        const place = labDOM.call('lab_town_store_get', 'ZA', sourceName) as GlobeTown;
+        const expected = i < 2 ? 'Heidelberg' : 'Newport (Harbour)';
+        check(place.town.name === sourceName && place.town.value === sourceName &&
+              place.displayName === expected && place.fullName === expected,
+              'native display names hide GeoNames IDs without rewriting catalogue identity');
+        for (const zoom of [3, 16]) {
+            const label = labelledGlobe.townLabel(place, zoom, 600);
+            check(label.name === expected && label.full === expected && label.width === 128,
+                  'globe markers and accessible names omit IDs without treating them as expanded names');
+        }
+    }
     townBatch[0].name = 'mutated browser input';
     const retained = labDOM.call('lab_town_store_get', 'ZZ', 'Native western') as {town: LabTown};
     check(retained.town.name === 'Native western', 'town storage owns its strings independently of input objects');
@@ -920,10 +939,22 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 const shifted = labDOM.call('lab_globe_project', centre[0], centre[1], b.slice(0, 4)) as number[];
                 const pixels = Math.hypot(shifted[0], shifted[1]) * b[4] * 800 / 2.24;
                 const scale = Math.abs(Math.log(b[4] / a[4])) * 400;
-                check(next > progress && pixels + scale <= 6.001,
-                      'ordinary and redirected flights bound motion to six pixels even after a slow frame');
+                check(next > progress && pixels + scale <= 18.001,
+                      'ordinary and redirected flights bound motion to 18 pixels even after a slow frame');
             }
         }
+        const durations: number[] = [];
+        for (const rate of [60, 30, 20]) {
+            let progress = 0, frames = 0;
+            while (progress < 1 && frames < rate * 120) {
+                progress = labDOM.call('lab_globe_flight_advance', maxStart, maxEnd, progress, 1000 / rate, 800) as number;
+                ++frames;
+            }
+            check(progress === 1, `close-view travel completes at ${rate} Hz`);
+            durations.push(frames / rate);
+        }
+        check(Math.max(...durations) - Math.min(...durations) < 1,
+              `render rate does not multiply the journey time: ${durations.join(', ')}`);
         for (const [name, fromLat, fromLon, toLat, toLon] of globeFlightRoutes) {
             for (const [fromZoom, toZoom] of [[1, 150], [150, 20], [150, 512]]) {
                 const a = [...labDOM.call('lab_globe_centre', fromLat, fromLon) as number[], fromZoom];
@@ -2085,8 +2116,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             selectedLabel!.click();
             labDOM.call('lab_workspace_dom_busy', 0, null, [], []);
             check(town.value === place!.value && latitude.value === place!.latitude && longitude.value === place!.longitude &&
-                  elevation.value === '50' && evaluations === beforeTownClick + 1,
-                  'one town click immediately selects its observer and evaluates once without changing elevation');
+                  elevation.value === place!.elevation && evaluations === beforeTownClick + 1,
+                  'one town click applies its catalogue elevation before evaluating, replacing the previous altitude');
             for (let i = 0; i < 12; ++i)
                 document.querySelector<HTMLButtonElement>('[data-globe-action="out"]')!.click();
             await new Promise(requestAnimationFrame);
@@ -2095,6 +2126,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             globeCanvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
             document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();
             await new Promise(requestAnimationFrame);
+            elevation.value = '50';
             globeCanvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
             await new Promise(requestAnimationFrame);
             check(elevation.value === '50' && Number(longitude.value) !== Number(place!.longitude),

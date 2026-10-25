@@ -332,19 +332,23 @@ static json_t *lab_cal_observer_summary(const json_t *options, const char *town,
 {
     const char *surface = lab_cal_text(options, "observer_surface");
     if (!*surface) surface = sea ? "Sea" : "Land";
-    double temperature = 0, pressure = 0;
+    double temperature = 0, pressure = 0, sea_level_pressure = 0, elevation = 0;
+    (void)lab_cal_number(lab_cal_text(options, "elevation"), &elevation);
     bool have_temperature = lab_cal_number(lab_cal_text(options, "temperature_c"), &temperature);
     bool have_pressure = lab_cal_number(lab_cal_text(options, "pressure_hpa"), &pressure);
+    bool have_sea_level = lab_cal_number(lab_cal_text(options, "pressure_msl_hpa"), &sea_level_pressure);
     string_t *values[] = {
         string_sprintf("%s %s", lab_cal_text(options, "date"), lab_cal_text(options, "time")),
         lab_cal_observer_location(options, town, sea),
         string_new_with(lab_cal_text(options, "zone")),
         lab_cal_observer_angle(lab_cal_text(options, "lat"), true),
         lab_cal_observer_angle(lab_cal_text(options, "lon"), false),
-        string_sprintf("%s m · %s", lab_cal_text(options, "elevation"), surface),
+        string_sprintf("%.0f m · %s", round(elevation) + 0.0, surface),
         have_temperature ? string_sprintf(strstr(lab_cal_text(options, "weather_source"), "Rough seasonal assumption") ?
                                            "~%.0f °C" : "%.1f °C", temperature) : string_new_with("Unavailable"),
-        have_pressure ? string_sprintf("%.0f hPa", pressure) : string_new_with("Unavailable"),
+        have_pressure ? (have_sea_level ?
+            string_sprintf("%.0f hPa (observer)\n%.0f hPa (sea level)", pressure, sea_level_pressure) :
+            string_sprintf("%.0f hPa (observer)", pressure)) : string_new_with("Unavailable"),
         string_new_with(*lab_cal_text(options, "weather_source") ? lab_cal_text(options, "weather_source") : "Unavailable"),
     };
     static const char *const labels[] = {"GMT moment", "Location", "Zone (UTC offset)", "Latitude", "Longitude",
@@ -472,8 +476,10 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
     if (!*surface) surface = sea_horizon ? "Sea" : "Land";
     lab_cal_take(response, "observer_summary",
                  lab_cal_observer_summary(options, lab_cal_part(town_parts, town_count, 0), sea_horizon));
-    string_append_format(observer, ", %s %s m (%s mode)", sea_horizon ? "height of eye" : "elevation",
-                         lab_cal_text(options, "elevation"), surface);
+    double elevation = 0;
+    (void)lab_cal_number(lab_cal_text(options, "elevation"), &elevation);
+    string_append_format(observer, ", %s %.0f m (%s mode)", sea_horizon ? "height of eye" : "elevation",
+                         round(elevation) + 0.0, surface);
     string_t *title =
         string_sprintf("Upcoming eclipses and inner planetary transits through %s", string_c_str(end_date));
     string_t *event_year = string_sprintf("%04d", year);

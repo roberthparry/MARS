@@ -2,13 +2,15 @@
  * @file countries.c
  * @brief Import administrative polygons and resolve countries with bounded indexed ray intersections.
  *
- * The globe controller verifies land independently before using this layer. Natural Earth polygon rings,
+ * Natural Earth polygon rings,
  * including holes, are split into 256-edge integer-microdegree chunks. An R-tree selects only chunks
  * intersecting an eastward ray; parity is accumulated per feature without loading complete countries.
  * Database streams and returned names follow the public globe API ownership rules. No network is used.
  * ISO identifiers join to jurisdiction-owned presentation metadata. Import also matches shared polygon edges
  * into indexed display chunks, omitting unmatched administrative coastlines. A bounded ordinary-heap buffer holds
  * only public source geometry during matching; no SQLCipher temporary table competes for locked memory.
+ * Confirmed detailed land can bridge a gap of at most one kilometre in the generalised country outline,
+ * provided only one country occurs within that distance. Water, overlaps and boundary points are not inferred.
  */
 #include <math.h>
 #include <stdint.h>
@@ -278,8 +280,9 @@ bool globe_import_countries(sqlite_t *db, file_t *shapes, file_t *attributes)
 }
 
 /* Accumulate parity across outer rings and holes, rejecting overlaps and boundary points. */
-static string_t *country_lookup(sqlite_t *db, double latitude, double longitude, bool code, bool regional)
+static string_t *country_lookup(sqlite_t *db, double latitude, double longitude, bool code, bool regional, bool *uncovered)
 {
+    if (uncovered) *uncovered = false;
     if (!db || !isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 || fabs(longitude) > 180) return NULL;
     double x = longitude * 1000000, y = latitude * 1000000;
     sqlite_stmt_t *q = sqlite_stmt_prepare(db, regional ?
@@ -314,6 +317,7 @@ static string_t *country_lookup(sqlite_t *db, double latitude, double longitude,
         if (found) ok = false;
         found = id;
     }
+    if (uncovered) *uncovered = ok && !found;
     q = ok && found ? sqlite_stmt_prepare(db, regional ? "select iso_country_code from region_name where id=?1" :
                                                   code ? "select iso_country_code from country_name where id=?1" :
                                                         "select name from country_name where id=?1") : NULL;
@@ -323,16 +327,86 @@ static string_t *country_lookup(sqlite_t *db, double latitude, double longitude,
     return name;
 }
 
+/* Search only the one-kilometre neighbourhood; competing country codes make the gap ambiguous. */
+static string_t *country_land_gap(sqlite_t *db, double latitude, double longitude, bool code)
+{
+    const double radius = 1000, scale_y = 111195;
+    double scale_x = fmax(1, scale_y * cos(latitude * 0.017453292519943295));
+    double latitude_radius = radius / scale_y, longitude_radius = radius / scale_x;
+    sqlite_stmt_t *q = sqlite_stmt_prepare(db,
+        "select n.iso_country_code,n.name,c.points from country_bounds b "
+        "join country_chunk c on c.id=b.id join country_name n on n.id=c.country "
+        "where b.west<=?1 and b.east>=?2 and b.south<=?3 and b.north>=?4 limit 10001");
+    bool ok = q != NULL;
+    unsigned rows = 0;
+    char selected[7] = {0};
+    double nearest = INFINITY;
+    string_t *result = NULL;
+    for (int wrap = -1; ok && wrap <= 1; ++wrap) {
+        double x = longitude + wrap * 360.0;
+        ok = sqlite_stmt_bind_double(q, 1, ceil((x + longitude_radius) * 1000000)) &&
+             sqlite_stmt_bind_double(q, 2, floor((x - longitude_radius) * 1000000)) &&
+             sqlite_stmt_bind_double(q, 3, ceil((latitude + latitude_radius) * 1000000)) &&
+             sqlite_stmt_bind_double(q, 4, floor((latitude - latitude_radius) * 1000000));
+        sqlite_step_result_t step = SQLITE_STEP_ERROR;
+        while (ok && (step = sqlite_stmt_step(q)) == SQLITE_STEP_ROW) {
+            const unsigned char *points = sqlite_stmt_column_blob(q, 2);
+            size_t length = sqlite_stmt_column_bytes(q, 2);
+            ok = ++rows <= 10000 && points && length >= 16 && length <= 257 * 8 && length % 8 == 0;
+            double distance = INFINITY;
+            for (size_t i = 8; ok && i < length; i += 8) {
+                double ax = (int32_t)country_u32(points + i - 8) * 0.000001;
+                double ay = (int32_t)country_u32(points + i - 4) * 0.000001;
+                double bx = (int32_t)country_u32(points + i) * 0.000001;
+                double by = (int32_t)country_u32(points + i + 4) * 0.000001;
+                if (fabs(bx - ax) > 180) continue;
+                double dx = (bx - ax) * scale_x, dy = (by - ay) * scale_y;
+                double px = (ax - x) * scale_x, py = (ay - latitude) * scale_y;
+                double squared = dx * dx + dy * dy;
+                double t = squared ? fmax(0, fmin(1, -(px * dx + py * dy) / squared)) : 0;
+                distance = fmin(distance, hypot(px + t * dx, py + t * dy));
+            }
+            if (!ok || distance > radius) continue;
+            const char *iso = sqlite_stmt_column_text(q, 0), *name = sqlite_stmt_column_text(q, 1);
+            size_t size = iso ? strlen(iso) : 0;
+            ok = (size == 2 || size == 6) && (!*selected || !strcmp(selected, iso)) && name && *name;
+            if (!ok) break;
+            memcpy(selected, iso, size + 1);
+            if (distance < nearest) {
+                nearest = distance;
+                string_free(result);
+                result = string_new_with(code ? iso : name);
+                ok = result != NULL;
+            }
+        }
+        ok = ok && step == SQLITE_STEP_DONE;
+        sqlite_stmt_reset(q);
+    }
+    sqlite_stmt_finalize(q);
+    if (!ok) { string_free(result); result = NULL; }
+    return result;
+}
+
+/* Reconcile only uncovered administrative points that the detailed shoreline confirms are land. */
+string_t *countries_resolve(sqlite_t *db, shoreline_t *shoreline, double latitude, double longitude, bool code)
+{
+    bool uncovered = false;
+    string_t *result = country_lookup(db, latitude, longitude, code, false, &uncovered);
+    if (uncovered && shoreline_hit_test_radius(shoreline, latitude, longitude, 0) == GLOBE_LAND)
+        return country_land_gap(db, latitude, longitude, code);
+    return result;
+}
+
 /* Keep regional display overlays separate from administrative country identification. */
 string_t *regions_lookup(sqlite_t *db, double latitude, double longitude)
 {
-    return country_lookup(db, latitude, longitude, true, true);
+    return country_lookup(db, latitude, longitude, true, true, NULL);
 }
 
 /* Reuse bounded indexed parity for the independent country layer. */
 string_t *countries_lookup(sqlite_t *db, double latitude, double longitude, bool code)
 {
-    return country_lookup(db, latitude, longitude, code, false);
+    return country_lookup(db, latitude, longitude, code, false, NULL);
 }
 
 /* Retain the descriptive lookup for existing callers and data without ISO metadata. */

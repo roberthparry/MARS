@@ -263,7 +263,7 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
         events.length = 0;
         await run(32, {mode: 'datetime', updateCoordinates: false}, {
             ...refreshServices,
-            locApplyTown: () => events.push('town'),
+            locApplyTown: () => { events.push('town'); return true; },
             async post(owner: unknown, payload: {action: string; jurisdiction: string; date: string}) {
                 equal(owner, request, 'post retains request');
                 equal(payload.jurisdiction, state.jurisdiction, 'post jurisdiction');
@@ -277,7 +277,7 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
                 equal(mode, 'datetime', 'response projection mode');
                 equal(owner, context, 'response projection retains context');
                 equal(update, false, 'response respects coordinate preservation');
-                check(!applied, 'preserve-coordinate path does not report a selected replacement town');
+                check(applied, 'preserve-coordinate path retains the selected town offset against country defaults');
                 events.push('response');
             },
             locAcceptContext(owner: unknown) {
@@ -286,6 +286,16 @@ window.checkLabLocationFlow = async function checkLabLocationFlow() {
             }
         });
         equal(events.join(','), 'begin,town,post,response,accept,finish', 'successful refresh order and cleanup');
+
+        events.length = 0;
+        await run(32, {mode: 'almanac', updateCoordinates: false}, {
+            ...refreshServices,
+            locBegin: () => { events.push('begin'); return request; },
+            locApplyTown: () => { events.push('town'); return true; },
+            post: () => { throw new Error('Date refresh must not request a country-capital offset'); }
+        });
+        equal(events.join(','), 'begin,town,finish',
+              'Almanac date refresh leaves offset resolution to the selected town and native evaluation');
 
         events.length = 0;
         await run(31, {button: {}}, {

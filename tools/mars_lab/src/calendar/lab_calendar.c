@@ -504,7 +504,7 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
     else {
         if (is_almanac_weather)
             lab_cal_atmosphere(options);
-        else if (is_almanac)
+        else if (is_almanac && !lab_cal_weather_conditions_restore(options, time(NULL)))
             lab_cal_observing_conditions(options, NULL);
         json_t *args = json_new_object();
         static const char *datetime_keys[] = {"date", "start",     "end",        "year",         "lat",

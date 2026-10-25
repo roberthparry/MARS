@@ -8,6 +8,7 @@
  * and resource reuse. Interior cracks cannot excuse themselves as boundary pixels.
  */
 async function checkGlobeGPU(check: (condition: boolean, message: string) => void): Promise<void> {
+    await checkGlobeBordersGPU(check);
     const moduleURL = '/js/globe_gpu.js';
     const {MarsGlobeMask} = await import(moduleURL) as typeof import('../../typescript/globe_gpu.js');
     const native = labWire.exports(), canvas = document.createElement('canvas');
@@ -123,4 +124,39 @@ async function checkGlobeGPU(check: (condition: boolean, message: string) => voi
         gl.getExtension('WEBGL_lose_context')?.loseContext();
         labDOM.call('lab_globe_shore_clear');
     }
+}
+
+/** Verify visible pixels, camera rotation and hidden-hemisphere clipping with the real GPU border shaders. */
+async function checkGlobeBordersGPU(check: (condition: boolean, message: string) => void): Promise<void> {
+    const moduleURL = '/js/globe_gpu.js';
+    const {MarsGlobeBorders} = await import(moduleURL) as typeof import('../../typescript/globe_gpu.js');
+    const count = labDOM.call('lab_globe_borders_mesh', '-10 0 10 0\n') as number;
+    const native = labWire.exports();
+    check(count > 2 && count % 2 === 0, 'native GPU borders subdivide spherical arcs');
+    const vertices = new Float32Array(native.memory.buffer, native.lab_globe_borders_vertices(), count * 3).slice();
+    for (let i = 0; i < vertices.length; i += 3)
+        check(Math.abs(Math.hypot(vertices[i], vertices[i + 1], vertices[i + 2]) - 1) < 1e-6,
+              'GPU border vertices remain on the sphere');
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const gl = canvas.getContext('webgl', {antialias: false})!;
+    const renderer = new MarsGlobeBorders(gl, labDOM.call('lab_globe_borders_shader', 0) as string,
+                                        labDOM.call('lab_globe_borders_shader', 1) as string, vertices);
+    const pixels = new Uint8Array(256 * 256 * 4);
+    try {
+        gl.enableVertexAttribArray(0);
+        gl.viewport(0, 0, 256, 256);
+        for (const [lon, zoom, visible] of [[0, 1, true], [180, 1, false], [0, 4096, true]] as const) {
+            const camera = labDOM.call('lab_globe_centre', 0, lon);
+            const rotation = (labDOM.call('lab_surface_camera', 1, camera, null, null, null, 0) as number[][]).flat();
+            gl.clear(gl.COLOR_BUFFER_BIT);
+            renderer.draw(rotation, zoom, 1);
+            gl.readPixels(0, 0, 256, 256, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            check(pixels.some(value => value > 0) === visible, `GPU borders respect visibility at longitude ${lon}, zoom ${zoom}`);
+            check(gl.getError() === gl.NO_ERROR, 'GPU border rendering has no WebGL error');
+        }
+        check(labDOM.call('lab_globe_borders_mesh', '0 91 1 0') === 0, 'invalid GPU border input is rejected');
+        check(labDOM.call('lab_globe_borders_mesh', '-89 0 89 0\n'.repeat(1000)) === 0,
+              'oversized border subdivision is rejected before GPU allocation');
+    } finally { renderer.dispose(); labDOM.call('lab_globe_borders_clear'); }
 }

@@ -298,6 +298,18 @@ void lab_evaluation_weather_state(jsref state, jsref data)
         int value = lab_evaluation_cards_or(lab_dom_get(fields, keys[i]), lab_dom_get(state, keys[i]));
         lab_dom_set(copy, keys[i], lab_dom_text(value));
     }
+    if (lab_dom_equal(lab_dom_get(data, "mode"), lab_dom_string("almanac"))) {
+        /* The follow-up recalculates the whole card. Retain the resolved observer,
+         * including deliberately empty town/country fields, rather than stale request defaults. */
+        static const char *const observer[] = {
+            "time", "zone", "zone_mode", "town", "jurisdiction", "elevation", "visibility"
+        };
+        for (unsigned i = 0; i < sizeof observer / sizeof *observer; ++i) {
+            int value = lab_dom_get(fields, observer[i]);
+            if (lab_dom_type(value) == LAB_VALUE_STRING)
+                lab_dom_set(copy, observer[i], value);
+        }
+    }
     lab_dom_return(copy);
 }
 

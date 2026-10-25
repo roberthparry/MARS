@@ -548,6 +548,53 @@ static bool country_test_border(double ax, double ay, double bx, double by, void
     return isfinite(ax) && isfinite(ay) && isfinite(bx) && isfinite(by);
 }
 
+static void country_test_land_gaps(sqlite_t *db, file_t *directory)
+{
+    const double latitude = 58.301830, longitude = -134.419720;
+    file_t *surface = temporary_file(directory, "country-land-gap.cf64");
+    const double land[][2] = {{-134.50,58.20},{-134.30,58.20},{-134.30,58.40},
+                              {-134.50,58.40},{-134.50,58.20}};
+    const double remote[][2] = {{-31,-1},{-29,-1},{-29,1},{-31,1},{-31,-1}};
+    TEST_ASSERT_TRUE(file_open_write(surface) && write_bytes(surface, "MARSCF64", 8) &&
+        write_precise_ring(surface, 1, land, 5) && write_precise_ring(surface, 2, remote, 5) &&
+        file_close(surface) && file_open_read(surface) && globe_import_shoreline(db, surface) && file_close(surface),
+        "detailed land for administrative outline gaps");
+    globe_t *globe = globe_open_databases(db, NULL, NULL);
+    TEST_ASSERT_TRUE(!countries_at(db, latitude, longitude), "packaged generalised outline misses Juneau");
+    string_t *code = globe_country_code_at(globe, latitude, longitude);
+    string_t *name = globe_country_at(globe, latitude, longitude);
+    TEST_ASSERT_TRUE(code && !strcmp(string_c_str(code), "US") &&
+                     name && !strcmp(string_c_str(name), "United States of America"),
+                     "detailed land resolves Juneau without any town catalogue or selected jurisdiction");
+    string_free(code); string_free(name);
+    TEST_ASSERT_TRUE(!globe_country_code_at(globe, 0, -30), "remote uncovered land does not select a distant country");
+    TEST_ASSERT_TRUE(!globe_country_code_at(globe, 58.315131, -134.446278),
+                     "exact administrative boundary remains ambiguous even on confirmed land");
+    globe_close(globe);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "UPDATE shoreline_chunk SET level=2"), "inland water in an outline gap");
+    globe = globe_open_databases(db, NULL, NULL);
+    TEST_ASSERT_TRUE(!globe_country_code_at(globe, latitude, longitude), "gap inference never assigns inland water");
+    globe_close(globe);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "UPDATE shoreline_chunk SET level=1; SAVEPOINT competing_country;"
+        "INSERT INTO country_name VALUES(1001,'Competing country','CA');"
+        "INSERT INTO country_chunk SELECT id+200000,1001,points FROM country_chunk WHERE country=166;"
+        "INSERT INTO country_bounds SELECT b.id+200000,b.west,b.east,b.south,b.north FROM country_bounds b "
+        "JOIN country_chunk c ON c.id=b.id WHERE c.country=166"), "nearby competing country fixture");
+    globe = globe_open_databases(db, NULL, NULL);
+    TEST_ASSERT_TRUE(!globe_country_code_at(globe, latitude, longitude) && !globe_country_at(globe, latitude, longitude),
+                     "competing country outlines reject gap inference");
+    globe_close(globe);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "ROLLBACK TO competing_country; RELEASE competing_country"),
+                     "restore original country geometry");
+    TEST_ASSERT_TRUE(file_open_write(surface) && write_bytes(surface, "MARSCF64", 8) &&
+        write_precise_ring(surface, 1, remote, 5) && file_close(surface) && file_open_read(surface) &&
+        globe_import_shoreline(db, surface) && file_close(surface), "sea at the same administrative gap");
+    globe = globe_open_databases(db, NULL, NULL);
+    TEST_ASSERT_TRUE(!globe_country_code_at(globe, latitude, longitude), "nearby country outlines never assign sea");
+    globe_close(globe);
+    file_delete(surface); file_free(surface);
+}
+
 static void test_country_packaged_boundaries(void)
 {
     file_t *directory = temporary_directory();
@@ -600,6 +647,12 @@ static void test_country_packaged_boundaries(void)
         {52.7077, -2.7541, "England"}, {48.8566, 2.3522, "France"},
         {51.4816, -3.1791, "Wales"}, {55.9533, -3.1883, "Scotland"}, {54.23, -4.52, "Isle of Man"},
         {-29.31, 27.48, "Lesotho"}, {-25.75, 28.19, "South Africa"},
+        {-33.805167, 18.369167, "South Africa"}, {-33.8064, 18.3688, "South Africa"},
+        {-33.796687, 18.373971, "South Africa"}, {-33.814701, 18.374134, "South Africa"},
+        {-34.1375, 18.5825, "South Africa"}, {-34.1359, 18.5823, "South Africa"},
+        {-34.1384, 18.5827, "South Africa"},
+        {-33.82, 18.35, NULL}, {-33.79, 18.38, NULL},
+        {-34.1375, 18.581, NULL}, {-34.1375, 18.584, NULL},
         {-17.77, 177.42, "Fiji"}, {55.70, 12.50, "Denmark"}, {52.37, 4.90, "Netherlands"},
         {38.72, -9.14, "Portugal"}, {0, -30, NULL}, {NAN, 0, NULL}, {91, 0, NULL}
     };
@@ -668,6 +721,7 @@ static void test_country_packaged_boundaries(void)
         globe_close(globe);
     }
     file_delete(surface); file_free(surface);
+    country_test_land_gaps(db, directory);
     TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "DROP TABLE shoreline_bounds;DROP TABLE shoreline_chunk;"
                                         "DROP TABLE shoreline_blob;DROP TABLE shoreline_dataset"), "remove surface fixtures");
     TEST_ASSERT_TRUE(!globe_import_countries(db, source[0], source[1]), "truncated source rejected");

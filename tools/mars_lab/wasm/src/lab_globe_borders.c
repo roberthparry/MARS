@@ -1,10 +1,12 @@
 /**
  * @file lab_globe_borders.c
- * @brief Bounded native border geometry and camera-projected SVG paths for the observer globe.
+ * @brief Bounded native border geometry, SVG projection and GPU travel meshes for the observer globe.
  *
  * array_t owns unit-sphere segment endpoints. Projection shares the globe quaternion, subdivides long
- * arcs to subpixel chord error, clips the hidden hemisphere and viewport, and emits only SVG path data.
- * No database access, JavaScript geometry cache or raster texture is involved. Input and output are capped;
+ * arcs to subpixel chord error and clips the hidden hemisphere and viewport for static SVG paths.
+ * A worker can instead prepare packed short spherical segments for GPU rotation during travel, with
+ * native-owned shaders clipping the hidden hemisphere. No database access or raster texture is involved.
+ * Input and output are capped;
  * path storage grows with visible output rather than reserving the complete ceiling for every frame.
  * malformed replacement data leave the previously accepted cache intact.
  * Mutable resident state belongs to a private singleton. Public operations enter its serial dispatcher;
@@ -12,6 +14,7 @@
  */
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "array-t.h"
 #include "lab_dom.h"
@@ -26,6 +29,7 @@ typedef struct _border_output_t {
 typedef struct _border_store_t {
     lab_serial_t serial;
     array_t *segments;
+    float *vertices;
     double bounds[4];
     bool has_bounds;
     const size_t border_limit;
@@ -84,6 +88,8 @@ static void lab_globe_borders_clear_owned(void)
     border_store_t *state = border_store();
     array_destroy(state->segments);
     state->segments = NULL;
+    free(state->vertices);
+    state->vertices = NULL;
     state->has_bounds = false;
 }
 
@@ -354,4 +360,76 @@ void lab_globe_borders_path(quaternion_jsref orientation, double zoom, double si
     border_store_t *state = border_store();
     globe_borders_path_request_t request = {.orientation = orientation, .zoom = zoom, .size = size};
     if (!lab_serial_dispatch(&state->serial, globe_borders_path_dispatch, &request)) lab_dom_return(0);
+}
+
+typedef struct _border_mesh_request_t { jsref text; unsigned count; } border_mesh_request_t;
+
+static void border_mesh_dispatch(void *context)
+{
+    border_mesh_request_t *request = context;
+    border_store_t *state = border_store();
+    if (!lab_globe_borders_load_owned(request->text)) return;
+    size_t pieces = 0;
+    for (size_t i = 0; i < array_size(state->segments); ++i) {
+        const border_segment_t *segment = array_get(state->segments, i);
+        double dot = 0;
+        for (unsigned axis = 0; axis < 3; ++axis) dot += segment->point[0][axis] * segment->point[1][axis];
+        double angle = acos(fmax(-1, fmin(1, dot)));
+        if (angle > 3.14) return;
+        pieces += (size_t)fmax(1, ceil(angle / 0.001));
+        if (pieces > 1000000) return;
+    }
+    float *vertices = pieces ? malloc(pieces * 6 * sizeof(float)) : NULL;
+    if (pieces && !vertices) return;
+    size_t output = 0;
+    for (size_t i = 0; i < array_size(state->segments); ++i) {
+        const border_segment_t *segment = array_get(state->segments, i);
+        double dot = 0;
+        for (unsigned axis = 0; axis < 3; ++axis) dot += segment->point[0][axis] * segment->point[1][axis];
+        double angle = acos(fmax(-1, fmin(1, dot))), sine = sin(angle);
+        unsigned count = (unsigned)fmax(1, ceil(angle / 0.001));
+        double previous[3];
+        memcpy(previous, segment->point[0], sizeof previous);
+        for (unsigned part = 1; part <= count; ++part) {
+            double t = (double)part / count;
+            double left = angle < 1e-8 ? 1 - t : sin((1 - t) * angle) / sine;
+            double right = angle < 1e-8 ? t : sin(t * angle) / sine;
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                double next = left * segment->point[0][axis] + right * segment->point[1][axis];
+                vertices[output + axis] = (float)previous[axis];
+                vertices[output + 3 + axis] = (float)next;
+                previous[axis] = next;
+            }
+            output += 6;
+        }
+    }
+    state->vertices = vertices;
+    request->count = (unsigned)(output / 3);
+}
+
+/* Prepare bounded GPU geometry once in the worker, never on the animation clock. */
+unsigned lab_globe_borders_mesh(jsref text)
+{
+    border_mesh_request_t request = {.text = text};
+    lab_serial_dispatch(&border_store()->serial, border_mesh_dispatch, &request);
+    return request.count;
+}
+
+/* The worker copies this synchronous snapshot into a transferable browser buffer. */
+const float *lab_globe_borders_vertices(void)
+{
+    return border_store()->vertices;
+}
+
+/* The GPU rotates fixed world vertices and clips the hidden hemisphere on every paint. */
+void lab_globe_borders_shader(unsigned fragment)
+{
+    static const char vertex[] =
+        "attribute vec3 position; uniform mat3 cameraToWorld; uniform float zoom; varying float facing;"
+        "void main(){vec3 p=position*cameraToWorld; facing=p.z; gl_Position=vec4(p.xy*zoom/1.12,0.,1.);}";
+    static const char pixel[] =
+        "precision mediump float; varying float facing;"
+        "void main(){if(facing<=0.)discard;gl_FragColor=vec4(.863,.780,.627,.85);}";
+    const char *source = fragment ? pixel : vertex;
+    lab_dom_return(lab_dom_utf8_string((const unsigned char *)source, strlen(source)));
 }

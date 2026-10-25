@@ -160,6 +160,17 @@ window.checkLabEvaluationCards = async function checkLabEvaluationCards() {
         equal(request.longitude, '2', 'empty evaluated longitude falls back to captured state');
         equal(request.zone, 'retained', 'weather request retains unrelated state');
         equal(state.date, 'old', 'captured weather state remains untouched');
+        const resolved = labDOM.call<LabTestTextFields>('lab_evaluation_weather_state', {
+            date: '2026-10-25', time: '10:13:46', latitude: '58.30183', longitude: '-134.41972',
+            zone: '11', zone_mode: 'auto', jurisdiction: 'AU', town: 'old town', elevation: '18', visibility: 'visible'
+        }, {mode: 'almanac', fields: {
+            zone: '-8', zone_mode: 'auto', jurisdiction: 'US-AK', town: '', time: '10:13:46', elevation: '18'
+        }});
+        equal(resolved.zone, '-8', 'weather follow-up retains the resolved observer offset');
+        equal(resolved.jurisdiction, 'US-AK', 'weather follow-up retains the resolved jurisdiction');
+        equal(resolved.town, '', 'resolved custom observer does not recover an unrelated captured town');
+        equal(resolved.visibility, 'visible', 'absent response fields retain captured settings');
+        equal(resolved.zone_mode, 'auto', 'weather preserves automatic offset provenance');
 
         cards = plan(7, {expression: ' native full ', full_display_expression: 'reusable goal'}, 'native full');
         equal(cards.unchanged, true, 'goal status compares trimmed opaque native source');

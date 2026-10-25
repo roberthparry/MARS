@@ -3097,6 +3097,7 @@
       "test_lab_integrator_high_precision_deadline": true,
       "test_lab_math_modes": true,
       "test_lab_observing_conditions": true,
+      "test_lab_weather_conditions_cache": true,
       "test_lab_weather_recent_estimate": true,
       "test_lab_worker_deadline_diagnostic": true
     }

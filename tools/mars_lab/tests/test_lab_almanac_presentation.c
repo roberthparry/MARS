@@ -433,13 +433,17 @@ static void test_lab_country_presentation(void)
     json_free(crimea);
     json_t *options = test_lab_json("{\"country\":\"Ukraine\",\"country_code\":\"UA\",\"jurisdiction\":\"RU\","
         "\"observer_surface\":\"Land\",\"town\":\"Chornomorske (GeoNames 710687)|45.50657|32.69776|17\","
-        "\"lat\":\"45.50657\",\"lon\":\"32.69776\",\"elevation\":\"39\",\"date\":\"2026-10-24\","
+        "\"lat\":\"45.50657\",\"lon\":\"32.69776\",\"elevation\":\"39.6\",\"date\":\"2026-10-24\","
         "\"time\":\"12:00:00\",\"zone\":\"3\",\"visibility\":\"all\",\"defer_events\":\"true\"}");
     json_t *fields = test_lab_json("{\"snapshot\":\"MOON|Moon|moon|0|0|0|0|0|1|0.5|0|0|0|0|YES|0|0|0|10|20|0.5\"}");
     unsigned status = 200;
     json_t *observer_response = lab_cal_almanac(fields, options, &status);
     const json_t *location_cell = json_array_get(lab_cal_get(observer_response, "observer_summary"), 1);
     const json_t *rendered = lab_cal_get(lab_cal_get(observer_response, "almanac_presentation"), "all");
+    TEST_ASSERT_TRUE(strstr(lab_cal_text(rendered, "html"), "40 m · Land") &&
+                     strstr(lab_cal_text(rendered, "copy_text"), "elevation 40 m") &&
+                     !strcmp(lab_cal_text(observer_response, "observer_elevation"), "39.6"),
+                     "altitude displays whole metres without rounding the calculation's double value");
     TEST_ASSERT_TRUE(status == 200 && !strcmp(lab_cal_text(location_cell, "value"), "Chornomorske, Ukraine") &&
                      strstr(lab_cal_text(rendered, "html"), "Chornomorske, Ukraine") &&
                      strstr(lab_cal_text(rendered, "copy_text"), "Chornomorske, Ukraine") &&
@@ -451,7 +455,7 @@ static void test_lab_country_presentation(void)
     TEST_ASSERT_TRUE(!strcmp(lab_cal_text(updates, "almanac_jurisdiction"), "UA") &&
                      !strcmp(lab_cal_text(updates, "almanac_town"), lab_cal_text(options, "town")) &&
                      !strcmp(lab_cal_text(updates, "almanac_latitude"), "45.50657") &&
-                     !strcmp(lab_cal_text(updates, "almanac_elevation"), "39") &&
+                     !strcmp(lab_cal_text(updates, "almanac_elevation"), "39.6") &&
                      !strcmp(lab_cal_text(updates, "almanac_zone"), "3"),
                      "saved observer uses the resolved country without losing the town key or authored inputs");
     json_free(updates);

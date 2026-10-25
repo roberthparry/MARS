@@ -84,7 +84,7 @@ bool cfg_database_current_revision(sqlite_t *db, const char *name, int64_t *revi
     return (step == SQLITE_STEP_ROW || step == SQLITE_STEP_DONE) && *revision >= 0;
 }
 
-static bool cfg_database_flags_refresh(sqlite_t *db, const string_t *root, const string_t *staging)
+static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root, const string_t *staging)
 {
     (void)staging;
     /* Unlike optional installation assets, a declared migration must not succeed without its source. */
@@ -98,7 +98,7 @@ static bool cfg_database_flags_refresh(sqlite_t *db, const string_t *root, const
     ok = ok && emblem && sqlite_stmt_step(emblem) == SQLITE_STEP_ROW;
     sqlite_stmt_finalize(emblem);
     file_free(source); string_free(path);
-    return ok;
+    return ok && cfg_database_source(db, root, "packaging/jurisdiction-db/location_additions.sql", false);
 }
 
 static bool cfg_database_update_one(const cfg_database_migration *migration)
@@ -149,10 +149,10 @@ static bool cfg_database_update_one(const cfg_database_migration *migration)
 int cfg_databases_update(void)
 {
     static const cfg_database_migration migrations[] = {
-        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 6, cfg_database_globe_refresh},
+        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 7, cfg_database_globe_refresh},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 4, cfg_database_flags_refresh},
+         "jurisdiction/mars_jurisdiction_rules.db", 6, cfg_database_jurisdiction_refresh},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)

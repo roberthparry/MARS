@@ -34,8 +34,14 @@ of that information is governed by the
 [WeatherAPI.com privacy policy](https://www.weatherapi.com/privacy.aspx) and
 [terms](https://www.weatherapi.com/terms.aspx).
 
-MARS uses the returned data only to display the Weather card. It does not cache
-or persist the returned weather response. Weather-specific request logs record
+MARS uses the returned data for weather cards and almanac observing conditions.
+It does not persist complete provider responses or API keys in its weather cache.
+Under `~/.mars/lab/weather-cache`, 64 bounded slots retain current temperature
+observations for fallback estimates, and another 64 slots retain calculated
+temperature and pressure for an exact location, GMT moment and altitude. The
+latter expire after 15 minutes and each occupies at most 2 KiB. Current-temperature
+fallbacks require observations within one hour of both now and the selected moment.
+These files use owner-only permissions. Weather-specific request logs record
 only success or failure and elapsed time, not the selected date, coordinates,
 API key or response.
 
