@@ -621,9 +621,8 @@ segments of one archive, not geographic layers or a runtime source composition.
 The installer reassembles and verifies its SHA-256, decompresses at most 602,563,348
 bytes, verifies the decoded SHA-256 and imports the lossless `MARSCF64` coordinates.
 Missing, damaged or substituted parts fail before geometry replacement. It does
-not call offline repair tools, load the historical Sydney correction or silently
-fall back to GSHHG. Staging needs approximately 1.02 GB for the archive and decoded
-stream, in addition to database and rollback-journal space.
+not call offline repair tools or silently fall back to GSHHG. Staging needs approximately
+1.02 GB for the archive and decoded stream, in addition to database and rollback-journal space.
 
 Holding **Shift** while hovering over the globe shows the latitude and longitude
 beneath the pointer in degrees and decimal minutes, even with the coordinate grid
@@ -710,7 +709,7 @@ output when a query fails or its visitor cancels.
 `globe_import_shoreline()` transactionally replaces shoreline tables from an
 open GSHHG 2.3.7 binary stream or a lossless `MARSCF64` stream. It retains unrelated tables and rolls back
 malformed input. Its savepoint also permits a caller-owned transaction, so the
-installer publishes geometry and correction provenance atomically.
+installer publishes geometry and source provenance atomically.
 Stored uncompressed coordinate chunks use BLOB pages and an
 integer R-tree; older compressed chunks remain readable. Levels 1–5 are retained,
 using the Antarctic ice front rather than the alternative grounding line.
@@ -898,8 +897,7 @@ The resumed trial passed Málaga and the polar checks but exposed missing Sydney
 Harbour water coverage. Both failed water probes lie inside the unsimplified OSM
 coastline shell as well as the simplified candidate. The separately retained OSM
 marine-water relation 1252425, version 123, covers both points. Its geometry was
-not part of the coastline-only source selection; the old Sydney correction is
-not automatically carried into a replacement coastline.
+not part of the coastline-only source selection.
 
 The optional offline `coastline_water` preparer incorporates a supplied valid
 marine-water GeoJSON polygon into an exclusive candidate copy. It spatially
@@ -953,41 +951,6 @@ is called by the normal importer, and neither approves or performs installation.
 
 See [almanac data provenance](almanac-data-provenance.md#shoreline-data) for
 source, checksums and licence notices.
-
-### Reviewed local shoreline corrections
-
-The former GSHHG installer applied `packaging/globe-db/shoreline-corrections.json` to a
-temporary copy of the upstream binary stream before import. This historical
-correction and its tests are retained for provenance, but revision 3 does not use
-them: Sydney harbour water is already present in the complete artifact. The original archive
-is unchanged. Corrections are sorted by polygon ID and specify an original point
-count, a zero-based inclusive vertex span and replacement microdegree coordinates. Both
-endpoints must match the original exactly; coordinates must remain within its
-bounds. Unknown revisions, missing polygons, changed source counts and invalid
-endpoints fail before database import. Preparation uses a 64 KiB copy buffer,
-at most 32 MB for a corrected source ring, and a bounded correction document.
-
-Revision 1 corrects the southern Sydney Harbour waterfront from Woolloomooloo
-through the CBD, Darling Harbour and Rozelle Bay to Balmain. GSHHG placed the
-unchanged Sydney catalogue coordinate (33.8678° S, 151.2073° E) outside its land polygon.
-The replacement uses [OSM Sydney Harbour relation 1252425](https://www.openstreetmap.org/relation/1252425),
-version 123, retrieved on 21 October 2026. Harbour banks are represented by a
-water multipolygon, not necessarily by `natural=coastline` ways; coastline-only
-extraction misses them. No town-coordinate offset or town-specific rendering
-rule is applied.
-
-The eastern join intersects the original edge. The western join retains the
-original Balmain endpoint, about 18 metres from the OSM bank. The retained OSM
-vertices are rounded to integer microdegrees, without smoothing or downsampling.
-This local seam is not a claim of surveyed accuracy or a worldwide coastline
-upgrade. The corrected stream adds 1,365 vertices (10,920 raw coordinate bytes),
-bringing its imported point count to 10,589,219. Geographic regressions check
-Sydney and nearby land, plus water in Darling Harbour, Circular Quay and
-Woolloomooloo Bay at two display scales, as well as cold and resident hit-tests.
-
-The correction is © OpenStreetMap contributors, available under the
-[Open Database Licence 1.0](https://www.openstreetmap.org/copyright).
-GSHHG's existing licence and attribution remain applicable to the base source.
 
 ### OSM coastline candidate: detail budget and acceptance
 
@@ -1060,7 +1023,6 @@ That pass completed successfully on 23 October 2026: 833,417 effective rings,
 contacts. The 26 complementary date-line joins are recorded separately. Both
 original island records remain in the repair overlay. The result is explicitly
 `boundary_contacts_clear_not_install_approved`, not a delivered shoreline update.
-At that stage the installer still imported GSHHG plus the Sydney correction.
 The subsequent complete-artifact work described above preserved inland waters,
 checked nesting, adopted lossless coordinates instead of microdegree quantisation,
 and raised the reader and decompression budgets before managed revision 3.

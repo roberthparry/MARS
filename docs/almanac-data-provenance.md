@@ -62,26 +62,17 @@ text is supplied as `GSHHG-COPYINGv3.txt`. The unmodified source remains availab
 in the packaged compressed binary. No Python interpreter or download is required
 to install, query or rebuild the index.
 
-The former globe installer also applied the versioned span replacements in
-`packaging/globe-db/shoreline-corrections.json`. Revision 1 replaces GSHHG polygon
-6 zero-based vertices 13,104–13,212 inclusive with 1,474 vertices, including its unchanged
-endpoints. The southern Sydney Harbour bank comes from
+Sydney Harbour water geometry comes from
 [OpenStreetMap relation 1252425](https://www.openstreetmap.org/relation/1252425),
 version 123. The full XML response retrieved on 21 October 2026 from the official
 OSM API has SHA-256
 `edb6c2d88d08e4b9d4eec38c596d77e01e0a3c4792048a99fd24408ab489b0ca`.
-Its outer water ring was exported using osmium 1.19.0; the selected bank was
-reversed to follow the GSHHG land-ring direction and rounded to microdegrees.
-The eastern join is an edge intersection; the western join retains the old
-Balmain endpoint approximately 18 metres away. Neither smoothing nor a city
-coordinate adjustment is applied. No other GSHHG span is changed.
+Its outer water ring was exported using osmium 1.19.0.
 
-These correction coordinates are © OpenStreetMap contributors under the
+These coordinates are © OpenStreetMap contributors under the
 [Open Database Licence 1.0](https://www.openstreetmap.org/copyright), not MARS's
 MIT licence. The GSHHG source archive and its existing licence notices remain
-unchanged. See [reviewed shoreline corrections](globe.md#reviewed-local-shoreline-corrections)
-for validation and update behaviour. This is a local geographic improvement,
-not surveyed shoreline or a navigation chart.
+unchanged. This data is not surveyed shoreline or a navigation chart.
 
 ## AstroNav workbook
 
