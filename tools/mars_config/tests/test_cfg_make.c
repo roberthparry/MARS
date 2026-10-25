@@ -167,16 +167,20 @@ static void test_cfg_make_forward(void)
                      "actual root recipe preserves argv, town precedence, spaces, accents and language exports");
 }
 
-static bool test_cfg_make_uninstall_fixture(const char *directory)
+static bool test_cfg_make_uninstall_check(const char *directory, bool all)
 {
     static const char *const paths[] = {
         "jurisdiction/mars_jurisdiction_rules.db", "jurisdiction/mars_jurisdiction_rules.db-journal",
         "jurisdiction/mars_jurisdiction_rules.db-wal", "jurisdiction/mars_jurisdiction_rules.db-shm",
-        "config/jurisdiction-db.env", "almanac/almanac.db", "config/almanac-db.env", "config/weather.env",
-        "jurisdiction/custom.db", "lab-settings.pb"
+        "config/jurisdiction-db.env", "almanac/almanac.db", "almanac/almanac.db-journal",
+        "almanac/almanac.db-wal", "almanac/almanac.db-shm", "config/almanac-db.env",
+        "globe/globe.db", "globe/globe.db-journal", "globe/globe.db-wal", "globe/globe.db-shm",
+        "config/globe-db.env", "config/weather.env", "jurisdiction/custom.db", "almanac/custom.db",
+        "globe/custom.db", "lab/mars_lab_state.json", "lab/mars_lab_history.db", "lab/mars_lab_history.db-journal",
+        "globe/rivers-checkpoint.sqlite3"
     };
     bool ok = test_cfg_make_environment();
-    static const char *const directories[] = {"jurisdiction", "config", "almanac"};
+    static const char *const directories[] = {"jurisdiction", "config", "almanac", "globe", "lab"};
     for (size_t i = 0; i < sizeof(directories) / sizeof(*directories) && ok; ++i) {
         string_t *path = string_sprintf("%s/.mars/%s", directory, directories[i]);
         file_t *folder = path ? file_new(path) : NULL;
@@ -192,7 +196,8 @@ static bool test_cfg_make_uninstall_fixture(const char *directory)
         string_free(path);
     }
     string_t *home_argument = string_sprintf("HOME=%s", directory);
-    const char *args[] = {"make", "--no-print-directory", "-j1", "uninstall-jurisdiction-db",
+    const char *args[] = {"make", "--no-print-directory", "-j1",
+                          all ? "uninstall-mars-db" : "uninstall-jurisdiction-db",
                           home_argument ? string_c_str(home_argument) : "", NULL};
     /* The HOME override is confined to this child Make process and its disposable fixture. */
     for (unsigned pass = 0; pass < 2 && ok; ++pass) {
@@ -204,7 +209,7 @@ static bool test_cfg_make_uninstall_fixture(const char *directory)
     for (size_t i = 0; i < sizeof(paths) / sizeof(*paths) && ok; ++i) {
         string_t *path = string_sprintf("%s/.mars/%s", directory, paths[i]);
         file_t *entry = path ? file_new(path) : NULL;
-        ok = entry && file_exists(entry) == (i >= 5);
+        ok = entry && file_exists(entry) == (i >= (all ? 15 : 5));
         file_free(entry);
         string_free(path);
     }
@@ -212,10 +217,26 @@ static bool test_cfg_make_uninstall_fixture(const char *directory)
     return ok;
 }
 
+static bool test_cfg_make_uninstall_fixture(const char *directory)
+{
+    return test_cfg_make_uninstall_check(directory, false);
+}
+
+static bool test_cfg_make_uninstall_all_fixture(const char *directory)
+{
+    return test_cfg_make_uninstall_check(directory, true);
+}
+
 static void test_cfg_make_uninstall(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_make_uninstall_fixture),
                      "jurisdiction removal is idempotent and preserves unrelated databases and settings");
+}
+
+static void test_cfg_make_uninstall_all(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_make_uninstall_all_fixture),
+                     "combined removal is idempotent and preserves history, settings, custom stores and river checkpoints");
 }
 
 static bool test_cfg_make_help_fixture(const char *directory)
@@ -227,7 +248,9 @@ static bool test_cfg_make_help_fixture(const char *directory)
     bool ok = test_cfg_make_environment() &&
               lab_proc_run(args, MARS_CONFIG_ROOT_DIR, 30000, 262144, &output, &status) && status == 0 && output &&
               string_find(output, "make native-lab ") >= 0 && string_find(output, "make test_http_live ") >= 0 &&
-              string_find(output, "make test_lab_native ") >= 0 && string_find(output, "make lab-browser-test ") >= 0;
+              string_find(output, "make test_lab_native ") >= 0 && string_find(output, "make lab-browser-test ") >= 0 &&
+              string_find(output, "make install-mars-db ") >= 0 && string_find(output, "make uninstall-mars-db ") >= 0 &&
+              string_find(output, "Reserved; currently refuses changes") < 0;
     static const char *const obsolete[] = {
         "lab-workers", "lab-build", "test-http-live", "check-jurisdiction-db-deps",
         "mars_lab", "equation_lab", "diffequation_lab", "matrix_lab", "integrator_lab",
@@ -320,5 +343,6 @@ void test_cfg_make_cases(void)
     TEST_RUN_IN_GROUP(test_cfg_make_reject, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_forward, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_uninstall, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_make_uninstall_all, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_make_help, tests, NULL);
 }

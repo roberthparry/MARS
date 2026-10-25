@@ -408,6 +408,12 @@ rebuilds the server and browser assets when necessary and launches it again.
 before starting the browser client; the installed desktop launcher starts the
 native executable directly.
 
+The database-only targets `make install-mars-db` and `make uninstall-mars-db` are
+listed in `make help`. The uninstall target removes the default globe, almanac and
+jurisdiction databases under `~/.mars`, their SQLite sidecar files and their database
+configuration files. It preserves custom database files, Lab history, weather settings
+and river-processing checkpoints. Stop the Lab before uninstalling databases.
+
 That installer now prompts for a password to protect the private jurisdiction
 database, stores the resulting configuration in
 `~/.mars/config/jurisdiction-db.env`, and builds the encrypted jurisdiction database at

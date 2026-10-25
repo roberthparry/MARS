@@ -2962,7 +2962,8 @@
       "test_cfg_make_help": true,
       "test_cfg_make_reject": true,
       "test_cfg_make_release": true,
-      "test_cfg_make_uninstall": true
+      "test_cfg_make_uninstall": true,
+      "test_cfg_make_uninstall_all": true
     }
   },
   "tools/mars_config/tests/test_cfg_progress.c": {

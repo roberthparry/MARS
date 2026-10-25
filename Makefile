@@ -651,13 +651,15 @@ to-be-announced-lab: native-tba-lab
 	@MARS_ROOT="$(CURDIR)" "$(TBA_SERVER)" $(ARGS)
 
 .PHONY: install-globe-db update-globe-db check-globe-db uninstall-globe-db
-.PHONY: install-mars-db
+.PHONY: install-mars-db uninstall-mars-db
 .PHONY: update-mars-db
 update-mars-db: check-native-deps native-config
 	@MARS_ROOT="$(CURDIR)" "$(CONFIG_PROGRAM)" databases-update
 
 install-mars-db: check-native-deps native-config
 	@"$(CONFIG_PROGRAM)" databases
+
+uninstall-mars-db: uninstall-globe-db uninstall-almanac-db uninstall-jurisdiction-db
 
 install-globe-db: check-native-deps native-config
 	@"$(CONFIG_PROGRAM)" globe-install
@@ -668,14 +670,22 @@ check-globe-db: check-native-deps native-config
 update-globe-db: check-native-deps native-config
 	@"$(CONFIG_PROGRAM)" globe-update
 
-uninstall-globe-db: check-native-deps native-config
-	@"$(CONFIG_PROGRAM)" globe-uninstall
+uninstall-globe-db:
+	rm -f "$(HOME)/.mars/globe/globe.db" \
+	    "$(HOME)/.mars/globe/globe.db-journal" \
+	    "$(HOME)/.mars/globe/globe.db-wal" \
+	    "$(HOME)/.mars/globe/globe.db-shm" \
+	    "$(HOME)/.mars/config/globe-db.env"
 
 install-almanac-db: check-native-deps native-config $(ALMANAC_RULES_SOURCES)
 	@"$(CONFIG_PROGRAM)" almanac
 
 uninstall-almanac-db:
-	rm -f "$(HOME)/.mars/almanac/almanac.db" "$(HOME)/.mars/config/almanac-db.env"
+	rm -f "$(HOME)/.mars/almanac/almanac.db" \
+	    "$(HOME)/.mars/almanac/almanac.db-journal" \
+	    "$(HOME)/.mars/almanac/almanac.db-wal" \
+	    "$(HOME)/.mars/almanac/almanac.db-shm" \
+	    "$(HOME)/.mars/config/almanac-db.env"
 
 ifeq ($(firstword $(MAKECMDGOALS)),install-jurisdiction-db)
     ifneq ($(word 3,$(MAKECMDGOALS)),)
@@ -799,55 +809,67 @@ uninstall-to-be-announced-lab:
 # Help
 # ------------------------------------------------------------
 help:
-	@echo "Targets:"
+	@printf '\n%s\n' "Build and cleanup"
 	@printf '  %-40s %s\n' "make debug" "Build debug binaries and tests"
-	@printf '  %-40s %s\n' "make release" "Build release binaries and tests"
+	@printf '  %-40s %s\n' "make release" "Build all standard targets in release mode (libraries, Labs, tests and benchmarks)"
+	@echo "    If MARS Lab is installed, also update its existing globe, almanac and jurisdiction databases."
+	@echo "    Missing databases are skipped; use make install-mars-db to install all three."
 	@printf '  %-40s %s\n' "make release-evidence" "Build a release and record its binary dependency evidence"
-	@printf '  %-40s %s\n' "make test" "Run all tests"
-	@printf '  %-40s %s\n' "make memtest" "Run all tests under valgrind"
-	@printf '  %-40s %s\n' "make test_<name>" "Build and run a single test (e.g. make test_expression)"
-	@printf '  %-40s %s\n' "make memtest_<name>" "Build and run a single test under valgrind"
-	@printf '  %-40s %s\n' "make bench_<name>" "Build and run a benchmark (e.g. make bench_integrator)"
-	@printf '  %-40s %s\n' "make scratch" "Build optional standalone examples (not built by all)"
 	@printf '  %-40s %s\n' "make native-lab" "Build the Lab server and WebAssembly assets"
+	@printf '  %-40s %s\n' "make native-config" "Build tools/mars_config/build/<mode>/mars_config"
+	@printf '  %-40s %s\n' "make native-checks" "Build tools/mars_checks/build/<mode>/mars_checks"
 	@printf '  %-40s %s\n' "make lab-wasm-asm" "Generate optional Lab WebAssembly assembly listings"
-	@printf '  %-40s %s\n' "make test_lab_native" "Run native Lab tests"
-	@printf '  %-40s %s\n' "make lab-browser-test" "Run Lab browser tests"
+	@printf '  %-40s %s\n' "make scratch" "Build optional standalone examples (not built by all)"
+	@printf '  %-40s %s\n' "make clean" "Remove all build artefacts"
+	@printf '\n%s\n' "MARS Lab"
 	@printf '  %-40s %s\n' "make mars-lab" "Launch the local MARS Lab"
 	@printf '  %-40s %s\n' "make mars-lab-stop" "Stop the local MARS Lab"
 	@printf '  %-40s %s\n' "make mars-lab-restart" "Stop and relaunch the local MARS Lab"
-	@printf '  %-40s %s\n' "make to-be-announced-lab" "Launch the local To-Be-Announced Lab"
 	@printf '  %-40s %s\n' "make install-mars-lab" "Install a user desktop launcher for MARS Lab"
 	@printf '  %-40s %s\n' "make uninstall-mars-lab" "Remove the user desktop launcher for MARS Lab"
-	@printf '  %-40s %s\n' "make install-almanac-db" "Build and configure the Almanac database only"
-	@printf '  %-40s %s\n' "make install-globe-db" "Build a fresh globe database with geography and photographic textures"
+	@printf '\n%s\n' "Databases — all three"
 	@printf '  %-40s %s\n' "make install-mars-db" "Install globe, almanac and jurisdiction databases sequentially"
 	@printf '  %-40s %s\n' "make update-mars-db" "Apply pending migrations to existing databases without prompting"
-	@printf '  %-40s %s\n' "make check-globe-db" "Verify globe integrity, shoreline availability and photographic textures"
+	@printf '  %-40s %s\n' "make uninstall-mars-db" "Remove all three default databases and their configuration; preserve Lab history"
+	@echo "    Stop the Lab before uninstalling. History and weather settings are preserved."
+	@printf '\n%s\n' "Databases — individual"
+	@printf '  %-40s %s\n' "make install-globe-db" "Build a fresh globe database with geography and photographic textures"
 	@printf '  %-40s %s\n' "make update-globe-db" "Update packaged geography and textures, preserving river data"
-	@printf '  %-40s %s\n' "make uninstall-globe-db" "Reserved; currently refuses changes"
-	@printf '  %-40s %s\n' "make uninstall-almanac-db" "Remove the configured Almanac database"
+	@printf '  %-40s %s\n' "make check-globe-db" "Verify globe integrity, shoreline availability and photographic textures"
+	@printf '  %-40s %s\n' "make uninstall-globe-db" "Remove the default globe database and its configuration"
+	@printf '  %-40s %s\n' "make install-almanac-db" "Build and configure the Almanac database only"
+	@printf '  %-40s %s\n' "make uninstall-almanac-db" "Remove the default Almanac database and its configuration"
 	@printf '  %-40s %s\n' "make install-jurisdiction-db [town]" "Build the private database and calendar_local for a town"
 	@echo "    Use LOCATION='town, jurisdiction' for a qualified or multiword town."
 	@echo "    Add CALENDAR_LANGUAGE=code to preselect a calendar language (also works non-interactively)"
 	@printf '  %-40s %s\n' "make uninstall-jurisdiction-db" "Remove only the default jurisdiction database and its configuration"
-	@printf '  %-40s %s\n' "make install-to-be-announced-lab" "Install a user desktop launcher for To-Be-Announced Lab"
-	@printf '  %-40s %s\n' "make uninstall-to-be-announced-lab" "Remove the user desktop launcher for To-Be-Announced Lab"
-	@printf '  %-40s %s\n' "make check-deps" "Check development libraries and native TypeScript compilers"
-	@printf '  %-40s %s\n' "make check-native-deps" "Check development libraries without browser build tools"
-	@printf '  %-40s %s\n' "make typescript-install-help" "Print native compiler installation commands without installing anything"
+	@printf '\n%s\n' "Tests and benchmarks"
+	@printf '  %-40s %s\n' "make test" "Run all tests"
+	@printf '  %-40s %s\n' "make test_<name>" "Build and run a single test (e.g. make test_expression)"
+	@printf '  %-40s %s\n' "make test_lab_native" "Run native Lab tests"
+	@printf '  %-40s %s\n' "make lab-browser-test" "Run Lab browser tests"
 	@printf '  %-40s %s\n' "make test_http_live" "Test the HTTP client against the native loopback web server"
 	@printf '  %-40s %s\n' "make test_webserver" "Run offline Linux web server tests and its README example"
 	@printf '  %-40s %s\n' "make test-readme-examples" "Compile/run complete Markdown C examples"
-	@printf '  %-40s %s\n' "make check-compliance" "Verify public-path, notice, SPDX and provenance safeguards"
-	@printf '  %-40s %s\n' "make check-source-policy" "Audit inline sizes, expression registries and absence of Python"
-	@printf '  %-40s %s\n' "make native-checks" "Build tools/mars_checks/build/<mode>/mars_checks"
-	@printf '  %-40s %s\n' "make native-config" "Build tools/mars_config/build/<mode>/mars_config"
+	@printf '  %-40s %s\n' "make memtest" "Run all tests under valgrind"
+	@printf '  %-40s %s\n' "make memtest_<name>" "Build and run a single test under valgrind"
+	@printf '  %-40s %s\n' "make bench_<name>" "Build and run a benchmark (e.g. make bench_integrator)"
+	@printf '\n%s\n' "Dependencies"
+	@printf '  %-40s %s\n' "make check-deps" "Check development libraries and native TypeScript compilers"
+	@printf '  %-40s %s\n' "make check-native-deps" "Check development libraries without browser build tools"
 	@printf '  %-40s %s\n' "make check-lab-deps" "Check development libraries and MARS Lab TypeScript/TeX/WebAssembly tools"
 	@printf '  %-40s %s\n' "make check-lab-wasm-deps" "Probe Clang's WebAssembly target and the LLVM linker"
+	@printf '  %-40s %s\n' "make typescript-install-help" "Print native compiler installation commands without installing anything"
+	@printf '\n%s\n' "Source and distribution checks"
+	@printf '  %-40s %s\n' "make check-compliance" "Verify public-path, notice, SPDX and provenance safeguards"
+	@printf '  %-40s %s\n' "make check-source-policy" "Audit inline sizes, expression registries and absence of Python"
+	@printf '\n%s\n' "Library installation"
 	@printf '  %-40s %s\n' "make install" "Install libraries and headers under PREFIX (default /usr/local)"
 	@printf '  %-40s %s\n' "make uninstall" "Remove installed libraries and headers from PREFIX"
-	@printf '  %-40s %s\n' "make clean" "Remove all build artefacts"
+	@printf '\n%s\n' "Private Lab"
+	@printf '  %-40s %s\n' "make to-be-announced-lab" "Launch the local To-Be-Announced Lab"
+	@printf '  %-40s %s\n' "make install-to-be-announced-lab" "Install a user desktop launcher for To-Be-Announced Lab"
+	@printf '  %-40s %s\n' "make uninstall-to-be-announced-lab" "Remove the user desktop launcher for To-Be-Announced Lab"
 	@echo ""
 	@echo "Builds and tests default to release; add DEBUG=1 for debug (e.g. make DEBUG=1 test_expression)."
 

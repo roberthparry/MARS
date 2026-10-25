@@ -648,7 +648,12 @@ database, using the packaged complete sources without geometry repairs. These im
 together; source preparation failures leave the database untouched and
 import failures roll back. The saved key, configuration and other layers are
 preserved. Stop MARS Lab before updating and restart it afterwards. This is
-not a river installation command. `make uninstall-globe-db` still refuses changes.
+not a river installation command. `make uninstall-globe-db` removes the default
+`~/.mars/globe/globe.db`, its SQLite sidecar files and `~/.mars/config/globe-db.env`.
+`make uninstall-mars-db` also removes the default almanac and jurisdiction databases,
+their SQLite sidecar files and database configuration files. Stop the Lab before
+uninstalling. Custom database paths, Lab history, weather settings and separate river
+processing files are preserved. Repeating an uninstall with absent files succeeds.
 `make install-mars-db` uses each database's own configured storage mode, defaulting to
 plaintext when no key is supplied. Calendar questions may still appear, but passwords
 are not prompted for. Standalone installers use the same rules. Installation creates a new database in the
