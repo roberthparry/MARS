@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "mars_paths.h"
 #include "cfg_locales.h"
 #define MARS_CFG_LOCALES_INTERNAL_ACCESS
 #include "cfg_locales_internal.h"
@@ -64,10 +65,8 @@ static bool cfg_locales_publish(const string_t *path, const string_t *sql)
 
 static bool cfg_locales_check(const string_t *root, const string_t *sql)
 {
-    string_t *path = string_clone(root);
-    const char *suffix = "/packaging/jurisdiction-db/mars_calendar_locale_names.sql";
-    bool ready = path && string_append_utf8_exact(path, suffix, strlen(suffix)) == 0;
-    string_t *expected = ready ? cfg_locales_read(path) : NULL;
+    string_t *path = mars_path_resource(MARS_PATH_JURISDICTION, root, "mars_calendar_locale_names.sql");
+    string_t *expected = path ? cfg_locales_read(path) : NULL;
     bool equal = expected && string_view_equals_view(string_view_all(sql), string_view_all(expected));
     string_free(expected);
     string_free(path);
@@ -102,16 +101,8 @@ int cfg_locales_run(int argc, char **argv)
         string_free(directory);
         return 2;
     }
-    const char *configured_root = getenv("MARS_ROOT");
-    string_t *root = cfg_locales_argument(configured_root && *configured_root ? configured_root : MARS_CONFIG_ROOT_DIR);
-    if (!directory && root) {
-        directory = string_clone(root);
-        const char *suffix = "/tools/mars_config/data/locales";
-        if (directory && string_append_utf8_exact(directory, suffix, strlen(suffix)) != 0) {
-            string_free(directory);
-            directory = NULL;
-        }
-    }
+    string_t *root = string_new();
+    if (!directory && root) directory = mars_path_resource(MARS_PATH_LOCALES, root, "");
     string_t *sql = root && directory ? cfg_locales_generate(root, directory) : NULL;
     bool ok = sql != NULL;
     if (!ok)

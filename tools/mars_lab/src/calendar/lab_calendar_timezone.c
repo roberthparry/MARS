@@ -18,6 +18,7 @@
 #include "datetime-t.h"
 #include "file-t.h"
 #include "jurisdiction-t.h"
+#include "mars_paths.h"
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 #include "lab_page.h"
@@ -54,22 +55,8 @@ static string_t *lab_cal_zone_file(const string_t *zone)
     string_cursor_free(cursor);
     if (!valid || !component || string_starts_with(zone, "posix/") || string_starts_with(zone, "right/"))
         return NULL;
-    string_t *path = string_sprintf("/usr/share/zoneinfo/%s", string_c_str(zone));
-    file_t *file = file_new(path);
-    file_t *resolved = file ? file_resolve(file) : NULL;
-    string_t *canonical = resolved ? string_new_with(file_path(resolved)) : NULL;
-    unsigned char magic[4];
-    size_t read_count = 0;
-    bool installed = canonical && string_starts_with(canonical, "/usr/share/zoneinfo/") && file_open_read(resolved) &&
-                     file_read(resolved, magic, sizeof(magic), &read_count) && read_count == sizeof(magic) &&
-                     magic[0] == 'T' && magic[1] == 'Z' && magic[2] == 'i' && magic[3] == 'f';
-    file_free(resolved);
-    file_free(file);
-    string_free(path);
-    if (!installed) {
-        string_free(canonical);
-        return NULL;
-    }
+    string_t *canonical = mars_path_zoneinfo(zone);
+    if (!canonical) return NULL;
     return canonical;
 }
 

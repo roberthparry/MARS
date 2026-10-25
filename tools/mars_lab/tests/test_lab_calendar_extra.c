@@ -149,6 +149,8 @@ static bool location_fixture(const char *directory)
         {"Europe/London", "2026-10-25", "00:59:00", "auto", "1"},
         {"Europe/London", "2026-10-25", "01:00:00", "auto", "0"},
         {"America/Los_Angeles", "2026-07-15", "12:00:00", "auto", "-7"},
+        {"America/Juneau", "2026-10-24", "11:37:29", "auto", "-8"},
+        {"America/Juneau", "2026-12-24", "11:37:29", "auto", "-9"},
         {"America/Does_Not_Exist", "2026-07-15", "12:00:00", "auto", "10"},
         {"Africa/Dar_es_Salaam", "2026-10-24", "17:46:18", "manual", "10"},
         {"Africa/Dar_es_Salaam", "2026-10-24", "17:46:18", "", "10"},

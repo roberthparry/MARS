@@ -16,10 +16,11 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "string-t.h"
+#include "mars_settings.h"
 #include "cfg_prompt.h"
 #include "cfg_storage.h"
 #include "cfg_weather.h"
-#include "string-t.h"
 
 static string_t *cfg_weather_text(const char *text)
 {
@@ -119,7 +120,7 @@ int cfg_weather_run(const char *explicit_key, bool interactive)
                                              "export MARS_WEATHER_API_KEY='%s'\n",
                                              string_c_str(key))
                             : NULL;
-        ok = ok && body && cfg_storage_publish(file, directory, body);
+        ok = ok && body && cfg_storage_publish(file, directory, body) && mars_settings_sync(body);
         string_free(body);
         if (ok)
             puts("Weather API configuration saved.");

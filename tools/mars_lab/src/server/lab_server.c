@@ -14,6 +14,7 @@
 #include "array-t.h"
 #include "file-t.h"
 #include "jurisdiction-t.h"
+#include "mars_paths.h"
 #include "lab_process_request.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
@@ -29,13 +30,7 @@
 #define MARS_LAB_SERVER_INTERNAL_ACCESS
 #include "lab_server_internal.h"
 
-#ifndef MARS_LAB_WASM_PATH
-#define MARS_LAB_WASM_PATH "tools/mars_lab/build/release/wasm/lab_browser.wasm"
-#endif
 
-#ifndef MARS_LAB_CODEC_PATH
-#define MARS_LAB_CODEC_PATH "tools/mars_lab/build/release/wasm/lab_codec.wasm"
-#endif
 
 typedef struct lab_server {
     websrv_t *listener;
@@ -100,7 +95,9 @@ bool lab_svr_message(const websrv_request_t *request, websrv_response_t *respons
 static bool lab_svr_static_asset(const websrv_request_t *request, websrv_response_t *response,
                                  const char *path, const char *type, size_t max_bytes)
 {
-    file_t *file = file_new_cstr(path);
+    string_t *resolved = mars_path_source(NULL, path);
+    file_t *file = resolved ? file_new(resolved) : NULL;
+    string_free(resolved);
     file_info_t *info = file ? file_get_info(file) : NULL;
     bool safe = info && file_info_type(info) == FILE_TYPE_REGULAR && file_info_size(info) <= max_bytes;
     array_t *bytes = safe ? file_read_all_bytes(file) : NULL;
@@ -123,46 +120,46 @@ struct lab_svr_asset {
 
 /* Enumerated once at registration, then resolved by the webserver's route index. */
 static const struct lab_svr_asset lab_svr_assets[] = {
-    {"/wasm/lab_browser.wasm", MARS_LAB_WASM_PATH, "application/wasm", 4194304},
-    {"/wasm/lab_codec.wasm", MARS_LAB_CODEC_PATH, "application/wasm", 4194304},
-    {"/js/codec.js", "tools/mars_lab/build/typescript/codec.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/codec_types.js", "tools/mars_lab/build/typescript/codec_types.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/jobs.js", "tools/mars_lab/build/typescript/jobs.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/codec_worker.js", "tools/mars_lab/build/typescript/codec_worker.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/transport.js", "tools/mars_lab/build/typescript/transport.js", "text/javascript; charset=utf-8", 4194304},
-    {"/index.css", "tools/mars_lab/assets/index.css", "text/css; charset=utf-8", 4194304},
-    {"/css/theme.css", "tools/mars_lab/assets/css/theme.css", "text/css; charset=utf-8", 4194304},
-    {"/css/layout.css", "tools/mars_lab/assets/css/layout.css", "text/css; charset=utf-8", 4194304},
-    {"/css/worksheets.css", "tools/mars_lab/assets/css/worksheets.css", "text/css; charset=utf-8", 4194304},
-    {"/css/dates.css", "tools/mars_lab/assets/css/dates.css", "text/css; charset=utf-8", 4194304},
-    {"/css/forms.css", "tools/mars_lab/assets/css/forms.css", "text/css; charset=utf-8", 4194304},
-    {"/css/bindings.css", "tools/mars_lab/assets/css/bindings.css", "text/css; charset=utf-8", 4194304},
-    {"/css/mobile.css", "tools/mars_lab/assets/css/mobile.css", "text/css; charset=utf-8", 4194304},
-    {"/css/buttons.css", "tools/mars_lab/assets/css/buttons.css", "text/css; charset=utf-8", 4194304},
-    {"/css/results.css", "tools/mars_lab/assets/css/results.css", "text/css; charset=utf-8", 4194304},
-    {"/css/help.css", "tools/mars_lab/assets/css/help.css", "text/css; charset=utf-8", 4194304},
-    {"/css/responsive.css", "tools/mars_lab/assets/css/responsive.css", "text/css; charset=utf-8", 4194304},
-    {"/js/api.js", "tools/mars_lab/build/typescript/api.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/app.js", "tools/mars_lab/build/typescript/app.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/bindings.js", "tools/mars_lab/build/typescript/bindings.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/bindings_controller.js", "tools/mars_lab/build/typescript/bindings_controller.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/locations.js", "tools/mars_lab/build/typescript/locations.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/globe.js", "tools/mars_lab/build/typescript/globe.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/globe_gpu.js", "tools/mars_lab/build/typescript/globe_gpu.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/globe_photo.js", "tools/mars_lab/build/typescript/globe_photo.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/globe_worker.js", "tools/mars_lab/build/typescript/globe_worker.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/results.js", "tools/mars_lab/build/typescript/results.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/results_services.js", "tools/mars_lab/build/typescript/results_services.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/surface.js", "tools/mars_lab/build/typescript/surface.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/surface_camera.js", "tools/mars_lab/build/typescript/surface_camera.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/surface_export.js", "tools/mars_lab/build/typescript/surface_export.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/surface_hover.js", "tools/mars_lab/build/typescript/surface_hover.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/surface_volume.js", "tools/mars_lab/build/typescript/surface_volume.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/state.js", "tools/mars_lab/build/typescript/state.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/history.js", "tools/mars_lab/build/typescript/history.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/workspace.js", "tools/mars_lab/build/typescript/workspace.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/workspace_controllers.js", "tools/mars_lab/build/typescript/workspace_controllers.js", "text/javascript; charset=utf-8", 4194304},
-    {"/js/workspace_native.js", "tools/mars_lab/build/typescript/workspace_native.js", "text/javascript; charset=utf-8", 4194304},
+    {"/wasm/lab_browser.wasm", "@wasm/lab_browser.wasm", "application/wasm", 4194304},
+    {"/wasm/lab_codec.wasm", "@wasm/lab_codec.wasm", "application/wasm", 4194304},
+    {"/js/codec.js", "@scripts/codec.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/codec_types.js", "@scripts/codec_types.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/jobs.js", "@scripts/jobs.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/codec_worker.js", "@scripts/codec_worker.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/transport.js", "@scripts/transport.js", "text/javascript; charset=utf-8", 4194304},
+    {"/index.css", "@assets/index.css", "text/css; charset=utf-8", 4194304},
+    {"/css/theme.css", "@assets/css/theme.css", "text/css; charset=utf-8", 4194304},
+    {"/css/layout.css", "@assets/css/layout.css", "text/css; charset=utf-8", 4194304},
+    {"/css/worksheets.css", "@assets/css/worksheets.css", "text/css; charset=utf-8", 4194304},
+    {"/css/dates.css", "@assets/css/dates.css", "text/css; charset=utf-8", 4194304},
+    {"/css/forms.css", "@assets/css/forms.css", "text/css; charset=utf-8", 4194304},
+    {"/css/bindings.css", "@assets/css/bindings.css", "text/css; charset=utf-8", 4194304},
+    {"/css/mobile.css", "@assets/css/mobile.css", "text/css; charset=utf-8", 4194304},
+    {"/css/buttons.css", "@assets/css/buttons.css", "text/css; charset=utf-8", 4194304},
+    {"/css/results.css", "@assets/css/results.css", "text/css; charset=utf-8", 4194304},
+    {"/css/help.css", "@assets/css/help.css", "text/css; charset=utf-8", 4194304},
+    {"/css/responsive.css", "@assets/css/responsive.css", "text/css; charset=utf-8", 4194304},
+    {"/js/api.js", "@scripts/api.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/app.js", "@scripts/app.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/bindings.js", "@scripts/bindings.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/bindings_controller.js", "@scripts/bindings_controller.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/locations.js", "@scripts/locations.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/globe.js", "@scripts/globe.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/globe_gpu.js", "@scripts/globe_gpu.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/globe_photo.js", "@scripts/globe_photo.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/globe_worker.js", "@scripts/globe_worker.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/results.js", "@scripts/results.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/results_services.js", "@scripts/results_services.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface.js", "@scripts/surface.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface_camera.js", "@scripts/surface_camera.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface_export.js", "@scripts/surface_export.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface_hover.js", "@scripts/surface_hover.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/surface_volume.js", "@scripts/surface_volume.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/state.js", "@scripts/state.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/history.js", "@scripts/history.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/workspace.js", "@scripts/workspace.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/workspace_controllers.js", "@scripts/workspace_controllers.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/workspace_native.js", "@scripts/workspace_native.js", "text/javascript; charset=utf-8", 4194304},
 };
 
 static bool lab_svr_asset_request(const websrv_request_t *request, websrv_response_t *response, void *context)
@@ -297,13 +294,13 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
             return ok;
         }
         if (lab_svr_equal(path, "/favicon.svg"))
-            return lab_svr_static_asset(request, response, "packaging/linux/mars-lab.svg", "image/svg+xml", 4194304);
+            return lab_svr_static_asset(request, response, "@icons/mars-lab.svg", "image/svg+xml", 4194304);
         if (lab_svr_equal(path, "/apple-touch-icon.png"))
-            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-180.png", "image/png", 4194304);
+            return lab_svr_static_asset(request, response, "@icons/icon-concepts/wizard-prism-180.png", "image/png", 4194304);
         if (lab_svr_equal(path, "/icon-192.png"))
-            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-192.png", "image/png", 4194304);
+            return lab_svr_static_asset(request, response, "@icons/icon-concepts/wizard-prism-192.png", "image/png", 4194304);
         if (lab_svr_equal(path, "/icon-512.png"))
-            return lab_svr_static_asset(request, response, "packaging/linux/icon-concepts/wizard-prism-512.png", "image/png", 4194304);
+            return lab_svr_static_asset(request, response, "@icons/icon-concepts/wizard-prism-512.png", "image/png", 4194304);
         /* Browser installation manifests have a standard JSON format, unlike our API messages. */
         const char *body =
             "{\"name\":\"MARS Lab\",\"short_name\":\"MARS\",\"start_url\":\"/\",\"display\":\"standalone\","

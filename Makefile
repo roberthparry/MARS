@@ -63,7 +63,7 @@ TO_BE_ANNOUNCED_LAB_LAUNCHER ?= $(MARS_LAB_BINDIR)/to-be-announced-lab
 TO_BE_ANNOUNCED_LAB_DESKTOP ?= $(MARS_LAB_APPDIR)/to-be-announced-lab.desktop
 TO_BE_ANNOUNCED_LAB_ICON ?= $(MARS_LAB_ICONDIR)/to-be-announced-lab.svg
 
-INCLUDES := -I. -Iinclude -Isrc -Itests -Itests/include
+INCLUDES := -I. -Iinclude -Isrc -Itests -Itests/include -Itools/common
 
 # ------------------------------------------------------------
 # Optional libunistring
@@ -147,6 +147,11 @@ HEADERS      := $(wildcard include/*.h)
 STATIC_LIB := $(BUILD_DIR)/libmars.a
 SHARED_LIB := $(BUILD_DIR)/libmars.so
 
+APP_RESOURCE_OBJ := $(BUILD_DIR)/tools/mars_paths.o $(BUILD_DIR)/tools/mars_settings.o $(BUILD_DIR)/tools/mars_keyring.o
+$(BUILD_DIR)/tools/%.o: tools/common/%.c tools/common/mars_paths.h tools/common/mars_settings.h tools/common/mars_keyring.h
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
 # Test-only native protocol peers; OpenSSL is not an additional MARS link requirement.
 
 $(TEST_BUILD_DIR)/shoreline/check_shoreline_precision: tests/shoreline/check_shoreline_precision.c $(STATIC_LIB)
@@ -167,6 +172,12 @@ include tools/to_be_announced_lab/Makefile
 include tools/mars_config/Makefile
 include tools/mars_checks/Makefile
 
+$(CHECKS_BUILD_DIR)/mars-config.db: $(CONFIG_BUILD_DIR)/mars-config.db
+	@mkdir -p $(@D)
+	cp "$<" "$@"
+
+$(CHECKS_BIN): | $(CHECKS_BUILD_DIR)/mars-config.db
+
 TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 TEST_BINS += $(TBA_TEST_BIN) $(LAB_TEST_BIN) $(CONFIG_TEST_BIN) $(CHECKS_TEST_BIN)
 
@@ -179,7 +190,8 @@ native-tools: $(CHECKS_BIN) $(CONFIG_PROGRAM)
 
 $(SHARED_LIB) $(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS) \
 $(TEST_BINS) $(BENCH_OBJS) $(BENCH_BINS) $(SCRATCH_OBJS) $(SCRATCH_BINS) \
-$(LAB_OBJS) $(LAB_TEST_OBJS) $(LAB_SERVER) $(TBA_OBJS) $(TBA_SERVER) \
+$(filter-out $(APP_RESOURCE_OBJ),$(LAB_OBJS)) $(LAB_TEST_OBJS) $(LAB_SERVER) \
+$(filter-out $(APP_RESOURCE_OBJ),$(TBA_OBJS)) $(TBA_SERVER) \
 $(CONFIG_TEST_OBJS) $(CHECKS_TEST_OBJS) $(CHECKS_TEST_FIXTURE_BIN): | native-tools
 
 .SECONDEXPANSION:
@@ -199,6 +211,7 @@ debug:
 release: check-compliance
 	$(MAKE) DEBUG=0 all
 	@if [ -x "$(MARS_LAB_LAUNCHER)" ]; then \
+		$(MAKE) --no-print-directory DEBUG=0 configure-mars && \
 		$(MAKE) --no-print-directory DEBUG=0 update-mars-db; \
 	fi
 
@@ -624,7 +637,7 @@ scratch: $(SCRATCH_BINS)
 
 .PHONY: mars-lab mars-lab-stop mars-lab-restart to-be-announced-lab install-almanac-db uninstall-almanac-db install-jurisdiction-db uninstall-jurisdiction-db install-mars-lab uninstall-mars-lab install-to-be-announced-lab uninstall-to-be-announced-lab
 mars-lab: native-lab
-	@MARS_ROOT="$(CURDIR)" "$(LAB_SERVER)" $(ARGS)
+	@"$(LAB_SERVER)" $(ARGS)
 
 mars-lab-stop:
 	@pattern='([t]ools/(mars_lab|lab)/build/(release|debug)/mars_lab(_server)?|[b]uild/(release|debug)/tools/mars_lab_server)([[:space:]]|$$)'; \
@@ -648,13 +661,20 @@ mars-lab-restart: mars-lab-stop
 
 .PHONY: to-be-announced-lab
 to-be-announced-lab: native-tba-lab
-	@MARS_ROOT="$(CURDIR)" "$(TBA_SERVER)" $(ARGS)
+	@"$(TBA_SERVER)" $(ARGS)
 
 .PHONY: install-globe-db update-globe-db check-globe-db uninstall-globe-db
 .PHONY: install-mars-db uninstall-mars-db
+.PHONY: configure-mars
+configure-mars: native-config
+	@echo "Preparing encrypted MARS settings; the desktop key store may request an unlock."
+	@"$(CONFIG_PROGRAM)" paths init
+	@"$(CONFIG_PROGRAM)" settings migrate
+	@echo "MARS configuration ready: mars.json locates encrypted mars.db; existing database paths and settings preserved."
+
 .PHONY: update-mars-db
 update-mars-db: check-native-deps native-config
-	@MARS_ROOT="$(CURDIR)" "$(CONFIG_PROGRAM)" databases-ensure
+	@"$(CONFIG_PROGRAM)" databases-ensure
 
 install-mars-db: check-native-deps native-config
 	@"$(CONFIG_PROGRAM)" databases
@@ -725,14 +745,13 @@ install-mars-lab: native-lab native-config check-lab-deps $(SHARED_LIB) $(JURISD
 	rm -f "$(MARS_LAB_BINDIR)/mars-expr-lab" "$(MARS_LAB_APPDIR)/mars-expr-lab.desktop" "$(MARS_LAB_ICONDIR)/mars-expr-lab.svg" "$(MARS_LAB_ICONDIR)"/mars-expr-lab-*.svg
 	@printf '%s\n' \
 		'#!/bin/sh' \
-		'export MARS_ROOT="$(CURDIR)"' \
 		'log_dir="$${XDG_STATE_HOME:-$$HOME/.local/state}/mars-lab"' \
 		'mkdir -p "$$log_dir"' \
 		'printf "[%s] launch %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$0 $$*" >> "$$log_dir/launcher.log" 2>&1' \
 		'open_browser=1' \
 		'for arg in "$$@"; do [ "$$arg" = "--no-browser" ] && open_browser=0; done' \
 		'unit="mars-lab-$$(date +%s%N)"' \
-		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" --working-directory="$(CURDIR)" "$(CURDIR)/$(LAB_SERVER)" --host :: --port 8765 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
+		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_CONFIG_FILE="$${MARS_CONFIG_FILE:-$${MARS_HOME:-$$HOME/.mars}/config/mars.json}" "$(CURDIR)/$(LAB_SERVER)" --host :: --port 8765 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
 		'status=$$?' \
 		'printf "[%s] systemd-run exit %s unit %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$status" "$$unit" >> "$$log_dir/launcher.log" 2>&1' \
 		'if [ "$$status" -eq 0 ] && [ "$$open_browser" -eq 1 ]; then' \
@@ -758,6 +777,7 @@ install-mars-lab: native-lab native-config check-lab-deps $(SHARED_LIB) $(JURISD
 	@$(MAKE) install-jurisdiction-db
 	@echo "MARS Lab install [4/4]: configuring weather (may request input)"
 	@"$(CONFIG_PROGRAM)" weather
+	@$(MAKE) --no-print-directory configure-mars
 	@echo "Installed MARS Lab desktop launcher:"
 	@echo "  $(MARS_LAB_DESKTOP)"
 
@@ -765,14 +785,13 @@ install-to-be-announced-lab: native-tba-lab packaging/linux/to-be-announced-lab.
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	@printf '%s\n' \
 		'#!/bin/sh' \
-		'export MARS_ROOT="$(CURDIR)"' \
 		'log_dir="$${XDG_STATE_HOME:-$$HOME/.local/state}/to-be-announced-lab"' \
 		'mkdir -p "$$log_dir"' \
 		'printf "[%s] launch %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$0 $$*" >> "$$log_dir/launcher.log" 2>&1' \
 		'open_browser=1' \
 		'for arg in "$$@"; do [ "$$arg" = "--no-browser" ] && open_browser=0; done' \
 		'unit="to-be-announced-lab-$$(date +%s%N)"' \
-		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" --working-directory="$(CURDIR)" "$(CURDIR)/$(TBA_SERVER)" --host :: --port 8766 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
+		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_CONFIG_FILE="$${MARS_CONFIG_FILE:-$${MARS_HOME:-$$HOME/.mars}/config/mars.json}" "$(CURDIR)/$(TBA_SERVER)" --host :: --port 8766 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
 		'status=$$?' \
 		'printf "[%s] systemd-run exit %s unit %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$status" "$$unit" >> "$$log_dir/launcher.log" 2>&1' \
 		'if [ "$$status" -eq 0 ] && [ "$$open_browser" -eq 1 ]; then' \
@@ -790,6 +809,7 @@ install-to-be-announced-lab: native-tba-lab packaging/linux/to-be-announced-lab.
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
 	@echo "Installed To-Be-Announced Lab desktop launcher:"
+	@$(MAKE) --no-print-directory configure-mars
 	@echo "  $(TO_BE_ANNOUNCED_LAB_DESKTOP)"
 
 uninstall-mars-lab:
@@ -813,6 +833,7 @@ help:
 	@printf '  %-40s %s\n' "make debug" "Build debug binaries and tests"
 	@printf '  %-40s %s\n' "make release" "Build all standard targets in release mode (libraries, Labs, tests and benchmarks)"
 	@echo "    If MARS Lab is installed, also install missing globe, almanac and jurisdiction databases."
+	@echo "    Creates or migrates encrypted mars.db first; the desktop key store may prompt for an unlock."
 	@echo "    Existing databases receive pending updates; their other data and settings are preserved."
 	@printf '  %-40s %s\n' "make release-evidence" "Build a release and record its binary dependency evidence"
 	@printf '  %-40s %s\n' "make native-lab" "Build the Lab server and WebAssembly assets"
@@ -827,9 +848,10 @@ help:
 	@printf '  %-40s %s\n' "make mars-lab-restart" "Stop and relaunch the local MARS Lab"
 	@printf '  %-40s %s\n' "make install-mars-lab" "Install a user desktop launcher for MARS Lab"
 	@printf '  %-40s %s\n' "make uninstall-mars-lab" "Remove the user desktop launcher for MARS Lab"
+	@printf '  %-40s %s\n' "make configure-mars" "Create tiny mars.json and encrypted mars.db; migrate existing settings using the desktop key store"
 	@printf '\n%s\n' "Databases — all three"
 	@printf '  %-40s %s\n' "make install-mars-db" "Install globe, almanac and jurisdiction databases sequentially"
-	@printf '  %-40s %s\n' "make update-mars-db" "Install missing databases and update existing ones without prompting"
+	@printf '  %-40s %s\n' "make update-mars-db" "Install missing databases and update existing ones using saved settings"
 	@printf '  %-40s %s\n' "make uninstall-mars-db" "Remove all three default databases and their configuration; preserve Lab history"
 	@echo "    Stop the Lab before uninstalling. History and weather settings are preserved."
 	@printf '\n%s\n' "Databases — individual"

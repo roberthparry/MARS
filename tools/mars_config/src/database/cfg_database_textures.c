@@ -16,6 +16,7 @@
 #include "globe-t.h"
 #include "json-t.h"
 #include "string-t.h"
+#include "mars_paths.h"
 #include "cfg_progress.h"
 #define MARS_CFG_DATABASE_INTERNAL_ACCESS
 #include "cfg_database_internal.h"
@@ -69,7 +70,7 @@ static bool texture_dimensions(const unsigned char *data, size_t size, unsigned 
     return false;
 }
 
-static bool texture_import(sqlite_stmt_t *insert, const string_t *root, const json_t *assets,
+static bool texture_import(sqlite_stmt_t *insert, const string_t *directory, const json_t *assets,
                            unsigned level, unsigned column, unsigned row)
 {
     static const unsigned widths[] = {2048, 8192, 1800}, heights[] = {1024, 4096, 1800};
@@ -77,7 +78,7 @@ static bool texture_import(sqlite_stmt_t *insert, const string_t *root, const js
                                    : string_new_with(level ? "earth_surface_detail.jpg" : "earth_surface.jpg");
     const json_t *asset = relative ? json_object_get(assets, relative) : NULL;
     const char *expected = texture_text(asset, "sha256", 64);
-    string_t *path = relative ? string_sprintf("%s/packaging/globe-db/textures/%s", string_c_str(root),
+    string_t *path = relative ? string_sprintf("%s/%s", string_c_str(directory),
                                                string_c_str(relative)) : NULL;
     file_t *file = path ? file_new(path) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
@@ -106,7 +107,8 @@ static bool texture_import(sqlite_stmt_t *insert, const string_t *root, const js
 bool cfg_database_textures(sqlite_t *db, const string_t *root)
 {
     if (!db || !root) return false;
-    string_t *path = string_sprintf("%s/packaging/globe-db/textures/manifest.json", string_c_str(root));
+    string_t *directory = mars_path_resource(MARS_PATH_TEXTURES, root, "");
+    string_t *path = directory ? string_sprintf("%s/manifest.json", string_c_str(directory)) : NULL;
     file_t *file = path ? file_new(path) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
     string_t *text = info && file_info_size(info) <= 65536 ? file_read_all_text(file) : NULL;
@@ -138,12 +140,12 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     for (unsigned level = 0; ok && level < 3; ++level)
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row)
             for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column)
-                ok = texture_import(insert, root, assets, level, column, row);
+                ok = texture_import(insert, directory, assets, level, column, row);
     sqlite_stmt_finalize(insert);
     if (ok) ok = sqlite_exec_cstr(db, "release globe_texture_import");
     if (transaction && !ok) sqlite_exec_cstr(db, "rollback to globe_texture_import;release globe_texture_import");
     cfg_progress_finish(progress, ok);
-    json_free(manifest); string_free(text); file_info_free(info); file_free(file); string_free(path);
+    json_free(manifest); string_free(text); file_info_free(info); file_free(file); string_free(path); string_free(directory);
     return ok;
 }
 

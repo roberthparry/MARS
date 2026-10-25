@@ -40,8 +40,8 @@ diagnostic_t *lab_proc_diagnostic(bool completed, int process_error, int exit_st
  * @param name Borrowed built-in mode name; see lab_worker.h.
  * @return Owned executable path released with string_free; NULL with EINVAL for
  * an unknown name, or ENOMEM on allocation failure.
- * @details By default every mode resolves to MARS_LAB_SERVER_PATH, compiled for
- * the active build configuration. A non-empty per-mode MARS_LAB_*_BINARY override
+ * @details By default every mode resolves to the configured lab_worker resource.
+ * A non-empty per-mode MARS_LAB_*_BINARY override
  * selects an external diagnostic executable. Use lab_proc_run_worker to supply
  * the necessary --worker-control dispatch arguments; this path alone is not a command.
  */

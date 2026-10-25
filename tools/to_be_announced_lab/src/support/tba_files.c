@@ -8,30 +8,19 @@
 #include <errno.h>
 #include <stdlib.h>
 
+#include "mars_paths.h"
 #include "tba_support.h"
 
-#ifndef TBA_ROOT
-#define TBA_ROOT "."
-#endif
-
-/* Resolve relative paths against the configured repository. */
+/* Resolve enumerated resource names using the shared application configuration. */
 string_t *tba_path(const char *path)
 {
-    const char *root = getenv("MARS_ROOT");
-    if (!root || !*root)
-        root = TBA_ROOT;
-    if (!path || !*path)
-        return NULL;
-    return path[0] == '/' ? string_new_with(path) : string_sprintf("%s/%s", root, path);
+    return path && *path ? mars_path_source(NULL, path) : NULL;
 }
 
 /* Resolve a packaged client asset. */
 string_t *tba_asset_path(const char *name)
 {
-    string_t *relative = string_sprintf("tools/to_be_announced_lab/assets/%s", name);
-    string_t *path = relative ? tba_path(string_c_str(relative)) : NULL;
-    string_free(relative);
-    return path;
+    return mars_path_resource(MARS_PATH_PRIVATE_ASSETS, NULL, name);
 }
 
 /* Bound reads on an opened regular file, including concurrent growth. */

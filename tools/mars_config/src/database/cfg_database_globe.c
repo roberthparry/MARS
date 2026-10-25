@@ -25,6 +25,7 @@
 
 #include "globe-t.h"
 #include "json-t.h"
+#include "mars_paths.h"
 #include "cfg_progress.h"
 #include "cfg_prompt.h"
 #include "cfg_storage.h"
@@ -1330,8 +1331,9 @@ static bool cfg_globe_countries(sqlite_t *db, const string_t *root, const string
     bool ok = true;
     cfg_progress_t *progress = cfg_progress_start("Indexing country boundaries");
     for (unsigned i = 0; i < 2; ++i) {
-        string_t *packed_path = string_sprintf("%s/packaging/globe-db/map-units-5.1.1.%s.zst",
-                                              string_c_str(root), extensions[i]);
+        string_t *name = string_sprintf("map-units-5.1.1.%s.zst", extensions[i]);
+        string_t *packed_path = name ? mars_path_resource(MARS_PATH_GLOBE, root, string_c_str(name)) : NULL;
+        string_free(name);
         string_t *plain_path = string_sprintf("%s/countries.%s", string_c_str(staging), extensions[i]);
         file_t *packed = packed_path ? file_new(packed_path) : NULL;
         plain[i] = plain_path ? file_new(plain_path) : NULL;
@@ -1365,7 +1367,7 @@ static bool cfg_globe_valid(sqlite_t *db)
 
 static bool cfg_globe_regions(sqlite_t *db, const string_t *root)
 {
-    string_t *path = string_sprintf("%s/packaging/globe-db/flag_regions.geojson", string_c_str(root));
+    string_t *path = mars_path_resource(MARS_PATH_GLOBE, root, "flag_regions.geojson");
     file_t *source = path ? file_new(path) : NULL;
     cfg_progress_t *progress = cfg_progress_start("Indexing regional flag coverage");
     bool ok = source && globe_import_regions(db, source);
@@ -1414,11 +1416,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
     string_t *staging = NULL, *temporary_path = NULL, *root = NULL, *body = NULL;
     file_t *temporary = NULL;
     sqlite_t *db = NULL;
-    root = cfg_storage_value(getenv("MARS_ROOT"));
-    if (root && !string_byte_length(root)) {
-        string_free(root);
-        root = string_new_with(MARS_CONFIG_ROOT_DIR);
-    }
+    root = string_new();
     if (ok && update) {
         /* Publish packaged layers together; credentials and rivers are untouched. */
         staging = exists ? cfg_database_stage(parent) : NULL;

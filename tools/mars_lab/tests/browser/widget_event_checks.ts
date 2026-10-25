@@ -99,7 +99,7 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
     const services = [
         'openMarsDatePicker', 'closeMarsDatePicker', 'commitMarsDateValue', 'shiftMarsDatePickerMonth',
         'shiftMarsDatePickerYear', 'setMarsDatePickerMonthYear', 'commitMarsTodayValue', 'placeMarsDatePicker',
-        'showButtonTooltip', 'hideButtonTooltip', 'markDatetimeOffsetTouched'
+        'showButtonTooltip', 'hideButtonTooltip', 'markDatetimeOffsetTouched', 'openFlagViewer', 'jurisdictionFlagModifier'
     ];
     const input = WorksheetContext.datetimeDate, otherInput = WorksheetContext.almanacDate;
     const opener = document.querySelector('[data-date-target="datetimeDate"]');
@@ -243,6 +243,10 @@ window.checkLabWidgetEvents = function checkLabWidgetEvents() {
         expect(17, {key: 'Enter'});
         expect(18, {}, [call('markDatetimeOffsetTouched')]);
         expect(19);
+        expect(20, {key: 'Alt', altKey: true}, [call('jurisdictionFlagModifier', true)]);
+        expect(20, {key: 'Alt', altKey: false}, [call('jurisdictionFlagModifier', false)]);
+        expect(20, {key: 'Enter', altKey: true});
+        expect(21, {}, [call('jurisdictionFlagModifier', false)]);
         expect(255);
 
         // Install on isolated document/window targets while exercising the real page controls.

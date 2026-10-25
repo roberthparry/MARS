@@ -9,7 +9,11 @@ reveal the error rather than leaving the worksheet hidden.
 The globe also retains its camera orientation and zoom in browser-local storage,
 independently of the restored observer fields. Native camera validation runs before the
 first globe frame; invalid records fall back to observer centring. Startup town
-hydration does not recenter a restored camera. Both calendar modes retain a saved
+hydration does not recenter a restored camera. `lab_globe_saved_camera()` validates
+the saved quaternion and zoom without changing a deliberate pan away from the
+observer. Exit snapshots preserve that displayed view even while location fields
+are changing; Back/Forward navigation validates destination visibility separately.
+Both calendar modes retain a saved
 town whose coordinates match the observer while catalogue pages load. Its official
 metadata replaces the temporary menu entry when available. A newly resolved town
 name refreshes the active worksheet without adding a history entry.
@@ -188,6 +192,8 @@ countries spanning multiple time zones; the zone remains editable. Nautical
 offsets apply only to positively identified inland water outside any jurisdiction.
 Date refreshes for an existing Almanac observer use its town timezone and native
 evaluation, without requesting a capital-city offset that could overwrite it.
+History entries without offset provenance resolve their zone again for the restored
+town and date. Entries explicitly marked as manually edited retain that offset.
 
 Explicit country-menu selections await the country's first town page asynchronously
 before applying the default town. Further pages continue loading in the background;
@@ -329,12 +335,16 @@ is sent to the native server's built-in calculation modes, which use MARSlib.
 
 ## Database updates during release builds
 
-After a successful build, `make release` runs `make update-mars-db` if the configured
+After a successful build, `make release` runs `make configure-mars` followed by
+`make update-mars-db` if the configured
 MARS Lab launcher is installed and executable. Without an installed launcher the
 release remains build-only. The updater prepares globe, almanac and jurisdiction
 databases sequentially: missing databases are installed from packaged sources, while
-existing ones receive only pending migrations. Saved paths and keys are reused without
-password prompts; a fresh configuration defaults to plaintext. New jurisdiction
+existing ones receive only pending migrations. The encrypted configuration key is
+retrieved from the desktop key store, which may request an unlock or initial setup.
+Once unlocked, it is reused without a separate MARS password. A failed configuration
+step stops the release before database updates. Content databases in a fresh
+installation default to plaintext. New jurisdiction
 installations use saved calendar choices or the locale's default location and language.
 Existing database configuration is preserved. This also restores all three databases
 after `make uninstall-mars-db`; `make install-mars-db` remains the explicit fresh-rebuild command.
@@ -407,6 +417,50 @@ progress bars and elapsed-time activity indicators for unmeasured work, so long
 imports and calendar generation remain visibly active. When output is redirected,
 plain status lines replace animated bars. Password and selection prompts remain
 unobstructed; a failed stage does not display successful completion.
+
+### Configuration and relocatable resources
+
+The small bootstrap file `~/.mars/config/mars.json` contains just the `database`
+field. Its initial value is `../mars.db`, locating the encrypted configuration
+database at `~/.mars/mars.db`. A relative value resolves from the JSON file's
+directory. `MARS_CONFIG_FILE` can select a different bootstrap file; no other
+environment variables are required for a configured installation.
+
+`make configure-mars` creates this configuration and imports existing database
+locations, weather settings and Lab cache settings. It preserves existing stores
+and configuration entries. The desktop's Secret Service key store holds the random
+encryption key; the key is never written into the JSON file. Unlocking requires
+`libsecret-1.so.0` and the user's running desktop Secret Service (normally GNOME
+Keyring), with a 30-second timeout. MARS connects to that service explicitly, so
+installation from a sandboxed editor and startup from the desktop use the same
+key store. An unavailable key fails
+startup explicitly rather than creating a replacement key for an existing database.
+Moving the encrypted database to another computer also requires transferring its
+key securely into that user's key store; copying `mars.json` alone is insufficient.
+
+Inside `mars.db`, `application_setting` holds settings and database locations;
+`resource_path` holds texture sources, packaged data, browser assets, calculation
+executables, time-zone data and temporary-directory locations. Relative paths
+resolve from `mars.db`'s directory. The native `mars_config` executable provides
+`settings list`, `settings set NAME VALUE`, `settings unset NAME` and
+`settings import FILE`, plus corresponding `paths list`, `paths set NAME PATH`
+and `paths unset NAME` commands. Settings listings redact credentials. Restart
+the Lab after editing settings; controlled calculations inherit the startup
+snapshot without looking up the key again.
+
+Explicit environment values remain available as diagnostic overrides. Builds
+generate a separate, unencrypted `mars-config.db` beside each application with
+public resource paths only, allowing development runs before user configuration.
+Runtime code resolves those paths through the shared configuration layer; it
+does not need the repository as its working directory. Installation records the
+actual resource locations, which can subsequently be edited without recompiling.
+The three content databases remain in their existing format. Migration also
+retains legacy `.env` files for compatibility, so existing plaintext credential
+copies are not removed by encrypting `mars.db`.
+Standalone river staging and checkpoint resumption continue to use their explicit
+input/candidate files and existing candidate-key setting, so background jobs do
+not require a desktop session. Publishing a candidate still loads the normal
+application configuration.
 
 Install the native TypeScript 7 compiler as `tsc` on PATH, or supply its absolute
 path through the Make variable `TSC`; `LAB_TSC` overrides it for MARS Lab alone.
@@ -883,6 +937,8 @@ standard-horizon predictions, not a model of local terrain or actual atmospheric
 An absent setup origin is reported rather than guessed from a dropdown.
 The browser fetches opaque native markup from `/home-sky` on startup and once per minute;
 no browser astronomy is performed. Refreshes do not overlap and stop at page disposal.
+Between refreshes, the home clock advances each second from the server instant using
+the setup timezone. This local tick performs no worksheet calculation or network request.
 Transient transport failures retain the last reading. Worksheet selections and weather
 requests do not change the home card or trigger extra home calculations.
 Switching modes resets the status immediately; mathematical modes never retain
@@ -920,14 +976,26 @@ reduced-motion preferences. It prefers the space above the flag when it fits in
 the viewport at the current scroll position, otherwise falling below. It can
 overlap both the summary and worksheet cards without being clipped. Escape dismisses it. Other flag displays
 are unchanged.
-Confirmed offshore points without an identified jurisdiction use the jurisdiction
+Click or tap the Location flag to open a large modal artwork viewer. **Zoom in** and
+**Zoom out** magnify the same SVG up to eight times its fitted size; scroll to inspect
+individual details, or choose **Fit** to see the entire flag. **Close** or Escape returns
+to the worksheet. Keyboard activation and flag animation remain available.
+Hold **Alt** to show the jurisdiction flag in the Almanac Location card, its hover
+preview and its open detail viewer. England, Wales, Scotland, Cornwall, Northern
+Ireland, the Isle of Man, Jersey and Guernsey show the Union Jack. Other regional
+flags show the country resolved for that location. Release Alt, or switch away
+from the window, to restore the ordinary artwork. The card's regional animation
+continues underneath; names, jurisdiction selections and other flag displays do
+not change. Offshore artwork remains unchanged.
+Confirmed sea and coastal-water points without an identified jurisdiction use the jurisdiction
 database's `ZZ-SEA` vector emblem: gold Pioneer-plaque-inspired linework on dark green,
 with clothed African-Caribbean figures. The card, observer tooltip and selected jurisdiction
 control share this artwork; the card retains its enlarged preview. The artwork uses
 scalable paths rather than an embedded bitmap. It is a display emblem, not
 a national flag: `ZZ-SEA` is an internal artwork key and never a selected or saved
-jurisdiction. Harbour/coastal water, inland water, land and unknown geography do
-not acquire it. The `/offshore_flag.svg` endpoint reads the SVG through the
+jurisdiction. Coastal water retains its classification and does not gain sea-horizon dip
+from displaying the emblem. An identified country's flag takes precedence; inland water,
+land and unknown geography do not acquire the emblem. The `/offshore_flag.svg` endpoint reads the SVG through the
 jurisdiction API; it does not read a runtime asset file or fall back to one when
 the database artwork is missing. `make update-mars-db` installs the artwork into
 an existing database without rebuilding towns or calendars.
@@ -1086,8 +1154,11 @@ of route length. Travel takes two seconds plus six seconds per radian;
 screen-motion limits and loading can extend these durations.
 The heading follows the route without north-up correction during travel. Zoom
 changes continuously while travelling, reaching its widest view at the geographic
-midpoint and returning to the **current departure zoom** on arrival, rather than
-restoring the destination's saved zoom. A destination already in view needs no
+midpoint and returning towards the **current departure zoom** on arrival, rather than
+restoring the destination's saved zoom. Automatic arrivals limit magnification to about
+three CSS pixels per photographic source pixel at the equator, using the view width and
+the 21,600-pixel source image. This prevents extreme saved zooms producing featureless
+arrival views; manual zoom remains available for closer inspection. A destination already in view needs no
 zoom-out. Other routes use an overview sized to the remaining half-route, not an
 automatic whole-globe view. Visible nearby destinations retain the departure
 heading to avoid rotating them out of the viewport. Reciprocal magnification
@@ -1102,7 +1173,7 @@ without adding history steps or clearing the forward branch. Camera ownership is
 matched by coordinates and jurisdiction, not the town dropdown's replaceable
 catalogue key. Animation frames do not overwrite the retained destination camera.
 Capturing a different observer during a flight never borrows that flight's target.
-Repeated Back/Forward clicks retain the zoom chosen before travel, not an intermediate
+Repeated Back/Forward clicks retain the bounded arrival zoom, not an intermediate
 zoom-out. Redirected journeys start from the displayed camera and transport its existing
 orientation, skipping a second stationary departure turn; arrival roll remains separate.
 The current route continues drawing while the replacement history entry resolves;
@@ -1116,6 +1187,10 @@ Town catalogue key refreshes alone cannot interrupt an active journey.
 observer. A mismatched legacy camera recentres north-up while retaining its valid zoom;
 matching cameras retain their pan and roll. This repair occurs on restoration without
 rewriting the history database or removing entries.
+The destination's detailed photographic patch is prepared before departure, with an
+eight-second download deadline; missing tiles leave the existing photograph usable.
+A travelling notice names the destination and explains that the worksheet already shows
+its results; the selected destination marker remains visible whenever it projects into view.
 Destination shoreline detail is prefetched off-thread. Projection and large stencil
 texture uploads wait until arrival so they cannot stall GPU travel rendering.
 The global photograph covers the
@@ -2240,8 +2315,9 @@ tests needing white-box access use the controlled `src/internal/` façades.
 
 The desktop icon calls the installed launcher, which starts the already-built
 `tools/mars_lab/build/release/mars_lab`; its name, icon and browser address
-are unchanged. Direct binaries use their compiled repository location unless
-`MARS_ROOT` is supplied.
+are unchanged. Direct binaries use the configured resource locations or the
+build-generated resource database beside the executable. `MARS_ROOT` remains
+an optional compatibility fallback for explicit development setups.
 
 Use `make mars-lab-stop` to stop a Lab process belonging to the current user,
 or `make mars-lab-restart` after changing the native helper or client.

@@ -105,22 +105,28 @@ static void test_cfg_textures_rollback(void)
                      "missing or corrupt final tiles roll back the entire replacement");
 }
 
-static void test_cfg_textures_migration(void)
+static bool texture_migration_fixture(const char *directory)
 {
     sqlite_t *db = texture_database("");
-    string_t *root = string_new_with(MARS_CONFIG_ROOT_DIR);
-    TEST_ASSERT_TRUE(db && root && sqlite_exec_cstr(db,
+    string_t *root = string_new_with(MARS_CONFIG_ROOT_DIR), *staging = string_new_with(directory);
+    bool ok = db && root && staging && sqlite_exec_cstr(db,
         "create table shoreline_dataset(id,format_version,point_count);insert into shoreline_dataset values(1,2,7);"
         "create table shoreline_blob(id,vertices);"
         "create table shoreline_chunk(id,level,codec,point_count,byte_offset,byte_count,boundary,blob_id);"
         "create virtual table shoreline_bounds using rtree(id,min_x,max_x,min_y,max_y);"
         "create table rivers_dataset(id,source);insert into rivers_dataset values(1,'retained');") &&
-        cfg_database_revision(db, "globe", 5) && cfg_database_globe_refresh(db, root, NULL) && cfg_database_textures_valid(db),
-        "revision-five migration needs no shoreline rebuild or staging directory");
+        cfg_database_revision(db, "globe", 5) && cfg_database_globe_refresh(db, root, staging) &&
+        cfg_database_textures_valid(db);
     sqlite_stmt_t *q = sqlite_stmt_prepare(db, "select source from rivers_dataset");
-    TEST_ASSERT_TRUE(q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && !strcmp(sqlite_stmt_column_text(q, 0), "retained"),
-                     "texture migration preserves independent river data");
-    sqlite_stmt_finalize(q); string_free(root); sqlite_close(db);
+    ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && !strcmp(sqlite_stmt_column_text(q, 0), "retained");
+    sqlite_stmt_finalize(q); string_free(staging); string_free(root); sqlite_close(db);
+    return ok;
+}
+
+static void test_cfg_textures_migration(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(texture_migration_fixture),
+                     "revision-five migration updates countries and textures while preserving shoreline and rivers");
 }
 
 static void example_globe_texture_metadata(void)

@@ -51,6 +51,7 @@ LAB_CONFIG := $(notdir $(BUILD_DIR))
 LAB_BUILD_DIR := tools/mars_lab/build/$(LAB_CONFIG)
 LAB_SRCS := $(sort $(wildcard tools/mars_lab/src/*/*.c))
 LAB_OBJS := $(patsubst tools/mars_lab/src/%.c,$(LAB_BUILD_DIR)/%.o,$(LAB_SRCS))
+LAB_OBJS += $(APP_RESOURCE_OBJ)
 LAB_SERVER := $(LAB_BUILD_DIR)/mars_lab
 LAB_SUPPORT_OBJS := $(filter-out $(LAB_BUILD_DIR)/app/lab_main.o,$(LAB_OBJS))
 LAB_TEST_SRCS := $(filter-out tools/mars_lab/tests/test_lab_cache_memory.c,$(sort $(wildcard tools/mars_lab/tests/*.c)))
@@ -253,21 +254,15 @@ check-lab-wasm-deps:
 	test -s "$$probe_dir/probe.wasm"; \
 	echo "MARS Lab WebAssembly compile/link probe passed."
 
-$(LAB_OBJS) $(LAB_SERVER) $(LAB_TEST_OBJS) $(LAB_TEST_BIN) $(LAB_BUILD_DIR)/tests/test_lab_browser: | check-lab-wasm-deps
+$(filter-out $(APP_RESOURCE_OBJ),$(LAB_OBJS)) $(LAB_SERVER) $(LAB_TEST_OBJS) $(LAB_TEST_BIN) $(LAB_BUILD_DIR)/tests/test_lab_browser: | check-lab-wasm-deps
 
 # Native Lab build rules. Included by the root Makefile after library variables.
 # The local Makefile delegates to this same graph, reusing MARS dependency checks.
-$(LAB_OBJS) $(LAB_SERVER): | native-tools check-native-deps
+$(filter-out $(APP_RESOURCE_OBJ),$(LAB_OBJS)) $(LAB_SERVER): | native-tools check-native-deps
 
 $(LAB_BUILD_DIR)/%.o: tools/mars_lab/src/%.c tools/mars_lab/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
-	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_lab/include -Itools/mars_lab/src \
-	    -DMARS_LAB_ROOT_DIR='"$(CURDIR)"' \
-	    -DMARS_LAB_ASSET_PATH='"$(CURDIR)/tools/mars_lab/assets/index.html"' \
-	    -DMARS_LAB_SERVER_PATH='"$(abspath $(LAB_SERVER))"' -c $< -o $@
-
-$(LAB_BUILD_DIR)/server/lab_server.o: CFLAGS += -DMARS_LAB_WASM_PATH='"$(abspath $(LAB_WASM))"'
-$(LAB_BUILD_DIR)/server/lab_server.o: CFLAGS += -DMARS_LAB_CODEC_PATH='"$(abspath $(LAB_CODEC_WASM))"'
+	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_lab/include -Itools/mars_lab/src -c $< -o $@
 
 $(LAB_SERVER): $(LAB_OBJS) $(STATIC_LIB) $(LAB_WASM) $(LAB_CODEC_WASM) | lab-typescript
 	@mkdir -p $(dir $@)

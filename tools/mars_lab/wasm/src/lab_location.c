@@ -575,8 +575,8 @@ static jsref lab_location_resolve(lab_mode_t mode, lab_calendar_operation_t oper
     }
     if (mode == LAB_MODE_ALMANAC) {
         int provenance = lab_dom_key_get(source, lab_dom_join(prefix, lab_dom_string("zone_mode"), ""));
-        /* Older histories have no provenance: never guess that an authored zone was automatic. */
-        lab_dom_set(result, "zone_mode", lab_dom_string(lab_location_is(provenance, "auto") ? "auto" : "manual"));
+        /* Legacy offsets may belong to an earlier destination; only explicit manual ownership survives restoration. */
+        lab_dom_set(result, "zone_mode", lab_dom_string(lab_location_is(provenance, "manual") ? "manual" : "auto"));
     }
     return result;
 }

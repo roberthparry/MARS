@@ -37,6 +37,7 @@ export class GlobePhoto {
         if (performance.now() < this.retryAfter) return;
         this.cancel();
         const controller = new AbortController();
+        const timeout = window.setTimeout(() => controller.abort(), 8000);
         this.request = controller;
         this.pendingKey = key;
         const canvas = document.createElement('canvas');
@@ -92,6 +93,7 @@ export class GlobePhoto {
         } catch {
             if (!controller.signal.aborted) this.retryAfter = performance.now() + 30000;
         } finally {
+            window.clearTimeout(timeout);
             canvas.width = canvas.height = 1;
             gl.deleteTexture(texture);
             if (!gl.isContextLost()) {

@@ -22,8 +22,9 @@
 #include <unistd.h>
 
 #include "file-t.h"
-#include "lab_runtime.h"
 #include "string-t.h"
+#include "mars_settings.h"
+#include "lab_runtime.h"
 
 static string_t *lab_runtime_environment_text(const char *name)
 {
@@ -341,6 +342,7 @@ static bool lab_runtime_publish_key(file_t *configuration, const string_t *direc
         file_free(folder);
         errno = error;
     }
+    if (ok) ok = mars_settings_sync(document);
     int error = errno;
     if (created && temporary)
         file_delete(temporary);

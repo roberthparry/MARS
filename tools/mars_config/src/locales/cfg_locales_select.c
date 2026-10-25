@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "mars_paths.h"
 #define MARS_CFG_LOCALES_INTERNAL_ACCESS
 #include "cfg_locales_internal.h"
 
@@ -129,7 +130,7 @@ static const string_t *cfg_locales_default(cfg_locales_state *state, const strin
 
 static json_t *cfg_locales_countries(const string_t *root)
 {
-    string_t *path = cfg_locales_path(root, "packaging/jurisdiction-db/mars_country_jurisdictions.sql");
+    string_t *path = mars_path_resource(MARS_PATH_JURISDICTION, root, "mars_country_jurisdictions.sql");
     string_t *text = path ? cfg_locales_read(path) : NULL;
     string_cursor_t *cursor = text ? string_cursor_new(text) : NULL;
     json_t *countries = cursor ? json_new_object() : NULL;

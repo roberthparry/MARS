@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "mars_settings.h"
 #include "cfg_storage.h"
 #include "cfg_database.h"
 #define MARS_CFG_DATABASE_INTERNAL_ACCESS
@@ -136,7 +137,7 @@ static bool cfg_plain_one(const char *name, const char *prefix)
         ok = body && file_chmod(temporary, 0600) && file_open_read(temporary);
         if (ok) { ok = file_sync(temporary, false); ok = file_close(temporary) && ok; }
         ok = ok && file_copy(config, backup, false) && file_chmod(backup, 0600) &&
-             file_move(temporary, destination, false) && cfg_storage_publish(config, directory, body);
+             file_move(temporary, destination, false) && cfg_storage_publish(config, directory, body) && mars_settings_sync(body);
         string_free(body);
     }
     if (ok) printf("%s database: plaintext verified%s.\n", name, plain ? " (already configured)" : " and selected");

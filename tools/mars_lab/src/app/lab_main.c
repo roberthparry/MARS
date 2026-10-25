@@ -5,8 +5,8 @@
  * Owns an IP listener and a fixed pool of separate request processes. Mathematical
  * calculations run as built-in modes of this executable in isolated children;
  * TeX utilities remain external programmes. No Python interpreter
- * is loaded or launched. Uses the compiled repository location unless MARS_ROOT
- * supplies an explicit alternative.
+ * is loaded or launched. Resource locations and persistent settings come from the
+ * configured MARS database, without changing the caller's working directory.
  */
 #include <errno.h>
 #include <signal.h>
@@ -18,6 +18,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "mars_paths.h"
 #include "lab_process.h"
 #include "lab_runtime.h"
 #include "lab_server.h"
@@ -115,8 +116,13 @@ static pid_t lab_app_start_worker(lab_server_t *server, unsigned index)
 /* Parse options, start request workers and synchronously reap them on shutdown. */
 int main(int argc, char **argv)
 {
+    /* Controlled calculations inherit the server's complete configuration snapshot. */
     if (argc > 1 && lab_app_option(argv[1], "--worker-control"))
         return lab_worker_dispatch_controlled(argc - 2, argv + 2);
+    if (!mars_paths_load()) {
+        fputs("Cannot read MARS configuration; check mars.json and its database.\n", stderr);
+        return 1;
+    }
     if (argc > 1 && lab_app_option(argv[1], "--worker"))
         return lab_worker_dispatch(argc - 2, argv + 2);
     const char *host = "127.0.0.1", *browser = "xdg-open";
@@ -127,7 +133,7 @@ int main(int argc, char **argv)
             puts("MARS Lab (native C)\nUsage: mars_lab [--host IP] [--port 0..65535] [--workers 1..8]\n"
                  "                       [--no-browser] [--browser PROGRAM]\n"
                  "       mars_lab --worker MODE [calculation arguments...]\n"
-                 "Uses the compiled MARS repository unless MARS_ROOT is set. Default: IPv4 loopback, four workers.");
+                 "Resources use the MARS configuration database. Default: IPv4 loopback, four workers.");
             return 0;
         }
         if (lab_app_option(argv[i], "--no-browser")) {
@@ -158,13 +164,6 @@ int main(int argc, char **argv)
             fprintf(stderr, "Unknown or invalid option: %s\n", argv[i]);
             return 2;
         }
-    }
-    const char *root = getenv("MARS_ROOT");
-    if (!root || !*root)
-        root = MARS_LAB_ROOT_DIR;
-    if (chdir(root)) {
-        perror("MARS_ROOT");
-        return 1;
     }
     if (setenv("MARS_LAB_BIND_HOST", host, 1))
         return 1;

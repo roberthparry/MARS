@@ -11,10 +11,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "string-t.h"
+#include "mars_paths.h"
+#include "mars_settings.h"
 #include "cfg_database.h"
 #include "cfg_locales.h"
 #include "cfg_weather.h"
-#include "string-t.h"
 
 static bool cfg_app_is(const char *text, const char *literal)
 {
@@ -27,18 +29,32 @@ static bool cfg_app_is(const char *text, const char *literal)
 /* Dispatch one explicit task; help and malformed options never touch configuration. */
 int main(int argc, char **argv)
 {
+    if (argc >= 2 && cfg_app_is(argv[1], "paths")) return mars_paths_command(argc - 2, argv + 2);
+    if (argc >= 2 && cfg_app_is(argv[1], "settings")) return mars_settings_command(argc - 2, argv + 2);
+    /* Standalone candidate jobs use their explicit files and existing candidate key, without a desktop session. */
+    if (argc >= 2 && cfg_app_is(argv[1], "globe-stage-rivers"))
+        return argc == 4 ? cfg_globe_river_stage(argv[2], argv[3]) : 2;
+    if (argc >= 2 && cfg_app_is(argv[1], "globe-resume-rivers"))
+        return argc == 4 ? cfg_globe_river_resume(argv[2], argv[3]) : 2;
     if (argc == 2 && cfg_app_is(argv[1], "--help")) {
         puts("Usage: mars_config weather [--weather-key KEY] [--noninteractive]\n"
              "       mars_config almanac [--db-path PATH] [--db-key KEY] [--noninteractive]\n"
              "       mars_config jurisdiction [TOWN] [--language LANGUAGE] [--db-path PATH]\n"
              "                                [--db-key KEY] [--noninteractive]\n"
-             "       mars_config locales [--check | --output PATH] [--data-dir DIR]");
+             "       mars_config locales [--check | --output PATH] [--data-dir DIR]\n"
+             "       mars_config paths [list | init | set NAME PATH | unset NAME]\n"
+             "       mars_config settings [list | migrate | set NAME VALUE | unset NAME | import FILE]\n"
+             "MARS_CONFIG_FILE optionally selects mars.json; its database field locates mars.db.");
         puts("       mars_config globe-install | globe-check | globe-update | globe-uninstall");
         puts("       mars_config databases | databases-ensure | databases-update | databases-plaintext");
         puts("       mars_config globe-stage-rivers INPUT.geojsonseq[.zst] NEW-CANDIDATE.db");
         puts("       mars_config globe-resume-rivers INPUT.geojsonseq[.zst] CANDIDATE.db");
         puts("       mars_config globe-install-rivers CANDIDATE.db");
         return 0;
+    }
+    if (!mars_settings_load()) {
+        fputs("Cannot read MARS configuration; check mars.json and its database.\n", stderr);
+        return 1;
     }
     if (argc < 2) {
         fputs("Choose weather, almanac, jurisdiction or locales; use --help for usage.\n", stderr);
@@ -54,10 +70,6 @@ int main(int argc, char **argv)
         return argc == 2 ? cfg_databases_ensure() : 2;
     if (cfg_app_is(argv[1], "databases-plaintext"))
         return argc == 2 ? cfg_databases_plain() : 2;
-    if (cfg_app_is(argv[1], "globe-stage-rivers"))
-        return argc == 4 ? cfg_globe_river_stage(argv[2], argv[3]) : 2;
-    if (cfg_app_is(argv[1], "globe-resume-rivers"))
-        return argc == 4 ? cfg_globe_river_resume(argv[2], argv[3]) : 2;
     if (cfg_app_is(argv[1], "globe-install-rivers"))
         return argc == 3 ? cfg_globe_river_install(argv[2]) : 2;
     if (cfg_app_is(argv[1], "globe-install") || cfg_app_is(argv[1], "globe-check") ||

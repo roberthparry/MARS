@@ -17,9 +17,6 @@
 #include "checks_policy.h"
 #include "checks_readme.h"
 
-#ifndef MARS_CHECKS_ROOT_DIR
-#define MARS_CHECKS_ROOT_DIR "."
-#endif
 
 static void checks_app_usage(void)
 {
@@ -111,7 +108,8 @@ int main(int argc, char **argv)
         checks_app_usage();
         return 2;
     }
-    string_t *root = checks_text(MARS_CHECKS_ROOT_DIR);
+    const char *configured_root = getenv("MARS_ROOT");
+    string_t *root = checks_text(configured_root && *configured_root ? configured_root : ".");
     if (!checks_process_interrupt_begin())
         checks_fatal("installing interruption handlers");
     int result = command->run(root, argc - 2, argv + 2);

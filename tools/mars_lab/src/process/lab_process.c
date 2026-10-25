@@ -34,6 +34,7 @@
 
 #include "file-t.h"
 #include "string-t.h"
+#include "mars_paths.h"
 #include "lab_process.h"
 
 extern char **environ;
@@ -305,8 +306,7 @@ static bool lab_proc_run_input_mode(const char *const argv[], const char *cwd, c
     pid_t child = -1;
     struct timespec start;
     int error = 0;
-    char directory[] = "/tmp/mars-lab-input-XXXXXX";
-    bool directory_created = false;
+    file_t *directory = NULL;
     file_t *input_file = NULL;
     if (clock_gettime(CLOCK_MONOTONIC, &start) < 0 || !lab_proc_pipe(descriptors)) {
         error = errno;
@@ -317,12 +317,12 @@ static bool lab_proc_run_input_mode(const char *const argv[], const char *cwd, c
         goto cleanup;
     }
     if (input) {
-        if (!mkdtemp(directory)) {
+        directory = mars_path_temporary();
+        if (!directory) {
             error = errno;
             goto cleanup;
         }
-        directory_created = true;
-        string_t *path = string_sprintf("%s/stdin", directory);
+        string_t *path = string_sprintf("%s/stdin", file_path(directory));
         input_file = path ? file_new(path) : NULL;
         string_free(path);
         if (!input_file) {
@@ -373,12 +373,11 @@ cleanup:
             error = errno;
         file_free(input_file);
     }
-    if (directory_created) {
-        file_t *folder = file_new_cstr(directory);
-        bool removed = folder && file_remove_directory(folder);
+    if (directory) {
+        bool removed = file_remove_directory(directory);
         if (!removed && !error)
-            error = folder ? errno : ENOMEM;
-        file_free(folder);
+            error = errno;
+        file_free(directory);
     }
     if (descriptors[0] >= 0)
         close(descriptors[0]);

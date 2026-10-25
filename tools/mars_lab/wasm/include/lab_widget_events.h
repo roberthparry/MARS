@@ -34,6 +34,9 @@ typedef enum {
     LAB_WIDGET_EVENT_TOOLTIP_HIDE   = 16, /**< Hide a tooltip. */
     LAB_WIDGET_EVENT_TOOLTIP_ESCAPE = 17, /**< Dismiss a tooltip with Escape. */
     LAB_WIDGET_EVENT_OFFSET_TOUCHED = 18, /**< Mark the observer offset as authored. */
+    LAB_WIDGET_EVENT_FLAG_OPEN      = 19, /**< Magnify the Location summary flag. */
+    LAB_WIDGET_EVENT_FLAG_MODIFIER  = 20, /**< Show jurisdiction artwork while Alt is held. */
+    LAB_WIDGET_EVENT_FLAG_RESET     = 21, /**< Restore ordinary artwork when the window loses focus. */
 } lab_widget_event_action_t;
 
 /**
@@ -49,7 +52,8 @@ void lab_widget_events_install(jsref document, jsref window, jsref state);
  * @param action Open picker 0, select grid day 1, previous/next month 2/3, previous/next year 4/5,
  * month change 6, year change 7, year key 8, Today 9, close 10, outside click 11, reposition 12,
  * tooltip pointer-over/out 13/14, tooltip focus-in 15, hide tooltip 16, tooltip Escape 17,
- * or mark observer offset touched 18; unknown codes produce an empty plan.
+ * mark observer offset touched 18, magnify Location flag 19, update Alt artwork 20 or reset artwork 21;
+ * unknown codes produce an empty plan.
  * @param event Scoped browser Event handle with currentTarget, target and keyboard/pointer fields.
  * @param state Scoped mutable picker context containing input, button, shell, year and month.
  * @details Publishes a browser event plan via lab_dom_return. Service arguments are browser values copied out

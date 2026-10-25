@@ -88,6 +88,14 @@ void lab_globe_view(quaternion_jsref orientation, double zoom, double factor);
 void lab_globe_photo_patch(double latitude, double longitude);
 
 /**
+ * @brief Validate a displayed camera without recentering it on an observer.
+ * @param camera Saved unit quaternion and magnification in 1..4096.
+ * @return Via the bridge, the unchanged five camera numbers, or null for invalid data.
+ * @details Startup restores the last displayed view, including a deliberate pan away from the observer.
+ */
+void lab_globe_saved_camera(jsref camera);
+
+/**
  * @brief Validate a saved camera against the geographic observer it accompanies.
  * @param camera Saved quaternion and zoom, or null for a legacy record without a camera.
  * @param latitude Observer latitude in degrees, within -90..90.
@@ -99,6 +107,15 @@ void lab_globe_photo_patch(double latitude, double longitude);
  * @return Via the bridge, five camera numbers, or null for an invalid observer or fallback zoom.
  */
 void lab_globe_history_camera(jsref camera, double latitude, double longitude, double zoom);
+
+/**
+ * @brief Bound automatic arrival magnification to three CSS pixels per source-photo pixel at the equator.
+ * @param zoom Requested magnification; manual gestures remain independent of this automatic framing limit.
+ * @param viewport View width in CSS pixels.
+ * @param pixels Width of the full-resolution equirectangular photograph.
+ * @return Via the bridge, bounded zoom or null for invalid inputs.
+ */
+void lab_globe_arrival_zoom(double zoom, double viewport, double pixels);
 
 /**
  * @brief Face the route, follow its shortest great circle, then restore the destination's roll.

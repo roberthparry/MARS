@@ -110,6 +110,10 @@ class LabApplication {
     private refreshTimer: number | undefined;
     private homeSkyTimer: number | undefined;
     private homeSkyPending = false;
+    private homeClockTimer: number | undefined;
+    private homeClockEpoch = 0;
+    private homeClockReceived = 0;
+    private homeClockFormat: Intl.DateTimeFormat | null = null;
     private config: LabConfiguration | undefined;
     private nativeCatalogue: LabCatalogue | undefined;
     private definitionScriptNames: readonly string[] = [];
@@ -442,7 +446,19 @@ class LabApplication {
         this.refreshTimer = window.setInterval(WorksheetRequests.calendarRequests.refreshMobileAccess, 5000);
         if (this.homeSkyTimer !== undefined) window.clearInterval(this.homeSkyTimer);
         this.homeSkyTimer = window.setInterval(() => { void this.refreshHomeSky(); }, 60000);
+        window.clearInterval(this.homeClockTimer);
+        this.homeClockTimer = window.setInterval(() => this.tickHomeClock(), 1000);
         void this.refreshHomeSky();
+    }
+
+    /** Advance only the home clock from the server instant; no astronomy or network request is needed. */
+    public tickHomeClock(now = performance.now()): void {
+        if (!this.homeClockFormat) return;
+        const instant = this.homeClockEpoch + Math.max(0, now - this.homeClockReceived);
+        const parts = Object.fromEntries(this.homeClockFormat.formatToParts(instant).map(part => [part.type, part.value]));
+        const zone = parts.timeZoneName === 'GMT' ? 'GMT+00:00' : parts.timeZoneName;
+        const text = `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} ${zone}`;
+        for (const clock of document.querySelectorAll<HTMLElement>('[data-home-clock-zone]')) clock.textContent = text;
     }
 
     /** Fetch opaque native home-sky markup; no worksheet coordinates, dates or astronomy enter this request. */
@@ -463,6 +479,18 @@ class LabApplication {
                 document.body.append(source);
             }
             source.innerHTML = data.html;
+            const clock = source.querySelector<HTMLElement>('[data-home-clock-zone]');
+            this.homeClockFormat = null;
+            if (clock && Number.isFinite(Number(clock.dataset.homeClockMs))) {
+                this.homeClockEpoch = Number(clock.dataset.homeClockMs);
+                this.homeClockReceived = performance.now();
+                try {
+                    this.homeClockFormat = new Intl.DateTimeFormat('en-GB', {
+                        timeZone: clock.dataset.homeClockZone, year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZoneName: 'longOffset'
+                    });
+                } catch { /* Retain the server-rendered clock when the browser lacks this timezone. */ }
+            }
             const mode = WorksheetWorkspace.mode.currentMode();
             if (mode === 'datetime' || mode === 'almanac') WorksheetWorkspace.presentation.setStatus('Ready');
         } catch {
@@ -489,6 +517,9 @@ class LabApplication {
         this.refreshTimer = undefined;
         window.clearInterval(this.homeSkyTimer);
         this.homeSkyTimer = undefined;
+        window.clearInterval(this.homeClockTimer);
+        this.homeClockTimer = undefined;
+        this.homeClockFormat = null;
         for (const callback of this.resizeCallbacks)
             this.resizeTarget.removeEventListener('resize', callback);
         this.resizeCallbacks.clear();
@@ -615,6 +646,8 @@ class LabApplication {
             placeMarsDatePicker: WorksheetLocations.picker.place,
             showButtonTooltip: WorksheetResults.tooltip.show,
             hideButtonTooltip: WorksheetResults.tooltip.hide,
+            openFlagViewer: WorksheetResults.tooltip.openFlagViewer,
+            jurisdictionFlagModifier: WorksheetResults.tooltip.jurisdictionFlagModifier,
             markDatetimeOffsetTouched: this.markDatetimeOffset.bind(this),
             setAlmanacVisibility: WorksheetResults.calendarResults.setAlmanacVisibility,
             saveLastAlmanacState: this.saveAlmanac.bind(this),

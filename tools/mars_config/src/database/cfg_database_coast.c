@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "globe-t.h"
+#include "mars_paths.h"
 #include "cfg_progress.h"
 #define MARS_CFG_DATABASE_INTERNAL_ACCESS
 #include "cfg_database_internal.h"
@@ -28,7 +29,9 @@ static bool cfg_coast_archive(const string_t *root, file_t *archive)
 {
     bool ok = file_open(archive, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
     for (unsigned i = 0; ok && i < 7; ++i) {
-        string_t *path = string_sprintf("%s/packaging/globe-db/shoreline-20261023.cf64.zst.%02u", string_c_str(root), i);
+        string_t *name = string_sprintf("shoreline-20261023.cf64.zst.%02u", i);
+        string_t *path = name ? mars_path_resource(MARS_PATH_GLOBE, root, string_c_str(name)) : NULL;
+        string_free(name);
         file_t *part = path ? file_new(path) : NULL;
         file_info_t *info = part ? file_get_info(part) : NULL;
         size_t expected = i < 6 ? 67108864 : 14916563;

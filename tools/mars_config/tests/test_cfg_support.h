@@ -13,6 +13,9 @@
 /** Copy packaged image fixtures beneath a disposable test root. */
 bool test_cfg_copy_textures(const char *directory);
 
+/** @brief Register encrypted configuration and relocatable resource regressions. */
+void test_cfg_paths_cases(void);
+
 /** Register photographic storage, validation and rollback regressions. */
 void test_cfg_textures_cases(void);
 

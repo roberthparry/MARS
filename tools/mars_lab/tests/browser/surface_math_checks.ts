@@ -132,6 +132,64 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         check(offshorePreview.getAttribute('src') === '/offshore_flag.svg' && offshorePreview.naturalWidth > 1000 &&
               offshorePreview.getBoundingClientRect().width === 336 && offshorePreview.getBoundingClientRect().height === 252,
               'bundled offshore artwork decodes and uses the same enlarged preview');
+        previewButton.click();
+        const viewer = document.querySelector<HTMLDialogElement>('.mars-flag-viewer')!;
+        check(!!viewer?.open, 'clicking the summary flag opens a modal artwork viewer');
+        const detail = viewer.querySelector('img')!;
+        await detail.decode();
+        await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        const fittedWidth = detail.getBoundingClientRect().width;
+        const viewerControls = Array.from(viewer.querySelectorAll('button'));
+        viewerControls.find(item => item.textContent === 'Zoom in')!.click();
+        check(detail.getAttribute('src') === '/offshore_flag.svg' &&
+              detail.getBoundingClientRect().width > fittedWidth * 1.4 && smallFlag.getBoundingClientRect().width === 24,
+              'detail viewer magnifies the original SVG without enlarging the summary flag');
+        viewerControls.find(item => item.textContent === 'Fit')!.click();
+        check(Math.abs(detail.getBoundingClientRect().width - fittedWidth) < 1,
+              'Fit restores the complete artwork within the viewer');
+        viewerControls.find(item => item.textContent === 'Close')!.click();
+        await new Promise(resolve => window.setTimeout(resolve, 30));
+        check(!document.querySelector('.mars-flag-viewer') && document.activeElement === previewButton,
+              'closing the viewer removes it and restores keyboard focus');
+        const jurisdictionFlag = smallFlag.cloneNode() as HTMLImageElement;
+        jurisdictionFlag.classList.add('jurisdiction-flag');
+        jurisdictionFlag.src = 'data:image/svg+xml;base64,' + btoa(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="18"><path fill="red" d="M0 0h24v18H0z"/></svg>');
+        smallFlag.src = regionalFlag;
+        previewButton.append(jurisdictionFlag);
+        WorksheetResults.tooltip.show(previewButton);
+        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Alt', altKey: true, bubbles: true}));
+        check(getComputedStyle(jurisdictionFlag).opacity === '1' && getComputedStyle(smallFlag).opacity === '0' &&
+              smallFlag.src === regionalFlag && popup.querySelector('img')?.getAttribute('src') === jurisdictionFlag.src,
+              'holding Alt shows parent artwork in the card and hover preview without replacing the animated image');
+        const refreshed = previewCard.cloneNode(true) as HTMLElement;
+        document.body.append(refreshed);
+        check(getComputedStyle(refreshed.querySelector('.jurisdiction-flag')!).opacity === '1',
+              'a replacement worksheet honours Alt immediately without a request or observer race');
+        refreshed.remove();
+        previewButton.click();
+        const parentViewer = document.querySelector<HTMLDialogElement>('.mars-flag-viewer')!;
+        check(parentViewer.querySelector('img')?.getAttribute('src') === jurisdictionFlag.src,
+              'the detail viewer opens on the currently displayed parent flag');
+        document.dispatchEvent(new KeyboardEvent('keyup', {key: 'Alt', altKey: false, bubbles: true}));
+        check(getComputedStyle(jurisdictionFlag).opacity === '0' && getComputedStyle(smallFlag).opacity === '1' &&
+              parentViewer.querySelector('img')?.getAttribute('src') === regionalFlag,
+              'Alt release restores the card and open viewer to regional artwork');
+        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Alt', altKey: true, bubbles: true}));
+        window.dispatchEvent(new Event('blur'));
+        check(!document.documentElement.hasAttribute('data-almanac-jurisdiction-flag') &&
+              parentViewer.querySelector('img')?.getAttribute('src') === regionalFlag,
+              'losing window focus clears Alt even when keyup happens outside the browser');
+        parentViewer.close();
+        await new Promise(resolve => window.setTimeout(resolve, 30));
+        jurisdictionFlag.remove();
+        smallFlag.src = '/offshore_flag.svg';
+        document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Alt', altKey: true, bubbles: true}));
+        WorksheetResults.tooltip.show(previewButton);
+        check(getComputedStyle(smallFlag).opacity === '1' &&
+              popup.querySelector('img')?.getAttribute('src') === '/offshore_flag.svg',
+              'Alt leaves the offshore emblem unchanged when no jurisdiction flag exists');
+        document.dispatchEvent(new KeyboardEvent('keyup', {key: 'Alt', bubbles: true}));
         for (const [width, height] of [[320, 640], [640, 240]]) {
             labDOM.call('lab_tooltip_show', previewButton, previewButton, width, height);
             const fitted = popup.querySelector<HTMLImageElement>('img')!.getBoundingClientRect();
@@ -180,6 +238,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     } finally {
         WorksheetResults.tooltip.hide();
         previewCard.remove();
+        WorksheetResults.tooltip.jurisdictionFlagModifier(false);
     }
 
     const borderCamera = [0, 0, 0, 1];
@@ -761,6 +820,10 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         }
     }
     check(labDOM.call('lab_globe_pick', 2, 0, [0, 0, 0, 1]) === null, 'globe limb rejects outside clicks');
+    check(labDOM.call('lab_globe_arrival_zoom', 10, 800, 21600) === 10 &&
+          (labDOM.call('lab_globe_arrival_zoom', 4096, 800, 21600) as number) < 26 &&
+          labDOM.call('lab_globe_arrival_zoom', 10, 0, 21600) === null,
+          'automatic arrivals retain useful zoom and bound excessive photo magnification with validated viewport sizes');
     {
         const juneau = [...labDOM.call('lab_globe_centre', 58.3019, -134.4197) as number[], 150];
         const repaired = labDOM.call('lab_globe_history_camera', juneau, -33.4489, -70.6693, 20) as number[];

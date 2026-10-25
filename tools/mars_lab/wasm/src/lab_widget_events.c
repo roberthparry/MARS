@@ -155,6 +155,31 @@ static void lab_widget_events_tooltip(lab_widget_event_action_t action, event_js
     lab_widget_events_emit(calls, tooltips[action].service, tooltips[action].count, button, 0, 0);
 }
 
+/* Only the worksheet Location flag opens the detailed artwork viewer. */
+static void lab_widget_events_flag(lab_widget_event_action_t action, event_jsref event, jsref state,
+                                   jsref plan, jsref calls)
+{
+    (void)action;
+    (void)state;
+    int button = lab_dom_closest(lab_dom_get(event, "target"), ".almanac-summary .almanac-location-flag");
+    if (!button) return;
+    lab_dom_set(plan, "prevent", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
+    lab_widget_events_emit(calls, "openFlagViewer", 1, button, 0, 0);
+}
+
+/* Alt affects artwork only; losing window focus must not leave the override latched. */
+static void lab_widget_events_flag_modifier(lab_widget_event_action_t action, event_jsref event, jsref state,
+                                           jsref plan, jsref calls)
+{
+    (void)state;
+    (void)plan;
+    if (action != LAB_WIDGET_EVENT_FLAG_RESET && !lab_dom_equal(lab_dom_get(event, "key"), lab_dom_string("Alt")))
+        return;
+    int held = action == LAB_WIDGET_EVENT_FLAG_RESET ? lab_dom_scalar(LAB_VALUE_BOOLEAN, 0) :
+                                                     lab_dom_get(event, "altKey");
+    lab_widget_events_emit(calls, "jurisdictionFlagModifier", 1, held, 0, 0);
+}
+
 /* Commit today's value only when an input is attached, then restore focus. */
 static void lab_widget_events_today(lab_widget_event_action_t action, event_jsref event, jsref state,
                                 jsref plan, jsref calls)
@@ -197,7 +222,7 @@ void lab_widget_events_dispatch(lab_widget_event_action_t action, event_jsref ev
     /** @brief Widget action implementation using the current event and deferred service plan. */
     typedef void (*lab_widget_event_handler_t)(lab_widget_event_action_t action, event_jsref event,
                                                jsref state, jsref plan, jsref calls);
-    static const lab_widget_event_handler_t handlers[LAB_WIDGET_EVENT_OFFSET_TOUCHED + 1] = {
+    static const lab_widget_event_handler_t handlers[LAB_WIDGET_EVENT_FLAG_RESET + 1] = {
         [LAB_WIDGET_EVENT_OPEN]           = lab_widget_events_open,
         [LAB_WIDGET_EVENT_GRID_DAY]       = lab_widget_events_grid,
         [LAB_WIDGET_EVENT_PREVIOUS_MONTH] = lab_widget_events_navigation,
@@ -216,8 +241,11 @@ void lab_widget_events_dispatch(lab_widget_event_action_t action, event_jsref ev
         [LAB_WIDGET_EVENT_TOOLTIP_FOCUS]  = lab_widget_events_tooltip,
         [LAB_WIDGET_EVENT_TOOLTIP_HIDE]   = lab_widget_events_tooltip,
         [LAB_WIDGET_EVENT_TOOLTIP_ESCAPE] = lab_widget_events_tooltip,
+        [LAB_WIDGET_EVENT_FLAG_OPEN]      = lab_widget_events_flag,
+        [LAB_WIDGET_EVENT_FLAG_MODIFIER]  = lab_widget_events_flag_modifier,
+        [LAB_WIDGET_EVENT_FLAG_RESET]     = lab_widget_events_flag_modifier,
     };
-    static const char *const services[LAB_WIDGET_EVENT_OFFSET_TOUCHED + 1] = {
+    static const char *const services[LAB_WIDGET_EVENT_FLAG_RESET + 1] = {
         [LAB_WIDGET_EVENT_OFFSET_TOUCHED] = "markDatetimeOffsetTouched",
     };
     int plan = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
@@ -266,6 +294,9 @@ void lab_widget_events_install(jsref document, jsref window, jsref state)
         const char *type;
         lab_widget_event_action_t action;
     } document_events[] = {
+        {"click", LAB_WIDGET_EVENT_FLAG_OPEN},
+        {"keydown", LAB_WIDGET_EVENT_FLAG_MODIFIER},
+        {"keyup", LAB_WIDGET_EVENT_FLAG_MODIFIER},
         {"pointerover", LAB_WIDGET_EVENT_TOOLTIP_OVER},
         {"pointerout", LAB_WIDGET_EVENT_TOOLTIP_OUT},
         {"focusin", LAB_WIDGET_EVENT_TOOLTIP_FOCUS},
@@ -278,6 +309,7 @@ void lab_widget_events_install(jsref document, jsref window, jsref state)
         lab_dom_subscribe(document, document_events[i].type, "lab_widget_events_dispatch", document_events[i].action,
                           state, 0);
     lab_dom_subscribe(window, "scroll", "lab_widget_events_dispatch", LAB_WIDGET_EVENT_TOOLTIP_HIDE, state, 1);
+    lab_dom_subscribe(window, "blur", "lab_widget_events_dispatch", LAB_WIDGET_EVENT_FLAG_RESET, state, 0);
     lab_dom_subscribe(window, "resize", "lab_widget_events_dispatch", LAB_WIDGET_EVENT_TOOLTIP_HIDE, state, 0);
     lab_dom_subscribe(window, "resize", "lab_widget_events_dispatch", LAB_WIDGET_EVENT_REPOSITION, state, 0);
 }

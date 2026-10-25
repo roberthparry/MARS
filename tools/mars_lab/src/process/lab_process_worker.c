@@ -12,14 +12,11 @@
 #include <string.h>
 
 #include "string-t.h"
+#include "mars_paths.h"
 #include "lab_worker.h"
 #include "lab_process.h"
 #define MARS_LAB_PROCESS_INTERNAL_ACCESS
 #include "lab_process_plot_cache.h"
-
-#ifndef MARS_LAB_SERVER_PATH
-#define MARS_LAB_SERVER_PATH "tools/mars_lab/build/release/mars_lab"
-#endif
 
 /* Resolve an explicit diagnostic override or the server containing the calculation. */
 string_t *lab_proc_worker_path(const char *name)
@@ -30,7 +27,7 @@ string_t *lab_proc_worker_path(const char *name)
         return NULL;
     }
     const char *override = getenv(environment);
-    string_t *path = string_new_with(override && *override ? override : MARS_LAB_SERVER_PATH);
+    string_t *path = override && *override ? string_new_with(override) : mars_path_resource(MARS_PATH_WORKER, NULL, "");
     if (!path)
         errno = ENOMEM;
     return path;

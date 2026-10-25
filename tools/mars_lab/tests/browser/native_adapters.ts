@@ -240,6 +240,8 @@ const labTestModulePaths: {[name: string]: string} = {
     copyResultFromEvent: 'WorksheetResults.actions.copyResultFromEvent',
     showButtonTooltip: 'WorksheetResults.tooltip.show',
     hideButtonTooltip: 'WorksheetResults.tooltip.hide',
+    openFlagViewer: 'WorksheetResults.tooltip.openFlagViewer',
+    jurisdictionFlagModifier: 'WorksheetResults.tooltip.jurisdictionFlagModifier',
     fitRenderedTeXToCard: 'WorksheetResults.renderedFit.fit',
     scheduleRenderedTeXFit: 'WorksheetResults.renderedFit.schedule',
     scheduleSolverTexFit: 'WorksheetResults.solverFit.schedule',

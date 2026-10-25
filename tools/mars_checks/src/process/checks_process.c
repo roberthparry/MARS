@@ -21,6 +21,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "mars_paths.h"
 #include "checks_process.h"
 
 extern char **environ;
@@ -162,10 +163,11 @@ bool checks_process_run(const checks_strings_t *arguments, const string_t *cwd, 
         errno = EINVAL;
         return false;
     }
-    char directory[] = "/tmp/mars-checks-capture-XXXXXX";
-    if (!mkdtemp(directory))
+    file_t *temporary = mars_path_temporary();
+    if (!temporary)
         return false;
-    string_t *root = checks_text(directory);
+    string_t *root = checks_text(file_path(temporary));
+    file_free(temporary);
     string_t *out_path = checks_path(root, "stdout"), *err_path = checks_path(root, "stderr");
     char **argv = calloc(count + 1, sizeof(*argv));
     if (!argv)

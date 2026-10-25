@@ -27,6 +27,7 @@ CHECKS_CONFIG := $(notdir $(BUILD_DIR))
 CHECKS_BUILD_DIR := tools/mars_checks/build/$(CHECKS_CONFIG)
 CHECKS_SRCS := $(sort $(wildcard tools/mars_checks/src/*/*.c))
 CHECKS_OBJS := $(patsubst tools/mars_checks/src/%.c,$(CHECKS_BUILD_DIR)/%.o,$(CHECKS_SRCS))
+CHECKS_OBJS += $(APP_RESOURCE_OBJ)
 CHECKS_SUPPORT_OBJS := $(filter-out $(CHECKS_BUILD_DIR)/app/checks_main.o,$(CHECKS_OBJS))
 CHECKS_BIN := $(CHECKS_BUILD_DIR)/mars_checks
 CHECKS_TEST_SRCS := $(sort $(wildcard tools/mars_checks/tests/*.c))
@@ -37,8 +38,7 @@ CHECKS_HEADERS := $(wildcard tools/mars_checks/include/*.h tools/mars_checks/tes
 
 $(CHECKS_BUILD_DIR)/%.o: tools/mars_checks/src/%.c $(CHECKS_HEADERS) tools/mars_checks/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
-	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_checks/include \
-	    -DMARS_CHECKS_ROOT_DIR='"$(CURDIR)"' -c $< -o $@
+	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_checks/include -c $< -o $@
 
 $(CHECKS_BIN): $(CHECKS_OBJS) $(STATIC_LIB)
 	@mkdir -p $(dir $@)

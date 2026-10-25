@@ -41,8 +41,11 @@ void lab_cal_resolve_observer(json_t *options);
  */
 void lab_cal_surface(json_t *options);
 
-/** @brief Add display-only offshore artwork for confirmed open sea without an identified jurisdiction. */
+/** @brief Add display-only marine artwork for sea or coastal water without an identified jurisdiction. */
 void lab_cal_offshore_flag(json_t *options);
+
+/** @brief Return owned static jurisdiction artwork for the Location card's temporary Alt preview. */
+string_t *lab_cal_jurisdiction_flag(const json_t *options);
 
 /** Return bounded geographic polygons for validated bounds, for projection by the WASM SVG renderer. */
 json_t *lab_cal_globe_vectors(const double bounds[4], unsigned *status);

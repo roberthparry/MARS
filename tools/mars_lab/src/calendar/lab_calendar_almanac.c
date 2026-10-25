@@ -362,8 +362,13 @@ static json_t *lab_cal_observer_summary(const json_t *options, const char *town,
         lab_cal_summary_cell(summary, labels[i], values[i]);
         string_free(values[i]);
     }
-    if (*lab_cal_text(options, "country_flag"))
+    if (*lab_cal_text(options, "country_flag")) {
         lab_cal_set((json_t *)json_array_get(summary, 1), "flag", lab_cal_text(options, "country_flag"));
+        string_t *parent = lab_cal_jurisdiction_flag(options);
+        if (parent && string_byte_length(parent) && strcmp(string_c_str(parent), lab_cal_text(options, "country_flag")))
+            lab_cal_set((json_t *)json_array_get(summary, 1), "jurisdiction_flag", string_c_str(parent));
+        string_free(parent);
+    }
     return summary;
 }
 

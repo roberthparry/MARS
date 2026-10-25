@@ -6,6 +6,7 @@
  * the file module, and hashes regular files. Package metadata is optional; failure to
  * hash a present copyright record or any required library aborts collection.
  */
+#include "mars_paths.h"
 #define MARS_CHECKS_EVIDENCE_INTERNAL_ACCESS
 #include "evidence_private.h"
 
@@ -48,7 +49,9 @@ static json_t *evidence_package(const string_t *root, const string_t *path)
     evidence_text(result, "architecture", architecture);
     string_t *base = NULL;
     checks_match(package, "^([^:]+)", 1, &base);
-    string_t *copyright = string_sprintf("/usr/share/doc/%s/copyright", string_c_str(base));
+    string_t *relative = string_sprintf("%s/copyright", string_c_str(base));
+    string_t *copyright = relative ? mars_path_resource(MARS_PATH_DOCUMENTATION, NULL, string_c_str(relative)) : NULL;
+    string_free(relative);
     string_free(base);
     checks_strings_free(fields);
     if (checks_is_file(copyright)) {

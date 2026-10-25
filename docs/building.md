@@ -23,6 +23,12 @@ subcommands and the `locales` calendar-name SQL generator. Existing
 `install-mars-lab` targets call it. Configuration uses `string_t` for literal
 parsing, the file module for filesystem operations and the database module for
 SQLCipher access. It does not invoke a shell to interpret credentials.
+`make configure-mars` creates or migrates the encrypted application configuration;
+`make release` runs it before preparing databases when MARS Lab is installed.
+The desktop key store holds its random key and may ask for an unlock or initial
+setup. No separate MARS password is required. The small `mars.json` locator and
+the `settings` and `paths` commands are described in the
+[Lab configuration guide](mars-lab.md#configuration-and-relocatable-resources).
 The `locales` command regenerates or verifies the maintained seed from pinned
 inputs under `tools/mars_config/data/`; see the
 [jurisdiction guide](jurisdiction.md) for its options and data provenance.
@@ -417,13 +423,13 @@ jurisdiction databases under `~/.mars`, their SQLite sidecar files and their dat
 configuration files. It preserves custom database files, Lab history, weather settings
 and river-processing checkpoints. Stop the Lab before uninstalling databases.
 
-That installer now prompts for a password to protect the private jurisdiction
-database, stores the resulting configuration in
-`~/.mars/config/jurisdiction-db.env`, and builds the encrypted jurisdiction database at
-`~/.mars/jurisdiction/mars_jurisdiction_rules.db`. MARS supplies no shared
+New content databases default to plaintext; existing encrypted databases retain
+their keys. The jurisdiction installer records its selected database location,
+with `~/.mars/jurisdiction/mars_jurisdiction_rules.db` as the default. MARS supplies no shared
 WeatherAPI account or key. If the installer creates their own WeatherAPI
 account and chooses to enable weather lookups, that account's key is stored in
-`~/.mars/config/weather.env`. Reinstalling replaces the selected jurisdiction
+the encrypted configuration after setup. Legacy `~/.mars/config/weather.env`
+and database `.env` files are retained for compatibility. Reinstalling replaces the selected jurisdiction
 database and its configuration, preserving unrelated files and saved Lab state.
 Each lookup sends the configured key, selected date,
 latitude and longitude from the local MARS Lab server to WeatherAPI.com over

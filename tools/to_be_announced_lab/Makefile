@@ -40,6 +40,7 @@ tba-typecheck: check-tba-typescript-deps
 
 TBA_SRCS := $(sort $(wildcard tools/to_be_announced_lab/src/*/*.c))
 TBA_OBJS := $(patsubst tools/to_be_announced_lab/src/%.c,$(TBA_BUILD_DIR)/%.o,$(TBA_SRCS))
+TBA_OBJS += $(APP_RESOURCE_OBJ)
 TBA_SERVER := $(TBA_BUILD_DIR)/to_be_announced_lab
 TBA_CRYPTO_CFLAGS := $(shell pkg-config --cflags libcrypto 2>/dev/null)
 TBA_CRYPTO_LIBS := $(shell pkg-config --libs libcrypto 2>/dev/null)
@@ -82,12 +83,9 @@ $(TBA_CODEC_WASM): $(TBA_CODEC_OBJS) tools/to_be_announced_lab/wasm/tba_codec.im
 check-tba-wasm-deps:
 	@command -v "$(TBA_WASM_CC)" >/dev/null && command -v "$(TBA_WASM_LD)" >/dev/null || { \
 	    echo "Private Lab requires Clang and the LLVM WebAssembly linker." >&2; exit 1; }
-$(TBA_BUILD_DIR)/server/tba_server.o: CFLAGS += -DTBA_WASM_PATH='"$(abspath $(TBA_WASM))"'
-$(TBA_BUILD_DIR)/server/tba_server.o: CFLAGS += -DTBA_CODEC_PATH='"$(abspath $(TBA_CODEC_WASM))"'
 $(TBA_BUILD_DIR)/%.o: tools/to_be_announced_lab/src/%.c tools/to_be_announced_lab/Makefile Makefile | check-native-deps
 	@mkdir -p $(dir $@) $(dir $@).deps
-	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/to_be_announced_lab/include \
-	    -DTBA_ROOT='"$(CURDIR)"' -DTBA_SERVER_PATH='"$(abspath $(TBA_SERVER))"' -c $< -o $@
+	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/to_be_announced_lab/include -c $< -o $@
 $(TBA_SERVER): $(TBA_OBJS) $(STATIC_LIB) $(TBA_WASM) $(TBA_CODEC_WASM) | tba-typescript
 	$(CC) $(LDFLAGS) -o $@ $(TBA_OBJS) $(STATIC_LIB) $(LDLIBS) $(TBA_CRYPTO_LIBS)
 .PHONY: native-tba-lab clean-tba-lab

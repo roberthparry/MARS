@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "mars_paths.h"
 #include "cfg_storage.h"
 #include "cfg_calendar.h"
 #define MARS_CFG_DATABASE_INTERNAL_ACCESS
@@ -67,7 +68,7 @@ static bool cfg_jurisdiction_sources(sqlite_t *db, const string_t *root, const s
 /* Import catalogue-owned artwork independently of geometry and observer selection. */
 bool cfg_database_flags(sqlite_t *db, const string_t *root)
 {
-    string_t *license_path = string_sprintf("%s/packaging/jurisdiction-db/flags/LICENSE", string_c_str(root));
+    string_t *license_path = mars_path_resource(MARS_PATH_JURISDICTION, root, "flags/LICENSE");
     file_t *license = license_path ? file_new(license_path) : NULL;
     bool present = license && file_exists(license);
     string_t *terms = present ? file_read_all_text(license) : NULL;
@@ -83,14 +84,14 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root)
     ok = ok && provenance && sqlite_stmt_bind_text(provenance, 1, string_c_str(terms)) &&
          sqlite_stmt_step(provenance) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(provenance); string_free(terms);
-    string_t *regions_path = string_sprintf("%s/packaging/jurisdiction-db/flag_regions.sql", string_c_str(root));
+    string_t *regions_path = mars_path_resource(MARS_PATH_JURISDICTION, root, "flag_regions.sql");
     file_t *regions = regions_path ? file_new(regions_path) : NULL;
     bool regional = regions && file_exists(regions);
     string_t *region_sql = regional ? file_read_all_text(regions) : NULL;
     if (regional) ok = ok && region_sql && sqlite_exec(db, region_sql);
     file_free(regions); string_free(regions_path); string_free(region_sql);
     if (regional) {
-        string_t *path = string_sprintf("%s/packaging/jurisdiction-db/flags/REGIONAL-NOTICES.txt", string_c_str(root));
+        string_t *path = mars_path_resource(MARS_PATH_JURISDICTION, root, "flags/REGIONAL-NOTICES.txt");
         file_t *source = path ? file_new(path) : NULL;
         string_t *notice = source ? file_read_all_text(source) : NULL;
         sqlite_stmt_t *record = notice ? sqlite_stmt_prepare(db,
@@ -99,14 +100,14 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root)
              sqlite_stmt_step(record) == SQLITE_STEP_DONE;
         sqlite_stmt_finalize(record); string_free(notice); file_free(source); string_free(path);
     }
-    string_t *emblems_path = string_sprintf("%s/packaging/jurisdiction-db/flag_emblems.sql", string_c_str(root));
+    string_t *emblems_path = mars_path_resource(MARS_PATH_JURISDICTION, root, "flag_emblems.sql");
     file_t *emblems = emblems_path ? file_new(emblems_path) : NULL;
     bool emblem = emblems && file_exists(emblems);
     string_t *emblem_sql = emblem ? file_read_all_text(emblems) : NULL;
     if (emblem) ok = ok && emblem_sql && sqlite_exec(db, emblem_sql);
     file_free(emblems); string_free(emblems_path); string_free(emblem_sql);
     if (emblem) {
-        string_t *path = string_sprintf("%s/packaging/jurisdiction-db/flags/OFFSHORE-NOTICES.txt", string_c_str(root));
+        string_t *path = mars_path_resource(MARS_PATH_JURISDICTION, root, "flags/OFFSHORE-NOTICES.txt");
         file_t *source = path ? file_new(path) : NULL;
         string_t *notice = source ? file_read_all_text(source) : NULL;
         sqlite_stmt_t *record = notice ? sqlite_stmt_prepare(db,
@@ -124,7 +125,8 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root)
     string_free(query);
     sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db,
         "insert into jurisdiction_country_flag values(?1,?2) on conflict(iso_country_code) do update set svg=excluded.svg") : NULL;
-    ok = ok && countries && insert;
+    string_t *directory = mars_path_resource(MARS_PATH_JURISDICTION, root, "flags");
+    ok = ok && countries && insert && directory;
     sqlite_step_result_t step = SQLITE_STEP_ERROR;
     while (ok && (step = sqlite_stmt_step(countries)) == SQLITE_STEP_ROW) {
         const char *code = sqlite_stmt_column_text(countries, 0);
@@ -139,7 +141,7 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root)
             filename[i] = letter ? code[i] + 'a' - 'A' : code[i];
         }
         if (!valid) continue;
-        string_t *path = string_sprintf("%s/packaging/jurisdiction-db/flags/%s.svg", string_c_str(root), filename);
+        string_t *path = string_sprintf("%s/%s.svg", string_c_str(directory), filename);
         file_t *source = path ? file_new(path) : NULL;
         file_info_t *info = source ? file_get_info(source) : NULL;
         string_t *svg = info && file_info_size(info) > 0 && file_info_size(info) <= 1024 * 1024 ?
@@ -155,6 +157,7 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root)
     }
     ok = ok && step == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(countries); sqlite_stmt_finalize(insert);
+    string_free(directory);
     if (ok) ok = sqlite_exec_cstr(db, "release country_flags");
     if (!ok && transaction) sqlite_exec_cstr(db, "rollback to country_flags; release country_flags");
     return ok;
@@ -163,8 +166,7 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root)
 static bool cfg_jurisdiction_populate(sqlite_t *db, const string_t *path, const cfg_database_options *options,
                                       bool interactive, string_t **location, string_t **language)
 {
-    const char *configured_root = getenv("MARS_ROOT");
-    string_t *root = string_new_with(configured_root && *configured_root ? configured_root : MARS_CONFIG_ROOT_DIR);
+    string_t *root = string_new();
     bool flags = root && cfg_database_flags(db, root);
     string_free(root);
     return flags && cfg_calendar_populate(db, path, options->key, options->requested_location,

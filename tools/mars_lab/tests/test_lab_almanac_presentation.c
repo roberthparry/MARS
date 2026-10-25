@@ -369,8 +369,9 @@ static void test_lab_country_presentation(void)
     TEST_ASSERT_TRUE(!strcmp(lab_cal_text(suggestion, "zone"), "5.5"), "suggestions never overwrite authored offsets");
     json_free(suggestion);
     const struct { const char *surface, *horizon, *country; bool offshore; } flag_cases[] = {
-        {"Sea", "true", "", true}, {"Sea", "false", "", false}, {"Sea", "true", "GB", false},
-        {"Coastal water", "false", "", false}, {"Inland water", "false", "", false},
+        {"Sea", "true", "", true}, {"Sea", "false", "", true}, {"Sea", "true", "GB", false},
+        {"Coastal water", "false", "", true}, {"Coastal water", "false", "US", false},
+        {"Inland water", "false", "", false}, {"Coastal", "false", "", false},
         {"Land", "false", "", false}, {"Unknown", "false", "", false}
     };
     for (size_t i = 0; i < sizeof flag_cases / sizeof *flag_cases; ++i) {
@@ -382,7 +383,9 @@ static void test_lab_country_presentation(void)
         TEST_ASSERT_TRUE(flag_cases[i].offshore ?
             !strcmp(lab_cal_text(point, "country_flag"), "/offshore_flag.svg") &&
             !strcmp(lab_cal_text(point, "flag_code"), "ZZ-SEA") && !*lab_cal_observer_jurisdiction(point) :
-            !*lab_cal_text(point, "country_flag"), "offshore artwork requires confirmed open sea and is never a country");
+            !*lab_cal_text(point, "country_flag"), "marine artwork covers unassigned coastal water without replacing a country");
+        TEST_ASSERT_TRUE(!strcmp(lab_cal_text(point, "sea_horizon"), flag_cases[i].horizon),
+                         "display artwork never changes horizon-dip eligibility");
         json_free(point);
     }
     json_t *water = test_lab_json("{\"location_name\":\"Caspian Sea\",\"observer_surface\":\"Inland water\"}");
@@ -484,6 +487,18 @@ static void test_lab_country_presentation(void)
                      strstr(lab_cal_text(rendered, "html"), "almanac-location-flag") &&
                      strstr(lab_cal_text(rendered, "html"), "/offshore_flag.svg") &&
                      !*lab_cal_observer_jurisdiction(options), "offshore card has a previewable emblem without a jurisdiction");
+    json_free(observer_response);
+    lab_cal_set(options, "observer_surface", "Coastal water");
+    lab_cal_set(options, "sea_horizon", "false");
+    lab_cal_set(options, "atmosphere_note", "Observer pressure fixture");
+    lab_cal_set(options, "country_flag", "");
+    lab_cal_offshore_flag(options);
+    observer_response = lab_cal_almanac(fields, options, &status);
+    rendered = lab_cal_get(lab_cal_get(observer_response, "almanac_presentation"), "all");
+    TEST_ASSERT_TRUE(strstr(lab_cal_text(rendered, "html"), "/offshore_flag.svg") &&
+                     strstr(lab_cal_text(rendered, "html"), "Custom — Coastal water") &&
+                     strstr(lab_cal_text(rendered, "html"), "No horizon dip"),
+                     "coastal-water card restores the Earth emblem while retaining its surface and horizon policy");
     json_free(observer_response); json_free(fields); json_free(options);
     json_t *coastal = test_lab_json("{\"jurisdiction\":\"ZA\",\"country_code\":\"\","
         "\"town\":\"Mossel Bay|-34.183|22.146\",\"lat\":\"-34.183000\",\"lon\":\"22.146000\","
@@ -515,16 +530,24 @@ static void test_lab_country_presentation(void)
         json_free(options);
     }
     json_t *response = test_lab_json("{\"observer_summary\":[{\"label\":\"Location\",\"value\":\"Britain & <UK>\","
-                                    "\"flag\":\"data:image/svg+xml;base64,PHN2Zy8+\"}],\"rows\":[],\"events\":[]}");
+                                    "\"flag\":\"data:image/svg+xml;base64,PHN2Zy8+\","
+                                    "\"jurisdiction_flag\":\"data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=\"}],"
+                                    "\"rows\":[],\"events\":[]}");
     string_t *html = lab_cal_almanac_markup(response, test_lab_member(response, "rows"),
                                            test_lab_member(response, "events"), false);
     bool ok = html && strstr(string_c_str(html), "class=\"country-flag\" alt=\"\"") &&
               strstr(string_c_str(html), "type=\"button\" class=\"almanac-location-flag\"") &&
+              strstr(string_c_str(html), "class=\"country-flag jurisdiction-flag\"") &&
               strstr(string_c_str(html), "aria-label=\"Flag for Britain &amp; &lt;UK&gt;\"") &&
               strstr(string_c_str(html), "Britain &amp; &lt;UK&gt;") && strstr(string_c_str(html), "<dt>Location</dt>") &&
               !strstr(string_c_str(html), "<dt>Country</dt>");
     string_free(html);
     json_t *cell = (json_t *)json_array_get(test_lab_member(response, "observer_summary"), 0);
+    lab_cal_set(cell, "jurisdiction_flag", "javascript:alert(1)");
+    html = lab_cal_almanac_markup(response, test_lab_member(response, "rows"), test_lab_member(response, "events"), false);
+    ok = ok && html && !strstr(string_c_str(html), "javascript:") &&
+         !strstr(string_c_str(html), "class=\"country-flag jurisdiction-flag\"");
+    string_free(html);
     lab_cal_set(cell, "flag", "javascript:alert(1)");
     html = lab_cal_almanac_markup(response, test_lab_member(response, "rows"), test_lab_member(response, "events"), false);
     ok = ok && html && !strstr(string_c_str(html), "javascript:") && !strstr(string_c_str(html), "country-flag") &&
@@ -716,6 +739,8 @@ static void test_lab_sky_status(void)
         "\"latitude\":\"52.7077\",\"longitude\":\"-2.7541\",\"timezone\":\"Europe/London\"}");
     html = lab_cal_home_markup(origin, (time_t)1792670400);
     ok = ok && html && strstr(string_c_str(html), "2026-10-22 13:00:00 GMT+01:00") &&
+         strstr(string_c_str(html), "data-home-clock-zone=\"Europe/London\"") &&
+         strstr(string_c_str(html), "data-home-clock-ms=\"1792670400000\"") &&
          strstr(string_c_str(html), "Home &amp; origin") && strstr(string_c_str(html), "Sunset · local") &&
          strstr(string_c_str(html), "almanac-moon-phase") &&
          strstr(string_c_str(html), "local zenith up") &&

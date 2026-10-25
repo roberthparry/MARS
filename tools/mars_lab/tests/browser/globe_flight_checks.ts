@@ -3,7 +3,7 @@
  * @brief Long-route camera checks on the real browser animation clock.
  *
  * Exercises northern and southern great-circle journeys, including separate arrival
- * roll correction, current-zoom retention and same-frame GPU submission. Timings
+ * roll correction, photographic arrival framing and same-frame GPU submission. Timings
  * are diagnostic rather than hardware-dependent pass thresholds.
  */
 const globeFlightRoutes: [string, number, number, number, number][] = [
@@ -13,6 +13,8 @@ const globeFlightRoutes: [string, number, number, number, number][] = [
 ];
 
 async function checkGlobeFlights(check: (condition: boolean, message: string) => void): Promise<void> {
+    const framedZoom = (zoom: number) => labDOM.call('lab_globe_arrival_zoom', zoom,
+        document.querySelector<HTMLCanvasElement>('.almanac-globe canvas')!.clientWidth, 21600) as number;
     const globe = Reflect.get(MarsAlmanacGlobe, 'instance') as {
         orientation: number[]; view: number[]; flightTarget: number[] | null; gl: WebGLRenderingContext;
         worldLoading: boolean; shoreRetryAfter: number; palettesReady: boolean;
@@ -107,7 +109,7 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
                 const visible = point[2] >= 0 && Math.max(Math.abs(point[0]), Math.abs(point[1])) * camera[4] <= 1.12;
                 if (destinationSeen && !visible) destinationLost = true;
                 destinationSeen ||= visible;
-                if (camera[4] === from[4] && Math.abs(globe.view[0] - toLat) < 1e-8 &&
+                if (camera[4] === framedZoom(from[4]) && Math.abs(globe.view[0] - toLat) < 1e-8 &&
                     Math.abs(globe.view[1] - toLon) < 1e-8) ++arrivalRollFrames;
             };
             const loading = globe.worldLoading;
@@ -135,8 +137,8 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             check(!globe.flightTarget && frameTimes.length > 30 && arrivalRollFrames > 2,
                   `${name}: completes a real animated flight with a separate arrival-roll phase; ` +
                   `progress=${flightProgress}, zoom=${globe.view[2]}, frames=${frameTimes.length}, arrival=${arrivalRollFrames}`);
-            check(globe.view[2] === from[4] && globe.orientation.every((value, i) => Math.abs(value - to[i]) < 1e-12),
-                  `${name}: retains the current zoom while restoring destination orientation`);
+            check(globe.view[2] === framedZoom(from[4]) && globe.orientation.every((value, i) => Math.abs(value - to[i]) < 1e-12),
+                  `${name}: limits excessive arrival magnification while restoring destination orientation`);
             check(deferredFrames === 0, `${name}: camera updates submit to the GPU in the same frame`);
             check(bordersDuringFlight === 0, `${name}: optional border projection waits until arrival`);
             check(gpuBorders > previousBorders, `${name}: enabled borders draw on the GPU during travel`);
@@ -176,10 +178,10 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             // Advance to the actual native midpoint without spending another whole journey here.
             const transit = native('lab_globe_flight', departure, first, .5, 0) as number[];
             globe.applyCamera(transit);
-            check(transit[4] < 3 && MarsAlmanacGlobe.captureHistory()![4] === 150,
+            check(transit[4] < 3 && MarsAlmanacGlobe.captureHistory()![4] === framedZoom(150),
                   'mid-flight history captures the chosen close zoom, not the temporary overview');
             globe.saveCamera();
-            check(JSON.parse(localStorage.getItem(bookmarkKey)!).camera[4] === 150,
+            check(JSON.parse(localStorage.getItem(bookmarkKey)!).camera[4] === framedZoom(150),
                   'a mid-flight browser bookmark retains the destination camera');
             const stale = MarsAlmanacGlobe.beginHistory();
             const latest = MarsAlmanacGlobe.beginHistory();
@@ -188,7 +190,7 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             MarsAlmanacGlobe.finishHistory(stale, first, true);
             check(globe.flightTarget === continuingTarget, 'superseded restoration cannot replace the continuing journey');
             MarsAlmanacGlobe.finishHistory(latest, next, true);
-            check(globe.flightTarget?.[4] === 150 && globe.view[2] === transit[4] && globe.historyRedirect,
+            check(globe.flightTarget?.[4] === framedZoom(150) && globe.view[2] === transit[4] && globe.historyRedirect,
                   'successive clicks retain chosen zoom through overlapping restorations without a camera jump');
             const end = globe.flightTarget!;
             const early = native('lab_globe_flight', transit, end, .05, 1) as number[];
@@ -216,7 +218,7 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             const manualToken = MarsAlmanacGlobe.beginHistory();
             latitude.value = '-33.8688'; longitude.value = '151.2093';
             MarsAlmanacGlobe.finishHistory(manualToken, camera(-33.8688, 151.2093, 512), true);
-            check(globe.flightTarget?.[4] === manualZoom && !globe.historyRedirect,
+            check(globe.flightTarget?.[4] === framedZoom(manualZoom) && !globe.historyRedirect,
                   'manual zoom cancels old travel intent and establishes the scale for subsequent navigation');
         } finally {
             document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();

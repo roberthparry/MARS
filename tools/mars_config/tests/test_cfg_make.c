@@ -32,12 +32,19 @@ void test_cfg_make_self_fixture(void)
     size_t length = 0, prefix = strlen(program) + 1;
     if (getenv("MARS_TEST_MAKE_RELEASE")) {
         bool ok = command && file_open_read(command) && file_read(command, bytes, sizeof(bytes), &length) &&
-                  length == prefix + sizeof("databases-ensure") && prefix <= sizeof(bytes) &&
-                  !memcmp(bytes, program, prefix) &&
-                  !memcmp(bytes + prefix, "databases-ensure", sizeof("databases-ensure"));
+                  prefix <= length && !memcmp(bytes, program, prefix);
+        bool setup = ok && length == prefix + sizeof("paths\0init") &&
+                     !memcmp(bytes + prefix, "paths\0init", sizeof("paths\0init"));
+        bool migrate = ok && length == prefix + sizeof("settings\0migrate") &&
+                       !memcmp(bytes + prefix, "settings\0migrate", sizeof("settings\0migrate"));
+        bool update = ok && length == prefix + sizeof("databases-ensure") &&
+                      !memcmp(bytes + prefix, "databases-ensure", sizeof("databases-ensure"));
+        ok = setup || migrate || update;
         file_free(command);
-        if (ok) { puts("release update fixture verified"); fflush(stdout); }
-        _exit(ok && !getenv("MARS_TEST_MAKE_FAIL") ? 0 : 93);
+        const char *phase = setup ? "setup" : migrate ? "migration" : "update";
+        if (ok) { printf("release %s fixture verified\n", phase); fflush(stdout); }
+        const char *fail = getenv("MARS_TEST_MAKE_FAIL");
+        _exit(ok && (!fail || strcmp(fail, phase)) ? 0 : 93);
     }
     bool ok = command && file_open_read(command) && file_read(command, bytes, sizeof(bytes), &length) &&
               length == prefix + sizeof("jurisdiction") && prefix <= sizeof(bytes) && !memcmp(bytes, program, prefix) &&
@@ -313,15 +320,20 @@ static bool test_cfg_make_release_fixture(const char *directory)
     const char *args[] = {"make", "--no-print-directory", "-j1", "-o", "check-compliance",
         "MAKE=make --no-print-directory -j1 -o all -o native-config -o check-native-deps",
         program ? string_c_str(program) : "", launcher_arg ? string_c_str(launcher_arg) : "", "release", NULL};
-    for (unsigned pass = 0; pass < 4 && ok; ++pass) {
+    for (unsigned pass = 0; pass < 6 && ok; ++pass) {
         if (pass == 1) ok = file_write_all_bytes(launcher, "fixture", 7) && file_chmod(launcher, 0600);
         if (pass == 2) ok = file_chmod(launcher, 0700);
-        if (pass == 3) ok = !setenv("MARS_TEST_MAKE_FAIL", "1", 1);
+        if (pass >= 3) ok = !setenv("MARS_TEST_MAKE_FAIL", pass == 3 ? "update" : pass == 4 ? "setup" : "migration", 1);
         string_t *output = NULL;
         int status = -1;
         ok = ok && lab_proc_run(args, MARS_CONFIG_ROOT_DIR, 30000, 262144, &output, &status) && output &&
-             ((status == 0) == (pass != 3)) &&
-             ((string_find(output, "release update fixture verified") >= 0) == (pass >= 2));
+             ((status == 0) == (pass < 3));
+        string_offset_t setup = string_find(output, "release setup fixture verified");
+        string_offset_t migration = string_find(output, "release migration fixture verified");
+        string_offset_t update = string_find(output, "release update fixture verified");
+        ok = ok && ((setup >= 0) == (pass >= 2)) &&
+             ((migration >= 0) == (pass >= 2 && pass != 4)) && ((update >= 0) == (pass == 2 || pass == 3)) &&
+             (migration < 0 || migration > setup) && (update < 0 || update > migration);
         if (!ok) fprintf(stderr, "Release dispatch pass %u failed: %s\n", pass, output ? string_c_str(output) : "no output");
         string_free(output);
     }
@@ -333,7 +345,7 @@ static bool test_cfg_make_release_fixture(const char *directory)
 static void test_cfg_make_release(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_make_release_fixture),
-                     "release updates only with an executable installed launcher and propagates migration failure");
+                     "release configures before updating, only with an installed launcher, and stops on either failure");
 }
 
 /* Register ordinary Make integration cases before the README groups. */

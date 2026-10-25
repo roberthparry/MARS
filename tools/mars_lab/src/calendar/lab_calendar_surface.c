@@ -54,6 +54,22 @@ static void lab_country_catalogue(json_t *result, const char *code)
     jurisdict_close(jurisdiction); string_free(name); string_free(svg);
 }
 
+/* Supply static parent artwork without changing geographic membership or the regional sequence. */
+string_t *lab_cal_jurisdiction_flag(const json_t *options)
+{
+    const char *country = lab_cal_text(options, "country_code");
+    if (strlen(country) < 2 || country[0] < 'A' || country[0] > 'Z' || country[1] < 'A' || country[1] > 'Z' ||
+        !strncmp(country, "ZZ", 2)) return string_new();
+    char code[3] = {country[0], country[1], 0};
+    /* The requested display convention also includes the Crown Dependencies. */
+    if (!strcmp(code, "IM") || !strcmp(code, "JE") || !strcmp(code, "GG")) memcpy(code, "GB", 3);
+    json_t *parent = json_new_object();
+    lab_country_catalogue(parent, code);
+    string_t *flag = string_new_with(lab_cal_text(parent, "country_flag"));
+    json_free(parent);
+    return flag;
+}
+
 static bool lab_country_metadata(json_t *result, globe_t *globe, double latitude, double longitude)
 {
     string_t *code = globe_country_code_at(globe, latitude, longitude);
@@ -75,11 +91,11 @@ static bool lab_country_metadata(json_t *result, globe_t *globe, double latitude
     return identified;
 }
 
-/* Artwork is a display marker, never a jurisdiction or a substitute for missing geography. */
+/* Marine artwork is independent of horizon clearance, never a jurisdiction or missing-geography fallback. */
 void lab_cal_offshore_flag(json_t *options)
 {
-    if (*lab_cal_text(options, "country_code") || strcmp(lab_cal_text(options, "observer_surface"), "Sea") ||
-        strcmp(lab_cal_text(options, "sea_horizon"), "true")) return;
+    const char *surface = lab_cal_text(options, "observer_surface");
+    if (*lab_cal_text(options, "country_code") || (strcmp(surface, "Sea") && strcmp(surface, "Coastal water"))) return;
     lab_cal_set(options, "country_flag", "/offshore_flag.svg");
     lab_cal_set(options, "flag_code", "ZZ-SEA");
 }
@@ -199,7 +215,7 @@ json_t *lab_cal_country(const json_t *payload, unsigned *status)
     bool boundaries = globe_has_layer(globe, GLOBE_LAYER_COUNTRIES);
     bool inland_water = !identified && boundaries && globe_hit_test(globe, latitude, longitude) == GLOBE_INLAND_WATER;
     lab_cal_nautical_zone(response, inland_water, identified, boundaries, longitude);
-    if (!identified && globe_hit_test_radius(globe, latitude, longitude, 5000) == GLOBE_SEA)
+    if (!identified && globe_hit_test(globe, latitude, longitude) == GLOBE_SEA)
         lab_country_catalogue(response, "ZZ-SEA");
     globe_close(globe);
     return response;

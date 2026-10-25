@@ -3021,6 +3021,13 @@
       "test_calendar_terminal": true
     }
   },
+  "tools/mars_config/tests/test_cfg_paths.c": {
+    "tests": {
+      "enabled": true,
+      "test_cfg_paths_relocation": true,
+      "test_cfg_settings_import": true
+    }
+  },
   "tools/mars_config/tests/test_cfg_textures.c": {
     "readme_examples": {
       "enabled": true,

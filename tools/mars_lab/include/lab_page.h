@@ -20,7 +20,7 @@
  * Optional mobile metadata is supplied under state.mobile by lab_mobile_details();
  * without it, mobile access is explicitly local-only. Supplied SVG is ignored and
  * regenerated natively from the URL. Release the result with string_free().
- * The asset is resolved via MARS_LAB_ASSET_FILE, MARS_ROOT, or the compiled asset path.
+ * The asset uses the configured lab_assets resource, with an optional MARS_LAB_ASSET_FILE override.
  * @param state Borrowed worksheet and optional mobile metadata; NULL uses defaults.
  * @return Owned page text released with string_free, or NULL on failure.
  */

@@ -112,6 +112,10 @@ static bool lab_tooltip_flag_preview(jsref node, jsref button, double viewport_w
     if (!lab_dom_has_class(button, "almanac-location-flag") || !lab_dom_closest(button, ".almanac-summary"))
         return false;
     int source = lab_dom_query(button, "img.country-flag");
+    if (lab_dom_query(0, "html[data-almanac-jurisdiction-flag]")) {
+        int parent = lab_dom_query(button, "img.jurisdiction-flag");
+        if (parent) source = parent;
+    }
     int flag = lab_dom_read(source, LAB_DOM_ATTRIBUTE, "src");
     double width = lab_dom_measure(source, LAB_DOM_MEASURE_RECT_WIDTH);
     double height = lab_dom_measure(source, LAB_DOM_MEASURE_RECT_HEIGHT);

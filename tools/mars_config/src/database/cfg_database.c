@@ -31,6 +31,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "mars_settings.h"
+#include "mars_paths.h"
 #include "cfg_progress.h"
 #include "cfg_prompt.h"
 #include "cfg_storage.h"
@@ -93,7 +95,7 @@ static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root
 {
     (void)staging;
     /* Unlike optional installation assets, a declared migration must not succeed without its source. */
-    string_t *path = string_sprintf("%s/packaging/jurisdiction-db/flags/LICENSE", string_c_str(root));
+    string_t *path = mars_path_resource(MARS_PATH_JURISDICTION, root, "flags/LICENSE");
     file_t *source = path ? file_new(path) : NULL;
     bool ok = source && file_exists(source) && cfg_database_flags(db, root);
     sqlite_stmt_t *emblem = ok ? sqlite_stmt_prepare(db,
@@ -125,8 +127,7 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
         ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
              cfg_database_current_revision(db, migration->name, &revision) && revision <= migration->revision;
     if (ok && exists && revision < migration->revision) {
-        const char *environment = getenv("MARS_ROOT");
-        string_t *root = string_new_with(environment && *environment ? environment : MARS_CONFIG_ROOT_DIR);
+        string_t *root = string_new();
         string_t *parent = cfg_storage_parent(path);
         string_t *staging = parent ? cfg_database_stage(parent) : NULL;
         bool transaction = root && staging && sqlite_exec_cstr(db, "begin immediate");
@@ -637,9 +638,7 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
         fprintf(stderr, "Import begin depth=%u source=%s\n", depth, label);
         fflush(stderr);
     }
-    string_t *resolved = string_starts_with(path, "/")
-                             ? string_clone(path)
-                             : string_sprintf("%s/%s", string_c_str(root), string_c_str(path));
+    string_t *resolved = mars_path_source(root, string_c_str(path));
     file_t *file = resolved ? file_new(resolved) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
     uint64_t total = file_info_size(info);
@@ -840,6 +839,10 @@ bool cfg_database_publish(file_t *database, file_t *destination, file_t *configu
     string_free(database_path);
     string_free(configuration_path);
     string_free(config_stage);
+    if (ok && !mars_settings_sync(body)) {
+        fputs("Database installed, but the encrypted settings could not be synchronised. Existing configuration is retained.\n", stderr);
+        return false;
+    }
     return ok;
 }
 
@@ -931,7 +934,7 @@ static string_t *cfg_database_configuration(const cfg_database_options *options,
 bool cfg_database_source(sqlite_t *db, const string_t *root, const char *name, bool optional)
 {
     string_t *path = string_new_with(name);
-    string_t *full = string_sprintf("%s/%s", string_c_str(root), name);
+    string_t *full = mars_path_source(root, name);
     file_t *file = full ? file_new(full) : NULL;
     bool exists = file && file_exists(file);
     bool ok = path && file &&
@@ -957,11 +960,7 @@ static bool cfg_database_build(cfg_database_options *options, const cfg_database
     string_t *temporary_path = staging ? string_sprintf("%s/database.db", string_c_str(staging)) : NULL;
     file_t *temporary = temporary_path ? file_new(temporary_path) : NULL;
     file_t *destination = file_new(options->expanded_path);
-    string_t *root = cfg_storage_value(getenv("MARS_ROOT"));
-    if (root && !string_byte_length(root)) {
-        string_free(root);
-        root = string_new_with(MARS_CONFIG_ROOT_DIR);
-    }
+    string_t *root = string_new();
     cfg_progress_t *progress = cfg_progress_start("Preparing database");
     sqlite_t *db = temporary && root ? cfg_database_open(temporary_path, options->key) : NULL;
     /* Bound both working caches as catalogues grow; their pages are locked by SQLCipher. */

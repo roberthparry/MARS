@@ -2821,6 +2821,8 @@
                     return value;
                 };
                 const settledCamera = async (expected: number[], zoom = expected[4]): Promise<void> => {
+                    zoom = labDOM.call('lab_globe_arrival_zoom', zoom,
+                        document.querySelector<HTMLCanvasElement>('.almanac-globe canvas')!.clientWidth, 21600) as number;
                     if (globe!.flightTarget && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
                         await new Promise(resolve => setTimeout(resolve, 1200));
                         check(globe!.view[2] > 1, 'nearby history navigation does not retreat to the whole-Earth overview');
@@ -2829,7 +2831,7 @@
                         await new Promise(resolve => setTimeout(resolve, 20));
                     check(!globe!.flightTarget && globe!.view[2] === zoom &&
                           globe!.orientation.every((value, i) => Math.abs(value - expected[i]) < 1e-12),
-                          `history retains current zoom and restores saved roll: expected=${expected}, zoom=${zoom}, ` +
+                          `history frames photographic detail and restores saved roll: expected=${expected}, zoom=${zoom}, ` +
                           `actual=${globe!.orientation},${globe!.view[2]}, pending=${globe!.flightTarget}`);
                 };
                 try {
@@ -2882,8 +2884,9 @@
                             window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ?
                                 {matches: true} as MediaQueryList : match.call(window, query);
                             MarsAlmanacGlobe.finishHistory(MarsAlmanacGlobe.beginHistory(), firstCamera, true);
-                            check(!globe.flightTarget && globe.view[2] === interruptedZoom,
-                                  'reduced motion retains current zoom immediately without a flight');
+                            check(!globe.flightTarget && globe.view[2] === labDOM.call('lab_globe_arrival_zoom', interruptedZoom,
+                                document.querySelector<HTMLCanvasElement>('.almanac-globe canvas')!.clientWidth, 21600),
+                                  'reduced motion applies photographic arrival framing immediately without a flight');
                         } finally { window.matchMedia = match; }
                         const country = document.getElementById('almanacJurisdiction') as HTMLSelectElement;
                         country.value = 'GB-ENG';
@@ -3136,6 +3139,12 @@
             await window.labReady;
             await labApplication.townsReady;
             if (startupCheck) {
+                const validCamera = [1, 0, 0, 0, 4];
+                check(JSON.stringify(labDOM.call('lab_globe_saved_camera', validCamera)) === JSON.stringify(validCamera),
+                      'startup camera validation preserves a valid displayed view');
+                for (const invalid of [null, [1, 0, 0, 0], [2, 0, 0, 0, 4], [1, 0, 0, 0, 5000]])
+                    check(labDOM.call('lab_globe_saved_camera', invalid) === null,
+                          'startup camera validation rejects malformed quaternions and zooms');
                 check(WorksheetWorkspace.mode.currentMode() === 'almanac' && startupReveals.join(',') === 'almanac',
                       `first restored mode: ${WorksheetWorkspace.mode.currentMode()}; reveals: ${startupReveals.join(',')}; ` +
                       `pending: ${document.documentElement.getAttribute('data-starting')}; requests: ${startupRequests.join(',')}`);
@@ -3235,19 +3244,30 @@
                     const home = document.getElementById('homeSky')!;
                     check(Boolean(home) && WorksheetContext.statusEl.innerHTML === home.innerHTML,
                           'Real DateTime response shows the independent home header');
-                    const homeMarkup = home.innerHTML;
+                    const clockBefore = home.querySelector('[data-home-clock-zone]')?.textContent;
+                    labApplication.tickHomeClock(performance.now() + 2100);
+                    check(!!clockBefore && home.querySelector('[data-home-clock-zone]')?.textContent !== clockBefore &&
+                          WorksheetContext.statusEl.querySelector('[data-home-clock-zone]')?.textContent ===
+                          home.querySelector('[data-home-clock-zone]')?.textContent,
+                          'home clock ticks locally in both the live header and its template: ' + JSON.stringify({
+                              before: clockBefore, after: home.querySelector('[data-home-clock-zone]')?.textContent,
+                              visible: WorksheetContext.statusEl.querySelector('[data-home-clock-zone]')?.textContent,
+                              zone: home.querySelector<HTMLElement>('[data-home-clock-zone]')?.dataset.homeClockZone,
+                              ready: Boolean(Reflect.get(labApplication, 'homeClockFormat'))
+                          }));
+                    labApplication.tickHomeClock();
                     await window.checkLabMobileLayout('DateTime home header spacing', true);
                     WorksheetWorkspace.mode.setMode(originalMode);
                     WorksheetWorkspace.presentation.syncModeUI();
                     delete WorksheetWorkspace.presentation.resultStates.datetime;
                     await WorksheetWorkspace.mode.selectWorksheetMode('datetime');
-                    check(WorksheetContext.statusEl.innerHTML === homeMarkup,
+                    check(WorksheetContext.statusEl.innerHTML === home.innerHTML,
                           'DateTime mode entry preserves the independent home header');
                     window.scrollTo(0, 0);
                     await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
                     check(window.scrollY < 1 && document.activeElement === WorksheetContext.almanacDate,
                           'Entering Almanac focuses its date without scrolling below the globe');
-                    check(WorksheetContext.statusEl.innerHTML === homeMarkup,
+                    check(WorksheetContext.statusEl.innerHTML === home.innerHTML,
                           'Almanac uses the same home origin rather than its selected observer');
                     await window.checkLabMobileLayout('Almanac home header spacing', true);
                     WorksheetWorkspace.mode.setMode(originalMode);

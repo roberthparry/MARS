@@ -28,6 +28,8 @@ namespace WorksheetResults {
     /** Own the active tooltip node; native code retains presentation policy. */
     export class WorksheetTooltipController {
         private activeButton: HTMLElement | null = null;
+        private flagViewer: HTMLDialogElement | null = null;
+        private flagViewerButton: HTMLElement | null = null;
         private readonly selectedCountries = new Map<HTMLElement, MutationObserver>();
         private flagRequest: {code: string; controller: AbortController} | null = null;
         private countryObserver: IntersectionObserver | null = null;
@@ -268,12 +270,99 @@ namespace WorksheetResults {
             private readonly viewport: () => {width: number; height: number}
         ) {
             marsBindCallbacks(this, [
-                'show', 'hide', 'dispose'
+                'show', 'hide', 'dispose', 'openFlagViewer', 'jurisdictionFlagModifier'
             ]);
         }
 
         /** @brief Return the active node without transferring its ownership. */
         get active(): HTMLElement | null { return this.activeButton; }
+
+        private displayedFlag(button: HTMLElement): HTMLImageElement | null {
+            const parent = document.documentElement.hasAttribute('data-almanac-jurisdiction-flag')
+                ? button.querySelector<HTMLImageElement>('img.jurisdiction-flag') : null;
+            return parent || button.querySelector<HTMLImageElement>('img.country-flag');
+        }
+
+        /** @brief Temporarily expose parent artwork without restarting the card's regional animation. */
+        jurisdictionFlagModifier(held: boolean): void {
+            const root = document.documentElement;
+            if (root.hasAttribute('data-almanac-jurisdiction-flag') === !!held) return;
+            root.toggleAttribute('data-almanac-jurisdiction-flag', !!held);
+            if (this.activeButton instanceof HTMLButtonElement &&
+                this.activeButton.matches('.almanac-summary .almanac-location-flag')) this.show(this.activeButton);
+            const image = this.flagViewer?.querySelector<HTMLImageElement>('.mars-flag-viewer-stage img');
+            if (image && this.flagViewerButton) {
+                const uri = this.displayedFlag(this.flagViewerButton)?.getAttribute('src');
+                if (uri && image.getAttribute('src') !== uri) image.src = uri;
+            }
+        }
+
+        /** @brief Inspect approved vector artwork in a modal with fit and scrollable magnification. */
+        openFlagViewer(button: HTMLElement): void {
+            const source = this.displayedFlag(button);
+            const uri = source?.getAttribute('src') || '';
+            if (!button.matches('.almanac-summary .almanac-location-flag') ||
+                (!uri.startsWith('data:image/svg+xml;base64,') && uri !== '/offshore_flag.svg')) return;
+            this.flagViewer?.close();
+            this.hide();
+            const dialog = document.createElement('dialog');
+            dialog.className = 'mars-flag-viewer';
+            dialog.setAttribute('aria-label', button.getAttribute('aria-label') || 'Flag details');
+            const toolbar = document.createElement('div');
+            toolbar.className = 'mars-flag-viewer-controls';
+            const stage = document.createElement('div');
+            stage.className = 'mars-flag-viewer-stage';
+            stage.tabIndex = 0;
+            stage.setAttribute('aria-label', 'Magnified flag; scroll to inspect details');
+            const image = document.createElement('img');
+            image.src = uri;
+            image.alt = button.getAttribute('aria-label') || 'Flag';
+            stage.append(image);
+            const status = document.createElement('output');
+            status.setAttribute('aria-live', 'polite');
+            let zoom = 1;
+            const fit = () => {
+                if (!image.naturalWidth || !image.naturalHeight) return;
+                const scale = Math.min(stage.clientWidth / image.naturalWidth, stage.clientHeight / image.naturalHeight);
+                image.style.width = `${image.naturalWidth * scale * zoom}px`;
+                image.style.height = `${image.naturalHeight * scale * zoom}px`;
+                status.textContent = `${Math.round(zoom * 100)}%`;
+                minus.disabled = zoom <= 1;
+                plus.disabled = zoom >= 8;
+            };
+            const control = (label: string, action: () => void) => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.textContent = label;
+                item.addEventListener('click', action);
+                toolbar.append(item);
+                return item;
+            };
+            const minus = control('Zoom out', () => { zoom = Math.max(1, zoom / 1.5); fit(); });
+            const plus = control('Zoom in', () => { zoom = Math.min(8, zoom * 1.5); fit(); });
+            control('Fit', () => { zoom = 1; fit(); stage.scrollTo(0, 0); });
+            toolbar.append(status);
+            const close = control('Close', () => dialog.close());
+            image.addEventListener('load', fit);
+            dialog.append(toolbar, stage);
+            document.body.append(dialog);
+            this.flagViewer = dialog;
+            this.flagViewerButton = button;
+            const resize = new ResizeObserver(fit);
+            resize.observe(stage);
+            dialog.addEventListener('close', () => {
+                resize.disconnect();
+                dialog.remove();
+                if (this.flagViewer === dialog) {
+                    this.flagViewer = null;
+                    this.flagViewerButton = null;
+                }
+                if (button.isConnected) button.focus({preventScroll: true});
+            }, {once: true});
+            dialog.showModal();
+            fit();
+            close.focus();
+        }
 
         /** @brief Show a valid candidate without replacing ownership when native code rejects it. */
         show(button: WorksheetCopyButton): void {
@@ -303,6 +392,9 @@ namespace WorksheetResults {
 
         /** @brief Release this owner's active tooltip during shutdown. */
         dispose(): void {
+            document.documentElement.removeAttribute('data-almanac-jurisdiction-flag');
+            this.flagViewerButton = null;
+            this.flagViewer?.close();
             for (const observer of this.selectedCountries.values()) observer.disconnect();
             this.selectedCountries.clear();
             this.countryObserver?.disconnect();

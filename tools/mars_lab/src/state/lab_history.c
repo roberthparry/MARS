@@ -10,6 +10,7 @@
  */
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -110,10 +111,16 @@ static bool history_valid(const json_t *history, unsigned mode)
 
 static sqlite_t *history_open(void)
 {
-    string_t *path = lab_state_private_path("mars_lab_history.db");
+    const char *configured = getenv("MARS_LAB_HISTORY_FILE");
+    string_t *path = configured && *configured ? string_new_with(configured) : lab_state_private_path("mars_lab_history.db");
+    const char *slash = path ? strrchr(string_c_str(path), '/') : NULL;
+    string_t *parent = slash ? string_sprintf("%.*s", (int)(slash == string_c_str(path) ? 1 :
+                                           slash - string_c_str(path)), string_c_str(path)) : string_new_with(".");
+    file_t *directory = parent ? file_new(parent) : NULL;
     file_t *file = path ? file_new(path) : NULL;
     mode_t mask = umask(0077);
-    bool private_file = file && file_open(file, FILE_MODE_OPEN_OR_CREATE, FILE_ACCESS_READ_WRITE) &&
+    bool private_file = file && directory && file_create_directory(directory, 0700, true) &&
+                        file_open(file, FILE_MODE_OPEN_OR_CREATE, FILE_ACCESS_READ_WRITE) &&
                         file_close(file) && file_chmod(file, 0600);
     sqlite_t *db = private_file ? sqlite_open_plain(path) : NULL;
     bool ok = db && sqlite_exec_cstr(db,
@@ -132,6 +139,8 @@ static sqlite_t *history_open(void)
         sqlite_stmt_finalize(query);
     }
     umask(mask);
+    file_free(directory);
+    string_free(parent);
     file_free(file);
     string_free(path);
     if (!ok) { sqlite_close(db); db = NULL; }

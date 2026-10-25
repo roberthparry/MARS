@@ -215,7 +215,8 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
             MarsAlmanacGlobe.finishHistory(wideToken,
                 [...labDOM.call('lab_globe_centre', -30, -70) as number[], 1], true);
             check(Math.abs(globe.view[0] + 33.4489) < 1e-7 && Math.abs(globe.view[1] + 70.6693) < 1e-7 &&
-                  globe.view[2] === 87.25,
+                  globe.view[2] === labDOM.call('lab_globe_arrival_zoom', 87.25,
+                      document.querySelector<HTMLCanvasElement>('.almanac-globe canvas')!.clientWidth, 21600),
                   'applying the current zoom recentres a saved overview that would otherwise hide the observer');
             await WorksheetPersistence.navigation.navigate(1);
             check(Math.abs(globe.view[0] - 55.9533) < 1e-7 && Math.abs(globe.view[1] + 3.1883) < 1e-7 &&

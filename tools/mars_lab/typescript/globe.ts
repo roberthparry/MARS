@@ -216,6 +216,8 @@ class MarsAlmanacGlobe {
     private flightFrame = 0;
     private flightGeneration = 0;
     private flightTarget: number[] | null = null;
+    private readonly travelNotice = document.createElement('div');
+    private photoLoading = 0;
     private flightSpeed = 0;
     private historyZoom: number | null = null;
     private historyRedirect = false;
@@ -227,10 +229,9 @@ class MarsAlmanacGlobe {
         if (!globe) return undefined;
         if (globe.flightTarget && globe.sameCameraObserver(globe.observerSignature)) return globe.flightTarget.slice();
         globe.rememberHistory();
-        const orientation = globe.sameCameraObserver(globe.observerSignature) || globe.retainsClickedView() ? globe.orientation :
-            labDOM.call('lab_globe_centre', Number(globe.input('Latitude').value),
-                Number(globe.input('Longitude').value)) as number[] | null;
-        return orientation ? [...orientation, globe.historyZoom ?? globe.view[2]] : undefined;
+        // Persist what is displayed even while form fields are changing. Navigation validates
+        // destination visibility separately when the history entry is actually revisited.
+        return [...globe.orientation, globe.historyZoom ?? globe.view[2]];
     }
 
     /** Suspend automatic centring while asynchronous history restoration resolves the destination. */
@@ -265,7 +266,10 @@ class MarsAlmanacGlobe {
         cancelAnimationFrame(globe.flightFrame);
         globe.flightFrame = 0;
         const start = [...globe.orientation, globe.view[2]];
-        const zoom = globe.historyZoom ?? start[4], redirect = globe.historyRedirect;
+        const requestedZoom = globe.historyZoom ?? start[4], redirect = globe.historyRedirect;
+        const zoom = labDOM.call('lab_globe_arrival_zoom', requestedZoom,
+            Math.max(1, globe.canvas.clientWidth), 21600) as number;
+        globe.historyZoom = zoom;
         let target = labDOM.call('lab_globe_history_camera', camera,
             Number(globe.input('Latitude').value), Number(globe.input('Longitude').value), zoom) as number[] | null;
         if (!target) { globe.cancelFlight(); return; }
@@ -276,9 +280,16 @@ class MarsAlmanacGlobe {
             Number(globe.input('Latitude').value), Number(globe.input('Longitude').value), zoom) as number[];
         globe.observerSignature = globe.observerState();
         globe.flightTarget = target;
+        const destination = globe.selectedTown();
+        const name = destination ? MarsAlmanacGlobe.townLabel(destination, zoom, 600).full :
+            `${MarsAlmanacGlobe.coordinate(Number(globe.input('Latitude').value), 'N', 'S')}, ` +
+            MarsAlmanacGlobe.coordinate(Number(globe.input('Longitude').value), 'E', 'W');
+        globe.travelNotice.textContent = `Travelling to ${name} · worksheet shows destination`;
+        globe.travelNotice.hidden = false;
         // Fetch the destination once, before zooming towards it, rather than chasing intermediate regions.
         void globe.loadShore();
         void globe.loadTravelBorders();
+        void globe.loadPhoto();
         globe.hideGridHover();
         const complete = (): void => {
             globe.applyCamera(target);
@@ -310,7 +321,8 @@ class MarsAlmanacGlobe {
                 complete();
                 return;
             }
-            const loading = globe.worldLoading || globe.highResolutionLoading || (progress === 0 && globe.travelBordersLoading);
+            const loading = globe.worldLoading || globe.highResolutionLoading ||
+                (progress === 0 && (globe.travelBordersLoading || globe.photoLoading > 0));
             // Warm the photographic surface before departure. Local vectors refine that complete
             // surface asynchronously, without braking and restarting at each coverage boundary.
             speed += Math.max(-elapsed / 600, Math.min(elapsed / 1200, (loading ? 0 : 1) - speed));
@@ -335,6 +347,7 @@ class MarsAlmanacGlobe {
         cancelAnimationFrame(this.flightFrame);
         this.flightFrame = 0;
         this.flightTarget = null;
+        this.travelNotice.hidden = true;
         this.flightSpeed = 0;
         this.historyZoom = null;
         this.historyRedirect = false;
@@ -371,6 +384,10 @@ class MarsAlmanacGlobe {
         this.canvas = root.querySelector('canvas')!;
         this.markers = root.querySelector('.almanac-globe-markers')!;
         this.status = root.querySelector('[role="status"]')!;
+        this.travelNotice.className = 'globe-travel-notice';
+        this.travelNotice.setAttribute('role', 'status');
+        this.travelNotice.hidden = true;
+        this.canvas.parentElement!.append(this.travelNotice);
         this.shoreOverlay.classList.add('globe-shore-overlay');
         this.shoreOverlay.setAttribute('aria-hidden', 'true');
         this.shoreOverlay.append(this.shoreGroup);
@@ -537,8 +554,7 @@ class MarsAlmanacGlobe {
             const saved = restored ? {camera: restored} : JSON.parse(localStorage.getItem(MarsAlmanacGlobe.cameraStorageKey) || 'null');
             if (!saved) return;
             // Native validation rejects malformed quaternions and out-of-range zooms.
-            const camera = labDOM.call('lab_globe_history_camera', saved.camera,
-                Number(this.input('Latitude').value), Number(this.input('Longitude').value), this.view[2]) as number[] | null;
+            const camera = labDOM.call('lab_globe_saved_camera', saved.camera) as number[] | null;
             if (!camera) return;
             this.orientation = camera.slice(0, 4);
             this.view = labDOM.call('lab_globe_view', this.orientation, camera[4], 1) as GlobeView;
@@ -806,16 +822,21 @@ class MarsAlmanacGlobe {
     }
 
     private async loadPhoto(): Promise<void> {
-        if (this.view[2] < 6 || this.shoreClosed || this.flightTarget) return;
+        const target = this.flightTarget;
+        if ((target?.[4] ?? this.view[2]) < 6 || this.shoreClosed) return;
+        const latitude = target ? Number(this.input('Latitude').value) : this.view[0];
+        const longitude = target ? Number(this.input('Longitude').value) : this.view[1];
+        ++this.photoLoading;
         try {
             const module = await (this.photoModule ||= import('./globe_photo.js'));
-            if (this.shoreClosed || this.view[2] < 6 || this.flightTarget) return;
+            if (this.shoreClosed || this.flightTarget !== target) return;
             this.photo ||= new module.GlobePhoto(this.gl, () => {
                 this.root.dataset.photoResolution = '21600';
                 this.draw();
             });
-            await this.photo.load(labDOM.call('lab_globe_photo_patch', this.view[0], this.view[1]) as number[]);
+            await this.photo.load(labDOM.call('lab_globe_photo_patch', latitude, longitude) as number[]);
         } catch { /* Retain the existing photographic surface if optional tiles are unavailable. */ }
+        finally { --this.photoLoading; }
     }
 
     private noteMotion(): void {

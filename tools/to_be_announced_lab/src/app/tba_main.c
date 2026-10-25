@@ -18,6 +18,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "mars_paths.h"
 #include "tba_process.h"
 #include "tba_server.h"
 
@@ -67,6 +68,10 @@ static void tba_main_browser(const char *browser, const char *url)
 /* Launch the native workbench without an interpreter or shell command construction. */
 int main(int argc, char **argv)
 {
+    if (!mars_paths_load()) {
+        fputs("Cannot read MARS configuration; check mars.json and its database.\n", stderr);
+        return 1;
+    }
     const char *host = "::", *browser = "", *base = NULL;
     bool open_browser = true;
     uint16_t port = 8766;

@@ -187,6 +187,7 @@
 }
 
 .almanac-summary .almanac-location-flag {
+  position: relative;
   display: inline-block;
   vertical-align: middle;
   margin: 0 0.35em 0 0;
@@ -203,6 +204,64 @@
 .almanac-summary .almanac-location-flag:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+.almanac-summary .almanac-location-flag > .jurisdiction-flag {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+html[data-almanac-jurisdiction-flag] .almanac-summary .almanac-location-flag > .jurisdiction-flag {
+  opacity: 1;
+}
+
+html[data-almanac-jurisdiction-flag] .almanac-summary .almanac-location-flag:has(> .jurisdiction-flag) > .country-flag:first-child {
+  opacity: 0;
+}
+
+.mars-flag-viewer {
+  width: 94vw;
+  max-width: 1600px;
+  height: 90dvh;
+  max-height: 94dvh;
+  padding: 0.8rem;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: #0b2119;
+  color: #e9f4ef;
+}
+
+.mars-flag-viewer[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.mars-flag-viewer::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.mars-flag-viewer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mars-flag-viewer-stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.mars-flag-viewer-stage img {
+  display: block;
+  max-width: none;
+  max-height: none;
+  margin: auto;
 }
 
 .almanac-location-flag > .country-flag,
@@ -564,6 +623,19 @@
 .almanac-globe { margin-bottom: 1rem; border: 1px solid var(--line, #52675b); border-radius: 16px; overflow: hidden; }
 .almanac-globe-toolbar { display: flex; align-items: center; gap: .5rem; padding: .7rem; flex-wrap: wrap; }
 .almanac-globe-toolbar strong { margin-right: auto; }
+.globe-travel-notice {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  right: 0.6rem;
+  z-index: 4;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  color: #f0c873;
+  background: rgba(7, 23, 18, 0.9);
+  pointer-events: none;
+  font-size: 0.8rem;
+}
 /* Keep the shared actions beside the globe, with their former footprint reserved for observer dropdowns. */
 #almanacActions .controls { padding: 0 0 1rem; }
 body.almanac-mode #workspaceActionsHome { min-height: 4rem; }

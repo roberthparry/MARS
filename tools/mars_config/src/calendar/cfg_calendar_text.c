@@ -15,9 +15,10 @@
 #include <uninorm.h>
 #endif
 
+#include "file-t.h"
+#include "mars_paths.h"
 #define MARS_CFG_CALENDAR_INTERNAL_ACCESS
 #include "cfg_calendar_internal.h"
-#include "file-t.h"
 
 /* Copy and trim a borrowed optional string. */
 string_t *cfg_calendar_value(const string_t *text)
@@ -211,24 +212,14 @@ bool cfg_calendar_zone_enter(const string_t *name, cfg_calendar_environment_t *s
     string_cursor_free(cursor);
     if (!valid || !component || string_starts_with(name, "right/") || string_starts_with(name, "posix/"))
         return false;
-    string_t *path = string_sprintf("/usr/share/zoneinfo/%s", string_c_str(name));
-    file_t *file = path ? file_new(path) : NULL;
-    file_t *resolved = file ? file_resolve(file) : NULL;
-    string_t *canonical = resolved ? string_new_with(file_path(resolved)) : NULL;
-    unsigned char magic[4];
-    size_t count = 0;
-    valid = canonical && string_starts_with(canonical, "/usr/share/zoneinfo/") && file_open_read(resolved) &&
-            file_read(resolved, magic, sizeof(magic), &count) && count == sizeof(magic) && magic[0] == 'T' &&
-            magic[1] == 'Z' && magic[2] == 'i' && magic[3] == 'f';
+    string_t *canonical = mars_path_zoneinfo(name);
+    valid = canonical != NULL;
     string_t *setting = valid ? string_sprintf(":%s", string_c_str(canonical)) : NULL;
     valid = setting && cfg_calendar_environment(state, "TZ", setting);
     if (valid)
         tzset();
     string_free(setting);
     string_free(canonical);
-    file_free(resolved);
-    file_free(file);
-    string_free(path);
     return valid;
 }
 

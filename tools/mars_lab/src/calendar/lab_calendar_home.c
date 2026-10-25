@@ -29,11 +29,13 @@ static bool home_origin(const jurisdict_place_t *place, void *context)
     return true;
 }
 
-static bool home_item(string_t *out, const char *label, const char *value)
+static bool home_item(string_t *out, const char *label, const char *value, const char *zone, time_t now)
 {
-    return !string_append_cstr(out, "<span class=\"sky-status-item\"><span class=\"sky-status-label\">") &&
-        lab_cal_markup_text(out, label) &&
-        !string_append_cstr(out, "</span><span class=\"sky-status-value\">") && lab_cal_markup_text(out, value) &&
+    bool ok = !string_append_cstr(out, "<span class=\"sky-status-item\"><span class=\"sky-status-label\">") &&
+        lab_cal_markup_text(out, label) && !string_append_cstr(out, "</span><span class=\"sky-status-value\"");
+    if (zone) ok = ok && !string_append_cstr(out, " data-home-clock-zone=\"") && lab_cal_markup_text(out, zone) &&
+        string_append_format(out, "\" data-home-clock-ms=\"%.0f\"", (double)now * 1000) >= 0;
+    return ok && !string_append_cstr(out, ">") && lab_cal_markup_text(out, value) &&
         !string_append_cstr(out, "</span></span>");
 }
 
@@ -63,7 +65,7 @@ static json_t *home_body(almanac_t *almanac, datetime_t *moment, const char *cod
 static bool home_solar(string_t *out, const string_t *zone, const almanac_rise_set_event_t *event, bool rising)
 {
     string_t *clock = lab_cal_solar_clock(event, zone);
-    bool ok = clock && home_item(out, rising ? "Sunrise · local" : "Sunset · local", string_c_str(clock));
+    bool ok = clock && home_item(out, rising ? "Sunrise · local" : "Sunset · local", string_c_str(clock), NULL, 0);
     string_free(clock);
     return ok;
 }
@@ -123,13 +125,13 @@ string_t *lab_cal_home_markup(const json_t *origin, time_t now)
     string_t *out = string_new_with("<span class=\"sky-status-strip\"><span class=\"sky-status-events\">");
     bool moon_ready = *lab_cal_text(moon, "phase") && *lab_cal_text(sun, "phase");
     ok = out && day && (moon_ready ? lab_cal_body_symbol(out, moon, sun, observer) :
-                                   home_item(out, "Moon", "unavailable")) &&
+                                   home_item(out, "Moon", "unavailable", NULL, 0)) &&
          home_solar(out, zone, &solar.set, false) && home_solar(out, zone, &solar.rise, true) &&
          !string_append_cstr(out, "</span><span class=\"sky-status-selection\">");
     int minutes = (int)lround(fabs(offset) * 60);
     string_t *clock = string_sprintf("%s GMT%c%02d:%02d", local_clock, offset < 0 ? '-' : '+', minutes / 60, minutes % 60);
     string_t *label = string_sprintf("Local time · %s", lab_cal_text(origin, "location"));
-    ok = ok && clock && label && home_item(out, string_c_str(label), string_c_str(clock)) &&
+    ok = ok && clock && label && home_item(out, string_c_str(label), string_c_str(clock), string_c_str(zone), now) &&
          home_flag(out, lab_cal_text(origin, "jurisdiction")) && !string_append_cstr(out, "</span></span>");
     string_free(clock); string_free(label); string_free(zone);
     json_free(moon); json_free(sun); json_free(observer);

@@ -6,8 +6,8 @@
  * File input, macro definitions, category-code changes and TeX character escapes
  * are rejected before execution. latex runs without shell escape in a private
  * temporary directory with paranoid kpathsea file access. dvisvgm ignores DVI
- * specials. Native file APIs own document/output access and cleanup; mkdtemp is
- * used solely for atomic creation of the private directory. Unsupported TeX is
+ * specials. Native file APIs own document/output access, private temporary-directory
+ * creation and cleanup. Unsupported TeX is
  * returned as a rendering diagnostic without altering mathematical results.
  */
 #ifndef _GNU_SOURCE
@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "file-t.h"
+#include "mars_paths.h"
 #include "lab_process.h"
 #define MARS_LAB_EVALUATE_INTERNAL_ACCESS
 #include "lab_evaluate_internal.h"
@@ -389,8 +390,8 @@ string_t *lab_eval_render(const string_t *TeX, diagnostic_t **error)
         errno = EINVAL;
         return NULL;
     }
-    char directory[] = "/tmp/mars-lab-TeX-XXXXXX";
-    if (!mkdtemp(directory)) {
+    file_t *temporary = mars_path_temporary();
+    if (!temporary) {
         int code = errno;
         if (error)
             *error = diagnostic_new(DIAGNOSTIC_ERROR, "lab.render", code,
@@ -398,6 +399,7 @@ string_t *lab_eval_render(const string_t *TeX, diagnostic_t **error)
         errno = code;
         return NULL;
     }
+    const char *directory = file_path(temporary);
     string_t *document = string_sprintf("\\documentclass{article}\n\\pagestyle{empty}\n"
                                         "\\usepackage{amsmath}\n\\usepackage{amssymb}\n"
                                         "\\begin{document}\n\\[\n%s\n\\]\n\\end{document}\n",
@@ -445,7 +447,7 @@ string_t *lab_eval_render(const string_t *TeX, diagnostic_t **error)
             svg = file_read_all_text(destination);
         file_info_free(info);
         file_free(destination);
-        if (svg && (!string_byte_length(svg) || !lab_eval_namespace_svg(svg, directory + sizeof(directory) - 7u))) {
+        if (svg && (!string_byte_length(svg) || !lab_eval_namespace_svg(svg, strrchr(directory, '/') + 1))) {
             string_free(svg);
             svg = NULL;
         }
@@ -461,6 +463,7 @@ string_t *lab_eval_render(const string_t *TeX, diagnostic_t **error)
     }
     string_free(output);
     lab_eval_clean_directory(directory);
+    file_free(temporary);
     if (!svg)
         errno = code ? code : EIO;
     return svg;

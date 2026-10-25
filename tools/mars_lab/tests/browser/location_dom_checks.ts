@@ -260,8 +260,11 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             equal(WorksheetLocations.calendar.currentAlmanacState().zone_mode, 'manual',
                   'typing an offset opts out of automatic updates even when its number is unchanged');
             WorksheetLocations.calendar.applyCalendarState('almanac', {...savedAlmanac, zone: '5.5', zone_mode: undefined});
+            equal(WorksheetLocations.calendar.currentAlmanacState().zone_mode, 'auto',
+                  'legacy histories re-resolve stale offsets at the restored destination');
+            WorksheetLocations.calendar.applyCalendarState('almanac', {...savedAlmanac, zone: '5.5', zone_mode: 'manual'});
             equal(WorksheetLocations.calendar.currentAlmanacState().zone_mode, 'manual',
-                  'legacy histories with no provenance retain authored offsets');
+                  'explicitly authored offsets still survive history restoration');
             WorksheetLocations.calendar.applyCalendarState('almanac', {...savedAlmanac, elevation: '136', elevation_mode: 'catalogue'});
             equal(WorksheetLocations.calendar.currentAlmanacState().elevation_mode, 'catalogue',
                   'catalogue height provenance survives history restoration');

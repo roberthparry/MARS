@@ -31,7 +31,7 @@ bool cfg_database_revision(sqlite_t *db, const char *name, int revision);
 /** Read the managed-data revision, returning zero for legacy databases without revision metadata. */
 bool cfg_database_current_revision(sqlite_t *db, const char *name, int64_t *revision);
 
-/** Refresh countries and, before revision three, shoreline; retain river data and credentials. */
+/** Refresh versioned geography and textures using a caller-owned staging directory; retain rivers and credentials. */
 bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging);
 
 /** @brief Atomically import all packaged photographic images and their verified metadata, preserving other layers. */

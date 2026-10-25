@@ -192,7 +192,15 @@ static bool globe_camera_read(jsref camera, double values[5])
     return quaternion_is_unit(values, 1e-6) && values[4] >= 1 && values[4] <= 4096;
 }
 
-/* Do not restore a camera which hides the location named by its history record. */
+/* A reopened page preserves a valid displayed view even when its observer is off-screen. */
+void lab_globe_saved_camera(jsref camera)
+{
+    double values[5];
+    if (globe_camera_read(camera, values)) globe_result(values, 5);
+    else lab_dom_return(0);
+}
+
+/* Do not navigate to a camera which hides the location named by its history record. */
 void lab_globe_history_camera(jsref camera, double latitude, double longitude, double zoom)
 {
     double values[5], matrix[9];
@@ -222,6 +230,15 @@ static double globe_ease(double t)
 {
     t = fmax(0, fmin(1, t));
     return t * t * t * (10 + t * (-15 + 6 * t));
+}
+
+/* Automatic journeys retain geographic context instead of magnifying individual photo texels across a town. */
+void lab_globe_arrival_zoom(double zoom, double viewport, double pixels)
+{
+    if (!isfinite(zoom) || zoom < 1 || zoom > 4096 || !isfinite(viewport) || viewport <= 0 ||
+        !isfinite(pixels) || pixels <= 0) { lab_dom_return(0); return; }
+    double limit = fmax(1, 3 * pixels / (180 * globe_radian * viewport));
+    lab_dom_return(lab_dom_numeric(fmin(zoom, limit)));
 }
 
 static double globe_flight_zoom(double from, double to, double fraction)

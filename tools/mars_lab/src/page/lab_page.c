@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "file-t.h"
+#include "mars_paths.h"
 #include "lab_mobile.h"
 #include "lab_page.h"
 
@@ -44,18 +45,10 @@ static const char *lab_page_text_value(const json_t *value)
 
 static string_t *lab_page_read_template(void)
 {
-    const char *configured = getenv("MARS_LAB_ASSET_FILE"), *root = getenv("MARS_ROOT");
-    string_t *path = string_new();
-    if (!path)
-        return NULL;
-    int error = 0;
-    if (configured && *configured)
-        error = string_append_cstr(path, configured);
-    else if (root && *root)
-        error = string_append_format(path, "%s/tools/mars_lab/assets/index.html", root) < 0;
-    else
-        error = string_append_cstr(path, MARS_LAB_ASSET_PATH);
-    file_t *file = error ? NULL : file_new(path);
+    const char *configured = getenv("MARS_LAB_ASSET_FILE");
+    string_t *path = configured && *configured ? string_new_with(configured) :
+                                              mars_path_resource(MARS_PATH_ASSETS, NULL, "index.html");
+    file_t *file = path ? file_new(path) : NULL;
     string_t *asset = file ? file_read_all_text(file) : NULL;
     file_free(file);
     string_free(path);

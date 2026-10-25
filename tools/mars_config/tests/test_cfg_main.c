@@ -18,6 +18,7 @@ int tests_main(void)
     TEST_SECTION("Native MARS configuration");
     test_cfg_progress_cases();
     test_cfg_storage_cases();
+    test_cfg_paths_cases();
     test_cfg_weather_cases();
     test_cfg_database_cases();
     test_cfg_rivers_cases();

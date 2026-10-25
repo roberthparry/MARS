@@ -14,6 +14,7 @@ else
 CONFIG_BUILD_DIR := tools/mars_config/build/$(notdir $(BUILD_DIR))
 CONFIG_SRCS := $(sort $(wildcard tools/mars_config/src/*/*.c))
 CONFIG_OBJS := $(patsubst tools/mars_config/src/%.c,$(CONFIG_BUILD_DIR)/%.o,$(CONFIG_SRCS))
+CONFIG_OBJS += $(APP_RESOURCE_OBJ)
 CONFIG_SUPPORT_OBJS := $(filter-out $(CONFIG_BUILD_DIR)/app/cfg_main.o,$(CONFIG_OBJS))
 CONFIG_PROGRAM := $(CONFIG_BUILD_DIR)/mars_config
 CONFIG_TEST_SRCS := $(sort $(wildcard tools/mars_config/tests/*.c))
@@ -62,8 +63,7 @@ $(CONFIG_BUILD_DIR)/coastline_water: tools/mars_config/coastline_water.c $(STATI
 
 $(CONFIG_BUILD_DIR)/%.o: tools/mars_config/src/%.c tools/mars_config/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
-	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_config/include \
-	    -DMARS_CONFIG_ROOT_DIR='"$(CURDIR)"' -c $< -o $@
+	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_config/include -c $< -o $@
 
 $(CONFIG_PROGRAM): $(CONFIG_OBJS) $(STATIC_LIB)
 	$(CC) $(LDFLAGS) -o $@ $(CONFIG_OBJS) $(STATIC_LIB) $(LDLIBS)
@@ -86,7 +86,37 @@ $(CONFIG_TEST_BIN): $(CONFIG_TEST_OBJS) $(CONFIG_SUPPORT_OBJS) $(LAB_BUILD_DIR)/
 	    $(LAB_BUILD_DIR)/process/lab_process.o $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS)
 
 .PHONY: native-config clean-config
-native-config: $(CONFIG_PROGRAM)
+native-config: $(CONFIG_PROGRAM) $(CONFIG_BUILD_DIR)/mars-config.db
+
+MARS_ZONEINFO_DIR ?= $(firstword $(wildcard $(TZDIR) /usr/share/zoneinfo /usr/share/lib/zoneinfo /usr/lib/zoneinfo))
+$(CONFIG_BUILD_DIR)/mars-config.db: $(CONFIG_PROGRAM) Makefile tools/mars_config/Makefile
+	@"$(CONFIG_PROGRAM)" paths seed "$@" \
+	    globe_sources "$(CURDIR)/packaging/globe-db" \
+	    globe_textures "$(CURDIR)/packaging/globe-db/textures" \
+	    jurisdiction_sources "$(CURDIR)/packaging/jurisdiction-db" \
+	    almanac_sources "$(CURDIR)/packaging/almanac-db" \
+	    lab_assets "$(CURDIR)/tools/mars_lab/assets" \
+	    lab_scripts "$(CURDIR)/tools/mars_lab/build/typescript" \
+	    lab_wasm "$(abspath $(LAB_BUILD_DIR))/wasm" \
+	    lab_icons "$(CURDIR)/packaging/linux" \
+	    lab_worker "$(abspath $(LAB_SERVER))" \
+	    locale_sources "$(CURDIR)/tools/mars_config/data/locales" zoneinfo "$(MARS_ZONEINFO_DIR)" \
+	    temporary "$(if $(TMPDIR),$(TMPDIR),/tmp)" system_documentation "$(if $(MARS_SYSTEM_DOC_DIR),$(MARS_SYSTEM_DOC_DIR),/usr/share/doc)" \
+	    private_assets "$(CURDIR)/tools/to_be_announced_lab/assets" \
+	    private_scripts "$(CURDIR)/tools/to_be_announced_lab/build/typescript" private_wasm "$(abspath $(TBA_BUILD_DIR))/wasm"
+
+$(LAB_BUILD_DIR)/mars-config.db: $(CONFIG_BUILD_DIR)/mars-config.db
+	@mkdir -p $(@D)
+	cp "$<" "$@"
+
+$(LAB_SERVER): | $(LAB_BUILD_DIR)/mars-config.db
+$(CONFIG_TEST_BIN): | $(CONFIG_BUILD_DIR)/mars-config.db
+
+$(TBA_BUILD_DIR)/mars-config.db: $(CONFIG_BUILD_DIR)/mars-config.db
+	@mkdir -p $(@D)
+	cp "$<" "$@"
+
+$(TBA_SERVER): | $(TBA_BUILD_DIR)/mars-config.db
 clean-config:
 	rm -rf tools/mars_config/build
 

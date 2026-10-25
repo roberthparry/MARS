@@ -82,6 +82,14 @@ static bool vector_surface_policy(void)
              !strcmp(lab_cal_text(options, "elevation"), "39") &&
              !*lab_cal_observer_jurisdiction(options) && location &&
              !strcmp(string_c_str(location), cases[i].location);
+        bool marine = !strcmp(cases[i].surface, "Sea") || !strcmp(cases[i].surface, "Coastal water");
+        unsigned status = 200;
+        json_t *country = lab_cal_country(options, &status);
+        const char *flag = marine ? "/offshore_flag.svg" : "";
+        ok = ok && country && status == 200 && !*lab_cal_text(country, "country_code") &&
+             !strcmp(lab_cal_text(country, "country_flag"), flag) &&
+             !strcmp(lab_cal_text(options, "country_flag"), flag);
+        json_free(country);
         string_free(location);
         json_free(options);
     }
