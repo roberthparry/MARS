@@ -409,7 +409,10 @@ before starting the browser client; the installed desktop launcher starts the
 native executable directly.
 
 The database-only targets `make install-mars-db` and `make uninstall-mars-db` are
-listed in `make help`. The uninstall target removes the default globe, almanac and
+listed in `make help`. When MARS Lab is installed, `make release` also installs any
+missing databases and applies pending updates to existing ones, preserving their other
+data and settings. `make update-mars-db` performs this database preparation separately.
+The uninstall target removes the default globe, almanac and
 jurisdiction databases under `~/.mars`, their SQLite sidecar files and their database
 configuration files. It preserves custom database files, Lab history, weather settings
 and river-processing checkpoints. Stop the Lab before uninstalling databases.

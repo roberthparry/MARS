@@ -331,10 +331,13 @@ is sent to the native server's built-in calculation modes, which use MARSlib.
 
 After a successful build, `make release` runs `make update-mars-db` if the configured
 MARS Lab launcher is installed and executable. Without an installed launcher the
-release remains build-only. The updater checks existing globe, almanac and
-jurisdiction databases sequentially, using their saved paths and keys without
-password prompts or configuration changes. Missing databases are skipped; install
-them explicitly with `make install-mars-db`.
+release remains build-only. The updater prepares globe, almanac and jurisdiction
+databases sequentially: missing databases are installed from packaged sources, while
+existing ones receive only pending migrations. Saved paths and keys are reused without
+password prompts; a fresh configuration defaults to plaintext. New jurisdiction
+installations use saved calendar choices or the locale's default location and language.
+Existing database configuration is preserved. This also restores all three databases
+after `make uninstall-mars-db`; `make install-mars-db` remains the explicit fresh-rebuild command.
 
 Updates are explicit, versioned migrations, not automatic reruns of the database
 installers. The current migrations refresh packaged shoreline/country geometry and
@@ -344,8 +347,9 @@ do not trigger a rebuild. Imported rivers, calendar settings and unrelated table
 are preserved. River candidates are never published by a release build.
 
 Each database commits its changes and revision together. Current databases require
-no source import. Failed migrations roll back and fail the release; earlier successful
-database updates remain committed and are skipped when retrying. Invalid credentials,
+no source import. Failed installations or migrations fail the release; failed migrations
+roll back. Earlier successful database updates remain committed and are skipped when
+retrying. Invalid credentials,
 locked databases and revisions newer than this build are errors, never reasons to
 recreate a database. Close and reopen MARS Lab after updating so its caches are refreshed;
 the updater does not stop running applications automatically.

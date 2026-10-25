@@ -7,6 +7,7 @@
  * Packaged almanac coverage checks the complete coefficient imports and encrypted
  * reopening. The jurisdiction fixture checks saved choices and failed replacements.
  * Globe fixtures distinguish fresh reinstallation from layer-preserving updates in both storage modes.
+ * Release preparation restores missing stores while retaining existing data, paths and credentials.
  * Every fixture runs beneath the
  * disposable test_cfg_isolated home; no user's configuration is accessed.
  */
@@ -1086,7 +1087,84 @@ static bool test_cfg_database_update_fixture(const char *directory)
 static void test_cfg_database_update(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_update_fixture),
-                     "release updates preserve keys and unrelated rows, skip current/missing stores and fail safely");
+                     "migration-only updates preserve keys and unrelated rows, skip current/missing stores and fail safely");
+}
+
+static bool test_cfg_database_ensure_fixture(const char *directory)
+{
+    static const char *const paths[] = {
+        "globe/globe.db", "custom almanac.db", "jurisdiction/mars_jurisdiction_rules.db"
+    };
+    static const char *const configurations[] = {
+        "config/globe-db.env", "config/almanac-db.env", "config/jurisdiction-db.env"
+    };
+    static const char *const keys[] = {"", "ensure-fixture-key", ""};
+    file_t *almanac = test_cfg_database_file(directory, paths[1]);
+    bool ok = almanac && !unsetenv("MARS_GLOBE_DB_PATH") && !unsetenv("MARS_GLOBE_DB_KEY") &&
+              !unsetenv("MARS_HOLIDAY_JURISDICTION") &&
+              !unsetenv("MARS_CALENDAR_LOCATION_ARGUMENT") && !unsetenv("MARS_CALENDAR_LANGUAGE_ARGUMENT") &&
+              !setenv("LANG", "en_GB.UTF-8", 1) && !setenv("LC_ALL", "en_GB.UTF-8", 1) &&
+              !setenv("MARS_ALMANAC_DB_PATH", file_path(almanac), 1) &&
+              !setenv("MARS_ALMANAC_DB_KEY", keys[1], 1) && !setenv("MARS_ROOT", directory, 1) &&
+              cfg_databases_ensure() == 1;
+    for (size_t i = 0; ok && i < 3; ++i) {
+        file_t *file = test_cfg_database_file(directory, paths[i]);
+        ok = file && !file_exists(file);
+        file_free(file);
+    }
+    /* Exercise a completely absent installation through the same native operation as release. */
+    ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && cfg_databases_ensure() == 0 &&
+         !unsetenv("MARS_ALMANAC_DB_PATH") && !unsetenv("MARS_ALMANAC_DB_KEY") && cfg_databases_ensure() == 0;
+    string_t *saved[3] = {0};
+    for (size_t i = 0; ok && i < 3; ++i) {
+        file_t *file = test_cfg_database_file(directory, paths[i]);
+        file_t *config = test_cfg_database_file(directory, configurations[i]);
+        sqlite_t *db = file ? test_cfg_database_open(file, keys[i]) : NULL;
+        saved[i] = config ? file_read_all_text(config) : NULL;
+        ok = db && saved[i] && sqlite_exec_cstr(db,
+            "create table release_retained(value);insert into release_retained values(42)");
+        sqlite_close(db); file_free(config); file_free(file);
+    }
+    /* Current databases must not need package files or lose custom data on repeated releases. */
+    ok = ok && !setenv("MARS_ROOT", directory, 1) && cfg_databases_ensure() == 0 &&
+         test_cfg_database_write(directory, "mars_lab_history.db", "history fixture") &&
+         test_cfg_database_write(directory, "river-checkpoint.db", "river fixture") && file_delete(almanac) &&
+         cfg_databases_ensure() == 1 && !file_exists(almanac) &&
+         test_cfg_database_fixture(directory, "create table restored(value);insert into restored values(7);") &&
+         cfg_databases_ensure() == 0;
+    for (size_t i = 0; ok && i < 3; ++i) {
+        file_t *file = test_cfg_database_file(directory, paths[i]);
+        file_t *config = test_cfg_database_file(directory, configurations[i]);
+        string_t *after = config ? file_read_all_text(config) : NULL;
+        sqlite_t *db = file ? test_cfg_database_open(file, keys[i]) : NULL;
+        ok = db && after && !string_compare(saved[i], after) &&
+             test_cfg_database_query(db, i == 1 ? "select value from restored" : "select value from release_retained",
+                                     i == 1 ? "7" : "42");
+        sqlite_close(db); string_free(after); file_free(config); file_free(file);
+    }
+    /* Invalid credentials are an error, never a reason to reinstall an existing database. */
+    file_t *snapshot = test_cfg_database_file(directory, "almanac-snapshot.db");
+    ok = ok && snapshot && file_copy(almanac, snapshot, false) &&
+         !setenv("MARS_ALMANAC_DB_KEY", "incorrect-key", 1) && cfg_databases_ensure() == 1 &&
+         test_cfg_database_equal(almanac, snapshot);
+    static const char *const retained[][2] = {
+        {"mars_lab_history.db", "history fixture"}, {"river-checkpoint.db", "river fixture"}
+    };
+    for (size_t i = 0; ok && i < 2; ++i) {
+        file_t *file = test_cfg_database_file(directory, retained[i][0]);
+        string_t *value = file ? file_read_all_text(file) : NULL;
+        ok = test_cfg_database_text(value, retained[i][1]);
+        string_free(value); file_free(file);
+    }
+    for (size_t i = 0; i < 3; ++i) string_free(saved[i]);
+    file_free(snapshot); file_free(almanac);
+    return ok;
+}
+
+static void test_cfg_database_ensure(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_ensure_fixture),
+                     "release restores missing stores, reuses saved paths and keys, and preserves existing data");
 }
 
 static bool test_cfg_database_globe_fixture(const char *directory)
@@ -1619,6 +1697,7 @@ void test_cfg_database_cases(void)
     TEST_RUN_IN_GROUP(test_cfg_country_migration, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_country_flags, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_update, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_database_ensure, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_coast_corrections, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_globe_packaged, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_trace, tests, NULL);

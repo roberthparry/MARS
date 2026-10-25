@@ -654,7 +654,7 @@ to-be-announced-lab: native-tba-lab
 .PHONY: install-mars-db uninstall-mars-db
 .PHONY: update-mars-db
 update-mars-db: check-native-deps native-config
-	@MARS_ROOT="$(CURDIR)" "$(CONFIG_PROGRAM)" databases-update
+	@MARS_ROOT="$(CURDIR)" "$(CONFIG_PROGRAM)" databases-ensure
 
 install-mars-db: check-native-deps native-config
 	@"$(CONFIG_PROGRAM)" databases
@@ -812,8 +812,8 @@ help:
 	@printf '\n%s\n' "Build and cleanup"
 	@printf '  %-40s %s\n' "make debug" "Build debug binaries and tests"
 	@printf '  %-40s %s\n' "make release" "Build all standard targets in release mode (libraries, Labs, tests and benchmarks)"
-	@echo "    If MARS Lab is installed, also update its existing globe, almanac and jurisdiction databases."
-	@echo "    Missing databases are skipped; use make install-mars-db to install all three."
+	@echo "    If MARS Lab is installed, also install missing globe, almanac and jurisdiction databases."
+	@echo "    Existing databases receive pending updates; their other data and settings are preserved."
 	@printf '  %-40s %s\n' "make release-evidence" "Build a release and record its binary dependency evidence"
 	@printf '  %-40s %s\n' "make native-lab" "Build the Lab server and WebAssembly assets"
 	@printf '  %-40s %s\n' "make native-config" "Build tools/mars_config/build/<mode>/mars_config"
@@ -829,7 +829,7 @@ help:
 	@printf '  %-40s %s\n' "make uninstall-mars-lab" "Remove the user desktop launcher for MARS Lab"
 	@printf '\n%s\n' "Databases — all three"
 	@printf '  %-40s %s\n' "make install-mars-db" "Install globe, almanac and jurisdiction databases sequentially"
-	@printf '  %-40s %s\n' "make update-mars-db" "Apply pending migrations to existing databases without prompting"
+	@printf '  %-40s %s\n' "make update-mars-db" "Install missing databases and update existing ones without prompting"
 	@printf '  %-40s %s\n' "make uninstall-mars-db" "Remove all three default databases and their configuration; preserve Lab history"
 	@echo "    Stop the Lab before uninstalling. History and weather settings are preserved."
 	@printf '\n%s\n' "Databases — individual"

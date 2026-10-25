@@ -66,6 +66,14 @@ int cfg_databases_run(void);
 int cfg_databases_update(void);
 
 /**
+ * @brief Install missing databases and migrate existing ones sequentially, without prompting.
+ * Reuses configured paths and keys; new configurations default to plaintext. Existing stores and settings are
+ * preserved except for pending managed migrations. Failed installation or migration stops before later stores.
+ * @return Zero on success, one on failure.
+ */
+int cfg_databases_ensure(void);
+
+/**
  * @brief Export the three installed databases to plaintext and switch their saved configurations sequentially.
  * Requires stopped database users and no path/key environment overrides. Original encrypted databases and a
  * private configuration backup are retained. New files use the .plain.db suffix; existing outputs are never replaced.

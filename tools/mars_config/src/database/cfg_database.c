@@ -5,6 +5,7 @@
  * Owns setting precedence, explicit storage-mode selection, streaming SQL imports, staging and
  * rollback-safe publication. Dispatches to the almanac and jurisdiction policies;
  * the combined installer preserves each database's individually configured mode.
+ * Release preparation installs missing stores and migrates existing ones without rebuilding them.
  *
  * Fixed-size file-module reads preserve UTF-8 SQL in string_t. SQLCipher checks
  * statement completeness, including quotes, comments and trigger bodies. Input
@@ -53,7 +54,11 @@ typedef struct cfg_database_migration {
     const char *name, *path_variable, *key_variable, *default_path;
     int revision;
     bool (*apply)(sqlite_t *, const string_t *, const string_t *);
+    const cfg_database_profile *profile;
 } cfg_database_migration;
+
+static int cfg_database_install(const cfg_database_profile *profile, const char *path, const char *key,
+                                const char *location, const char *language, bool interactive);
 
 bool cfg_database_revision(sqlite_t *db, const char *name, int revision)
 {
@@ -102,7 +107,7 @@ static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root
            cfg_database_source(db, root, "packaging/jurisdiction-db/location_subdivisions.sql", false);
 }
 
-static bool cfg_database_update_one(const cfg_database_migration *migration)
+static bool cfg_database_update_one(const cfg_database_migration *migration, bool install_missing)
 {
     string_t *home = cfg_storage_home();
     string_t *config_path = home ? string_sprintf("%s/config/%s-db.env", string_c_str(home), migration->name) : NULL;
@@ -138,7 +143,14 @@ static bool cfg_database_update_one(const cfg_database_migration *migration)
         cfg_database_cleanup(staging);
         string_free(staging); string_free(parent); string_free(root);
     }
-    if (ok) printf("%s database: %s.\n", migration->name, exists ? "up to date" : "not installed; skipped");
+    if (ok && !exists && install_missing) {
+        printf("Installing missing %s database...\n", migration->name);
+        ok = migration->profile ?
+            cfg_database_install(migration->profile, NULL, NULL, NULL, NULL, false) == 0 :
+            cfg_globe_run("globe-install") == 0;
+    }
+    if (ok) printf("%s database: %s.\n", migration->name,
+                   exists ? "up to date" : install_missing ? "installed" : "not installed; skipped");
     else fprintf(stderr, "%s database update failed; check saved credentials, source data and database availability.\n",
                  migration->name);
     sqlite_close(db); file_free(destination); file_free(config);
@@ -146,19 +158,30 @@ static bool cfg_database_update_one(const cfg_database_migration *migration)
     return ok;
 }
 
-/* Explicit migrations, not wholesale installer rebuilds; no settings or keys are rewritten. */
-int cfg_databases_update(void)
+static int cfg_databases_prepare(bool install_missing)
 {
     static const cfg_database_migration migrations[] = {
-        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 9, cfg_database_globe_refresh},
-        {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL},
+        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 9, cfg_database_globe_refresh, NULL},
+        {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 8, cfg_database_jurisdiction_refresh},
+         "jurisdiction/mars_jurisdiction_rules.db", 8, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)
-        if (!cfg_database_update_one(&migrations[i])) return 1;
+        if (!cfg_database_update_one(&migrations[i], install_missing)) return 1;
     return 0;
+}
+
+/* Explicit migrations only; missing databases remain absent. */
+int cfg_databases_update(void)
+{
+    return cfg_databases_prepare(false);
+}
+
+/* Restore missing stores without replacing any existing database or prompting. */
+int cfg_databases_ensure(void)
+{
+    return cfg_databases_prepare(true);
 }
 
 static bool cfg_database_space(unsigned char ch)

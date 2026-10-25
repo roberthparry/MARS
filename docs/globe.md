@@ -654,6 +654,9 @@ not a river installation command. `make uninstall-globe-db` removes the default
 their SQLite sidecar files and database configuration files. Stop the Lab before
 uninstalling. Custom database paths, Lab history, weather settings and separate river
 processing files are preserved. Repeating an uninstall with absent files succeeds.
+When MARS Lab is installed, the next `make release` restores missing databases from
+packaged sources and migrates existing databases without rebuilding them. The same
+operation is available directly as `make update-mars-db`.
 `make install-mars-db` uses each database's own configured storage mode, defaulting to
 plaintext when no key is supplied. Calendar questions may still appear, but passwords
 are not prompted for. Standalone installers use the same rules. Installation creates a new database in the

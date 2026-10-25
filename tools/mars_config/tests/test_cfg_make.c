@@ -32,9 +32,9 @@ void test_cfg_make_self_fixture(void)
     size_t length = 0, prefix = strlen(program) + 1;
     if (getenv("MARS_TEST_MAKE_RELEASE")) {
         bool ok = command && file_open_read(command) && file_read(command, bytes, sizeof(bytes), &length) &&
-                  length == prefix + sizeof("databases-update") && prefix <= sizeof(bytes) &&
+                  length == prefix + sizeof("databases-ensure") && prefix <= sizeof(bytes) &&
                   !memcmp(bytes, program, prefix) &&
-                  !memcmp(bytes + prefix, "databases-update", sizeof("databases-update"));
+                  !memcmp(bytes + prefix, "databases-ensure", sizeof("databases-ensure"));
         file_free(command);
         if (ok) { puts("release update fixture verified"); fflush(stdout); }
         _exit(ok && !getenv("MARS_TEST_MAKE_FAIL") ? 0 : 93);
@@ -250,6 +250,8 @@ static bool test_cfg_make_help_fixture(const char *directory)
               string_find(output, "make native-lab ") >= 0 && string_find(output, "make test_http_live ") >= 0 &&
               string_find(output, "make test_lab_native ") >= 0 && string_find(output, "make lab-browser-test ") >= 0 &&
               string_find(output, "make install-mars-db ") >= 0 && string_find(output, "make uninstall-mars-db ") >= 0 &&
+              string_find(output, "also install missing globe, almanac and jurisdiction databases") >= 0 &&
+              string_find(output, "Missing databases are skipped") < 0 &&
               string_find(output, "Reserved; currently refuses changes") < 0;
     static const char *const obsolete[] = {
         "lab-workers", "lab-build", "test-http-live", "check-jurisdiction-db-deps",

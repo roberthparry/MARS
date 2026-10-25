@@ -2920,6 +2920,7 @@
       "test_cfg_database_bounds": true,
       "test_cfg_database_coast_corrections": true,
       "test_cfg_database_conflicts": true,
+      "test_cfg_database_ensure": true,
       "test_cfg_database_failure": true,
       "test_cfg_database_globe": true,
       "test_cfg_database_globe_packaged": true,
