@@ -20,8 +20,10 @@ inferring coordinates from the machine's language. MARS Lab uses this for its ho
 
 `jurisdict_country(jurisdiction, code, &name, &flag_svg)` looks up an exact uppercase
 ISO alpha-2 country code or subdivision code through the catalogue's indexed key.
-Subdivisions with artwork use their own name and flag; others fall back to their
-parent country's presentation. Wales (`GB-WLS`), Scotland (`GB-SCT`) and the
+Subdivisions retain their own name and use their own artwork when available,
+otherwise inheriting the parent country's flag. Kaliningrad Oblast (`RU-KGD`)
+uses the Russian flag, its existing town catalogue and the `Europe/Kaliningrad`
+timezone, with Kaliningrad as its representative town. Wales (`GB-WLS`), Scotland (`GB-SCT`) and the
 Isle of Man (`IM`) therefore retain their distinct flags. The caller releases
 both owned strings with `string_free`. An unavailable flag leaves its output NULL
 while the country name remains usable. Invalid or unknown codes return false and
@@ -70,7 +72,17 @@ Ordinary England, Wales, Scotland, Isle of Man, Northern Ireland and Jersey
 flags remain static. Cornwall alternates St Piran's flag with England's cross,
 not the Union flag. Catalan artwork is also used for Valencia and the Balearics;
 their display names remain distinct. West, East and North Frisia have distinct
-artwork. Cultural coverage, including historical Brittany and both sides of the
+artwork. North Frisian coverage includes Helgoland. Saterland (`DE-SAT`) uses
+its own municipal flag, and Sorbian Lusatia (`DE-SOR`) uses the blue–red–white
+Sorbian tricolour; both alternate with Germany's flag without changing jurisdiction.
+Kashubia (`PL-KAS`) alternates the black-over-yellow Kashubian bicolour
+with Poland's flag; the country's jurisdiction and civil time remain Polish.
+Finland's Sámi homeland (`FI-SAP`) alternates the Sámi flag with Finland's flag;
+the jurisdiction and civil time remain Finnish.
+Mongolia's Kazakh cultural areas (`MN-KAZ`) alternate Kazakhstan's existing
+blue-and-gold flag artwork with Mongolia's flag. Mongolia remains the jurisdiction
+and supplies civil time; this is a cultural display convention, not a territorial claim.
+Cultural coverage, including historical Brittany and both sides of the
 Basque border, is defined by the independent [globe region layer](globe.md#regional-flag-coverage).
 
 Flag-cache identifiers remain separate from geographic country identifiers.

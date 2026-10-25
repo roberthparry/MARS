@@ -405,11 +405,16 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     check(admitMarker(110, 100) === null && Boolean(admitMarker(300, 100)),
           'native direct-indexed grid rejects overlap but admits separated labels');
     check(Boolean(admitMarker(110, 100, 80, true, true)), 'selected marker bypasses overlap suppression');
-    check(admitMarker(790, 100) === null && admitMarker(100, 5) === null, 'native marker clipping protects edges');
+    check(admitMarker(790, 100)?.[2] === -1 && admitMarker(100, 5) === null,
+          'right-edge labels can face left while vertical clipping protects edges');
     labDOM.call('lab_globe_markers_begin', 800);
     check(Boolean(admitMarker(100, 100)), 'new frame resets native occupancy');
     check(JSON.stringify(admitMarker(790, 799, 80, true, true)) === '[720,786]',
           'selected marker is clamped inside the viewport');
+    labDOM.call('lab_globe_markers_begin', 800);
+    admitMarker(380, 400, 28, false);
+    check(JSON.stringify(admitMarker(340, 400, 78)) === '[262,400,-1]',
+          'a nearby observer cannot suppress a town when its label fits on the other side');
     labDOM.call('lab_globe_markers_begin', Infinity);
     check(admitMarker(100, 100) === null, 'invalid viewport disables native marker admission');
     check(labDOM.call('lab_globe_coordinate', -4.42, 'E', 'W') === '4° 25.20′ W' &&
@@ -526,7 +531,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
               'native display names hide GeoNames IDs without rewriting catalogue identity');
         for (const zoom of [3, 16]) {
             const label = labelledGlobe.townLabel(place, zoom, 600);
-            check(label.name === expected && label.full === expected && label.width === 128,
+            check(label.name === expected && label.full === expected && label.width > 20 && label.width <= 128,
                   'globe markers and accessible names omit IDs without treating them as expanded names');
         }
     }

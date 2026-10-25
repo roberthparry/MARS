@@ -422,9 +422,8 @@ static bool lab_forms_town_match(const json_t *wanted, const json_t *candidate)
         if (!isfinite(left) || !isfinite(right) || fabs(left - right) > 0.000001)
             return false;
     }
-    const string_t *height = json_string_value(lab_forms_get(wanted, "elevation"));
-    const string_t *other_height = json_string_value(lab_forms_get(candidate, "elevation"));
-    return !string_byte_length(height) || !string_byte_length(other_height) || !string_compare(height, other_height);
+    /* Updated reference heights must not turn the same town into a custom location. */
+    return true;
 }
 
 static string_t *lab_forms_town_detail(const json_t *town)

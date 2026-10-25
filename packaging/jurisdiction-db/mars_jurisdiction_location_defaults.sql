@@ -235,7 +235,7 @@ insert into jurisdiction_location_default_seed(
     ('RE', '-20.8667', '55.4667', 'Indian/Reunion', 'Reunion'),
     ('RO', '44.4333', '26.1000', 'Europe/Bucharest', 'Bucharest'),
     ('RS', '44.8333', '20.5000', 'Europe/Belgrade', 'Belgrade'),
-    ('RU', '54.7167', '20.5000', 'Europe/Kaliningrad', 'MSK-01 - Kaliningrad'),
+    ('RU', '55.7522', '37.6156', 'Europe/Moscow', 'Moscow'),
     ('RW', '-1.9500', '30.0667', 'Africa/Kigali', 'Kigali'),
     ('SA', '24.6333', '46.7167', 'Asia/Riyadh', 'Riyadh'),
     ('SB', '-9.5333', '160.2000', 'Pacific/Guadalcanal', 'Guadalcanal'),

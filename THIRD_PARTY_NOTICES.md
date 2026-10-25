@@ -53,14 +53,17 @@ elevation is supplied. Its existing South African land coverage and shoreline ar
 The additional SVGs and per-file authorship/licences are recorded in
 [`REGIONAL-NOTICES.txt`](packaging/jurisdiction-db/flags/REGIONAL-NOTICES.txt),
 also retained in the jurisdiction database. Brittany, Corsica and West Frisian
-SVGs are public-domain artwork. The unchanged Sardinian SVG by icnussa and
+SVGs and the Sámi SVG are public-domain artwork. The unchanged Sardinian SVG by icnussa and
 Xander89 is distributed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/legalcode),
-not MIT. Cornish, East Frisian and North Frisian simple geometric SVG encodings
+not MIT. The unchanged Saterland SVG by Ætoms (design Bernd Stolle) is marked
+as public-domain official flag artwork on Commons; its structured record also
+records CC BY-SA 4.0, retained in the regional notices.
+Cornish, East Frisian, North Frisian, Sorbian and Kashubian simple geometric SVG encodings
 are original MARS code. Catalan and Basque images reuse the existing flag-icons assets.
 
 `packaging/globe-db/flag_regions.geojson` is a selected-coordinate compilation
-prepared by `tools/mars_config/region_extract.c`. Source geometry is unchanged;
-properties are replaced by local display codes. Retrieved 24 October 2026:
+prepared by `tools/mars_config/region_extract.c`. Source geometry is retained as
+downloaded; properties are replaced by local display codes. Retrieved 24–25 October 2026:
 
 - [Natural Earth admin-1 5.1.1](https://github.com/nvkelso/natural-earth-vector/blob/v5.1.1/geojson/ne_10m_admin_1_states_provinces.geojson),
   public domain, supplies the selected European provinces/regions.
@@ -74,6 +77,71 @@ properties are replaced by local display codes. Retrieved 24 October 2026:
 - French departments and department 66 communes from [france-geojson](https://github.com/gregoiredavid/france-geojson),
   Grégoire David, derived from IGN Admin Express COG 2018 and distributed under Licence Ouverte.
   The 28 Fenouillèdes communes are excluded by INSEE code; geometry is not redrawn.
+- Polish municipalities: GUGiK's Państwowy Rejestr Granic (PRG), served by
+  [GIOŚ, AdministrativeDivisionSHP, Gminy layer](https://wody.gios.gov.pl/arcgis/rest/services/MPP/AdministrativeDivisionSHP/MapServer/2).
+  [GUGiK permits free download and unrestricted reuse of PRG data](https://www.geoportal.gov.pl/pl/dane/panstwowy-rejestr-granic-prg/).
+  GeoJSON was requested in EPSG:4326 with six decimal places and a 0.0001-degree
+  generalisation tolerance. The county filter was `DISTRICT_I IN (2201,2202,2203,2204,2205,2206,2208,2211,2212,2215,2261,2262,2263,2264)`;
+  output fields were `DISTRICT_I,NAME`. Retrieved input SHA-256:
+  `538228ba332e67a8b4af2aefde1ca6ec72407be1415eb16c481ba41d4ae5f427`.
+  The extractor selects 81 municipal features, preserving the returned coordinates.
+  This administrative proxy follows the ethnic/historical-area discussion in
+  [*Polska dydaktyka geografii* (2008), pp. 181–182](https://www.kegptg.uni.lodz.pl/fileadmin/Wydzialy/Wydzial_Nauk_Geograficznych/KOMISJA_EDUKACJI_GEOGRAFICZNEJ/Publikacje/PUBLIKACJE_CZ%C5%81ONK%C3%93W_KEG/Polska_Dydaktyka_Geografii_2008.pdf);
+  it does not reproduce that publication's map or claim a definitive cultural boundary.
+
+- Finnish Sámi homeland: *SaamelaistenKotiseutualue*, Finnish Environment Institute
+  (Syke), ELY centres and the University of Oulu Department of Geography, via
+  [Syke's official feature service](https://services2.arcgis.com/11yekre9tJo7Eqb5/arcgis/rest/services/Mapio_Agol_saamelaisalue/FeatureServer/0).
+  [Syke's open-data terms](https://www.syke.fi/en/environmental-data/use-license-and-responsibilities)
+  apply [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The source metadata
+  credits Finland's national boundary to National Land Survey administrative boundaries (2015).
+  The complete homeland polygon was requested with `where=1=1`, `outFields=*`,
+  `outSR=4326`, `geometryPrecision=6` and `f=geojson`, without generalisation.
+  Retrieved input SHA-256: `aed46490051b08388c73c052a30a20c250a42d8b68bbf26fc069724ddb075ce7`.
+  MARS retains the returned geometry and replaces properties with `FI-SAP`.
+  Coverage follows the [Sámi Parliament's homeland description](https://matkailu.samediggi.fi/en/sanasto/sami-homeland/).
+
+- Helgoland and Saterland: © GeoBasis-DE / BKG 2025,
+  [VG25 municipal outlines via the public ArcGIS service](https://services2.arcgis.com/jUpNdisbWqRpMo35/ArcGIS/rest/services/VG250_Gemeindegrenzen_2019/FeatureServer/0),
+  [Data licence Germany – attribution – version 2.0](https://www.govdata.de/dl-de/by-2-0).
+  Selected `GeografischerName_GEN IN ('Saterland','Helgoland')`, retaining fields
+  `GeografischerName_GEN,Gemeindeschlüssel_AGS`; exported with `outSR=4326`,
+  `geometryPrecision=6` and `f=geojson`. The source service name contains 2019,
+  but its attribution identifies BKG 2025. Input SHA-256:
+  `18c1a0b06a04cde0d83765e6281ed3a68bc3f6de8d53e74711d1f97fcd6232a2`.
+  [Helgoland's council](https://www.helgoland.de/rathaus/rathausundpolitik/der-friesenrat/)
+  describes its participation in the Friesenrat's northern section.
+- Brandenburg Sorbian/Wendish settlement: © GeoBasis-DE / LGB,
+  [Sorbisch/Wendische Siedlungsgebiete](https://ogc-api.geobasis-bb.de/datasets/vg/collections/sorb),
+  [Data licence Germany – attribution – version 2.0](https://www.govdata.de/dl-de/by-2-0).
+  Retrieved `/items?f=json&limit=1000` in default CRS84; all six features returned,
+  with `sorb_aktualitaet=2026-07-02`. Input SHA-256:
+  `80e4a443182d34d5bc6d559b2acb92eab81f33b0e0636c947da7c56fca7baa5f`.
+- Saxon Sorbian settlement: Datenquelle: © Landkreis Bautzen, dl-de/by-2-0,
+  [www.landkreis-bautzen.de/geoweb](https://www.landkreis-bautzen.de/geoweb).
+  The [provider's reuse terms](https://cardomap.idu.de/lrabz/content.aspx?method=CopyRight,UsageConstraints,ApplicationContent)
+  apply Data licence Germany – attribution – version 2.0 to its geodata services.
+  Retrieved the single `cls:L356` feature through
+  `https://cardomap.idu.de/lrabz/public/ogcsl.ashx`, with `NODEID=444`,
+  `service=WFS`, `version=2.0.0`, `request=GetFeature`, `typenames=cls:L356`,
+  `srsName=urn:ogc:def:crs:EPSG::4326`, `outputFormat=application/geo+json`.
+  The returned GeoJSON uses longitude/latitude order. Input SHA-256:
+  `1d433333b9bd9419b0096ebafa938af7871b62bea4b4d77fde30048c8450d2bb`.
+  For both Sorbian sources, MARS retains geometry and replaces properties with
+  `DE-SOR`. No provider endorsement is implied.
+
+- Mongolian soums/districts: National Statistical Office of Mongolia and OCHA ROAP,
+  via [geoBoundaries MNG ADM2, revision 9469f09](https://github.com/wmgeolab/geoBoundaries/tree/9469f09/releaseData/gbOpen/MNG/ADM2),
+  boundary identifier `MNG-ADM2-93677404`, representing 2021, under
+  [CC BY 3.0 IGO](https://creativecommons.org/licenses/by/3.0/igo/).
+  Four district features retain source geometry and replace properties with `MN-KAZ`.
+  Input SHA-256: `dc4ffaa394bfd6a5d278bea15d8c302cbce38d8650b8b4859862bacb1f63a91f`.
+  No endorsement is implied. Bayan-Ölgii uses the Natural Earth source above.
+  Coverage follows [Macalester's Mongolian Kazakh research](https://www.macalester.edu/geography/research-barcus/kazakhs/),
+  [Ellis's research in Khovd](https://rai.onlinelibrary.wiley.com/doi/full/10.1111/1467-9655.14051)
+  and [the Mongolian transport ministry's environmental and social framework](https://mrt.gov.mn/up/news/%D0%A2%D1%8D%D1%8D%D0%B2%D1%80%D0%B8%D0%B9%D0%BD%20%D0%A4%D0%BE%D1%80%D1%83%D0%BC-2024/Busad/ESMF_MTCLI_P174806_2021.pdf),
+  which identifies the established Nalaikh community. Administrative coverage is
+  a cultural display approximation, not a census map or change of sovereignty.
 
 The sources' licence terms apply to their respective portions of the compilation.
 Local cultural codes do not assert sovereignty. Coverage and limitations are in

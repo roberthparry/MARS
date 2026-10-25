@@ -94,7 +94,7 @@ bool cfg_database_flags(sqlite_t *db, const string_t *root)
         file_t *source = path ? file_new(path) : NULL;
         string_t *notice = source ? file_read_all_text(source) : NULL;
         sqlite_stmt_t *record = notice ? sqlite_stmt_prepare(db,
-            "insert or replace into jurisdiction_country_flag_source values(2,'2026-10-24','REGIONAL-NOTICES.txt',?1)") : NULL;
+            "insert or replace into jurisdiction_country_flag_source values(2,'2026-10-25','REGIONAL-NOTICES.txt',?1)") : NULL;
         ok = ok && record && sqlite_stmt_bind_text(record, 1, string_c_str(notice)) &&
              sqlite_stmt_step(record) == SQLITE_STEP_DONE;
         sqlite_stmt_finalize(record); string_free(notice); file_free(source); string_free(path);

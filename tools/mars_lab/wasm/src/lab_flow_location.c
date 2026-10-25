@@ -8,6 +8,8 @@
  * native location APIs own field and town policy. Browser services retain
  * Intl/Date conversion, request resources and promises.
  */
+#include <math.h>
+
 #include "lab_dom.h"
 #include "lab_flow.h"
 #include "lab_flow_location.h"
@@ -269,10 +271,22 @@ static jsref lab_flow_location_history_current(frame_jsref frame)
 static jsref lab_flow_location_history_fields(frame_jsref frame)
 {
     if (!lab_dom_truth(lab_dom_get(frame, "current"))) return lab_flow_done(0);
-    /* Catalogue hydration may refresh a town key, but must not replace authored
-     * altitude, coordinates or zone with the town's defaults during history restore. */
+    /* Coordinates and zone remain authored. Only reference heights are refreshed;
+     * explicit manual heights keep their provenance across catalogue hydration. */
     jsref state = lab_dom_get(frame, "state"), elements = lab_dom_get(frame, "elements");
     lab_dom_set(state, "town", lab_dom_read(lab_dom_get(elements, "town"), LAB_DOM_VALUE, ""));
+    jsref option = lab_dom_selected(lab_dom_get(elements, "town"));
+    double latitude = lab_dom_to_number(lab_dom_get(state, "latitude"));
+    double longitude = lab_dom_to_number(lab_dom_get(state, "longitude"));
+    double town_latitude = lab_dom_to_number(lab_dom_read(option, LAB_DOM_DATASET, "latitude"));
+    double town_longitude = lab_dom_to_number(lab_dom_read(option, LAB_DOM_DATASET, "longitude"));
+    int height = lab_dom_read(option, LAB_DOM_DATASET, "elevation");
+    if (!lab_dom_equal(lab_dom_get(state, "elevation_mode"), lab_dom_string("manual")) &&
+        lab_dom_length(lab_dom_get(state, "town")) && lab_dom_length(height) &&
+        fabs(latitude - town_latitude) <= 0.000001 && fabs(longitude - town_longitude) <= 0.000001) {
+        lab_dom_set(state, "elevation", height);
+        lab_dom_set(state, "elevation_mode", lab_dom_string("catalogue"));
+    }
     return lab_flow_call(frame, 5, "locApplyState", 0, 0, 2, lab_dom_get(frame, "mode"), state);
 }
 

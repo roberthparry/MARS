@@ -340,10 +340,14 @@ static json_t *lab_cal_observer_summary(const json_t *options, const char *town,
     string_t *values[] = {
         string_sprintf("%s %s", lab_cal_text(options, "date"), lab_cal_text(options, "time")),
         lab_cal_observer_location(options, town, sea),
-        string_new_with(lab_cal_text(options, "zone")),
+        *lab_cal_text(options, "zone_note") ?
+            string_sprintf("%s (%s)", lab_cal_text(options, "zone"), lab_cal_text(options, "zone_note")) :
+            string_new_with(lab_cal_text(options, "zone")),
         lab_cal_observer_angle(lab_cal_text(options, "lat"), true),
         lab_cal_observer_angle(lab_cal_text(options, "lon"), false),
-        string_sprintf("%.0f m · %s", round(elevation) + 0.0, surface),
+        string_sprintf("%.0f m · %s%s", round(elevation) + 0.0, surface,
+                       !strcmp(lab_cal_text(options, "elevation_mode"), "retained") ?
+                       "\nRetained height; terrain altitude unknown" : ""),
         have_temperature ? string_sprintf(strstr(lab_cal_text(options, "weather_source"), "Rough seasonal assumption") ?
                                            "~%.0f °C" : "%.1f °C", temperature) : string_new_with("Unavailable"),
         have_pressure ? (have_sea_level ?
@@ -455,6 +459,7 @@ json_t *lab_cal_almanac(json_t *fields, const json_t *options, unsigned *status)
     lab_cal_set(fields, "town", lab_cal_text(options, "town"));
     lab_cal_set(fields, "timezone", lab_cal_text(options, "timezone"));
     lab_cal_set(fields, "zone_mode", lab_cal_text(options, "zone_mode"));
+    lab_cal_set(fields, "elevation_mode", lab_cal_text(options, "elevation_mode"));
     lab_cal_set(fields, "visibility", lab_cal_text(options, "visibility"));
     json_t *response = json_new_object();
     lab_cal_take(response, "ok", json_new_bool(true));

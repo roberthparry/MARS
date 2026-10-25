@@ -52,7 +52,7 @@ globe_t *jurisdict_globe_open(jurisdiction_t *jurisdiction);
 
 /**
  * @brief Read presentation metadata by uppercase ISO country or subdivision code.
- * Subdivisions without artwork fall back to their parent country's name and flag.
+ * Subdivisions retain their own name; those without artwork inherit their parent country's flag.
  * Optional cultural display codes return regional metadata independently of jurisdiction membership.
  * Display-only emblem codes such as ZZ-SEA (Offshore) return static database artwork, not a jurisdiction.
  * Their self-contained SVG uses a fifteen-second cycle with 2.5-second cross-fades and five-second holds.

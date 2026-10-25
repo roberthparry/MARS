@@ -122,11 +122,11 @@ static void test_lab_forms_town(void)
     result = lab_forms_test_request(
         "{\"action\":\"town\",\"value\":\"Name|51.5|-3|7\",\"candidates\":[\"Name|51.5|-3|5\"]}", &status);
     bool has_index = json_number_value(test_lab_member(result, "match_index"), &index);
-    ok = ok && status == 200 && has_index && num_to_double(index) == -1;
+    ok = ok && status == 200 && has_index && num_to_double(index) == 0;
     if (has_index)
         num_destroy(&index);
     json_free(result);
-    TEST_ASSERT_TRUE(ok, "legacy town fields retain positions; matching tolerates coordinates but respects elevation");
+    TEST_ASSERT_TRUE(ok, "legacy town fields retain positions; revised catalogue heights do not change town identity");
 }
 
 static void test_lab_forms_rejections(void)

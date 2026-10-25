@@ -279,6 +279,7 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
         check(native.lab_workspace_history_count(6, 0) === 1, 'offline reopening recovers the bounded local copy');
         const altitude = document.getElementById('almanacElevation') as HTMLInputElement;
         altitude.value = '123';
+        altitude.dispatchEvent(new Event('input'));
         document.dispatchEvent(new Event('change'));
         await reopened.flush();
         const offlineSnapshot = WorksheetPersistence.history.snapshot();

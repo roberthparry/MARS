@@ -344,6 +344,7 @@ void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage)
                              !(flags & 8) && mode != LAB_MODE_EQUATION && mode != LAB_MODE_DIFFERENTIAL_EQUATION);
     lab_workspace_dom_hidden("#goalSeek", !(flags & 16));
     lab_workspace_dom_hidden("#run", mode == LAB_MODE_ALMANAC);
+    lab_workspace_dom_hidden("#clear", mode == LAB_MODE_ALMANAC);
     lab_workspace_dom_hidden("#plotRange", mode > LAB_MODE_DIFFERENTIAL_EQUATION && mode != LAB_MODE_INTEGRATOR);
     lab_workspace_dom_hidden("#plotCard", (mode > LAB_MODE_DIFFERENTIAL_EQUATION && mode != LAB_MODE_INTEGRATOR) ||
                              !lab_workspace_dom_content(lab_dom_query(0, "#plotRendered"), LAB_DOM_TEXT));

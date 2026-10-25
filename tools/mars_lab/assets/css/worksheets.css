@@ -603,6 +603,9 @@ body.almanac-mode #workspaceActionsHome { min-height: 4rem; }
 .almanac-globe .globe-town:hover, .almanac-globe .globe-town:focus-visible { background: #214e46; border-color: #ffdb8a; z-index: 1; }
 .almanac-globe .globe-town.selected { color: #ffd379; border-color: #ffd379; z-index: 2; }
 .almanac-globe .globe-town:active:not(:disabled) { transform: translate(-4px, -50%); }
-.globe-observer { color: #ffd379; font-size: 24px; transform: translate(-50%, -50%); text-shadow: 0 1px 3px #000; }
+.almanac-globe .globe-town { font: 600 11px Arial, sans-serif; }
+.almanac-globe .globe-town.left-label, .almanac-globe .globe-town.left-label:active:not(:disabled) { transform: translate(4px, -50%); }
+.globe-observer { color: #ffd379; font-size: 24px; transform: translate(-50%, -50%);
+    text-shadow: -1px -1px 0 #071b15, 1px -1px 0 #071b15, -1px 1px 0 #071b15, 1px 1px 0 #071b15, 0 0 4px #071b15; }
 .almanac-globe .mode-hint,
 .almanac-globe .globe-credit { display: none; }

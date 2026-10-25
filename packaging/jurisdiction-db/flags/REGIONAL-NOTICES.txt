@@ -1,6 +1,23 @@
-Regional artwork additions, retrieved 24 October 2026
+Regional artwork additions, retrieved 24–25 October 2026
 
 These files are NOT part of the adjacent flag-icons MIT licence grant.
+
+de-sat.svg: Saterland municipal flag, original design Bernd Stolle; SVG by
+Ætoms, 25 February 2021. Unchanged SVG. Wikimedia Commons marks the official
+flag public domain (PD-Flag-Germany); its structured record also records
+CC BY-SA 4.0. Retain attribution and that licence for any adaptations.
+https://commons.wikimedia.org/wiki/File:DEU_Saterland_Flag.svg
+https://creativecommons.org/licenses/by-sa/4.0/
+
+de-sor.svg: original MARS geometric SVG encoding of the Sorbian blue/red/white
+horizontal tricolour, under the repository MIT Licence.
+Design reference: Landkreis Bautzen, "Das Volk der Sorben".
+https://www.landkreis-bautzen.de/sorben.php
+
+fi-sap.svg: Sámi flag, original design Astrid Båhl (1986); SVG by Jeltz,
+with later simplification by Wikimedia Commons contributors. Public-domain
+dedication by Jeltz, with an unrestricted fallback grant. Unchanged SVG.
+https://commons.wikimedia.org/wiki/File:Sami_flag.svg
 
 fr-bre.svg: Gwenn ha du, original design Morvan Marchal; SVG from OpenClipart,
 Gryffindor and Alkari (25 August 2012), public domain. Unchanged SVG.
@@ -33,3 +50,10 @@ https://commons.wikimedia.org/wiki/File:Nordfriesischeflagge.svg
 Catalan and Basque artwork reuses es-ct.svg and es-pv.svg from flag-icons 7.3.2,
 under the adjacent MIT LICENSE. Normalised display proportions and animation
 are applied at runtime; source SVGs are retained without modification.
+Mongolia's Kazakh cultural display reuses kz.svg from the same flag-icons release,
+paired with mn.svg. Both retain the adjacent MIT LICENSE; no new flag artwork is copied.
+
+pl-kas.svg: original MARS geometric SVG encoding of the traditional Kashubian
+black-over-yellow bicolour, under the repository MIT Licence.
+Design reference: Kaszëbskô Jednota, "Herb, godło i flaga narodowa".
+https://kaszebsko.com/herb-godlo-i-flaga-narodowa

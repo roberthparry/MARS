@@ -86,26 +86,70 @@ The offline `packaging/globe-db/flag_regions.geojson` package covers Cornwall;
 historical Brittany (including Loire-Atlantique); Catalonia, Valencia, Balearics;
 Northern Catalonia excluding the 28 Occitan Fenouillèdes communes; Corsica;
 Sardinia; Spanish Basque Country and Navarre; the French Pays Basque outline;
-Dutch Fryslân; East Frisia (Aurich, Leer, Wittmund, Emden); and North Frisia
-(Nordfriesland district and islands). It does not assign all of Lower Saxony,
-Schleswig-Holstein or Pyrénées-Atlantiques to those cultural areas. Heligoland
-and other disputed or wider historical extensions are not inferred.
+Dutch Fryslân; East Frisia (Aurich, Leer, Wittmund, Emden); North Frisia
+(Nordfriesland district and islands, plus Helgoland); Saterland; Sorbian Lusatia;
+Kashubia in northern Poland; Finland's Sámi homeland; and selected Kazakh cultural
+areas in Mongolia.
+It does not assign all of Lower Saxony,
+Schleswig-Holstein or Pyrénées-Atlantiques to those cultural areas. Other disputed
+or wider historical extensions are not inferred.
 
 These are explicit display conventions, not definitive cultural boundaries.
 Generalised source coastlines can omit very small coastal places. The French
 Basque authority outline and administrative district/commune polygons provide
 reviewable proxies; nearby unrecognised places retain their ordinary flag.
 
-`tools/mars_config/region_extract.c` prepares the package from five offline
+Kashubia uses the broader ethnic and historical coverage described by Jan Mordawski
+in *Polska dydaktyka geografii* (2008), pp. 181–182, represented by selected PRG
+municipal polygons. Included are the Bytów, Chojnice, Kartuzy, Kościerzyna, Lębork,
+Puck, Słupsk and Wejherowo districts; Gdańsk, Gdynia, Sopot and Słupsk cities;
+and the Człuchów, Koczała, Przechlewo, Rzeczenica, Kolbudy and Przywidz municipalities.
+Whole municipalities are a display approximation: in particular, the southern
+Chojnice/Czersk fringe extends beyond the study's partial-municipality boundary.
+Tczew, Starogard Gdański, Malbork, Pruszcz Gdański and the rest of Poland keep their
+ordinary flag. The regional code is `PL-KAS`; geographic jurisdiction stays `PL`.
+
+Finland's Sámi homeland uses the Finnish Environment Institute's official outline:
+Enontekiö, Inari and Utsjoki, plus the Lappi reindeer-herding district in northern
+Sodankylä, including Vuotso. The rest of Finnish Lapland keeps Finland's ordinary
+flag. The display code is `FI-SAP`; geographic jurisdiction stays `FI`. This layer
+does not extend the Finnish coverage into Norway, Sweden or Russia.
+
+German coverage retains separate East and North Frisian artwork (`DE-OFR` and
+`DE-NFR`). Helgoland uses the North Frisian flag, reflecting its participation in
+the Friesenrat's northern section. Saterland (`DE-SAT`) uses its own municipal
+flag. These two additions use BKG municipal outlines, selected by municipality
+codes `01056025` and `03453013`; neighbouring mainland municipalities are excluded.
+
+Sorbian coverage (`DE-SOR`) follows the settlement polygons published by
+Brandenburg's LGB and Landkreis Bautzen, covering Lower and Upper Lusatia
+respectively. The Brandenburg source reports an update date of 2 July 2026;
+the Saxon source is the dedicated `L356` settlement layer. These are cultural
+display boundaries, not a determination of current statutory minority rights.
+The whole of Brandenburg, Saxony, Bautzen district or Görlitz district is not
+assigned the Sorbian flag. All German regions retain jurisdiction `DE`.
+
+Mongolia's Kazakh cultural coverage (`MN-KAZ`) includes Bayan-Ölgii aimag and
+the Khovd, Buyant and Jargalant (Khovd city) soums of Khovd aimag, plus Nalaikh
+district. These administrative outlines are display proxies for established
+Kazakh communities, not claims that every resident is Kazakh. Other Khovd soums
+and central Ulaanbaatar retain Mongolia's ordinary flag. Bayan-Ölgii uses Natural
+Earth admin-1; the four additional districts use pinned geoBoundaries identifiers
+to avoid selecting identically named districts elsewhere. Jurisdiction remains `MN`.
+
+`tools/mars_config/region_extract.c` prepares the package from eleven offline
 GeoJSON inputs (Natural Earth admin-1, German districts, French Basque outline,
-department 66 communes and French departments), followed by the output path. It uses native MARS JSON
+department 66 communes, French departments, Polish PRG municipalities and the
+Finnish Sámi homeland, Frisian municipalities, Brandenburg Sorbian settlement
+and Saxon Sorbian settlement, Mongolian districts), followed by the output path.
+It uses native MARS JSON
 and file APIs, retains selected source coordinates and requires no Python or
 runtime downloads. `make update-mars-db` applies the independent geometry and
 artwork migrations, preserving installed coastline and river data. Fresh globe
 and jurisdiction installations include their respective parts.
 Sources, licences and attribution are in [third-party notices](../THIRD_PARTY_NOTICES.md#regional-flag-artwork-and-coverage).
 
-Package SHA-256: `6a169009101199bdeb1c541453fcc2d16be0413e32f87c4bf2273da343add145`.
+Package SHA-256: `2c7b7c789d1e55e823601579beacf18a8d9d3781d235511c885f0f002e5a4945`.
 Preparation input SHA-256 values, in argument order:
 
 | Input | SHA-256 |
@@ -115,6 +159,12 @@ Preparation input SHA-256 values, in argument order:
 | French Basque outline | `825adbd166ac5ecaf9d2f472666026c14d594d051e90f809d34f5f01125fcb46` |
 | Department 66 communes | `6d5dcdb4c63b5e8ae2b13e1cf80a3d85da97836e1fdb736359065e2211189a96` |
 | French departments | `6f551c26ebe6a02ebbab47ca4309b03a8a6c5b24d454713a00d921210c105279` |
+| Polish PRG municipalities | `538228ba332e67a8b4af2aefde1ca6ec72407be1415eb16c481ba41d4ae5f427` |
+| Finnish Sámi homeland | `aed46490051b08388c73c052a30a20c250a42d8b68bbf26fc069724ddb075ce7` |
+| Frisian municipalities | `18c1a0b06a04cde0d83765e6281ed3a68bc3f6de8d53e74711d1f97fcd6232a2` |
+| Brandenburg Sorbian settlement | `80e4a443182d34d5bc6d559b2acb92eab81f33b0e0636c947da7c56fca7baa5f` |
+| Saxon Sorbian settlement | `1d433333b9bd9419b0096ebafa938af7871b62bea4b4d77fde30048c8450d2bb` |
+| Mongolian districts | `dc4ffaa394bfd6a5d278bea15d8c302cbce38d8650b8b4859862bacb1f63a91f` |
 
 ## Named inland waters
 
@@ -422,7 +472,9 @@ approximation as shoreline proximity queries. No maritime buffer is introduced,
 and the land/water classification remains unchanged.
 `globe_has_layer(globe, GLOBE_LAYER_COUNTRIES)` reports administrative-layer availability.
 `globe_country_code_at()` returns the independently resolved ISO alpha-2 code, or a UK constituent-country code
-such as `GB-WLS` or `GB-SCT`.
+such as `GB-WLS` or `GB-SCT`, or `RU-KGD` for Kaliningrad Oblast.
+Installation and managed updates identify the existing detached Kaliningrad polygon
+as that subdivision without changing its boundary edges.
 The Lab joins that code to jurisdiction-owned country names and flag artwork;
 it never substitutes the form's selected jurisdiction for a geographic result.
 

@@ -31,6 +31,9 @@ string_t *lab_cal_town_timezone(const json_t *options);
 /** @brief Refresh an explicitly automatic observer zone at its UTC instant, retaining manual and legacy offsets. */
 void lab_cal_resolve_observer_zone(json_t *options);
 
+/** @brief Restore exact catalogue town metadata and non-manual heights, marking unresolved terrain explicitly. */
+void lab_cal_resolve_observer(json_t *options);
+
 /**
  * @brief Set observer classification and sea-horizon policy from the native shoreline hit-test.
  * @param options Borrowed mutable request options with validated latitude and longitude.

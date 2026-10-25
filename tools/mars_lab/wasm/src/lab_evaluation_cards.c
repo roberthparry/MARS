@@ -302,7 +302,7 @@ void lab_evaluation_weather_state(jsref state, jsref data)
         /* The follow-up recalculates the whole card. Retain the resolved observer,
          * including deliberately empty town/country fields, rather than stale request defaults. */
         static const char *const observer[] = {
-            "time", "zone", "zone_mode", "town", "jurisdiction", "elevation", "visibility"
+            "time", "zone", "zone_mode", "town", "jurisdiction", "elevation", "elevation_mode", "visibility"
         };
         for (unsigned i = 0; i < sizeof observer / sizeof *observer; ++i) {
             int value = lab_dom_get(fields, observer[i]);

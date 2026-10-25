@@ -1,12 +1,14 @@
 /**
  * @file lab_calendar_timezone.c
- * @brief Named-town zoneinfo conversion for single-threaded native Lab workers.
+ * @brief Observer catalogue recovery and zoneinfo conversion for native Lab workers.
  *
  * Validates IANA names and their installed TZif files through the file module.
  * Each conversion saves and restores the complete TZ environment state and
  * calls tzset after both changes. This deliberately requires the Lab's prefork,
  * single-threaded worker model; it must not run alongside threads using libc
- * local-time functions. Town catalogue lookups are indexed once per worker.
+ * local-time functions. Town catalogue lookups are indexed once per worker by
+ * name and exact reference coordinates. The same index recovers saved town
+ * identity and catalogue heights without replacing explicitly manual heights.
  */
 #include <math.h>
 #include <stdio.h>
@@ -197,11 +199,44 @@ static json_t *lab_cal_town_index(void)
                 if (key)
                     lab_cal_set(index, string_c_str(key), lab_cal_text(row, "timezone"));
                 string_free(key);
+                key = lab_cal_town_key("@", "", lab_cal_text(row, "latitude"), lab_cal_text(row, "longitude"));
+                if (key && !lab_cal_get(index, string_c_str(key))) {
+                    json_t *place = json_new_object();
+                    lab_cal_set(place, "value", lab_cal_text(row, "value"));
+                    lab_cal_set(place, "elevation", lab_cal_text(row, "elevation"));
+                    lab_cal_set(place, "timezone", lab_cal_text(row, "timezone"));
+                    lab_cal_set(place, "jurisdiction", string_c_str(jurisdiction));
+                    lab_cal_take(index, string_c_str(key), place);
+                }
+                string_free(key);
             }
         }
     }
     json_free(data);
     return index;
+}
+
+/* Repair legacy named locations by exact catalogue coordinates; never infer terrain from a nearby town. */
+void lab_cal_resolve_observer(json_t *options)
+{
+    const char *mode = lab_cal_text(options, "elevation_mode");
+    if (!*mode) return; /* Older API callers retain their explicitly supplied height. */
+    string_t *key = lab_cal_town_key("@", "", lab_cal_text(options, "lat"), lab_cal_text(options, "lon"));
+    const json_t *town = key ? lab_cal_get(lab_cal_town_index(), string_c_str(key)) : NULL;
+    string_free(key);
+    if (town) {
+        lab_cal_set(options, "town", lab_cal_text(town, "value"));
+        const char *selected = lab_cal_text(options, "jurisdiction"), *code = lab_cal_text(town, "jurisdiction");
+        if (!(strlen(code) == 2 && !strncmp(selected, code, 2) && selected[2] == '-'))
+            lab_cal_set(options, "jurisdiction", code);
+        lab_cal_set(options, "timezone", lab_cal_text(town, "timezone"));
+        if (strcmp(mode, "manual") && *lab_cal_text(town, "elevation")) {
+            lab_cal_set(options, "elevation", lab_cal_text(town, "elevation"));
+            lab_cal_set(options, "elevation_mode", "catalogue");
+        }
+    } else if (strcmp(mode, "manual")) {
+        lab_cal_set(options, "elevation_mode", "retained");
+    }
 }
 
 /* Honour explicit town-zone metadata; otherwise look up the browser's exact town option value. */
@@ -249,6 +284,7 @@ string_t *lab_cal_town_timezone(const json_t *options)
 /* Recompute only offsets known to be derived, using the exact saved UTC instant. */
 void lab_cal_resolve_observer_zone(json_t *options)
 {
+    lab_cal_set(options, "zone_note", "");
     if (strcmp(lab_cal_text(options, "zone_mode"), "auto")) return;
     datetime_t *moment = datetime_from_string(lab_cal_text(options, "date"));
     unsigned hour = 0, minute = 0, second = 0;
@@ -266,7 +302,9 @@ void lab_cal_resolve_observer_zone(json_t *options)
     if (!resolved) {
         const char *code = lab_cal_observer_jurisdiction(options);
         jurisdiction_t *engine = *code ? jurisdict_open(code) : NULL;
-        resolved = engine && jurisdict_default_gmt_offset(engine, moment, &offset);
+        /* Antarctica has station-specific civil times, not a continent-wide McMurdo zone. */
+        resolved = !strcmp(code, "AQ") || (engine && jurisdict_default_gmt_offset(engine, moment, &offset));
+        if (!strcmp(code, "AQ")) lab_cal_set(options, "zone_note", "UTC; station timezone unknown");
         jurisdict_close(engine);
     }
     if (resolved && isfinite(offset) && offset >= -14 && offset <= 14) {

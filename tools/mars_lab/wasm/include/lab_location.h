@@ -31,7 +31,8 @@ jsref lab_location_town_text(jsref text);
 /** @brief Native event emitted by a town selector. */
 typedef enum {
     LAB_LOCATION_SELECTION_CHANGED = 1, /**< Invalidate pending restoration after a select change. */
-    LAB_LOCATION_ZONE_EDITED = 2 /**< Preserve a manually authored offset against automatic refresh. */
+    LAB_LOCATION_ZONE_EDITED = 2, /**< Preserve a manually authored offset against automatic refresh. */
+    LAB_LOCATION_HEIGHT_EDITED = 3 /**< Preserve an explicitly entered observer height. */
 } lab_location_action_t;
 
 /** @brief Guarded town-restoration phase around a compatibility lookup. */

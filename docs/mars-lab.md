@@ -1142,13 +1142,16 @@ interpolates zoom and quaternion orientation. `lab_globe_flight_advance()` suppl
 the bounded display clock; the browser schedules frames and reports loading readiness.
 Saving an unchanged observer does not reset a rotated view.
 
-In Almanac mode, **Back**, **Forward**, **Help** and **Clear** sit directly below
+In Almanac mode, **Back**, **Forward** and **Help** sit directly below
 the globe, above the worksheet introduction. Their former area below the observer
 fields remains empty to leave room for country and town dropdowns. Other modes
 retain the usual action-row position; the same buttons and handlers are reused.
+Almanac hides **Evaluate** and **Clear** because its results update automatically.
 
 The selected town keeps a gold label beside the observer marker, including at overview zoom;
 it takes priority over nearby labels while its location is visible on the globe.
+Other labels reserve their measured text width, favour jurisdiction default towns,
+and can extend to the left of their town marker when the right side is occupied.
 Globe town buttons and navigation remain available during an Almanac refresh.
 Selecting another town starts a replacement refresh, cancelling superseded
 evaluation and background requests; stale results cannot replace the latest town.
@@ -4315,13 +4318,24 @@ text and clipboard output. Full catalogue names and selection keys retain those
 identifiers to distinguish towns with the same name. Successful calculations save
 the resolved jurisdiction returned in the result, including an empty jurisdiction
 for an unidentified location, rather than restoring an obsolete submitted country.
-Editing observer altitude still switches a mismatched named town to Custom.
-Evaluate and background weather refresh retain that entered altitude; returned
-calculation fields cannot overwrite it. Selecting a town from the globe, town list
+Editing observer altitude retains the named town when its coordinates are unchanged.
+Manual heights are recorded separately from catalogue heights, so evaluation,
+weather refresh and history restoration preserve an explicitly entered height.
+Older saved town heights are refreshed from the current catalogue. Exact catalogue
+coordinates also recover a missing town selection, including its subdivision.
+Selecting a town from the globe, town list
 or jurisdiction controls applies that town's catalogue reference elevation, replacing
 the previous location's altitude. Selecting a custom globe point retains the entered
-altitude. Catalogue heights describe reference coordinates, not every point in a town;
+altitude and labels it as a retained height with unknown terrain altitude.
+Catalogue heights describe reference coordinates, not every point in a town;
 an explicit location action can also supply a new observer altitude.
+
+Where a subdivision has no separate town catalogue, a unique namesake seat takes
+precedence over the national capital. Unnamed Antarctic locations use UTC with a
+station-timezone-unknown label; named stations retain their own timezone rules.
+Magnified photographic tiles use bounded sharpening, while the observer crosshair
+has a dark outline that remains visible over bright ice. The source photograph
+still limits the real detail available at close viewing distances.
 
 Temperature changes refraction, not parallax. Below −0.575° the displayed altitude
 receives no refraction correction. The native globe hit-test classifies the

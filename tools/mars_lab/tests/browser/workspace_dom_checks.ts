@@ -81,6 +81,7 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             check(hidden(WorksheetContext.derivativeButtons) === !calculus[mode], 'calculus visibility');
             check(hidden(WorksheetContext.goalSeek) === (mode !== 0), 'goal seek is expression-only');
             check(hidden(WorksheetContext.run) === (mode === 6), 'automatic Almanac hides Evaluate; other modes retain it');
+            check(hidden(WorksheetContext.clear) === (mode === 6), 'automatic Almanac hides Clear; other modes retain it');
             const actions = document.getElementById('workspaceActions')!;
             const actionHome = document.getElementById(mode === 6 ? 'almanacActions' : 'workspaceActionsHome')!;
             check(actions.parentElement === actionHome && actions.contains(WorksheetContext.back),

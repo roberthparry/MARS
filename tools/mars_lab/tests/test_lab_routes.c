@@ -633,6 +633,28 @@ static bool route_catalogue_elevation(const char *directory)
     ok = jurisdict_each_town_near_batch(engine, 53.3, -3.5, 0, 32, catalogue_elevation, &count, &next) &&
          count == 2 && ok;
     jurisdict_close(engine);
+    static const struct { const char *mode, *latitude, *expected, *source; } heights[] = {
+        {"legacy", "52.707700", "-250", "catalogue"},
+        {"catalogue", "52.707700", "-250", "catalogue"},
+        {"manual", "52.707700", "17", "manual"},
+        {"legacy", "52.710000", "17", "retained"},
+        {"manual", "52.710000", "17", "manual"},
+    };
+    for (size_t i = 0; i < sizeof heights / sizeof *heights; ++i) {
+        json_t *observer = json_new_object();
+        lab_cal_set(observer, "lat", heights[i].latitude);
+        lab_cal_set(observer, "lon", "-2.754100");
+        lab_cal_set(observer, "jurisdiction", "GB");
+        lab_cal_set(observer, "elevation", "17");
+        lab_cal_set(observer, "elevation_mode", heights[i].mode);
+        lab_cal_resolve_observer(observer);
+        ok = ok && !strcmp(lab_cal_text(observer, "elevation"), heights[i].expected) &&
+             !strcmp(lab_cal_text(observer, "elevation_mode"), heights[i].source);
+        if (i < 3) ok = ok && !strcmp(lab_cal_text(observer, "town"), "Shrewsbury|52.7077|-2.7541|-250") &&
+                             !strcmp(lab_cal_text(observer, "jurisdiction"), "GB-ENG");
+        else ok = ok && !*lab_cal_text(observer, "town");
+        json_free(observer);
+    }
     http_response_t *response = route_request(HTTP_GET, "/towns?after=0", NULL, NULL, NULL, NULL);
     json_t *data = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
     const json_t *towns = test_lab_member(test_lab_member(data, "towns"), "GB-WLS");

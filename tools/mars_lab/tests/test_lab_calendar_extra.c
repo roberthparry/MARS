@@ -164,6 +164,14 @@ static bool location_fixture(const char *directory)
         passed = passed && !strcmp(lab_cal_text(options, "zone"), automatic[i].expected);
         json_free(options);
     }
+    json_t *polar = test_lab_json("{\"date\":\"2026-10-25\",\"time\":\"12:00:00\",\"zone\":\"13\","
+                                 "\"zone_mode\":\"auto\",\"country_code\":\"AQ\"}");
+    lab_cal_resolve_observer_zone(polar);
+    passed = passed && !strcmp(lab_cal_text(polar, "zone"), "0") && *lab_cal_text(polar, "zone_note");
+    lab_cal_set(polar, "timezone", "Antarctica/McMurdo");
+    lab_cal_resolve_observer_zone(polar);
+    passed = passed && !strcmp(lab_cal_text(polar, "zone"), "13");
+    json_free(polar);
     return passed;
 }
 

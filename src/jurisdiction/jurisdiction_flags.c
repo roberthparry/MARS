@@ -131,8 +131,8 @@ bool jurisdict_country(jurisdiction_t *j, const char *code, string_t **name, str
     *flag_svg = jurisdiction_flag_read(j, code);
     if (length > 2 && !*flag_svg) {
         char country[3] = {code[0], code[1], 0};
-        string_free(*name); *name = NULL;
-        return jurisdict_country(j, country, name, flag_svg);
+        /* Inherit artwork, not the parent's name: subdivisions retain their identity. */
+        *flag_svg = jurisdiction_flag_read(j, country);
     }
     return true;
 }

@@ -177,7 +177,7 @@ static void lab_payload_weather(jsref payload, jsref inputs, jsref request, doub
     for (unsigned field = 0; field < sizeof fields / sizeof *fields; ++field)
         lab_dom_set(payload, fields[field], lab_dom_get(state, fields[field]));
     if (lab_dom_equal(lab_dom_get(state, "mode"), lab_dom_string("almanac"))) {
-        static const char *const observer[] = {"time", "zone", "zone_mode", "town", "jurisdiction", "elevation", "visibility"};
+        static const char *const observer[] = {"time", "zone", "zone_mode", "town", "jurisdiction", "elevation", "elevation_mode", "visibility"};
         for (unsigned i = 0; i < sizeof observer / sizeof *observer; ++i)
             lab_dom_set(payload, observer[i], lab_dom_get(state, observer[i]));
     }

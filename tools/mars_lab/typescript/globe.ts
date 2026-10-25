@@ -100,11 +100,15 @@ class MarsAlmanacGlobe {
     private cameraRestored = false;
     private cameraBookmarkRestored = false;
     private observerStartupReady = false;
+    private static readonly labelMeasure = document.createElement('canvas').getContext('2d');
     private static townLabel(place: GlobeTown, zoom: number, available: number): {name: string; full: string; width: number} {
         const name = place.displayName || place.town.name;
         const full = place.fullName || name;
         const expanded = full !== name && zoom >= 12 && available >= 430;
-        return {name: expanded ? full : name, full, width: expanded ? 430 : 128};
+        const text = expanded ? full : name, measure = this.labelMeasure;
+        if (measure) measure.font = '600 11px Arial, sans-serif';
+        const width = measure ? Math.ceil(measure.measureText(`• ${text}`).width) + 14 : 128;
+        return {name: text, full, width: Math.min(expanded ? 430 : 128, width)};
     }
 
     private view: GlobeView = [0, 0, 1, -180, -90, 180, 90];
@@ -1314,7 +1318,9 @@ class MarsAlmanacGlobe {
             const active = Boolean(place && selected && this.townKey(place) === this.townKey(selected));
             const label = place ? MarsAlmanacGlobe.townLabel(place, this.view[2], active ? size - 8 : size - point[0]) : null;
             const width = label ? label.width : 28;
-            point = labDOM.call('lab_globe_markers_place', point[0], point[1], width, Number(Boolean(place)), Number(active)) as [number, number] | null;
+            const positioned = labDOM.call('lab_globe_markers_place', point[0], point[1], width,
+                Number(Boolean(place)), Number(active)) as [number, number, number?] | null;
+            point = positioned ? [positioned[0], positioned[1]] : null;
             if (!point) return;
             const key = place ? this.townKey(place) : null;
             visible.add(key);
@@ -1333,7 +1339,9 @@ class MarsAlmanacGlobe {
                 this.markerNodes.set(key, marker);
                 this.markers.append(marker);
             }
-            const text = label ? `• ${label.name}` : '⊕';
+            const left = positioned?.[2] === -1;
+            const text = label ? left ? `${label.name} •` : `• ${label.name}` : '⊕';
+            marker.classList.toggle('left-label', left);
             if (marker.textContent !== text) marker.textContent = text;
             const name = label && place ? `${label.full}, ${place.country}` : this.country ? `Observer, ${this.country}` : 'Observer';
             marker.dataset.marsTooltipTitle = `${name} · Latitude ${MarsAlmanacGlobe.coordinate(lat, 'N', 'S')} · ` +
@@ -1361,7 +1369,10 @@ class MarsAlmanacGlobe {
             const [, , , west, south, east, north] = this.view;
             const places = labDOM.call('lab_town_store_region', west, south, east, north) as GlobeTown[];
             for (const place of places)
-                append(Number(place.town.latitude), Number(place.town.longitude), this.placeCountry(place));
+                if (place.town.default) append(Number(place.town.latitude), Number(place.town.longitude), this.placeCountry(place));
+            for (const place of places)
+                if (!place.town.default)
+                    append(Number(place.town.latitude), Number(place.town.longitude), this.placeCountry(place));
         }
         for (const [key, marker] of this.markerNodes) {
             if (!visible.has(key)) { marker.remove(); this.markerNodes.delete(key); }
@@ -1392,6 +1403,7 @@ class MarsAlmanacGlobe {
                 WorksheetLocations.selects.syncSelection(document.getElementById('almanacJurisdiction') as WorksheetSelect);
                 WorksheetLocations.townSelection.applySelectedTown(WorksheetLocations.calendar.calendarTownControls('almanac'));
             } else {
+                this.input('Elevation').dataset.elevationMode = 'retained';
                 jurisdiction.value = '';
                 labDOM.call('lab_location_populate', select, [], false);
                 WorksheetLocations.selects.syncSelection(jurisdiction);

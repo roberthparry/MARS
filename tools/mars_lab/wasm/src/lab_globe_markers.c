@@ -54,6 +54,27 @@ typedef struct _marker_request_t {
     bool town, selected;
 } marker_request_t;
 
+static bool marker_reserve(marker_store_t *state, double x, double y, double width, bool town, bool selected)
+{
+    if (x < 0 || x > state->size || (town && (x + width > state->size || y < 14 || y > state->size - 14)))
+        return false;
+    int left = (int)floor((x - 8) / 32) + 1, right = (int)floor((x + width) / 32) + 1;
+    int top = (int)floor((y - 15) / 24) + 1, bottom = (int)floor((y + 15) / 24) + 1;
+    if (left < 0 || right >= 516 || top < 0 || bottom >= 686) return false;
+    if (town && !selected)
+        for (int row = top; row <= bottom; ++row)
+            for (int col = left; col <= right; ++col) {
+                unsigned index = (unsigned)(row * 516 + col);
+                if (state->occupied[index / 64] & (UINT64_C(1) << (index % 64))) return false;
+            }
+    for (int row = top; row <= bottom; ++row)
+        for (int col = left; col <= right; ++col) {
+            unsigned index = (unsigned)(row * 516 + col);
+            state->occupied[index / 64] |= UINT64_C(1) << (index % 64);
+        }
+    return true;
+}
+
 static void marker_place(void *context)
 {
     marker_request_t *request = context;
@@ -66,22 +87,14 @@ static void marker_place(void *context)
         x = fmax(4, fmin(size - width, x + 14));
         y = fmax(14, fmin(size - 14, y));
     }
-    if (request->town && (x + width > size || y < 14 || y > size - 14)) return;
-    int left = (int)floor((x - 8) / 32) + 1, right = (int)floor((x + width) / 32) + 1;
-    int top = (int)floor((y - 15) / 24) + 1, bottom = (int)floor((y + 15) / 24) + 1;
-    if (left < 0 || right >= 516 || top < 0 || bottom >= 686) return;
-    if (request->town && !request->selected)
-        for (int row = top; row <= bottom; ++row)
-            for (int col = left; col <= right; ++col) {
-                unsigned index = (unsigned)(row * 516 + col);
-                if (state->occupied[index / 64] & (UINT64_C(1) << (index % 64))) return;
-            }
-    for (int row = top; row <= bottom; ++row)
-        for (int col = left; col <= right; ++col) {
-            unsigned index = (unsigned)(row * 516 + col);
-            state->occupied[index / 64] |= UINT64_C(1) << (index % 64);
-        }
-    marker_pixels(x, y);
+    if (marker_reserve(state, x, y, width, request->town, request->selected)) marker_pixels(x, y);
+    else if (request->town && !request->selected && marker_reserve(state, x - width, y, width, true, false)) {
+        jsref result = lab_dom_object(LAB_VALUE_ARRAY);
+        lab_dom_push(result, lab_dom_numeric(x - width));
+        lab_dom_push(result, lab_dom_numeric(y));
+        lab_dom_push(result, lab_dom_numeric(-1));
+        lab_dom_return(result);
+    }
 }
 
 /* Admit one projected candidate without retaining browser references. */

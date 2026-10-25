@@ -259,11 +259,13 @@ class LabApplication {
         await Promise.all(pending);
     }
 
-    /** Await only the first country page; the remaining catalogue continues in the background. */
+    /** Await the selected catalogue and any parent needed to resolve a subdivision's local seat. */
     public async prepareCountrySelection(code: string): Promise<void> {
-        if (!this.catalogue?.available || this.townJurisdictions.has(code)) return;
+        if (!this.catalogue?.available) return;
         void this.loadSelectedTowns();
         await this.townJobs.get(code)?.ready;
+        if (code.includes('-') && !labDOM.call('lab_town_store_list', code))
+            await this.townJobs.get(code.split('-')[0])?.promise;
     }
 
     private async loadJurisdictionTowns(code: string, controller: AbortSignal, firstPage: () => void): Promise<void> {

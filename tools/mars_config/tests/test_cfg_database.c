@@ -884,10 +884,11 @@ static bool test_cfg_country_flags_fixture(const char *directory)
         sqlite_exec_cstr(db, "insert into jurisdiction values('GB-ENG','subdivision','GB','GB','England'),"
                              "('GB-WLS','subdivision','GB','GB','Wales'),"
                              "('GB-SCT','subdivision','GB','GB','Scotland'),"
-                             "('GB-NIR','subdivision','GB','GB','Northern Ireland')") &&
+                             "('GB-NIR','subdivision','GB','GB','Northern Ireland'),"
+                             "('RU-KGD','subdivision','RU','RU','Kaliningrad Oblast')") &&
         cfg_database_flags(db, root) && cfg_database_flags(db, root) &&
-        test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "263") &&
-        test_cfg_database_query(db, "select count(*) from jurisdiction_flag_region", "14") &&
+        test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "267") &&
+        test_cfg_database_query(db, "select count(*) from jurisdiction_flag_region", "19") &&
         test_cfg_database_query(db, "select name from jurisdiction_flag_emblem where code='ZZ-SEA'", "Offshore") &&
         test_cfg_database_query(db, "select count(*) from jurisdiction where jurisdiction_id='ZZ-SEA'", "0") &&
         test_cfg_database_query(db, "select source from jurisdiction_country_flag_source where id=3", "OFFSHORE-NOTICES.txt") &&
@@ -907,7 +908,7 @@ static bool test_cfg_country_flags_fixture(const char *directory)
              "insert into jurisdiction_flag_emblem values('ZZ-MIS','Missing artwork')") &&
          !cfg_database_flags(db, incomplete_root) &&
          test_cfg_database_query(db, "select count(*) from jurisdiction_flag_emblem where code='ZZ-MIS'", "0") &&
-         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "263") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "267") &&
          test_cfg_database_query(db, "select value from retained", "42");
     file_free(incomplete); string_free(incomplete_root);
     sqlite_close(db); string_free(root);
@@ -918,11 +919,12 @@ static bool test_cfg_country_flags_fixture(const char *directory)
     ok = ok && jurisdict_country(j, "GB", &name, &svg) && name && svg &&
          strstr(string_c_str(svg), "<svg") && !strcmp(string_c_str(name), "Britain (UK)");
     string_free(name); string_free(svg);
-    const char *const codes[] = {"GB-WLS", "GB-SCT", "IM", "GB-ENG", "GB-NIR", "JE"};
-    const char *const names[] = {"Wales", "Scotland", "Isle of Man", "England", "Northern Ireland", "Jersey"};
+    const char *const codes[] = {"GB-WLS", "GB-SCT", "IM", "GB-ENG", "GB-NIR", "JE", "RU-KGD"};
+    const char *const names[] = {"Wales", "Scotland", "Isle of Man", "England", "Northern Ireland", "Jersey",
+                               "Kaliningrad Oblast"};
     const char *const artwork[] = {"flag-icons-gb-wls", "flag-icons-gb-sct", "flag-icons-im",
-                                    "flag-icons-gb-eng", "flag-icons-gb-nir", "flag-icons-je"};
-    for (unsigned i = 0; i < 6; ++i) {
+                                    "flag-icons-gb-eng", "flag-icons-gb-nir", "flag-icons-je", "flag-icons-ru"};
+    for (unsigned i = 0; i < sizeof codes / sizeof *codes; ++i) {
         name = NULL; svg = NULL;
         ok = ok && jurisdict_country(j, codes[i], &name, &svg) && name && svg &&
              !strcmp(string_c_str(name), names[i]) && strstr(string_c_str(svg), artwork[i]) &&
@@ -930,7 +932,8 @@ static bool test_cfg_country_flags_fixture(const char *directory)
         string_free(name); string_free(svg);
     }
     const char *const regions[] = {"GB-CON", "FR-BRE", "FR-COR", "IT-88", "NL-FR", "DE-OFR", "DE-NFR",
-                                    "ES-CT", "ES-VC", "ES-IB", "ES-PV", "ES-NA", "FR-BAS", "FR-CAT"};
+                                    "ES-CT", "ES-VC", "ES-IB", "ES-PV", "ES-NA", "FR-BAS", "FR-CAT", "PL-KAS", "FI-SAP",
+                                    "DE-SAT", "DE-SOR", "MN-KAZ"};
     for (unsigned i = 0; i < sizeof regions / sizeof *regions; ++i) {
         name = NULL; svg = NULL;
         bool valid = jurisdict_country(j, regions[i], &name, &svg) && name && svg &&
@@ -939,6 +942,23 @@ static bool test_cfg_country_flags_fixture(const char *directory)
                      strstr(string_c_str(svg), "prefers-reduced-motion:reduce") &&
                      !strstr(string_c_str(svg), "<image");
         if (!valid) fprintf(stderr, "Regional SVG failed: %s\n", regions[i]);
+        if (!strcmp(regions[i], "PL-KAS"))
+            valid = valid && !strcmp(string_c_str(name), "Kashubia, Poland") &&
+                    strstr(string_c_str(svg), "#ffdf00") && strstr(string_c_str(svg), "flag-icons-pl");
+        if (!strcmp(regions[i], "FI-SAP"))
+            valid = valid && !strcmp(string_c_str(name), "Sámi homeland, Finland") &&
+                    strstr(string_c_str(svg), "#0035ad") && strstr(string_c_str(svg), "#dc241f") &&
+                    strstr(string_c_str(svg), "flag-icons-fi");
+        if (!strcmp(regions[i], "DE-SAT"))
+            valid = valid && !strcmp(string_c_str(name), "Saterland, Germany") &&
+                    strstr(string_c_str(svg), "flag-icons-de");
+        if (!strcmp(regions[i], "DE-SOR"))
+            valid = valid && !strcmp(string_c_str(name), "Sorbian Lusatia, Germany") &&
+                    strstr(string_c_str(svg), "#00f") && strstr(string_c_str(svg), "#f00") &&
+                    strstr(string_c_str(svg), "#fff") && strstr(string_c_str(svg), "flag-icons-de");
+        if (!strcmp(regions[i], "MN-KAZ"))
+            valid = valid && !strcmp(string_c_str(name), "Kazakh cultural area, Mongolia") &&
+                    strstr(string_c_str(svg), "flag-icons-kz") && strstr(string_c_str(svg), "flag-icons-mn");
         ok = valid && ok;
         string_free(name); string_free(svg);
     }
@@ -966,16 +986,34 @@ static bool test_cfg_database_update_fixture(const char *directory)
     file_t *database = test_cfg_database_file(directory, "existing.db");
     sqlite_t *db = ok ? test_cfg_database_open(database, "saved-update-key") : NULL;
     ok = ok && db && sqlite_exec_cstr(db,
-        "create table jurisdiction(jurisdiction_id text primary key,jurisdiction_type text,iso_country_code text);"
-        "insert into jurisdiction values('GB','country','GB');"
-        "insert into jurisdiction values('ZA','country','ZA');"
-        "create table jurisdiction_town(jurisdiction_town_id integer primary key,jurisdiction_id,town_name);"
+        "create table jurisdiction(jurisdiction_id text primary key,jurisdiction_type text,iso_country_code text,"
+        "parent_jurisdiction_id text,iso_subdivision_code text,cldr_region_code text,name text);"
+        "insert into jurisdiction(jurisdiction_id,jurisdiction_type,iso_country_code) values('GB','country','GB'),"
+        "('ZA','country','ZA'),('RU','country','RU');"
+        "create table jurisdiction_town_name(jurisdiction_town_id integer primary key,town_name);"
+        "create table jurisdiction_town_jurisdiction_id(jurisdiction_town_id integer primary key,jurisdiction_id);"
+        "create view jurisdiction_town as select jurisdiction_town_id,jurisdiction_id,town_name "
+        "from jurisdiction_town_name join jurisdiction_town_jurisdiction_id using(jurisdiction_town_id);"
+        "create trigger jurisdiction_town_insert instead of insert on jurisdiction_town begin "
+        "insert into jurisdiction_town_name values(new.jurisdiction_town_id,new.town_name);"
+        "insert into jurisdiction_town_jurisdiction_id values(last_insert_rowid(),new.jurisdiction_id);end;"
         "create table jurisdiction_town_latitude(jurisdiction_town_id integer primary key,latitude);"
         "create table jurisdiction_town_longitude(jurisdiction_town_id integer primary key,longitude);"
         "create table jurisdiction_town_elevation(jurisdiction_town_id integer primary key,elevation_metres);"
         "create table jurisdiction_town_timezone(jurisdiction_town_id integer primary key,timezone_code);"
         "create table timezone_code(timezone_name,timezone_code);"
         "insert into timezone_code values('Africa/Johannesburg',24);"
+        "insert into timezone_code values('Europe/Kaliningrad',246),('Europe/Moscow',257);"
+        "insert into jurisdiction_town values(101,'RU','Kaliningrad'),(102,'RU','Moscow');"
+        "insert into jurisdiction_town_latitude values(101,'54.70639'),(102,'55.7522');"
+        "insert into jurisdiction_town_longitude values(101,'20.51102'),(102,'37.6156');"
+        "insert into jurisdiction_town_timezone values(101,246),(102,257);"
+        "create table jurisdiction_default_town(jurisdiction_id text primary key,jurisdiction_town_id);"
+        "create table jurisdiction_location_default(jurisdiction_id text primary key);"
+        "create table jurisdiction_location_default_latitude(jurisdiction_id text primary key,latitude);"
+        "create table jurisdiction_location_default_longitude(jurisdiction_id text primary key,longitude);"
+        "create table jurisdiction_location_default_timezone(jurisdiction_id text primary key,timezone_code);"
+        "create table jurisdiction_location_default_locality(jurisdiction_id text primary key,locality_name);"
         "create table retained(value);insert into retained values(42)");
     sqlite_close(db);
     file_t *config_directory = test_cfg_database_file(directory, "config");
@@ -1001,14 +1039,16 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && cfg_databases_update() == 0 &&
          !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "6") &&
-         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "18") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "8") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "27") &&
+         test_cfg_database_query(db, "select jurisdiction_id from jurisdiction_town where town_name='Kaliningrad'", "RU-KGD") &&
+         test_cfg_database_query(db, "select locality_name from jurisdiction_location_default_locality where jurisdiction_id='RU'", "Moscow") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction_town where jurisdiction_id='ZA' "
                                    "and town_name in ('Robben Island','Seal Island','Duiker Island')", "3") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction_town_timezone where timezone_code=24", "3") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction where jurisdiction_id='ZZ-SEA'", "0") &&
          test_cfg_database_query(db, "select value from retained", "42") &&
-         cfg_database_revision(db, "jurisdiction", 7);
+         cfg_database_revision(db, "jurisdiction", 9);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
          cfg_databases_update() == 1;
@@ -1052,6 +1092,140 @@ static void test_cfg_database_globe(void)
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_globe_fixture), "globe setup fails safely without shoreline source");
 }
 
+static bool test_cfg_kashubian_coverage(globe_t *globe)
+{
+    static const struct { const char *name; double latitude, longitude; bool regional; } places[] = {
+        {"Kartuzy", 54.334, 18.197, true},
+        {"Kościerzyna", 54.122, 17.981, true},
+        {"Bytów", 54.170, 17.491, true},
+        {"Puck", 54.718, 18.409, true},
+        {"Hel", 54.608, 18.801, true},
+        {"Wejherowo", 54.605, 18.235, true},
+        {"Gdańsk", 54.352, 18.646, true},
+        {"Gdynia", 54.519, 18.531, true},
+        {"Sopot", 54.441, 18.560, true},
+        {"Słupsk", 54.464, 17.028, true},
+        {"Łeba", 54.760, 17.555, true},
+        {"Chojnice", 53.695, 17.558, true},
+        {"Koczała", 53.904, 17.066, true},
+        {"Przywidz", 54.195, 18.321, true},
+        {"Kolbudy", 54.270, 18.465, true},
+        {"Tczew", 54.092, 18.778, false},
+        {"Starogard Gdański", 53.963, 18.526, false},
+        {"Malbork", 54.036, 19.038, false},
+        {"Pruszcz Gdański", 54.262, 18.636, false},
+        {"Koszalin", 54.194, 16.172, false},
+        {"Warsaw", 52.230, 21.012, false},
+    };
+    bool ok = true;
+    for (size_t i = 0; i < sizeof places / sizeof *places; ++i) {
+        string_t *code = globe_region_code_at(globe, places[i].latitude, places[i].longitude);
+        /* National coverage is checked separately: its coarser outline omits the Hel peninsula. */
+        bool valid = places[i].regional ? code && !strcmp(string_c_str(code), "PL-KAS") : !code;
+        if (!valid) fprintf(stderr, "Kashubian coverage mismatch: %s (%s)\n", places[i].name,
+                            code ? string_c_str(code) : "no regional flag");
+        ok = valid && ok;
+        string_free(code);
+    }
+    return ok;
+}
+
+static bool test_cfg_sami_coverage(globe_t *globe)
+{
+    static const struct { const char *name; double latitude, longitude; bool regional; } places[] = {
+        {"Hetta, Enontekiö", 68.386, 23.638, true},
+        {"Kilpisjärvi", 69.045, 20.790, true},
+        {"Inari", 68.906, 27.028, true},
+        {"Ivalo", 68.659, 27.540, true},
+        {"Utsjoki", 69.908, 27.029, true},
+        {"Vuotso", 68.086, 27.123, true},
+        {"Sodankylä centre", 67.416, 26.590, false},
+        {"Rovaniemi", 66.503, 25.729, false},
+        {"Kittilä", 67.655, 24.914, false},
+        {"Muonio", 67.958, 23.680, false},
+        {"Kiruna, Sweden", 67.855, 20.225, false},
+        {"Karasjok, Norway", 69.471, 25.511, false},
+    };
+    bool ok = true;
+    for (size_t i = 0; i < sizeof places / sizeof *places; ++i) {
+        string_t *code = globe_region_code_at(globe, places[i].latitude, places[i].longitude);
+        bool valid = places[i].regional ? code && !strcmp(string_c_str(code), "FI-SAP") : !code;
+        if (places[i].regional) {
+            string_t *country = globe_country_code_at(globe, places[i].latitude, places[i].longitude);
+            valid = valid && country && !strcmp(string_c_str(country), "FI");
+            string_free(country);
+        }
+        if (!valid) fprintf(stderr, "Sámi coverage mismatch: %s (%s)\n", places[i].name,
+                            code ? string_c_str(code) : "no regional flag");
+        ok = valid && ok;
+        string_free(code);
+    }
+    return ok;
+}
+
+static bool test_cfg_german_region_coverage(globe_t *globe)
+{
+    static const struct { const char *name, *code; double latitude, longitude; } places[] = {
+        {"Emden", "DE-OFR", 53.367, 7.207},
+        {"Aurich", "DE-OFR", 53.470, 7.483},
+        {"Husum", "DE-NFR", 54.478, 9.050},
+        {"Westerland", "DE-NFR", 54.908, 8.308},
+        {"Helgoland", "DE-NFR", 54.182, 7.889},
+        {"Ramsloh", "DE-SAT", 53.104, 7.681},
+        {"Scharrel", "DE-SAT", 53.073, 7.709},
+        {"Bautzen", "DE-SOR", 51.181, 14.424},
+        {"Crostwitz", "DE-SOR", 51.238, 14.243},
+        {"Hoyerswerda", "DE-SOR", 51.437, 14.249},
+        {"Schleife", "DE-SOR", 51.541, 14.532},
+        {"Cottbus", "DE-SOR", 51.756, 14.334},
+        {"Burg", "DE-SOR", 51.835, 14.148},
+        {"Lübbenau", "DE-SOR", 51.869, 13.969},
+        {"Cloppenburg", NULL, 52.847, 8.045},
+        {"Pinneberg", NULL, 53.660, 9.800},
+        {"Dresden", NULL, 51.051, 13.738},
+        {"Görlitz", NULL, 51.152, 14.988},
+        {"Berlin", NULL, 52.520, 13.405},
+    };
+    bool ok = true;
+    for (size_t i = 0; i < sizeof places / sizeof *places; ++i) {
+        string_t *code = globe_region_code_at(globe, places[i].latitude, places[i].longitude);
+        bool valid = places[i].code ? code && !strcmp(string_c_str(code), places[i].code) : !code;
+        if (!valid) fprintf(stderr, "German regional coverage mismatch: %s (%s)\n", places[i].name,
+                            code ? string_c_str(code) : "no regional flag");
+        ok = valid && ok;
+        string_free(code);
+    }
+    return ok;
+}
+
+static bool test_cfg_kazakh_coverage(globe_t *globe)
+{
+    static const struct { const char *name; double latitude, longitude; bool regional; } places[] = {
+        {"Ölgii", 48.968, 89.962, true},
+        {"Tsengel", 48.944, 89.145, true},
+        {"Khovd city", 48.005, 91.641, true},
+        {"Khovd soum", 48.200, 91.100, true},
+        {"Buyant, Khovd", 48.060, 91.820, true},
+        {"Nalaikh", 47.773, 107.253, true},
+        {"Ulaangom", 49.982, 92.066, false},
+        {"Central Ulaanbaatar", 47.918, 106.917, false},
+        {"Jargalant, Töv", 48.450, 105.860, false},
+        {"Altai city", 46.373, 96.258, false},
+    };
+    bool ok = true;
+    for (size_t i = 0; i < sizeof places / sizeof *places; ++i) {
+        string_t *code = globe_region_code_at(globe, places[i].latitude, places[i].longitude);
+        string_t *country = globe_country_code_at(globe, places[i].latitude, places[i].longitude);
+        bool valid = (places[i].regional ? code && !strcmp(string_c_str(code), "MN-KAZ") : !code) &&
+                     country && !strcmp(string_c_str(country), "MN");
+        if (!valid) fprintf(stderr, "Mongolian Kazakh coverage mismatch: %s (%s)\n", places[i].name,
+                            code ? string_c_str(code) : "no regional flag");
+        ok = valid && ok;
+        string_free(code); string_free(country);
+    }
+    return ok;
+}
+
 static bool test_cfg_country_migration_mode(const char *directory, const char *key)
 {
     file_t *database = test_cfg_database_file(directory, "country_migration.db");
@@ -1087,17 +1261,32 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     file_t *region_target = test_cfg_database_file(directory, "packaging/globe-db/flag_regions.geojson");
     ok = ok && region_source && region_target && file_copy(region_source, region_target, false);
     file_free(region_source); file_free(region_target);
+    file_t *subdivision_source = test_cfg_database_file(MARS_CONFIG_ROOT_DIR,
+        "packaging/globe-db/jurisdiction_subdivisions.sql");
+    file_t *subdivision_target = test_cfg_database_file(directory, "packaging/globe-db/jurisdiction_subdivisions.sql");
+    ok = ok && subdivision_source && subdivision_target && file_copy(subdivision_source, subdivision_target, false);
+    file_free(subdivision_source); file_free(subdivision_target);
     /* No shoreline archive exists here: update countries, display regions and images independently. */
     ok = ok && test_cfg_copy_textures(directory) && !cfg_databases_update();
     db = ok ? test_cfg_database_open(database, key) : NULL;
     globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
     string_t *code = globe_country_code_at(globe, 44.95, 34.1);
     ok = ok && code && !strcmp(string_c_str(code), "UA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "7") &&
-         test_cfg_database_query(db, "select count(distinct iso_country_code) from region_name", "14") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "9") &&
+         test_cfg_database_query(db, "select count(distinct iso_country_code) from region_name", "19") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "7") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained") &&
-         test_cfg_database_query(db, "select count(*) from country_name", "298");
+         test_cfg_database_query(db, "select count(*) from country_name", "299");
+    string_t *kaliningrad = globe_country_code_at(globe, 54.634833, 21.3865);
+    string_t *poland = globe_country_code_at(globe, 54.35, 18.65);
+    string_t *lithuania = globe_country_code_at(globe, 55.7, 21.15);
+    string_t *moscow = globe_country_code_at(globe, 55.75, 37.62);
+    ok = ok && kaliningrad && !strcmp(string_c_str(kaliningrad), "RU-KGD") &&
+         poland && !strcmp(string_c_str(poland), "PL") && lithuania && !strcmp(string_c_str(lithuania), "LT") &&
+         moscow && !strcmp(string_c_str(moscow), "RU");
+    string_free(kaliningrad); string_free(poland); string_free(lithuania); string_free(moscow);
+    ok = ok && test_cfg_kashubian_coverage(globe) && test_cfg_sami_coverage(globe) &&
+         test_cfg_german_region_coverage(globe) && test_cfg_kazakh_coverage(globe);
     string_free(code); globe_close(globe); sqlite_close(db);
     /* A revision-six installation already owns its images: refresh countries without importing them again. */
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1111,9 +1300,22 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe = db ? globe_open_databases(db, db, NULL) : NULL;
     code = globe_country_code_at(globe, -33.8064, 18.3688);
     ok = ok && code && !strcmp(string_c_str(code), "ZA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "7") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "9") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained");
     string_free(code); globe_close(globe); sqlite_close(db);
+    /* Revision eight needs only new display coverage, retaining installed countries and images. */
+    db = ok ? test_cfg_database_open(database, key) : NULL;
+    ok = ok && db && cfg_database_revision(db, "globe", 8) &&
+         sqlite_exec_cstr(db, "delete from region_name where iso_country_code in "
+                             "('PL-KAS','FI-SAP','DE-SAT','DE-SOR','MN-KAZ')");
+    sqlite_close(db);
+    ok = ok && !cfg_databases_update();
+    db = ok ? test_cfg_database_open(database, key) : NULL;
+    globe = db ? globe_open_databases(db, db, NULL) : NULL;
+    ok = ok && test_cfg_kashubian_coverage(globe) && test_cfg_sami_coverage(globe) &&
+         test_cfg_german_region_coverage(globe) && test_cfg_kazakh_coverage(globe) &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "9");
+    globe_close(globe); sqlite_close(db);
     /* A current database must remain usable even when the migration sources are no longer available. */
     string_t *missing = string_sprintf("%s/missing", directory);
     ok = ok && missing && !setenv("MARS_ROOT", string_c_str(missing), 1) && !cfg_databases_update();
@@ -1247,9 +1449,9 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     file_t *database = test_cfg_database_file(directory, "globe/globe.db");
     sqlite_t *db = ok && database ? test_cfg_database_open(database, key) : NULL;
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
-         test_cfg_database_query(db, "SELECT count(*) FROM country_name", "298") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM country_name", "299") &&
          test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "7") &&
+         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "9") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
                                     "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
          test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
@@ -1262,7 +1464,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
          test_cfg_database_query(db, "select value from retained", "42") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "7");
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "9");
     sqlite_close(db);
     /* Country metadata is independent of town selection and land/water classification. */
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1289,9 +1491,9 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && !cfg_globe_run("globe-install");
     db = ok ? test_cfg_database_open(database, key) : NULL;
     ok = ok && db && test_cfg_coast_sydney(db) && test_cfg_database_mode(database, 0600) &&
-         test_cfg_database_query(db, "select count(*) from country_name", "298") &&
+         test_cfg_database_query(db, "select count(*) from country_name", "299") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "7") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "9") &&
          test_cfg_database_query(db, "select count(*) from sqlite_master where name in ('retained','rivers_dataset')", "0") &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_KEY", key) &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_PATH", file_path(database)) &&

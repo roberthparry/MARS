@@ -315,10 +315,10 @@ json_t *lab_cal_state_updates(bool is_datetime, const json_t *options, const jso
 {
     static const char *source_keys[] = {"date", "start", "end",       "year",      "jurisdiction",
                                         "town", "lat",   "lon",       "elevation", "gmt_offset",
-                                        "time", "zone",  "visibility", "zone_mode"};
+                                        "time", "zone",  "visibility", "zone_mode", "elevation_mode"};
     static const char *state_keys[] = {"date", "start",    "end",       "year",      "jurisdiction",
                                        "town", "latitude", "longitude", "elevation", "gmt_offset",
-                                       "time", "zone",     "visibility", "zone_mode"};
+                                       "time", "zone",     "visibility", "zone_mode", "elevation_mode"};
     json_t *updates = json_new_object();
     for (size_t i = 0; i < sizeof(source_keys) / sizeof(*source_keys); ++i) {
         if (!lab_cal_get(options, source_keys[i]))
@@ -406,6 +406,7 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
     json_free(defaults);
     lab_cal_option(options, payload, "town", "town", "");
     lab_cal_option(options, payload, "timezone", "timezone", "");
+    lab_cal_option(options, payload, "elevation_mode", "elevation_mode", "");
     const char *error = NULL;
     if (!lab_cal_valid_date(lab_cal_text(options, "date")))
         error = "Bad request: Date must look like YYYY-MM-DD and be a valid calendar date";
@@ -469,6 +470,7 @@ json_t *lab_cal_request(const string_t *route, const json_t *payload, unsigned *
         json_free(options);
         return lab_cal_error(status, 400, error);
     }
+    if (is_almanac || is_datetime) lab_cal_resolve_observer(options);
     if (is_almanac) {
         /* Only the initial interactive request may defer the annual event search. */
         lab_cal_set(options, "defer_events", !is_almanac_weather &&

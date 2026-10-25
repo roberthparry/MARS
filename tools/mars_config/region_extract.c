@@ -3,8 +3,9 @@
  * @brief Offline extraction of reviewed cultural flag coverage from attributed GeoJSON.
  *
  * Developer-only preparation tool: takes Natural Earth admin-1, geoBoundaries German
- * districts, the Pays Basque authority outline, French department 66 communes and French departments,
- * followed by an output path. Keeps source polygon geometry and selected identifiers;
+ * districts, the Pays Basque authority outline, French department 66 communes, French departments, PRG gminas,
+ * the Finnish Sámi homeland, Frisian municipalities, Brandenburg/Saxon Sorbian settlement outlines,
+ * and Mongolian districts, followed by an output path. Keeps source polygon geometry and selected identifiers;
  * it does not infer sovereignty, download data or modify installed databases.
  * See the existing globe guide and third-party notices for sources and scope.
  */
@@ -66,7 +67,7 @@ static const char *natural_code(const json_t *properties)
         {"ES.VC", "ES-VC"}, {"IT-88", "IT-88"}
     };
     static const region_mapping_t provinces[] = {
-        {"GB-CON", "GB-CON"}, {"NL-FR", "NL-FR"}
+        {"GB-CON", "GB-CON"}, {"MN-071", "MN-KAZ"}, {"NL-FR", "NL-FR"}
     };
     const char *code = mapped(regions, sizeof regions / sizeof *regions, text_field(properties, "region_cod"));
     return code ? code : mapped(provinces, sizeof provinces / sizeof *provinces, text_field(properties, "iso_3166_2"));
@@ -104,18 +105,93 @@ static const char *french_code(const json_t *properties)
     return mapped(departments, sizeof departments / sizeof *departments, text_field(properties, "code"));
 }
 
+static const char *basque_code(const json_t *properties)
+{
+    (void)properties;
+    return "FR-BAS";
+}
+
+static const char *polish_code(const json_t *properties)
+{
+    /* Reviewed municipal proxy for the ethnic and historical coverage; see the globe guide. */
+    static const region_mapping_t districts[] = {
+        {"2201", "PL-KAS"}, {"2202", "PL-KAS"}, {"2205", "PL-KAS"}, {"2206", "PL-KAS"},
+        {"2208", "PL-KAS"}, {"2211", "PL-KAS"}, {"2212", "PL-KAS"}, {"2215", "PL-KAS"},
+        {"2261", "PL-KAS"}, {"2262", "PL-KAS"}, {"2263", "PL-KAS"}, {"2264", "PL-KAS"}
+    };
+    /* Names retain the spelling in the GIOS PRG service, including its missing Polish diacritics. */
+    static const region_mapping_t municipalities[] = {
+        {"2203:Czluchów", "PL-KAS"}, {"2203:Koczala", "PL-KAS"}, {"2203:Przechlewo", "PL-KAS"},
+        {"2203:Rzeczenica", "PL-KAS"}, {"2204:Kolbudy", "PL-KAS"}, {"2204:Przywidz", "PL-KAS"}
+    };
+    number_t number;
+    if (!json_number_value(field(properties, "DISTRICT_I"), &number)) return NULL;
+    double district = num_to_double(number);
+    if (!(district >= 2200 && district < 2300) || district != (unsigned)district) return NULL;
+    char key[128];
+    snprintf(key, sizeof key, "%04u", (unsigned)district);
+    const char *code = mapped(districts, sizeof districts / sizeof *districts, key);
+    if (code) return code;
+    int length = snprintf(key, sizeof key, "%04u:%s", (unsigned)district, text_field(properties, "NAME"));
+    return length > 0 && (size_t)length < sizeof key ?
+           mapped(municipalities, sizeof municipalities / sizeof *municipalities, key) : NULL;
+}
+
+static const char *sami_code(const json_t *properties)
+{
+    return !strcmp(text_field(properties, "Nimi"), "Saamelaisten kotiseutualue") ? "FI-SAP" : NULL;
+}
+
+static const char *frisian_code(const json_t *properties)
+{
+    static const region_mapping_t municipalities[] = {
+        {"01056025", "DE-NFR"}, {"03453013", "DE-SAT"}
+    };
+    return mapped(municipalities, sizeof municipalities / sizeof *municipalities,
+                  text_field(properties, "Gemeindeschlüssel_AGS"));
+}
+
+static const char *brandenburg_code(const json_t *properties)
+{
+    return !strcmp(text_field(properties, "sorb_info"), "Angestammtes Siedlungsgebiet der Sorben/Wenden") ?
+           "DE-SOR" : NULL;
+}
+
+static const char *saxon_code(const json_t *properties)
+{
+    /* The dedicated L356 layer contains the entire Saxon settlement outline as one feature. */
+    number_t number;
+    return json_number_value(field(properties, "objectid"), &number) && num_to_double(number) == 1 ? "DE-SOR" : NULL;
+}
+
+static const char *mongolian_code(const json_t *properties)
+{
+    /* Pinned geoBoundaries identifiers distinguish namesakes in other aimags. */
+    static const region_mapping_t districts[] = {
+        {"93677404B42040735626844", "MN-KAZ"}, /* Jargalant: Khovd city. */
+        {"93677404B72325521473587", "MN-KAZ"}, /* Nalaikh. */
+        {"93677404B7788562092433", "MN-KAZ"},  /* Buyant, Khovd aimag. */
+        {"93677404B84217279169077", "MN-KAZ"}  /* Khovd soum, Khovd aimag. */
+    };
+    return !strcmp(text_field(properties, "shapeGroup"), "MNG") ?
+           mapped(districts, sizeof districts / sizeof *districts, text_field(properties, "shapeID")) : NULL;
+}
+
 static bool extract(json_t *output, const char *path, unsigned source)
 {
+    static const char *(*const selectors[])(const json_t *) = {
+        natural_code, german_code, basque_code, catalan_code, french_code, polish_code, sami_code,
+        frisian_code, brandenburg_code, saxon_code, mongolian_code
+    };
     string_t *name = string_new_with(path);
     json_t *document = json_from_file(name);
     string_free(name);
     const json_t *features = field(document, "features");
     size_t count = json_array_size(features), selected = 0;
-    bool ok = count && count <= 10000;
+    bool ok = count && count <= 10000 && source < sizeof selectors / sizeof *selectors;
     for (size_t i = 0; ok && i < count; ++i) {
         const json_t *feature = json_array_get(features, i), *properties = field(feature, "properties");
-        const char *code = source == 0 ? natural_code(properties) : source == 1 ? german_code(properties) :
-                           source == 2 ? "FR-BAS" : source == 3 ? catalan_code(properties) : french_code(properties);
+        const char *code = selectors[source](properties);
         if (!code) continue;
         json_t *copy = json_new_object(), *metadata = json_new_object();
         ok = copy && metadata && set_text(copy, "type", "Feature") && set_text(metadata, "code", code) &&
@@ -132,14 +208,15 @@ static bool extract(json_t *output, const char *path, unsigned source)
 /* Prepare a reproducible offline subset; installation consumes only the resulting package. */
 int main(int argc, char **argv)
 {
-    if (argc != 7) {
-        fprintf(stderr, "usage: region_extract admin1 districts basque communes departments output\n"); return 2;
+    if (argc != 13) {
+        fprintf(stderr, "usage: region_extract admin1 districts basque communes departments gminas sami "
+                        "frisian brandenburg saxony mongolia output\n"); return 2;
     }
     json_t *document = json_new_object(), *features = json_new_array();
     bool ok = document && features;
-    for (unsigned i = 0; ok && i < 5; ++i) ok = extract(features, argv[i + 1], i);
+    for (unsigned i = 0; ok && i < 11; ++i) ok = extract(features, argv[i + 1], i);
     ok = ok && set_text(document, "type", "FeatureCollection") && set(document, "features", features);
-    string_t *path = string_new_with(argv[6]);
+    string_t *path = string_new_with(argv[12]);
     if (ok) ok = json_to_file(document, path) == 0;
     string_free(path); json_free(features); json_free(document);
     return ok ? 0 : 1;

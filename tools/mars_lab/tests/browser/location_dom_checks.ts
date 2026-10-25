@@ -90,6 +90,34 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
         equal(
             labDOM.call<unknown[]>('lab_location_towns', catalogue, {value: 'GB-SCT'}), towns,
             'missing regional catalogue uses country');
+        const labels = Reflect.get(WorksheetContext.almanacJurisdiction, 'labJurisdictionLabels');
+        try {
+            Reflect.set(WorksheetContext.almanacJurisdiction, 'labJurisdictionLabels', {'IT-PR': 'Italy - Parma', 'IT-MI': 'Italy - Milan'});
+            const italian = {config: {}, jurisdictions: new Set(['IT-PR', 'IT-MI']), towns: {IT: [
+                {name: 'Rome', value: 'rome', default: true}, {name: 'Parma', value: 'parma'}, {name: 'Milan', value: 'milan'}
+            ]}};
+            equal(labDOM.call<{value: string}[]>('lab_location_towns', italian, {value: 'IT-PR'})[0].value,
+                  'parma', 'Parma selects its local seat instead of inheriting Rome');
+            equal(labDOM.call<{value: string}[]>('lab_location_towns', italian, {value: 'IT-MI'})[0].value,
+                  'milan', 'namesake subdivision seats follow the same rule');
+        } finally { Reflect.set(WorksheetContext.almanacJurisdiction, 'labJurisdictionLabels', labels); }
+        let releaseParent!: () => void;
+        const parentReady = new Promise<void>(resolve => { releaseParent = resolve; });
+        const gate = {
+            catalogue: {available: true}, loadSelectedTowns: async () => {},
+            townJobs: new Map([
+                ['IT-PR', {ready: Promise.resolve(), promise: Promise.resolve()}],
+                ['IT', {ready: Promise.resolve(), promise: parentReady}]
+            ])
+        } as unknown as typeof labApplication;
+        let selectionReady = false;
+        const preparation = labApplication.prepareCountrySelection.call(gate, 'IT-PR').then(() => { selectionReady = true; });
+        await Promise.resolve();
+        await Promise.resolve();
+        check(!selectionReady, 'an empty subdivision page cannot race ahead of its parent town catalogue');
+        releaseParent();
+        await preparation;
+        check(selectionReady, 'subdivision selection continues once its parent catalogue is ready');
         catalogue.towns.GB = {} as unknown as typeof towns;
         equal(
             labDOM.call<unknown[]>('lab_location_towns', catalogue, {value: 'GB-SCT'}).length, 0,
@@ -118,7 +146,11 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
         equal(select.value, towns[1].value, 'elevation within tolerance retains town');
         elevation.value = '3.02';
         WorksheetLocations.townSelection.clearTownForCustomCoordinates(select, latitude, longitude, elevation);
-        equal(select.value, '', 'edited elevation clears town');
+        equal(select.value, towns[1].value, 'manual observer height does not remove the town at unchanged coordinates');
+        latitude.value = '1.1';
+        WorksheetLocations.townSelection.clearTownForCustomCoordinates(select, latitude, longitude, elevation);
+        equal(select.value, '', 'edited coordinates clear town');
+        equal(elevation.dataset.elevationMode, 'retained', 'moving coordinates marks inherited height explicitly');
         equal(WorksheetLocations.townSelection.selectedTownOption(select), null, 'empty select has no town');
         check(!WorksheetLocations.townSelection.selectTownByCoordinates(null as unknown as WorksheetSelect, 1, 2), 'absent select safely rejected');
 
@@ -230,6 +262,15 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             WorksheetLocations.calendar.applyCalendarState('almanac', {...savedAlmanac, zone: '5.5', zone_mode: undefined});
             equal(WorksheetLocations.calendar.currentAlmanacState().zone_mode, 'manual',
                   'legacy histories with no provenance retain authored offsets');
+            WorksheetLocations.calendar.applyCalendarState('almanac', {...savedAlmanac, elevation: '136', elevation_mode: 'catalogue'});
+            equal(WorksheetLocations.calendar.currentAlmanacState().elevation_mode, 'catalogue',
+                  'catalogue height provenance survives history restoration');
+            labDOM.call('lab_location_dispatch', 3, {target: WorksheetContext.almanacElevation}, WorksheetContext.almanacElevation);
+            equal(WorksheetLocations.calendar.currentAlmanacState().elevation_mode, 'manual',
+                  'typing height explicitly prevents future catalogue replacement');
+            WorksheetLocations.calendar.applyCalendarState('almanac', {...savedAlmanac, elevation_mode: undefined});
+            equal(WorksheetLocations.calendar.currentAlmanacState().elevation_mode, 'legacy',
+                  'older history heights remain distinguishable from authored values');
         } finally { WorksheetLocations.calendar.applyCalendarState('almanac', savedAlmanac); }
         const beforeInvalid = JSON.stringify(WorksheetLocations.calendar.readCalendarControls('datetime'));
         let rejected = false;

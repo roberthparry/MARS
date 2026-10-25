@@ -124,6 +124,20 @@ static jsref lab_location_town_list(jsref context, jsref value)
         return towns;
     int parent = lab_dom_item(lab_dom_split(code, "-"), 0);
     towns = native ? lab_town_store_snapshot(parent) : lab_dom_key_get(catalogue, parent);
+    if (!lab_dom_equal(parent, code) && lab_dom_type(towns) == LAB_VALUE_ARRAY) {
+        int labels = lab_dom_get(lab_location_element(LAB_MODE_ALMANAC, 3), "labJurisdictionLabels");
+        int parts = lab_dom_split(lab_dom_key_get(labels, code), " - ");
+        int name = lab_dom_item(parts, lab_dom_count(parts) ? lab_dom_count(parts) - 1 : 0);
+        int matches = lab_dom_object(LAB_VALUE_ARRAY), mark = lab_dom_mark();
+        /* This bounded pass already materialises a country menu. Prefer its subdivision's
+         * namesake seat when no subdivision catalogue exists, rather than its national capital. */
+        for (unsigned i = 0; i < lab_dom_count(towns); ++i) {
+            int row = lab_dom_item(towns, i);
+            if (lab_dom_equal(lab_location_town_text(lab_dom_get(row, "name")), name)) lab_dom_push(matches, row);
+            lab_dom_release(mark);
+        }
+        if (lab_dom_count(matches) == 1) return matches;
+    }
     return lab_dom_type(towns) == LAB_VALUE_ARRAY ? towns : lab_dom_object(LAB_VALUE_ARRAY);
 }
 
@@ -134,6 +148,7 @@ bool lab_location_catalogue(jsref catalogue)
     int selects[] = {lab_location_element(LAB_MODE_DATETIME, 5), lab_location_element(LAB_MODE_ALMANAC, 3)};
     if (lab_dom_type(options) != LAB_VALUE_ARRAY || lab_dom_type(towns) != LAB_VALUE_OBJECT || !selects[0] || !selects[1])
         return false;
+    int labels = lab_dom_object(LAB_VALUE_OBJECT);
     unsigned count = lab_dom_count(options), mark = lab_dom_mark();
     /* Validate every row first so a malformed response cannot leave one menu partly replaced. */
     for (unsigned index = 0; index < count; ++index) {
@@ -146,8 +161,14 @@ bool lab_location_catalogue(jsref catalogue)
             return false;
     }
     int available = lab_dom_truth(lab_dom_get(catalogue, "available"));
+    for (unsigned index = 0; index < count; ++index) {
+        int row = lab_dom_item(options, index);
+        lab_dom_key_set(labels, lab_dom_item(row, 0), lab_dom_item(row, 1));
+        lab_dom_release(mark);
+    }
     for (unsigned field = 0; field < 2; ++field) {
         int select = selects[field];
+        lab_dom_set(select, "labJurisdictionLabels", labels);
         lab_dom_write(select, LAB_DOM_TEXT, "", lab_dom_string(""));
         if (field == 1) {
             int unknown = lab_dom_create("option");
@@ -276,6 +297,8 @@ void lab_location_dispatch(lab_location_action_t action, event_jsref event, node
         lab_dom_set(select, "labTownGeneration", lab_dom_object(LAB_VALUE_OBJECT));
     if (select && action == LAB_LOCATION_ZONE_EDITED && lab_dom_equal(lab_dom_get(event, "target"), select))
         lab_dom_write(select, LAB_DOM_DATASET, "automaticZone", lab_dom_string(""));
+    if (select && action == LAB_LOCATION_HEIGHT_EDITED && lab_dom_equal(lab_dom_get(event, "target"), select))
+        lab_dom_write(select, LAB_DOM_DATASET, "elevationMode", lab_dom_string("manual"));
     lab_dom_return(plan);
 }
 
@@ -327,16 +350,13 @@ void lab_location_clear_custom(node_jsref select, jsref latitude, jsref longitud
     int option = lab_location_selected_option(select);
     if (!option)
         return;
-    int selected = lab_dom_clean(lab_dom_read(option, LAB_DOM_DATASET, "elevation"), LAB_DOM_CLEAN_TRIM);
-    int current = lab_dom_clean(lab_location_value(elevation), LAB_DOM_CLEAN_TRIM);
     if (lab_forms_nearly_equal(lab_menu_index_number(lab_dom_read(option, LAB_DOM_DATASET, "latitude")),
                                lab_menu_index_number(lab_location_value(latitude)), 0.000001) &&
         lab_forms_nearly_equal(lab_menu_index_number(lab_dom_read(option, LAB_DOM_DATASET, "longitude")),
-                               lab_menu_index_number(lab_location_value(longitude)), 0.000001) &&
-        (!lab_dom_length(selected) || !lab_dom_length(current) ||
-         lab_forms_nearly_equal(lab_menu_index_number(selected), lab_menu_index_number(current), 0.01)))
+                               lab_menu_index_number(lab_location_value(longitude)), 0.000001))
         return;
     lab_location_write(select, lab_dom_string(""));
+    lab_dom_write(elevation, LAB_DOM_DATASET, "elevationMode", lab_dom_string("retained"));
 }
 
 /* Snapshot real node identities and candidate values for asynchronous restoration guards. */
@@ -437,6 +457,7 @@ bool lab_location_apply_town(jsref controls, jsref offset, jsref context)
         if (lab_dom_length(value))
             lab_dom_write(lab_dom_get(controls, inputs[field]), LAB_DOM_VALUE, "", value);
     }
+    lab_dom_write(lab_dom_get(controls, "elevationInput"), LAB_DOM_DATASET, "elevationMode", lab_dom_string("catalogue"));
     int zone = lab_dom_get(controls, "zoneInput");
     if (lab_dom_length(offset)) {
         lab_dom_write(zone, LAB_DOM_VALUE, "", offset);
@@ -478,6 +499,13 @@ static jsref lab_location_read_controls(lab_mode_t mode, jsref context)
                         : lab_dom_get(context, "visibility");
         lab_dom_set(result, lab_profile_text(mode, field, LAB_PROFILE_KEY), value);
         lab_dom_release(mark);
+    }
+    if (mode == LAB_MODE_ALMANAC || mode == LAB_MODE_DATETIME) {
+        int height = lab_location_element(mode, lab_location_control_fields[mode].town + 3);
+        lab_dom_subscribe(height, "input", "lab_location_dispatch", LAB_LOCATION_HEIGHT_EDITED, height, 0);
+        lab_dom_subscribe(height, "change", "lab_location_dispatch", LAB_LOCATION_HEIGHT_EDITED, height, 0);
+        int source = lab_dom_read(height, LAB_DOM_DATASET, "elevationMode");
+        lab_dom_set(result, "elevation_mode", lab_dom_length(source) ? source : lab_dom_string("legacy"));
     }
     if (mode == LAB_MODE_ALMANAC) {
         int zone = lab_location_element(mode, 2);
@@ -540,6 +568,11 @@ static jsref lab_location_resolve(lab_mode_t mode, lab_calendar_operation_t oper
         lab_dom_set(result, key, chosen);
         lab_dom_release(mark);
     }
+    if (mode == LAB_MODE_ALMANAC || mode == LAB_MODE_DATETIME) {
+        int height = lab_dom_key_get(source, lab_dom_join(prefix, lab_dom_string("elevation_mode"), ""));
+        lab_dom_set(result, "elevation_mode", lab_location_is(height, "manual") ||
+            lab_location_is(height, "catalogue") || lab_location_is(height, "retained") ? height : lab_dom_string("legacy"));
+    }
     if (mode == LAB_MODE_ALMANAC) {
         int provenance = lab_dom_key_get(source, lab_dom_join(prefix, lab_dom_string("zone_mode"), ""));
         /* Older histories have no provenance: never guess that an authored zone was automatic. */
@@ -566,6 +599,9 @@ static void lab_location_project(lab_mode_t mode, lab_calendar_operation_t opera
     }
     if (mode == LAB_MODE_DATETIME && (operation == LAB_CALENDAR_RESTORE || operation == LAB_CALENDAR_RESET))
         lab_location_reset_offset(context, lab_location_element(mode, 10));
+    if (mode == LAB_MODE_ALMANAC || mode == LAB_MODE_DATETIME)
+        lab_dom_write(lab_location_element(mode, lab_location_control_fields[mode].town + 3),
+                      LAB_DOM_DATASET, "elevationMode", lab_dom_get(state, "elevation_mode"));
     if (mode == LAB_MODE_ALMANAC)
         lab_dom_write(lab_location_element(mode, 2), LAB_DOM_DATASET, "automaticZone",
                       lab_location_is(lab_dom_get(state, "zone_mode"), "auto") ? lab_dom_get(state, "zone")
@@ -830,6 +866,12 @@ void lab_location_evaluation(lab_mode_t mode, jsref data, jsref context)
             lab_location_reset_offset(context, offset);
         }
     } else if (mode == LAB_MODE_ALMANAC) {
+        int previous_jurisdiction = lab_location_value(lab_location_element(mode, 3));
+        int provenance = lab_dom_get(fields, "elevation_mode");
+        if (lab_dom_length(provenance)) {
+            lab_dom_write(lab_location_element(mode, 7), LAB_DOM_DATASET, "elevationMode", provenance);
+            lab_location_write(lab_location_element(mode, 7), lab_dom_get(fields, "elevation"));
+        }
         if (lab_location_is(lab_dom_get(fields, "zone_mode"), "auto"))
             lab_dom_write(lab_location_element(mode, 2), LAB_DOM_DATASET, "automaticZone",
                           lab_dom_clean(lab_dom_get(fields, "zone"), LAB_DOM_CLEAN_TRIM));
@@ -862,6 +904,24 @@ void lab_location_evaluation(lab_mode_t mode, jsref data, jsref context)
                 lab_location_write(lab_location_element(mode, field), value);
             }
             lab_dom_release(mark);
+        }
+        int town = lab_dom_get(fields, "town"), select = lab_location_element(mode, 4);
+        int selected_jurisdiction = lab_location_value(lab_location_element(mode, 3));
+        if (!lab_dom_equal(previous_jurisdiction, selected_jurisdiction) && lab_dom_length(town))
+            lab_location_populate(select, lab_location_town_list(context, selected_jurisdiction), false);
+        if (lab_dom_length(town) && !lab_dom_equal(town, lab_location_value(select))) {
+            int selection = lab_dom_object(LAB_VALUE_OBJECT), response = lab_dom_object(LAB_VALUE_OBJECT);
+            int place = lab_dom_object(LAB_VALUE_OBJECT), parts = lab_dom_split(town, "|");
+            lab_dom_set(selection, "value", town);
+            lab_dom_set(selection, "latitude", lab_dom_get(fields, "latitude"));
+            lab_dom_set(selection, "longitude", lab_dom_get(fields, "longitude"));
+            lab_dom_set(place, "name", lab_dom_item(parts, 0));
+            lab_dom_set(place, "latitude", lab_dom_item(parts, 1));
+            lab_dom_set(place, "longitude", lab_dom_item(parts, 2));
+            lab_dom_set(place, "elevation", lab_dom_item(parts, 3));
+            lab_dom_set(place, "timezone", lab_dom_get(fields, "timezone"));
+            lab_dom_set(response, "town", place);
+            if (!lab_location_choose(select, selection)) lab_location_retain_town(select, selection, response);
         }
     }
 }

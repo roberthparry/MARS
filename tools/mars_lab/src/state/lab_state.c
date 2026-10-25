@@ -346,6 +346,8 @@ static bool lab_state_merge(json_t *state, const json_t *updates, const json_t *
             valid = lab_state_one_of(text, "|all|visible|");
         else if (!strcmp(name, "almanac_zone_mode"))
             valid = lab_state_one_of(text, "|auto|manual|");
+        else if (!strcmp(name, "almanac_elevation_mode") || !strcmp(name, "datetime_elevation_mode"))
+            valid = lab_state_one_of(text, "|legacy|catalogue|manual|retained|");
         else if (!strcmp(name, "matrix") || !strcmp(name, "diffequation") || !strcmp(name, "integrator_expression"))
             valid = string_byte_length(text) && string_find(text, "...") < 0;
         else if (!strcmp(name, "integrator_bounds") || !strcmp(name, "equation_variable"))

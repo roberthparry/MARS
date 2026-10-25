@@ -2996,8 +2996,8 @@
     "tests": {
       "enabled": true,
       "test_cfg_rivers_compressed_input": true,
-      "test_cfg_rivers_numeric_decoder": true,
       "test_cfg_rivers_neighbourhoods": true,
+      "test_cfg_rivers_numeric_decoder": true,
       "test_cfg_rivers_osm_import_and_display": true,
       "test_cfg_rivers_section_widths": true,
       "test_cfg_rivers_stage": true,

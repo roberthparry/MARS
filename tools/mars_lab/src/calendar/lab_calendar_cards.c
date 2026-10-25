@@ -31,7 +31,8 @@ json_t *lab_cal_location_fields(const json_t *fields, const json_t *options)
         string_t *text = string_sprintf("%.10g", offset);
         lab_cal_set(response, "gmt_offset", string_c_str(text));
         string_free(text);
-    }
+    } else if (!strcmp(lab_cal_text(options, "jurisdiction"), "AQ"))
+        lab_cal_set(response, "gmt_offset", "0");
     string_free(zone);
     string_free(date);
     lab_cal_set(response, "source", "holiday_lab");
