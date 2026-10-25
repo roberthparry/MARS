@@ -9,6 +9,8 @@
  * uses libjpeg; the application and ordinary builds do not require its development files.
  * File access uses the MARS file module. Source credit and provenance belong in
  * THIRD_PARTY_NOTICES.md alongside the generated assets.
+ * The --manifest mode records the packaged images' dimensions, sizes, source attribution and SHA-256 digests
+ * for transactional installation into the globe database. It does not re-encode any image.
  */
 #include <stdbool.h>
 #include <math.h>
@@ -114,10 +116,50 @@ static bool save_overview(array_t *bytes, const char *directory, unsigned width)
     return ok;
 }
 
+static bool save_manifest(const char *directory)
+{
+    string_t *manifest = string_new_with(
+        "{\n  \"format_version\": 1,\n  \"name\": \"Blue Marble Next Generation\",\n"
+        "  \"reference_month\": \"2004-07\",\n"
+        "  \"source_url\": \"https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/"
+        "bmng-topography-bathymetry/july/world.topo.bathy.200407.3x21600x10800.jpg\",\n"
+        "  \"source_sha256\": \"d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0\",\n"
+        "  \"attribution\": \"NASA Earth Observatory; Reto Stoeckli, NASA Goddard Space Flight Center. "
+        "Historical July 2004 reference imagery. NASA imagery reuse policy applies; no endorsement implied.\",\n"
+        "  \"assets\": {\n");
+    static const unsigned widths[] = {2048, 8192, 1800}, heights[] = {1024, 4096, 1800};
+    bool ok = manifest != NULL;
+    unsigned index = 0;
+    for (unsigned level = 0; ok && level < 3; ++level) {
+        for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row) {
+            for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column) {
+                string_t *relative = level == 2 ? string_sprintf("earth_tiles/%02u-%02u.jpg", column, row)
+                                    : string_new_with(level ? "earth_surface_detail.jpg" : "earth_surface.jpg");
+                string_t *path = relative ? string_sprintf("%s/%s", directory, string_c_str(relative)) : NULL;
+                file_t *file = path ? file_new(path) : NULL;
+                file_info_t *info = file ? file_get_info(file) : NULL;
+                string_t *digest = info ? file_sha256(file) : NULL;
+                ok = digest && string_append_format(manifest,
+                    "%s    \"%s\": {\"width\": %u, \"height\": %u, \"bytes\": %llu, \"sha256\": \"%s\"}",
+                    index++ ? ",\n" : "", string_c_str(relative), widths[level], heights[level],
+                    (unsigned long long)file_info_size(info), string_c_str(digest)) >= 0;
+                string_free(digest); file_info_free(info); file_free(file); string_free(path); string_free(relative);
+            }
+        }
+    }
+    string_t *path = string_sprintf("%s/manifest.json", directory);
+    file_t *output = path ? file_new(path) : NULL;
+    ok = ok && string_append_cstr(manifest, "\n  }\n}\n") >= 0 && output && file_write_all_text(output, manifest);
+    file_free(output); string_free(path); string_free(manifest);
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
+    if (argc == 3 && !strcmp(argv[1], "--manifest")) return save_manifest(argv[2]) ? 0 : 1;
     if (argc != 3 && argc != 4) {
-        fprintf(stderr, "Usage: %s source.jpg tile-directory [overview-directory]\n", argv[0]);
+        fprintf(stderr, "Usage: %s source.jpg tile-directory [overview-directory]\n"
+                        "       %s --manifest packaged-texture-directory\n", argv[0], argv[0]);
         return 2;
     }
     file_t *source = file_new_cstr(argv[1]), *directory = file_new_cstr(argv[2]);

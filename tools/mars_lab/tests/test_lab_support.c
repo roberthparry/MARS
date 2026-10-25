@@ -13,14 +13,55 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+/* Keep the POSIX alternate signal-stack typedef distinct from the MARS stack API. */
+#define stack_t posix_signal_stack_t
 #include <sys/wait.h>
+#undef stack_t
 #include <unistd.h>
 
 #include "file-t.h"
+#include "array-t.h"
 #include "sqlite-t.h"
 #include "string-t.h"
 
 #include "test_lab_support.h"
+
+/* Independently seed image rows so HTTP tests exercise runtime reads without depending on installer objects. */
+bool test_lab_texture_database(const char *directory)
+{
+    string_t *path = string_sprintf("%s/textures.db", directory);
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    bool ok = db && sqlite_exec_cstr(db,
+        "begin;create table globe_texture_dataset(id,format_version);insert into globe_texture_dataset values(1,1);"
+        "create table globe_texture(level,column_index,row_index,width,height,byte_count,sha256,jpeg,"
+        "primary key(level,column_index,row_index));");
+    sqlite_stmt_t *q = ok ? sqlite_stmt_prepare(db, "insert into globe_texture values(?1,?2,?3,?4,?5,?6,?7,?8)") : NULL;
+    static const unsigned widths[] = {2048, 8192, 1800}, heights[] = {1024, 4096, 1800};
+    ok = ok && q;
+    for (unsigned level = 0; ok && level < 3; ++level) {
+        for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row) {
+            for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column) {
+                string_t *name = level == 2 ? string_sprintf("packaging/globe-db/textures/earth_tiles/%02u-%02u.jpg", column, row)
+                                : string_sprintf("packaging/globe-db/textures/earth_surface%s.jpg", level ? "_detail" : "");
+                file_t *file = name ? file_new(name) : NULL;
+                array_t *bytes = file ? file_read_all_bytes(file) : NULL;
+                string_t *hash = bytes ? file_sha256(file) : NULL;
+                ok = bytes && hash && sqlite_stmt_bind_int(q, 1, level) && sqlite_stmt_bind_int(q, 2, column) &&
+                     sqlite_stmt_bind_int(q, 3, row) && sqlite_stmt_bind_int(q, 4, widths[level]) &&
+                     sqlite_stmt_bind_int(q, 5, heights[level]) && sqlite_stmt_bind_int64(q, 6, array_size(bytes)) &&
+                     sqlite_stmt_bind_text(q, 7, string_c_str(hash)) &&
+                     sqlite_stmt_bind_blob(q, 8, array_get(bytes, 0), array_size(bytes)) && sqlite_stmt_step(q) == SQLITE_STEP_DONE;
+                sqlite_stmt_reset(q);
+                string_free(hash); array_destroy(bytes); file_free(file); string_free(name);
+            }
+        }
+    }
+    sqlite_stmt_finalize(q);
+    ok = ok && sqlite_exec_cstr(db, "commit") && !setenv("MARS_GLOBE_DB_PATH", string_c_str(path), 1) &&
+         !setenv("MARS_GLOBE_DB_KEY", "", 1);
+    sqlite_close(db); string_free(path);
+    return ok;
+}
 
 /* Parse a fixture literal using the public JSON API. */
 json_t *test_lab_json(const char *text)

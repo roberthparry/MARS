@@ -5,6 +5,68 @@ country and river readers behind a single public interface. Implementations live
 under `src/globe`; there are no separate public shoreline or river headers or guides.
 SVG and WebGL rendering remain application responsibilities.
 
+## Photographic textures
+
+`globe.db` stores the photographic JPEG layers alongside the geographic data.
+The offline source package is `packaging/globe-db/textures/`; its manifest records
+dimensions, byte counts, SHA-256 digests and NASA source attribution.
+Fresh installations include all 74 images. Managed database revision 6 adds them
+to existing installations through `make update-mars-db` or `make release`,
+preserving coastline, country, regional and river layers. Import validates every
+image before committing; a missing or damaged image rolls back the replacement.
+
+`globe_texture_metadata(globe, level, column, row, &info)` reads an indexed record
+without loading JPEG bytes. Level 0 is the 2048 × 1024 overview; level 1 is the
+8192 × 4096 detail image. Both use column and row zero. Level 2 contains a 12 × 6
+grid of 1800 × 1800 tiles, indexed west to east and north to south from zero.
+Missing data or invalid addresses return false and clear the output structure.
+
+`globe_texture_jpeg(globe, level, column, row, &info)` returns an owned byte array,
+or `NULL` if the record has changed or its payload fails validation. Release the
+array with `array_destroy`. Reads work with plaintext and encrypted databases;
+they neither decode images nor preload the full texture set. Metadata is bounded
+to 16 MiB for the detail image and 4 MiB for each other image. Applications remain
+responsible for progressive loading and image decoding.
+
+The Lab retains its image URLs and loads the overview before requesting more
+detail. Private browser caching uses the content digest as an ETag: an unchanged
+image receives a bodyless 304 response after revalidation. Unavailable or corrupt
+images return an error; there is no filesystem fallback.
+
+With an installed texture layer:
+
+```c
+#include <stdio.h>
+
+#include "array-t.h"
+#include "globe-t.h"
+
+int main(void)
+{
+    globe_t *globe = globe_open_configured(NULL);
+    globe_texture_info_t info;
+    if (!globe_texture_metadata(globe, 0, 0, 0, &info)) {
+        globe_close(globe);
+        return 1;
+    }
+    array_t *jpeg = globe_texture_jpeg(globe, 0, 0, 0, &info);
+    if (!jpeg) {
+        globe_close(globe);
+        return 1;
+    }
+    printf("%u x %u; %zu bytes\n", info.width, info.height, array_size(jpeg));
+    array_destroy(jpeg);
+    globe_close(globe);
+    return 0;
+}
+```
+
+Output:
+
+```text
+2048 x 1024; 832192 bytes
+```
+
 ## Regional flag coverage
 
 `globe_import_regions(db, source)` transactionally imports a bounded GeoJSON
@@ -491,9 +553,9 @@ the jurisdiction town catalogue.
 
 ### Installation targets
 
-`make install-globe-db` creates a separate shoreline and country database
-from the complete validated OSM/GSHHG shoreline and Natural Earth country sources,
-with no download. Its default location is
+`make install-globe-db` creates a separate globe database from the complete
+validated OSM/GSHHG shoreline, Natural Earth country sources, regional coverage
+and photographic texture package, with no download. Its default location is
 `$MARS_HOME/globe/globe.db` (normally `~/.mars/globe/globe.db`); settings are saved
 privately in `config/globe-db.env`. `MARS_GLOBE_DB_PATH` and `MARS_GLOBE_DB_KEY`
 override saved values. Fresh installations default to plaintext, without password prompts;
@@ -502,13 +564,13 @@ sources, with import progress shown, even when a database already exists. The co
 destination only after validation. Existing river and custom tables are removed on successful reinstallation;
 failed builds leave the installed database unchanged. The selected path, storage mode and saved river staging
 key are retained. Separate river candidate files are not modified.
-Staged import, integrity checking and shoreline availability checks must succeed
-before publication. Missing packaged geometry is an error, not an empty installation.
+Staged import, integrity checking, shoreline availability and texture validation must
+succeed before publication. Missing packaged data is an error, not an empty installation.
 
-`make check-globe-db` checks integrity and shoreline availability with the saved
+`make check-globe-db` checks integrity, shoreline availability and all photographic textures with the saved
 settings. It does not prove positional accuracy or import other geographic layers.
-`make update-globe-db` replaces only the shoreline and country tables in an existing globe
-database, using the packaged complete sources without geometry repairs. Both layer imports commit
+`make update-globe-db` replaces the shoreline, country, regional coverage and texture tables in an existing globe
+database, using the packaged complete sources without geometry repairs. These imports commit
 together; source preparation failures leave the database untouched and
 import failures roll back. The saved key, configuration and other layers are
 preserved. Stop MARS Lab before updating and restart it afterwards. This is

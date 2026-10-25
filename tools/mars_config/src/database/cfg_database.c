@@ -149,7 +149,7 @@ static bool cfg_database_update_one(const cfg_database_migration *migration)
 int cfg_databases_update(void)
 {
     static const cfg_database_migration migrations[] = {
-        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 5, cfg_database_globe_refresh},
+        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 6, cfg_database_globe_refresh},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
          "jurisdiction/mars_jurisdiction_rules.db", 4, cfg_database_flags_refresh},

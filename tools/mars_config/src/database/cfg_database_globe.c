@@ -1,10 +1,11 @@
 /**
  * @file cfg_database_globe.c
- * @brief Globe database configuration, shoreline and country import, and river data preparation.
+ * @brief Globe database configuration, packaged layer installation and river data preparation.
  *
  * Owns the globe installer and offline OSM river conversion, candidate staging and
  * transactional river publication. Installation always builds and validates a fresh
  * database before replacing the destination; updates retain unrelated installed layers.
+ * Photographic JPEG validation and import are delegated to the independent texture installer.
  * Stored centrelines have a conservative eight-metre
  * error ceiling with junctions fixed; the separate source extract retains full detail.
  * Staging and publication enforce a 3.8 GB river-layer limit, including indexes.
@@ -1379,7 +1380,8 @@ bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string
     int64_t revision = 0;
     return cfg_database_current_revision(db, "globe", &revision) && cfg_globe_valid(db) &&
            (revision >= 3 || cfg_database_coast(db, root, staging)) &&
-           (revision >= 4 || cfg_globe_countries(db, root, staging)) && cfg_globe_regions(db, root) && cfg_globe_valid(db);
+           (revision >= 4 || cfg_globe_countries(db, root, staging)) &&
+           (revision >= 5 || cfg_globe_regions(db, root)) && cfg_database_textures(db, root) && cfg_globe_valid(db);
 }
 
 /* Keep globe setup independent; unsupported operations fail without changing storage. */
@@ -1416,20 +1418,22 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         root = string_new_with(MARS_CONFIG_ROOT_DIR);
     }
     if (ok && update) {
-        /* Publish both layers together; credentials and rivers are untouched. */
+        /* Publish packaged layers together; credentials and rivers are untouched. */
         staging = exists ? cfg_database_stage(parent) : NULL;
         db = staging ? cfg_database_open(expanded, key) : NULL;
         bool transaction = db && root &&
             sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
             cfg_globe_valid(db) && sqlite_exec_cstr(db, "begin immediate");
         ok = transaction && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
-             cfg_globe_regions(db, root) && cfg_globe_valid(db) && cfg_database_revision(db, "globe", 5) &&
+             cfg_globe_regions(db, root) && cfg_database_textures(db, root) && cfg_globe_valid(db) &&
+             cfg_database_revision(db, "globe", 6) &&
              sqlite_exec_cstr(db, "commit");
         if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
         sqlite_close(db);
     } else if (ok && check) {
         db = exists ? cfg_database_open(expanded, key) : NULL;
-        ok = db && sqlite_exec_cstr(db, "PRAGMA query_only=ON; PRAGMA cache_size=-512;") && cfg_globe_valid(db);
+        ok = db && sqlite_exec_cstr(db, "PRAGMA query_only=ON; PRAGMA cache_size=-512;") &&
+             cfg_globe_valid(db) && cfg_database_textures_valid(db);
         sqlite_close(db);
     } else if (ok && install) {
         ok = cfg_storage_private_directory(home, true) && cfg_storage_private_directory(parent, true) &&
@@ -1440,7 +1444,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         db = temporary && root ? cfg_database_open(temporary_path, key) : NULL;
         ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
-             cfg_globe_regions(db, root) && cfg_database_revision(db, "globe", 5);
+             cfg_globe_regions(db, root) && cfg_database_textures(db, root) && cfg_database_revision(db, "globe", 6);
         sqlite_close(db);
         string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
         string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;
@@ -1456,9 +1460,9 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         string_free(river_key);
         ok = ok && body && cfg_database_publish(temporary, destination, config, config_dir, staging, body);
     }
-    if (ok) puts(update ? "Globe shoreline and countries updated; other layers and settings preserved. Restart MARS Lab."
-                        : install ? "Fresh globe database installed: shoreline and countries imported. Restart MARS Lab."
-                        : "Globe database integrity and shoreline availability verified.");
+    if (ok) puts(update ? "Globe shoreline, countries and textures updated; other layers and settings preserved. Restart MARS Lab."
+                        : install ? "Fresh globe database installed: shoreline, countries and textures imported. Restart MARS Lab."
+                        : "Globe database integrity, shoreline and photographic textures verified.");
     else fputs("Globe database operation failed; check its path, key and packaged geographic sources.\n", stderr);
     file_free(temporary);
     cfg_database_cleanup(staging);

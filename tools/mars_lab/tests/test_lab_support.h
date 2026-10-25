@@ -35,6 +35,9 @@ bool test_lab_isolated(bool (*callback)(const char *directory));
 /** Create and configure a private encrypted jurisdiction fixture beneath the supplied test directory. */
 bool test_lab_catalogue_database(const char *directory);
 
+/** Create and select a disposable photographic database for native and browser image-route checks. */
+bool test_lab_texture_database(const char *directory);
+
 /** @brief Import the packaged offshore SVG into the active disposable catalogue fixture. */
 bool test_lab_offshore_database(void);
 

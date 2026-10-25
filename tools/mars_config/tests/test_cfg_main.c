@@ -21,6 +21,7 @@ int tests_main(void)
     test_cfg_weather_cases();
     test_cfg_database_cases();
     test_cfg_rivers_cases();
+    test_cfg_textures_cases();
     test_cfg_calendar_cases();
     test_cfg_terminal_cases();
     test_cfg_rendering_cases();
@@ -30,6 +31,7 @@ int tests_main(void)
     test_cfg_calendar_readme_cases();
     test_cfg_rendering_readme_cases();
     test_cfg_locales_readme_cases();
+    test_cfg_textures_readme_cases();
     test_cfg_calendar_fixture_finish();
     return TEST_EXIT_CODE();
 }

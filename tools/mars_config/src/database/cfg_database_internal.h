@@ -34,6 +34,12 @@ bool cfg_database_current_revision(sqlite_t *db, const char *name, int64_t *revi
 /** Refresh countries and, before revision three, shoreline; retain river data and credentials. */
 bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging);
 
+/** @brief Atomically import all packaged photographic images and their verified metadata, preserving other layers. */
+bool cfg_database_textures(sqlite_t *db, const string_t *root);
+
+/** @brief Validate the complete installed photographic image set, including content digests. */
+bool cfg_database_textures_valid(sqlite_t *db);
+
 /** Shared installer-owned settings; callbacks borrow these strings and never publish them directly. */
 typedef struct cfg_database_options {
     string_t *home;

@@ -3019,6 +3019,18 @@
       "test_calendar_terminal": true
     }
   },
+  "tools/mars_config/tests/test_cfg_textures.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_globe_texture_metadata": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_cfg_textures_install": true,
+      "test_cfg_textures_migration": true,
+      "test_cfg_textures_rollback": true
+    }
+  },
   "tools/mars_config/tests/test_cfg_weather.c": {
     "tests": {
       "enabled": true,
@@ -3823,6 +3835,7 @@
       "test_lab_http_contracts": true,
       "test_lab_http_rejections": true,
       "test_lab_http_rivers": true,
+      "test_lab_http_textures": true,
       "test_lab_server_lifetime": true
     }
   },

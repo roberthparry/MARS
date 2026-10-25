@@ -10,6 +10,15 @@
 
 #include <stdbool.h>
 
+/** Copy packaged image fixtures beneath a disposable test root. */
+bool test_cfg_copy_textures(const char *directory);
+
+/** Register photographic storage, validation and rollback regressions. */
+void test_cfg_textures_cases(void);
+
+/** Run the documented photographic metadata example after ordinary tests. */
+void test_cfg_textures_readme_cases(void);
+
 /** Run callback beneath a private temporary directory; return success after cleanup. */
 bool test_cfg_isolated(bool (*callback)(const char *directory));
 

@@ -20,14 +20,6 @@ static bool lab_svr_equal(const string_t *text, const char *literal)
     return result;
 }
 
-static const string_t *lab_svr_request_header(const websrv_request_t *request, const char *name)
-{
-    string_t *key = string_new_with(name);
-    const string_t *value = key ? websrv_request_header(request, key) : NULL;
-    string_free(key);
-    return value;
-}
-
 static bool lab_svr_private_v4(const struct in_addr *address)
 {
     uint32_t ip = ntohl(address->s_addr);

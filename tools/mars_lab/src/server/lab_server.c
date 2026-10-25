@@ -39,6 +39,7 @@
 
 typedef struct lab_server {
     websrv_t *listener;
+    lab_texture_routes_t *textures;
 } lab_server_t;
 
 static bool lab_svr_equal(const string_t *text, const char *literal)
@@ -49,7 +50,7 @@ static bool lab_svr_equal(const string_t *text, const char *literal)
     return result;
 }
 
-static bool lab_svr_header(websrv_response_t *response, const char *name, const char *value)
+bool lab_svr_header(websrv_response_t *response, const char *name, const char *value)
 {
     string_t *key = string_new_with(name), *text = string_new_with(value);
     bool ok = key && text && websrv_response_header(response, key, text);
@@ -58,7 +59,7 @@ static bool lab_svr_header(websrv_response_t *response, const char *name, const 
     return ok;
 }
 
-static const string_t *lab_svr_request_header(const websrv_request_t *request, const char *name)
+const string_t *lab_svr_request_header(const websrv_request_t *request, const char *name)
 {
     string_t *key = string_new_with(name);
     const string_t *value = key ? websrv_request_header(request, key) : NULL;
@@ -78,7 +79,7 @@ static bool lab_svr_value(const websrv_request_t *request, websrv_response_t *re
     return ok;
 }
 
-static bool lab_svr_message(const websrv_request_t *request, websrv_response_t *response, unsigned status,
+bool lab_svr_message(const websrv_request_t *request, websrv_response_t *response, unsigned status,
                             const char *text)
 {
     json_t *json = json_new_object(), *ok = json_new_bool(false);
@@ -150,80 +151,6 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/globe_gpu.js", "tools/mars_lab/build/typescript/globe_gpu.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/globe_photo.js", "tools/mars_lab/build/typescript/globe_photo.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/globe_worker.js", "tools/mars_lab/build/typescript/globe_worker.js", "text/javascript; charset=utf-8", 4194304},
-    {"/earth_surface.jpg", "tools/mars_lab/assets/earth_surface.jpg", "image/jpeg", 4194304},
-    {"/earth_surface_detail.jpg", "tools/mars_lab/assets/earth_surface_detail.jpg", "image/jpeg", 16777216},
-    {"/earth_tiles/00-00.jpg", "tools/mars_lab/assets/earth_tiles/00-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/01-00.jpg", "tools/mars_lab/assets/earth_tiles/01-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/02-00.jpg", "tools/mars_lab/assets/earth_tiles/02-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/03-00.jpg", "tools/mars_lab/assets/earth_tiles/03-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/04-00.jpg", "tools/mars_lab/assets/earth_tiles/04-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/05-00.jpg", "tools/mars_lab/assets/earth_tiles/05-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/06-00.jpg", "tools/mars_lab/assets/earth_tiles/06-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/07-00.jpg", "tools/mars_lab/assets/earth_tiles/07-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/08-00.jpg", "tools/mars_lab/assets/earth_tiles/08-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/09-00.jpg", "tools/mars_lab/assets/earth_tiles/09-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/10-00.jpg", "tools/mars_lab/assets/earth_tiles/10-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/11-00.jpg", "tools/mars_lab/assets/earth_tiles/11-00.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/00-01.jpg", "tools/mars_lab/assets/earth_tiles/00-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/01-01.jpg", "tools/mars_lab/assets/earth_tiles/01-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/02-01.jpg", "tools/mars_lab/assets/earth_tiles/02-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/03-01.jpg", "tools/mars_lab/assets/earth_tiles/03-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/04-01.jpg", "tools/mars_lab/assets/earth_tiles/04-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/05-01.jpg", "tools/mars_lab/assets/earth_tiles/05-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/06-01.jpg", "tools/mars_lab/assets/earth_tiles/06-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/07-01.jpg", "tools/mars_lab/assets/earth_tiles/07-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/08-01.jpg", "tools/mars_lab/assets/earth_tiles/08-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/09-01.jpg", "tools/mars_lab/assets/earth_tiles/09-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/10-01.jpg", "tools/mars_lab/assets/earth_tiles/10-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/11-01.jpg", "tools/mars_lab/assets/earth_tiles/11-01.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/00-02.jpg", "tools/mars_lab/assets/earth_tiles/00-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/01-02.jpg", "tools/mars_lab/assets/earth_tiles/01-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/02-02.jpg", "tools/mars_lab/assets/earth_tiles/02-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/03-02.jpg", "tools/mars_lab/assets/earth_tiles/03-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/04-02.jpg", "tools/mars_lab/assets/earth_tiles/04-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/05-02.jpg", "tools/mars_lab/assets/earth_tiles/05-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/06-02.jpg", "tools/mars_lab/assets/earth_tiles/06-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/07-02.jpg", "tools/mars_lab/assets/earth_tiles/07-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/08-02.jpg", "tools/mars_lab/assets/earth_tiles/08-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/09-02.jpg", "tools/mars_lab/assets/earth_tiles/09-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/10-02.jpg", "tools/mars_lab/assets/earth_tiles/10-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/11-02.jpg", "tools/mars_lab/assets/earth_tiles/11-02.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/00-03.jpg", "tools/mars_lab/assets/earth_tiles/00-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/01-03.jpg", "tools/mars_lab/assets/earth_tiles/01-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/02-03.jpg", "tools/mars_lab/assets/earth_tiles/02-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/03-03.jpg", "tools/mars_lab/assets/earth_tiles/03-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/04-03.jpg", "tools/mars_lab/assets/earth_tiles/04-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/05-03.jpg", "tools/mars_lab/assets/earth_tiles/05-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/06-03.jpg", "tools/mars_lab/assets/earth_tiles/06-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/07-03.jpg", "tools/mars_lab/assets/earth_tiles/07-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/08-03.jpg", "tools/mars_lab/assets/earth_tiles/08-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/09-03.jpg", "tools/mars_lab/assets/earth_tiles/09-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/10-03.jpg", "tools/mars_lab/assets/earth_tiles/10-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/11-03.jpg", "tools/mars_lab/assets/earth_tiles/11-03.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/00-04.jpg", "tools/mars_lab/assets/earth_tiles/00-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/01-04.jpg", "tools/mars_lab/assets/earth_tiles/01-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/02-04.jpg", "tools/mars_lab/assets/earth_tiles/02-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/03-04.jpg", "tools/mars_lab/assets/earth_tiles/03-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/04-04.jpg", "tools/mars_lab/assets/earth_tiles/04-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/05-04.jpg", "tools/mars_lab/assets/earth_tiles/05-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/06-04.jpg", "tools/mars_lab/assets/earth_tiles/06-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/07-04.jpg", "tools/mars_lab/assets/earth_tiles/07-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/08-04.jpg", "tools/mars_lab/assets/earth_tiles/08-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/09-04.jpg", "tools/mars_lab/assets/earth_tiles/09-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/10-04.jpg", "tools/mars_lab/assets/earth_tiles/10-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/11-04.jpg", "tools/mars_lab/assets/earth_tiles/11-04.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/00-05.jpg", "tools/mars_lab/assets/earth_tiles/00-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/01-05.jpg", "tools/mars_lab/assets/earth_tiles/01-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/02-05.jpg", "tools/mars_lab/assets/earth_tiles/02-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/03-05.jpg", "tools/mars_lab/assets/earth_tiles/03-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/04-05.jpg", "tools/mars_lab/assets/earth_tiles/04-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/05-05.jpg", "tools/mars_lab/assets/earth_tiles/05-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/06-05.jpg", "tools/mars_lab/assets/earth_tiles/06-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/07-05.jpg", "tools/mars_lab/assets/earth_tiles/07-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/08-05.jpg", "tools/mars_lab/assets/earth_tiles/08-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/09-05.jpg", "tools/mars_lab/assets/earth_tiles/09-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/10-05.jpg", "tools/mars_lab/assets/earth_tiles/10-05.jpg", "image/jpeg", 4194304},
-    {"/earth_tiles/11-05.jpg", "tools/mars_lab/assets/earth_tiles/11-05.jpg", "image/jpeg", 4194304},
     {"/js/results.js", "tools/mars_lab/build/typescript/results.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/results_services.js", "tools/mars_lab/build/typescript/results_services.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/surface.js", "tools/mars_lab/build/typescript/surface.js", "text/javascript; charset=utf-8", 4194304},
@@ -509,7 +436,8 @@ static bool lab_svr_register_routes(lab_server_t *server)
         if (!ok)
             return false;
     }
-    return true;
+    server->textures = lab_svr_textures_new(server->listener);
+    return server->textures != NULL;
 }
 
 /* Own the listener and its complete route set as one application resource. */
@@ -537,6 +465,7 @@ void lab_svr_free(lab_server_t *server)
 {
     if (server) {
         websrv_free(server->listener);
+        lab_svr_textures_free(server->textures);
         free(server);
     }
 }

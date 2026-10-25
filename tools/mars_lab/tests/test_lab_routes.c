@@ -24,6 +24,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "array-t.h"
 #include "file-t.h"
 #include "globe-t.h"
 #include "http-t.h"
@@ -46,8 +47,8 @@ static bool request_header(http_request_t *request, const char *name, const char
     return ok;
 }
 
-static http_response_t *route_request(webmethod_t method, const char *path, const char *body, const char *type,
-                                      const char *host, const char *origin)
+static http_response_t *route_request_headers(webmethod_t method, const char *path, const char *body, const char *type,
+                                              const char *host, const char *origin, const char *etag)
 {
     /* Page generation and real maths share the server's absolute I/O deadline.
      * Allow CPU-limited DEBUG builds while preserving a finite per-request bound. */
@@ -65,10 +66,11 @@ static http_response_t *route_request(webmethod_t method, const char *path, cons
     json_t *object = body && type && !strcmp(type, "application/x-protobuf") ? test_lab_json(body) : NULL;
     array_t *encoded = object ? lab_wire_encode(object) : NULL;
     json_free(object);
-    http_limits_t limits = {.connect_timeout_ms = 5000, .total_timeout_ms = 75000, .max_body_bytes = 8388608};
+    http_limits_t limits = {.connect_timeout_ms = 5000, .total_timeout_ms = 75000, .max_body_bytes = 16777216};
     bool ready =
         client && request && http_client_set_limits(client, &limits) &&
         (!host || request_header(request, "Host", host)) && (!origin || request_header(request, "Origin", origin)) &&
+        (!etag || request_header(request, "If-None-Match", etag)) &&
         (!body || (payload &&
                    http_request_set_body(request, encoded ? array_get(encoded, 0) : (const void *)string_c_str(payload),
                                          encoded ? array_size(encoded) : string_byte_length(payload), content_type)));
@@ -123,6 +125,12 @@ static http_response_t *route_request(webmethod_t method, const char *path, cons
     return response;
 }
 
+static http_response_t *route_request(webmethod_t method, const char *path, const char *body, const char *type,
+                                      const char *host, const char *origin)
+{
+    return route_request_headers(method, path, body, type, host, origin, NULL);
+}
+
 static bool response_header_equals(const http_response_t *response, const char *name, const char *expected)
 {
     string_t *key = string_new_with(name);
@@ -132,9 +140,10 @@ static bool response_header_equals(const http_response_t *response, const char *
     return ok;
 }
 
-static bool route_check(const http_response_t *response, unsigned expected, bool content_ok, const char *description)
+static bool route_check_cache(const http_response_t *response, unsigned expected, bool content_ok,
+                              const char *description, const char *cache_control)
 {
-    bool headers_ok = response_header_equals(response, "Cache-Control", "no-store") &&
+    bool headers_ok = response_header_equals(response, "Cache-Control", cache_control) &&
                       response_header_equals(response, "X-Content-Type-Options", "nosniff");
     bool ok = response && http_response_status(response) == expected && content_ok && headers_ok;
     if (!ok) {
@@ -147,6 +156,11 @@ static bool route_check(const http_response_t *response, unsigned expected, bool
         json_free(error);
     }
     return ok;
+}
+
+static bool route_check(const http_response_t *response, unsigned expected, bool content_ok, const char *description)
+{
+    return route_check_cache(response, expected, content_ok, description, "no-store");
 }
 
 static bool response_contains(const http_response_t *response, const char *text)
@@ -189,7 +203,8 @@ static bool page_has_no_placeholders(const http_response_t *response)
 
 static bool route_contracts(const char *directory)
 {
-    if (!test_lab_catalogue_database(directory) || !test_lab_offshore_database()) return false;
+    if (!test_lab_catalogue_database(directory) || !test_lab_offshore_database() || !test_lab_texture_database(directory))
+        return false;
     if (setenv("NO_PROXY", "*", 1) || setenv("no_proxy", "*", 1))
         return false;
     http_response_t *response = route_request(HTTP_GET, "/", NULL, NULL, NULL, NULL);
@@ -364,15 +379,17 @@ static bool route_contracts(const char *directory)
     http_response_free(response);
     response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
     const unsigned char *earth = response ? http_response_body(response) : NULL;
-    ok = route_check(response, 200, earth && http_response_body_size(response) > 100000 &&
+    ok = route_check_cache(response, 200, earth && http_response_body_size(response) > 100000 &&
                      earth[0] == 0xff && earth[1] == 0xd8 &&
-                     response_header_equals(response, "Content-Type", "image/jpeg"), "GET /earth_surface.jpg") && ok;
+                     response_header_equals(response, "Content-Type", "image/jpeg"), "GET /earth_surface.jpg",
+                     "private, no-cache") && ok;
     http_response_free(response);
     response = route_request(HTTP_GET, "/earth_tiles/05-01.jpg", NULL, NULL, NULL, NULL);
     earth = response ? http_response_body(response) : NULL;
-    ok = route_check(response, 200, earth && http_response_body_size(response) > 1000 &&
+    ok = route_check_cache(response, 200, earth && http_response_body_size(response) > 1000 &&
                      earth[0] == 0xff && earth[1] == 0xd8 &&
-                     response_header_equals(response, "Content-Type", "image/jpeg"), "local photographic tile") && ok;
+                     response_header_equals(response, "Content-Type", "image/jpeg"), "local photographic tile",
+                     "private, no-cache") && ok;
     http_response_free(response);
     response = route_request(HTTP_GET, "/earth_tiles/12-00.jpg", NULL, NULL, NULL, NULL);
     ok = response && http_response_status(response) == 404 && ok;
@@ -981,6 +998,61 @@ static bool route_rivers(const char *directory)
     return ok;
 }
 
+static bool route_textures(const char *directory)
+{
+    if (!test_lab_texture_database(directory)) return false;
+    file_t *source = file_new_cstr("packaging/globe-db/textures/earth_surface.jpg");
+    array_t *original = source ? file_read_all_bytes(source) : NULL;
+    string_t *hash = source ? file_sha256(source) : NULL;
+    string_t *etag = hash ? string_sprintf("\"sha256-%s\"", string_c_str(hash)) : NULL;
+    http_response_t *response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
+    bool ok = original && etag && response && http_response_status(response) == 200 &&
+              http_response_body_size(response) == array_size(original) &&
+              !memcmp(http_response_body(response), array_get(original, 0), array_size(original)) &&
+              response_header_equals(response, "ETag", string_c_str(etag)) &&
+              response_header_equals(response, "Cache-Control", "private, no-cache");
+    http_response_free(response);
+    string_t *weak = etag ? string_sprintf("\"outdated\", W/%s", string_c_str(etag)) : NULL;
+    const char *validators[] = {etag ? string_c_str(etag) : "", weak ? string_c_str(weak) : "", "*"};
+    for (unsigned i = 0; ok && i < 3; ++i) {
+        response = route_request_headers(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL, validators[i]);
+        ok = response && http_response_status(response) == 304 && !http_response_body_size(response) &&
+             response_header_equals(response, "ETag", string_c_str(etag));
+        http_response_free(response);
+    }
+    response = route_request_headers(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, "https://public.invalid",
+                                     etag ? string_c_str(etag) : "*");
+    ok = response && http_response_status(response) == 403 &&
+         response_header_equals(response, "Cache-Control", "no-store") && ok;
+    http_response_free(response);
+    response = route_request_headers(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL, "\"outdated\"");
+    ok = response && http_response_status(response) == 200 && http_response_body_size(response) == array_size(original) && ok;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/earth_surface_detail.jpg", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 200 && http_response_body_size(response) == 9361205 && ok;
+    http_response_free(response);
+    string_t *path = string_new_with(getenv("MARS_GLOBE_DB_PATH"));
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    ok = db && sqlite_exec_cstr(db, "update globe_texture set jpeg=zeroblob(byte_count) where level=0") && ok;
+    sqlite_close(db);
+    response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 500 && response_header_equals(response, "Cache-Control", "no-store") && ok;
+    http_response_free(response);
+    db = path ? sqlite_open_plain(path) : NULL;
+    ok = db && sqlite_exec_cstr(db, "drop table globe_texture") && ok;
+    sqlite_close(db);
+    response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 404 && ok;
+    http_response_free(response);
+    string_free(path); string_free(weak); string_free(etag); string_free(hash); array_destroy(original); file_free(source);
+    return ok;
+}
+
+static void test_lab_http_textures(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(route_textures), "database image bytes, conditional caching, corruption and missing-layer responses");
+}
+
 static void test_lab_http_rivers(void)
 {
     TEST_ASSERT_TRUE(test_lab_isolated(route_rivers), "river overlay uses independent globe data and rejects wide requests");
@@ -995,4 +1067,5 @@ void test_lab_route_cases(void)
     TEST_RUN_IN_GROUP(test_lab_catalogue_country, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_rejections, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_rivers, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_http_textures, tests, NULL);
 }

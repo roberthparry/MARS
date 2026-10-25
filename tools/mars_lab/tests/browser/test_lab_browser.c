@@ -139,7 +139,7 @@ static bool lab_browser_prepare(const char *directory)
 static bool lab_browser_run(const char *directory)
 {
     bool startup_check = getenv("MARS_LAB_STARTUP_CHECKS") && !strcmp(getenv("MARS_LAB_STARTUP_CHECKS"), "1");
-    if (!test_lab_catalogue_database(directory) || !lab_browser_prepare(directory))
+    if (!test_lab_catalogue_database(directory) || !test_lab_texture_database(directory) || !lab_browser_prepare(directory))
         return false;
     if (startup_check) {
         if (!lab_browser_listener_only(directory)) return false;

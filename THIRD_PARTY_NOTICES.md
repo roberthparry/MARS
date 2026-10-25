@@ -211,7 +211,7 @@ Size: 24,147,269 bytes. SHA-256:
 `aaddcd967a9f09fb2d7ef50ff452bebfcf10192c520465d5eb1ad8446c716e98`.
 These older assets have been replaced; their credits and checksums are retained here as provenance.
 
-The current global textures and close-view tiles in `tools/mars_lab/assets/earth_tiles/` are derived from
+The current global textures and close-view tiles in `packaging/globe-db/textures/earth_tiles/` are derived from
 [NASA's July 2004 Blue Marble: Next Generation image with topography and bathymetry](https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july/world.topo.bathy.200407.3x21600x10800.jpg).
 Credit: **NASA Earth Observatory**, produced by Reto Stöckli, NASA Goddard Space
 Flight Center. [Dataset description and acknowledgements](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/).
@@ -226,13 +226,16 @@ This is historical reference imagery; it does not assert current surface or ice
 conditions. Both global textures use area-weighted resampling of this same source,
 with JPEG quality 95 and 4:4:4 sampling:
 
-- `tools/mars_lab/assets/earth_surface.jpg`: 2048 × 1024, 832,192 bytes;
+- `packaging/globe-db/textures/earth_surface.jpg`: 2048 × 1024, 832,192 bytes;
   SHA-256 `7e9f55f01df03a826fa7106e7fb55e4ae5c2974371dd55be6f3b8ea0cea0f184`.
-- `tools/mars_lab/assets/earth_surface_detail.jpg`: 8192 × 4096, 9,361,205 bytes;
+- `packaging/globe-db/textures/earth_surface_detail.jpg`: 8192 × 4096, 9,361,205 bytes;
   SHA-256 `ceb97696df39d72cac710158c4d1613948006c79cf303a8bfe91df721ff94aab`.
 
 The utility accepts an optional overview output directory after the tile directory.
 Rendering blends these matching images with independent shoreline layers.
+Its `--manifest` mode records the packaged images' dimensions, sizes, digests and
+source attribution. Installation copies their unchanged JPEG bytes and attribution
+into `globe.db`; runtime image routes read that database.
 
 ## WASI libc maths, memory and strings
 

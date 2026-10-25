@@ -82,6 +82,19 @@ void globe_close(globe_t *g)
     free(g);
 }
 
+/* Read only the indexed image identity until an application actually needs the JPEG. */
+bool globe_texture_metadata(globe_t *g, unsigned level, unsigned column, unsigned row, globe_texture_info_t *info)
+{
+    return textures_metadata(g ? g->geometry : NULL, level, column, row, info);
+}
+
+/* Keep payload ownership and corruption detection within the geographic data API. */
+array_t *globe_texture_jpeg(globe_t *g, unsigned level, unsigned column, unsigned row,
+                            const globe_texture_info_t *expected)
+{
+    return textures_jpeg(g ? g->geometry : NULL, level, column, row, expected);
+}
+
 /* Use a bounded indexed capability table, including explicit unavailable future layers. */
 bool globe_has_layer(const globe_t *g, globe_layer_t layer)
 {

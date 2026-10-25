@@ -1,6 +1,6 @@
 /**
  * @file globe-t.h
- * @brief Unified geographic controller for shorelines, countries, rivers, towns and regional map layers.
+ * @brief Unified geographic controller for shorelines, countries, rivers, towns and photographic surface layers.
  *
  * The controller borrows independently selectable shoreline, map and town SQLite connections and owns layer readers.
  * Roads and buildings have explicit unavailable states until their regional dataset is implemented and installed.
@@ -26,6 +26,8 @@
  * Independent cultural display polygons supply regional flag identifiers, never country ownership or time zones.
  * Named-water lookup currently recognises the Caspian Sea through exact shoreline containment, independently
  * of country ownership; it is not a comprehensive water-name gazetteer.
+ * Photographic textures are indexed JPEG blobs with dimensions and SHA-256 identities. Metadata reads do not
+ * decode or load the image; applications can validate cached responses before requesting the bounded payload.
  */
 #ifndef MARS_GLOBE_H
 #define MARS_GLOBE_H
@@ -35,6 +37,38 @@
 
 /** @brief Opaque geographic controller, borrowing its database connections. */
 typedef struct _globe_t globe_t;
+
+/** @brief Validated image metadata; level 0 is the overview, 1 global detail and 2 the twelve-by-six tile grid. */
+typedef struct _globe_texture_info_t {
+    unsigned width; /**< JPEG width in pixels. */
+    unsigned height; /**< JPEG height in pixels. */
+    size_t byte_count; /**< Encoded JPEG size, at most 16 MiB. */
+    char sha256[65]; /**< Lower-case hexadecimal content digest, including its terminating NUL. */
+} globe_texture_info_t;
+
+/**
+ * @brief Read indexed texture metadata without loading its JPEG payload.
+ * @param globe Borrowed controller; calls must be serialised.
+ * @param level Zero for the overview, one for global detail, or two for a native-resolution tile.
+ * @param column Zero for global images; 0..11 west to east for tiles.
+ * @param row Zero for global images; 0..5 north to south for tiles.
+ * @param info Required output, cleared on failure.
+ * @return True for installed, structurally valid metadata; false for missing data or invalid arguments.
+ */
+bool globe_texture_metadata(globe_t *globe, unsigned level, unsigned column, unsigned row, globe_texture_info_t *info);
+
+/**
+ * @brief Copy and checksum-verify one installed JPEG matching previously read metadata.
+ * @param globe Borrowed controller; calls must be serialised.
+ * @param level Texture level, as for globe_texture_metadata.
+ * @param column Texture column, as for globe_texture_metadata.
+ * @param row Texture row, as for globe_texture_metadata.
+ * @param expected Required metadata from globe_texture_metadata; changed identities are rejected.
+ * @return Owned byte array released with array_destroy, or NULL for missing, changed or corrupt data.
+ * @note No decompression, filesystem fallback or whole-dataset cache is performed.
+ */
+array_t *globe_texture_jpeg(globe_t *globe, unsigned level, unsigned column, unsigned row,
+                            const globe_texture_info_t *expected);
 
 /** @brief Events in a clipped shoreline polygon, with a nesting level supplied separately. */
 typedef enum _globe_path_event_t {

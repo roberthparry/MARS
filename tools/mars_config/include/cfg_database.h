@@ -17,7 +17,7 @@
  * @brief Install, verify or update independent shoreline storage using saved settings or environment overrides.
  * @param action globe-install, globe-check or globe-update; reserved removal commands fail without changing files.
  * @note Installation builds a fresh staged database and replaces the destination only after validation. Existing
- * river and custom tables are removed on success. Updating replaces only shoreline and country tables in one
+ * river and custom tables are removed on success. Updating replaces packaged geography and texture tables in one
  * transaction, retaining the configuration and other layers. Both operations report import progress.
  * @return Zero on success, one on operational failure, two for an unsupported action.
  * Installation reuses the selected path and key; saved river staging credentials survive replacement.
@@ -27,7 +27,7 @@
 int cfg_globe_run(const char *action);
 
 /**
- * @brief Build fresh shoreline and country storage with an explicitly supplied key, without prompting.
+ * @brief Build fresh geography and photographic texture storage with an explicit key, without prompting.
  * @param key Borrowed password; empty selects plaintext, NULL is invalid. Never printed.
  * @return Zero on success, one on failure.
  */
