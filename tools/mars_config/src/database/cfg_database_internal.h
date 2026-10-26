@@ -156,7 +156,7 @@ bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source);
 
 /**
  * @brief Copy validated OSM chunks between distinct borrowed connections, replacing only river tables transactionally.
- * @note Rejects candidates or rebuilt river layers exceeding 3,800,000,000 bytes, including indexes; failures roll back.
+ * @note Rejects candidates or rebuilt river layers exceeding 7,000,000,000 bytes, including indexes; failures roll back.
  */
 bool cfg_database_publish_rivers(sqlite_t *destination, sqlite_t *source);
 

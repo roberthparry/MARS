@@ -167,6 +167,7 @@
         "${workspaceFolder}/tests",
         "${workspaceFolder}/tests/include",
         "${workspaceFolder}/tests/*",
+        "${workspaceFolder}/tools/common",
         "${workspaceFolder}/tools/mars_lab/include",
         "${workspaceFolder}/tools/mars_lab/wasm/include",
         "${workspaceFolder}/tools/mars_lab/src",

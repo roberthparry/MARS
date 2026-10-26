@@ -31,7 +31,7 @@ int main(int argc, char **argv)
 {
     if (argc >= 2 && cfg_app_is(argv[1], "paths")) return mars_paths_command(argc - 2, argv + 2);
     if (argc >= 2 && cfg_app_is(argv[1], "settings")) return mars_settings_command(argc - 2, argv + 2);
-    /* Standalone candidate jobs use their explicit files and existing candidate key, without a desktop session. */
+    /* Standalone candidate jobs use explicit unencrypted files, without configuration or a desktop session. */
     if (argc >= 2 && cfg_app_is(argv[1], "globe-stage-rivers"))
         return argc == 4 ? cfg_globe_river_stage(argv[2], argv[3]) : 2;
     if (argc >= 2 && cfg_app_is(argv[1], "globe-resume-rivers"))

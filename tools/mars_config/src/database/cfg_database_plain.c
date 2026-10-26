@@ -126,14 +126,6 @@ static bool cfg_plain_one(const char *name, const char *prefix)
     sqlite_close(db);
     if (ok && !plain) {
         string_t *body = cfg_plain_settings(config, string_c_str(path_name), string_c_str(key_name), destination_path);
-        /* Existing river checkpoints may still be encrypted independently of the installed globe. */
-        if (body && !strcmp(name, "globe")) {
-            string_t *river_key = cfg_storage_setting(config, "MARS_GLOBE_RIVER_DB_KEY");
-            bool preserved = river_key && cfg_database_export(body, "MARS_GLOBE_RIVER_DB_KEY",
-                                                               string_byte_length(river_key) ? river_key : key);
-            string_free(river_key);
-            if (!preserved) { string_free(body); body = NULL; }
-        }
         ok = body && file_chmod(temporary, 0600) && file_open_read(temporary);
         if (ok) { ok = file_sync(temporary, false); ok = file_close(temporary) && ok; }
         ok = ok && file_copy(config, backup, false) && file_chmod(backup, 0600) &&

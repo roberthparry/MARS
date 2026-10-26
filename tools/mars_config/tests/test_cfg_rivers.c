@@ -2,7 +2,7 @@
  * @file test_cfg_rivers.c
  * @brief Installer-owned OSM import, junction-preserving display and rollback regressions.
  *
- * Synthetic GeoJSON sequences are imported into a disposable encrypted database and queried through the
+ * Synthetic GeoJSON sequences are imported into disposable unencrypted databases and queried through the
  * public globe API. No installed data or user credentials are accessed; the runtime has no OSM parser dependency.
  */
 #include <math.h>
@@ -20,10 +20,9 @@
 
 static sqlite_t *test_database(void)
 {
-    string_t *path = string_new_with(":memory:"), *key = string_new_with("rivers-test");
-    sqlite_t *db = sqlite_open_encrypted(path, key);
+    string_t *path = string_new_with(":memory:");
+    sqlite_t *db = sqlite_open_plain(path);
     string_free(path);
-    string_free(key);
     return db;
 }
 
@@ -199,7 +198,7 @@ static void test_cfg_rivers_storage_detail(void)
                      "budget rejection preserves the previously installed river layer");
     sqlite_stmt_finalize(q);
     TEST_ASSERT_TRUE(cfg_database_publish_rivers(installed, db),
-                     "the approved 3.8 GB limit accepts a valid candidate above the former 3.8 MB limit");
+                     "the approved 7 GB limit accepts a valid candidate above the former 3.8 MB limit");
     sqlite_close(installed); sqlite_close(db);
     TEST_ASSERT_TRUE(file_delete(source) && file_remove_directory(directory), "clean storage-detail fixture");
     file_free(source); file_free(directory);
@@ -365,8 +364,8 @@ static void test_cfg_rivers_section_widths(void)
 static void test_cfg_rivers_storage_budget(void)
 {
     sqlite_t *source = test_database(), *installed = test_database();
-    TEST_ASSERT_TRUE(cfg_database_river_storage_budget == INT64_C(3800000000) &&
-                     cfg_database_river_storage_budget > INT32_MAX, "production budget is 3.8 decimal GB with 64-bit arithmetic");
+    TEST_ASSERT_TRUE(cfg_database_river_storage_budget == INT64_C(7000000000) &&
+                     cfg_database_river_storage_budget > INT32_MAX, "production budget is 7 decimal GB with 64-bit arithmetic");
     TEST_ASSERT_TRUE(!cfg_database_publish_rivers_limited(installed, source, 0) &&
                      !cfg_database_publish_rivers_limited(installed, source, -1) &&
                      !cfg_database_publish_rivers_limited(installed, source, cfg_database_river_storage_budget + 1),
@@ -548,6 +547,38 @@ static void test_cfg_rivers_numeric_decoder(void)
     file_free(source); file_free(directory);
 }
 
+static bool test_cfg_rivers_plain_install(const char *directory, const string_t *candidate)
+{
+    string_t *path = string_sprintf("%s/installed.db", directory);
+    file_t *file = path ? file_new(path) : NULL;
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    bool ok = file && db && sqlite_exec_cstr(db,
+        "create table shoreline_dataset(id,format_version,point_count);"
+        "insert into shoreline_dataset values(1,2,7);"
+        "create table shoreline_blob(id,vertices);"
+        "create table shoreline_chunk(id,level,codec,point_count,byte_offset,byte_count,boundary,blob_id);"
+        "create virtual table shoreline_bounds using rtree(id,min_x,max_x,min_y,max_y);");
+    sqlite_close(db);
+    ok = ok && file_chmod(file, 0600) && !setenv("MARS_GLOBE_DB_PATH", string_c_str(path), 1) &&
+         !setenv("MARS_GLOBE_DB_KEY", "ignored-stale-key", 1) && !cfg_globe_river_install(string_c_str(candidate));
+    unsigned char header[16];
+    size_t count = 0;
+    ok = ok && file_open_read(file) && file_read(file, header, sizeof header, &count) &&
+         count == sizeof header && !memcmp(header, "SQLite format 3", sizeof header);
+    if (file && file_is_open(file)) ok = file_close(file) && ok;
+    db = ok ? sqlite_open_plain(path) : NULL;
+    globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
+    sqlite_stmt_t *check = db ? sqlite_stmt_prepare(db, "select point_count from shoreline_dataset where id=1") : NULL;
+    ok = ok && globe && globe_has_layer(globe, GLOBE_LAYER_RIVERS) && globe_has_layer(globe, GLOBE_LAYER_SHORELINE) &&
+         check && sqlite_stmt_step(check) == SQLITE_STEP_ROW && sqlite_stmt_column_int(check, 0) == 7;
+    sqlite_stmt_finalize(check);
+    globe_close(globe);
+    sqlite_close(db);
+    file_free(file);
+    string_free(path);
+    return ok;
+}
+
 static bool test_cfg_rivers_stage_fixture(const char *directory)
 {
     string_t *input_path = string_sprintf("%s/river.geojsonseq", directory);
@@ -563,14 +594,19 @@ static bool test_cfg_rivers_stage_fixture(const char *directory)
     file_info_t *info = output ? file_get_info(output) : NULL;
     ok = ok && info && file_info_permissions(info) == 0600 &&
          cfg_globe_river_stage(string_c_str(input_path), string_c_str(output_path)) != 0;
-    string_t *key = string_new_with("river-stage-fixture");
-    sqlite_t *db = ok && key ? sqlite_open_encrypted(output_path, key) : NULL;
+    unsigned char header[16];
+    size_t header_bytes = 0;
+    ok = ok && file_open_read(output) && file_read(output, header, sizeof header, &header_bytes) &&
+         header_bytes == sizeof header && !memcmp(header, "SQLite format 3", sizeof header);
+    if (file_is_open(output)) ok = file_close(output) && ok;
+    sqlite_t *db = ok ? sqlite_open_plain(output_path) : NULL;
     globe_t *g = db ? globe_open_databases(NULL, db, NULL) : NULL;
     ok = ok && g && globe_has_layer(g, GLOBE_LAYER_RIVERS);
     globe_close(g); sqlite_close(db);
+    ok = ok && test_cfg_rivers_plain_install(directory, output_path);
     ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
     /* Recreate an interrupted junction phase from the independently known source fixture. */
-    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    db = ok ? sqlite_open_plain(output_path) : NULL;
     ok = db && sqlite_exec_cstr(db,
         "delete from rivers_dataset;"
         "create table rivers_node_use(id integer primary key,uses integer not null);"
@@ -579,7 +615,7 @@ static bool test_cfg_rivers_stage_fixture(const char *directory)
         "update rivers_stage set phase=1,last_chunk=0");
     sqlite_close(db);
     ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
-    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    db = ok ? sqlite_open_plain(output_path) : NULL;
     ok = db && sqlite_exec_cstr(db,
         "delete from rivers_dataset;create table rivers_node_use(id integer primary key,uses integer not null);"
         "update rivers_stage set phase=2,last_chunk=0");
@@ -597,7 +633,7 @@ static bool test_cfg_rivers_stage_fixture(const char *directory)
     ok = ok && packed && second_path && file_compress_zstd(input, packed, false) &&
          !cfg_globe_river_stage(string_c_str(packed_path), string_c_str(second_path));
     file_free(packed); string_free(packed_path); string_free(second_path);
-    string_free(key); file_info_free(info); file_free(input); file_free(output);
+    file_info_free(info); file_free(input); file_free(output);
     string_free(input_path); string_free(output_path); string_free(text);
     return ok;
 }
@@ -615,7 +651,7 @@ static bool test_cfg_rivers_checkpoint_fixture(const char *directory)
             "\"properties\":{\"@type\":\"way\",\"@id\":1,\"@way_nodes\":[1,2],\"waterway\":\"river\"}}\n") == 0;
     ok = ok && file_write_all_text(input, text) &&
          !cfg_globe_river_stage(string_c_str(input_path), string_c_str(output_path));
-    sqlite_t *db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    sqlite_t *db = ok ? sqlite_open_plain(output_path) : NULL;
     ok = db && sqlite_exec_cstr(db,
         "delete from rivers_dataset;create table rivers_node_use(id integer primary key,uses integer not null);"
         "insert into rivers_node_use values(1,2),(2,2);"
@@ -625,7 +661,7 @@ static bool test_cfg_rivers_checkpoint_fixture(const char *directory)
         "begin select raise(abort,'fixture interruption'); end");
     sqlite_close(db);
     ok = ok && cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path)) != 0;
-    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    db = ok ? sqlite_open_plain(output_path) : NULL;
     sqlite_stmt_t *check = db ? sqlite_stmt_prepare(db,
         "select phase,last_chunk,(select count(*) from rivers_dataset) from rivers_stage") : NULL;
     ok = check && sqlite_stmt_step(check) == SQLITE_STEP_ROW && sqlite_stmt_column_int(check, 0) == 1 &&
@@ -634,7 +670,7 @@ static bool test_cfg_rivers_checkpoint_fixture(const char *directory)
     ok = ok && sqlite_exec_cstr(db, "drop trigger checkpoint_stop");
     sqlite_close(db);
     ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
-    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    db = ok ? sqlite_open_plain(output_path) : NULL;
     ok = db && sqlite_exec_cstr(db,
         "delete from rivers_dataset;delete from rivers_chunk where id>10000;delete from rivers_bounds where id>10000;"
         "create table rivers_node_use(id integer primary key,uses integer not null);"
@@ -644,7 +680,7 @@ static bool test_cfg_rivers_checkpoint_fixture(const char *directory)
         "source_points=0,unknown_width_sections=10000");
     sqlite_close(db);
     ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
-    db = ok ? sqlite_open_encrypted(output_path, key) : NULL;
+    db = ok ? sqlite_open_plain(output_path) : NULL;
     check = db ? sqlite_stmt_prepare(db,
         "select point_count,feature_count,(select count(*) from rivers_chunk) from rivers_dataset") : NULL;
     ok = check && sqlite_stmt_step(check) == SQLITE_STEP_ROW && sqlite_stmt_column_int(check, 0) == 20004 &&
@@ -657,7 +693,7 @@ static bool test_cfg_rivers_checkpoint_fixture(const char *directory)
 static void test_cfg_rivers_stage(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_rivers_stage_fixture),
-                     "staging retains its separate encryption key with plaintext installed storage and refuses overwrites");
+                     "staging, resume and installation ignore stale keys and preserve plaintext storage and shorelines");
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_rivers_checkpoint_fixture),
                      "batch checkpoints survive failure and input replay does not duplicate records");
 }

@@ -1580,7 +1580,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && body && string_append_cstr(body, "export MARS_GLOBE_RIVER_DB_KEY='separate-staging-key'\n") >= 0 &&
          file_write_all_text(config, body);
     string_free(body);
-    /* Missing archive parts must preserve the installed database and its separate staging credentials. */
+    /* Failed installation must preserve the installed database and all existing settings. */
     ok = ok && !setenv("MARS_ROOT", directory, 1) && cfg_globe_run("globe-update") == 1 &&
          cfg_globe_run("globe-install") == 1;
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1599,7 +1599,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
          test_cfg_database_query(db, "select count(*) from sqlite_master where name in ('retained','rivers_dataset')", "0") &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_KEY", key) &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_PATH", file_path(database)) &&
-         test_cfg_database_setting(config, "MARS_GLOBE_RIVER_DB_KEY", "separate-staging-key");
+         test_cfg_database_setting(config, "MARS_GLOBE_RIVER_DB_KEY", "");
     sqlite_close(db);
     file_free(config);
     file_free(database);
@@ -1621,7 +1621,7 @@ static void test_cfg_database_globe_packaged(void)
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_globe_packaged_fixture),
                      "encrypted globe reinstallation builds afresh; updates and failed installs preserve existing data");
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_globe_plain_fixture),
-                     "plaintext globe reinstallation builds afresh and retains separate river staging credentials");
+                     "plaintext globe reinstallation builds afresh and removes obsolete river key settings");
 }
 
 /* Called only by the parent's sequential native configuration test runner. */
@@ -1671,7 +1671,7 @@ static bool test_cfg_database_plain_fixture(const char *directory)
         ok = ok && config && key_name && test_cfg_database_setting(config, string_c_str(key_name), "") &&
              test_cfg_database_setting(config, "MARS_CALENDAR_LOCATION", "Retained town");
         if (ok && i == 0)
-            ok = test_cfg_database_setting(config, "MARS_GLOBE_RIVER_DB_KEY", "conversion fixture");
+            ok = test_cfg_database_setting(config, "MARS_GLOBE_RIVER_DB_KEY", "");
         file_free(config); string_free(key_name); string_free(filename);
     }
     almanac_t *almanac = ok ? almanac_open() : NULL;

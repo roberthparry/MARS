@@ -402,7 +402,7 @@ they are no longer a prerequisite. Resume this delivery work before unrelated im
 - Recover the timed-out river staging safely, add resumable checkpoints, and
   finish simplification at the same tolerance. Prioritise larger rivers worldwide,
   including the Severn; omit narrow sections rather than entire rivers. Keep the
-  final river database footprint within the authorised **3.8 GB** budget.
+  final river database footprint within the authorised **7 GB** budget.
 - The user explicitly requested on 22 October that the work not time out.
   For these offline preparation jobs, replace expired wall-clock deadlines with
   `RuntimeMaxSec=infinity` when launching the next validated stage, and verify the
@@ -433,7 +433,7 @@ Input-phase resume streams the compressed source from its start but skips alread
 validated records without reinserting nodes or geometry. Later phases resume by
 indexed chunk ID. Dataset publication metadata remains absent until simplification
 finishes. The ordinary transactional importer remains all-or-nothing.
-Compaction, integrity checks, the 3.8 GB limit and geographic acceptance are still
+Compaction, integrity checks, the 7 GB limit and geographic acceptance are still
 required; a successful resume alone does not install or approve the dataset.
 The local operational launcher is `build/mapdetail-source/run-rivers-checkpointed.sh`.
 It uses a separate `rivers-261012-selected-8m-checkpointed.sqlite3` candidate and
@@ -682,10 +682,8 @@ with an `.encrypted-backup` suffix. Both outputs are owner-only. Existing export
 inspect retained files after a failed conversion before retrying. Switching configuration is atomic per file, not
 across all three databases. Restart the Lab after conversion. For rollback, stop database users and restore the old
 configuration; subsequent changes made only to the plaintext copy will not be present in the encrypted original.
-Conversion retains the globe's old key as `MARS_GLOBE_RIVER_DB_KEY` for unfinished encrypted river candidates.
-River staging/resume and candidate reading use that separate key when present; publication uses the installed
-globe's own mode. An explicitly empty `MARS_GLOBE_RIVER_DB_KEY` environment value selects plaintext candidates.
-Changing the installed globe does not convert or interrupt separate staging files.
+River staging, resume and publication use unencrypted SQLite databases. These operations do not use a river
+encryption key; the desktop keyring protects only the separate `mars.db` configuration store.
 
 `globe_has_layer()` reports availability through `globe_layer_t`. Shoreline and
 future detailed geometry belong in the globe database; towns remain in the
@@ -1423,20 +1421,19 @@ verification fails. The running job's kernel controls were verified. It preserve
 interrupted files and does not change permanent system configuration or install
 river data.
 
-The installed river layer has a **3,800,000,000-byte total budget** (decimal
-3.8 GB), including tables, metadata and spatial/feature indexes. This supersedes
-the earlier 3.8 MB limit after clarification of the intended units. Coverage is to
-prioritise larger rivers worldwide, with the Severn explicitly retained, rather
-than being restricted to selected sailing regions; the larger allowance avoids
-the drastic coverage reduction required by the previous limit. The complete
-source extract remains separate. The installable derivative has not yet been
-prepared or geographically accepted. If further selection is needed to meet
+The installed river layer has a **7,000,000,000-byte total budget** (decimal
+7 GB), including tables, metadata and spatial/feature indexes. This replaces
+the previous 3.8 GB limit with the user's approval to retain the complete processed
+network, including streams, canals and tidal channels. Coverage is worldwide,
+with the Severn explicitly retained. The complete source extract remains separate.
+If further selection is needed to meet
 the limit, it must not pick arbitrary first-arriving way fragments. Width filtering
 is section-by-section: a narrow upper reach must not discard wider downstream reaches.
 
 The installer-owned staging command `globe-stage-rivers` accepts an exported
 GeoJSON sequence, either plain or Zstandard-compressed, and a new candidate path. It refuses existing destinations,
-uses mode 0600 and checks SQLite integrity. The full-resolution extract remains
+uses unencrypted SQLite with mode 0600 and checks SQLite integrity. Saved key settings cannot enable encryption
+for river candidates. The full-resolution extract remains
 separate. Compressed input is detected by its frame signature and streamed through
 64 KiB buffers directly into the record parser, without an expanded staging file.
 It must contain exactly one complete frame with a window no larger than 8 MiB.
@@ -1500,21 +1497,21 @@ cache, compared with 69.81 seconds before it. All 18,815 output chunks had ident
 coordinates, anchors and feature identities; both runs retained 565,772 points.
 This measures the bounded replay, not an estimated completion time for the full
 dataset. The nine focused river regressions also passed, including crowded-cache
-fallback and date-line crossing checks. The full candidate remains stopped at
-phase 2, chunk 4,344,000 of 32,780,598. Resuming the system service requires
-administrator authentication and sufficient free space for its existing launch
-guard; the installed river layer has not changed.
-After compaction, staging rejects a candidate larger than 3,800,000,000 bytes.
+fallback and date-line crossing checks. The full candidate subsequently completed
+all 32,780,598 chunks, retaining 351,363,987 of 848,247,640 source points across
+32,194,860 features. Its compacted encrypted size is 6,587,858,944 bytes. This
+exceeded the former budget and prompted the approved increase to 7 GB.
+After compaction, staging rejects a candidate larger than 7,000,000,000 bytes.
 The limit applies to the installed derivative, not temporary conversion files,
 the retained source extract or the existing shoreline layer.
 
 After geographic review, `globe-install-rivers` accepts the candidate path. It
-reuses the configured globe key, validates every copied coordinate and anchor,
+opens unencrypted source and destination databases, validates every copied coordinate and anchor,
 rebuilds spatial bounds and checks feature/point totals and storage-detail metadata.
 Candidates without that metadata or with a tolerance above eight metres are rejected.
 Publication also rejects an oversized source candidate and measures the destination
-river tables as they are rebuilt: different database page sizes and encryption
-overhead can change their footprint. The check counts newly occupied pages even
+river tables as they are rebuilt: different database page sizes and index layouts
+can change their footprint. The check counts newly occupied pages even
 when they reuse free space, reserving two additional pages for shared header/schema
 overhead. An over-budget replacement rolls back; unrelated shoreline pages are
 not charged to the river budget. These checks enforce size, not coverage or
@@ -1525,6 +1522,9 @@ layers exceeding the former 3.8 MB limit.
 Only river tables are
 replaced, in one transaction; failures preserve the previous river tables and
 all unrelated shoreline data. It does not reinstall towns or almanac data.
+Publication reports validated feature and point totals every 100,000 chunks;
+these are uncommitted until the complete replacement passes validation. The
+installation connection uses a bounded 64 MiB SQLite page cache.
 This path currently installs river, stream, canal and tidal-channel centrelines,
 not filled water-area polygons. The original extract retains those polygons for
 later work. River strokes do not establish channel width, depth or navigability.

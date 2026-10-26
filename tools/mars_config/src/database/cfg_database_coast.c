@@ -59,10 +59,23 @@ bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *stag
     file_t *packed = packed_path ? file_new(packed_path) : NULL;
     file_t *plain = plain_path ? file_new(plain_path) : NULL;
     cfg_progress_t *progress = cfg_progress_start("Indexing validated shorelines");
-    bool ok = packed && plain && cfg_coast_archive(root, packed) &&
-        file_decompress_zstd(packed, plain, 602563348, false) &&
-        cfg_coast_hash(plain, "89b67b8d82bec49e6f28a3b55dc944e29d9c1a48e0beacb64550280a6c4f0d84") &&
-        file_open_read(plain);
+    bool ok = packed && plain && cfg_coast_archive(root, packed);
+    if (!ok)
+        fputs("Shoreline archive assembly or checksum failed.\n", stderr);
+    if (ok) {
+        ok = file_decompress_zstd(packed, plain, 602563348, false);
+        if (!ok) {
+            int error = file_last_error(packed);
+            if (!error) error = file_last_error(plain);
+            fprintf(stderr, "Shoreline decompression failed: %s.\n", error ? strerror(error) : "unknown error");
+        }
+    }
+    if (ok) {
+        ok = cfg_coast_hash(plain, "89b67b8d82bec49e6f28a3b55dc944e29d9c1a48e0beacb64550280a6c4f0d84") &&
+             file_open_read(plain);
+        if (!ok)
+            fputs("Expanded shoreline checksum or opening failed.\n", stderr);
+    }
     bool transaction = ok && sqlite_exec_cstr(db, "savepoint globe_coast");
     ok = transaction && globe_import_shoreline(db, plain) && sqlite_exec_cstr(db,
         "update shoreline_dataset set source='OSM 2026-10-12 + GSHHG 2.3.7; complete 8m shoreline 2026-10-23 r2' "

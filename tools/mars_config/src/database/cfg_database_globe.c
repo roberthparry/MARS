@@ -8,7 +8,7 @@
  * Photographic JPEG validation and import are delegated to the independent texture installer.
  * Stored centrelines have a conservative eight-metre
  * error ceiling with junctions fixed; the separate source extract retains full detail.
- * Staging and publication enforce a 3.8 GB river-layer limit, including indexes.
+ * Staging and publication enforce a 7 GB river-layer limit, including indexes.
  * Source selection and geographic acceptance remain separate; no network download is performed.
  */
 #include <ctype.h>
@@ -206,7 +206,7 @@ static const double cfg_river_storage_metres = 8.0;
 static const double cfg_river_minimum_width_metres = 16.0;
 
 /* Decimal GB: the installed river layer includes its tables and spatial/feature indexes. */
-const int64_t cfg_database_river_storage_budget = INT64_C(3800000000);
+const int64_t cfg_database_river_storage_budget = INT64_C(7000000000);
 
 static bool cfg_river_storage_bytes(sqlite_t *db, bool used_only, int64_t *bytes, int64_t *page_size)
 {
@@ -1095,34 +1095,19 @@ static bool osm_stage_run(sqlite_t *db, file_t *source, const char *digest, bool
     return ok;
 }
 
-static string_t *cfg_river_key(file_t *config)
-{
-    const char *environment = getenv("MARS_GLOBE_RIVER_DB_KEY");
-    if (environment) return string_new_with(environment);
-    string_t *key = config ? cfg_storage_setting(config, "MARS_GLOBE_RIVER_DB_KEY") : NULL;
-    if (!key || string_byte_length(key)) return key;
-    string_free(key);
-    environment = getenv("MARS_GLOBE_DB_KEY");
-    return environment ? string_new_with(environment) : cfg_storage_setting(config, "MARS_GLOBE_DB_KEY");
-}
-
 static int cfg_globe_river_stage_run(const char *input_path, const char *output_path, bool resume)
 {
-    string_t *home = cfg_storage_home();
-    string_t *config_path = home ? string_sprintf("%s/config/globe-db.env", string_c_str(home)) : NULL;
-    file_t *config = config_path ? file_new(config_path) : NULL;
-    string_t *key = cfg_river_key(config);
     file_t *input = file_new_cstr(input_path), *output = file_new_cstr(output_path);
     string_t *path = string_new_with(output_path);
     string_t *digest = input ? file_sha256(input) : NULL;
-    bool ok = key && input && output && path && digest && file_open_read(input);
+    bool ok = input && output && path && digest && file_open_read(input);
     if (ok) ok = resume ? file_exists(output) : file_open(output, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
     if (output && file_is_open(output)) ok = file_close(output) && ok;
     if (ok && !resume) ok = file_chmod(output, 0600);
-    sqlite_t *db = ok ? cfg_database_open(path, key) : NULL;
+    sqlite_t *db = ok ? sqlite_open_plain(path) : NULL;
     ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-8192;PRAGMA temp_store=FILE;PRAGMA temp.cache_size=-1024;");
     if (ok) {
-        puts("Staging rivers with an 8 m error ceiling and a 3.8 GB final size limit; installed globe unchanged.");
+        puts("Staging rivers with an 8 m error ceiling and a 7 GB final size limit; installed globe unchanged.");
         fflush(stdout);
         ok = osm_stage_run(db, input, string_c_str(digest), resume);
     }
@@ -1146,9 +1131,9 @@ static int cfg_globe_river_stage_run(const char *input_path, const char *output_
     }
     sqlite_stmt_finalize(check);
     sqlite_close(db);
-    file_free(input); file_free(output); file_free(config);
-    string_free(path); string_free(key); string_free(config_path); string_free(home); string_free(digest);
-    if (ok) puts("Encrypted river candidate ready for geographic review; not installed.");
+    file_free(input); file_free(output);
+    string_free(path); string_free(digest);
+    if (ok) puts("Unencrypted river candidate ready for geographic review; not installed.");
     else fputs("River candidate failed; installed globe unchanged. Do not install the failed candidate.\n", stderr);
     return ok ? 0 : 1;
 }
@@ -1247,6 +1232,12 @@ bool cfg_database_publish_rivers_limited(sqlite_t *destination, sqlite_t *source
              sqlite_stmt_bind_int(bounds, 3, east) && sqlite_stmt_bind_int(bounds, 4, south) &&
              sqlite_stmt_bind_int(bounds, 5, north) && cfg_river_step(bounds);
         if (ok && chunks % 128 == 0) ok = cfg_river_layer_fits(destination, baseline, budget);
+        if (ok && chunks % 100000 == 0) {
+            printf("Installing rivers: %lld/%lld features, %lld/%lld points validated and copied.\n",
+                   (long long)counted_features, (long long)features,
+                   (long long)counted_points, (long long)points);
+            fflush(stdout);
+        }
     }
     sqlite_stmt_finalize(rows); sqlite_stmt_finalize(chunk); sqlite_stmt_finalize(bounds);
     ok = ok && step == SQLITE_STEP_DONE && counted_features == features && counted_points == points;
@@ -1275,14 +1266,12 @@ static string_t *cfg_river_setting(file_t *config, const char *name)
     return environment ? string_new_with(environment) : cfg_storage_setting(config, name);
 }
 
-/* An explicit install reuses the saved key and preserves all non-river tables. */
+/* Publish unencrypted river storage, preserving all non-river tables. */
 int cfg_globe_river_install(const char *candidate_path)
 {
     string_t *home = cfg_storage_home();
     string_t *config_path = home ? string_sprintf("%s/config/globe-db.env", string_c_str(home)) : NULL;
     file_t *config = config_path ? file_new(config_path) : NULL;
-    string_t *key = config ? cfg_river_setting(config, "MARS_GLOBE_DB_KEY") : NULL;
-    string_t *source_key = cfg_river_key(config);
     string_t *raw = config ? cfg_river_setting(config, "MARS_GLOBE_DB_PATH") : NULL;
     if (raw && !string_byte_length(raw)) {
         string_free(raw);
@@ -1292,22 +1281,21 @@ int cfg_globe_river_install(const char *candidate_path)
     string_t *candidate = candidate_path ? string_new_with(candidate_path) : NULL;
     file_t *target_file = path ? file_new(path) : NULL, *source_file = candidate ? file_new(candidate) : NULL;
     bool target_exists = false, source_exists = false;
-    bool ok = key && source_key && target_file && source_file &&
+    bool ok = target_file && source_file &&
               cfg_storage_safe_regular(target_file, &target_exists) && target_exists &&
               cfg_storage_safe_regular(source_file, &source_exists) && source_exists;
-    sqlite_t *source = ok ? cfg_database_open(candidate, source_key) : NULL;
-    sqlite_t *target = source ? cfg_database_open(path, key) : NULL;
+    sqlite_t *source = ok ? sqlite_open_plain(candidate) : NULL;
+    sqlite_t *target = source ? sqlite_open_plain(path) : NULL;
     ok = ok && source && target &&
          sqlite_exec_cstr(source, "PRAGMA query_only=ON;PRAGMA cache_size=-8192;") &&
-         sqlite_exec_cstr(target, "PRAGMA cache_size=-8192;");
+         sqlite_exec_cstr(target, "PRAGMA cache_size=-65536;");
     globe_t *globe = ok ? globe_open_databases(target, NULL, NULL) : NULL;
     ok = ok && globe && globe_has_layer(globe, GLOBE_LAYER_SHORELINE);
     globe_close(globe);
     if (ok) ok = cfg_database_publish_rivers(target, source);
     sqlite_close(target); sqlite_close(source);
-    string_free(source_key);
     file_free(target_file); file_free(source_file); file_free(config);
-    string_free(candidate); string_free(path); string_free(raw); string_free(key); string_free(config_path); string_free(home);
+    string_free(candidate); string_free(path); string_free(raw); string_free(config_path); string_free(home);
     if (ok) puts("River tables installed in the globe database; shoreline and configuration preserved.");
     else fputs("River installation failed; no river replacement committed.\n", stderr);
     return ok ? 0 : 1;
@@ -1456,11 +1444,6 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
             string_c_str(quoted_path), string_c_str(quoted_key)) : NULL;
         string_free(quoted_path);
         string_free(quoted_key);
-        /* Separate encrypted river candidates must remain readable after a fresh globe installation. */
-        string_t *river_key = body ? cfg_storage_setting(config, "MARS_GLOBE_RIVER_DB_KEY") : NULL;
-        ok = ok && river_key && (!string_byte_length(river_key) ||
-                                cfg_database_export(body, "MARS_GLOBE_RIVER_DB_KEY", river_key));
-        string_free(river_key);
         ok = ok && body && cfg_database_publish(temporary, destination, config, config_dir, staging, body);
     }
     if (ok) puts(update ? "Globe shoreline, countries and textures updated; other layers and settings preserved. Restart MARS Lab."
