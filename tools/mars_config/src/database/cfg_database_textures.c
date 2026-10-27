@@ -2,12 +2,13 @@
  * @file cfg_database_textures.c
  * @brief Transactional installation of packaged photographic surface imagery.
  *
- * Imports the two global JPEGs and 72 native-resolution tiles into the independent globe store. A bounded
+ * Imports two global JPEGs, 72 NASA tiles and up to 64 regional photographs into the independent globe store. A bounded
  * manifest supplies content digests and source attribution; each JPEG must match its declared size, dimensions
  * and digest. Savepoints preserve an existing image set on missing or corrupt input, including within migrations.
  * No image transcoding, network download or geometry replacement occurs here.
  */
 #include <errno.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sodium.h>
@@ -73,34 +74,72 @@ static bool texture_dimensions(const unsigned char *data, size_t size, unsigned 
 static bool texture_import(sqlite_stmt_t *insert, const string_t *directory, const json_t *assets,
                            unsigned level, unsigned column, unsigned row)
 {
-    static const unsigned widths[] = {2048, 8192, 1800}, heights[] = {1024, 4096, 1800};
-    string_t *relative = level == 2 ? string_sprintf("earth_tiles/%02u-%02u.jpg", column, row)
+    static const unsigned widths[] = {2048, 8192, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800};
+    string_t *relative = level == 3 ? string_sprintf("regional/%02u.jpg", column) :
+                        level == 2 ? string_sprintf("earth_tiles/%02u-%02u.jpg", column, row)
                                    : string_new_with(level ? "earth_surface_detail.jpg" : "earth_surface.jpg");
     const json_t *asset = relative ? json_object_get(assets, relative) : NULL;
+    unsigned width = level == 3 && texture_number(asset, "width", 3600) ? 3600 : widths[level];
+    unsigned height = level == 3 ? width : heights[level];
     const char *expected = texture_text(asset, "sha256", 64);
     string_t *path = relative ? string_sprintf("%s/%s", string_c_str(directory),
                                                string_c_str(relative)) : NULL;
     file_t *file = path ? file_new(path) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
-    size_t maximum = level == 1 ? 16777216 : 4194304;
+    size_t maximum = level == 1 || level == 3 ? 16777216 : 4194304;
     bool ok = info && file_info_type(info) == FILE_TYPE_REGULAR && file_info_size(info) <= maximum &&
-              expected && strlen(expected) == 64 && texture_number(asset, "width", widths[level]) &&
-              texture_number(asset, "height", heights[level]) && texture_number(asset, "bytes", file_info_size(info));
+              expected && strlen(expected) == 64 && texture_number(asset, "width", width) &&
+              texture_number(asset, "height", height) && texture_number(asset, "bytes", file_info_size(info));
     array_t *bytes = ok ? file_read_all_bytes(file) : NULL;
     size_t size = array_size(bytes);
     const unsigned char *data = bytes && size ? array_get(bytes, 0) : NULL;
     unsigned char digest[crypto_hash_sha256_BYTES];
     char hex[65];
     ok = data && size <= maximum && size == file_info_size(info) &&
-         texture_dimensions(data, size, widths[level], heights[level]) &&
+         texture_dimensions(data, size, width, height) &&
          crypto_hash_sha256(digest, data, size) == 0 && sodium_bin2hex(hex, sizeof hex, digest, sizeof digest) &&
          !strcmp(hex, expected) && sqlite_stmt_bind_int(insert, 1, level) &&
          sqlite_stmt_bind_int(insert, 2, column) && sqlite_stmt_bind_int(insert, 3, row) &&
-         sqlite_stmt_bind_int(insert, 4, widths[level]) && sqlite_stmt_bind_int(insert, 5, heights[level]) &&
+         sqlite_stmt_bind_int(insert, 4, width) && sqlite_stmt_bind_int(insert, 5, height) &&
          sqlite_stmt_bind_int64(insert, 6, size) && sqlite_stmt_bind_text(insert, 7, hex) &&
          sqlite_stmt_bind_blob(insert, 8, data, size) && sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
     sqlite_stmt_reset(insert);
     array_destroy(bytes); file_info_free(info); file_free(file); string_free(path); string_free(relative);
+    return ok;
+}
+
+/* Optional catalogue uses fixed numeric slots; it cannot introduce arbitrary file paths. */
+static bool texture_regions(sqlite_t *db, sqlite_stmt_t *insert, const string_t *directory, const json_t *manifest)
+{
+    const json_t *regions = texture_field(manifest, "regions");
+    size_t count = regions ? json_array_size(regions) : 0;
+    if (regions && (json_type(regions) != JSON_ARRAY || count > 64)) return false;
+    if (!sqlite_exec_cstr(db, "drop table if exists globe_texture_region;"
+        "create table globe_texture_region(slot integer primary key check(slot>=0 and slot<64),"
+        "west real,south real,east real,north real,attribution text,source_url text)")) return false;
+    sqlite_stmt_t *q = sqlite_stmt_prepare(db, "insert into globe_texture_region values(?1,?2,?3,?4,?5,?6,?7)");
+    bool ok = q != NULL;
+    for (size_t i = 0; ok && i < count; ++i) {
+        const json_t *region = json_array_get(regions, i), *bounds = texture_field(region, "bounds");
+        const char *credit = texture_text(region, "attribution", 4096), *url = texture_text(region, "source_url", 2048);
+        double b[4] = {0};
+        ok = credit && url && json_type(bounds) == JSON_ARRAY && json_array_size(bounds) == 4;
+        for (unsigned j = 0; ok && j < 4; ++j) {
+            const string_t *number = json_number_text(json_array_get(bounds, j));
+            char *end = NULL;
+            b[j] = number ? strtod(string_c_str(number), &end) : NAN;
+            ok = end && !*end && isfinite(b[j]);
+        }
+        ok = ok && b[0] >= -180 && b[2] <= 180 && b[1] >= -90 && b[3] <= 90 &&
+             b[0] < b[2] && b[1] < b[3] &&
+             texture_import(insert, directory, texture_field(manifest, "assets"), 3, (unsigned)i, 0) &&
+             sqlite_stmt_bind_int(q, 1, (int)i);
+        for (unsigned j = 0; ok && j < 4; ++j) ok = sqlite_stmt_bind_double(q, j + 2, b[j]);
+        ok = ok && sqlite_stmt_bind_text(q, 6, credit) && sqlite_stmt_bind_text(q, 7, url) &&
+             sqlite_stmt_step(q) == SQLITE_STEP_DONE;
+        sqlite_stmt_reset(q);
+    }
+    sqlite_stmt_finalize(q);
     return ok;
 }
 
@@ -111,7 +150,7 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     string_t *path = directory ? string_sprintf("%s/manifest.json", string_c_str(directory)) : NULL;
     file_t *file = path ? file_new(path) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
-    string_t *text = info && file_info_size(info) <= 65536 ? file_read_all_text(file) : NULL;
+    string_t *text = info && file_info_size(info) <= 1048576 ? file_read_all_text(file) : NULL;
     json_t *manifest = text ? json_from_text(text) : NULL;
     const json_t *assets = texture_field(manifest, "assets");
     const char *name = texture_text(manifest, "name", 256), *url = texture_text(manifest, "source_url", 2048);
@@ -119,7 +158,8 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     const char *attribution = texture_text(manifest, "attribution", 4096);
     const char *month = texture_text(manifest, "reference_month", 7);
     bool ok = texture_number(manifest, "format_version", 1) && json_type(assets) == JSON_OBJECT &&
-              json_object_size(assets) == 74 && name && url && source_digest && strlen(source_digest) == 64 &&
+              json_object_size(assets) == 74 + json_array_size(texture_field(manifest, "regions")) &&
+              name && url && source_digest && strlen(source_digest) == 64 &&
               attribution && month && !strcmp(month, "2004-07");
     bool transaction = ok && sqlite_exec_cstr(db, "savepoint globe_texture_import");
     ok = transaction && sqlite_exec_cstr(db,
@@ -141,6 +181,7 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row)
             for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column)
                 ok = texture_import(insert, directory, assets, level, column, row);
+    if (ok) ok = texture_regions(db, insert, directory, manifest);
     sqlite_stmt_finalize(insert);
     if (ok) ok = sqlite_exec_cstr(db, "release globe_texture_import");
     if (transaction && !ok) sqlite_exec_cstr(db, "rollback to globe_texture_import;release globe_texture_import");
@@ -153,7 +194,8 @@ bool cfg_database_textures_valid(sqlite_t *db)
 {
     globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
     sqlite_stmt_t *count = db ? sqlite_stmt_prepare(db, "select count(*) from globe_texture") : NULL;
-    bool ok = globe && count && sqlite_stmt_step(count) == SQLITE_STEP_ROW && sqlite_stmt_column_int(count, 0) == 74;
+    int total = count && sqlite_stmt_step(count) == SQLITE_STEP_ROW ? sqlite_stmt_column_int(count, 0) : 0;
+    bool ok = globe && total >= 74 && total <= 138;
     sqlite_stmt_finalize(count);
     for (unsigned level = 0; ok && level < 3; ++level) {
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row) {
@@ -165,6 +207,13 @@ bool cfg_database_textures_valid(sqlite_t *db)
                 array_destroy(jpeg);
             }
         }
+    }
+    for (int slot = 0; ok && slot < total - 74; ++slot) {
+        globe_texture_info_t info;
+        array_t *jpeg = globe_texture_metadata(globe, 3, (unsigned)slot, 0, &info)
+            ? globe_texture_jpeg(globe, 3, (unsigned)slot, 0, &info) : NULL;
+        ok = jpeg != NULL;
+        array_destroy(jpeg);
     }
     globe_close(globe);
     return ok;

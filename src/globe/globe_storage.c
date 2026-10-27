@@ -5,8 +5,11 @@
  * The globe controller owns the returned SQLite connection. A non-empty configured key selects encryption;
  * an empty or absent key selects plaintext. Environment overrides precede literal
  * assignments in globe-db.env. Missing or malformed configuration fails closed; no legacy database is consulted.
+ * Serial readers retain configured connections and expose opaque metadata fingerprints for derived imagery,
+ * without scanning content or returning resource paths and credentials to consumers of those fingerprints.
  */
 #include <stdlib.h>
+#include <sodium.h>
 
 #include "string-t.h"
 #define MARS_GLOBE_INTERNAL_ACCESS
@@ -179,6 +182,20 @@ globe_t *globe_reader_get(globe_reader_t *reader)
     }
     string_free(path); string_free(key); string_free(stamp);
     return reader->globe;
+}
+
+/* Hide local resource names while identifying the current generation of derived geographic imagery. */
+string_t *globe_reader_identity(globe_reader_t *reader)
+{
+    if (!globe_reader_get(reader)) return NULL;
+    string_t *source = string_sprintf("%s\n%s", string_c_str(reader->path), string_c_str(reader->stamp));
+    unsigned char digest[crypto_hash_sha256_BYTES];
+    char text[crypto_hash_sha256_BYTES * 2 + 1];
+    bool ok = source && crypto_hash_sha256(digest, (const unsigned char *)string_c_str(source),
+                                          string_byte_length(source)) == 0;
+    if (ok) sodium_bin2hex(text, sizeof text, digest, sizeof digest);
+    string_free(source);
+    return ok ? string_new_with(text) : NULL;
 }
 
 /* Close readers before their borrowed database and discard configuration secrets. */

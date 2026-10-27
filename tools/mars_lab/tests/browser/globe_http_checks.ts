@@ -7,8 +7,11 @@
  */
 
 /** @brief Serve controlled HTTP responses inside real drawing workers; other worker types are unchanged. */
-function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Response>): {
-    Worker: typeof Worker; dispose(): void;
+function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Response>,
+                          options: {endpoint: string; script: string; nativeShore: boolean; storageDenied?: boolean;
+                                    surfaceProbe?: boolean} =
+                              {endpoint: '/almanac-globe', script: '/js/globe_worker.js', nativeShore: true}): {
+    Worker: typeof Worker; releaseSurfaceCache(): void; dispose(): void;
 } {
     const BrowserWorker = globalThis.Worker;
     const source = `
@@ -16,8 +19,14 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
         const loadScripts = globalThis.importScripts.bind(globalThis);
         globalThis.importScripts = (...urls) => loadScripts(...urls.map(url => new URL(url, ${JSON.stringify(location.origin)}).href));
         const replies = new Map();
+        const photographs = new Set();
+        let releaseCache;
+        const cacheReady = new Promise(resolve => { releaseCache = resolve; });
         let next = 0;
         addEventListener('message', event => {
+            if (event.data.fixturePersist) {
+                event.stopImmediatePropagation(); releaseCache(); return;
+            }
             if (!event.data.fixtureReply) return;
             event.stopImmediatePropagation();
             const pending = replies.get(event.data.id);
@@ -27,7 +36,12 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                 event.data.bytes, {status: event.data.status, headers: event.data.headers}));
         });
         globalThis.fetch = (url, options) => {
-            if (url !== '/almanac-globe') return networkFetch(new URL(url, ${JSON.stringify(location.origin)}), options);
+            if (${Boolean(options.surfaceProbe)} && (String(url).startsWith('/earth_tiles/') ||
+                String(url).startsWith('/earth_regions/'))) {
+                if (photographs.has(url)) throw new Error('Photograph decoded repeatedly');
+                photographs.add(url);
+            }
+            if (url !== ${JSON.stringify(options.endpoint)}) return networkFetch(new URL(url, ${JSON.stringify(location.origin)}), options);
             return new Promise((resolve, reject) => {
                 const id = ++next;
                 replies.set(id, {resolve, reject});
@@ -37,15 +51,28 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                 postMessage({fixtureFetch: true, id, body: options.body});
             });
         };
-        importScripts(${JSON.stringify(new URL('/js/globe_worker.js', location.href).href)});
-        labWire.decode = labWire.decodeAsync = () => { throw new Error('Shoreline must not construct host response values'); };
-        labDOM.env.lab_dom_bytes_copy = () => { throw new Error('Shoreline bytes must not return through host handles'); };
+        if (${Boolean(options.storageDenied)}) Object.defineProperty(globalThis, 'indexedDB', {
+            value: {open() { throw new Error('Fixture storage denied'); }}
+        });
+        importScripts(${JSON.stringify(new URL(options.script, location.href).href)});
+        if (${Boolean(options.surfaceProbe)}) {
+            const put = GlobeSurfaceCache.prototype.put;
+            GlobeSurfaceCache.prototype.put = async function(key, blob) {
+                await cacheReady;
+                return put.call(this, key, blob);
+            };
+        }
+        if (${options.nativeShore}) {
+            labWire.decode = labWire.decodeAsync = () => { throw new Error('Shoreline must not construct host response values'); };
+            labDOM.env.lab_dom_bytes_copy = () => { throw new Error('Shoreline bytes must not return through host handles'); };
+        }
     `;
     const url = URL.createObjectURL(new Blob([source], {type: 'text/javascript'}));
     const workers = new Set<Worker>();
+    const fixtureScript = options.script;
     class FixtureWorker extends BrowserWorker {
         constructor(scriptURL: string | URL, options?: WorkerOptions) {
-            const globe = String(scriptURL).endsWith('/js/globe_worker.js');
+            const globe = String(scriptURL).endsWith(fixtureScript);
             super(globe ? url : scriptURL, options);
             if (!globe) return;
             workers.add(this);
@@ -61,7 +88,9 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
             });
         }
     }
-    return {Worker: FixtureWorker, dispose() {
+    return {Worker: FixtureWorker, releaseSurfaceCache() {
+        for (const worker of workers) worker.postMessage({fixturePersist: true});
+    }, dispose() {
         for (const worker of workers) {
             worker.dispatchEvent(new ErrorEvent('error', {message: 'Globe HTTP fixture disposed'}));
             worker.terminate();

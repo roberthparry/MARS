@@ -22,7 +22,7 @@ typedef struct {
 
 struct _lab_texture_routes_t {
     globe_reader_t *reader;
-    lab_texture_route_t routes[74];
+    lab_texture_route_t routes[138];
 };
 
 /* GET revalidation uses weak comparison and accepts an HTTP entity-tag list. Header length is server-bounded. */
@@ -80,12 +80,13 @@ lab_texture_routes_t *lab_svr_textures_new(websrv_t *listener)
     if (!owner) return NULL;
     unsigned index = 0;
     bool ok = true;
-    for (unsigned level = 0; ok && level < 3; ++level) {
+    for (unsigned level = 0; ok && level < 4; ++level) {
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row) {
-            for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column) {
+            for (unsigned column = 0; ok && column < (level == 3 ? 64u : level == 2 ? 12u : 1u); ++column) {
                 lab_texture_route_t *route = &owner->routes[index++];
                 *route = (lab_texture_route_t){owner, level, column, row};
-                string_t *path = level == 2 ? string_sprintf("/earth_tiles/%02u-%02u.jpg", column, row)
+                string_t *path = level == 3 ? string_sprintf("/earth_regions/%02u.jpg", column) :
+                                level == 2 ? string_sprintf("/earth_tiles/%02u-%02u.jpg", column, row)
                                            : string_new_with(level ? "/earth_surface_detail.jpg" : "/earth_surface.jpg");
                 ok = path && websrv_route(listener, HTTP_GET, path, texture_request, route);
                 string_free(path);

@@ -12,7 +12,8 @@
  * engine, browser or network service is required. Display queries lazily retain immutable exact coordinates,
  * a spatial tree and four display resolutions; callers can prepare these before native workers fork.
  * A serially owned globe_reader_t session lazily retains a configured connection, revalidates
- * configuration and file metadata on acquisition, and must itself be created after forking.
+ * configuration and file metadata on acquisition, supplies opaque identities for derived-image caches,
+ * and must itself be created after forking.
  *
  * Cold hit-tests use indexed chunks; resident hit-tests use exact cached coordinates, never display simplifications.
  * Older compressed chunks remain readable. The 500-metre coastal uncertainty
@@ -46,12 +47,18 @@ typedef struct _globe_texture_info_t {
     char sha256[65]; /**< Lower-case hexadecimal content digest, including its terminating NUL. */
 } globe_texture_info_t;
 
+/** @brief Receive a regional JPEG slot and its west, south, east, north bounds; false stops enumeration. */
+typedef bool (*globe_texture_region_fn)(unsigned slot, const double bounds[4], void *context);
+
+/** @brief Visit installed regional photographs intersecting a non-wrapping window; JPEGs are 1800 or 3600 square. */
+bool globe_texture_regions(globe_t *globe, const double bounds[4], globe_texture_region_fn callback, void *context);
+
 /**
  * @brief Read indexed texture metadata without loading its JPEG payload.
  * @param globe Borrowed controller; calls must be serialised.
- * @param level Zero for the overview, one for global detail, or two for a native-resolution tile.
- * @param column Zero for global images; 0..11 west to east for tiles.
- * @param row Zero for global images; 0..5 north to south for tiles.
+ * @param level Zero for the overview, one for global detail, two for NASA tiles, three for regional photographs.
+ * @param column Zero for global images; 0..11 for NASA tiles; 0..63 regional slot.
+ * @param row Zero for global and regional images; 0..5 north to south for NASA tiles.
  * @param info Required output, cleared on failure.
  * @return True for installed, structurally valid metadata; false for missing data or invalid arguments.
  */
@@ -173,6 +180,15 @@ globe_reader_t *globe_reader_new(void);
  * Callers must serialise all access and must not close the borrowed controller or retain it across this call.
  */
 globe_t *globe_reader_get(globe_reader_t *reader);
+
+/**
+ * @brief Return an opaque cache identity for the reader's current configured database and journal state.
+ * @param reader Borrowed serially owned reader, refreshed before obtaining its identity.
+ * @return Owned hexadecimal identity, or NULL when storage is unavailable; release with string_free().
+ * @note This metadata fingerprint invalidates derived imagery after replacement or writes; it is not a content checksum.
+ * It contains no database path or credentials. Revalidate before publishing work derived from an earlier identity.
+ */
+string_t *globe_reader_identity(globe_reader_t *reader);
 
 /** @brief Close a session's owned connection and release the session; accepts NULL. */
 void globe_reader_free(globe_reader_t *reader);
@@ -303,6 +319,27 @@ bool globe_has_layer(const globe_t *globe, globe_layer_t layer);
 
 /** @brief Consume one clipped river segment; return false to cancel. Coordinates are longitude/latitude degrees. */
 typedef bool (*globe_river_segment_fn)(int64_t id, unsigned kind, double ax, double ay, double bx, double by, void *context);
+
+/** @brief Read a recorded width in metres; zero means unknown. False indicates invalid or corrupt data. */
+bool globe_river_width_metres(globe_t *globe, int64_t id, double *width);
+
+/**
+ * @brief Consume one mapped water polygon, with an outer ring followed by holes.
+ * @param coordinates Borrowed interleaved longitude/latitude degrees, unwrapped to the query window.
+ * @param ring_sizes Borrowed point counts for each consecutively stored, closed ring.
+ * @param ring_count Number of rings. Arrays remain valid only during the callback.
+ * @param context Caller-owned context. Return false to cancel and discard partial output.
+ */
+typedef bool (*globe_river_bank_fn)(const double *coordinates, const size_t *ring_sizes, size_t ring_count, void *context);
+
+/** @brief Stream indexed mapped water polygons; absent bank data give an empty successful result. */
+bool globe_river_banks(globe_t *globe, double west, double south, double east, double north,
+                       globe_river_bank_fn visit, void *context);
+
+/** @brief Whether a window lies wholly within an explicitly complete mapped open-water survey.
+ * Missing coverage returns false; absence of a water polygon alone never establishes land.
+ */
+bool globe_river_water_complete(globe_t *globe, double west, double south, double east, double north);
 
 /** @brief Stream bounded river segments; false means unavailable, invalid, corrupt or cancelled. Discard partial output. */
 bool globe_river_segments(globe_t *globe, double west, double south, double east, double north,

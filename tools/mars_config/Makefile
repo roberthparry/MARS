@@ -34,6 +34,10 @@ $(CONFIG_BUILD_DIR)/catalogue_towns: tools/mars_config/catalogue_towns.c $(STATI
 	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
 # Optional offline preparation only; GEOS is not linked into mars_config or libmars.
+$(CONFIG_BUILD_DIR)/river_water: tools/mars_config/river_water.c $(CONFIG_BUILD_DIR)/database/cfg_database_river_width.o $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) -Itools/mars_config/src/database $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< \
+	    $(CONFIG_BUILD_DIR)/database/cfg_database_river_width.o $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
+
 $(CONFIG_BUILD_DIR)/coastline_stage: tools/mars_config/coastline_stage.c $(STATIC_LIB)
 	$(CC) $(CFLAGS) $(INCLUDES) $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -l:libgeos_c.so.1
 

@@ -10,7 +10,8 @@
  * File access uses the MARS file module. Source credit and provenance belong in
  * THIRD_PARTY_NOTICES.md alongside the generated assets.
  * The --manifest mode records the packaged images' dimensions, sizes, source attribution and SHA-256 digests
- * for transactional installation into the globe database. It does not re-encode any image.
+ * for transactional installation into the globe database, preserving an existing regional catalogue.
+ * It does not re-encode any image.
  */
 #include <stdbool.h>
 #include <math.h>
@@ -20,6 +21,7 @@
 #include <jpeglib.h>
 
 #include "array-t.h"
+#include "json-t.h"
 #include "string-t.h"
 #include "file-t.h"
 
@@ -116,6 +118,33 @@ static bool save_overview(array_t *bytes, const char *directory, unsigned width)
     return ok;
 }
 
+static string_t *retain_regions(file_t *output, const string_t *text)
+{
+    string_t *previous = file_read_all_text(output);
+    json_t *old = previous ? json_from_text(previous) : NULL;
+    json_t *next = json_from_text(text);
+    string_t *regions_key = string_new_with("regions"), *assets_key = string_new_with("assets");
+    const json_t *regions = old && regions_key ? json_object_get(old, regions_key) : NULL;
+    const json_t *old_assets = old && assets_key ? json_object_get(old, assets_key) : NULL;
+    json_t *assets = next && assets_key ? json_clone(json_object_get(next, assets_key)) : NULL;
+    bool ok = next && assets && regions_key && assets_key && (!previous || old);
+    if (regions) {
+        size_t count = json_array_size(regions);
+        ok = ok && json_type(regions) == JSON_ARRAY && count <= 64 && json_object_set(next, regions_key, regions);
+        for (size_t i = 0; ok && i < count; ++i) {
+            string_t *key = string_sprintf("regional/%02u.jpg", (unsigned)i);
+            const json_t *asset = key ? json_object_get(old_assets, key) : NULL;
+            ok = asset && json_object_set(assets, key, asset);
+            string_free(key);
+        }
+        ok = ok && json_object_set(next, assets_key, assets);
+    }
+    string_t *result = ok ? json_to_string_pretty(next, 2) : NULL;
+    json_free(assets); json_free(next); json_free(old);
+    string_free(previous); string_free(regions_key); string_free(assets_key);
+    return result;
+}
+
 static bool save_manifest(const char *directory)
 {
     string_t *manifest = string_new_with(
@@ -149,7 +178,10 @@ static bool save_manifest(const char *directory)
     }
     string_t *path = string_sprintf("%s/manifest.json", directory);
     file_t *output = path ? file_new(path) : NULL;
-    ok = ok && string_append_cstr(manifest, "\n  }\n}\n") >= 0 && output && file_write_all_text(output, manifest);
+    ok = ok && string_append_cstr(manifest, "\n  }\n}\n") >= 0 && output;
+    string_t *combined = ok ? retain_regions(output, manifest) : NULL;
+    ok = combined && file_write_all_text(output, combined);
+    string_free(combined);
     file_free(output); string_free(path); string_free(manifest);
     return ok;
 }

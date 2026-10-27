@@ -17,6 +17,8 @@
 
 typedef struct {
     string_t *path;
+    string_t *fill;
+    globe_t *globe;
     double west, north, scale_x, scale_y;
     size_t segments;
     size_t limit;
@@ -28,6 +30,13 @@ static bool lab_river_segment(int64_t id, unsigned kind, double ax, double ay, d
     (void)id;
     (void)kind;
     lab_river_paths_t *p = context;
+    if (p->globe) {
+        double width;
+        if (!globe_river_width_metres(p->globe, id, &width)) return false;
+        if (width > 0)
+            return ++p->segments <= 100000 && lab_cal_river_ribbon(p->fill, width, ax, ay, bx, by,
+                p->west, p->north, p->scale_x, p->scale_y);
+    }
     return ++p->segments <= (p->limit ? p->limit : 100000) && string_append_format(p->path, "M%.3f %.3fL%.3f %.3f",
         (ax - p->west) * p->scale_x, (p->north - ay) * p->scale_y,
         (bx - p->west) * p->scale_x, (p->north - by) * p->scale_y) >= 0;
@@ -94,6 +103,9 @@ json_t *lab_cal_borders(const json_t *payload, unsigned *status)
 /* Render an independently requested overlay, never blocking the initial globe response. */
 json_t *lab_cal_rivers(const json_t *payload, unsigned *status)
 {
+    const char *format = lab_cal_text(payload, "format");
+    if (!strcmp(format, "surface-plan") || !strcmp(format, "surface-data"))
+        return lab_cal_river_surface(payload, status);
     double b[4];
     const char *keys[] = {"west", "south", "east", "north"};
     for (unsigned i = 0; i < 4; ++i)
@@ -104,17 +116,29 @@ json_t *lab_cal_rivers(const json_t *payload, unsigned *status)
         return lab_cal_error(status, 400, "River overlays require a close view");
     lab_river_paths_t p = {.path = string_new(), .west = b[0], .north = b[3],
                            .scale_x = 2048 / (b[2] - b[0]), .scale_y = 2048 / (b[3] - b[1])};
-    jurisdiction_t *j = jurisdict_open(NULL);
-    globe_t *r = jurisdict_globe_open(j);
+    globe_t *r = globe_open_configured(NULL);
+    p.globe = r;
+    p.fill = string_new();
     double tolerance = fmin(b[2] - b[0], b[3] - b[1]) / 2048;
-    bool ok = p.path && globe_river_display_segments(r, b[0], b[1], b[2], b[3], tolerance, lab_river_segment, &p);
+    bool regional = fmax(b[2] - b[0], b[3] - b[1]) <= 6;
+    bool ok = p.path && p.fill && (!regional ||
+        globe_river_display_segments(r, b[0], b[1], b[2], b[3], tolerance, lab_river_segment, &p));
+    json_t *banks = ok ? lab_cal_river_banks(r, b) : NULL;
+    string_t *bank_svg = string_new();
+    ok = ok && banks && bank_svg;
+    for (size_t i = 0; ok && i < json_array_size(banks); ++i) {
+        const string_t *path = json_string_value(json_array_get(banks, i));
+        ok = path && string_append_string(bank_svg, path) == 0;
+    }
     globe_close(r);
-    jurisdict_close(j);
     string_t *image = ok ? string_sprintf(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2048\" height=\"2048\" viewBox=\"0 0 2048 2048\">"
-        "<path fill=\"none\" stroke=\"#367fb0\" stroke-width=\"2\" stroke-linecap=\"round\" d=\"%s\"/></svg>",
-        string_c_str(p.path)) : NULL;
+        "<path fill=\"none\" stroke=\"#367fb0\" stroke-width=\"2\" stroke-linecap=\"round\" d=\"%s\"/>"
+        "<path fill=\"#367fb0\" d=\"%s\"/><path fill=\"#367fb0\" fill-rule=\"nonzero\" d=\"%s\"/></svg>", string_c_str(p.path), string_c_str(p.fill),
+        string_c_str(bank_svg)) : NULL;
     string_free(p.path);
+    string_free(p.fill);
+    string_free(bank_svg); json_free(banks);
     if (!image) return lab_cal_error(status, 503, "River data unavailable; import rivers into the globe database");
     json_t *response = json_new_object();
     lab_cal_take(response, "ok", json_new_bool(true));

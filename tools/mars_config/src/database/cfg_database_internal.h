@@ -17,6 +17,7 @@
 #include <stdint.h>
 
 #include "file-t.h"
+#include "json-t.h"
 #include "sqlite-t.h"
 
 /** Open the selected format: an empty key means plaintext; NULL is a configuration failure. */
@@ -153,6 +154,10 @@ bool cfg_database_rivers(sqlite_t *db, const string_t *root, const string_t *sta
  * Compressed input requires one complete frame with an at-most-8-MiB window; expanded input is capped at 128 GiB.
  */
 bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source);
+/** @brief Parse an explicit OSM width in metres; estimates and malformed widths return false. */
+bool cfg_database_river_width_metres(const json_t *properties, double *width);
+/** @brief Recognise mapped open water, including lakes and lagoons; wetland alone is insufficient. */
+bool cfg_database_river_open_water(const json_t *properties);
 
 /**
  * @brief Copy validated OSM chunks between distinct borrowed connections, replacing only river tables transactionally.

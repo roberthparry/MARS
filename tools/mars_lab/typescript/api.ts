@@ -242,10 +242,40 @@ namespace WorksheetRequests {
         /** @brief Run native endpoint selection, transport, decoding and metadata installation. */
         public async post(request: MarsApiRequest | null, payload: unknown, fallback: string,
                           signal?: AbortSignal): Promise<MarsApiPostResult> {
-            const frame: MarsApiPostFrame = {request, payload, fallback, signal};
-            const result = await this.advance(65, frame) as MarsApiPostResult | undefined;
-            if (!result) throw new Error('Native request did not return a response');
-            return result;
+            const calendar = ['/almanac-eval', '/datetime-eval', '/almanac-weather', '/datetime-weather'].includes(fallback);
+            const lifetime = request?.controller.signal || signal || this.lifetime.signal;
+            let delay = 1000;
+            let reconnecting = false;
+            for (;;) {
+                this.assertCurrent(request);
+                lifetime.throwIfAborted();
+                const frame: MarsApiPostFrame = {request, payload, fallback, signal};
+                try {
+                    const result = await this.advance(65, frame) as MarsApiPostResult | undefined;
+                    if (!result) throw new Error('Native request did not return a response');
+                    if (reconnecting && request?.channel === this.mainChannel) this.host.status('');
+                    return result;
+                } catch (error) {
+                    this.assertCurrent(request);
+                    lifetime.throwIfAborted();
+                    // Only failed network transport is retried; native validation and calculation errors retain their diagnostics.
+                    if (!calendar || !(error instanceof TypeError)) throw error;
+                    reconnecting = true;
+                    if (request?.channel === this.mainChannel)
+                        this.host.status('Reconnecting… showing the previous worksheet until the selected calculation is available.');
+                    await new Promise<void>((resolve, reject) => {
+                        const finish = () => {
+                            clearTimeout(timer);
+                            lifetime.removeEventListener('abort', abort);
+                        };
+                        const abort = () => { finish(); reject(new DOMException('Aborted', 'AbortError')); };
+                        const timer = setTimeout(() => { finish(); resolve(); }, delay);
+                        lifetime.addEventListener('abort', abort, {once: true});
+                        if (lifetime.aborted) abort();
+                    });
+                    delay = Math.min(8000, delay * 2);
+                }
+            }
         }
 
         /** @brief Run an admitted action with native cleanup, preserving its resolved result type. */

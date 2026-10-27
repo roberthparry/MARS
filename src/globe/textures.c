@@ -6,6 +6,7 @@
  * HTTP consumers can revalidate browser caches without reading or decrypting an image. No image codec, migration,
  * filesystem fallback or persistent pixel cache is part of this reader. Installers validate JPEG dimensions.
  */
+#include <math.h>
 #include <string.h>
 #include <sodium.h>
 
@@ -15,7 +16,8 @@
 
 static bool texture_address(unsigned level, unsigned column, unsigned row)
 {
-    return level < 3 && (level == 2 ? column < 12 && row < 6 : column == 0 && row == 0);
+    return level == 3 ? column < 64 && row == 0 :
+        level < 3 && (level == 2 ? column < 12 && row < 6 : column == 0 && row == 0);
 }
 
 static bool texture_digest(const char *text)
@@ -36,15 +38,49 @@ bool textures_metadata(sqlite_t *db, unsigned level, unsigned column, unsigned r
         "and exists(select 1 from globe_texture_dataset where id=1 and format_version=1)");
     bool ok = q && sqlite_stmt_bind_int(q, 1, level) && sqlite_stmt_bind_int(q, 2, column) &&
               sqlite_stmt_bind_int(q, 3, row) && sqlite_stmt_step(q) == SQLITE_STEP_ROW;
-    static const int widths[] = {2048, 8192, 1800}, heights[] = {1024, 4096, 1800};
+    static const int widths[] = {2048, 8192, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800};
+    int width = ok && level == 3 && sqlite_stmt_column_int(q, 0) == 3600 ? 3600 : widths[level];
+    int height = level == 3 ? width : heights[level];
     int64_t size = ok ? sqlite_stmt_column_int64(q, 2) : 0;
     const char *digest = ok ? sqlite_stmt_column_text(q, 3) : NULL;
-    ok = ok && sqlite_stmt_column_int(q, 0) == widths[level] && sqlite_stmt_column_int(q, 1) == heights[level] &&
-         size >= 4 && size <= (level == 1 ? 16777216 : 4194304) && texture_digest(digest);
+    ok = ok && sqlite_stmt_column_int(q, 0) == width && sqlite_stmt_column_int(q, 1) == height &&
+         size >= 4 && size <= (level == 1 || level == 3 ? 16777216 : 4194304) && texture_digest(digest);
     if (ok) {
-        info->width = widths[level]; info->height = heights[level]; info->byte_count = (size_t)size;
+        info->width = width; info->height = height; info->byte_count = (size_t)size;
         memcpy(info->sha256, digest, sizeof info->sha256);
     }
+    sqlite_stmt_finalize(q);
+    return ok;
+}
+
+bool textures_regions(sqlite_t *db, const double bounds[4], globe_texture_region_fn callback, void *context)
+{
+    if (!db || !bounds || !callback) return false;
+    for (unsigned i = 0; i < 4; ++i) if (!isfinite(bounds[i])) return false;
+    if (bounds[0] >= bounds[2] || bounds[1] >= bounds[3]) return false;
+    sqlite_stmt_t *exists = sqlite_stmt_prepare(db,
+        "select 1 from sqlite_master where type='table' and name='globe_texture_region'");
+    sqlite_step_result_t step = exists ? sqlite_stmt_step(exists) : SQLITE_STEP_ERROR;
+    sqlite_stmt_finalize(exists);
+    if (step != SQLITE_STEP_ROW) return step == SQLITE_STEP_DONE;
+    /* The optional catalogue is capped at 64 slots, so this metadata-only scan has a fixed small bound. */
+    sqlite_stmt_t *q = sqlite_stmt_prepare(db,
+        "select slot,west,south,east,north from globe_texture_region "
+        "where west<?1 and east>?2 and south<?3 and north>?4 order by slot limit 65");
+    bool ok = q && sqlite_stmt_bind_double(q, 1, bounds[2]) && sqlite_stmt_bind_double(q, 2, bounds[0]) &&
+              sqlite_stmt_bind_double(q, 3, bounds[3]) && sqlite_stmt_bind_double(q, 4, bounds[1]);
+    unsigned count = 0;
+    while (ok && (step = sqlite_stmt_step(q)) == SQLITE_STEP_ROW) {
+        int slot = sqlite_stmt_column_int(q, 0);
+        double b[4];
+        for (unsigned i = 0; i < 4; ++i) {
+            b[i] = sqlite_stmt_column_double(q, i + 1);
+            ok = ok && isfinite(b[i]);
+        }
+        ok = ok && ++count <= 64 && slot >= 0 && slot < 64 && b[0] >= -180 && b[2] <= 180 &&
+             b[1] >= -90 && b[3] <= 90 && b[0] < b[2] && b[1] < b[3] && callback((unsigned)slot, b, context);
+    }
+    ok = ok && step == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(q);
     return ok;
 }

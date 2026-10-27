@@ -526,6 +526,13 @@ void lab_result_copy(jsref target, jsref last_TeX)
     if (lab_dom_equal(target, lab_dom_string("rendered"))) {
         int rendered = lab_dom_query(0, "#rendered");
         text = lab_dom_has_class(rendered, "error") ? lab_dom_read(rendered, LAB_DOM_TEXT, "") : last_TeX;
+        if (!lab_dom_has_class(rendered, "error")) {
+            int latitude = lab_dom_query(rendered, ".almanac-summary [data-coordinate=\"latitude\"]");
+            int longitude = lab_dom_query(rendered, ".almanac-summary [data-coordinate=\"longitude\"]");
+            if (lab_dom_truth(latitude) && lab_dom_truth(longitude))
+                text = lab_dom_join(lab_dom_join(lab_dom_read(latitude, LAB_DOM_TEXT, ""), lab_dom_string(", "), ""),
+                                    lab_dom_read(longitude, LAB_DOM_TEXT, ""), "");
+        }
     } else if (lab_dom_equal(target, lab_dom_string("plot"))) {
         int plot = lab_dom_id("plotRendered");
         text = lab_dom_has_class(plot, "error") ? lab_dom_read(plot, LAB_DOM_TEXT, "") : lab_result_data(plot, "displaySvg");

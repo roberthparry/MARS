@@ -303,6 +303,10 @@ window.checkLabResultDom = async function checkLabResultDom() {
         equal(WorksheetContext.rendered.dataset.displayTex, 'short TeX', 'native abbreviated TeX installed');
         equal(WorksheetContext.rendered.dataset.responsiveFit, 'true', 'native responsive-fit flag');
         equal(WorksheetResults.clipboard.copyTextForTarget('rendered'), 'native TeX', 'rendered copy source');
+        WorksheetContext.rendered.innerHTML = '<dl class="almanac-summary">' +
+            '<dd data-coordinate="latitude">52° 18.81′ N</dd><dd data-coordinate="longitude">3° 43.11′ W</dd></dl>';
+        equal(WorksheetResults.clipboard.copyTextForTarget('rendered'), '52° 18.81′ N, 3° 43.11′ W',
+              'Almanac copies the displayed coordinates, latitude first');
         WorksheetContext.rendered.classList.add('error');
         WorksheetContext.rendered.textContent = 'native diagnostic';
         equal(WorksheetResults.clipboard.copyTextForTarget('rendered'), 'native diagnostic', 'error copy policy');

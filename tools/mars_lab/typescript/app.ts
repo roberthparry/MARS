@@ -97,6 +97,10 @@ class LabScriptLoad {
 class LabApplication {
     /** @brief Initial selected-jurisdiction loading; workspace startup does not await it. */
     public townsReady: Promise<void> = Promise.resolve();
+    private restored = false;
+    private resolveRestored!: () => void;
+    /** @brief Saved controls and camera are ready, independently of worksheet calculation. */
+    public readonly restoredReady = new Promise<void>(resolve => { this.resolveRestored = resolve; });
     private readonly townJurisdictions = new Set<string>();
     private readonly failedTownCodes = new Set<string>();
     private readonly townJobs = new Map<string, {controller: AbortController; promise: Promise<void>; ready: Promise<void>}>();
@@ -164,11 +168,18 @@ class LabApplication {
             worksheet: this.startWorksheet.bind(this),
             fail: this.failStartup.bind(this)
         }, this.lifetime.signal);
+    }
+
+    /** @brief Begin independent map/catalogue work once the saved observer has been restored. */
+    public worksheetRestored(): void {
+        if (this.restored) return;
+        this.restored = true;
         this.townsReady = this.loadTowns().catch(error => {
             if (!this.lifetime.signal.aborted) {
                 this.townNotice(`Town loading incomplete: ${String(error)}. Loaded towns and observer coordinates remain usable.`);
             }
         });
+        this.resolveRestored();
     }
 
     private townNotice(message: string): void {

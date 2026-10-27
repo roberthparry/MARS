@@ -36,19 +36,22 @@ bool test_lab_texture_database(const char *directory)
         "create table globe_texture(level,column_index,row_index,width,height,byte_count,sha256,jpeg,"
         "primary key(level,column_index,row_index));");
     sqlite_stmt_t *q = ok ? sqlite_stmt_prepare(db, "insert into globe_texture values(?1,?2,?3,?4,?5,?6,?7,?8)") : NULL;
-    static const unsigned widths[] = {2048, 8192, 1800}, heights[] = {1024, 4096, 1800};
+    static const unsigned widths[] = {2048, 8192, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800};
     ok = ok && q;
-    for (unsigned level = 0; ok && level < 3; ++level) {
+    for (unsigned level = 0; ok && level < 4; ++level) {
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row) {
-            for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column) {
-                string_t *name = level == 2 ? string_sprintf("packaging/globe-db/textures/earth_tiles/%02u-%02u.jpg", column, row)
+            for (unsigned column = 0; ok && column < (level == 3 ? 2u : level == 2 ? 12u : 1u); ++column) {
+                unsigned width = level == 3 && column == 1 ? 3600 : widths[level];
+                unsigned height = level == 3 ? width : heights[level];
+                string_t *name = level == 3 ? string_sprintf("packaging/globe-db/textures/regional/%02u.jpg", column) :
+                                level == 2 ? string_sprintf("packaging/globe-db/textures/earth_tiles/%02u-%02u.jpg", column, row)
                                 : string_sprintf("packaging/globe-db/textures/earth_surface%s.jpg", level ? "_detail" : "");
                 file_t *file = name ? file_new(name) : NULL;
                 array_t *bytes = file ? file_read_all_bytes(file) : NULL;
                 string_t *hash = bytes ? file_sha256(file) : NULL;
                 ok = bytes && hash && sqlite_stmt_bind_int(q, 1, level) && sqlite_stmt_bind_int(q, 2, column) &&
-                     sqlite_stmt_bind_int(q, 3, row) && sqlite_stmt_bind_int(q, 4, widths[level]) &&
-                     sqlite_stmt_bind_int(q, 5, heights[level]) && sqlite_stmt_bind_int64(q, 6, array_size(bytes)) &&
+                     sqlite_stmt_bind_int(q, 3, row) && sqlite_stmt_bind_int(q, 4, width) &&
+                     sqlite_stmt_bind_int(q, 5, height) && sqlite_stmt_bind_int64(q, 6, array_size(bytes)) &&
                      sqlite_stmt_bind_text(q, 7, string_c_str(hash)) &&
                      sqlite_stmt_bind_blob(q, 8, array_get(bytes, 0), array_size(bytes)) && sqlite_stmt_step(q) == SQLITE_STEP_DONE;
                 sqlite_stmt_reset(q);
@@ -57,6 +60,9 @@ bool test_lab_texture_database(const char *directory)
         }
     }
     sqlite_stmt_finalize(q);
+    ok = ok && sqlite_exec_cstr(db,
+        "create table globe_texture_region(slot integer primary key,west,south,east,north);"
+        "insert into globe_texture_region values(0,-3.85,52.166666667,-3.60,52.333333333)");
     ok = ok && sqlite_exec_cstr(db, "commit") && !setenv("MARS_GLOBE_DB_PATH", string_c_str(path), 1) &&
          !setenv("MARS_GLOBE_DB_KEY", "", 1);
     sqlite_close(db); string_free(path);

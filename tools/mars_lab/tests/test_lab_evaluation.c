@@ -19,8 +19,10 @@
 #include "almanac-t.h"
 #include "file-t.h"
 #include "number-t.h"
+#include "sqlite-t.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
+#include "lab_state.h"
 #define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
 #include "internal/lab_evaluate_internal.h"
 #define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
@@ -374,7 +376,6 @@ static void test_lab_observing_conditions(void)
 
 static bool weather_cache_fixture(const char *directory)
 {
-    (void)directory;
     time_t now = time(NULL);
     struct tm utc = {0};
     gmtime_r(&now, &utc);
@@ -384,12 +385,46 @@ static bool weather_cache_fixture(const char *directory)
     json_t *options = test_lab_json("{\"lat\":\"52.7077\",\"lon\":\"-2.7541\",\"elevation\":\"50\"}");
     lab_cal_set(options, "date", date);
     lab_cal_set(options, "time", clock);
+    /* Preserve an observation from the former files before accepting any new weather. */
+    string_t *location = string_new_with("52.708,-2.754");
+    string_t *legacy_directory = string_sprintf("%s/lab/weather-cache", directory);
+    string_t *legacy_path = string_sprintf("%S/%02lu.json", legacy_directory, string_hash(location) % 64);
+    file_t *legacy_dir = file_new(legacy_directory), *legacy_file = file_new(legacy_path);
+    string_t *legacy = string_sprintf("{\"location\":\"52.708,-2.754\",\"retrieved\":\"%lld\","
+                                      "\"observed\":\"%lld\",\"temp_c\":\"7.2\"}", (long long)now, (long long)now);
+    bool migrated = file_create_directory(legacy_dir, 0700, true) && file_write_all_text(legacy_file, legacy);
+    string_t *blocked_path = lab_state_private_path("weather_cache.db");
+    sqlite_t *blocked = sqlite_open_plain(blocked_path);
+    migrated = migrated && blocked && sqlite_exec_cstr(blocked,
+        "CREATE TABLE weather_cache(slot INTEGER PRIMARY KEY,record TEXT NOT NULL)");
+    sqlite_stmt_t *legacy_insert = blocked ? sqlite_stmt_prepare(blocked,
+        "INSERT INTO weather_cache VALUES(7,?1)") : NULL;
+    migrated = migrated && legacy_insert && sqlite_stmt_bind_text(legacy_insert, 1, string_c_str(legacy)) &&
+               sqlite_stmt_step(legacy_insert) == SQLITE_STEP_DONE;
+    sqlite_stmt_finalize(legacy_insert);
+    migrated = migrated && blocked && sqlite_exec_cstr(blocked, "BEGIN IMMEDIATE");
+    json_t *unavailable = lab_cal_weather_recent(options, now);
+    migrated = migrated && !unavailable && file_exists(legacy_file);
+    json_free(unavailable);
+    if (blocked) sqlite_exec_cstr(blocked, "ROLLBACK");
+    sqlite_close(blocked);
+    string_free(blocked_path);
+    json_t *imported = migrated ? lab_cal_weather_recent(options, now) : NULL;
+    migrated = migrated && imported && !strcmp(lab_cal_text(imported, "temp_c"), "7.2") &&
+               !file_exists(legacy_dir);
+    json_free(imported);
+    file_free(legacy_file);
+    file_free(legacy_dir);
+    string_free(legacy);
+    string_free(legacy_path);
+    string_free(legacy_directory);
+    string_free(location);
     string_t *source = string_sprintf("{\"current\":{\"last_updated_epoch\":%lld,\"temp_c\":8.3,\"pressure_mb\":1032}}",
                                       (long long)now);
     json_t *weather = json_from_text(source);
     string_free(source);
     lab_cal_observing_conditions(options, weather);
-    bool ok = !strcmp(lab_cal_text(options, "weather_source"),
+    bool ok = migrated && !strcmp(lab_cal_text(options, "weather_source"),
                       "WeatherAPI\nestimated pressure (standard atmosphere)") &&
               !strcmp(lab_cal_text(options, "temperature_c"), "8.300000");
     if (!ok) string_fprintf(stderr, "Current observation failed: %s\n", lab_cal_text(options, "weather_source"));
@@ -403,6 +438,28 @@ static bool weather_cache_fixture(const char *directory)
     ok = ok && recent && !strcmp(lab_cal_text(recent, "temp_c"), "8.3");
     if (!ok) string_fprintf(stderr, "Recent cache lookup failed\n");
     json_free(recent);
+    string_t *cache_path = lab_state_private_path("weather_cache.db");
+    sqlite_t *cache_db = sqlite_open_plain(cache_path);
+    ok = ok && cache_db && sqlite_exec_cstr(cache_db, "BEGIN IMMEDIATE");
+    /* Another worker holding the cache must cause an immediate miss, not a blocked evaluation. */
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && !recent;
+    json_free(recent);
+    if (cache_db) sqlite_exec_cstr(cache_db, "ROLLBACK");
+    sqlite_stmt_t *limit = cache_db ? sqlite_stmt_prepare(cache_db, "SELECT count(*) FROM weather_records") : NULL;
+    ok = ok && limit && sqlite_stmt_step(limit) == SQLITE_STEP_ROW && sqlite_stmt_column_int(limit, 0) == 1;
+    sqlite_stmt_finalize(limit);
+    ok = ok && !sqlite_stmt_prepare(cache_db, "SELECT record FROM weather_cache") &&
+         !sqlite_exec_cstr(cache_db, "UPDATE weather_records SET latitude=100") &&
+         !sqlite_exec_cstr(cache_db, "UPDATE weather_records SET source=zeroblob(257)");
+    limit = sqlite_stmt_prepare(cache_db,
+        "SELECT typeof(latitude),typeof(temperature_c),valid_utc FROM weather_readable");
+    ok = ok && limit && sqlite_stmt_step(limit) == SQLITE_STEP_ROW &&
+         !strcmp(sqlite_stmt_column_text(limit, 0), "real") &&
+         !strcmp(sqlite_stmt_column_text(limit, 1), "real") && strlen(sqlite_stmt_column_text(limit, 2)) == 19;
+    sqlite_stmt_finalize(limit);
+    sqlite_close(cache_db);
+    string_free(cache_path);
     recent = lab_cal_weather_recent(options, now + 3601);
     ok = ok && !recent;
     json_free(recent);
@@ -424,8 +481,14 @@ static bool weather_cache_fixture(const char *directory)
     lab_cal_set(options, "time", clock);
     lab_cal_set(options, "lon", "-1.7541");
     recent = lab_cal_weather_recent(options, now);
+    double distance = 0;
+    ok = ok && recent && lab_cal_number(lab_cal_text(recent, "distance_km"), &distance) && distance > 60 && distance < 80;
+    json_free(recent);
+    lab_cal_set(options, "lat", "20");
+    recent = lab_cal_weather_recent(options, now);
     ok = ok && !recent;
     json_free(recent);
+    lab_cal_set(options, "lat", "52.7077");
     lab_cal_set(options, "lon", "-2.7541");
     lab_cal_set(options, "date", "2000-01-01");
     recent = lab_cal_weather_recent(options, now);
@@ -438,6 +501,80 @@ static bool weather_cache_fixture(const char *directory)
     recent = lab_cal_weather_recent(options, now);
     ok = ok && recent && !strcmp(lab_cal_text(recent, "temp_c"), "8.3");
     json_free(recent);
+    /* The closest fresh observation wins, rather than always using the latest observation. */
+    source = string_sprintf("{\"current\":{\"last_updated_epoch\":%lld,\"temp_c\":12.4}}", (long long)now - 1800);
+    json_t *earlier = json_from_text(source);
+    string_free(source);
+    lab_cal_weather_remember(options, earlier, now);
+    time_t selected = now - 1700;
+    gmtime_r(&selected, &utc);
+    strftime(date, sizeof date, "%Y-%m-%d", &utc);
+    strftime(clock, sizeof clock, "%H:%M:%S", &utc);
+    lab_cal_set(options, "date", date);
+    lab_cal_set(options, "time", clock);
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && recent && !strcmp(lab_cal_text(recent, "temp_c"), "12.4");
+    json_free(recent);
+    /* More than 64 locations coexist, including keys that previously collided in the same slot. */
+    for (unsigned i = 0; i < 70; ++i) {
+        string_t *longitude = string_sprintf("%u", i);
+        lab_cal_set(options, "lon", string_c_str(longitude));
+        string_free(longitude);
+        lab_cal_weather_remember(options, earlier, now);
+    }
+    lab_cal_set(options, "lon", "-2.7541");
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && recent && !strcmp(lab_cal_text(recent, "temp_c"), "12.4");
+    json_free(recent);
+    json_free(earlier);
+    cache_path = lab_state_private_path("weather_cache.db");
+    cache_db = sqlite_open_plain(cache_path);
+    ok = ok && sqlite_exec_cstr(cache_db, "DELETE FROM weather_records");
+    sqlite_close(cache_db);
+    string_free(cache_path);
+    lab_cal_set(options, "lat", "48.8566");
+    lab_cal_set(options, "lon", "2.3522");
+    lab_cal_weather_remember(options, weather, now);
+    lab_cal_set(options, "lat", "51.5074");
+    lab_cal_set(options, "lon", "-0.1278");
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && recent && lab_cal_number(lab_cal_text(recent, "distance_km"), &distance) &&
+         distance > 340 && distance < 350;
+    json_free(recent);
+    lab_cal_weather_remember(options, weather, now);
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && recent && lab_cal_number(lab_cal_text(recent, "distance_km"), &distance) && distance < 0.1;
+    json_free(recent);
+    lab_cal_set(options, "lat", "0");
+    lab_cal_set(options, "lon", "179.5");
+    lab_cal_weather_remember(options, weather, now);
+    lab_cal_set(options, "lon", "-179.5");
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && recent && lab_cal_number(lab_cal_text(recent, "distance_km"), &distance) &&
+         distance > 110 && distance < 112;
+    json_free(recent);
+    lab_cal_observing_conditions(options, NULL);
+    ok = ok && strstr(lab_cal_text(options, "weather_source"), "from 111 km away");
+    lab_cal_set(options, "lat", "-45");
+    for (unsigned i = 0; i < 520; ++i) {
+        string_t *longitude = string_sprintf("%.1f", -130 + i * 0.5);
+        lab_cal_set(options, "lon", string_c_str(longitude));
+        string_free(longitude);
+        lab_cal_weather_remember(options, weather, now);
+    }
+    cache_path = lab_state_private_path("weather_cache.db");
+    cache_db = sqlite_open_plain(cache_path);
+    limit = sqlite_stmt_prepare(cache_db, "SELECT count(*) FROM weather_records");
+    ok = ok && limit && sqlite_stmt_step(limit) == SQLITE_STEP_ROW && sqlite_stmt_column_int(limit, 0) == 512;
+    sqlite_stmt_finalize(limit);
+    limit = sqlite_stmt_prepare(cache_db, "PRAGMA page_count");
+    ok = ok && limit && sqlite_stmt_step(limit) == SQLITE_STEP_ROW && sqlite_stmt_column_int(limit, 0) <= 256;
+    sqlite_stmt_finalize(limit);
+    sqlite_close(cache_db);
+    string_free(cache_path);
+    recent = lab_cal_weather_recent(options, now);
+    ok = ok && recent;
+    json_free(recent);
     json_free(weather);
     json_free(options);
     return ok;
@@ -446,7 +583,7 @@ static bool weather_cache_fixture(const char *directory)
 static void test_lab_weather_recent_estimate(void)
 {
     TEST_ASSERT_TRUE(test_lab_isolated(weather_cache_fixture),
-                     "current UTC observations and location-matched estimates expire strictly at 48 hours");
+                     "SQLite migration preserves observations, removes old files and skips contention; estimates expire in one hour");
 }
 
 static bool weather_conditions_fixture(const char *directory)

@@ -104,6 +104,12 @@ void test_lab_almanac_presentation_cases(void);
 /** Register isolated native shoreline-vector transport tests. */
 void test_lab_vector_cases(void);
 
+/** @brief Register native photographic river surface and cache identity regressions. */
+void test_lab_river_surface_cases(void);
+
+/** @brief Register the documented geographic cache identity example after ordinary tests. */
+void test_lab_river_surface_readme_cases(void);
+
 /** @brief Register native mathematical worker regressions. @return No value. */
 void test_lab_math_cases(void);
 

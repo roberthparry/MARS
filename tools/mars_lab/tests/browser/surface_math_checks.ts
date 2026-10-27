@@ -23,6 +23,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     await checkGlobeHTTP(check);
     await checkGlobeGPU(check);
     await checkGlobePhoto(check);
+    await checkGlobeSurface(check);
     const regionalSvg = window.labAlmanacFixtures()[3];
     const regionalFlag = 'data:image/svg+xml;base64,' + btoa(regionalSvg);
     const existingCountry = document.getElementById('almanacJurisdiction');
@@ -820,10 +821,14 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         }
     }
     check(labDOM.call('lab_globe_pick', 2, 0, [0, 0, 0, 1]) === null, 'globe limb rejects outside clicks');
-    check(labDOM.call('lab_globe_arrival_zoom', 10, 800, 21600) === 10 &&
-          (labDOM.call('lab_globe_arrival_zoom', 4096, 800, 21600) as number) < 26 &&
-          labDOM.call('lab_globe_arrival_zoom', 10, 0, 21600) === null,
-          'automatic arrivals retain useful zoom and bound excessive photo magnification with validated viewport sizes');
+    {
+        const start = [...labDOM.call('lab_globe_centre', 52.708, -2.75) as number[], 4096];
+        const end = [...labDOM.call('lab_globe_centre', 52.709, -2.75) as number[], 4096];
+        for (const progress of [0, .125, .25, .5, .75, .875, 1]) {
+            const frame = labDOM.call('lab_globe_flight', start, end, progress) as number[];
+            check(frame[4] === 4096, 'nearby visible destinations retain maximum departure zoom throughout travel');
+        }
+    }
     {
         const juneau = [...labDOM.call('lab_globe_centre', 58.3019, -134.4197) as number[], 150];
         const repaired = labDOM.call('lab_globe_history_camera', juneau, -33.4489, -70.6693, 20) as number[];
@@ -834,6 +839,19 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             .every((value, i) => value === juneau[i]), 'matching saved cameras retain their exact orientation and zoom');
         check(labDOM.call('lab_globe_history_camera', juneau, 91, 0, 20) === null,
               'history camera repair rejects invalid geographic observers');
+    }
+    {
+        const start = [...labDOM.call('lab_globe_centre', 0, 0) as number[], 150];
+        const quarter = [...labDOM.call('lab_globe_centre', 0, 90) as number[], 1];
+        const distance = labDOM.call('lab_globe_flight_distance', start, quarter) as number;
+        check(distance > 10007 && distance < 10008, 'travel notice distance measures a quarter great circle in kilometres');
+        check(labDOM.call('lab_globe_flight_distance', start, [...start.slice(0, 4), 4096]) === 0,
+              'zoom-only changes do not add travel distance');
+        const west = [...labDOM.call('lab_globe_centre', 0, 179.9) as number[], 1];
+        const east = [...labDOM.call('lab_globe_centre', 0, -179.9) as number[], 1];
+        const crossing = labDOM.call('lab_globe_flight_distance', west, east) as number;
+        check(crossing > 22 && crossing < 23, 'travel distance takes the short route across the date line');
+        check(labDOM.call('lab_globe_flight_distance', [], quarter) === null, 'invalid cameras have no travel distance');
     }
     for (const [lat, lon] of [[52, -2], [-33, 151], [89.99, -179.9], [0, 180]]) {
         const start = [...labDOM.call('lab_globe_centre', 0, 179.9) as number[], 150];
@@ -908,6 +926,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         a.reduce((sum, value, i) => sum + value * b[i], 0));
     for (const [fromLat, fromLon, toLat, toLon, zoom] of [
         [51, -2, 51.1, -1.9, 150], [51, -2, 52, -1, 4096], [70, -60, 70, 60, 128],
+        [70.6634, 23.6821, 69.9689, 23.2716, 4096],
         [0, 179.9, 0, -179.9, 150], [89.9, 0, 89.9, 180, 150],
         [0, 0, 0, 180, 150], [0, 0, .000001, 179.999999, 150], [51, -2, 51, -2, 150],
         ...globeFlightRoutes.map(([, a, b, c, d]) => [a, b, c, d, 150])
@@ -921,7 +940,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         const extent = Math.max(Math.abs(projected[0]), Math.abs(projected[1]));
         const visible = projected[2] > 0 && extent * zoom <= 1.12;
         const cruise = visible ? zoom : Math.min(zoom, 1.05 / Math.sqrt((1 - projected[2]) / 2));
-        const alignsHeading = projected[2] <= 0 || Math.hypot(projected[0], projected[1]) * zoom > 1.12 * Math.SQRT2;
+        const alignsHeading = distance * 6371.0088 >= 500 &&
+            (projected[2] <= 0 || Math.hypot(projected[0], projected[1]) * zoom > 1.12 * Math.SQRT2);
         let previousDistance = 0;
         for (const progress of [.01, .125, .25, .375, .5, .625, .75, .875, .99]) {
             const frame = labDOM.call('lab_globe_flight', start, end, progress) as number[];
@@ -1289,7 +1309,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             const paletteBackend = await import(paletteModuleURL) as typeof import('../../typescript/globe_gpu.js');
             const activeTexture = gl.getParameter(gl.ACTIVE_TEXTURE) as number;
             const savedTextures: (WebGLTexture | null)[] = [], paletteTextures: WebGLTexture[] = [];
-            const paletteUniforms = ['mapMode', 'detailReady', 'grid', 'riverReady', 'vectorReady', 'naturalShore', 'palettesReady', 'photoReady'];
+            const paletteUniforms = ['mapMode', 'detailReady', 'grid', 'riverReady', 'riverComposite', 'vectorReady', 'naturalShore', 'palettesReady', 'photoReady'];
             const savedUniforms = paletteUniforms.map(name => gl.getUniform(program, gl.getUniformLocation(program, name)!));
             const savedCamera = gl.getUniform(program, gl.getUniformLocation(program, 'camera')!) as Float32Array;
             const savedGridMatrix = gl.getUniform(program, gl.getUniformLocation(program, 'cameraToWorld')!) as Float32Array;
@@ -1421,6 +1441,38 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                                   1, 1, gl.RGBA, gl.UNSIGNED_BYTE, outside);
                     check(outside.every((channel, i) => Math.abs(channel - localCentre[i]) <= 2),
                           'outside a retained patch preserves the same world-anchored photograph');
+                    const savedViewport = gl.getParameter(gl.VIEWPORT) as Int32Array;
+                    const viewportUniform = gl.getUniform(program, gl.getUniformLocation(program, 'viewport')!) as number;
+                    const blend = gl.getUniform(program, gl.getUniformLocation(program, 'shoreBlend')!) as number;
+                    try {
+                        gl.viewport(0, 0, 1, 1);
+                        gl.uniform1f(gl.getUniformLocation(program, 'viewport'), 1);
+                        gl.uniform1f(gl.getUniformLocation(program, 'shoreBlend'), 1);
+                        gl.uniform4f(gl.getUniformLocation(program, 'shoreBounds'), -180, -90, 180, 90);
+                        gl.uniform3f(gl.getUniformLocation(program, 'shoreOffset'), 0, 0, 1);
+                        gl.activeTexture(gl.TEXTURE4);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+                        const sample = (values: number[]) => {
+                            const bytes = new Uint8Array(values.flatMap(value => [value, value, value, 255]));
+                            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+                            gl.drawArrays(gl.TRIANGLES, 0, 6);
+                            const pixel = new Uint8Array(4);
+                            gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+                            return pixel;
+                        };
+                        const water = sample([0, 0, 0, 0]), land = sample([255, 255, 255, 255]);
+                        const edge = sample([0, 0, 0, 255]);
+                        check(edge[1] > Math.min(water[1], land[1]) + 2 &&
+                              edge[1] < Math.max(water[1], land[1]) - 2 && edge[3] === 255,
+                              'harbour stencil corners receive subpixel coverage instead of a hard single-sample step');
+                    } finally {
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                        gl.viewport(savedViewport[0], savedViewport[1], savedViewport[2], savedViewport[3]);
+                        gl.uniform1f(gl.getUniformLocation(program, 'viewport'), viewportUniform);
+                        gl.uniform1f(gl.getUniformLocation(program, 'shoreBlend'), blend);
+                    }
                 } finally {
                     gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), naturalSaved);
                     shoreNames.forEach((name, i) => {
@@ -1457,10 +1509,34 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     const centre = Math.floor(globeCanvas.width / 2);
                     gl.readPixels(centre, centre, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, sea);
                     gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 1);
+                    gl.uniform1i(gl.getUniformLocation(program, 'riverComposite'), 0);
+                    gl.activeTexture(gl.TEXTURE3);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                                  new Uint8Array([255, 255, 255, 255]));
                     gl.drawArrays(gl.TRIANGLES, 0, 6);
                     gl.readPixels(centre, centre, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, river);
                     check(sea.every((channel, i) => Math.abs(channel - river[i]) <= 1),
                           'river colour matches adjoining sea and fjord water, including missing-photo fallback');
+                    gl.uniform1i(gl.getUniformLocation(program, 'riverComposite'), 1);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                                  new Uint8Array([0, 0, 0, 0]));
+                    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                    gl.readPixels(centre, centre, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, river);
+                    check(sea.every((channel, i) => Math.abs(channel - river[i]) <= 1),
+                          'cached photographic river cut-outs use the same water palette and lighting');
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                                  new Uint8Array([32, 42, 15, 128]));
+                    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                    gl.readPixels(centre, centre, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, river);
+                    check(river[1] > river[2] && river[3] >= 250,
+                          'surveyed islands replace coarse lake water with opaque land');
+                    const vectorReady = gl.getUniform(program, gl.getUniformLocation(program, 'vectorReady')!);
+                    gl.uniform1i(gl.getUniformLocation(program, 'vectorReady'), 1);
+                    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                    gl.readPixels(centre, centre, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, river);
+                    check(river[1] > river[2] && river[3] >= 250,
+                          'surveyed islands also cover the underlying SVG shoreline');
+                    gl.uniform1i(gl.getUniformLocation(program, 'vectorReady'), Number(vectorReady));
                 }
                 // Constant geographic coordinates isolate real shader grid coverage from projection and imagery.
                 gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 0);
@@ -1769,12 +1845,15 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 const naturalTexture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
                 const sandTexture = gl.createTexture()!;
                 const photoReady = gl.getUniform(program, gl.getUniformLocation(program, 'photoReady')!);
+                const riverReady = gl.getUniform(program, gl.getUniformLocation(program, 'riverReady')!);
                 const photoBounds = gl.getUniform(program, gl.getUniformLocation(program, 'photoBounds')!) as Float32Array;
                 gl.activeTexture(gl.TEXTURE7);
                 const naturalPatch = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
                 const patchTexture = gl.createTexture()!;
                 gl.activeTexture(gl.TEXTURE0);
                 try {
+                    // Isolate the source photographs from an asynchronously completed river composite.
+                    gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 0);
                     gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), 0);
                     gl.bindTexture(gl.TEXTURE_2D, sandTexture);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -1813,6 +1892,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     check([190, 165, 100].every((channel, i) => Math.abs(sand[i] - channel * light) <= 2),
                           'outside the photographic patch the overview remains intact');
                 } finally {
+                    gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), Number(riverReady));
                     gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), Number(photoReady));
                     gl.uniform4fv(gl.getUniformLocation(program, 'photoBounds'), photoBounds);
                     gl.activeTexture(gl.TEXTURE7);
@@ -2405,6 +2485,9 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             const zoomOut = globeRoot.querySelector<HTMLButtonElement>('[data-globe-action="out"]')!;
             const zoomIn = globeRoot.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!;
             const originalUpload = gl.texImage2D;
+            const surfaceModuleURL = '/js/globe_surface.js';
+            const {GlobeSurface} = await import(surfaceModuleURL) as typeof import('../../typescript/globe_surface.js');
+            const originalSurfaceLoad = GlobeSurface.prototype.load;
             let releasedTextures = 0;
             const riverReply = (): MarsTransportResponse => Object.assign(new Response(), {
                 async labData() {
@@ -2412,6 +2495,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 }
             });
             try {
+                // Exercise the SVG fallback explicitly; imagery-only databases now support the worker too.
+                GlobeSurface.prototype.load = async () => { throw new Error('Surface worker unavailable in fallback fixture'); };
                 gl.texImage2D = function (...args: unknown[]): void {
                     if (gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE3 && args.length === 9 &&
                         args[3] === 1 && args[4] === 1) ++releasedTextures;
@@ -2424,18 +2509,23 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 };
                 for (let i = 0; i < 24; ++i) zoomOut.click();
                 delete globeRoot.dataset.rivers;
-                await new Promise(resolve => setTimeout(resolve, 400));
+                await new Promise(resolve => setTimeout(resolve, 2200));
+                releasedTextures = 0;
                 check(pending.length === 0, 'overview does not fetch river data');
-                for (let i = 0; i < 9; ++i) zoomIn.click();
+                for (let i = 0; i < 8; ++i) zoomIn.click();
                 for (let i = 0; i < 40 && pending.length < 1; ++i) await new Promise(resolve => setTimeout(resolve, 25));
-                check(pending.length === 1, 'close zoom starts an independent asynchronous river request');
+                check(pending.length === 1, 'regional zoom below the old cutoff starts an independent water-area request');
                 labApplication.loadNearbyTowns = async () => { ++nearbyRequests; };
                 globeCanvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
                 check(pendingSurface.length > 0, 'surface request remains in flight during movement');
                 pendingSurface.shift()!(riverReply());
+                check(!pending[0].signal?.aborted, 'small pans retain a useful river and photographic request');
+                for (let i = 0; i < 40 && !pending[0].signal?.aborted; ++i)
+                    globeCanvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
                 check(pending[0].signal?.aborted === true, 'moving while rivers load cancels the obsolete request');
                 for (let i = 0; i < 40 && pending.length < 2; ++i) await new Promise(resolve => setTimeout(resolve, 25));
                 check(pending.length === 2, 'new view fetches rivers without waiting for the old response');
+                for (let i = 0; i < 40 && !nearbyRequests; ++i) await new Promise(resolve => setTimeout(resolve, 25));
                 check(nearbyRequests > 0, 'surface completion cannot cancel the pending nearby-town request');
                 pending[0].resolve(riverReply());
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -2445,20 +2535,20 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     await new Promise(resolve => setTimeout(resolve, 25));
                 check(globeRoot.dataset.rivers === 'ready', 'current asynchronous river image reaches the live globe');
                 const observer = [latitude.value, longitude.value, town.value, town.options.length];
-                for (let i = 0; i < 9; ++i) zoomOut.click();
+                for (let i = 0; i < 8; ++i) zoomOut.click();
                 await new Promise(resolve => setTimeout(resolve, 100));
                 check(releasedTextures === 0, 'brief zoom-out retains the river texture during its grace period');
-                for (let i = 0; i < 9; ++i) zoomIn.click();
+                for (let i = 0; i < 8; ++i) zoomIn.click();
                 await new Promise(resolve => setTimeout(resolve, 2200));
                 check(pending.length === 2 && releasedTextures === 0 && globeRoot.dataset.rivers === 'ready',
                       'returning during the grace period reuses rivers and cancels the pending unload');
-                for (let i = 0; i < 9; ++i) zoomOut.click();
+                for (let i = 0; i < 8; ++i) zoomOut.click();
                 await new Promise(resolve => setTimeout(resolve, 2200));
                 check(releasedTextures === 1 && globeRoot.dataset.rivers === 'unloaded',
                       'sustained zoom-out releases regional texture storage asynchronously');
                 check(JSON.stringify(observer) === JSON.stringify([latitude.value, longitude.value, town.value, town.options.length]),
                       'river unloading retains town choices and the selected observer');
-                for (let i = 0; i < 9; ++i) zoomIn.click();
+                for (let i = 0; i < 8; ++i) zoomIn.click();
                 for (let i = 0; i < 40 && pending.length < 3; ++i) await new Promise(resolve => setTimeout(resolve, 25));
                 check(pending.length === 3, 'returning after eviction requests visible rivers again');
                 pending[2].resolve(riverReply());
@@ -2466,6 +2556,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     await new Promise(resolve => setTimeout(resolve, 25));
                 check(globeRoot.dataset.rivers === 'ready', 'evicted rivers reload without blocking the globe');
             } finally {
+                GlobeSurface.prototype.load = originalSurfaceLoad;
                 gl.texImage2D = originalUpload;
                 for (let i = 0; i < 24; ++i) zoomOut.click();
                 pending.forEach(request => request.resolve(riverReply()));

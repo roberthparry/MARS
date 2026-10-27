@@ -20,6 +20,9 @@ sqlite_t *globe_configured_database(void);
 /** @brief Read one bounded texture identity from the borrowed geometry store, without loading its JPEG. */
 bool textures_metadata(sqlite_t *db, unsigned level, unsigned column, unsigned row, globe_texture_info_t *info);
 
+/** @brief Enumerate the bounded optional regional photographic catalogue. */
+bool textures_regions(sqlite_t *db, const double bounds[4], globe_texture_region_fn callback, void *context);
+
 /** @brief Return owned checksum-verified JPEG bytes matching the caller's metadata, or NULL. */
 array_t *textures_jpeg(sqlite_t *db, unsigned level, unsigned column, unsigned row, const globe_texture_info_t *expected);
 
@@ -70,6 +73,14 @@ typedef globe_river_segment_fn rivers_segment_fn;
 rivers_t *rivers_open(sqlite_t *db);
 /** @brief Release a river reader. */
 void rivers_close(rivers_t *rivers);
+/** @brief Read optional indexed width metadata; absent metadata gives zero metres. */
+bool rivers_width_metres(rivers_t *rivers, int64_t id, double *width);
+/** @brief Stream bounded, spatially indexed water polygons with their holes intact. */
+bool rivers_banks(rivers_t *rivers, double west, double south, double east, double north,
+                   globe_river_bank_fn visit, void *context);
+
+/** @brief Check indexed complete water coverage without inferring coverage from polygon bounds. */
+bool rivers_water_complete(rivers_t *rivers, double west, double south, double east, double north);
 /** @brief Stream clipped river segments. */
 bool rivers_segments(rivers_t *rivers, double west, double south, double east, double north,
                      rivers_segment_fn visit, void *context);

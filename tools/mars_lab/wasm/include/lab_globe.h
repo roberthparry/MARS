@@ -109,15 +109,6 @@ void lab_globe_saved_camera(jsref camera);
 void lab_globe_history_camera(jsref camera, double latitude, double longitude, double zoom);
 
 /**
- * @brief Bound automatic arrival magnification to three CSS pixels per source-photo pixel at the equator.
- * @param zoom Requested magnification; manual gestures remain independent of this automatic framing limit.
- * @param viewport View width in CSS pixels.
- * @param pixels Width of the full-resolution equirectangular photograph.
- * @return Via the bridge, bounded zoom or null for invalid inputs.
- */
-void lab_globe_arrival_zoom(double zoom, double viewport, double pixels);
-
-/**
  * @brief Face the route, follow its shortest great circle, then restore the destination's roll.
  * @param start Five finite numbers: unit quaternion x,y,z,w and zoom in 1..4096.
  * @param target Saved camera in the same format, including roll.
@@ -138,6 +129,9 @@ void lab_globe_arrival_zoom(double zoom, double viewport, double pixels);
  * @return Via the bridge, a five-number camera, or null for malformed input.
  */
 void lab_globe_flight(jsref start, jsref target, double progress, bool redirect);
+
+/** @brief Return the camera route's great-circle distance in kilometres, independent of zoom and roll; null if invalid. */
+void lab_globe_flight_distance(jsref start, jsref target);
 
 /**
  * @brief Advance the display clock at a distance-dependent, screen-motion-limited rate.

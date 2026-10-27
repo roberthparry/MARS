@@ -88,6 +88,12 @@ bool globe_texture_metadata(globe_t *g, unsigned level, unsigned column, unsigne
     return textures_metadata(g ? g->geometry : NULL, level, column, row, info);
 }
 
+/* Enumerate regional imagery without reading image payloads. */
+bool globe_texture_regions(globe_t *g, const double bounds[4], globe_texture_region_fn callback, void *context)
+{
+    return textures_regions(g ? g->geometry : NULL, bounds, callback, context);
+}
+
 /* Keep payload ownership and corruption detection within the geographic data API. */
 array_t *globe_texture_jpeg(globe_t *g, unsigned level, unsigned column, unsigned row,
                             const globe_texture_info_t *expected)
@@ -178,6 +184,25 @@ bool globe_river_display_segments(globe_t *g, double west, double south, double 
                                   double tolerance, globe_river_segment_fn visit, void *context)
 {
     return g && rivers_display_segments(g->rivers, west, south, east, north, tolerance, visit, context);
+}
+
+/* Read recorded river width independently of the centreline geometry. */
+bool globe_river_width_metres(globe_t *g, int64_t id, double *width)
+{
+    return g && rivers_width_metres(g->rivers, id, width);
+}
+
+/* Stream bank geometry independently of centreline width metadata. */
+bool globe_river_banks(globe_t *g, double west, double south, double east, double north,
+                       globe_river_bank_fn visit, void *context)
+{
+    return g && rivers_banks(g->rivers, west, south, east, north, visit, context);
+}
+
+/* Complete survey coverage permits local water polygons to supersede a coarse lake mask. */
+bool globe_river_water_complete(globe_t *g, double west, double south, double east, double north)
+{
+    return g && rivers_water_complete(g->rivers, west, south, east, north);
 }
 
 /* Preserve transactional shoreline import without changing catalogue ownership. */

@@ -100,7 +100,8 @@ static bool lab_browser_prepare(const char *directory)
                                           "worker_checks.js",         "mobile_layout_checks.js",
                                           "surface_hover_checks.js",   "surface_mesh_checks.js",
                                           "surface_export_checks.js",  "globe_http_checks.js", "globe_gpu_checks.js",
-                                          "globe_flight_checks.js", "globe_photo_checks.js", "surface_math_checks.js", "history_checks.js",
+                                          "globe_flight_checks.js", "globe_photo_checks.js", "globe_surface_checks.js",
+                                          "surface_math_checks.js", "history_checks.js",
                                           "memory_checks.js", "protobuf_wire_checks.js"};
     for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {
         file_t *module = lab_browser_file("tools/mars_lab/build/typescript_checks/tests/browser", modules[i]);

@@ -10,11 +10,20 @@
     const startupCheck = new URLSearchParams(location.search).get('startup-check') === '1';
     const startupRequests: string[] = [];
     const startupReveals: string[] = [];
+    let startupMapReadyBeforeCalculation = false;
     if (startupCheck) {
         localStorage.setItem('mars.exprLab.lastMode', 'almanac');
         const originalFetch = window.fetch.bind(window);
-        window.fetch = (input, options) => {
+        window.fetch = async (input, options) => {
             startupRequests.push(String(input));
+            if (String(input) === '/almanac-eval') {
+                // Hold the calculation while the restored camera and catalogue begin independently.
+                await new Promise(requestAnimationFrame);
+                await new Promise(requestAnimationFrame);
+                const globe = Reflect.get(MarsAlmanacGlobe, 'instance') as {cameraRestored?: boolean} | undefined;
+                startupMapReadyBeforeCalculation = !document.documentElement.hasAttribute('data-starting') &&
+                    Boolean(globe?.cameraRestored) && startupRequests.some(url => url.startsWith('/towns?'));
+            }
             return originalFetch(input, options);
         };
         const observer = new MutationObserver(() => {
@@ -2821,8 +2830,6 @@
                     return value;
                 };
                 const settledCamera = async (expected: number[], zoom = expected[4]): Promise<void> => {
-                    zoom = labDOM.call('lab_globe_arrival_zoom', zoom,
-                        document.querySelector<HTMLCanvasElement>('.almanac-globe canvas')!.clientWidth, 21600) as number;
                     if (globe!.flightTarget && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
                         await new Promise(resolve => setTimeout(resolve, 1200));
                         check(globe!.view[2] > 1, 'nearby history navigation does not retreat to the whole-Earth overview');
@@ -2884,9 +2891,8 @@
                             window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ?
                                 {matches: true} as MediaQueryList : match.call(window, query);
                             MarsAlmanacGlobe.finishHistory(MarsAlmanacGlobe.beginHistory(), firstCamera, true);
-                            check(!globe.flightTarget && globe.view[2] === labDOM.call('lab_globe_arrival_zoom', interruptedZoom,
-                                document.querySelector<HTMLCanvasElement>('.almanac-globe canvas')!.clientWidth, 21600),
-                                  'reduced motion applies photographic arrival framing immediately without a flight');
+                            check(!globe.flightTarget && globe.view[2] === interruptedZoom,
+                                  'reduced motion retains departure zoom immediately without a flight');
                         } finally { window.matchMedia = match; }
                         const country = document.getElementById('almanacJurisdiction') as HTMLSelectElement;
                         country.value = 'GB-ENG';
@@ -3139,6 +3145,8 @@
             await window.labReady;
             await labApplication.townsReady;
             if (startupCheck) {
+                check(startupMapReadyBeforeCalculation,
+                      'saved camera and towns start before the initial Almanac calculation completes');
                 const validCamera = [1, 0, 0, 0, 4];
                 check(JSON.stringify(labDOM.call('lab_globe_saved_camera', validCamera)) === JSON.stringify(validCamera),
                       'startup camera validation preserves a valid displayed view');
@@ -3206,12 +3214,14 @@
             }
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('evaluation-check') === '1') {
+                await runBrowserGroup('checkLabResultDom', window.checkLabResultDom);
                 await runBrowserGroup('checkLabEvaluation', window.checkLabEvaluation);
                 await runBrowserGroup('checkLabEvaluationInstall', window.checkLabEvaluationInstall);
                 await runBrowserGroup('checkLabEvaluationCards', window.checkLabEvaluationCards);
                 await runBrowserGroup('checkLabWeather', window.checkLabWeather);
                 await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
                 await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
+                await runBrowserGroup('checkLabRequests', window.checkLabRequests);
                 await report('PASS: asynchronous result installation, drawing opportunities and stale-request rejection');
                 return;
             }

@@ -595,6 +595,7 @@ int tests_main(void)
     test_lab_syntax_cases();
     test_lab_almanac_presentation_cases();
     test_lab_vector_cases();
+    test_lab_river_surface_cases();
     test_lab_eclipse_worker_cases();
     TEST_SECTION("Native mathematical worker regressions");
     test_lab_math_cases();
@@ -603,5 +604,6 @@ int tests_main(void)
     test_lab_math_readme_cases();
     test_lab_wasm_build_readme_cases();
     test_lab_plot_readme_cases();
+    test_lab_river_surface_readme_cases();
     return TEST_EXIT_CODE();
 }

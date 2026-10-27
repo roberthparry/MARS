@@ -232,15 +232,6 @@ static double globe_ease(double t)
     return t * t * t * (10 + t * (-15 + 6 * t));
 }
 
-/* Automatic journeys retain geographic context instead of magnifying individual photo texels across a town. */
-void lab_globe_arrival_zoom(double zoom, double viewport, double pixels)
-{
-    if (!isfinite(zoom) || zoom < 1 || zoom > 4096 || !isfinite(viewport) || viewport <= 0 ||
-        !isfinite(pixels) || pixels <= 0) { lab_dom_return(0); return; }
-    double limit = fmax(1, 3 * pixels / (180 * globe_radian * viewport));
-    lab_dom_return(lab_dom_numeric(fmin(zoom, limit)));
-}
-
 static double globe_flight_zoom(double from, double to, double fraction)
 {
     if (from == to || fraction <= 0) return from;
@@ -296,6 +287,8 @@ static bool globe_flight_frame(const double a[5], const double b[5], double prog
     bool visible = projected[2] > 0 && extent * a[4] <= 1.12;
     bool align_heading = projected[2] <= 0 || hypot(projected[0], projected[1]) * a[4] > 1.12 * sqrt(2);
     double half_span = sqrt(fmax(0, (1 - fmin(1, projected[2])) / 2));
+    bool local = half_span < sin(500.0 / (2 * 6371.0088));
+    if (local) align_heading = false;
     double cruise = fmin(a[4], b[4]);
     if (!visible && half_span > 0) cruise = fmin(cruise, 1.05 / half_span);
     /* Quintic easing joins stationary phases with zero velocity and acceleration.
@@ -316,10 +309,18 @@ static bool globe_flight_frame(const double a[5], const double b[5], double prog
         /* Angular motion is already eased. Ease only the midpoint tangent here:
          * a second stationary endpoint easing would zoom in ahead of the destination. */
         double fraction = turn * 2, zoom = fraction * (2 - fraction);
+        if (local) zoom *= zoom;
         result[4] = globe_flight_zoom(a[4], cruise, zoom);
     } else {
         double fraction = turn * 2 - 1, zoom = fraction * fraction;
+        if (local) zoom = 1 - (1 - zoom) * (1 - zoom);
         result[4] = globe_flight_zoom(cruise, b[4], zoom);
+    }
+    if (local && !visible && travel > 0 && travel < 1) {
+        /* A tighter local overview must still contain the destination throughout approach.
+         * Use the circular extent so saved roll cannot push it beyond a viewport edge. */
+        double span = sin(2 * asin(fmin(1, half_span)) * fmin(turn, 1 - turn));
+        if (span > 0) result[4] = fmin(result[4], 1.10 / span);
     }
     return true;
 }
@@ -331,6 +332,19 @@ void lab_globe_flight(jsref start, jsref target, double progress, bool redirect)
     if (!isfinite(progress) || !globe_camera_read(start, a) || !globe_camera_read(target, b) ||
         !globe_flight_frame(a, b, progress, redirect, result)) { lab_dom_return(0); return; }
     globe_result(result, 5);
+}
+
+/* Measure the actual camera route, including a redirected flight's current starting point. */
+void lab_globe_flight_distance(jsref start, jsref target)
+{
+    double a[5], b[5], am[9], bm[9];
+    if (!globe_camera_read(start, a) || !globe_camera_read(target, b) ||
+        !quaternion_matrix3(am, a) || !quaternion_matrix3(bm, b)) { lab_dom_return(0); return; }
+    double x = am[7] * bm[8] - am[8] * bm[7];
+    double y = am[8] * bm[6] - am[6] * bm[8];
+    double z = am[6] * bm[7] - am[7] * bm[6];
+    double dot = am[6] * bm[6] + am[7] * bm[7] + am[8] * bm[8];
+    lab_dom_return(lab_dom_numeric(6371.0088 * atan2(hypot(hypot(x, y), z), dot)));
 }
 
 static double globe_flight_motion(const double a[5], const double b[5], double viewport)
@@ -362,7 +376,7 @@ void lab_globe_flight_advance(jsref start, jsref target, double progress, double
     double budget = 360 * seconds;
     /* Heading and arrival roll are short local operations, not fractions of a long route. */
     double duration = !redirect && progress < .125 ? 1.2 / .125 :
-                      progress >= .875 ? 2.5 / .125 : (2 + 6 * angle) / (redirect ? .875 : .75);
+                      progress >= .875 ? 4.0 / .125 : (2 + 6 * angle) / (redirect ? .875 : .75);
     double low = progress, high = fmin(1, progress + seconds / duration);
     if (!globe_flight_frame(a, b, high, redirect, after)) { lab_dom_return(0); return; }
     if (globe_flight_motion(before, after, viewport) > budget) {

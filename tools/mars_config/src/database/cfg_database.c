@@ -162,10 +162,10 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
 static int cfg_databases_prepare(bool install_missing)
 {
     static const cfg_database_migration migrations[] = {
-        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 9, cfg_database_globe_refresh, NULL},
+        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 11, cfg_database_globe_refresh, NULL},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 8, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction},
+         "jurisdiction/mars_jurisdiction_rules.db", 10, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)
@@ -454,7 +454,7 @@ static const cfg_database_source_label_t *cfg_database_source_label(const string
         {"packaging/globe-db/jurisdiction_subdivisions.sql", "Identifying Kaliningrad Oblast on the globe"},
         {"packaging/jurisdiction-db/flag_emblems.sql", "Installing flag emblems"},
         {"packaging/jurisdiction-db/flag_regions.sql", "Installing regional flag definitions"},
-        {"packaging/jurisdiction-db/location_additions.sql", "Adding South African island locations"},
+        {"packaging/jurisdiction-db/location_additions.sql", "Adding named reference locations"},
         {"packaging/jurisdiction-db/location_subdivisions.sql", "Updating Kaliningrad towns and location defaults"},
         {"packaging/jurisdiction-db/mars_calendar_local.sql", "Installing local calendar settings"},
         {"packaging/jurisdiction-db/mars_calendar_locale_names.sql", "Installing translated calendar names"},

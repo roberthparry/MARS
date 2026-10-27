@@ -202,8 +202,9 @@ static bool osm_checkpoint(osm_river_import_t *state)
 /* Match the finest shoreline trial budget, not a fixed spacing or a vertex quota. */
 static const double cfg_river_storage_metres = 8.0;
 
-/* Independent coverage policy, not a consequence of the simplification error ceiling. */
-static const double cfg_river_minimum_width_metres = 16.0;
+/* User-selected coverage cutoff, independent of zoom and the simplification error ceiling.
+ * Exactly three metres is retained; only explicit narrower widths justify exclusion. */
+static const double cfg_river_minimum_width_metres = 3.0;
 
 /* Decimal GB: the installed river layer includes its tables and spatial/feature indexes. */
 const int64_t cfg_database_river_storage_budget = INT64_C(7000000000);
@@ -465,81 +466,6 @@ static bool osm_step(sqlite_stmt_t *q)
     return ok;
 }
 
-static const char *osm_width_space(const char *text)
-{
-    while (isspace((unsigned char)*text)) ++text;
-    return text;
-}
-
-/* OSM widths use decimal points, regardless of the installer's current locale. */
-static bool osm_width_decimal(const char **text, double *value)
-{
-    const char *p = *text;
-    double number = 0, place = 0.1;
-    bool digits = false;
-    while (*p >= '0' && *p <= '9') {
-        number = number * 10 + (*p++ - '0');
-        digits = true;
-    }
-    if (*p == '.') {
-        ++p;
-        while (*p >= '0' && *p <= '9') {
-            number += (*p++ - '0') * place;
-            place *= 0.1;
-            digits = true;
-        }
-    }
-    *text = p;
-    *value = number;
-    return digits && isfinite(number);
-}
-
-/* Unrecognised, range-valued or conflicting tags remain unknown; they never become a zero-width section. */
-static bool osm_width_metres(const json_t *properties, double *width)
-{
-    const json_t *tag = osm_field(properties, "width");
-    if (!tag) tag = osm_field(properties, "est_width");
-    const string_t *value = tag ? json_string_value(tag) : NULL;
-    if (!value && tag) value = json_number_text(tag);
-    if (!value || !string_byte_length(value) || string_byte_length(value) > 128) return false;
-    const char *text = string_c_str(value);
-    if (strlen(text) != string_byte_length(value)) return false;
-    const char *end = osm_width_space(text);
-    double number;
-    if (!osm_width_decimal(&end, &number)) return false;
-    if (*end == '\'') {
-        if (floor(number) != number) return false;
-        ++end;
-        double inches;
-        if (!osm_width_decimal(&end, &inches) || inches >= 12 || *end++ != '"' || *osm_width_space(end))
-            return false;
-        number = number * 0.3048 + inches * 0.0254;
-    } else {
-        const char *unit = osm_width_space(end);
-        if (*unit) {
-            if (unit == end) return false;
-            /* This fixed eight-entry unit vocabulary has bounded scan cost. */
-            static const struct { const char *name; double metres; } units[] = {
-                {"m", 1}, {"cm", 0.01}, {"mm", 0.001}, {"km", 1000},
-                {"ft", 0.3048}, {"in", 0.0254}, {"yd", 0.9144}, {"mi", 1609.344}
-            };
-            bool known = false;
-            for (size_t i = 0; i < sizeof units / sizeof *units; ++i) {
-                size_t n = strlen(units[i].name);
-                if (!strncmp(unit, units[i].name, n) && !*osm_width_space(unit + n)) {
-                    number *= units[i].metres;
-                    known = true;
-                    break;
-                }
-            }
-            if (!known) return false;
-        }
-    }
-    if (!isfinite(number) || number <= 0) return false;
-    *width = number;
-    return true;
-}
-
 static bool osm_line(osm_river_import_t *s, const json_t *feature, const osm_record_t *record)
 {
     if (!osm_text(osm_field(feature, "type"), "Feature")) return false;
@@ -560,7 +486,7 @@ static bool osm_line(osm_river_import_t *s, const json_t *feature, const osm_rec
     size_t n;
     if (!osm_raw_vertices(s, record, &n)) return false;
     double width;
-    if (osm_width_metres(properties, &width)) {
+    if (cfg_database_river_width_metres(properties, &width)) {
         if (width < cfg_river_minimum_width_metres) {
             ++s->narrow_sections;
             return true;
@@ -1011,7 +937,7 @@ bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source)
     }
     if (ok) ok = sqlite_exec_cstr(db, "drop table rivers_node_use;commit");
     if (!ok) sqlite_exec_cstr(db, "rollback");
-    if (ok) printf("River width selection: %lld sections retained, %lld below %.0f m omitted, %lld retained with unknown width.\n",
+    if (ok) printf("River width selection: %lld sections retained, %lld below %.1f m omitted, %lld retained with unknown width.\n",
                    (long long)state.features, (long long)state.narrow_sections, cfg_river_minimum_width_metres,
                    (long long)state.unknown_width_sections);
     return ok;
@@ -1033,14 +959,14 @@ static bool osm_stage_run(sqlite_t *db, file_t *source, const char *digest, bool
             "create virtual table rivers_bounds using rtree_i32(id,min_x,max_x,min_y,max_y);"
             "create table rivers_node_use(id integer primary key,uses integer not null)");
         sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db,
-            "insert into rivers_stage values(1,1,?1,0,0,0,0,0,0,0,0,0)") : NULL;
+            "insert into rivers_stage values(1,3,?1,0,0,0,0,0,0,0,0,0)") : NULL;
         ok = insert && sqlite_stmt_bind_text(insert, 1, digest) && sqlite_stmt_step(insert) == SQLITE_STEP_DONE;
         sqlite_stmt_finalize(insert);
     }
     osm_river_import_t state = {.checkpoint_db = db};
     sqlite_stmt_t *saved = ok ? sqlite_stmt_prepare(db,
         "select phase,last_chunk,records,chunks,features,points,narrow_sections,unknown_width_sections,source_points "
-        "from rivers_stage where id=1 and version=1 and source_sha256=?1") : NULL;
+        "from rivers_stage where id=1 and version=3 and source_sha256=?1") : NULL;
     ok = saved && sqlite_stmt_bind_text(saved, 1, digest) && sqlite_stmt_step(saved) == SQLITE_STEP_ROW;
     if (ok) {
         state.phase = sqlite_stmt_column_int(saved, 0);
@@ -1368,11 +1294,15 @@ static bool cfg_globe_regions(sqlite_t *db, const string_t *root)
 bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging)
 {
     int64_t revision = 0;
-    return cfg_database_current_revision(db, "globe", &revision) && cfg_globe_valid(db) &&
+    if (!cfg_database_current_revision(db, "globe", &revision)) return false;
+    /* Revision nine already validated the geographic layers. This migration changes photographs only;
+       their installer verifies every image and rolls back atomically without rescanning gigabytes of rivers. */
+    if (revision == 9 || revision == 10) return cfg_database_textures(db, root);
+    return cfg_globe_valid(db) &&
            (revision >= 3 || cfg_database_coast(db, root, staging)) &&
            (revision >= 7 || cfg_globe_countries(db, root, staging)) &&
            (revision >= 9 || cfg_globe_regions(db, root)) &&
-           (revision >= 6 || cfg_database_textures(db, root)) &&
+           (revision >= 11 || cfg_database_textures(db, root)) &&
            cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) && cfg_globe_valid(db);
 }
 
@@ -1415,7 +1345,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         ok = transaction && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
              cfg_globe_regions(db, root) && cfg_database_textures(db, root) && cfg_globe_valid(db) &&
              cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
-             cfg_database_revision(db, "globe", 9) &&
+             cfg_database_revision(db, "globe", 11) &&
              sqlite_exec_cstr(db, "commit");
         if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
         sqlite_close(db);
@@ -1435,7 +1365,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
              cfg_globe_regions(db, root) && cfg_database_textures(db, root) &&
              cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
-             cfg_database_revision(db, "globe", 9);
+             cfg_database_revision(db, "globe", 11);
         sqlite_close(db);
         string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
         string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;

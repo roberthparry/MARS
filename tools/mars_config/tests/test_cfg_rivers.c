@@ -276,17 +276,48 @@ static void test_cfg_rivers_storage_chunks(void)
 
 static void test_cfg_rivers_section_widths(void)
 {
+    static const struct { const char *properties; bool water; } areas[] = {
+        {"{\"natural\":\"water\",\"water\":\"lake\"}", true},
+        {"{\"natural\":\"water\",\"water\":\"lagoon\"}", true},
+        {"{\"natural\":\"water\",\"water\":\"reservoir\"}", true},
+        {"{\"natural\":\"water\"}", true},
+        {"{\"waterway\":\"riverbank\"}", true},
+        {"{\"water\":\"river\"}", true},
+        {"{\"water\":\"stream\"}", true},
+        {"{\"water\":\"canal\"}", true},
+        {"{\"natural\":\"wetland\",\"wetland\":\"marsh\"}", false},
+        {"{\"natural\":\"wood\"}", false},
+        {"{}", false}
+    };
+    for (size_t i = 0; i < sizeof areas / sizeof *areas; ++i) {
+        string_t *text = string_new_with(areas[i].properties);
+        json_t *properties = text ? json_from_text(text) : NULL;
+        TEST_ASSERT_TRUE(properties && cfg_database_river_open_water(properties) == areas[i].water,
+                         "include mapped lakes, lagoons and reservoirs without flooding marshland");
+        json_free(properties); string_free(text);
+    }
     static const struct { const char *properties; const char *kind; bool retained; } cases[] = {
         {",\"width\":\"20\"", "river", true},
-        {",\"width\":\"5\"", "river", false},
+        {",\"width\":\"2.999\"", "river", false},
+        {",\"width\":\"3\"", "river", true},
+        {",\"width\":\"299 cm\"", "canal", false},
+        {",\"width\":\"3000 mm\"", "stream", true},
+        {",\"width\":\"0.00299 km\"", "tidal_channel", false},
+        {",\"width\":3", "river", true},
+        {",\"width\":\"0.5\"", "river", false},
+        {",\"width\":\"1 ft\"", "river", false},
+        {",\"width\":\"0'6\\\"\"", "river", false},
+        {",\"est_width\":\"0.01\"", "river", true},
+        {",\"width\":\"unknown\",\"est_width\":\"0.01\"", "river", true},
+        {",\"width\":\"5\"", "river", true},
         {",\"width\":\"25\"", "river", true},
         {",\"width\":\"16 m\"", "river", true},
-        {",\"width\":\"15.999\"", "river", false},
+        {",\"width\":\"15.999\"", "river", true},
         {",\"width\":16", "river", true},
-        {",\"width\":\"10\"", "canal", false},
+        {",\"width\":\"10\"", "canal", true},
         {",\"width\":\"50\"", "canal", true},
         {",\"width\":\"30\"", "stream", true},
-        {",\"width\":\"8\"", "tidal_channel", false},
+        {",\"width\":\"8\"", "tidal_channel", true},
         {"", "river", true},
         {",\"width\":\"narrow\"", "river", true},
         {",\"width\":\"5;25\"", "river", true},
@@ -299,25 +330,25 @@ static void test_cfg_rivers_section_widths(void)
         {",\"width\":\"0x5\"", "river", true},
         {",\"width\":\"5e-3\"", "river", true},
         {",\"width\":\"5\\u0000;25\"", "river", true},
-        {",\"est_width\":\"8\"", "river", false},
+        {",\"est_width\":\"8\"", "river", true},
         {",\"width\":\"20\",\"est_width\":\"5\"", "river", true},
-        {",\"width\":\"5\",\"est_width\":\"20\"", "river", false},
+        {",\"width\":\"5\",\"est_width\":\"20\"", "river", true},
         {",\"width\":\"unknown\",\"est_width\":\"5\"", "river", true},
         {",\"maxwidth\":\"2\"", "canal", true},
         {",\"width\":\"15 m extra\"", "river", true},
-        {",\"width\":\"1500 cm\"", "river", false},
-        {",\"width\":\"0.015 km\"", "river", false},
+        {",\"width\":\"1500 cm\"", "river", true},
+        {",\"width\":\"0.015 km\"", "river", true},
         {",\"width\":\"16000 mm\"", "river", true},
         {",\"width\":\"0.01 mi\"", "river", true},
-        {",\"width\":\"17 yd\"", "river", false},
-        {",\"width\":\"600 in\"", "river", false},
-        {",\"width\":\"50 ft\"", "river", false},
+        {",\"width\":\"17 yd\"", "river", true},
+        {",\"width\":\"600 in\"", "river", true},
+        {",\"width\":\"50 ft\"", "river", true},
         {",\"width\":\"53 ft\"", "river", true},
-        {",\"width\":\"52'5\\\"\"", "river", false},
+        {",\"width\":\"52'5\\\"\"", "river", true},
         {",\"width\":\"52'6\\\"\"", "river", true},
         {",\"width\":\"5'12\\\"\"", "river", true},
         {",\"width\":\"5'6\"", "river", true},
-        {",\"width\":\" 15.5 m \\t\"", "river", false},
+        {",\"width\":\" 15.5 m \\t\"", "river", true},
         {",\"width\":null", "river", true},
         {",\"width\":[5,25]", "river", true}
     };
@@ -621,6 +652,18 @@ static bool test_cfg_rivers_stage_fixture(const char *directory)
         "update rivers_stage set phase=2,last_chunk=0");
     sqlite_close(db);
     ok = ok && !cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path));
+    /* Never mix earlier selection policies with a new checkpoint. */
+    db = ok ? sqlite_open_plain(output_path) : NULL;
+    ok = db && sqlite_exec_cstr(db, "update rivers_stage set version=1");
+    sqlite_close(db);
+    ok = ok && cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path)) != 0;
+    db = ok ? sqlite_open_plain(output_path) : NULL;
+    ok = db && sqlite_exec_cstr(db, "update rivers_stage set version=2");
+    sqlite_close(db);
+    ok = ok && cfg_globe_river_resume(string_c_str(input_path), string_c_str(output_path)) != 0;
+    db = ok ? sqlite_open_plain(output_path) : NULL;
+    ok = db && sqlite_exec_cstr(db, "update rivers_stage set version=3");
+    sqlite_close(db);
     /* Resume rejects a different source even if it is itself valid GeoJSON. */
     string_t *changed = string_clone(text);
     ok = ok && changed && string_append_cstr(changed, "\n") == 0 && file_write_all_text(input, changed) &&

@@ -413,6 +413,7 @@ namespace WorksheetResults {
             WorksheetWorkspace.presentation.syncModeTabs();
             WorksheetWorkspace.presentation.syncModeUI();
             document.documentElement.removeAttribute('data-starting');
+            labApplication.worksheetRestored();
         },
 
         /** @brief Evaluate the restored mode when native startup policy requests it. */

@@ -29,10 +29,15 @@ bool test_cfg_copy_textures(const char *directory)
     file_t *folder = texture_file(directory, "earth_tiles");
     bool ok = folder && file_create_directory(folder, 0700, true);
     file_free(folder);
-    for (unsigned i = 0; ok && i < 75; ++i) {
+    folder = texture_file(directory, "regional");
+    ok = ok && folder && file_create_directory(folder, 0700, true);
+    file_free(folder);
+    for (unsigned i = 0; ok && i < 139; ++i) {
         string_t *name = i < 72 ? string_sprintf("earth_tiles/%02u-%02u.jpg", i % 12, i / 12)
+                       : i >= 75 ? string_sprintf("regional/%02u.jpg", i - 75)
                        : string_new_with(i == 72 ? "earth_surface.jpg" : i == 73 ? "earth_surface_detail.jpg" : "manifest.json");
         file_t *source = name ? texture_file(MARS_CONFIG_ROOT_DIR, string_c_str(name)) : NULL;
+        if (i >= 75 && source && !file_exists(source)) { file_free(source); string_free(name); break; }
         file_t *target = name ? texture_file(directory, string_c_str(name)) : NULL;
         ok = source && target && file_copy(source, target, false);
         file_free(source); file_free(target); string_free(name);
@@ -46,6 +51,13 @@ static sqlite_t *texture_database(const char *key)
     sqlite_t *db = path && secret ? cfg_database_open(path, secret) : NULL;
     string_free(path); string_free(secret);
     return db;
+}
+
+static bool texture_region_found(unsigned slot, const double bounds[4], void *context)
+{
+    unsigned *count = context;
+    ++*count;
+    return slot < 64 && bounds[0] < bounds[2] && bounds[1] < bounds[3];
 }
 
 static void test_cfg_textures_install(void)
@@ -63,7 +75,27 @@ static void test_cfg_textures_install(void)
         array_t *jpeg = globe_texture_jpeg(globe, 0, 0, 0, &info);
         TEST_ASSERT_TRUE(jpeg && array_size(jpeg) == info.byte_count, "read unchanged, verified JPEG bytes");
         array_destroy(jpeg);
-        TEST_ASSERT_TRUE(!globe_texture_metadata(globe, 3, 0, 0, &info) && !info.width &&
+        TEST_ASSERT_TRUE(globe_texture_metadata(globe, 3, 0, 0, &info) && info.width == 1800 &&
+                         info.byte_count == 760960, "regional Sentinel photograph is installed");
+        unsigned found = 0;
+        const double inside[] = {-3.72, 52.31, -3.71, 52.32}, outside[] = {0, 0, 1, 1};
+        TEST_ASSERT_TRUE(globe_texture_regions(globe, inside, texture_region_found, &found) && found >= 2,
+                         "regional coverage includes detailed Welsh imagery and an overview");
+        unsigned previous = found;
+        TEST_ASSERT_TRUE(globe_texture_regions(globe, outside, texture_region_found, &found) && found == previous,
+                         "regional coverage selects Wales and leaves other places unchanged");
+        TEST_ASSERT_TRUE(globe_texture_metadata(globe, 3, 1, 0, &info) && info.width == 3600 && info.height == 3600,
+                         "larger regional imagery retains its validated dimensions");
+        static const double places[][2] = {
+            {-4.63, 53.31}, {-5.27, 51.88}, {-3.18, 51.48}, {-2.71, 51.81}, {-4.08, 53.06},
+        };
+        for (size_t i = 0; i < sizeof places / sizeof *places; ++i) {
+            double window[] = {places[i][0] - .001, places[i][1] - .001, places[i][0] + .001, places[i][1] + .001};
+            found = 0;
+            TEST_ASSERT_TRUE(globe_texture_regions(globe, window, texture_region_found, &found) && found >= 2,
+                             "Anglesey, western, southern, eastern and mountain views have overview and detail coverage");
+        }
+        TEST_ASSERT_TRUE(!globe_texture_metadata(globe, 4, 0, 0, &info) && !info.width &&
                          !globe_texture_metadata(globe, 2, 12, 0, &info) &&
                          !globe_texture_metadata(globe, 2, 0, 6, &info) &&
                          !globe_texture_metadata(globe, 0, 1, 0, &info), "reject invalid texture addresses");
@@ -119,7 +151,20 @@ static bool texture_migration_fixture(const char *directory)
         cfg_database_textures_valid(db);
     sqlite_stmt_t *q = sqlite_stmt_prepare(db, "select source from rivers_dataset");
     ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && !strcmp(sqlite_stmt_column_text(q, 0), "retained");
-    sqlite_stmt_finalize(q); string_free(staging); string_free(root); sqlite_close(db);
+    sqlite_stmt_finalize(q);
+    ok = ok && cfg_database_revision(db, "globe", 9) &&
+         sqlite_exec_cstr(db, "delete from globe_texture where level=3;drop table globe_texture_region") &&
+         cfg_database_globe_refresh(db, root, staging) && cfg_database_textures_valid(db);
+    q = sqlite_stmt_prepare(db, "select source from rivers_dataset");
+    ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && !strcmp(sqlite_stmt_column_text(q, 0), "retained");
+    sqlite_stmt_finalize(q);
+    ok = ok && cfg_database_revision(db, "globe", 10) &&
+         sqlite_exec_cstr(db, "delete from globe_texture where level=3 and column_index>0") &&
+         cfg_database_globe_refresh(db, root, staging) && cfg_database_textures_valid(db);
+    globe_t *globe = ok ? globe_open_databases(db, db, NULL) : NULL;
+    globe_texture_info_t info;
+    ok = ok && globe_texture_metadata(globe, 3, 1, 0, &info) && info.width == 3600;
+    globe_close(globe); string_free(staging); string_free(root); sqlite_close(db);
     return ok;
 }
 

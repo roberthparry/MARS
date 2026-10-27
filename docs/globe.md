@@ -10,7 +10,8 @@ SVG and WebGL rendering remain application responsibilities.
 `globe.db` stores the photographic JPEG layers alongside the geographic data.
 The offline source package is `packaging/globe-db/textures/`; its manifest records
 dimensions, byte counts, SHA-256 digests and NASA source attribution.
-Fresh installations include all 74 images. Managed database revision 6 adds them
+Fresh installations include the 74 NASA images and regional Sentinel-2 coverage of Wales.
+Managed database revision 11 installs the regional catalogue and imagery
 to existing installations through `make update-mars-db` or `make release`,
 preserving coastline, country, regional and river layers. Import validates every
 image before committing; a missing or damaged image rolls back the replacement.
@@ -19,7 +20,24 @@ image before committing; a missing or damaged image rolls back the replacement.
 without loading JPEG bytes. Level 0 is the 2048 × 1024 overview; level 1 is the
 8192 × 4096 detail image. Both use column and row zero. Level 2 contains a 12 × 6
 grid of 1800 × 1800 tiles, indexed west to east and north to south from zero.
+Level 3 contains regional 1800 × 1800 or 3600 × 3600 photographs, addressed by slot 0–63 and row zero.
+`globe_texture_regions` enumerates intersecting slots and their geographic bounds through
+a `globe_texture_region_fn` callback without loading their JPEGs. Older stores without
+the optional catalogue return an empty enumeration. The catalogue is bounded to 64 slots.
 Missing data or invalid addresses return false and clear the output structure.
+
+Welsh coverage spans 5.51–2.61° W and 51.24–53.493333° N, including Anglesey and the
+coastal islands. A 3600-square overview and 42 overlapping 3600-square detail tiles
+use July–September 2025 Copernicus Sentinel-2 observations, filling missing pixels
+from April–June 2025. The source resolution is 10 metres; reprojection to WGS84 gives
+approximately 9–10 metre detail pixels. The original Cambrian Mountains patch is retained.
+The manifest records sources, processing, bounds and attribution. Regenerating the NASA
+manifest preserves the regional catalogue. Regional JPEGs may be 1800 or 3600 pixels square.
+For surface windows at most four degrees across, Lab composites the regional overview
+over NASA imagery off-thread; windows at most one degree across also receive detail tiles.
+Four-per-cent tile overlaps cover the two-per-cent edge feathers, avoiding gaps between
+adjacent photographs. Existing water colours and river cut-outs remain in use. These are
+historical photographs, not live imagery; areas outside the coverage retain NASA detail.
 
 `globe_texture_jpeg(globe, level, column, row, &info)` returns an owned byte array,
 or `NULL` if the record has changed or its payload fails validation. Release the
@@ -257,6 +275,28 @@ attempting a replacement. The borrowed controller expires on the next `get` or
 `free`; callers must serialise access and create sessions after forking. The Lab's
 single geometry service owns one such session and closes it on service exit.
 
+`globe_reader_identity()` refreshes a session and returns an owned, opaque fingerprint
+of its resolved database path and database/WAL metadata, or `NULL` if unavailable.
+It exposes neither paths nor keys and does not read the whole database. It is a cache
+generation identifier, not a content checksum; compare identities before and after
+preparing derived imagery. Release the returned string with `string_free()`.
+
+With a configured, readable globe database:
+
+```c
+globe_reader_t *reader = globe_reader_new();
+string_t *identity = globe_reader_identity(reader);
+printf("Cache identity available: %s\n", identity ? "yes" : "no");
+string_free(identity);
+globe_reader_free(reader);
+```
+
+Output:
+
+```text
+Cache identity available: yes
+```
+
 Closed display rings reduced to one or two vertices by simplification are discarded
 without rejecting the remaining coastline. Unclosed rings, invalid coordinates and
 invalid nesting levels still reject the replacement atomically. This distinction
@@ -378,7 +418,7 @@ or image upload in the production mask path. Horizon arcs are subdivided to
 subpixel error. Reusable GPU buffers and double-buffered textures keep the previous
 complete frame until replacement succeeds. Close-view gestures transform retained
 SVG and coverage rather than rebuilding geometry each animation frame. Clipboard
-capture still composites the visible SVG, labels and GPU image into a PNG.
+capture still composites the visible SVG, labels and GPU image into a JPEG.
 
 Globe compositing shaders also live in native application code. Browser code
 compiles GLSL once per context, caches uniform locations and submits numeric state.
@@ -1460,7 +1500,9 @@ This is a candidate detail target, not a claim of surveyed accuracy or a uniform
 shoreline resolution. Geographic-axis distance uses a conservative 112 km per
 degree bound, retaining extra detail at high latitudes. Junctions, mouths and chunk
 endpoints remain fixed; small loops are not collapsed. The separate width filter
-uses an initial sixteen-metre minimum; this is a coverage choice, not a consequence
+uses a user-selected three-metre minimum, retaining sections exactly three metres
+wide. This is a coverage choice, not a claim that narrower sections can never be
+visible at maximum zoom, nor a consequence
 of the eight-metre simplification error ceiling. Only source ways with a usable
 width below the cutoff are omitted. Wider sections of the same named river remain,
 and no replacement segment bridges an omitted section. Rivers, streams, canals
@@ -1470,17 +1512,97 @@ causes exclusion.
 Width handling follows the [OSM width convention](https://wiki.openstreetmap.org/wiki/Key:width):
 bare decimal values are metres. The importer also recognises explicit metre,
 centimetre, millimetre, kilometre, foot, inch, yard and mile units, and feet/inches
-notation. It uses `est_width` only when `width` is absent. Missing, malformed,
+notation. Estimated widths (`est_width`) cannot justify permanent exclusion.
+Missing, malformed,
 range-valued or unsupported widths remain unknown and are retained by this filter;
 they are not inferred from the name or waterway class. A malformed explicit width
 does not fall back to an estimate that could silently exclude the section.
+The original source remains intact. New staging databases use selection-policy
+version 3 and reject earlier resume checkpoints, avoiding a mixture of different
+width selection rules. Existing installed datasets are not
+filtered or rebuilt automatically; their omitted sections require source replay.
 These tags describe whole OSM ways: detecting a narrowing within a way without
 separate width tags would require further riverbank geometry analysis. Neither
 tagged width nor inclusion in the globe establishes navigability.
 
+Recorded widths and mapped water polygons can be supplied alongside the completed
+centreline network. `globe_river_width_metres()` reads indexed `rivers_width`
+metadata; zero means unknown, while invalid metadata fails the query.
+`globe_river_banks()` streams spatially indexed polygons from `rivers_bank` and
+`rivers_bank_bounds`, with an outer ring and its holes kept together. Its callback
+borrows interleaved longitude/latitude coordinates and per-ring point counts only
+for the duration of the call. Absent bank tables produce an empty successful
+query; malformed geometry fails rather than publishing a partial overlay.
+
+The optional `river_water` preparation tool accepts an OSM GeoJSON sequence or a
+metadata-only OPL extract and creates a new, separate candidate database. It uses
+the same strict width parser as centreline selection. GEOS validates bank polygons
+and all mapped `natural=water` areas, including lakes, lagoons and reservoirs;
+areas tagged only as wetlands are excluded. It clips valid polygons into
+one-degree pieces at microdegree coordinate precision,
+preserving islands. Geometry crossing the date line without being split first,
+invalid polygons and oversized features are rejected. The tool never installs
+the candidate or changes the original source. Like the existing coastline tools,
+its build accepts `GEOS_CFLAGS`; GEOS is not a runtime Lab dependency.
+
+The Lab projects recorded widths in metres into rounded ribbons, taking latitude
+and segment direction into account. Widths below half a regional texture pixel
+are omitted at that view; unknown widths retain the centreline fallback. Bank
+polygons have consistent outer/hole winding and use a combined nonzero fill, so
+islands remain land, overlapping water stays filled and adjoining pieces avoid
+raster seams. Both photographic surface
+tiles and the SVG fallback use these rules. A new surface cache generation
+invalidates tiles made before width and bank support. These are display layers;
+they do not change observer geography, jurisdictions or navigation calculations.
+The initial auxiliary installation contains 13,412 matching recorded widths
+worldwide and 1,240 mapped bank pieces in the Severn corridor, adding 2,064,384
+bytes to the installed globe. Other regions still require their own bank data;
+the reader does not infer worldwide polygon coverage from this regional import.
+Source identities and coverage are retained in `rivers_water_source`.
+The Cape Peninsula extension adds 852 open-water pieces and 331,776 bytes,
+including the Zandvlei lagoon, Marina da Gama channels and Zeekoevlei. It uses
+the general open-water selection rule, without special rendering cases for
+individual towns or water bodies. Other regions still need mapped-water imports.
+
+The Inari extension supplies 322 mapped water pieces, including the Juutuanjoki
+connection and Lake Inari islands. `globe_river_water_complete()` checks the optional
+`rivers_water_coverage` integer R-tree for a complete survey enclosing the requested
+window. Only such windows allow mapped water polygons to replace the coarse lake
+mask, including restoring islands and surrounding land. Polygon bounds alone never
+establish completeness; missing metadata and partially covered windows retain the
+ordinary overlays. This describes completeness of the imported mapped areas, not
+a guarantee that every real water feature has been surveyed.
+
+The Nykøbing Mors extension retains 256 mapped inland-water polygons after source review. These remain
+additive overlays: inland-water coverage does not establish the extent of the sea
+or replace the coastal shoreline.
+Two additional surviving Danish ponds are supplied by OpenStreetMap ways 902239253
+(Gårdbo Sø area) and 1139175080 (Sperring Sø area), retrieved through the public
+OpenStreetMap API on 26 October 2026. Their individual mapped outlines are additive
+water overlays; the much larger drained lakebeds remain land. The installed
+`rivers_water_source` record retains the extract checksum and ODbL attribution.
+
+The Limfjord and Zealand/Lolland extension adds 52,315 previously absent water pieces
+from Geofabrik's Denmark extract dated 25 October 2026. Selection windows are
+`[8,56.25,10.2,57.25]` and `[10.9,54.55,12.75,56.15]` (west, south, east, north);
+whole intersecting mapped features and their island holes are retained. Existing
+source identities are not duplicated. The unsupported Højriis permanent-lake polygon
+and one sub-metre triangle that degenerates at microdegree precision are excluded.
+These remain additive overlays, not a declaration of complete water coverage.
+The source and filtered-extract checksums are retained in `rivers_water_source`.
+Mapped areas smaller than a quarter pixel in a 2048-pixel surface tile are omitted
+from that drawing request, keeping regional views within their response budget;
+their geometry remains stored and becomes visible in closer views. Water colours
+and centreline data are unchanged.
+
+Photographic river tiles encode surveyed land separately from water and unknown
+coverage. Within complete windows they use mapped polygons instead of width ribbons;
+elsewhere the existing width and centreline rules remain. Surface cache generation 4
+invalidates earlier encodings. The SVG fallback remains an additive water overlay.
+
 Shortcuts are checked against retained segments and spatially indexed neighbouring
 chunks, including across the date line. A bounded per-chunk cache decodes neighbours
-once and reuses them across its shortcuts, avoiding repeated encrypted database
+once and reuses them across its shortcuts, avoiding repeated database
 reads. It holds at most 128 chunks in each of three longitude frames (under 2 MiB).
 If the whole-chunk envelope exceeds that capacity, queries fall back to individual
 shortcut bounds; a crowded envelope alone does not prevent simplification.
@@ -1501,6 +1623,10 @@ fallback and date-line crossing checks. The full candidate subsequently complete
 all 32,780,598 chunks, retaining 351,363,987 of 848,247,640 source points across
 32,194,860 features. Its compacted encrypted size is 6,587,858,944 bytes. This
 exceeded the former budget and prompted the approved increase to 7 GB.
+Installation and verification completed on 26 October. The unencrypted installed
+river layer occupies 6,553,923,584 bytes, including indexes. Metadata totals,
+database integrity, seven regional renderings and the Lab HTTP endpoint passed;
+pre-existing shorelines, photographs, countries and regional coverage were unchanged.
 After compaction, staging rejects a candidate larger than 7,000,000,000 bytes.
 The limit applies to the installed derivative, not temporary conversion files,
 the retained source extract or the existing shoreline layer.
@@ -1567,15 +1693,34 @@ not re-enabled by these changes.
 
 ## Application loading and memory
 
-The existing MARS Lab river overlay requests independently at 12× zoom or closer,
-when longitude and latitude spans are each at most 30°. Movement is debounced;
+MARS Lab requests regional water surfaces independently when longitude and latitude
+spans are each at most 30°, without a fixed zoom cutoff. Mapped riverbanks and lakes
+use their projected area to omit subpixel geometry. Windows spanning more than 6°
+in either direction contain mapped water areas only, avoiding unbounded centreline
+work; closer windows also include the usual river lines and recorded-width ribbons.
+The shader does not hide a loaded water area merely because the camera zoom changes.
+Movement is debounced;
 obsolete requests are cancelled and late responses ignored. This mechanism
 does not make withdrawn or uninstalled data available.
 
-The browser retains one regional texture, about 16 MiB, replacing it when a new
+On a cache miss, native code supplies photographic crop rectangles and a bounded
+river path. A dedicated browser worker composites a 2048 × 2048 regional photograph
+with river cut-outs; WebGL fills these with the existing water palette and lighting.
+The worker decodes one source photograph at a time and never processes the whole
+network. The base globe stays visible throughout. Missing worker or photographic
+support falls back to the independent river SVG overlay.
+
+Completed JPEGs are cached in IndexedDB per browser and Lab origin, with at most
+64 MiB of JPEG payload, 128 entries and 8 MiB per entry. Browser storage overhead is
+additional. Least recently used entries are evicted; larger tiles remain uncached.
+Database identities invalidate stale imagery, and cache hits avoid querying or
+rasterising river geometry again. Denied or unavailable storage does not prevent
+drawing. This cache does not replace or reduce the installed river database.
+
+The browser retains one regional GPU texture, about 16 MiB, replacing it when a new
 region loads. Zooming out hides it immediately and releases its texture storage
 after a two-second grace period. Returning during that interval reuses it;
-returning later requests the region again. Graphics drivers may retain freed
+returning later checks the persistent cache before preparing the region again. Graphics drivers may retain freed
 allocations internally. Towns remain resident and observer selection is
 unaffected. This browser policy does not evict the separate native shoreline
 cache or establish a memory budget for the planned road and building layers.

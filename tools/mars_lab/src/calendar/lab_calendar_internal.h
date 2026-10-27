@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <time.h>
 
+#include "globe-t.h"
 #include "lab_calendar.h"
 
 /** @brief Render current setup-origin sky information at a supplied UTC instant for native tests and the header route. */
@@ -82,6 +83,14 @@ json_t *lab_cal_borders(const json_t *payload, unsigned *status);
 
 /** @brief Return an owned close-view river SVG response from jurisdiction data; set the optional HTTP status. */
 json_t *lab_cal_rivers(const json_t *payload, unsigned *status);
+
+/** @brief Prepare native photo crops and river paths for bounded cached surface imagery. */
+json_t *lab_cal_river_surface(const json_t *payload, unsigned *status);
+/** @brief Append a metric river ribbon with round joins; omit recorded widths below half a texture pixel. */
+bool lab_cal_river_ribbon(string_t *path, double width, double ax, double ay, double bx, double by,
+                          double west, double north, double sx, double sy);
+/** @brief Build consistently wound bank paths for a combined nonzero fill at the supplied bounds. */
+json_t *lab_cal_river_banks(globe_t *globe, const double bounds[4]);
 
 /**
  * @brief Convert a UTC Julian date using a validated zoneinfo file, restoring TZ afterwards.

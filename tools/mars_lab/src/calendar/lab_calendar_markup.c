@@ -256,8 +256,12 @@ static bool lab_cal_markup_summary_row(string_t *out, const char *label, const c
     size_t length = strlen(prefix);
     if (length && !strncmp(value, prefix, length))
         value += length;
+    const char *coordinate = !strcmp(label, "Latitude") ? "latitude" : !strcmp(label, "Longitude") ? "longitude" : "";
     return !string_append_cstr(out, "<div class=\"almanac-summary-row\"><dt>") &&
-           lab_cal_markup_text(out, label) && !string_append_cstr(out, "</dt><dd>") &&
+           lab_cal_markup_text(out, label) && !string_append_cstr(out, "</dt><dd") &&
+           (!*coordinate || (!string_append_cstr(out, " data-coordinate=\"") &&
+                             !string_append_cstr(out, coordinate) && !string_append_cstr(out, "\""))) &&
+           !string_append_cstr(out, ">") &&
            lab_cal_markup_text(out, value) && !string_append_cstr(out, "</dd></div>");
 }
 

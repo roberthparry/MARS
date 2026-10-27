@@ -6,6 +6,8 @@ Expression is not painted or evaluated as an intermediate mode when Almanac,
 Datetime or another mode was last used. The existing native restoration policy
 continues to resolve persisted state and browser-local recovery. Startup failures
 reveal the error rather than leaving the worksheet hidden.
+Once saved controls are restored, camera restoration and town loading proceed
+independently of the initial calculation, including weather and eclipse work.
 The globe also retains its camera orientation and zoom in browser-local storage,
 independently of the restored observer fields. Native camera validation runs before the
 first globe frame; invalid records fall back to observer centring. Startup town
@@ -63,6 +65,21 @@ before the close-view handoff at zoom eight. Sharper photographic imagery remain
 available when reopening directly at close zoom. Photography stays world-anchored
 at every zoom; a local land/water palette corrects only pixels that disagree with
 the detailed shoreline, rather than flattening the entire view.
+Sentinel-2 coverage adds 10-metre source detail throughout Wales, including Anglesey
+and coastal islands. A Wales-wide overview and 42 overlapping detail tiles are stored
+in `globe.db`; the surface worker decodes one photograph at a time. The overview is used
+for windows at most four degrees across, with detail tiles added below one degree.
+Coverage spans 5.51–2.61° W and 51.24–53.493333° N. Overlapping feathered edges blend
+neighbouring tiles; existing river, shoreline and water colouring remain in use.
+Photographic surface requests include a margin around the visible area and start
+during dragging, before the current coverage runs out. A pending tile continues
+loading while it still covers the view. Failed loads retry automatically with
+delays increasing from one to eight seconds; existing imagery remains visible.
+Calendar calculations also retry connection failures without replacing the last
+worksheet with an error card. A reconnecting status identifies the retained result
+as the previous worksheet. Changing the selection cancels the obsolete retry.
+Other areas retain NASA imagery. `make release` installs this layer through globe
+managed-data revision 11, preserving the installed geographic and river data.
 Drag samples predict up to 400 ms ahead with a bounded quarter-viewport lead;
 native coverage checks keep the current view inside each prefetched region.
 Natural Earth retains covered portions of the previous detailed frame while the
@@ -872,6 +889,8 @@ its vector overlays, place labels and observer marker, rather than the hidden
 expression editor. It preserves the displayed camera and does not request fresh
 shoreline data. Image copying requires browser clipboard-image support and
 clipboard permission; result cards retain their separate copy actions.
+The Almanac worksheet's **Copy** button copies its displayed latitude and longitude,
+in that order, using degrees and minutes separated by a comma.
 
 The left-hand Almanac card includes an observer globe, initially centred on the
 entered town or coordinates. Drag or use arrow keys to rotate; scroll, pinch or
@@ -1070,27 +1089,53 @@ The optional `tools/mars_lab/texture_tiles.c` maintainer utility reproduces the
 tiles from the credited NASA source using libjpeg development files. It is not
 part of ordinary builds or releases; no image-processing installation is required
 to run the Lab. Source URL, checksum and attribution are in the imagery notice.
-At 12× zoom or closer, once the requested longitude and latitude spans are each
-at most 30°, an independent asynchronous request loads a river SVG overlay from
-the **jurisdiction database**. The initial globe, towns and observer selection
-never wait for this layer. Requests are debounced after movement, cancelled when
-the view changes and time-limited; obsolete responses cannot replace the current
-overlay. Only one regional river texture is retained (about 16 MiB). Zooming out
-below 12× hides it immediately and releases its storage after a two-second grace
-period; zooming back in during that interval cancels the release and reuses it.
-Returning after release loads the visible region again asynchronously. Towns
+Once the requested longitude and latitude spans are each
+at most 30°, independent asynchronous requests prepare a photographic river tile from
+the **globe database**. Native code supplies image crops and river paths; a dedicated
+browser worker composites the tile without holding up animation. The initial globe, towns and observer selection
+never wait for this layer. Padded coverage is refreshed during movement; useful
+pending requests continue until the view leaves their coverage. Requests are
+time-limited; obsolete responses cannot replace the current
+overlay. Mapped riverbanks and lakes have no fixed zoom cutoff; areas smaller than
+a quarter texture pixel are omitted until a closer view. Windows wider or taller
+than 6° use mapped areas without centreline detail. Only one regional river texture
+is retained (about 16 MiB). Views exceeding the 30° regional extent release its
+storage after a two-second grace period; returning during that interval cancels
+the release and reuses it.
+The worker retains up to 64 MiB of decoded photograph pixels, including feathered
+regional edges, to reuse them across nearby views. This excludes temporary decoding
+and drawing buffers. Finished pixels are displayed before optional raw-pixel readback
+and storage; at most one additional 16 MiB canvas is retained for that background
+work, and further cache writes are skipped while it is busy.
+Completed tiles persist in a per-browser, per-Lab-origin IndexedDB cache, bounded
+to four 2048-square RGBA tiles: 16 MiB each and 64 MiB in total. These disposable
+raw tiles avoid image decompression on reuse. Browser storage and transient readback
+buffers are additional; least recently used entries are evicted as needed. Database
+changes invalidate cached images. Returning after release reuses a valid cached
+tile without querying or rasterising its rivers again. Storage denial still allows
+uncached drawing; unavailable worker or photo support falls back to the river SVG
+overlay. This cache does not reduce the source river database's storage. Towns
 remain resident to preserve immediate selection; this river policy does not
 evict the selected town or introduce a town-cache memory cap.
 Only spatially indexed chunks intersecting the view are read. Missing
 river data leave the globe usable. The WDBII dataset has been withdrawn because
 it misses important town-scale meanders. Updated builds reject it even in older
-databases; no replacement river dataset is currently packaged.
+databases. The processed OSM network can be installed separately; a release build
+does not publish a river candidate automatically.
 
 River strokes use the same local photographic water-colour sampling and lighting
 as sea and fjord fills, including the water-only fallback where narrow channels
 are unresolved in the photograph. There is no separate bright-blue river palette.
-This is a centreline overlay, not surveyed channel width,
-depth or evidence of navigability, and it does not change observer corrections.
+Where available, recorded widths produce metre-scaled ribbons and mapped water
+polygons supply the actual bank outline, retaining islands and bends. Recorded
+widths too small to resolve at the current view are omitted instead of exaggerated.
+Unknown widths retain the thin centreline fallback. Mapped-water coverage
+includes the Severn corridor, including Shrewsbury and the estuary, and the Cape
+Peninsula's lakes, lagoons, reservoirs and channels, including Zandvlei and
+Zeekoevlei. Wetland tags alone do not create an open-water fill;
+recorded-width metadata apply to matching installed centrelines worldwide.
+These source mappings are not a survey, depth information or evidence of
+navigability, and they do not change observer corrections.
 
 Country and town selectors in both Almanac and Datetime remain usable during
 asynchronous calculations, including their search fields and option buttons.
@@ -1149,19 +1194,32 @@ evaluation. Almanac history retains five camera numbers (quaternion and zoom), n
 textures or geographical data. **Back** and **Forward** follow the shortest great
 circle between the saved view centres at a distance-dependent pace: longer routes
 take longer, with separate departure-heading, travel and arrival-roll phases. The
-departure and arrival turns have nominal durations of 1.2 and 2.5 seconds, independent
+departure and arrival turns have nominal durations of 1.2 and 4 seconds, independent
 of route length. Travel takes two seconds plus six seconds per radian;
 screen-motion limits and loading can extend these durations.
+The travelling notice includes the total great-circle distance for the camera
+route, rounded to kilometres (metres for routes shorter than one kilometre).
+Redirecting a journey measures the new route from the camera's current position.
 The heading follows the route without north-up correction during travel. Zoom
 changes continuously while travelling, reaching its widest view at the geographic
 midpoint and returning towards the **current departure zoom** on arrival, rather than
-restoring the destination's saved zoom. Automatic arrivals limit magnification to about
-three CSS pixels per photographic source pixel at the equator, using the view width and
-the 21,600-pixel source image. This prevents extreme saved zooms producing featureless
-arrival views; manual zoom remains available for closer inspection. A destination already in view needs no
+restoring the destination's saved zoom. Arrivals retain that magnification even at
+the closest zoom; photographic resolution does not override the chosen scale.
+A destination already in view needs no
 zoom-out. Other routes use an overview sized to the remaining half-route, not an
 automatic whole-globe view. Visible nearby destinations retain the departure
 heading to avoid rotating them out of the viewport. Reciprocal magnification
+interpolation on routes shorter than 500 km spends less time near the widest view;
+these local journeys also retain their departure heading instead of turning to face travel.
+Destination rivers and mapped water areas load asynchronously from departure, and
+unfinished requests survive arrival without restarting. The notice names the destination
+without claiming that the independently updating worksheet has already caught up.
+At Inari, complete mapped-water coverage lets the photographic surface replace the
+coarse lake outline and preserve the river connection and islands. Outside complete
+coverage, mapped water remains an additive overlay; missing polygons do not imply land.
+Close shoreline rendering samples four subpixel positions per screen pixel to soften
+stencil stair-steps at harbour edges without altering the mapped geometry.
+Reciprocal magnification
 interpolation follows angular progress rather than a separate zoom clock, preventing
 zoom-in overtaking the approach. Quintic easing brings ordinary phase boundaries to rest.
 Redirected travel starts with a non-zero route slope and eases to rest on arrival,
@@ -1189,8 +1247,8 @@ matching cameras retain their pan and roll. This repair occurs on restoration wi
 rewriting the history database or removing entries.
 The destination's detailed photographic patch is prepared before departure, with an
 eight-second download deadline; missing tiles leave the existing photograph usable.
-A travelling notice names the destination and explains that the worksheet already shows
-its results; the selected destination marker remains visible whenever it projects into view.
+A travelling notice names the destination and route distance; the selected destination
+marker remains visible whenever it projects into view.
 Destination shoreline detail is prefetched off-thread. Projection and large stencil
 texture uploads wait until arrival so they cannot stall GPU travel rendering.
 The global photograph covers the
@@ -1200,7 +1258,7 @@ repaints beneath its alpha canvas. Travel waits for
 the photographic texture before departure, then accelerates gently. Local vector
 requests do not brake and restart the camera: photographic coverage remains visible
 while they refine it. Slow rendering still limits the display clock and frame steps.
-River and town requests and local SVG border projection wait until arrival; enabled
+Town requests and local SVG border projection wait until arrival; enabled
 world borders rotate on the GPU throughout travel, alongside the selected marker.
 Travel starts after its first border buffer is prepared, and later journeys reuse it.
 Flight camera updates render in the same animation frame at up to one drawing pixel
@@ -4287,13 +4345,13 @@ or replacing those results.
 Each lookup sends the configured key, selected date, latitude and longitude
 from the local Lab server to WeatherAPI.com over HTTPS. The key is not sent to
 the browser. MARS retains only validated current temperatures in a bounded local
-cache for up to 48 hours, but reuses them only within one hour of both the current
+cache for up to one hour, and reuses them only within one hour of both the current
 time and selected moment when a later request fails;
 it does not cache complete responses, forecast arrays or API keys. A separate
-64-slot cache retains provider-derived almanac temperature and pressure for
+indexed cache retains provider-derived almanac temperature and pressure for
 15 minutes, matching the exact coordinates, GMT moment and elevation. Returning
 to that worksheet uses these conditions immediately while an asynchronous refresh
-runs; a failed refresh retains them until expiry. Each slot is limited to 2 KiB.
+runs; a failed refresh retains them until expiry.
 The follow-up uses the initial result's resolved observer fields, including its
 time-zone offset and jurisdiction, so weather cannot restore superseded defaults.
 The date and coordinates remain in private local Lab state so that its
@@ -4346,12 +4404,29 @@ is labelled as an hourly value, not a live measurement; extrapolation is not use
 Daily minimum and maximum values remain in the daily weather card: without the
 times of those extremes they do not define a trustworthy daily temperature curve.
 Cached observations must be at most one hour old and within one hour of the
-selected moment, matching coordinates rounded to three decimal places. Their
-source label includes their age and separation from the selected time. Estimates
+selected moment. SQL prefers matching coordinates rounded to three decimal places,
+then ranks nearby observations by squared spherical chord distance relative to
+500 km plus time separation relative to one hour, with newest retrieval breaking ties.
+Candidates outside 500 km are rejected using unit-vector dot products, including
+across the date line. The location/time index limits candidates before ranking;
+only the selected row is returned. This is a fallback heuristic, not a weather model:
+nearby terrain and weather systems can differ, and no altitude correction is inferred
+without a known observation elevation. The source label includes distance for nearby
+readings, their age and separation from the selected time. Estimates
 never renew cache age. Only temperature is reused; pressure retains its independent fallback.
-The cache uses at most 64 small files under `MARS_HOME/lab/weather-cache` (normally
-`~/.mars/lab/weather-cache`), contains no credentials, and uses non-blocking locks
-between workers. Unavailable or corrupt entries simply fall back to the seasonal
+The unencrypted SQLite database `weather_cache.db` lives beside the configured
+Lab state (normally `~/.mars/lab/weather_cache.db`). Its `weather_records` table
+stores native numeric location, altitude, UTC epoch, expiry, temperature and pressure
+columns, plus bounded source and note text. `kind` is zero for observations and one
+for calculated conditions; observation altitude is an unused zero sentinel. Nullable
+pressure columns distinguish unknown values. The `weather_readable` view adds
+readable UTC date columns for database inspection. No JSON payloads or arbitrary
+slots remain. Expired entries are removed on writes; oldest retrievals are evicted
+above 512 records, with a 1 MiB database limit. It contains no credentials. Transactions protect
+workers from partial writes; lock contention skips the cache without waiting.
+Existing slot records and JSON cache files are imported automatically and removed only after the
+transaction commits; the old directory is then removed if empty. Unavailable or
+corrupt entries simply fall back to the seasonal
 model. Without a recent reading, a deliberately rough latitude/season estimate is reduced by
 6.5 °C per kilometre of elevation. Its northern seasonal maximum is in July,
 reversed in the southern hemisphere. This has no time-of-day information: it is

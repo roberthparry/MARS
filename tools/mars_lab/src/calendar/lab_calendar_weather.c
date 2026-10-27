@@ -366,6 +366,9 @@ void lab_cal_observing_conditions(json_t *options, const json_t *weather)
     string_t *temperature_text = string_sprintf("%.6f", temperature);
     string_t *pressure_text = string_sprintf("%.6f", pressure);
     string_t *source_text = string_new_with(source);
+    double cache_distance = 0;
+    if (cached && lab_cal_provider_number(recent, "distance_km", &cache_distance) && cache_distance >= 0.1)
+        string_append_format(source_text, " from %.0f km away", cache_distance);
     if (cached && lab_cal_provider_number(recent, "observed", &observed))
         string_append_format(source_text, " (%.0f min old; %.0f min from selected time)",
                              difftime(time(NULL), (time_t)observed) / 60, fabs(epoch - observed) / 60);

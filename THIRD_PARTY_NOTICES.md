@@ -48,6 +48,19 @@ Its reference point, −34.05861, 18.32694, follows
 to Wikipedia contributors under CC BY-SA 4.0, checked 25 October 2026. No surveyed
 elevation is supplied. Its existing South African land coverage and shoreline are unchanged.
 
+The temporary Danish former-lake inspection references used these sources:
+Kolindsund, Tastum Sø, Gårdbo Sø, Sjørring Sø and Sperring Sø. Their approximate
+reference points followed Kjeld Hansen's *Det tabte land* site accounts:
+[Kolindsund](https://www.dettabteland.dk/midtjylland/kolindsund.pdf),
+[Tastum](https://www.dettabteland.dk/midtjylland/tastum.pdf),
+[Gårdbo](https://www.baeredygtighed.dk/tabteland/gaardbo.pdf),
+[Sjørring](https://www.dettabteland.dk/nordjylland/sjoerring.pdf) and
+[Sperring](https://www.dettabteland.dk/nordjylland/sperring.pdf), checked 26 October 2026.
+Published northing/easting reference pairs were interpreted as UTM zone 32N and
+converted to latitude/longitude, rounded to five decimal places. These were navigation
+reference points rather than surveyed boundaries; no elevations or water geometry
+were derived from these accounts.
+
 ## Regional flag artwork and coverage
 
 The additional SVGs and per-file authorship/licences are recorded in
@@ -272,6 +285,17 @@ under the display-only key `ZZ-SEA`; its notice is stored in
 database, with no runtime asset-file dependency or external image requests.
 
 ## NASA Blue Marble globe imagery
+
+The Welsh photographs in `packaging/globe-db/textures/regional/`
+contain modified Copernicus Sentinel data 2025. They derive from the ESA/CDSE
+Sentinel-2 quarterly cloudless mosaics for 2025 Q3, with missing observations
+filled from 2025 Q2, RGB bands B04/B03/B02. Source cells are 30UUB, 30UUC, 30UUD,
+30UUE, 30UVB, 30UVC, 30UVD, 30UVE, 30UWB, 30UWC, 30UWD and 30UWE (`_0_0`),
+provided by the [Taylor Geospatial Engine mirror](https://source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics).
+The [Copernicus Sentinel data legal notice](https://cds.climate.copernicus.eu/licences/ec-sentinel)
+permits reuse and redistribution with attribution. The packaged manifest records
+geographic bounds, reprojection, colour scaling and the resulting JPEG digest.
+These modified images are not official ESA products and imply no endorsement.
 
 Historical provenance: before the July 2004 replacement, the overview was the unmodified 2048 × 1024 NASA
 Blue Marble composite, *Land Surface, Ocean Color and Sea Ice*, published

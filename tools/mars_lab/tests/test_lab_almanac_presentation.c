@@ -531,11 +531,15 @@ static void test_lab_country_presentation(void)
     }
     json_t *response = test_lab_json("{\"observer_summary\":[{\"label\":\"Location\",\"value\":\"Britain & <UK>\","
                                     "\"flag\":\"data:image/svg+xml;base64,PHN2Zy8+\","
-                                    "\"jurisdiction_flag\":\"data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=\"}],"
+                                    "\"jurisdiction_flag\":\"data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=\"},"
+                                    "{\"label\":\"Latitude\",\"value\":\"52° 18.81′ N\"},"
+                                    "{\"label\":\"Longitude\",\"value\":\"3° 43.11′ W\"}],"
                                     "\"rows\":[],\"events\":[]}");
     string_t *html = lab_cal_almanac_markup(response, test_lab_member(response, "rows"),
                                            test_lab_member(response, "events"), false);
-    bool ok = html && strstr(string_c_str(html), "class=\"country-flag\" alt=\"\"") &&
+    bool ok = html && strstr(string_c_str(html), "data-coordinate=\"latitude\">52° 18.81′ N</dd>") &&
+              strstr(string_c_str(html), "data-coordinate=\"longitude\">3° 43.11′ W</dd>") &&
+              strstr(string_c_str(html), "class=\"country-flag\" alt=\"\"") &&
               strstr(string_c_str(html), "type=\"button\" class=\"almanac-location-flag\"") &&
               strstr(string_c_str(html), "class=\"country-flag jurisdiction-flag\"") &&
               strstr(string_c_str(html), "aria-label=\"Flag for Britain &amp; &lt;UK&gt;\"") &&

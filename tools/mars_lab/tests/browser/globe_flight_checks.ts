@@ -13,8 +13,6 @@ const globeFlightRoutes: [string, number, number, number, number][] = [
 ];
 
 async function checkGlobeFlights(check: (condition: boolean, message: string) => void): Promise<void> {
-    const framedZoom = (zoom: number) => labDOM.call('lab_globe_arrival_zoom', zoom,
-        document.querySelector<HTMLCanvasElement>('.almanac-globe canvas')!.clientWidth, 21600) as number;
     const globe = Reflect.get(MarsAlmanacGlobe, 'instance') as {
         orientation: number[]; view: number[]; flightTarget: number[] | null; gl: WebGLRenderingContext;
         worldLoading: boolean; shoreRetryAfter: number; palettesReady: boolean;
@@ -22,6 +20,10 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
         borders: boolean;
         travelBorders: import('../../typescript/globe_gpu.js').MarsGlobeBorders | null;
         applyCamera(camera: number[]): void; stopRegionRequests(): void;
+        loadRivers(): Promise<void>;
+        move(dx: number, dy: number, factor: number): void;
+        riverRequest: AbortController | null;
+        riverRequestBounds: number[] | null; riverRequestZoom: number;
         shoreJob(entry: GlobeWorkerRequest['entry'], args: GlobeWorkerRequest['args'], signal?: AbortSignal): Promise<unknown>;
     };
     const savedMode = WorksheetWorkspace.mode.currentMode();
@@ -31,6 +33,8 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
     const savedObserver = [latitude.value, longitude.value];
     const savedRetry = globe.shoreRetryAfter;
     const applyCamera = globe.applyCamera, native = labDOM.call, shoreJob = globe.shoreJob;
+    const loadRivers = globe.loadRivers;
+    let destinationRiverLoads = 0;
     const matchMedia = window.matchMedia, drawArrays = globe.gl.drawArrays;
     const fetch = labHttp.fetch, savedBorders = globe.borders;
     const savedTravelBorders = globe.travelBorders;
@@ -41,8 +45,34 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
     let releaseGeometry = (): void => {};
     try {
         WorksheetWorkspace.mode.setMode('almanac');
+        globe.stopRegionRequests();
+        const pendingRivers = new AbortController();
+        globe.riverRequest = pendingRivers;
+        globe.move(0, 0, 1);
+        check(!pendingRivers.signal.aborted && globe.riverRequest === pendingRivers,
+              'arrival refresh preserves an unfinished destination river request');
+        globe.move(.001, 0, 1);
+        check(pendingRivers.signal.aborted && !globe.riverRequest,
+              'manual camera movement still cancels obsolete river requests');
+        const useful = new AbortController();
+        const savedBounds = globe.riverRequestBounds, savedZoom = globe.riverRequestZoom;
+        globe.riverRequest = useful;
+        globe.riverRequestBounds = [globe.view[3] - 10, globe.view[4] - 10, globe.view[5] + 10, globe.view[6] + 10];
+        globe.riverRequestZoom = globe.view[2];
+        globe.move(.001, 0, 1);
+        check(!useful.signal.aborted && globe.riverRequest === useful,
+              'panning within an in-flight tile preserves its request rather than starving imagery');
+        useful.abort();
+        globe.riverRequest = null;
+        globe.riverRequestBounds = savedBounds;
+        globe.riverRequestZoom = savedZoom;
+        globe.stopRegionRequests();
         globe.borders = true;
         globe.travelBorders = null;
+        globe.loadRivers = async () => {
+            if (globe.flightTarget) ++destinationRiverLoads;
+            await loadRivers.call(globe);
+        };
         labHttp.fetch = async (url, options) => {
             if (url !== '/almanac-borders') return fetch.call(labHttp, url, options);
             const payload = labWire.decode(options!.body as Uint8Array<ArrayBuffer>) as {west: number; east: number};
@@ -109,7 +139,7 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
                 const visible = point[2] >= 0 && Math.max(Math.abs(point[0]), Math.abs(point[1])) * camera[4] <= 1.12;
                 if (destinationSeen && !visible) destinationLost = true;
                 destinationSeen ||= visible;
-                if (camera[4] === framedZoom(from[4]) && Math.abs(globe.view[0] - toLat) < 1e-8 &&
+                if (camera[4] === from[4] && Math.abs(globe.view[0] - toLat) < 1e-8 &&
                     Math.abs(globe.view[1] - toLon) < 1e-8) ++arrivalRollFrames;
             };
             const loading = globe.worldLoading;
@@ -137,8 +167,8 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             check(!globe.flightTarget && frameTimes.length > 30 && arrivalRollFrames > 2,
                   `${name}: completes a real animated flight with a separate arrival-roll phase; ` +
                   `progress=${flightProgress}, zoom=${globe.view[2]}, frames=${frameTimes.length}, arrival=${arrivalRollFrames}`);
-            check(globe.view[2] === framedZoom(from[4]) && globe.orientation.every((value, i) => Math.abs(value - to[i]) < 1e-12),
-                  `${name}: limits excessive arrival magnification while restoring destination orientation`);
+            check(globe.view[2] === from[4] && globe.orientation.every((value, i) => Math.abs(value - to[i]) < 1e-12),
+                  `${name}: retains departure zoom while restoring destination orientation`);
             check(deferredFrames === 0, `${name}: camera updates submit to the GPU in the same frame`);
             check(bordersDuringFlight === 0, `${name}: optional border projection waits until arrival`);
             check(gpuBorders > previousBorders, `${name}: enabled borders draw on the GPU during travel`);
@@ -178,10 +208,10 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             // Advance to the actual native midpoint without spending another whole journey here.
             const transit = native('lab_globe_flight', departure, first, .5, 0) as number[];
             globe.applyCamera(transit);
-            check(transit[4] < 3 && MarsAlmanacGlobe.captureHistory()![4] === framedZoom(150),
+            check(transit[4] < 3 && MarsAlmanacGlobe.captureHistory()![4] === 150,
                   'mid-flight history captures the chosen close zoom, not the temporary overview');
             globe.saveCamera();
-            check(JSON.parse(localStorage.getItem(bookmarkKey)!).camera[4] === framedZoom(150),
+            check(JSON.parse(localStorage.getItem(bookmarkKey)!).camera[4] === 150,
                   'a mid-flight browser bookmark retains the destination camera');
             const stale = MarsAlmanacGlobe.beginHistory();
             const latest = MarsAlmanacGlobe.beginHistory();
@@ -190,7 +220,7 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             MarsAlmanacGlobe.finishHistory(stale, first, true);
             check(globe.flightTarget === continuingTarget, 'superseded restoration cannot replace the continuing journey');
             MarsAlmanacGlobe.finishHistory(latest, next, true);
-            check(globe.flightTarget?.[4] === framedZoom(150) && globe.view[2] === transit[4] && globe.historyRedirect,
+            check(globe.flightTarget?.[4] === 150 && globe.view[2] === transit[4] && globe.historyRedirect,
                   'successive clicks retain chosen zoom through overlapping restorations without a camera jump');
             const end = globe.flightTarget!;
             const early = native('lab_globe_flight', transit, end, .05, 1) as number[];
@@ -218,7 +248,7 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             const manualToken = MarsAlmanacGlobe.beginHistory();
             latitude.value = '-33.8688'; longitude.value = '151.2093';
             MarsAlmanacGlobe.finishHistory(manualToken, camera(-33.8688, 151.2093, 512), true);
-            check(globe.flightTarget?.[4] === framedZoom(manualZoom) && !globe.historyRedirect,
+            check(globe.flightTarget?.[4] === manualZoom && !globe.historyRedirect,
                   'manual zoom cancels old travel intent and establishes the scale for subsequent navigation');
         } finally {
             document.querySelector<HTMLButtonElement>('[data-globe-action="in"]')!.click();
@@ -235,10 +265,13 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
             check(!globe.flightTarget, 'manual navigation cancels a journey even while imagery is pending');
         } finally { globe.worldLoading = loading; }
         document.getElementById('almanacGlobe')!.dataset.flightTestTiming = timings.join('; ');
+        check(destinationRiverLoads >= globeFlightRoutes.length,
+              'destination river surfaces start loading during travel, before arrival');
     } finally {
         releaseGeometry();
         MarsAlmanacGlobe.beginHistory();
         globe.applyCamera = applyCamera;
+        globe.loadRivers = loadRivers;
         globe.shoreJob = shoreJob;
         globe.shoreRetryAfter = savedRetry;
         globe.gl.drawArrays = drawArrays;

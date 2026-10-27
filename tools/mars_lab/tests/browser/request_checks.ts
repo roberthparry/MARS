@@ -305,6 +305,43 @@ window.checkLabRequests = async function checkLabRequests() {
         return WorksheetRequests.labRequests.run('evaluate', 'expression', collectResult);
     }
     try {
+        WorksheetWorkspace.mode.setMode('almanac');
+        WorksheetRequests.labRequests.modeChanged('almanac');
+        let attempts = 0;
+        const rendered = document.getElementById('rendered')!;
+        const retainedResult = document.createElement('span');
+        retainedResult.hidden = true;
+        retainedResult.textContent = 'Previously calculated worksheet';
+        rendered.appendChild(retainedResult);
+        const isReconnect = (url: RequestInfo | URL, options?: RequestInit) => String(url) === '/almanac-eval' &&
+            options?.body instanceof Uint8Array &&
+            (labWire.decode(new Uint8Array(options.body)) as {reconnect_fixture?: boolean}).reconnect_fixture === true;
+        window.fetch = async (url, options) => {
+            if (!isReconnect(url, options)) return originalFetch(url, options);
+            if (++attempts === 1) throw new TypeError('Failed to fetch');
+            return response({ok: true, marker: 'reconnected'});
+        };
+        const reconnect = WorksheetRequests.labRequests.begin('evaluate', 'almanac');
+        try {
+            const recovered = await WorksheetRequests.labRequests.post(reconnect, {reconnect_fixture: true}, '/almanac-eval');
+            check(attempts === 2 && recovered.data.marker === 'reconnected',
+                  'calendar evaluation retries a connection failure and accepts the recovered response');
+            check(retainedResult.isConnected, 'connection recovery retains the previous worksheet');
+        } finally { retainedResult.remove(); WorksheetRequests.labRequests.finish(reconnect); }
+        attempts = 0;
+        window.fetch = async (url, options) => {
+            if (!isReconnect(url, options)) return originalFetch(url, options);
+            ++attempts;
+            throw new TypeError('Failed to fetch');
+        };
+        const abandoned = WorksheetRequests.labRequests.begin('evaluate', 'almanac');
+        const cancelled = WorksheetRequests.labRequests.post(abandoned, {reconnect_fixture: true}, '/almanac-eval').then(
+            () => false, error => error instanceof DOMException && error.name === 'AbortError');
+        await new Promise(resolve => setTimeout(resolve, 100));
+        WorksheetRequests.labRequests.cancel('evaluate');
+        check(await cancelled && attempts === 1, 'cancelling an obsolete selection cancels its reconnect timer');
+        WorksheetWorkspace.presentation.setStatus('');
+        window.fetch = originalFetch;
         WorksheetWorkspace.mode.setMode('expression');
         WorksheetRequests.labRequests.modeChanged('expression');
         const callbackValue = {marker: 'owned callback result'};

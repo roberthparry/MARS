@@ -15,9 +15,29 @@
 
 typedef struct _rivers_t {
     sqlite_stmt_t *query;
+    sqlite_stmt_t *width_query;
+    sqlite_stmt_t *bank_query;
+    sqlite_stmt_t *coverage_query;
+    int64_t width_id;
+    double width;
     bool busy;
     bool anchors;
 } rivers_t;
+
+/* Only an explicit complete-survey rectangle establishes that unpainted pixels are land. */
+bool rivers_water_complete(rivers_t *r, double west, double south, double east, double north)
+{
+    if (!r || !r->coverage_query || !isfinite(west) || !isfinite(south) || !isfinite(east) || !isfinite(north) ||
+        west < -180 || east > 180 || south < -90 || north > 90 || west >= east || south >= north) return false;
+    sqlite_stmt_t *q = r->coverage_query;
+    bool covered = sqlite_stmt_bind_int64(q, 1, (int64_t)floor(west * 1000000)) &&
+                   sqlite_stmt_bind_int64(q, 2, (int64_t)floor(south * 1000000)) &&
+                   sqlite_stmt_bind_int64(q, 3, (int64_t)ceil(east * 1000000)) &&
+                   sqlite_stmt_bind_int64(q, 4, (int64_t)ceil(north * 1000000)) &&
+                   sqlite_stmt_step(q) == SQLITE_STEP_ROW;
+    sqlite_stmt_reset(q);
+    return covered;
+}
 
 int32_t rivers_coordinate(const unsigned char *p)
 {
@@ -45,7 +65,26 @@ rivers_t *rivers_open(sqlite_t *db)
         "select c.feature_id,c.kind,case when length(c.vertices) between 16 and 2056 "
         "then c.vertices end from rivers_bounds b join rivers_chunk c on c.id=b.id "
         "where b.max_x>=?1 and b.min_x<=?2 and b.max_y>=?3 and b.min_y<=?4");
-    if (!r->query) { free(r); return NULL; }
+    sqlite_stmt_t *tables = sqlite_stmt_prepare(db,
+        "select 1 from sqlite_master where type='table' and name='rivers_width'");
+    bool widths = tables && sqlite_stmt_step(tables) == SQLITE_STEP_ROW;
+    sqlite_stmt_finalize(tables);
+    if (widths) r->width_query = sqlite_stmt_prepare(db, "select metres from rivers_width where feature_id=?1");
+    tables = sqlite_stmt_prepare(db, "select 1 from sqlite_master where type='table' and name='rivers_bank'");
+    bool banks = tables && sqlite_stmt_step(tables) == SQLITE_STEP_ROW;
+    sqlite_stmt_finalize(tables);
+    if (banks) r->bank_query = sqlite_stmt_prepare(db,
+        "select case when length(c.rings) between 40 and 4194304 then c.rings end "
+        "from rivers_bank_bounds b join rivers_bank c on c.id=b.id "
+        "where b.max_x>=?1 and b.min_x<=?2 and b.max_y>=?3 and b.min_y<=?4");
+    r->width_id = -1;
+    tables = sqlite_stmt_prepare(db, "select 1 from sqlite_master where name='rivers_water_coverage'");
+    bool coverage = tables && sqlite_stmt_step(tables) == SQLITE_STEP_ROW;
+    sqlite_stmt_finalize(tables);
+    if (coverage) r->coverage_query = sqlite_stmt_prepare(db,
+        "select 1 from rivers_water_coverage where min_x<=?1 and min_y<=?2 and max_x>=?3 and max_y>=?4 limit 1");
+    if (coverage && !r->coverage_query) { rivers_close(r); return NULL; }
+    if (!r->query || (widths && !r->width_query) || (banks && !r->bank_query)) { rivers_close(r); return NULL; }
     return r;
 }
 
@@ -54,7 +93,35 @@ void rivers_close(rivers_t *r)
 {
     if (!r) return;
     sqlite_stmt_finalize(r->query);
+    sqlite_stmt_finalize(r->width_query);
+    sqlite_stmt_finalize(r->bank_query);
+    sqlite_stmt_finalize(r->coverage_query);
     free(r);
+}
+
+/* Adjacent segments share a feature: one indexed lookup serves all of its vertices. */
+bool rivers_width_metres(rivers_t *r, int64_t id, double *width)
+{
+    if (!r || !width || id < 0) return false;
+    if (r->width_id != id) {
+        double value = 0;
+        bool ok = true;
+        if (r->width_query) {
+            sqlite_stmt_t *q = r->width_query;
+            ok = sqlite_stmt_bind_int64(q, 1, id);
+            sqlite_step_result_t step = ok ? sqlite_stmt_step(q) : SQLITE_STEP_ERROR;
+            if (step == SQLITE_STEP_ROW) {
+                value = sqlite_stmt_column_double(q, 0);
+                ok = isfinite(value) && value > 0 && value <= 100000;
+            } else ok = step == SQLITE_STEP_DONE;
+            sqlite_stmt_reset(q);
+        }
+        if (!ok) return false;
+        r->width_id = id;
+        r->width = value;
+    }
+    *width = r->width;
+    return true;
 }
 
 static bool rivers_clip(double p, double q, double *start, double *end)
@@ -69,6 +136,71 @@ static bool rivers_clip(double p, double q, double *start, double *end)
         if (t < *end) *end = t;
     }
     return true;
+}
+
+static bool bank_polygon(const unsigned char *blob, size_t bytes, double shift,
+                         globe_river_bank_fn visit, void *context)
+{
+    if (!blob || bytes < 40 || bytes > 4194304) return false;
+    int32_t rings = rivers_coordinate(blob);
+    if (rings < 1 || rings > 4096 || (size_t)rings > (bytes - 4) / 36) return false;
+    size_t *sizes = calloc((size_t)rings, sizeof *sizes);
+    double *coordinates = malloc(bytes * 2);
+    bool ok = sizes && coordinates;
+    size_t offset = 4, points = 0;
+    for (int32_t ring = 0; ok && ring < rings; ++ring) {
+        if (bytes - offset < 4) { ok = false; break; }
+        int32_t count = rivers_coordinate(blob + offset);
+        offset += 4;
+        if (count < 4 || (size_t)count > (bytes - offset) / 8) { ok = false; break; }
+        sizes[ring] = (size_t)count;
+        size_t first = points;
+        for (int32_t i = 0; i < count; ++i) {
+            double x = rivers_coordinate(blob + offset) / 1e6;
+            double y = rivers_coordinate(blob + offset + 4) / 1e6;
+            if (fabs(x) > 180 || fabs(y) > 90) ok = false;
+            coordinates[2 * points] = x + shift;
+            coordinates[2 * points + 1] = y;
+            ++points;
+            offset += 8;
+        }
+        if (coordinates[2 * first] != coordinates[2 * (points - 1)] ||
+            coordinates[2 * first + 1] != coordinates[2 * (points - 1) + 1]) ok = false;
+    }
+    ok = ok && offset == bytes && visit(coordinates, sizes, (size_t)rings, context);
+    free(coordinates); free(sizes);
+    return ok;
+}
+
+/* Polygon queries use the same wrapped longitude frames as centreline queries. */
+bool rivers_banks(rivers_t *r, double west, double south, double east, double north,
+                   globe_river_bank_fn visit, void *context)
+{
+    if (!r || r->busy || !visit || !isfinite(west) || !isfinite(east) || !isfinite(south) || !isfinite(north) ||
+        west < -360 || west > 180 || east <= west || east - west > 360 || south < -90 || north > 90 || north <= south)
+        return false;
+    if (!r->bank_query) return true;
+    r->busy = true;
+    bool ok = true;
+    size_t total = 0;
+    sqlite_stmt_t *q = r->bank_query;
+    for (int wrap = -2; ok && wrap <= 2; ++wrap) {
+        double shift = wrap * 360.;
+        if (east - shift < -180 || west - shift > 180) continue;
+        ok = sqlite_stmt_bind_double(q, 1, (west - shift) * 1e6) &&
+             sqlite_stmt_bind_double(q, 2, (east - shift) * 1e6) &&
+             sqlite_stmt_bind_double(q, 3, south * 1e6) && sqlite_stmt_bind_double(q, 4, north * 1e6);
+        sqlite_step_result_t step = SQLITE_STEP_DONE;
+        while (ok && (step = sqlite_stmt_step(q)) == SQLITE_STEP_ROW) {
+            size_t bytes = sqlite_stmt_column_bytes(q, 0);
+            total += bytes;
+            ok = total <= 8 * 1024 * 1024 && bank_polygon(sqlite_stmt_column_blob(q, 0), bytes, shift, visit, context);
+        }
+        if (ok) ok = step == SQLITE_STEP_DONE;
+        sqlite_stmt_reset(q);
+    }
+    r->busy = false;
+    return ok;
 }
 
 /* Stream exact segments; clip only to the requested display window. */
