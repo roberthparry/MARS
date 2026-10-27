@@ -6,7 +6,7 @@
  * Only one 1800-row strip is decoded at a time. Optional global textures use
  * area-weighted resampling with one decoded source row and one output image.
  * This optional maintainer utility
- * uses libjpeg; the application and ordinary builds do not require its development files.
+ * uses libjpeg and zlib; the application and ordinary builds do not require its development files.
  * File access uses the MARS file module. Source credit and provenance belong in
  * THIRD_PARTY_NOTICES.md alongside the generated assets.
  * The --manifest mode records the packaged images' dimensions, sizes, source attribution and SHA-256 digests
@@ -19,49 +19,61 @@
 #include <stdlib.h>
 #include <string.h>
 #include <jpeglib.h>
+#include <zlib.h>
 
 #include "array-t.h"
 #include "json-t.h"
 #include "string-t.h"
 #include "file-t.h"
 
+static void texture_u32(unsigned char *out, unsigned value)
+{
+    out[0] = value >> 24; out[1] = value >> 16; out[2] = value >> 8; out[3] = value;
+}
+
+static bool texture_chunk(array_t *output, const char *type, const unsigned char *data, size_t size)
+{
+    unsigned char prefix[8], checksum[4];
+    texture_u32(prefix, (unsigned)size);
+    memcpy(prefix + 4, type, 4);
+    uLong crc = crc32(0, (const Bytef *)type, 4);
+    if (size) crc = crc32(crc, data, (uInt)size);
+    texture_u32(checksum, (unsigned)crc);
+    return array_append_carray(output, prefix, sizeof prefix) &&
+           (!size || array_append_carray(output, data, size)) &&
+           array_append_carray(output, checksum, sizeof checksum);
+}
+
 static bool save_image(const string_t *path, unsigned width, unsigned height, size_t stride, unsigned char *pixels)
 {
-    struct jpeg_compress_struct encoder;
-    struct jpeg_error_mgr error;
-    encoder.err = jpeg_std_error(&error);
-    jpeg_create_compress(&encoder);
-    unsigned char *bytes = NULL;
-    unsigned long length = 0;
-    jpeg_mem_dest(&encoder, &bytes, &length);
-    encoder.image_width = width;
-    encoder.image_height = height;
-    encoder.input_components = 3;
-    encoder.in_color_space = JCS_RGB;
-    jpeg_set_defaults(&encoder);
-    jpeg_set_quality(&encoder, 95, true);
-    for (unsigned component = 0; component < 3; ++component) {
-        encoder.comp_info[component].h_samp_factor = 1;
-        encoder.comp_info[component].v_samp_factor = 1;
+    size_t row = (size_t)width * 3 + 1, size = row * height;
+    unsigned char *raw = malloc(size);
+    uLongf length = compressBound(size);
+    unsigned char *compressed = malloc(length);
+    if (!raw || !compressed) { free(raw); free(compressed); return false; }
+    for (unsigned y = 0; y < height; ++y) {
+        raw[y * row] = 0;
+        memcpy(raw + y * row + 1, pixels + y * stride, row - 1);
     }
-    encoder.optimize_coding = true;
-    jpeg_start_compress(&encoder, true);
-    while (encoder.next_scanline < height) {
-        JSAMPROW line = pixels + (size_t)encoder.next_scanline * stride;
-        jpeg_write_scanlines(&encoder, &line, 1);
-    }
-    jpeg_finish_compress(&encoder);
-    jpeg_destroy_compress(&encoder);
-    file_t *file = path ? file_new(path) : NULL;
-    bool ok = file && file_write_all_bytes(file, bytes, length);
-    file_free(file);
-    free(bytes);
+    bool ok = compress2(compressed, &length, raw, size, 6) == Z_OK;
+    free(raw);
+    array_t *encoded = ok ? array_create(1, NULL, NULL) : NULL;
+    unsigned char header[13] = {0};
+    texture_u32(header, width); texture_u32(header + 4, height);
+    header[8] = 8; header[9] = 2;
+    ok = encoded && array_append_carray(encoded, "\211PNG\r\n\032\n", 8) &&
+         texture_chunk(encoded, "IHDR", header, sizeof header) &&
+         texture_chunk(encoded, "IDAT", compressed, length) && texture_chunk(encoded, "IEND", NULL, 0);
+    free(compressed);
+    file_t *file = ok && path ? file_new(path) : NULL;
+    ok = file && file_write_all_bytes(file, array_get(encoded, 0), array_size(encoded));
+    file_free(file); array_destroy(encoded);
     return ok;
 }
 
 static bool save_tile(const char *directory, unsigned column, unsigned row, unsigned char *strip)
 {
-    string_t *path = string_sprintf("%s/%02u-%02u.jpg", directory, column, row);
+    string_t *path = string_sprintf("%s/%02u-%02u.png", directory, column, row);
     bool ok = path && save_image(path, 1800, 1800, 21600 * 3, strip + column * 1800 * 3);
     string_free(path);
     return ok;
@@ -108,7 +120,7 @@ static bool save_overview(array_t *bytes, const char *directory, unsigned width)
     }
     if (ok) jpeg_finish_decompress(&decoder);
     jpeg_destroy_decompress(&decoder);
-    string_t *path = string_sprintf("%s/earth_surface%s.jpg", directory, width == 2048 ? "" : "_detail");
+    string_t *path = string_sprintf("%s/earth_surface%s.png", directory, width == 2048 ? "" : "_detail");
     ok = ok && path && save_image(path, width, height, width * 3, pixels);
     string_free(path);
     free(pixels);
@@ -132,7 +144,7 @@ static string_t *retain_regions(file_t *output, const string_t *text)
         size_t count = json_array_size(regions);
         ok = ok && json_type(regions) == JSON_ARRAY && count <= 64 && json_object_set(next, regions_key, regions);
         for (size_t i = 0; ok && i < count; ++i) {
-            string_t *key = string_sprintf("regional/%02u.jpg", (unsigned)i);
+            string_t *key = string_sprintf("regional/%02u.png", (unsigned)i);
             const json_t *asset = key ? json_object_get(old_assets, key) : NULL;
             ok = asset && json_object_set(assets, key, asset);
             string_free(key);
@@ -148,7 +160,7 @@ static string_t *retain_regions(file_t *output, const string_t *text)
 static bool save_manifest(const char *directory)
 {
     string_t *manifest = string_new_with(
-        "{\n  \"format_version\": 1,\n  \"name\": \"Blue Marble Next Generation\",\n"
+        "{\n  \"format_version\": 2,\n  \"name\": \"Blue Marble Next Generation\",\n"
         "  \"reference_month\": \"2004-07\",\n"
         "  \"source_url\": \"https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/"
         "bmng-topography-bathymetry/july/world.topo.bathy.200407.3x21600x10800.jpg\",\n"
@@ -162,8 +174,8 @@ static bool save_manifest(const char *directory)
     for (unsigned level = 0; ok && level < 3; ++level) {
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row) {
             for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column) {
-                string_t *relative = level == 2 ? string_sprintf("earth_tiles/%02u-%02u.jpg", column, row)
-                                    : string_new_with(level ? "earth_surface_detail.jpg" : "earth_surface.jpg");
+                string_t *relative = level == 2 ? string_sprintf("earth_tiles/%02u-%02u.png", column, row)
+                                    : string_new_with(level ? "earth_surface_detail.png" : "earth_surface.png");
                 string_t *path = relative ? string_sprintf("%s/%s", directory, string_c_str(relative)) : NULL;
                 file_t *file = path ? file_new(path) : NULL;
                 file_info_t *info = file ? file_get_info(file) : NULL;

@@ -2,8 +2,8 @@
  * @file cfg_database_textures.c
  * @brief Transactional installation of packaged photographic surface imagery.
  *
- * Imports two global JPEGs, 72 NASA tiles and up to 64 regional photographs into the independent globe store. A bounded
- * manifest supplies content digests and source attribution; each JPEG must match its declared size, dimensions
+ * Imports two global PNGs, 72 NASA tiles and up to 64 regional photographs into the independent globe store. A bounded
+ * manifest supplies content digests and source attribution; each PNG must match its declared size, dimensions
  * and digest. Savepoints preserve an existing image set on missing or corrupt input, including within migrations.
  * No image transcoding, network download or geometry replacement occurs here.
  */
@@ -48,25 +48,29 @@ static bool texture_number(const json_t *value, const char *name, uint64_t expec
     return start[0] >= '0' && start[0] <= '9' && end && !*end && !errno && number == expected;
 }
 
-/* Inspect JPEG segment headers only; runtime decoding remains the browser's responsibility. */
+/* Validate chunk bounds and the RGB header without decoding the photograph. */
+static unsigned texture_u32(const unsigned char *p)
+{
+    return ((unsigned)p[0] << 24) | ((unsigned)p[1] << 16) | ((unsigned)p[2] << 8) | p[3];
+}
+
 static bool texture_dimensions(const unsigned char *data, size_t size, unsigned width, unsigned height)
 {
-    if (size < 4 || data[0] != 0xff || data[1] != 0xd8 || data[size - 2] != 0xff || data[size - 1] != 0xd9)
-        return false;
-    size_t at = 2;
-    while (at + 4 <= size) {
-        if (data[at++] != 0xff) return false;
-        while (at < size && data[at] == 0xff) ++at;
-        if (at + 3 > size) return false;
-        unsigned marker = data[at++];
-        if (marker == 0xda || marker == 0xd9 || marker == 0 || marker == 0xd8) return false;
-        size_t length = ((size_t)data[at] << 8) | data[at + 1];
-        if (length < 2 || length > size - at) return false;
-        if (marker == 0xc0 || marker == 0xc2)
-            return length == 17 && data[at + 2] == 8 && data[at + 7] == 3 &&
-                   ((unsigned)data[at + 3] * 256 + data[at + 4]) == height &&
-                   ((unsigned)data[at + 5] * 256 + data[at + 6]) == width;
-        at += length;
+    if (size < 57 || memcmp(data, "\211PNG\r\n\032\n", 8)) return false;
+    bool header = false, pixels = false;
+    for (size_t at = 8; at + 12 <= size;) {
+        unsigned length = texture_u32(data + at);
+        if (length > size - at - 12) return false;
+        const unsigned char *type = data + at + 4, *body = data + at + 8;
+        if (!header) {
+            if (memcmp(type, "IHDR", 4) || length != 13 || texture_u32(body) != width ||
+                texture_u32(body + 4) != height || body[8] != 8 || body[9] != 2 ||
+                body[10] || body[11] || body[12]) return false;
+            header = true;
+        } else if (!memcmp(type, "IHDR", 4)) return false;
+        if (!memcmp(type, "IDAT", 4)) pixels = true;
+        if (!memcmp(type, "IEND", 4)) return !length && pixels && at + 12 == size;
+        at += (size_t)length + 12;
     }
     return false;
 }
@@ -75,9 +79,9 @@ static bool texture_import(sqlite_stmt_t *insert, const string_t *directory, con
                            unsigned level, unsigned column, unsigned row)
 {
     static const unsigned widths[] = {2048, 8192, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800};
-    string_t *relative = level == 3 ? string_sprintf("regional/%02u.jpg", column) :
-                        level == 2 ? string_sprintf("earth_tiles/%02u-%02u.jpg", column, row)
-                                   : string_new_with(level ? "earth_surface_detail.jpg" : "earth_surface.jpg");
+    string_t *relative = level == 3 ? string_sprintf("regional/%02u.png", column) :
+                        level == 2 ? string_sprintf("earth_tiles/%02u-%02u.png", column, row)
+                                   : string_new_with(level ? "earth_surface_detail.png" : "earth_surface.png");
     const json_t *asset = relative ? json_object_get(assets, relative) : NULL;
     unsigned width = level == 3 && texture_number(asset, "width", 3600) ? 3600 : widths[level];
     unsigned height = level == 3 ? width : heights[level];
@@ -86,7 +90,7 @@ static bool texture_import(sqlite_stmt_t *insert, const string_t *directory, con
                                                string_c_str(relative)) : NULL;
     file_t *file = path ? file_new(path) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
-    size_t maximum = level == 1 || level == 3 ? 16777216 : 4194304;
+    size_t maximum = level == 1 ? 134217728 : level == 3 ? 67108864 : 16777216;
     bool ok = info && file_info_type(info) == FILE_TYPE_REGULAR && file_info_size(info) <= maximum &&
               expected && strlen(expected) == 64 && texture_number(asset, "width", width) &&
               texture_number(asset, "height", height) && texture_number(asset, "bytes", file_info_size(info));
@@ -157,7 +161,7 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     const char *source_digest = texture_text(manifest, "source_sha256", 64);
     const char *attribution = texture_text(manifest, "attribution", 4096);
     const char *month = texture_text(manifest, "reference_month", 7);
-    bool ok = texture_number(manifest, "format_version", 1) && json_type(assets) == JSON_OBJECT &&
+    bool ok = texture_number(manifest, "format_version", 2) && json_type(assets) == JSON_OBJECT &&
               json_object_size(assets) == 74 + json_array_size(texture_field(manifest, "regions")) &&
               name && url && source_digest && strlen(source_digest) == 64 &&
               attribution && month && !strcmp(month, "2004-07");
@@ -167,9 +171,9 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
         "create table globe_texture_dataset(id integer primary key,format_version integer not null,name text not null,"
         "source_url text not null,source_sha256 text not null,attribution text not null,reference_month text not null);"
         "create table globe_texture(level integer not null,column_index integer not null,row_index integer not null,"
-        "width integer not null,height integer not null,byte_count integer not null,sha256 text not null,jpeg blob not null,"
+        "width integer not null,height integer not null,byte_count integer not null,sha256 text not null,png blob not null,"
         "primary key(level,column_index,row_index));");
-    sqlite_stmt_t *meta = ok ? sqlite_stmt_prepare(db, "insert into globe_texture_dataset values(1,1,?1,?2,?3,?4,?5)") : NULL;
+    sqlite_stmt_t *meta = ok ? sqlite_stmt_prepare(db, "insert into globe_texture_dataset values(1,2,?1,?2,?3,?4,?5)") : NULL;
     ok = meta && sqlite_stmt_bind_text(meta, 1, name) && sqlite_stmt_bind_text(meta, 2, url) &&
          sqlite_stmt_bind_text(meta, 3, source_digest) && sqlite_stmt_bind_text(meta, 4, attribution) &&
          sqlite_stmt_bind_text(meta, 5, month) && sqlite_stmt_step(meta) == SQLITE_STEP_DONE;
@@ -201,19 +205,19 @@ bool cfg_database_textures_valid(sqlite_t *db)
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row) {
             for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column) {
                 globe_texture_info_t info;
-                array_t *jpeg = globe_texture_metadata(globe, level, column, row, &info)
-                                    ? globe_texture_jpeg(globe, level, column, row, &info) : NULL;
-                ok = jpeg != NULL;
-                array_destroy(jpeg);
+                array_t *png = globe_texture_metadata(globe, level, column, row, &info)
+                                    ? globe_texture_png(globe, level, column, row, &info) : NULL;
+                ok = png != NULL;
+                array_destroy(png);
             }
         }
     }
     for (int slot = 0; ok && slot < total - 74; ++slot) {
         globe_texture_info_t info;
-        array_t *jpeg = globe_texture_metadata(globe, 3, (unsigned)slot, 0, &info)
-            ? globe_texture_jpeg(globe, 3, (unsigned)slot, 0, &info) : NULL;
-        ok = jpeg != NULL;
-        array_destroy(jpeg);
+        array_t *png = globe_texture_metadata(globe, 3, (unsigned)slot, 0, &info)
+            ? globe_texture_png(globe, 3, (unsigned)slot, 0, &info) : NULL;
+        ok = png != NULL;
+        array_destroy(png);
     }
     globe_close(globe);
     return ok;

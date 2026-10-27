@@ -162,7 +162,7 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
 static int cfg_databases_prepare(bool install_missing)
 {
     static const cfg_database_migration migrations[] = {
-        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 11, cfg_database_globe_refresh, NULL},
+        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 12, cfg_database_globe_refresh, NULL},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
          "jurisdiction/mars_jurisdiction_rules.db", 10, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction},

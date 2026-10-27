@@ -294,7 +294,7 @@ filled from 2025 Q2, RGB bands B04/B03/B02. Source cells are 30UUB, 30UUC, 30UUD
 provided by the [Taylor Geospatial Engine mirror](https://source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics).
 The [Copernicus Sentinel data legal notice](https://cds.climate.copernicus.eu/licences/ec-sentinel)
 permits reuse and redistribution with attribution. The packaged manifest records
-geographic bounds, reprojection, colour scaling and the resulting JPEG digest.
+geographic bounds, reprojection, colour scaling and the resulting image digest.
 These modified images are not official ESA products and imply no endorsement.
 
 Historical provenance: before the July 2004 replacement, the overview was the unmodified 2048 × 1024 NASA
@@ -333,21 +333,23 @@ The NASA imagery reuse policy linked above applies; no endorsement is implied.
 Source dimensions: 21600 × 10800. Source size: 27,201,049 bytes.
 Source SHA-256: `d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0`.
 The native `tools/mars_lab/texture_tiles.c` utility crops a 12 × 6 grid without
-resampling, then encodes each 1800 × 1800 tile as JPEG quality 95, 4:4:4 sampling.
+resampling, then encodes each 1800 × 1800 tile as lossless PNG. The current assets
+were converted from the previously packaged JPEG quality 95, 4:4:4 tiles; this
+preserves their decoded pixels without restoring detail lost in JPEG encoding.
 Filenames contain zero-based column and row numbers, west to east and north to south.
 This is historical reference imagery; it does not assert current surface or ice
 conditions. Both global textures use area-weighted resampling of this same source,
-with JPEG quality 95 and 4:4:4 sampling:
+originally with JPEG quality 95 and 4:4:4 sampling, now stored as PNG:
 
-- `packaging/globe-db/textures/earth_surface.jpg`: 2048 × 1024, 832,192 bytes;
-  SHA-256 `7e9f55f01df03a826fa7106e7fb55e4ae5c2974371dd55be6f3b8ea0cea0f184`.
-- `packaging/globe-db/textures/earth_surface_detail.jpg`: 8192 × 4096, 9,361,205 bytes;
-  SHA-256 `ceb97696df39d72cac710158c4d1613948006c79cf303a8bfe91df721ff94aab`.
+- `packaging/globe-db/textures/earth_surface.png`: 2048 × 1024, 2,623,195 bytes;
+  SHA-256 `62f8c4cce65741169233efb5cb76c5e168734e3983450373f6335dcff306b626`.
+- `packaging/globe-db/textures/earth_surface_detail.png`: 8192 × 4096, 31,806,347 bytes;
+  SHA-256 `cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d`.
 
 The utility accepts an optional overview output directory after the tile directory.
 Rendering blends these matching images with independent shoreline layers.
 Its `--manifest` mode records the packaged images' dimensions, sizes, digests and
-source attribution. Installation copies their unchanged JPEG bytes and attribution
+source attribution. Installation copies their unchanged PNG bytes and attribution
 into `globe.db`; runtime image routes read that database.
 
 ## WASI libc maths, memory and strings

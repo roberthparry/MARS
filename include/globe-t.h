@@ -27,7 +27,7 @@
  * Independent cultural display polygons supply regional flag identifiers, never country ownership or time zones.
  * Named-water lookup currently recognises the Caspian Sea through exact shoreline containment, independently
  * of country ownership; it is not a comprehensive water-name gazetteer.
- * Photographic textures are indexed JPEG blobs with dimensions and SHA-256 identities. Metadata reads do not
+ * Photographic textures are indexed PNG blobs with dimensions and SHA-256 identities. Metadata reads do not
  * decode or load the image; applications can validate cached responses before requesting the bounded payload.
  */
 #ifndef MARS_GLOBE_H
@@ -41,20 +41,20 @@ typedef struct _globe_t globe_t;
 
 /** @brief Validated image metadata; level 0 is the overview, 1 global detail and 2 the twelve-by-six tile grid. */
 typedef struct _globe_texture_info_t {
-    unsigned width; /**< JPEG width in pixels. */
-    unsigned height; /**< JPEG height in pixels. */
-    size_t byte_count; /**< Encoded JPEG size, at most 16 MiB. */
+    unsigned width; /**< PNG width in pixels. */
+    unsigned height; /**< PNG height in pixels. */
+    size_t byte_count; /**< Encoded PNG size: at most 128 MiB globally, 64 MiB regionally, 16 MiB otherwise. */
     char sha256[65]; /**< Lower-case hexadecimal content digest, including its terminating NUL. */
 } globe_texture_info_t;
 
-/** @brief Receive a regional JPEG slot and its west, south, east, north bounds; false stops enumeration. */
+/** @brief Receive a regional PNG slot and its west, south, east, north bounds; false stops enumeration. */
 typedef bool (*globe_texture_region_fn)(unsigned slot, const double bounds[4], void *context);
 
-/** @brief Visit installed regional photographs intersecting a non-wrapping window; JPEGs are 1800 or 3600 square. */
+/** @brief Visit installed regional photographs intersecting a non-wrapping window; PNGs are 1800 or 3600 square. */
 bool globe_texture_regions(globe_t *globe, const double bounds[4], globe_texture_region_fn callback, void *context);
 
 /**
- * @brief Read indexed texture metadata without loading its JPEG payload.
+ * @brief Read indexed texture metadata without loading its PNG payload.
  * @param globe Borrowed controller; calls must be serialised.
  * @param level Zero for the overview, one for global detail, two for NASA tiles, three for regional photographs.
  * @param column Zero for global images; 0..11 for NASA tiles; 0..63 regional slot.
@@ -65,7 +65,7 @@ bool globe_texture_regions(globe_t *globe, const double bounds[4], globe_texture
 bool globe_texture_metadata(globe_t *globe, unsigned level, unsigned column, unsigned row, globe_texture_info_t *info);
 
 /**
- * @brief Copy and checksum-verify one installed JPEG matching previously read metadata.
+ * @brief Copy and checksum-verify one installed PNG matching previously read metadata.
  * @param globe Borrowed controller; calls must be serialised.
  * @param level Texture level, as for globe_texture_metadata.
  * @param column Texture column, as for globe_texture_metadata.
@@ -74,7 +74,7 @@ bool globe_texture_metadata(globe_t *globe, unsigned level, unsigned column, uns
  * @return Owned byte array released with array_destroy, or NULL for missing, changed or corrupt data.
  * @note No decompression, filesystem fallback or whole-dataset cache is performed.
  */
-array_t *globe_texture_jpeg(globe_t *globe, unsigned level, unsigned column, unsigned row,
+array_t *globe_texture_png(globe_t *globe, unsigned level, unsigned column, unsigned row,
                             const globe_texture_info_t *expected);
 
 /** @brief Events in a clipped shoreline polygon, with a nesting level supplied separately. */

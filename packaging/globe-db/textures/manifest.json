@@ -1,5 +1,5 @@
 {
-  "format_version": 1,
+  "format_version": 2,
   "name": "Blue Marble Next Generation",
   "reference_month": "2004-07",
   "source_url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july/world.topo.bathy.200407.3x21600x10800.jpg",
@@ -17,7 +17,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/30UVC_0_0/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/30UVC_0_0/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB bands B04/B03/B02, 10-metre source resolution, July-September 2025 with April-June 2025 filling missing observations.",
-      "processing": "Fill Q3 nodata from Q2, then WGS84 bilinear reprojection to 1800x1800; all three bands have 100% valid coverage. Reflectance DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94."
+      "processing": "Fill Q3 nodata from Q2, then WGS84 bilinear reprojection to 1800x1800; all three bands have 100% valid coverage. Reflectance DN 0..3000 scaled to 0..255 with exponent 0.7; lossless PNG generated directly from the retained reprojected satellite raster. The earlier packaged version used JPEG quality 94."
     },
     {
       "name": "Wales Sentinel tile 01",
@@ -30,7 +30,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -57,7 +57,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -84,7 +84,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -111,7 +111,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -138,7 +138,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -165,7 +165,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -192,7 +192,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -219,7 +219,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -246,7 +246,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -273,7 +273,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -300,7 +300,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -327,7 +327,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -354,7 +354,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -381,7 +381,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -408,7 +408,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -435,7 +435,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -462,7 +462,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -489,7 +489,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -516,7 +516,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -543,7 +543,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -570,7 +570,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -597,7 +597,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -624,7 +624,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -651,7 +651,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -678,7 +678,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -705,7 +705,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -732,7 +732,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -759,7 +759,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -786,7 +786,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -813,7 +813,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -840,7 +840,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -867,7 +867,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -894,7 +894,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -921,7 +921,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -948,7 +948,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -975,7 +975,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -1002,7 +1002,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -1029,7 +1029,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -1056,7 +1056,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -1083,7 +1083,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -1110,7 +1110,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -1137,7 +1137,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -1164,7 +1164,7 @@
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
-      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview.",
+      "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; 3600-square tiles overlap by four per cent. DN 0..3000 scaled to 0..255 with exponent 0.7; JPEG quality 94. Tile 01 is the Wales-wide overview. Stored as lossless PNG. Original reprojected satellite pixels used for region 00; other tiles preserve the prior JPEG decoded pixels.",
       "source_tiles": [
         "30UWE",
         "30UWD",
@@ -1182,713 +1182,714 @@
     }
   ],
   "assets": {
-    "regional/00.jpg": {
-      "width": 1800,
-      "height": 1800,
-      "bytes": 760960,
-      "sha256": "bad6b9f48646c7197f6b7762a2ba56ef834f5318d3e41c4e17debadd07623fcb"
-    },
-    "earth_surface.jpg": {
+    "earth_surface.png": {
       "width": 2048,
       "height": 1024,
-      "bytes": 832192,
-      "sha256": "7e9f55f01df03a826fa7106e7fb55e4ae5c2974371dd55be6f3b8ea0cea0f184"
+      "bytes": 2623195,
+      "sha256": "62f8c4cce65741169233efb5cb76c5e168734e3983450373f6335dcff306b626"
     },
-    "earth_surface_detail.jpg": {
+    "earth_surface_detail.png": {
       "width": 8192,
       "height": 4096,
-      "bytes": 9361205,
-      "sha256": "ceb97696df39d72cac710158c4d1613948006c79cf303a8bfe91df721ff94aab"
+      "bytes": 31806347,
+      "sha256": "cb96e65923a8a76c9224edfa2b73462c798460d4ea0c99682d95b3131888120d"
     },
-    "earth_tiles/00-00.jpg": {
+    "earth_tiles/00-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 651425,
-      "sha256": "fadff3eb24bc4bb92f7bf84912810e16671026a364dc2c8b17b4842fa79fa347"
+      "bytes": 2461533,
+      "sha256": "b5350e58034442c4a325b2eafd6fd335e54ec3fffb76e91fd2db08726efa56e8"
     },
-    "earth_tiles/01-00.jpg": {
+    "earth_tiles/00-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 648093,
-      "sha256": "039cf2083b9069fb8d5ab3564e3ae9f0ad9f87a47e71ba93ebd4f774b1652ee1"
+      "bytes": 833006,
+      "sha256": "0841e6dba005d5c4fe5a9a1d1eaa40ba87c247f8ab6a5edcb9a6da5fc15f201b"
     },
-    "earth_tiles/02-00.jpg": {
+    "earth_tiles/00-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 921652,
-      "sha256": "f2ca22c3396c6b134fd266b272e163053e468a48b62ac22daf314d5d8b01f451"
+      "bytes": 921262,
+      "sha256": "beb625917e56393ef07a42cf25eee26f6e7dea4109d4bbb18577391471aac32f"
     },
-    "earth_tiles/03-00.jpg": {
+    "earth_tiles/00-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 960244,
-      "sha256": "2db1ec8ce8691ae17c7c4e488b2a526be9fb97a6221c7bf7e5ed42568c7e71f8"
+      "bytes": 998063,
+      "sha256": "44184a24fda41d31a26b9c789b9268b3a619883150e62827b1fac821f6fd0920"
     },
-    "earth_tiles/04-00.jpg": {
+    "earth_tiles/00-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 470869,
-      "sha256": "a3447559545ada72d9a7bb3fbadcb83a17867784f7cd24cb9e6ffeaecec3b233"
+      "bytes": 503269,
+      "sha256": "b92b366ac6214e199de99d2fa9d330f64467c8120c80d608a25f6e0f8319b9eb"
     },
-    "earth_tiles/05-00.jpg": {
+    "earth_tiles/00-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 662547,
-      "sha256": "f03e133b73da9117606a306ecc5e82f1c3a59e92292cd9995daf0ede469133ee"
+      "bytes": 1162612,
+      "sha256": "7385b68dc05d025a0f51b15e2ab972cb5930673d423de5fa97f758a29f7ad108"
     },
-    "earth_tiles/06-00.jpg": {
+    "earth_tiles/01-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 681922,
-      "sha256": "93cfd43c4cbab217b6c511fbc294383fdae0576da07a4a60352c17eb59a9fffb"
+      "bytes": 2339386,
+      "sha256": "b66d1fb6ed2d47cd66018adc99d7bd3a949e90309e3449194aaa0059fe1f73a5"
     },
-    "earth_tiles/07-00.jpg": {
+    "earth_tiles/01-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 623377,
-      "sha256": "b32e38423605706a922ce9437cdae5ac10e473fd375ce7e6e2a58e0f0bb0781b"
+      "bytes": 2186731,
+      "sha256": "092a6b203783e654b82947b0f81e47e758453a8f201e21a09cddeb3025c6e88a"
     },
-    "earth_tiles/08-00.jpg": {
+    "earth_tiles/01-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 716405,
-      "sha256": "53a00a18d2d57a383f9b30b9487aa92388e08c2b2c7c06728295910257df55f8"
+      "bytes": 437168,
+      "sha256": "4be01717b4b087b8fc62a91ea21d14b31ed3894e38bcf588a653fe6be45e482c"
     },
-    "earth_tiles/09-00.jpg": {
+    "earth_tiles/01-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 706237,
-      "sha256": "7b7d4517d6e7de1da52e84f1f3db2bcd8a580794d5014ce7d4559af6bfe3c8db"
+      "bytes": 649949,
+      "sha256": "84a267a5af460b0dd2b59b4ed6085035832f6702e4e2864ae3239f676c4a1463"
     },
-    "earth_tiles/10-00.jpg": {
+    "earth_tiles/01-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 750528,
-      "sha256": "bf8c7ce5da60d73cbdda258153bdc1fd2781621c509fbf05bd1842d4128db006"
+      "bytes": 374055,
+      "sha256": "4a64ef2b588487695b7dc2ca8912def84e11cb7ad2b32b356753d3ea004d4307"
     },
-    "earth_tiles/11-00.jpg": {
+    "earth_tiles/01-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 679519,
-      "sha256": "a7ce8ba556b19cae9c3b5ac2600a668dea99fd7b4a843236631ecf183d5d30a3"
+      "bytes": 1240890,
+      "sha256": "d142e79445b772a1a1b19cfed5d411bbd55a8e6dd4c47252ccdc0790bf0e5ac5"
     },
-    "earth_tiles/00-01.jpg": {
+    "earth_tiles/02-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 235934,
-      "sha256": "56b65e879dafbb3b5ef35e3972b1d0030d0c8d4b7e2f28a52807f5522b324128"
+      "bytes": 3140499,
+      "sha256": "103c9775dbd79fe080751d1467c0aefab04fddd6cc655a3c8541879789b6aafe"
     },
-    "earth_tiles/01-01.jpg": {
+    "earth_tiles/02-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 553719,
-      "sha256": "d164f1c756292644e74065afa915d95f0b150d64c9719c2073cc37528f656c36"
+      "bytes": 4566832,
+      "sha256": "d8c31421388f8d78e4a8c2af807bcdb70ceb7f5dc4e5e9bba92f8e3f823d2f12"
     },
-    "earth_tiles/02-01.jpg": {
+    "earth_tiles/02-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 1104351,
-      "sha256": "224f8bbc66ec8e1823bd1aff5e45df284de9ef93186cc0c9e8fd71a06894c40d"
+      "bytes": 2164738,
+      "sha256": "366e6904e0d260cc41b90e6a8820c08dd2e4890b80d6fd13243bcf085abffbf1"
     },
-    "earth_tiles/03-01.jpg": {
+    "earth_tiles/02-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 812837,
-      "sha256": "42ba82d849737a64f2607081184eedb2c52354ef7dcb8fa2abed7164dfe6c823"
+      "bytes": 682051,
+      "sha256": "74c7142ed8db93d941fe4d2fee90a1c21e19668da62c210d65702a50e743f9dc"
     },
-    "earth_tiles/04-01.jpg": {
+    "earth_tiles/02-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 405948,
-      "sha256": "9e260ab95db32fd95128af1fba4e670778e3ea84a6a01c9554d79f6df1677e99"
+      "bytes": 430413,
+      "sha256": "fe67f3309e5f229d26818f543227056405d394b4fe8444088d6efd22a392f9cb"
     },
-    "earth_tiles/05-01.jpg": {
+    "earth_tiles/02-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 646586,
-      "sha256": "7e3f457266ac3e33558ddd3b919cedaf906a55d08ec7fa15641090aaa5607d27"
+      "bytes": 1188531,
+      "sha256": "9724fb87af9f8963e074ae075dd4d97dadc6dadfc66cb95ef6fdcc76c149b40d"
     },
-    "earth_tiles/06-01.jpg": {
+    "earth_tiles/03-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 1069403,
-      "sha256": "95e4ecc09f6e17a3cdd7ced02e6d1e10288222e8ba96f0a10208bdb3754fa3d3"
+      "bytes": 3306380,
+      "sha256": "df75577690a815bab5867940223023952b62dd782a14fc98427225d4f9f9c4f3"
     },
-    "earth_tiles/07-01.jpg": {
+    "earth_tiles/03-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 1071347,
-      "sha256": "e636f12058145c7099b342ea7c0d9ea81c4c8ed0edff84c7f0df9420e19ebcc8"
+      "bytes": 3373588,
+      "sha256": "fab702f011ada7a2d4f45cccb1aca018dd513aba50fad8ff70cc97c028ccba79"
     },
-    "earth_tiles/08-01.jpg": {
+    "earth_tiles/03-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 1231095,
-      "sha256": "282e915412c74d4a6cc1031f42350f62774f1b335bfc730c908ec1172bc26725"
+      "bytes": 2926970,
+      "sha256": "c970a82fa2a03d5f810c83d2a180d6121e51db69f8b5b14086eecd59b9537559"
     },
-    "earth_tiles/09-01.jpg": {
+    "earth_tiles/03-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 1140029,
-      "sha256": "779c9b0b55a4db95764edb4bdc8a7cdcdcfb8dda70409a95837727dd8957b2ed"
+      "bytes": 2958794,
+      "sha256": "dfc0c4bb41952f0b541e7974dd3759c11b6fae265cde8f2e3fa056bf3f8a076c"
     },
-    "earth_tiles/10-01.jpg": {
+    "earth_tiles/03-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 756097,
-      "sha256": "b2cab21579225fbd3b1d133fe0a5650671d9a3573f9ac2998c85c21529531c3a"
+      "bytes": 2471229,
+      "sha256": "344d01a1dd13b512bc3473a4378fb5c567856a04e604c5ea69bc30e04f3d902a"
     },
-    "earth_tiles/11-01.jpg": {
+    "earth_tiles/03-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 337996,
-      "sha256": "3139ceeb914e0d895df04acc99d7babebb69fcc92d376ba98193e72a4c480440"
+      "bytes": 2176851,
+      "sha256": "647ac98d3d4b93c91bdef0c51105dc9aaf968f9ac6865ab283583e26ae7ac4ae"
     },
-    "earth_tiles/00-02.jpg": {
+    "earth_tiles/04-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 244198,
-      "sha256": "ea8a4f7128847ac62797eb0be8ae7808ba12bdcf7b2808cced18c137786e3165"
+      "bytes": 1556285,
+      "sha256": "d78c3ac95241da9171a853f029dd1bf89e7a7d2b5f2d2fedf536f2fb2262d241"
     },
-    "earth_tiles/01-02.jpg": {
+    "earth_tiles/04-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 142179,
-      "sha256": "a3407114f01e1ba4d0d55205b032560271f69b05bcc1a5210c8b1bca33e9e4ce"
+      "bytes": 1616778,
+      "sha256": "750ac6cf78df420bc4bd6b2f3c88fe7dfc166fbd048b67f77af60b233715eb4a"
     },
-    "earth_tiles/02-02.jpg": {
+    "earth_tiles/04-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 542384,
-      "sha256": "a749b6aa91b9ead52f50498c896ed724a76c547536753841de7196ea4eeaae52"
+      "bytes": 1639608,
+      "sha256": "d34f5dc10db7bfef375e62cda76f7c7508720da56ad7e5eb50ca8187048b4939"
     },
-    "earth_tiles/03-02.jpg": {
+    "earth_tiles/04-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 714623,
-      "sha256": "d5514d48f1172632f792a26fe981e862b0331bb4668c2de281272f7d7d12c09d"
+      "bytes": 3579135,
+      "sha256": "29cfdc3b3449dadad35d56ee45e8c72d8d31b0a247fc93d864b10cadee1d52f0"
     },
-    "earth_tiles/04-02.jpg": {
+    "earth_tiles/04-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 387520,
-      "sha256": "34f9440404084ec1dc72ea2528089839d789e3dbb97bdd4b5d0d7374c7ed14e8"
+      "bytes": 1183831,
+      "sha256": "7869886a5735460d391e61a84e5c66a7157ca19e1fcd6076f8f33f35cd2a81e3"
     },
-    "earth_tiles/05-02.jpg": {
+    "earth_tiles/04-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 552859,
-      "sha256": "2ae3be8aa0feb89aa5d39690845658bb9272d9687c8736dc1cb0177848626e97"
+      "bytes": 1447383,
+      "sha256": "de394d62ebb8653d95b2fe74418b88a39eff7ac353ad52c91f8850131d0783d8"
     },
-    "earth_tiles/06-02.jpg": {
+    "earth_tiles/05-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 807357,
-      "sha256": "7debfdcc55f9b3687a00900d7bd528b8b35405b980d6aea79ebd299773b2d060"
+      "bytes": 2420481,
+      "sha256": "eee665c62d01c6219081845e12363c7ab146b259bf3764c51174c9a8642fc543"
     },
-    "earth_tiles/07-02.jpg": {
+    "earth_tiles/05-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 926859,
-      "sha256": "149642c9cce90f566bf22b44c50b3bff4356655b3ff6e7d9591a7dabc89093d6"
+      "bytes": 2709682,
+      "sha256": "e9740a984ffd39d4865d776bb64e424188cc8fdbcaa40c947346409f61b6351b"
     },
-    "earth_tiles/08-02.jpg": {
+    "earth_tiles/05-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 679101,
-      "sha256": "f987188a6f3ae8cf49fadfe5892080a62360c1e041e962b631fcea70930d3a82"
+      "bytes": 2268783,
+      "sha256": "d247675b1ec1f54f4d69837fccab8f2b2ac162175575c6bcd9808fda5c7aee42"
     },
-    "earth_tiles/09-02.jpg": {
+    "earth_tiles/05-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 911896,
-      "sha256": "703e703a2bbe46cf072f7f461b567b63692cd6e065affa4a97ee78167d2aedda"
+      "bytes": 1036697,
+      "sha256": "fcc5760e0c256320467e0ecd64fbe85a35bafec9a35270e73650ac0b77eeb505"
     },
-    "earth_tiles/10-02.jpg": {
+    "earth_tiles/05-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 573739,
-      "sha256": "b186ba7639a4947419546f5ea3d57ed5d50c41caf9a3a380b81a0e57d829fe9e"
+      "bytes": 1277460,
+      "sha256": "f3cc71ba98c77032b3076fd77f7541b61db09d001dfa9986481352a9124ba8e9"
     },
-    "earth_tiles/11-02.jpg": {
+    "earth_tiles/05-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 284949,
-      "sha256": "cbf0b47e74bd34bc7683f5de747eeeab5165ff6780dc030ad649cb8f6c189575"
+      "bytes": 1691104,
+      "sha256": "123d99eb6120bb8bd7af027c1b54d9e2e606cbf04dd7683ed14acbdb03b0a160"
     },
-    "earth_tiles/00-03.jpg": {
+    "earth_tiles/06-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 262862,
-      "sha256": "1c925990293f033a2c40841117014e214abbceaa3607e5a2875a8093091e0538"
+      "bytes": 2531136,
+      "sha256": "3f05c3b8e72f45002de71ce7b75f5100cf808c714638dcf5e65fdd41913e6afd"
     },
-    "earth_tiles/01-03.jpg": {
+    "earth_tiles/06-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 196287,
-      "sha256": "7b1a8f0d939f5090d730bdac4aa1da3e84b5205a0b9c26ed534b9a9601afde0d"
+      "bytes": 4269913,
+      "sha256": "2a37d89f6deb00cd58c6b9c60a27ccdf00d9fdb5afa0ba5c7672eee184ab0060"
     },
-    "earth_tiles/02-03.jpg": {
+    "earth_tiles/06-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 200825,
-      "sha256": "581dbabaaaa57614069e55bb5d6cb2e9e68bfe4cdefef0d0a4f97cadce294cc0"
+      "bytes": 3492902,
+      "sha256": "c4a62eda54ff464e378faad48fddf8343bc5dcfa050a6d3bcb41daa60901b573"
     },
-    "earth_tiles/03-03.jpg": {
+    "earth_tiles/06-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 684630,
-      "sha256": "e845ea7cc836fc8c31ee89c5475f8ac5ba175860a13635a1d2c4975e09071d75"
+      "bytes": 3065801,
+      "sha256": "864ce3737b892434301eb897806c73ec162e474ace6722898a10f256f81b7a35"
     },
-    "earth_tiles/04-03.jpg": {
+    "earth_tiles/06-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 845583,
-      "sha256": "db28d2e9103a3084956e8bde4b2263391515912c2e44d31b26de6731c2356018"
+      "bytes": 1624838,
+      "sha256": "c41d70ba04e9034e8fe91cdde6ff29e001b1fd042a55cae9da204557256f498c"
     },
-    "earth_tiles/05-03.jpg": {
+    "earth_tiles/06-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 275706,
-      "sha256": "847e4c4adc0e75613f218a18a75b43813ac27036d9d5498e4871610bcff57fc3"
+      "bytes": 1402878,
+      "sha256": "1fc9b100de8c8f0ee8fcea0fb9072961794ff3b95f5c7dd5b0026be23288c3f7"
     },
-    "earth_tiles/06-03.jpg": {
+    "earth_tiles/07-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 725858,
-      "sha256": "5906d04f0f448512e128e1dba72331862d9a28fb63bb5847a0e5c98a37e25238"
+      "bytes": 2311698,
+      "sha256": "8335ac90c29463893fce4929fa926e2db9f97247b65c360e28e6398d59d54f89"
     },
-    "earth_tiles/07-03.jpg": {
+    "earth_tiles/07-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 625584,
-      "sha256": "446a505a7efb47cb5ff1db1904e7c37fd90039050e93bb2693bcbf8e34abcd18"
+      "bytes": 4400768,
+      "sha256": "73998b21010dd2301d41d2fb3199fb318dc7ce0500d8fdce717aa796acc4d3e3"
     },
-    "earth_tiles/08-03.jpg": {
+    "earth_tiles/07-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 427492,
-      "sha256": "2f16ccab8e74b27f19f656b6bc8bec8c2eaf2a37cedfd4076001dce21aee9fe4"
+      "bytes": 3883169,
+      "sha256": "fbd0f590b3e8b701fce2fc327549c147d12def0aad0b1eaa2e11ace05005ab6b"
     },
-    "earth_tiles/09-03.jpg": {
+    "earth_tiles/07-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 452353,
-      "sha256": "73159b2ae065ef14441f14f5fa3a39354bf6ec4cb95a4b90407a330f3c70d785"
+      "bytes": 2572455,
+      "sha256": "5cf84bf89de3fe56589109e2e5179f45b06876e6269f9abae1e766560d2a5054"
     },
-    "earth_tiles/10-03.jpg": {
+    "earth_tiles/07-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 914339,
-      "sha256": "2917f054dcf21f12cfb0c9c3cb1a29239d3a00bd69cb6333846f3ecaefec49a4"
+      "bytes": 1327830,
+      "sha256": "c0978dd259bdbcf95b5679af7d03ec3536fd37961363b19b3e5137b8cd213447"
     },
-    "earth_tiles/11-03.jpg": {
+    "earth_tiles/07-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 492198,
-      "sha256": "43b920edef7110f410c9f57049280ded769b8158119dfdde7268db5c9def6a4b"
+      "bytes": 1525240,
+      "sha256": "2a57066925812220d316e91f152d276798943d39eea7b7bf29506389a49c784d"
     },
-    "earth_tiles/00-04.jpg": {
+    "earth_tiles/08-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 151713,
-      "sha256": "f3783ac55ec8a161f29d107334c955201ec4f5903f10732e46393a42c3a769d4"
+      "bytes": 2711933,
+      "sha256": "aa008b02cb806f84b380528029cdf9d8c4a758ab84ebaf3d73c939060a62bc3b"
     },
-    "earth_tiles/01-04.jpg": {
+    "earth_tiles/08-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 132207,
-      "sha256": "448f4ccd1219605b74ef5f978e7669c8eb83649a976aad36c4fca2774b988347"
+      "bytes": 4958284,
+      "sha256": "58a3539d9bae3a20d13ddfb0308fd1e63fbadaeb0d8683024a3c8d2ef2cd62f5"
     },
-    "earth_tiles/02-04.jpg": {
+    "earth_tiles/08-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 149530,
-      "sha256": "f00772bca13d569dea0c2a2381429dea95a367898ad5710b500708d66c706aec"
+      "bytes": 2725841,
+      "sha256": "85cfa793d82947369ce0797ad4a563b0084994760e96fa75f8e4413594271333"
     },
-    "earth_tiles/03-04.jpg": {
+    "earth_tiles/08-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 632959,
-      "sha256": "92ea48ac3e78384c70205a9e28fe1c7fa065cd32d250ba1abde946b9c20261c3"
+      "bytes": 1720949,
+      "sha256": "36184a7517998cb7a51e48c0484ac49ea6f670088a43d37762afb6715e05a47d"
     },
-    "earth_tiles/04-04.jpg": {
+    "earth_tiles/08-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 315720,
-      "sha256": "c1584aca87c844bdc08fb50b48909cd47592f95e3dd0032a4b6bdbb65c7a6cbb"
+      "bytes": 1010162,
+      "sha256": "87151d83f13a2f215b1b1b34ff1136bc61bb427e648cb562113d534e498d08c2"
     },
-    "earth_tiles/05-04.jpg": {
+    "earth_tiles/08-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 336604,
-      "sha256": "f17cded32ed22dd792d0c7c05f30aaec40ee8c59199c7386de88a5ec0e9671c9"
+      "bytes": 1836616,
+      "sha256": "6261d9a2a019c602a3a8ebd10daf7eb6fd4401ba8efeb7a05cc645fbb5839a56"
     },
-    "earth_tiles/06-04.jpg": {
+    "earth_tiles/09-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 414026,
-      "sha256": "9c71815dc3036458e185bad161d35df2c136275000e20a8d45061ac2f4380e3d"
+      "bytes": 2536595,
+      "sha256": "8ce2c7d9d206d3f7e8677f8d22389cf23d4bb886c88e98cefe4b5d39096f78f7"
     },
-    "earth_tiles/07-04.jpg": {
+    "earth_tiles/09-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 350707,
-      "sha256": "8e008f489fa4e11c3dbce7d292b49b77761b3565d38b9e595154db54da238012"
+      "bytes": 4707752,
+      "sha256": "98c919e2429b6cdbfdc7df4bcdf56e25940e46ebb389cfaeee91618a68fa0d9e"
     },
-    "earth_tiles/08-04.jpg": {
+    "earth_tiles/09-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 274075,
-      "sha256": "f50584656edf5d5f70ce315d6036899697792f7a4a578e0f160c2a56684ed943"
+      "bytes": 3736173,
+      "sha256": "a0fd495ec889e4f56ccf4fdb926dbb2c49cdfc0149b6ef07aaf4bdf41bc98b32"
     },
-    "earth_tiles/09-04.jpg": {
+    "earth_tiles/09-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 255557,
-      "sha256": "1f17d6ba5493151d9767272a59b04311a4c380b09b8b6a68c596deabea80cd56"
+      "bytes": 1805253,
+      "sha256": "1170189e52fdd128afda013a882b39133307b6602e2be285e419cac8c859f532"
     },
-    "earth_tiles/10-04.jpg": {
+    "earth_tiles/09-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 476567,
-      "sha256": "e5dd35e404d34c74a8ab1e34470c5b361eb373a2f416ac9ca1e48dd091c9090f"
+      "bytes": 916949,
+      "sha256": "bede49a5bdfba37bf94a85b1e0cc5919afaa89145d58ec12e788c8acfbd7c434"
     },
-    "earth_tiles/11-04.jpg": {
+    "earth_tiles/09-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 421076,
-      "sha256": "5088d051f16047163dad7c513fe83f801088f1a1e5807acb439688b5c3725b4d"
+      "bytes": 1507618,
+      "sha256": "5fe87761b48bcbc7c6647bf18260b991cec15fa6c9904f6cd047eebac76c672d"
     },
-    "earth_tiles/00-05.jpg": {
+    "earth_tiles/10-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 395142,
-      "sha256": "36f5b797dcc33cba6aad2e330bb99a6fac1bf77a1d7887f4a21e5eec2c08b891"
+      "bytes": 2778678,
+      "sha256": "8a63999cbc033fb355b15f9a319ea5f1a098e34a2f0b140ca76f4cc2f40a8322"
     },
-    "earth_tiles/01-05.jpg": {
+    "earth_tiles/10-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 471675,
-      "sha256": "3f4e96fc93b8c1b20df6cb834facec4003c6412cf99f447f2d3b25f16707a3f6"
+      "bytes": 3145359,
+      "sha256": "d21c027a1dc7df993dc0281e8cc4f1b5da1d875309dfc88e29f470dfb4c5e8ba"
     },
-    "earth_tiles/02-05.jpg": {
+    "earth_tiles/10-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 447124,
-      "sha256": "c0e473ece4bb3465a4cfa1d84dd99d1047de52854f37ec2afed686fa152237ce"
+      "bytes": 2338294,
+      "sha256": "67a3a5920bf619f3febebac11e20903b9f9caaf8939e8fbb7bf65a4f9a4b1a3f"
     },
-    "earth_tiles/03-05.jpg": {
+    "earth_tiles/10-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 667388,
-      "sha256": "785e351b0077effaf4ef2370640773ffe47a0a3968df605a6bd30980f30f8645"
+      "bytes": 3744781,
+      "sha256": "ba31f5189cfc0afe520fd8118aa9d1aa662bc8f6095df8366636668eefbfae1d"
     },
-    "earth_tiles/04-05.jpg": {
+    "earth_tiles/10-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 456680,
-      "sha256": "dc9c4adc62ecf65d91a1728d1f1c9b251e340a289d6c8a672702016ba8994c03"
+      "bytes": 1870505,
+      "sha256": "06b180b87d1f42aa621be8fc40d25d7a516aeed1830c1f2c8ea941c9097bbd14"
     },
-    "earth_tiles/05-05.jpg": {
+    "earth_tiles/10-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 499772,
-      "sha256": "3f6a11c88b961b8033936500031421aaf0fcf2c8b4efb2db496b305a3ccff93d"
+      "bytes": 1918496,
+      "sha256": "da968e237c506a7e9374ed5bf7afe639d2df3eb8d8cd7fd5c51c8a0c73c27cfe"
     },
-    "earth_tiles/06-05.jpg": {
+    "earth_tiles/11-00.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 445223,
-      "sha256": "72a0789533bbf50bbb7fc83d2283322ac40ae5288dd693c784010021d4cd6b57"
+      "bytes": 2492238,
+      "sha256": "f22a3b174eb26aa3fa099933a23c812b831663014a66d4a757fef023889ca523"
     },
-    "earth_tiles/07-05.jpg": {
+    "earth_tiles/11-01.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 462842,
-      "sha256": "ed6eb3e38e814e0a9dcfedd17907f5ea5943e57fe46fefa0276437ec716e25de"
+      "bytes": 1309915,
+      "sha256": "496d04adb7ece965ccb5b03e2e3226e78b6fdba538c12ab4f2a3a45fff2db3d9"
     },
-    "earth_tiles/08-05.jpg": {
+    "earth_tiles/11-02.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 534786,
-      "sha256": "e054f99c70247e426a7636bf23a91418bfbb88cbdc12c47aa35f4ac8046b7883"
+      "bytes": 1059955,
+      "sha256": "38f0a020eda6bbc2a393698d7a887fd55ac0113384027967347fa3eff64a96bd"
     },
-    "earth_tiles/09-05.jpg": {
+    "earth_tiles/11-03.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 429718,
-      "sha256": "6633ceb90be9d232116e94770e055ba89cf433c837937b0bee165a3fc09e78b4"
+      "bytes": 1977073,
+      "sha256": "72636e1cfde3d401f9d1b7ff6f513a82de0c23934c5be1f4057cd9df4a7eddf2"
     },
-    "earth_tiles/10-05.jpg": {
+    "earth_tiles/11-04.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 541679,
-      "sha256": "ba244a4e6cc97b762af13391b680149e88c52e444a8e9eb186bd3281416558f5"
+      "bytes": 1651112,
+      "sha256": "e2a893365a6b093197c034d4ed70158a7d1b63cb0ab05769900c6d46bc8ad8c3"
     },
-    "earth_tiles/11-05.jpg": {
+    "earth_tiles/11-05.png": {
       "width": 1800,
       "height": 1800,
-      "bytes": 777509,
-      "sha256": "b1aab84abc17dc38b181bb48f8cd17d68d626bf23313780b3f06b520b0e4a1b6"
+      "bytes": 2620913,
+      "sha256": "379187a6ba00ac2ad8bb5a2208a62e29483b8915ec01d34a3d48a5624d77177f"
     },
-    "regional/01.jpg": {
+    "regional/00.png": {
+      "width": 1800,
+      "height": 1800,
+      "bytes": 4216742,
+      "sha256": "d05d7b8e96ecacd36414bf50f39c041dc31bd78795cdd604f0ac34193e22b0de"
+    },
+    "regional/01.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3498060,
-      "sha256": "f912e46995ef908b7a39f1df72f03da76c504448ba81d27a21ed183ab7bd694f"
+      "bytes": 16673975,
+      "sha256": "10e62bd4550508eb90d65667879b3f789c6e4bd55a30d16af8e4457b0054cc94"
     },
-    "regional/02.jpg": {
+    "regional/02.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1250495,
-      "sha256": "142ab39926e2518235d62a5da608ca3d338f455eb3ada8d101285b8fb2c5a001"
+      "bytes": 6669665,
+      "sha256": "f568696c4959899e15729fa62597129a337c0cbd241c7cf8887ecb08c0c93a7d"
     },
-    "regional/03.jpg": {
+    "regional/03.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1285416,
-      "sha256": "44e726c09d39c98931871c4d7ce5ff02e0400433132ed4a443f7cdb25cab6ff3"
+      "bytes": 6849481,
+      "sha256": "fd16c1c862592824acabfe272f7eb854ed57fd2f9759bf4728319cacca7becb0"
     },
-    "regional/04.jpg": {
+    "regional/04.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1491445,
-      "sha256": "7b4b203d3c9600507b3043d829e27540e3bcb12613a15a40e5feea7f30bde599"
+      "bytes": 7827109,
+      "sha256": "ad77688fbb90899a668aa23de5f12d32ff457038a30d70ed5033d289345286e8"
     },
-    "regional/05.jpg": {
+    "regional/05.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1920740,
-      "sha256": "3f7a4ac513903a3f7e80bd854102225242c85c5471c7fd9c3ff39a497ff12deb"
+      "bytes": 10186620,
+      "sha256": "cdf20fdd51f0a2dc9c55f52a3b2d42aad6b6498ee447ebaf686bc01ff58db804"
     },
-    "regional/06.jpg": {
+    "regional/06.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3183064,
-      "sha256": "18aca5db63813020e19f6eef9b812ad27bbe4337c73ad0491be9b9d0bad63f98"
+      "bytes": 15439620,
+      "sha256": "7d7c8da5bbd417f5b0216749cc8733e4a598076cf248ecc4176eeb23d329cf32"
     },
-    "regional/07.jpg": {
+    "regional/07.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3316448,
-      "sha256": "8cce0578a91a8581be2c00cab04d9a3d24dc2dc2470e17c17e3de6999b97a8e1"
+      "bytes": 16583291,
+      "sha256": "d0bda9bee27d892ba5dfde93e2162eb60c440e7566ceca853af50a2fdd62384a"
     },
-    "regional/08.jpg": {
+    "regional/08.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1848800,
-      "sha256": "f83ac3860c8380d505d803194f9ed4752dd7d301c02c4dfdaf8cefe919b80c45"
+      "bytes": 9942752,
+      "sha256": "90bf16dbb3b7dd4ecc6d3bfca90189247c4c662e069d4e488d916b1014045f8f"
     },
-    "regional/09.jpg": {
+    "regional/09.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 2892895,
-      "sha256": "ea7dce38c336932ee73c4b02235f4e8b5736af36f9f658187e77e83da8e3e4d7"
+      "bytes": 14466374,
+      "sha256": "920aca41d127aace15d355cfbd260a4916b4e9df3a25f72a20b90c5db11c08ec"
     },
-    "regional/10.jpg": {
+    "regional/10.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3207232,
-      "sha256": "8eb06a7b69703078908c372eb7e3abad9f922cc8572efe8f5b617f4a2e54fa70"
+      "bytes": 16013220,
+      "sha256": "33d196717830c6d8bea6e338909cb801b68e3208ad5212e14296e165d395fa8f"
     },
-    "regional/11.jpg": {
+    "regional/11.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3806277,
-      "sha256": "1ac55f5a79fa5457a03c260f112a01f8ad5c7049a280fb61e4eb55ac05121f38"
+      "bytes": 18294546,
+      "sha256": "05a436cf1e7e14800f24ff396b3ff190ce4c92574dd5527badec53952b5acfd0"
     },
-    "regional/12.jpg": {
+    "regional/12.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3921739,
-      "sha256": "e8aa1fa59f63e6fa3c7e3ad4f966c7faac4b802ba90864df498e46a81668a0d2"
+      "bytes": 18761365,
+      "sha256": "724e4c76fc162889991d4f6b1a50d7214a5134f8563651254a65e6f74d2b2309"
     },
-    "regional/13.jpg": {
+    "regional/13.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 4162902,
-      "sha256": "8c55762b0ea3fc0e7fddadd70ba0a279c3e63f36eae203f25cea00db880a9096"
+      "bytes": 19636904,
+      "sha256": "7c1833fb2f6185e3366b7c23d1f239698e6ac50799dd94ea3575f7530a8a4cd0"
     },
-    "regional/14.jpg": {
+    "regional/14.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1753875,
-      "sha256": "97fda2aeac05fc1fa93e113ac9be536b57e32ae641b3243dfd10de90c0b57208"
+      "bytes": 9490368,
+      "sha256": "845d20876645db30dc92d70cac1879147264bdd34231ba1c140596688a84e83e"
     },
-    "regional/15.jpg": {
+    "regional/15.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 2522836,
-      "sha256": "858bee89e70ffaf905fb3c84837b73fa4747dfcab58b285307e47443d6b2860d"
+      "bytes": 12884730,
+      "sha256": "27013c4009729350943a56b6afb6755f42a369f0f7ac8f10152ead52ef3fc537"
     },
-    "regional/16.jpg": {
+    "regional/16.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3682564,
-      "sha256": "c2c433a42fe4d70892da317debeac570012792026e2baf793cc8d58a47e36051"
+      "bytes": 17949211,
+      "sha256": "55a9180c45eb31c42ac1e5eedfc5aa91df68b50cfbc8ff00e0a02492a891253d"
     },
-    "regional/17.jpg": {
+    "regional/17.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3603796,
-      "sha256": "b346f20e096881eeed34596481d689b245de4164a696ed396fd4cd0096d9bcd9"
+      "bytes": 17539973,
+      "sha256": "1a5e6c97762cc6ece36586fca7a404fb0137358b636ba6c61cfb9d5955a548eb"
     },
-    "regional/18.jpg": {
+    "regional/18.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3773946,
-      "sha256": "af26948e5e43e7302b1ee33d651d3202a3a534988c7e71f4d37b01d1cee765ee"
+      "bytes": 18229937,
+      "sha256": "eca82604f6f5315067538e9ad3d4b705afd6e0a754eb66ba1826ee033d9ced34"
     },
-    "regional/19.jpg": {
+    "regional/19.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 4272040,
-      "sha256": "f78e4a9cc3dd1b2cf039b2fa33ca7562c65775ce4cc1d29980612f7b6b90ecbf"
+      "bytes": 19931136,
+      "sha256": "bd06a2bb931c3a556d31b33116ec3f404479e3fb1da536e6ab2949de98c76655"
     },
-    "regional/20.jpg": {
+    "regional/20.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1116299,
-      "sha256": "86d6ffe6cf8049edafc61784386b76f0a28bcb8e5a896075fde353ec14297cd4"
+      "bytes": 6038051,
+      "sha256": "f96ac2bec02878bef5f5489132d923e8df929ed2e183f53c8bb541fa66cb0a8b"
     },
-    "regional/21.jpg": {
+    "regional/21.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1038535,
-      "sha256": "ce59ae4c9a65116335f64922d06afe7a5042d3d39d994001eade85c64bf86715"
+      "bytes": 5589614,
+      "sha256": "1f15898496668038fdd0c44e3176c49a622e6a3b7a1a2ea05beda33e75a232dd"
     },
-    "regional/22.jpg": {
+    "regional/22.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1838844,
-      "sha256": "99a2e91eeddf3175e0bd0a0258f5c0835f96ab3ca902fddae9184e5de2fe7758"
+      "bytes": 9882891,
+      "sha256": "425e95926d38a68223cb6350d95e2c2a0f708b9f52613211492e03b332b68413"
     },
-    "regional/23.jpg": {
+    "regional/23.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3364195,
-      "sha256": "9916b3dd89b45fff68cf5fce97495cf98fda6eac1328395370d30a8c27a67026"
+      "bytes": 16681963,
+      "sha256": "c55d5e4cd3f4f099ccfddfd153dd7cb6ace85c1c475c85952346b0b1ff14e671"
     },
-    "regional/24.jpg": {
+    "regional/24.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3785335,
-      "sha256": "c46150483714e3fa6c5f781610243292c3d5d69dbb7796bb070b4dc582a642cd"
+      "bytes": 18306193,
+      "sha256": "da7557d18b7eee0b1407983a319654863c428b0c6ee9d22017c585f35fd8ce20"
     },
-    "regional/25.jpg": {
+    "regional/25.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 4256032,
-      "sha256": "2b493263a9614b84b9429915d765160cf12e4f60bf35f254094b5923dde4379a"
+      "bytes": 19845421,
+      "sha256": "d33dce7f19b8cfa6ca152558fa7a18146631c723008bd45b95fe42c899e1da67"
     },
-    "regional/26.jpg": {
+    "regional/26.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1245313,
-      "sha256": "12905e3bccbe49ecd7bc8dc1ca5a8b2412eb71468b273bbd606c6854c74dcf23"
+      "bytes": 6657038,
+      "sha256": "25ca5292da4a301af0187f6c55b7dce0e5f31f8b5e0e1a32d1e30c8a069228f1"
     },
-    "regional/27.jpg": {
+    "regional/27.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1179686,
-      "sha256": "61b11fd71178c7df3d988db0d89f34bc8898341867f0b7518d7729dd235aa32a"
+      "bytes": 6356316,
+      "sha256": "b027cf74612b9df3dade38603337cc5684ec3994f49a956522f1bbb16e4e2dc7"
     },
-    "regional/28.jpg": {
+    "regional/28.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1709288,
-      "sha256": "d09e9c91c256c4ed5bba9dbe8120d6bdc0dbf578483ea13023fb00f6e5ecfa8c"
+      "bytes": 9366449,
+      "sha256": "695b863e487f552bf226b01fcad9c7f5c2635349cc3ba253eb851d5b20c3ca46"
     },
-    "regional/29.jpg": {
+    "regional/29.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3471405,
-      "sha256": "e9eeb0d7f465e1cd6d4814f31414c9dbc5a91551e03340ab09e16d87309edef4"
+      "bytes": 16991078,
+      "sha256": "853cbec8ba615941ed54d73ec68ae9cb0985a585e2a2310cc2b64a93583a7032"
     },
-    "regional/30.jpg": {
+    "regional/30.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3813929,
-      "sha256": "4fc30df1f1bf8881f315043db7e26425ae5f93ce0ec75ba47f6ad05e3a948df6"
+      "bytes": 18368031,
+      "sha256": "d1cd69a9cd2839ec047e712269195458a9da30b0755819a1b91962e5fac3b7a1"
     },
-    "regional/31.jpg": {
+    "regional/31.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 4266084,
-      "sha256": "8380f2e858316fa8154c3a0b14d57523c9a986043419d8a53d82ee3a46731121"
+      "bytes": 19973701,
+      "sha256": "eeacfa1ef7baf331d7747135c47764325286fd12fea34728fd02c64a14d7ffab"
     },
-    "regional/32.jpg": {
+    "regional/32.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1381050,
-      "sha256": "c2d93c9ccff3fd5796e56eec07983be445e7b921087124338097e29102fbec1d"
+      "bytes": 7455468,
+      "sha256": "6de5d5d0eb0f6725caa1f6d5dc229215cb8a13ec89c4b05a063e16ffe7567cbd"
     },
-    "regional/33.jpg": {
+    "regional/33.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1279758,
-      "sha256": "b2ce44439f2d70daa3ce3c09ff892219a18b00509c23170585ea9dd8a25ba91b"
+      "bytes": 6862351,
+      "sha256": "60845690f4727d42220c7bb38cadaf73ca6bfd4ae9b39ad2daead1472ec8ca12"
     },
-    "regional/34.jpg": {
+    "regional/34.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 2906348,
-      "sha256": "15110a7839e2f7ac3c0798069a79b15d1c7320056f65f847ea5776431dd1ff4a"
+      "bytes": 14696660,
+      "sha256": "ac1c64b4adc76424b4295a674a9711839d40d23c504be41f5ef0552a820e4933"
     },
-    "regional/35.jpg": {
+    "regional/35.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3453287,
-      "sha256": "b674ad0d759c06835faec869b8a3be9792ff2ce0706ecae96022fd803b6feb95"
+      "bytes": 16935622,
+      "sha256": "482558fc6825e37524d486bf42c5b94e4bdc827e0b901d4b7a1773161f8f0964"
     },
-    "regional/36.jpg": {
+    "regional/36.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3718715,
-      "sha256": "a35e9c86409b101308efd833e9d072bee6cfec10a544db282845520b091156bd"
+      "bytes": 18013003,
+      "sha256": "f11bf987af2e3b09c34ce0368d4cae99719491dad6161f7f304e24b68deafe51"
     },
-    "regional/37.jpg": {
+    "regional/37.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 4238911,
-      "sha256": "a117f9aed8e13981470583e232cc3789c5e0ef650c385094217b7d9521e1a3af"
+      "bytes": 19933252,
+      "sha256": "6e3d8b6e3a8968522d110634c2b839b61577c9df421272e4342ff43718c37d11"
     },
-    "regional/38.jpg": {
+    "regional/38.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1339985,
-      "sha256": "286f31060daa5284614284bbcca9c02b9d4a35786def4b0103a66c3c2e792373"
+      "bytes": 7348268,
+      "sha256": "dd383b174ff2ee394a11b993ecee94dffcfb8fb810b8858e4150cc081f687c80"
     },
-    "regional/39.jpg": {
+    "regional/39.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 1679620,
-      "sha256": "da5c79a3eb167ae8fba81ffc257cd352a21794aa13eb067e98efaa7e9c55cd04"
+      "bytes": 9011428,
+      "sha256": "1d9d43ca8698ba5f075ea5029061615a58542fca512f1bfd8eb4b7111de19ae9"
     },
-    "regional/40.jpg": {
+    "regional/40.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 2880244,
-      "sha256": "9bcd0ce660219fa61ce63e91b42947e28b2030a86f60a9588a86d4005d0e40f1"
+      "bytes": 14583565,
+      "sha256": "df6e5b6c50a1d82c699ddebaae663204fa3bdffc5bf27a23ec07a6a20b11d340"
     },
-    "regional/41.jpg": {
+    "regional/41.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 2656726,
-      "sha256": "6eec8bf5b0afdf1147ea25db7db217e260754cda510de6f936e33f0e68e832ee"
+      "bytes": 13326169,
+      "sha256": "b1cc2b7a9b21114868f854b1a861f8676f113480cec3ea58b061ce0a59ebfe58"
     },
-    "regional/42.jpg": {
+    "regional/42.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 3020389,
-      "sha256": "4ad98490d489e527ee97b293acf86f523feb3f11d251e8b95928115ac285b7b1"
+      "bytes": 15151894,
+      "sha256": "9788e9a3898c8a7c290c292c401eed6f4e009b67d698187e855e750de131b7ad"
     },
-    "regional/43.jpg": {
+    "regional/43.png": {
       "width": 3600,
       "height": 3600,
-      "bytes": 4616197,
-      "sha256": "8457cc23808ce64350d82e29e2f5886358bc4bf9b0e42942830c6287d67ebb9a"
+      "bytes": 21483138,
+      "sha256": "ecb8657076cb305cf59f651fcb134998da04983549daed5f50ecbf0af0a8f6a3"
     }
-  }
+  },
+  "processing": "Stored as lossless PNG; conversion from the prior NASA JPEG assets does not restore lost detail."
 }

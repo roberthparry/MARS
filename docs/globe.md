@@ -7,22 +7,22 @@ SVG and WebGL rendering remain application responsibilities.
 
 ## Photographic textures
 
-`globe.db` stores the photographic JPEG layers alongside the geographic data.
+`globe.db` stores the photographic PNG layers alongside the geographic data.
 The offline source package is `packaging/globe-db/textures/`; its manifest records
 dimensions, byte counts, SHA-256 digests and NASA source attribution.
 Fresh installations include the 74 NASA images and regional Sentinel-2 coverage of Wales.
-Managed database revision 11 installs the regional catalogue and imagery
+Managed database revision 12 installs PNG imagery and the regional catalogue
 to existing installations through `make update-mars-db` or `make release`,
 preserving coastline, country, regional and river layers. Import validates every
 image before committing; a missing or damaged image rolls back the replacement.
 
 `globe_texture_metadata(globe, level, column, row, &info)` reads an indexed record
-without loading JPEG bytes. Level 0 is the 2048 × 1024 overview; level 1 is the
+without loading PNG bytes. Level 0 is the 2048 × 1024 overview; level 1 is the
 8192 × 4096 detail image. Both use column and row zero. Level 2 contains a 12 × 6
 grid of 1800 × 1800 tiles, indexed west to east and north to south from zero.
 Level 3 contains regional 1800 × 1800 or 3600 × 3600 photographs, addressed by slot 0–63 and row zero.
 `globe_texture_regions` enumerates intersecting slots and their geographic bounds through
-a `globe_texture_region_fn` callback without loading their JPEGs. Older stores without
+a `globe_texture_region_fn` callback without loading their PNGs. Older stores without
 the optional catalogue return an empty enumeration. The catalogue is bounded to 64 slots.
 Missing data or invalid addresses return false and clear the output structure.
 
@@ -32,18 +32,18 @@ use July–September 2025 Copernicus Sentinel-2 observations, filling missing pi
 from April–June 2025. The source resolution is 10 metres; reprojection to WGS84 gives
 approximately 9–10 metre detail pixels. The original Cambrian Mountains patch is retained.
 The manifest records sources, processing, bounds and attribution. Regenerating the NASA
-manifest preserves the regional catalogue. Regional JPEGs may be 1800 or 3600 pixels square.
+manifest preserves the regional catalogue. Regional PNGs may be 1800 or 3600 pixels square.
 For surface windows at most four degrees across, Lab composites the regional overview
 over NASA imagery off-thread; windows at most one degree across also receive detail tiles.
 Four-per-cent tile overlaps cover the two-per-cent edge feathers, avoiding gaps between
 adjacent photographs. Existing water colours and river cut-outs remain in use. These are
 historical photographs, not live imagery; areas outside the coverage retain NASA detail.
 
-`globe_texture_jpeg(globe, level, column, row, &info)` returns an owned byte array,
+`globe_texture_png(globe, level, column, row, &info)` returns an owned byte array,
 or `NULL` if the record has changed or its payload fails validation. Release the
 array with `array_destroy`. Reads work with plaintext and encrypted databases;
-they neither decode images nor preload the full texture set. Metadata is bounded
-to 16 MiB for the detail image and 4 MiB for each other image. Applications remain
+they neither decode images nor preload the full texture set. Encoded payloads are bounded
+to 128 MiB for global detail, 64 MiB for regional images and 16 MiB otherwise. Applications remain
 responsible for progressive loading and image decoding.
 
 The Lab retains its image URLs and loads the overview before requesting more
@@ -67,13 +67,13 @@ int main(void)
         globe_close(globe);
         return 1;
     }
-    array_t *jpeg = globe_texture_jpeg(globe, 0, 0, 0, &info);
-    if (!jpeg) {
+    array_t *png = globe_texture_png(globe, 0, 0, 0, &info);
+    if (!png) {
         globe_close(globe);
         return 1;
     }
-    printf("%u x %u; %zu bytes\n", info.width, info.height, array_size(jpeg));
-    array_destroy(jpeg);
+    printf("%u x %u; %zu bytes\n", info.width, info.height, array_size(png));
+    array_destroy(png);
     globe_close(globe);
     return 0;
 }
@@ -82,7 +82,7 @@ int main(void)
 Output:
 
 ```text
-2048 x 1024; 832192 bytes
+2048 x 1024; 2623195 bytes
 ```
 
 ## Regional flag coverage
@@ -418,7 +418,7 @@ or image upload in the production mask path. Horizon arcs are subdivided to
 subpixel error. Reusable GPU buffers and double-buffered textures keep the previous
 complete frame until replacement succeeds. Close-view gestures transform retained
 SVG and coverage rather than rebuilding geometry each animation frame. Clipboard
-capture still composites the visible SVG, labels and GPU image into a JPEG.
+capture still composites the visible SVG, labels and GPU image into a PNG.
 
 Globe compositing shaders also live in native application code. Browser code
 compiles GLSL once per context, caches uniform locations and submits numeric state.
@@ -1710,9 +1710,12 @@ The worker decodes one source photograph at a time and never processes the whole
 network. The base globe stays visible throughout. Missing worker or photographic
 support falls back to the independent river SVG overlay.
 
-Completed JPEGs are cached in IndexedDB per browser and Lab origin, with at most
-64 MiB of JPEG payload, 128 entries and 8 MiB per entry. Browser storage overhead is
-additional. Least recently used entries are evicted; larger tiles remain uncached.
+Completed raw RGBA pixels are cached in IndexedDB per browser and Lab origin, with at most
+four 2048-square tiles, 16 MiB each and 64 MiB in total. Browser storage overhead is
+additional. Least recently used entries are evicted. Pixels are stored premultiplied
+and transferred directly to WebGL, without image decoding or rebuilding an ImageBitmap.
+Disk reads and GPU uploads remain necessary; resident textures are reused directly.
+The cache format upgrade discards older straight-alpha entries.
 Database identities invalidate stale imagery, and cache hits avoid querying or
 rasterising river geometry again. Denied or unavailable storage does not prevent
 drawing. This cache does not replace or reduce the installed river database.

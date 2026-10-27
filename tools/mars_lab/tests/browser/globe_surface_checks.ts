@@ -14,7 +14,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         document.head.appendChild(script);
     });
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open('mars.globe.surface.v1', 2);
+        const request = indexedDB.open('mars.globe.surface.v1', 3);
         request.onupgradeneeded = () => request.result.createObjectStore('tiles', {keyPath: 'key'}).createIndex('used', 'used');
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
@@ -49,10 +49,10 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         await clear();
         const moduleURL = '/js/globe_surface.js';
         const {GlobeSurface} = await import(moduleURL) as typeof import('../../typescript/globe_surface.js');
-        const photograph = await fetch('/earth_tiles/05-01.jpg');
+        const photograph = await fetch('/earth_tiles/05-01.png');
         const sha256 = photograph.headers.get('ETag')!.replace(/^"sha256-|"$/g, '');
         await photograph.body?.cancel();
-        const regionalPhoto = await fetch('/earth_regions/01.jpg');
+        const regionalPhoto = await fetch('/earth_regions/01.png');
         const regionalSha = regionalPhoto.headers.get('ETag')!.replace(/^"sha256-|"$/g, '');
         const regionalBitmap = await createImageBitmap(await regionalPhoto.blob());
         const reference = document.createElement('canvas');
@@ -71,9 +71,9 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
             if (payload.format === 'surface-plan') {
                 ++plans;
                 return new Response(labWire.encode({ok: true, key: key(), bounds: [0, 0, 1, 1], photos: [
-                    {url: '/earth_tiles/05-01.jpg', sha256, source: [0, 0, 1800, 1800], target: [0, 0, 1024.3, 2048]},
-                    {url: '/earth_tiles/05-01.jpg', sha256, source: [0, 0, 1800, 1800], target: [1024.3, 0, 1023.7, 2048]},
-                    {url: '/earth_regions/01.jpg', sha256: regionalSha, regional: true,
+                    {url: '/earth_tiles/05-01.png', sha256, source: [0, 0, 1800, 1800], target: [0, 0, 1024.3, 2048]},
+                    {url: '/earth_tiles/05-01.png', sha256, source: [0, 0, 1800, 1800], target: [1024.3, 0, 1023.7, 2048]},
+                    {url: '/earth_regions/01.png', sha256: regionalSha, regional: true,
                      source: [0, 0, 3600, 3600], target: [0, 0, 2048, 2048]}
                 ]}));
             }
@@ -94,12 +94,36 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         const OriginalWorker = globalThis.Worker;
         let surface = new GlobeSurface();
         globalThis.Worker = fixture.Worker;
-        const inspect = (bitmap: ImageBitmap) => {
+        const draw = (context: CanvasRenderingContext2D, tile: import('../../typescript/globe_surface.js').GlobeSurfaceTile) => {
+            if (!('pixels' in tile)) { context.drawImage(tile, 0, 0); return; }
+            const gpuCanvas = document.createElement('canvas'), gl = gpuCanvas.getContext('webgl')!;
+            const texture = gl.createTexture(), framebuffer = gl.createFramebuffer();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, tile.width, tile.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, tile.pixels);
+            gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+            check(gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE,
+                  'cached RGBA uploads directly into a complete WebGL texture');
+            const pixels = new Uint8Array(tile.width * tile.height * 4);
+            gl.readPixels(0, 0, tile.width, tile.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+            check(gl.getError() === gl.NO_ERROR && pixels.every((value, i) => value === tile.pixels[i]),
+                  'direct upload preserves every premultiplied colour and alpha byte');
+            gl.deleteFramebuffer(framebuffer); gl.deleteTexture(texture);
+            gl.getExtension('WEBGL_lose_context')?.loseContext();
+            const straight = new Uint8ClampedArray(pixels);
+            for (let i = 0; i < straight.length; i += 4) {
+                const alpha = straight[i + 3];
+                if (alpha) for (let channel = 0; channel < 3; ++channel)
+                    straight[i + channel] = Math.round(straight[i + channel] * 255 / alpha);
+            }
+            context.putImageData(new ImageData(straight, tile.width, tile.height), 0, 0);
+        };
+        const inspect = (bitmap: import('../../typescript/globe_surface.js').GlobeSurfaceTile) => {
             check(bitmap.width === 2048 && bitmap.height === 2048, 'worker publishes a complete regional bitmap');
             const canvas = document.createElement('canvas');
             canvas.width = canvas.height = 2048;
             const context = canvas.getContext('2d')!;
-            context.drawImage(bitmap, 0, 0);
+            draw(context, bitmap);
             const river = context.getImageData(512, 1024, 1, 1).data;
             const land = context.getImageData(512, 100, 1, 1).data;
             const seam = context.getImageData(1024, 100, 1, 1).data;
@@ -123,7 +147,9 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
             fixture.releaseSurfaceCache();
             await persisted();
             surface.dispose(); surface = new GlobeSurface();
-            inspect(await surface.load([0, 0, 1, 1], new AbortController().signal));
+            const cached = await surface.load([0, 0, 1, 1], new AbortController().signal);
+            check('pixels' in cached, 'a disk cache hit transfers raw pixels without rebuilding an ImageBitmap');
+            inspect(cached);
             check(plans === 2 && paths === 1, 'a new worker reuses the persisted tile without fetching river geometry');
             fixture.releaseSurfaceCache();
             ++revision;
@@ -161,12 +187,18 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
             const canvas = document.createElement('canvas');
             canvas.width = canvas.height = 2048;
             const context = canvas.getContext('2d')!;
-            context.drawImage(surveyed, 0, 0);
+            draw(context, surveyed);
             const alpha = (x: number, y: number) => context.getImageData(x, y, 1, 1).data[3];
             check(Math.abs(alpha(1200, 600) - 128) <= 1 && Math.abs(alpha(512, 100) - 128) <= 1 &&
                   alpha(1000, 600) === 0,
                   'complete mapped coverage distinguishes islands and land from both water and unknown coverage');
-            surveyed.close(); canvas.width = canvas.height = 1;
+            surveyed.close();
+            await persisted();
+            const cachedSurveyed = await surface.load([0, 0, 1, 1], new AbortController().signal);
+            draw(context, cachedSurveyed);
+            check(Math.abs(alpha(1200, 600) - 128) <= 1 && alpha(1000, 600) === 0,
+                  'cached GPU-ready pixels retain half-alpha surveyed land and transparent water');
+            cachedSurveyed.close(); canvas.width = canvas.height = 1;
             complete = false; ++revision;
         } finally {
             (held as (() => void) | null)?.();

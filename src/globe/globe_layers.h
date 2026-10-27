@@ -17,14 +17,14 @@
 /** @brief Open an existing configured geometry store; caller owns the connection, or NULL on failure. */
 sqlite_t *globe_configured_database(void);
 
-/** @brief Read one bounded texture identity from the borrowed geometry store, without loading its JPEG. */
+/** @brief Read one bounded texture identity from the borrowed geometry store, without loading its PNG. */
 bool textures_metadata(sqlite_t *db, unsigned level, unsigned column, unsigned row, globe_texture_info_t *info);
 
 /** @brief Enumerate the bounded optional regional photographic catalogue. */
 bool textures_regions(sqlite_t *db, const double bounds[4], globe_texture_region_fn callback, void *context);
 
-/** @brief Return owned checksum-verified JPEG bytes matching the caller's metadata, or NULL. */
-array_t *textures_jpeg(sqlite_t *db, unsigned level, unsigned column, unsigned row, const globe_texture_info_t *expected);
+/** @brief Return owned checksum-verified PNG bytes matching the caller's metadata, or NULL. */
+array_t *textures_png(sqlite_t *db, unsigned level, unsigned column, unsigned row, const globe_texture_info_t *expected);
 
 /** @brief Resolve a country polygon through bounded, indexed ray intersections; caller owns the returned name. */
 string_t *countries_at(sqlite_t *db, double latitude, double longitude);

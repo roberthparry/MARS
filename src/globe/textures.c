@@ -1,10 +1,10 @@
 /**
  * @file textures.c
- * @brief Indexed photographic texture metadata and bounded, verified JPEG reads.
+ * @brief Indexed photographic texture metadata and bounded, verified PNG reads.
  *
  * The globe controller supplies its borrowed geometry connection. Metadata and payload reads are separate so
  * HTTP consumers can revalidate browser caches without reading or decrypting an image. No image codec, migration,
- * filesystem fallback or persistent pixel cache is part of this reader. Installers validate JPEG dimensions.
+ * filesystem fallback or persistent pixel cache is part of this reader. Installers validate PNG dimensions.
  */
 #include <math.h>
 #include <string.h>
@@ -34,8 +34,8 @@ bool textures_metadata(sqlite_t *db, unsigned level, unsigned column, unsigned r
     if (!db || !info || !texture_address(level, column, row)) return false;
     sqlite_stmt_t *q = sqlite_stmt_prepare(db,
         "select width,height,byte_count,sha256 from globe_texture "
-        "where level=?1 and column_index=?2 and row_index=?3 and length(jpeg)=byte_count "
-        "and exists(select 1 from globe_texture_dataset where id=1 and format_version=1)");
+        "where level=?1 and column_index=?2 and row_index=?3 and length(png)=byte_count "
+        "and exists(select 1 from globe_texture_dataset where id=1 and format_version=2)");
     bool ok = q && sqlite_stmt_bind_int(q, 1, level) && sqlite_stmt_bind_int(q, 2, column) &&
               sqlite_stmt_bind_int(q, 3, row) && sqlite_stmt_step(q) == SQLITE_STEP_ROW;
     static const int widths[] = {2048, 8192, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800};
@@ -44,7 +44,7 @@ bool textures_metadata(sqlite_t *db, unsigned level, unsigned column, unsigned r
     int64_t size = ok ? sqlite_stmt_column_int64(q, 2) : 0;
     const char *digest = ok ? sqlite_stmt_column_text(q, 3) : NULL;
     ok = ok && sqlite_stmt_column_int(q, 0) == width && sqlite_stmt_column_int(q, 1) == height &&
-         size >= 4 && size <= (level == 1 || level == 3 ? 16777216 : 4194304) && texture_digest(digest);
+         size >= 4 && size <= (level == 1 ? 134217728 : level == 3 ? 67108864 : 16777216) && texture_digest(digest);
     if (ok) {
         info->width = width; info->height = height; info->byte_count = (size_t)size;
         memcpy(info->sha256, digest, sizeof info->sha256);
@@ -85,7 +85,7 @@ bool textures_regions(sqlite_t *db, const double bounds[4], globe_texture_region
     return ok;
 }
 
-array_t *textures_jpeg(sqlite_t *db, unsigned level, unsigned column, unsigned row, const globe_texture_info_t *expected)
+array_t *textures_png(sqlite_t *db, unsigned level, unsigned column, unsigned row, const globe_texture_info_t *expected)
 {
     globe_texture_info_t current;
     if (!expected || !memchr(expected->sha256, 0, sizeof expected->sha256) ||
@@ -93,15 +93,14 @@ array_t *textures_jpeg(sqlite_t *db, unsigned level, unsigned column, unsigned r
         current.width != expected->width || current.height != expected->height ||
         current.byte_count != expected->byte_count || strcmp(current.sha256, expected->sha256)) return NULL;
     sqlite_stmt_t *q = sqlite_stmt_prepare(db,
-        "select jpeg from globe_texture where level=?1 and column_index=?2 and row_index=?3 and sha256=?4 "
-        "and byte_count=?5 and length(jpeg)=?5");
+        "select png from globe_texture where level=?1 and column_index=?2 and row_index=?3 and sha256=?4 "
+        "and byte_count=?5 and length(png)=?5");
     bool ok = q && sqlite_stmt_bind_int(q, 1, level) && sqlite_stmt_bind_int(q, 2, column) &&
               sqlite_stmt_bind_int(q, 3, row) && sqlite_stmt_bind_text(q, 4, expected->sha256) &&
               sqlite_stmt_bind_int64(q, 5, expected->byte_count) && sqlite_stmt_step(q) == SQLITE_STEP_ROW;
     size_t size = ok ? sqlite_stmt_column_bytes(q, 0) : 0;
     const unsigned char *data = ok ? sqlite_stmt_column_blob(q, 0) : NULL;
-    ok = ok && data && size == expected->byte_count && size >= 4 && data[0] == 0xff && data[1] == 0xd8 &&
-         data[size - 2] == 0xff && data[size - 1] == 0xd9;
+    ok = ok && data && size == expected->byte_count && size >= 57 && !memcmp(data, "\211PNG\r\n\032\n", 8);
     unsigned char digest[crypto_hash_sha256_BYTES];
     char hex[65];
     if (ok) {

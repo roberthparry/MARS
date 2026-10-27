@@ -2,7 +2,7 @@
  * @file globe_surface_cache.ts
  * @brief Bounded IndexedDB storage of completed photographic river tiles.
  *
- * Stores disposable, uncompressed 2048-square RGBA tiles. One serial read/write transaction updates accounting and evicts
+ * Stores disposable, uncompressed 2048-square premultiplied RGBA tiles ready for WebGL upload. One serial transaction evicts
  * the least recently used entries. Storage denial or quota failure is an optional-cache miss, not a drawing error.
  */
 interface GlobeSurfaceRecord { key: string; blob: Blob; size: number; used: number; }
@@ -16,7 +16,7 @@ class GlobeSurfaceCache {
         return this.database ??= new Promise(resolve => {
             let unavailable = false;
             try {
-                const request = indexedDB.open('mars.globe.surface.v1', 2);
+                const request = indexedDB.open('mars.globe.surface.v1', 3);
                 request.onupgradeneeded = () => {
                     if (request.result.objectStoreNames.contains('tiles')) request.result.deleteObjectStore('tiles');
                     request.result.createObjectStore('tiles', {keyPath: 'key'}).createIndex('used', 'used');

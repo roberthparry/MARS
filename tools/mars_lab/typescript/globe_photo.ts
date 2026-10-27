@@ -51,7 +51,7 @@ export class GlobePhoto {
                     const name = `${String(plan[column]).padStart(2, '0')}-${String(plan[2] + row).padStart(2, '0')}`;
                     let bitmap = this.cache.get(name);
                     if (!bitmap) {
-                        const response = await fetch(`/earth_tiles/${name}.jpg`, {signal: controller.signal});
+                        const response = await fetch(`/earth_tiles/${name}.png`, {signal: controller.signal});
                         if (!response.ok) throw new Error('Photo tile unavailable');
                         bitmap = await createImageBitmap(await response.blob());
                         if (controller.signal.aborted || this.closed) { bitmap.close(); return; }

@@ -1062,7 +1062,7 @@ reference imagery does not affect land/sea classification.
 See the [imagery notice](../THIRD_PARTY_NOTICES.md#nasa-blue-marble-globe-imagery)
 for source, credit, reuse terms and checksum.
 At 2× zoom, Natural Earth asynchronously loads the bundled 8192 × 4096 version
-as JPEG, replacing the overview only after a successful GPU upload.
+as PNG, replacing the overview only after a successful GPU upload.
 That provides four times the linear resolution and sixteen times the pixels.
 The upgrade is requested once per globe instance, on closer zoom or before a
 history journey. Graphics limits or allocation failure select 4096 × 2048 where
@@ -1074,8 +1074,10 @@ From 6× zoom, a local four-tile patch adds the 21600 × 10800 NASA Blue Marble:
 Next Generation image for July 2004, with shaded topography and bathymetry.
 Its source has 2.64 times the linear resolution and about seven times the pixels
 of the 8192-pixel image. Each of the 72 bundled tiles is 1800 × 1800 pixels;
-tiles are cropped without resampling and JPEG-encoded at quality 95 with full
-colour sampling. They are served locally, including when offline.
+tiles are stored as lossless PNGs. The NASA source and most existing Wales tiles
+were already JPEG-encoded; PNG preserves their decoded pixels without recovering
+lost detail. The original Cambrian Mountains patch is regenerated directly from
+the retained satellite raster. They are served locally, including when offline.
 The native `lab_globe_photo_patch` planner wraps longitude at the date line and
 clamps tile rows at the poles. The browser retains at most four decoded tiles
 and one 3600 × 3600 GPU patch (about 49.4 MiB each), plus transient replacement
@@ -1086,7 +1088,7 @@ out of history flights. The shader blends the patch edges and zoom transition;
 surveyed shorelines remain independent, and ice comes from the same reference image.
 This is fixed reference imagery, not live imagery or selected-date vegetation.
 The optional `tools/mars_lab/texture_tiles.c` maintainer utility reproduces the
-tiles from the credited NASA source using libjpeg development files. It is not
+tiles from the credited NASA source using libjpeg and zlib development files. It is not
 part of ordinary builds or releases; no image-processing installation is required
 to run the Lab. Source URL, checksum and attribution are in the imagery notice.
 Once the requested longitude and latitude spans are each
@@ -1109,7 +1111,11 @@ and storage; at most one additional 16 MiB canvas is retained for that backgroun
 work, and further cache writes are skipped while it is busy.
 Completed tiles persist in a per-browser, per-Lab-origin IndexedDB cache, bounded
 to four 2048-square RGBA tiles: 16 MiB each and 64 MiB in total. These disposable
-raw tiles avoid image decompression on reuse. Browser storage and transient readback
+raw tiles store premultiplied RGBA bytes, transferred from the worker directly into
+a WebGL texture without image decoding, canvas conversion or rebuilding an ImageBitmap.
+Reading the bytes and uploading them to GPU memory are still necessary; resident
+GPU textures are reused directly. Older straight-alpha cache entries are discarded.
+Browser storage and transient readback
 buffers are additional; least recently used entries are evicted as needed. Database
 changes invalidate cached images. Returning after release reuses a valid cached
 tile without querying or rasterising its rivers again. Storage denial still allows

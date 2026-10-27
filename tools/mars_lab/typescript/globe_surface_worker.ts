@@ -2,7 +2,7 @@
  * @file globe_surface_worker.ts
  * @brief Off-main-thread rasterisation and persistent reuse of photographic river surface tiles.
  *
- * Native code supplies crop rectangles and paths. A bounded decoded-photo cache avoids repeat JPEG work during
+ * Native code supplies crop rectangles and paths. A bounded decoded-photo cache avoids repeat PNG work during
  * panning. Completed pixels are published before optional raw-pixel persistence. River cut-outs retain exact coverage.
  */
 interface GlobeSurfacePhoto { url: string; sha256: string; source: number[]; target: number[]; regional?: boolean; }
@@ -79,6 +79,13 @@ class GlobeSurfaceWorker {
             // Yield so the ready bitmap can reach the globe before cache readback starts.
             await new Promise(resolve => setTimeout(resolve, 0));
             const pixels = canvas.getContext('2d')!.getImageData(0, 0, 2048, 2048);
+            // Match ImageBitmap's premultiplied upload once, before persistence, not on every cache hit.
+            for (let i = 0; i < pixels.data.length; i += 4) {
+                const alpha = pixels.data[i + 3] / 255;
+                pixels.data[i] = Math.round(pixels.data[i] * alpha);
+                pixels.data[i + 1] = Math.round(pixels.data[i + 1] * alpha);
+                pixels.data[i + 2] = Math.round(pixels.data[i + 2] * alpha);
+            }
             await this.cache.put(key, new Blob([pixels.data], {type: 'application/octet-stream'}));
         } catch { /* Optional persistence must never delay or reject a visible tile. */ }
         finally { canvas.width = canvas.height = 1; this.saving = false; }
@@ -113,22 +120,16 @@ class GlobeSurfaceWorker {
         return plan;
     }
 
-    private async tile(bounds: number[], signal: AbortSignal): Promise<ImageBitmap> {
+    private async tile(bounds: number[], signal: AbortSignal): Promise<ImageBitmap | ArrayBuffer> {
         await this.ready;
         signal.throwIfAborted();
         const plan = await this.request(bounds, 'surface-plan', signal);
         const saved = await this.cache.get(plan.key);
         if (saved) {
             try {
-                const pixels = new Uint8ClampedArray(await saved.arrayBuffer());
+                const pixels = await saved.arrayBuffer();
                 signal.throwIfAborted();
-                const bitmap = await createImageBitmap(new ImageData(pixels, 2048, 2048),
-                    {premultiplyAlpha: 'premultiply'});
-                if (bitmap.width === 2048 && bitmap.height === 2048) {
-                    if (signal.aborted) { bitmap.close(); signal.throwIfAborted(); }
-                    return bitmap;
-                }
-                bitmap.close();
+                if (pixels.byteLength === GlobeSurfaceCache.tileBytes) return pixels;
             } catch { signal.throwIfAborted(); }
         }
         if (!Array.isArray(plan.photos) || !plan.photos.length || plan.photos.length > 68)
@@ -144,7 +145,7 @@ class GlobeSurfaceWorker {
             context.fillStyle = '#183a32';
             context.fillRect(0, 0, 2048, 2048);
             for (const photo of plan.photos) {
-                if (!(photo.regional ? /^\/earth_regions\/\d{2}\.jpg$/ : /^\/earth_tiles\/\d{2}-\d{2}\.jpg$/).test(photo.url) ||
+                if (!(photo.regional ? /^\/earth_regions\/\d{2}\.png$/ : /^\/earth_tiles\/\d{2}-\d{2}\.png$/).test(photo.url) ||
                     !Array.isArray(photo.source) || photo.source.length !== 4 ||
                     !Array.isArray(photo.target) || photo.target.length !== 4 ||
                     ![...photo.source, ...photo.target].every(Number.isFinite)) throw new Error('Invalid photo crop');
@@ -196,7 +197,9 @@ class GlobeSurfaceWorker {
                 try {
                     if (!message.bounds || !Number.isSafeInteger(message.id)) throw new Error('Invalid surface job');
                     const bitmap = await this.tile(message.bounds, controller.signal);
-                    if (controller.signal.aborted) bitmap.close();
+                    if (controller.signal.aborted) {
+                        if (bitmap instanceof ImageBitmap) bitmap.close();
+                    } else if (bitmap instanceof ArrayBuffer) this.port.postMessage({id: message.id, pixels: bitmap}, [bitmap]);
                     else this.port.postMessage({id: message.id, bitmap}, [bitmap]);
                 } catch (error) {
                     this.port.postMessage({id: message.id, error: String(error)});

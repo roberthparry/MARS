@@ -175,7 +175,7 @@ static bool surface_fixture(const char *directory)
                                       "surface-plan", NULL, &status);
     const json_t *regional_photos = test_lab_member(regional, "photos");
     ok = ok && status == 200 && json_array_size(regional_photos) == 2 &&
-         !strcmp(test_lab_text(json_array_get(regional_photos, 1), "url"), "/earth_regions/00.jpg");
+         !strcmp(test_lab_text(json_array_get(regional_photos, 1), "url"), "/earth_regions/00.png");
     json_free(regional);
     db = sqlite_open_plain(path);
     ok = ok && db && sqlite_exec_cstr(db,
@@ -185,7 +185,7 @@ static bool surface_fixture(const char *directory)
                                "surface-plan", NULL, &status);
     regional_photos = test_lab_member(regional, "photos");
     ok = ok && status == 200 && json_array_size(regional_photos) == 2 &&
-         !strcmp(test_lab_text(json_array_get(regional_photos, 1), "url"), "/earth_regions/01.jpg");
+         !strcmp(test_lab_text(json_array_get(regional_photos, 1), "url"), "/earth_regions/01.png");
     json_free(regional);
     regional = surface_request(welsh_bounds, "surface-plan", NULL, &status);
     ok = ok && status == 200 && json_array_size(test_lab_member(regional, "photos")) == 3;
@@ -197,8 +197,8 @@ static bool surface_fixture(const char *directory)
         if (!i) key = string_new_with(test_lab_text(plan, "key"));
         if (i == 1 || i == 2) {
             const json_t *photos = test_lab_member(plan, "photos");
-            ok = ok && !strcmp(test_lab_text(json_array_get(photos, 0), "url"), "/earth_tiles/11-02.jpg") &&
-                 !strcmp(test_lab_text(json_array_get(photos, 1), "url"), "/earth_tiles/00-02.jpg");
+            ok = ok && !strcmp(test_lab_text(json_array_get(photos, 0), "url"), "/earth_tiles/11-02.png") &&
+                 !strcmp(test_lab_text(json_array_get(photos, 1), "url"), "/earth_tiles/00-02.png");
         }
         json_free(plan);
     }

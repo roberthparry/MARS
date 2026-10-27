@@ -1076,7 +1076,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     check(space.backgroundColor === 'rgb(0, 0, 0)' && space.backgroundImage.includes('radial-gradient'),
           'globe has a blue-black star field behind its transparent exterior');
     const earth = new Image();
-    earth.src = '/earth_surface.jpg';
+    earth.src = '/earth_surface.png';
     await earth.decode();
     check(earth.naturalWidth === 2048 && earth.naturalHeight === 1024,
           'bundled NASA overview decodes at its prepared resolution');

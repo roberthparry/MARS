@@ -70,7 +70,7 @@ static bool surface_region(unsigned slot, const double region[4], void *context)
     double target[] = {(left - b[0]) * 2048 / (b[2] - b[0]), (b[3] - north) * 2048 / (b[3] - b[1]),
                        (right - left) * 2048 / (b[2] - b[0]), (north - south) * 2048 / (b[3] - b[1])};
     json_t *photo = json_new_object();
-    string_t *url = string_sprintf("/earth_regions/%02u.jpg", slot);
+    string_t *url = string_sprintf("/earth_regions/%02u.png", slot);
     if (photo && url) {
         lab_cal_set(photo, "url", string_c_str(url));
         lab_cal_set(photo, "sha256", info.sha256);
@@ -101,7 +101,7 @@ static json_t *surface_photographs(globe_t *globe, const double b[4])
             double target[] = {(left - b[0]) * 2048 / (b[2] - b[0]), (b[3] - upper) * 2048 / (b[3] - b[1]),
                                (right - left) * 2048 / (b[2] - b[0]), (upper - south) * 2048 / (b[3] - b[1])};
             json_t *photo = ok ? json_new_object() : NULL;
-            string_t *url = ok ? string_sprintf("/earth_tiles/%02u-%02u.jpg", wrapped, (unsigned)row) : NULL;
+            string_t *url = ok ? string_sprintf("/earth_tiles/%02u-%02u.png", wrapped, (unsigned)row) : NULL;
             if (photo && url) {
                 lab_cal_set(photo, "url", string_c_str(url));
                 lab_cal_set(photo, "sha256", info.sha256);

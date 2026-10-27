@@ -5,7 +5,7 @@
  * Owns the globe installer and offline OSM river conversion, candidate staging and
  * transactional river publication. Installation always builds and validates a fresh
  * database before replacing the destination; updates retain unrelated installed layers.
- * Photographic JPEG validation and import are delegated to the independent texture installer.
+ * Photographic PNG validation and import are delegated to the independent texture installer.
  * Stored centrelines have a conservative eight-metre
  * error ceiling with junctions fixed; the separate source extract retains full detail.
  * Staging and publication enforce a 7 GB river-layer limit, including indexes.
@@ -1297,12 +1297,12 @@ bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string
     if (!cfg_database_current_revision(db, "globe", &revision)) return false;
     /* Revision nine already validated the geographic layers. This migration changes photographs only;
        their installer verifies every image and rolls back atomically without rescanning gigabytes of rivers. */
-    if (revision == 9 || revision == 10) return cfg_database_textures(db, root);
+    if (revision >= 9 && revision <= 11) return cfg_database_textures(db, root);
     return cfg_globe_valid(db) &&
            (revision >= 3 || cfg_database_coast(db, root, staging)) &&
            (revision >= 7 || cfg_globe_countries(db, root, staging)) &&
            (revision >= 9 || cfg_globe_regions(db, root)) &&
-           (revision >= 11 || cfg_database_textures(db, root)) &&
+           (revision >= 12 || cfg_database_textures(db, root)) &&
            cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) && cfg_globe_valid(db);
 }
 
@@ -1345,7 +1345,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         ok = transaction && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
              cfg_globe_regions(db, root) && cfg_database_textures(db, root) && cfg_globe_valid(db) &&
              cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
-             cfg_database_revision(db, "globe", 11) &&
+             cfg_database_revision(db, "globe", 12) &&
              sqlite_exec_cstr(db, "commit");
         if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
         sqlite_close(db);
@@ -1365,7 +1365,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
              cfg_globe_regions(db, root) && cfg_database_textures(db, root) &&
              cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
-             cfg_database_revision(db, "globe", 11);
+             cfg_database_revision(db, "globe", 12);
         sqlite_close(db);
         string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
         string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;

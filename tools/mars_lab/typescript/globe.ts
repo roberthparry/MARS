@@ -697,14 +697,16 @@ class MarsAlmanacGlobe {
         } finally { URL.revokeObjectURL(url); }
     }
 
-    private upload(index: number, image: HTMLImageElement | ImageBitmap): void {
+    private upload(index: number, image: HTMLImageElement | import('./globe_surface.js').GlobeSurfaceTile): void {
         const gl = this.gl;
         gl.activeTexture(gl.TEXTURE0 + index);
         gl.bindTexture(gl.TEXTURE_2D, this.textures[index]);
         const filter = index === 2 || (index === 1 && this.usesShoreDetail()) ? gl.NEAREST : gl.LINEAR;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        if ('pixels' in image)
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, image.width, image.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, image.pixels);
+        else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
         this.draw();
     }
 
@@ -713,7 +715,7 @@ class MarsAlmanacGlobe {
         this.status.textContent = 'Loading Earth imagery…';
         try {
             const image = new Image();
-            image.src = '/earth_surface.jpg';
+            image.src = '/earth_surface.png';
             await image.decode();
             this.upload(0, image);
             this.root.dataset.surface = 'blue-marble';
@@ -735,7 +737,7 @@ class MarsAlmanacGlobe {
         this.highResolutionLoading = true;
         try {
             const image = new Image();
-            image.src = '/earth_surface_detail.jpg';
+            image.src = '/earth_surface_detail.png';
             await image.decode();
             if (image.naturalWidth !== 8192 || image.naturalHeight !== 4096) throw new Error('Invalid Earth detail image');
             while (width > 2048 && !gl.isContextLost()) {
@@ -1011,9 +1013,9 @@ class MarsAlmanacGlobe {
         this.riverRequestBounds = bounds;
         this.riverRequestZoom = zoom;
         const timeout = window.setTimeout(() => request.abort(), 15000);
-        let bitmap: ImageBitmap | null = null;
+        let bitmap: import('./globe_surface.js').GlobeSurfaceTile | null = null;
         try {
-            let image: HTMLImageElement | ImageBitmap;
+            let image: HTMLImageElement | import('./globe_surface.js').GlobeSurfaceTile;
             try {
                 if (!this.riverSurface) {
                     const {GlobeSurface} = await import('./globe_surface.js');

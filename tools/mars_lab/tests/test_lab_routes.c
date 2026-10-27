@@ -67,6 +67,7 @@ static http_response_t *route_request_headers(webmethod_t method, const char *pa
     array_t *encoded = object ? lab_wire_encode(object) : NULL;
     json_free(object);
     http_limits_t limits = {.connect_timeout_ms = 5000, .total_timeout_ms = 75000, .max_body_bytes = 16777216};
+    if (!strncmp(path, "/earth_", 7)) limits.max_body_bytes = 134217728;
     bool ready =
         client && request && http_client_set_limits(client, &limits) &&
         (!host || request_header(request, "Host", host)) && (!origin || request_header(request, "Origin", origin)) &&
@@ -377,21 +378,21 @@ static bool route_contracts(const char *directory)
     response = route_request(HTTP_GET, "/favicon.svg", NULL, NULL, NULL, NULL);
     ok = route_check(response, 200, response_contains(response, "<svg"), "GET /favicon.svg") && ok;
     http_response_free(response);
-    response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
+    response = route_request(HTTP_GET, "/earth_surface.png", NULL, NULL, NULL, NULL);
     const unsigned char *earth = response ? http_response_body(response) : NULL;
     ok = route_check_cache(response, 200, earth && http_response_body_size(response) > 100000 &&
-                     earth[0] == 0xff && earth[1] == 0xd8 &&
-                     response_header_equals(response, "Content-Type", "image/jpeg"), "GET /earth_surface.jpg",
+                     !memcmp(earth, "\211PNG\r\n\032\n", 8) &&
+                     response_header_equals(response, "Content-Type", "image/png"), "GET /earth_surface.png",
                      "private, no-cache") && ok;
     http_response_free(response);
-    response = route_request(HTTP_GET, "/earth_tiles/05-01.jpg", NULL, NULL, NULL, NULL);
+    response = route_request(HTTP_GET, "/earth_tiles/05-01.png", NULL, NULL, NULL, NULL);
     earth = response ? http_response_body(response) : NULL;
     ok = route_check_cache(response, 200, earth && http_response_body_size(response) > 1000 &&
-                     earth[0] == 0xff && earth[1] == 0xd8 &&
-                     response_header_equals(response, "Content-Type", "image/jpeg"), "local photographic tile",
+                     !memcmp(earth, "\211PNG\r\n\032\n", 8) &&
+                     response_header_equals(response, "Content-Type", "image/png"), "local photographic tile",
                      "private, no-cache") && ok;
     http_response_free(response);
-    response = route_request(HTTP_GET, "/earth_tiles/12-00.jpg", NULL, NULL, NULL, NULL);
+    response = route_request(HTTP_GET, "/earth_tiles/12-00.png", NULL, NULL, NULL, NULL);
     ok = response && http_response_status(response) == 404 && ok;
     http_response_free(response);
     response = route_request(HTTP_GET, "/offshore_flag.svg", NULL, NULL, NULL, NULL);
@@ -1023,11 +1024,11 @@ static bool route_rivers(const char *directory)
 static bool route_textures(const char *directory)
 {
     if (!test_lab_texture_database(directory)) return false;
-    file_t *source = file_new_cstr("packaging/globe-db/textures/earth_surface.jpg");
+    file_t *source = file_new_cstr("packaging/globe-db/textures/earth_surface.png");
     array_t *original = source ? file_read_all_bytes(source) : NULL;
     string_t *hash = source ? file_sha256(source) : NULL;
     string_t *etag = hash ? string_sprintf("\"sha256-%s\"", string_c_str(hash)) : NULL;
-    http_response_t *response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
+    http_response_t *response = route_request(HTTP_GET, "/earth_surface.png", NULL, NULL, NULL, NULL);
     bool ok = original && etag && response && http_response_status(response) == 200 &&
               http_response_body_size(response) == array_size(original) &&
               !memcmp(http_response_body(response), array_get(original, 0), array_size(original)) &&
@@ -1037,33 +1038,33 @@ static bool route_textures(const char *directory)
     string_t *weak = etag ? string_sprintf("\"outdated\", W/%s", string_c_str(etag)) : NULL;
     const char *validators[] = {etag ? string_c_str(etag) : "", weak ? string_c_str(weak) : "", "*"};
     for (unsigned i = 0; ok && i < 3; ++i) {
-        response = route_request_headers(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL, validators[i]);
+        response = route_request_headers(HTTP_GET, "/earth_surface.png", NULL, NULL, NULL, NULL, validators[i]);
         ok = response && http_response_status(response) == 304 && !http_response_body_size(response) &&
              response_header_equals(response, "ETag", string_c_str(etag));
         http_response_free(response);
     }
-    response = route_request_headers(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, "https://public.invalid",
+    response = route_request_headers(HTTP_GET, "/earth_surface.png", NULL, NULL, NULL, "https://public.invalid",
                                      etag ? string_c_str(etag) : "*");
     ok = response && http_response_status(response) == 403 &&
          response_header_equals(response, "Cache-Control", "no-store") && ok;
     http_response_free(response);
-    response = route_request_headers(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL, "\"outdated\"");
+    response = route_request_headers(HTTP_GET, "/earth_surface.png", NULL, NULL, NULL, NULL, "\"outdated\"");
     ok = response && http_response_status(response) == 200 && http_response_body_size(response) == array_size(original) && ok;
     http_response_free(response);
-    response = route_request(HTTP_GET, "/earth_surface_detail.jpg", NULL, NULL, NULL, NULL);
-    ok = response && http_response_status(response) == 200 && http_response_body_size(response) == 9361205 && ok;
+    response = route_request(HTTP_GET, "/earth_surface_detail.png", NULL, NULL, NULL, NULL);
+    ok = response && http_response_status(response) == 200 && http_response_body_size(response) == 31806347 && ok;
     http_response_free(response);
     string_t *path = string_new_with(getenv("MARS_GLOBE_DB_PATH"));
     sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
-    ok = db && sqlite_exec_cstr(db, "update globe_texture set jpeg=zeroblob(byte_count) where level=0") && ok;
+    ok = db && sqlite_exec_cstr(db, "update globe_texture set png=zeroblob(byte_count) where level=0") && ok;
     sqlite_close(db);
-    response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
+    response = route_request(HTTP_GET, "/earth_surface.png", NULL, NULL, NULL, NULL);
     ok = response && http_response_status(response) == 500 && response_header_equals(response, "Cache-Control", "no-store") && ok;
     http_response_free(response);
     db = path ? sqlite_open_plain(path) : NULL;
     ok = db && sqlite_exec_cstr(db, "drop table globe_texture") && ok;
     sqlite_close(db);
-    response = route_request(HTTP_GET, "/earth_surface.jpg", NULL, NULL, NULL, NULL);
+    response = route_request(HTTP_GET, "/earth_surface.png", NULL, NULL, NULL, NULL);
     ok = response && http_response_status(response) == 404 && ok;
     http_response_free(response);
     string_free(path); string_free(weak); string_free(etag); string_free(hash); array_destroy(original); file_free(source);

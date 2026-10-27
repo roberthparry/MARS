@@ -58,12 +58,12 @@ static bool texture_request(const websrv_request_t *request, websrv_response_t *
         return lab_svr_message(request, response, 404, "Globe texture is not installed");
     string_t *etag = string_sprintf("\"sha256-%s\"", info.sha256);
     bool cached = etag && texture_cached(lab_svr_request_header(request, "If-None-Match"), string_c_str(etag));
-    array_t *bytes = !cached && etag ? globe_texture_jpeg(globe, route->level, route->column, route->row, &info) : NULL;
+    array_t *bytes = !cached && etag ? globe_texture_png(globe, route->level, route->column, route->row, &info) : NULL;
     bool ok;
     if (!etag || (!cached && !bytes)) {
         ok = lab_svr_message(request, response, 500, "Globe texture failed validation");
     } else {
-        ok = lab_svr_header(response, "Content-Type", "image/jpeg") &&
+        ok = lab_svr_header(response, "Content-Type", "image/png") &&
              lab_svr_header(response, "Cache-Control", "private, no-cache") &&
              lab_svr_header(response, "ETag", string_c_str(etag)) &&
              (cached ? websrv_response_status(response, 304)
@@ -85,9 +85,9 @@ lab_texture_routes_t *lab_svr_textures_new(websrv_t *listener)
             for (unsigned column = 0; ok && column < (level == 3 ? 64u : level == 2 ? 12u : 1u); ++column) {
                 lab_texture_route_t *route = &owner->routes[index++];
                 *route = (lab_texture_route_t){owner, level, column, row};
-                string_t *path = level == 3 ? string_sprintf("/earth_regions/%02u.jpg", column) :
-                                level == 2 ? string_sprintf("/earth_tiles/%02u-%02u.jpg", column, row)
-                                           : string_new_with(level ? "/earth_surface_detail.jpg" : "/earth_surface.jpg");
+                string_t *path = level == 3 ? string_sprintf("/earth_regions/%02u.png", column) :
+                                level == 2 ? string_sprintf("/earth_tiles/%02u-%02u.png", column, row)
+                                           : string_new_with(level ? "/earth_surface_detail.png" : "/earth_surface.png");
                 ok = path && websrv_route(listener, HTTP_GET, path, texture_request, route);
                 string_free(path);
             }
