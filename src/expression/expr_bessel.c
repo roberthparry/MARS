@@ -195,8 +195,8 @@ static expr_t *bessel_i_simplify(const expr_t *e, expr_t *order, expr_t *z)
 
 const expr_ops_t ops_bessel_i = {
     .eval = bessel_i_eval, .deriv = bessel_i_deriv, .kind = EXPR_KIND_BESSEL_I, .arity = EXPR_OP_BINARY,
-    .expression_name = "BesselI", .function_name = "besseli", .TeX_name = "I",
-    .apply_binary = expr_bessel_i, .simplify = bessel_i_simplify, .integrate = bessel_i_integrate,
+    .expression_name = "BesselI", .function_name = "besseli", .apply_binary = expr_bessel_i,
+    .simplify = bessel_i_simplify, .integrate = bessel_i_integrate,
     .reverse = bessel_i_reverse,
 };
 
@@ -296,8 +296,8 @@ static expr_t *bessel_k_simplify(const expr_t *e, expr_t *n, expr_t *z)
 
 const expr_ops_t ops_bessel_k = {
     .eval = bessel_k_eval, .deriv = bessel_k_deriv, .kind = EXPR_KIND_BESSEL_K, .arity = EXPR_OP_BINARY,
-    .expression_name = "BesselK", .function_name = "besselk", .TeX_name = "K",
-    .apply_binary = expr_bessel_k, .simplify = bessel_k_simplify, .integrate = bessel_k_integrate,
+    .expression_name = "BesselK", .function_name = "besselk", .apply_binary = expr_bessel_k,
+    .simplify = bessel_k_simplify, .integrate = bessel_k_integrate,
 };
 
 /* Construct an order-argument node, preserving the scalar function for all output styles. */
@@ -401,8 +401,8 @@ static expr_t *bessel_y_simplify(const expr_t *e, expr_t *order, expr_t *z)
 const expr_ops_t ops_bessel_y = {
     .eval = eval_bessel_y, .deriv = deriv_bessel_y, .reverse = expr_reverse_bessel_y,
     .kind = EXPR_KIND_BESSEL_Y, .arity = EXPR_OP_BINARY,
-    .expression_name = "BesselY", .function_name = "bessely", .TeX_name = "Y",
-    .apply_binary = expr_bessel_y, .integrate = expr_integrate_dispatch_primitive, .simplify = bessel_y_simplify,
+    .expression_name = "BesselY", .function_name = "bessely", .apply_binary = expr_bessel_y,
+    .integrate = expr_integrate_dispatch_primitive, .simplify = bessel_y_simplify,
 };
 
 /* Construct the principal Bessel function of the second kind, retaining its operands. */

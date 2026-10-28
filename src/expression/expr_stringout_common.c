@@ -20,6 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "expression-t.h"
+#include "string-t.h"
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -28,14 +31,29 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string-t.h"
+
 
 static const char *sup_digits[10] = {"⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹"};
 
 static const char *sub_digits[10] = {"₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"};
+
+/* Determine whether an absolute-valued additive operand needs visible grouping. */
+bool emit_expr_abs_needs_visible_add_parens(const expr_t *expr)
+{
+    const expr_t *constant = expr_is_neg(expr) ? expr->a : expr;
+    return additive_const_needs_visible_parens(constant);
+}
+
+/* Recognise logarithms represented directly or by an exact symbolic binding. */
+bool expr_is_rendered_log_local(const expr_t *expr)
+{
+    return expr_is_op(expr, &ops_log) ||
+           (expr && expr_is_const(expr) && expr->binding_expr &&
+            expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+            expr->binding_expr->u.unary_op.ops == &ops_log);
+}
 
 
 void emit_superscript_int(sbuf_t *b, long n)
@@ -227,97 +245,6 @@ void emit_atom(expr_t *f, sbuf_t *b, int parent_prec)
             free(text);
         }
     }
-}
-
-bool emit_negative_const_binding_expr_abs(const expr_t *f, sbuf_t *b, bool tex)
-{
-    char *raw;
-    string_t *text;
-    string_cursor_t *cursor;
-    string_pos_t rest_start;
-    string_pos_t digits_start;
-    string_pos_t digits_end;
-    string_t *slice;
-    unsigned char digit;
-    bool ok = false;
-
-    if (!f || !f->binding_expr)
-        return false;
-
-    raw = tex ? expr_binding_expr_to_TeX(f->binding_expr) : expr_binding_expr_to_string(f->binding_expr);
-    if (!raw)
-        return false;
-
-    text = string_new_with(raw);
-    free(raw);
-    if (!text)
-        return false;
-
-    cursor = string_cursor_new(text);
-    if (!cursor) {
-        string_free(text);
-        return false;
-    }
-
-    string_cursor_skip_spaces(cursor);
-    if (!rune_is_equal(string_cursor_peek(cursor), '-'))
-        goto done;
-
-    (void)string_cursor_next(cursor);
-    string_cursor_skip_spaces(cursor);
-
-    rest_start = string_cursor_position(cursor);
-    digits_start = rest_start;
-    while (string_cursor_peek_ascii(cursor, &digit) && isdigit(digit))
-        (void)string_cursor_next(cursor);
-    digits_end = string_cursor_position(cursor);
-
-    if (digits_end > digits_start) {
-        if (tex && string_cursor_consume(cursor, " \\cdot \\pi")) {
-            slice = string_cursor_slice_between(digits_start, digits_end, cursor);
-            if (slice) {
-                sbuf_puts(b, string_c_str(slice));
-                string_free(slice);
-            }
-            sbuf_puts(b, "\\pi");
-            slice =
-                string_cursor_slice_between(string_cursor_position(cursor), string_cursor_end_position(cursor), cursor);
-            if (slice) {
-                sbuf_puts(b, string_c_str(slice));
-                string_free(slice);
-            }
-            ok = true;
-            goto done;
-        }
-        if (!tex && string_cursor_consume(cursor, "·π")) {
-            slice = string_cursor_slice_between(digits_start, digits_end, cursor);
-            if (slice) {
-                sbuf_puts(b, string_c_str(slice));
-                string_free(slice);
-            }
-            sbuf_puts(b, "π");
-            slice =
-                string_cursor_slice_between(string_cursor_position(cursor), string_cursor_end_position(cursor), cursor);
-            if (slice) {
-                sbuf_puts(b, string_c_str(slice));
-                string_free(slice);
-            }
-            ok = true;
-            goto done;
-        }
-    }
-
-    slice = string_cursor_slice_between(rest_start, string_cursor_end_position(cursor), cursor);
-    if (slice) {
-        sbuf_puts(b, string_c_str(slice));
-        string_free(slice);
-        ok = true;
-    }
-
-done:
-    string_cursor_free(cursor);
-    string_free(text);
-    return ok;
 }
 
 /* -------------------------------------------------------------
@@ -1018,48 +945,10 @@ void sort_factors(expr_t **fac, int n)
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_expr_abs_bars(const expr_t *f, sbuf_t *b);
-void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec);
+void TeX_emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec);
-
-
-bool emit_TeX_unit_fraction_power(const expr_t *base, number_t exponent, sbuf_t *b, int parent_prec)
-{
-    long numerator;
-    long denominator;
-    bool reciprocal;
-    int need;
-
-    /* Root(base^p, q) is not the principal base^(p/q) for general complex bases. */
-    if (!num_get_small_rational(exponent, &numerator, &denominator) ||
-        (numerator != 1L && numerator != -1L) || denominator <= 1L)
-        return false;
-
-    reciprocal = numerator < 0L;
-    need = (reciprocal ? PREC_MUL : PREC_UNARY) < parent_prec;
-    if (need)
-        sbuf_puts(b, "\\left(");
-    if (reciprocal)
-        sbuf_puts(b, "\\frac{1}{");
-    if (denominator == 2L) {
-        sbuf_puts(b, "\\sqrt{");
-    } else {
-        char index_text[32];
-
-        snprintf(index_text, sizeof(index_text), "%ld", denominator);
-        sbuf_puts(b, "\\sqrt[");
-        sbuf_puts(b, index_text);
-        sbuf_puts(b, "]{");
-    }
-    emit_TeX_expr(base, b, PREC_LOWEST);
-    sbuf_putc(b, '}');
-    if (reciprocal)
-        sbuf_putc(b, '}');
-    if (need)
-        sbuf_puts(b, "\\right)");
-    return true;
-}
 
 void emit_expr_sqrt_power(const expr_t *base, sbuf_t *b, int parent_prec, bool reciprocal)
 {
@@ -1191,7 +1080,7 @@ void emit_math_with_temporaries(const expr_t *f, sbuf_t *b, style_t style, const
     function_temporary_context.count = count;
     function_temporary_context.expanded_node = NULL;
     if (style == style_LATEX)
-        emit_TeX_expr(f, b, PREC_LOWEST);
+        TeX_emit_expr(f, b, PREC_LOWEST);
     else
         emit_expr(f, b, PREC_LOWEST);
     function_temporary_context = previous;

@@ -241,6 +241,9 @@ diffequ_t *de_new(const equation_t *equation);
  * only for dependent `x`, and to `Dx` for every other dependent variable,
  * including in direct forms such as `D^2(y)` and `D^2(x)`. An explicit suffix
  * takes precedence.
+ * Condition-only braced shorthand such as `{ y'' + y | y(0)=1, y'(0)=0 }` infers the independent variable.
+ * A shorthand residual without an equals sign means an equation equal to zero. Canonical three-section input
+ * continues to separate independent variables, constants and conditions explicitly.
  *
  * @param text Null-terminated input text. Must not be `NULL`.
  * @return A newly allocated differential-equation problem, or `NULL` when the
@@ -376,6 +379,14 @@ const expr_t *de_condition_argument_at(const diffequ_t *de, size_t condition_ind
  *         and must release it with string_free().
  */
 string_t *de_to_text(const diffequ_t *de, style_t style);
+
+/**
+ * @brief Render the complete problem as TeX, including initial and boundary conditions, without solving it.
+ * @param de Borrowed problem; not modified or consumed.
+ * @return Owned TeX body, released with string_free(), or NULL on invalid input or allocation failure.
+ * @note Conditions retain their local argument values and use evaluation bars. Ordinary de_to_text() output is unchanged.
+ */
+string_t *de_problem_to_TeX(const diffequ_t *de);
 
 /**
  * @brief Format a differential-equation problem as a C string.

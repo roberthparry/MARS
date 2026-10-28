@@ -15,6 +15,9 @@
 #include "diffequ_pde_internal.h"
 
 /* The normalising coefficient is constant in both coordinates and in the dependent variable. */
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static bool de_autonomous_constant(const expr_t *coefficient, const expr_t *dependent, bool *assumption)
 {
     if (!coefficient || de_expr_uses(coefficient, dependent) || expr_is_exact_zero(coefficient))
@@ -41,65 +44,6 @@ static bool de_autonomous_invariant(const expr_t *relation, const expr_t *x, con
     expr_free(first);
     expr_free(dy);
     expr_free(dx);
-    return valid;
-}
-
-static bool de_autonomous_steps(diffequ_solve_result_t *result, const expr_t *dependent, const expr_t *along,
-                                const expr_t *across, const expr_t *coefficient, const expr_t *speed,
-                                const expr_t *invariant, const expr_t *relation, bool assumption)
-{
-    const expr_t *values[] = {dependent, along, across, coefficient, speed, invariant, relation};
-    char *text[7] = {NULL}, *TeX[7] = {NULL};
-    string_t *steps = NULL, *steps_TeX = NULL;
-    bool valid = false;
-
-    for (size_t i = 0u; i < 7u; ++i) {
-        expr_t *symbol = i < 3u ? expr_new_named_var(NUM_NAN, expr_symbol_name(values[i])) : NULL;
-        text[i] = expr_to_string(symbol ? symbol : values[i], style_UNBOUND);
-        TeX[i] = expr_to_TeX_body(symbol ? symbol : values[i]);
-        expr_free(symbol);
-        if (!text[i] || !TeX[i])
-            goto cleanup;
-    }
-    steps = string_sprintf(
-        "Autonomous transport: implicit characteristic solution.\n"
-        "Along characteristics, d%s/d%s = %s and d%s/d%s = 0.\n"
-        "Thus %s and %s are constant along each characteristic.\n"
-        "Relating these constants gives %s = F(%s), with F an arbitrary differentiable function.\n"
-        "Let H = %s. Partial derivatives of H hold %s independent of the coordinates.\n"
-        "The native solver verifies the original transport operator applied to H is zero.\n"
-        "Local smooth branches require the partial derivative of H with respect to %s to be nonzero.\n"
-        "Coefficients must be defined; no initial or boundary data are imposed.\n"
-        "This is a classical local solution, not a continuation through characteristic crossings.\n",
-        text[2], text[1], text[4], text[0], text[1], text[0], text[5], text[0], text[5], text[6], text[0], text[0]);
-    steps_TeX = string_sprintf(
-        "\\begin{aligned}&\\text{Autonomous transport: implicit characteristic solution}"
-        "\\\\&\\frac{d %s}{d %s}=%s,\\qquad\\frac{d %s}{d %s}=0"
-        "\\\\&%s\\text{ and }%s\\text{ are constant along characteristics.}"
-        "\\\\&%s=F\\left(%s\\right),\\qquad F\\text{ arbitrary and differentiable}"
-        "\\\\&H=%s"
-        "\\\\&\\text{The original transport operator annihilates }H\\text{ with }%s\\text{ held fixed.}"
-        "\\\\&\\frac{\\partial H}{\\partial %s}\\ne0\\quad\\text{defines a local smooth branch.}"
-        "\\\\&\\text{Coefficients defined; no initial or boundary data imposed.}"
-        "\\\\&\\text{No continuation through characteristic crossings is asserted.}",
-        TeX[2], TeX[1], TeX[4], TeX[0], TeX[1], TeX[0], TeX[5], TeX[0], TeX[5], TeX[6], TeX[0], TeX[0]);
-    if (!steps || !steps_TeX)
-        goto cleanup;
-    if (assumption && (string_append_format(steps, "Normalisation requires %s != 0.\n", text[3]) < 0 ||
-                       string_append_format(steps_TeX, "\\\\&%s\\ne0\\quad\\text{(normalisation)}", TeX[3]) < 0))
-        goto cleanup;
-    if (string_append_cstr(steps_TeX, "\\end{aligned}") != 0)
-        goto cleanup;
-    valid = de_solve_result_set_steps(result, string_c_str(steps)) == 0 &&
-            de_solve_result_set_steps_TeX(result, string_c_str(steps_TeX)) == 0;
-
-cleanup:
-    string_free(steps_TeX);
-    string_free(steps);
-    for (size_t i = 0u; i < 7u; ++i) {
-        free(TeX[i]);
-        free(text[i]);
-    }
     return valid;
 }
 

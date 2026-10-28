@@ -22,6 +22,9 @@
 #include "internal/equation_internal.h"
 
 /* Keep the documented Taylor normal-form bound independent of the shared collector's capacity. */
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static bool de_series_polynomial(const de_lie_t *normal, const expr_t *expr, size_t coordinate)
 {
     if (!expr)
@@ -202,62 +205,6 @@ static expr_t **de_series_compose(const de_lie_t *normal, const expr_t *expr, si
     }
     de_series_clear(coefficients, highest);
     return out;
-}
-
-static bool de_series_steps(const diffequ_t *de, diffequ_solve_result_t *result)
-{
-    char *centre = expr_to_string(result->series_centre, style_UNBOUND);
-    char *centre_TeX = expr_to_TeX_body(result->series_centre);
-    string_t *steps = centre ? string_sprintf(
-        "Local Taylor series about %s, through degree %zu.\n"
-        "Here x0 is the expansion point and N is the highest retained power.\n"
-        "Using generic coordinates, write y'' = f(x,y,p), with p = y' (the slope).\n"
-        "Along a solution, dy/dx = p and dp/dx = f.\n"
-        "D is total differentiation along that solution: it applies the chain rule, not a new unknown.\n"
-        "For any g(x,y,p), Dg = partial_x g + p*partial_y g + f*partial_p g\n"
-        "                   = d/dx g(x,y(x),p(x)).\n"
-        "The partial derivatives hold the other coordinates fixed.\n"
-        "D^k means applying D k times: y'' = f, y''' = Df, y'''' = D^2 f.\n"
-        "Taylor coefficients are derivatives at x0 divided by factorials:\n"
-        "c0 = y(x0), c1 = y'(x0), cn = y^(n)(x0)/n! = (D^(n-2) f)(x0,c0,c1)/n! for n >= 2.\n"
-        "The implementation computes the same coefficients by matching powers in the ODE,\n"
-        "using truncated polynomial convolution.\n"
-        "Missing initial values remain arbitrary constants.\n"
-        "Polynomial f guarantees local convergence for finite initial data; no radius or numerical error bound is supplied.\n"
-        "O((x-x0)^(%zu)) denotes omitted higher powers; this is a local truncated series, not a closed form.\n",
-        centre, result->series_degree, result->series_degree + 1u) : NULL;
-    string_t *steps_TeX = centre_TeX ? string_sprintf(
-        "\\begin{aligned}&\\text{Local Taylor series: }x_0=%s,\\quad N=%zu"
-        "\\\\&\\text{Expand about }x_0\\text{, retaining powers through degree }N\\text{.}"
-        "\\\\[0.5em]&\\text{Using generic coordinates: }y''=f(x,y,p),\\quad p=y'\\text{ (the slope).}"
-        "\\\\&\\frac{dy}{dx}=p,\\quad\\frac{dp}{dx}=f\\quad\\text{along a solution.}"
-        "\\\\[0.5em]&D\\text{ is total differentiation along that solution (the chain rule).}"
-        "\\\\&\\text{For any }g(x,y,p):\\quad Dg=\\partial_x g+p\\partial_y g+f\\partial_p g"
-        "\\\\&\\hphantom{\\text{For any }g(x,y,p):\\quad Dg}=\\frac{d}{dx}g(x,y(x),p(x))"
-        "\\\\&\\text{Partial derivatives hold the other coordinates fixed.}"
-        "\\\\&D^k\\text{ means applying }D\\text{ }k\\text{ times: }y'''=Df,\\quad y^{(4)}=D^2f."
-        "\\\\[0.5em]&\\text{Taylor coefficients are derivatives at }x_0\\text{ divided by factorials:}"
-        "\\\\&c_0=y(x_0),\\quad c_1=y'(x_0)"
-        "\\\\&c_n=\\frac{y^{(n)}(x_0)}{n!}=\\frac{(D^{n-2}f)(x_0,c_0,c_1)}{n!}\\quad(n\\ge2)"
-        "\\\\&\\text{Computed by matching powers in the ODE.}"
-        "\\\\&y=\\sum_{n=0}^{N}c_n(x-x_0)^n+O((x-x_0)^{N+1})"
-        "\\\\&\\text{Missing initial values remain arbitrary constants.}"
-        "\\\\&O((x-x_0)^{N+1})\\text{ denotes omitted higher powers, not a closed form.}"
-        "\\\\[0.5em]&\\text{Locally convergent for finite initial data.}"
-        "\\\\&\\text{Convergence radius and numerical error bound not supplied.}\\end{aligned}",
-        centre_TeX, result->series_degree) : NULL;
-    /* Preserve the useful diagnostic independently of the series construction. */
-    diffequ_solve_result_t *analysis = steps ? de_lie_unsolved_analysis(de, true) : NULL;
-    if (analysis && de_solve_result_steps(analysis))
-        string_append_format(steps, "\n%s", de_solve_result_steps(analysis));
-    bool ok = steps && steps_TeX && de_solve_result_set_steps(result, string_c_str(steps)) == 0 &&
-              de_solve_result_set_steps_TeX(result, string_c_str(steps_TeX)) == 0;
-    de_solve_result_free(analysis);
-    string_free(steps_TeX);
-    string_free(steps);
-    free(centre_TeX);
-    free(centre);
-    return ok;
 }
 
 /* Match Taylor coefficients using truncated polynomial arithmetic for the parsed normal form. */

@@ -17,6 +17,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "expression-t.h"
+#include "string-t.h"
+#include "TeX-t.h"
+
+#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
+#include "internal/expr_notation_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -25,15 +31,32 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string-t.h"
+
 
 static bool expr_number_scientific_local = false;
 static int expr_number_precision_local = -1;
 
 static string_t *expr_trim_decimal_display_artifacts_text_local(const string_t *text);
+
+/* Native numeric classification supplies semantics; TeX alone spells the fraction. */
+bool expr_emit_exact_rational_TeX(sbuf_t *buffer, number_t value)
+{
+    if (!num_is_exact(value) || !num_is_real(value) || num_is_integer(value))
+        return false;
+    notation_build_t *build = notation_build_new();
+    const TeX_model_node_t *root = notation_build_number(build, value);
+    TeX_context_t *context = notation_build_context(build, root);
+    notation_build_free(build);
+    TeX_t *notation = TeX_from_context(context);
+    bool rendered = notation != NULL;
+    if (notation)
+        sbuf_puts(buffer, TeX_source(notation));
+    TeX_free(notation);
+    TeX_context_free(context);
+    return rendered;
+}
 
 bool expr_set_number_scientific_local(bool scientific)
 {
@@ -252,7 +275,7 @@ fail:
     return NULL;
 }
 
-static bool expr_split_rational_text_local(const string_t *text, string_t **numer_out, string_t **denom_out)
+bool expr_split_rational_text_local(const string_t *text, string_t **numer_out, string_t **denom_out)
 {
     string_cursor_t *cursor;
     string_pos_t numer_start = 0u;
@@ -336,29 +359,7 @@ static bool expr_split_rational_text_local(const string_t *text, string_t **nume
 }
 
 /* Preserve exact rational atoms in mathematical output, independently of decimal text preferences. */
-bool expr_emit_exact_rational_TeX(sbuf_t *buffer, number_t value)
-{
-    if (!num_is_exact(value) || !num_is_real(value) || num_is_integer(value))
-        return false;
-    string_t *text = num_to_string(value), *numerator = NULL, *denominator = NULL;
-    bool matched = expr_split_rational_text_local(text, &numerator, &denominator);
-    if (matched) {
-        string_view_t view = string_view_all(numerator);
-        unsigned char first = 0u;
-        bool negative = string_view_peek_ascii(view, 0u, &first) && first == '-';
-        if (negative)
-            sbuf_putc(buffer, '-');
-        sbuf_puts(buffer, "\\frac{");
-        sbuf_puts(buffer, string_c_str(numerator) + (negative ? 1u : 0u));
-        sbuf_puts(buffer, "}{");
-        sbuf_puts(buffer, string_c_str(denominator));
-        sbuf_putc(buffer, '}');
-    }
-    string_free(denominator);
-    string_free(numerator);
-    string_free(text);
-    return matched;
-}
+
 
 static char *expr_decimal_string_from_rational_text_local(const string_t *text)
 {

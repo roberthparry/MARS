@@ -18,6 +18,9 @@
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static bool de_gradient_constant(const expr_t *expr, const diffequ_t *de, const expr_t *dependent)
 {
     if (!expr || de_expr_uses(expr, dependent))
@@ -52,85 +55,7 @@ static expr_t *de_gradient_parameter(const diffequ_t *de, const expr_t *dependen
 }
 
 /* Keep the coupled condition visible even without optional derivation steps. */
-static bool de_gradient_present(diffequ_solve_result_t *result, const expr_t *dependent, const expr_t *parameter,
-                                const expr_t *denominator, const expr_t *slope, const expr_t *offset,
-                                const expr_t *profile_symbol, bool include_steps)
-{
-    const expr_t *values[] = {dependent, parameter, denominator, slope, offset,
-                              equ_rhs(result->solutions[0]), equ_lhs(result->parameter_constraint),
-                              equ_rhs(result->solutions[1]), profile_symbol};
-    char *plain[9] = {NULL}, *TeX[9] = {NULL};
-    string_t *lhs = NULL, *rhs = NULL, *lhs_TeX = NULL, *rhs_TeX = NULL;
-    bool valid = false;
-    for (size_t i = 0u; i < 9u; ++i) {
-        const char *name = expr_symbol_name(values[i]);
-        expr_t *symbol = name && (expr_is_variable(values[i]) || expr_is_named_const(values[i]))
-                             ? expr_new_named_var(NUM_NAN, name) : NULL;
-        plain[i] = expr_to_string(symbol ? symbol : values[i], style_UNBOUND);
-        TeX[i] = expr_to_TeX_body(symbol ? symbol : values[i]);
-        expr_free(symbol);
-        if (!plain[i] || !TeX[i])
-            goto cleanup;
-    }
-    lhs = string_sprintf("Local envelope: %s", plain[0]);
-    rhs = string_sprintf("%s\n  subject to H = %s = 0; %s != 0; dH/d%s != 0.\n"
-                         "  %s is arbitrary and twice continuously differentiable; solve jointly for %s.",
-                         plain[5], plain[6], plain[2], plain[1], plain[8], plain[1]);
-    lhs_TeX = string_sprintf("\\text{Local envelope: }%s", TeX[0]);
-    rhs_TeX = string_sprintf("\\begin{aligned}[t]&%s\\\\"
-        "&\\text{subject to }H=%s=0\\\\&%s\\ne0,\\quad\\frac{\\partial H}{\\partial %s}\\ne0\\\\"
-        "&%s\\text{ arbitrary and twice continuously differentiable; solve locally for }%s\\end{aligned}",
-        TeX[5], TeX[6], TeX[2], TeX[1], TeX[8], TeX[1]);
-    if (!lhs || !rhs || !lhs_TeX || !rhs_TeX ||
-        equ_set_display_unbound(result->solutions[0], lhs, rhs) != 0 ||
-        equ_set_display_TeX(result->solutions[0], lhs_TeX, rhs_TeX) != 0)
-        goto cleanup;
-    string_free(lhs); string_free(rhs); string_free(lhs_TeX); string_free(rhs_TeX);
-    lhs = string_sprintf("Affine complete integral: %s", plain[0]);
-    rhs = string_sprintf("%s; %s != 0; %s and %s are arbitrary constants.", plain[7], plain[2], plain[1], plain[4]);
-    lhs_TeX = string_sprintf("\\text{Affine complete integral: }%s", TeX[0]);
-    rhs_TeX = string_sprintf("%s,\\quad %s\\ne0,\\quad %s,%s\\text{ arbitrary constants}",
-                             TeX[7], TeX[2], TeX[1], TeX[4]);
-    if (!lhs || !rhs || !lhs_TeX || !rhs_TeX ||
-        equ_set_display_unbound(result->solutions[1], lhs, rhs) != 0 ||
-        equ_set_display_TeX(result->solutions[1], lhs_TeX, rhs_TeX) != 0)
-        goto cleanup;
-    if (include_steps) {
-        string_t *steps = string_sprintf(
-            "Gradient-only equation: set p and q equal to the two first partial derivatives.\n"
-            "The characteristic equations keep p and q constant along each characteristic.\n"
-            "Parameterise the gradient curve by p = %s, q = %s, with %s != 0.\n"
-            "Integrating constant gradients gives the affine complete integral.\n"
-            "Replace its additive constant by %s(%s) and differentiate the resulting expression with respect to %s.\n"
-            "Setting that derivative H to zero gives the envelope constraint.\n"
-            "On H=0 the chain rule gives the original gradients p and q; the native solver verifies their PDE identity.\n"
-            "dH/d%s != 0 determines a regular local branch. Affine solutions are listed separately.\n"
-            "No initial data, boundary data or continuation through envelope singularities are asserted.",
-            plain[1], plain[3], plain[2], plain[8], plain[1], plain[1], plain[1]);
-        string_t *steps_TeX = string_sprintf(
-            "\\begin{aligned}&\\text{Gradient-only PDE: characteristic slopes are constant.}"
-            "\\\\&p=%s,\\quad q=%s,\\quad %s\\ne0"
-            "\\\\&\\text{Replace the affine offset by }%s(%s)\\text{ and impose stationarity in }%s."
-            "\\\\&H=%s=0"
-            "\\\\&\\text{On }H=0\\text{, the chain rule recovers }p,q\\text{ satisfying the original PDE.}"
-            "\\\\&\\frac{\\partial H}{\\partial %s}\\ne0\\text{ defines a regular local envelope.}"
-            "\\\\&\\text{Affine families are separate; no initial or boundary data imposed.}"
-            "\\\\&\\text{No continuation through envelope singularities asserted.}\\end{aligned}",
-            TeX[1], TeX[3], TeX[2], TeX[8], TeX[1], TeX[1], TeX[6], TeX[1]);
-        valid = steps && steps_TeX && de_solve_result_set_steps(result, string_c_str(steps)) == 0 &&
-                de_solve_result_set_steps_TeX(result, string_c_str(steps_TeX)) == 0;
-        string_free(steps_TeX);
-        string_free(steps);
-    } else {
-        valid = true;
-    }
-cleanup:
-    string_free(rhs_TeX); string_free(lhs_TeX); string_free(rhs); string_free(lhs);
-    for (size_t i = 0u; i < 9u; ++i) {
-        free(TeX[i]); free(plain[i]);
-    }
-    return valid;
-}
+
 
 /* Nondegenerate bilinear gradient curves A*p*q+B*p+C*q+D=0 admit affine and regular envelope families. */
 diffequ_solve_result_t *de_pde_solve_gradient_envelope(const diffequ_t *de, const expr_t *residual, bool include_steps)

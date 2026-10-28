@@ -75,7 +75,8 @@ void test_diffequ_fourier_evolution(void)
         const char *steps = de_solve_result_steps(result);
         const char *TeX = de_solve_result_steps_TeX(result);
         bool explained = steps && strstr(steps, "Schwartz") && strstr(steps, "Fourier inversion") &&
-                         TeX && !strstr(TeX, "NAN");
+                         TeX && !strstr(TeX, "NAN") &&
+                         strstr(TeX, i == 3u ? "\\widehat{w}" : "\\widehat{u}");
         de_free(de);
         string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
         printf("  %s\n  %s\n", sources[i], text ? string_c_str(text) : "NULL");

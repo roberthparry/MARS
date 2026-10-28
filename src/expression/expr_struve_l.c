@@ -259,8 +259,8 @@ static expr_t *struve_l_simplify(const expr_t *e, expr_t *order, expr_t *z)
 
 const expr_ops_t ops_struve_l = {
     .eval = struve_l_eval, .deriv = struve_l_deriv, .kind = EXPR_KIND_STRUVE_L, .arity = EXPR_OP_BINARY,
-    .expression_name = "StruveL", .function_name = "struvel", .TeX_name = "\\mathbf{L}",
-    .apply_binary = expr_struve_l, .simplify = struve_l_simplify, .integrate = struve_l_integrate,
+    .expression_name = "StruveL", .function_name = "struvel", .apply_binary = expr_struve_l,
+    .simplify = struve_l_simplify, .integrate = struve_l_integrate,
     .reverse = struve_l_reverse,
 };
 

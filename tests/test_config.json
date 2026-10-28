@@ -482,7 +482,8 @@
     "test_diffequ_wave_kirchhoff_family": true,
     "test_diffequ_wave_polynomial_data": true,
     "test_diffequ_wave_rejects_outside_family": true,
-    "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true
+    "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true,
+    "test_diffequ_notation_rule_families": true
   },
   "tests/equation/test_equation.c": {
     "readme_examples": {
@@ -2776,7 +2777,20 @@
       "docs_xml_001": true,
       "docs_xml_002": true,
       "docs_xml_003": true,
-      "enabled": true
+      "enabled": true,
+      "docs_TeX_001": true,
+      "docs_TeX_002": true,
+      "docs_TeX_003": true,
+      "docs_TeX_004": true,
+      "docs_TeX_005": true,
+      "docs_TeX_006": true,
+      "docs_TeX_007": true,
+      "docs_TeX_008": true,
+      "docs_TeX_009": true,
+      "docs_TeX_010": true,
+      "docs_TeX_011": true,
+      "docs_TeX_012": true,
+      "docs_TeX_013": true
     }
   },
   "tools/mars_checks/tests/test_checks_build.c": {
@@ -3941,6 +3955,35 @@
       "test_tba_rows": true,
       "test_tba_stream": true,
       "test_tba_worker": true
+    }
+  },
+  "tests/TeX/test_TeX.c": {
+    "tests": {
+      "enabled": true,
+      "test_TeX_bound_problems": true,
+      "test_TeX_calculus": true,
+      "test_TeX_calculus_invalid_inputs": true,
+      "test_TeX_calculus_shorthand": true,
+      "test_TeX_composition": true,
+      "test_TeX_context_callback_lifetime": true,
+      "test_TeX_context_semantics": true,
+      "test_TeX_context_validation": true,
+      "test_TeX_equations": true,
+      "test_TeX_escaping": true,
+      "test_TeX_expression_style": true,
+      "test_TeX_from_expression": true,
+      "test_TeX_from_expression_invalid": true,
+      "test_TeX_matrices_and_invalid_inputs": true,
+      "test_TeX_matrix_input": true,
+      "test_TeX_native_contexts": true,
+      "test_TeX_native_index_roundtrip": true,
+      "test_TeX_native_layout": true,
+      "test_TeX_native_text_array": true,
+      "test_TeX_tensor_slots_and_fences": true,
+      "test_TeX_text_boundaries": true,
+      "test_TeX_context_calculus": true,
+      "test_TeX_native_aggregate_contexts": true,
+      "test_TeX_compact_symbol_lookups": true
     }
   }
 }

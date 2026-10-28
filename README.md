@@ -438,6 +438,7 @@ int main(void) {
 | `protobuf_t` | Bounded native Protocol Buffers wire encoding and decoding | [`docs/protobuf.md`](./docs/protobuf.md) |
 | `websrv_t` | Synchronous Linux web server, exact routes and JSON/XML responses | [`docs/webserver.md`](./docs/webserver.md) |
 | `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](./docs/string.md) |
+| `TeX_t` | Owned mathematical notation and escaped text | [`docs/TeX.md`](./docs/TeX.md) |
 | `dictionary_t` | Generic key/value storage with copy/cleanup callbacks | [`docs/dictionary.md`](./docs/dictionary.md) |
 | `set_t` | Generic set storage with copy/cleanup callbacks | [`docs/set.md`](./docs/set.md) |
 | `array_t` | Generic array storage with copy/cleanup callbacks | [`docs/array.md`](./docs/array.md) |

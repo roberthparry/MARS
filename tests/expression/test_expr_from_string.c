@@ -2891,6 +2891,13 @@ static void test_from_string_deriv(void)
                                 "{ 6x | x = ? }", __LINE__);
     check_parse_simplified_expr("Dxy(...) parses as mixed expression derivative", "{ Dxy(x^2*y^3) | x = ?, y = ? }",
                                 "{ 6xy² | x = ?, y = ? }", __LINE__);
+    check_parse_simplified_expr("Leibniz first derivative uses the native derivative parser", "{ d/dx(x^3) }",
+                                "{ 3x² | x = ? }", __LINE__);
+    check_parse_simplified_expr("Leibniz second derivative uses matching orders", "{ d^2/dx^2(x^3) }",
+                                "{ 6x | x = ? }", __LINE__);
+    check_parse_simplified_expr("Leibniz mixed derivative matches Dxy", "{ d^2/dxy(x^2*y^3) | x = ?, y = ? }",
+                                "{ 6xy² | x = ?, y = ? }", __LINE__);
+    check_parse_val("ordinary division of d is not a derivative", "{ d/d | ; d = 2 }", 1.0, __LINE__);
     check_parse_simplified_expr("D[x^5](...) parses as compact high-order derivative", "{ D[x^5](x^7) }",
                                 "{ 2520x² | x = ? }", __LINE__);
     check_parse_simplified_expr("D[x^2y^3](...) preserves mixed derivative order", "{ D[x^2y^3](x^3*y^4) }",

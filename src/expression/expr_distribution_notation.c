@@ -13,13 +13,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "string-t.h"
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "string-t.h"
 
 /* Match one complete, explicitly grouped occurrence, not an identifier or term substring. */
+#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
+#include "internal/TeX_semantic_internal.h"
+
 static const char *expr_distribution_group(const char *body, const char *operand)
 {
     size_t length = strlen(operand);
@@ -127,7 +131,6 @@ bool expr_distribution_restore(string_t **body, string_t **conditions)
 
 /* Scoped distribution qualifications in expression and TeX output. */
 
-static _Thread_local expr_distribution_TeX_scope_t *distribution_scope;
 static _Thread_local const expr_t *expression_detached;
 
 const char *expr_distribution_qualification(const expr_t *expr)
@@ -172,7 +175,7 @@ bool expr_distribution_has_qualification(const expr_t *expr)
     return count != 0u;
 }
 
-static const expr_t *distribution_detachable(const expr_t *root)
+const expr_t *expr_distribution_detachable(const expr_t *root)
 {
     const expr_t *found = NULL;
     size_t count = 0u;
@@ -183,7 +186,7 @@ static const expr_t *distribution_detachable(const expr_t *root)
 const expr_t *expr_distribution_expr_body(const expr_t *root, sbuf_t *buffer)
 {
     const expr_t *saved = expression_detached;
-    const expr_t *detached = distribution_detachable(root);
+    const expr_t *detached = expr_distribution_detachable(root);
     expression_detached = detached;
     const expr_t *body = expr_is_op(root, &ops_real_domain) ? root->a : root;
     sbuf_t rendered;
@@ -236,63 +239,65 @@ void expr_distribution_expr_caption(const expr_t *expr, sbuf_t *buffer)
     sbuf_puts(buffer, expr_distribution_qualification(expr));
 }
 
+static _Thread_local expr_distribution_TeX_scope_t *TeX_scope;
+
+/* Retain expression-owned scope while each recursive renderer prepares its output. */
 void expr_distribution_TeX_begin(const expr_t *root, expr_distribution_TeX_scope_t *scope)
 {
     scope->root = root;
-    scope->detached = distribution_detachable(root);
+    scope->detached = expr_distribution_detachable(root);
     scope->appended = false;
-    scope->outer = distribution_scope;
-    distribution_scope = scope;
+    scope->outer = TeX_scope;
+    TeX_scope = scope;
 }
 
-static void distribution_TeX_caption(expr_distribution_TeX_scope_t *scope, sbuf_t *buffer)
+static void distribution_append_TeX(sbuf_t *output, const expr_t *operand, const char *caption,
+                                    TeX_qualification_style_t style, int precedence)
 {
-    /* The argument has no nested qualification when a caption can be detached. */
-    emit_TeX_expr(scope->detached->a, buffer, PREC_LOWEST);
-    sbuf_puts(buffer, ":\\;\\text{");
-    sbuf_puts(buffer, expr_distribution_qualification(scope->detached));
-    sbuf_putc(buffer, '}');
-    scope->appended = true;
+    sbuf_t body;
+    sbuf_init(&body);
+    TeX_emit_expr(operand, &body, precedence);
+    string_t *text = string_new_with(sbuf_c_str(&body));
+    string_t *layout = text ? TeX_qualification(text, caption, style) : NULL;
+    if (layout)
+        sbuf_puts(output, string_c_str(layout));
+    string_free(layout);
+    string_free(text);
+    sbuf_free(&body);
 }
 
-void expr_distribution_TeX_conditions(const expr_t *root, sbuf_t *buffer)
+/* Attach a detached qualification to the existing condition list. */
+void expr_distribution_TeX_conditions(const expr_t *root, sbuf_t *output)
 {
-    if (distribution_scope && distribution_scope->root == root && distribution_scope->detached) {
-        sbuf_puts(buffer, ";\\;");
-        distribution_TeX_caption(distribution_scope, buffer);
+    if (TeX_scope && TeX_scope->root == root && TeX_scope->detached) {
+        distribution_append_TeX(output, TeX_scope->detached->a, expr_distribution_qualification(TeX_scope->detached),
+                                TeX_QUALIFICATION_CONDITION, PREC_LOWEST);
+        TeX_scope->appended = true;
     }
 }
 
-void expr_distribution_TeX_end(expr_distribution_TeX_scope_t *scope, sbuf_t *buffer)
+/* Finish a scoped expression and restore any outer expression's state. */
+void expr_distribution_TeX_end(expr_distribution_TeX_scope_t *scope, sbuf_t *output)
 {
-    if (scope->detached && !scope->appended) {
-        sbuf_puts(buffer, "\\quad (");
-        distribution_TeX_caption(scope, buffer);
-        sbuf_putc(buffer, ')');
-    }
-    distribution_scope = scope->outer;
+    if (scope->detached && !scope->appended)
+        distribution_append_TeX(output, scope->detached->a, expr_distribution_qualification(scope->detached),
+                                TeX_QUALIFICATION_TRAILING, PREC_LOWEST);
+    TeX_scope = scope->outer;
 }
 
-bool expr_distribution_TeX_emit(const expr_t *expr, sbuf_t *buffer, int parent_prec)
+/* Select distribution semantics; generic TeX layout supplies the notation. */
+bool expr_distribution_TeX_emit(const expr_t *expr, sbuf_t *output, int parent_prec)
 {
     if (expr_is_half_line_finite_part(expr)) {
-        sbuf_puts(buffer, "\\operatorname{Fp}\\!\\left[");
-        emit_TeX_expr(expr->a, buffer, PREC_LOWEST);
-        sbuf_puts(buffer, "\\right]");
+        distribution_append_TeX(output, expr->a, NULL, TeX_QUALIFICATION_FINITE_PART, PREC_LOWEST);
         return true;
     }
     const char *qualification = expr_distribution_qualification(expr);
     if (!qualification)
         return false;
-    if (distribution_scope && distribution_scope->detached == expr) {
-        emit_TeX_expr(expr->a, buffer, parent_prec);
-    } else {
-        /* Braces delimit precisely this operator, including nesting and unqualified duplicates. */
-        sbuf_puts(buffer, "\\underbrace{");
-        emit_TeX_expr(expr->a, buffer, parent_prec);
-        sbuf_puts(buffer, "}_{\\text{");
-        sbuf_puts(buffer, qualification);
-        sbuf_puts(buffer, "}}");
-    }
+    if (TeX_scope && TeX_scope->detached == expr)
+        TeX_emit_expr(expr->a, output, parent_prec);
+    else
+        distribution_append_TeX(output, expr->a, qualification, TeX_QUALIFICATION_INLINE, parent_prec);
     return true;
 }

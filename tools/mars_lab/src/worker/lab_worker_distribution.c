@@ -14,8 +14,6 @@
 #include "plot-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-#define MARS_SHARED_EXPR_DISTRIBUTION_INTERNAL_ACCESS
-#include "internal/expr_distribution_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 

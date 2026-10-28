@@ -2305,3 +2305,22 @@ Output:
 ```text
 Stopped: 1
 ```
+
+### TeX notation ownership
+
+All matrix TeX composition uses the reusable [TeX module](TeX.md): matrix delimiters,
+real/imaginary alignment, scalar-factor spacing and binding envelopes. Component
+extraction and the choice to split a wide display remain in the matrix renderer.
+`MAT_STRING_LATEX` retains its existing output and ownership contract; matrix
+semantics, bindings and common-factor selection remain in the matrix module.
+
+The [matrix-literal TeX example](TeX.md#matrix-literals-and-symbolic-powers)
+uses `TeX_from_expression` to display a literal with an optional scalar exponent.
+It delegates literal parsing here and leaves the matrix power unevaluated.
+Explicit scalar products on either side of a literal are also accepted by the
+notation adapter. It displays the scalar alongside the matrix without distributing
+it into the entries. Matrix sums and matrix–matrix products remain outside that
+convenience input grammar.
+Outer scalar bindings are accepted and shared with exponent parsing; the display
+retains symbolic entries and exponents rather than substituting their values.
+Use `mat_expression_from_string` when the matrix operation should actually be evaluated.

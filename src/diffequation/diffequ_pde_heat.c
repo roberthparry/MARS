@@ -19,6 +19,9 @@
 #include "internal/equation_internal.h"
 
 /* The derivative orders determine time and space independently of spelling and term order. */
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static bool de_heat_derivatives(const expr_t *expr, const expr_t **field, const expr_t **dt, const expr_t **dxx)
 {
     if (expr_is_formal_derivative(expr)) {
@@ -125,39 +128,7 @@ static expr_t *de_heat_dummy(const diffequ_t *de, const expr_t *residual, const 
 }
 
 /* Domain and limiting boundary interpretation remain visible when optional steps are disabled. */
-static bool de_heat_present(equation_t *solution, const expr_t *space, const expr_t *time,
-                            const expr_t *diffusivity, const expr_t *reaction)
-{
-    expr_t *x = expr_new_named_var(NUM_NAN, expr_symbol_name(space));
-    expr_t *t = expr_new_named_var(NUM_NAN, expr_symbol_name(time));
-    const expr_t *values[] = {equ_lhs(solution), equ_rhs(solution), x, t, diffusivity, reaction};
-    char *plain[6] = {NULL}, *TeX[6] = {NULL};
-    string_t *lhs = NULL, *rhs = NULL, *lhs_TeX = NULL, *rhs_TeX = NULL;
-    bool valid = false;
-    for (size_t i = 0u; i < 6u; ++i) {
-        plain[i] = values[i] ? expr_to_string(values[i], style_UNBOUND) : NULL;
-        TeX[i] = values[i] ? expr_to_TeX_body(values[i]) : NULL;
-        if (!plain[i] || !TeX[i]) goto cleanup;
-    }
-    lhs = string_sprintf("%s", plain[0]);
-    rhs = string_sprintf("%s; %s > 0, %s > 0; right half-line, decay at infinity; "
-        "continuous locally bounded boundary data, zero at the corner; boundary value by the right-hand spatial limit.",
-        plain[1], plain[2], plain[3]);
-    lhs_TeX = string_sprintf("%s", TeX[0]);
-    rhs_TeX = string_sprintf(
-        "\\begin{aligned}[t]&%s\\\\&%s>0,\\quad %s>0,\\quad\\kappa=%s>0,\\quad %s\\in\\mathbb{R}"
-        "\\\\&\\text{Right half-line; decay at spatial infinity.}"
-        "\\\\&\\text{Continuous, locally bounded boundary data; zero at the corner.}"
-        "\\\\&\\text{Boundary value is the right-hand spatial limit, not substitution at zero.}\\end{aligned}",
-        TeX[1], TeX[2], TeX[3], TeX[4], TeX[5]);
-    valid = lhs && rhs && lhs_TeX && rhs_TeX && equ_set_display_unbound(solution, lhs, rhs) == 0 &&
-            equ_set_display_TeX(solution, lhs_TeX, rhs_TeX) == 0;
-cleanup:
-    string_free(rhs_TeX); string_free(lhs_TeX); string_free(rhs); string_free(lhs);
-    for (size_t i = 0u; i < 6u; ++i) { free(TeX[i]); free(plain[i]); }
-    expr_free(t); expr_free(x);
-    return valid;
-}
+
 
 /* Heat Poisson kernel for zero initial data on x>0 with a prescribed Dirichlet history at x=0. */
 diffequ_solve_result_t *de_pde_solve_half_line_heat(const diffequ_t *de, const expr_t *residual, bool include_steps)
@@ -224,28 +195,7 @@ diffequ_solve_result_t *de_pde_solve_half_line_heat(const diffequ_t *de, const e
         "continuous locally bounded boundary data with zero corner value; decay at infinity; "
         "boundary trace by the right-hand spatial limit");
     if (!result) goto cleanup;
-    if (include_steps && (de_solve_result_set_steps(result,
-        "Normalise to u_t=kappa*u_xx-a*u, with constant kappa>0 and real constant a.\n"
-        "On the right half-line use zero initial data, prescribed Dirichlet history and decay at infinity.\n"
-        "Multiplication by exp(a*t) removes the reaction term.\n"
-        "The heat Dirichlet Poisson kernel is x*exp(-x^2/(4*kappa*tau))/(2*sqrt(pi*kappa)*tau^(3/2)).\n"
-        "Multiply by exp(-a*tau) and convolve with the boundary history.\n"
-        "For x>0 the integrand vanishes rapidly at tau=0; it solves the PDE and has zero initial trace.\n"
-        "As x tends to zero from above, the kernel is an approximate identity and recovers continuous boundary data.\n"
-        "Do not substitute x=0 inside the integral: that would miss the boundary limit.\n"
-        "Assume continuous locally bounded boundary data, zero at t=0 for corner compatibility.\n"
-        "The result decays at spatial infinity on finite time intervals; "
-        "no left half-line or finite interval is asserted.") != 0 ||
-        de_solve_result_set_steps_TeX(result,
-        "\\begin{aligned}&u_t=\\kappa u_{xx}-a u,\\quad\\kappa>0,\\quad a\\in\\mathbb{R}"
-        "\\\\&w=e^{at}u\\quad\\Longrightarrow\\quad w_t=\\kappa w_{xx}"
-        "\\\\&P(x,\\tau)=\\tfrac{x}{2\\sqrt{\\pi\\kappa}}\\tau^{-3/2}"
-        "e^{-x^2/(4\\kappa\\tau)-a\\tau},\\quad x,\\tau>0"
-        "\\\\&u=\\int_0^t P(x,t-s)g(s)\\,ds"
-        "\\\\&\\text{The kernel solves the PDE and has zero initial trace for }x>0."
-        "\\\\&\\lim_{x\\downarrow0}u(x,t)=g(t)\\quad\\text{by the approximate-identity boundary limit.}"
-        "\\\\&\\text{Assume continuous locally bounded data, }g(0)=0\\text{, and decay at infinity.}"
-        "\\\\&\\text{Here }x,t,g\\text{ denote the recognised space, time and boundary history.}\\end{aligned}") != 0))
+    if (include_steps && !de_heat_set_steps(result))
         goto failure;
     if (de_solve_result_append(result, solution) != 0) goto failure;
     solution = NULL;

@@ -17,6 +17,8 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
 
 static bool display_shift_terms(const expr_t *expr, const expr_t **terms, bool *negative)
 {
@@ -47,8 +49,9 @@ static bool display_contains_imaginary_unit(const expr_t *expr)
                    display_contains_imaginary_unit(expr->b));
 }
 
-/* Display a symbolic centre plus an explicit imaginary displacement without changing the expression tree. */
-bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style)
+/* Select the mathematical centre and imaginary displacement without rendering either. */
+bool expr_display_complex_shift(const expr_t *expr, const expr_t **centre_out, const expr_t **coefficient_out,
+                                bool *centre_negative, bool *coefficient_negative)
 {
     const expr_t *terms[2];
     bool negative[2];
@@ -62,19 +65,45 @@ bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec
                                     display_imaginary_unit(term->b) ? term->a : NULL;
         if (!coefficient || expr_is_const(coefficient) || display_contains_imaginary_unit(coefficient))
             continue;
-        void (*emit)(const expr_t *, sbuf_t *, int) = style == style_LATEX ? emit_TeX_expr :
+        *centre_out = centre;
+        *coefficient_out = coefficient;
+        *centre_negative = negative[1u - side];
+        *coefficient_negative = negative[side];
+        return true;
+    }
+    return false;
+}
+
+/* Display a symbolic centre plus an explicit imaginary displacement without changing the expression tree. */
+bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style)
+{
+    const expr_t *centre = NULL, *coefficient = NULL;
+    bool centre_negative = false, coefficient_negative = false;
+    if (expr_display_complex_shift(expr, &centre, &coefficient, &centre_negative, &coefficient_negative)) {
+        void (*emit)(const expr_t *, sbuf_t *, int) = style == style_LATEX ? TeX_emit_expr :
                                                     style == style_FUNCTION ? emit_func : emit_expr;
         bool bracketed = parent_prec > PREC_ADD;
-        if (bracketed)
-            sbuf_puts(buffer, style == style_LATEX ? "\\left(" : "(");
-        if (negative[1 - side])
+        if (bracketed) {
+            if (style == style_LATEX)
+                TeX_emit_parenthesis(buffer, false);
+            else
+                sbuf_putc(buffer, '(');
+        }
+        if (centre_negative)
             sbuf_putc(buffer, '-');
-        emit(centre, buffer, negative[1 - side] ? PREC_MUL : PREC_ADD);
-        sbuf_puts(buffer, negative[side] ? " - i" : " + i");
-        sbuf_puts(buffer, style == style_LATEX ? "\\," : style == style_FUNCTION ? "." : "·");
+        emit(centre, buffer, centre_negative ? PREC_MUL : PREC_ADD);
+        sbuf_puts(buffer, coefficient_negative ? " - i" : " + i");
+        if (style == style_LATEX)
+            TeX_emit_product_space(buffer);
+        else
+            sbuf_puts(buffer, style == style_FUNCTION ? "." : "·");
         emit(coefficient, buffer, PREC_MUL);
-        if (bracketed)
-            sbuf_puts(buffer, style == style_LATEX ? "\\right)" : ")");
+        if (bracketed) {
+            if (style == style_LATEX)
+                TeX_emit_parenthesis(buffer, true);
+            else
+                sbuf_putc(buffer, ')');
+        }
         return true;
     }
     return false;

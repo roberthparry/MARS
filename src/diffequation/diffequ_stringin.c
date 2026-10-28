@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "diffequation-t.h"
+
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
@@ -2465,8 +2466,26 @@ static char *de_expand_shorthand(const char *source)
     if (!trimmed)
         return NULL;
     length = strlen(trimmed);
-    if (length > 0u && trimmed[0] == '{')
-        return trimmed;
+    if (length > 0u && trimmed[0] == '{') {
+        size_t pipe, separator;
+        if (length < 2u || trimmed[length - 1u] != '}')
+            return trimmed;
+        char *inner = de_trimmed_copy(trimmed + 1u, length - 2u);
+        if (!inner) {
+            free(trimmed);
+            return NULL;
+        }
+        /* A braced condition-only shorthand omits the independent/constant declarations. */
+        if (!de_find_top_level_char(inner, '|', &pipe) ||
+            de_find_top_level_char(inner + pipe + 1u, ';', &separator)) {
+            free(inner);
+            return trimmed;
+        }
+        inner[pipe] = ';';
+        free(trimmed);
+        trimmed = inner;
+        length = strlen(trimmed);
+    }
 
     for (size_t i = 0u; i < length; ++i) {
         if (trimmed[i] == '(')
@@ -2484,6 +2503,13 @@ static char *de_expand_shorthand(const char *source)
     }
 
     equation = de_trimmed_copy(trimmed, first_separator == SIZE_MAX ? length : first_separator);
+    if (equation && !de_find_top_level_char(equation, '=', NULL)) {
+        char *residual = equation;
+        equation = NULL;
+        if (asprintf(&equation, "%s = 0", residual) < 0)
+            equation = NULL;
+        free(residual);
+    }
     if (equation) {
         char *subscript_normalized = de_normalize_subscript_derivatives(equation, NULL);
         char *wrt = subscript_normalized ? de_prime_shorthand_independent(subscript_normalized) : NULL;
@@ -2536,7 +2562,7 @@ static char *de_expand_shorthand(const char *source)
                 brackets++;
             else if (ch == ']' && brackets > 0)
                 brackets--;
-            if (ch != ';' || parens != 0 || brackets != 0)
+            if ((ch != ';' && ch != ',') || parens != 0 || brackets != 0)
                 continue;
             {
                 char *condition = de_trimmed_copy(trimmed + start, i - start);

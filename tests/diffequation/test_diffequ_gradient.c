@@ -112,21 +112,30 @@ void test_diffequ_gradient_envelope(void)
         expr_t *simplified = difference ? expr_simplify(difference) : NULL;
         bool stationary = simplified && gradient_zero(simplified, de, parameter);
         const char *steps = de_solve_result_steps(result), *steps_TeX = de_solve_result_steps_TeX(result);
-        bool explained = steps && strstr(steps, "chain rule") && steps_TeX && !strstr(steps_TeX, "NAN");
+        bool explained = steps && strstr(steps, "chain rule") && steps_TeX && !strstr(steps_TeX, "NAN") &&
+                         strstr(steps_TeX, "\\partial H") && strstr(steps_TeX, "\\ne");
         expr_free(simplified); expr_free(difference); expr_free(derivative);
         de_free(de);
         string_t *text = envelope ? equ_to_text(envelope, style_UNBOUND) : NULL;
         bool retained = text && strstr(string_c_str(text), "subject to H =") &&
                         strstr(string_c_str(text), "!= 0") && !strstr(string_c_str(text), "NAN") &&
                         !strstr(string_c_str(text), "291/");
+        string_t *envelope_TeX = envelope ? equ_to_text(envelope, style_LATEX) : NULL;
+        string_t *plane_TeX = plane ? equ_to_text(plane, style_LATEX) : NULL;
+        bool typeset = envelope_TeX && plane_TeX && strstr(string_c_str(envelope_TeX), "subject to") &&
+                       strstr(string_c_str(envelope_TeX), "\\partial H") &&
+                       strstr(string_c_str(plane_TeX), "arbitrary constants");
         printf("  %s\n  %s\n", sources[i], text ? string_c_str(text) : "NULL");
         string_free(text);
+        string_free(envelope_TeX);
+        string_free(plane_TeX);
         de_solve_result_free(result);
         ASSERT_TRUE(solved);
         ASSERT_TRUE(verified);
         ASSERT_TRUE(stationary);
         ASSERT_TRUE(explained);
         ASSERT_TRUE(retained);
+        ASSERT_TRUE(typeset);
     }
 }
 
@@ -188,7 +197,8 @@ void example_diffequation_gradient_envelope(void)
     char *TeX = de ? de_to_string(de, style_LATEX) : NULL;
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
     bool valid = de_solve_result_count(result) == 2u && de_solve_result_parameter_constraint(result);
-    bool readable = TeX && strstr(TeX, "\\cdot") && !strstr(TeX, "NAN");
+    bool readable = TeX && strstr(TeX, "\\frac{\\partial u}{\\partial x}\\,\\frac{\\partial u}{\\partial y}") &&
+                    !strstr(TeX, "NAN");
     printf("  u_x + u_x u_y = 1\n");
     for (size_t i = 0u; i < de_solve_result_count(result); ++i) {
         string_t *text = equ_to_text(de_solve_result_at(result, i), style_UNBOUND);

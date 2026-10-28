@@ -249,7 +249,6 @@ typedef struct expr_ops {
     expr_diff_kind_t diff_kind;
     const char *expression_name;
     const char *function_name;
-    const char *TeX_name;
     const struct expr_ops *direct_inverse;
     expr_inverse_unary_fn inverse_unary;
     expr_apply_unary_fn apply_unary;
@@ -432,6 +431,12 @@ expr_t *expr_transform_bound_constants(const expr_t *expr);
 
 /** Return whether an expression is a forward or inverse integral-transform operator. */
 bool expr_is_integral_transform(const expr_t *expr);
+
+/** @brief Borrow the operand of a negation without changing the expression. */
+bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out);
+
+/** @brief Parse authored mathematical presentation while retaining functions and calculus operations. */
+expr_t *expr_from_presentation_text_internal(const string_t *text);
 
 /** Simplify a forward or inverse integral-transform operator, retaining unsupported transforms. */
 expr_t *expr_transform_result(const expr_t *transform);
@@ -786,6 +791,16 @@ const expr_t *expr_current_wrt_internal(void);
 expr_t *expr_deriv_rational_over_polynomial_power(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_deriv_cosine_harmonic_antiderivative(const expr_t *expr, const expr_t *wrt);
 expr_t *expr_finite_progression_closed_form(const expr_t *expr);
+
+/** @brief Identify the upper bound, step and function of a finite progression. */
+bool expr_finite_progression_parts(const expr_t *expr, const expr_t **upper, expr_t **step,
+                                   const expr_ops_t **function);
+
+/** @brief Construct the closed form of a recognised exponential sine progression. */
+expr_t *expr_finite_exponential_sine_progression_closed_form(const expr_t *expr);
+
+/** @brief Construct the closed form of a recognised scaled progression. */
+expr_t *expr_finite_progression_scaled_closed_form(const expr_t *expr);
 expr_t *expr_finite_weighted_sinh_from_lerch_form(const expr_t *expr);
 expr_t *expr_finite_weighted_cosh_from_lerch_form(const expr_t *expr);
 expr_t *expr_new_unary_internal(const expr_ops_t *ops, const expr_t *a);
@@ -1132,13 +1147,6 @@ int expr_is_default_constant_name(const char *name);
 int expr_is_default_constant_name_text(const string_t *name);
 const char *expr_default_constant_canonical_name(const char *name);
 string_t *expr_default_constant_canonical_name_text(const string_t *name);
-char *expr_tostring_texify(const char *text);
-
-/** Render the authored operation tree without evaluating nested transforms. Returns an owning C string. */
-char *expr_to_TeX_operation_body(const expr_t *expr);
-
-/** @brief Scan an authored expression tree for calculus operations. */
-bool expr_contains_calculus_request(const expr_t *expr);
 int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out);
 char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit);
 void *fs_xmalloc(size_t n);

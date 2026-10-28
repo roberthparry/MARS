@@ -266,8 +266,8 @@ static expr_t *struve_h_simplify(const expr_t *e, expr_t *order, expr_t *z)
 
 const expr_ops_t ops_struve_h = {
     .eval = struve_h_eval, .deriv = struve_h_deriv, .kind = EXPR_KIND_STRUVE_H, .arity = EXPR_OP_BINARY,
-    .expression_name = "StruveH", .function_name = "struveh", .TeX_name = "\\mathbf{H}",
-    .apply_binary = expr_struve_h, .simplify = struve_h_simplify, .integrate = struve_h_integrate,
+    .expression_name = "StruveH", .function_name = "struveh", .apply_binary = expr_struve_h,
+    .simplify = struve_h_simplify, .integrate = struve_h_integrate,
     .reverse = struve_h_reverse,
 };
 

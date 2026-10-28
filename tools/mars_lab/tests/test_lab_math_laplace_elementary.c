@@ -307,8 +307,9 @@ static void test_laplace_elementary_cuts(void)
     lab_math_contains(lab_math_text(result, "function"), "laplace(", false);
     lab_math_contains(lab_math_text(result, "function"), "realpart(c) == c", true);
     lab_math_contains(lab_math_text(result, "tex"), "\\in\\mathbb{R}", true);
-    lab_math_contains(lab_math_text(result, "tex"), "\\frac{1}{2\\mkern-2mu s}\\,\\left[", true);
-    lab_math_contains(lab_math_text(result, "tex"), "\\right]\\quad", true);
+    lab_math_contains(lab_math_text(result, "tex"), "}{2\\mkern-2mu s}\\quad", true);
+    lab_math_contains(lab_math_text(result, "tex"), "\\operatorname{Ei}", true);
+    lab_math_contains(lab_math_text(result, "tex"), "\\operatorname{E1}", true);
     for (int rate = -1; rate <= 1; rate += 2) {
         const json_t *copy = lab_math_elementary_fields(lab_math_format("{%s | s=1; c=%d}", lab_math_text(result,
             "unbound"), rate));

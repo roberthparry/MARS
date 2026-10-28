@@ -5,20 +5,35 @@
  * Extracts shared reciprocal integer factors and recognises additive centres with opposite displacements,
  * including square-root radicands. Operates on borrowed trees and retains the existing temporary-binding plan;
  * neither the solver's algebra nor the numerical values are changed by presentation.
+ * The equation module owns these structural decisions. TeX constructors supply
+ * radicals, symmetric pairs and fractions without exposing their command syntax.
  */
 
 #include <stdlib.h>
 
 #include "number-t.h"
 #include "string-t.h"
-#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
-#include "internal/equation_internal.h"
+#include "TeX-t.h"
+
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
+
+/* Adapt native rendered parts to independently owned notation. */
+static string_t *equ_pair_TeX(const char *centre, const char *offset, const char *denominator, bool group_offset)
+{
+    TeX_t *c = TeX_raw(centre), *o = TeX_raw(offset), *d = denominator ? TeX_raw(denominator) : NULL;
+    TeX_t *pair = denominator && !d ? NULL : TeX_symmetric_pair(c, o, d, group_offset);
+    string_t *out = pair ? TeX_render(pair) : NULL;
+    TeX_free(pair);
+    TeX_free(d);
+    TeX_free(o);
+    TeX_free(c);
+    return out;
+}
 
 typedef struct {
     const expr_t *expr;
@@ -132,7 +147,16 @@ static bool equ_pair_symmetric(const expr_function_temporaries_t *plan, const ex
             ok = equ_pair_append_term(texts[side], plan,
                                      sums[side].terms[side ? unmatched_b : unmatched_a], style, true);
         if (ok && roots) {
-            string_t *root = string_sprintf(style == style_LATEX ? "\\sqrt{%S}" : "√(%S)", texts[side]);
+            string_t *root;
+            if (style == style_LATEX) {
+                TeX_t *body = TeX_raw(string_c_str(texts[side]));
+                TeX_t *notation = TeX_root(body, NULL);
+                root = notation ? TeX_render(notation) : NULL;
+                TeX_free(notation);
+                TeX_free(body);
+            } else {
+                root = string_sprintf("√(%S)", texts[side]);
+            }
             string_free(texts[side]);
             texts[side] = root;
             ok = root != NULL;
@@ -241,13 +265,13 @@ string_t *equ_solution_pair_rhs_text(const equation_t *first, const equation_t *
         char *denominator_text = denominator ? (style == style_LATEX ? expr_to_TeX_body(denominator) :
                                                                       expr_to_string(denominator, style)) : NULL;
         if (centre_text && offset_text && (!denominator || denominator_text)) {
-            if (denominator)
-                out = string_sprintf(style == style_LATEX ? "\\frac{%s \\pm \\left(%s\\right)}{%s}" :
-                                     (expr_is_variable(denominator) ? "(%s ± (%s))/%s" : "(%s ± (%s))/(%s)"),
+            if (style == style_LATEX)
+                out = equ_pair_TeX(centre_text, offset_text, denominator_text, true);
+            else if (denominator)
+                out = string_sprintf(expr_is_variable(denominator) ? "(%s ± (%s))/%s" : "(%s ± (%s))/(%s)",
                                      centre_text, offset_text, denominator_text);
             else
-                out = string_sprintf(style == style_LATEX ? "%s \\pm \\left(%s\\right)" : "%s ± (%s)",
-                                     centre_text, offset_text);
+                out = string_sprintf("%s ± (%s)", centre_text, offset_text);
         }
         free(denominator_text);
         free(offset_text);
@@ -297,16 +321,18 @@ bool equ_solution_pairs_text(const expr_function_temporaries_t *plan, const expr
     for (size_t i = count % 2u; ok && i < count; i += 2u) {
         const expr_t *radicand = NULL;
         bool root = expr_match_sqrt_expr(bases[i + 1u], &radicand);
-        if (denominators[i] > 1L && root)
-            rendered[i] = string_sprintf(style == style_LATEX ? "\\frac{%S \\pm %S}{%ld}" : "(%S ± %S)/%ld",
-                                          parts[i], parts[i + 1u], denominators[i]);
-        else if (denominators[i] > 1L)
-            rendered[i] = string_sprintf(style == style_LATEX ? "\\frac{%S \\pm \\left(%S\\right)}{%ld}" :
-                                                               "(%S ± (%S))/%ld",
-                                          parts[i], parts[i + 1u], denominators[i]);
-        else
-            rendered[i] = string_sprintf(style == style_LATEX ? "%S \\pm \\left(%S\\right)" : "%S ± (%S)",
-                                          parts[i], parts[i + 1u]);
+        if (style == style_LATEX) {
+            string_t *denominator = denominators[i] > 1L ? string_sprintf("%ld", denominators[i]) : NULL;
+            rendered[i] = denominators[i] > 1L && !denominator ? NULL
+                : equ_pair_TeX(string_c_str(parts[i]), string_c_str(parts[i + 1u]),
+                               denominator ? string_c_str(denominator) : NULL, !(denominators[i] > 1L && root));
+            string_free(denominator);
+        } else if (denominators[i] > 1L) {
+            rendered[i] = string_sprintf(root ? "(%S ± %S)/%ld" : "(%S ± (%S))/%ld",
+                                         parts[i], parts[i + 1u], denominators[i]);
+        } else {
+            rendered[i] = string_sprintf("%S ± (%S)", parts[i], parts[i + 1u]);
+        }
         ok = rendered[i] != NULL;
     }
     for (size_t i = 0u; i < count; ++i)

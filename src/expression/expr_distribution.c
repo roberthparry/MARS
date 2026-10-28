@@ -10,10 +10,10 @@
 #include "computation-t.h"
 #define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
 #include "internal/computation_internal.h"
-#define MARS_SHARED_EXPR_DISTRIBUTION_INTERNAL_ACCESS
-#include "internal/expr_distribution_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_fourier_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 /* Distinguish unsupported distributions from ordinary expressions before numerical sampling. */
 bool expr_is_distribution(const expr_t *f)

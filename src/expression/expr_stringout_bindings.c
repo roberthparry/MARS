@@ -13,12 +13,37 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
+#include "internal/TeX_semantic_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
+
+/* Interpret structured numeric text in expression; TeX owns symbol spelling. */
+char *expr_text_to_TeX_local(const char *text)
+{
+    if (!text)
+        return NULL;
+    const char *known = TeX_known_math_text(text);
+    if (known)
+        return expr_tostring_xstrdup(known);
+    if (!strchr(text, '/') && !strchr(text, '^') && !strchr(text, '(') && !strchr(text, ')') &&
+        !strstr(text, "√") && !strstr(text, "·"))
+        return TeX_from_unicode_math(text);
+    string_t *wrapped = string_sprintf("{ %s }", text);
+    expr_t *parsed = wrapped ? expr_from_string(string_c_str(wrapped), NULL) : NULL;
+    string_free(wrapped);
+    if (!parsed)
+        return TeX_from_unicode_math(text);
+    string_t *notation = expr_to_text(parsed, style_LATEX);
+    char *result = notation ? expr_tostring_xstrdup(string_c_str(notation)) : NULL;
+    string_free(notation);
+    expr_free(parsed);
+    return result ? result : TeX_from_unicode_math(text);
+}
 
 static const char subscript_digits[10][4] = {
     "\xE2\x82\x80", "\xE2\x82\x81", "\xE2\x82\x82", "\xE2\x82\x83", "\xE2\x82\x84",

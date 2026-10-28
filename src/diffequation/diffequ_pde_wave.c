@@ -20,6 +20,9 @@
 #include "diffequ_pde_internal.h"
 
 /* At most four coordinates: identify pure second derivatives without relying on coordinate names. */
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static bool de_wave_derivatives(const expr_t *expr, size_t count, expr_t *const *coordinates, const expr_t **dependent,
                                  const expr_t **derivatives)
 {
@@ -122,7 +125,7 @@ static expr_t *de_wave_squared_speed(const expr_t *spatial, const expr_t *tempor
 }
 
 /* Four display/binder names are chosen once; suffix searches occur only when the input occupies a preferred name. */
-static expr_t *de_wave_fresh_symbol(const diffequ_t *de, const expr_t *residual, const char *preferred)
+expr_t *de_wave_fresh_symbol(const diffequ_t *de, const expr_t *residual, const char *preferred)
 {
     char name[64];
     snprintf(name, sizeof(name), "%s", preferred);
@@ -163,16 +166,7 @@ static expr_t *de_wave_mean(const char *name, expr_t *const *shifted, const expr
     return mean;
 }
 
-/* A bound coordinate must render as its name rather than its unset numeric value. */
-static char *de_wave_coordinate_TeX(const expr_t *coordinate)
-{
-    expr_t *symbol = expr_new_named_var(NUM_NAN, expr_symbol_name(coordinate));
-    char *TeX = symbol ? expr_to_TeX_body(symbol) : NULL;
-    expr_free(symbol);
-    return TeX;
-}
-
-static const expr_t *de_wave_square_base(const expr_t *squared)
+const expr_t *de_wave_square_base(const expr_t *squared)
 {
     const expr_t *base = NULL, *exponent = NULL;
     expr_t *two = expr_const_long(2L);
@@ -190,111 +184,6 @@ static const expr_t *de_wave_square_base(const expr_t *squared)
 }
 
 /* Under the wave family's positive-real squared-speed assumption, sqrt(b^2) is |b|, with real non-zero b. */
-static bool de_wave_speed_notation(const expr_t *squared, const expr_t *speed, char **TeX, char **text,
-                                    string_t **condition_TeX, string_t **condition_text)
-{
-    const expr_t *base = de_wave_square_base(squared);
-    bool square = base != NULL;
-    expr_t *display = square ? expr_abs(base) : expr_clone(speed);
-    *TeX = display ? expr_to_TeX_body_wrapped(display, SIZE_MAX) : NULL;
-    *text = display ? expr_to_string(display, style_UNBOUND) : NULL;
-    expr_free(display);
-    if (square) {
-        char *base_TeX = expr_to_TeX_body_wrapped(base, SIZE_MAX);
-        char *base_text = expr_to_string(base, style_UNBOUND);
-        if (base_TeX && base_text) {
-            *condition_TeX = string_sprintf(
-                ",\\quad %s\\in\\mathbb R,\\quad %s\\ne0", base_TeX, base_TeX);
-            *condition_text = string_sprintf("; %s is real and non-zero (either sign)", base_text);
-        }
-        free(base_text);
-        free(base_TeX);
-    } else {
-        *condition_TeX = string_sprintf(",\\quad\\text{real, non-zero wave speed}");
-        *condition_text = string_sprintf(" (real, non-zero wave speed)");
-    }
-    return *TeX && *text && *condition_TeX && *condition_text;
-}
-
-static bool de_wave_notation(equation_t *solution, diffequ_solve_result_t *result, expr_t *const *space,
-                              const expr_t *time, const expr_t *speed_squared, const expr_t *speed,
-                              const expr_t *f, const expr_t *g,
-                              const diffequ_t *de, const expr_t *residual, bool include_steps)
-{
-    expr_t *speed_symbol = de_wave_fresh_symbol(de, residual, "c");
-    char *names[8] = {NULL};
-    const expr_t *symbols[8] = {space[0], space[1], space[2], time, f, g, speed_symbol, equ_lhs(solution)};
-    bool valid = speed_symbol != NULL;
-    for (size_t i = 0u; valid && i < 8u; ++i) {
-        names[i] = de_wave_coordinate_TeX(symbols[i]);
-        valid = names[i] != NULL;
-    }
-    char *speed_TeX = NULL, *speed_text = NULL;
-    string_t *condition_TeX = NULL, *condition_text = NULL;
-    valid = de_wave_speed_notation(speed_squared, speed, &speed_TeX, &speed_text,
-                                   &condition_TeX, &condition_text) && valid;
-    const char *tn = expr_symbol_name(time), *fn = expr_symbol_name(f), *gn = expr_symbol_name(g);
-    const char *cn = expr_symbol_name(speed_symbol);
-    valid = valid && speed_TeX && speed_text;
-    string_t *notation = valid ? string_sprintf(
-        "\\begin{aligned}[t]\n"
-        "&\\frac{\\partial}{\\partial %s}\\!\\left[%s\\,\\mathcal M_{%s\\,%s}%s(\\mathbf r)\\right]"
-        "+%s\\,\\mathcal M_{%s\\,%s}%s(\\mathbf r)"
-        "\\\\[0.6em]&\\mathbf r=(%s,%s,%s),\\quad %s=%s%S"
-        "\\\\[0.4em]&\\mathcal M_a:\\text{ spherical average at radius }|a|"
-        "\\\\&%s,%s:\\text{ arbitrary smooth spatial functions.}"
-        "\n\\end{aligned}",
-        names[3], names[3], names[6], names[3], names[4], names[3], names[6], names[3], names[5],
-        names[0], names[1], names[2], names[6], speed_TeX, condition_TeX, names[4], names[5]) : NULL;
-    string_t *unbound = valid ? string_sprintf(
-        "d/d%s[%s*M_(%s*%s) %s(r)] + %s*M_(%s*%s) %s(r)\n"
-        "r = (%s, %s, %s); %s = %s%S.\n"
-        "M_a H(r): average of H over the sphere centred at r, radius |a|.\n"
-        "%s, %s: arbitrary smooth spatial functions.",
-        tn, tn, cn, tn, fn, tn, cn, tn, gn,
-        expr_symbol_name(space[0]), expr_symbol_name(space[1]), expr_symbol_name(space[2]),
-        cn, speed_text, condition_text, fn, gn) : NULL;
-    valid = notation && unbound && equ_set_display_TeX(solution, NULL, notation) == 0 &&
-            equ_set_display_unbound(solution, NULL, unbound) == 0;
-    if (valid && include_steps) {
-        string_t *plain = string_sprintf(
-            "Kirchhoff's formula for the three-dimensional constant-speed wave equation.\n"
-            "Time coordinate: %s; spatial coordinates: (%s, %s, %s).\n"
-            "M_a H(r) = (1/(4*pi))*∫_{|omega|=1} H(r+a*omega) dOmega.\n"
-            "This is the spherical average of H, centred at r with radius |a|; M_0 H = H.\n"
-            "%s and %s are arbitrary initial field and initial time derivative; no initial data imposed.\n"
-            "Require finite non-zero constant coefficients and a real positive squared speed.\n"
-            "This is the general smooth whole-space family, with no boundary conditions imposed.\n"
-            "It is an exact integral representation, not a finite elementary closed form.\n",
-            tn, expr_symbol_name(space[0]), expr_symbol_name(space[1]), expr_symbol_name(space[2]), fn, gn);
-        string_t *TeX = string_sprintf(
-            "\\begin{aligned}&\\text{Kirchhoff's formula (three spatial dimensions)}"
-            "\\\\[0.6em]&\\mathcal M_a H(\\mathbf r)=\\frac{1}{4\\pi}"
-            "\\int_{|\\boldsymbol\\omega|=1}H(\\mathbf r+a\\boldsymbol\\omega)\\,d\\Omega"
-            "\\\\[0.5em]&\\text{Average over a sphere centred at }\\mathbf r\\text{, radius }|a|."
-            "\\\\&\\mathcal M_0 H=H"
-            "\\\\[0.5em]&%s(\\mathbf r,0)=%s(\\mathbf r),\\quad "
-            "\\frac{\\partial %s}{\\partial %s}(\\mathbf r,0)=%s(\\mathbf r)"
-            "\\\\&\\text{Both functions are arbitrary; no initial data imposed.}"
-            "\\\\[0.5em]&\\text{Assumes finite non-zero constant coefficients and real }%s>0."
-            "\\\\&\\text{Whole space; no boundary conditions. Exact integral representation.}\\end{aligned}",
-            names[7], names[4], names[7], names[3], names[5], names[6]);
-        valid = plain && TeX && de_solve_result_set_steps(result, string_c_str(plain)) == 0 &&
-                de_solve_result_set_steps_TeX(result, string_c_str(TeX)) == 0;
-        string_free(TeX);
-        string_free(plain);
-    }
-    string_free(unbound);
-    string_free(notation);
-    string_free(condition_text);
-    string_free(condition_TeX);
-    free(speed_text);
-    free(speed_TeX);
-    for (size_t i = 0u; i < 8u; ++i)
-        free(names[i]);
-    expr_free(speed_symbol);
-    return valid;
-}
 
 /* Recognise A*Delta(u)+B*u_tt=0 and construct its general whole-space Kirchhoff family. */
 diffequ_solve_result_t *de_pde_solve_wave(const diffequ_t *de, const expr_t *residual, bool include_steps)
@@ -535,90 +424,8 @@ static bool de_wave_initial_data(const diffequ_t *de, const expr_t *dependent, s
     return valid;
 }
 
-static bool de_wave_ivp_steps(diffequ_solve_result_t *result, const expr_t *space, const expr_t *time,
-                               const expr_t *initial_time, const expr_t *speed_squared, const expr_t *speed)
-{
-    char *x = de_wave_coordinate_TeX(space), *t = de_wave_coordinate_TeX(time);
-    char *t0 = expr_to_TeX_body_wrapped(initial_time, SIZE_MAX);
-    char *speed_TeX = NULL, *speed_text = NULL;
-    string_t *condition_TeX = NULL, *condition_text = NULL;
-    bool valid = de_wave_speed_notation(speed_squared, speed, &speed_TeX, &speed_text,
-                                         &condition_TeX, &condition_text) && x && t && t0;
-    string_t *plain = valid ? string_sprintf(
-        "d'Alembert's formula plus Duhamel's principle (one spatial dimension).\n"
-        "Space: %s; time: %s. Wave speed: %s%S.\n"
-        "The two supplied data are the displacement and time derivative on the same initial slice.\n"
-        "Translate the displacement in both directions and average.\n"
-        "Integrate the initial velocity between the two characteristic endpoints, with coefficient 1/(2*speed).\n"
-        "Integrate the normalised forcing over the past characteristic triangle with the same coefficient.\n"
-        "The forcing contribution and its first time derivative vanish on the initial slice.\n"
-        "Use verified elementary primitives where available; otherwise retain exact definite integrals.\n"
-        "Assumes sufficiently smooth data, finite constant coefficients, real positive squared speed,\n"
-        "and a real initial time. Whole spatial line; no boundary conditions imposed.",
-        expr_symbol_name(space), expr_symbol_name(time), speed_text, condition_text) : NULL;
-    string_t *TeX = valid ? string_sprintf(
-        "\\begin{aligned}&\\text{d'Alembert + Duhamel (one spatial dimension)}"
-        "\\\\[0.5em]&\\text{Space: }%s,\\quad\\text{time: }%s,\\quad\\text{initial time: }%s"
-        "\\\\&\\text{Wave speed: }%s%S"
-        "\\\\[0.5em]&\\text{Average the two translated initial displacements.}"
-        "\\\\&\\text{Add the initial-velocity integral between the characteristic endpoints.}"
-        "\\\\&\\text{Add the forcing integral over the past characteristic triangle.}"
-        "\\\\&\\text{Each integral has coefficient }1/(2\\,\\text{wave speed})."
-        "\\\\[0.5em]&\\text{The forcing term and its first time derivative initially vanish.}"
-        "\\\\&\\text{Verified elementary primitives, or exact definite integrals.}"
-        "\\\\&\\text{Assumes smooth data, real initial time and finite constant coefficients.}"
-        "\\\\&\\text{Whole spatial line; no boundary conditions imposed.}\\end{aligned}",
-        x, t, t0, speed_TeX, condition_TeX) : NULL;
-    valid = plain && TeX && de_solve_result_set_steps(result, string_c_str(plain)) == 0 &&
-            de_solve_result_set_steps_TeX(result, string_c_str(TeX)) == 0;
-    string_free(TeX);
-    string_free(plain);
-    string_free(condition_text);
-    string_free(condition_TeX);
-    free(speed_text);
-    free(speed_TeX);
-    free(t0);
-    free(t);
-    free(x);
-    return valid;
-}
-
 /* Keep the three computed contributions on one line, with coefficients beside rather than enclosing integrals. */
-static bool de_wave_ivp_notation(equation_t *solution, const expr_t *displacement,
-                                  const expr_t *velocity, const expr_t *source, const expr_t *twice_speed)
-{
-    expr_t *terms[3] = {expr_clone(displacement), expr_div(velocity, twice_speed), expr_div(source, twice_speed)};
-    string_t *TeX = string_new();
-    bool valid = TeX != NULL, first = true;
-    for (size_t i = 0u; valid && i < 3u; ++i) {
-        if (!terms[i]) {
-            valid = false;
-            break;
-        }
-        /* Zero data can still be represented as (0+0)/2 or 0/(2*c).
-           Test the reduced term, but retain the paired-endpoint notation for non-zero contributions. */
-        expr_t *reduced = expr_simplify(terms[i]);
-        if (!reduced) {
-            valid = false;
-            break;
-        }
-        bool zero = expr_is_exact_zero(reduced);
-        expr_free(reduced);
-        if (zero)
-            continue;
-        char *term = expr_to_TeX_body_wrapped(terms[i], SIZE_MAX);
-        valid = term && string_append_format(TeX, "%s%s", first ? "" : " + ", term) >= 0;
-        free(term);
-        first = false;
-    }
-    if (valid && first)
-        valid = string_append_cstr(TeX, "0") >= 0;
-    valid = valid && equ_set_display_TeX(solution, NULL, TeX) == 0;
-    string_free(TeX);
-    for (size_t i = 0u; i < 3u; ++i)
-        expr_free(terms[i]);
-    return valid;
-}
+
 
 /* Solve A*u_tt+B*u_xx=R with both Cauchy data, allowing a translated initial time and exact forcing integrals. */
 diffequ_solve_result_t *de_pde_solve_wave_ivp(const diffequ_t *de, const expr_t *residual, bool include_steps)

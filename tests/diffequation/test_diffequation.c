@@ -488,6 +488,26 @@ static void test_diffequ_parses_ode_shorthand(void)
 
     free(text);
     de_free(de);
+
+    de = de_from_string("{ y'' + 3y' + 40y | y'(0) = 1, y(0) = 0 }");
+    WANT_POINTER("condition-only braced residual", de, true);
+    if (!de)
+        return;
+    WANT_LONG("condition-only braced count", (long)de_condition_count(de), 2L);
+    string_t *source = de_to_text(de, style_EXPRESSION);
+    diffequ_t *copy = source ? de_from_text(source) : NULL;
+    WANT_POINTER("braced residual canonical round trip", copy, true);
+    string_t *rendered = de_problem_to_TeX(de);
+    string_t *copied = copy ? de_problem_to_TeX(copy) : NULL;
+    WANT_POINTER("complete problem TeX", rendered, true);
+    WANT_POINTER("round trip problem TeX", copied, true);
+    if (rendered && copied)
+        WANT_TEXT("condition notation survives round trip", string_c_str(copied), string_c_str(rendered));
+    string_free(copied);
+    string_free(rendered);
+    de_free(copy);
+    string_free(source);
+    de_free(de);
 }
 
 static void test_diffequ_parses_greek_differential_forms(void)
@@ -882,6 +902,32 @@ static void test_diffequ_rejects_noncanonical_text(void)
     WANT_POINTER("explicit form missing a section", missing_section, false);
     de_free(missing_section);
     de_free(missing_derivative);
+}
+
+static void test_diffequ_notation_rule_families(void)
+{
+    static const struct { const char *source; de_solver_t solver; } cases[] = {
+        {"Dx(y) = x*y; y(0) = 1",          DE_SOLVER_SEPARABLE},
+        {"Dx(y) + y = x; y(0) = 0",       DE_SOLVER_LINEAR},
+        {"Dx(y) = y/x + x/y; y(1) = 1",   DE_SOLVER_HOMOGENEOUS},
+        {"Dx(y) = (x + y)^2; y(0) = 1",   DE_SOLVER_LINEAR_SUBSTITUTION},
+        {"Dx(y) + y = x*y^2; y(0) = 1",   DE_SOLVER_BERNOULLI},
+        {"(y')^2 = y' + 2y",              DE_SOLVER_DERIVATIVE_QUADRATIC},
+        {"Dxx(y) = y; y(0) = 1; y'(0) = 1", DE_SOLVER_STURM_LIOUVILLE},
+        {"(sin(theta)-2r cos^2(theta))dr + r cos(theta)(2r sin(theta)+1)dtheta = 0",
+                                                   DE_SOLVER_EXACT_FIRST_ORDER}
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        diffequ_t *problem = de_from_string(cases[i].source);
+        diffequ_solve_result_t *result = problem ? de_solve_with_options(problem, DE_SOLVE_OPTION_STEPS) : NULL;
+        const char *notation = result ? de_solve_result_steps_TeX(result) : NULL;
+        bool valid = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+                     de_solve_result_solver(result) == cases[i].solver && notation &&
+                     strstr(notation, "Reduction:") && strstr(notation, "Solution");
+        de_solve_result_free(result);
+        de_free(problem);
+        TEST_ASSERT_TRUE(valid, cases[i].source);
+    }
 }
 
 static void test_diffequ_solves_separable_initial_value_problem(void)
@@ -1706,7 +1752,7 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
                        strstr(de_solve_result_steps(result), "d²Y/dX² = 0"), true);
     if (de_solve_result_steps_TeX(result)) {
         WANT_POINTER("modified-Emden TeX uses the dependent symbol directly",
-                       strstr(de_solve_result_steps_TeX(result), "y=\\frac{1}{u}u'"), true);
+                       strstr(de_solve_result_steps_TeX(result), "y = \\frac{1}{u}\\mkern-2mu u'"), true);
         WANT_POINTER("modified-Emden TeX omits binding wrappers",
                        strstr(de_solve_result_steps_TeX(result), "\\middle|"), false);
         WANT_POINTER("modified-Emden TeX omits unbound sentinel values",
@@ -1714,7 +1760,7 @@ static void test_diffequ_linearizes_modified_emden_problem(void)
         WANT_POINTER("modified-Emden TeX keeps derivatives outside algebraic fractions",
                        strstr(de_solve_result_steps_TeX(result), "\\frac{u'"), false);
         WANT_POINTER("modified-Emden TeX explains the auxiliary polynomial",
-                       strstr(de_solve_result_steps_TeX(result), "u=Ax^2+Bx+C"), true);
+                       strstr(de_solve_result_steps_TeX(result), "u = A\\mkern-2mu x^{2} + B\\mkern-2mu x + C"), true);
         WANT_POINTER("modified-Emden TeX omits redundant unit coefficients",
                        strstr(de_solve_result_steps_TeX(result), "3(1)"), false);
     }
@@ -1851,6 +1897,8 @@ static void test_diffequ_rejects_quartic_emden_point_linearization(void)
         WANT_POINTER("actual coefficient algorithm is identified", strstr(explanations[i], "matching powers"), true);
         WANT_POINTER("remainder is explained", strstr(explanations[i], "omitted higher powers"), true);
     }
+    ASSERT_TRUE(strstr(explanations[1], "\\sum_") && strstr(explanations[1], "n!") &&
+                !strstr(explanations[1], "\\frac{y"));
 
     de_solve_result_free(result);
     de_free(de);
@@ -2135,6 +2183,9 @@ static void test_diffequ_stationary_eigenfunction_uses_general_rule(void)
                 (long)DE_SOLVER_STATIONARY_EIGENFUNCTION);
     WANT_TEXT("stationary rule solution", text ? string_c_str(text) : NULL, "u = exp(2·(2t + x))");
     WANT_POINTER("stationary rule derived rate", strstr(de_solve_result_steps(result), "λ ="), true);
+    const char *notation = de_solve_result_steps_TeX(result);
+    ASSERT_TRUE(notation && strstr(notation, "\\lambda") && strstr(notation, "\\partial") &&
+                strstr(notation, "\\frac{") && strstr(notation, "e^{"));
 
     string_free(text);
     de_solve_result_free(result);
@@ -2317,7 +2368,7 @@ static void test_diffequ_normalizes_variable_coefficient_sturm_liouville(void)
     if (!de)
         return;
 
-    result = de_solve(de);
+    result = de_solve_with_options(de, DE_SOLVE_OPTION_STEPS);
     WANT_POINTER("variable-coefficient solve result", result, true);
     if (result) {
         WANT_LONG("variable-coefficient solve status", (long)de_solve_result_status(result),
@@ -2325,6 +2376,8 @@ static void test_diffequ_normalizes_variable_coefficient_sturm_liouville(void)
         WANT_LONG("variable-coefficient solution count", (long)de_solve_result_count(result), 0L);
         WANT_POINTER("variable-coefficient Lie diagnostic",
                       strstr(de_solve_result_diagnostic(result), "computed Lie–Tressé invariants"), true);
+        const char *notation = de_solve_result_steps_TeX(result);
+        WANT_POINTER("Lie invariant notation", notation ? strstr(notation, "I_{1}") : NULL, true);
     }
 
     de_solve_result_free(result);
@@ -2937,6 +2990,13 @@ static bool test_diffequ_want_pde_solution(const char *source, const char *want,
 
 static void test_diffequ_solves_second_order_pde_distinct_roots(void)
 {
+    diffequ_t *problem = de_from_string("z_xx - 3z_xy + 2z_yy = 0");
+    diffequ_solve_result_t *derivation = problem ? de_solve_with_options(problem, DE_SOLVE_OPTION_STEPS) : NULL;
+    const char *notation = derivation ? de_solve_result_steps_TeX(derivation) : NULL;
+    ASSERT_TRUE(notation && strstr(notation, "Characteristic polynomial") && strstr(notation, "m^{2}") &&
+                strstr(notation, "Particular solution") && strstr(notation, "Solution:"));
+    de_solve_result_free(derivation);
+    de_free(problem);
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 3z_yx + 2z_yy = 0", "z = F(x + y) + G(2x + y)");
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - 3z_xy + 2z_yy = 0", "z = F(x + y) + G(2x + y)");
     WANT_SECOND_ORDER_PDE_SOLUTION("z_xx - z_xy - 2z_yx + 2z_yy = 0", "z = F(x + y) + G(2x + y)");
@@ -3336,7 +3396,8 @@ static void test_diffequ_wave_ivp_integral_data(void)
     WANT_LONG("exact bounded-integral solution", de_solve_result_solver(result), DE_SOLVER_DALEMBERT_DUHAMEL);
     const equation_t *solution = de_solve_result_at(result, 0u);
     char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
-    ASSERT_TRUE(TeX && strstr(TeX, "\\int_{0}^{t}") && strstr(TeX, "d\\xi\\, ds"));
+        ASSERT_TRUE(TeX && strstr(TeX, "\\int_{0}^{t}") && strstr(TeX, "d\\xi") &&
+                    strstr(TeX, "ds") && !strstr(TeX, "+ -"));
     ASSERT_TRUE(!strstr(TeX, "\\frac{\\int") && !strstr(TeX, "NAN"));
     ASSERT_TRUE(de_solve_result_steps(result) == NULL);
     printf("  %s\n", TeX);
@@ -3482,18 +3543,19 @@ static void test_diffequ_wave_kirchhoff_family(void)
         ASSERT_TRUE(expanded_text && strcmp(string_c_str(expanded_text), string_c_str(text)) == 0);
         string_free(expanded_text);
         equ_free(expanded);
-        ASSERT_TRUE(TeX && strstr(TeX, "\\mathcal M_") && !strstr(TeX, "NAN"));
+        ASSERT_TRUE(TeX && strstr(TeX, "\\mathcal{M}_") && !strstr(TeX, "NAN"));
         ASSERT_TRUE(strstr(TeX, "arbitrary smooth spatial functions") && !strstr(TeX, "\\int"));
         if (i == 0u || i >= 6u) {
             const char *parameter = i == 7u ? "k" : "v";
             char condition[64], absolute[16];
-            snprintf(condition, sizeof(condition), "%s\\in\\mathbb R,\\quad %s\\ne0", parameter, parameter);
+            snprintf(condition, sizeof(condition), "%s\\in \\mathbb{R}\\quad %s \\ne 0", parameter, parameter);
             snprintf(absolute, sizeof(absolute), "|%s|", parameter);
             ASSERT_TRUE(strstr(TeX, condition) && !strstr(TeX, "\\sqrt"));
             ASSERT_TRUE(strstr(string_c_str(text), absolute));
             ASSERT_TRUE(strstr(string_c_str(text), "real and non-zero (either sign)"));
         }
-        ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), "\\int_{|\\boldsymbol\\omega|=1}"));
+        ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result),
+                           "\\int_{\\left| \\boldsymbol{\\omega} \\right| = 1}"));
         ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), "no initial data imposed"));
         ASSERT_TRUE(strstr(de_solve_result_steps(result), "general smooth whole-space family"));
         ASSERT_TRUE(strstr(de_solve_result_steps(result), "real positive squared speed"));
@@ -3723,8 +3785,9 @@ static void test_diffequ_radial_euler_pde(void)
         ASSERT_TRUE(strstr(TeX, " = 0") && strcmp(strstr(TeX, " = 0"), " = 0") == 0);
         ASSERT_TRUE(strstr(de_solve_result_steps(result), "radial scaling"));
         ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), "Local chart"));
+        ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), "\\partial^{2} z"));
         ASSERT_TRUE(!strstr(de_solve_result_steps_TeX(result), "NAN"));
-        ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), i == 2u ? "s>0" : "x>0"));
+        ASSERT_TRUE(strstr(de_solve_result_steps_TeX(result), i == 2u ? "s > 0" : "x > 0"));
 
         /* Exercise both arbitrary functions using 1+eta² and eta³-eta. */
         const expr_t *x = de_independent_at(de, 0u), *y = de_independent_at(de, 1u);
@@ -4055,6 +4118,20 @@ static void test_diffequ_second_order_pde_solutions_satisfy_operator(void)
 
 static void test_diffequ_solves_two_dimensional_laplace_equation(void)
 {
+    diffequ_t *polar = de_from_string("phi_rr + phi_r/r + phi_thetatheta/r^2 = 0");
+    diffequ_solve_result_t *proof = polar ? de_solve_with_options(polar, DE_SOLVE_OPTION_STEPS) : NULL;
+    const char *notation = proof ? de_solve_result_steps_TeX(proof) : NULL;
+    ASSERT_TRUE(notation && strstr(notation, "\\partial^{2} u") && strstr(notation, "F''") &&
+                strstr(notation, "\\Delta") && strstr(notation, " = 0"));
+    de_solve_result_free(proof);
+    de_free(polar);
+    diffequ_t *cartesian = de_from_string("phi_xx + phi_yy = 0");
+    diffequ_solve_result_t *cartesian_proof = cartesian ? de_solve_with_options(cartesian, DE_SOLVE_OPTION_STEPS) : NULL;
+    const char *cartesian_notation = cartesian_proof ? de_solve_result_steps_TeX(cartesian_proof) : NULL;
+    ASSERT_TRUE(cartesian_notation && strstr(cartesian_notation, "\\partial^{2}") &&
+                strstr(cartesian_notation, "\\Delta") && strstr(cartesian_notation, " = 0"));
+    de_solve_result_free(cartesian_proof);
+    de_free(cartesian);
     WANT_LAPLACE_SOLUTION("phi_xx + phi_yy = 0", "φ = F(x + i·y) + G(x - i·y)");
     WANT_LAPLACE_SOLUTION("3*phi_xx + 3*phi_yy = 0", "φ = F(x + i·y) + G(x - i·y)");
     WANT_LAPLACE_SOLUTION("u_ss + u_tt = 0", "u = F(s + i·t) + G(s - i·t)");
@@ -4609,6 +4686,9 @@ static void test_diffequ_solves_parameter_linear_pde(void)
                        strstr(de_solve_result_steps(result), "μz = ½x·exp(y²)·(y² - 1) + F(x)"), true);
     }
     WANT_POINTER("parameter-linear PDE TeX derivation", result ? de_solve_result_steps_TeX(result) : NULL, true);
+    const char *derivation = result ? de_solve_result_steps_TeX(result) : NULL;
+    ASSERT_TRUE(derivation && strstr(derivation, "\\int") && strstr(derivation, "\\partial") &&
+                strstr(derivation, "\\mu") && strstr(derivation, "F\\left("));
 
     free(tex);
     free(problem);
@@ -4938,7 +5018,7 @@ static void example_diffequation_wave_kirchhoff(void)
     diffequ_t *de = de_from_string(source);
     char *problem_TeX = de ? de_to_string(de, style_LATEX) : NULL;
     ASSERT_TRUE(problem_TeX && strstr(problem_TeX,
-        "\\frac{1}{v^{2}}\\mkern-2mu \\frac{\\partial^{2} \\psi}{\\partial t^{2}}"));
+        "\\frac{1}{v^{2}}\\,\\frac{\\partial^{2} \\psi}{\\partial t^{2}}"));
     printf("  %s\n", problem_TeX ? problem_TeX : "NULL");
     free(problem_TeX);
     diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
@@ -4946,10 +5026,11 @@ static void example_diffequation_wave_kirchhoff(void)
     WANT_LONG("wave solver", de_solve_result_solver(result), DE_SOLVER_KIRCHHOFF);
     const equation_t *solution = de_solve_result_at(result, 0u);
     char *TeX = solution ? equ_to_TeX_body_wrapped(solution, SIZE_MAX) : NULL;
-    ASSERT_TRUE(TeX && strstr(TeX, "\\mathcal M_") && strstr(TeX, "arbitrary smooth spatial functions"));
-    ASSERT_TRUE(strstr(TeX, "F(\\mathbf r)") && strstr(TeX, "G(\\mathbf r)"));
-    ASSERT_TRUE(strstr(TeX, "v\\in\\mathbb R,\\quad v\\ne0") && !strstr(TeX, "\\sqrt"));
-    ASSERT_TRUE(strstr(TeX, "\\mathbf r=(x,y,z)"));
+    ASSERT_TRUE(TeX && strstr(TeX, "\\mathcal{M}_") && strstr(TeX, "arbitrary smooth spatial functions"));
+    ASSERT_TRUE(strstr(TeX, "F\\left(\\boldsymbol{r}\\right)") &&
+                strstr(TeX, "G\\left(\\boldsymbol{r}\\right)"));
+    ASSERT_TRUE(strstr(TeX, "v\\in \\mathbb{R}\\quad v \\ne 0") && !strstr(TeX, "\\sqrt"));
+    ASSERT_TRUE(strstr(TeX, "\\boldsymbol{r} = \\left( x,\\;y,\\;z \\right)"));
     printf("  %s\n  %s\n", source, TeX);
     free(TeX);
     de_solve_result_free(result);
@@ -5062,6 +5143,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_parses_subscript_partial_derivatives);
     RUN_TEST_CASE(test_diffequ_compact_parameter_derivatives);
     RUN_TEST_CASE(test_diffequ_rejects_noncanonical_text);
+    RUN_TEST_CASE(test_diffequ_notation_rule_families);
     RUN_TEST_CASE(test_diffequ_solves_separable_initial_value_problem);
     RUN_TEST_CASE(test_diffequ_solves_linear_initial_value_problem);
     RUN_TEST_CASE(test_diffequ_solves_quadratic_separable_problem);

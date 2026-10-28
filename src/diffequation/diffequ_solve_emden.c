@@ -16,7 +16,7 @@
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 
-static char *de_emden_symbolic_text(const expr_t *expression)
+char *de_emden_symbolic_text(const expr_t *expression)
 {
     const char *name = expr_symbol_name(expression);
     expr_t *symbol = name && (expr_is_variable(expression) || expr_is_named_const(expression))
@@ -27,110 +27,6 @@ static char *de_emden_symbolic_text(const expr_t *expression)
 }
 
 /* Describe the native logarithmic-derivative substitution without browser rewriting. */
-bool de_modified_emden_steps(const expr_t *independent, const expr_t *dependent, const expr_t *scale,
-                                    char **steps_out, char **steps_TeX_out)
-{
-    const char *x_name = expr_symbol_name(independent);
-    char *x = x_name ? strdup(x_name) : NULL;
-    char *y = de_emden_symbolic_text(dependent);
-    char *a = de_emden_symbolic_text(scale);
-    char *x_TeX = x_name ? strdup(x_name) : NULL;
-    char *y_TeX = expr_to_TeX_body(dependent);
-    char *a_TeX = expr_to_TeX_body(scale);
-    char *ay = NULL;
-    char *au = NULL;
-    char *ay_den = NULL;
-    char *au_den = NULL;
-    char *ay_TeX = NULL;
-    char *au_TeX = NULL;
-    string_t *steps = string_new();
-    string_t *steps_TeX = string_new();
-    if (a && strcmp(a, "1") == 0) {
-        ay = y ? strdup(y) : NULL;
-        au = strdup("u");
-        ay_TeX = y_TeX ? strdup(y_TeX) : NULL;
-        au_TeX = strdup("u");
-        ay_den = y ? strdup(y) : NULL;
-        au_den = strdup("u");
-    } else {
-        int ay_length = a && y ? asprintf(&ay, "%s%s", a, y) : -1;
-        int au_length = a ? asprintf(&au, "%su", a) : -1;
-        int ay_TeX_length = a_TeX && y_TeX ? asprintf(&ay_TeX, "%s%s", a_TeX, y_TeX) : -1;
-        int au_TeX_length = a_TeX ? asprintf(&au_TeX, "%su", a_TeX) : -1;
-
-        if (ay_length < 0 || au_length < 0 || ay_TeX_length < 0 || au_TeX_length < 0) {
-            free(ay);
-            free(au);
-            free(ay_TeX);
-            free(au_TeX);
-            ay = NULL;
-            au = NULL;
-            ay_TeX = NULL;
-            au_TeX = NULL;
-        }
-        if (ay && au) {
-            if (asprintf(&ay_den, "(%s)", ay) < 0)
-                ay_den = NULL;
-            if (asprintf(&au_den, "(%s)", au) < 0)
-                au_den = NULL;
-        }
-    }
-    bool success =
-        x && y && a && x_TeX && y_TeX && a_TeX && ay && au && ay_den && au_den && ay_TeX && au_TeX && steps &&
-        steps_TeX &&
-        string_append_format(steps,
-                             "Modified Emden linearisation\n"
-                             "Set %s = (1/%s)u′, with u non-zero. Then\n"
-                             "      (1/%s)u‴ = 0, hence u‴ = 0.\n"
-                             "Thus u = A%s² + B%s + C; a common non-zero factor cancels from %s.\n"
-                             "Equivalently, the point transformation is\n"
-                             "      X = %s − 1/%s\n"
-                             "      Y = %s/%s − %s²/2\n"
-                             "and d²Y/dX² = 0.",
-                             y, au_den, au_den, x, x, y,
-                             x, ay_den, x, ay_den, x) >= 0 &&
-        string_append_format(steps_TeX,
-                             "\\begin{aligned}[t]"
-                             "&\\text{Modified Emden linearisation}\\\\"
-                             "\\text{Set}\\quad&%s=\\frac{1}{%s}u',\\qquad u\\ne0\\\\"
-                             "&\\frac{1}{%s}u'''=0\\quad\\Longrightarrow\\quad u'''=0\\\\"
-                             "&u=A%s^2+B%s+C\\\\"
-                             "\\text{Point transformation:}\\quad&"
-                             "X=%s-\\frac{1}{%s}\\\\"
-                             "&Y=\\frac{%s}{%s}-\\frac{%s^2}{2}\\\\"
-                             "&\\frac{d^2Y}{dX^2}=0"
-                             "\\end{aligned}",
-                             y_TeX, au_TeX,
-                             au_TeX, x_TeX, x_TeX, x_TeX, ay_TeX, x_TeX, ay_TeX, x_TeX) >= 0;
-
-    if (success) {
-        *steps_out = strdup(string_c_str(steps));
-        *steps_TeX_out = strdup(string_c_str(steps_TeX));
-        success = *steps_out && *steps_TeX_out;
-    }
-    if (!success) {
-        free(*steps_out);
-        free(*steps_TeX_out);
-        *steps_out = NULL;
-        *steps_TeX_out = NULL;
-    }
-    string_free(steps_TeX);
-    string_free(steps);
-    free(au_TeX);
-    free(ay_TeX);
-    free(au_den);
-    free(ay_den);
-    free(au);
-    free(ay);
-    free(a_TeX);
-    free(y_TeX);
-    free(x_TeX);
-    free(a);
-    free(y);
-    free(x);
-    return success;
-}
-
 
 /*
  * The modified Emden equation

@@ -24,6 +24,21 @@
 #include "equation-t.h"
 #include "number-t.h"
 
+#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
+#include "internal/expr_notation_internal.h"
+
+/** @brief Create an owned equation notation snapshot, released with TeX_context_free. */
+TeX_context_t *equ_TeX_context(const equation_t *value);
+
+/** @brief Render a borrowed native operand with a caller-owned parser context. */
+typedef TeX_t *(*notation_read_fn)(void *context, const string_t *text);
+
+/** @brief Parse an equation and delegate its sides through the supplied reader. */
+TeX_t *equ_notation_input(const string_t *text, notation_read_fn read, void *context, bool *recognised);
+
+/** @brief Snapshot both equation sides in a borrowed builder. */
+const TeX_model_node_t *notation_build_equation(notation_build_t *build, const equation_t *value);
+
 /* Binding probe for differential equations: undeclared calls are symbolic functions, not scalar products. */
 equation_t *equ_from_differential_text_internal(const string_t *text);
 /* Shared construction and operator-polynomial recognition for the differential-equation parser. */

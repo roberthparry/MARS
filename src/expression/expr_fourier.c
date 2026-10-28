@@ -824,10 +824,10 @@ static expr_t *fourier_simplify(const expr_t *expr, expr_t *a, expr_t *b)
 const expr_ops_t ops_fourier = {
     .eval = fourier_eval, .deriv = expr_transform_deriv, .reverse = expr_reverse_not_differentiable,
     .kind = EXPR_KIND_FOURIER, .arity = EXPR_OP_BINARY, .expression_name = "ℱ", .function_name = "fourier",
-    .TeX_name = "\\mathcal{F}", .simplify = fourier_simplify,
+    .simplify = fourier_simplify,
 };
 const expr_ops_t ops_inverse_fourier = {
     .eval = fourier_eval, .deriv = expr_transform_deriv, .reverse = expr_reverse_not_differentiable,
     .kind = EXPR_KIND_INVERSE_FOURIER, .arity = EXPR_OP_BINARY, .expression_name = "ℱ⁻¹", .function_name = "inversefourier",
-    .TeX_name = "\\mathcal{F}^{-1}", .simplify = fourier_simplify,
+    .simplify = fourier_simplify,
 };

@@ -102,7 +102,7 @@ static void test_laplace_time_translation_history(void)
     result = lab_math_laplace_time_fields("@L{16t^2u(t-1/4)}");
     lab_math_laplace_time_contains(result, "function", "16.derivative(", true);
     lab_math_laplace_time_contains(result, "function", ", s, 2)", true);
-    lab_math_laplace_time_contains(result, "tex", "\\frac{d^{2}}{d s^{2}}\\left[", true);
+    lab_math_laplace_time_contains(result, "tex", "\\frac{\\mathrm{d}^{2}}{\\mathrm{d} s^{2}}\\left[", true);
     lab_math_laplace_time_contains(result, "function", ", -1/4, 0)", true);
     lab_math_laplace_time_same("@L{16*(t^2*u(t-1/4))}", "@L{16t^2u(t-1/4)}", "tex");
     lab_math_laplace_time_same("@L{u(t-1/4)*(16*t^2)}", "@L{16t^2u(t-1/4)}", "tex");
@@ -140,8 +140,8 @@ static void test_laplace_time_translation_domains(void)
     result = lab_math_laplace_time_fields("@L{t^3*u(t-1)}");
     lab_math_laplace_time_contains(result, "function", "-derivative(", true);
     lab_math_laplace_time_contains(result, "function", ", s, 3)", true);
-    lab_math_laplace_time_contains(result, "tex", "\\frac{d^{3}}{d s^{3}}", true);
-    lab_math_laplace_time_contains(lab_math_laplace_time_fields("@L{t^64*u(t-1)}"), "tex", "\\frac{d^{64}}{d s^{64}}", true);
+    lab_math_laplace_time_contains(result, "tex", "\\frac{\\mathrm{d}^{3}}{\\mathrm{d} s^{3}}", true);
+    lab_math_laplace_time_contains(lab_math_laplace_time_fields("@L{t^64*u(t-1)}"), "tex", "\\frac{\\mathrm{d}^{64}}{\\mathrm{d} s^{64}}", true);
     lab_math_laplace_time_contains(lab_math_laplace_time_fields("@L{t^65*u(t-1)}"), "function", "integral(", false);
     result = lab_math_laplace_time_fields("{@L{t^2*u(t-a)} | s=3; a=1/4}");
     lab_math_laplace_time_contains(result, "function", "derivative(", true);

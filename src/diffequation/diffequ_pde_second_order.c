@@ -19,6 +19,9 @@
 #include "diffequ_pde_internal.h"
 
 /* Index xx, xy, yx, yy directly, with optional separate slots for the first derivatives x and y. */
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static bool de_pde_second_order_derivatives(const expr_t *expr, const expr_t *x, const expr_t *y,
                                            const expr_t **dependent, const expr_t **derivatives,
                                            const expr_t **first_derivatives)
@@ -121,60 +124,6 @@ static bool de_pde_euler_coefficient(const expr_t *coefficient, const expr_t *we
     expr_t *ratio = expr_div_simplify_owned(expr_clone(coefficient), expr_clone(weight));
     bool valid = ratio && expr_match_const_value(ratio, value) && num_is_real(*value) && num_is_finite(*value);
     expr_free(ratio);
-    return valid;
-}
-
-static bool de_pde_euler_steps(const diffequ_t *de, diffequ_solve_result_t *result, const number_t *parameters)
-{
-    /* Coordinates are bound problem symbols; render fresh unbound names, not their unset values. */
-    expr_t *x_symbol = expr_new_named_var(NUM_NAN, expr_symbol_name(de->independent_vars[0]));
-    expr_t *y_symbol = expr_new_named_var(NUM_NAN, expr_symbol_name(de->independent_vars[1]));
-    char *x = x_symbol ? expr_to_TeX_body(x_symbol) : NULL;
-    char *y = y_symbol ? expr_to_TeX_body(y_symbol) : NULL;
-    expr_free(y_symbol);
-    expr_free(x_symbol);
-    char *values[3] = {NULL, NULL, NULL};
-    char *values_TeX[3] = {NULL, NULL, NULL};
-    bool valid = x && y;
-    for (size_t i = 0u; i < 3u; ++i) {
-        expr_t *value = expr_new_const(parameters[i]);
-        values[i] = value ? expr_to_string(value, style_UNBOUND) : NULL;
-        values_TeX[i] = value ? expr_to_TeX_body(value) : NULL;
-        valid = valid && values[i] && values_TeX[i];
-        expr_free(value);
-    }
-    string_t *steps = valid ? string_sprintf(
-        "Radial Euler equation with A=%s, B=%s, C=%s.\n"
-        "In generic coordinates, E=x*partial_x+y*partial_y differentiates along radial scaling.\n"
-        "x*x*z_xx+2*x*y*z_xy+y*y*z_yy=(E*E-E)z.\n"
-        "On the positive first-coordinate chart, set r=ln(x), eta=y/x; then E=partial_r.\n"
-        "The equation becomes A*z_rr+(B-A)*z_r+C*z=0 at each fixed eta.\n"
-        "Solve A*m*(m-1)+B*m+C=0 using the native equation solver.\n"
-        "Distinct roots give x^m1*F(eta)+x^m2*G(eta); a repeated root gives x^m*(F(eta)+ln(x)*G(eta)).\n"
-        "F and G are arbitrary twice-differentiable functions (complex-valued if needed).\n"
-        "This local chart requires the first coordinate > 0; no boundary data are imposed.\n",
-        values[0], values[1], values[2]) : NULL;
-    string_t *TeX = valid ? string_sprintf(
-        "\\begin{aligned}&\\text{Radial Euler equation: }A=%s,\\ B=%s,\\ C=%s"
-        "\\\\&E=%s\\partial_{%s}+%s\\partial_{%s}\\quad\\text{(differentiation along radial scaling)}"
-        "\\\\&\\text{The second-order radial operator is }E^2-E."
-        "\\\\&r=\\ln(%s),\\quad\\eta=\\frac{%s}{%s},\\quad E=\\partial_r"
-        "\\\\&A z_{rr}+(B-A)z_r+Cz=0\\quad\\text{at fixed }\\eta"
-        "\\\\&A m(m-1)+Bm+C=0\\quad\\text{determines the powers.}"
-        "\\\\&\\text{A repeated root introduces a logarithmic second solution.}"
-        "\\\\&\\text{The two coefficients are arbitrary functions of }\\eta\\text{.}"
-        "\\\\&\\text{Local chart: }%s>0\\text{; no boundary data imposed.}\\end{aligned}",
-        values_TeX[0], values_TeX[1], values_TeX[2], x, x, y, y, x, y, x, x) : NULL;
-    valid = steps && TeX && de_solve_result_set_steps(result, string_c_str(steps)) == 0 &&
-            de_solve_result_set_steps_TeX(result, string_c_str(TeX)) == 0;
-    string_free(TeX);
-    string_free(steps);
-    for (size_t i = 0u; i < 3u; ++i) {
-        free(values_TeX[i]);
-        free(values[i]);
-    }
-    free(y);
-    free(x);
     return valid;
 }
 
@@ -621,66 +570,6 @@ static expr_t *de_pde_second_order_particular(const expr_t *forcing, const expr_
         expr_free(candidate);
     }
     return particular ? particular : de_pde_second_order_phase_particular(forcing, forcing, x, y, coefficients);
-}
-
-static bool de_pde_second_order_steps(const diffequ_t *de, diffequ_solve_result_t *result,
-                                      const expr_t *particular)
-{
-    const equation_t *solution = de_solve_result_at(result, 0u);
-    char *problem = de_to_string(de, style_UNBOUND);
-    char *problem_TeX = de_to_string(de, style_LATEX);
-    string_t *solution_text = equ_to_text(solution, style_UNBOUND);
-    char *left_TeX = solution ? expr_to_TeX_body(equ_lhs(solution)) : NULL;
-    char *right_TeX = solution ? expr_to_TeX_body(equ_rhs(solution)) : NULL;
-    char *particular_text = particular ? expr_to_string(particular, style_UNBOUND) : NULL;
-    char *particular_TeX = particular ? expr_to_TeX_body(particular) : NULL;
-    string_t *steps = NULL;
-    string_t *steps_TeX = NULL;
-    bool success = false;
-
-    if (!problem || !problem_TeX || !solution_text || !left_TeX || !right_TeX || !particular_text || !particular_TeX)
-        goto cleanup;
-    steps = string_sprintf("Factor the homogeneous second-order constant-coefficient operator.\n"
-                           "Parsed equation: %s\n"
-                           "For A*u_xx + B*u_xy + C*u_yy = 0, solve A*m^2 + B*m + C = 0.\n"
-                           "Distinct roots give u_h = F(m1*x+y) + G(m2*x+y).\n"
-                           "A repeated root gives u_h = F(m*x+y) + x*G(m*x+y).\n"
-                           "Exchange coordinates if A = 0; for u_xy = 0 use F(x) + G(y).\n"
-                           "The roots are obtained by the native equation solver.\n"
-                           "For forcing f, seek u_p = q*f/k with q in {1,x,y,x*x,x*y,y*y} and L(q*f) = k*f.\n"
-                           "Otherwise, for f = f(s), s = a*x+b*y+c, reduce to (A*a*a+B*a*b+C*b*b)*H'' = f.\n"
-                           "At resonance use a coordinate multiplier and one integration, or a quadratic multiplier.\n"
-                           "Verify antiderivatives and retain exact integral nodes when no closed form is available.\n"
-                           "Apply superposition to sums and verify L(u_p) = f symbolically.\n"
-                           "Particular solution: u_p = %s\nSolution: %s",
-                           problem, particular_text, string_c_str(solution_text));
-    steps_TeX = string_sprintf("\\begin{aligned}[t]"
-                               "\\text{Equation:}\\quad&%s\\\\"
-                               "\\text{Characteristic polynomial:}\\quad&A m^2+B m+C=0\\\\"
-                               "\\text{Distinct roots:}\\quad&u_h=F(m_1x+y)+G(m_2x+y)\\\\"
-                               "\\text{Repeated root:}\\quad&u_h=F(mx+y)+xG(mx+y)\\\\"
-                               "\\text{If }A=0:\\quad&\\text{exchange coordinates;}\\\\"
-                               "A=C=0:\\quad&u_h=F(x)+G(y)\\\\"
-                               "\\text{Single-phase reduction:}\\quad&s=ax+by+c\\\\"
-                               "\\kappa\\ne0:\\quad&\\kappa H''(s)=f(s),\\quad\\kappa=Aa^2+Bab+Cb^2\\\\"
-                               "\\text{Particular solution:}\\quad&u_p=%s\\\\"
-                               "\\text{Verified:}\\quad&L(u_p)=f\\\\"
-                               "\\text{Solution:}\\quad&%s=%s\\end{aligned}",
-                               problem_TeX, particular_TeX, left_TeX, right_TeX);
-    success = steps && steps_TeX && de_solve_result_set_steps(result, string_c_str(steps)) == 0 &&
-              de_solve_result_set_steps_TeX(result, string_c_str(steps_TeX)) == 0;
-
-cleanup:
-    string_free(steps_TeX);
-    string_free(steps);
-    free(right_TeX);
-    free(left_TeX);
-    free(particular_TeX);
-    free(particular_text);
-    string_free(solution_text);
-    free(problem_TeX);
-    free(problem);
-    return success;
 }
 
 /* Combine characteristic families with a verified particular solution for a constant-coefficient PDE. */

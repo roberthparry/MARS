@@ -77,7 +77,9 @@ static void test_diffequ_wave_ivp_case(const char *source, const char *expected_
         expr_free(lhs);
     }
     ASSERT_TRUE(strstr(de_solve_result_steps(result), "Duhamel"));
-    ASSERT_TRUE(!strstr(de_solve_result_steps_TeX(result), "NAN"));
+    const char *notation = de_solve_result_steps_TeX(result);
+    ASSERT_TRUE(notation && !strstr(notation, "NAN") && strstr(notation, "Wave speed") &&
+                strstr(notation, "\\frac{1}{") && strstr(notation, "initial time"));
     expr_free(point);
     expr_free(time);
     expr_free(applied);

@@ -20,27 +20,25 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define MARS_SHARED_EXPR_STRINGOUT_INTERNAL_ACCESS
+#include "internal/expr_stringout_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
+#define DISPLAY_POLY_MAX_VARS 16u
+
+typedef struct {
+    const expr_t *expr;
+    bool subtract;
+    long degree[DISPLAY_POLY_MAX_VARS];
+} display_poly_term_t;
+
 typedef enum { PREC_LOWEST = 0, PREC_ADD = 1, PREC_MUL = 2, PREC_POW = 3, PREC_UNARY = 4, PREC_ATOM = 5 } prec_t;
 
-typedef struct {
+struct _expr_autoname_entry_t {
     expr_t *node;
     char *buf;
-} autoname_entry_t;
-
-typedef struct {
-    autoname_entry_t *entries;
-    size_t count;
-    size_t cap;
-} autoname_table_t;
-
-typedef struct {
-    expr_t **vars;
-    size_t count;
-    size_t cap;
-} varlist_t;
+};
 
 /* Local value formatting. */
 char *expr_number_to_string_local(number_t value);
@@ -72,6 +70,10 @@ bool expr_emit_conjugate_sum(const expr_t *expr, sbuf_t *buffer, int parent_prec
  */
 bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style);
 
+/** @brief Identify a symbolic real centre and imaginary displacement, with their signs. */
+bool expr_display_complex_shift(const expr_t *expr, const expr_t **centre, const expr_t **coefficient,
+                                bool *centre_negative, bool *coefficient_negative);
+
 /* Recognise opposite shifts in paired function arguments or definite-integral bounds, without rewriting the DAG. */
 const expr_t *expr_display_symmetric_shift_centre(const expr_t *expr);
 bool expr_display_centred_shift_parts(const expr_t *expr, const expr_t *centre,
@@ -92,6 +94,9 @@ char *binding_rhs_TeX_string_local(const expr_t *expr);
 char *binding_rhs_c_string_local(const expr_t *expr);
 
 /* Expression emitters. */
+/** @brief Render an expression and its binding envelope as owned TeX text. */
+string_t *expr_to_TeX_text(const expr_t *expr);
+
 typedef struct expr_distribution_TeX_scope {
     const expr_t *root;
     const expr_t *detached;
@@ -110,10 +115,10 @@ bool expr_distribution_TeX_emit(const expr_t *expr, sbuf_t *buffer, int parent_p
 void expr_distribution_TeX_conditions(const expr_t *root, sbuf_t *buffer);
 
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
-void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec);
+void TeX_emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 
 /** Emit native multiplication spacing or a separator between neighbouring factors. */
-void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b);
+void TeX_emit_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b);
 
 /** Collect borrowed additive terms in display order, with their signs, within the supplied capacity. */
 bool expr_display_ordered_sum(const expr_t *expr, const expr_t **nodes, int *signs, size_t *count, size_t capacity);
@@ -126,13 +131,6 @@ void emit_func_with_temporaries(const expr_t *f, sbuf_t *b, int parent_prec, con
                                 const char *const *names, size_t count, const expr_t *expanded_node);
 void emit_math_with_temporaries(const expr_t *f, sbuf_t *b, style_t style, const expr_t *const *nodes,
                                 const char *const *names, size_t count);
-void emit_TeX_name(sbuf_t *b, const char *name);
-void expr_TeX_partial_derivatives_push(void);
-void expr_TeX_partial_derivatives_pop(void);
-bool expr_TeX_partial_derivatives_enabled(void);
-void expr_TeX_total_derivatives_push(void);
-void expr_TeX_total_derivatives_pop(void);
-bool expr_TeX_total_derivatives_enabled(void);
 
 /* Top-level text builders. */
 string_t *expr_to_text_expr(const expr_t *f);
@@ -202,15 +200,11 @@ bool emit_TeX_analytic_unary_cartesian(const expr_t *f, sbuf_t *b);
 void emit_expr_integral(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_formal_derivative_expr(const expr_t *f, sbuf_t *b);
 void emit_ordered_derivative(const expr_t *f, sbuf_t *b, int style);
-void emit_formal_derivative_TeX(const expr_t *f, sbuf_t *b);
 void emit_arbitrary_function_expr(const expr_t *f, sbuf_t *b);
 void emit_argument_list_expr(const expr_t *f, sbuf_t *b);
 void emit_formal_derivative_func(const expr_t *f, sbuf_t *b);
 void emit_arbitrary_function_func(const expr_t *f, sbuf_t *b);
 void emit_argument_list_func(const expr_t *f, sbuf_t *b);
-void emit_arbitrary_function_TeX(const expr_t *f, sbuf_t *b);
-void emit_argument_list_TeX(const expr_t *f, sbuf_t *b);
-void emit_TeX_integral(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func_integral(const expr_t *f, sbuf_t *b);
 
 /* polynomial formatting. */
@@ -272,12 +266,10 @@ void emit_func_lambert_wn(const expr_t *f, sbuf_t *b);
 void emit_function_builtin_name(sbuf_t *b, const expr_ops_t *ops);
 
 /* TeX emit formatting. */
-bool expr_TeX_source_order_preserved(void);
 bool expr_is_rendered_log_local(const expr_t *expr);
 void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 bool emit_expr_abs_needs_visible_add_parens(const expr_t *expr);
 char *expr_to_TeX_operation_body(const expr_t *expr);
-char *expr_to_TeX_body_ordered(const expr_t *expr, bool partial);
 
 /* expr emit formatting. */
 void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);

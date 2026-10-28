@@ -19,12 +19,15 @@
 
 #include "string-t.h"
 #include "expression-t.h"
+
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_binding_simplify.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_binding_render.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringin_scan.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -38,15 +41,6 @@ typedef struct {
     string_t *errmsg;
 } binding_parser_t;
 
-typedef enum {
-    BIND_PREC_LOWEST = 0,
-    BIND_PREC_ADD = 1,
-    BIND_PREC_MUL = 2,
-    BIND_PREC_POW = 3,
-    BIND_PREC_UNARY = 4,
-    BIND_PREC_ATOM = 5
-} binding_prec_t;
-
 #define BINDING_CONST_COUNT 5u
 #define BINDING_EXPR_KIND_COUNT 11u
 
@@ -54,7 +48,6 @@ typedef struct {
     expr_binding_const_id_t id;
     const char *canonical_name;
     const char *expr_name;
-    const char *TeX_name;
     const number_t *value;
 } binding_const_meta_t;
 
@@ -72,7 +65,6 @@ typedef struct {
     bool (*explicit_mul_separator)(const expr_binding_expr_t *expr);
     void (*emit_expr)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
     void (*emit_func)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-    void (*emit_TeX)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 } binding_expr_ops_t;
 
 typedef number_t (*binding_number_unary_fn)(number_t);
@@ -83,11 +75,11 @@ static const char *s_binding_sup_digits[10] = {"⁰", "¹", "²", "³", "⁴", "
 static const char *s_binding_sub_digits[10] = {"₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"};
 
 static const binding_const_meta_t s_binding_consts[BINDING_CONST_COUNT] = {
-    [EXPR_BINDING_CONST_E] = {EXPR_BINDING_CONST_E, "e", "e", "e", &NUM_E},
-    [EXPR_BINDING_CONST_I] = {EXPR_BINDING_CONST_I, "i", "i", "i", &NUM_I},
-    [EXPR_BINDING_CONST_PI] = {EXPR_BINDING_CONST_PI, "@pi", "π", "\\pi", &NUM_PI},
-    [EXPR_BINDING_CONST_PHI] = {EXPR_BINDING_CONST_PHI, "@phi", "φ", "\\phi", &NUM_PHI},
-    [EXPR_BINDING_CONST_GAMMA] = {EXPR_BINDING_CONST_GAMMA, "@gamma", "γ", "\\gamma", &NUM_EULER_MASCHERONI}};
+    [EXPR_BINDING_CONST_E] = {EXPR_BINDING_CONST_E, "e", "e", &NUM_E},
+    [EXPR_BINDING_CONST_I] = {EXPR_BINDING_CONST_I, "i", "i", &NUM_I},
+    [EXPR_BINDING_CONST_PI] = {EXPR_BINDING_CONST_PI, "@pi", "π", &NUM_PI},
+    [EXPR_BINDING_CONST_PHI] = {EXPR_BINDING_CONST_PHI, "@phi", "φ", &NUM_PHI},
+    [EXPR_BINDING_CONST_GAMMA] = {EXPR_BINDING_CONST_GAMMA, "@gamma", "γ", &NUM_EULER_MASCHERONI}};
 
 static const binding_const_meta_t *binding_const_meta(expr_binding_const_id_t const_id)
 {
@@ -103,12 +95,7 @@ static const char *binding_const_expr_name(expr_binding_const_id_t const_id)
     return meta ? meta->expr_name : "?";
 }
 
-static const char *binding_const_TeX_name(expr_binding_const_id_t const_id)
-{
-    const binding_const_meta_t *meta = binding_const_meta(const_id);
 
-    return meta ? meta->TeX_name : "?";
-}
 
 static void binding_free_none(expr_binding_expr_t *expr);
 static void binding_free_array(expr_binding_expr_t *expr);
@@ -208,17 +195,6 @@ static void emit_binding_func_unary_op(const expr_binding_expr_t *expr, sbuf_t *
 static void emit_binding_func_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_func_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 
-static void emit_binding_TeX_number(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_array(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_const(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_neg(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_add(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_sub(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_mul_node(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_div(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_powi(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_unary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
     [EXPR_BINDING_EXPR_ARRAY] = {.precedence = BIND_PREC_ATOM,
                                  .atomic = true,
@@ -232,8 +208,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                  .exact_complex = NULL,
                                  .explicit_mul_separator = binding_explicit_mul_separator_false,
                                  .emit_expr = emit_binding_expr_array,
-                                 .emit_func = emit_binding_func_array,
-                                 .emit_TeX = emit_binding_TeX_array},
+                                 .emit_func = emit_binding_func_array},
     [EXPR_BINDING_EXPR_NUMBER] = {.precedence = BIND_PREC_ATOM,
                                   .atomic = true,
                                   .free_payload = binding_free_number,
@@ -246,8 +221,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                   .exact_complex = binding_exact_complex_number,
                                   .explicit_mul_separator = binding_explicit_mul_separator_false,
                                   .emit_expr = emit_binding_expr_number,
-                                  .emit_func = emit_binding_func_number,
-                                  .emit_TeX = emit_binding_TeX_number},
+                                  .emit_func = emit_binding_func_number},
     [EXPR_BINDING_EXPR_CONST] = {.precedence = BIND_PREC_ATOM,
                                  .atomic = true,
                                  .free_payload = binding_free_none,
@@ -260,8 +234,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                  .exact_complex = binding_exact_complex_const,
                                  .explicit_mul_separator = binding_explicit_mul_separator_false,
                                  .emit_expr = emit_binding_expr_const,
-                                 .emit_func = emit_binding_func_const,
-                                 .emit_TeX = emit_binding_TeX_const},
+                                 .emit_func = emit_binding_func_const},
     [EXPR_BINDING_EXPR_NEG] = {.precedence = BIND_PREC_UNARY,
                                .atomic = false,
                                .free_payload = binding_free_unary,
@@ -274,8 +247,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                .exact_complex = binding_exact_complex_unary,
                                .explicit_mul_separator = binding_explicit_mul_separator_unary,
                                .emit_expr = emit_binding_expr_neg,
-                               .emit_func = emit_binding_func_neg,
-                               .emit_TeX = emit_binding_TeX_neg},
+                               .emit_func = emit_binding_func_neg},
     [EXPR_BINDING_EXPR_ADD] = {.precedence = BIND_PREC_ADD,
                                .atomic = false,
                                .free_payload = binding_free_binary,
@@ -288,8 +260,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                .exact_complex = binding_exact_complex_addsub,
                                .explicit_mul_separator = binding_explicit_mul_separator_false,
                                .emit_expr = emit_binding_expr_add,
-                               .emit_func = emit_binding_func_add,
-                               .emit_TeX = emit_binding_TeX_add},
+                               .emit_func = emit_binding_func_add},
     [EXPR_BINDING_EXPR_SUB] = {.precedence = BIND_PREC_ADD,
                                .atomic = false,
                                .free_payload = binding_free_binary,
@@ -302,8 +273,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                .exact_complex = binding_exact_complex_addsub,
                                .explicit_mul_separator = binding_explicit_mul_separator_false,
                                .emit_expr = emit_binding_expr_sub,
-                               .emit_func = emit_binding_func_sub,
-                               .emit_TeX = emit_binding_TeX_sub},
+                               .emit_func = emit_binding_func_sub},
     [EXPR_BINDING_EXPR_MUL] = {.precedence = BIND_PREC_MUL,
                                .atomic = false,
                                .free_payload = binding_free_binary,
@@ -316,8 +286,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                .exact_complex = binding_exact_complex_mul,
                                .explicit_mul_separator = binding_explicit_mul_separator_mul,
                                .emit_expr = emit_binding_expr_mul_node,
-                               .emit_func = emit_binding_func_mul_node,
-                               .emit_TeX = emit_binding_TeX_mul_node},
+                               .emit_func = emit_binding_func_mul_node},
     [EXPR_BINDING_EXPR_DIV] = {.precedence = BIND_PREC_MUL,
                                .atomic = false,
                                .free_payload = binding_free_binary,
@@ -330,8 +299,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                .exact_complex = binding_exact_complex_div,
                                .explicit_mul_separator = binding_explicit_mul_separator_true,
                                .emit_expr = emit_binding_expr_div,
-                               .emit_func = emit_binding_func_div,
-                               .emit_TeX = emit_binding_TeX_div},
+                               .emit_func = emit_binding_func_div},
     [EXPR_BINDING_EXPR_POWI] = {.precedence = BIND_PREC_POW,
                                 .atomic = true,
                                 .free_payload = binding_free_powi,
@@ -344,8 +312,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                 .exact_complex = binding_exact_complex_powi,
                                 .explicit_mul_separator = binding_explicit_mul_separator_powi,
                                 .emit_expr = emit_binding_expr_powi,
-                                .emit_func = emit_binding_func_powi,
-                                .emit_TeX = emit_binding_TeX_powi},
+                                .emit_func = emit_binding_func_powi},
     [EXPR_BINDING_EXPR_UNARY_OP] = {.precedence = BIND_PREC_UNARY,
                                     .atomic = false,
                                     .free_payload = binding_free_unary_op,
@@ -358,8 +325,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                     .exact_complex = NULL,
                                     .explicit_mul_separator = binding_explicit_mul_separator_false,
                                     .emit_expr = emit_binding_expr_unary_op,
-                                    .emit_func = emit_binding_func_unary_op,
-                                    .emit_TeX = emit_binding_TeX_unary_op},
+                                    .emit_func = emit_binding_func_unary_op},
     [EXPR_BINDING_EXPR_BINARY_OP] = {.precedence = BIND_PREC_POW,
                                      .atomic = false,
                                      .free_payload = binding_free_binary_op,
@@ -372,8 +338,7 @@ static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
                                      .exact_complex = NULL,
                                      .explicit_mul_separator = binding_explicit_mul_separator_binary_op,
                                      .emit_expr = emit_binding_expr_binary_op,
-                                     .emit_func = emit_binding_func_binary_op,
-                                     .emit_TeX = emit_binding_TeX_binary_op}};
+                                     .emit_func = emit_binding_func_binary_op}};
 
 static const binding_expr_ops_t *binding_expr_ops_for_kind(expr_binding_expr_kind_t kind)
 {
@@ -3122,7 +3087,7 @@ static bool binding_expr_is_atomic(const expr_binding_expr_t *expr)
     return ops ? ops->atomic : false;
 }
 
-static bool binding_expr_needs_pow_base_parens(const expr_binding_expr_t *expr)
+bool binding_expr_needs_pow_base_parens(const expr_binding_expr_t *expr)
 {
     number_t value;
     bool need;
@@ -3161,13 +3126,7 @@ static void emit_binding_superscript_int(sbuf_t *b, long n)
         sbuf_puts(b, s_binding_sup_digits[tmp[len] - '0']);
 }
 
-typedef struct {
-    bool negative;
-    string_t *numer;
-    string_t *denom;
-} binding_simple_rational_t;
-
-static void binding_simple_rational_clear(binding_simple_rational_t *rational)
+void binding_simple_rational_clear(binding_simple_rational_t *rational)
 {
     if (!rational)
         return;
@@ -3234,7 +3193,7 @@ done:
     return ok;
 }
 
-static bool binding_text_is_simple_rational(const char *text, binding_simple_rational_t *out)
+bool binding_text_is_simple_rational(const char *text, binding_simple_rational_t *out)
 {
     string_t *string = text ? string_new_with(text) : NULL;
     bool ok;
@@ -3247,7 +3206,7 @@ static bool binding_text_is_simple_rational(const char *text, binding_simple_rat
     return ok;
 }
 
-static void emit_binding_digits(sbuf_t *b, const string_t *digits)
+void emit_binding_digits(sbuf_t *b, const string_t *digits)
 {
     string_cursor_t *cursor = string_cursor_new(digits);
 
@@ -3281,7 +3240,7 @@ static void emit_binding_unicode_digits(sbuf_t *b, const string_t *digits, const
     string_cursor_free(cursor);
 }
 
-static string_t *binding_decimal_display_text(const char *text)
+string_t *binding_decimal_display_text(const char *text)
 {
     string_t *source = string_new_with(text ? text : "");
     string_t *out = NULL;
@@ -3399,7 +3358,6 @@ static void emit_binding_number_text(const char *text, sbuf_t *b)
 }
 
 static void emit_binding_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
-static void emit_binding_TeX_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 
 static bool binding_number_value_unary(const expr_binding_expr_t *expr, binding_number_unary_fn op, number_t *out)
 {
@@ -3588,16 +3546,7 @@ static void emit_binding_expr_mul_separator(const expr_binding_expr_t *left, con
         sbuf_puts(b, "·");
 }
 
-static void emit_binding_TeX_mul_separator(const expr_binding_expr_t *left, const expr_binding_expr_t *right, sbuf_t *b)
-{
-    if (expr_binding_expr_is_numeric_literal(left) && expr_binding_expr_needs_explicit_mul_separator(right)) {
-        sbuf_puts(b, " \\times ");
-        return;
-    }
-    sbuf_puts(b, "\\mkern-2mu ");
-}
-
-static bool binding_mul_should_swap_power_before_radical(const expr_binding_expr_t *left,
+bool binding_mul_should_swap_power_before_radical(const expr_binding_expr_t *left,
                                                          const expr_binding_expr_t *right)
 {
     number_t left_exponent;
@@ -3635,29 +3584,6 @@ static void emit_binding_expr_mul(const expr_binding_expr_t *left, const expr_bi
     emit_binding_expr(left, b, BIND_PREC_MUL);
     emit_binding_expr_mul_separator(left, right, b);
     emit_binding_expr(right, b, BIND_PREC_MUL);
-    if (need)
-        sbuf_putc(b, ')');
-}
-
-static void emit_binding_TeX_mul(const expr_binding_expr_t *left, const expr_binding_expr_t *right, sbuf_t *b,
-                                 int parent_prec)
-{
-    bool need = BIND_PREC_MUL < parent_prec;
-
-    if ((left && left->kind == EXPR_BINDING_EXPR_UNARY_OP && left->u.unary_op.ops == &ops_sqrt && right &&
-         right->kind == EXPR_BINDING_EXPR_BINARY_OP && right->u.binary_op.ops == &ops_pow) ||
-        binding_mul_should_swap_power_before_radical(left, right)) {
-        const expr_binding_expr_t *tmp = left;
-
-        left = right;
-        right = tmp;
-    }
-
-    if (need)
-        sbuf_putc(b, '(');
-    emit_binding_TeX_expr(left, b, BIND_PREC_MUL);
-    emit_binding_TeX_mul_separator(left, right, b);
-    emit_binding_TeX_expr(right, b, BIND_PREC_MUL);
     if (need)
         sbuf_putc(b, ')');
 }
@@ -3810,224 +3736,11 @@ static void emit_binding_expr_powi(const expr_binding_expr_t *expr, sbuf_t *b, i
     emit_binding_superscript_int(b, expr->u.powi.exponent);
 }
 
-static void emit_binding_TeX_number(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    string_t *clean;
-    char *tex;
-    binding_simple_rational_t rational = {false, NULL, NULL};
-    const char *literal = expr->u.text ? expr->u.text : "";
-    bool negative = *literal == '-';
-
-    (void)parent_prec;
-    if (*literal == '-' || *literal == '+')
-        literal++;
-    if (*literal == '@')
-        literal++;
-    /* All accepted infinity spellings share one mathematical rendering, including in sum and integral bounds. */
-    if (*literal == 'i' || *literal == 'I' || strcmp(literal, "∞") == 0) {
-        number_t value = binding_number_from_text(literal);
-        bool infinite = num_is_inf(value) && num_is_real(value);
-
-        num_destroy(&value);
-        if (infinite) {
-            sbuf_puts(b, negative ? "-\\infty" : "\\infty");
-            return;
-        }
-    }
-    if (binding_text_is_simple_rational(expr->u.text, &rational)) {
-        if (rational.negative)
-            sbuf_putc(b, '-');
-        sbuf_puts(b, "\\frac{");
-        emit_binding_digits(b, rational.numer);
-        sbuf_puts(b, "}{");
-        emit_binding_digits(b, rational.denom);
-        sbuf_putc(b, '}');
-        binding_simple_rational_clear(&rational);
-        return;
-    }
-
-    clean = binding_decimal_display_text(expr->u.text);
-    tex = expr_tostring_texify(clean ? string_c_str(clean) : "");
-    string_free(clean);
-    if (tex) {
-        sbuf_puts(b, tex);
-        free(tex);
-    }
-}
-
-static void emit_binding_TeX_array(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    (void)parent_prec;
-    sbuf_puts(b, "\\left[");
-    if (expr->u.array.unspecified) {
-        sbuf_putc(b, '?');
-    } else {
-        for (size_t i = 0u; i < expr->u.array.count; ++i) {
-            if (i > 0u)
-                sbuf_puts(b, ", ");
-            emit_binding_TeX_expr(expr->u.array.items[i], b, BIND_PREC_LOWEST);
-        }
-    }
-    sbuf_puts(b, "\\right]");
-}
-
-static void emit_binding_TeX_const(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    (void)parent_prec;
-    sbuf_puts(b, binding_const_TeX_name(expr->u.const_id));
-}
-
-static void emit_binding_TeX_neg(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    bool need = BIND_PREC_UNARY < parent_prec;
-
-    if (need)
-        sbuf_putc(b, '(');
-    sbuf_putc(b, '-');
-    emit_binding_TeX_expr(expr->u.unary.child, b, BIND_PREC_UNARY);
-    if (need)
-        sbuf_putc(b, ')');
-}
-
-static void emit_binding_TeX_addsub(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec, const char *op,
-                                    int right_prec)
-{
-    bool need = BIND_PREC_ADD < parent_prec;
-
-    if (need)
-        sbuf_putc(b, '(');
-    emit_binding_TeX_expr(expr->u.binary.left, b, BIND_PREC_ADD);
-    sbuf_puts(b, op);
-    emit_binding_TeX_expr(expr->u.binary.right, b, right_prec);
-    if (need)
-        sbuf_putc(b, ')');
-}
-
-static void emit_binding_TeX_add(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    emit_binding_TeX_addsub(expr, b, parent_prec, " + ", BIND_PREC_ADD);
-}
-
-static void emit_binding_TeX_sub(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    emit_binding_TeX_addsub(expr, b, parent_prec, " - ", BIND_PREC_ADD + 1);
-}
-
-static void emit_binding_TeX_mul_node(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    emit_binding_TeX_mul(expr->u.binary.left, expr->u.binary.right, b, parent_prec);
-}
-
-static void emit_binding_TeX_const_ratio_numer(expr_binding_const_id_t const_id, long numer, sbuf_t *b)
-{
-    long abs_numer = numer < 0L ? -numer : numer;
-
-    if (numer < 0L)
-        sbuf_putc(b, '-');
-    if (abs_numer != 1L) {
-        char nbuf[32];
-
-        snprintf(nbuf, sizeof(nbuf), "%ld", abs_numer);
-        sbuf_puts(b, nbuf);
-    }
-    sbuf_puts(b, binding_const_TeX_name(const_id));
-}
-
-static void emit_binding_TeX_const_ratio_value(expr_binding_const_id_t const_id, long numer, long denom, sbuf_t *b)
-{
-    if (denom == 1L) {
-        emit_binding_TeX_const_ratio_numer(const_id, numer, b);
-        return;
-    }
-    {
-        char dbuf[32];
-
-        snprintf(dbuf, sizeof(dbuf), "%ld", denom);
-        sbuf_puts(b, "\\frac{");
-        emit_binding_TeX_const_ratio_numer(const_id, numer, b);
-        sbuf_puts(b, "}{");
-        sbuf_puts(b, dbuf);
-        sbuf_putc(b, '}');
-    }
-}
-
-static void emit_binding_TeX_div(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    long numer;
-    long denom;
-    expr_binding_const_id_t const_id;
-
-    (void)parent_prec;
-    if (binding_const_ratio_parts(expr->u.binary.left, expr->u.binary.right, &numer, &denom, &const_id)) {
-        emit_binding_TeX_const_ratio_value(const_id, numer, denom, b);
-        return;
-    }
-    sbuf_puts(b, "\\frac{");
-    emit_binding_TeX_expr(expr->u.binary.left, b, BIND_PREC_LOWEST);
-    sbuf_puts(b, "}{");
-    emit_binding_TeX_expr(expr->u.binary.right, b, BIND_PREC_LOWEST);
-    sbuf_putc(b, '}');
-}
-
-static void emit_binding_TeX_powi(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    bool base_need = binding_expr_needs_pow_base_parens(expr->u.powi.base);
-    char expbuf[64];
-
-    (void)parent_prec;
-    if (expr->u.powi.exponent < 0) {
-        long positive_exponent = -expr->u.powi.exponent;
-
-        sbuf_puts(b, "\\frac{1}{");
-        if (positive_exponent == 1L) {
-            emit_binding_TeX_expr(expr->u.powi.base, b, BIND_PREC_LOWEST);
-        } else {
-            if (base_need)
-                sbuf_puts(b, "\\left(");
-            emit_binding_TeX_expr(expr->u.powi.base, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
-            if (base_need)
-                sbuf_puts(b, "\\right)");
-            snprintf(expbuf, sizeof(expbuf), "%ld", positive_exponent);
-            sbuf_puts(b, "^{");
-            sbuf_puts(b, expbuf);
-            sbuf_putc(b, '}');
-        }
-        sbuf_putc(b, '}');
-        return;
-    }
-
-    if (base_need)
-        sbuf_puts(b, "\\left(");
-    emit_binding_TeX_expr(expr->u.powi.base, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
-    if (base_need)
-        sbuf_puts(b, "\\right)");
-    snprintf(expbuf, sizeof(expbuf), "%ld", expr->u.powi.exponent);
-    sbuf_puts(b, "^{");
-    sbuf_puts(b, expbuf);
-    sbuf_putc(b, '}');
-}
-
 static void emit_binding_expr_unary_call(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     sbuf_puts(b, expr_ops_expression_name(ops));
     sbuf_putc(b, '(');
     emit_binding_expr(child, b, BIND_PREC_LOWEST);
-    sbuf_putc(b, ')');
-}
-
-static void emit_binding_TeX_unary_call(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
-{
-    const char *name = (ops && ops->TeX_name) ? ops->TeX_name : NULL;
-
-    if (!name) {
-        sbuf_puts(b, "\\operatorname{");
-        sbuf_puts(b, expr_ops_expression_name(ops));
-        sbuf_putc(b, '}');
-    } else {
-        sbuf_puts(b, name);
-    }
-    sbuf_putc(b, '(');
-    emit_binding_TeX_expr(child, b, BIND_PREC_LOWEST);
     sbuf_putc(b, ')');
 }
 
@@ -4048,27 +3761,11 @@ static void emit_binding_expr_unary_sqrt(const expr_ops_t *ops, const expr_bindi
     emit_binding_expr_root_argument(child, b, true);
 }
 
-static void emit_binding_TeX_unary_sqrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
-{
-    (void)ops;
-    sbuf_puts(b, "\\sqrt{");
-    emit_binding_TeX_expr(child, b, BIND_PREC_LOWEST);
-    sbuf_putc(b, '}');
-}
-
 static void emit_binding_expr_unary_cubrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_puts(b, "³√");
     emit_binding_expr_root_argument(child, b, true);
-}
-
-static void emit_binding_TeX_unary_cubrt(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
-{
-    (void)ops;
-    sbuf_puts(b, "\\sqrt[3]{");
-    emit_binding_TeX_expr(child, b, BIND_PREC_LOWEST);
-    sbuf_putc(b, '}');
 }
 
 static void emit_binding_expr_unary_abs(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
@@ -4079,28 +3776,12 @@ static void emit_binding_expr_unary_abs(const expr_ops_t *ops, const expr_bindin
     sbuf_putc(b, '|');
 }
 
-static void emit_binding_TeX_unary_abs(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
-{
-    (void)ops;
-    sbuf_puts(b, "\\left|");
-    emit_binding_TeX_expr(child, b, BIND_PREC_LOWEST);
-    sbuf_puts(b, "\\right|");
-}
-
 static void emit_binding_expr_unary_floor(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
     sbuf_puts(b, "⌊");
     emit_binding_expr(child, b, BIND_PREC_LOWEST);
     sbuf_puts(b, "⌋");
-}
-
-static void emit_binding_TeX_unary_floor(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
-{
-    (void)ops;
-    sbuf_puts(b, "\\left\\lfloor ");
-    emit_binding_TeX_expr(child, b, BIND_PREC_LOWEST);
-    sbuf_puts(b, " \\right\\rfloor");
 }
 
 static void emit_binding_expr_unary_ceil(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
@@ -4111,53 +3792,6 @@ static void emit_binding_expr_unary_ceil(const expr_ops_t *ops, const expr_bindi
     sbuf_puts(b, "⌉");
 }
 
-static void emit_binding_TeX_unary_ceil(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
-{
-    (void)ops;
-    sbuf_puts(b, "\\left\\lceil ");
-    emit_binding_TeX_expr(child, b, BIND_PREC_LOWEST);
-    sbuf_puts(b, " \\right\\rceil");
-}
-
-static bool emit_binding_TeX_exp_unit_fraction_root(const expr_binding_expr_t *child, sbuf_t *b)
-{
-    number_t value;
-    long numerator;
-    long denominator;
-
-    if (!expr_binding_expr_number_value(child, &value))
-        return false;
-
-    if (!num_get_small_rational(value, &numerator, &denominator) || numerator != 1L || denominator <= 1L) {
-        num_destroy(&value);
-        return false;
-    }
-
-    if (denominator == 2L) {
-        sbuf_puts(b, "\\sqrt{e}");
-    } else {
-        char index_text[32];
-
-        snprintf(index_text, sizeof(index_text), "%ld", denominator);
-        sbuf_puts(b, "\\sqrt[");
-        sbuf_puts(b, index_text);
-        sbuf_puts(b, "]{e}");
-    }
-    num_destroy(&value);
-    return true;
-}
-
-static void emit_binding_TeX_unary_exp(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
-{
-    (void)ops;
-    if (emit_binding_TeX_exp_unit_fraction_root(child, b))
-        return;
-
-    sbuf_puts(b, "e^{");
-    emit_binding_TeX_expr(child, b, BIND_PREC_LOWEST);
-    sbuf_putc(b, '}');
-}
-
 static void emit_binding_expr_unary_neg_op(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
 {
     (void)ops;
@@ -4165,28 +3799,20 @@ static void emit_binding_expr_unary_neg_op(const expr_ops_t *ops, const expr_bin
     emit_binding_expr(child, b, BIND_PREC_UNARY);
 }
 
-static void emit_binding_TeX_unary_neg_op(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b)
-{
-    (void)ops;
-    sbuf_putc(b, '-');
-    emit_binding_TeX_expr(child, b, BIND_PREC_UNARY);
-}
-
 typedef void (*binding_unary_emit_fn)(const expr_ops_t *ops, const expr_binding_expr_t *child, sbuf_t *b);
 
 typedef struct {
     binding_unary_emit_fn emit_expr;
-    binding_unary_emit_fn emit_TeX;
 } binding_unary_render_t;
 
 static const binding_unary_render_t s_binding_unary_renderers[EXPR_KIND_COUNT] = {
-    [EXPR_KIND_NEG] = {emit_binding_expr_unary_neg_op, emit_binding_TeX_unary_neg_op},
-    [EXPR_KIND_SQRT] = {emit_binding_expr_unary_sqrt, emit_binding_TeX_unary_sqrt},
-    [EXPR_KIND_CUBRT] = {emit_binding_expr_unary_cubrt, emit_binding_TeX_unary_cubrt},
-    [EXPR_KIND_ABS] = {emit_binding_expr_unary_abs, emit_binding_TeX_unary_abs},
-    [EXPR_KIND_FLOOR] = {emit_binding_expr_unary_floor, emit_binding_TeX_unary_floor},
-    [EXPR_KIND_CEIL] = {emit_binding_expr_unary_ceil, emit_binding_TeX_unary_ceil},
-    [EXPR_KIND_EXP] = {emit_binding_expr_unary_call, emit_binding_TeX_unary_exp}};
+    [EXPR_KIND_NEG] = {emit_binding_expr_unary_neg_op},
+    [EXPR_KIND_SQRT] = {emit_binding_expr_unary_sqrt},
+    [EXPR_KIND_CUBRT] = {emit_binding_expr_unary_cubrt},
+    [EXPR_KIND_ABS] = {emit_binding_expr_unary_abs},
+    [EXPR_KIND_FLOOR] = {emit_binding_expr_unary_floor},
+    [EXPR_KIND_CEIL] = {emit_binding_expr_unary_ceil},
+    [EXPR_KIND_EXP] = {emit_binding_expr_unary_call}};
 
 static const binding_unary_render_t *binding_unary_renderer_for_ops(const expr_ops_t *ops)
 {
@@ -4217,20 +3843,7 @@ static void emit_binding_expr_unary_op(const expr_binding_expr_t *expr, sbuf_t *
         sbuf_putc(b, ')');
 }
 
-static void emit_binding_TeX_unary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    const binding_unary_render_t *renderer = binding_unary_renderer_for_ops(expr->u.unary_op.ops);
-    bool need = BIND_PREC_UNARY < parent_prec;
 
-    if (need)
-        sbuf_putc(b, '(');
-    if (renderer && renderer->emit_TeX)
-        renderer->emit_TeX(expr->u.unary_op.ops, expr->u.unary_op.child, b);
-    else
-        emit_binding_TeX_unary_call(expr->u.unary_op.ops, expr->u.unary_op.child, b);
-    if (need)
-        sbuf_putc(b, ')');
-}
 
 static void emit_binding_expr_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
@@ -4482,66 +4095,6 @@ static void emit_binding_func_binary_op(const expr_binding_expr_t *expr, sbuf_t 
     sbuf_putc(b, ')');
 }
 
-static void emit_binding_TeX_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    const expr_ops_t *ops = expr->u.binary_op.ops;
-
-    (void)parent_prec;
-    if (ops == &ops_pow) {
-        bool base_need = binding_expr_needs_pow_base_parens(expr->u.binary_op.left);
-
-        if (base_need)
-            sbuf_puts(b, "\\left(");
-        emit_binding_TeX_expr(expr->u.binary_op.left, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
-        if (base_need)
-            sbuf_puts(b, "\\right)");
-        sbuf_puts(b, "^{");
-        emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
-        sbuf_putc(b, '}');
-        return;
-    }
-
-    if (ops == &ops_root) {
-        sbuf_puts(b, "\\sqrt[");
-        emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
-        sbuf_puts(b, "]{");
-        emit_binding_TeX_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
-        sbuf_putc(b, '}');
-        return;
-    }
-
-    if (ops == &ops_polygamma) {
-        sbuf_puts(b, "\\psi^{");
-        emit_binding_TeX_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
-        sbuf_puts(b, "}(");
-        emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
-        sbuf_putc(b, ')');
-        return;
-    }
-
-    if (ops == &ops_qdigamma) {
-        sbuf_puts(b, "\\psi_{");
-        emit_binding_TeX_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
-        sbuf_puts(b, "}\\left(");
-        emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
-        sbuf_puts(b, "\\right)");
-        return;
-    }
-
-    if (ops && ops->TeX_name)
-        sbuf_puts(b, ops->TeX_name);
-    else {
-        sbuf_puts(b, "\\operatorname{");
-        sbuf_puts(b, expr_ops_expression_name(ops));
-        sbuf_putc(b, '}');
-    }
-    sbuf_putc(b, '(');
-    emit_binding_TeX_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
-    sbuf_puts(b, ", ");
-    emit_binding_TeX_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
-    sbuf_putc(b, ')');
-}
-
 static void emit_binding_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
     const binding_expr_ops_t *ops;
@@ -4578,23 +4131,7 @@ static void emit_binding_func_expr(const expr_binding_expr_t *expr, sbuf_t *b, i
     ops->emit_func(expr, b, parent_prec);
 }
 
-static void emit_binding_TeX_expr(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    const binding_expr_ops_t *ops;
 
-    if (!expr) {
-        sbuf_puts(b, "0");
-        return;
-    }
-
-    ops = binding_expr_ops_for_kind(expr->kind);
-    if (!ops || !ops->emit_TeX) {
-        sbuf_puts(b, "?");
-        return;
-    }
-
-    ops->emit_TeX(expr, b, parent_prec);
-}
 
 char *expr_binding_expr_to_string(const expr_binding_expr_t *expr)
 {
@@ -4615,19 +4152,6 @@ char *expr_binding_expr_to_function_string(const expr_binding_expr_t *expr)
 
     sbuf_init(&b);
     emit_binding_func_expr(expr, &b, BIND_PREC_LOWEST);
-    {
-        char *out = sbuf_to_c_string(&b);
-        sbuf_free(&b);
-        return out;
-    }
-}
-
-char *expr_binding_expr_to_TeX(const expr_binding_expr_t *expr)
-{
-    sbuf_t b;
-
-    sbuf_init(&b);
-    emit_binding_TeX_expr(expr, &b, BIND_PREC_LOWEST);
     {
         char *out = sbuf_to_c_string(&b);
         sbuf_free(&b);

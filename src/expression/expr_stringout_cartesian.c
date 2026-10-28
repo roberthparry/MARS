@@ -20,6 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "expression-t.h"
+#include "string-t.h"
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -28,192 +31,17 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string-t.h"
 
-static bool expr_stringout_tree_has_symbol_name(const expr_t *expr, const char *name)
+
+bool expr_stringout_tree_has_symbol_name(const expr_t *expr, const char *name)
 {
     if (!expr || !name)
         return false;
     if (expr->name && strcmp(expr->name, name) == 0)
         return true;
     return expr_stringout_tree_has_symbol_name(expr->a, name) || expr_stringout_tree_has_symbol_name(expr->b, name);
-}
-
-static void emit_TeX_log_cartesian_real(const expr_t *real, const expr_t *imaginary, sbuf_t *b)
-{
-    sbuf_puts(b, "\\frac{1}{2}\\ln\\left(");
-    emit_TeX_expr(real, b, PREC_POW);
-    sbuf_puts(b, "^{2}+");
-    emit_TeX_expr(imaginary, b, PREC_POW);
-    sbuf_puts(b, "^{2}\\right)");
-}
-
-static void emit_TeX_cartesian_norm_squared(const expr_t *real, const expr_t *imaginary, sbuf_t *b)
-{
-    emit_TeX_expr(real, b, PREC_POW);
-    sbuf_puts(b, "^{2}+");
-    emit_TeX_expr(imaginary, b, PREC_POW);
-    sbuf_puts(b, "^{2}");
-}
-
-static void emit_TeX_log_cartesian_imaginary(const expr_t *real, const expr_t *imaginary, sbuf_t *b)
-{
-    sbuf_puts(b, "\\operatorname{atan2}(");
-    emit_TeX_expr(imaginary, b, PREC_LOWEST);
-    sbuf_putc(b, ',');
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_putc(b, ')');
-}
-
-static void emit_TeX_log_cartesian_norm_squared(const expr_t *real, const expr_t *imaginary, sbuf_t *b)
-{
-    sbuf_puts(b, "\\left(");
-    emit_TeX_log_cartesian_real(real, imaginary, b);
-    sbuf_puts(b, "\\right)^{2}+\\operatorname{atan2}^{2}(");
-    emit_TeX_expr(imaginary, b, PREC_LOWEST);
-    sbuf_putc(b, ',');
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_putc(b, ')');
-}
-
-static void emit_TeX_log_cartesian_argument(const expr_t *real, const expr_t *imaginary, sbuf_t *b)
-{
-    sbuf_puts(b, "\\operatorname{atan2}\\left(");
-    emit_TeX_log_cartesian_imaginary(real, imaginary, b);
-    sbuf_putc(b, ',');
-    emit_TeX_log_cartesian_real(real, imaginary, b);
-    sbuf_puts(b, "\\right)");
-}
-
-bool emit_TeX_logarithmic_integral_cartesian(const expr_t *f, sbuf_t *b)
-{
-    static const char *index_names[] = {"n", "m", "k", "l", "j"};
-    expr_t *real = NULL;
-    expr_t *imaginary = NULL;
-    bool has_imaginary = false;
-    const char *index = "j";
-
-    if (!f || !expr_is_op(f, &ops_Li) ||
-        !expr_cartesian_parts_for_display(f->a, &real, &imaginary, &has_imaginary) || !has_imaginary) {
-        expr_free(imaginary);
-        expr_free(real);
-        return false;
-    }
-    for (size_t i = 0u; i < sizeof(index_names) / sizeof(index_names[0]); ++i) {
-        if (!expr_stringout_tree_has_symbol_name(f, index_names[i])) {
-            index = index_names[i];
-            break;
-        }
-    }
-
-    sbuf_puts(b, "\\begin{aligned}\n\\operatorname{Li}(");
-    emit_TeX_expr(f->a, b, PREC_LOWEST);
-    sbuf_puts(b, ")&=p+q\\mkern-2mu i,\\\\\np&=\\gamma+\\frac{1}{2}\\ln\\left(");
-    emit_TeX_log_cartesian_norm_squared(real, imaginary, b);
-    sbuf_puts(b, "\\right)+\\sum_{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "=1}^{\\infty}\\frac{\\left(");
-    emit_TeX_log_cartesian_norm_squared(real, imaginary, b);
-    sbuf_puts(b, "\\right)^{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "/2}\\cos\\left(");
-    sbuf_puts(b, index);
-    emit_TeX_log_cartesian_argument(real, imaginary, b);
-    sbuf_puts(b, "\\right)}{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "\\,");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "!},\\\\\nq&=");
-    emit_TeX_log_cartesian_argument(real, imaginary, b);
-    sbuf_puts(b, "+\\sum_{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "=1}^{\\infty}\\frac{\\left(");
-    emit_TeX_log_cartesian_norm_squared(real, imaginary, b);
-    sbuf_puts(b, "\\right)^{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "/2}\\sin\\left(");
-    sbuf_puts(b, index);
-    emit_TeX_log_cartesian_argument(real, imaginary, b);
-    sbuf_puts(b, "\\right)}{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "\\,");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "!}\\end{aligned}");
-
-    expr_free(imaginary);
-    expr_free(real);
-    return true;
-}
-
-bool emit_TeX_exponential_integral_cartesian(const expr_t *f, sbuf_t *b)
-{
-    static const char *index_names[] = {"n", "m", "k", "l", "j"};
-    expr_t *real = NULL;
-    expr_t *imaginary = NULL;
-    bool has_imaginary = false;
-    const char *index = "j";
-
-    if (!f || !expr_is_op(f, &ops_Ei) ||
-        !expr_cartesian_parts_for_display(f->a, &real, &imaginary, &has_imaginary) || !has_imaginary) {
-        expr_free(imaginary);
-        expr_free(real);
-        return false;
-    }
-    for (size_t i = 0u; i < sizeof(index_names) / sizeof(index_names[0]); ++i) {
-        if (!expr_stringout_tree_has_symbol_name(f, index_names[i])) {
-            index = index_names[i];
-            break;
-        }
-    }
-
-    sbuf_puts(b, "\\begin{aligned}\n\\operatorname{Ei}(");
-    emit_TeX_expr(f->a, b, PREC_LOWEST);
-    sbuf_puts(b, ")&=p+q\\mkern-2mu i,\\\\\np&=\\gamma+\\frac{1}{2}\\ln\\left(");
-    emit_TeX_cartesian_norm_squared(real, imaginary, b);
-    sbuf_puts(b, "\\right)+\\sum_{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "=1}^{\\infty}\\frac{\\left(");
-    emit_TeX_cartesian_norm_squared(real, imaginary, b);
-    sbuf_puts(b, "\\right)^{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "/2}\\cos\\left(");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "\\operatorname{atan2}(");
-    emit_TeX_expr(imaginary, b, PREC_LOWEST);
-    sbuf_puts(b, ",");
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_puts(b, ")\\right)}{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "\\,");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "!},\\\\\nq&=\\operatorname{atan2}(");
-    emit_TeX_expr(imaginary, b, PREC_LOWEST);
-    sbuf_puts(b, ",");
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_puts(b, ")+\\sum_{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "=1}^{\\infty}\\frac{\\left(");
-    emit_TeX_cartesian_norm_squared(real, imaginary, b);
-    sbuf_puts(b, "\\right)^{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "/2}\\sin\\left(");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "\\operatorname{atan2}(");
-    emit_TeX_expr(imaginary, b, PREC_LOWEST);
-    sbuf_puts(b, ",");
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_puts(b, ")\\right)}{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "\\,");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "!}\\end{aligned}");
-
-    expr_free(imaginary);
-    expr_free(real);
-    return true;
 }
 
 static bool expr_log_cartesian_parts_for_output(const expr_t *argument, expr_t **real_out, expr_t **imaginary_out);
@@ -620,7 +448,7 @@ bool emit_func_integral_cartesian_body(const expr_t *f, sbuf_t *b)
     return true;
 }
 
-static bool expr_kind_has_analytic_cartesian_series(expr_op_kind_t kind)
+bool expr_kind_has_analytic_cartesian_series(expr_op_kind_t kind)
 {
     static const bool supported[EXPR_KIND_COUNT] = {
         [EXPR_KIND_SQRT]              = true,
@@ -661,111 +489,4 @@ static bool expr_kind_has_analytic_cartesian_series(expr_op_kind_t kind)
     };
 
     return kind >= 0 && kind < EXPR_KIND_COUNT && supported[kind];
-}
-
-bool emit_TeX_cube_root_cartesian(const expr_t *f, sbuf_t *b)
-{
-    expr_t *real = NULL;
-    expr_t *imaginary = NULL;
-    bool has_imaginary = false;
-
-    if (!f || !expr_is_op(f, &ops_cubrt) ||
-        !expr_cartesian_parts_for_display(f->a, &real, &imaginary, &has_imaginary) || !has_imaginary) {
-        expr_free(imaginary);
-        expr_free(real);
-        return false;
-    }
-
-    sbuf_puts(b, "\\begin{aligned}\n\\sqrt[3]{");
-    emit_TeX_expr(f->a, b, PREC_LOWEST);
-    sbuf_puts(b, "}&=p+q\\mkern-2mu i,\\\\\np&=\\left(");
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_puts(b, "^{2}+");
-    emit_TeX_expr(imaginary, b, PREC_LOWEST);
-    sbuf_puts(b, "^{2}\\right)^{1/6}\\cos\\left(\\frac{1}{3}\\operatorname{atan2}(");
-    emit_TeX_expr(imaginary, b, PREC_LOWEST);
-    sbuf_puts(b, ",");
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_puts(b, ")\\right),\\\\\nq&=\\left(");
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_puts(b, "^{2}+");
-    emit_TeX_expr(imaginary, b, PREC_LOWEST);
-    sbuf_puts(b, "^{2}\\right)^{1/6}\\sin\\left(\\frac{1}{3}\\operatorname{atan2}(");
-    emit_TeX_expr(imaginary, b, PREC_LOWEST);
-    sbuf_puts(b, ",");
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_puts(b, ")\\right)\\end{aligned}");
-
-    expr_free(imaginary);
-    expr_free(real);
-    return true;
-}
-
-bool emit_TeX_analytic_unary_cartesian(const expr_t *f, sbuf_t *b)
-{
-    static const char *index_names[] = {"n", "m", "k", "l", "j"};
-    expr_t *real = NULL;
-    expr_t *imaginary = NULL;
-    bool has_imaginary = false;
-    const char *index = "j";
-    const char *name;
-
-    if (!f || !f->ops || f->ops->arity != EXPR_OP_UNARY ||
-        !expr_kind_has_analytic_cartesian_series(f->ops->kind) ||
-        !expr_cartesian_parts_for_display(f->a, &real, &imaginary, &has_imaginary) || !has_imaginary) {
-        expr_free(imaginary);
-        expr_free(real);
-        return false;
-    }
-    for (size_t i = 0u; i < sizeof(index_names) / sizeof(index_names[0]); ++i) {
-        if (!expr_stringout_tree_has_symbol_name(f, index_names[i])) {
-            index = index_names[i];
-            break;
-        }
-    }
-    name = f->ops->TeX_name ? f->ops->TeX_name : "\\operatorname{f}";
-
-    sbuf_puts(b, "\\begin{aligned}\n");
-    sbuf_puts(b, name);
-    sbuf_putc(b, '(');
-    emit_TeX_expr(f->a, b, PREC_LOWEST);
-    sbuf_puts(b, ")&=p+q\\mkern-2mu i,\\\\\np&=\\sum_{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "=0}^{\\infty}\\frac{(-1)^{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "}");
-    emit_TeX_expr(imaginary, b, PREC_POW);
-    sbuf_puts(b, "^{2");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "}}{(2");
-    sbuf_puts(b, index);
-    sbuf_puts(b, ")!}");
-    sbuf_puts(b, "\\left(");
-    sbuf_puts(b, name);
-    sbuf_puts(b, "\\right)^{(2");
-    sbuf_puts(b, index);
-    sbuf_puts(b, ")}(");
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_puts(b, "),\\\\\nq&=\\sum_{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "=0}^{\\infty}\\frac{(-1)^{");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "}");
-    emit_TeX_expr(imaginary, b, PREC_POW);
-    sbuf_puts(b, "^{2");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "+1}}{(2");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "+1)!}");
-    sbuf_puts(b, "\\left(");
-    sbuf_puts(b, name);
-    sbuf_puts(b, "\\right)^{(2");
-    sbuf_puts(b, index);
-    sbuf_puts(b, "+1)}(");
-    emit_TeX_expr(real, b, PREC_LOWEST);
-    sbuf_puts(b, ")\\end{aligned}");
-
-    expr_free(imaginary);
-    expr_free(real);
-    return true;
 }

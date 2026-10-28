@@ -14,11 +14,15 @@
 #include <string.h>
 
 #include "equation-t.h"
+#include "string-t.h"
+#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
+#include "internal/expr_notation_internal.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
-#include "string-t.h"
 
 typedef struct {
     string_view_t lhs;
@@ -354,4 +358,42 @@ equation_t *equ_from_string(const char *s)
     equation = equ_from_text(text);
     string_free(text);
     return equation;
+}
+
+/* Compose an equation from native sides supplied by a mathematical input reader. */
+TeX_t *equ_notation_input(const string_t *text, notation_read_fn read, void *context, bool *recognised)
+{
+    string_view_t view = string_view_trim(string_view_all(text));
+    size_t equality;
+    if (!equ_strip_outer_braces(&view)) {
+        *recognised = true;
+        return NULL;
+    }
+    size_t pipe;
+    if (equ_find_top_level_char(view, '|', &pipe))
+        view = string_view_slice(view, 0u, pipe);
+    if (!equ_find_top_level_char(view, '=', &equality))
+        return NULL;
+    *recognised = true;
+    equation_parse_parts_t parts;
+    if (!read || !equ_parse_parts(text, &parts))
+        return NULL;
+    string_t *left = string_from_view(&parts.lhs), *right = string_from_view(&parts.rhs);
+    string_t *bindings = parts.has_bindings ? string_from_view(&parts.bindings) : NULL;
+    if (parts.has_bindings) {
+        string_t *bound_left = left && bindings ? string_sprintf("{ %S | %S }", left, bindings) : NULL;
+        string_t *bound_right = right && bindings ? string_sprintf("{ %S | %S }", right, bindings) : NULL;
+        string_free(left);
+        string_free(right);
+        left = bound_left;
+        right = bound_right;
+    }
+    TeX_t *lhs = left ? read(context, left) : NULL, *rhs = right ? read(context, right) : NULL;
+    TeX_t *result = lhs && rhs ? TeX_equation(lhs, rhs, TeX_EQUATION_INLINE) : NULL;
+    TeX_free(lhs);
+    TeX_free(rhs);
+    string_free(left);
+    string_free(right);
+    string_free(bindings);
+    return result;
 }

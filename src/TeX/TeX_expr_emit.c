@@ -1,11 +1,11 @@
 /**
- * @file expr_stringout_TeX_emit.c
+ * @file TeX_expr_emit.c
  * @brief Recursive TeX expression body rendering.
  *
  * Emits node operations with grouping, source ordering and style-aware mathematical notation. It renders native
  * expression structure rather than introducing client-side simplification.
  *
- * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
+ * This is the native expression backend of the TeX module. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
@@ -20,25 +20,92 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_bindings.h"
-#define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_internal.h"
-#define MARS_EXPR_INTERNAL_ACCESS
-#include "expr_stringout.h"
-#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
-#include "expr_stringout_internal.h"
 #include "expression-t.h"
+#include "string-t.h"
+#include "TeX-t.h"
+
+#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
+#include "internal/expr_notation_internal.h"
+#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
+#include "internal/TeX_semantic_internal.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string-t.h"
+#define MARS_SHARED_EXPR_RENDER_INTERNAL_ACCESS
+#include "internal/expr_render_internal.h"
+#define MARS_TeX_SEMANTIC_SYMBOLS_INTERNAL_ACCESS
+#include "TeX_semantic_symbols.h"
+#define MARS_TeX_INTERNAL_ACCESS
+#include "TeX_expr_private.h"
 
-static _Thread_local unsigned TeX_source_order_depth;
+_Static_assert((int)TeX_PRECEDENCE_LOWEST == (int)PREC_LOWEST &&
+               (int)TeX_PRECEDENCE_ADDITION == (int)PREC_ADD &&
+               (int)TeX_PRECEDENCE_MULTIPLICATION == (int)PREC_MUL,
+               "Legacy TeX and expression precedence levels must agree");
 
-bool expr_TeX_source_order_preserved(void)
+static const char *TeX_expression_operation(const expr_t *expression)
 {
-    return TeX_source_order_depth != 0u;
+    expr_notation_operation_names_t names;
+    return expr_notation_operation_names(expression, &names) && names.canonical_name
+        ? TeX_operation_name(names.canonical_name) : NULL;
 }
+
+
+/* Keep allocation failure consistent with the expression output buffer contract. */
+static void emit_TeX_notation(const TeX_t *notation, sbuf_t *out)
+{
+    if (!notation) {
+        fprintf(stderr, "expr_to_string: out of memory\n");
+        abort();
+    }
+    sbuf_puts(out, TeX_source(notation));
+}
+
+static void emit_TeX_fraction_text(const char *numerator, const char *denominator, sbuf_t *out)
+{
+    TeX_t *top = TeX_raw(numerator), *bottom = TeX_raw(denominator);
+    TeX_t *fraction = TeX_fraction(top, bottom);
+    emit_TeX_notation(fraction, out);
+    TeX_free(fraction);
+    TeX_free(bottom);
+    TeX_free(top);
+}
+
+static void emit_TeX_fraction_expr(const expr_t *numerator, const expr_t *denominator,
+                                   bool absolute_numerator, bool absolute_denominator, sbuf_t *out)
+{
+    sbuf_t top, bottom;
+    sbuf_init(&top);
+    sbuf_init(&bottom);
+    if (absolute_numerator)
+        emit_TeX_expr_abs(numerator, &top, PREC_LOWEST);
+    else
+        TeX_emit_expr(numerator, &top, PREC_LOWEST);
+    if (absolute_denominator)
+        emit_TeX_expr_abs(denominator, &bottom, PREC_LOWEST);
+    else
+        TeX_emit_expr(denominator, &bottom, PREC_LOWEST);
+    emit_TeX_fraction_text(sbuf_c_str(&top), sbuf_c_str(&bottom), out);
+    sbuf_free(&bottom);
+    sbuf_free(&top);
+}
+
+static void emit_TeX_radical(const expr_t *radicand, const char *index, sbuf_t *out)
+{
+    sbuf_t body;
+    sbuf_init(&body);
+    TeX_emit_expr(radicand, &body, 0);
+    TeX_t *value = TeX_raw(sbuf_c_str(&body));
+    TeX_t *degree = index ? TeX_raw(index) : NULL;
+    TeX_t *root = (!index || degree) ? TeX_root(value, degree) : NULL;
+    emit_TeX_notation(root, out);
+    TeX_free(root);
+    TeX_free(degree);
+    TeX_free(value);
+    sbuf_free(&body);
+}
+
 
 static int TeX_exp_needs_parens(const expr_t *e)
 {
@@ -60,7 +127,7 @@ static void emit_TeX_factor_abs(const expr_t *f, sbuf_t *b)
     if (expr_is_negative(f))
         emit_TeX_expr_abs(f, b, PREC_MUL);
     else
-        emit_TeX_expr(f, b, PREC_MUL);
+        TeX_emit_expr(f, b, PREC_MUL);
 }
 
 static bool TeX_contains_calculus(const expr_t *f);
@@ -82,7 +149,7 @@ static bool TeX_factor_is_projection(const expr_t *factor)
 }
 
 /* Use the same factor separation in ordinary products, fractions and multiline output. */
-void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
+void TeX_emit_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
 {
     const expr_t *right_power_base = NULL;
 
@@ -122,22 +189,12 @@ void emit_TeX_mul_separator(const expr_t *left, const expr_t *right, sbuf_t *b)
     sbuf_puts(b, "\\mkern-2mu ");
 }
 
-bool expr_is_rendered_log_local(const expr_t *expr)
-{
-    return expr_is_op(expr, &ops_log) ||
-           (expr && expr_is_const(expr) && expr->binding_expr &&
-            expr->binding_expr->kind == EXPR_BINDING_EXPR_UNARY_OP &&
-            expr->binding_expr->u.unary_op.ops == &ops_log);
-}
-
 /* Inspect only the expression tree being rendered; binding tables and derivative-coordinate metadata are not scanned. */
 static bool TeX_contains_calculus(const expr_t *f)
 {
     if (!f)
         return false;
-    if (expr_is_op(f, &ops_integral) ||
-        (expr_is_formal_derivative(f) &&
-         (expr_TeX_partial_derivatives_enabled() || expr_TeX_total_derivatives_enabled())))
+    if (expr_is_op(f, &ops_integral))
         return true;
     return TeX_contains_calculus(f->a) || TeX_contains_calculus(f->b);
 }
@@ -230,7 +287,7 @@ static bool emit_TeX_calculus_quotient(const expr_t *f, sbuf_t *b, int parent_pr
             sbuf_puts(b, "\\,");
         if (inverse_exp) {
             sbuf_puts(b, "e^{");
-            emit_TeX_expr(negative_exponent, b, PREC_LOWEST);
+            TeX_emit_expr(negative_exponent, b, PREC_LOWEST);
             sbuf_putc(b, '}');
         } else {
             sbuf_puts(b, "\\left(");
@@ -259,14 +316,14 @@ static bool emit_TeX_large_sum_quotient(const expr_t *sum, const expr_t *denomin
     sbuf_t numerator, divisor;
     sbuf_init(&numerator);
     sbuf_init(&divisor);
-    emit_TeX_expr(sum, &numerator, PREC_LOWEST);
+    TeX_emit_expr(sum, &numerator, PREC_LOWEST);
     if (q != 1L) {
         char text[32];
         snprintf(text, sizeof(text), "%ld", q);
         sbuf_puts(&divisor, text);
-        emit_TeX_mul_separator(NULL, denominator, &divisor);
+        TeX_emit_mul_separator(NULL, denominator, &divisor);
     }
-    emit_TeX_expr(denominator, &divisor, q == 1L ? PREC_LOWEST : PREC_MUL);
+    TeX_emit_expr(denominator, &divisor, q == 1L ? PREC_LOWEST : PREC_MUL);
     bool factored = sbuf_len(&numerator) >= 200u && sbuf_len(&divisor) <= 32u;
     if (factored) {
         if (PREC_MUL < parent_prec)
@@ -330,7 +387,7 @@ static bool emit_TeX_rational_quotient(const expr_t *numerator, const expr_t *de
         if (i == coefficient_index)
             continue;
         if (emitted)
-            emit_TeX_mul_separator(previous_factor, factors[i], b);
+            TeX_emit_mul_separator(previous_factor, factors[i], b);
         emit_TeX_expr_abs(factors[i], b, PREC_MUL);
         previous_factor = factors[i];
         emitted = true;
@@ -339,8 +396,8 @@ static bool emit_TeX_rational_quotient(const expr_t *numerator, const expr_t *de
     char text[32];
     snprintf(text, sizeof(text), "%ld", q);
     sbuf_puts(b, text);
-    emit_TeX_mul_separator(NULL, denominator, b);
-    emit_TeX_expr(denominator, b, PREC_MUL);
+    TeX_emit_mul_separator(NULL, denominator, b);
+    TeX_emit_expr(denominator, b, PREC_MUL);
     sbuf_putc(b, '}');
     if (PREC_MUL < parent_prec)
         sbuf_puts(b, "\\right)");
@@ -366,7 +423,7 @@ static bool emit_TeX_reciprocal_sum(const expr_t *f, sbuf_t *b, int parent_prec)
     if (numerator < 0)
         sbuf_putc(b, '-');
     sbuf_puts(b, "\\frac{");
-    emit_TeX_expr(sum, b, PREC_LOWEST);
+    TeX_emit_expr(sum, b, PREC_LOWEST);
     char divisor[32];
     snprintf(divisor, sizeof(divisor), "}{%ld}", denominator);
     sbuf_puts(b, divisor);
@@ -407,7 +464,7 @@ void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_neg(f)) {
-        emit_TeX_expr(f->a, b, parent_prec);
+        TeX_emit_expr(f->a, b, parent_prec);
         return;
     }
 
@@ -429,7 +486,7 @@ void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
 
         for (int i = 0; i < n; ++i) {
             if (i > 0)
-                emit_TeX_mul_separator(fac[i - 1], fac[i], b);
+                TeX_emit_mul_separator(fac[i - 1], fac[i], b);
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_puts(b, "\\left(");
             emit_TeX_factor_abs(fac[i], b);
@@ -450,30 +507,13 @@ void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
                 sbuf_puts(b, "\\right)");
             return;
         }
-        sbuf_puts(b, "\\frac{");
-        if (expr_is_negative(f->a))
-            emit_TeX_expr_abs(f->a, b, PREC_LOWEST);
-        else
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
-        sbuf_puts(b, "}{");
-        if (expr_is_negative(f->b))
-            emit_TeX_expr_abs(f->b, b, PREC_LOWEST);
-        else
-            emit_TeX_expr(f->b, b, PREC_LOWEST);
-        sbuf_putc(b, '}');
+        emit_TeX_fraction_expr(f->a, f->b, expr_is_negative(f->a), expr_is_negative(f->b), b);
         if (need)
             sbuf_puts(b, "\\right)");
         return;
     }
 
-    emit_TeX_expr(f, b, parent_prec);
-}
-
-bool emit_expr_abs_needs_visible_add_parens(const expr_t *expr)
-{
-    const expr_t *constant = expr_is_neg(expr) ? expr->a : expr;
-
-    return additive_const_needs_visible_parens(constant);
+    TeX_emit_expr(f, b, parent_prec);
 }
 
 static bool emit_TeX_expr_abs_needs_visible_add_parens(const expr_t *expr)
@@ -481,9 +521,7 @@ static bool emit_TeX_expr_abs_needs_visible_add_parens(const expr_t *expr)
     return emit_expr_abs_needs_visible_add_parens(expr);
 }
 
-
 static _Thread_local unsigned TeX_expression_depth;
-static _Thread_local bool preserve_TeX_operations;
 static _Thread_local const expr_t *TeX_shift_centre;
 static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec);
 
@@ -536,16 +574,16 @@ static const expr_t *TeX_postfix_factorial_argument(const expr_t *expr)
     return NULL;
 }
 
-void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
+void TeX_emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
 {
     const char *temporary = expr_math_temporary_name(f);
     if (temporary) {
-        emit_TeX_name(b, temporary);
+        TeX_emit_name(b, temporary);
         return;
     }
     expr_cartesian_composition_t view;
     const bool outermost = TeX_expression_depth == 0u;
-    expr_t *resolved = outermost && !preserve_TeX_operations && expr_is_integral_transform(f)
+    expr_t *resolved = outermost && expr_is_integral_transform(f)
                            ? expr_transform_result(f) : NULL;
     if (resolved)
         f = resolved;
@@ -557,17 +595,17 @@ void emit_TeX_expr(const expr_t *f, sbuf_t *b, int parent_prec)
     if (centre)
         TeX_shift_centre = centre;
 
-    if (TeX_expression_depth++ == 0u && !preserve_TeX_operations && expr_cartesian_composition_init(f, &view)) {
+    if (TeX_expression_depth++ == 0u && expr_cartesian_composition_init(f, &view)) {
         sbuf_puts(b, "\\begin{aligned}\n&");
-        emit_TeX_expr(view.compact, b, PREC_LOWEST);
+        TeX_emit_expr(view.compact, b, PREC_LOWEST);
         sbuf_puts(b, ",\\\\\n");
-        emit_TeX_expr(view.real_name, b, PREC_LOWEST);
+        TeX_emit_expr(view.real_name, b, PREC_LOWEST);
         sbuf_puts(b, "&=");
-        emit_TeX_expr(view.real_definition, b, PREC_LOWEST);
+        TeX_emit_expr(view.real_definition, b, PREC_LOWEST);
         sbuf_puts(b, ",\\\\\n");
-        emit_TeX_expr(view.imaginary_name, b, PREC_LOWEST);
+        TeX_emit_expr(view.imaginary_name, b, PREC_LOWEST);
         sbuf_puts(b, "&=");
-        emit_TeX_expr(view.imaginary_definition, b, PREC_LOWEST);
+        TeX_emit_expr(view.imaginary_definition, b, PREC_LOWEST);
         sbuf_puts(b, "\\end{aligned}");
         expr_cartesian_composition_clear(&view);
     } else {
@@ -595,78 +633,82 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     if (TeX_shift_centre && expr_display_centred_shift_parts(f, TeX_shift_centre, &shift, &subtract)) {
         if (parent_prec > PREC_ADD)
             sbuf_puts(b, "\\left(");
-        emit_TeX_expr(TeX_shift_centre, b, PREC_ADD);
+        TeX_emit_expr(TeX_shift_centre, b, PREC_ADD);
         sbuf_puts(b, subtract ? " - " : " + ");
-        emit_TeX_expr(shift, b, PREC_MUL);
+        TeX_emit_expr(shift, b, PREC_MUL);
         if (parent_prec > PREC_ADD)
             sbuf_puts(b, "\\right)");
         return;
     }
 
     if (expr_is_op(f, &ops_real_domain)) {
-        emit_TeX_expr(f->a, b, parent_prec);
+        TeX_emit_expr(f->a, b, parent_prec);
         sbuf_puts(b, "\\quad (");
         for (const expr_t *pair = f->b; pair; pair = pair->b->b) {
             if (pair != f->b)
                 sbuf_puts(b, ",\\;");
             const expr_t *nonzero = expr_domain_nonzero_operand(pair);
             if (nonzero) {
-                emit_TeX_expr(nonzero, b, PREC_LOWEST);
+                TeX_emit_expr(nonzero, b, PREC_LOWEST);
                 sbuf_puts(b, "\\ne 0");
                 continue;
             }
             if (expr_is_op(pair->a, &ops_nonnegative_integer) || expr_is_op(pair->a, &ops_real_parameter)) {
-                emit_TeX_expr(pair->a->a, b, PREC_LOWEST);
+                TeX_emit_expr(pair->a->a, b, PREC_LOWEST);
                 sbuf_puts(b, expr_is_op(pair->a, &ops_real_parameter) ? "\\in\\mathbb{R}" : "\\in\\mathbb{Z}_{\\ge0}");
                 continue;
             }
-            sbuf_puts(b, ops_real_bound.TeX_name);
+            sbuf_puts(b, TeX_operation_name("realpart"));
             sbuf_putc(b, '(');
-            emit_TeX_expr(pair->a, b, PREC_LOWEST);
+            TeX_emit_expr(pair->a, b, PREC_LOWEST);
             sbuf_puts(b, ")>");
-            emit_TeX_expr(pair->b->a, b, PREC_LOWEST);
+            TeX_emit_expr(pair->b->a, b, PREC_LOWEST);
         }
         expr_distribution_TeX_conditions(f, b);
         sbuf_putc(b, ')');
         return;
     }
     if (expr_is_integral_transform(f)) {
-        expr_t *result = preserve_TeX_operations ? NULL : expr_transform_result(f);
+        expr_t *result = expr_transform_result(f);
         if (result) {
-            emit_TeX_expr(result, b, parent_prec);
+            TeX_emit_expr(result, b, parent_prec);
         } else {
-            sbuf_puts(b, f->ops->TeX_name);
+            sbuf_puts(b, TeX_expression_operation(f));
             sbuf_puts(b, "_{");
             if (f->b->a->name)
-                emit_TeX_name(b, f->b->a->name);
+                TeX_emit_name(b, f->b->a->name);
             else
-                emit_TeX_expr(f->b->a, b, PREC_LOWEST);
+                TeX_emit_expr(f->b->a, b, PREC_LOWEST);
             sbuf_puts(b, "\\to ");
             if (f->b->b->a->name)
-                emit_TeX_name(b, f->b->b->a->name);
+                TeX_emit_name(b, f->b->b->a->name);
             else
-                emit_TeX_expr(f->b->b->a, b, PREC_LOWEST);
+                TeX_emit_expr(f->b->b->a, b, PREC_LOWEST);
             sbuf_puts(b, "}\\{");
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a, b, PREC_LOWEST);
             sbuf_puts(b, "\\}");
         }
         expr_free(result);
         return;
     }
     if (expr_is_formal_derivative(f)) {
-        emit_formal_derivative_TeX(f, b);
+        TeX_emit_formal_derivative(f, b);
         return;
     }
     if (expr_is_op(f, &ops_ordered_derivative)) {
-        emit_ordered_derivative(f, b, 2);
+        char *derivative = expr_to_TeX_body(f);
+        if (derivative) {
+            sbuf_puts(b, derivative);
+            free(derivative);
+        }
         return;
     }
     if (expr_is_arbitrary_function(f)) {
-        emit_arbitrary_function_TeX(f, b);
+        TeX_emit_arbitrary_function(f, b);
         return;
     }
     if (expr_is_op(f, &ops_argument_list)) {
-        emit_argument_list_TeX(f, b);
+        TeX_emit_argument_list(f, b);
         return;
     }
 
@@ -676,7 +718,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_op(f, &ops_integral)) {
-        emit_TeX_integral(f, b, parent_prec);
+        TeX_emit_integral(f, b, parent_prec);
         return;
     }
 
@@ -687,7 +729,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         if (need)
             sbuf_puts(b, "\\left(");
         if (expr_is_neg(a)) {
-            emit_TeX_expr(a->a, b, 0);
+            TeX_emit_expr(a->a, b, 0);
         } else if (expr_is_negative(a)) {
             emit_TeX_expr_abs(a, b, 0);
         } else {
@@ -695,7 +737,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, '-');
             if (child_needs_paren)
                 sbuf_puts(b, "\\left(");
-            emit_TeX_expr(a, b, 0);
+            TeX_emit_expr(a, b, 0);
             if (child_needs_paren)
                 sbuf_puts(b, "\\right)");
         }
@@ -721,7 +763,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
                 expr_t *argument = expr_add_long(f->a, 1L);
 
                 sbuf_puts(b, "\\Gamma(");
-                emit_TeX_expr(argument, b, PREC_LOWEST);
+                TeX_emit_expr(argument, b, PREC_LOWEST);
                 sbuf_putc(b, ')');
                 expr_free(argument);
                 if (need)
@@ -732,18 +774,18 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
             if (group_argument)
                 sbuf_puts(b, "\\left(");
-            emit_TeX_expr(factorial_argument, b, PREC_LOWEST);
+            TeX_emit_expr(factorial_argument, b, PREC_LOWEST);
             if (group_argument)
                 sbuf_puts(b, "\\right)");
             sbuf_putc(b, '!');
         } else if (expr_is_op(f, &ops_real_bound) || expr_is_op(f, &ops_imag_coordinate)) {
-            sbuf_puts(b, f->ops->TeX_name);
+            sbuf_puts(b, TeX_expression_operation(f));
             sbuf_puts(b, "\\mathopen{}\\left\\{");
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a, b, PREC_LOWEST);
             sbuf_puts(b, "\\right\\}");
         } else if (expr_is_op(f, &ops_conj)) {
             sbuf_puts(b, "\\overline{");
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a, b, PREC_LOWEST);
             sbuf_putc(b, '}');
         } else if (expr_is_op(f, &ops_abs)) {
             sbuf_puts(b, "\\left|");
@@ -751,34 +793,30 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, "\\right|");
         } else if (expr_is_op(f, &ops_floor)) {
             sbuf_puts(b, "\\left\\lfloor ");
-            emit_TeX_expr(f->a, b, 0);
+            TeX_emit_expr(f->a, b, 0);
             sbuf_puts(b, " \\right\\rfloor");
         } else if (expr_is_op(f, &ops_ceil)) {
             sbuf_puts(b, "\\left\\lceil ");
-            emit_TeX_expr(f->a, b, 0);
+            TeX_emit_expr(f->a, b, 0);
             sbuf_puts(b, " \\right\\rceil");
         } else if (expr_is_sqrt_expr(f)) {
-            sbuf_puts(b, "\\sqrt{");
-            emit_TeX_expr(f->a, b, 0);
-            sbuf_putc(b, '}');
+            emit_TeX_radical(f->a, NULL, b);
         } else if (expr_is_op(f, &ops_cubrt)) {
-            sbuf_puts(b, "\\sqrt[3]{");
-            emit_TeX_expr(f->a, b, 0);
-            sbuf_putc(b, '}');
+            emit_TeX_radical(f->a, "3", b);
         } else if (expr_is_op(f, &ops_exp)) {
             if (!emit_TeX_exp_unit_fraction_root(f->a, b)) {
                 sbuf_puts(b, "e^{");
-                emit_TeX_expr(f->a, b, 0);
+                TeX_emit_expr(f->a, b, 0);
                 sbuf_putc(b, '}');
             }
         } else {
             sbuf_puts(b, name ? name : "\\operatorname{f}");
             if (TeX_unary_has_bare_greek_argument(f)) {
                 sbuf_putc(b, ' ');
-                emit_TeX_expr(f->a, b, PREC_UNARY);
+                TeX_emit_expr(f->a, b, PREC_UNARY);
             } else {
                 sbuf_putc(b, '(');
-                emit_TeX_expr(f->a, b, 0);
+                TeX_emit_expr(f->a, b, 0);
                 sbuf_putc(b, ')');
             }
         }
@@ -795,7 +833,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
         if (num_is_real(f->c) && num_sign(f->c) < 0 && TeX_contains_calculus(f->a)) {
             sbuf_puts(b, "\\left(");
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a, b, PREC_LOWEST);
             sbuf_puts(b, "\\right)^{");
             emit_TeX_const_value(b, f);
             sbuf_putc(b, '}');
@@ -816,7 +854,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
             if (group_factorial)
                 sbuf_puts(b, "\\left(");
-            emit_TeX_expr(f->a, b, positive_exponent == 1L ? PREC_LOWEST : PREC_POW);
+            TeX_emit_expr(f->a, b, positive_exponent == 1L ? PREC_LOWEST : PREC_POW);
             if (group_factorial)
                 sbuf_puts(b, "\\right)");
             if (positive_exponent != 1L) {
@@ -855,14 +893,14 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             }
             if (expr_is_op(f->a, &ops_real_bound) || expr_is_op(f->a, &ops_imag_coordinate)) {
                 sbuf_puts(b, "}\\mathopen{}\\left\\{");
-                emit_TeX_expr(f->a->a, b, PREC_LOWEST);
+                TeX_emit_expr(f->a->a, b, PREC_LOWEST);
                 sbuf_puts(b, "\\right\\}");
             } else if (TeX_unary_has_bare_greek_argument(f->a)) {
                 sbuf_puts(b, "} ");
-                emit_TeX_expr(f->a->a, b, PREC_UNARY);
+                TeX_emit_expr(f->a->a, b, PREC_UNARY);
             } else {
                 sbuf_puts(b, "}(");
-                emit_TeX_expr(f->a->a, b, 0);
+                TeX_emit_expr(f->a->a, b, 0);
                 sbuf_putc(b, ')');
             }
         } else {
@@ -870,7 +908,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
             if (base_needs_parens)
                 sbuf_puts(b, "\\left(");
-            emit_TeX_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+            TeX_emit_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
             if (base_needs_parens)
                 sbuf_puts(b, "\\right)");
             sbuf_puts(b, "^{");
@@ -933,7 +971,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
         for (int i = 0; i < n; i++) {
             if (i > 0)
-                emit_TeX_mul_separator(fac[i - 1], fac[i], b);
+                TeX_emit_mul_separator(fac[i - 1], fac[i], b);
             bool grouped = n > 1 && mul_coefficient_needs_parens(fac[i], i == 0 && sign > 0);
             if (grouped)
                 sbuf_puts(b, "\\left(");
@@ -963,7 +1001,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         if (match_add_negative_complex_rhs(f, &negative_complex_base, &negative_complex_rhs)) {
             if (need)
                 sbuf_puts(b, "\\left(");
-            emit_TeX_expr(negative_complex_base, b, PREC_ADD);
+            TeX_emit_expr(negative_complex_base, b, PREC_ADD);
             sbuf_puts(b, " - \\left(");
             emit_TeX_expr_abs(negative_complex_rhs, b, PREC_ADD);
             sbuf_puts(b, "\\right)");
@@ -977,14 +1015,14 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
             if (need)
                 sbuf_puts(b, "\\left(");
-            emit_TeX_expr(complex_shift_base, b, PREC_ADD);
+            TeX_emit_expr(complex_shift_base, b, PREC_ADD);
             sbuf_puts(b, " - \\left(");
-            emit_TeX_expr(complex_shift_real, b, PREC_ADD);
+            TeX_emit_expr(complex_shift_real, b, PREC_ADD);
             sbuf_puts(b, imag_neg ? " - " : " + ");
             if (imag_neg)
                 emit_TeX_expr_abs(complex_shift_imag, b, PREC_ADD);
             else
-                emit_TeX_expr(complex_shift_imag, b, PREC_ADD);
+                TeX_emit_expr(complex_shift_imag, b, PREC_ADD);
             sbuf_puts(b, "\\right)");
             if (need)
                 sbuf_puts(b, "\\right)");
@@ -996,7 +1034,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
         if (need)
             sbuf_puts(b, "\\left(");
-        emit_TeX_expr(f->a, b, PREC_ADD);
+        TeX_emit_expr(f->a, b, PREC_ADD);
 
         if (expr_is_op(f, &ops_add))
             sbuf_puts(b, neg ? " - " : " + ");
@@ -1011,7 +1049,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         if (neg)
             emit_TeX_expr_abs(f->b, b, PREC_ADD);
         else
-            emit_TeX_expr(f->b, b, PREC_ADD);
+            TeX_emit_expr(f->b, b, PREC_ADD);
         if (rhs_parens)
             sbuf_puts(b, "\\right)");
 
@@ -1035,11 +1073,11 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             if (need)
                 sbuf_puts(b, "\\left(");
             sbuf_puts(b, "\\frac{");
-            emit_TeX_expr(f->a->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a->a, b, PREC_LOWEST);
             sbuf_puts(b, "}{");
-            emit_TeX_expr(f->a->b, b, PREC_MUL);
-            emit_TeX_mul_separator(f->a->b, f->b, b);
-            emit_TeX_expr(f->b, b, PREC_MUL);
+            TeX_emit_expr(f->a->b, b, PREC_MUL);
+            TeX_emit_mul_separator(f->a->b, f->b, b);
+            TeX_emit_expr(f->b, b, PREC_MUL);
             sbuf_putc(b, '}');
             if (need)
                 sbuf_puts(b, "\\right)");
@@ -1055,9 +1093,9 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             if (need)
                 sbuf_puts(b, "\\left(");
             sbuf_puts(b, "\\frac{1}{");
-            emit_TeX_expr(denominator, b, PREC_LOWEST);
+            TeX_emit_expr(denominator, b, PREC_LOWEST);
             sbuf_puts(b, "} ");
-            emit_TeX_expr(atan_expr, b, PREC_MUL);
+            TeX_emit_expr(atan_expr, b, PREC_MUL);
             if (need)
                 sbuf_puts(b, "\\right)");
             return;
@@ -1068,17 +1106,7 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         if (neg_num ^ neg_den)
             sbuf_putc(b, '-');
 
-        sbuf_puts(b, "\\frac{");
-        if (neg_num)
-            emit_TeX_expr_abs(f->a, b, PREC_LOWEST);
-        else
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
-        sbuf_puts(b, "}{");
-        if (neg_den)
-            emit_TeX_expr_abs(f->b, b, PREC_LOWEST);
-        else
-            emit_TeX_expr(f->b, b, PREC_LOWEST);
-        sbuf_putc(b, '}');
+        emit_TeX_fraction_expr(f->a, f->b, neg_num, neg_den, b);
 
         if (need)
             sbuf_puts(b, "\\right)");
@@ -1103,14 +1131,14 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, "\\left(");
         if (base_needs_parens)
             sbuf_puts(b, "\\left(");
-        emit_TeX_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+        TeX_emit_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
         if (base_needs_parens)
             sbuf_puts(b, "\\right)");
         sbuf_puts(b, "^{");
         if (TeX_exp_needs_parens(f->b))
-            emit_TeX_expr(f->b, b, 0);
+            TeX_emit_expr(f->b, b, 0);
         else
-            emit_TeX_expr(f->b, b, 0);
+            TeX_emit_expr(f->b, b, 0);
         sbuf_putc(b, '}');
         if (need)
             sbuf_puts(b, "\\right)");
@@ -1120,16 +1148,16 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     if (f->ops->arity == EXPR_OP_BINARY) {
         if (expr_is_op(f, &ops_root)) {
             sbuf_puts(b, "\\sqrt[");
-            emit_TeX_expr(f->b, b, PREC_LOWEST);
+            TeX_emit_expr(f->b, b, PREC_LOWEST);
             sbuf_puts(b, "]{");
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a, b, PREC_LOWEST);
             sbuf_putc(b, '}');
             return;
         }
         if (expr_is_op(f, &ops_indexed_symbol)) {
-            emit_TeX_expr(f->a, b, 0);
+            TeX_emit_expr(f->a, b, 0);
             sbuf_puts(b, "_{");
-            emit_TeX_expr(f->b, b, 0);
+            TeX_emit_expr(f->b, b, 0);
             sbuf_putc(b, '}');
             return;
         }
@@ -1151,22 +1179,22 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
                 }
             }
             sbuf_puts(b, expr_is_op(f, &ops_summation) ? "\\sum_{" : "\\prod_{");
-            emit_TeX_expr(index, b, 0);
+            TeX_emit_expr(index, b, 0);
             sbuf_putc(b, '=');
             if (lower)
-                emit_TeX_expr(lower, b, 0);
+                TeX_emit_expr(lower, b, 0);
             else
                 sbuf_putc(b, '0');
             sbuf_puts(b, "}^{");
             if (upper)
-                emit_TeX_expr(upper, b, 0);
+                TeX_emit_expr(upper, b, 0);
             else
                 sbuf_puts(b, "\\infty");
             sbuf_putc(b, '}');
             TeX_index_domain_t scope = {index, !lower || TeX_known_nonnegative_integer(lower), TeX_index_domain};
 
             TeX_index_domain = &scope;
-            emit_TeX_expr(f->a, b, PREC_MUL);
+            TeX_emit_expr(f->a, b, PREC_MUL);
             TeX_index_domain = scope.outer;
             if (grouped)
                 sbuf_puts(b, "\\right)");
@@ -1174,9 +1202,9 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_op(f, &ops_qdigamma)) {
             sbuf_puts(b, "\\psi_{");
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a, b, PREC_LOWEST);
             sbuf_puts(b, "}\\left(");
-            emit_TeX_expr(f->b, b, PREC_LOWEST);
+            TeX_emit_expr(f->b, b, PREC_LOWEST);
             sbuf_puts(b, "\\right)");
             return;
         }
@@ -1185,21 +1213,21 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
         if (expr_is_op(f, &ops_zetah) || expr_is_op(f, &ops_zatahp)) {
-            sbuf_puts(b, f->ops->TeX_name);
+            sbuf_puts(b, TeX_expression_operation(f));
             sbuf_putc(b, '(');
-            emit_TeX_expr(f->a, b, 0);
+            TeX_emit_expr(f->a, b, 0);
             sbuf_puts(b, ", ");
-            emit_TeX_expr(f->b, b, 0);
+            TeX_emit_expr(f->b, b, 0);
             sbuf_putc(b, ')');
             return;
         }
         if (expr_is_op(f, &ops_lerch_phi) && f->a && expr_is_op(f->a, &ops_lerch_phi_pack)) {
             sbuf_puts(b, "\\Phi\\left(");
-            emit_TeX_expr(f->a->a, b, 0);
+            TeX_emit_expr(f->a->a, b, 0);
             sbuf_puts(b, ", ");
-            emit_TeX_expr(f->a->b, b, 0);
+            TeX_emit_expr(f->a->b, b, 0);
             sbuf_puts(b, ", ");
-            emit_TeX_expr(f->b, b, 0);
+            TeX_emit_expr(f->b, b, 0);
             sbuf_puts(b, "\\right)");
             return;
         }
@@ -1208,12 +1236,12 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
         if (f->ops == &ops_chebyshev_t || f->ops == &ops_chebyshev_u || f->ops == &ops_hermite_h) {
-            sbuf_puts(b, f->ops->TeX_name);
+            sbuf_puts(b, TeX_expression_operation(f));
             sbuf_puts(b, "_{");
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a, b, PREC_LOWEST);
             sbuf_puts(b, "}");
             sbuf_puts(b, "\\left(");
-            emit_TeX_expr(f->b, b, PREC_LOWEST);
+            TeX_emit_expr(f->b, b, PREC_LOWEST);
             sbuf_puts(b, "\\right)");
             return;
         }
@@ -1227,18 +1255,18 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         }
         if (expr_is_op(f, &ops_clausen)) {
             sbuf_puts(b, "\\operatorname{Cl}_{");
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a, b, PREC_LOWEST);
             sbuf_puts(b, "}(");
-            emit_TeX_expr(f->b, b, PREC_LOWEST);
+            TeX_emit_expr(f->b, b, PREC_LOWEST);
             sbuf_putc(b, ')');
             return;
         }
         if (expr_cylindrical_symbol(f)) {
-            sbuf_puts(b, f->ops->TeX_name);
+            sbuf_puts(b, TeX_expression_operation(f));
             sbuf_puts(b, "_{");
-            emit_TeX_expr(f->a, b, PREC_LOWEST);
+            TeX_emit_expr(f->a, b, PREC_LOWEST);
             sbuf_puts(b, "}\\left(");
-            emit_TeX_expr(f->b, b, PREC_LOWEST);
+            TeX_emit_expr(f->b, b, PREC_LOWEST);
             sbuf_puts(b, "\\right)");
             return;
         }
@@ -1262,62 +1290,23 @@ static void emit_TeX_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_TeX_hypergeometric_pFq(f, b);
             return;
         }
-        if (f->ops->TeX_name)
-            sbuf_puts(b, f->ops->TeX_name);
+        const char *operation = TeX_expression_operation(f);
+        if (operation)
+            sbuf_puts(b, operation);
         else {
+            expr_notation_operation_names_t names = {0};
+            expr_notation_operation_names(f, &names);
             sbuf_puts(b, "\\operatorname{");
-            sbuf_puts(b, expr_ops_expression_name(f->ops));
+            sbuf_puts(b, names.expression_name ? names.expression_name : "?");
             sbuf_putc(b, '}');
         }
         sbuf_putc(b, '(');
-        emit_TeX_expr(f->a, b, 0);
+        TeX_emit_expr(f->a, b, 0);
         sbuf_puts(b, ", ");
-        emit_TeX_expr(f->b, b, 0);
+        TeX_emit_expr(f->b, b, 0);
         sbuf_putc(b, ')');
         return;
     }
 
     emit_TeX_atom(f, b);
-}
-
-
-char *expr_to_TeX_operation_body(const expr_t *expr)
-{
-    sbuf_t buffer;
-    bool previous = preserve_TeX_operations;
-
-    if (!expr)
-        return NULL;
-    sbuf_init(&buffer);
-    preserve_TeX_operations = true;
-    ++TeX_source_order_depth;
-    emit_TeX_expr(expr, &buffer, PREC_LOWEST);
-    --TeX_source_order_depth;
-    preserve_TeX_operations = previous;
-    char *text = expr_tostring_texify(sbuf_c_str(&buffer));
-    sbuf_free(&buffer);
-    return text;
-}
-
-/* Render an authored equation term without polynomial reordering, retaining the normal calculus factor layout. */
-char *expr_to_TeX_body_ordered(const expr_t *expr, bool partial)
-{
-    if (!expr)
-        return NULL;
-    sbuf_t buffer;
-    sbuf_init(&buffer);
-    ++TeX_source_order_depth;
-    if (partial)
-        expr_TeX_partial_derivatives_push();
-    else
-        expr_TeX_total_derivatives_push();
-    emit_TeX_expr(expr, &buffer, PREC_LOWEST);
-    if (partial)
-        expr_TeX_partial_derivatives_pop();
-    else
-        expr_TeX_total_derivatives_pop();
-    --TeX_source_order_depth;
-    char *text = expr_tostring_texify(sbuf_c_str(&buffer));
-    sbuf_free(&buffer);
-    return text;
 }

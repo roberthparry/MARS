@@ -100,13 +100,13 @@ static void test_bessel_specialised_order_simplifies_absolute_value(void)
             lab_math_contains(math_fourier_text(r, "transform_identity_TeX"), "T_{\\left|", false);
         }
         lab_math_contains(math_fourier_text(math_fourier_fields(lab_math_format("%s{J_n(%s)}", op, source), target),
-            "tex"), "T_{\\left|n\\right|}", true);
+            "tex"), "T_{\\left| n \\right|}", true);
     }
     const char *cases[][2] = {{"3", "3"}, {"-3", "3"}, {"0", "0"}, {"-0.75", "3/4"}, {"-3/2", "3/2"}};
     for (size_t i = 0; i < 5; ++i)
         lab_math_equal(math_fourier_text(math_fourier_fields(lab_math_format("abs(%s)", cases[i][0]), "ω"), "tex"),
             math_fourier_text(math_fourier_fields(cases[i][1], "ω"), "tex"));
-    lab_math_contains(math_fourier_text(math_fourier_fields("x+abs(a)", "x"), "tex"), "\\left|a\\right|", true);
+    lab_math_contains(math_fourier_text(math_fourier_fields("x+abs(a)", "x"), "tex"), "\\left| a \\right|", true);
 }
 
 static void test_scaled_chebyshev_spectrum_inverse(void)

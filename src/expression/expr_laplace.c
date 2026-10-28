@@ -1603,8 +1603,7 @@ static expr_t *laplace_simplify(const expr_t *expr, expr_t *a, expr_t *b)
 const expr_ops_t ops_laplace = {
     .eval = laplace_eval, .deriv = expr_transform_deriv, .reverse = expr_reverse_not_differentiable,
     .kind = EXPR_KIND_LAPLACE, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_SMOOTH,
-    .expression_name = "ℒ", .function_name = "laplace", .TeX_name = "\\mathcal{L}",
-    .simplify = laplace_simplify,
+    .expression_name = "ℒ", .function_name = "laplace", .simplify = laplace_simplify,
 };
 
 

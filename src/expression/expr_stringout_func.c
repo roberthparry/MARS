@@ -19,6 +19,8 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
 
 static void emit_name_c(sbuf_t *b, const char *name)
 {
@@ -1113,13 +1115,14 @@ string_t *expr_temporaries_math_definitions(const expr_function_temporaries_t *p
     sbuf_t buffer;
     sbuf_init(&buffer);
     for (size_t i = 0u; i < plan->temporaries.count; ++i) {
-        if (i)
-            sbuf_puts(&buffer, style == style_LATEX ? " \\\\\n" : "\n");
-        if (style == style_LATEX)
-            emit_TeX_name(&buffer, plan->temporaries.names[i]);
-        else
+        if (style == style_LATEX) {
+            TeX_emit_definition_heading(&buffer, plan->temporaries.names[i], i != 0u);
+        } else {
+            if (i)
+                sbuf_putc(&buffer, '\n');
             emit_name(&buffer, plan->temporaries.names[i]);
-        sbuf_puts(&buffer, style == style_LATEX ? " &= " : " = ");
+            sbuf_puts(&buffer, " = ");
+        }
         emit_math_with_temporaries(plan->temporaries.nodes[i], &buffer, style, plan->temporaries.nodes,
                                    (const char *const *)plan->temporaries.names, i);
     }
@@ -1380,11 +1383,12 @@ string_t *expr_to_transform_function_text(const expr_t *expr)
     return text;
 }
 
-/* Search the authored expression tree for operations which must remain executable. */
+/* Inspect authored expression structure for calculus operations without evaluating them. */
 bool expr_contains_calculus_request(const expr_t *expr)
 {
     return expr && (expr_is_formal_derivative(expr) || expr_is_op(expr, &ops_integral) ||
-                    expr_is_integral_transform(expr) ||
+                    expr_is_integral_transform(expr) || expr_is_op(expr, &ops_summation) ||
+                    expr_is_op(expr, &ops_product) ||
                     expr_contains_calculus_request(expr->a) || expr_contains_calculus_request(expr->b));
 }
 

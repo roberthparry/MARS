@@ -15,6 +15,8 @@
 
 #define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
 #include "diffequ_solve_internal.h"
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 
@@ -280,7 +282,7 @@ static bool de_lie_collect(const de_lie_t *lie, const expr_t *expr, size_t coord
     return valid;
 }
 
-static const expr_t *de_lie_entry(const matrix_t *matrix, size_t row, size_t column)
+const expr_t *de_lie_entry(const matrix_t *matrix, size_t row, size_t column)
 {
     expr_t *entry = NULL;
     if (!matrix || mat_typeof(matrix) != MAT_TYPE_EXPR || row >= mat_get_row_count(matrix) ||
@@ -549,66 +551,10 @@ diffequ_solve_result_t *de_lie_unsolved_analysis(const diffequ_t *de, bool inclu
     if (result && include_steps) {
         matrix_t *generators = de_lie_polynomial_generators(lie, 2u);
         equation_t *reduced = de_lie_autonomous_reduction(lie);
-        string_t *steps = string_sprintf("Lie point-symmetry analysis of the normalised second-order equation.\n"
-                                         "Computed Lie–Tressé invariants: I1 = %s; I2 = %s.\n"
-                                         "Both must vanish identically for local point-linearisation.\n", plain[0], plain[1]);
-        char *tex[2] = {expr_to_TeX_body(invariants[0]), expr_to_TeX_body(invariants[1])};
-        string_t *steps_TeX = tex[0] && tex[1] ? string_sprintf("\\begin{aligned}&I_1=%s\\\\&I_2=%s",
-                                                               tex[0], tex[1]) : NULL;
-        if (steps && generators) {
-            size_t count = mat_get_col_count(generators);
-            string_append_format(steps, "Polynomial generator search (total degree <= 2): %zu verified.\n", count);
-            if (steps_TeX)
-                string_append_format(steps_TeX, "\\\\&\\text{Polynomial search: total degree }\\le2;\\quad"
-                                                "%zu\\text{ verified generators}", count);
-            for (size_t j = 0u; j < count; ++j) {
-                for (size_t c = 0u; c < 2u; ++c) {
-                    const expr_t *entry = de_lie_entry(generators, c, j);
-                    char *component = expr_to_string(entry, style_UNBOUND);
-                    char *component_TeX = expr_to_TeX_body(entry);
-                    if (component)
-                        string_append_format(steps, "G%zu: %s = %s\n", j + 1u, c ? "eta" : "xi", component);
-                    if (steps_TeX && component_TeX)
-                        string_append_format(steps_TeX, "\\\\&%s_{%zu}=%s", c ? "\\eta" : "\\xi", j + 1u,
-                                              component_TeX);
-                    free(component_TeX);
-                    free(component);
-                }
-            }
-            string_append_cstr(steps, "This finite search does not exhaust non-polynomial symmetries.\n");
-            if (steps_TeX)
-                string_append_cstr(steps_TeX, "\\\\&\\text{Non-polynomial symmetries are not exhausted by this search.}");
-        } else if (steps) {
-            string_append_cstr(steps, "Polynomial coefficient search is unsupported for this normal form.\n");
-            if (steps_TeX)
-                string_append_cstr(steps_TeX, "\\\\&\\text{Polynomial coefficient search is unsupported.}");
-        }
-        if (steps && reduced) {
-            string_t *reduction = equ_to_text(reduced, style_UNBOUND);
-            if (reduction)
-                string_append_format(steps, "Translation symmetry gives the local order reduction: %s.\n"
-                                            "Here the velocity is a function of the dependent coordinate; "
-                                            "check equilibria separately in the original ODE.\n", string_c_str(reduction));
-            string_free(reduction);
-            char *lhs = expr_to_TeX_body_wrapped_with_totals(equ_lhs(reduced), 0u);
-            char *rhs = expr_to_TeX_body(equ_rhs(reduced));
-            if (steps_TeX && lhs && rhs)
-                string_append_format(steps_TeX, "\\\\&\\text{Local order reduction:}\\quad %s=%s"
-                                                "\\\\&\\text{Check equilibria separately in the original ODE.}", lhs, rhs);
-            free(rhs);
-            free(lhs);
-        }
-        if (steps_TeX)
-            string_append_cstr(steps_TeX, "\\end{aligned}");
-        if (!steps || !steps_TeX || de_solve_result_set_steps(result, string_c_str(steps)) != 0 ||
-            de_solve_result_set_steps_TeX(result, string_c_str(steps_TeX)) != 0) {
+        if (!de_lie_set_steps(result, invariants, plain, generators, reduced)) {
             de_solve_result_free(result);
             result = NULL;
         }
-        free(tex[1]);
-        free(tex[0]);
-        string_free(steps_TeX);
-        string_free(steps);
         equ_free(reduced);
         mat_free(generators);
     }

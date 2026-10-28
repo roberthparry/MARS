@@ -9,8 +9,8 @@
 #include <math.h>
 #include <string.h>
 
-#define MARS_SHARED_EXPR_DISTRIBUTION_INTERNAL_ACCESS
-#include "internal/expr_distribution_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #include "test_lab_math_support.h"
 
 typedef struct {

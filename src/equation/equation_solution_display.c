@@ -5,8 +5,8 @@
  * Orders solutions and produces compact text with shared structure retained where possible. It works on solver
  * results rather than altering the mathematical equation to fit an output format.
  *
- * This belongs to the equation_t implementation. Public callers work with equations and solution collections;
- * internal matching or numerical attempts are not independent application APIs.
+ * The equation module plans paired roots and shared definitions. TeX owns the
+ * layout syntax when the caller requests typeset output.
  */
 
 #include <stdlib.h>
@@ -14,10 +14,11 @@
 
 #include "equation-t.h"
 #include "string-t.h"
-#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
-#include "internal/equation_internal.h"
+
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
+#include "internal/TeX_semantic_internal.h"
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
 
@@ -108,18 +109,29 @@ string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, cons
         goto cleanup;
     if (!equ_solution_pairs_text(plan, roots, count, style, rendered))
         goto cleanup;
+    if (TeX) {
+        const string_t *rows_to_align[16] = {0};
+        size_t row_count = 0u;
+        for (size_t i = 0u; i < count;) {
+            rows_to_align[row_count++] = rendered[i];
+            i += (i != 0u || count % 2u == 0u) ? 2u : 1u;
+        }
+        output = TeX_align_equation_rows(definitions, lhs, rows_to_align, row_count);
+        complete = output != NULL;
+        goto cleanup;
+    }
     output = string_new();
     if (!output)
         goto cleanup;
-    if (string_append_cstr(output, TeX ? "\\begin{aligned} " : bound ? "{ " : "") < 0)
+    if (string_append_cstr(output, bound ? "{ " : "") < 0)
         goto cleanup;
     if (!bound && string_append_string(output, definitions) < 0)
         goto cleanup;
     for (size_t i = 0u; i < count;) {
         bool paired = i != 0u || count % 2u == 0u;
-        const char *separator = TeX ? " \\\\\n" : bound ? (i ? ";\n  " : "") : "\n";
+        const char *separator = bound ? (i ? ";\n  " : "") : "\n";
         if (string_append_format(output, "%s%s%s%s", separator, string_c_str(lhs),
-                                 TeX ? " &= " : " = ", string_c_str(rendered[i])) < 0)
+                                 " = ", string_c_str(rendered[i])) < 0)
             goto cleanup;
         i += paired ? 2u : 1u;
     }
@@ -139,7 +151,7 @@ string_t *equ_solutions_compact_text(const equation_solutions_t *solutions, cons
             cursor = newline + 1;
         }
     }
-    if (string_append_cstr(output, TeX ? " \\end{aligned}" : bound ? " }" : "") < 0)
+    if (string_append_cstr(output, bound ? " }" : "") < 0)
         goto cleanup;
     complete = true;
 

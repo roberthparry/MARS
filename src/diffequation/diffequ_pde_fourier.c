@@ -18,6 +18,9 @@
 
 enum { DE_FOURIER_MAX_ORDER = 8 };
 
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static bool de_fourier_has_name(const expr_t *expr, const char *name)
 {
     const char *symbol = expr ? expr_symbol_name(expr) : NULL;
@@ -146,45 +149,6 @@ cleanup:
     return valid;
 }
 
-static bool de_fourier_steps(diffequ_solve_result_t *result, const expr_t *real, const expr_t *imaginary,
-                             const expr_t *frequency, const expr_t *time, const expr_t *initial_time)
-{
-    char *r = expr_to_TeX_body(real), *s = expr_to_TeX_body(imaginary), *k = expr_to_TeX_body(frequency);
-    const char *time_name = expr_symbol_name(time);
-    expr_t *time_symbol = time_name ? expr_new_named_var(NUM_NAN, time_name) : NULL;
-    char *t = time_symbol ? expr_to_TeX_body(time_symbol) : NULL, *t0 = expr_to_TeX_body(initial_time);
-    expr_free(time_symbol);
-    const char *plain =
-        "Whole-line Fourier evolution with real constant coefficients.\n"
-        "Distinct symbols remain distinct: a coefficient such as U is not the dependent variable u.\n"
-        "Replace each spatial derivative of order n by (i*k)^n, obtaining P(i*k)=R(k)+i*S(k).\n"
-        "Each Fourier mode evolves by exp(-(t-t0)*P(i*k)).\n"
-        "Pair positive and negative frequencies to obtain the real cosine kernel, then convolve with the initial data.\n"
-        "The highest even power in R has a known positive coefficient, ensuring high-frequency decay for t>t0.\n"
-        "Assumptions: whole real spatial line, real finite coefficient parameters, t>t0, Schwartz initial data.\n"
-        "Schwartz means smooth with the function and all derivatives decaying faster than every inverse power.\n"
-        "The initial condition holds as t tends to t0 from above by Fourier inversion, not by an ordinary kernel at t0.\n"
-        "This is an exact integral representation; no numerical integral or boundary-value problem is claimed.\n";
-    string_t *TeX = r && s && k && t && t0 ? string_sprintf(
-        "\\begin{aligned}&\\text{Whole-line Fourier evolution; real constant parameters.}"
-        "\\\\&\\tau=%s-(%s)>0,\\quad R(%s)=%s,\\quad S(%s)=%s"
-        "\\\\&\\text{The Fourier transform uses the factor }e^{-i%s\\,\\text{(spatial coordinate)}}."
-        "\\\\&\\widehat{u}\\text{ denotes the spatial Fourier transform of the solution.}"
-        "\\\\&\\partial_{\\tau}\\widehat{u}=-(R+iS)\\widehat{u},\\quad "
-        "\\widehat{u}(\\tau)=e^{-\\tau(R+iS)}\\widehat{u}(0)."
-        "\\\\&\\text{Pair opposite frequencies and convolve the resulting kernel with the supplied initial data.}"
-        "\\\\&\\text{Assume smooth, rapidly decreasing initial data on the whole real line.}"
-        "\\\\&\\text{All derivatives of the data must also decrease faster than every inverse power.}"
-        "\\\\&\\text{Initial data are recovered as }\\tau\\downarrow0\\text{ by Fourier inversion.}"
-        "\\\\&\\text{Exact integral representation; no finite-interval boundary conditions.}\\end{aligned}",
-        t, t0, k, r, k, s, k) : NULL;
-    bool valid = TeX && de_solve_result_set_steps(result, plain) == 0 &&
-                 de_solve_result_set_steps_TeX(result, string_c_str(TeX)) == 0;
-    string_free(TeX);
-    free(t0); free(t); free(k); free(s); free(r);
-    return valid;
-}
-
 /* Solve a first-time-order, constant-spatial-coefficient IVP by its dissipative whole-line kernel. */
 diffequ_solve_result_t *de_pde_solve_fourier_evolution(const diffequ_t *de, const expr_t *residual, bool include_steps)
 {
@@ -240,7 +204,7 @@ diffequ_solve_result_t *de_pde_solve_fourier_evolution(const diffequ_t *de, cons
     result = solution ? de_solve_result_new(DE_SOLVE_STATUS_SOLVED, DE_SOLVER_FOURIER_EVOLUTION,
         "exact whole-line Fourier kernel for t>t0; real constant parameters and Schwartz initial data; "
         "initial condition recovered by the right-hand limit") : NULL;
-    if (!result || (include_steps && !de_fourier_steps(result, real, imaginary, k, time, initial_time)) ||
+    if (!result || (include_steps && !de_fourier_steps(result, dependent, real, imaginary, k, time, initial_time)) ||
         de_solve_result_append(result, solution) != 0) {
         de_solve_result_free(result);
         result = NULL;

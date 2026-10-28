@@ -2834,13 +2834,12 @@ the accuracy of a later higher-precision derivative.
 ### String Conversion
 
 The native formatter keeps its public conversion, printing and serialisation
-entry points in `expr_stringout.c`. Recursive expression, Function and TeX body
-emitters live in the corresponding `expr_stringout_*_emit.c` units. Shared
-precedence and atom handling, Cartesian forms, calculus notation, polynomial
-ordering and special-function notation have separate implementation units.
-The existing style wrappers still own binding envelopes and declarations.
-These units share the existing private formatting header; rendering scopes remain
-thread-local and private to their owning implementation.
+entry points in `expr_stringout.c`. Recursive native and Function body
+emitters remain in expression. The TeX backend, including calculus, binding values,
+operation symbols and special-function notation, lives in `src/TeX/`. Controlled
+rendering interfaces share native structure without duplicating parsing or solving.
+TeX binding envelopes and derivation layouts are owned by that backend; rendering
+scopes remain thread-local.
 
 Explicit univariate power series with an `O(...)` remainder are rendered in
 ascending powers of the expansion variable (or its shift), with the remainder
@@ -2977,8 +2976,8 @@ index changes to `k`, `j`, `m`, or `l` so that the two bindings cannot collide.
 
 [MARS Lab plot titles](mars-lab.md#native-function-plots) retain this source sigma
 notation without appending the derivation or replacing it with a closed-form
-function name. Recognition and TeX generation remain in the native expression
-module; the browser does not interpret the series.
+function name. Recognition remains in the native expression module; TeX generation is delegated
+to the native TeX backend; the browser does not interpret the series.
 
 For the inverse-power family `Σ(k=1..n) 1/k^p`, the generic finite expression
 is `ζ(p) - ζ(p, n + 1)` away from `p = 1`. At `p = 1`, both zeta terms have a
@@ -3696,3 +3695,48 @@ Returns the public result described by vsprintf text.
 ```c
 string_t *expr_vsprintf_text(const char *fmt, va_list ap);
 ```
+
+### TeX notation ownership
+
+The [TeX module](TeX.md#ordinary-mathematical-text-without-tex-commands) offers
+`TeX_from_expression(const string_t *)` for callers who want ordinary mathematical
+text converted directly to owned notation. It uses this module's public presentation parser,
+beautifier for algebra-only input, and body renderer; grammar, algebra and domain conventions remain
+owned here rather than being duplicated in the notation module.
+
+Scalar symbolic indices accept `x_n` and `x_(n+1)` and round-trip in native
+expression output. They use the existing indexed-symbol model; this does not
+introduce tensor grammar. The [text alternatives example](TeX.md) uses these
+indices alongside complete equations in one array of input strings.
+
+`expr_from_text_preserving_calculus(text, bindings_out)` retains authored integral
+and derivative operations for presentation. It returns an owned `expr_t` that
+requires `expr_free`; optional binding metadata requires `expr_bindings_free`.
+The ordinary parser still evaluates explicit calculus requests as before.
+`expr_contains_calculus_request(expr)` detects derivatives, integrals, transforms,
+sums and products so presentation callers can avoid simplifying those operations
+away. The complete runnable [calculus example](TeX.md#native-calculus-shorthand)
+demonstrates the presentation path.
+
+`expr_to_TeX_operation_body(expr)` renders the authored operation tree without
+evaluating nested Fourier or Laplace transforms. Its returned C string is owned
+and must be released with `free`. Pair it with the preserving parser when the
+operator itself must remain visible. The TeX adapter uses this public path for
+calculus, and the ordinary beautifier for algebra-only input. All registered
+function names and aliases are shared with the native expression parser.
+
+The [native-output conversion example](TeX.md#converting-native-expression-output)
+passes `expr_to_text(expression, style_EXPRESSION)` directly to `TeX_from_expression`.
+Bindings are accepted as input metadata; the TeX body remains symbolic and retains
+domain conditions. Operations already evaluated by the producer remain evaluated.
+
+Both parser entry points recognise `d/dx(...)`, `d^2/dx^2(...)` and
+`d^2/dxy(...)` as aliases of `Dx(...)`, `Dxx(...)` and `Dxy(...)`.
+The operands must be parenthesised and the positive integer orders must agree.
+
+All TeX emission is owned by the reusable [TeX module](TeX.md), including operation
+names, recursive calculus, binding values and series derivations. The public
+`style_LATEX` and `expr_to_TeX_*` APIs retain their output and ownership contracts.
+The backend reads native mathematical structure through controlled interfaces and
+uses native operations for display views; it does not reparse rendered fragments.
+Parsing, evaluation and simplification remain expression responsibilities.

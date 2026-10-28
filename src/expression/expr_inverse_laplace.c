@@ -1328,6 +1328,5 @@ static expr_t *inverse_laplace_simplify(const expr_t *expr, expr_t *a, expr_t *b
 const expr_ops_t ops_inverse_laplace = {
     .eval = inverse_laplace_eval, .deriv = expr_transform_deriv, .reverse = expr_reverse_not_differentiable,
     .kind = EXPR_KIND_INVERSE_LAPLACE, .arity = EXPR_OP_BINARY, .diff_kind = EXPR_DIFF_SMOOTH,
-    .expression_name = "ℒ⁻¹", .function_name = "inverselaplace", .TeX_name = "\\mathcal{L}^{-1}",
-    .simplify = inverse_laplace_simplify,
+    .expression_name = "ℒ⁻¹", .function_name = "inverselaplace", .simplify = inverse_laplace_simplify,
 };

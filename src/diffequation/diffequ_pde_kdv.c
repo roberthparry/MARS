@@ -19,6 +19,9 @@
 #include "internal/equation_internal.h"
 
 /* The third derivative identifies the spatial coordinate without relying on its name or input order. */
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static const expr_t *de_kdv_third(const expr_t *expr)
 {
     if (expr_is_formal_derivative(expr))
@@ -106,26 +109,7 @@ expr_t *de_pde_kdv_parameter(const diffequ_t *de, const expr_t *residual, const 
 }
 
 /* Put the scope and parameter restrictions in the solution itself, even when steps are disabled. */
-static bool de_kdv_present(equation_t *solution, const expr_t *k, const expr_t *position)
-{
-    expr_t *field = expr_new_named_var(NUM_NAN, expr_symbol_name(equ_lhs(solution)));
-    char *u = field ? expr_to_TeX_body(field) : NULL, *rhs = expr_to_TeX_body(equ_rhs(solution));
-    char *kt = expr_to_TeX_body(k), *pt = expr_to_TeX_body(position);
-    char *plain = expr_to_string(equ_rhs(solution), style_UNBOUND);
-    string_t *lhs = string_sprintf("Solitary-wave family (not the general solution): %s",
-                                   expr_symbol_name(equ_lhs(solution)));
-    string_t *right = plain ? string_sprintf("%s; %s > 0, %s real (arbitrary constants).", plain,
-                                             expr_symbol_name(k), expr_symbol_name(position)) : NULL;
-    string_t *lhs_TeX = u ? string_sprintf("%s", u) : NULL;
-    string_t *rhs_TeX = rhs && kt && pt ? string_sprintf(
-        "\\begin{aligned}[t]&%s\\\\&%s>0,\\quad %s\\in\\mathbb{R}\\quad\\text{(arbitrary constants)}"
-        "\\\\&\\text{Solitary-wave family; not the general solution.}\\end{aligned}", rhs, kt, pt) : NULL;
-    bool valid = lhs && right && lhs_TeX && rhs_TeX && equ_set_display_unbound(solution, lhs, right) == 0 &&
-                 equ_set_display_TeX(solution, lhs_TeX, rhs_TeX) == 0;
-    string_free(rhs_TeX); string_free(lhs_TeX); string_free(right); string_free(lhs);
-    free(plain); free(pt); free(kt); free(rhs); free(u); expr_free(field);
-    return valid;
-}
+
 
 /* A*u_t+B*u*u_x+C*u_xxx=0 has zero-background solitary waves for real nonzero constant coefficients. */
 diffequ_solve_result_t *de_pde_solve_kdv(const diffequ_t *de, const expr_t *residual, bool include_steps)
@@ -183,21 +167,7 @@ diffequ_solve_result_t *de_pde_solve_kdv(const diffequ_t *de, const expr_t *resi
         "no initial or boundary data imposed");
     if (!result)
         goto cleanup;
-    if (include_steps && (de_solve_result_set_steps(result,
-        "Recognise A*u_t+B*u*u_x+C*u_xxx=0 with real nonzero constant coefficients.\n"
-        "Here x, t, u, k and x0 denote the spatial, temporal, field, inverse-width and position roles.\n"
-        "Set u=V(z), z=x-v*t-x0. Integrate once with zero background: C*V''-A*v*V+(B/2)*V^2=0.\n"
-        "For V=M*sech(k*z)^2, V''=4*k^2*V-(6*k^2/M)*V^2.\n"
-        "Matching coefficients gives v=4*C*k^2/A and M=12*C*k^2/B.\n"
-        "k>0 and x0 is real. This is a solitary-wave family, not the general solution.\n"
-        "No arbitrary initial or boundary data, multi-soliton or periodic solutions are claimed.") != 0 ||
-        de_solve_result_set_steps_TeX(result,
-        "\\begin{aligned}&A u_t+B u u_x+C u_{xxx}=0,\\quad A,B,C\\in\\mathbb{R}\\setminus\\{0\\}"
-        "\\\\&\\text{Here }x,t,u\\text{ denote the recognised space, time and field.}"
-        "\\\\&u=V(z),\\quad z=x-vt-x_0,\\quad C V''-AvV+\\tfrac{B}{2}V^2=0"
-        "\\\\&V=M\\operatorname{sech}^2(kz),\\quad V''=4k^2V-\\tfrac{6k^2}{M}V^2"
-        "\\\\&v=\\tfrac{4C}{A}k^2,\\quad M=\\tfrac{12C}{B}k^2,\\quad k>0,\\quad x_0\\in\\mathbb{R}"
-        "\\\\&\\text{Zero-background solitary-wave family; not the general solution.}\\end{aligned}") != 0))
+    if (include_steps && !de_kdv_set_steps(result))
         goto failure;
     if (de_solve_result_append(result, solution) != 0)
         goto failure;

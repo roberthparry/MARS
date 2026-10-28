@@ -23,6 +23,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "expression-t.h"
+#include "string-t.h"
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -31,10 +34,8 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string-t.h"
 
 static int expr_append_padding(string_t *out, int count)
 {
@@ -132,35 +133,6 @@ static string_format_result_t expr_format_callback(string_t *out, const string_f
 fail:
     string_free(text);
     return STRING_FORMAT_ERROR;
-}
-
-
-static string_t *expr_to_TeX_text(const expr_t *expr)
-{
-    char *expression_text = NULL;
-    char *bindings = NULL;
-    sbuf_t b;
-    string_t *out;
-
-    if (expr_to_TeX_parts(expr, &expression_text, &bindings) != 0)
-        return expr_to_text_expr(expr);
-
-    sbuf_init(&b);
-    if (bindings && *bindings) {
-        sbuf_puts(&b, "\\left\\{ ");
-        sbuf_puts(&b, expression_text);
-        sbuf_puts(&b, " \\;\\middle|\\; ");
-        sbuf_puts(&b, bindings);
-        sbuf_puts(&b, " \\right\\}");
-    } else {
-        sbuf_puts(&b, expression_text);
-    }
-
-    free(expression_text);
-    free(bindings);
-    out = sbuf_to_string(&b);
-    sbuf_free(&b);
-    return out;
 }
 
 static bool expr_is_trailing_display_space(rune_t rune)

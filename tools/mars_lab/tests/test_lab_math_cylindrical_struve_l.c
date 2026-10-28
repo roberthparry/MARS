@@ -172,7 +172,7 @@ static void test_struve_l_laplace_notation_and_round_trip(void)
 static void test_struve_l_general_hypergeometric_notation(void)
 {
     const json_t *ordinary = lab_math_struve_l_fields("2*x*hypergeometricpfq(1,2,2,3,4,x)");
-    lab_math_contains(lab_math_text(ordinary, "tex"), "\\cdot", true);
+    lab_math_contains(lab_math_text(ordinary, "tex"), "2\\mkern-2mu x\\mkern-2mu", true);
     lab_math_contains(lab_math_text(ordinary, "tex"), "F_{2}", true);
     lab_math_contains(lab_math_text(lab_math_struve_l_fields("I0(x)"), "tex"), "I_{0}", true);
     lab_math_contains(lab_math_text(lab_math_struve_l_fields("I0(x)"), "function"), "besseli(0, x)", true);

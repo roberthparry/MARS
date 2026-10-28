@@ -20,6 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "expression-t.h"
+#include "string-t.h"
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -28,23 +31,18 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#include "expression-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#include "string-t.h"
-
-#define DISPLAY_POLY_MAX_VARS 16u
-
-typedef struct {
-    const expr_t *expr;
-    bool subtract;
-    long degree[DISPLAY_POLY_MAX_VARS];
-} display_poly_term_t;
+#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
+#include "internal/TeX_semantic_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_notation_internal.h"
 
 typedef struct {
     const char *name[DISPLAY_POLY_MAX_VARS];
     size_t count;
 } display_poly_var_list_t;
+
 
 static bool display_poly_vars_add(display_poly_var_list_t *vars, const char *name)
 {
@@ -527,7 +525,7 @@ static bool display_transform_prepare_terms(const expr_t *expr, display_poly_ter
     return true;
 }
 
-static bool display_poly_prepare_terms(const expr_t *expr, display_poly_term_t *terms, size_t *count, size_t max_terms)
+bool display_poly_prepare_terms(const expr_t *expr, display_poly_term_t *terms, size_t *count, size_t max_terms)
 {
     display_poly_var_list_t vars = {0};
     bool has_variable_term = false;
@@ -583,6 +581,59 @@ bool expr_display_ordered_sum(const expr_t *expr, const expr_t **nodes, int *sig
     return true;
 }
 
+/* Give the renderer ordered semantic terms without exposing polynomial structure. */
+const TeX_model_node_t *expr_notation_ordered_sum(notation_build_t *build, const expr_t *expression)
+{
+    const expr_t *terms[96];
+    int signs[96];
+    size_t count = 0u;
+    if (!expr_display_ordered_sum(expression, terms, signs, &count, 96u) || count < 2u)
+        return NULL;
+    const TeX_model_node_t *result = NULL;
+    for (size_t i = 0u; i < count; ++i) {
+        const expr_t *magnitude = NULL;
+        if (expr_match_neg_expr(terms[i], &magnitude))
+            signs[i] = -signs[i];
+        else
+            magnitude = terms[i];
+        const TeX_model_node_t *term = notation_build_expr(build, magnitude);
+        if (!term)
+            return NULL;
+        if (!result) {
+            result = signs[i] < 0 ? notation_build_node(build,
+                (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &term) : term;
+        } else {
+            const TeX_model_node_t *parts[] = {result, term};
+            result = notation_build_node(build, (TeX_node_view_t){
+                .kind = signs[i] < 0 ? TeX_NODE_DIFFERENCE : TeX_NODE_SUM, .child_count = 2u}, parts);
+        }
+        if (!result)
+            return NULL;
+    }
+    return result;
+}
+
+/* Adapt the legacy string entry point to the semantic ordering provider. */
+bool emit_TeX_display_polynomial_sum(const expr_t *expression, sbuf_t *buffer, int parent_prec)
+{
+    notation_build_t *build = notation_build_new();
+    const TeX_model_node_t *ordered = build ? expr_notation_ordered_sum(build, expression) : NULL;
+    string_t *text = ordered ? notation_build_render(build, ordered) : NULL;
+    notation_build_free(build);
+    if (!text)
+        return false;
+    if (PREC_ADD < parent_prec) {
+        string_t *grouped = TeX_parenthesise_compact(text);
+        string_free(text);
+        text = grouped;
+    }
+    if (!text)
+        return false;
+    sbuf_puts(buffer, string_c_str(text));
+    string_free(text);
+    return true;
+}
+
 bool emit_expr_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_prec)
 {
     display_poly_term_t terms[96];
@@ -619,46 +670,6 @@ bool emit_expr_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_
 
     if (need)
         sbuf_putc(b, ')');
-    return true;
-}
-
-
-bool emit_TeX_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_prec)
-{
-    display_poly_term_t terms[96];
-    size_t count = 0u;
-    int need = PREC_ADD < parent_prec;
-
-    if (expr_TeX_source_order_preserved() || !display_poly_prepare_terms(expr, terms, &count, sizeof(terms) / sizeof(terms[0])))
-        return false;
-
-    if (need)
-        sbuf_puts(b, "\\left(");
-
-    for (size_t i = 0u; i < count; ++i) {
-        bool term_negative = expr_renders_negative(terms[i].expr);
-        bool effective_negative = terms[i].subtract != term_negative;
-        bool term_needs_parens = add_rhs_needs_visible_parens(terms[i].expr);
-
-        if (i == 0u) {
-            if (effective_negative)
-                sbuf_putc(b, '-');
-        } else {
-            sbuf_puts(b, effective_negative ? " - " : " + ");
-        }
-
-        if (term_needs_parens)
-            sbuf_puts(b, "\\left(");
-        if (term_negative)
-            emit_TeX_expr_abs(terms[i].expr, b, PREC_ADD);
-        else
-            emit_TeX_expr(terms[i].expr, b, PREC_ADD);
-        if (term_needs_parens)
-            sbuf_puts(b, "\\right)");
-    }
-
-    if (need)
-        sbuf_puts(b, "\\right)");
     return true;
 }
 
@@ -706,4 +717,13 @@ void emit_func_display(const expr_t *f, sbuf_t *b, int parent_prec)
     if (f && expr_is_addsub(f) && emit_func_display_polynomial_sum(f, b, parent_prec))
         return;
     emit_func(f, b, parent_prec);
+}
+
+/* Give equation formatting the native display order without exposing emitters or precedence. */
+char *expr_function_display_body(const expr_t *expression)
+{
+    sbuf_t buffer;
+    sbuf_init(&buffer);
+    emit_func_display(expression, &buffer, PREC_LOWEST);
+    return sbuf_take_c_string(&buffer);
 }

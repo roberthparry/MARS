@@ -17,6 +17,9 @@
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static const expr_t *de_gkdv_power(const expr_t *expr, const expr_t *field, expr_t **exponent)
 {
     const expr_t *base = NULL, *left = NULL, *right = NULL, *symbolic = NULL;
@@ -72,39 +75,6 @@ static expr_t *de_gkdv_scale(const expr_t *coefficient, const expr_t *c, const e
     return ratio;
 }
 
-static bool de_gkdv_present(equation_t *solution, const expr_t *n, const expr_t *v, const expr_t *position,
-                            const expr_t *z, bool singular)
-{
-    const expr_t *values[] = {equ_lhs(solution), equ_rhs(solution), n, v, position, z};
-    char *plain[6] = {NULL}, *TeX[6] = {NULL};
-    bool valid = false;
-    string_t *lhs = NULL, *rhs = NULL, *lhs_TeX = NULL, *rhs_TeX = NULL;
-    for (size_t i = 0u; i < 6u; ++i) {
-        plain[i] = expr_to_string(values[i], style_UNBOUND);
-        TeX[i] = expr_to_TeX_body(values[i]);
-        if (!plain[i] || !TeX[i])
-            goto cleanup;
-    }
-    lhs = string_sprintf("%s travelling-wave family (not the general solution): %s",
-                          singular ? "Singular" : "Solitary", plain[0]);
-    rhs = string_sprintf("%s; %s is a positive integer; %s > 0, %s real; positive real root%s%s%s.",
-        plain[1], plain[2], plain[3], plain[4], singular ? "; " : "",
-        singular ? plain[5] : "", singular ? " != 0 (moving singularity excluded)" : "");
-    lhs_TeX = string_sprintf("%s", TeX[0]);
-    rhs_TeX = string_sprintf(
-        "\\begin{aligned}[t]&%s\\\\&%s\\in\\mathbb{Z}_{>0},\\quad %s>0,\\quad %s\\in\\mathbb{R}"
-        "\\\\&\\text{Positive real root; %s travelling-wave family, not the general solution.}%s%s%s\\end{aligned}",
-        TeX[1], TeX[2], TeX[3], TeX[4], singular ? "singular" : "solitary",
-        singular ? "\\\\&" : "", singular ? TeX[5] : "",
-        singular ? "\\ne0\\quad\\text{(moving singularity excluded)}" : "");
-    valid = lhs && rhs && lhs_TeX && rhs_TeX && equ_set_display_unbound(solution, lhs, rhs) == 0 &&
-            equ_set_display_TeX(solution, lhs_TeX, rhs_TeX) == 0;
-cleanup:
-    string_free(rhs_TeX); string_free(lhs_TeX); string_free(rhs); string_free(lhs);
-    for (size_t i = 0u; i < 6u; ++i) { free(TeX[i]); free(plain[i]); }
-    return valid;
-}
-
 /* Solve the zero-energy travelling-wave reduction of A*u_t+B*u^n*u_x+C*u_xxx=0. */
 diffequ_solve_result_t *de_pde_solve_gkdv(const diffequ_t *de, const expr_t *residual, const expr_t *field,
     const expr_t *time, const expr_t *space, const expr_t *a, const expr_t *c, const expr_t *nonlinear,
@@ -152,23 +122,7 @@ diffequ_solve_result_t *de_pde_solve_gkdv(const diffequ_t *de, const expr_t *res
                    "positive real root, positive wave parameter and real position");
     if (!result)
         goto cleanup;
-    if (include_steps && (de_solve_result_set_steps(result,
-        "Write A*u_t+B*u^n*u_x+C*u_xxx=0 and g=2*B/(C*(n+1)*(n+2)).\n"
-        "Assume n is a positive integer and use positive real roots.\n"
-        "Set u=V(z), z=x-(C/A)*v*t-x0, with v>0.\n"
-        "Integrate twice with zero integration constants: (V')^2=v*V^2-g*V^(n+2).\n"
-        "For g>0, V^n=(v/g)*sech(n*sqrt(v)*z/2)^2 is a smooth pulse.\n"
-        "For g<0, V^n=(-v/g)*csch(n*sqrt(v)*z/2)^2 is singular at z=0.\n"
-        "Differentiation gives V''=v*V-(g*(n+2)/2)*V^(n+1), proving the original PDE.\n"
-        "These are particular real travelling-wave families, not the general solution. No initial data are imposed.") != 0 ||
-        de_solve_result_set_steps_TeX(result,
-        "\\begin{aligned}&A u_t+B u^n u_x+C u_{xxx}=0,\\quad g=\\tfrac{2B}{C(n+1)(n+2)}"
-        "\\\\&n\\in\\mathbb{Z}_{>0},\\quad v>0,\\quad u=V(z),\\quad z=x-\\tfrac{C}{A}vt-x_0"
-        "\\\\&(V')^2=vV^2-gV^{n+2},\\quad V''=vV-\\tfrac{g(n+2)}{2}V^{n+1}"
-        "\\\\&g>0:\\quad V^n=\\tfrac{v}{g}\\operatorname{sech}^2(\\tfrac{n\\sqrt{v}}{2}z)"
-        "\\\\&g<0:\\quad V^n=-\\tfrac{v}{g}\\operatorname{csch}^2(\\tfrac{n\\sqrt{v}}{2}z),\\quad z\\ne0"
-        "\\\\&\\text{Use the positive real root; singular branch excludes the moving pole.}"
-        "\\\\&\\text{Particular travelling-wave families; not the general solution.}\\end{aligned}") != 0))
+    if (include_steps && !de_gkdv_set_steps(result))
         goto failure;
     if (de_solve_result_append(result, solution) != 0)
         goto failure;

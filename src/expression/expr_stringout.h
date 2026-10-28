@@ -20,12 +20,10 @@
 
 #include <stddef.h>
 
+#define MARS_SHARED_EXPR_STRINGOUT_INTERNAL_ACCESS
+#include "internal/expr_stringout_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
-
-typedef struct {
-    string_t *text;
-} sbuf_t;
 
 /* One Cartesian presentation shared by all output styles for a composed Li or Ei expression. */
 typedef struct {

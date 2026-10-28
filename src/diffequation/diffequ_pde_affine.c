@@ -15,6 +15,9 @@
 #include "diffequ_pde_internal.h"
 
 /* A finite numerical constant makes the zero/nonzero branch unambiguous. */
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static bool de_affine_constant(const expr_t *expr, const diffequ_t *de, const expr_t *dependent)
 {
     if (!expr || de_expr_uses(expr, dependent))
@@ -106,59 +109,6 @@ cleanup:
     expr_free(offset);
     expr_free(slope);
     return invariant;
-}
-
-static bool de_affine_steps(diffequ_solve_result_t *result, const expr_t *time, const expr_t *clock,
-                            const expr_t *arbitrary, const expr_t *particular, bool coupled)
-{
-    char *family = expr_to_TeX_body(arbitrary), *primitive = expr_to_TeX_body(particular);
-    char *scale = expr_to_TeX_body(clock);
-    const char *name = expr_symbol_name(time);
-    expr_t *symbol = name ? expr_new_named_var(NUM_NAN, name) : NULL;
-    char *parameter = symbol ? expr_to_TeX_body(symbol) : NULL;
-    expr_free(symbol);
-    string_t *plain = name ? string_sprintf(
-        "Affine transport by characteristics, using %s as parameter.\n"
-        "Divide the original transport coefficients by the constant coefficient of its derivative.\n"
-        "%s"
-        "Each remaining coordinate obeys dz/d%s = A(%s)*z+B(%s).\n"
-        "Integrate A in that parameter and negate its primitive to form mu = exp(-primitive).\n"
-        "The invariant is I = mu*z minus a primitive of mu*B in the same parameter.\n"
-        "Constant rates retain their equivalent compact shifted-exponential forms.\n"
-        "F is an arbitrary differentiable function of all these invariants.\n"
-        "Integrate the normalised forcing in %s for the particular solution.\n"
-        "Every invariant and the complete solution are verified against the original PDE.\n"
-        "The solution is local to regions where the coefficient functions and primitives are defined.\n"
-        "No initial or boundary data are imposed.\n", name,
-        coupled ? "Resolve upstream coordinates first and substitute their flows into each remaining drift.\n"
-                  "Eliminate the integration parameters using the earlier invariants.\n" : "",
-        name, name, name, name) : NULL;
-    string_t *TeX = family && primitive && scale && parameter ? string_sprintf(
-        "\\begin{aligned}&\\text{Affine transport by characteristics; parameter }%s"
-        "\\\\&\\text{Normalise the transport operator by }%s."
-        "%s"
-        "\\\\&\\frac{dz}{d%s}=A(%s)z+B(%s)"
-        "\\\\&\\mu=\\exp\\left(-\\int A(%s)\\,d%s\\right),\\quad "
-        "I=\\mu z-\\int\\mu B(%s)\\,d%s"
-        "\\\\&\\text{Homogeneous family: }%s"
-        "\\\\&\\text{Particular solution: }%s"
-        "\\\\&F\\text{ is arbitrary and differentiable.}"
-        "\\\\&\\text{All invariants and the complete solution satisfy the original operator.}"
-        "\\\\&\\text{Local where coefficients and primitives are defined; no initial or boundary data.}\\end{aligned}",
-        parameter, scale,
-        coupled ? "\\\\&\\text{Resolve upstream flows first; evaluate each drift along those flows.}"
-                  "\\\\&\\text{Eliminate their integration parameters using the earlier invariants.}" : "",
-        parameter, parameter, parameter, parameter, parameter, parameter, parameter,
-        family, primitive) : NULL;
-    bool valid = plain && TeX && de_solve_result_set_steps(result, string_c_str(plain)) == 0 &&
-                 de_solve_result_set_steps_TeX(result, string_c_str(TeX)) == 0;
-    string_free(TeX);
-    string_free(plain);
-    free(parameter);
-    free(scale);
-    free(primitive);
-    free(family);
-    return valid;
 }
 
 /* Solve diagonal or triangular characteristic flow with a constant clock and forcing in that clock alone. */

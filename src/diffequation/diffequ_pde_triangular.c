@@ -14,6 +14,9 @@
 #define MARS_DIFFEQUATION_PDE_INTERNAL_ACCESS
 #include "diffequ_pde_internal.h"
 
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
+
 static bool de_triangular_constant(const expr_t *expr, const expr_t *x, const expr_t *y, const expr_t *dependent)
 {
     if (!expr || de_expr_uses(expr, x) || de_expr_uses(expr, y) || de_expr_uses(expr, dependent))
@@ -46,56 +49,6 @@ static bool de_triangular_verify(const expr_t *candidate, const expr_t *forcing,
             return false;
     }
     return true;
-}
-
-static bool de_triangular_steps(diffequ_solve_result_t *result, const expr_t *dependent, const expr_t *x, const expr_t *y,
-                                const expr_t *first, const expr_t *second, const expr_t *forcing,
-                                const expr_t *invariant, const expr_t *particular, bool repeated)
-{
-    const expr_t *values[] = {x, y, first, second, forcing, invariant, particular, dependent};
-    char *text[8] = {NULL}, *TeX[8] = {NULL};
-    string_t *plain = NULL, *display = NULL;
-    bool valid = false;
-    for (size_t i = 0u; i < 8u; ++i) {
-        const char *name = expr_symbol_name(values[i]);
-        expr_t *symbol = name && (expr_is_variable(values[i]) || expr_is_named_const(values[i]))
-                             ? expr_new_named_var(NUM_NAN, name) : NULL;
-        text[i] = expr_to_string(symbol ? symbol : values[i], style_UNBOUND);
-        TeX[i] = expr_to_TeX_body(symbol ? symbol : values[i]);
-        expr_free(symbol);
-        if (!text[i] || !TeX[i])
-            goto cleanup;
-    }
-    plain = string_sprintf(
-        "Triangular linear characteristic field.\n"
-        "d%s/ds = %s, d%s/ds = %s, d%s/ds = %s.\n"
-        "%s\nInvariant: I = %s. Particular solution: P = %s.\n"
-        "Thus %s = P + F(I), with F an arbitrary differentiable function.\n"
-        "The invariant and complete solution are verified on both real charts %s>0 and %s<0.\n"
-        "This representation requires %s != 0; no extension across that axis is asserted.\n"
-        "No initial or boundary data are imposed.\n", text[0], text[2], text[1], text[3], text[7], text[4],
-        repeated ? "Equal diagonal rates produce a logarithmic invariant." : "Distinct diagonal rates give a scaled invariant.",
-        text[5], text[6], text[7], text[0], text[0], text[0]);
-    display = string_sprintf(
-        "\\begin{aligned}&\\text{Triangular linear characteristic field}"
-        "\\\\&\\frac{d%s}{ds}=%s,\\qquad\\frac{d%s}{ds}=%s,\\qquad\\frac{d%s}{ds}=%s"
-        "\\\\&I=%s\\quad\\text{is constant along characteristics.}"
-        "\\\\&P=%s\\quad\\text{is a particular solution.}"
-        "\\\\&%s=P+F(I),\\quad F\\text{ arbitrary and differentiable}"
-        "\\\\&\\text{Verified separately on }%s>0\\text{ and }%s<0."
-        "\\\\&%s\\ne0;\\quad\\text{no extension across that axis asserted.}"
-        "\\\\&\\text{No initial or boundary data imposed.}\\end{aligned}",
-        TeX[0], TeX[2], TeX[1], TeX[3], TeX[7], TeX[4], TeX[5], TeX[6], TeX[7], TeX[0], TeX[0], TeX[0]);
-    valid = plain && display && de_solve_result_set_steps(result, string_c_str(plain)) == 0 &&
-            de_solve_result_set_steps_TeX(result, string_c_str(display)) == 0;
-cleanup:
-    string_free(display);
-    string_free(plain);
-    for (size_t i = 0u; i < 8u; ++i) {
-        free(TeX[i]);
-        free(text[i]);
-    }
-    return valid;
 }
 
 /* Recognise a*x*u_x + (b*x+d*y)*u_y = q, including the repeated-rate (Jordan) case. */

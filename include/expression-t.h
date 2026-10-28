@@ -560,6 +560,14 @@ bool expr_integral_value_note(const expr_t *expr, char *out, size_t out_size);
  */
 bool expr_contains_integral_operation(const expr_t *expr);
 
+/**
+ * @brief Report whether an expression contains calculus notation that presentation should retain.
+ * @param expr Borrowed expression, or NULL.
+ * @return True for a derivative, integral, integral transform, summation or product anywhere in the expression.
+ * @note Visits expression structure without evaluating it; NULL returns false.
+ */
+bool expr_contains_calculus_request(const expr_t *expr);
+
 /* ------------------------------------------------------------------------- */
 /* Arithmetic (graph-building, owning)                                       */
 /* ------------------------------------------------------------------------- */
@@ -2108,6 +2116,16 @@ string_t *expr_to_calculus_function_text(const expr_t *request, const expr_t *re
 char *expr_to_TeX_body(const expr_t *expr);
 
 /**
+ * @brief Render an authored operation tree without evaluating nested integral transforms.
+ *
+ * Preserves operator notation and source ordering. Use expr_from_text_preserving_calculus()
+ * to retain calculus requests during parsing as well. Already evaluated operations cannot be recovered.
+ * @param expr Borrowed expression; not consumed.
+ * @return Owned NUL-terminated TeX body; release with free(). NULL on invalid input or formatting failure.
+ */
+char *expr_to_TeX_operation_body(const expr_t *expr);
+
+/**
  * @brief Return a display-oriented TeX expression body with line breaks.
  *
  * This keeps the ordinary expr_to_TeX_body() spelling available for exact
@@ -2299,6 +2317,18 @@ expr_t *expr_from_string_with_derivation_TeX(const char *s, expr_bindings_t **bn
  * @return Owned expression; release with expr_free. NULL when the operation reports failure.
  */
 expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out);
+
+/**
+ * @brief Parse mathematical source while retaining authored calculus operations for presentation.
+ *
+ * Uses the ordinary Expression grammar, but keeps integral requests and D-notation derivatives as symbolic
+ * operations instead of completing them during parsing. Ordinary expr_from_text() evaluation is unchanged.
+ * @param text Borrowed source text; not modified or retained.
+ * @param bnd_out Optional owned binding metadata, released with expr_bindings_free().
+ * @return Owned expression, released with expr_free(), or NULL on invalid source or allocation failure.
+ * @note Subsequent explicit simplification can still evaluate reducible operations.
+ */
+expr_t *expr_from_text_preserving_calculus(const string_t *text, expr_bindings_t **bnd_out);
 
 /**
  * @brief Parse a MARS Function-style expression body from text.

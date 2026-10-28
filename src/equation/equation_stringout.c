@@ -17,6 +17,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "TeX-t.h"
+
+
 #define MARS_SHARED_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "internal/expr_stringout_internal.h"
 #define MARS_EQUATION_INTERNAL_ACCESS
@@ -43,7 +46,7 @@ static void equ_emit_function_parameter_list(sbuf_t *buffer, const varlist_t *va
         if (variables->count > 0u || i > 0u)
             sbuf_puts(buffer, ", ");
         sbuf_puts(buffer, "const ");
-        equ_emit_function_name(buffer, constants->vars[i]->name);
+        equ_emit_function_name(buffer, expr_symbol_name(constants->vars[i]));
     }
 }
 
@@ -57,7 +60,7 @@ static void equ_emit_function_argument_list(sbuf_t *buffer, const varlist_t *var
     for (size_t i = 0u; i < constants->count; ++i) {
         if (variables->count > 0u || i > 0u)
             sbuf_puts(buffer, ", ");
-        equ_emit_function_name(buffer, constants->vars[i]->name);
+        equ_emit_function_name(buffer, expr_symbol_name(constants->vars[i]));
     }
 }
 
@@ -88,14 +91,7 @@ static void equ_emit_unknown_variable_hint(sbuf_t *buffer, const varlist_t *vari
 
 static char *equ_function_expression_dup(const expr_t *expression)
 {
-    sbuf_t buffer;
-    char *text;
-
-    sbuf_init(&buffer);
-    emit_func_display(expression, &buffer, PREC_LOWEST);
-    text = sbuf_take_c_string(&buffer);
-    sbuf_free(&buffer);
-    return text;
+    return expr_function_display_body(expression);
 }
 
 static bool equ_is_function_break_operator(char operation, bool multiplicative)
@@ -418,14 +414,13 @@ static string_t *equ_to_text_TeX(const equation_t *equation)
     const string_t *rhs_display = equ_rhs_display_TeX(equation);
     string_t *lhs = lhs_display ? string_clone(lhs_display) : expr_to_text(equ_lhs(equation), style_LATEX);
     string_t *rhs = rhs_display ? string_clone(rhs_display) : expr_to_text(equ_rhs(equation), style_LATEX);
-    string_t *out = NULL;
-
-    if (!lhs || !rhs)
-        goto cleanup;
-
-    out = string_sprintf("%S = %S", lhs, rhs);
-
-cleanup:
+    TeX_t *left = lhs ? TeX_raw(string_c_str(lhs)) : NULL;
+    TeX_t *right = rhs ? TeX_raw(string_c_str(rhs)) : NULL;
+    TeX_t *notation = TeX_equation(left, right, TeX_EQUATION_INLINE);
+    string_t *out = notation ? TeX_render(notation) : NULL;
+    TeX_free(notation);
+    TeX_free(right);
+    TeX_free(left);
     string_free(rhs);
     string_free(lhs);
     return out;
@@ -438,63 +433,20 @@ static char *equ_side_TeX_body_dup(const expr_t *side, const string_t *display_T
     return expr_to_TeX_body_wrapped(side, line_limit);
 }
 
-static bool equ_TeX_aligned_body(const char *TeX, const char **body_out, size_t *body_length_out)
-{
-    static const char prefix[] = "\\begin{aligned}[t]\n";
-    static const char suffix[] = "\n\\end{aligned}";
-    const char *body;
-    const char *end;
-    const size_t suffix_length = strlen(suffix);
-
-    if (!TeX || strncmp(TeX, prefix, strlen(prefix)) != 0)
-        return false;
-    end = TeX + strlen(TeX);
-    if ((size_t)(end - TeX) < suffix_length || strcmp(end - suffix_length, suffix) != 0)
-        return false;
-    body = TeX + strlen(prefix);
-    if (*body == '&')
-        ++body;
-    end -= suffix_length;
-    while (end > body && isspace((unsigned char)end[-1]))
-        --end;
-    *body_out = body;
-    *body_length_out = (size_t)(end - body);
-    return true;
-}
-
 /* Render an equation as an aligned TeX body using its native display metadata. */
 char *equ_to_TeX_body_wrapped(const equation_t *equation, size_t line_limit)
 {
-    char *lhs = NULL;
-    char *rhs = NULL;
-    char *out = NULL;
-    const char *rhs_body = NULL;
-    size_t rhs_body_length = 0u;
-    int needed;
-
     if (!equation)
         return NULL;
-    lhs = equ_side_TeX_body_dup(equ_lhs(equation), equ_lhs_display_TeX(equation), line_limit);
-    rhs = equ_side_TeX_body_dup(equ_rhs(equation), equ_rhs_display_TeX(equation), line_limit);
-    if (!lhs || !rhs)
-        goto cleanup;
-    if (equ_TeX_aligned_body(rhs, &rhs_body, &rhs_body_length))
-        needed = snprintf(NULL, 0, "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}", lhs,
-                          (int)rhs_body_length, rhs_body);
-    else
-        needed = snprintf(NULL, 0, "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}", lhs, rhs);
-    if (needed < 0)
-        goto cleanup;
-    out = malloc((size_t)needed + 1u);
-    if (!out)
-        goto cleanup;
-    if (rhs_body)
-        snprintf(out, (size_t)needed + 1u, "\\begin{aligned}[t]\n%s ={}& %.*s\n\\end{aligned}", lhs,
-                 (int)rhs_body_length, rhs_body);
-    else
-        snprintf(out, (size_t)needed + 1u, "\\begin{aligned}[t]\n%s &= %s\n\\end{aligned}", lhs, rhs);
-
-cleanup:
+    char *lhs = equ_side_TeX_body_dup(equ_lhs(equation), equ_lhs_display_TeX(equation), line_limit);
+    char *rhs = equ_side_TeX_body_dup(equ_rhs(equation), equ_rhs_display_TeX(equation), line_limit);
+    TeX_t *left = lhs ? TeX_raw(lhs) : NULL;
+    TeX_t *right = rhs ? TeX_raw(rhs) : NULL;
+    TeX_t *notation = TeX_equation(left, right, TeX_EQUATION_ALIGNED);
+    char *out = notation ? strdup(TeX_source(notation)) : NULL;
+    TeX_free(notation);
+    TeX_free(right);
+    TeX_free(left);
     free(rhs);
     free(lhs);
     return out;

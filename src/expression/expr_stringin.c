@@ -67,6 +67,7 @@
 #include "string-t.h"
 #include "qfloat-t.h"
 #include "expression-t.h"
+
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 
@@ -78,8 +79,11 @@
 #include "expr_stringin_scan.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_series_notation.h"
 
 /* Restore detached bound-Expression qualifications before parsing the body. */
+
 bool expr_distribution_restore(string_t **body, string_t **conditions);
 
 /* ------------------------------------------------------------------ */
@@ -1756,6 +1760,8 @@ static int scan_derivative_call_view(string_view_t text, size_t pos, size_t *suf
     size_t p = pos;
     int bracketed = 0;
     int have_variable = 0;
+    bool leibniz = false;
+    unsigned long requested_order = 1ul, actual_order = 0ul;
     uint32_t cp = 0u;
     size_t len = 0u;
     unsigned char c = 0u;
@@ -1767,9 +1773,30 @@ static int scan_derivative_call_view(string_view_t text, size_t pos, size_t *suf
     if (paren_pos_out)
         *paren_pos_out = SIZE_MAX;
 
-    if (!expr_parse_view_peek_ascii(text, p, &c) || c != 'D')
+    if (!expr_parse_view_peek_ascii(text, p, &c) || (c != 'D' && c != 'd'))
         return 0;
+    leibniz = c == 'd';
     p++;
+
+    if (leibniz) {
+        if (expr_parse_view_peek_ascii(text, p, &c) && c == '^') {
+            requested_order = 0ul;
+            p++;
+            while (expr_parse_view_peek_ascii(text, p, &c) && isdigit(c)) {
+                unsigned digit = (unsigned)(c - '0');
+                if (requested_order > (ULONG_MAX - digit) / 10ul)
+                    return -1;
+                requested_order = requested_order * 10ul + digit;
+                p++;
+            }
+        }
+        if (!expr_parse_view_peek_ascii(text, p, &c) || c != '/' ||
+            !expr_parse_view_peek_ascii(text, p + 1u, &c) || c != 'd')
+            return 0;
+        if (!requested_order)
+            return -1;
+        p += 2u;
+    }
 
     if (expr_parse_view_peek_ascii(text, p, &c) && c == '[') {
         bracketed = 1;
@@ -1786,19 +1813,19 @@ static int scan_derivative_call_view(string_view_t text, size_t pos, size_t *suf
         have_variable = 1;
         p += len;
 
-        if (bracketed && expr_parse_view_peek_ascii(text, p, &c) && c == '^') {
+        if ((bracketed || leibniz) && expr_parse_view_peek_ascii(text, p, &c) && c == '^') {
             p++;
             while (expr_parse_view_peek_ascii(text, p, &c) && isdigit(c)) {
                 unsigned int digit = (unsigned int)(c - '0');
 
                 if (repeat > (ULONG_MAX - digit) / 10ul)
-                    return 0;
+                    return leibniz ? -1 : 0;
                 repeat = repeat * 10ul + digit;
                 repeat_digits = 1;
                 p++;
             }
             if (!repeat_digits || repeat == 0ul)
-                return 0;
+                return leibniz ? -1 : 0;
         } else {
             while (expr_parse_view_peek_value(text, p, &cp, &len) && expr_parse_is_superscript_digit(cp)) {
                 int digit = expr_parse_superscript_digit_value(cp);
@@ -1812,6 +1839,10 @@ static int scan_derivative_call_view(string_view_t text, size_t pos, size_t *suf
             if (repeat_digits && repeat == 0ul)
                 return 0;
         }
+        unsigned long contribution = repeat_digits ? repeat : 1ul;
+        if (actual_order > ULONG_MAX - contribution)
+            return leibniz ? -1 : 0;
+        actual_order += contribution;
     }
 
     if (!have_variable)
@@ -1827,8 +1858,12 @@ static int scan_derivative_call_view(string_view_t text, size_t pos, size_t *suf
         *suffix_end_out = p;
     }
 
+    while (expr_parse_view_peek_ascii(text, p, &c) && isspace(c))
+        p++;
     if (!expr_parse_view_peek_ascii(text, p, &c) || c != '(')
         return 0;
+    if (leibniz && actual_order != requested_order)
+        return -1;
 
     if (paren_pos_out)
         *paren_pos_out = p;
@@ -1876,19 +1911,12 @@ static expr_t *lookup_or_create_derivative_wrt(expr_parse_state_t *p, string_vie
 static expr_t *parse_derivative_atom(expr_parse_state_t *p, size_t suffix_start, size_t suffix_end, size_t paren_pos)
 {
     string_view_t text = expr_parse_text(p);
-    int bracketed = suffix_start > 0u;
     expr_t **wrts = NULL;
     size_t wrt_count = 0u;
     size_t wrt_cap = 0u;
     size_t pos = suffix_start;
     expr_t *arg = NULL;
     expr_t *cur = NULL;
-
-    if (bracketed) {
-        unsigned char before = 0u;
-
-        bracketed = expr_parse_view_peek_ascii(text, suffix_start - 1u, &before) && before == '[';
-    }
 
     while (pos < suffix_end) {
         uint32_t cp = 0u;
@@ -1913,7 +1941,7 @@ static expr_t *parse_derivative_atom(expr_parse_state_t *p, size_t suffix_start,
             int repeat_digits = 0;
             unsigned char c = 0u;
 
-            if (bracketed && expr_parse_view_peek_ascii(text, pos, &c) && c == '^') {
+            if (expr_parse_view_peek_ascii(text, pos, &c) && c == '^') {
                 pos++;
                 while (pos < suffix_end && expr_parse_view_peek_ascii(text, pos, &c) && isdigit(c)) {
                     unsigned int digit = (unsigned int)(c - '0');
@@ -3032,10 +3060,11 @@ static expr_t *parse_integral_atom(expr_parse_state_t *p)
     }
 
     result = build_ascii_bounded_integral_expr(lower, upper, display_integrand, dummy);
+    if (result && evaluate_symbolically)
+        p->has_symbolic_integral = true;
     if (result && evaluate_symbolically && !preserve_calculus_operations) {
         expr_t *completed = expr_display_simplified(result);
 
-        p->has_symbolic_integral = true;
         if (completed) {
             expr_free(result);
             result = completed;
@@ -3589,8 +3618,15 @@ static expr_t *parse_atom_body(expr_parse_state_t *p, bool allow_ascii_rational_
         size_t suffix_end = SIZE_MAX;
         size_t paren_pos = SIZE_MAX;
         const func_entry_t *fe = lookup_fixed_func_call_view(text, pos, p->syntax, &paren_pos);
-        if (!fe && scan_derivative_call_view(text, pos, &suffix_start, &suffix_end, &paren_pos))
-            return parse_derivative_atom(p, suffix_start, suffix_end, paren_pos);
+        if (!fe) {
+            int derivative = scan_derivative_call_view(text, pos, &suffix_start, &suffix_end, &paren_pos);
+            if (derivative < 0) {
+                set_error(p, "invalid derivative: use matching positive orders and a parenthesised operand");
+                return NULL;
+            }
+            if (derivative)
+                return parse_derivative_atom(p, suffix_start, suffix_end, paren_pos);
+        }
 
         if (fe && paren_pos != SIZE_MAX) {
             size_t after_kw_pos = pos + func_entry_kw_len(fe);
@@ -4040,6 +4076,22 @@ static expr_t *parse_power_operand_mode(expr_parse_state_t *p, bool allow_ascii_
     expr_t *base = parse_atom(p, allow_ascii_rational_literal);
     if (!base)
         return NULL;
+
+    /* Symbolic indices are native expression nodes, not typesetting fragments. */
+    if (expr_symbol_name(base) && expr_parse_consume_char(p, '_')) {
+        const char *name = expr_symbol_name(base);
+        expr_t *index = expr_parse_consume_char(p, '(')
+                            ? parse_enclosed_addexpr(p, ')', "expected ')' after symbolic index")
+                            : parse_atom(p, false);
+        expr_t *indexed = name && index ? expr_new_indexed_symbol(name, index) : NULL;
+        expr_free(index);
+        expr_free(base);
+        base = indexed;
+        if (!base) {
+            set_error(p, "symbolic index requires a named symbol and an index");
+            return NULL;
+        }
+    }
 
     unsigned char postfix_next = 0u;
     while (!(expr_parse_view_peek_ascii(expr_parse_text(p), expr_parse_pos(p) + 1u, &postfix_next) &&
@@ -5624,73 +5676,6 @@ bool expr_series_zeta_difference_parts(const expr_t *result, const expr_t **para
     return true;
 }
 
-static char *expr_series_zeta_parameter_TeX(const expr_t *parameter)
-{
-    const expr_t *positive = NULL;
-    const char *name;
-
-    if (!parameter)
-        return NULL;
-    name = expr_symbol_name(parameter);
-    if (name)
-        return strdup(name);
-    positive = expr_is_neg(parameter) ? parameter->a : NULL;
-    if (positive && (name = expr_symbol_name(positive)) != NULL) {
-        const size_t name_length = strlen(name);
-        char *negative_name = malloc(name_length + 2u);
-
-        if (!negative_name)
-            return NULL;
-        negative_name[0] = '-';
-        memcpy(negative_name + 1u, name, name_length + 1u);
-        return negative_name;
-    }
-    return expr_to_TeX_body(parameter);
-}
-
-static string_t *expr_series_derivation_TeX(const string_t *series_TeX, const expr_t *result)
-{
-    const expr_t *zeta_parameter = NULL;
-    const expr_t *zeta_endpoint = NULL;
-    char *result_TeX = expr_to_TeX_body(result);
-    string_t *derivation = string_new();
-    const bool result_is_series = result_TeX && strcmp(string_c_str(series_TeX), result_TeX) == 0;
-
-    if (result_is_series) {
-        if (!derivation || string_append_format(derivation, "\\begin{aligned}[t]\n&%S\n\\end{aligned}", series_TeX) < 0) {
-            string_free(derivation);
-            derivation = NULL;
-        }
-    } else if (result_TeX && derivation &&
-               expr_series_zeta_difference_parts(result, &zeta_parameter, &zeta_endpoint)) {
-        expr_t *digamma = expr_digamma(zeta_endpoint);
-        expr_t *gamma = expr_from_string("gamma", NULL);
-        expr_t *harmonic = digamma && gamma ? expr_add(digamma, gamma) : NULL;
-        char *harmonic_TeX = harmonic ? expr_to_TeX_body(harmonic) : NULL;
-        char *parameter_TeX = expr_series_zeta_parameter_TeX(zeta_parameter);
-
-        if (!harmonic_TeX || !parameter_TeX ||
-            string_append_format(derivation,
-                                 "\\begin{aligned}[t]\n&%S \\\\\n"
-                                 "&= \\begin{cases}\n%s, & %s = 1, \\\\\n%s, & %s \\ne 1.\n\\end{cases}\n\\end{aligned}",
-                                 series_TeX, harmonic_TeX, parameter_TeX, result_TeX, parameter_TeX) < 0) {
-            string_free(derivation);
-            derivation = NULL;
-        }
-        free(parameter_TeX);
-        free(harmonic_TeX);
-        expr_free(harmonic);
-        expr_free(gamma);
-        expr_free(digamma);
-    } else if (!result_TeX || !derivation ||
-        string_append_format(derivation, "\\begin{aligned}[t]\n&%S \\\\\n&= %s\n\\end{aligned}", series_TeX, result_TeX) < 0) {
-        string_free(derivation);
-        derivation = NULL;
-    }
-    free(result_TeX);
-    return derivation;
-}
-
 /* Parse an expression while preserving its native series derivation and specialisation metadata. */
 expr_t *expr_from_string_with_derivation_TeX_internal(const char *s, expr_bindings_t **bnd_out,
                                                       string_t **derivation_TeX_out,
@@ -5749,15 +5734,34 @@ string_t *expr_source_TeX_internal(const char *source)
     return result;
 }
 
-/* Retain authored calculus nodes for executable Function cards without changing ordinary parsing. */
-expr_t *expr_from_string_preserving_calculus_internal(const char *source)
+/* Retain authored calculus nodes without changing ordinary parser evaluation. */
+expr_t *expr_from_text_preserving_calculus(const string_t *text, expr_bindings_t **bnd_out)
 {
     bool previous = preserve_calculus_operations;
     expr_t *result;
 
     preserve_calculus_operations = true;
-    result = expr_from_string(source, NULL);
+    result = expr_from_text(text, bnd_out);
     preserve_calculus_operations = previous;
+    return result;
+}
+
+/* Equation presentation retains undeclared function calls and authored calculus. */
+expr_t *expr_from_presentation_text_internal(const string_t *text)
+{
+    bool previous = preserve_calculus_operations;
+    preserve_calculus_operations = true;
+    expr_t *result = expr_from_text_internal(text, NULL, NULL, NULL, EXPR_PARSE_DIFFERENTIAL_SYNTAX);
+    preserve_calculus_operations = previous;
+    return result;
+}
+
+/* Adapt legacy internal callers to the public string-based presentation parser. */
+expr_t *expr_from_string_preserving_calculus_internal(const char *source)
+{
+    string_t *text = source ? string_new_with(source) : NULL;
+    expr_t *result = text ? expr_from_text_preserving_calculus(text, NULL) : NULL;
+    string_free(text);
     return result;
 }
 

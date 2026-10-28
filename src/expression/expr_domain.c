@@ -16,6 +16,7 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
+
 static bool domain_numeric(const expr_t *expr);
 
 /* Recognise |z| > 0 as z != 0 without changing the predicate's evaluation. */
@@ -68,8 +69,7 @@ static expr_t *real_bound_simplify(const expr_t *expr, expr_t *a, expr_t *b)
 
 const expr_ops_t ops_real_bound = {
     .eval = real_bound_eval, .kind = EXPR_KIND_REAL_BOUND, .arity = EXPR_OP_UNARY,
-    .expression_name = "Re", .function_name = "realpart", .TeX_name = "\\mathfrak{Re}",
-    .apply_unary = real_bound_new, .simplify = real_bound_simplify,
+    .expression_name = "Re", .function_name = "realpart", .apply_unary = real_bound_new, .simplify = real_bound_simplify,
 };
 
 /* Cartesian coordinates use the existing number-layer projections. They are not holomorphic derivatives. */
@@ -113,8 +113,8 @@ static expr_t *imag_coordinate_simplify(const expr_t *expr, expr_t *a, expr_t *b
 
 const expr_ops_t ops_imag_coordinate = {
     .eval = imag_coordinate_eval, .kind = EXPR_KIND_IMAG_COORDINATE, .arity = EXPR_OP_UNARY,
-    .expression_name = "Im", .function_name = "imagpart", .TeX_name = "\\mathfrak{Im}",
-    .apply_unary = expr_imag_coordinate, .simplify = imag_coordinate_simplify,
+    .expression_name = "Im", .function_name = "imagpart", .apply_unary = expr_imag_coordinate,
+    .simplify = imag_coordinate_simplify,
 };
 
 static number_t real_parameter_eval(expr_t *expr)
@@ -491,66 +491,3 @@ char *expr_formal_transform_TeX(const expr_t *source, const expr_t *result)
 }
 
 /* Present an evaluated transform as an identity without changing the result algebra. */
-char *expr_transform_identity_TeX(const expr_t *source, const expr_t *result)
-{
-    while (source && source->ops == &ops_real_domain)
-        source = source->a;
-    while (result && result->ops == &ops_real_domain && !result->b)
-        result = result->a;
-    if (!expr_is_integral_transform(source) || !result)
-        return NULL;
-    const expr_t *source_target = source->b->b->a;
-    const expr_t *result_target = result->ops == &ops_laplace ? result->b->b->a : NULL;
-    bool same_target = result_target &&
-                       (expr_struct_eq(source_target, result_target) ||
-                        (source_target->name && result_target->name &&
-                         strcmp(source_target->name, result_target->name) == 0));
-    bool shifted_formal = source->ops == &ops_laplace && result->ops == &ops_laplace && !same_target;
-    if (expr_is_integral_transform(result) && !shifted_formal)
-        return NULL;
-    expr_t *operand = shifted_formal ? NULL : expr_transform_bound_constants(source->a);
-    if (!operand)
-        operand = expr_clone(source->a);
-    char *body = expr_to_TeX_operation_body(operand);
-    /* The integration coordinate is a symbol, even when copied with an unset binding. */
-    expr_t *coordinate = source->b->a->name ? expr_new_named_var(NUM_NAN, source->b->a->name)
-                                          : expr_clone(source->b->a);
-    char *from = expr_to_TeX_body(coordinate);
-    expr_free(coordinate);
-    const expr_t *target = source->b->b->a;
-    coordinate = target->name ? expr_new_named_var(NUM_NAN, target->name) : expr_clone(target);
-    char *to = expr_to_TeX_body(coordinate);
-    expr_free(coordinate);
-    char *rhs = expr_to_TeX_body(result);
-    char *out = NULL;
-    if (body && from && to && rhs && shifted_formal) {
-        char *argument = expr_to_TeX_body(result->b->b->a);
-        char *function = expr_to_TeX_body(result->a);
-        if (argument && function) {
-            size_t size = strlen(body) + 2u * strlen(from) + 3u * strlen(to) +
-                          2u * strlen(argument) + strlen(function) + 256u;
-            out = malloc(size);
-            if (out)
-                snprintf(out, size,
-                         "\\mathcal{L}_{%s\\to %s}\\left\\{%s\\right\\} = F\\left(%s\\right)"
-                         "\\quad F(%s):=\\mathcal{L}_{%s\\to %s}\\left\\{%s\\right\\}"
-                         "\\quad %s\\in\\operatorname{ROC}(F)",
-                         from, to, body, argument, to, from, to, function, argument);
-        }
-        free(function);
-        free(argument);
-    } else if (body && from && to && rhs) {
-        size_t size = strlen(body) + strlen(from) + strlen(to) + strlen(rhs) + 80u;
-        out = malloc(size);
-        if (out)
-            snprintf(out, size, "%s_{%s\\to %s}\\left\\{%s\\right\\} = %s",
-                     source->ops->TeX_name,
-                     from, to, body, rhs);
-    }
-    free(rhs);
-    free(to);
-    free(from);
-    free(body);
-    expr_free(operand);
-    return out;
-}

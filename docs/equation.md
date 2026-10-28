@@ -8,6 +8,19 @@ Internally, `src/equation/equation_polynomial_match.c` groups the affine and
 quadratic coefficient recognisers. General polynomial storage and the
 degree-specific root algorithms remain separate implementation units.
 
+TeX output composes its sides through `TeX_equation` in the shared [TeX module](TeX.md),
+including top-aligned wrapped output. The TeX-owned solution-display backend handles
+compact root families and symmetric pairs through `TeX_root` and `TeX_symmetric_pair`.
+Equation metadata and solving remain here; the display backend calls native
+structural operations rather than reimplementing algebra or reparsing TeX.
+
+The `TeX_from_expression` convenience adapter uses this module's equation
+separator and binding parser. A native operand-reader callback interprets each
+side, including scalar–matrix products, and `TeX_equation` composes the result.
+Undeclared calls on equation sides remain symbolic functions; explicit multiplication
+distinguishes a product from a function call. Ordinary equation-solving APIs keep
+their existing grammar and evaluation behaviour.
+
 The intended public workflow is:
 
 1. Parse or construct an equation.

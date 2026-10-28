@@ -18,13 +18,24 @@
 #error "Private header requires MARS_SHARED_EXPR_INTERNAL_ACCESS."
 #endif
 
+#include "expression-t.h"
+
+/** @brief Receive a borrowed support coordinate and finite complex impulse weight for plotting. */
+typedef bool (*expr_impulse_callback_t)(number_t coordinate, number_t weight, void *context);
+
+/** @brief Recognise distribution nodes, including unsupported nonlinear combinations, without evaluating them. */
+bool expr_is_distribution(const expr_t *expression);
+
+/** @brief Return an owned regular part and emit impulses; preview reports a bounded infinite-sum preview. */
+expr_t *expr_distribution_decompose(const expr_t *expression, const expr_t *variable,
+                                    expr_impulse_callback_t callback, void *context, bool *preview);
+
 #ifndef EXPR_INTERNAL_H
 
 #include <stdbool.h>
 #include <stddef.h>
 
 #include "string-t.h"
-#include "expression-t.h"
 #include "expr_context-t.h"
 
 typedef enum expr_integration_bound_kind {
@@ -384,7 +395,6 @@ const char *expr_greek_symbol_alias(rune_t symbol);
 
 string_t *expr_normalise_binding_name_text(const string_t *name);
 int expr_is_default_constant_name_text(const string_t *name);
-char *expr_tostring_texify(const char *text);
 int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out);
 
 /** @brief Render expression text with bindings, retaining a bound root variable symbolically. */
@@ -392,9 +402,6 @@ string_t *expr_to_text_symbolic(const expr_t *expr);
 
 /** @brief Render owning TeX body and bindings separately, retaining a bound root variable symbolically. */
 int expr_to_TeX_symbolic_parts(const expr_t *expr, char **expr_out, char **bindings_out);
-char *expr_to_TeX_body_wrapped_with_partials(const expr_t *expr, size_t line_limit);
-char *expr_to_TeX_body_wrapped_with_totals(const expr_t *expr, size_t line_limit);
-char *expr_to_TeX_body_ordered(const expr_t *expr, bool partial);
 
 #endif /* EXPR_INTERNAL_H */
 
@@ -478,6 +485,9 @@ expr_t *expr_from_string_with_derivation_TeX_internal(const char *s, expr_bindin
 
 /** @brief Parse authored calculus operations without replacing them with their results. */
 expr_t *expr_from_string_preserving_calculus_internal(const char *source);
+
+/** @brief Parse equation-side presentation with symbolic calls and unevaluated calculus; caller owns the result. */
+expr_t *expr_from_presentation_text_internal(const string_t *text);
 
 /** @brief Return owning source TeX, preferring the recognised sigma notation over a series' closed form. */
 string_t *expr_source_TeX_internal(const char *source);

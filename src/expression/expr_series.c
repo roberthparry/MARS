@@ -21,6 +21,9 @@
 
 #include "string-t.h"
 #include "expression-t.h"
+
+#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
+#include "internal/TeX_semantic_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -282,10 +285,7 @@ static string_t *expr_series_expand_telescoping_product(const string_t *source, 
     expanded = string_new();
     TeX = string_new();
     if (!expanded || !TeX || string_append_format(expanded, "((%s)+1)/2", denominators[3]) < 0 ||
-        string_append_format(TeX,
-                             "\\prod_{k=2}^{%s}\\left(1+\\frac{1}{k}\\right)="
-                             "\\frac{%s+1}{2}",
-                             denominators[3], denominators[3]) < 0)
+        TeX_append_telescoping_product(TeX, denominators[3]) < 0)
         goto cleanup;
     matched = true;
 
@@ -361,9 +361,7 @@ static string_t *expr_series_expand_infinite_prime_product(const string_t *sourc
     TeX = string_new();
     if (!expanded || !TeX ||
         string_append_cstr(expanded, product_sign > 0 ? "inf" : "0") != 0 ||
-        string_append_cstr(TeX, product_sign > 0
-                                    ? "\\prod_{p\\in\\mathbb{P}}\\left(1+\\frac{1}{p}\\right)=+\\infty"
-                                    : "\\prod_{p\\in\\mathbb{P}}\\left(1-\\frac{1}{p}\\right)=0") != 0)
+        TeX_append_prime_product(TeX, product_sign > 0) != 0)
         goto cleanup;
     *expanded_out = true;
     *display_TeX_out = TeX;
@@ -1110,21 +1108,17 @@ static string_t *expr_series_expand_trigonometric_progression(const string_t *so
                                  trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_SINH;
         const char *first_function = hyperbolic ? "sinh" : "sin";
         const char *second_function = sine_family ? first_function : (hyperbolic ? "cosh" : "cos");
-        const char *TeX_function = trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_SIN    ? "\\sin"
-                                   : trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_COS  ? "\\cos"
-                                   : trigonometric_kind == EXPR_SERIES_TRIGONOMETRIC_SINH ? "\\sinh"
-                                                                                           : "\\cosh";
+        const char *function_name = sine_family ? first_function : second_function;
 
         if (unit_angle_step) {
             if (string_append_format(expanded, "%s((%s)/2)*%s(((%s)+1)/2)/%s(1/2)", first_function,
                                      endpoint_text, second_function, endpoint_text, first_function) < 0 ||
-                string_append_format(TeX, "\\sum_{k=1}^{%s}%s(k)", endpoint_TeX, TeX_function) < 0)
+                TeX_append_trigonometric_sum(TeX, endpoint_TeX, function_name, NULL, false) < 0)
                 goto cleanup;
         } else if (string_append_format(expanded, "%s((%s)*(%s)/2)*%s(((%s)+1)*(%s)/2)/%s((%s)/2)",
                                         first_function, endpoint_text, angle_step_text, second_function,
                                         endpoint_text, angle_step_text, first_function, angle_step_text) < 0 ||
-                   string_append_format(TeX, "\\sum_{k=1}^{%s}%s(k\\mkern-2mu %s)", endpoint_TeX,
-                                        TeX_function, angle_step_TeX) < 0) {
+                   TeX_append_trigonometric_sum(TeX, endpoint_TeX, function_name, angle_step_TeX, false) < 0) {
             goto cleanup;
         }
     }
@@ -1276,17 +1270,11 @@ static string_t *expr_series_expand_weighted_trigonometric_progression(const str
                                     : kind == EXPR_SERIES_TRIGONOMETRIC_COS  ? "cos"
                                     : kind == EXPR_SERIES_TRIGONOMETRIC_SINH ? "sinh"
                                                                             : "cosh";
-        const char *TeX_name = kind == EXPR_SERIES_TRIGONOMETRIC_SIN    ? "\\sin"
-                               : kind == EXPR_SERIES_TRIGONOMETRIC_COS  ? "\\cos"
-                               : kind == EXPR_SERIES_TRIGONOMETRIC_SINH ? "\\sinh"
-                                                                       : "\\cosh";
-
         if (expr_series_append_slice(output, text, 0u, expr_series_trim(text, terms[0]).start) != 0 ||
             string_append_format(output, "sum(k,1,%s,%s(k*(%s))/k)", endpoint_text, function_name, angle_text) < 0 ||
             expr_series_append_slice(output, text, expr_series_trim(text, terms[ellipsis_index + 1u]).end,
                                      strlen(text)) != 0 ||
-            string_append_format(TeX, "\\sum_{k=1}^{%s}\\frac{%s(k\\mkern-2mu %s)}{k}", endpoint_TeX,
-                                 TeX_name, angle_TeX) < 0)
+            TeX_append_trigonometric_sum(TeX, endpoint_TeX, function_name, angle_TeX, true) < 0)
             goto cleanup;
     }
     matched = true;

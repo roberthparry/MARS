@@ -8,6 +8,21 @@
 - fixed problem constants; and
 - initial or boundary conditions.
 
+TeX output is delegated to the shared [TeX module](TeX.md), including ordered
+derivatives, repeated-quadratic and differential-form displays, boundary conditions
+and solver-specific explanations. Native solvers supply verified results and
+metadata; the presentation backend owns TeX syntax and associated derivation text.
+Rendering does not reparse expressions or run the solver again.
+
+`de_problem_to_TeX(problem)` returns an owned `string_t` containing the equation
+and its initial or boundary conditions, displayed using evaluation bars. Release
+it with `string_free`. This presentation-only API does not solve the problem;
+`de_to_text(problem, style_LATEX)` continues to return the equation alone.
+The parser also accepts condition-only braced shorthand and interprets a shorthand
+residual without an equals sign as equal to zero. The complete runnable
+[bound-problem example](TeX.md#bound-matrix-powers-and-differential-equation-problems)
+demonstrates both through the TeX convenience API.
+
 The module supports construction, parsing, inspection, formatting, and
 symbolic solvers for first-order separable, linear, homogeneous, affine and
 linear-coordinate substitutions, and quadratic Bernoulli ODEs. Second-order

@@ -74,7 +74,8 @@ void test_diffequ_autonomous_transport(void)
         const char *TeX = de_solve_result_steps_TeX(result);
         bool explained = steps && strstr(steps, "implicit") && strstr(steps, "nonzero") &&
                          strstr(steps, "no initial or boundary data");
-        bool rendered = TeX && strstr(TeX, "\\partial H") && !strstr(TeX, "NAN");
+        bool rendered = TeX && strstr(TeX, "\\partial H") && strstr(TeX, "\\ne") &&
+                        strstr(TeX, "F\\left(") && !strstr(TeX, "NAN");
         if (i == 7u)
             explained = explained && strstr(steps, "Normalisation requires a != 0");
         de_free(de);

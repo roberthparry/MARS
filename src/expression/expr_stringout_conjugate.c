@@ -11,10 +11,15 @@
 #include <stdint.h>
 
 #include "dictionary-t.h"
+
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_notation_internal.h"
 
 typedef struct {
     const expr_t *base;
@@ -136,7 +141,7 @@ static void expr_conjugate_emit_term(const expr_t *base, number_t coefficient, b
     negative = negative != term_negative;
     sbuf_puts(buffer, *first ? (negative ? "-" : "") : negative ? " - " : " + ");
     if (style == style_LATEX)
-        (term_negative ? emit_TeX_expr_abs : emit_TeX_expr)(term, buffer, PREC_MUL);
+        (term_negative ? emit_TeX_expr_abs : TeX_emit_expr)(term, buffer, PREC_MUL);
     else if (style == style_FUNCTION)
         (term_negative ? emit_func_abs : emit_func)(term, buffer, PREC_MUL);
     else
@@ -164,7 +169,7 @@ static bool expr_conjugate_common_factor(const expr_t *expr, sbuf_t *buffer, int
                 expr_new_binary_internal(&ops_mul, expr_new_const(NUM_TWO), expr_clone(left[i])));
             expr_t *result = expr_new_binary_internal(&ops_mul, twice_factor, projection);
             if (style == style_LATEX)
-                emit_TeX_expr(result, buffer, parent_prec);
+                TeX_emit_expr(result, buffer, parent_prec);
             else if (style == style_FUNCTION)
                 emit_func(result, buffer, parent_prec);
             else
@@ -174,6 +179,81 @@ static bool expr_conjugate_common_factor(const expr_t *expr, sbuf_t *buffer, int
         }
     }
     return false;
+}
+
+static const TeX_model_node_t *expr_notation_common_conjugate(notation_build_t *build, const expr_t *expr)
+{
+    if (!expr_is_op(expr, &ops_add) || !expr_is_mul(expr->a) || !expr_is_mul(expr->b))
+        return NULL;
+    const expr_t *left[] = {expr->a->a, expr->a->b}, *right[] = {expr->b->a, expr->b->b};
+    for (size_t i = 0u; i < 2u; ++i) {
+        for (size_t j = 0u; j < 2u; ++j) {
+            const expr_t *a = left[1u - i], *b = right[1u - j];
+            const expr_t *argument = expr_is_op(a, &ops_conj) && expr_struct_eq(a->a, b) ? b :
+                                     expr_is_op(b, &ops_conj) && expr_struct_eq(b->a, a) ? a : NULL;
+            if (!argument || !expr_struct_eq(left[i], right[j]))
+                continue;
+            expr_t *factor = expr_simplify_owned(
+                expr_new_binary_internal(&ops_mul, expr_new_const(NUM_TWO), expr_clone(left[i])));
+            const TeX_model_node_t *operand = notation_build_expr(build, argument);
+            const TeX_model_node_t *projection = notation_build_node(build,
+                (TeX_node_view_t){.kind = TeX_NODE_REAL_PROJECTION, .child_count = 1u}, &operand);
+            const TeX_model_node_t *parts[] = {notation_build_expr(build, factor), projection};
+            const TeX_model_node_t *result = notation_build_node(build,
+                (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
+            expr_free(factor);
+            return result;
+        }
+    }
+    return NULL;
+}
+
+static const TeX_model_node_t *expr_notation_conjugate_term(notation_build_t *build, const expr_t *base,
+                                                            number_t coefficient, TeX_node_kind_t kind)
+{
+    const TeX_model_node_t *operand = notation_build_expr(build, base);
+    if (kind != TeX_NODE_COUNT)
+        operand = notation_build_node(build, (TeX_node_view_t){.kind = kind, .child_count = 1u}, &operand);
+    if (num_is_one(coefficient))
+        return operand;
+    const TeX_model_node_t *parts[] = {notation_build_number(build, coefficient), operand};
+    return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
+}
+
+/* Group complete native sums before asking TeX to render conjugate projections. */
+const TeX_model_node_t *expr_notation_conjugate_sum(notation_build_t *build, const expr_t *expr)
+{
+    if (!build || !expr_is_addsub(expr) || !expr_conjugate_sum_contains(expr))
+        return NULL;
+    const TeX_model_node_t *common = expr_notation_common_conjugate(build, expr);
+    if (common)
+        return common;
+    dictionary_t *groups = dictionary_create(sizeof(const expr_t *), sizeof(expr_conjugate_group_t),
+        expr_conjugate_hash, expr_conjugate_compare, NULL, NULL, NULL, NULL, expr_conjugate_destroy);
+    bool has_conjugate = false;
+    bool valid = groups && expr_conjugate_collect(expr, NUM_ONE, groups, &has_conjugate) && has_conjugate;
+    const TeX_model_node_t *result = NULL;
+    for (size_t i = 0u; valid && i < dictionary_size(groups); ++i) {
+        const expr_conjugate_group_t *group = dictionary_get_value(groups, i);
+        bool paired = num_eq(group->coefficients[0], group->coefficients[1]) && !num_is_zero(group->coefficients[0]);
+        for (size_t side = 0u; valid && side < (paired ? 1u : 2u); ++side) {
+            if (!paired && num_is_zero(group->coefficients[side]))
+                continue;
+            number_t coefficient = paired ? num_add(group->coefficients[0], group->coefficients[0])
+                                          : num_clone(group->coefficients[side]);
+            const TeX_model_node_t *term = expr_notation_conjugate_term(build, group->base, coefficient,
+                paired ? TeX_NODE_REAL_PROJECTION : side ? TeX_NODE_CONJUGATE : TeX_NODE_COUNT);
+            num_destroy(&coefficient);
+            const TeX_model_node_t *parts[] = {result, term};
+            result = result ? notation_build_node(build,
+                (TeX_node_view_t){.kind = TeX_NODE_SUM, .child_count = 2u}, parts) : term;
+            valid = result != NULL;
+        }
+    }
+    if (valid && !result)
+        result = notation_build_literal(build, TeX_NODE_NUMBER, "0");
+    dictionary_destroy(groups);
+    return valid ? result : NULL;
 }
 
 /* Consume the complete sum, including unequal groups, so nested pairs cannot be rewritten in isolation. */
@@ -193,8 +273,12 @@ bool expr_emit_conjugate_sum(const expr_t *expr, sbuf_t *buffer, int parent_prec
         return false;
     }
     bool bracketed = parent_prec > PREC_ADD, first = true;
-    if (bracketed)
-        sbuf_puts(buffer, style == style_LATEX ? "\\left(" : "(");
+    if (bracketed) {
+        if (style == style_LATEX)
+            TeX_emit_parenthesis(buffer, false);
+        else
+            sbuf_putc(buffer, '(');
+    }
     for (size_t i = 0u; i < dictionary_size(groups); ++i) {
         const expr_conjugate_group_t *group = dictionary_get_value(groups, i);
         if (num_eq(group->coefficients[0], group->coefficients[1]) && !num_is_zero(group->coefficients[0])) {
@@ -210,8 +294,12 @@ bool expr_emit_conjugate_sum(const expr_t *expr, sbuf_t *buffer, int parent_prec
     }
     if (first)
         sbuf_putc(buffer, '0');
-    if (bracketed)
-        sbuf_puts(buffer, style == style_LATEX ? "\\right)" : ")");
+    if (bracketed) {
+        if (style == style_LATEX)
+            TeX_emit_parenthesis(buffer, true);
+        else
+            sbuf_putc(buffer, ')');
+    }
     dictionary_destroy(groups);
     return true;
 }

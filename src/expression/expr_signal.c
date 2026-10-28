@@ -389,26 +389,26 @@ static void sgn_reverse(const expr_t *expr, const number_t *out_bar, number_t *a
 const expr_ops_t ops_sgn = {
     .eval = signal_eval, .deriv = signal_deriv, .reverse = sgn_reverse,
     .kind = EXPR_KIND_SGN, .arity = EXPR_OP_UNARY,
-    .expression_name = "sgn", .function_name = "sgn", .TeX_name = "\\operatorname{sgn}",
-    .apply_unary = expr_sgn, .simplify = signal_simplify, .integrate = signal_integrate,
+    .expression_name = "sgn", .function_name = "sgn", .apply_unary = expr_sgn,
+    .simplify = signal_simplify, .integrate = signal_integrate,
 };
 
-#define SIGNAL_OP(name, kind_id, expression, display)                                                                    \
+#define SIGNAL_OP(name, kind_id, expression)                                                                    \
     const expr_ops_t ops_##name = {                                                                                     \
         .eval = signal_eval, .deriv = signal_deriv, .reverse = expr_reverse_not_differentiable,                           \
         .kind = kind_id, .arity = EXPR_OP_UNARY, .expression_name = expression, .function_name = #name,                   \
-        .TeX_name = display, .apply_unary = expr_##name, .simplify = signal_simplify, .integrate = signal_integrate,      \
+        .apply_unary = expr_##name, .simplify = signal_simplify, .integrate = signal_integrate,      \
     }
 
-SIGNAL_OP(step, EXPR_KIND_STEP, "step", "\\operatorname{step}");
-SIGNAL_OP(rect, EXPR_KIND_RECT, "rect", "\\operatorname{rect}");
-SIGNAL_OP(tri, EXPR_KIND_TRI, "tri", "\\operatorname{tri}");
-SIGNAL_OP(circ, EXPR_KIND_CIRC, "circ", "\\operatorname{circ}");
-SIGNAL_OP(sinc, EXPR_KIND_SINC, "sinc", "\\operatorname{sinc}");
-SIGNAL_OP(delta, EXPR_KIND_DELTA, "δ", "\\delta");
-SIGNAL_OP(analytic_delta, EXPR_KIND_ANALYTIC_DELTA, "analytic_delta", "\\delta");
-SIGNAL_OP(principal_value, EXPR_KIND_PRINCIPAL_VALUE, "principal_value", "\\operatorname{PV}");
-SIGNAL_OP(finite_part, EXPR_KIND_FINITE_PART, "finite_part", "\\operatorname{Fp}");
+SIGNAL_OP(step, EXPR_KIND_STEP, "step");
+SIGNAL_OP(rect, EXPR_KIND_RECT, "rect");
+SIGNAL_OP(tri, EXPR_KIND_TRI, "tri");
+SIGNAL_OP(circ, EXPR_KIND_CIRC, "circ");
+SIGNAL_OP(sinc, EXPR_KIND_SINC, "sinc");
+SIGNAL_OP(delta, EXPR_KIND_DELTA, "δ");
+SIGNAL_OP(analytic_delta, EXPR_KIND_ANALYTIC_DELTA, "analytic_delta");
+SIGNAL_OP(principal_value, EXPR_KIND_PRINCIPAL_VALUE, "principal_value");
+SIGNAL_OP(finite_part, EXPR_KIND_FINITE_PART, "finite_part");
 #undef SIGNAL_OP
 
 static expr_t *signal_new(const expr_ops_t *ops, const expr_t *argument)
@@ -717,7 +717,7 @@ static expr_t *convolution_integrate(const expr_t *e, const expr_t *wrt)
 #define CONVOLUTION_OP(name, id, spelling) \
     const expr_ops_t ops_##name = { .eval = convolution_eval, .deriv = convolution_deriv, \
         .kind = id, .arity = EXPR_OP_BINARY, .expression_name = spelling, .function_name = spelling, \
-        .TeX_name = "\\operatorname{" spelling "}", .simplify = convolution_simplify, \
+        .simplify = convolution_simplify, \
         .integrate = convolution_integrate }
 CONVOLUTION_OP(convolution, EXPR_KIND_CONVOLUTION, "convolve");
 CONVOLUTION_OP(causal_convolution, EXPR_KIND_CAUSAL_CONVOLUTION, "causal_convolve");
