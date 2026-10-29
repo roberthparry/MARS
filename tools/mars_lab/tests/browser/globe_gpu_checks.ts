@@ -12,6 +12,19 @@ async function checkGlobeGPU(check: (condition: boolean, message: string) => voi
     const moduleURL = '/js/globe_gpu.js';
     const {MarsGlobeMask} = await import(moduleURL) as typeof import('../../typescript/globe_gpu.js');
     const native = labWire.exports(), canvas = document.createElement('canvas');
+    const planFor = (words: number[], vertices: number) => {
+        const batches = new Uint32Array(words);
+        return labDOM.call('lab_webgl_mask_commands', new Uint8Array(batches.buffer), vertices) as
+            {pointer: number; count: number} | null;
+    };
+    check(planFor([], 0)?.count === 0, 'native GPU command planner accepts empty coverage');
+    for (const words of [[1, 3, 1], [0, 4, 1], [0, 6, 1], [0, 3, 2], [0, 3, 1, 3, 3, 0], [0, 3]])
+        check(planFor(words, 3) === null, 'native GPU planner rejects malformed or out-of-range batches atomically');
+    const planned = planFor([0, 3, 1, 3, 3, 0], 6)!;
+    const commands = new Uint32Array(native.memory.buffer, planned.pointer, planned.count * 5);
+    check(planned.count === 26 && commands[10 * 5 + 1] === 1 && commands[23 * 5 + 1] === 0 &&
+          commands[12 * 5] === 7 && commands[25 * 5] === 7,
+          'native GPU policy paints land then water and clears stencil after each pass');
     const gl = canvas.getContext('webgl')!;
     check(Boolean(gl), 'GPU mask test has a WebGL context');
     const renderer = new MarsGlobeMask(gl, labDOM.call('lab_globe_mask_shader', 0) as string,
@@ -119,6 +132,21 @@ async function checkGlobeGPU(check: (condition: boolean, message: string) => voi
             console.log(`GPU MASK: ${vertices.length / 2} vertices, ${batches.length / 3} batches, ` +
                         `${projectMs.toFixed(2)}ms native projection, ${submitMs.toFixed(2)}ms CPU submission`);
         }
+        let rejected = false;
+        try { renderer.render({svg: '', vertices: new Float32Array(6), batches: new Uint32Array([0, 6, 1])},
+                              256, quad, texture); }
+        catch { rejected = true; }
+        check(rejected && gl.isTexture(texture) && gl.getError() === gl.NO_ERROR,
+              'invalid native frame preserves the published GPU texture without changing GPU state');
+        renderer.dispose();
+        renderer.dispose();
+        check(gl.isTexture(texture) && gl.isBuffer(quad), 'native disposal preserves published texture and borrowed quad');
+        for (let i = 0; i < 32; ++i) {
+            const temporary = new MarsGlobeMask(gl, labDOM.call('lab_globe_mask_shader', 0) as string,
+                                               labDOM.call('lab_globe_mask_shader', 1) as string);
+            temporary.dispose();
+        }
+        check(gl.getError() === gl.NO_ERROR, 'native GPU owner slots and handles are reusable beyond the slot limit');
     } finally {
         renderer.dispose(); gl.deleteTexture(texture); gl.deleteBuffer(quad); gl.deleteFramebuffer(read);
         gl.getExtension('WEBGL_lose_context')?.loseContext();

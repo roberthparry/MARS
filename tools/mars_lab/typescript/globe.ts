@@ -107,8 +107,8 @@ class MarsAlmanacGlobe {
         const expanded = full !== name && zoom >= 12 && available >= 430;
         const text = expanded ? full : name, measure = this.labelMeasure;
         if (measure) measure.font = '600 11px Arial, sans-serif';
-        const width = measure ? Math.ceil(measure.measureText(`• ${text}`).width) + 14 : 128;
-        return {name: text, full, width: Math.min(expanded ? 430 : 128, width)};
+        const width = measure ? Math.ceil(measure.measureText(`• ${text}`).width) + 18 : 220;
+        return {name: text, full, width: Math.min(Math.max(28, available), expanded ? 430 : 220, width)};
     }
 
     private view: GlobeView = [0, 0, 1, -180, -90, 180, 90];
@@ -213,7 +213,11 @@ class MarsAlmanacGlobe {
     private riverGeneration = 0;
     private riverReady = false;
     private riverComposite = false;
+    private riverPreview = false;
     private riverSurface: import('./globe_surface.js').GlobeSurface | null = null;
+    private riverTiles: import('./globe_surface_tiles.js').GlobeSurfaceTiles | null = null;
+    private riverTilesModule: Promise<typeof import('./globe_surface_tiles.js')> | null = null;
+    private riverTravelRefresh = 0;
     private riverBounds = [-180, -90, 180, 90];
     private riverZoom = 0;
     private riverUnloadTimer = 0;
@@ -259,7 +263,7 @@ class MarsAlmanacGlobe {
         globe.stopRegionRequests();
         // A saved zoom may cross from photographic detail to a land mask or vice versa.
         globe.detailReady = false;
-        globe.riverReady = false;
+        // Geographic textures remain valid while history resolves the next destination.
         return globe.flightGeneration;
     }
 
@@ -301,7 +305,7 @@ class MarsAlmanacGlobe {
         void globe.loadShore();
         void globe.loadTravelBorders();
         void globe.loadPhoto();
-        void globe.loadRivers();
+        void globe.loadFlightSurface(start, target, redirect);
         globe.hideGridHover();
         const complete = (): void => {
             globe.applyCamera(target);
@@ -391,6 +395,10 @@ class MarsAlmanacGlobe {
         this.view = labDOM.call('lab_globe_view', this.orientation, camera[4], 1) as GlobeView;
         this.rotation = (labDOM.call('lab_surface_camera', 1, this.orientation, null, null, null, 0) as number[][]).flat();
         this.draw(Boolean(this.flightTarget));
+        if (this.flightTarget && !this.riverRequest && performance.now() - this.riverTravelRefresh >= 1000) {
+            this.riverTravelRefresh = performance.now();
+            void this.loadRivers(true);
+        }
         this.scheduleCameraSave();
     }
 
@@ -475,6 +483,7 @@ class MarsAlmanacGlobe {
             this.riverRequest?.abort();
             window.clearTimeout(this.riverTimer);
             this.riverSurface?.dispose();
+            this.riverTiles?.dispose();
             this.travelBordersRequest?.abort();
             this.travelBorders?.dispose();
             void this.maskRenderer?.then(renderer => renderer.dispose()).catch(() => {});
@@ -988,18 +997,32 @@ class MarsAlmanacGlobe {
         }, delay);
     }
 
-    private async loadRivers(): Promise<void> {
-        const target = this.flightTarget;
+    private async loadFlightSurface(start: number[], target: number[], redirect: boolean): Promise<void> {
+        const midpoint = labDOM.call('lab_globe_flight', start, target, 0.5, Number(redirect)) as number[] | null;
+        // A destination-sized tile shrinks to a tiny rectangle during the approach.
+        // Prepare the regional overview first, then refine it at the arrival scale.
+        if (midpoint && midpoint[4] < target[4] / 1.5) await this.loadRivers(false, midpoint[4]);
+        if (this.flightTarget === target) await this.loadRivers();
+    }
+
+    private async loadRivers(currentView = false, overviewZoom?: number): Promise<void> {
+        const {GlobeSurfaceTiles} = await (this.riverTilesModule ||= import('./globe_surface_tiles.js'));
+        const target = currentView ? null : this.flightTarget;
         const orientation = target ? target.slice(0, 4) : this.orientation;
-        const zoom = target?.[4] ?? this.view[2];
+        const zoom = overviewZoom ?? target?.[4] ?? this.view[2];
         if (this.shoreClosed || !this.root.getClientRects().length || this.gl.isContextLost()) return;
+        this.riverTiles ??= new GlobeSurfaceTiles(this.gl);
         const view = labDOM.call('lab_globe_view', orientation, zoom, 1) as GlobeView;
         const reserve = labDOM.call('lab_globe_view', orientation, zoom / 1.25, 1) as GlobeView;
-        let bounds = (labDOM.call('lab_globe_view', orientation, zoom / 1.75, 1) as GlobeView).slice(3);
+        let bounds = GlobeSurfaceTiles.bounds(reserve.slice(3));
         if (bounds[2] - bounds[0] > 30 || bounds[3] - bounds[1] > 30)
             bounds = (labDOM.call('lab_globe_view', orientation, zoom / 1.15, 1) as GlobeView).slice(3);
         if (bounds[2] - bounds[0] > 30 || bounds[3] - bounds[1] > 30) return;
-        if (this.riverReady && (this.riverComposite || performance.now() < this.riverFallbackRetryAt) &&
+        if (this.riverTiles.covering(reserve.slice(3), zoom)?.complete) {
+            this.draw();
+            return;
+        }
+        if (!this.riverPreview && this.riverReady && (this.riverComposite || performance.now() < this.riverFallbackRetryAt) &&
             this.riverCovers(reserve, this.riverBounds) &&
             zoom <= this.riverZoom * 1.5) return;
         const key = bounds.join(',');
@@ -1022,7 +1045,12 @@ class MarsAlmanacGlobe {
                     this.riverSurface ??= new GlobeSurface();
                 }
                 request.signal.throwIfAborted();
-                image = bitmap = await this.riverSurface.load(bounds, request.signal);
+                image = bitmap = await this.riverSurface.load(bounds, request.signal, tile => {
+                    if (generation !== this.riverGeneration || request.signal.aborted) return;
+                    this.riverTiles!.put(bounds, zoom, tile, false);
+                    this.root.dataset.riverSurface = 'preview';
+                    this.draw();
+                });
             } catch {
                 request.signal.throwIfAborted();
                 image = await this.riverImage(bounds, request.signal);
@@ -1033,12 +1061,19 @@ class MarsAlmanacGlobe {
                 this.riverRetryDelay = Math.min(8000, this.riverRetryDelay * 2);
                 return;
             }
-            this.riverBounds = bounds;
-            this.riverZoom = zoom;
-            this.riverReady = true;
-            this.riverComposite = bitmap !== null;
-            this.riverFallbackRetryAt = bitmap ? 0 : performance.now() + 8000;
-            this.upload(3, image);
+            if (bitmap) {
+                this.riverTiles.put(bounds, zoom, bitmap);
+                this.riverPreview = false;
+            }
+            else {
+                this.riverBounds = bounds;
+                this.riverZoom = zoom;
+                this.riverReady = true;
+                this.riverComposite = false;
+                this.riverPreview = false;
+                this.riverFallbackRetryAt = performance.now() + 8000;
+                this.upload(3, image);
+            }
             this.root.dataset.rivers = 'ready';
             this.root.dataset.riverSurface = bitmap ? 'composite' : 'overlay';
             this.riverRetryDelay = 1000;
@@ -1205,6 +1240,14 @@ class MarsAlmanacGlobe {
             if (this.canvas.width !== pixels || this.canvas.height !== pixels)
                 this.canvas.width = this.canvas.height = pixels;
             const gl = this.gl;
+            const resident = this.riverTiles?.bind(this.view.slice(3), this.view[2]);
+            if (resident) {
+                this.riverBounds = resident.bounds;
+                this.riverZoom = resident.zoom;
+                this.riverReady = this.riverComposite = true;
+                this.riverPreview = !resident.complete;
+                this.riverFallbackRetryAt = 0;
+            }
             const colourTransform = mapReady && this.shoreColourFrame === this.shoreFrame
                 ? labDOM.call('lab_globe_frame_transform', this.shoreFrame, [...this.orientation, this.view[2], size]) as number[] | null
                 : null;
@@ -1240,6 +1283,10 @@ class MarsAlmanacGlobe {
             gl.uniform4fv(this.uniform('riverBounds'), this.riverBounds);
             gl.uniform1i(this.uniform('riverReady'), Number(this.riverReady));
             gl.uniform1i(this.uniform('riverComposite'), Number(this.riverComposite));
+            // Retained photography remains useful at a new scale. Its rasterised minimum-width
+            // river ink must not expand into thick artificial channels while refinement loads.
+            gl.uniform1f(this.uniform('riverInk'), this.riverPreview ? 0 :
+                Math.max(0, Math.min(1, (2 - this.view[2] / Math.max(1, this.riverZoom)) * 2)));
             gl.uniform1i(this.uniform('grid'), Number(this.grid));
             gl.uniform1i(this.uniform('mapMode'), Number(mapReady));
             gl.uniform1i(this.uniform('interactionPreview'), 0);
@@ -1422,7 +1469,8 @@ class MarsAlmanacGlobe {
             let point = this.project(lat, lon, size);
             if (!point) return;
             const active = Boolean(place && selected && this.townKey(place) === this.townKey(selected));
-            const label = place ? MarsAlmanacGlobe.townLabel(place, this.view[2], active ? size - 8 : size - point[0]) : null;
+            const available = active ? size - 8 : Math.max(point[0], size - point[0]) - 8;
+            const label = place ? MarsAlmanacGlobe.townLabel(place, this.view[2], available) : null;
             const width = label ? label.width : 28;
             const positioned = labDOM.call('lab_globe_markers_place', point[0], point[1], width,
                 Number(Boolean(place)), Number(active)) as [number, number, number?] | null;
@@ -1461,6 +1509,7 @@ class MarsAlmanacGlobe {
                     `Longitude ${MarsAlmanacGlobe.coordinate(lon, 'E', 'W')}`;
             }
             marker.style.maxWidth = `${width}px`;
+            marker.style.width = `${width}px`;
             marker.style.left = `${point[0]}px`;
             marker.style.top = `${point[1]}px`;
             marker.classList.toggle('selected', active);

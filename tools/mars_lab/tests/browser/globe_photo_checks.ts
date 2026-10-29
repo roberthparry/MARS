@@ -2,7 +2,7 @@
  * @file globe_photo_checks.ts
  * @brief Geographic coverage and bounded local photographic tile loading checks.
  *
- * Uses real bundled JPEGs and WebGL uploads, including seam wrapping, cache reuse,
+ * Uses real bundled PNGs and WebGL uploads, including seam wrapping, cache reuse,
  * cancellation, unavailable tiles and rejection of obsolete asynchronous completions.
  */
 async function checkGlobePhoto(check: (condition: boolean, message: string) => void): Promise<void> {
@@ -35,12 +35,14 @@ async function checkGlobePhoto(check: (condition: boolean, message: string) => v
     };
     try {
         const europe = plan(52, -3);
+        const started = performance.now();
         await photo.load(europe);
         check(photo.ready && published === 1 && downloads === 4 && photo.bounds.join() === europe.slice(3).join(),
-              'four local source tiles publish one complete full-resolution patch');
+              `four local source tiles publish one complete full-resolution patch (ready=${photo.ready}, published=${published}, downloads=${downloads}, ` +
+              `cache=${(photo as unknown as {cache: {size: number}}).cache.size}, elapsed=${Math.round(performance.now() - started)}ms, GL=${gl.getError()})`);
         await photo.load(europe);
         check(downloads === 4 && published === 1, 'unchanged view does not re-decode or re-upload tiles');
-        const state = photo as unknown as {cache: Map<string, ImageBitmap>; texture: WebGLTexture | null};
+        const state = photo as unknown as {cache: {readonly size: number}; texture: WebGLTexture | null};
         check(state.cache.size === 4 && state.texture !== null, 'decoded image cache is bounded to four tiles');
         const framebuffer = gl.createFramebuffer()!;
         gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);

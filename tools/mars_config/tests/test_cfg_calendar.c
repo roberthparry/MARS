@@ -566,13 +566,13 @@ static bool test_calendar_translated_snapshot(sqlite_t *db, const string_t *path
     bool ok =
         request && language && empty && cfg_calendar_catalogue(db) &&
         cfg_calendar_choose_place(db, request, NULL, false, &place) &&
-        cfg_calendar_snapshot(db, path, key, &place, empty) &&
+        cfg_calendar_snapshot(db, path, key, &place, empty, NULL) &&
         sqlite_exec_cstr(
             db,
             "DROP TABLE IF EXISTS temp.untranslated_days; DROP TABLE IF EXISTS temp.untranslated_events;"
             "CREATE TEMP TABLE untranslated_days AS SELECT calendar_date,is_weekend,utc_offset_hours "
             "FROM calendar_local_days; CREATE TEMP TABLE untranslated_events AS SELECT * FROM cfg_calendar_events;") &&
-        cfg_calendar_snapshot(db, path, key, &place, language) &&
+        cfg_calendar_snapshot(db, path, key, &place, language, NULL) &&
         test_calendar_query(db,
                             "SELECT count(*) FROM (SELECT calendar_date,is_weekend,utc_offset_hours "
                             "FROM calendar_local_days EXCEPT SELECT * FROM untranslated_days)",

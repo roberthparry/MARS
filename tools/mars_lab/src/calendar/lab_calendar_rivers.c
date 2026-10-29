@@ -133,8 +133,8 @@ json_t *lab_cal_rivers(const json_t *payload, unsigned *status)
     globe_close(r);
     string_t *image = ok ? string_sprintf(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"2048\" height=\"2048\" viewBox=\"0 0 2048 2048\">"
-        "<path fill=\"none\" stroke=\"#367fb0\" stroke-width=\"2\" stroke-linecap=\"round\" d=\"%s\"/>"
-        "<path fill=\"#367fb0\" d=\"%s\"/><path fill=\"#367fb0\" fill-rule=\"nonzero\" d=\"%s\"/></svg>", string_c_str(p.path), string_c_str(p.fill),
+        "<path fill=\"none\" stroke=\"#2b4648\" stroke-width=\"2\" stroke-linecap=\"round\" d=\"%s\"/>"
+        "<path fill=\"#2b4648\" d=\"%s\"/><path fill=\"#2b4648\" fill-rule=\"nonzero\" d=\"%s\"/></svg>", string_c_str(p.path), string_c_str(p.fill),
         string_c_str(bank_svg)) : NULL;
     string_free(p.path);
     string_free(p.fill);

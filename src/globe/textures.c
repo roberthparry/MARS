@@ -16,7 +16,7 @@
 
 static bool texture_address(unsigned level, unsigned column, unsigned row)
 {
-    return level == 3 ? column < 64 && row == 0 :
+    return level == 3 ? column < GLOBE_TEXTURE_REGION_LIMIT && row == 0 :
         level < 3 && (level == 2 ? column < 12 && row < 6 : column == 0 && row == 0);
 }
 
@@ -63,10 +63,22 @@ bool textures_regions(sqlite_t *db, const double bounds[4], globe_texture_region
     sqlite_step_result_t step = exists ? sqlite_stmt_step(exists) : SQLITE_STEP_ERROR;
     sqlite_stmt_finalize(exists);
     if (step != SQLITE_STEP_ROW) return step == SQLITE_STEP_DONE;
-    /* The optional catalogue is capped at 64 slots, so this metadata-only scan has a fixed small bound. */
+    sqlite_stmt_t *index = sqlite_stmt_prepare(db,
+        "select 1 from sqlite_master where type='table' and name='globe_texture_region_index'");
+    sqlite_step_result_t indexed = index ? sqlite_stmt_step(index) : SQLITE_STEP_ERROR;
+    sqlite_stmt_finalize(index);
+    if (indexed == SQLITE_STEP_ERROR) return false;
+    /* New catalogues use the spatial index; legacy catalogues contain at most 64 slots. */
     sqlite_stmt_t *q = sqlite_stmt_prepare(db,
+        indexed == SQLITE_STEP_ROW ?
+        "select t.slot,t.west,t.south,t.east,t.north "
+        "from globe_texture_region_index r join globe_texture_region t on t.slot=r.slot "
+        "where r.west<?1 and r.east>?2 and r.south<?3 and r.north>?4 "
+        "and t.west<?1 and t.east>?2 and t.south<?3 and t.north>?4 "
+        "order by (t.east-t.west)*(t.north-t.south) desc,t.slot limit 4097" :
         "select slot,west,south,east,north from globe_texture_region "
-        "where west<?1 and east>?2 and south<?3 and north>?4 order by slot limit 65");
+        "where west<?1 and east>?2 and south<?3 and north>?4 "
+        "order by (east-west)*(north-south) desc,slot limit 65");
     bool ok = q && sqlite_stmt_bind_double(q, 1, bounds[2]) && sqlite_stmt_bind_double(q, 2, bounds[0]) &&
               sqlite_stmt_bind_double(q, 3, bounds[3]) && sqlite_stmt_bind_double(q, 4, bounds[1]);
     unsigned count = 0;
@@ -77,7 +89,8 @@ bool textures_regions(sqlite_t *db, const double bounds[4], globe_texture_region
             b[i] = sqlite_stmt_column_double(q, i + 1);
             ok = ok && isfinite(b[i]);
         }
-        ok = ok && ++count <= 64 && slot >= 0 && slot < 64 && b[0] >= -180 && b[2] <= 180 &&
+        ok = ok && ++count <= (indexed == SQLITE_STEP_ROW ? GLOBE_TEXTURE_REGION_LIMIT : 64) &&
+             slot >= 0 && slot < GLOBE_TEXTURE_REGION_LIMIT && b[0] >= -180 && b[2] <= 180 &&
              b[1] >= -90 && b[3] <= 90 && b[0] < b[2] && b[1] < b[3] && callback((unsigned)slot, b, context);
     }
     ok = ok && step == SQLITE_STEP_DONE;

@@ -1283,14 +1283,16 @@ static void test_lab_extra_equation_frame(void)
     static const struct {
         const char *left, *right, *axis;
         bool found;
+        double minimum_height;
     } cases[] = {
-        {"x^4-x^3-26x^2+4x+8", "0", "x", true},
-        {"t^2", "t+2", "t", true},
-        {"x^4", "0", "x", true},
-        {"sin(x)", "0", "x", true},
-        {"exp(x)", "2", "x", true},
-        {"1/x", "0", "x", false},
-        {"x", "x+1", "x", false}
+        {"x^4-x^3-26x^2+4x+8", "0", "x", true, 0},
+        {"t^2", "t+2", "t", true, 0},
+        {"x^4", "0", "x", true, 0},
+        {"sin(x)", "0", "x", true, 0},
+        {"exp(x)", "2", "x", true, 1},
+        {"sqrt(7^x)", "49", "x", true, 20},
+        {"1/x", "0", "x", false, 0},
+        {"x", "x+1", "x", false, 0}
     };
     bool ok = true;
     for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
@@ -1300,7 +1302,8 @@ static void test_lab_extra_equation_frame(void)
         bool found = lab_worker_plot_equation_frame((const expr_t *const *)sides, sources, cases[i].axis, true, bounds);
         ok = ok && found == cases[i].found;
         if (found)
-            ok = ok && num_lt(bounds[0], bounds[1]) && num_lt(bounds[2], bounds[3]);
+            ok = ok && num_lt(bounds[0], bounds[1]) && num_lt(bounds[2], bounds[3]) &&
+                 num_to_double(bounds[3]) - num_to_double(bounds[2]) > cases[i].minimum_height;
         if (!i)
             ok = ok && num_to_double(bounds[0]) > -7 && num_to_double(bounds[0]) < -5 &&
                  num_to_double(bounds[1]) > 6 && num_to_double(bounds[1]) < 8 &&
@@ -2181,6 +2184,24 @@ static void test_lab_extra_gaussian_integral(void)
     }
 }
 
+static void test_lab_extra_nested_root_equation(void)
+{
+    expect_response("/equation-eval", "{\"equation\":\"sqrt(7^x)=49\",\"precision\":97}",
+                    200u, "solutions", "x = 4");
+    expect_response("/equation-eval", "{\"equation\":\"sqrt(7^x)=-49\",\"precision\":97}",
+                    200u, "status", "no solutions");
+    expect_response("/function-run", "{\"source\":\"equation equ(x) { return equation(sqrt(7^x) = 49). } "
+                                     "outputa(solve(equ(x))).\",\"precision\":97}", 200u, "output", "x = 4");
+    unsigned status = 0;
+    json_t *result = request("/eval", "{\"expression\":\"sqrt(7^x)=49\",\"wrt\":\"x\",\"precision\":97,"
+                                     "\"action\":\"plot\",\"plot_source_mode\":\"equation\"}", &status);
+    bool ok = status == 200 && contains(result, "plot_svg", "data-series=\"0\"") &&
+              contains(result, "plot_svg", "data-series=\"1\"") && contains(result, "plot_solutions", "x = 4");
+    if (!ok) show_failure(result);
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "nested exponential roots solve and draw both equation sides at worksheet precision");
+}
+
 static void test_lab_extra_equation(void)
 {
     expect_response("/equation-eval", "{\"equation\":\"cos(z)-sin(pi-xy)=0\",\"precision\":78}",
@@ -2714,6 +2735,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_mesh_closed, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_solution_families, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_equation_frame, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_nested_root_equation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_precision, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_plot_title_fallback, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_native_records, tests, NULL);

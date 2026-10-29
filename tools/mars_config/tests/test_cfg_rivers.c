@@ -26,6 +26,66 @@ static sqlite_t *test_database(void)
     return db;
 }
 
+static file_t *temporary_directory(void);
+
+static void test_cfg_rivers_main_selection(void)
+{
+    file_t *directory = temporary_directory();
+    string_t *path = directory ? string_sprintf("%s/main.db", file_path(directory)) : NULL;
+    sqlite_t *source = test_database();
+    bool ok = source && path && sqlite_exec_cstr(source,
+        "create table rivers_dataset(id,format_version,source,point_count,feature_count,source_point_count,"
+        "storage_tolerance_metres);"
+        "insert into rivers_dataset values(1,2,'OpenStreetMap centreline export / ODbL',11,5,11,8);"
+        "create table rivers_chunk(id integer primary key,feature_id,kind,vertices,anchors);"
+        "insert into rivers_chunk values"
+        "(1,10,1,x'0000000000000000000f424000000000',x'0101'),"
+        "(2,10,1,x'000f424000000000001e848000000000',x'0101'),"
+        "(3,20,1,x'000f424000000000000f4240000f4240',x'0101'),"
+        "(4,30,2,x'001e848000000000001e8480000f4240',x'0101'),"
+        "(5,40,3,x'001e848000000000001e8480fff0bdc0',x'0101'),"
+        "(6,50,4,x'000000000000000000000000000f4240',x'0101');"
+        "create virtual table rivers_bounds using rtree_i32(id,min_x,max_x,min_y,max_y);"
+        "insert into rivers_bounds values(1,0,1000000,0,0),(2,1000000,2000000,0,0),"
+        "(3,1000000,1000000,0,1000000),(4,2000000,2000000,0,1000000),"
+        "(5,2000000,2000000,-1000000,0),(6,0,0,0,1000000)") &&
+        cfg_database_select_main_rivers(source, path);
+    sqlite_t *selected = ok ? sqlite_open_plain(path) : NULL;
+    sqlite_stmt_t *meta = selected ? sqlite_stmt_prepare(selected,
+        "select point_count,feature_count,source_point_count from rivers_dataset") : NULL;
+    ok = ok && meta && sqlite_stmt_step(meta) == SQLITE_STEP_ROW &&
+        sqlite_stmt_column_int64(meta, 0) == 5 && sqlite_stmt_column_int64(meta, 1) == 2 &&
+        sqlite_stmt_column_int64(meta, 2) == 11;
+    sqlite_stmt_finalize(meta);
+    sqlite_stmt_t *a = sqlite_stmt_prepare(source,
+        "select id,feature_id,kind,hex(vertices),hex(anchors) from rivers_chunk where kind=1 order by id");
+    sqlite_stmt_t *b = selected ? sqlite_stmt_prepare(selected,
+        "select id,feature_id,kind,hex(vertices),hex(anchors) from rivers_chunk order by id") : NULL;
+    ok = ok && a && b;
+    size_t rows = 0;
+    sqlite_step_result_t left = SQLITE_STEP_DONE, right = SQLITE_STEP_DONE;
+    while (ok && a && b && (left = sqlite_stmt_step(a)) == SQLITE_STEP_ROW) {
+        right = sqlite_stmt_step(b);
+        ok = right == SQLITE_STEP_ROW;
+        for (unsigned column = 0; ok && column < 5; ++column)
+            ok = !strcmp(sqlite_stmt_column_text(a, column), sqlite_stmt_column_text(b, column));
+        ++rows;
+    }
+    ok = ok && left == SQLITE_STEP_DONE && sqlite_stmt_step(b) == SQLITE_STEP_DONE && rows == 3;
+    sqlite_stmt_finalize(a); sqlite_stmt_finalize(b);
+    ok = ok && !cfg_database_select_main_rivers(source, path);
+    meta = sqlite_stmt_prepare(source, "select count(*) from rivers_chunk");
+    ok = ok && meta && sqlite_stmt_step(meta) == SQLITE_STEP_ROW && sqlite_stmt_column_int(meta, 0) == 6;
+    sqlite_stmt_finalize(meta);
+    sqlite_close(selected); sqlite_close(source);
+    file_t *file = path ? file_new(path) : NULL;
+    if (file && file_exists(file)) file_delete(file);
+    file_free(file); string_free(path);
+    if (directory) file_remove_directory(directory);
+    file_free(directory);
+    TEST_ASSERT_TRUE(ok, "main-channel selection removes minor classes and retains complete tributaries and anchors");
+}
+
 static file_t *temporary_directory(void)
 {
     string_t *parent = string_new_with("tests/build/release/rivers");
@@ -744,6 +804,7 @@ static void test_cfg_rivers_stage(void)
 /* Register installer regressions with the sequential configuration runner. */
 void test_cfg_rivers_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_cfg_rivers_main_selection, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_osm_import_and_display, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_storage_detail, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_neighbourhoods, tests, NULL);

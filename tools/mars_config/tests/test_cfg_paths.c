@@ -4,8 +4,12 @@
  *
  * Uses a native key-provider fixture rather than a real desktop keyring. Verifies that a tiny JSON locator
  * can move an encrypted configuration independently of resource directories and the current working directory.
+ * Verifies that a dedicated settings process keeps memory locking out of large plaintext image allocations,
+ * preserves environment precedence and encrypted updates, and fails closed on invalid input or shutdown.
  */
+#include <errno.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -128,6 +132,84 @@ static bool paths_literal_import(const char *directory)
     return ok;
 }
 
+static pid_t paths_settings_client;
+
+/* Only the isolated settings process may retrieve this fixture's encryption key. */
+static string_t *paths_isolated_key(bool create)
+{
+    return getpid() == paths_settings_client ? NULL : paths_test_key(create);
+}
+
+static bool paths_memory_security_disabled(sqlite_t *db)
+{
+    sqlite_stmt_t *query = sqlite_stmt_prepare(db, "pragma cipher_memory_security");
+    bool ok = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW && !sqlite_stmt_column_int(query, 0);
+    sqlite_stmt_finalize(query);
+    return ok;
+}
+
+static bool paths_isolation(const char *directory)
+{
+    bool ok = !unsetenv("MARS_CONFIG_FILE") && !unsetenv("MARS_GLOBE_DB_PATH") &&
+              !unsetenv("MARS_GLOBE_TEXTURE_DIR") && !unsetenv("MARS_ROOT") &&
+              !setenv("MARS_WEATHER_API_KEY", "explicit", 1) && mars_settings_initialise();
+    paths_settings_client = getpid();
+    mars_settings_key_provider(paths_isolated_key);
+    pid_t setup = ok ? fork() : -1;
+    if (!setup) {
+        char *resource[] = {"set", "globe_textures", "images with spaces"};
+        char *setting[] = {"set", "MARS_GLOBE_DB_PATH", "world/globe.db"};
+        char *secret[] = {"set", "MARS_WEATHER_API_KEY", "fixture-secret"};
+        _exit(mars_paths_command(3, resource) || mars_settings_command(3, setting) ||
+              mars_settings_command(3, secret) ? 1 : 0);
+    }
+    int status = 0;
+    pid_t waited = -1;
+    if (setup > 0) {
+        do { waited = waitpid(setup, &status, 0); } while (waited < 0 && errno == EINTR);
+    }
+    ok = ok && setup > 0 && waited == setup && WIFEXITED(status) && !WEXITSTATUS(status);
+    string_t *memory = string_new_with(":memory:");
+    sqlite_t *db = ok ? sqlite_open_plain(memory) : NULL;
+    ok = ok && db && paths_memory_security_disabled(db);
+    sqlite_close(db);
+    ok = ok && mars_settings_isolate() && mars_settings_load();
+    db = ok ? sqlite_open_plain(memory) : NULL;
+    ok = !mars_settings_open(false) && errno == EPERM && ok;
+    string_t *globe = string_sprintf("%s/config/../world/globe.db", directory);
+    string_t *textures = mars_path_resource(MARS_PATH_TEXTURES, NULL, "tile.png");
+    string_t *expected = string_sprintf("%s/config/../images with spaces/tile.png", directory);
+    ok = ok && getenv("MARS_GLOBE_DB_PATH") && !strcmp(getenv("MARS_GLOBE_DB_PATH"), string_c_str(globe)) &&
+         getenv("MARS_WEATHER_API_KEY") && !strcmp(getenv("MARS_WEATHER_API_KEY"), "explicit") &&
+         textures && !string_compare(textures, expected) && paths_memory_security_disabled(db);
+    string_t *update = string_new_with("MARS_GLOBE_DB_PATH='updated/globe.db'\n");
+    ok = ok && mars_settings_sync(update) && !unsetenv("MARS_GLOBE_DB_PATH") &&
+         !unsetenv("MARS_WEATHER_API_KEY") && mars_settings_load();
+    string_free(globe); globe = string_sprintf("%s/config/../updated/globe.db", directory);
+    ok = ok && getenv("MARS_GLOBE_DB_PATH") && !strcmp(getenv("MARS_GLOBE_DB_PATH"), string_c_str(globe)) &&
+         getenv("MARS_WEATHER_API_KEY") && !strcmp(getenv("MARS_WEATHER_API_KEY"), "fixture-secret") &&
+         paths_memory_security_disabled(db) && sqlite_exec_cstr(db,
+             "create table image(png blob);insert into image values(zeroblob(16777216))");
+    sqlite_stmt_t *size = db ? sqlite_stmt_prepare(db, "select length(png) from image") : NULL;
+    ok = ok && size && sqlite_stmt_step(size) == SQLITE_STEP_ROW && sqlite_stmt_column_int(size, 0) == 16777216;
+    sqlite_stmt_finalize(size);
+    string_t *locator = string_sprintf("%s/config/mars.json", directory);
+    ok = paths_write(locator, "{broken json") && !mars_settings_load() && paths_memory_security_disabled(db) && ok;
+    string_free(locator);
+    mars_settings_isolation_close();
+
+    ok = !mars_settings_load() && paths_memory_security_disabled(db) && ok;
+    sqlite_close(db);
+    string_free(update); string_free(expected); string_free(textures); string_free(globe); string_free(memory);
+    return ok;
+}
+
+static void test_cfg_settings_isolation(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(paths_isolation),
+                     "settings retain encryption in their helper while large plaintext image buffers remain unlocked");
+}
+
 static void test_cfg_paths_relocation(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(paths_relocation),
@@ -145,4 +227,5 @@ void test_cfg_paths_cases(void)
 {
     TEST_RUN_IN_GROUP(test_cfg_paths_relocation, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_settings_import, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_settings_isolation, tests, NULL);
 }

@@ -33,6 +33,10 @@ $(CONFIG_BUILD_DIR)/region_extract: tools/mars_config/region_extract.c $(STATIC_
 $(CONFIG_BUILD_DIR)/catalogue_towns: tools/mars_config/catalogue_towns.c $(STATIC_LIB)
 	$(CC) $(CFLAGS) $(INCLUDES) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
+$(CONFIG_BUILD_DIR)/river_select: tools/mars_config/river_select.c $(CONFIG_SUPPORT_OBJS) $(STATIC_LIB)
+	$(CC) $(CFLAGS) $(INCLUDES) -Itools/mars_config/include -Itools/mars_config/src/database $(LDFLAGS) \
+	    -o $@ $< $(CONFIG_SUPPORT_OBJS) $(STATIC_LIB) $(LDLIBS)
+
 # Optional offline preparation only; GEOS is not linked into mars_config or libmars.
 $(CONFIG_BUILD_DIR)/river_water: tools/mars_config/river_water.c $(CONFIG_BUILD_DIR)/database/cfg_database_river_width.o $(STATIC_LIB)
 	$(CC) $(CFLAGS) $(INCLUDES) -Itools/mars_config/src/database $(GEOS_CFLAGS) $(LDFLAGS) -o $@ $< \
@@ -87,7 +91,7 @@ $(CONFIG_BUILD_DIR)/tests/%.o: tools/mars_config/tests/%.c tools/mars_config/tes
 
 $(CONFIG_TEST_BIN): $(CONFIG_TEST_OBJS) $(CONFIG_SUPPORT_OBJS) $(LAB_BUILD_DIR)/process/lab_process.o $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(CONFIG_PROGRAM)
 	$(CC) $(LDFLAGS) -o $@ $(CONFIG_TEST_OBJS) $(CONFIG_SUPPORT_OBJS) \
-	    $(LAB_BUILD_DIR)/process/lab_process.o $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS)
+	    $(LAB_BUILD_DIR)/process/lab_process.o $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS) -lz
 
 .PHONY: native-config clean-config
 native-config: $(CONFIG_PROGRAM) $(CONFIG_BUILD_DIR)/mars-config.db

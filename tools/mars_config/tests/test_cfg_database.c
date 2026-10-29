@@ -807,6 +807,54 @@ static void test_cfg_database_conflicts(void)
                      "multiline conflict headers retain conflict policies, exact SQL text and failure preservation");
 }
 
+static void test_cfg_database_transaction_finish(void)
+{
+    string_t *path = string_new_with(":memory:");
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    bool ok = db && sqlite_exec_cstr(db,
+        "pragma foreign_keys=on;"
+        "create table parent(id integer primary key);"
+        "create table child(parent_id integer references parent(id) deferrable initially deferred);"
+        "insert into parent values(7);begin;insert into parent values(8)") &&
+        cfg_database_finish_transaction(db, true) &&
+        test_cfg_database_query(db, "select count(*) from parent", "2") &&
+        sqlite_exec_cstr(db, "begin;insert into parent values(9)") &&
+        !cfg_database_finish_transaction(db, false) &&
+        test_cfg_database_query(db, "select count(*) from parent", "2");
+    /* A deferred constraint fails at commit, so completion must restore the preceding state. */
+    ok = ok && sqlite_exec_cstr(db, "begin;insert into child values(999)") &&
+        !cfg_database_finish_transaction(db, true) &&
+        test_cfg_database_query(db, "select count(*) from child", "0") &&
+        test_cfg_database_query(db, "select count(*) from parent", "2") &&
+        sqlite_exec_cstr(db, "begin") && cfg_database_finish_transaction(db, true) &&
+        !cfg_database_finish_transaction(NULL, true);
+    sqlite_close(db); string_free(path);
+    TEST_ASSERT_TRUE(ok, "reported transaction completion commits valid work and restores failed work or commits");
+}
+
+static void test_cfg_database_public_ddl(void)
+{
+    string_t *path = string_new_with(":memory:");
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    bool ok = db && sqlite_exec_cstr(db, "create table private_sentinel(value);insert into private_sentinel values(7)");
+    static const char *const modes[] = {
+        [0] = "pragma secure_delete=off",
+        [1] = "pragma secure_delete=on",
+        [2] = "pragma secure_delete=fast"
+    };
+    for (unsigned mode = 0; ok && mode < 3; ++mode) {
+        ok = sqlite_exec_cstr(db, modes[mode]) && sqlite_exec_cstr(db, "create table public_asset(value)") &&
+             cfg_database_public_ddl(db, "drop table public_asset") &&
+             !cfg_database_public_ddl(db, "drop table missing_public_asset");
+        sqlite_stmt_t *q = sqlite_stmt_prepare(db, "pragma secure_delete");
+        ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int(q, 0) == (int)mode;
+        sqlite_stmt_finalize(q);
+        ok = ok && test_cfg_database_query(db, "select value from private_sentinel", "7");
+    }
+    sqlite_close(db); string_free(path);
+    TEST_ASSERT_TRUE(ok, "public-asset DDL restores every secure-delete mode after success and failure");
+}
+
 static void test_cfg_database_trace(void)
 {
     static const char *const sources[] = {
@@ -1383,7 +1431,7 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
     string_t *code = globe_country_code_at(globe, 44.95, 34.1);
     ok = ok && code && !strcmp(string_c_str(code), "UA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "12") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "15") &&
          test_cfg_database_query(db, "select count(distinct iso_country_code) from region_name", "19") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "7") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained") &&
@@ -1411,7 +1459,7 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe = db ? globe_open_databases(db, db, NULL) : NULL;
     code = globe_country_code_at(globe, -33.8064, 18.3688);
     ok = ok && code && !strcmp(string_c_str(code), "ZA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "12") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "15") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained");
     string_free(code); globe_close(globe); sqlite_close(db);
     /* Revision eight adds display coverage and regional photographs, retaining installed countries. */
@@ -1425,7 +1473,7 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe = db ? globe_open_databases(db, db, NULL) : NULL;
     ok = ok && test_cfg_kashubian_coverage(globe) && test_cfg_sami_coverage(globe) &&
          test_cfg_german_region_coverage(globe) && test_cfg_kazakh_coverage(globe) &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "12");
+         test_cfg_database_query(db, "select revision from mars_database_revision", "15");
     globe_close(globe); sqlite_close(db);
     /* A current database must remain usable even when the migration sources are no longer available. */
     string_t *missing = string_sprintf("%s/missing", directory);
@@ -1562,7 +1610,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "SELECT count(*) FROM country_name", "299") &&
          test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "12") &&
+         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "15") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
                                     "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
          test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
@@ -1575,7 +1623,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
          test_cfg_database_query(db, "select value from retained", "42") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "12");
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "15");
     sqlite_close(db);
     /* Country metadata is independent of town selection and land/water classification. */
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1604,7 +1652,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_coast_sydney(db) && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "select count(*) from country_name", "299") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "12") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "15") &&
          test_cfg_database_query(db, "select count(*) from sqlite_master where name in ('retained','rivers_dataset')", "0") &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_KEY", key) &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_PATH", file_path(database)) &&
@@ -1622,13 +1670,22 @@ static bool test_cfg_database_globe_packaged_fixture(const char *directory)
 
 static bool test_cfg_database_globe_plain_fixture(const char *directory)
 {
-    return test_cfg_database_globe_packaged_mode(directory, "");
+    string_t *textures = string_sprintf("%s/packaging/globe-db/textures", directory);
+    bool ok = textures && test_cfg_copy_textures(directory) &&
+              !setenv("MARS_GLOBE_TEXTURE_DIR", string_c_str(textures), 1) &&
+              test_cfg_database_globe_packaged_mode(directory, "");
+    string_free(textures);
+    return ok;
 }
 
 static void test_cfg_database_globe_packaged(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_globe_packaged_fixture),
                      "encrypted globe reinstallation builds afresh; updates and failed installs preserve existing data");
+}
+
+static void test_cfg_database_globe_plain(void)
+{
     TEST_ASSERT_TRUE(test_cfg_isolated(test_cfg_database_globe_plain_fixture),
                      "plaintext globe reinstallation builds afresh and removes obsolete river key settings");
 }
@@ -1709,6 +1766,7 @@ void test_cfg_database_cases(void)
     TEST_RUN_IN_GROUP(test_cfg_database_ensure, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_coast_corrections, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_globe_packaged, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_database_globe_plain, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_trace, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_sardinia, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_stream, tests, NULL);
@@ -1717,6 +1775,8 @@ void test_cfg_database_cases(void)
     TEST_RUN_IN_GROUP(test_cfg_database_bounds, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_large, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_conflicts, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_database_transaction_finish, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_database_public_ddl, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_paths, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_packaged_almanac, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_jurisdiction, tests, NULL);

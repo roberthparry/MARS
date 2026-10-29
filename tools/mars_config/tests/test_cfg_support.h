@@ -10,8 +10,19 @@
 
 #include <stdbool.h>
 
-/** Copy packaged image fixtures beneath a disposable test root. */
+/**
+ * @brief Create compact valid image fixtures beneath a caller-owned disposable root.
+ * @param directory Borrowed root path; its owner removes the generated package after use.
+ * @return True on success; false on image-generation, file or metadata failure.
+ */
 bool test_cfg_copy_textures(const char *directory);
+
+/**
+ * @brief Obtain the process-owned compact texture package used by installer regressions.
+ * @return Borrowed root path valid until process exit, or NULL on failure; never free or modify it.
+ * @note Tests call this serially; the parent process releases its private storage at normal exit.
+ */
+const char *test_cfg_texture_root(void);
 
 /** @brief Register encrypted configuration and relocatable resource regressions. */
 void test_cfg_paths_cases(void);

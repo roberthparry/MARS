@@ -10,6 +10,7 @@
  */
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -2365,6 +2366,95 @@ static void test_equation_compact_symmetric_surds(void)
     }
 }
 
+static void test_equation_inverts_roots_and_constant_powers(void)
+{
+    static const struct {
+        const char *source;
+        long root;
+    } cases[] = {
+        {"sqrt(7^x) = 49", 4},
+        {"49 = sqrt(7^x)", 4},
+        {"sqrt(7^x) + 1 = 50", 4},
+        {"sqrt(2^(x+1)) = 8", 5},
+        {"sqrt(x) = 3", 9},
+        {"7^x = 2401", 4},
+        {"7^(2*x+1) = 343", 1},
+        {"(1/7)^x = 49", -2},
+        {"7^x = 1", 0},
+        {"sqrt(x) = i", -1}
+    };
+    size_t saved = num_get_default_prec_bits();
+    static const size_t precisions[] = {17, 64, 97};
+    for (size_t p = 0; p < sizeof precisions / sizeof *precisions; ++p) {
+        num_set_default_prec_digits(precisions[p]);
+        for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+            equation_t *equation = equ_from_string(cases[i].source);
+            equation_solutions_t *solutions = equation ? equ_derive_solutions(equation) : NULL;
+            bool ok = solutions && equ_solutions_count(solutions) == 1 &&
+                      test_equation_result_contains_long(solutions, cases[i].root);
+            number_t solved = solutions && equ_solutions_count(solutions)
+                                  ? expr_eval(equ_rhs(equ_solutions_at(solutions, 0))) : num_new();
+            ok = ok && num_is_exact(solved);
+            num_destroy(&solved);
+            expr_t *variable = equ_binding(equation, "x");
+            number_t value = variable ? expr_get_val(variable) : num_new();
+            ok = ok && num_is_nan(value);
+            num_destroy(&value);
+            equ_solutions_free(solutions);
+            equ_free(equation);
+            ASSERT_TRUE(ok);
+        }
+    }
+    num_set_default_prec_bits(saved);
+    equation_t *equation = equ_from_string("sqrt(7^(x^2)) = 49");
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    bool ok = solutions && equ_solutions_count(solutions) == 2 &&
+              test_equation_result_contains_long(solutions, 2) && test_equation_result_contains_long(solutions, -2);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    ASSERT_TRUE(ok);
+    equation = equ_from_string("7^x = 2401.00000001");
+    solutions = equ_derive_solutions(equation);
+    ok = solutions && equ_solutions_count(solutions) == 1 && !test_equation_result_contains_long(solutions, 4) &&
+         test_equation_all_solutions_satisfy(equation, equ_binding(equation, "x"), solutions, "1e-24");
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    ASSERT_TRUE(ok);
+}
+
+static void test_equation_preserves_principal_root_domain(void)
+{
+    static const char *const sources[] = {"sqrt(7^x) = -49", "sqrt(x) = -3", "sqrt(x) = -i", "7^x = 0"};
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        equation_t *equation = equ_from_string(sources[i]);
+        equation_solutions_t *solutions = equ_derive_solutions(equation);
+        bool ok = solutions && !equ_solutions_count(solutions) && equ_solutions_proven_empty(solutions);
+        equ_solutions_free(solutions);
+        equ_free(equation);
+        ASSERT_TRUE(ok);
+    }
+    equation_t *equation = equ_from_string("{sqrt(x) = a | x=?; a=?}");
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    bool ok = solutions && !equ_solutions_count(solutions) && !equ_solutions_proven_empty(solutions);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    ASSERT_TRUE(ok);
+}
+
+/* README example: solve the nested principal-root equation without a numerical starting value. */
+static void example_equation_root_inverse(void)
+{
+    equation_t *equation = equ_from_string("sqrt(7^x) = 49");
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    const equation_t *solution = equ_solutions_at(solutions, 0);
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    int status = text && puts(string_c_str(text)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+    string_free(text);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    ASSERT_EQ_INT(status, EXIT_SUCCESS);
+}
+
 static void test_equation_basics(void)
 {
     TEST_RUN_SUBTEST(test_equation_compact_symmetric_surds, NULL);
@@ -2446,6 +2536,8 @@ static void test_equation_future_solver_cases(void)
 int tests_main(void)
 {
     TEST_SECTION("Equation Basics");
+    TEST_RUN_IN_GROUP(test_equation_inverts_roots_and_constant_powers, tests, NULL);
+    TEST_RUN_IN_GROUP(test_equation_preserves_principal_root_domain, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_basics, tests, NULL);
 
     TEST_SECTION("Future Solver Cases");
@@ -2456,6 +2548,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_sextic_solve, readme_examples, "equation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_kepler, readme_examples, "equation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_output_form, readme_examples, "equation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_equation_root_inverse, readme_examples, "equation,readme,output");
 
     return TEST_EXIT_CODE();
 }

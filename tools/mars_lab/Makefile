@@ -80,8 +80,24 @@ LAB_TS_CONFIG := tools/mars_lab/tsconfig.json
 LAB_TEST_TS_CONFIG := tools/mars_lab/tsconfig.tests.json
 
 # Optional offline asset preparation only; ordinary builds use the bundled tiles.
+LAB_GDAL_CFLAGS ?= $(shell pkg-config --cflags gdal 2>/dev/null)
+LAB_GDAL_LIBS ?= -lgdal
+$(LAB_BUILD_DIR)/satellite_coastmask: tools/mars_lab/satellite_mask.c tools/mars_lab/satellite_mask_main.c tools/mars_lab/include/satellite_mask.h $(STATIC_LIB)
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude -Itools/mars_lab/include $(LAB_GDAL_CFLAGS) $(LDFLAGS) \
+	    -o $@ tools/mars_lab/satellite_mask.c tools/mars_lab/satellite_mask_main.c $(STATIC_LIB) $(LDLIBS) $(LAB_GDAL_LIBS)
+
+$(LAB_BUILD_DIR)/tests/test_satellite_mask: tools/mars_lab/tests/satellite/test_satellite_mask.c tools/mars_lab/satellite_mask.c tools/mars_lab/include/satellite_mask.h $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB)
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude -Itools/mars_lab/include -Itests/include $(LAB_GDAL_CFLAGS) $(LDFLAGS) \
+	    -o $@ tools/mars_lab/tests/satellite/test_satellite_mask.c tools/mars_lab/satellite_mask.c \
+	    $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS) $(LAB_GDAL_LIBS)
+
 LAB_JPEG_CFLAGS ?=
 LAB_JPEG_LIBS ?= -ljpeg -lz
+$(LAB_BUILD_DIR)/satellite_catalogue: tools/mars_lab/satellite_catalogue.c $(STATIC_LIB)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -lz
+
 $(LAB_BUILD_DIR)/texture_tiles: tools/mars_lab/texture_tiles.c $(STATIC_LIB)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LAB_JPEG_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) $(LAB_JPEG_LIBS)
 
@@ -105,6 +121,8 @@ LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/dictionary.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/array.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/http_receive.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/webgl_mask.o
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/webgl_renderer.o
+LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/globe_view.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/quaternion.o
 LAB_WASM_ASM := $(LAB_WASM_OBJS:.o=.s)
 # Debian/Ubuntu's wasi-libc keeps musl maths in libc.a; libm.a is an empty compatibility archive.
@@ -125,11 +143,11 @@ $(LAB_BUILD_DIR)/wasm/marslib/quaternion.s: src/quaternion/quaternion.c tools/ma
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
 
-$(LAB_BUILD_DIR)/wasm/marslib/webgl_mask.o: src/webgl/webgl_mask.c tools/mars_lab/Makefile | check-lab-wasm-deps
+$(LAB_BUILD_DIR)/wasm/marslib/webgl_%.o: src/webgl/webgl_%.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
 
-$(LAB_BUILD_DIR)/wasm/marslib/webgl_mask.s: src/webgl/webgl_mask.c tools/mars_lab/Makefile | check-lab-wasm-deps
+$(LAB_BUILD_DIR)/wasm/marslib/webgl_%.s: src/webgl/webgl_%.c tools/mars_lab/Makefile | check-lab-wasm-deps
 	@mkdir -p $(dir $@)
 	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
 
@@ -222,7 +240,7 @@ check-lab-wasm-deps:
 	    echo "For another installation, set LAB_WASM_INCLUDE and LAB_WASM_LIBC." >&2; \
 	    exit 1; \
 	fi; \
-	probe_dir=$$(mktemp -d /tmp/mars-check-wasm.XXXXXX); \
+	probe_dir=$$(mktemp -d -t mars-check-wasm.XXXXXX); \
 	trap 'rm -f "$$probe_dir/probe.o" "$$probe_dir/array.o" "$$probe_dir/probe.wasm" "$$probe_dir/probe.log"; rmdir "$$probe_dir"' EXIT; \
 	trap 'exit 1' HUP INT TERM; \
 	if ! printf '%s\n' '#include <math.h>' '#include <string.h>' '#include "array-t.h"' \
@@ -300,3 +318,15 @@ clean-lab:
 	rm -rf tools/mars_lab/build
 
 endif
+
+# Pure geographic view policy is shared with native globe consumers, without SQLite linkage.
+$(LAB_BUILD_DIR)/wasm/marslib/globe_view.o: src/globe/globe_view.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/globe_view.s: src/globe/globe_view.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
+# globe-t.h exposes database types whose system declarations require the WASI header ABI.
+$(addprefix $(LAB_BUILD_DIR)/wasm/src/,lab_globe.o lab_globe.s): LAB_WASM_CFLAGS += --target=wasm32-wasi

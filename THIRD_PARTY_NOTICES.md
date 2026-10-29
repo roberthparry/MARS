@@ -286,16 +286,21 @@ database, with no runtime asset-file dependency or external image requests.
 
 ## NASA Blue Marble globe imagery
 
-The Welsh photographs in `packaging/globe-db/textures/regional/`
+The regional photographs in `packaging/globe-db/textures/regional/`
 contain modified Copernicus Sentinel data 2025. They derive from the ESA/CDSE
 Sentinel-2 quarterly cloudless mosaics for 2025 Q3, with missing observations
-filled from 2025 Q2, RGB bands B04/B03/B02. Source cells are 30UUB, 30UUC, 30UUD,
+filled from 2025 Q2, RGB bands B04/B03/B02. The original Welsh source cells are 30UUB, 30UUC, 30UUD,
 30UUE, 30UVB, 30UVC, 30UVD, 30UVE, 30UWB, 30UWC, 30UWD and 30UWE (`_0_0`),
 provided by the [Taylor Geospatial Engine mirror](https://source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics).
 The [Copernicus Sentinel data legal notice](https://cds.climate.copernicus.eu/licences/ec-sentinel)
 permits reuse and redistribution with attribution. The packaged manifest records
 geographic bounds, reprojection, colour scaling and the resulting image digest.
 These modified images are not official ESA products and imply no endorsement.
+The expanded catalogue uses the same published quarterly mosaics for the UK,
+Ireland, Denmark, Netherlands, Italy, the requested Mediterranean and Atlantic
+islands, Portugal, Spain, coastal Svalbard and Cape Peninsula. Regional names,
+coverage bounds, processing details and output checksums are retained in the
+complete manifest imported into the globe database.
 
 Historical provenance: before the July 2004 replacement, the overview was the unmodified 2048 × 1024 NASA
 Blue Marble composite, *Land Surface, Ocean Color and Sea Ice*, published

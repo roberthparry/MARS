@@ -10,21 +10,41 @@ SVG and WebGL rendering remain application responsibilities.
 `globe.db` stores the photographic PNG layers alongside the geographic data.
 The offline source package is `packaging/globe-db/textures/`; its manifest records
 dimensions, byte counts, SHA-256 digests and NASA source attribution.
-Fresh installations include the 74 NASA images and regional Sentinel-2 coverage of Wales.
-Managed database revision 12 installs PNG imagery and the regional catalogue
+Fresh installations include the 74 NASA images and 2,125 regional Sentinel-2 photographs.
+Managed database revision 15 installs the coastal PNG catalogue and its complete manifest
 to existing installations through `make update-mars-db` or `make release`,
 preserving coastline, country, regional and river layers. Import validates every
 image before committing; a missing or damaged image rolls back the replacement.
+The `globe_texture_manifest` table retains the complete original JSON in its `json`
+column (row `id=1`), including regional names, processing notes, gap-fill sources
+and any additional provenance fields. Indexed texture and regional tables support
+runtime lookups without repeatedly parsing that document. The snapshot is replaced
+in the same transaction as the images, so its metadata describes the installed set.
 
 `globe_texture_metadata(globe, level, column, row, &info)` reads an indexed record
 without loading PNG bytes. Level 0 is the 2048 × 1024 overview; level 1 is the
 8192 × 4096 detail image. Both use column and row zero. Level 2 contains a 12 × 6
 grid of 1800 × 1800 tiles, indexed west to east and north to south from zero.
-Level 3 contains regional 1800 × 1800 or 3600 × 3600 photographs, addressed by slot 0–63 and row zero.
+Level 3 contains regional 1800 × 1800 or 3600 × 3600 photographs, addressed by slot 0–4095 and row zero.
 `globe_texture_regions` enumerates intersecting slots and their geographic bounds through
 a `globe_texture_region_fn` callback without loading their PNGs. Older stores without
-the optional catalogue return an empty enumeration. The catalogue is bounded to 64 slots.
+the optional catalogue return an empty enumeration. New imports use an R-tree spatial index
+and the `GLOBE_TEXTURE_REGION_LIMIT` bound of 4096 slots. Older unindexed catalogues retain
+their 64-slot bound. Results place larger photographs first, allowing finer photographs
+to overlay them. Catalogue capacity does not increase decoded-image cache budgets.
 Missing data or invalid addresses return false and clear the output structure.
+
+The prepared catalogue covers the UK, Ireland, Denmark, Netherlands, Italy, Corsica,
+Sardinia, Capri, Greek islands, mainland Portugal, Azores, Madeira, Spain, Canaries,
+Falklands, Ascension, Isle of Man, Jersey, Guernsey, coastal Svalbard and Cape Peninsula.
+It occupies about 20.9 GiB as encoded PNGs after coastline trimming, about 8.05 GiB less
+than the unmasked package. Spain and Svalbard use 1800-square tiles;
+other new regions use 3600-square tiles. These dimensions describe individual images,
+not an allocation of the whole catalogue: indexed queries select only the visible
+coverage and existing decoded-image and GPU cache limits still apply.
+The source observations are fixed 2025 quarterly mosaics, with transparent remaining
+gaps retaining underlying imagery. This is reference imagery, not live satellite data.
+
 
 Welsh coverage spans 5.51–2.61° W and 51.24–53.493333° N, including Anglesey and the
 coastal islands. A 3600-square overview and 42 overlapping 3600-square detail tiles
@@ -33,11 +53,52 @@ from April–June 2025. The source resolution is 10 metres; reprojection to WGS8
 approximately 9–10 metre detail pixels. The original Cambrian Mountains patch is retained.
 The manifest records sources, processing, bounds and attribution. Regenerating the NASA
 manifest preserves the regional catalogue. Regional PNGs may be 1800 or 3600 pixels square.
-For surface windows at most four degrees across, Lab composites the regional overview
+Both RGB and RGBA PNGs are accepted; transparent missing observations retain the underlying image.
+Browser PNG reads use bounded encoded-byte buffers before decoding, avoiding
+temporary-file-backed response Blobs. The decoded photographs and completed GPU
+pixels retain their existing cache limits.
+The optional native `tools/mars_lab/satellite_catalogue.c` preparation tool combines
+labelled rendering plans with a base texture package. It checks slot continuity,
+bounds, observation counts, PNG dimensions, chunk CRCs and SHA-256 digests before
+publishing a new manifest. It uses immutable hard links where possible and copies
+between filesystems. Assembly needs no GDAL and makes no database changes. Rendering
+with `satellite_tiles.c` still requires the optional GDAL development environment.
+`make release` installs this prepared package through the normal managed update;
+ordinary builds and runtime need neither tool nor a network imagery download.
+
+For surface windows at most 30 degrees across, Lab composites regional overviews
 over NASA imagery off-thread; windows at most one degree across also receive detail tiles.
+Plans contain at most 68 photographs, with broad coverage first. Native code chooses
+smaller decoded images when the display cannot use their full resolution.
 Four-per-cent tile overlaps cover the two-per-cent edge feathers, avoiding gaps between
 adjacent photographs. Existing water colours and river cut-outs remain in use. These are
 historical photographs, not live imagery; areas outside the coverage retain NASA detail.
+
+Regional PNGs are trimmed to the packaged coastline using transparency. Their
+rectangular geographic bounds and pixel spacing stay unchanged; offshore colour and
+alpha are cleared, while inland lakes, islands and missing observations are preserved.
+Two-by-two coverage samples antialias the coast. The global NASA ocean photographs
+remain intact beneath the regional land imagery. Clearing hidden colour as well as
+alpha improves PNG compression; decoded texture dimensions and GPU memory do not shrink.
+`globe_coastline_window(globe, bounds, &may_cross)` supplies a conservative indexed
+outer-coastline check without loading polygon coordinates. A successful false result
+proves that the window contains no coastline crossing; a separate point classification
+can then identify its uniform land or sea footprint. True includes bounding-box false
+positives, and failures leave the result true. Bounds must form a finite increasing
+window within −180° to 180° longitude and −90° to 90° latitude; split date-line windows.
+Inland lake boundaries are excluded from this outer-coastline predicate.
+
+The optional native `satellite_coastmask` preparation executable takes a source texture
+directory, an existing shoreline database and a separate output directory. Build its
+explicit target under `tools/mars_lab/build/release/` with the GDAL development files;
+`LAB_GDAL_CFLAGS` and `LAB_GDAL_LIBS` select a non-system development installation.
+Ordinary builds and runtime gain no GDAL dependency. The tool reuses unchanged inland
+photographs, retains attribution and global imagery, verifies source digests and records
+restartable per-image checkpoints. A known source observation count avoids decoding
+wholly inland or offshore images. Coastline geometry is indexed and retained once;
+raster working buffers stay below 256 MiB. An 8 GiB free-space reserve stops safely.
+Only the completed package receives a new manifest; publication and database installation
+remain separate operations. Changed asset digests invalidate browser imagery after installation.
 
 `globe_texture_png(globe, level, column, row, &info)` returns an owned byte array,
 or `NULL` if the record has changed or its payload fails validation. Release the
@@ -405,6 +466,26 @@ or incomplete frame is not readable until reset and successful reconstruction.
 `webgl_mask_vertex_shader` and `webgl_mask_fragment_shader` supply immutable
 WebGL 1 GLSL sources.
 
+`webgl_mask_commands` validates the complete batch list and produces a bounded
+binary submission stream. Native code chooses signed winding operations, colour
+writes, paint order and stencil resets. Invalid ranges, colours or insufficient
+output capacity fail before any commands are written.
+The `webgl_mask_renderer_new`, `webgl_mask_renderer_draw` and
+`webgl_mask_renderer_free` APIs own GPU resource IDs, shader compilation,
+buffer capacities, double-buffered textures and submission. Its synchronous
+`webgl_backend_t` callback forwards WebGL operations through a direct operation
+table and stores the actual browser objects in indexed slots. Failed frames retain
+the previously published texture. Disposal releases owned resources while preserving
+the borrowed quad and published texture. A renderer has one serial owner and one
+GPU context; a replacement context requires a new renderer.
+
+Geographic calculations live separately in `src/globe/globe_view.c`.
+`globe_view_project` projects points through a camera rotation; `globe_view_bounds`
+calculates spherical-cap bounds across the poles and date line for a caller-supplied
+angular radius. These pure functions need neither SQLite nor browser state.
+Applications choose their own zoom limits, viewport padding and texture-cache window
+rules. The coverage renderer likewise accepts a caller-selected texture unit.
+
 The backend uses signed non-zero stencil winding, normalises ring orientation,
 and limits each batch to 127 rings to prevent eight-bit wraparound with overlapping
 simple polygons. Concave rings need no expensive triangulation; successive levels
@@ -687,7 +768,13 @@ settings. It does not prove positional accuracy or import other geographic layer
 database, using the packaged complete sources without geometry repairs. These imports commit
 together; source preparation failures leave the database untouched and
 import failures roll back. The saved key, configuration and other layers are
-preserved. Stop MARS Lab before updating and restart it afterwards. This is
+preserved. Plaintext updates build a new database beside the installed file, copying the non-image data and
+preserving unrelated schema before importing the photographs into fresh 64 KiB pages. This avoids copying old
+image pages into a rollback journal. Bounded caches and full synchronisation remain enabled. The source stays
+writer-locked until the validated replacement is atomically renamed into place; temporary space for that
+replacement is required. Managed photographic migrations during `make release` use the same publication path,
+preserving installed geography and rivers. Individual image checks are performed during import, so publication
+does not hash the entire catalogue a second time. Stop MARS Lab before updating and restart it afterwards. This is
 not a river installation command. `make uninstall-globe-db` removes the default
 `~/.mars/globe/globe.db`, its SQLite sidecar files and `~/.mars/config/globe-db.env`.
 `make uninstall-mars-db` also removes the default almanac and jurisdiction databases,
@@ -1648,12 +1735,25 @@ layers exceeding the former 3.8 MB limit.
 Only river tables are
 replaced, in one transaction; failures preserve the previous river tables and
 all unrelated shoreline data. It does not reinstall towns or almanac data.
-Publication reports validated feature and point totals every 100,000 chunks;
-these are uncommitted until the complete replacement passes validation. The
+Publication reports copied/total point counts beside its live progress bar; stored-river simplification
+reports processed/total chunk counts, including its resumed checkpoint position. These are uncommitted
+until the complete replacement passes validation. The
 installation connection uses a bounded 64 MiB SQLite page cache.
-This path currently installs river, stream, canal and tidal-channel centrelines,
-not filled water-area polygons. The original extract retains those polygons for
-later work. River strokes do not establish channel width, depth or navigability.
+Publication accepts river, stream, canal and tidal-channel centrelines. The optional native
+`river_select` preparation target produces a smaller plaintext candidate containing only OSM
+`waterway=river` features. It removes stream, canal and tidal-channel centrelines from that candidate;
+it keeps every chunk, anchor and coordinate of each retained river, including tributaries and
+narrow connecting reaches. Missing width information does not exclude a retained river.
+This classification is a practical reduction in clutter, not a ranking of river importance or navigability.
+Installing this candidate replaces the previous centreline tables; discarded rows are removed from the
+installed dataset rather than hidden by a rendering filter. Existing mapped water areas and widths remain.
+
+The retained local inputs and prepared candidate are kept in the ignored
+`packaging/globe-db/source-cache/` directory, outside all build directories. This cache contains the
+completed `waterways-261012.osm.pbf` extract and `rivers-main-8m.sqlite3` candidate; `make clean` leaves
+them intact. The selected candidate retains source attribution, original point counts, the eight-metre
+storage tolerance and its selection policy. The original extract retains water-area geometry for later
+work. River strokes do not establish channel width, depth or navigability.
 
 Display simplification should use zoom-dependent error bounds, preserve junctions
 and shared boundaries. Retain the original extract separately for future finer
@@ -1705,13 +1805,17 @@ does not make withdrawn or uninstalled data available.
 
 On a cache miss, native code supplies photographic crop rectangles and a bounded
 river path. A dedicated browser worker composites a 2048 × 2048 regional photograph
-with river cut-outs; WebGL fills these with the existing water palette and lighting.
+with river cut-outs; WebGL fills these with the existing water palette and lighting, mixed with a
+restrained local terrain tint to soften the river contrast against photographic tiles.
+Photographs load alongside the river query and can be displayed before it finishes.
+Completed river coverage replaces that preview at the same geographic cache address;
+only completed surfaces are persisted.
 The worker decodes one source photograph at a time and never processes the whole
 network. The base globe stays visible throughout. Missing worker or photographic
 support falls back to the independent river SVG overlay.
 
 Completed raw RGBA pixels are cached in IndexedDB per browser and Lab origin, with at most
-four 2048-square tiles, 16 MiB each and 64 MiB in total. Browser storage overhead is
+32 2048-square tiles, 16 MiB each and 512 MiB in total. Browser storage overhead is
 additional. Least recently used entries are evicted. Pixels are stored premultiplied
 and transferred directly to WebGL, without image decoding or rebuilding an ImageBitmap.
 Disk reads and GPU uploads remain necessary; resident textures are reused directly.
@@ -1720,13 +1824,26 @@ Database identities invalidate stale imagery, and cache hits avoid querying or
 rasterising river geometry again. Denied or unavailable storage does not prevent
 drawing. This cache does not replace or reduce the installed river database.
 
-The browser retains one regional GPU texture, about 16 MiB, replacing it when a new
-region loads. Zooming out hides it immediately and releases its texture storage
-after a two-second grace period. Returning during that interval reuses it;
-returning later checks the persistent cache before preparing the region again. Graphics drivers may retain freed
+The browser retains up to four regional GPU textures (64 MiB), rebinding a matching
+view without another upload. New destination loads protect the displayed texture.
+Stable geographic bounds improve reuse across small camera changes. History keeps
+the outgoing detail, and idle destination requests allow visible route coverage to load.
+Travel prepares a broad destination overview before its close arrival tile. Retained
+photographs remain visible during refinement; excessively magnified old raster strokes
+fade until correctly scaled river coverage arrives.
+Persistence runs in the worker after publication, yielding between pixel batches;
+at most two extra canvases hold the active write and newest pending destination.
+Older pending intermediate views may be skipped. Graphics drivers may retain freed
 allocations internally. Towns remain resident and observer selection is
 unaffected. This browser policy does not evict the separate native shoreline
 cache or establish a memory budget for the planned road and building layers.
+
+The Lab's WASM `lab_texture_cache` service uses native `dictionary_t` lookup and
+LRU eviction for GPU and decoded-photo resources. `lab_globe_surface_bounds`
+selects stable windows, and `lab_texture_premultiply` prepares small pixel batches.
+Browser adapters retain only direct-indexed resource slots; IndexedDB operations
+and GPU uploads remain browser-owned. Temporary upload allocations are additional
+to the 64 MiB retained GPU working set.
 
 River strokes use the same local water-colour sampling, lighting and water-only
 fallback as sea and fjord fills. They do not invent surveyed channel widths or

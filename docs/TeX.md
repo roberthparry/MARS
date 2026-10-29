@@ -171,9 +171,7 @@ Output:
 
 Rendered mathematics:
 
-$$
-{r}_{n} = \frac{\sqrt[3]{1 + {x}_{n}^{2}}}{\sqrt{1 + {\lambda}^{2}}}\qquad \text{scaled \& normalised}
-$$
+$\quad\begin{array}{l}\displaystyle {r}_{n} = \frac{\sqrt[3]{1 + {x}_{n}^{2}}}{\sqrt{1 + {\lambda}^{2}}}\qquad \text{scaled \& normalised}\end{array}$
 
 ## A symmetric projection matrix
 
@@ -244,9 +242,7 @@ P(x) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2}\end{bmatr
 
 Rendered mathematics:
 
-$$
-P(x) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2}\end{bmatrix}
-$$
+$\quad\begin{array}{l}\displaystyle P(x) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2}\end{bmatrix}\end{array}$
 
 ## Calculus and tensor notation
 
@@ -428,25 +424,15 @@ i\hbar\,\frac{\partial {\psi(x,t)}}{\partial {t}} = -\frac{{\hbar}^{2}}{2m}\,\fr
 
 Rendered mathematics:
 
-$$
-{R}_{\mu}{}_{\nu} - \frac{1}{2}\,R\,{g}_{\mu}{}_{\nu} + \Lambda\,{g}_{\mu}{}_{\nu} = \frac{8\pi G}{{c}^{4}}\,{T}_{\mu}{}_{\nu}
-$$
+$\quad\begin{array}{l}\displaystyle {R}_{\mu}{}_{\nu} - \frac{1}{2}\,R\,{g}_{\mu}{}_{\nu} + \Lambda\,{g}_{\mu}{}_{\nu} = \frac{8\pi G}{{c}^{4}}\,{T}_{\mu}{}_{\nu}\end{array}$
 
-$$
-i\hbar\,\frac{\partial {\psi(x,t)}}{\partial {t}} = -\frac{{\hbar}^{2}}{2m}\,\frac{\partial^{2} {\psi(x,t)}}{\partial {x}^{2}} + V(x,t)\,\psi(x,t)
-$$
+$\quad\begin{array}{l}\displaystyle i\hbar\,\frac{\partial {\psi(x,t)}}{\partial {t}} = -\frac{{\hbar}^{2}}{2m}\,\frac{\partial^{2} {\psi(x,t)}}{\partial {x}^{2}} + V(x,t)\,\psi(x,t)\end{array}$
 
-$$
-\left( i\,{\gamma}^{\mu}\,{\partial}_{\mu} - m \right)\,\psi = 0
-$$
+$\quad\begin{array}{l}\displaystyle \left( i\,{\gamma}^{\mu}\,{\partial}_{\mu} - m \right)\,\psi = 0\end{array}$
 
-$$
-\psi(x) = \sum_{n=0}^{\infty} {{a}_{n}\,{\phi}_{n}(x)}
-$$
+$\quad\begin{array}{l}\displaystyle \psi(x) = \sum_{n=0}^{\infty} {{a}_{n}\,{\phi}_{n}(x)}\end{array}$
 
-$$
-\int_{-\infty}^{\infty} {{\left| \psi(x) \right|}^{2}}\,\mathrm{d}{x} = 1
-$$
+$\quad\begin{array}{l}\displaystyle \int_{-\infty}^{\infty} {{\left| \psi(x) \right|}^{2}}\,\mathrm{d}{x} = 1\end{array}$
 
 ## Ordinary mathematical text without TeX commands
 
@@ -503,9 +489,7 @@ Output:
 
 Rendered mathematics:
 
-$$
-\frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{2\mkern-2mu x\mkern-2mu \left(x - 1\right)}
-$$
+$\quad\begin{array}{l}\displaystyle \frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{2\mkern-2mu x\mkern-2mu \left(x - 1\right)}\end{array}$
 
 The result can also be supplied to `TeX_matrix`, `TeX_sequence` or any other
 structured constructor, just like a manually constructed fragment. `TeX_text`
@@ -604,69 +588,37 @@ W_{0}(x)
 
 Rendered mathematics, in the same order as the programme output:
 
-$$
-\mathcal{F}_{x\to k}\{e^{-x^{2}}\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}_{x\to k}\{e^{-x^{2}}\}\end{array}$
 
-$$
-\mathcal{F}^{-1}_{k\to x}\{e^{-k^{2}}\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{F}^{-1}_{k\to x}\{e^{-k^{2}}\}\end{array}$
 
-$$
-\mathcal{L}_{t\to s}\{\sin(t)\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}_{t\to s}\{\sin(t)\}\end{array}$
 
-$$
-\mathcal{L}^{-1}_{s\to t}\{\frac{1}{s + 1}\}
-$$
+$\quad\begin{array}{l}\displaystyle \mathcal{L}^{-1}_{s\to t}\{\frac{1}{s + 1}\}\end{array}$
 
-$$
-\prod_{k=1}^{3}k
-$$
+$\quad\begin{array}{l}\displaystyle \prod_{k=1}^{3}k\end{array}$
 
-$$
-\Gamma(x)
-$$
+$\quad\begin{array}{l}\displaystyle \Gamma(x)\end{array}$
 
-$$
-J_{2}\left(x\right)
-$$
+$\quad\begin{array}{l}\displaystyle J_{2}\left(x\right)\end{array}$
 
-$$
-W_{0}(x)
-$$
+$\quad\begin{array}{l}\displaystyle W_{0}(x)\end{array}$
 
-$$
-\int x^{2}\, dx
-$$
+$\quad\begin{array}{l}\displaystyle \int x^{2}\, dx\end{array}$
 
-$$
-\int_{0}^{1} x^{2}\, dx
-$$
+$\quad\begin{array}{l}\displaystyle \int_{0}^{1} x^{2}\, dx\end{array}$
 
-$$
-\sum_{k=1}^{3}k^{2}
-$$
+$\quad\begin{array}{l}\displaystyle \sum_{k=1}^{3}k^{2}\end{array}$
 
-$$
-\frac{\partial}{\partial x}\left[\sin(x)\right]
-$$
+$\quad\begin{array}{l}\displaystyle \frac{\partial}{\partial x}\left[\sin(x)\right]\end{array}$
 
-$$
-\frac{\partial^{2}}{\partial x^{2}}\left[\sin(x)\right]
-$$
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{2}}{\partial x^{2}}\left[\sin(x)\right]\end{array}$
 
-$$
-\frac{\partial^{2}}{\partial y\,\partial x}\left[x^{2}\mkern-2mu y^{3}\right]
-$$
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{2}}{\partial y\,\partial x}\left[x^{2}\mkern-2mu y^{3}\right]\end{array}$
 
-$$
-\frac{\partial^{2}}{\partial y\,\partial x}\left[x^{2}\mkern-2mu y^{3}\right]
-$$
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{2}}{\partial y\,\partial x}\left[x^{2}\mkern-2mu y^{3}\right]\end{array}$
 
-$$
-\frac{\partial^{3}}{\partial x\,\partial y\,\partial x}\left[x^{3}\mkern-2mu y^{2}\right]
-$$
+$\quad\begin{array}{l}\displaystyle \frac{\partial^{3}}{\partial x\,\partial y\,\partial x}\left[x^{3}\mkern-2mu y^{2}\right]\end{array}$
 
 ## Existing renderers
 
@@ -825,21 +777,13 @@ i\mkern-2mu h\mkern-2mu \frac{\partial}{\partial t}\left[\psi\right] = -\frac{h^
 
 Rendered mathematics, in the same order (the caption is separate text):
 
-$$
-\sqrt{\frac{x}{2}}
-$$
+$\quad\begin{array}{l}\displaystyle \sqrt{\frac{x}{2}}\end{array}$
 
-$$
-r_{n} = \frac{\sqrt[3]{x_{n}^{2} + 1}}{\sqrt{\lambda^{2} + 1}}
-$$
+$\quad\begin{array}{l}\displaystyle r_{n} = \frac{\sqrt[3]{x_{n}^{2} + 1}}{\sqrt{\lambda^{2} + 1}}\end{array}$
 
-$$
-P\left(x\right) = \frac{1}{x^{2} + 1}\mkern-5mu \begin{bmatrix}1 & x \\[10pt] x & x^{2}\end{bmatrix}
-$$
+$\quad\begin{array}{l}\displaystyle P\left(x\right) = \frac{1}{x^{2} + 1}\mkern-5mu \begin{bmatrix}1 & x \\[10pt] x & x^{2}\end{bmatrix}\end{array}$
 
-$$
-i\mkern-2mu h\mkern-2mu \frac{\partial}{\partial t}\left[\psi\right] = -\frac{h^{2}}{2\mkern-2mu m}\mkern-2mu \frac{\partial^{2}}{\partial x^{2}}\left[\psi\right] + V\mkern-2mu \psi
-$$
+$\quad\begin{array}{l}\displaystyle i\mkern-2mu h\mkern-2mu \frac{\partial}{\partial t}\left[\psi\right] = -\frac{h^{2}}{2\mkern-2mu m}\mkern-2mu \frac{\partial^{2}}{\partial x^{2}}\left[\psi\right] + V\mkern-2mu \psi\end{array}$
 
 ## Native constants and infinity
 
@@ -902,11 +846,7 @@ i
 
 Rendered mathematics, in the same order:
 
-$$
-\infty,\quad \infty,\quad -\infty,\quad \gamma,\quad \gamma,\quad
-\pi,\quad \phi,\quad \tau,\quad e,\quad i,\quad
-\int_{0}^{\infty} e^{-x}\, dx
-$$
+$\quad\begin{array}{l}\displaystyle \infty,\quad \infty,\quad -\infty,\quad \gamma,\quad \gamma,\quad \pi,\quad \phi,\quad \tau,\quad e,\quad i,\quad \int_{0}^{\infty} e^{-x}\, dx\end{array}$
 
 ## Matrix literals and symbolic powers
 
@@ -960,9 +900,7 @@ Output:
 
 Rendered mathematics:
 
-$$
-{\begin{bmatrix}1 & 2 \\[10pt] 3 & 4\end{bmatrix}}^{x}
-$$
+$\quad\begin{array}{l}\displaystyle {\begin{bmatrix}1 & 2 \\[10pt] 3 & 4\end{bmatrix}}^{x}\end{array}$
 
 ## Bound matrix powers and differential-equation problems
 
@@ -1022,13 +960,9 @@ Output:
 
 Rendered mathematics:
 
-$$
-{\begin{bmatrix}1 & 2 \\[10pt] 3 & 4\end{bmatrix}}^{x}
-$$
+$\quad\begin{array}{l}\displaystyle {\begin{bmatrix}1 & 2 \\[10pt] 3 & 4\end{bmatrix}}^{x}\end{array}$
 
-$$
-\frac{d^{2} y}{d x^{2}} + 3\mkern-2mu \frac{d y}{d x} + 40\mkern-2mu y = 0,\qquad \left. \frac{d y}{d x}\right|_{x=0} = 1,\qquad \left. y\right|_{x=0} = 0
-$$
+$\quad\begin{array}{l}\displaystyle \frac{d^{2} y}{d x^{2}} + 3\mkern-2mu \frac{d y}{d x} + 40\mkern-2mu y = 0,\qquad \left. \frac{d y}{d x}\right|_{x=0} = 1,\qquad \left. y\right|_{x=0} = 0\end{array}$
 
 ## Native layout composition
 
@@ -1081,18 +1015,50 @@ Output:
 
 Rendered:
 
-$$
-\left\{ x \;\middle|\; x = 1 \right\}
-$$
+$\quad\begin{array}{l}\displaystyle \left\{ x \;\middle|\; x = 1 \right\}\end{array}$
 
-$$
-2\mkern-5mu x
-$$
+$\quad\begin{array}{l}\displaystyle 2\mkern-5mu x\end{array}$
 
-$$
-\begin{aligned}&x \\[10pt] &{}+ i\mkern-2mu y\end{aligned}
-$$
+$\quad\begin{array}{l}\displaystyle \begin{aligned}&x \\[10pt] &{}+ i\mkern-2mu y\end{aligned}\end{array}$
 
-$$
-\frac{x \pm \left(y\right)}{2}
-$$
+$\quad\begin{array}{l}\displaystyle \frac{x \pm \left(y\right)}{2}\end{array}$
+
+## Planned reverse Polish construction
+
+**Design proposal recorded on 29 October 2026; deferred for later implementation.**
+
+Add a stack-based convenience interface with `TeX_push_…` and `TeX_apply_…`
+function families. Callers push operands, then apply an operation to the top
+operands, replacing them with the resulting notation. This reverse Polish
+construction should make the earlier complex examples much shorter, avoiding
+separate temporary variables and cleanup calls for every intermediate fragment.
+These are proposed API families, not functions available in the current header.
+
+The intended design is:
+
+- Push numbers, symbols, literal text, native mathematical expressions or existing
+  notation through appropriately named `TeX_push_…` calls. Copy borrowed inputs
+  into construction-owned values, with ownership documented explicitly.
+- Apply fractions, roots, powers, indices, equations, sequences, matrices,
+  integrals and sums through `TeX_apply_…` calls. TeX supplies the typesetting
+  syntax; callers describe the required structure.
+- Define operand order and arity explicitly, especially for fractions, indexed
+  roots, bounds and row-major matrix cells. Reject stack underflow, invalid
+  dimensions and allocation failures without losing the previous valid stack.
+- Let one opaque construction object own intermediate fragments. Finalisation
+  requires one completed formula and returns an independently owned `TeX_t`,
+  released with `TeX_free`. Releasing the construction object cleans up any
+  remaining fragments, including after failure.
+- Use direct stack indexing and ordinary function dispatch. Keep lifecycle
+  names, exact signatures and the error-reporting interface for the later API
+  design and implementation.
+
+Preserve the existing module boundary: expression, matrix, equation and
+differential equation retain mathematical interpretation and provide semantic
+information through their internal callbacks. TeX owns presentation. Ordinary
+requests for TeX output continue to manage rendering contexts internally; the
+new stack interface is an optional convenience for explicit formula construction.
+
+When this work is implemented, add runnable stack-based alternatives to the
+earlier complex examples and their README tests, with matching rendered output
+and explicit ownership and failure handling.

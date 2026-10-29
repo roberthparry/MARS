@@ -88,6 +88,17 @@ int equ_append_solution_expr(const expr_t *wrt, const expr_t *rhs, equation_solu
 /* Propose a rational approximation without claiming that it is an exact root or coefficient. */
 number_t equ_polynomial_rational_candidate(number_t value);
 
+/**
+ * @brief Invert a principal square root, exponential or logarithm on either isolated equation side.
+ * @param equation Borrowed source equation; its sides and bindings are not modified.
+ * @param wrt Borrowed variable to isolate.
+ * @param solutions Borrowed collection receiving reduced solutions or a proved-empty status.
+ * @return Zero after a handled reduction, one when inapplicable, or minus one on allocation or computation failure.
+ * @note Square-root targets must have a known principal-root range. Constant-base exponential inversion requires
+ * a finite positive real base different from one; it returns the principal logarithmic inverse.
+ */
+int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
+
 int equ_try_solve_cubic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 
 int equ_try_solve_quartic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);

@@ -7,8 +7,8 @@
  */
 interface GlobeSurfaceRecord { key: string; blob: Blob; size: number; used: number; }
 class GlobeSurfaceCache {
-    static readonly maximumBytes = 64 * 1024 * 1024;
-    static readonly maximumEntries = 4;
+    static readonly maximumBytes = 512 * 1024 * 1024;
+    static readonly maximumEntries = 32;
     static readonly tileBytes = 2048 * 2048 * 4;
     private database: Promise<IDBDatabase | null> | null = null;
 
@@ -64,7 +64,7 @@ class GlobeSurfaceCache {
             try {
                 const transaction = db.transaction('tiles', 'readwrite'), store = transaction.objectStore('tiles');
                 store.put({key, blob, size: blob.size, used: Date.now()} satisfies GlobeSurfaceRecord);
-                // At most five small metadata records are examined. Blobs are not decoded or copied into JS memory.
+                // At most 33 metadata records are examined. Pixel payloads remain in browser storage.
                 const entries: {key: IDBValidKey; size: number}[] = [];
                 let bytes = 0;
                 const cursor = store.index('used').openCursor();

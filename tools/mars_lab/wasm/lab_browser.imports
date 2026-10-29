@@ -86,3 +86,4 @@ lab_host_kind
 lab_host_number
 lab_host_text
 lab_host_value
+lab_webgl_host_call

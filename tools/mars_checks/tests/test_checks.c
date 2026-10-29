@@ -12,6 +12,8 @@
 
 #include <stdlib.h>
 
+#include "mars_paths.h"
+
 #include "test_harness.h"
 #include "test_checks.h"
 
@@ -20,10 +22,12 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 /* Allocate a private fixture tree. */
 string_t *test_checks_root(void)
 {
-    char pattern[] = "/tmp/mars-checks-tests-XXXXXX";
-    if (!mkdtemp(pattern))
+    file_t *directory = mars_path_temporary();
+    if (!directory)
         checks_fatal("creating checker test fixture");
-    return checks_text(pattern);
+    string_t *root = checks_text(file_path(directory));
+    file_free(directory);
+    return root;
 }
 
 /* Write a fixture through the file-module adapter. */

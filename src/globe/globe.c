@@ -172,6 +172,33 @@ bool globe_surface_paths(globe_t *g, double west, double south, double east, dou
     return g && shoreline_paths(g->shoreline, west, south, east, north, tolerance, visit, context);
 }
 
+/* Reject uniform windows through the spatial index before loading complete polygon rings. */
+bool globe_coastline_window(globe_t *g, const double bounds[4], bool *may_cross)
+{
+    if (may_cross) *may_cross = true;
+    if (!g || !g->shoreline || !bounds || !may_cross) return false;
+    for (unsigned i = 0; i < 4; ++i) if (!isfinite(bounds[i])) return false;
+    if (bounds[0] < -180 || bounds[2] > 180 || bounds[0] >= bounds[2] ||
+        bounds[1] < -90 || bounds[3] > 90 || bounds[1] >= bounds[3]) return false;
+    sqlite_stmt_t *query = sqlite_stmt_prepare(g->geometry,
+        "SELECT 1 "
+        "FROM shoreline_bounds AS r "
+        "JOIN shoreline_chunk AS c ON c.id = r.id "
+        "WHERE c.level = 1 "
+        "  AND r.min_x <= ?1 AND r.max_x >= ?2 "
+        "  AND r.min_y <= ?3 AND r.max_y >= ?4 "
+        "LIMIT 1");
+    bool ok = query && sqlite_stmt_bind_double(query, 1, ceil(bounds[2] * 1000000) + 1) &&
+        sqlite_stmt_bind_double(query, 2, floor(bounds[0] * 1000000) - 1) &&
+        sqlite_stmt_bind_double(query, 3, ceil(bounds[3] * 1000000) + 1) &&
+        sqlite_stmt_bind_double(query, 4, floor(bounds[1] * 1000000) - 1);
+    sqlite_step_result_t step = ok ? sqlite_stmt_step(query) : SQLITE_STEP_ERROR;
+    ok = step == SQLITE_STEP_ROW || step == SQLITE_STEP_DONE;
+    if (ok) *may_cross = step == SQLITE_STEP_ROW;
+    sqlite_stmt_finalize(query);
+    return ok;
+}
+
 /* Stream regional rivers without retaining the full network. */
 bool globe_river_segments(globe_t *g, double west, double south, double east, double north,
                           globe_river_segment_fn visit, void *context)

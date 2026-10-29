@@ -100,3 +100,6 @@ texput.log
 tools/render/
 docs/books/Applied Differential Equations/img
 AGENTS.md
+
+# Retained geographic inputs and prepared candidates survive make clean.
+/packaging/globe-db/source-cache/

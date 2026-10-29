@@ -1,15 +1,18 @@
 /**
  * @file test_lab_browser_fixtures.c
- * @brief Native calendar markup fixtures encoded for real-browser layout tests.
+ * @brief Native calendar markup and complete-image delivery fixtures for browser tests.
  *
- * Exercises the production calendar renderers and Protobuf encoder without an
+ * Verifies a complete PNG response through the native HTTP client, then exercises
+ * the production calendar renderers and Protobuf encoder without an
  * ephemeris worker. Emits only decimal bytes into the disposable test page, so
  * test text cannot become script source. Kept separate from process/signal code
  * because the library and POSIX stack types occupy the same C namespace.
  */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "http-t.h"
 #include "jurisdiction-t.h"
 #define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
@@ -149,5 +152,25 @@ bool lab_browser_almanac_fixture(string_t *script)
     json_free(envelope);
     json_free(pending);
     json_free(fixture);
+    return ok;
+}
+
+/* Verify fixture image delivery independently of browser decoding and cancellation. */
+bool lab_browser_texture_probe(unsigned port)
+{
+    string_t *url = string_sprintf("http://127.0.0.1:%u/earth_tiles/05-00.png", port);
+    http_client_t *client = http_client_new();
+    http_request_t *request = http_request_new(HTTP_GET, url);
+    http_response_t *response = request ? http_client_send(client, request) : NULL;
+    file_t *source = file_new_cstr("packaging/globe-db/textures/earth_tiles/05-00.png");
+    array_t *expected = file_read_all_bytes(source);
+    bool ok = response && expected && http_response_ok(response) &&
+        http_response_body_size(response) == array_size(expected) &&
+        !memcmp(http_response_body(response), array_get(expected, 0), array_size(expected));
+    string_fprintf(stderr, "Fixture PNG HTTP probe: %s (%zu/%zu bytes)\n", ok ? "pass" : "fail",
+        http_response_body_size(response), array_size(expected));
+    if (!ok) string_fprintf(stderr, "Fixture HTTP error: %S\n", http_client_error_text(client));
+    array_destroy(expected); file_free(source); http_response_free(response); http_request_free(request);
+    http_client_free(client); string_free(url);
     return ok;
 }

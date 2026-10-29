@@ -189,7 +189,7 @@ static bool packaged_defaults(const char *directory)
     const string_t *bits = json_number_text(test_lab_member(precision, "integrator"));
     bool ok = configured && expected && actual && !string_compare(expected, actual) &&
               json_object_size(constants) == 40 && !test_lab_member(constants, "DEFAULT_SCRATCH_TARGET") &&
-              json_object_size(defaults) == 35 &&
+              json_object_size(defaults) == 37 &&
               json_object_size(precision) == 7 && bits && string_view_equals_literal(string_view_all(bits), "1280") &&
               !strcmp(test_lab_text(defaults, "datetime_date"), "2026-10-05") &&
               !strcmp(test_lab_text(defaults, "almanac_town"), "Shrewsbury|52.7077|-2.7541|75") &&

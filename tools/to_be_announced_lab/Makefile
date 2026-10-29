@@ -49,13 +49,14 @@ TBA_CRYPTO_LIBS := -lcrypto
 endif
 .PHONY: check-tba-crypto-deps
 check-tba-crypto-deps:
-	@probe_dir=$$(mktemp -d /tmp/mars-tba-crypto.XXXXXX) || exit 1; \
+	@probe_dir=$$(mktemp -d -t mars-tba-crypto.XXXXXX) || exit 1; \
 	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
 	trap 'exit 1' HUP INT TERM; \
 	if ! printf '%s\n' '#include <openssl/evp.h>' '#include <openssl/rsa.h>' \
 	    'int main(void) { EVP_PKEY *k = EVP_RSA_gen(2048); EVP_PKEY_free(k); return 0; }' \
 	    | $(CC) $(TBA_CRYPTO_CFLAGS) -x c - -o "$$probe_dir/probe" $(TBA_CRYPTO_LIBS); then \
-	    echo 'Private Lab encryption requires OpenSSL 3 development files (Debian/Ubuntu: libssl-dev).'; exit 1; \
+	    echo 'Private Lab OpenSSL 3 compile/link probe failed; see compiler diagnostics above.' >&2; \
+	    echo 'Development package on Debian/Ubuntu: libssl-dev.' >&2; exit 1; \
 	fi
 $(TBA_BUILD_DIR)/stream/tba_stream.o: CFLAGS += $(TBA_CRYPTO_CFLAGS)
 $(TBA_BUILD_DIR)/stream/tba_stream.o: | check-tba-crypto-deps

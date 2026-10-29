@@ -735,8 +735,13 @@ static bool cfg_river_simplify(sqlite_t *db, osm_river_import_t *state)
         "where b.id<>?1 and b.min_x<=?2 and b.max_x>=?3 and b.min_y<=?4 and b.max_y>=?5 limit 129");
     cfg_river_neighbourhood_t *cache = malloc(sizeof *cache);
     bool ok = rows && update && neighbours && cache && sqlite_stmt_bind_int64(rows, 1, state->last_chunk);
+    static const char label[] = "Reducing stored rivers to shoreline detail";
+    cfg_progress_t *progress = ok ? cfg_progress_start(label) : NULL;
+    cfg_progress_update_items(progress, label, state->last_chunk, state->chunks, "chunks processed");
     sqlite_step_result_t step = SQLITE_STEP_DONE;
     while (ok && (step = sqlite_stmt_step(rows)) == SQLITE_STEP_ROW) {
+        if (state->last_chunk % 128 == 0)
+            cfg_progress_update_items(progress, label, state->last_chunk, state->chunks, "chunks processed");
         if (state->last_chunk && state->last_chunk % 1000 == 0 && !osm_checkpoint(state)) { ok = false; break; }
         state->last_chunk = sqlite_stmt_column_int64(rows, 0);
         size_t bytes = sqlite_stmt_column_bytes(rows, 1), n = bytes / 8;
@@ -783,7 +788,10 @@ static bool cfg_river_simplify(sqlite_t *db, osm_river_import_t *state)
     }
     sqlite_stmt_finalize(rows); sqlite_stmt_finalize(update); sqlite_stmt_finalize(neighbours);
     free(cache);
-    return ok && step == SQLITE_STEP_DONE;
+    ok = ok && step == SQLITE_STEP_DONE;
+    if (ok) cfg_progress_update_items(progress, label, state->last_chunk, state->chunks, "chunks processed");
+    cfg_progress_finish(progress, ok);
+    return ok;
 }
 
 static bool osm_records_feed(osm_river_import_t *state, string_t *record, const unsigned char *input, size_t length)
@@ -923,10 +931,8 @@ bool cfg_database_import_osm_rivers(sqlite_t *db, file_t *source)
         fflush(stdout);
     }
     int64_t source_points = state.points;
-    cfg_progress_t *progress = ok ? cfg_progress_start("Reducing stored rivers to shoreline detail") : NULL;
     state.last_chunk = 0;
     if (ok) ok = cfg_river_simplify(db, &state);
-    cfg_progress_finish(progress, ok);
     if (ok) {
         sqlite_stmt_t *meta = sqlite_stmt_prepare(db,
             "insert into rivers_dataset values(1,2,'OpenStreetMap centreline export / ODbL',?1,?2,?3,?4)");
@@ -1101,8 +1107,9 @@ bool cfg_database_publish_rivers_limited(sqlite_t *destination, sqlite_t *source
     ok = ok && points >= 2 && features > 0 && features <= points / 2 && source_points >= points &&
          isfinite(tolerance) && tolerance > 0 && tolerance <= cfg_river_storage_metres;
     if (ok) ok = cfg_river_candidate_fits(source, budget);
+    cfg_progress_t *progress = ok ? cfg_progress_start("Preparing installed river tables") : NULL;
     bool transaction = ok && sqlite_exec_cstr(destination, "begin immediate");
-    ok = ok && transaction && sqlite_exec_cstr(destination,
+    ok = ok && transaction && cfg_database_public_ddl(destination,
         "drop table if exists rivers_bounds;drop table if exists rivers_chunk;drop table if exists rivers_dataset;");
     int64_t baseline = 0, page_size = 0;
     if (ok) ok = cfg_river_storage_bytes(destination, true, &baseline, &page_size);
@@ -1112,6 +1119,10 @@ bool cfg_database_publish_rivers_limited(sqlite_t *destination, sqlite_t *source
         "create table rivers_chunk(id integer primary key,feature_id integer,kind integer,vertices blob,anchors blob);"
         "create index rivers_feature_chunks on rivers_chunk(feature_id,id);"
         "create virtual table rivers_bounds using rtree_i32(id,min_x,max_x,min_y,max_y);");
+    cfg_progress_finish(progress, ok);
+    static const char copy_label[] = "Installing river network";
+    progress = ok ? cfg_progress_start(copy_label) : NULL;
+    cfg_progress_update_items(progress, copy_label, 0, points, "points copied");
     sqlite_stmt_t *rows = ok ? sqlite_stmt_prepare(source,
         "select feature_id,kind,vertices,anchors from rivers_chunk order by feature_id,id") : NULL;
     sqlite_stmt_t *chunk = ok ? sqlite_stmt_prepare(destination,
@@ -1158,12 +1169,8 @@ bool cfg_database_publish_rivers_limited(sqlite_t *destination, sqlite_t *source
              sqlite_stmt_bind_int(bounds, 3, east) && sqlite_stmt_bind_int(bounds, 4, south) &&
              sqlite_stmt_bind_int(bounds, 5, north) && cfg_river_step(bounds);
         if (ok && chunks % 128 == 0) ok = cfg_river_layer_fits(destination, baseline, budget);
-        if (ok && chunks % 100000 == 0) {
-            printf("Installing rivers: %lld/%lld features, %lld/%lld points validated and copied.\n",
-                   (long long)counted_features, (long long)features,
-                   (long long)counted_points, (long long)points);
-            fflush(stdout);
-        }
+        if (ok && chunks % 128 == 0)
+            cfg_progress_update_items(progress, copy_label, counted_points, points, "points copied");
     }
     sqlite_stmt_finalize(rows); sqlite_stmt_finalize(chunk); sqlite_stmt_finalize(bounds);
     ok = ok && step == SQLITE_STEP_DONE && counted_features == features && counted_points == points;
@@ -1175,8 +1182,9 @@ bool cfg_database_publish_rivers_limited(sqlite_t *destination, sqlite_t *source
     sqlite_stmt_finalize(meta);
     if (ok) ok = cfg_river_layer_fits(destination, baseline, budget);
     if (!sqlite_exec_cstr(source, "rollback")) ok = false;
-    if (ok) ok = sqlite_exec_cstr(destination, "commit");
-    if (!ok && transaction) sqlite_exec_cstr(destination, "rollback");
+    if (ok) cfg_progress_update_items(progress, copy_label, counted_points, points, "points copied");
+    cfg_progress_finish(progress, ok);
+    if (transaction) ok = cfg_database_finish_transaction(destination, ok);
     return ok;
 }
 
@@ -1243,7 +1251,9 @@ static bool cfg_globe_countries(sqlite_t *db, const string_t *root, const string
     const char *extensions[] = {"shp", "dbf"};
     file_t *plain[2] = {NULL, NULL};
     bool ok = true;
-    cfg_progress_t *progress = cfg_progress_start("Indexing country boundaries");
+    static const char label[] = "Preparing country boundary files";
+    cfg_progress_t *progress = cfg_progress_start(label);
+    cfg_progress_update_items(progress, label, 0, 2, "files prepared");
     for (unsigned i = 0; i < 2; ++i) {
         string_t *name = string_sprintf("map-units-5.1.1.%s.zst", extensions[i]);
         string_t *packed_path = name ? mars_path_resource(MARS_PATH_GLOBE, root, string_c_str(name)) : NULL;
@@ -1253,8 +1263,10 @@ static bool cfg_globe_countries(sqlite_t *db, const string_t *root, const string
         plain[i] = plain_path ? file_new(plain_path) : NULL;
         ok = ok && packed && plain[i] && file_decompress_zstd(packed, plain[i], 16 * 1024 * 1024, false) &&
              file_open_read(plain[i]);
+        if (ok) cfg_progress_update_items(progress, label, i + 1, 2, "files prepared");
         file_free(packed); string_free(packed_path); string_free(plain_path);
     }
+    if (ok) cfg_progress_update(progress, "Indexing country boundaries", 0, 0);
     ok = ok && globe_import_countries(db, plain[0], plain[1]);
     for (unsigned i = 0; i < 2; ++i) {
         if (plain[i]) {
@@ -1297,13 +1309,21 @@ bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string
     if (!cfg_database_current_revision(db, "globe", &revision)) return false;
     /* Revision nine already validated the geographic layers. This migration changes photographs only;
        their installer verifies every image and rolls back atomically without rescanning gigabytes of rivers. */
-    if (revision >= 9 && revision <= 11) return cfg_database_textures(db, root);
+    if (revision >= 9 && revision <= 14) return cfg_database_textures(db, root);
     return cfg_globe_valid(db) &&
            (revision >= 3 || cfg_database_coast(db, root, staging)) &&
            (revision >= 7 || cfg_globe_countries(db, root, staging)) &&
            (revision >= 9 || cfg_globe_regions(db, root)) &&
-           (revision >= 12 || cfg_database_textures(db, root)) &&
+           (revision >= 15 || cfg_database_textures(db, root)) &&
            cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) && cfg_globe_valid(db);
+}
+
+static bool cfg_globe_refresh_all(sqlite_t *db, const string_t *root, const string_t *staging)
+{
+    /* Check geographic integrity before adding photographs, whose importer verifies each payload separately. */
+    return cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
+           cfg_globe_regions(db, root) && cfg_globe_valid(db) && cfg_database_textures(db, root) &&
+           cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false);
 }
 
 /* Keep globe setup independent; unsupported operations fail without changing storage. */
@@ -1339,15 +1359,15 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         /* Publish packaged layers together; credentials and rivers are untouched. */
         staging = exists ? cfg_database_stage(parent) : NULL;
         db = staging ? cfg_database_open(expanded, key) : NULL;
-        bool transaction = db && root &&
-            sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
+        bool staged_update = db && root && !string_byte_length(key);
+        if (staged_update)
+            ok = cfg_database_rebuild_globe(&db, expanded, root, staging, cfg_globe_refresh_all, 15, true);
+        bool transaction = !staged_update && db && root &&
+            sqlite_exec_cstr(db, "PRAGMA cache_size=-16384; PRAGMA temp.cache_size=-512;") &&
             cfg_globe_valid(db) && sqlite_exec_cstr(db, "begin immediate");
-        ok = transaction && cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
-             cfg_globe_regions(db, root) && cfg_database_textures(db, root) && cfg_globe_valid(db) &&
-             cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
-             cfg_database_revision(db, "globe", 12) &&
-             sqlite_exec_cstr(db, "commit");
-        if (transaction && !ok) sqlite_exec_cstr(db, "rollback");
+        if (!staged_update)
+            ok = transaction && cfg_globe_refresh_all(db, root, staging) && cfg_database_revision(db, "globe", 15);
+        if (transaction) ok = cfg_database_finish_transaction(db, ok);
         sqlite_close(db);
     } else if (ok && check) {
         db = exists ? cfg_database_open(expanded, key) : NULL;
@@ -1361,11 +1381,14 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
         temporary_path = staging ? string_sprintf("%s/database.db", string_c_str(staging)) : NULL;
         temporary = temporary_path ? file_new(temporary_path) : NULL;
         db = temporary && root ? cfg_database_open(temporary_path, key) : NULL;
-        ok = ok && db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
+        ok = ok && db && (string_byte_length(key) || sqlite_exec_cstr(db, "PRAGMA page_size=65536")) &&
+             sqlite_exec_cstr(db, string_byte_length(key) ?
+                 "PRAGMA cache_size=-16384; PRAGMA temp.cache_size=-512;" :
+                 "PRAGMA cache_size=-65536; PRAGMA temp.cache_size=-512;") &&
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
              cfg_globe_regions(db, root) && cfg_database_textures(db, root) &&
              cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
-             cfg_database_revision(db, "globe", 12);
+             cfg_database_revision(db, "globe", 15);
         sqlite_close(db);
         string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
         string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;

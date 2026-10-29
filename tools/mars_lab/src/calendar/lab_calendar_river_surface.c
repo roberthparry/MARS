@@ -60,6 +60,9 @@ static bool surface_region(unsigned slot, const double region[4], void *context)
     /* Broad views use regional overviews, not dozens of full-detail PNGs. */
     if (fmax(b[2] - b[0], b[3] - b[1]) > 1 && fmax(region[2] - region[0], region[3] - region[1]) <= 1)
         return true;
+    /* Regions arrive from the spatial index, broad overviews first. Keep the
+     * transport and decoded working set bounded even for a continental approach. */
+    if (json_array_size(state->photos) >= 68) return true;
     globe_texture_info_t info;
     if (!globe_texture_metadata(state->globe, 3, slot, 0, &info)) return false;
     double left = fmax(b[0], region[0]), right = fmin(b[2], region[2]);
@@ -77,6 +80,12 @@ static bool surface_region(unsigned slot, const double region[4], void *context)
         lab_cal_take(photo, "source", surface_numbers(source, 4));
         lab_cal_take(photo, "target", surface_numbers(target, 4));
         lab_cal_take(photo, "regional", json_new_bool(true));
+        double scale = fmax(target[2] / source[2], target[3] / source[3]);
+        double decode = fmin(info.width, fmax(64, ceil(info.width * scale / 64) * 64));
+        string_t *width = string_sprintf("%u", info.width), *decoded = string_sprintf("%.0f", decode);
+        lab_cal_take(photo, "width", width ? json_new_number(width) : NULL);
+        lab_cal_take(photo, "decode_size", decoded ? json_new_number(decoded) : NULL);
+        string_free(width); string_free(decoded);
     }
     bool ok = photo && url && json_array_append(state->photos, photo);
     json_free(photo); string_free(url);
@@ -113,8 +122,7 @@ static json_t *surface_photographs(globe_t *globe, const double b[4])
         }
     }
     surface_regions_t state = {globe, photos, b};
-    if (ok && fmax(b[2] - b[0], b[3] - b[1]) <= 4)
-        ok = globe_texture_regions(globe, b, surface_region, &state);
+    if (ok) ok = globe_texture_regions(globe, b, surface_region, &state);
     if (ok) return photos;
     json_free(photos);
     return NULL;
@@ -135,7 +143,7 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
     globe_reader_t *reader = globe_reader_new();
     string_t *identity = globe_reader_identity(reader);
     globe_t *globe = identity ? globe_reader_get(reader) : NULL;
-    string_t *key = identity ? string_sprintf("river-surface-5:%s:%.12g:%.12g:%.12g:%.12g",
+    string_t *key = identity ? string_sprintf("river-surface-6:%s:%.12g:%.12g:%.12g:%.12g",
         string_c_str(identity), b[0], b[1], b[2], b[3]) : NULL;
     bool ok = key && globe;
     bool rivers = ok && globe_has_layer(globe, GLOBE_LAYER_RIVERS);

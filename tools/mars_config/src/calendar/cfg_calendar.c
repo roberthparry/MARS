@@ -38,7 +38,7 @@ bool cfg_calendar_populate(sqlite_t *db, const string_t *path, const string_t *k
     bool cleared = db && sqlite_exec_cstr(db, "DROP TABLE IF EXISTS main.cfg_calendar_places; PRAGMA shrink_memory;");
     ok = ok && cleared;
     progress = ok ? cfg_progress_start("Generating local calendar") : NULL;
-    ok = ok && cfg_calendar_snapshot(db, path, key, &place, locale);
+    ok = ok && cfg_calendar_snapshot(db, path, key, &place, locale, progress);
     cfg_progress_finish(progress, ok);
     if (ok) {
         *chosen_location = label;

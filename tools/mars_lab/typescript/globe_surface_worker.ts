@@ -2,10 +2,13 @@
  * @file globe_surface_worker.ts
  * @brief Off-main-thread rasterisation and persistent reuse of photographic river surface tiles.
  *
- * Native code supplies crop rectangles and paths. A bounded decoded-photo cache avoids repeat PNG work during
+ * Native code supplies crop rectangles and paths. PNG input is read into bounded encoded-byte buffers. A bounded decoded-photo cache avoids repeat PNG work during
  * panning. Completed pixels are published before optional raw-pixel persistence. River cut-outs retain exact coverage.
  */
-interface GlobeSurfacePhoto { url: string; sha256: string; source: number[]; target: number[]; regional?: boolean; }
+interface GlobeSurfacePhoto {
+    url: string; sha256: string; source: number[]; target: number[]; regional?: boolean;
+    width?: number; decode_size?: number;
+}
 interface GlobeSurfacePlan {
     ok: boolean; key: string; bounds: number[]; photos: GlobeSurfacePhoto[];
     path?: string; fill?: string; banks?: string[]; complete?: boolean;
@@ -17,36 +20,38 @@ class GlobeSurfaceWorker {
     private active: AbortController | null = null;
     private pending: GlobeSurfaceMessage | null = null;
     private running = false;
-    private readonly photographs = new Map<string, ImageBitmap>();
-    private photographBytes = 0;
+    private photographs: import('./globe_texture_cache.js').GlobeTextureCache<ImageBitmap> | null = null;
     private saving = false;
+    private pendingSave: {key: string; canvas: OffscreenCanvas} | null = null;
 
     private async photograph(photo: GlobeSurfacePhoto, signal: AbortSignal): Promise<ImageBitmap> {
-        const key = `${photo.url}:${photo.sha256}:${Boolean(photo.regional)}`;
-        const saved = this.photographs.get(key);
-        if (saved) {
-            this.photographs.delete(key);
-            this.photographs.set(key, saved);
-            return saved;
+        const reduced = photo.regional && photo.width && photo.decode_size;
+        if (reduced && (![1800, 3600].includes(photo.width!) || !Number.isInteger(photo.decode_size) ||
+            photo.decode_size! < 64 || photo.decode_size! > photo.width!)) throw new Error('Invalid photograph size');
+        const key = `${photo.url}:${photo.sha256}:${Boolean(photo.regional)}:${photo.decode_size || 0}`;
+        if (!this.photographs) {
+            const moduleURL = '/js/globe_texture_cache.js';
+            const {GlobeTextureCache} = await import(moduleURL) as typeof import('./globe_texture_cache.js');
+            this.photographs = new GlobeTextureCache(32, 64 * 1024 * 1024, bitmap => bitmap.close());
         }
+        const saved = this.photographs.get(key);
+        if (saved) return saved;
         const response = await fetch(photo.url, {signal});
         if (!response.ok || response.headers.get('ETag') !== `"sha256-${photo.sha256}"`)
             throw new Error('Photographic source changed');
-        let bitmap = await createImageBitmap(await response.blob());
+        const encoded = await response.arrayBuffer();
+        if (!encoded.byteLength || encoded.byteLength > (photo.regional ? 64 : 16) * 1024 * 1024)
+            throw new Error('Photographic source exceeds its byte limit');
+        let bitmap = await createImageBitmap(new Blob([encoded], {type: 'image/png'}), reduced ? {
+            resizeWidth: photo.decode_size, resizeHeight: photo.decode_size, resizeQuality: 'high'
+        } : {});
         try {
             signal.throwIfAborted();
             const size = bitmap.width;
-            if ((size !== 1800 && !(photo.regional && size === 3600)) || bitmap.height !== size)
+            if ((reduced ? size !== photo.decode_size : size !== 1800 && !(photo.regional && size === 3600)) ||
+                bitmap.height !== size)
                 throw new Error('Invalid photograph');
             const bytes = size * size * 4;
-            // Map insertion order provides constant-time oldest-entry eviction; no scan of stored photographs.
-            while (this.photographBytes + bytes > 64 * 1024 * 1024) {
-                const oldest = this.photographs.entries().next().value;
-                if (!oldest) break;
-                this.photographBytes -= oldest[1].width * oldest[1].height * 4;
-                oldest[1].close();
-                this.photographs.delete(oldest[0]);
-            }
             if (photo.regional) {
                 const feathered = new OffscreenCanvas(size, size);
                 try {
@@ -68,8 +73,7 @@ class GlobeSurfaceWorker {
                 } finally { feathered.width = feathered.height = 1; }
             }
             signal.throwIfAborted();
-            this.photographs.set(key, bitmap);
-            this.photographBytes += bytes;
+            if (!this.photographs.put(key, bitmap, bytes)) throw new Error('Photograph cache unavailable');
             return bitmap;
         } catch (error) { bitmap.close(); throw error; }
     }
@@ -80,15 +84,24 @@ class GlobeSurfaceWorker {
             await new Promise(resolve => setTimeout(resolve, 0));
             const pixels = canvas.getContext('2d')!.getImageData(0, 0, 2048, 2048);
             // Match ImageBitmap's premultiplied upload once, before persistence, not on every cache hit.
-            for (let i = 0; i < pixels.data.length; i += 4) {
-                const alpha = pixels.data[i + 3] / 255;
-                pixels.data[i] = Math.round(pixels.data[i] * alpha);
-                pixels.data[i + 1] = Math.round(pixels.data[i + 1] * alpha);
-                pixels.data[i + 2] = Math.round(pixels.data[i + 2] * alpha);
+            for (let start = 0; start < pixels.data.length; start += 2048 * 64 * 4) {
+                const end = Math.min(pixels.data.length, start + 2048 * 64 * 4);
+                const chunk = new Uint8Array(pixels.data.buffer, start, end - start);
+                const pointer = labDOM.call('lab_texture_premultiply', chunk) as number;
+                if (!pointer) throw new Error('Native pixel preparation failed');
+                chunk.set(new Uint8Array(labWire.exports().memory.buffer, pointer, chunk.length));
+                // New travel requests and cancellation can run between small batches of cache preparation.
+                await new Promise(resolve => setTimeout(resolve, 0));
             }
             await this.cache.put(key, new Blob([pixels.data], {type: 'application/octet-stream'}));
         } catch { /* Optional persistence must never delay or reject a visible tile. */ }
-        finally { canvas.width = canvas.height = 1; this.saving = false; }
+        finally {
+            canvas.width = canvas.height = 1;
+            this.saving = false;
+            const next = this.pendingSave;
+            this.pendingSave = null;
+            if (next) { this.saving = true; void this.persist(next.key, next.canvas); }
+        }
     }
 
     constructor(private readonly port: {
@@ -120,7 +133,8 @@ class GlobeSurfaceWorker {
         return plan;
     }
 
-    private async tile(bounds: number[], signal: AbortSignal): Promise<ImageBitmap | ArrayBuffer> {
+    private async tile(bounds: number[], signal: AbortSignal,
+                       preview: (bitmap: ImageBitmap) => void): Promise<ImageBitmap | ArrayBuffer> {
         await this.ready;
         signal.throwIfAborted();
         const plan = await this.request(bounds, 'surface-plan', signal);
@@ -134,8 +148,10 @@ class GlobeSurfaceWorker {
         }
         if (!Array.isArray(plan.photos) || !plan.photos.length || plan.photos.length > 68)
             throw new Error('Invalid photographic tile plan');
-        const data = await this.request(bounds, 'surface-data', signal, plan.key);
-        if (data.key !== plan.key || typeof data.path !== 'string') throw new Error('River surface changed');
+        // Geometry and photographic reads are independent. Publish imagery while the native
+        // river query runs; its latency must not leave the destination on the global overview.
+        const geometry = this.request(bounds, 'surface-data', signal, plan.key)
+            .then(data => ({data, error: null}), error => ({data: null, error}));
         const canvas = new OffscreenCanvas(2048, 2048), context = canvas.getContext('2d');
         let retained = false;
         try {
@@ -145,15 +161,24 @@ class GlobeSurfaceWorker {
             context.fillStyle = '#183a32';
             context.fillRect(0, 0, 2048, 2048);
             for (const photo of plan.photos) {
-                if (!(photo.regional ? /^\/earth_regions\/\d{2}\.png$/ : /^\/earth_tiles\/\d{2}-\d{2}\.png$/).test(photo.url) ||
+                if (!(photo.regional ? /^\/earth_regions\/\d{2,4}\.png$/ : /^\/earth_tiles\/\d{2}-\d{2}\.png$/).test(photo.url) ||
                     !Array.isArray(photo.source) || photo.source.length !== 4 ||
                     !Array.isArray(photo.target) || photo.target.length !== 4 ||
                     ![...photo.source, ...photo.target].every(Number.isFinite)) throw new Error('Invalid photo crop');
                 const bitmap = await this.photograph(photo, signal);
                 signal.throwIfAborted();
                 const [sx, sy, sw, sh] = photo.source, [dx, dy, dw, dh] = photo.target;
-                context.drawImage(bitmap, sx, sy, sw, sh, dx, dy, dw, dh);
+                const scale = photo.width ? bitmap.width / photo.width : 1;
+                context.drawImage(bitmap, sx * scale, sy * scale, sw * scale, sh * scale, dx, dy, dw, dh);
             }
+            signal.throwIfAborted();
+            const photograph = await createImageBitmap(canvas, {premultiplyAlpha: 'premultiply'});
+            if (signal.aborted) { photograph.close(); signal.throwIfAborted(); }
+            preview(photograph);
+            const {data, error} = await geometry;
+            if (!data) throw error;
+            signal.throwIfAborted();
+            if (data.key !== plan.key || typeof data.path !== 'string') throw new Error('River surface changed');
             context.globalCompositeOperation = 'destination-out';
             // Half alpha denotes surveyed land; zero denotes water, full alpha leaves the base mask intact.
             if (data.complete === true) {
@@ -177,10 +202,14 @@ class GlobeSurfaceWorker {
             signal.throwIfAborted();
             const bitmap = await createImageBitmap(canvas, {premultiplyAlpha: 'premultiply'});
             if (signal.aborted) { bitmap.close(); signal.throwIfAborted(); }
-            // At most one extra output canvas is retained for optional background storage.
+            // Retain the newest destination while a previous write is busy; never wait before publishing it.
+            retained = true;
             if (!this.saving) {
-                this.saving = retained = true;
+                this.saving = true;
                 void this.persist(plan.key, canvas);
+            } else {
+                if (this.pendingSave) this.pendingSave.canvas.width = this.pendingSave.canvas.height = 1;
+                this.pendingSave = {key: plan.key, canvas};
             }
             return bitmap;
         } finally { if (!retained) canvas.width = canvas.height = 1; }
@@ -196,7 +225,10 @@ class GlobeSurfaceWorker {
                 const controller = this.active = new AbortController();
                 try {
                     if (!message.bounds || !Number.isSafeInteger(message.id)) throw new Error('Invalid surface job');
-                    const bitmap = await this.tile(message.bounds, controller.signal);
+                    const bitmap = await this.tile(message.bounds, controller.signal, bitmap => {
+                        if (controller.signal.aborted) bitmap.close();
+                        else this.port.postMessage({id: message.id, bitmap, preview: true}, [bitmap]);
+                    });
                     if (controller.signal.aborted) {
                         if (bitmap instanceof ImageBitmap) bitmap.close();
                     } else if (bitmap instanceof ArrayBuffer) this.port.postMessage({id: message.id, pixels: bitmap}, [bitmap]);

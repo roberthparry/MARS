@@ -34,19 +34,67 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
     try {
         await clear();
         const raw = new Blob([new Uint8Array(2048 * 2048 * 4)], {type: 'application/octet-stream'});
-        for (let i = 0; i < 4; ++i) await cache.put(`tile-${i}`, raw);
+        for (let i = 0; i < GlobeSurfaceCache.maximumEntries; ++i) await cache.put(`tile-${i}`, raw);
         await new Promise(resolve => setTimeout(resolve, 5));
         check(Boolean(await cache.get('tile-0')), 'a raw cache hit refreshes its recency');
         await cache.put('newest', raw);
         const saved = await records();
-        check(saved.length === 4 && saved.reduce((sum, item) => sum + item.size, 0) === 64 * 1024 * 1024 &&
+        check(saved.length === 32 && saved.reduce((sum, item) => sum + item.size, 0) === 512 * 1024 * 1024 &&
               Boolean(await cache.get('tile-0')) && !await cache.get('tile-1'),
-              'raw cache stays within 64 MiB and evicts the least recently used tile');
+              'raw disk cache retains 32 views within 512 MiB and evicts the least recently used tile');
         await cache.put('invalid-size', new Blob(['short'], {type: 'application/octet-stream'}));
         await cache.put('invalid-type', new Blob([raw], {type: 'image/png'}));
         check(!await cache.get('invalid-size') && !await cache.get('invalid-type'),
               'raw tiles require the exact pixel count and format');
         await clear();
+        const tilesURL = '/js/globe_surface_tiles.js';
+        const {GlobeSurfaceTiles} = await import(tilesURL) as typeof import('../../typescript/globe_surface_tiles.js');
+        const cacheURL = '/js/globe_texture_cache.js';
+        const {GlobeTextureCache} = await import(cacheURL) as typeof import('../../typescript/globe_texture_cache.js');
+        const released: number[] = [], indexed = new GlobeTextureCache<number>(4, 10, value => released.push(value));
+        try {
+            check(indexed.put('one', 1, 4) && indexed.put('two', 2, 4) && indexed.get('one') === 1,
+                  'native dictionary retrieves resources by copied key and refreshes recency');
+            check(indexed.put('three', 3, 4) && indexed.get('two') === null && released.includes(2) && indexed.size === 2,
+                  'native byte-budget eviction removes the least recently used resource');
+            check(!indexed.put('oversize', 4, 11) && indexed.get('one') === 1,
+                  'an oversized insertion leaves useful native cache entries intact');
+        } finally { indexed.dispose(); }
+        check(released.includes(1) && released.includes(3) && indexed.size === 0,
+              'native cache disposal releases each remaining host slot');
+        const firstBounds = GlobeSurfaceTiles.bounds([-2.8, 52.7, -2.7, 52.8]);
+        const shiftedBounds = GlobeSurfaceTiles.bounds([-2.80000001, 52.70000001, -2.70000001, 52.80000001]);
+        check(firstBounds.every((value, i) => value === shiftedBounds[i]),
+              'tiny camera differences reuse the same geographic cache key');
+        for (const bounds of [[-2.8, 52.7, -2.7, 52.8], [-181, -2, -179, 2], [1, 89.9, 2, 90]]) {
+            const padded = GlobeSurfaceTiles.bounds(bounds);
+            check(padded[0] <= bounds[0] && padded[1] <= bounds[1] &&
+                  padded[2] >= bounds[2] && padded[3] >= bounds[3] && padded[3] <= 90,
+                  'stable windows cover the view, including poles and the antimeridian');
+        }
+        const gpuCanvas = document.createElement('canvas'), gpu = gpuCanvas.getContext('webgl')!;
+        const resident = new GlobeSurfaceTiles(gpu);
+        const sample = await createImageBitmap(new ImageData(2, 2));
+        try {
+            resident.put([0, 0, 1, 1], 100, sample, false);
+            let first = resident.covering([0.1, 0.1, 0.9, 0.9], 100)!;
+            check(!first.complete, 'a resident preview remains distinguishable from completed river coverage');
+            resident.bind([0.1, 0.1, 0.9, 0.9], 100);
+            resident.put([0, 0, 1, 1], 100, sample);
+            const refined = resident.covering([0.1, 0.1, 0.9, 0.9], 100)!;
+            check(refined.complete && refined.texture !== first.texture &&
+                  !gpu.isTexture(first.texture) && gpu.isTexture(refined.texture),
+                  'a completed tile replaces its photographic preview at the same geographic cache key');
+            first = refined;
+            for (let i = 1; i <= 4; ++i) resident.put([i * 2, 0, i * 2 + 1, 1], 100, sample);
+            check(resident.covering([0.1, 0.1, 0.9, 0.9], 100)?.texture === first.texture && gpu.isTexture(first.texture),
+                  'destination preloading retains and reuses the displayed GPU texture');
+            check(!resident.covering([2, 0, 3, 1], 100) && resident.covering([8, 0, 9, 1], 100) !== null,
+                  'the GPU working set evicts older non-visible regions after four textures');
+            check(!resident.covering([0, 0, 1, 1], 200), 'a deep zoom requests adequate detail');
+            resident.dispose();
+            check(!gpu.isTexture(first.texture), 'disposing the working set releases GPU textures');
+        } finally { sample.close(); resident.dispose(); gpu.getExtension('WEBGL_lose_context')?.loseContext(); }
         const moduleURL = '/js/globe_surface.js';
         const {GlobeSurface} = await import(moduleURL) as typeof import('../../typescript/globe_surface.js');
         const photograph = await fetch('/earth_tiles/05-01.png');
@@ -54,7 +102,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         await photograph.body?.cancel();
         const regionalPhoto = await fetch('/earth_regions/01.png');
         const regionalSha = regionalPhoto.headers.get('ETag')!.replace(/^"sha256-|"$/g, '');
-        const regionalBitmap = await createImageBitmap(await regionalPhoto.blob());
+        const regionalBitmap = await createImageBitmap(new Blob([await regionalPhoto.arrayBuffer()], {type: 'image/png'}));
         const reference = document.createElement('canvas');
         reference.width = reference.height = 2048;
         const referenceContext = reference.getContext('2d')!;
@@ -64,6 +112,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         reference.width = reference.height = 1;
         let plans = 0, paths = 0, revision = 1, held: (() => void) | null = null;
         let holdNext = false, deny = false, complete = false;
+        let regionalURL = '/earth_regions/123.png';
         const key = () => `surface-browser-${revision}`;
         const respond = async (bytes: Uint8Array<ArrayBuffer>): Promise<Response> => {
             const payload = labWire.decode(bytes) as {format: string; key: string};
@@ -73,7 +122,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
                 return new Response(labWire.encode({ok: true, key: key(), bounds: [0, 0, 1, 1], photos: [
                     {url: '/earth_tiles/05-01.png', sha256, source: [0, 0, 1800, 1800], target: [0, 0, 1024.3, 2048]},
                     {url: '/earth_tiles/05-01.png', sha256, source: [0, 0, 1800, 1800], target: [1024.3, 0, 1023.7, 2048]},
-                    {url: '/earth_regions/01.png', sha256: regionalSha, regional: true,
+                    {url: regionalURL, sha256: regionalSha, regional: true, width: 3600, decode_size: 3600,
                      source: [0, 0, 3600, 3600], target: [0, 0, 2048, 2048]}
                 ]}));
             }
@@ -85,7 +134,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
                     'M1450 600L1650 600L1650 900L1450 900Z']}));
         };
         const fixture = globeHTTPFixture(respond,
-            {endpoint: '/almanac-rivers', script: '/js/globe_surface_worker.js', nativeShore: false, surfaceProbe: true});
+            {endpoint: '/almanac-rivers', script: '/js/globe_surface_worker.js', nativeShore: false, surfaceProbe: true, regionalAliases: true});
         const persisted = async () => {
             for (let attempt = 0; attempt < 200 && !await cache.get(key()); ++attempt)
                 await new Promise(resolve => setTimeout(resolve, 25));
@@ -144,17 +193,25 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
             inspect(await surface.load([0, 0, 1, 1], new AbortController().signal));
             check(plans === 1 && paths === 1, 'first view fetches one plan and one geometry payload');
             check(!await cache.get(key()), 'pixels reach the globe even while raw cache storage is blocked');
+            ++revision;
+            inspect(await surface.load([0, 0, 1, 1], new AbortController().signal));
+            check(plans === 2 && paths === 2 && !await cache.get(key()),
+                  'a second destination publishes while the previous disk write remains blocked');
             fixture.releaseSurfaceCache();
             await persisted();
             surface.dispose(); surface = new GlobeSurface();
             const cached = await surface.load([0, 0, 1, 1], new AbortController().signal);
             check('pixels' in cached, 'a disk cache hit transfers raw pixels without rebuilding an ImageBitmap');
             inspect(cached);
-            check(plans === 2 && paths === 1, 'a new worker reuses the persisted tile without fetching river geometry');
+            check(plans === 3 && paths === 2, 'a new worker reuses the persisted tile without fetching river geometry');
             fixture.releaseSurfaceCache();
             ++revision;
             inspect(await surface.load([0, 0, 1, 1], new AbortController().signal));
-            check(paths === 2, 'a new database identity replaces cached imagery');
+            check(paths === 3, 'a new database identity replaces cached imagery');
+            regionalURL = '/earth_regions/4095.png';
+            ++revision;
+            inspect(await surface.load([0, 0, 1, 1], new AbortController().signal));
+            check(paths === 4, 'three- and four-digit regional image addresses render through the real worker');
             await persisted();
             await new Promise<void>((resolve, reject) => {
                 const transaction = database.transaction('tiles', 'readwrite');
@@ -164,7 +221,20 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
                 transaction.onabort = () => reject(transaction.error);
             });
             inspect(await surface.load([0, 0, 1, 1], new AbortController().signal));
-            check(paths === 3, 'a damaged cache entry is rebuilt without losing the region');
+            check(paths === 5, 'a damaged cache entry is rebuilt without losing the region');
+            ++revision; holdNext = true;
+            let previews = 0, completed = false;
+            const refining = surface.load([0, 0, 1, 1], new AbortController().signal, tile => {
+                check(tile.width === 2048 && tile.height === 2048,
+                      'an independent photographic preview has the complete geographic extent');
+                ++previews;
+            }).then(tile => { completed = true; return tile; });
+            for (let i = 0; i < 200 && !previews; ++i) await new Promise(resolve => setTimeout(resolve, 25));
+            check(previews === 1 && !completed && Boolean(held),
+                  'photography is visible while the river query is still pending');
+            (held as (() => void) | null)?.();
+            held = null;
+            inspect(await refining);
             ++revision; holdNext = true;
             const abort = new AbortController();
             const obsolete = surface.load([0, 0, 1, 1], abort.signal).then(bitmap => {
@@ -206,7 +276,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         }
         deny = false;
         const denied = globeHTTPFixture(respond, {endpoint: '/almanac-rivers', script: '/js/globe_surface_worker.js',
-                                                  nativeShore: false, storageDenied: true});
+                                                  nativeShore: false, storageDenied: true, regionalAliases: true});
         globalThis.Worker = denied.Worker;
         surface = new GlobeSurface();
         const before = paths;

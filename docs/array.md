@@ -18,10 +18,11 @@ An appendable, sortable array. Elements are stored inline in a contiguous arena;
 
 ### Copying And Cleanup
 
-Pass `NULL` for both callbacks to copy element bytes with `memcpy` and perform
-no per-element cleanup. Supply `clone_fn` and `destroy_fn` to have the array
+Pass `NULL` for both callbacks to copy element bytes and perform
+no per-element cleanup. Bulk insertion copies the contiguous byte range in one operation, including byte arrays
+used for file contents and image payloads. Supply `clone_fn` and `destroy_fn` to have the array
 deep-copy each inserted element into its own storage and clean up those stored
-copies on removal or destruction.
+copies on removal or destruction. A supplied clone callback is still called once for each inserted element.
 
 #### Plain Byte Copies
 

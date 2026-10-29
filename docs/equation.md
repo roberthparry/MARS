@@ -155,6 +155,43 @@ model, rather than silently extrapolating an inconsistent pattern.
 
 ## Solving Model
 
+Principal square roots can be isolated recursively when the target has a known
+value in the principal square root's range. Squaring preserves nested exponentials
+and polynomial subexpressions; a negative real target is proved impossible instead
+of producing an extraneous root. An unknown target's branch restriction remains unresolved.
+Positive real constant bases other than one use the principal logarithmic inverse.
+A proposed integer exponent is accepted only after exact exponentiation verifies
+it; otherwise the logarithmic quotient is retained. Other complex logarithmic
+branches are not enumerated by this principal inverse.
+
+For example, this complete programme needs no starting value for `x`:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "equation-t.h"
+
+int main(void)
+{
+    equation_t *equation = equ_from_string("sqrt(7^x) = 49");
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    const equation_t *solution = equ_solutions_at(solutions, 0);
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    int status = text && puts(string_c_str(text)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+    string_free(text);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    return status;
+}
+```
+
+Output:
+
+```text
+x = 4
+```
+
 Open consecutive power series with a symbolic exponent are recognised natively
 and retained as sums with their convergence domain. Riemann or Hurwitz zeta
 identities are used internally only where the real part of the zeta argument

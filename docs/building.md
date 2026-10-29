@@ -3,6 +3,11 @@
 MARS uses `make` as its main build entry point. The supported and guaranteed
 build target is Linux with GCC or Clang.
 
+Make keeps compiler temporary files in the active build tree: `build/release/tmp`
+or `build/debug/tmp`. It creates the directory before compilation and dependency
+probes. An explicit `TMPDIR` still takes precedence. This avoids relying on spare
+space in the system temporary filesystem during a large build.
+
 ## Requirements
 
 ### Native maintenance applications
@@ -33,15 +38,47 @@ The `locales` command regenerates or verifies the maintained seed from pinned
 inputs under `tools/mars_config/data/`; see the
 [jurisdiction guide](jurisdiction.md) for its options and data provenance.
 
+The native configurator keeps encrypted settings access in a separate process during
+content-database work. The helper retains SQLCipher memory protection and the desktop
+key-store connection; copied settings and automatic path updates use a bounded private
+socket. Large plaintext image buffers therefore do not inherit SQLCipher's process-wide
+memory locking. An unavailable helper fails settings access without decrypting locally.
+
 Database installers build and validate private staged databases before publishing
 them. Existing databases and saved configuration are retained when validation
 fails. Database and configuration publication uses separate atomic renames with
 rollback on reported errors; the pair is not a crash-atomic filesystem
 transaction. Run installations serially and close database consumers first.
 Live source-byte progress bars and elapsed-time indicators distinguish measured
-imports from work without a known total. Redirected output receives periodic
+imports from work without a known total. Every measured bar displays completed/total counts with the
+appropriate unit: bytes processed, tiles imported, files prepared, river chunks processed, river points copied
+or calendar days generated. Source bytes are counted as they are processed, including the final line of a SQL
+file without a newline; read-ahead bytes are not reported as completed work. Redirected output receives periodic
 status lines instead of terminal animation. The desktop installer also labels
 its stages; progress never claims successful completion after a failed stage.
+Measured bars retain an animated activity marker while a single item is being processed. After enough
+observations, they show an approximate remaining time for the current source. Estimates reset when the source
+changes or a resumed count moves backwards, and are replaced by an unchanged-count duration if no count has
+advanced for five seconds. A full count awaiting stage completion is identified explicitly. Unmeasured stages
+state that no intermediate count is available; a reporting heartbeat alone does not prove that work is advancing.
+Expensive photograph preparation, import, finalisation and rollback stages explain their work above the live
+line. Extra timing detail is omitted when it cannot fit beside the counts on a narrow terminal.
+Photographic updates report table preparation before removing the previous image
+tables, then image import and finalisation. Preparation stays animated with elapsed
+time during blocking SQLite work; it has no estimated percentage. Image import shows the number of validated,
+inserted PNGs against the manifest total alongside the bar and percentage. The count includes global images
+and regional tiles, advances only after a successful insertion, and remains visible during finalisation.
+Managed updates also report the final database commit or restoration after a failure.
+Plaintext photographic globe migrations build a replacement beside the installed database. They copy the
+non-image tables and preserve their rowids, indexes, views, triggers, sequence counters and database metadata,
+then import the verified photographs once into new pages. The source is writer-locked until publication.
+The replacement uses 64 KiB pages, a bounded 64 MiB main cache and an 8 MiB source cache; rollback journalling
+and full commit synchronisation remain enabled. The completed file is synchronised and atomically renamed
+into place. Failure leaves the installed file unchanged. This needs temporary space for the complete replacement,
+but avoids journalling and rewriting the previous multi-gigabyte image catalogue. Each imported tile is validated;
+publication checks table counts, stored image lengths and foreign keys without rehashing all image bytes again.
+Other bulk map updates use a bounded 16 MiB page cache. Discarding public image and river tables temporarily
+disables SQLite's secure erasure, then restores its previous setting. Private settings protection is unchanged.
 Packaged SQL steps name the operation being performed, such as adding island
 locations or updating subdivision membership and location defaults. Import traces
 identify the corresponding packaged SQL filename.
@@ -328,6 +365,11 @@ Clean build outputs:
 ```sh
 make clean
 ```
+
+This removes `build`, `tests/build` and application build outputs. Installed databases, packaged
+textures and the ignored geographic source cache at `packaging/globe-db/source-cache/` are retained.
+Keep long-running geographic inputs and accepted candidates in that cache rather than in `build`.
+Stop the running Lab before cleaning; its executable and browser assets are build outputs.
 
 Install headers and libraries:
 

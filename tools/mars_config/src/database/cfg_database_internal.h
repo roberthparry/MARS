@@ -32,6 +32,40 @@ bool cfg_database_revision(sqlite_t *db, const char *name, int revision);
 /** Read the managed-data revision, returning zero for legacy databases without revision metadata. */
 bool cfg_database_current_revision(sqlite_t *db, const char *name, int64_t *revision);
 
+/**
+ * @brief Finish an installer-owned transaction with live commit or rollback reporting.
+ * @param[in] db Borrowed writable database with an active outer transaction; remains open.
+ * @param[in] success True commits completed work; false requests restoration without committing.
+ * @return True only after a successful commit. False preserves an earlier failure or reports
+ * a failed commit, after attempting rollback. A NULL database returns false without SQL work.
+ * @note Database installers use this helper serially after their stage reporters have finished.
+ * Progress allocation failure does not prevent database work. No argument is retained or consumed.
+ * Rollback reporting reflects its own result; callers remain responsible for handling update failure.
+ */
+bool cfg_database_finish_transaction(sqlite_t *db, bool success);
+
+/**
+ * @brief Execute trusted public-asset DDL without zero-overwriting discarded pages.
+ * @param[in] db Borrowed writable database; serialise access for the complete call.
+ * @param[in] sql Borrowed trusted SQL for public map or photographic tables only; never user input.
+ * @return True after execution and restoration of the previous secure-delete setting; false on failure.
+ * @note The original OFF, ON or FAST setting is restored even when the supplied SQL fails. Journaling,
+ * durability and enclosing transactions remain enabled. This helper is unsuitable for private settings
+ * or secrets. Arguments are neither consumed nor retained, and the database remains open.
+ */
+bool cfg_database_public_ddl(sqlite_t *db, const char *sql);
+
+/**
+ * @brief Prepare a new plaintext candidate containing complete river-class waterways.
+ * @param[in] source Borrowed existing OSM centreline database, used only as a read source.
+ * @param[in] output Borrowed path for a new candidate; existing paths are rejected.
+ * @return True after a validated, committed candidate is available; false on invalid data or I/O failure.
+ * @note Retains every kind-1 chunk, coordinate, anchor and spatial bound, including tributaries. Other
+ * centreline classes are omitted. The source remains open and unchanged; no installed database is opened.
+ * Call serially with no other transaction or attachment on source. No argument is consumed or retained.
+ */
+bool cfg_database_select_main_rivers(sqlite_t *source, const string_t *output);
+
 /** Refresh versioned geography and textures using a caller-owned staging directory; retain rivers and credentials. */
 bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging);
 
@@ -40,6 +74,49 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root);
 
 /** @brief Validate the complete installed photographic image set, including content digests. */
 bool cfg_database_textures_valid(sqlite_t *db);
+
+/**
+ * @brief Copy every non-photographic table from the attached previous globe into an empty main database.
+ * @param[in,out] db Borrowed plaintext staging connection with an active transaction and a previous attachment.
+ * @return True after all table values and row counts have been preserved; false leaves publication to the caller.
+ * @note The caller must hold the source writer lock. Values, rowids and virtual-table rows are copied through
+ * public SQL; generated columns are recomputed. No input is retained or consumed. Use serially.
+ */
+bool cfg_database_copy_globe(sqlite_t *db);
+
+/**
+ * @brief Recreate preserved indexes, views, triggers and sequence state after table and image insertion.
+ * @param[in,out] db Borrowed staging connection used by cfg_database_copy_globe(), with the previous attachment.
+ * @return True after auxiliary schema is preserved; false on incompatible or invalid schema.
+ * @note Run before committing and after all data has been copied, so triggers cannot replay during copying.
+ * The connection remains caller-owned; no argument is retained or consumed.
+ */
+bool cfg_database_copy_globe_schema(sqlite_t *db);
+
+/**
+ * @brief Require an existing destination to have no journal, WAL or shared-memory sidecar files.
+ * @param[in] destination Borrowed closed file handle; never consumed or retained.
+ * @return True when all sidecars are absent; false on presence, unsafe paths or metadata errors.
+ * @note Call under the destination writer guard before atomic publication. Never removes a sidecar.
+ */
+bool cfg_database_no_sidecars(file_t *destination);
+
+/**
+ * @brief Rebuild a plaintext globe beside its destination and atomically publish only a validated replacement.
+ * @param[in,out] source Owned existing connection pointer; closed and set to NULL on entry. No active transaction
+ * or statement may belong to it. The replacement uses its own writer guard on the destination.
+ * @param[in] path Borrowed existing destination path; must identify a regular plaintext database.
+ * @param[in] root Borrowed resource root, passed to apply without retention.
+ * @param[in] staging Borrowed empty installer-owned directory on the destination filesystem.
+ * @param[in] apply Borrowed migration callback operating only on the new staged connection.
+ * @param[in] revision Expected final globe revision, checked under the source writer lock.
+ * @param[in] force True reruns apply at the expected revision; false treats an already completed migration as success.
+ * @return True after publication or an already completed migration; false preserves the installed database.
+ * @note Source data, including unrelated tables and rowids, survives. Old images are not copied. Cache use is
+ * bounded; SQLite journalling and full synchronisation remain enabled. Call serially with consumers closed.
+ */
+bool cfg_database_rebuild_globe(sqlite_t **source, const string_t *path, const string_t *root, const string_t *staging,
+                               bool (*apply)(sqlite_t *, const string_t *, const string_t *), int revision, bool force);
 
 /** Shared installer-owned settings; callbacks borrow these strings and never publish them directly. */
 typedef struct cfg_database_options {

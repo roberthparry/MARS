@@ -12,10 +12,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define MARS_CFG_CALENDAR_INTERNAL_ACCESS
-#include "cfg_calendar_internal.h"
 #include "datetime-t.h"
 #include "jurisdiction-t.h"
+#define MARS_CFG_CALENDAR_INTERNAL_ACCESS
+#include "cfg_calendar_internal.h"
 
 typedef struct {
     sqlite_stmt_t *label;
@@ -117,11 +117,14 @@ static bool cfg_calendar_settings(sqlite_t *db, const cfg_calendar_place_t *plac
     return ok;
 }
 
-static bool cfg_calendar_days(sqlite_t *db, int last_year, const bool *weekends, long *expected)
+static bool cfg_calendar_days(sqlite_t *db, int last_year, const bool *weekends, long *expected,
+                              cfg_progress_t *progress)
 {
     datetime_t *day = datetime_alloc();
     long first = datetime_ymd_to_jdn(2015, 1, 1), last = datetime_ymd_to_jdn((short)last_year, 12, 31);
     *expected = last - first + 1;
+    static const char label[] = "Generating local calendar";
+    cfg_progress_update_items(progress, label, 0, (uint64_t)*expected, "days generated");
     sqlite_stmt_t *write = sqlite_stmt_prepare(
         db, "INSERT INTO calendar_local_days(calendar_date,holiday_name,is_weekend,utc_offset_hours) "
             "VALUES(?1,?2,?3,?4)");
@@ -153,6 +156,8 @@ static bool cfg_calendar_days(sqlite_t *db, int last_year, const bool *weekends,
              sqlite_stmt_bind_double(write, 4, offset) && sqlite_stmt_step(write) == SQLITE_STEP_DONE;
         string_free(names);
         string_free(date);
+        if (ok) cfg_progress_update_items(progress, label, (uint64_t)(jdn - first + 1), (uint64_t)*expected,
+                                          "days generated");
     }
     sqlite_stmt_finalize(read);
     sqlite_stmt_finalize(write);
@@ -175,7 +180,7 @@ static bool cfg_calendar_validate(sqlite_t *db, long expected)
 
 /* Expand first, then replace under a savepoint and validate every date rendering. */
 bool cfg_calendar_snapshot(sqlite_t *db, const string_t *path, const string_t *key, const cfg_calendar_place_t *place,
-                           const string_t *locale)
+                           const string_t *locale, cfg_progress_t *progress)
 {
     cfg_calendar_environment_t timezone = {0};
     bool ok = cfg_calendar_zone_enter(place->timezone, &timezone);
@@ -192,7 +197,7 @@ bool cfg_calendar_snapshot(sqlite_t *db, const string_t *path, const string_t *k
          sqlite_exec_cstr(db, "DELETE FROM calendar_local_days; DELETE FROM calendar_local_settings;") &&
          cfg_calendar_settings(db, place, locale, last_year);
     long expected = 0;
-    ok = ok && cfg_calendar_days(db, last_year, weekends, &expected) && cfg_calendar_validate(db, expected);
+    ok = ok && cfg_calendar_days(db, last_year, weekends, &expected, progress) && cfg_calendar_validate(db, expected);
     /* Restore process state before committing, so a restoration failure also rolls back. */
     bool restored = cfg_calendar_restore(&timezone);
     tzset();

@@ -9,7 +9,7 @@
 /** @brief Serve controlled HTTP responses inside real drawing workers; other worker types are unchanged. */
 function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Response>,
                           options: {endpoint: string; script: string; nativeShore: boolean; storageDenied?: boolean;
-                                    surfaceProbe?: boolean} =
+                                    surfaceProbe?: boolean; regionalAliases?: boolean} =
                               {endpoint: '/almanac-globe', script: '/js/globe_worker.js', nativeShore: true}): {
     Worker: typeof Worker; releaseSurfaceCache(): void; dispose(): void;
 } {
@@ -41,6 +41,9 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                 if (photographs.has(url)) throw new Error('Photograph decoded repeatedly');
                 photographs.add(url);
             }
+            if (${Boolean(options.regionalAliases)} &&
+                (url === '/earth_regions/123.png' || url === '/earth_regions/4095.png'))
+                return networkFetch(new URL('/earth_regions/01.png', ${JSON.stringify(location.origin)}), options);
             if (url !== ${JSON.stringify(options.endpoint)}) return networkFetch(new URL(url, ${JSON.stringify(location.origin)}), options);
             return new Promise((resolve, reject) => {
                 const id = ++next;

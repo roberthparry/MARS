@@ -491,7 +491,8 @@
       "example_equation_kepler": true,
       "example_equation_output_form": true,
       "example_equation_quadratic_solve": true,
-      "example_equation_sextic_solve": true
+      "example_equation_sextic_solve": true,
+      "example_equation_root_inverse": true
     },
     "tests": {
       "enabled": true,
@@ -570,7 +571,9 @@
         "test_equation_future_simplifies_schoolbook_periodic_sin_families": true,
         "test_equation_future_simplifies_schoolbook_periodic_tan_families": true,
         "test_equation_future_solves_sin_family": true
-      }
+      },
+      "test_equation_inverts_roots_and_constant_powers": true,
+      "test_equation_preserves_principal_root_domain": true
     }
   },
   "tests/executor/test_executor.c": {
@@ -2789,8 +2792,7 @@
       "docs_TeX_009": true,
       "docs_TeX_010": true,
       "docs_TeX_011": true,
-      "docs_TeX_012": true,
-      "docs_TeX_013": true
+      "docs_TeX_012": true
     }
   },
   "tools/mars_checks/tests/test_checks_build.c": {
@@ -2949,7 +2951,10 @@
       "test_cfg_database_sardinia": true,
       "test_cfg_database_stream": true,
       "test_cfg_database_trace": true,
-      "test_cfg_database_update": true
+      "test_cfg_database_update": true,
+      "test_cfg_database_globe_plain": true,
+      "test_cfg_database_transaction_finish": true,
+      "test_cfg_database_public_ddl": true
     }
   },
   "tools/mars_config/tests/test_cfg_locales.c": {
@@ -2985,7 +2990,8 @@
     "tests": {
       "enabled": true,
       "test_cfg_paths_relocation": true,
-      "test_cfg_settings_import": true
+      "test_cfg_settings_import": true,
+      "test_cfg_settings_isolation": true
     }
   },
   "tools/mars_config/tests/test_cfg_progress.c": {
@@ -3026,7 +3032,8 @@
       "test_cfg_rivers_stage": true,
       "test_cfg_rivers_storage_budget": true,
       "test_cfg_rivers_storage_chunks": true,
-      "test_cfg_rivers_storage_detail": true
+      "test_cfg_rivers_storage_detail": true,
+      "test_cfg_rivers_main_selection": true
     }
   },
   "tools/mars_config/tests/test_cfg_storage.c": {
@@ -3051,7 +3058,9 @@
       "enabled": true,
       "test_cfg_textures_install": true,
       "test_cfg_textures_migration": true,
-      "test_cfg_textures_rollback": true
+      "test_cfg_textures_rollback": true,
+      "test_cfg_textures_manifest": true,
+      "test_cfg_textures_staged": true
     }
   },
   "tools/mars_config/tests/test_cfg_weather.c": {
@@ -3204,7 +3213,8 @@
       "test_lab_extra_surface_slices": true,
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,
-      "test_lab_extra_unsafe_TeX_input": true
+      "test_lab_extra_unsafe_TeX_input": true,
+      "test_lab_extra_nested_root_equation": true
     }
   },
   "tools/mars_lab/tests/test_lab_forms.c": {
@@ -3984,6 +3994,19 @@
       "test_TeX_context_calculus": true,
       "test_TeX_native_aggregate_contexts": true,
       "test_TeX_compact_symbol_lookups": true
+    }
+  },
+  "tests/webgl/test_webgl.c": {
+    "tests": {
+      "enabled": true,
+      "test_globe_cap_has_no_application_zoom_policy": true,
+      "test_webgl_texture_unit_is_caller_owned": true
+    }
+  },
+  "tools/mars_lab/tests/satellite/test_satellite_mask.c": {
+    "tests": {
+      "enabled": true,
+      "test_satellite_coastal_mask": true
     }
   }
 }

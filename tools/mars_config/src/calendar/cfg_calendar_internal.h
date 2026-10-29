@@ -17,6 +17,7 @@
 #include <time.h>
 
 #include "array-t.h"
+#include "cfg_progress.h"
 #include "cfg_calendar.h"
 
 /** @brief Owned, fully resolved calendar location. */
@@ -83,9 +84,19 @@ string_t *cfg_calendar_choose_language(sqlite_t *db, const cfg_calendar_place_t 
 /** @brief Build indexed, precedence-aware native-event label translations. */
 bool cfg_calendar_labels(sqlite_t *db, const string_t *jurisdiction, const string_t *locale);
 
-/** @brief Expand native policies and atomically replace the validated daily calendar snapshot. */
+/**
+ * @brief Expand native policies and atomically replace the validated daily calendar snapshot.
+ * @param[in,out] db Borrowed staging connection; remains open and caller-owned.
+ * @param[in] path Borrowed staging database path used by the jurisdiction engine during the call.
+ * @param[in] key Borrowed database credential, never printed or retained beyond the call.
+ * @param[in] place Borrowed resolved location; its fields remain caller-owned.
+ * @param[in] locale Borrowed locale selection; remains caller-owned.
+ * @param[in,out] progress Optional borrowed reporter for completed/total generated days; NULL suppresses reporting.
+ * The caller owns and finishes the reporter after this call. Use it serially on the calling thread.
+ * @return True after complete validated replacement; false preserves the earlier snapshot under its savepoint.
+ */
 bool cfg_calendar_snapshot(sqlite_t *db, const string_t *path, const string_t *key, const cfg_calendar_place_t *place,
-                           const string_t *locale);
+                           const string_t *locale, cfg_progress_t *progress);
 
 /** @brief Fill temporary events and caller-owned (last-first+1)*7 Monday-first weekend flags using prepared labels. */
 bool cfg_calendar_policy(sqlite_t *db, const string_t *path, const string_t *key, const cfg_calendar_place_t *place,

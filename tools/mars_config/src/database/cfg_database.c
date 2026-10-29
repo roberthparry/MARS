@@ -5,7 +5,8 @@
  * Owns setting precedence, explicit storage-mode selection, streaming SQL imports, staging and
  * rollback-safe publication. Dispatches to the almanac and jurisdiction policies;
  * the combined installer preserves each database's individually configured mode.
- * Release preparation installs missing stores and migrates existing ones without rebuilding them.
+ * Release preparation installs missing stores and migrates existing ones. Photographic globe updates build a
+ * replacement file while preserving unrelated installed data, avoiding journal copies of previous image pages.
  *
  * Fixed-size file-module reads preserve UTF-8 SQL in string_t. SQLCipher checks
  * statement completeness, including quotes, comments and trigger bodies. Input
@@ -57,6 +58,7 @@ typedef struct cfg_database_migration {
     int revision;
     bool (*apply)(sqlite_t *, const string_t *, const string_t *);
     const cfg_database_profile *profile;
+    bool rebuild_globe;
 } cfg_database_migration;
 
 static int cfg_database_install(const cfg_database_profile *profile, const char *path, const char *key,
@@ -89,6 +91,45 @@ bool cfg_database_current_revision(sqlite_t *db, const char *name, int64_t *revi
     if (step == SQLITE_STEP_ROW) *revision = sqlite_stmt_column_int64(stmt, 0);
     sqlite_stmt_finalize(stmt);
     return (step == SQLITE_STEP_ROW || step == SQLITE_STEP_DONE) && *revision >= 0;
+}
+
+/* Keep commit and restoration visible without changing the caller's update outcome. */
+bool cfg_database_finish_transaction(sqlite_t *db, bool success)
+{
+    if (!db) return false;
+    cfg_progress_t *progress = cfg_progress_start(
+        success ? "Finalising database update" : "Restoring previous database");
+    cfg_progress_explain(progress, success ?
+        "Saving the complete update to disk. This database step has no intermediate item count." :
+        "Restoring the previous data. Large updates can take time to roll back.");
+    if (success) {
+        bool committed = sqlite_exec_cstr(db, "commit");
+        cfg_progress_finish(progress, committed);
+        if (committed) return true;
+        progress = cfg_progress_start("Restoring previous database");
+        cfg_progress_explain(progress, "Restoring the previous data. Large updates can take time to roll back.");
+    }
+    bool restored = sqlite_exec_cstr(db, "rollback");
+    cfg_progress_finish(progress, restored);
+    return false;
+}
+
+/* Public map assets need transactional replacement, without erasing every discarded image or coordinate page. */
+bool cfg_database_public_ddl(sqlite_t *db, const char *sql)
+{
+    if (!db || !sql) return false;
+    sqlite_stmt_t *query = sqlite_stmt_prepare(db, "pragma secure_delete");
+    int previous = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW ? sqlite_stmt_column_int(query, 0) : -1;
+    sqlite_stmt_finalize(query);
+    static const char *const restore[] = {
+        [0] = "pragma secure_delete=off",
+        [1] = "pragma secure_delete=on",
+        [2] = "pragma secure_delete=fast"
+    };
+    if (previous < 0 || previous > 2 || !sqlite_exec_cstr(db, "pragma secure_delete=off")) return false;
+    bool executed = sqlite_exec_cstr(db, sql);
+    bool restored = sqlite_exec_cstr(db, restore[previous]);
+    return executed && restored;
 }
 
 static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root, const string_t *staging)
@@ -124,23 +165,27 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
     sqlite_t *db = cfg_database_open(path, key);
     int64_t revision = 0;
     if (ok && exists)
-        ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-512; PRAGMA temp.cache_size=-512;") &&
+        ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-16384; PRAGMA temp.cache_size=-512;") &&
              cfg_database_current_revision(db, migration->name, &revision) && revision <= migration->revision;
     if (ok && exists && revision < migration->revision) {
         string_t *root = string_new();
         string_t *parent = cfg_storage_parent(path);
         string_t *staging = parent ? cfg_database_stage(parent) : NULL;
-        bool transaction = root && staging && sqlite_exec_cstr(db, "begin immediate");
+        bool staged_update = root && staging && migration->rebuild_globe && key && !string_byte_length(key) && revision >= 9;
+        if (staged_update) {
+            printf("Updating %s database to managed-data revision %d...\n", migration->name, migration->revision);
+            ok = cfg_database_rebuild_globe(&db, path, root, staging, migration->apply, migration->revision, false);
+        }
+        bool transaction = !staged_update && root && staging && sqlite_exec_cstr(db, "begin immediate");
         /* Recheck under the writer lock so simultaneous releases cannot apply a migration twice. */
-        ok = transaction && cfg_database_current_revision(db, migration->name, &revision) &&
-             revision <= migration->revision;
-        if (ok && revision < migration->revision) {
+        if (!staged_update) ok = transaction && cfg_database_current_revision(db, migration->name, &revision) &&
+                           revision <= migration->revision;
+        if (!staged_update && ok && revision < migration->revision) {
             printf("Updating %s database to managed-data revision %d...\n", migration->name, migration->revision);
             ok = migration->apply && migration->apply(db, root, staging) &&
                  cfg_database_revision(db, migration->name, migration->revision);
         }
-        if (ok) ok = sqlite_exec_cstr(db, "commit");
-        if (!ok && transaction) sqlite_exec_cstr(db, "rollback");
+        if (transaction) ok = cfg_database_finish_transaction(db, ok);
         cfg_database_cleanup(staging);
         string_free(staging); string_free(parent); string_free(root);
     }
@@ -162,10 +207,10 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
 static int cfg_databases_prepare(bool install_missing)
 {
     static const cfg_database_migration migrations[] = {
-        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 12, cfg_database_globe_refresh, NULL},
-        {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac},
+        {"globe", "MARS_GLOBE_DB_PATH", "MARS_GLOBE_DB_KEY", "globe/globe.db", 15, cfg_database_globe_refresh, NULL, true},
+        {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac, false},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 10, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction},
+         "jurisdiction/mars_jurisdiction_rules.db", 10, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)
@@ -650,7 +695,7 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
     char *line = malloc(cfg_database_line_limit);
     bool ok = file && pending && line && file_open_read(file);
     char chunk[16384];
-    size_t used = 0, count = 0, bytes_read = 0, line_number = 1;
+    size_t used = 0, count = 0, bytes_read = 0, bytes_processed = 0, line_number = 1;
     while (ok) {
         ok = file_read(file, chunk, sizeof(chunk), &count);
         if (!ok || !count)
@@ -665,12 +710,14 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
             line[used++] = chunk[i];
             if (chunk[i] == '\n') {
                 ok = cfg_database_sql_line(db, root, pending, &values, &lexer, line, used, depth, progress);
-                if (ok)
+                if (ok) {
                     ++line_number;
+                    bytes_processed += used;
+                }
                 used = 0;
             }
         }
-        cfg_progress_update(progress, progress_label, bytes_read - used, total);
+        cfg_progress_update(progress, progress_label, bytes_processed, total);
     }
     if (ok && used)
         ok = cfg_database_sql_line(db, root, pending, &values, &lexer, line, used, depth, progress);
@@ -681,6 +728,7 @@ static bool cfg_database_sql_file(sqlite_t *db, const string_t *root, const stri
         ok = cfg_database_execute(db, &values, string_c_str(pending));
     if (file && file_is_open(file))
         ok = file_close(file) && ok;
+    if (ok) cfg_progress_update(progress, progress_label, bytes_read, total);
     if (!ok)
         fprintf(stderr, "SQL import failed: source=%s line=%zu (read, syntax or import-limit failure)\n",
                 label, line_number);
@@ -765,8 +813,10 @@ void cfg_database_cleanup(const string_t *staging)
     file_free(folder);
 }
 
-static bool cfg_database_no_sidecars(file_t *destination)
+/* Publication must not replace a database while any SQLite sidecar still belongs to its pathname. */
+bool cfg_database_no_sidecars(file_t *destination)
 {
+    if (!destination) return false;
     static const char *const suffixes[] = {"-journal", "-wal", "-shm"};
     bool ok = true;
     for (size_t i = 0; i < sizeof(suffixes) / sizeof(*suffixes) && ok; ++i) {

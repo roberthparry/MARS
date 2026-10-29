@@ -22,6 +22,7 @@
 #include <zlib.h>
 
 #include "array-t.h"
+#include "globe-t.h"
 #include "json-t.h"
 #include "string-t.h"
 #include "file-t.h"
@@ -142,7 +143,7 @@ static string_t *retain_regions(file_t *output, const string_t *text)
     bool ok = next && assets && regions_key && assets_key && (!previous || old);
     if (regions) {
         size_t count = json_array_size(regions);
-        ok = ok && json_type(regions) == JSON_ARRAY && count <= 64 && json_object_set(next, regions_key, regions);
+        ok = ok && json_type(regions) == JSON_ARRAY && count <= GLOBE_TEXTURE_REGION_LIMIT && json_object_set(next, regions_key, regions);
         for (size_t i = 0; ok && i < count; ++i) {
             string_t *key = string_sprintf("regional/%02u.png", (unsigned)i);
             const json_t *asset = key ? json_object_get(old_assets, key) : NULL;

@@ -476,6 +476,12 @@ static int equ_derive_symbolic_solutions(const equation_t *equation, expr_bindin
             rc = -1;
             goto cleanup;
         }
+        if (partial.status == EQUATION_SOLVE_NO_SOLUTIONS) {
+            equ_solutions_clear(solutions);
+            solutions->status = EQUATION_SOLVE_NO_SOLUTIONS;
+            equ_solutions_clear(&partial);
+            goto cleanup;
+        }
         if (partial.count > 0u && equ_merge_solutions(solutions, &partial) != 0)
             rc = -1;
         equ_solutions_clear(&partial);
@@ -519,9 +525,17 @@ static const char *equ_branch_parameter_name(const equation_t *equation)
     return "r";
 }
 
+/* Match using the candidate's precision, independent of when an immortal constant was first evaluated. */
+static bool equ_matches_constant(number_t value, number_t constant)
+{
+    number_t expected = num_const_prec(constant, num_get_effective_prec_bits(value));
+    bool matches = num_is_finite(value) && num_eq(value, expected);
+    num_destroy(&expected);
+    return matches;
+}
+
 static int equ_try_solve_symbolic_affine(const expr_t *residual, const expr_t *wrt, equation_solutions_t *solutions);
 static int equ_try_solve_unary_periodic(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
-static int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 static int equ_try_solve_atan_sum(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 static int equ_try_solve_self_power(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions);
 static number_t equ_quadratic_discriminant(number_t constant, number_t linear, number_t quadratic);
@@ -1469,7 +1483,7 @@ static int equ_try_solve_periodic_trig_kind(equ_periodic_trig_kind_t kind, const
 
         case EQU_PERIODIC_TRIG_TAN: {
             number_t target_value = num_new();
-            bool is_sqrt_three = expr_match_const_value(target, &target_value) && num_eq(target_value, NUM_SQRT3);
+            bool is_sqrt_three = expr_match_const_value(target, &target_value) && equ_matches_constant(target_value, NUM_SQRT3);
 
             num_destroy(&target_value);
             if (is_sqrt_three) {
@@ -1546,70 +1560,6 @@ static int equ_try_solve_unary_periodic(const equation_t *equation, const expr_t
         return rc;
     return equ_try_solve_unary_periodic_side(equation->rhs, equation->lhs, wrt,
                                              equ_branch_parameter_name(equation), solutions);
-}
-
-typedef enum { EQU_UNARY_INVERSE_EXP, EQU_UNARY_INVERSE_LOG } equ_unary_inverse_kind_t;
-
-static expr_t *equ_unary_inverse_rhs(equ_unary_inverse_kind_t kind, const expr_t *rhs)
-{
-    switch (kind) {
-        case EQU_UNARY_INVERSE_EXP:
-            return rhs ? expr_simplify_owned(expr_log(rhs)) : NULL;
-        case EQU_UNARY_INVERSE_LOG:
-            return rhs ? expr_simplify_owned(expr_exp(rhs)) : NULL;
-        default:
-            return NULL;
-    }
-}
-
-static int equ_try_solve_unary_inverse_side(const expr_t *lhs, const expr_t *rhs, const expr_t *wrt,
-                                            equation_solutions_t *solutions)
-{
-    const expr_t *inner = NULL;
-    expr_t *inverse_rhs = NULL;
-    equation_t *reduced = NULL;
-    int rc = 1;
-
-    if (!lhs || !rhs || !wrt || !solutions)
-        return -1;
-    if (!equ_expr_uses_wrt(lhs, wrt) || equ_expr_uses_wrt(rhs, wrt))
-        return 1;
-
-    if (expr_match_exp_expr(lhs, &inner))
-        inverse_rhs = equ_unary_inverse_rhs(EQU_UNARY_INVERSE_EXP, rhs);
-    else if (expr_match_log_expr(lhs, &inner))
-        inverse_rhs = equ_unary_inverse_rhs(EQU_UNARY_INVERSE_LOG, rhs);
-    else
-        return 1;
-
-    if (!inverse_rhs)
-        return -1;
-
-    reduced = equ_new(inner, inverse_rhs);
-    if (!reduced) {
-        rc = -1;
-        goto cleanup;
-    }
-
-    rc = equ_solve_for_into(reduced, wrt, solutions);
-
-cleanup:
-    equ_free(reduced);
-    expr_free(inverse_rhs);
-    return rc;
-}
-
-static int equ_try_solve_unary_inverse(const equation_t *equation, const expr_t *wrt, equation_solutions_t *solutions)
-{
-    int rc;
-
-    if (!equation || !wrt || !solutions)
-        return -1;
-
-    rc = equ_try_solve_unary_inverse_side(equation->lhs, equation->rhs, wrt, solutions);
-    if (rc != 1)
-        return rc;
-    return equ_try_solve_unary_inverse_side(equation->rhs, equation->lhs, wrt, solutions);
 }
 
 static bool equ_expr_is_self_power(const expr_t *expr, const expr_t *wrt)
@@ -2021,12 +1971,7 @@ cleanup:
 static bool equ_expr_is_pi_over_four(const expr_t *expr)
 {
     number_t value = expr ? expr_eval(expr) : num_new();
-    number_t four = num_create_from_long(4L);
-    number_t expected = num_div(NUM_PI, four);
-    bool matches = num_is_finite(value) && num_eq(value, expected);
-
-    num_destroy(&expected);
-    num_destroy(&four);
+    bool matches = equ_matches_constant(value, NUM_PI_4);
     num_destroy(&value);
     return matches;
 }
@@ -2534,7 +2479,8 @@ static equation_solutions_t *equ_derive_solutions_impl(const equation_t *equatio
         seeded = seeded && num_is_finite(value);
         num_destroy(&value);
     }
-    if (equ_solutions_count(solutions) == 0u && variables > 0u && (variables == 1u || seeded)) {
+    if (!equ_solutions_proven_empty(solutions) && equ_solutions_count(solutions) == 0u &&
+        variables > 0u && (variables == 1u || seeded)) {
         int search_rc = equ_try_search_zeta_roots(equation, solutions);
 
         if (search_rc < 0)

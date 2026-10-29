@@ -405,6 +405,10 @@ class LabDOMBridge {
 
     /** @brief Host imports for the native DOM ABI; captured handles are valid only during the owning synchronous call. */
     public readonly env: Record<string, (...args: number[]) => unknown> = {
+        lab_webgl_host_call: (host, operation, a, b, c, d) => {
+            const backend = this.values[host] as {invoke: (op: number, a: number, b: number, c: number, d: number) => number};
+            return backend.invoke(operation, a, b, c, d);
+        },
         // --- Handle lifecycle ---
         lab_dom_mark: () => this.values.length,
         lab_dom_release: mark => {

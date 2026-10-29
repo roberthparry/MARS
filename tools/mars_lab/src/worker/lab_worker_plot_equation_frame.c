@@ -18,7 +18,7 @@ typedef struct {
     expr_t *sides[2];
     expr_t *axes[2];
     double xmin, xmax, ymin, ymax, root_min, root_max;
-    bool found, roots;
+    bool found, roots, turning;
 } equation_frame_t;
 
 static void feature(equation_frame_t *frame, double x, bool root)
@@ -67,6 +67,7 @@ static void collect(equation_frame_t *frame, const sampler_t *samples, bool resi
         bool connected = previous && !p->break_before;
         bool turning = p->stationary || (connected && num_is_zero(p->dy) &&
                        num_is_real(previous->dy) && num_is_finite(previous->dy) && !num_is_zero(previous->dy));
+        frame->turning |= turning;
         if (turning || (residual && !y))
             feature(frame, x, residual && !y);
         if (residual && connected) {
@@ -79,6 +80,35 @@ static void collect(equation_frame_t *frame, const sampler_t *samples, bool resi
         }
         previous = p;
     }
+}
+
+static bool viewport(equation_frame_t *frame, double lo, double hi, bool horizontal, number_t bounds[4])
+{
+    if (!frame->found)
+        return false;
+    double padding = fmax((frame->xmax - frame->xmin) * 0.15, (hi - lo) * 0.05);
+    double xmin = horizontal ? fmax(lo, frame->xmin - padding) : lo;
+    double xmax = horizontal ? fmin(hi, frame->xmax + padding) : hi;
+    /* A monotonic crossing alone has almost no vertical spread. Include both sides at the visible edges,
+     * while retaining the feature-led clipping used when actual turning points are present. */
+    if (frame->roots && !frame->turning) {
+        feature(frame, xmin, false);
+        feature(frame, xmax, false);
+    }
+    double centre = frame->roots ? frame->root_min / 2 + frame->root_max / 2 : frame->ymin / 2 + frame->ymax / 2;
+    double radius = fmax(centre - frame->ymin, frame->ymax - centre) * 1.1;
+    if (!isfinite(centre) || !isfinite(radius))
+        return false;
+    if (radius <= 0)
+        radius = fmax(1, fabs(centre) * 0.05);
+    double values[] = {xmin, xmax, centre - radius, centre + radius};
+    if (!isfinite(values[2]) || !isfinite(values[3]) || values[2] >= values[3])
+        return false;
+    for (unsigned i = 0; i < 4; ++i) {
+        num_destroy(&bounds[i]);
+        bounds[i] = num_create_from_double(values[i]);
+    }
+    return true;
 }
 
 /* Derive a padded feature viewport without altering either mathematical side. */
@@ -108,29 +138,12 @@ bool lab_worker_plot_equation_frame(const expr_t *const *sides, char *const *sou
             collect(&frame, samples, i == 2);
         sampler_free(samples);
     }
+    bool framed = ok && viewport(&frame, lo, hi, horizontal, bounds);
     for (unsigned i = 0; i < 2; ++i) {
         expr_free(frame.sides[i]);
         expr_bindings_free(bindings[i]);
     }
     expr_free(difference);
     free(residual);
-    if (!ok || !frame.found)
-        return false;
-    double centre = frame.roots ? frame.root_min / 2 + frame.root_max / 2 : frame.ymin / 2 + frame.ymax / 2;
-    double radius = fmax(centre - frame.ymin, frame.ymax - centre) * 1.1;
-    if (!isfinite(centre) || !isfinite(radius))
-        return false;
-    if (radius <= 0)
-        radius = fmax(1, fabs(centre) * 0.05);
-    double padding = fmax((frame.xmax - frame.xmin) * 0.15, (hi - lo) * 0.05);
-    double xmin = horizontal ? fmax(lo, frame.xmin - padding) : lo;
-    double xmax = horizontal ? fmin(hi, frame.xmax + padding) : hi;
-    double values[] = {xmin, xmax, centre - radius, centre + radius};
-    if (!isfinite(values[2]) || !isfinite(values[3]) || values[2] >= values[3])
-        return false;
-    for (unsigned i = 0; i < 4; ++i) {
-        num_destroy(&bounds[i]);
-        bounds[i] = num_create_from_double(values[i]);
-    }
-    return true;
+    return framed;
 }

@@ -5,7 +5,8 @@
  * The controller borrows independently selectable shoreline, map and town SQLite connections and owns layer readers.
  * Roads and buildings have explicit unavailable states until their regional dataset is implemented and installed.
  * No database migration, browser dependency or background network download is implied by opening a controller.
- * Classifies coordinates and streams clipped vector polygons using GSHHG rings in a borrowed SQLite
+ * Classifies coordinates, rejects uniform windows through conservative indexed coastline checks,
+ * and streams clipped vector polygons using GSHHG rings in a borrowed SQLite
  * database. The importer stores uncompressed coordinate chunks in BLOB pages with an integer R-tree.
  * The opaque globe_t owns prepared queries and borrows its database connection. Applications may share these
  * tables with other data, including the encrypted almanac catalogue. No astronomical
@@ -29,6 +30,8 @@
  * of country ownership; it is not a comprehensive water-name gazetteer.
  * Photographic textures are indexed PNG blobs with dimensions and SHA-256 identities. Metadata reads do not
  * decode or load the image; applications can validate cached responses before requesting the bounded payload.
+ * Pure view helpers provide orthographic projection and spherical-cap bounds without
+ * opening a database. Native and WASM clients share these geographic presentation calculations.
  */
 #ifndef MARS_GLOBE_H
 #define MARS_GLOBE_H
@@ -38,6 +41,30 @@
 
 /** @brief Opaque geographic controller, borrowing its database connections. */
 typedef struct _globe_t globe_t;
+
+/** @brief Maximum regional photographic catalogue size; pixel buffers remain independently bounded. */
+enum { GLOBE_TEXTURE_REGION_LIMIT = 4096 };
+
+/**
+ * @brief Project a geographic point through a row-major world-to-camera rotation.
+ * @param rotation Nine finite rotation components, normally from quaternion_matrix3.
+ * @param latitude Latitude in degrees within [-90,90].
+ * @param longitude Finite longitude in degrees.
+ * @param point Three output components: right, down and towards the observer; positive depth is visible.
+ * @return False for invalid inputs; output remains unchanged on failure.
+ */
+bool globe_view_project(const double rotation[9], double latitude, double longitude, double point[3]);
+
+/**
+ * @brief Derive the centre and geographic bounds of a camera-centred spherical cap.
+ * @param rotation Nine finite row-major world-to-camera rotation components.
+ * @param radius Angular radius in degrees within [0,90], selected by the caller.
+ * @param view Six outputs: latitude, longitude, west, south, east and north in degrees.
+ * @return False for invalid inputs; output remains unchanged on failure.
+ * @details Longitude bounds remain unwrapped across the date line; polar caps cover all meridians.
+ * Magnification limits and viewport padding are application responsibilities.
+ */
+bool globe_view_bounds(const double rotation[9], double radius, double view[6]);
 
 /** @brief Validated image metadata; level 0 is the overview, 1 global detail and 2 the twelve-by-six tile grid. */
 typedef struct _globe_texture_info_t {
@@ -114,6 +141,21 @@ typedef bool (*globe_path_fn)(globe_path_event_t event, double longitude, double
  */
 bool globe_surface_paths(globe_t *shoreline, double west, double south, double east, double north,
                      double tolerance, globe_path_fn visit, void *context);
+
+/**
+ * @brief Conservatively test whether indexed outer-coastline chunks may cross a geographic window.
+ * @param[in] globe Borrowed controller with an available shoreline database; serialise access.
+ * @param[in] bounds Borrowed west, south, east and north degrees. Values must be finite,
+ * with -180 <= west < east <= 180 and -90 <= south < north <= 90; split date-line windows first.
+ * @param[out] may_cross Required caller-owned result. False proves no outer coastline crosses
+ * the window; true includes possible false positives from chunk bounding rectangles.
+ * @return True after a successful indexed query; false on invalid input, unavailable data or
+ * database failure. The result is set to true on failure wherever the pointer is non-NULL.
+ * @note Does not classify the window as land or sea. With no crossing, a separate point
+ * classification can identify its uniform outer-coastline footprint. Inland lake boundaries
+ * are excluded. No polygon coordinates are loaded, and no argument is consumed or retained.
+ */
+bool globe_coastline_window(globe_t *globe, const double bounds[4], bool *may_cross);
 
 /**
  * @brief Prepare resident exact coordinates and display resolutions, optionally before workers fork.

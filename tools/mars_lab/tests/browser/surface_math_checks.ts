@@ -583,6 +583,21 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     const labelledGlobe = MarsAlmanacGlobe as unknown as {
         townLabel(place: GlobeTown, zoom: number, available: number): {name: string; full: string; width: number}
     };
+    const labelHost = document.createElement('div');
+    labelHost.className = 'almanac-globe';
+    document.body.append(labelHost);
+    try {
+        for (const name of ['Madrid', 'Anacapri', 'Los Angeles', 'Barton on Sea', 'Saint-Jean-de-Luz']) {
+            const label = labelledGlobe.townLabel({town: town(name, '40', '-3')} as GlobeTown, 512, 600);
+            const button = document.createElement('button');
+            button.className = 'globe-town selected';
+            button.textContent = `• ${label.name}`;
+            button.style.width = button.style.maxWidth = `${label.width}px`;
+            labelHost.append(button);
+            check(button.scrollWidth <= button.clientWidth,
+                  `town label fits its rendered text, padding and border without an ellipsis: ${name}`);
+        }
+    } finally { labelHost.remove(); }
     for (const [i, sourceName] of sourceNames.entries()) {
         const place = labDOM.call('lab_town_store_get', 'ZA', sourceName) as GlobeTown;
         const expected = i < 2 ? 'Heidelberg' : 'Newport (Harbour)';
@@ -591,7 +606,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
               'native display names hide GeoNames IDs without rewriting catalogue identity');
         for (const zoom of [3, 16]) {
             const label = labelledGlobe.townLabel(place, zoom, 600);
-            check(label.name === expected && label.full === expected && label.width > 20 && label.width <= 128,
+            check(label.name === expected && label.full === expected && label.width > 20 && label.width <= 220,
                   'globe markers and accessible names omit IDs without treating them as expanded names');
         }
     }
@@ -1509,6 +1524,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     const centre = Math.floor(globeCanvas.width / 2);
                     gl.readPixels(centre, centre, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, sea);
                     gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 1);
+                    gl.uniform1f(gl.getUniformLocation(program, 'riverInk'), 1);
                     gl.uniform1i(gl.getUniformLocation(program, 'riverComposite'), 0);
                     gl.activeTexture(gl.TEXTURE3);
                     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
@@ -1538,6 +1554,60 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                           'surveyed islands also cover the underlying SVG shoreline');
                     gl.uniform1i(gl.getUniformLocation(program, 'vectorReady'), Number(vectorReady));
                 }
+                const tintUniforms = ['shoreBounds', 'shoreTransform', 'shoreOffset'];
+                const tintSaved = tintUniforms.map(name => gl.getUniform(program, gl.getUniformLocation(program, name)!));
+                const tintShore = gl.getUniform(program, gl.getUniformLocation(program, 'naturalShore')!);
+                const tintBlend = gl.getUniform(program, gl.getUniformLocation(program, 'shoreBlend')!);
+                try {
+                    gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), 1);
+                    gl.uniform1f(gl.getUniformLocation(program, 'shoreBlend'), 1);
+                    gl.uniform4f(gl.getUniformLocation(program, 'shoreBounds'), -180, -90, 180, 90);
+                    gl.uniform4f(gl.getUniformLocation(program, 'shoreTransform'), 1, 0, 0, 1);
+                    gl.uniform3f(gl.getUniformLocation(program, 'shoreOffset'), 0, 0, globeCanvas.width);
+                    gl.uniform1i(gl.getUniformLocation(program, 'riverComposite'), 0);
+                    gl.activeTexture(gl.TEXTURE3);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                        new Uint8Array([255, 255, 255, 255]));
+                    const pixels: Uint8Array[] = [];
+                    for (const land of [0, 255]) {
+                        gl.activeTexture(gl.TEXTURE4);
+                        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                            new Uint8Array([land, land, land, 255]));
+                        gl.drawArrays(gl.TRIANGLES, 0, 6);
+                        const pixel = new Uint8Array(4), centre = Math.floor(globeCanvas.width / 2);
+                        gl.readPixels(centre, centre, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+                        pixels.push(pixel);
+                    }
+                    check(pixels[1][0] > pixels[0][0] + 4 && pixels[1][1] > pixels[0][1] + 4 &&
+                        pixels[1][2] < pixels[0][2],
+                        'inland river ink softens towards local terrain while coastal water keeps its sea palette');
+                } finally {
+                    gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), Number(tintShore));
+                    gl.uniform1f(gl.getUniformLocation(program, 'shoreBlend'), Number(tintBlend));
+                    gl.uniform4fv(gl.getUniformLocation(program, 'shoreBounds'), tintSaved[0] as Float32Array);
+                    gl.uniform4fv(gl.getUniformLocation(program, 'shoreTransform'), tintSaved[1] as Float32Array);
+                    gl.uniform3fv(gl.getUniformLocation(program, 'shoreOffset'), tintSaved[2] as Float32Array);
+                }
+                const previousVector = gl.getUniform(program, gl.getUniformLocation(program, 'vectorReady')!);
+                const previousShore = gl.getUniform(program, gl.getUniformLocation(program, 'naturalShore')!);
+                gl.uniform1i(gl.getUniformLocation(program, 'vectorReady'), 1);
+                gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), 0);
+                gl.uniform1i(gl.getUniformLocation(program, 'riverComposite'), 0);
+                gl.activeTexture(gl.TEXTURE3);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                              new Uint8Array([255, 255, 255, 255]));
+                const ink = new Uint8Array(4), fadedInk = new Uint8Array(4);
+                gl.uniform1f(gl.getUniformLocation(program, 'riverInk'), 1);
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+                gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, ink);
+                gl.uniform1f(gl.getUniformLocation(program, 'riverInk'), 0);
+                gl.drawArrays(gl.TRIANGLES, 0, 6);
+                gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, fadedInk);
+                check(ink[3] >= 250 && fadedInk[3] === 0,
+                      'stale minimum-width raster strokes can fade without discarding the retained photograph');
+                gl.uniform1f(gl.getUniformLocation(program, 'riverInk'), 1);
+                gl.uniform1i(gl.getUniformLocation(program, 'vectorReady'), Number(previousVector));
+                gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), Number(previousShore));
                 // Constant geographic coordinates isolate real shader grid coverage from projection and imagery.
                 gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 0);
                 gl.uniform3f(gl.getUniformLocation(program, 'camera'), -89.875, .125, 100);
@@ -2732,7 +2802,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
         }
         for (const entry of WebAssembly.Module.imports(module)) {
             const allowed = entry.name.startsWith('lab_host_') ||
-                (filename === 'lab_browser.wasm' && entry.name.startsWith('lab_dom_'));
+                (filename === 'lab_browser.wasm' &&
+                    (entry.name.startsWith('lab_dom_') || entry.name === 'lab_webgl_host_call'));
             check(entry.kind === 'function' && entry.module === 'env' && allowed,
                   filename + ' has unexpected host import: ' + entry.module + '.' + entry.name);
         }

@@ -12,6 +12,7 @@
 #include <math.h>
 
 #include "quaternion-t.h"
+#include "globe-t.h"
 #include "lab_dom.h"
 #include "lab_globe.h"
 
@@ -76,13 +77,10 @@ void lab_globe_rotate(quaternion_jsref orientation, double zoom, double dx, doub
 /* Return projected coordinates and front/back visibility from the same rotation used by the shader. */
 void lab_globe_project(double latitude, double longitude, quaternion_jsref orientation)
 {
-    double p = latitude * globe_radian, l = longitude * globe_radian, matrix[9];
-    double point[] = {cos(p) * sin(l), sin(p), cos(p) * cos(l)}, values[3] = {0};
+    double matrix[9], point[3];
     lab_surface_rotation(orientation, matrix);
-    for (unsigned row = 0; row < 3; ++row)
-        for (unsigned col = 0; col < 3; ++col) values[row] += matrix[row * 3 + col] * point[col];
-    values[1] = -values[1];
-    globe_result(values, 3);
+    if (globe_view_project(matrix, latitude, longitude, point)) globe_result(point, 3);
+    else lab_dom_return(0);
 }
 
 /* Reproject retained local vectors without scanning or reparsing any shoreline vertices. */
@@ -149,21 +147,15 @@ void lab_globe_grid(double latitude, double longitude, double zoom, double size)
 void lab_globe_view(quaternion_jsref orientation, double zoom, double factor)
 {
     if (!isfinite(zoom) || !isfinite(factor) || factor <= 0) { lab_dom_return(0); return; }
-    double matrix[9];
-    lab_surface_rotation(orientation, matrix);
-    double latitude = asin(fmax(-1, fmin(1, matrix[7]))) / globe_radian;
-    double longitude = globe_longitude(atan2(matrix[6], matrix[8]) / globe_radian);
     zoom = fmax(1, fmin(4096, zoom));
     zoom = fmax(1, fmin(4096, zoom * factor));
-    double span = asin(fmin(1, 1.6 / zoom)) / globe_radian;
-    double south = fmax(-90, latitude - span), north = fmin(90, latitude + span);
-    /* The viewport fits in this spherical cap. Its tangent meridians give the
-     * exact longitude extent; dividing by the cosine at its northern edge
-     * greatly over-fetches high-latitude views and can exhaust geometry budgets. */
-    double lon_span = south <= -90 || north >= 90 ? 180 :
-        asin(fmin(1, sin(span * globe_radian) / cos(latitude * globe_radian))) / globe_radian;
-    double values[] = {latitude, longitude, zoom, longitude - lon_span, south, longitude + lon_span, north};
-    globe_result(values, 7);
+    double matrix[9], cap[6];
+    lab_surface_rotation(orientation, matrix);
+    if (!globe_view_bounds(matrix, asin(fmin(1, 1.6 / zoom)) / globe_radian, cap)) {
+        lab_dom_return(0); return;
+    }
+    const double view[] = {cap[0], cap[1], zoom, cap[2], cap[3], cap[4], cap[5]};
+    globe_result(view, 7);
 }
 
 /* Select neighbouring source tiles without changing their photographic resolution. */

@@ -192,6 +192,7 @@ static bool lab_browser_run(const char *directory)
         }
         workers_ready = workers[i] > 0;
     }
+    workers_ready = workers_ready && lab_browser_texture_probe(lab_svr_port(server));
     pid_t child = -1;
     posix_spawnattr_t attr;
     bool attr_ready = !posix_spawnattr_init(&attr);

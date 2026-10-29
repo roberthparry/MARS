@@ -146,3 +146,44 @@ const char *webgl_mask_fragment_shader(void)
 {
     return "precision mediump float; uniform float shade; void main(){gl_FragColor=vec4(vec3(shade),1.);}";
 }
+
+/* Validate the entire frame before emitting any GPU state changes. */
+size_t webgl_mask_commands(const webgl_mask_batch_t *batches, size_t count, size_t vertices,
+                          webgl_mask_command_t *commands, size_t capacity)
+{
+    if (count > 16384 || vertices > 1048576 || vertices % 3 || (count && !batches)) return SIZE_MAX;
+    size_t required = 0;
+    for (size_t i = 0; i < count; ++i) {
+        const webgl_mask_batch_t *batch = batches + i;
+        if (batch->first % 3 || batch->count % 3 || batch->first > vertices ||
+            batch->count > vertices - batch->first || batch->colour > 1) return SIZE_MAX;
+        if (batch->count) required += 13;
+    }
+    if (!commands) return required;
+    if (capacity < required) return SIZE_MAX;
+    /* WebGL 1 enum values are part of its portable command ABI, not platform headers. */
+    enum { triangles = 4, front = 0x0404, back = 0x0405, always = 0x0207, not_equal = 0x0205,
+           keep = 0x1e00, increment_wrap = 0x8507, decrement_wrap = 0x8508, stencil_bit = 0x0400 };
+    size_t next = 0;
+    for (size_t i = 0; i < count; ++i) {
+        const webgl_mask_batch_t *batch = batches + i;
+        if (!batch->count) continue;
+        const webgl_mask_command_t pass[] = {
+            {WEBGL_MASK_BIND_XY, {0}},
+            {WEBGL_MASK_COLOUR_WRITE, {0}},
+            {WEBGL_MASK_STENCIL_FUNCTION, {always, 0, 255}},
+            {WEBGL_MASK_STENCIL_SEPARATE, {front, keep, keep, increment_wrap}},
+            {WEBGL_MASK_STENCIL_SEPARATE, {back, keep, keep, decrement_wrap}},
+            {WEBGL_MASK_DRAW, {triangles, batch->first, batch->count}},
+            {WEBGL_MASK_COLOUR_WRITE, {1}},
+            {WEBGL_MASK_STENCIL_FUNCTION, {not_equal, 0, 255}},
+            {WEBGL_MASK_STENCIL_OPERATION, {keep, keep, keep}},
+            {WEBGL_MASK_BIND_XY, {1}},
+            {WEBGL_MASK_SHADE, {batch->colour}},
+            {WEBGL_MASK_DRAW, {triangles, 0, 6}},
+            {WEBGL_MASK_CLEAR, {stencil_bit}}
+        };
+        for (size_t j = 0; j < sizeof pass / sizeof *pass; ++j) commands[next++] = pass[j];
+    }
+    return next;
+}

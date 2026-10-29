@@ -71,9 +71,18 @@ Use `tests/test_config.json` to isolate a failing case; the corresponding source
 file is the configuration key. The shared helper owns per-case strings and
 worker results and releases them between cases.
 
-Native dependency probes and per-case scratch directories honour `TMPDIR`; otherwise
-they use the platform temporary-directory default. Set `TMPDIR` to an existing,
-writable directory when temporary storage is limited.
+The optional satellite preparation suite is
+`tools/mars_lab/tests/satellite/test_satellite_mask.c`. Its explicit
+`tools/mars_lab/build/release/tests/test_satellite_mask` target requires the GDAL
+development files, selected through `LAB_GDAL_CFLAGS` and `LAB_GDAL_LIBS` when needed.
+It checks coastal alpha, unchanged land colours, inland lakes, separate islands,
+missing observations, smaller encoded output and protection of existing inputs.
+Ordinary library and Lab tests do not acquire this preparation dependency.
+
+Make targets default `TMPDIR` to the active build tree's `tmp` directory and create
+it before compiler probes and compilation. Explicit `TMPDIR` values still take
+precedence. Per-case scratch directories inherit that setting; standalone tools
+use the platform temporary-directory default when it is absent.
 
 ```sh
 make test_number

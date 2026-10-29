@@ -109,7 +109,9 @@ results discarded. The main thread retains coverage metadata, not the shoreline
 geographic vertices. Binary projected GPU buffers are transferred for submission;
 the browser does not interpret or reformat their coordinates. Workers are terminated
 when leaving the page outside the back-forward cache. Coverage textures are double-buffered,
-and the backend retains its vertex buffers, shader program and uniform locations.
+and marslib's native renderer owns the vertex buffers, shader program, uniform
+locations and texture publication. Its browser bridge retains direct-indexed opaque
+objects and forwards API calls; it does not decide resource lifetimes or stencil passes.
 The globe's GLSL sources are native-owned and compiled once per context.
 `data-shore-project-ms` measures worker projection and transfer-buffer preparation;
 `data-mask-submit-ms` measures CPU-side GPU mask submission, not completed GPU time.
@@ -1074,10 +1076,17 @@ From 6× zoom, a local four-tile patch adds the 21600 × 10800 NASA Blue Marble:
 Next Generation image for July 2004, with shaded topography and bathymetry.
 Its source has 2.64 times the linear resolution and about seven times the pixels
 of the 8192-pixel image. Each of the 72 bundled tiles is 1800 × 1800 pixels;
-tiles are stored as lossless PNGs. The NASA source and most existing Wales tiles
-were already JPEG-encoded; PNG preserves their decoded pixels without recovering
-lost detail. The original Cambrian Mountains patch is regenerated directly from
-the retained satellite raster. They are served locally, including when offline.
+tiles are stored as lossless PNGs. The NASA source was already JPEG-encoded; PNG preserves its decoded pixels without
+recovering lost detail. The regional Sentinel photographs are generated directly
+from their satellite rasters. They are served locally, including when offline.
+The prepared Sentinel-2 catalogue contains 2,125 regional images covering the UK,
+Ireland, Denmark, Netherlands, Italy and the requested Mediterranean and Atlantic
+islands, mainland Portugal and Spain, coastal Svalbard and Cape Peninsula. Spain and
+Svalbard use reduced-resolution 1800-square images; other new regions use 3600-square
+images. Remaining missing observations are transparent. Managed globe revision 14
+imports the approximately 29 GiB catalogue with `make release`; only photographs
+needed for the current view are loaded, using the existing bounded caches.
+
 The native `lab_globe_photo_patch` planner wraps longitude at the date line and
 clamps tile rows at the poles. The browser retains at most four decoded tiles
 and one 3600 × 3600 GPU patch (about 49.4 MiB each), plus transient replacement
@@ -1091,30 +1100,57 @@ The optional `tools/mars_lab/texture_tiles.c` maintainer utility reproduces the
 tiles from the credited NASA source using libjpeg and zlib development files. It is not
 part of ordinary builds or releases; no image-processing installation is required
 to run the Lab. Source URL, checksum and attribution are in the imagery notice.
+The optional `tools/mars_lab/satellite_tiles.c` maintainer utility plans regional
+coverage from a source catalogue and country outline, then reprojects downloaded
+GeoTIFF bands directly to lossless RGBA PNG using the GDAL C API. It uses earlier
+quarterly observations to fill gaps and leaves remaining missing observations
+transparent. Rendering writes checksummed per-tile checkpoints and verifies them
+before resuming. Its output requires validation and manifest installation before
+the Lab uses it; GDAL is not a runtime dependency.
+The companion `satellite_catalogue.c` native preparation utility validates the
+checksummed render outputs and combines their metadata into an installable package.
+It preserves NASA and Copernicus attribution and publishes the manifest only after
+every image passes validation. The database importer then replaces imagery in a
+transaction, preserving geographic layers, saved settings and location history.
+
 Once the requested longitude and latitude spans are each
 at most 30°, independent asynchronous requests prepare a photographic river tile from
 the **globe database**. Native code supplies image crops and river paths; a dedicated
-browser worker composites the tile without holding up animation. The initial globe, towns and observer selection
-never wait for this layer. Padded coverage is refreshed during movement; useful
+browser worker composites the tile without holding up animation. Photographs are decoded
+concurrently with river geometry and published as a preview, then replaced by the
+completed river surface at the same cache address.
+Only completed surfaces are written to the persistent cache. Native plans choose
+decoded image sizes for the display scale and contain at most 68 source photographs.
+The initial globe, towns and observer selection never wait for this layer.
+Padded coverage is refreshed during movement; useful
 pending requests continue until the view leaves their coverage. Requests are
 time-limited; obsolete responses cannot replace the current
 overlay. Mapped riverbanks and lakes have no fixed zoom cutoff; areas smaller than
 a quarter texture pixel are omitted until a closer view. Windows wider or taller
-than 6° use mapped areas without centreline detail. Only one regional river texture
-is retained (about 16 MiB). Views exceeding the 30° regional extent release its
-storage after a two-second grace period; returning during that interval cancels
-the release and reuses it.
+than 6° use mapped areas without centreline detail. Up to four completed regional
+textures remain on the GPU (64 MiB total), allowing recent destinations to be
+rebound without decoding or uploading them again. A destination preload does not
+evict the displayed surface. History navigation retains the outgoing detail;
+travel also requests visible route coverage when the destination request is idle.
+Stable geographic windows let small framing changes reuse the same disk entry.
+The native `lab_texture_cache` service uses `dictionary_t` for copied-key lookup,
+byte budgets and LRU eviction. `lab_globe_surface_bounds` selects stable windows;
+`lab_texture_premultiply` prepares bounded pixel batches in WASM. JavaScript keeps
+only indexed browser-resource slots and performs WebGL and IndexedDB operations.
 The worker retains up to 64 MiB of decoded photograph pixels, including feathered
 regional edges, to reuse them across nearby views. This excludes temporary decoding
 and drawing buffers. Finished pixels are displayed before optional raw-pixel readback
-and storage; at most one additional 16 MiB canvas is retained for that background
-work, and further cache writes are skipped while it is busy.
+and storage. Pixel preparation yields in small worker batches, and travel never
+waits for a disk write. At most two additional 16 MiB canvases are retained for
+background persistence: the active write and the newest pending destination.
+Rapid intermediate views may replace a pending write, keeping memory bounded.
 Completed tiles persist in a per-browser, per-Lab-origin IndexedDB cache, bounded
-to four 2048-square RGBA tiles: 16 MiB each and 64 MiB in total. These disposable
+to 32 2048-square RGBA tiles: 16 MiB each and 512 MiB in total. These disposable
 raw tiles store premultiplied RGBA bytes, transferred from the worker directly into
 a WebGL texture without image decoding, canvas conversion or rebuilding an ImageBitmap.
 Reading the bytes and uploading them to GPU memory are still necessary; resident
 GPU textures are reused directly. Older straight-alpha cache entries are discarded.
+GPU upload buffers and driver allocations are additional to the retained-texture budget.
 Browser storage and transient readback
 buffers are additional; least recently used entries are evicted as needed. Database
 changes invalidate cached images. Returning after release reuses a valid cached
@@ -1255,6 +1291,11 @@ The destination's detailed photographic patch is prepared before departure, with
 eight-second download deadline; missing tiles leave the existing photograph usable.
 A travelling notice names the destination and route distance; the selected destination
 marker remains visible whenever it projects into view.
+A broad regional overview loads before the close destination tile, so approach imagery
+does not shrink to a tiny isolated rectangle. Old raster river ink fades when magnified
+beyond its prepared scale while its photographs remain useful during refinement.
+Town labels allow up to 220 CSS pixels, including padding and borders, and can use
+the space on either side of the marker. Labels truncate only when that budget is exceeded.
 Destination shoreline detail is prefetched off-thread. Projection and large stencil
 texture uploads wait until arrival so they cannot stall GPU travel rendering.
 The global photograph covers the

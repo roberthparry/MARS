@@ -5,7 +5,10 @@
  * Keeps the locator small and the main settings independent of all three content databases. No settings
  * file is sourced as shell code. Configuration files and database files are private to the current user;
  * diagnostic listings redact credentials. Explicit environment values take precedence over stored values.
+ * Bulk installers delegate reads and automatic updates to an isolated settings process, retaining SQLCipher
+ * memory protection for configuration without applying its global allocator policy to content databases.
  */
+#include <errno.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -18,6 +21,8 @@
 #include "sqlite-t.h"
 #include "mars_settings.h"
 #include "mars_keyring.h"
+#define MARS_SETTINGS_INTERNAL_ACCESS
+#include "mars_settings_internal.h"
 
 static string_t *(*settings_key_source)(bool) = mars_keyring_password;
 static string_t *settings_key;
@@ -146,6 +151,11 @@ static string_t *settings_value(const char *name, const char *value)
 /* Resource and application settings share the same encrypted configuration database. */
 sqlite_t *mars_settings_open(bool create)
 {
+    if (mars_settings_process_enabled()) {
+        errno = EPERM;
+        return NULL;
+    }
+
     string_t *path = mars_settings_database(), *parent = settings_parent(path);
     file_t *file = path ? file_new(path) : NULL, *directory = parent ? file_new(parent) : NULL;
     bool ready = file && (create ? directory && file_create_directory(directory, 0700, true) : file_exists(file));
@@ -168,6 +178,13 @@ sqlite_t *mars_settings_open(bool create)
 /* Cache only copied values, never a SQLite handle across the Lab's prefork worker boundary. */
 string_t *mars_settings_resource(const char *name)
 {
+    if (mars_settings_process_enabled()) {
+        string_t *input = name ? string_new_with(name) : NULL, *output = NULL;
+        bool ok = input && mars_settings_process_request(MARS_SETTINGS_RESOURCE, input, &output);
+        string_free(input);
+        return ok ? output : NULL;
+    }
+
     string_t *database = mars_settings_database();
     file_t *file = database ? file_new(database) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
@@ -218,11 +235,21 @@ string_t *mars_settings_resource(const char *name)
     return result;
 }
 
-/* Populate only missing variables; worker children inherit the resulting configuration snapshot. */
-bool mars_settings_load(void)
+/* Snapshot trees are private copies; erase transferred credential values before releasing them. */
+static void settings_snapshot_free(json_t *values)
+{
+    for (size_t i = 0; i < json_object_size(values); ++i) {
+        const string_t *value = json_string_value(json_object_value_at(values, i));
+        if (value) sodium_memzero((void *)string_c_str(value), string_byte_length(value));
+    }
+    json_free(values);
+}
+
+/* Copy literal settings while encrypted database allocations remain in the settings process. */
+string_t *mars_settings_snapshot(void)
 {
     string_t *path = mars_settings_database();
-    if (!path) return false;
+    if (!path) return NULL;
     file_t *file = file_new(path);
     bool exists = file && file_exists(file);
     file_free(file); string_free(path);
@@ -231,7 +258,7 @@ bool mars_settings_load(void)
         file_t *bootstrap = locator ? file_new(locator) : NULL;
         bool configured = bootstrap && file_exists(bootstrap);
         file_free(bootstrap); string_free(locator);
-        return !configured;
+        return configured ? NULL : string_new_with("{}");
     }
     sqlite_t *db = mars_settings_open(false);
     sqlite_stmt_t *table = db ? sqlite_stmt_prepare(db,
@@ -240,21 +267,61 @@ bool mars_settings_load(void)
     bool present = ok && sqlite_stmt_column_int(table, 0);
     sqlite_stmt_finalize(table);
     sqlite_stmt_t *q = present ? sqlite_stmt_prepare(db, "select name,value from application_setting limit 1025") : NULL;
+    json_t *values = json_new_object();
     unsigned count = 0;
     sqlite_step_result_t step = SQLITE_STEP_DONE;
-    if (present) ok = ok && q;
+    ok = ok && values && (!present || q);
     while (ok && q && (step = sqlite_stmt_step(q)) == SQLITE_STEP_ROW) {
         const char *name = sqlite_stmt_column_text(q, 0), *value = sqlite_stmt_column_text(q, 1);
         ok = ++count <= 1024 && settings_name(name) && value && strlen(value) <= 65536 &&
-             strlen(value) == sqlite_stmt_column_bytes(q, 1);
-        if (ok && !getenv(name)) {
-            string_t *resolved = settings_value(name, value);
-            ok = resolved && !setenv(name, string_c_str(resolved), 0);
-            string_free(resolved);
+             strlen(name) == sqlite_stmt_column_bytes(q, 0) && strlen(value) == sqlite_stmt_column_bytes(q, 1);
+        if (ok) {
+            string_t *key = string_new_with(name), *resolved = string_new_with(value);
+            json_t *entry = resolved ? json_new_string(resolved) : NULL;
+            ok = key && entry && json_object_set(values, key, entry);
+            if (resolved) sodium_memzero((void *)string_c_str(resolved), string_byte_length(resolved));
+            string_free(resolved); string_free(key);
+            const string_t *copy = json_string_value(entry);
+            if (copy) sodium_memzero((void *)string_c_str(copy), string_byte_length(copy));
+            json_free(entry);
         }
     }
     ok = ok && step == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(q); sqlite_close(db);
+    string_t *snapshot = ok ? json_to_string(values) : NULL;
+    settings_snapshot_free(values);
+    return snapshot;
+}
+
+/* Populate missing variables; the configuration database key never enters the reply. */
+bool mars_settings_load(void)
+{
+    string_t *snapshot = NULL;
+    bool ok = mars_settings_process_enabled()
+                  ? mars_settings_process_request(MARS_SETTINGS_LOAD, NULL, &snapshot)
+                  : (snapshot = mars_settings_snapshot()) != NULL;
+    json_t *values = ok && snapshot ? json_from_text(snapshot) : NULL;
+    ok = ok && values && json_type(values) == JSON_OBJECT && json_object_size(values) <= 1024;
+    for (size_t i = 0; ok && i < json_object_size(values); ++i) {
+        const string_t *name = json_object_key_at(values, i);
+        const string_t *value = json_string_value(json_object_value_at(values, i));
+        ok = name && value && settings_name(string_c_str(name)) &&
+             strlen(string_c_str(name)) == string_byte_length(name) && string_byte_length(value) <= 65536 &&
+             strlen(string_c_str(value)) == string_byte_length(value);
+    }
+    for (size_t i = 0; ok && i < json_object_size(values); ++i) {
+        const char *name = string_c_str(json_object_key_at(values, i));
+        const char *value = string_c_str(json_string_value(json_object_value_at(values, i)));
+        if (!getenv(name)) {
+            string_t *resolved = settings_value(name, value);
+            ok = resolved && !setenv(name, string_c_str(resolved), 0);
+            if (resolved) sodium_memzero((void *)string_c_str(resolved), string_byte_length(resolved));
+            string_free(resolved);
+        }
+    }
+    settings_snapshot_free(values);
+    if (snapshot) sodium_memzero((void *)string_c_str(snapshot), string_byte_length(snapshot));
+    string_free(snapshot);
     return ok;
 }
 
@@ -300,6 +367,13 @@ bool mars_settings_import(const string_t *text, bool replace)
 /* Existing installations without a bootstrap file retain their established configuration workflow. */
 bool mars_settings_sync(const string_t *text)
 {
+    if (mars_settings_process_enabled()) {
+        string_t *output = NULL;
+        bool ok = mars_settings_process_request(MARS_SETTINGS_SYNC, text, &output);
+        string_free(output);
+        return ok;
+    }
+
     string_t *locator = settings_locator();
     file_t *file = locator ? file_new(locator) : NULL;
     bool enabled = file && file_exists(file);

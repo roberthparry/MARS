@@ -25,8 +25,12 @@ static bool cfg_coast_hash(file_t *file, const char *expected)
 }
 
 /* Seven sequential parts form one archive; they are not independent geographic sources. */
-static bool cfg_coast_archive(const string_t *root, file_t *archive)
+static bool cfg_coast_archive(const string_t *root, file_t *archive, cfg_progress_t *progress)
 {
+    const uint64_t total = UINT64_C(6) * 67108864 + 14916563;
+    uint64_t copied = 0;
+    static const char label[] = "Assembling shoreline archive";
+    cfg_progress_update(progress, label, 0, total);
     bool ok = file_open(archive, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE);
     for (unsigned i = 0; ok && i < 7; ++i) {
         string_t *name = string_sprintf("shoreline-20261023.cf64.zst.%02u", i);
@@ -42,12 +46,17 @@ static bool cfg_coast_archive(const string_t *root, file_t *archive)
             size_t read = 0, written = 0, wanted = expected < sizeof buffer ? expected : sizeof buffer;
             ok = file_read(part, buffer, wanted, &read) && read == wanted &&
                 file_write(archive, buffer, read, &written) && written == read;
-            if (ok) expected -= read;
+            if (ok) {
+                expected -= read;
+                copied += read;
+                cfg_progress_update(progress, label, copied, total);
+            }
         }
         if (part && file_is_open(part)) ok = file_close(part) && ok;
         file_free(part); string_free(path);
     }
     if (file_is_open(archive)) ok = file_close(archive) && ok;
+    if (ok) cfg_progress_update(progress, "Verifying shoreline archive", 0, 0);
     return ok && cfg_coast_hash(archive, "6296a43c066718fa65f2bfdea8a55a7660c9b69dfd3e906b45734a5c8c9a3297");
 }
 
@@ -59,10 +68,11 @@ bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *stag
     file_t *packed = packed_path ? file_new(packed_path) : NULL;
     file_t *plain = plain_path ? file_new(plain_path) : NULL;
     cfg_progress_t *progress = cfg_progress_start("Indexing validated shorelines");
-    bool ok = packed && plain && cfg_coast_archive(root, packed);
+    bool ok = packed && plain && cfg_coast_archive(root, packed, progress);
     if (!ok)
         fputs("Shoreline archive assembly or checksum failed.\n", stderr);
     if (ok) {
+        cfg_progress_update(progress, "Expanding shoreline archive", 0, 0);
         ok = file_decompress_zstd(packed, plain, 602563348, false);
         if (!ok) {
             int error = file_last_error(packed);
@@ -71,12 +81,14 @@ bool cfg_database_coast(sqlite_t *db, const string_t *root, const string_t *stag
         }
     }
     if (ok) {
+        cfg_progress_update(progress, "Verifying expanded shoreline", 0, 0);
         ok = cfg_coast_hash(plain, "89b67b8d82bec49e6f28a3b55dc944e29d9c1a48e0beacb64550280a6c4f0d84") &&
              file_open_read(plain);
         if (!ok)
             fputs("Expanded shoreline checksum or opening failed.\n", stderr);
     }
     bool transaction = ok && sqlite_exec_cstr(db, "savepoint globe_coast");
+    if (ok) cfg_progress_update(progress, "Indexing validated shorelines", 0, 0);
     ok = transaction && globe_import_shoreline(db, plain) && sqlite_exec_cstr(db,
         "update shoreline_dataset set source='OSM 2026-10-12 + GSHHG 2.3.7; complete 8m shoreline 2026-10-23 r2' "
         "where id=1") && sqlite_exec_cstr(db, "release globe_coast");

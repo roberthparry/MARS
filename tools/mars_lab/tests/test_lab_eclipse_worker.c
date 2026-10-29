@@ -225,7 +225,7 @@ static bool almanac_location_modes(void)
              !strcmp(test_lab_text(json_array_get(summary, 3), "value"), i == 2 ? "0° 00.00′ N" : "52° 42.46′ N") &&
              !strcmp(test_lab_text(json_array_get(summary, 4), "value"), i == 2 ? "0° 00.00′ E" : "2° 45.25′ W") &&
              !strcmp(test_lab_text(json_array_get(summary, 8), "value"),
-                     "Rough seasonal assumption; estimated pressure") &&
+                     "Rough seasonal assumption\nestimated pressure (standard atmosphere)") &&
              !strcmp(lab_cal_text(response, "observer_latitude"), i == 2 ? "0" : "52.707700") && ok;
         json_free(response);
     }

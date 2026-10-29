@@ -52,7 +52,7 @@ int main(int argc, char **argv)
         puts("       mars_config globe-install-rivers CANDIDATE.db");
         return 0;
     }
-    if (!mars_settings_load()) {
+    if (!mars_settings_isolate() || !mars_settings_load()) {
         fputs("Cannot read MARS configuration; check mars.json and its database.\n", stderr);
         return 1;
     }

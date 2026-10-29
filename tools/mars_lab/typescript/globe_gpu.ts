@@ -124,121 +124,151 @@ export function buildGlobePalettes(gl: WebGLRenderingContext, program: WebGLProg
     }
 }
 
-export class MarsGlobeMask {
-    private readonly program: WebGLProgram;
-    private readonly buffer: WebGLBuffer;
-    private readonly framebuffer: WebGLFramebuffer;
-    private readonly stencil: WebGLRenderbuffer;
-    private readonly shade: WebGLUniformLocation | null;
-    private spare: WebGLTexture;
-    private pixels = 0;
-    private capacity = 0;
-    private readonly sizes = new WeakMap<WebGLTexture, number>();
+/** Browser object table and API forwarding only; marslib owns allocation and rendering decisions. */
+class GlobeGPUBridge {
+    private readonly objects: (object | null)[] = [null];
+    private readonly free: number[] = [];
+    private readonly operations: ((a: number, b: number, c: number, d: number) => unknown)[];
+    private failed = false;
+    vertices: Float32Array<ArrayBuffer> | null = null;
 
     constructor(private readonly gl: WebGLRenderingContext, vertex: string, fragment: string) {
-        const program = gl.createProgram(), buffer = gl.createBuffer(), framebuffer = gl.createFramebuffer();
-        const stencil = gl.createRenderbuffer(), texture = gl.createTexture();
-        if (!program || !buffer || !framebuffer || !stencil || !texture) {
-            gl.deleteProgram(program); gl.deleteBuffer(buffer); gl.deleteFramebuffer(framebuffer);
-            gl.deleteRenderbuffer(stencil); gl.deleteTexture(texture);
-            throw new Error('GPU coverage allocation failed');
-        }
-        this.program = program; this.buffer = buffer; this.framebuffer = framebuffer;
-        this.stencil = stencil; this.spare = texture;
-        try {
-            for (const [type, source] of [[gl.VERTEX_SHADER, vertex], [gl.FRAGMENT_SHADER, fragment]] as const) {
-                const shader = gl.createShader(type);
-                if (!shader) throw new Error('GPU coverage shader allocation failed');
-                gl.shaderSource(shader, source); gl.compileShader(shader);
-                const compiled = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
-                if (compiled) gl.attachShader(program, shader);
-                gl.deleteShader(shader);
-                if (!compiled) throw new Error('GPU coverage shader compilation failed');
-            }
-            gl.bindAttribLocation(program, 0, 'position');
-            gl.linkProgram(program);
-            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('GPU coverage link failed');
-        } catch (error) { this.dispose(); throw error; }
-        this.shade = gl.getUniformLocation(program, 'shade');
+        const create = [() => gl.createProgram(), () => gl.createBuffer(), () => gl.createFramebuffer(),
+            () => gl.createRenderbuffer(), () => gl.createTexture(), () => gl.createShader(gl.VERTEX_SHADER),
+            () => gl.createShader(gl.FRAGMENT_SHADER)];
+        const remove = [
+            (id: number) => gl.deleteProgram(this.get<WebGLProgram>(id)),
+            (id: number) => gl.deleteBuffer(this.get<WebGLBuffer>(id)),
+            (id: number) => gl.deleteFramebuffer(this.get<WebGLFramebuffer>(id)),
+            (id: number) => gl.deleteRenderbuffer(this.get<WebGLRenderbuffer>(id)),
+            (id: number) => gl.deleteTexture(this.get<WebGLTexture>(id)),
+            (id: number) => gl.deleteShader(this.get<WebGLShader>(id)),
+            (id: number) => gl.deleteShader(this.get<WebGLShader>(id)),
+            (_id: number) => {}
+        ];
+        // Direct-indexed ABI from webgl-t.h. No projection, shader policy, draw ordering or cache decisions.
+        this.operations = [
+            id => {
+                gl.bindBuffer(gl.ARRAY_BUFFER, this.get<WebGLBuffer>(id));
+                gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+            },
+            enabled => gl.colorMask(Boolean(enabled), Boolean(enabled), Boolean(enabled), Boolean(enabled)),
+            (func, ref, mask) => gl.stencilFunc(func, ref, mask),
+            (face, fail, depthFail, pass) => gl.stencilOpSeparate(face, fail, depthFail, pass),
+            (fail, depthFail, pass) => gl.stencilOp(fail, depthFail, pass),
+            (mode, first, count) => gl.drawArrays(mode, first, count),
+            (shade, id) => gl.uniform1f(this.get<WebGLUniformLocation>(id), shade),
+            mask => gl.clear(mask),
+            kind => this.adopt(create[kind]()),
+            (kind, id) => {
+                try { remove[kind](id); }
+                finally { this.objects[id] = null; this.free.push(id); }
+            },
+            (id, source) => gl.shaderSource(this.get<WebGLShader>(id), source ? fragment : vertex),
+            id => gl.compileShader(this.get<WebGLShader>(id)),
+            id => gl.getShaderParameter(this.get<WebGLShader>(id), gl.COMPILE_STATUS),
+            (program, shader) => gl.attachShader(this.get<WebGLProgram>(program), this.get<WebGLShader>(shader)),
+            id => gl.bindAttribLocation(this.get<WebGLProgram>(id), 0, 'position'),
+            id => gl.linkProgram(this.get<WebGLProgram>(id)),
+            id => gl.getProgramParameter(this.get<WebGLProgram>(id), gl.LINK_STATUS),
+            id => this.adopt(gl.getUniformLocation(this.get<WebGLProgram>(id), 'shade')),
+            unit => gl.activeTexture(unit),
+            id => gl.bindTexture(gl.TEXTURE_2D, this.get<WebGLTexture>(id)),
+            (name, value) => gl.texParameteri(gl.TEXTURE_2D, name, value),
+            pixels => gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, pixels, pixels, 0, gl.RGBA, gl.UNSIGNED_BYTE, null),
+            id => gl.bindFramebuffer(gl.FRAMEBUFFER, this.get<WebGLFramebuffer>(id)),
+            id => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D,
+                                         this.get<WebGLTexture>(id), 0),
+            id => gl.bindRenderbuffer(gl.RENDERBUFFER, this.get<WebGLRenderbuffer>(id)),
+            pixels => gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_STENCIL, pixels, pixels),
+            id => gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER,
+                                            this.get<WebGLRenderbuffer>(id)),
+            () => gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE,
+            pixels => gl.viewport(0, 0, pixels, pixels),
+            id => gl.useProgram(this.get<WebGLProgram>(id)),
+            capability => gl.disable(capability),
+            capability => gl.enable(capability),
+            mask => gl.stencilMask(mask),
+            value => gl.clearStencil(value),
+            (r, g, b, a) => gl.clearColor(r, g, b, a),
+            id => gl.bindBuffer(gl.ARRAY_BUFFER, this.get<WebGLBuffer>(id)),
+            bytes => gl.bufferData(gl.ARRAY_BUFFER, bytes, gl.DYNAMIC_DRAW),
+            () => gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.vertices!),
+            index => gl.enableVertexAttribArray(index),
+            () => {
+                const error = gl.getError(), failed = this.failed;
+                this.failed = false;
+                return error || (failed ? gl.INVALID_OPERATION : gl.NO_ERROR);
+            },
+            () => gl.isContextLost()
+        ];
     }
 
-    /** Publish a replacement texture only after a complete native coverage plan has been submitted. */
+    adopt(object: object | null): number {
+        if (!object) return 0;
+        const id = this.free.pop() ?? this.objects.length;
+        this.objects[id] = object;
+        return id;
+    }
+
+    get<T>(id: number): T { return this.objects[id] as T; }
+
+    invoke(operation: number, a: number, b: number, c: number, d: number): number {
+        try { return Number(this.operations[operation](a, b, c, d) ?? 0); }
+        catch { this.failed = true; return 0; }
+    }
+}
+
+/** Thin adapter for marslib's native GPU resource owner. */
+export class MarsGlobeMask {
+    private readonly bridge: GlobeGPUBridge;
+    private token: number;
+    private quad: WebGLBuffer | null = null;
+    private quadId = 0;
+    private published: WebGLTexture | null = null;
+    private publishedId = 0;
+    private initialPrevious: WebGLTexture | null = null;
+    private initialPreviousId = 0;
+
+    constructor(gl: WebGLRenderingContext, vertex: string, fragment: string) {
+        this.bridge = new GlobeGPUBridge(gl, vertex, fragment);
+        this.token = labDOM.call('lab_webgl_renderer_create', this.bridge) as number;
+        if (!this.token) throw new Error('Native GPU coverage allocation failed');
+    }
+
     render(frame: GlobeMaskFrame, pixels: number, quad: WebGLBuffer, previous: WebGLTexture): WebGLTexture {
-        const gl = this.gl, {vertices, batches} = frame;
-        if (!(vertices instanceof Float32Array) || !(batches instanceof Uint32Array) ||
-            vertices.length % 6 || vertices.length > 2097152 || batches.length % 3 || batches.length > 49152)
+        const {vertices, batches} = frame;
+        if (!this.token || !(vertices instanceof Float32Array) || !(batches instanceof Uint32Array) ||
+            vertices.length % 6 || vertices.length > 2097152 || !Number.isInteger(pixels) || pixels < 1 || pixels > 8192)
             throw new Error('Invalid native GPU coverage plan');
-        for (let i = 0; i < batches.length; i += 3) {
-            if (batches[i] % 3 || batches[i + 1] % 3 || batches[i] + batches[i + 1] > vertices.length / 2 ||
-                batches[i + 2] > 1) throw new Error('Invalid native GPU coverage range');
+        if (quad !== this.quad) {
+            if (this.quad) throw new Error('GPU coverage quad changed');
+            this.quad = quad;
+            this.quadId = this.bridge.adopt(quad);
         }
+        if (!this.published && !this.initialPrevious) {
+            this.initialPrevious = previous;
+            this.initialPreviousId = this.bridge.adopt(previous);
+        }
+        const previousId = previous === this.published ? this.publishedId :
+            previous === this.initialPrevious ? this.initialPreviousId : 0;
+        if (!previousId) throw new Error('Unexpected GPU coverage texture owner');
+        this.bridge.vertices = vertices;
         try {
-            gl.activeTexture(gl.TEXTURE4);
-            gl.bindTexture(gl.TEXTURE_2D, this.spare);
-            if (this.sizes.get(this.spare) !== pixels) {
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, pixels, pixels, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-                this.sizes.set(this.spare, pixels);
-            }
-            gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.spare, 0);
-            if (this.pixels !== pixels) {
-                gl.bindRenderbuffer(gl.RENDERBUFFER, this.stencil);
-                gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_STENCIL, pixels, pixels);
-                gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_STENCIL_ATTACHMENT, gl.RENDERBUFFER, this.stencil);
-                this.pixels = pixels;
-            }
-            if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
-                throw new Error('GPU coverage framebuffer incomplete');
-            gl.viewport(0, 0, pixels, pixels);
-            gl.useProgram(this.program);
-            gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE); gl.disable(gl.DEPTH_TEST);
-            gl.enable(gl.STENCIL_TEST); gl.stencilMask(255); gl.clearStencil(0);
-            gl.colorMask(true, true, true, true); gl.clearColor(0, 0, 0, 1);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-            if (vertices.byteLength > this.capacity) {
-                this.capacity = vertices.byteLength;
-                gl.bufferData(gl.ARRAY_BUFFER, this.capacity, gl.DYNAMIC_DRAW);
-            }
-            if (vertices.length) gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertices);
-            gl.enableVertexAttribArray(0);
-            for (let i = 0; i < batches.length; i += 3) {
-                if (!batches[i + 1]) continue;
-                gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-                gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-                gl.colorMask(false, false, false, false);
-                gl.stencilFunc(gl.ALWAYS, 0, 255);
-                gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP);
-                gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP);
-                gl.drawArrays(gl.TRIANGLES, batches[i], batches[i + 1]);
-                gl.colorMask(true, true, true, true);
-                gl.stencilFunc(gl.NOTEQUAL, 0, 255);
-                gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
-                gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-                gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-                gl.uniform1f(this.shade, batches[i + 2]);
-                gl.drawArrays(gl.TRIANGLES, 0, 6);
-                gl.clear(gl.STENCIL_BUFFER_BIT);
-            }
-            const error = gl.getError();
-            if (gl.isContextLost() || error !== gl.NO_ERROR) throw new Error(`GPU coverage draw failed (${error})`);
-            const result = this.spare;
-            this.spare = previous;
-            return result;
-        } finally {
-            gl.colorMask(true, true, true, true); gl.disable(gl.STENCIL_TEST);
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.bindRenderbuffer(gl.RENDERBUFFER, null);
-        }
+            const id = labDOM.call('lab_webgl_renderer_draw', this.bridge, this.token,
+                new Uint8Array(batches.buffer, batches.byteOffset, batches.byteLength), vertices.length / 2,
+                pixels, this.quadId, previousId) as number;
+            if (!id) throw new Error('Native GPU coverage draw failed');
+            this.publishedId = id;
+            this.published = this.bridge.get<WebGLTexture>(id);
+            this.initialPrevious = null;
+            this.initialPreviousId = 0;
+            return this.published;
+        } finally { this.bridge.vertices = null; }
     }
 
-    /** Release retained resources; the currently published texture belongs to the globe, not this backend. */
     dispose(): void {
-        const gl = this.gl;
-        gl.deleteProgram(this.program); gl.deleteBuffer(this.buffer); gl.deleteFramebuffer(this.framebuffer);
-        gl.deleteRenderbuffer(this.stencil); gl.deleteTexture(this.spare);
+        if (this.token) labDOM.call('lab_webgl_renderer_free', this.bridge, this.token);
+        this.token = 0;
     }
 }

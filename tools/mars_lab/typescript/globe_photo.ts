@@ -6,6 +6,8 @@
  * and uploads a complete replacement, retaining the previous texture on failure.
  * No network imagery service or full-resolution global allocation is required.
  */
+import {GlobeTextureCache} from './globe_texture_cache.js';
+
 export class GlobePhoto {
     bounds = [-180, -90, 180, 90];
     ready = false;
@@ -13,7 +15,7 @@ export class GlobePhoto {
     private pendingKey = '';
     private request: AbortController | null = null;
     private texture: WebGLTexture | null = null;
-    private readonly cache = new Map<string, ImageBitmap>();
+    private readonly cache = new GlobeTextureCache<ImageBitmap>(4, 64 * 1024 * 1024, bitmap => bitmap.close());
     private closed = false;
     private retryAfter = 0;
     private readonly fallback: WebGLTexture | null;
@@ -53,23 +55,20 @@ export class GlobePhoto {
                     if (!bitmap) {
                         const response = await fetch(`/earth_tiles/${name}.png`, {signal: controller.signal});
                         if (!response.ok) throw new Error('Photo tile unavailable');
-                        bitmap = await createImageBitmap(await response.blob());
+                        // Explicit bounded bytes avoid temporary-file-backed response Blobs in restricted browsers.
+                        const encoded = await response.arrayBuffer();
+                        if (!encoded.byteLength || encoded.byteLength > 16 * 1024 * 1024) throw new Error('Photo tile exceeds its byte limit');
+                        bitmap = await createImageBitmap(new Blob([encoded], {type: 'image/png'}));
                         if (controller.signal.aborted || this.closed) { bitmap.close(); return; }
                         if (bitmap.width !== 1800 || bitmap.height !== 1800) {
                             bitmap.close();
                             throw new Error('Invalid photo tile dimensions');
                         }
-                        this.cache.set(name, bitmap);
-                    } else {
-                        this.cache.delete(name);
-                        this.cache.set(name, bitmap);
+                        if (!this.cache.put(name, bitmap, bitmap.width * bitmap.height * 4)) {
+                            bitmap.close(); throw new Error('Photo cache unavailable');
+                        }
                     }
                     context.drawImage(bitmap, column * 1800, row * 1800);
-                    while (this.cache.size > 4) {
-                        const oldest = this.cache.keys().next().value!;
-                        this.cache.get(oldest)!.close();
-                        this.cache.delete(oldest);
-                    }
                 }
             }
             if (controller.signal.aborted || this.closed || gl.isContextLost()) return;
@@ -118,8 +117,7 @@ export class GlobePhoto {
     dispose(): void {
         this.closed = true;
         this.cancel();
-        for (const bitmap of this.cache.values()) bitmap.close();
-        this.cache.clear();
+        this.cache.dispose();
         this.gl.deleteTexture(this.texture);
         this.texture = null;
         this.ready = false;

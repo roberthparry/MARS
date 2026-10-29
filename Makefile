@@ -16,6 +16,10 @@ else
     RELEASE_BUILD  := 1
 endif
 
+# Keep compiler spill files on the build filesystem; explicit TMPDIR remains supported.
+TMPDIR ?= $(abspath $(BUILD_DIR)/tmp)
+export TMPDIR
+
 CFLAGS += -D_GNU_SOURCE -pthread
 
 CC := gcc
@@ -147,7 +151,8 @@ HEADERS      := $(wildcard include/*.h)
 STATIC_LIB := $(BUILD_DIR)/libmars.a
 SHARED_LIB := $(BUILD_DIR)/libmars.so
 
-APP_RESOURCE_OBJ := $(BUILD_DIR)/tools/mars_paths.o $(BUILD_DIR)/tools/mars_settings.o $(BUILD_DIR)/tools/mars_keyring.o
+APP_RESOURCE_OBJ := $(BUILD_DIR)/tools/mars_paths.o $(BUILD_DIR)/tools/mars_settings.o $(BUILD_DIR)/tools/mars_settings_process.o $(BUILD_DIR)/tools/mars_keyring.o
+$(BUILD_DIR)/tools/mars_settings.o $(BUILD_DIR)/tools/mars_settings_process.o: tools/common/mars_settings_internal.h
 $(BUILD_DIR)/tools/%.o: tools/common/%.c tools/common/mars_paths.h tools/common/mars_settings.h tools/common/mars_keyring.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
@@ -249,7 +254,12 @@ check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS) | native-tools
 # ------------------------------------------------------------
 # Dependency checks
 # ------------------------------------------------------------
-.PHONY: check-native-deps check-lab-typescript-deps check-tba-typescript-deps typescript-install-help
+.PHONY: check-native-deps check-lab-typescript-deps check-tba-typescript-deps typescript-install-help build-temporary
+build-temporary:
+	@mkdir -p "$(TMPDIR)"
+
+check-native-deps check-lab-wasm-deps check-tba-crypto-deps check-http-fixture-deps: | build-temporary
+
 check-deps: check-native-deps check-lab-typescript-deps check-tba-typescript-deps check-lab-wasm-deps
 	@echo "All dependency checks passed (C development libraries, native TypeScript compilers and WebAssembly runtime)."
 
@@ -411,19 +421,19 @@ DEPS     := $(shell find build tests/build tools/mars_lab/build -name '*.d' 2>/d
 # ------------------------------------------------------------
 # Object build rules
 # ------------------------------------------------------------
-$(BUILD_DIR)/%.o: src/%.c Makefile
+$(BUILD_DIR)/%.o: src/%.c Makefile | build-temporary
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
-$(TEST_BUILD_DIR)/%.o: tests/%.c Makefile $(TEST_SHARED_HEADERS) $(TEST_SUITE_HEADERS)
+$(TEST_BUILD_DIR)/%.o: tests/%.c Makefile $(TEST_SHARED_HEADERS) $(TEST_SUITE_HEADERS) | build-temporary
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
-$(BUILD_DIR)/bench/%.o: bench/%.c Makefile
+$(BUILD_DIR)/bench/%.o: bench/%.c Makefile | build-temporary
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
-$(BUILD_DIR)/scratch/%.o: scratch/%.c Makefile
+$(BUILD_DIR)/scratch/%.o: scratch/%.c Makefile | build-temporary
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 

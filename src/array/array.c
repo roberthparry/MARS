@@ -101,13 +101,15 @@ static bool array_grow_to(array_t *arr, size_t needed)
 // Requires arr->mutex held.
 static void array_copy_elems(array_t *arr, size_t dst_idx, const void *src, size_t n)
 {
+    if (!arr->clone) {
+        if (n)
+            memmove((char *)arr->arena + dst_idx * arr->elem_size, src, n * arr->elem_size);
+        return;
+    }
     for (size_t i = 0; i < n; ++i) {
         const void *s = (const char *)src + i * arr->elem_size;
         void *d = (char *)arr->arena + (dst_idx + i) * arr->elem_size;
-        if (arr->clone)
-            arr->clone(d, s);
-        else
-            memcpy(d, s, arr->elem_size);
+        arr->clone(d, s);
     }
 }
 
