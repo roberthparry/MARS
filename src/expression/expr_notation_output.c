@@ -1,10 +1,11 @@
 /**
  * @file expr_notation_output.c
- * @brief Compose an expression result and its native binding envelope.
+ * @brief Select expression bodies, bindings and native naming scopes for TeX output.
  *
- * The expression module chooses which body and bindings belong to the result.
- * TeX constructors supply all enclosure and separator syntax; no native graph
- * or binding implementation is inspected by this composition layer.
+ * Expression owns authored-versus-result semantics, temporary names and the
+ * binding envelope. Semantic contexts remain internal to these output APIs.
+ * TeX constructs and serialises the selected notation without exposing syntax
+ * to this module or requiring applications to configure a rendering context.
  */
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +13,8 @@
 #include "expression-t.h"
 #include "TeX-t.h"
 
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
@@ -31,6 +34,21 @@ bool expr_notation_requires_unwrapped_body(const expr_t *expression)
         return false;
     expr_cartesian_composition_clear(&view);
     return true;
+}
+
+/* Compose a selected antiderivative definition, consuming the owned body on every path. */
+TeX_t *expr_notation_append_primitive(TeX_t *body, const expr_t *initial)
+{
+    if (!body || !initial)
+        return body;
+    TeX_context_t *context = expr_notation_primitive_context(initial);
+    TeX_t *definition = context ? TeX_from_context(context) : NULL;
+    const TeX_t *parts[] = {body, definition};
+    TeX_t *result = definition ? TeX_sequence(parts, 2u) : NULL;
+    TeX_free(definition);
+    TeX_context_free(context);
+    TeX_free(body);
+    return result;
 }
 
 /* Project a native expression body through its semantic callback context. */
@@ -59,12 +77,73 @@ char *expr_to_TeX_operation_body(const expr_t *expression)
     return result;
 }
 
- /* Preserve the native output entry point while delegating envelope syntax to TeX. */
+static int expr_to_TeX_parts_mode(const expr_t *expression, char **body_out, char **bindings_out,
+                                  bool preserve_root_symbol)
+{
+    expr_init_singletons();
+    if (!body_out || !bindings_out)
+        return -1;
+    *body_out = NULL;
+    *bindings_out = NULL;
+    expr_t *initial = NULL;
+    expr_t *display = expression ? expr_notation_primitive_display(expression, &initial) : NULL;
+    TeX_context_t *surface = !display ? expr_notation_surface_context(expression, preserve_root_symbol) : NULL;
+    if (surface || !expression) {
+        TeX_t *notation = surface ? TeX_from_context(surface) : TeX_raw("NULL");
+        *body_out = notation ? strdup(TeX_source(notation)) : NULL;
+        *bindings_out = strdup("");
+        TeX_free(notation);
+        TeX_context_free(surface);
+    } else {
+        autoname_table_t names;
+        autoname_init(&names);
+        assign_unnamed_vars_dfs((expr_t *)expression, &names);
+        TeX_context_t *context = expr_TeX_result_context(display ? display : expression);
+        TeX_t *body = context ? TeX_from_context(context) : NULL;
+        TeX_context_free(context);
+        body = expr_notation_append_primitive(body, initial);
+        TeX_context_t *binding_context = NULL;
+        bool ready = body && expr_notation_bindings_context(expression, &binding_context);
+        TeX_t *bindings = binding_context ? TeX_from_context(binding_context) : NULL;
+        if (ready && (!binding_context || bindings)) {
+            *body_out = strdup(TeX_source(body));
+            *bindings_out = strdup(bindings ? TeX_source(bindings) : "");
+        }
+        TeX_free(bindings);
+        TeX_context_free(binding_context);
+        TeX_free(body);
+        autoname_restore(&names);
+    }
+    expr_free(display);
+    expr_free(initial);
+    if (!*body_out || !*bindings_out) {
+        free(*body_out);
+        free(*bindings_out);
+        *body_out = NULL;
+        *bindings_out = NULL;
+        return -1;
+    }
+    return 0;
+}
+
+/* Select the ordinary expression body and its independently owned binding notation. */
+int expr_to_TeX_parts(const expr_t *expression, char **body_out, char **bindings_out)
+{
+    return expr_to_TeX_parts_mode(expression, body_out, bindings_out, false);
+}
+
+/* Preserve a bound root variable when another mathematical object requests its notation. */
+int expr_to_TeX_symbolic_parts(const expr_t *expression, char **body_out, char **bindings_out)
+{
+    return expr_to_TeX_parts_mode(expression, body_out, bindings_out, true);
+}
+
+/* Preserve the native output entry point while delegating envelope syntax to TeX. */
 string_t *expr_to_TeX_text(const expr_t *expression)
 {
     char *body_text = NULL, *binding_text = NULL;
     if (expr_to_TeX_parts(expression, &body_text, &binding_text) != 0)
-        return expr_to_text_expr(expression);
+        return NULL;
     TeX_t *body = body_text ? TeX_raw(body_text) : NULL;
     bool bound = binding_text && *binding_text;
     TeX_t *bindings = bound ? TeX_raw(binding_text) : NULL;

@@ -71,6 +71,10 @@ Use `tests/test_config.json` to isolate a failing case; the corresponding source
 file is the configuration key. The shared helper owns per-case strings and
 worker results and releases them between cases.
 
+Native dependency probes and per-case scratch directories honour `TMPDIR`; otherwise
+they use the platform temporary-directory default. Set `TMPDIR` to an existing,
+writable directory when temporary storage is limited.
+
 ```sh
 make test_number
 make test_qfloat

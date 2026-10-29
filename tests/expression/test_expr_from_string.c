@@ -9,10 +9,10 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
-#include "test_expr.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expression/expr_internal.h"
 
-#define MARS_SHARED_EXPR_INTERNAL_ACCESS
-#include "internal/expr_internal.h"
+#include "test_expr.h"
 
 static void check_parse_num(const char *label, const char *s, const char *want_text, int line);
 static void check_parse_expr(const char *label, const char *s, const char *want_expr, int line);
@@ -1039,8 +1039,8 @@ static void test_from_string_series_ellipsis(void)
         ASSERT_NOT_NULL(product_text);
         TEST_ASSERT_STR_EQ(product_text, "¹¹⁄₂");
         ASSERT_NOT_NULL(strstr(string_c_str(product_derivation_TeX),
-                               "\\prod_{k=2}^{10}\\left(1+\\frac{1}{k}\\right)"));
-        ASSERT_NOT_NULL(strstr(string_c_str(product_derivation_TeX), "\\frac{10+1}{2}"));
+                               "\\prod_{k=2}^{10}\\left(1 + \\frac{1}{k}\\right)"));
+        ASSERT_NOT_NULL(strstr(string_c_str(product_derivation_TeX), "\\frac{10 + 1}{2}"));
         product_value = expr_eval(product);
         ASSERT_TRUE(num_is_exact(product_value));
         ASSERT_TRUE(num_eq(product_value, product_want));
@@ -1061,7 +1061,7 @@ static void test_from_string_series_ellipsis(void)
         ASSERT_NOT_NULL(prime_product);
         ASSERT_NOT_NULL(prime_product_derivation_TeX);
         ASSERT_NOT_NULL(strstr(string_c_str(prime_product_derivation_TeX),
-                               "\\prod_{p\\in\\mathbb{P}}\\left(1+\\frac{1}{p}\\right)=+\\infty"));
+                               "\\prod_{p\\in \\mathbb{P}}\\left(1 + \\frac{1}{p}\\right) = \\infty"));
         prime_product_value = expr_eval(prime_product);
         ASSERT_TRUE(num_is_inf(prime_product_value));
         ASSERT_TRUE(num_get_sign(prime_product_value) > 0);
@@ -1085,7 +1085,7 @@ static void test_from_string_series_ellipsis(void)
         ASSERT_NOT_NULL(reciprocal_prime_product_text);
         TEST_ASSERT_STR_EQ(reciprocal_prime_product_text, "0");
         ASSERT_NOT_NULL(strstr(string_c_str(reciprocal_prime_product_derivation_TeX),
-                               "\\prod_{p\\in\\mathbb{P}}\\left(1-\\frac{1}{p}\\right)=0"));
+                               "\\prod_{p\\in \\mathbb{P}}\\left(1 - \\frac{1}{p}\\right) = 0"));
         reciprocal_prime_product_value = expr_eval(reciprocal_prime_product);
         ASSERT_TRUE(num_is_zero(reciprocal_prime_product_value));
         num_destroy(&reciprocal_prime_product_value);

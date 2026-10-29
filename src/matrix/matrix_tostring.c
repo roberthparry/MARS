@@ -14,14 +14,13 @@
 #include <string.h>
 
 #include "string-t.h"
-#include "TeX-t.h"
 
-#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
-#include "internal/TeX_semantic_internal.h"
-#define MARS_MATRIX_INTERNAL_ACCESS
-#include "matrix_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_MATRIX_INTERNAL_ACCESS
+#include "matrix_notation_internal.h"
+#define MARS_MATRIX_INTERNAL_ACCESS
+#include "matrix_internal.h"
 
 typedef struct {
     string_t *text;
@@ -47,18 +46,6 @@ static int mat_rune_is_token_space(rune_t rune)
 static size_t mat_text_display_length(const string_t *text)
 {
     return text ? string_length(text) : 0u;
-}
-
-static string_t *mat_string_from_owned_cstr(char *raw)
-{
-    string_t *text;
-
-    if (!raw)
-        return NULL;
-
-    text = string_new_with(raw);
-    free(raw);
-    return text;
 }
 
 static int mat_text_equal(const string_t *a, const string_t *b)
@@ -651,163 +638,6 @@ static void mat_emit_cells_expression_layout(mat_buf_t *out, string_t **cells, s
     mb_putc(out, ')');
 }
 
-static int mat_emit_matrix_TeX(mat_buf_t *out, string_t **cells, size_t rows, size_t cols, TeX_matrix_style_t style)
-{
-    size_t count = rows * cols;
-    TeX_t **entries = calloc(count, sizeof *entries);
-    TeX_t *matrix = NULL;
-    int result = -1;
-    if (!entries)
-        return -1;
-    for (size_t i = 0; i < count; ++i) {
-        if (cells[i] && !(entries[i] = TeX_raw(string_c_str(cells[i]))))
-            goto cleanup;
-    }
-    matrix = TeX_matrix((const TeX_t *const *)entries, rows, cols, style, 10);
-    if (matrix)
-        result = mb_puts(out, TeX_source(matrix));
-cleanup:
-    TeX_free(matrix);
-    for (size_t i = 0; i < count; ++i)
-        TeX_free(entries[i]);
-    free(entries);
-    return result;
-}
-
-static int mat_numeric_cells_need_multiline_TeX(string_t **cells, size_t rows, size_t cols)
-{
-    for (size_t i = 0u; i < rows; ++i) {
-        size_t row_width = cols > 0u ? 3u * (cols - 1u) : 0u;
-
-        for (size_t j = 0u; j < cols; ++j) {
-            size_t cell_width = mat_text_display_length(cells[i * cols + j]);
-
-            if (cell_width > 64u)
-                return 1;
-            row_width += cell_width;
-        }
-        if (row_width > 90u)
-            return 1;
-    }
-    return 0;
-}
-
-static void mat_numeric_cell_TeX_parts(const string_t *cell, const char **real, size_t *real_length,
-                                      const char **imaginary, size_t *imaginary_length, int *imaginary_sign)
-{
-    static const char zero[] = "0";
-    static const char one[] = "1";
-    const char *text = cell ? string_c_str(cell) : zero;
-    size_t length = strlen(text);
-    const char *separator = strstr(text, " + ");
-
-    if (!separator && text[0] != '\0')
-        separator = strstr(text + 1, " - ");
-
-    if (separator) {
-        *real = text;
-        *real_length = (size_t)(separator - text);
-        *imaginary = separator + 3;
-        *imaginary_length = length - (size_t)(*imaginary - text);
-        *imaginary_sign = separator[1] == '-' ? -1 : 1;
-        if (*imaginary_length > 0u && (*imaginary)[*imaginary_length - 1u] == 'i')
-            (*imaginary_length)--;
-        if (*imaginary_length == 0u) {
-            *imaginary = one;
-            *imaginary_length = 1u;
-        }
-        return;
-    }
-
-    if (length > 0u && text[length - 1u] == 'i') {
-        *real = zero;
-        *real_length = 1u;
-        *imaginary = text;
-        *imaginary_length = length - 1u;
-        *imaginary_sign = 1;
-        if (*imaginary_length > 0u && ((*imaginary)[0] == '-' || (*imaginary)[0] == '+')) {
-            *imaginary_sign = (*imaginary)[0] == '-' ? -1 : 1;
-            (*imaginary)++;
-            (*imaginary_length)--;
-        }
-        if (*imaginary_length == 0u) {
-            *imaginary = one;
-            *imaginary_length = 1u;
-        }
-        return;
-    }
-
-    *real = text;
-    *real_length = length;
-    *imaginary = zero;
-    *imaginary_length = 1u;
-    *imaginary_sign = 1;
-}
-
-static int mat_numeric_cells_have_imaginary_TeX(string_t **cells, size_t rows, size_t cols)
-{
-    for (size_t i = 0u; i < rows * cols; ++i) {
-        const char *real;
-        const char *imaginary;
-        size_t real_length;
-        size_t imaginary_length;
-        int imaginary_sign;
-
-        mat_numeric_cell_TeX_parts(cells[i], &real, &real_length, &imaginary, &imaginary_length, &imaginary_sign);
-        if (!(imaginary_length == 1u && imaginary[0] == '0'))
-            return 1;
-    }
-    return 0;
-}
-
-static int mat_emit_numeric_component_TeX(mat_buf_t *out, string_t **cells, size_t rows, size_t cols, int imaginary_part)
-{
-    size_t count = rows * cols;
-    string_t **components = calloc(count, sizeof *components);
-    int result = -1;
-    if (!components)
-        return -1;
-    for (size_t i = 0u; i < count; ++i) {
-        const char *real, *imaginary;
-        size_t real_length, imaginary_length;
-        int imaginary_sign;
-        mat_numeric_cell_TeX_parts(cells[i], &real, &real_length, &imaginary, &imaginary_length, &imaginary_sign);
-        components[i] = string_new_with(imaginary_part && imaginary_sign < 0 ? "-" : "");
-        if (!components[i] || string_append_bytes(components[i], imaginary_part ? imaginary : real,
-                                                  imaginary_part ? imaginary_length : real_length) != 0)
-            goto cleanup;
-    }
-    result = mat_emit_matrix_TeX(out, components, rows, cols, TeX_MATRIX_PARENTHESES);
-cleanup:
-    for (size_t i = 0u; i < count; ++i)
-        string_free(components[i]);
-    free(components);
-    return result;
-}
-
-static int mat_emit_numeric_cells_real_imaginary_TeX(mat_buf_t *out, string_t **cells, size_t rows, size_t cols)
-{
-    mat_buf_t real = {0}, imaginary = {0};
-    TeX_t *real_notation = NULL, *imaginary_notation = NULL, *sum = NULL;
-    int status = -1;
-    if (mat_emit_numeric_component_TeX(&real, cells, rows, cols, 0) != 0 ||
-        mat_emit_numeric_component_TeX(&imaginary, cells, rows, cols, 1) != 0)
-        goto cleanup;
-    real_notation = TeX_raw(string_c_str(real.text));
-    imaginary_notation = TeX_raw(string_c_str(imaginary.text));
-    sum = TeX_cartesian_sum(real_notation, imaginary_notation);
-    if (sum)
-        status = mb_puts(out, TeX_source(sum));
-cleanup:
-    TeX_free(sum);
-    TeX_free(imaginary_notation);
-    TeX_free(real_notation);
-    string_free(imaginary.text);
-    string_free(real.text);
-    return status;
-}
-
-
 static int mat_split_expr_repr(const expr_t *expr, string_t **expr_out, string_t **bindings_out)
 {
     string_t *tmp_text;
@@ -892,30 +722,6 @@ done:
     return ok ? 0 : -1;
 }
 
-static int mat_expr_TeX_parts_text(const expr_t *expr, string_t **expr_out, string_t **bindings_out)
-{
-    char *expression_text = NULL;
-    char *bindings = NULL;
-    int ok;
-
-    *expr_out = NULL;
-    *bindings_out = NULL;
-
-    if (expr_to_TeX_symbolic_parts(expr, &expression_text, &bindings) != 0)
-        return -1;
-
-    *expr_out = mat_string_from_owned_cstr(expression_text);
-    *bindings_out = mat_string_from_owned_cstr(bindings);
-    ok = *expr_out && *bindings_out;
-    if (!ok) {
-        string_free(*expr_out);
-        string_free(*bindings_out);
-        *expr_out = NULL;
-        *bindings_out = NULL;
-    }
-    return ok ? 0 : -1;
-}
-
 static string_t *mat_function_expression_text(const expr_function_temporaries_t *temporaries, const expr_t *expr)
 {
     if (temporaries)
@@ -934,9 +740,6 @@ static string_t *mat_matrix_factor_text(const expr_t *factor, mat_string_style_t
     if (style == MAT_STRING_FUNCTION) {
         expression = mat_function_expression_text(temporaries, factor);
         if (!expression)
-            return NULL;
-    } else if (style == MAT_STRING_LATEX) {
-        if (mat_expr_TeX_parts_text(factor, &expression, &bindings) != 0)
             return NULL;
     } else if (mat_split_expr_repr(factor, &expression, &bindings) != 0) {
         return NULL;
@@ -996,84 +799,13 @@ static string_t *mat_format_scalar(const matrix_t *A, size_t i, size_t j, int sc
     return text;
 }
 
-static string_t *mat_binding_list_TeX(string_t **bindings, size_t nbindings)
-{
-    string_t *out = string_new();
-
-    if (!out)
-        return NULL;
-
-    for (size_t i = 0; i < nbindings; ++i) {
-        char *tex = TeX_from_unicode_math(string_c_str(bindings[i]));
-
-        if (i > 0 && string_append_cstr(out, ", ") != 0) {
-            free(tex);
-            goto fail;
-        }
-        if (tex) {
-            if (string_append_cstr(out, tex) != 0) {
-                free(tex);
-                goto fail;
-            }
-            free(tex);
-        } else {
-            if (string_append_string(out, bindings[i]) != 0)
-                goto fail;
-        }
-    }
-
-    return out;
-
-fail:
-    string_free(out);
-    return NULL;
-}
-
-static string_t *mat_join_bindings_TeX(string_t **var_bindings, size_t nvar_bindings, string_t **const_bindings,
-                                      size_t nconst_bindings)
-{
-    string_t *vars = nvar_bindings ? mat_binding_list_TeX(var_bindings, nvar_bindings) : string_new();
-    string_t *consts = nconst_bindings ? mat_binding_list_TeX(const_bindings, nconst_bindings) : string_new();
-    string_t *out = NULL;
-
-    if (!vars || !consts)
-        goto fail;
-
-    if (string_length(vars) == 0u && string_length(consts) == 0u) {
-        string_free(vars);
-        return consts;
-    }
-
-    out = string_new();
-    if (!out)
-        goto fail;
-
-    if (string_length(vars) > 0u && string_append_string(out, vars) != 0)
-        goto fail;
-    if (string_length(consts) > 0u) {
-        if (string_length(vars) > 0u && string_append_cstr(out, "; ") != 0)
-            goto fail;
-        if (string_append_string(out, consts) != 0)
-            goto fail;
-    }
-
-    string_free(vars);
-    string_free(consts);
-    return out;
-
-fail:
-    string_free(vars);
-    string_free(consts);
-    string_free(out);
-    return NULL;
-}
-
 static string_t *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)
 {
+    if (style == MAT_STRING_LATEX)
+        return mat_numeric_notation_TeX(A);
     mat_buf_t out = {0};
     string_t **cells = NULL;
     size_t *widths = NULL;
-    int tex = (style == MAT_STRING_LATEX);
     int expression_layout = (style == MAT_STRING_EXPRESSION_LAYOUT);
     int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC || style == MAT_STRING_LAYOUT_PRETTY);
     int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC || style == MAT_STRING_LAYOUT_SCIENTIFIC);
@@ -1094,8 +826,7 @@ static string_t *mat_to_string_numeric(const matrix_t *A, mat_string_style_t sty
                 ok = 0;
                 break;
             }
-            cells[idx] =
-                tex ? mat_string_from_owned_cstr(TeX_from_unicode_math(string_c_str(scalar))) : string_clone(scalar);
+            cells[idx] = string_clone(scalar);
             string_free(scalar);
             if (!cells[idx]) {
                 ok = 0;
@@ -1112,14 +843,7 @@ static string_t *mat_to_string_numeric(const matrix_t *A, mat_string_style_t sty
         goto cleanup;
     }
 
-    if (tex) {
-        if (mat_numeric_cells_need_multiline_TeX(cells, A->rows, A->cols) &&
-            mat_numeric_cells_have_imaginary_TeX(cells, A->rows, A->cols))
-            ok = mat_emit_numeric_cells_real_imaginary_TeX(&out, cells, A->rows, A->cols) == 0;
-        else
-            ok = mat_emit_matrix_TeX(&out, cells, A->rows, A->cols, TeX_MATRIX_BRACKETS) == 0;
-    }
-    else if (expression_layout)
+    if (expression_layout)
         mat_emit_cells_expression_layout(&out, cells, A->rows, A->cols);
     else
         mat_emit_cells(&out, cells, A->rows, A->cols, widths, layout);
@@ -1141,6 +865,8 @@ cleanup:
 static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style, int include_bindings,
                                     string_t **function_declarations_out)
 {
+    if (style == MAT_STRING_LATEX)
+        return mat_symbolic_notation_TeX(A, include_bindings != 0);
     size_t n = A->rows * A->cols;
     string_t **exprs = calloc(n ? n : 1, sizeof(*exprs));
     string_t **additive_constants = calloc(n ? n : 1, sizeof(*additive_constants));
@@ -1153,7 +879,6 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
     size_t *constant_widths = calloc(A->cols ? A->cols : 1, sizeof(*constant_widths));
     mat_buf_t out = {0};
     int ok = exprs && additive_constants && widths && constant_widths;
-    int tex = (style == MAT_STRING_LATEX);
     int expression_style = (style == MAT_STRING_EXPRESSION || style == MAT_STRING_EXPRESSION_LAYOUT);
     int expression_layout = (style == MAT_STRING_EXPRESSION_LAYOUT);
     int function = (style == MAT_STRING_FUNCTION);
@@ -1211,8 +936,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
                 }
                 string_free(constant_binding_text);
                 constant_binding_text = NULL;
-            } else if ((tex && mat_expr_TeX_parts_text(display_expr, &expr, &binding_text) != 0) ||
-                       (!tex && mat_split_expr_repr(display_expr, &expr, &binding_text) != 0)) {
+            } else if (mat_split_expr_repr(display_expr, &expr, &binding_text) != 0) {
                 string_free(expr);
                 string_free(binding_text);
                 ok = 0;
@@ -1227,7 +951,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
             exprs[idx] = expr;
             mat_collect_expr_bindings(display_expr, &var_bindings, &nvar_bindings, &capvar_bindings, &const_bindings,
                                      &nconst_bindings, &capconst_bindings, binding_text);
-            if (!tex && !expression_layout) {
+            if (!expression_layout) {
                 mat_pretty_expr_expr(&exprs[idx], const_bindings, nconst_bindings);
             }
             if (mat_text_display_length(exprs[idx]) > widths[j])
@@ -1242,10 +966,8 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
                     }
                     string_free(expr);
                     expr = NULL;
-                } else if ((tex && mat_expr_TeX_parts_text(beautification.additive_constants[idx],
-                                                          &additive_constants[idx], &constant_binding_text) != 0) ||
-                           (!tex && mat_split_expr_repr(beautification.additive_constants[idx], &additive_constants[idx],
-                                                       &constant_binding_text) != 0)) {
+                } else if (mat_split_expr_repr(beautification.additive_constants[idx], &additive_constants[idx],
+                                                       &constant_binding_text) != 0) {
                     string_free(constant_binding_text);
                     string_free(binding_text);
                     ok = 0;
@@ -1260,7 +982,7 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
                 mat_collect_expr_bindings(beautification.additive_constants[idx], &var_bindings, &nvar_bindings,
                                          &capvar_bindings, &const_bindings, &nconst_bindings, &capconst_bindings,
                                          constant_binding_text);
-                if (!tex && !expression_layout)
+                if (!expression_layout)
                     mat_pretty_expr_expr(&additive_constants[idx], const_bindings, nconst_bindings);
                 if (mat_text_display_length(additive_constants[idx]) > constant_widths[j])
                     constant_widths[j] = mat_text_display_length(additive_constants[idx]);
@@ -1288,45 +1010,6 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
     if (!ok) {
         string_free(out.text);
         out.text = string_new_with("<expr matrix>");
-    } else if (tex) {
-        omit_wrapper = !include_bindings ||
-                       mat_all_bindings_are_unset(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
-        string_t *joined = mat_join_bindings_TeX(var_bindings, nvar_bindings, const_bindings, nconst_bindings);
-        mat_buf_t body = {0};
-        ok = mat_emit_matrix_TeX(&body, exprs, A->rows, A->cols, TeX_MATRIX_BRACKETS) == 0;
-        TeX_t *notation = ok ? TeX_raw(string_c_str(body.text)) : NULL;
-        if (notation && common_factor_text) {
-            TeX_t *factor = TeX_raw(string_c_str(common_factor_text));
-            TeX_t *scaled = TeX_scaled(factor, notation);
-            TeX_free(factor);
-            TeX_free(notation);
-            notation = scaled;
-        }
-        if (notation && beautification.additive_constants) {
-            mat_buf_t constants = {0};
-            bool rendered = mat_emit_matrix_TeX(&constants, additive_constants, A->rows, A->cols,
-                                                 TeX_MATRIX_BRACKETS) == 0;
-            TeX_t *plus = TeX_raw(" + ");
-            TeX_t *addition = rendered ? TeX_raw(string_c_str(constants.text)) : NULL;
-            const TeX_t *parts[] = {notation, plus, addition};
-            TeX_t *sum = plus && addition ? TeX_sequence(parts, 3u) : NULL;
-            TeX_free(addition);
-            TeX_free(plus);
-            TeX_free(notation);
-            string_free(constants.text);
-            notation = sum;
-        }
-        if (notation && !omit_wrapper) {
-            TeX_t *bindings = joined ? TeX_raw(string_c_str(joined)) : NULL;
-            TeX_t *bound = joined && !bindings ? NULL : TeX_bound(notation, bindings);
-            TeX_free(bindings);
-            TeX_free(notation);
-            notation = bound;
-        }
-        ok = notation && mb_puts(&out, TeX_source(notation)) == 0;
-        TeX_free(notation);
-        string_free(body.text);
-        string_free(joined);
     } else if (!layout) {
         string_t *joined;
 
@@ -1422,10 +1105,6 @@ static string_t *mat_to_string_expr(const matrix_t *A, mat_string_style_t style,
     free(widths);
     free(constant_widths);
     free(function_roots);
-    if (tex && !ok) {
-        string_free(out.text);
-        return NULL;
-    }
     return mb_take(&out);
 }
 

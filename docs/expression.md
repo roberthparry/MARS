@@ -3737,6 +3737,9 @@ The operands must be parenthesised and the positive integer orders must agree.
 All TeX emission is owned by the reusable [TeX module](TeX.md), including operation
 names, recursive calculus, binding values and series derivations. The public
 `style_LATEX` and `expr_to_TeX_*` APIs retain their output and ownership contracts.
-The backend reads native mathematical structure through controlled interfaces and
-uses native operations for display views; it does not reparse rendered fragments.
-Parsing, evaluation and simplification remain expression responsibilities.
+Expression prepares semantic snapshots internally, including binding values,
+constant identities and recognised series identities. TeX requests additive terms
+through a private callback only when wrapping is necessary. It has no access to
+expression graphs or operation tables, and does not reparse rendered fragments.
+Parsing, evaluation, simplification, naming scopes and mathematical display
+selection remain expression responsibilities; callers need no rendering context.

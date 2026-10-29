@@ -1,5 +1,5 @@
 /**
- * @file TeX_expr_symbols.c
+ * @file TeX_unicode.c
  * @brief Unicode symbols and perfect-hash TeX translations.
  *
  * Converts mathematical Unicode symbols into notation without accessing native
@@ -9,24 +9,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 #include "string-t.h"
 
-#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
-#include "internal/TeX_semantic_internal.h"
-#define MARS_TeX_SEMANTIC_SYMBOLS_INTERNAL_ACCESS
-#include "TeX_semantic_symbols.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
+#define MARS_TeX_INTERNAL_ACCESS
+#include "TeX_internal.h"
 
-#define EXPR_LATEX_HASH_FRACTION_SIZE 21u
-#define EXPR_LATEX_HASH_SYMBOL_SIZE 9u
+#define TeX_FRACTION_HASH_SIZE 21u
+#define TeX_SYMBOL_HASH_SIZE 9u
 
 typedef struct {
     unsigned int codepoint;
     const char *text;
-} expr_tostring_TeX_map_t;
+} TeX_character_map_t;
 
-static const expr_tostring_TeX_map_t expr_tostring_vulgar_fraction_TeX_table[EXPR_LATEX_HASH_FRACTION_SIZE] = {
+static const TeX_character_map_t TeX_vulgar_fractions[TeX_FRACTION_HASH_SIZE] = {
     [0] = {0x00BD, "\\frac{1}{2}"},
     [1] = {0x00BE, "\\frac{3}{4}"},
     [2] = {0x2150, "\\frac{1}{7}"},
@@ -47,7 +46,7 @@ static const expr_tostring_TeX_map_t expr_tostring_vulgar_fraction_TeX_table[EXP
     [20] = {0x00BC, "\\frac{1}{4}"}
 };
 
-static const expr_tostring_TeX_map_t expr_tostring_symbol_TeX_table[EXPR_LATEX_HASH_SYMBOL_SIZE] = {
+static const TeX_character_map_t TeX_symbols[TeX_SYMBOL_HASH_SIZE] = {
     [0] = {0x2260, "\\neq"},
     [1] = {0x2202, "\\partial"},
     [2] = {0x221E, "\\infty"},
@@ -57,39 +56,6 @@ static const expr_tostring_TeX_map_t expr_tostring_symbol_TeX_table[EXPR_LATEX_H
     [7] = {0x221A, "\\sqrt{}"},
     [8] = {0x00D7, " \\times "}
 };
-
-/* Retain known notation spellings without knowing how native maths is parsed. */
-const char *TeX_known_math_text(const char *text)
-{
-    if (!text)
-        return NULL;
-    if (strcmp(text, "1/√π") == 0)
-        return "\\frac{1}{\\sqrt{\\pi}}";
-    if (strcmp(text, "2/√π") == 0)
-        return "\\frac{2}{\\sqrt{\\pi}}";
-    if (strcmp(text, "-2/√π") == 0)
-        return "-\\frac{2}{\\sqrt{\\pi}}";
-    if (strcmp(text, "√π") == 0)
-        return "\\sqrt{\\pi}";
-    if (strcmp(text, "√(2π)") == 0)
-        return "\\sqrt{2\\pi}";
-    if (strcmp(text, "1/√(2π)") == 0)
-        return "\\frac{1}{\\sqrt{2\\pi}}";
-    if (strcmp(text, "√(π/2)") == 0)
-        return "\\sqrt{\\pi/2}";
-    if (strcmp(text, "√2") == 0)
-        return "\\sqrt{2}";
-    if (strcmp(text, "√3") == 0)
-        return "\\sqrt{3}";
-    if (strcmp(text, "√(1/2)") == 0)
-        return "\\sqrt{1/2}";
-    if (strcmp(text, "√2/2") == 0)
-        return "\\frac{\\sqrt{2}}{2}";
-    if (strcmp(text, "√3/2") == 0)
-        return "\\frac{\\sqrt{3}}{2}";
-    return NULL;
-}
-
 
 typedef struct {
     unsigned int codepoint;
@@ -136,44 +102,9 @@ static int TeX_collect_script(string_cursor_t *cursor, string_t *output, bool su
     return 0;
 }
 
-static const char *TeX_character_lookup(const expr_tostring_TeX_map_t *table, size_t index, unsigned int cp)
+static const char *TeX_character_lookup(const TeX_character_map_t *table, size_t index, unsigned int cp)
 {
     return table[index].codepoint == cp ? table[index].text : NULL;
-}
-
-/* Remove the sign and normalise a numeric pi coefficient in trusted notation. */
-string_t *TeX_negative_coefficient_abs(const string_t *text)
-{
-    string_cursor_t *cursor = text ? string_cursor_new(text) : NULL;
-    if (!cursor)
-        return NULL;
-    string_cursor_skip_spaces(cursor);
-    if (!rune_is_equal(string_cursor_peek(cursor), '-')) {
-        string_cursor_free(cursor);
-        return NULL;
-    }
-    string_cursor_next(cursor);
-    string_cursor_skip_spaces(cursor);
-    string_pos_t start = string_cursor_position(cursor);
-    unsigned char digit;
-    while (string_cursor_peek_ascii(cursor, &digit) && isdigit(digit))
-        string_cursor_next(cursor);
-    string_pos_t end = string_cursor_position(cursor);
-    string_t *result = NULL;
-    if (end > start && string_cursor_consume(cursor, " \\cdot \\pi")) {
-        result = string_cursor_slice_between(start, end, cursor);
-        string_t *suffix = string_cursor_slice_between(string_cursor_position(cursor),
-                                                       string_cursor_end_position(cursor), cursor);
-        if (!result || !suffix || string_append_cstr(result, "\\pi") || string_append_string(result, suffix)) {
-            string_free(result);
-            result = NULL;
-        }
-        string_free(suffix);
-    } else {
-        result = string_cursor_slice_between(start, string_cursor_end_position(cursor), cursor);
-    }
-    string_cursor_free(cursor);
-    return result;
 }
 
 /* Convert Unicode mathematical symbols without accessing native expression structures. */
@@ -187,8 +118,8 @@ char *TeX_from_unicode_math(const char *text)
     while (!string_cursor_done(cursor)) {
         rune_t rune = string_cursor_peek(cursor);
         unsigned int cp = rune_value(rune);
-        const char *mapped = TeX_character_lookup(expr_tostring_vulgar_fraction_TeX_table,
-                                                  cp % EXPR_LATEX_HASH_FRACTION_SIZE, cp);
+        const char *mapped = TeX_character_lookup(TeX_vulgar_fractions,
+                                                  cp % TeX_FRACTION_HASH_SIZE, cp);
         if (mapped) {
             if (string_append_cstr(output, mapped) || string_cursor_next(cursor))
                 goto fail;
@@ -229,8 +160,8 @@ char *TeX_from_unicode_math(const char *text)
                 goto fail;
             continue;
         }
-        mapped = TeX_character_lookup(expr_tostring_symbol_TeX_table,
-                                      (cp ^ (cp >> 12u)) % EXPR_LATEX_HASH_SYMBOL_SIZE, cp);
+        mapped = TeX_character_lookup(TeX_symbols,
+                                      (cp ^ (cp >> 12u)) % TeX_SYMBOL_HASH_SIZE, cp);
         if ((mapped ? string_append_cstr(output, mapped) : string_append_rune(output, rune)) ||
             string_cursor_next(cursor))
             goto fail;

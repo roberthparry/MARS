@@ -22,12 +22,16 @@
 #include "string-t.h"
 #include "expression-t.h"
 
-#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
-#include "internal/TeX_semantic_internal.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_computation_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_series_notation.h"
 
 typedef struct {
     size_t start;
@@ -283,9 +287,8 @@ static string_t *expr_series_expand_telescoping_product(const string_t *source, 
     }
 
     expanded = string_new();
-    TeX = string_new();
-    if (!expanded || !TeX || string_append_format(expanded, "((%s)+1)/2", denominators[3]) < 0 ||
-        TeX_append_telescoping_product(TeX, denominators[3]) < 0)
+    TeX = expr_series_telescoping_identity_TeX(denominators[3]);
+    if (!expanded || !TeX || string_append_format(expanded, "((%s)+1)/2", denominators[3]) < 0)
         goto cleanup;
     matched = true;
 
@@ -358,10 +361,9 @@ static string_t *expr_series_expand_infinite_prime_product(const string_t *sourc
         goto cleanup;
 
     expanded = string_new();
-    TeX = string_new();
+    TeX = expr_series_prime_identity_TeX(product_sign > 0);
     if (!expanded || !TeX ||
-        string_append_cstr(expanded, product_sign > 0 ? "inf" : "0") != 0 ||
-        TeX_append_prime_product(TeX, product_sign > 0) != 0)
+        string_append_cstr(expanded, product_sign > 0 ? "inf" : "0") != 0)
         goto cleanup;
     *expanded_out = true;
     *display_TeX_out = TeX;
@@ -970,9 +972,7 @@ static string_t *expr_series_expand_trigonometric_progression(const string_t *so
     expr_t *endpoint_term = NULL;
     expr_t *endpoint = NULL;
     char *endpoint_text = NULL;
-    char *endpoint_TeX = NULL;
     char *angle_step_text = NULL;
-    char *angle_step_TeX = NULL;
     string_t *expanded = NULL;
     string_t *TeX = NULL;
     bool matched = false;
@@ -1093,12 +1093,10 @@ static string_t *expr_series_expand_trigonometric_progression(const string_t *so
         expr_free(expanded_endpoint_term);
     }
     endpoint_text = endpoint ? expr_to_string(endpoint, style_UNBOUND) : NULL;
-    endpoint_TeX = endpoint ? expr_to_TeX_body(endpoint) : NULL;
     angle_step_text = angle_step ? expr_to_string(angle_step, style_UNBOUND) : NULL;
-    angle_step_TeX = angle_step ? expr_to_TeX_body(angle_step) : NULL;
     expanded = string_new();
     TeX = string_new();
-    if (!endpoint_text || !endpoint_TeX || (!unit_angle_step && (!angle_step_text || !angle_step_TeX)) ||
+    if (!endpoint_text || (!unit_angle_step && !angle_step_text) ||
         !expanded || !TeX)
         goto cleanup;
     {
@@ -1109,25 +1107,25 @@ static string_t *expr_series_expand_trigonometric_progression(const string_t *so
         const char *first_function = hyperbolic ? "sinh" : "sin";
         const char *second_function = sine_family ? first_function : (hyperbolic ? "cosh" : "cos");
         const char *function_name = sine_family ? first_function : second_function;
+        string_free(TeX);
+        TeX = expr_series_trigonometric_sum_TeX(endpoint, function_name, unit_angle_step ? NULL : angle_step, false);
+        if (!TeX)
+            goto cleanup;
 
         if (unit_angle_step) {
             if (string_append_format(expanded, "%s((%s)/2)*%s(((%s)+1)/2)/%s(1/2)", first_function,
-                                     endpoint_text, second_function, endpoint_text, first_function) < 0 ||
-                TeX_append_trigonometric_sum(TeX, endpoint_TeX, function_name, NULL, false) < 0)
+                                     endpoint_text, second_function, endpoint_text, first_function) < 0)
                 goto cleanup;
         } else if (string_append_format(expanded, "%s((%s)*(%s)/2)*%s(((%s)+1)*(%s)/2)/%s((%s)/2)",
                                         first_function, endpoint_text, angle_step_text, second_function,
-                                        endpoint_text, angle_step_text, first_function, angle_step_text) < 0 ||
-                   TeX_append_trigonometric_sum(TeX, endpoint_TeX, function_name, angle_step_TeX, false) < 0) {
+                                        endpoint_text, angle_step_text, first_function, angle_step_text) < 0) {
             goto cleanup;
         }
     }
     matched = true;
 
 cleanup:
-    free(angle_step_TeX);
     free(angle_step_text);
-    free(endpoint_TeX);
     free(endpoint_text);
     expr_free(endpoint);
     expr_free(endpoint_term);
@@ -1200,9 +1198,7 @@ static string_t *expr_series_expand_weighted_trigonometric_progression(const str
     const expr_t *endpoint_factor = NULL;
     expr_t *endpoint = NULL;
     char *angle_text = NULL;
-    char *angle_TeX = NULL;
     char *endpoint_text = NULL;
-    char *endpoint_TeX = NULL;
     string_t *output = NULL;
     string_t *TeX = NULL;
     bool matched = false;
@@ -1258,31 +1254,30 @@ static string_t *expr_series_expand_weighted_trigonometric_progression(const str
         goto cleanup;
 
     angle_text = expr_to_string(angle_step, style_UNBOUND);
-    angle_TeX = expr_to_TeX_body(angle_step);
     endpoint_text = expr_to_string(endpoint, style_UNBOUND);
-    endpoint_TeX = expr_to_TeX_body(endpoint);
     output = string_new();
     TeX = string_new();
-    if (!angle_text || !angle_TeX || !endpoint_text || !endpoint_TeX || !output || !TeX)
+    if (!angle_text || !endpoint_text || !output || !TeX)
         goto cleanup;
     {
         const char *function_name = kind == EXPR_SERIES_TRIGONOMETRIC_SIN    ? "sin"
                                     : kind == EXPR_SERIES_TRIGONOMETRIC_COS  ? "cos"
                                     : kind == EXPR_SERIES_TRIGONOMETRIC_SINH ? "sinh"
                                                                             : "cosh";
+        string_free(TeX);
+        TeX = expr_series_trigonometric_sum_TeX(endpoint, function_name, angle_step, true);
+        if (!TeX)
+            goto cleanup;
         if (expr_series_append_slice(output, text, 0u, expr_series_trim(text, terms[0]).start) != 0 ||
             string_append_format(output, "sum(k,1,%s,%s(k*(%s))/k)", endpoint_text, function_name, angle_text) < 0 ||
             expr_series_append_slice(output, text, expr_series_trim(text, terms[ellipsis_index + 1u]).end,
-                                     strlen(text)) != 0 ||
-            TeX_append_trigonometric_sum(TeX, endpoint_TeX, function_name, angle_TeX, true) < 0)
+                                     strlen(text)) != 0)
             goto cleanup;
     }
     matched = true;
 
 cleanup:
-    free(endpoint_TeX);
     free(endpoint_text);
-    free(angle_TeX);
     free(angle_text);
     expr_free(endpoint);
     expr_free(expanded_endpoint);

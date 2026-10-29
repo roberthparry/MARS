@@ -17,16 +17,16 @@
 #include "diffequation-t.h"
 #include "TeX-t.h"
 
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
-#define MARS_SHARED_MATRIX_NOTATION_INTERNAL_ACCESS
-#include "internal/matrix_notation_internal.h"
-#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
-#include "internal/equation_internal.h"
-#define MARS_SHARED_DIFFEQUATION_NOTATION_INTERNAL_ACCESS
-#include "internal/diffequation_notation_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
+#define MARS_SHARED_MATRIX_INTERNAL_ACCESS
+#include "internal/matrix_internal.h"
+#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
+#include "internal/equation_internal.h"
+#define MARS_SHARED_DIFFEQUATION_INTERNAL_ACCESS
+#include "internal/diffequation_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_notation_internal.h"
 
 /* Interpret scalar mathematics here and request notation from the existing TeX backend. */
 TeX_t *expr_notation_scalar(const string_t *text, bool formal)

@@ -13,8 +13,9 @@
 
 #include "expr_context-t.h"
 #include "computation-t.h"
-#define MARS_SHARED_EXPR_INTERNAL_ACCESS
-#include "internal/expr_internal.h"
+
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expression/expr_internal.h"
 
 #include "test_expr.h"
 

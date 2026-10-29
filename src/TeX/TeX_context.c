@@ -16,10 +16,10 @@
 #include "dictionary-t.h"
 #include "TeX-t.h"
 
-#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
-#include "internal/TeX_semantic_internal.h"
-#define MARS_TeX_SEMANTIC_SYMBOLS_INTERNAL_ACCESS
-#include "TeX_semantic_symbols.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
+#define MARS_TeX_INTERNAL_ACCESS
+#include "TeX_internal.h"
 
 struct _TeX_context_t {
     TeX_node_ref_t root;
@@ -154,6 +154,13 @@ static TeX_t *render_identifier(const TeX_node_view_t *view, const TeX_t *const 
     }
     TeX_free(literal);
     return from_owned_source(source);
+}
+
+/* Render an identifier independently of a native mathematical representation. */
+TeX_t *TeX_identifier(const string_t *name)
+{
+    const TeX_node_view_t view = {.kind = TeX_NODE_IDENTIFIER, .text = name};
+    return render_identifier(&view, NULL);
 }
 
 static TeX_t *render_binary(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -636,6 +643,20 @@ static TeX_t *render_big_operator(const TeX_node_view_t *view, const TeX_t *cons
         TeX_source(children[2]), TeX_source(children[3]), TeX_source(children[0])));
 }
 
+static TeX_t *render_conditional_product(const TeX_node_view_t *view, const TeX_t *const *children)
+{
+    if (view->child_count != 2u && view->child_count != 3u)
+        return invalid_node();
+    string_t *source = string_sprintf("\\prod_{%s}", TeX_source(children[1]));
+    if (!source || (view->child_count == 3u &&
+        string_append_format(source, "^{%s}", TeX_source(children[2])) < 0) ||
+        string_append_cstr(source, TeX_source(children[0]))) {
+        string_free(source);
+        return NULL;
+    }
+    return from_owned_source(source);
+}
+
 static TeX_t *render_number_set(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     (void)children;
@@ -644,7 +665,8 @@ static TeX_t *render_number_set(const TeX_node_view_t *view, const TeX_t *const 
         [TeX_SET_COMPLEX]             = "\\mathbb{C}",
         [TeX_SET_INTEGERS]            = "\\mathbb{Z}",
         [TeX_SET_NONNEGATIVE_INTEGERS] = "\\mathbb{Z}_{\\ge0}",
-        [TeX_SET_NATURALS]            = "\\mathbb{N}"
+        [TeX_SET_NATURALS]            = "\\mathbb{N}",
+        [TeX_SET_PRIMES]              = "\\mathbb{P}"
     };
     return !view->child_count && (unsigned)view->number_set < sizeof sets / sizeof *sets
         ? TeX_raw(sets[view->number_set]) : invalid_node();
@@ -761,6 +783,7 @@ static const TeX_node_renderer_fn renderers[TeX_NODE_COUNT] = {
     [TeX_NODE_CASES]      = render_cases,
     [TeX_NODE_SUMMATION]  = render_big_operator,
     [TeX_NODE_INDEXED_PRODUCT] = render_big_operator,
+    [TeX_NODE_CONDITIONAL_PRODUCT] = render_conditional_product,
     [TeX_NODE_NUMBER_SET] = render_number_set,
     [TeX_NODE_LIST]       = render_list,
     [TeX_NODE_FENCED]     = render_fenced,
@@ -798,9 +821,11 @@ static bool needs_fence(TeX_node_kind_t parent, TeX_node_kind_t child, size_t in
 {
     bool additive = child == TeX_NODE_SUM || child == TeX_NODE_DIFFERENCE || child == TeX_NODE_EQUATION ||
                     child == TeX_NODE_COMPLEX_LITERAL;
-    bool aggregate = child == TeX_NODE_SUMMATION || child == TeX_NODE_INDEXED_PRODUCT;
+    bool aggregate = child == TeX_NODE_SUMMATION || child == TeX_NODE_INDEXED_PRODUCT ||
+                     child == TeX_NODE_CONDITIONAL_PRODUCT;
     return (parent == TeX_NODE_PRODUCT && (additive || aggregate)) ||
-           ((parent == TeX_NODE_SUMMATION || parent == TeX_NODE_INDEXED_PRODUCT) && index == 0u && additive) ||
+           ((parent == TeX_NODE_SUMMATION || parent == TeX_NODE_INDEXED_PRODUCT ||
+             parent == TeX_NODE_CONDITIONAL_PRODUCT) && index == 0u && additive) ||
            (parent == TeX_NODE_DIFFERENCE && index == 1u && additive) ||
            (parent == TeX_NODE_NEGATIVE && additive) ||
            ((parent == TeX_NODE_FACTORIAL || parent == TeX_NODE_PRIME) &&

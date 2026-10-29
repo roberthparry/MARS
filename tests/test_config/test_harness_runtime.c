@@ -22,8 +22,10 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "test_harness.h"
+#include "file-t.h"
 #include "string-t.h"
+
+#include "test_harness.h"
 
 typedef enum { TEST_OUTCOME_PASS, TEST_OUTCOME_FAIL, TEST_OUTCOME_SKIP } test_outcome_t;
 
@@ -513,29 +515,22 @@ const test_validity_contract_t *test_validity_contract_cstr(void)
 
 static const string_t *test_case_temp_dir_text(void)
 {
-    char template_buf[] = "/tmp/mars-test-XXXXXX";
-    char *created;
-    string_t *owned;
-
     if (g_test_case_temp_dir)
         return g_test_case_temp_dir;
 
-    created = mkdtemp(template_buf);
-    if (!created)
-        return NULL;
-
-    owned = string_new_with(created);
-    if (!owned) {
-        (void)rmdir(created);
-        return NULL;
-    }
-
-    if (!test_case_register_cleanup(test_case_cleanup_temp_tree, owned)) {
-        (void)rmdir(created);
+    const char *configured = getenv("TMPDIR");
+    string_t *parent = string_new_with(configured && *configured ? configured : P_tmpdir);
+    file_t *directory = parent ? file_create_temp_directory(parent) : NULL;
+    string_free(parent);
+    string_t *owned = directory ? string_new_with(file_path(directory)) : NULL;
+    if (!owned || !test_case_register_cleanup(test_case_cleanup_temp_tree, owned)) {
+        if (directory)
+            (void)file_remove_directory(directory);
+        file_free(directory);
         string_free(owned);
         return NULL;
     }
-
+    file_free(directory);
     g_test_case_temp_dir = owned;
     return g_test_case_temp_dir;
 }

@@ -16,8 +16,6 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#define MARS_SHARED_TeX_INTERNAL_ACCESS
-#include "internal/TeX_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_notation_internal.h"
 
@@ -36,38 +34,9 @@ static bool expr_conjugate_sum_contains(const expr_t *expr)
            (expr_conjugate_sum_contains(expr->a) || expr_conjugate_sum_contains(expr->b));
 }
 
-static size_t expr_conjugate_hash_node(const expr_t *expr);
-
-static size_t expr_conjugate_hash_product(const expr_t *expr)
-{
-    if (expr_is_mul(expr))
-        return expr_conjugate_hash_product(expr->a) * expr_conjugate_hash_product(expr->b);
-    if (expr_is_neg(expr))
-        return expr_conjugate_hash_product(expr->a);
-    /* Structural product equality combines scalar factors, irrespective of their association. */
-    return expr_is_const(expr) ? 1u : expr_conjugate_hash_node(expr);
-}
-
-static size_t expr_conjugate_hash_node(const expr_t *expr)
-{
-    if (!expr)
-        return 1u;
-    if (expr_is_var(expr))
-        return (size_t)expr->var_id * 2654435761u + 3u;
-    /* Numeric backends compare by value, not representation; constants deliberately share a hash bucket. */
-    if (expr_is_const(expr))
-        return 7u;
-    if (expr_is_mul(expr))
-        return expr_conjugate_hash_product(expr);
-    bool square_root = expr_is_sqrt_expr(expr) || (expr_is_pow_d_expr(expr) && num_eq(expr->c, NUM_HALF));
-    size_t kind = square_root ? EXPR_KIND_SQRT : expr->ops->kind;
-    return (kind + 11u) * 2654435761u + 31u * expr_conjugate_hash_node(expr->a) +
-           (square_root ? 0u : 37u * expr_conjugate_hash_node(expr->b));
-}
-
 static size_t expr_conjugate_hash(const void *key)
 {
-    return expr_conjugate_hash_node(*(const expr_t *const *)key);
+    return expr_struct_hash(*(const expr_t *const *)key);
 }
 
 static int expr_conjugate_compare(const void *left, const void *right)
@@ -140,9 +109,7 @@ static void expr_conjugate_emit_term(const expr_t *base, number_t coefficient, b
     bool term_negative = expr_renders_negative(term);
     negative = negative != term_negative;
     sbuf_puts(buffer, *first ? (negative ? "-" : "") : negative ? " - " : " + ");
-    if (style == style_LATEX)
-        (term_negative ? emit_TeX_expr_abs : TeX_emit_expr)(term, buffer, PREC_MUL);
-    else if (style == style_FUNCTION)
+    if (style == style_FUNCTION)
         (term_negative ? emit_func_abs : emit_func)(term, buffer, PREC_MUL);
     else
         (term_negative ? emit_expr_abs : emit_expr)(term, buffer, PREC_MUL);
@@ -168,9 +135,7 @@ static bool expr_conjugate_common_factor(const expr_t *expr, sbuf_t *buffer, int
             expr_t *twice_factor = expr_simplify_owned(
                 expr_new_binary_internal(&ops_mul, expr_new_const(NUM_TWO), expr_clone(left[i])));
             expr_t *result = expr_new_binary_internal(&ops_mul, twice_factor, projection);
-            if (style == style_LATEX)
-                TeX_emit_expr(result, buffer, parent_prec);
-            else if (style == style_FUNCTION)
+            if (style == style_FUNCTION)
                 emit_func(result, buffer, parent_prec);
             else
                 emit_expr(result, buffer, parent_prec);
@@ -220,11 +185,9 @@ static const TeX_model_node_t *expr_notation_conjugate_term(notation_build_t *bu
     return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
 }
 
-/* Group complete native sums before asking TeX to render conjugate projections. */
-const TeX_model_node_t *expr_notation_conjugate_sum(notation_build_t *build, const expr_t *expr)
+/* Group a sum already known to contain a conjugate. */
+static const TeX_model_node_t *expr_notation_conjugate_known(notation_build_t *build, const expr_t *expr)
 {
-    if (!build || !expr_is_addsub(expr) || !expr_conjugate_sum_contains(expr))
-        return NULL;
     const TeX_model_node_t *common = expr_notation_common_conjugate(build, expr);
     if (common)
         return common;
@@ -256,6 +219,13 @@ const TeX_model_node_t *expr_notation_conjugate_sum(notation_build_t *build, con
     return valid ? result : NULL;
 }
 
+/* Group complete native sums before asking TeX to render conjugate projections. */
+const TeX_model_node_t *expr_notation_conjugate_sum(notation_build_t *build, const expr_t *expr)
+{
+    return build && expr_is_addsub(expr) && expr_conjugate_sum_contains(expr)
+        ? expr_notation_conjugate_known(build, expr) : NULL;
+}
+
 /* Consume the complete sum, including unequal groups, so nested pairs cannot be rewritten in isolation. */
 bool expr_emit_conjugate_sum(const expr_t *expr, sbuf_t *buffer, int parent_prec, style_t style)
 {
@@ -273,12 +243,8 @@ bool expr_emit_conjugate_sum(const expr_t *expr, sbuf_t *buffer, int parent_prec
         return false;
     }
     bool bracketed = parent_prec > PREC_ADD, first = true;
-    if (bracketed) {
-        if (style == style_LATEX)
-            TeX_emit_parenthesis(buffer, false);
-        else
-            sbuf_putc(buffer, '(');
-    }
+    if (bracketed)
+        sbuf_putc(buffer, '(');
     for (size_t i = 0u; i < dictionary_size(groups); ++i) {
         const expr_conjugate_group_t *group = dictionary_get_value(groups, i);
         if (num_eq(group->coefficients[0], group->coefficients[1]) && !num_is_zero(group->coefficients[0])) {
@@ -294,12 +260,8 @@ bool expr_emit_conjugate_sum(const expr_t *expr, sbuf_t *buffer, int parent_prec
     }
     if (first)
         sbuf_putc(buffer, '0');
-    if (bracketed) {
-        if (style == style_LATEX)
-            TeX_emit_parenthesis(buffer, true);
-        else
-            sbuf_putc(buffer, ')');
-    }
+    if (bracketed)
+        sbuf_putc(buffer, ')');
     dictionary_destroy(groups);
     return true;
 }

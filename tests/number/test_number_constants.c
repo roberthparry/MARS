@@ -20,6 +20,28 @@ void run_number_constant_tests(void)
     printf(C_CYAN "Testing named constants and decimal powers...\n" C_RESET);
 
     {
+        const size_t precisions[] = {64u, 128u, 512u};
+        const char *aliases[] = {"sqrt_pi_over_two", "sqrt(pi/2)", "sqrt(@pi/2)", "√(π/2)"};
+        for (size_t i = 0u; i < sizeof precisions / sizeof *precisions; ++i) {
+            number_t pi = num_const_prec(NUM_PI, precisions[i]);
+            number_t half_pi = num_div(pi, NUM_TWO);
+            number_t expected = num_sqrt(half_pi);
+            number_t actual = num_const_prec(NUM_SQRT_PI_OVER_TWO, precisions[i]);
+            ASSERT_NUMBER_EQ(actual, expected);
+            num_destroy(&actual);
+            num_destroy(&expected);
+            num_destroy(&half_pi);
+            num_destroy(&pi);
+        }
+        for (size_t i = 0u; i < sizeof aliases / sizeof *aliases; ++i) {
+            number_t parsed = num_create_from_string(aliases[i]);
+            ASSERT_NUMBER_EQ(parsed, NUM_SQRT_PI_OVER_TWO);
+            assert_number_string_prefix("sqrt(pi/2) alias", parsed, "1.253314137315500251207882642405");
+            num_destroy(&parsed);
+        }
+    }
+
+    {
         number_t pi = NUM_PI;
         number_t e = NUM_E;
         number_t gamma = NUM_EULER_MASCHERONI;

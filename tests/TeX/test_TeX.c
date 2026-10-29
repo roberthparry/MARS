@@ -7,8 +7,10 @@
  * Markdown example runner after ordinary regression checks.
  */
 #include <errno.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "TeX-t.h"
@@ -16,16 +18,16 @@
 #include "matrix-t.h"
 #include "equation-t.h"
 #include "diffequation-t.h"
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
-#define MARS_SHARED_MATRIX_NOTATION_INTERNAL_ACCESS
-#include "internal/matrix_notation_internal.h"
-#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
-#include "internal/equation_internal.h"
-#define MARS_SHARED_DIFFEQUATION_NOTATION_INTERNAL_ACCESS
-#include "internal/diffequation_notation_internal.h"
-#define MARS_TeX_SEMANTIC_SYMBOLS_INTERNAL_ACCESS
-#include "TeX/TeX_semantic_symbols.h"
+#define MARS_SHARED_DIFFEQUATION_INTERNAL_ACCESS
+#include "internal/diffequation_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expression/expr_notation_internal.h"
+#define MARS_MATRIX_INTERNAL_ACCESS
+#include "matrix/matrix_notation_internal.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
+#include "equation/equation_internal.h"
+#define MARS_TeX_INTERNAL_ACCESS
+#include "TeX/TeX_internal.h"
 #include "test_harness.h"
 #include "test_TeX_spellings.h"
 
@@ -573,8 +575,63 @@ static bool context_test_child(const void *context, const void *object, size_t i
     return true;
 }
 
+typedef struct {
+    context_test_state_t state;
+    context_test_node_t *terms[2];
+    size_t count_calls;
+    size_t term_calls;
+    bool fail;
+} sum_test_state_t;
+
+static size_t sum_test_count(void *context)
+{
+    sum_test_state_t *state = context;
+    ++state->count_calls;
+    return 2u;
+}
+
+static TeX_context_t *sum_test_term(void *context, size_t index, int *sign)
+{
+    sum_test_state_t *state = context;
+    ++state->term_calls;
+    if (state->fail || index >= 2u)
+        return NULL;
+    *sign = index ? -1 : 1;
+    return TeX_context_new((TeX_node_ref_t){&context_test_provider, &state->state, state->terms[index]});
+}
+
+static void test_TeX_sum_wrapping(void)
+{
+    context_test_state_t state = {0};
+    context_test_node_t x = {.kind = TeX_NODE_IDENTIFIER, .text = "x"};
+    context_test_node_t two = {.kind = TeX_NODE_NUMBER, .text = "2"};
+    context_test_node_t difference = {.kind = TeX_NODE_DIFFERENCE, .children = {&x, &two}, .count = 2u};
+    TeX_context_t *context = TeX_context_new((TeX_node_ref_t){&context_test_provider, &state, &difference});
+    sum_test_state_t selection = {.terms = {&x, &two}};
+    static const TeX_sum_provider_t provider = {.count = sum_test_count, .term = sum_test_term};
+    TeX_t *notation = TeX_wrap_sum(context, 100u, &provider, &selection);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), "x - 2") &&
+        !selection.count_calls && !selection.term_calls, "short sums do not ask native modules to prepare terms");
+    TeX_free(notation);
+    notation = TeX_wrap_sum(context, 1u, &provider, &selection);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation),
+        "\\begin{aligned}[t]\n&x \\\\\n&{} - 2\n\\end{aligned}") &&
+        selection.count_calls == 1u && selection.term_calls == 2u,
+        "native callbacks select signed terms while TeX owns their alignment");
+    TeX_free(notation);
+    selection.fail = true;
+    notation = TeX_wrap_sum(context, 1u, &provider, &selection);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), "x - 2"),
+                     "an unavailable multiline alternative retains the complete ordinary body");
+    TeX_free(notation);
+    TeX_context_free(context);
+    string_free(selection.state.scratch);
+    string_free(state.scratch);
+}
+
 static void test_TeX_context_semantics(void)
 {
+    test_TeX_sum_wrapping();
     context_test_state_t state = {0};
     context_test_node_t x = {.kind = TeX_NODE_IDENTIFIER, .text = "x"};
     context_test_node_t two = {.kind = TeX_NODE_NUMBER, .text = "2"};
@@ -711,26 +768,30 @@ static void test_TeX_native_contexts(void)
     expr_t *argument = expr_new_named_var(NUM_ONE, "θ");
     expr_t *sine = expr_sin(argument);
     expr_t *signal = expr_delta(argument);
-    expr_notation_unary_t operation = {0};
-    TEST_ASSERT_TRUE(expr_notation_unary(sine, &operation) && operation.name &&
-        !strcmp(operation.name, "sin") && operation.atomic_argument_name &&
-        !strcmp(operation.atomic_argument_name, "θ") && !operation.signal_function,
-        "unary classification supplies mathematical names without typesetting syntax");
-    TEST_ASSERT_TRUE(expr_notation_is_greek_symbol(operation.atomic_argument_name) &&
-        expr_notation_is_greek_symbol("@alpha") && !expr_notation_is_greek_symbol("radius"),
-        "Greek symbols and aliases are classified by expression");
-    TEST_ASSERT_TRUE(expr_notation_unary(signal, &operation) && operation.signal_function,
-                     "unary classification identifies signal functions");
-    TEST_ASSERT_TRUE(!expr_notation_unary(argument, &operation), "non-unary nodes are rejected");
-    expr_notation_operation_names_t names = {0};
-    TEST_ASSERT_TRUE(expr_notation_operation_names(sine, &names) && names.canonical_name &&
-        !strcmp(names.canonical_name, "sin") && names.expression_name && !strcmp(names.expression_name, "sin"),
-        "operation description contains native names rather than TeX notation");
-    TEST_ASSERT_TRUE(!expr_notation_operation_names(NULL, &names) &&
-        !expr_notation_operation_names(sine, NULL), "invalid operation descriptions are rejected");
+    TeX_context_t *sine_context = expr_TeX_context(sine);
+    TeX_context_t *signal_context = expr_TeX_context(signal);
+    TeX_node_ref_t call = TeX_context_root(sine_context), child = {0};
+    TeX_node_view_t call_view = {0}, child_view = {0};
+    TEST_ASSERT_TRUE(call.provider && call.provider->describe(call.context, call.node, &call_view) &&
+        call_view.kind == TeX_NODE_CALL && call_view.text && !strcmp(string_c_str(call_view.text), "sin"),
+        "semantic callbacks supply mathematical operation names without typesetting syntax");
+    TEST_ASSERT_TRUE(call.provider && call.provider->child(call.context, call.node, 0u, &child) &&
+        child.provider->describe(child.context, child.node, &child_view) && child_view.kind == TeX_NODE_IDENTIFIER &&
+        child_view.text && !strcmp(string_c_str(child_view.text), "θ"),
+        "semantic callbacks identify the Greek argument without exposing an expression graph");
     expr_free(signal);
     expr_free(sine);
     expr_free(argument);
+    TeX_t *sine_notation = TeX_from_context(sine_context);
+    TeX_t *signal_notation = TeX_from_context(signal_context);
+    TEST_ASSERT_TRUE(sine_notation && strstr(TeX_source(sine_notation), "\\sin(\\theta)"),
+                     "unary notation survives destruction of its native expression");
+    TEST_ASSERT_TRUE(signal_notation && strstr(TeX_source(signal_notation), "\\delta"),
+                     "the signal operation is supplied through the same semantic callbacks");
+    TeX_free(signal_notation);
+    TeX_free(sine_notation);
+    TeX_context_free(signal_context);
+    TeX_context_free(sine_context);
 
     expr_t *expression = expr_from_string("sqrt(x/2)", NULL);
     TeX_context_t *context = expr_TeX_context(expression);
@@ -980,10 +1041,80 @@ static void test_TeX_context_calculus(void)
     TeX_free(notation);
     TeX_context_free(context);
     string_free(state.scratch);
+
+}
+
+static TeX_t *numeric_notation(number_t value)
+{
+    notation_build_t *build = notation_build_new();
+    const TeX_model_node_t *root = notation_build_number(build, value);
+    TeX_context_t *context = notation_build_context(build, root);
+    notation_build_free(build);
+    TeX_t *notation = TeX_from_context(context);
+    TeX_context_free(context);
+    return notation;
+}
+
+static void test_TeX_numeric_constant_lookups(void)
+{
+    static const struct { const number_t *value; const char *expected; } constants[] = {
+        {&NUM_SQRT1ONPI,            "\\frac{1}{\\sqrt{\\pi}}"},
+        {&NUM_2_SQRTPI,             "\\frac{2}{\\sqrt{\\pi}}"},
+        {&NUM_NEG_TWO_OVER_SQRT_PI, "-\\frac{2}{\\sqrt{\\pi}}"},
+        {&NUM_SQRT_PI,             "\\sqrt{\\pi}"},
+        {&NUM_SQRT_2PI,            "\\sqrt{2\\mkern-2mu \\pi}"},
+        {&NUM_INV_SQRT_2PI,         "\\frac{1}{\\sqrt{2\\mkern-2mu \\pi}}"},
+        {&NUM_SQRT_PI_OVER_TWO,     "\\sqrt{\\frac{\\pi}{2}}"},
+        {&NUM_SQRT2,               "\\sqrt{2}"},
+        {&NUM_SQRT3,               "\\sqrt{3}"},
+        {&NUM_SQRT_HALF,           "\\sqrt{\\frac{1}{2}}"},
+        {&NUM_SQRT2_OVER_TWO,       NULL},
+        {&NUM_SQRT3_OVER_TWO,       "\\frac{\\sqrt{3}}{2}"}
+    };
+    for (size_t i = 0u; i < sizeof constants / sizeof *constants; ++i) {
+        const char *expected = constants[i].expected;
+        if (!expected)
+            expected = num_eq(NUM_SQRT_HALF, NUM_SQRT2_OVER_TWO) ? "\\sqrt{\\frac{1}{2}}" : "\\frac{\\sqrt{2}}{2}";
+        number_t copy = num_const_prec(*constants[i].value, num_get_prec_bits(*constants[i].value));
+        expr_t *expression = expr_new_const(num_clone(copy));
+        TeX_t *literal = numeric_notation(copy);
+        char *atom = expr_to_TeX_body(expression);
+        TEST_ASSERT_TRUE(literal && !strcmp(TeX_source(literal), expected),
+                         "known numeric constant retains its mathematical identity");
+        if (!atom || strcmp(atom, expected))
+            fprintf(stderr, "Constant %zu: expected %s, got %s\n", i, expected, atom ? atom : "(null)");
+        TEST_ASSERT_TRUE(atom && !strcmp(atom, expected), "constant-expression output uses the same semantic lookup");
+        free(atom);
+        TeX_free(literal);
+        expr_free(expression);
+        num_destroy(&copy);
+
+        const size_t precisions[] = {64u, 128u, 512u};
+        for (size_t j = 0u; j < sizeof precisions / sizeof *precisions; ++j) {
+            number_t retained = num_const_prec(*constants[i].value, precisions[j]);
+            literal = numeric_notation(retained);
+            TEST_ASSERT_TRUE(literal && !strcmp(TeX_source(literal), expected),
+                             "constant identity supplies notation independently of numeric precision");
+            TeX_free(literal);
+            num_destroy(&retained);
+        }
+    }
+    const double nonmembers[] = {-2.0, -1.125, 0.0, 1.25, 3.0, 4.0, NAN, INFINITY, -INFINITY,
+                                 nextafter(num_to_double(NUM_SQRT2), INFINITY)};
+    for (size_t i = 0u; i < sizeof nonmembers / sizeof *nonmembers; ++i) {
+        number_t value = num_new();
+        num_set_double(&value, nonmembers[i]);
+        TeX_t *output = numeric_notation(value);
+        TEST_ASSERT_TRUE(output && !strstr(TeX_source(output), "\\sqrt"),
+                         "collisions, nearby values and non-finite numbers do not acquire a constant name");
+        TeX_free(output);
+        num_destroy(&value);
+    }
 }
 
 static void test_TeX_compact_symbol_lookups(void)
 {
+    test_TeX_numeric_constant_lookups();
     for (size_t i = 0u; i < sizeof test_TeX_spellings / sizeof *test_TeX_spellings; ++i) {
         const test_TeX_spelling_t *fixture = &test_TeX_spellings[i];
         string_t *name = string_new_with(fixture->name);

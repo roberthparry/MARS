@@ -20,8 +20,8 @@
 #include "almanac-t.h"
 #include "datetime-t.h"
 #include "jurisdiction-t.h"
-#define MARS_ALMANAC_INTERNAL_ACCESS
-#include "almanac/almanac_internal.h"
+#define MARS_SHARED_ALMANAC_INTERNAL_ACCESS
+#include "internal/almanac_internal.h"
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac/almanac_engine_internal.h"
 #include "spice_oracle.h"

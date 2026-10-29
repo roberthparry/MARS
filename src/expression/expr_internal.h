@@ -33,6 +33,8 @@
 #include "dictionary-t.h"
 #include "expression-t.h"
 #include "expr_context-t.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_computation_internal.h"
@@ -518,6 +520,11 @@ size_t expr_formal_derivative_order(const expr_t *expr);
 const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
 expr_t *expr_new_arbitrary_function(const char *name, const expr_t *argument);
 expr_t *expr_new_arbitrary_function_n(const char *name, size_t argument_count, expr_t *const *arguments);
+/**
+ * @brief Report whether a borrowed expression is an uninterpreted symbolic function call.
+ * @param expr Borrowed source expression to inspect or transform without transferring ownership.
+ * @return True when the documented structural property holds; false otherwise.
+ */
 bool expr_is_arbitrary_function(const expr_t *expr);
 extern const expr_ops_t ops_sin;
 extern const expr_ops_t ops_cos;
@@ -701,51 +708,6 @@ static inline int expr_is_pow_d_expr(const expr_t *expr) { return expr && expr->
 
 static inline int expr_is_unnamed_const(const expr_t *expr) { return expr_is_const(expr) && (!expr->name || !*expr->name); }
 
-typedef enum expr_integration_bound_kind {
-    EXPR_INTEGRATION_BOUND_DEFINITE = 0,
-    EXPR_INTEGRATION_BOUND_UPPER_ONLY,
-    EXPR_INTEGRATION_BOUND_INDEFINITE
-} expr_integration_bound_kind_t;
-
-typedef enum {
-    EXPR_PATTERN_UNARY_EXP,
-    EXPR_PATTERN_UNARY_LOG,
-    EXPR_PATTERN_UNARY_LOG10,
-    EXPR_PATTERN_UNARY_SIN,
-    EXPR_PATTERN_UNARY_COS,
-    EXPR_PATTERN_UNARY_TAN,
-    EXPR_PATTERN_UNARY_SEC,
-    EXPR_PATTERN_UNARY_COSEC,
-    EXPR_PATTERN_UNARY_COT,
-    EXPR_PATTERN_UNARY_SINH,
-    EXPR_PATTERN_UNARY_COSH,
-    EXPR_PATTERN_UNARY_COSECH,
-    EXPR_PATTERN_UNARY_TANH,
-    EXPR_PATTERN_UNARY_SECH,
-    EXPR_PATTERN_UNARY_COTH,
-    EXPR_PATTERN_UNARY_ASIN,
-    EXPR_PATTERN_UNARY_ACOS,
-    EXPR_PATTERN_UNARY_ATAN,
-    EXPR_PATTERN_UNARY_ASEC,
-    EXPR_PATTERN_UNARY_ACOSEC,
-    EXPR_PATTERN_UNARY_ACOT,
-    EXPR_PATTERN_UNARY_ASINH,
-    EXPR_PATTERN_UNARY_ACOSH,
-    EXPR_PATTERN_UNARY_ATANH,
-    EXPR_PATTERN_UNARY_ASECH,
-    EXPR_PATTERN_UNARY_ACOSECH,
-    EXPR_PATTERN_UNARY_ACOTH,
-    EXPR_PATTERN_UNARY_ERF,
-    EXPR_PATTERN_UNARY_ERFC,
-    EXPR_PATTERN_UNARY_NORMAL_PDF,
-    EXPR_PATTERN_UNARY_NORMAL_CDF,
-    EXPR_PATTERN_UNARY_NORMAL_LOGPDF,
-    EXPR_PATTERN_UNARY_EI,
-    EXPR_PATTERN_UNARY_E1,
-    EXPR_PATTERN_UNARY_LI,
-    EXPR_PATTERN_UNARY_COUNT
-} expr_pattern_unary_affine_kind_t;
-
 typedef struct {
     string_t *name;
     expr_t *node;
@@ -783,6 +745,7 @@ int expr_get_default_constant_num(const char *name, number_t *value_out);
 int expr_get_default_constant_num_text(const string_t *name, number_t *value_out);
 void expr_store_const_num(expr_t *expr, number_t value);
 void expr_store_value_num(expr_t *expr, number_t value);
+/** @brief Initialise expression's immutable mathematical constants before rendering. */
 void expr_init_singletons(void);
 /* Return a borrowed cache value; use expr_eval() when the caller needs an owning number. */
 number_t expr_eval_num_internal(const expr_t *expr);
@@ -891,6 +854,14 @@ bool expr_combine_trig_pythagorean_addends(addend_t *terms, size_t n);
 
 /* Term collection and product rebuilding helpers. */
 int expr_struct_eq(const expr_t *u, const expr_t *v);
+
+/**
+ * @brief Hash a borrowed expression consistently with structural equality.
+ * @param expression Borrowed expression graph to hash without evaluating or changing it.
+ * @return Structural hash consistent with expr_struct_eq; equal structures have equal hashes.
+ * @note A structural mutation may change the hash; callers retain ownership of the expression.
+ */
+size_t expr_struct_hash(const expr_t *expression);
 bool expr_simplify_same_factor(const expr_t *left, const expr_t *right);
 bool expr_simplify_additive_terms_equal(const expr_t *left, const expr_t *right);
 expr_t *expr_simplify_extract_exact_factor_quotient(const expr_t *expr, const expr_t *factor);
@@ -1082,8 +1053,23 @@ bool expr_match_pow_const(const expr_t *expr, const expr_t **base_out, number_t 
 bool expr_match_pow_expr(const expr_t *expr, const expr_t **base_out, const expr_t **exponent_out);
 bool expr_match_integral_expr(const expr_t *expr, const expr_t **integrand_out, const expr_t **domain_out);
 bool expr_child_exprs(const expr_t *expr, const expr_t **left_out, const expr_t **right_out);
+/**
+ * @brief Borrow the dummy variable encoded by an integral, or return NULL when unavailable.
+ * @param integral Borrowed integral expression to inspect without modifying its bounds or operands.
+ * @return Borrowed expression owned by the source graph, or NULL when absent; do not free the returned pointer.
+ */
 const expr_t *expr_integral_dummy_expr(const expr_t *integral);
+/**
+ * @brief Borrow the upper bound encoded by an integral, or return NULL when absent.
+ * @param integral Borrowed integral expression to inspect without modifying its bounds or operands.
+ * @return Borrowed expression owned by the source graph, or NULL when absent; do not free the returned pointer.
+ */
 const expr_t *expr_integral_upper_bound_expr(const expr_t *integral);
+/**
+ * @brief Borrow the lower bound encoded by an integral, or return NULL when absent.
+ * @param integral Borrowed integral expression to inspect without modifying its bounds or operands.
+ * @return Borrowed expression owned by the source graph, or NULL when absent; do not free the returned pointer.
+ */
 const expr_t *expr_integral_lower_bound_expr(const expr_t *integral);
 const char *expr_symbol_name(const expr_t *expr);
 void expr_set_binding_pi_linear_family(expr_t *expr, long denominator, long n_coeff, long offset);
@@ -1138,6 +1124,14 @@ bool expr_match_affine_poly_deg4_times_unary_affine_kind(const expr_t *expr,
 char *expr_normalise_name(const char *name);
 string_t *expr_normalise_name_text(const string_t *name);
 string_t *expr_normalise_greek_alias_text(const string_t *alias);
+/**
+ * @brief Resolve a canonical Greek symbol to its at-prefixed ASCII alias.
+ *
+ * Lower-case and upper-case symbols retain their case in the returned alias.
+ *
+ * @param symbol Greek Unicode symbol to resolve.
+ * @return Borrowed process-lifetime alias, or `NULL` when the symbol is not registered.
+ */
 const char *expr_greek_symbol_alias(rune_t symbol);
 char *expr_take_string_as_c_string(string_t *text);
 char *expr_normalise_binding_name(const char *name);
@@ -1147,7 +1141,6 @@ int expr_is_default_constant_name(const char *name);
 int expr_is_default_constant_name_text(const string_t *name);
 const char *expr_default_constant_canonical_name(const char *name);
 string_t *expr_default_constant_canonical_name_text(const string_t *name);
-int expr_to_TeX_parts(const expr_t *expr, char **expr_out, char **bindings_out);
 char *expr_to_TeX_body_wrapped(const expr_t *expr, size_t line_limit);
 void *fs_xmalloc(size_t n);
 int fs_is_letter(unsigned int c);
@@ -1191,6 +1184,12 @@ bool expr_exact_complex_value(const expr_t *expr, binding_exact_complex_t *out);
 bool expr_exact_complex_rational_power(const binding_exact_complex_t *base, number_t exponent, number_t *value_out);
 bool expr_exact_complex_root_seed(const expr_t *expr, number_t *seed_out, long *order_out);
 bool expr_exact_principal_sqrt_seed(const expr_t *expr, number_t *seed_out);
+/**
+ * @brief Report the order of an explicitly authored reciprocal power without transferring ownership.
+ * @param expr Borrowed source expression to inspect or transform without transferring ownership.
+ * @param order_out Required caller-owned output receiving the recognised mathematical order.
+ * @return True when the requested pattern matches; false when it does not match or matching fails.
+ */
 bool expr_explicit_root_order(const expr_t *expr, long *order_out);
 
 /* Precision-sensitive binding evaluation. */
@@ -1212,7 +1211,55 @@ expr_t *expr_move_imaginary_unit_last_for_display(const expr_t *expr);
 bool expr_cartesian_parts_for_display(const expr_t *expr, expr_t **real_out, expr_t **imaginary_out,
                                       bool *has_imaginary_out);
 
-#define MARS_SHARED_EXPR_INTERNAL_ACCESS
-#include "internal/expr_internal.h"
+/**
+ * @brief Return an owned tangent progression recognised from its q-digamma representation.
+ * @param expr Borrowed q-digamma expression to recognise without changing its algebra.
+ * @return Owned progression released with expr_free, or NULL when unrecognised or allocation fails.
+ */
+expr_t *expr_finite_tangent_from_qdigamma_form(const expr_t *expr);
+
+/**
+ * @brief Report whether a borrowed expression is a recognised q-digamma tangent progression.
+ * @param expr Borrowed expression to inspect.
+ * @return True when the documented finite tangent progression is recognised; false otherwise.
+ */
+bool expr_is_finite_tangent_qdigamma_form(const expr_t *expr);
+
+/**
+ * @brief Evaluate a recognised finite tangent progression into an owned output value.
+ * @param expr Borrowed finite tangent progression to evaluate.
+ * @param value_out Initialised numeric output replaced on success; release the result with num_destroy.
+ * @return True when evaluation succeeds; false for unrecognised or unavailable values.
+ */
+bool expr_finite_tangent_qdigamma_value(const expr_t *expr, number_t *value_out);
+
+/**
+ * @brief Return an owned hyperbolic tangent progression recognised from q-digamma terms.
+ * @param expr Borrowed q-digamma expression to recognise without changing its algebra.
+ * @return Owned progression released with expr_free, or NULL when unrecognised or allocation fails.
+ */
+expr_t *expr_finite_tanh_from_qdigamma_form(const expr_t *expr);
+
+/**
+ * @brief Borrow the argument of a unary function that can be reapplied to another expression.
+ * @param expr Borrowed unary-function expression to inspect.
+ * @param arg_out Required output receiving the borrowed argument on a match; keep expr alive while using it.
+ * @return True when the unary function can be reapplied to another argument; false otherwise.
+ */
+bool expr_match_reapplicable_unary_function(const expr_t *expr, const expr_t **arg_out);
+
+/**
+ * @brief Apply a borrowed unary-function prototype to a borrowed argument; return an owned expression.
+ * @param prototype Borrowed unary-function expression selecting the operation.
+ * @param argument Borrowed replacement argument; no input ownership transfers.
+ * @return Owned expression released with expr_free, or NULL for an unsupported operation or allocation failure.
+ */
+expr_t *expr_apply_reapplicable_unary_function(const expr_t *prototype, const expr_t *argument);
+
+/**
+ * @brief Validate the parser function-name perfect hash for regression checks.
+ * @return True when the requested operation succeeds; false when unavailable, invalid or unsuccessful.
+ */
+bool expr_stringin_function_hash_is_valid(void);
 
 #endif /* EXPR_INTERNAL_H */

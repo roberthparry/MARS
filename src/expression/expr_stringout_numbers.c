@@ -19,10 +19,6 @@
 
 #include "expression-t.h"
 #include "string-t.h"
-#include "TeX-t.h"
-
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -39,24 +35,6 @@ static bool expr_number_scientific_local = false;
 static int expr_number_precision_local = -1;
 
 static string_t *expr_trim_decimal_display_artifacts_text_local(const string_t *text);
-
-/* Native numeric classification supplies semantics; TeX alone spells the fraction. */
-bool expr_emit_exact_rational_TeX(sbuf_t *buffer, number_t value)
-{
-    if (!num_is_exact(value) || !num_is_real(value) || num_is_integer(value))
-        return false;
-    notation_build_t *build = notation_build_new();
-    const TeX_model_node_t *root = notation_build_number(build, value);
-    TeX_context_t *context = notation_build_context(build, root);
-    notation_build_free(build);
-    TeX_t *notation = TeX_from_context(context);
-    bool rendered = notation != NULL;
-    if (notation)
-        sbuf_puts(buffer, TeX_source(notation));
-    TeX_free(notation);
-    TeX_context_free(context);
-    return rendered;
-}
 
 bool expr_set_number_scientific_local(bool scientific)
 {

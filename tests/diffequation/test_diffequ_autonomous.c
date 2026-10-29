@@ -14,10 +14,11 @@
 #include <string.h>
 
 #include "diffequation-t.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expression/expr_internal.h"
+
 #include "test_harness.h"
 #include "test_diffequ_autonomous.h"
-#define MARS_SHARED_EXPR_INTERNAL_ACCESS
-#include "internal/expr_internal.h"
 
 /* Substitute the implicit derivatives into the original PDE after multiplying by the common H_u factor. */
 static bool implicit_transport_residual(const diffequ_t *de, const equation_t *solution)

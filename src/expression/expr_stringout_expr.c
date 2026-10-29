@@ -18,6 +18,8 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_series_notation.h"
 
 static string_t *expr_text_from_owned_c_string(char *raw)
 {

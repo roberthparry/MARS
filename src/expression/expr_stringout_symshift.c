@@ -17,8 +17,6 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#define MARS_SHARED_TeX_INTERNAL_ACCESS
-#include "internal/TeX_internal.h"
 
 static bool display_shift_terms(const expr_t *expr, const expr_t **terms, bool *negative)
 {
@@ -80,30 +78,18 @@ bool expr_emit_complex_shift(const expr_t *expr, sbuf_t *buffer, int parent_prec
     const expr_t *centre = NULL, *coefficient = NULL;
     bool centre_negative = false, coefficient_negative = false;
     if (expr_display_complex_shift(expr, &centre, &coefficient, &centre_negative, &coefficient_negative)) {
-        void (*emit)(const expr_t *, sbuf_t *, int) = style == style_LATEX ? TeX_emit_expr :
-                                                    style == style_FUNCTION ? emit_func : emit_expr;
+        void (*emit)(const expr_t *, sbuf_t *, int) = style == style_FUNCTION ? emit_func : emit_expr;
         bool bracketed = parent_prec > PREC_ADD;
-        if (bracketed) {
-            if (style == style_LATEX)
-                TeX_emit_parenthesis(buffer, false);
-            else
-                sbuf_putc(buffer, '(');
-        }
+        if (bracketed)
+            sbuf_putc(buffer, '(');
         if (centre_negative)
             sbuf_putc(buffer, '-');
         emit(centre, buffer, centre_negative ? PREC_MUL : PREC_ADD);
         sbuf_puts(buffer, coefficient_negative ? " - i" : " + i");
-        if (style == style_LATEX)
-            TeX_emit_product_space(buffer);
-        else
-            sbuf_puts(buffer, style == style_FUNCTION ? "." : "·");
+        sbuf_puts(buffer, style == style_FUNCTION ? "." : "·");
         emit(coefficient, buffer, PREC_MUL);
-        if (bracketed) {
-            if (style == style_LATEX)
-                TeX_emit_parenthesis(buffer, true);
-            else
-                sbuf_putc(buffer, ')');
-        }
+        if (bracketed)
+            sbuf_putc(buffer, ')');
         return true;
     }
     return false;

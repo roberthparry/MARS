@@ -33,8 +33,8 @@
 #include "expr_stringout_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
-#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
-#include "internal/TeX_semantic_internal.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_notation_internal.h"
 
@@ -611,27 +611,6 @@ const TeX_model_node_t *expr_notation_ordered_sum(notation_build_t *build, const
             return NULL;
     }
     return result;
-}
-
-/* Adapt the legacy string entry point to the semantic ordering provider. */
-bool emit_TeX_display_polynomial_sum(const expr_t *expression, sbuf_t *buffer, int parent_prec)
-{
-    notation_build_t *build = notation_build_new();
-    const TeX_model_node_t *ordered = build ? expr_notation_ordered_sum(build, expression) : NULL;
-    string_t *text = ordered ? notation_build_render(build, ordered) : NULL;
-    notation_build_free(build);
-    if (!text)
-        return false;
-    if (PREC_ADD < parent_prec) {
-        string_t *grouped = TeX_parenthesise_compact(text);
-        string_free(text);
-        text = grouped;
-    }
-    if (!text)
-        return false;
-    sbuf_puts(buffer, string_c_str(text));
-    string_free(text);
-    return true;
 }
 
 bool emit_expr_display_polynomial_sum(const expr_t *expr, sbuf_t *b, int parent_prec)

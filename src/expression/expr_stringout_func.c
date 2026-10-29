@@ -13,14 +13,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#define MARS_SHARED_TeX_INTERNAL_ACCESS
-#include "internal/TeX_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_series_notation.h"
 
 static void emit_name_c(sbuf_t *b, const char *name)
 {
@@ -1112,18 +1116,39 @@ string_t *expr_temporaries_math_definitions(const expr_function_temporaries_t *p
 {
     if (!plan || (style != style_UNBOUND && style != style_LATEX))
         return NULL;
+    if (style == style_LATEX) {
+        size_t count = plan->temporaries.count;
+        string_t **names = count ? calloc(count, sizeof *names) : NULL;
+        TeX_t **values = count ? calloc(count, sizeof *values) : NULL;
+        bool ok = !count || (names && values);
+        for (size_t i = 0u; ok && i < count; ++i) {
+            names[i] = string_new_with(plan->temporaries.names[i]);
+            TeX_context_t *context = expr_notation_temporaries_context(plan->temporaries.nodes[i],
+                plan->temporaries.nodes, (const char *const *)plan->temporaries.names, i);
+            values[i] = context ? TeX_from_context(context) : NULL;
+            TeX_context_free(context);
+            ok = names[i] && values[i];
+        }
+        string_t *result = ok ? TeX_format_definitions((const string_t *const *)names,
+                                                         (const TeX_t *const *)values, count) : NULL;
+        for (size_t i = 0u; i < count; ++i) {
+            if (names)
+                string_free(names[i]);
+            if (values)
+                TeX_free(values[i]);
+        }
+        free(values);
+        free(names);
+        return result;
+    }
     sbuf_t buffer;
     sbuf_init(&buffer);
     for (size_t i = 0u; i < plan->temporaries.count; ++i) {
-        if (style == style_LATEX) {
-            TeX_emit_definition_heading(&buffer, plan->temporaries.names[i], i != 0u);
-        } else {
-            if (i)
-                sbuf_putc(&buffer, '\n');
-            emit_name(&buffer, plan->temporaries.names[i]);
-            sbuf_puts(&buffer, " = ");
-        }
-        emit_math_with_temporaries(plan->temporaries.nodes[i], &buffer, style, plan->temporaries.nodes,
+        if (i)
+            sbuf_putc(&buffer, '\n');
+        emit_name(&buffer, plan->temporaries.names[i]);
+        sbuf_puts(&buffer, " = ");
+        emit_math_with_temporaries(plan->temporaries.nodes[i], &buffer, plan->temporaries.nodes,
                                    (const char *const *)plan->temporaries.names, i);
     }
     string_t *text = sbuf_to_string(&buffer);
@@ -1136,9 +1161,18 @@ string_t *expr_temporaries_math_expression(const expr_function_temporaries_t *pl
 {
     if (!plan || !expr || (style != style_UNBOUND && style != style_LATEX))
         return NULL;
+    if (style == style_LATEX) {
+        TeX_context_t *context = expr_notation_temporaries_context(expr, plan->temporaries.nodes,
+            (const char *const *)plan->temporaries.names, plan->temporaries.count);
+        TeX_t *notation = context ? TeX_from_context(context) : NULL;
+        string_t *result = notation ? TeX_render(notation) : NULL;
+        TeX_free(notation);
+        TeX_context_free(context);
+        return result;
+    }
     sbuf_t buffer;
     sbuf_init(&buffer);
-    emit_math_with_temporaries(expr, &buffer, style, plan->temporaries.nodes,
+    emit_math_with_temporaries(expr, &buffer, plan->temporaries.nodes,
                                (const char *const *)plan->temporaries.names, plan->temporaries.count);
     string_t *text = sbuf_to_string(&buffer);
     sbuf_free(&buffer);

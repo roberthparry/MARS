@@ -62,7 +62,7 @@ void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         char *text;
         number_t pos_value = num_neg(f->c);
 
-        if (emit_negative_const_binding_expr_abs(f, b, false)) {
+        if (emit_negative_const_binding_expr_abs(f, b)) {
             num_destroy(&pos_value);
             return;
         }
@@ -79,7 +79,7 @@ void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
         char *text;
         number_t pos_value = num_neg(f->c);
 
-        if (emit_negative_const_binding_expr_abs(f, b, false)) {
+        if (emit_negative_const_binding_expr_abs(f, b)) {
             num_destroy(&pos_value);
             return;
         }

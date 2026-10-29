@@ -12,10 +12,12 @@
 #include "expression-t.h"
 #include "TeX-t.h"
 
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_notation_internal.h"
 
 /* Derivative recognition belongs to expression, not to its presentation backend. */
 bool expr_notation_has_formal_derivative(const expr_t *expression)

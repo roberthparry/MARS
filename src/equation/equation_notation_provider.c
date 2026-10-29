@@ -8,10 +8,10 @@
 #include "equation-t.h"
 #include "TeX-t.h"
 
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
-#define MARS_SHARED_EQUATION_INTERNAL_ACCESS
-#include "internal/equation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
+#define MARS_EQUATION_INTERNAL_ACCESS
+#include "equation_internal.h"
 
 /* Preserve the native equality without solving it or transferring its operands. */
 const TeX_model_node_t *notation_build_equation(notation_build_t *build, const equation_t *equation)

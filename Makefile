@@ -316,7 +316,7 @@ typescript-install-help:
 # Library, installation and maintenance-tool targets do not need TypeScript.
 check-native-deps:
 	@missing=0; \
-	probe_dir=$$(mktemp -d /tmp/mars-check-deps.XXXXXX) || exit 1; \
+	probe_dir=$$(mktemp -d -t mars-check-deps.XXXXXX) || exit 1; \
 	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
 	trap 'exit 1' HUP INT TERM; \
 	packages=""; \
@@ -455,7 +455,7 @@ $(TEST_BUILD_DIR)/file/test_file: TEST_LINK_FLAGS = $(foreach fn,$(FILE_TEST_WRA
 # Standalone native protocol fixtures keep malformed peer behaviour outside the library under test.
 .PHONY: check-http-fixture-deps
 check-http-fixture-deps:
-	@probe_dir=$$(mktemp -d /tmp/mars-http-deps.XXXXXX) || exit 1; \
+	@probe_dir=$$(mktemp -d -t mars-http-deps.XXXXXX) || exit 1; \
 	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
 	trap 'exit 1' HUP INT TERM; \
 	if ! printf '%s\n' '#include <openssl/ssl.h>' \

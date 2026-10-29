@@ -15,15 +15,14 @@
 
 #include "string-t.h"
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
 
 /* Match one complete, explicitly grouped occurrence, not an identifier or term substring. */
-#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
-#include "internal/TeX_semantic_internal.h"
-
 static const char *expr_distribution_group(const char *body, const char *operand)
 {
     size_t length = strlen(operand);
@@ -237,67 +236,4 @@ void expr_distribution_expr_caption(const expr_t *expr, sbuf_t *buffer)
     emit_expr(expr->a, buffer, PREC_LOWEST);
     sbuf_puts(buffer, " : ");
     sbuf_puts(buffer, expr_distribution_qualification(expr));
-}
-
-static _Thread_local expr_distribution_TeX_scope_t *TeX_scope;
-
-/* Retain expression-owned scope while each recursive renderer prepares its output. */
-void expr_distribution_TeX_begin(const expr_t *root, expr_distribution_TeX_scope_t *scope)
-{
-    scope->root = root;
-    scope->detached = expr_distribution_detachable(root);
-    scope->appended = false;
-    scope->outer = TeX_scope;
-    TeX_scope = scope;
-}
-
-static void distribution_append_TeX(sbuf_t *output, const expr_t *operand, const char *caption,
-                                    TeX_qualification_style_t style, int precedence)
-{
-    sbuf_t body;
-    sbuf_init(&body);
-    TeX_emit_expr(operand, &body, precedence);
-    string_t *text = string_new_with(sbuf_c_str(&body));
-    string_t *layout = text ? TeX_qualification(text, caption, style) : NULL;
-    if (layout)
-        sbuf_puts(output, string_c_str(layout));
-    string_free(layout);
-    string_free(text);
-    sbuf_free(&body);
-}
-
-/* Attach a detached qualification to the existing condition list. */
-void expr_distribution_TeX_conditions(const expr_t *root, sbuf_t *output)
-{
-    if (TeX_scope && TeX_scope->root == root && TeX_scope->detached) {
-        distribution_append_TeX(output, TeX_scope->detached->a, expr_distribution_qualification(TeX_scope->detached),
-                                TeX_QUALIFICATION_CONDITION, PREC_LOWEST);
-        TeX_scope->appended = true;
-    }
-}
-
-/* Finish a scoped expression and restore any outer expression's state. */
-void expr_distribution_TeX_end(expr_distribution_TeX_scope_t *scope, sbuf_t *output)
-{
-    if (scope->detached && !scope->appended)
-        distribution_append_TeX(output, scope->detached->a, expr_distribution_qualification(scope->detached),
-                                TeX_QUALIFICATION_TRAILING, PREC_LOWEST);
-    TeX_scope = scope->outer;
-}
-
-/* Select distribution semantics; generic TeX layout supplies the notation. */
-bool expr_distribution_TeX_emit(const expr_t *expr, sbuf_t *output, int parent_prec)
-{
-    if (expr_is_half_line_finite_part(expr)) {
-        distribution_append_TeX(output, expr->a, NULL, TeX_QUALIFICATION_FINITE_PART, PREC_LOWEST);
-        return true;
-    }
-    const char *qualification = expr_distribution_qualification(expr);
-    if (!qualification)
-        return false;
-    if (TeX_scope && TeX_scope->detached == expr)
-        TeX_emit_expr(expr->a, output, parent_prec);
-    else
-        distribution_append_TeX(output, expr->a, qualification, TeX_QUALIFICATION_INLINE, parent_prec);
-    return true;
 }

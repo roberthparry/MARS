@@ -20,8 +20,8 @@
 #include "TeX-t.h"
 
 
-#define MARS_SHARED_EXPR_STRINGOUT_INTERNAL_ACCESS
-#include "internal/expr_stringout_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_EQUATION_INTERNAL_ACCESS
 #include "equation_internal.h"
 

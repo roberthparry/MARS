@@ -9,10 +9,12 @@ quadratic coefficient recognisers. General polynomial storage and the
 degree-specific root algorithms remain separate implementation units.
 
 TeX output composes its sides through `TeX_equation` in the shared [TeX module](TeX.md),
-including top-aligned wrapped output. The TeX-owned solution-display backend handles
-compact root families and symmetric pairs through `TeX_root` and `TeX_symmetric_pair`.
-Equation metadata and solving remain here; the display backend calls native
-structural operations rather than reimplementing algebra or reparsing TeX.
+including top-aligned wrapped output. Equation selects compact root families and
+symmetric pairs; TeX composes their
+notation through `TeX_root` and `TeX_symmetric_pair`. Equation metadata, root
+selection and solving remain here. Private semantic callbacks carry mathematical
+data without exposing native object layouts or reparsing TeX. The ordinary output
+APIs manage this internally; application callers need no rendering context.
 
 The `TeX_from_expression` convenience adapter uses this module's equation
 separator and binding parser. A native operand-reader callback interprets each

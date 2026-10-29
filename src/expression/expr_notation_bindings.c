@@ -202,14 +202,19 @@ TeX_context_t *expr_notation_surface_context(const expr_t *expression, bool pres
     return context;
 }
 
-static const TeX_model_node_t *build_assignment(notation_build_t *build, const expr_t *symbol)
+/* Snapshot one native binding without exposing its private encoding to other modules. */
+const TeX_model_node_t *notation_build_assignment(notation_build_t *build, const expr_t *symbol, bool *unset_out)
 {
+    if (!symbol)
+        return NULL;
     bool unset = !symbol->binding_expr && num_is_nan(symbol->c);
     if (symbol->binding_expr && symbol->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER) {
         number_t value = NUM_ZERO;
         unset = expr_binding_expr_number_value(symbol->binding_expr, &value) && num_is_nan(value);
         num_destroy(&value);
     }
+    if (unset_out)
+        *unset_out = unset;
     const TeX_model_node_t *value = unset ? notation_build_literal(build, TeX_NODE_IDENTIFIER, "?")
         : symbol->binding_expr ? expr_notation_binding(build, symbol->binding_expr)
                                : notation_build_number(build, symbol->c);
@@ -243,8 +248,8 @@ bool expr_notation_bindings_context(const expr_t *expression, TeX_context_t **co
     const TeX_model_node_t **children = build ? calloc(count, sizeof *children) : NULL;
     if (children) {
         for (size_t i = 0u; i < count; ++i)
-            children[i] = build_assignment(build, i < variables.count ? variables.vars[i]
-                                                                       : constants.vars[i - variables.count]);
+            children[i] = notation_build_assignment(build, i < variables.count ? variables.vars[i]
+                                                                       : constants.vars[i - variables.count], NULL);
     }
     const TeX_model_node_t *root = children ? notation_build_node(build,
         (TeX_node_view_t){.kind = TeX_NODE_BINDINGS, .rows = variables.count, .child_count = count}, children) : NULL;
@@ -255,16 +260,4 @@ bool expr_notation_bindings_context(const expr_t *expression, TeX_context_t **co
     free(constants.vars);
     free(variables.vars);
     return !count || *context != NULL;
-}
-
-/* Preserve the established native string API while delegating all command syntax to TeX. */
-char *expr_binding_expr_to_TeX(const expr_binding_expr_t *binding)
-{
-    notation_build_t *build = notation_build_new();
-    const TeX_model_node_t *root = expr_notation_binding(build, binding);
-    string_t *text = notation_build_render(build, root);
-    char *result = text ? strdup(string_c_str(text)) : NULL;
-    string_free(text);
-    notation_build_free(build);
-    return result;
 }

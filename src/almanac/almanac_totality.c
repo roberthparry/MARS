@@ -18,11 +18,10 @@
 #define MARS_SHARED_COMPUTATION_INTERNAL_ACCESS
 #include "internal/computation_internal.h"
 
+#define MARS_SHARED_ALMANAC_INTERNAL_ACCESS
+#include "internal/almanac_internal.h"
 #define MARS_ALMANAC_INTERNAL_ACCESS
 #include "almanac_engine_internal.h"
-
-#define MARS_ALMANAC_INTERNAL_ACCESS
-#include "almanac_internal.h"
 
 typedef struct almanac_land_box_t {
     double min_lat;

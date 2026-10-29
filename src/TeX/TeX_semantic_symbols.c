@@ -7,8 +7,8 @@
  */
 #include <stddef.h>
 
-#define MARS_TeX_SEMANTIC_SYMBOLS_INTERNAL_ACCESS
-#include "TeX_semantic_symbols.h"
+#define MARS_TeX_INTERNAL_ACCESS
+#include "TeX_internal.h"
 
 static const char *const greek_uppercase[25] = {
     [ 0] = "A",

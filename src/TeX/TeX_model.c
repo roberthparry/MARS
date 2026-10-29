@@ -13,8 +13,10 @@
 
 #include "TeX-t.h"
 
-#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
-#include "internal/TeX_semantic_internal.h"
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
+#define MARS_TeX_INTERNAL_ACCESS
+#include "TeX_internal.h"
 
 struct _TeX_model_node_t {
     struct _TeX_model_node_t *next;

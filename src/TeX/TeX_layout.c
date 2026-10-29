@@ -1,5 +1,5 @@
 /**
- * @file TeX_expr_layout.c
+ * @file TeX_layout.c
  * @brief Layout primitives shared by native mathematical display planners.
  *
  * Owns grouping and aligned-definition syntax while callers retain their native
@@ -9,12 +9,8 @@
 
 #define MARS_SHARED_TeX_INTERNAL_ACCESS
 #include "internal/TeX_internal.h"
-#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
-#include "internal/TeX_semantic_internal.h"
-#define MARS_TeX_SEMANTIC_SYMBOLS_INTERNAL_ACCESS
-#include "TeX_semantic_symbols.h"
 #define MARS_TeX_INTERNAL_ACCESS
-#include "TeX_expr_private.h"
+#include "TeX_internal.h"
 
 /* Own qualification syntax while the caller chooses the associated operand. */
 string_t *TeX_qualification(const string_t *operand, const char *caption, TeX_qualification_style_t style)
@@ -37,12 +33,6 @@ string_t *TeX_qualification(const string_t *operand, const char *caption, TeX_qu
         result = string_sprintf("\\quad (%S:\\;%s)", operand, TeX_source(label));
     TeX_free(label);
     return result;
-}
-
-/* Supply compact grouping independently of the source mathematics. */
-string_t *TeX_parenthesise_compact(const string_t *body)
-{
-    return body ? string_sprintf("\\left(%S\\right)", body) : NULL;
 }
 
 /* Arrange already selected derivation rows without interpreting their mathematics. */
@@ -90,54 +80,24 @@ fail:
     return NULL;
 }
 
-void TeX_emit_definition_heading(sbuf_t *buffer, const char *name, bool separated)
+/* Format selected names and already rendered values without inspecting their mathematics. */
+string_t *TeX_format_definitions(const string_t *const *names, const TeX_t *const *values, size_t count)
 {
-    if (separated)
-        sbuf_puts(buffer, " \\\\\n");
-    TeX_emit_name(buffer, name);
-    sbuf_puts(buffer, " &= ");
-}
-
-void TeX_emit_parenthesis(sbuf_t *buffer, bool closing)
-{
-    sbuf_puts(buffer, closing ? "\\right)" : "\\left(");
-}
-
-void TeX_emit_product_space(sbuf_t *buffer)
-{
-    sbuf_puts(buffer, "\\,");
-}
-
-int TeX_append_telescoping_product(string_t *out, const char *endpoint)
-{
-    return string_append_format(out, "\\prod_{k=2}^{%s}\\left(1+\\frac{1}{k}\\right)=\\frac{%s+1}{2}",
-                                 endpoint, endpoint);
-}
-
-int TeX_append_prime_product(string_t *out, bool positive)
-{
-    return string_append_cstr(out, positive
-        ? "\\prod_{p\\in\\mathbb{P}}\\left(1+\\frac{1}{p}\\right)=+\\infty"
-        : "\\prod_{p\\in\\mathbb{P}}\\left(1-\\frac{1}{p}\\right)=0");
-}
-
-int TeX_append_trigonometric_sum(string_t *out, const char *endpoint, const char *function,
-                                 const char *angle, bool weighted)
-{
-    string_t *name = function ? string_new_with(function) : NULL;
-    const char *spelling = name ? TeX_semantic_function(name) : NULL;
-    if (!spelling) {
-        string_free(name);
-        return -1;
+    if ((!names || !values) && count)
+        return NULL;
+    string_t *out = string_new();
+    if (!out)
+        return NULL;
+    for (size_t i = 0u; i < count; ++i) {
+        TeX_t *name = names[i] ? TeX_identifier(names[i]) : NULL;
+        bool valid = name && values[i] &&
+            (!i || !string_append_cstr(out, " \\\\\n")) &&
+            string_append_format(out, "%s &= %s", TeX_source(name), TeX_source(values[i])) >= 0;
+        TeX_free(name);
+        if (!valid) {
+            string_free(out);
+            return NULL;
+        }
     }
-    int result;
-    if (weighted)
-        result = string_append_format(out, "\\sum_{k=1}^{%s}\\frac{%s(k\\mkern-2mu %s)}{k}",
-                                      endpoint, spelling, angle);
-    else if (angle)
-        result = string_append_format(out, "\\sum_{k=1}^{%s}%s(k\\mkern-2mu %s)", endpoint, spelling, angle);
-    else
-        result = string_append_format(out, "\\sum_{k=1}^{%s}%s(k)", endpoint, spelling);
-    string_free(name);
-    return result;
+    return out;
 }

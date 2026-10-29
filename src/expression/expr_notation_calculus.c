@@ -11,6 +11,8 @@
 #include "expression-t.h"
 #include "TeX-t.h"
 
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_notation_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -51,6 +53,25 @@ static bool contains_calculus(const expr_t *expression, unsigned depth)
     return expr_is_formal_derivative(expression) || expr_is_integral_transform(expression) ||
            expr_is_op(expression, &ops_integral) || contains_calculus(expression->a, depth + 1u) ||
            contains_calculus(expression->b, depth + 1u);
+}
+
+/* Preserve exact reciprocal-sum structure without enclosing calculus in a fraction. */
+const TeX_model_node_t *expr_notation_reciprocal_sum(notation_build_t *build, const expr_t *expression)
+{
+    const expr_t *factor = NULL, *sum = NULL;
+    long numerator = 0, denominator = 0;
+    if (!expr_notation_scaled_sum(expression, &factor, &sum) || !expr_is_unnamed_const(factor) ||
+        (factor->binding_expr && !expr_binding_expr_is_numeric_literal(factor->binding_expr)) ||
+        !num_get_small_rational(factor->c, &numerator, &denominator) || denominator <= 1 ||
+        (numerator != 1 && numerator != -1) || contains_calculus(sum, 0u))
+        return NULL;
+    number_t divisor = num_create_from_long(denominator);
+    const TeX_model_node_t *children[] = {notation_build_expr(build, sum), notation_build_number(build, divisor)};
+    num_destroy(&divisor);
+    const TeX_model_node_t *fraction = notation_build_node(build,
+        (TeX_node_view_t){.kind = TeX_NODE_FRACTION, .child_count = 2u}, children);
+    return numerator < 0 ? notation_build_node(build,
+        (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &fraction) : fraction;
 }
 
 /* An exponential never vanishes, so its reciprocal is an exact negative exponential. */

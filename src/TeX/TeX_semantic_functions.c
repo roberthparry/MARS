@@ -10,8 +10,8 @@
 
 #include "string-t.h"
 
-#define MARS_TeX_SEMANTIC_SYMBOLS_INTERNAL_ACCESS
-#include "TeX_semantic_symbols.h"
+#define MARS_TeX_INTERNAL_ACCESS
+#include "TeX_internal.h"
 
 typedef struct {
     const char *name;

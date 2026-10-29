@@ -271,8 +271,9 @@ static int number_mpfr_const_sqrt_pi(mpfr_t out)
 
 static int number_mpfr_const_sqrt_pi_over_two(mpfr_t out)
 {
-    number_mpfr_const_sqrt_pi(out);
+    number_mpfr_const_pi(out);
     mpfr_div_2ui(out, out, 1u, MPFR_RNDN);
+    mpfr_sqrt(out, out, MPFR_RNDN);
     return 0;
 }
 

@@ -14,6 +14,9 @@
 #include <string.h>
 
 #include "diffequation-t.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expression/expr_internal.h"
+
 #include "test_harness.h"
 #include "test_diffequ_wave_ivp.h"
 #include "test_diffequ_format.h"
@@ -27,9 +30,6 @@
 #include "test_diffequ_gkdv.h"
 #include "test_diffequ_heat.h"
 #include "test_diffequ_notation.h"
-
-#define MARS_SHARED_EXPR_INTERNAL_ACCESS
-#include "internal/expr_internal.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 

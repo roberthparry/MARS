@@ -44,7 +44,6 @@ typedef enum { ELEM_NUMBER = 0, ELEM_EXPR = 1, ELEM_MAX } elem_kind;
 /* ============================================================
    Scalar function vtable (per element type)
    ============================================================ */
-
 struct elem_fun_vtable {
     /* elementary functions */
     void (*exp)(void *out, const void *a);
@@ -127,7 +126,6 @@ struct elem_fun_vtable {
 /* ============================================================
    Element vtable
    ============================================================ */
-
 struct elem_vtable {
     size_t size;
     elem_kind kind;
@@ -165,7 +163,6 @@ struct elem_vtable {
 /* ============================================================
    Storage vtable
    ============================================================ */
-
 struct store_vtable {
     struct _matrix_t *(*create)(size_t rows, size_t cols, const struct elem_vtable *elem);
 
@@ -200,7 +197,6 @@ typedef struct matrix_meta_t {
 /* ============================================================
    Matrix object (opaque in matrix-t.h)
    ============================================================ */
-
 typedef struct _matrix_t {
     size_t rows;
     size_t cols;
@@ -216,7 +212,6 @@ typedef struct _matrix_t {
 /* ============================================================
    Element vtable instances (defined in matrix_vtables.c)
    ============================================================ */
-
 extern const struct elem_vtable number_elem;
 extern const struct elem_vtable expr_elem;
 
@@ -253,7 +248,6 @@ void mat_expr_beautification_clear(mat_expr_beautification_t *beautification);
 /* ============================================================
    Matrix construction helpers (internal)
    ============================================================ */
-
 struct _matrix_t *mat_create_dense_with_elem(size_t rows, size_t cols, const struct elem_vtable *elem);
 struct _matrix_t *mat_create_with_store(size_t rows, size_t cols, const struct elem_vtable *elem,
                                        const struct store_vtable *store);
@@ -312,7 +306,6 @@ extern const struct store_vtable lower_triangular_store;
 /* ============================================================
    Convenience accessor
    ============================================================ */
-
 static inline const struct elem_vtable *elem_of(const struct _matrix_t *A) {
     return A ? A->elem : NULL;
 }
@@ -345,7 +338,6 @@ void mat_schur_factor_free(mat_schur_factor_t *S);
 /* ============================================================
    Shared exact symbolic helpers for numeric decomposition glue
    ============================================================ */
-
 matrix_t *mat_nullspace_expr_exact(const matrix_t *A);
 int mat_rank_expr_exact(const matrix_t *A);
 matrix_t *mat_pseudoinverse_expr_exact(const matrix_t *A);

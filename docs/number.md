@@ -181,6 +181,10 @@ Fixed-precision constructors deliberately keep their fixed precision:
 - `num_create_from_qfloat(...)` creates a `qfloat_t` precision value
 - `num_create_from_qcomplex(...)` creates a `qcomplex_t` precision value
 
+`NUM_SQRT_PI_OVER_TWO` and its `sqrt(pi/2)`, `sqrt(@pi/2)` and
+`√(π/2)` aliases denote √(π/2), approximately 1.2533141373, at the
+requested precision. The division by two is inside the square root.
+
 Explicit precision materialisation is available for constants and existing
 values:
 

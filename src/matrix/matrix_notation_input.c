@@ -11,11 +11,12 @@
 #include "matrix-t.h"
 #include "TeX-t.h"
 
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
-#define MARS_SHARED_MATRIX_NOTATION_INTERNAL_ACCESS
-#include "internal/matrix_notation_internal.h"
-
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
+#define MARS_SHARED_MATRIX_INTERNAL_ACCESS
+#include "internal/matrix_internal.h"
+#define MARS_MATRIX_INTERNAL_ACCESS
+#include "matrix_notation_internal.h"
 
 /* A compound exponent must be grouped; never reinterpret a trailing matrix sum as part of the power. */
 static bool mat_notation_power_is_grouped(const string_t *text)

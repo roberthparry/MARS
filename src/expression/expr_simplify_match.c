@@ -17,6 +17,33 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
 
+static size_t expr_struct_product_hash(const expr_t *expression)
+{
+    if (expr_is_mul(expression))
+        return expr_struct_product_hash(expression->a) * expr_struct_product_hash(expression->b);
+    if (expr_is_neg(expression))
+        return expr_struct_product_hash(expression->a);
+    return expr_is_const(expression) ? 1u : expr_struct_hash(expression);
+}
+
+/* Equal expression graphs share a hash even when product factors are reordered. */
+size_t expr_struct_hash(const expr_t *expression)
+{
+    if (!expression)
+        return 1u;
+    if (expr_is_var(expression))
+        return (size_t)expression->var_id * 2654435761u + 3u;
+    if (expr_is_const(expression))
+        return 7u;
+    if (expr_is_mul(expression))
+        return expr_struct_product_hash(expression);
+    bool root = expr_is_sqrt_expr(expression) ||
+                (expr_is_pow_d_expr(expression) && num_eq(expression->c, NUM_HALF));
+    size_t kind = root ? EXPR_KIND_SQRT : expression->ops->kind;
+    return (kind + 11u) * 2654435761u + 31u * expr_struct_hash(expression->a) +
+           (root ? 0u : 37u * expr_struct_hash(expression->b));
+}
+
 static int const_is_protected_bound_symbol(const expr_t *expr)
 {
     number_t value;

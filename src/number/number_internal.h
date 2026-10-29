@@ -22,6 +22,8 @@
 #include <mpc.h>
 
 #include "number-t.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 
 /* Scoped allocation services implemented by number_core.c. */
 void *number_scope_mem_alloc(size_t size, size_t align);
@@ -51,8 +53,6 @@ typedef enum number_math_family_t {
     NUMBER_MATH_MPFR,
     NUMBER_MATH_COMPLEX
 } number_math_family_t;
-
-typedef enum number_const_id_t number_const_id_t;
 
 /*
  * Representation vtable: payload lifetime, conversion, predicates and the
@@ -149,68 +149,6 @@ typedef struct _complex_t {
 } complex_t;
 
 typedef enum number_binary_op_t { NUMBER_OP_ADD, NUMBER_OP_SUB, NUMBER_OP_MUL, NUMBER_OP_DIV } number_binary_op_t;
-
-typedef enum number_const_id_t {
-    NUMBER_CONST_ZERO,
-    NUMBER_CONST_ONE,
-    NUMBER_CONST_NEG_ONE,
-    NUMBER_CONST_HALF,
-    NUMBER_CONST_ONE_AND_HALF,
-    NUMBER_CONST_ONE_THIRD,
-    NUMBER_CONST_QUARTER,
-    NUMBER_CONST_ONE_SIXTH,
-    NUMBER_CONST_ONE_EIGHTH,
-    NUMBER_CONST_ONE_TENTH,
-    NUMBER_CONST_TWO,
-    NUMBER_CONST_TEN,
-    NUMBER_CONST_PI,
-    NUMBER_CONST_2PI,
-    NUMBER_CONST_PI_2,
-    NUMBER_CONST_NEG_PI_2,
-    NUMBER_CONST_PI_4,
-    NUMBER_CONST_3PI_4,
-    NUMBER_CONST_PI_6,
-    NUMBER_CONST_PI_3,
-    NUMBER_CONST_2_PI,
-    NUMBER_CONST_E,
-    NUMBER_CONST_INV_E,
-    NUMBER_CONST_NEG_INV_E,
-    NUMBER_CONST_LN2,
-    NUMBER_CONST_LN10,
-    NUMBER_CONST_INVLN2,
-    NUMBER_CONST_EULER_MASCHERONI,
-    NUMBER_CONST_PHI,
-    NUMBER_CONST_SQRT_HALF,
-    NUMBER_CONST_SQRT2,
-    NUMBER_CONST_SQRT3,
-    NUMBER_CONST_SQRT2_OVER_TWO,
-    NUMBER_CONST_SQRT3_OVER_TWO,
-    NUMBER_CONST_SQRT_2PI,
-    NUMBER_CONST_SQRT_PI,
-    NUMBER_CONST_SQRT_PI_OVER_TWO,
-    NUMBER_CONST_SQRT1ONPI,
-    NUMBER_CONST_2_SQRTPI,
-    NUMBER_CONST_NEG_TWO_OVER_SQRT_PI,
-    NUMBER_CONST_INV_SQRT_2PI,
-    NUMBER_CONST_LOG_SQRT_2PI,
-    NUMBER_CONST_LN_2PI,
-    NUMBER_CONST_PI_SQUARED,
-    NUMBER_CONST_2PI_CUBED,
-    NUMBER_CONST_NAN,
-    NUMBER_CONST_INF,
-    NUMBER_CONST_NINF,
-    NUMBER_CONST_I,
-    NUMBER_CONST_NEG_I,
-    NUMBER_CONST_SPEED_OF_LIGHT,
-    NUMBER_CONST_ELEMENTARY_CHARGE,
-    NUMBER_CONST_PLANCK,
-    NUMBER_CONST_BOLTZMANN,
-    NUMBER_CONST_AVOGADRO,
-    NUMBER_CONST_STANDARD_GRAVITY,
-    NUMBER_CONST_ASTRONOMICAL_UNIT,
-    NUMBER_CONST_JULIAN_YEAR,
-    NUMBER_CONST_COUNT
-} number_const_id_t;
 
 typedef struct _number_mpfr_t {
     number_const_id_t constant_id;
@@ -388,7 +326,6 @@ bool number_eq_same_tol_with_precision(const number_t *a, const number_t *b, siz
 number_kind_t number_common_kind(const number_t *a, const number_t *b, number_binary_op_t op);
 number_t *number_coerce(const number_t *number, number_kind_t target_kind);
 bool number_matches_value(const number_t *reference, const number_t *target);
-bool number_const_id_from_immortal(const number_t *number, number_const_id_t *id_out);
 qfloat_t number_const_qfloat(number_const_id_t id);
 qcomplex_t number_const_qcomplex(number_const_id_t id);
 number_t number_const_mpfr_exact(number_const_id_t id);

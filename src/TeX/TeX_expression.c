@@ -7,8 +7,8 @@
  */
 #include "TeX-t.h"
 
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 
 /* Ask the native mathematical input adapters to compose the requested notation. */

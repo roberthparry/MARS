@@ -12,8 +12,8 @@
 #error "Private header requires MARS_DIFFEQUATION_INTERNAL_ACCESS."
 #endif
 
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 
 /** @brief Return a borrowed entry from a verified generator matrix. */
 const expr_t *de_lie_entry(const matrix_t *matrix, size_t row, size_t column);

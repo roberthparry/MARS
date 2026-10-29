@@ -12,10 +12,10 @@
 #include "diffequation-t.h"
 #include "TeX-t.h"
 
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
-#define MARS_SHARED_DIFFEQUATION_NOTATION_INTERNAL_ACCESS
-#include "internal/diffequation_notation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
+#define MARS_SHARED_DIFFEQUATION_INTERNAL_ACCESS
+#include "internal/diffequation_internal.h"
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_notation_internal.h"
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS

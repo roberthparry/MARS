@@ -2309,8 +2309,11 @@ Stopped: 1
 ### TeX notation ownership
 
 All matrix TeX composition uses the reusable [TeX module](TeX.md): matrix delimiters,
-real/imaginary alignment, scalar-factor spacing and binding envelopes. Component
-extraction and the choice to split a wide display remain in the matrix renderer.
+real/imaginary alignment, scalar-factor spacing and binding envelopes. Matrix
+supplies real and imaginary values through native numeric APIs. TeX
+measures rendered entries and chooses whether to split a wide complex display;
+it never recovers components by parsing rendered text. Symbolic entries and exact
+binding values likewise arrive as semantic nodes, with no TeX syntax in matrix.
 `MAT_STRING_LATEX` retains its existing output and ownership contract; matrix
 semantics, bindings and common-factor selection remain in the matrix module.
 

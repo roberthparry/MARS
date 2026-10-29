@@ -2,48 +2,24 @@
  * @file expr_stringout_bindings.c
  * @brief Binding-value output shared by expression styles.
  *
- * Formats names and exact right-hand-side binding expressions for native, function and TeX output. It preserves
+ * Formats names and exact right-hand-side binding expressions for native and function output. It preserves
  * unset or symbolic values instead of partially evaluating the displayed algebra.
  *
  * This is part of the expr_t implementation. Preserve expression ownership, symbol identity and mathematical
  * domain restrictions when extending these operations.
  */
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define MARS_SHARED_TeX_SEMANTIC_INTERNAL_ACCESS
-#include "internal/TeX_semantic_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-
-/* Interpret structured numeric text in expression; TeX owns symbol spelling. */
-char *expr_text_to_TeX_local(const char *text)
-{
-    if (!text)
-        return NULL;
-    const char *known = TeX_known_math_text(text);
-    if (known)
-        return expr_tostring_xstrdup(known);
-    if (!strchr(text, '/') && !strchr(text, '^') && !strchr(text, '(') && !strchr(text, ')') &&
-        !strstr(text, "√") && !strstr(text, "·"))
-        return TeX_from_unicode_math(text);
-    string_t *wrapped = string_sprintf("{ %s }", text);
-    expr_t *parsed = wrapped ? expr_from_string(string_c_str(wrapped), NULL) : NULL;
-    string_free(wrapped);
-    if (!parsed)
-        return TeX_from_unicode_math(text);
-    string_t *notation = expr_to_text(parsed, style_LATEX);
-    char *result = notation ? expr_tostring_xstrdup(string_c_str(notation)) : NULL;
-    string_free(notation);
-    expr_free(parsed);
-    return result ? result : TeX_from_unicode_math(text);
-}
 
 static const char subscript_digits[10][4] = {
     "\xE2\x82\x80", "\xE2\x82\x81", "\xE2\x82\x82", "\xE2\x82\x83", "\xE2\x82\x84",
@@ -328,24 +304,6 @@ char *binding_rhs_expr_string_local(const expr_t *expr)
     return out;
 }
 
-char *binding_rhs_TeX_string_local(const expr_t *expr)
-{
-    string_t *number_text;
-    char *text;
-    char *tex;
-
-    if (binding_rhs_is_unset(expr))
-        return expr_tostring_xstrdup("?");
-    if (expr && expr->binding_expr)
-        return expr_binding_expr_to_TeX(expr->binding_expr);
-    number_text = expr ? num_to_string(expr->c) : NULL;
-    text = number_text ? expr_tostring_xstrdup(string_c_str(number_text)) : NULL;
-    string_free(number_text);
-    tex = expr_text_to_TeX_local(text);
-    free(text);
-    return tex;
-}
-
 char *binding_rhs_c_string_local(const expr_t *expr)
 {
     string_t *text;
@@ -357,4 +315,53 @@ char *binding_rhs_c_string_local(const expr_t *expr)
     out = text ? expr_tostring_xstrdup(string_c_str(text)) : NULL;
     string_free(text);
     return out;
+}
+
+/* Preserve exact negative binding values while each presentation owns its syntax. */
+bool emit_negative_const_binding_expr_abs(const expr_t *expression, sbuf_t *buffer)
+{
+    if (!expression || !expression->binding_expr)
+        return false;
+    char *raw = expr_binding_expr_to_string(expression->binding_expr);
+    string_t *text = raw ? string_new_with(raw) : NULL;
+    free(raw);
+    if (!text)
+        return false;
+    string_cursor_t *cursor = string_cursor_new(text);
+    if (!cursor) {
+        string_free(text);
+        return false;
+    }
+    string_cursor_skip_spaces(cursor);
+    bool success = false;
+    if (rune_is_equal(string_cursor_peek(cursor), '-')) {
+        string_cursor_next(cursor);
+        string_cursor_skip_spaces(cursor);
+        string_pos_t start = string_cursor_position(cursor);
+        unsigned char digit;
+        while (string_cursor_peek_ascii(cursor, &digit) && isdigit(digit))
+            string_cursor_next(cursor);
+        string_pos_t end = string_cursor_position(cursor);
+        string_t *part = NULL;
+        if (end > start && string_cursor_consume(cursor, "·π")) {
+            part = string_cursor_slice_between(start, end, cursor);
+            if (part) {
+                sbuf_puts(buffer, string_c_str(part));
+                sbuf_puts(buffer, "π");
+                string_free(part);
+                part = string_cursor_slice_between(string_cursor_position(cursor),
+                                                   string_cursor_end_position(cursor), cursor);
+            }
+        } else {
+            part = string_cursor_slice_between(start, string_cursor_end_position(cursor), cursor);
+        }
+        if (part) {
+            sbuf_puts(buffer, string_c_str(part));
+            string_free(part);
+            success = true;
+        }
+    }
+    string_cursor_free(cursor);
+    string_free(text);
+    return success;
 }

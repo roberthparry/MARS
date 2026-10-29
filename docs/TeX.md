@@ -672,16 +672,28 @@ $$
 
 The [expression](expression.md), [matrix](matrix.md), [equation](equation.md) and
 [differential-equation](diffequation.md) output APIs retain their existing contracts.
-TeX syntax is owned by this module: recursive expression and binding renderers,
-operation symbols, calculus notation, matrix composition, equation solution displays
-and differential-equation explanations all live here. Native modules supply their
-mathematical data through public APIs or controlled internal rendering interfaces.
+TeX owns typesetting syntax, symbol spellings, grouping, delimiters and layout.
+The mathematical modules supply owned semantic snapshots through callbacks; TeX
+does not inspect their private objects or parse rendered output to recover meaning.
+Expression selects operation semantics, binding values, constant identities,
+series identities and temporary names. Matrix selects factors, additive constants
+and native real/imaginary components. Equation and differential equation select
+their solutions, conditions and derivation steps.
 
-Parsing, evaluation, solving and selection of mathematical results remain native
-responsibilities of the mathematical modules. The TeX backend may form display
-views through those native APIs; it does not implement a second solver. Rendering
-scopes remain thread-local, and existing renderers compose fragments directly
-without reparsing them through `TeX_from_expression`.
+Rendering contexts and providers are private implementation details. Ordinary
+callers continue to request `style_LATEX`, `MAT_STRING_LATEX` or the documented
+`*_to_TeX_*` APIs; they never construct or manage a rendering context. The native
+text convenience entry point delegates parsing to those same mathematical modules.
+
+Wrapped and unwrapped expressions share one semantic renderer. TeX requests
+native-selected additive terms only when the ordinary body exceeds its line
+budget. For wide complex matrices, it requests native numeric components and
+arranges them as real and imaginary matrices. Neither operation reparses numeric
+or TeX strings. Each traversal has independent memoisation and cycle detection;
+shared children render once. Native formatting and temporary-name scopes remain
+thread-local. Recognised numeric constants use retained constant IDs directly,
+with a perfect-hash candidate lookup and full-precision equality for untagged
+values. Parsing, evaluation and solving remain native mathematical operations.
 
 `TeX_bound` composes a braced body with optional bindings, `TeX_scaled` places a
 scalar factor beside a body, and `TeX_cartesian_sum` aligns real and imaginary

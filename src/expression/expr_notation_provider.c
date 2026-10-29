@@ -15,8 +15,8 @@
 #include "expression-t.h"
 #include "TeX-t.h"
 
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -173,85 +173,6 @@ const TeX_model_node_t *notation_build_literal(notation_build_t *build, TeX_node
     const TeX_model_node_t *result = value
         ? notation_build_node(build, (TeX_node_view_t){.kind = kind, .text = value}, NULL) : NULL;
     string_free(value);
-    return result;
-}
-
-/* Recover small exactly representable dyadic coefficients from complex storage. */
-static const TeX_model_node_t *notation_build_imaginary_number(notation_build_t *build, const number_t value)
-{
-    if (num_is_finite(value) && !num_is_exact(value)) {
-        double approximate = num_to_double(value);
-        for (long denominator = 2; denominator <= 64; denominator *= 2) {
-            double scaled = approximate * (double)denominator;
-            if (!isfinite(scaled) || fabs(scaled) > 1000000 || trunc(scaled) != scaled)
-                continue;
-            number_t rational = num_create_from_frac((long)scaled, denominator);
-            bool equal = num_eq(value, rational);
-            const TeX_model_node_t *node = equal ? notation_build_number(build, rational) : NULL;
-            num_destroy(&rational);
-            if (equal)
-                return node;
-        }
-    }
-    return notation_build_number(build, value);
-}
-
-/* Keep exact fractions and complex components as mathematics, not formatted syntax. */
-const TeX_model_node_t *notation_build_number(notation_build_t *build, const number_t value)
-{
-    if (num_is_nan(value))
-        return notation_build_literal(build, TeX_NODE_IDENTIFIER, "NaN");
-    if (num_is_inf(value))
-        return notation_build_literal(build, TeX_NODE_IDENTIFIER, num_get_sign(value) < 0 ? "−∞" : "∞");
-    if (!num_is_real(value)) {
-        number_t real = num_real_part(value), imaginary = num_imag_part(value);
-        if (num_is_zero(real)) {
-            bool negative = num_get_sign(imaginary) < 0;
-            number_t magnitude = negative ? num_neg(imaginary) : num_clone(imaginary);
-            const TeX_model_node_t *unit = notation_build_literal(build, TeX_NODE_IDENTIFIER, "i");
-            const TeX_model_node_t *factor = num_eq(magnitude, NUM_ONE) ? unit : notation_build_node(build,
-                (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u},
-                (const TeX_model_node_t *const[]){notation_build_imaginary_number(build, magnitude), unit});
-            const TeX_model_node_t *result = negative ? notation_build_node(build,
-                (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &factor) : factor;
-            num_destroy(&magnitude);
-            num_destroy(&real);
-            num_destroy(&imaginary);
-            return result;
-        }
-        const TeX_model_node_t *imaginary_parts[] = {
-            notation_build_imaginary_number(build, imaginary), notation_build_literal(build, TeX_NODE_IDENTIFIER, "i")
-        };
-        const TeX_model_node_t *sum[] = {
-            notation_build_number(build, real),
-            notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, imaginary_parts)
-        };
-        num_destroy(&real);
-        num_destroy(&imaginary);
-        return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_SUM, .child_count = 2u}, sum);
-    }
-    if (num_get_sign(value) < 0) {
-        number_t magnitude = num_abs(value);
-        const TeX_model_node_t *positive = notation_build_number(build, magnitude);
-        num_destroy(&magnitude);
-        return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &positive);
-    }
-    number_t numerator = num_new(), denominator = num_new();
-    bool fraction = num_get_fraction_parts(value, &numerator, &denominator) && !num_eq(denominator, NUM_ONE);
-    if (fraction) {
-        const TeX_model_node_t *parts[] = {
-            notation_build_number(build, numerator), notation_build_number(build, denominator)
-        };
-        num_destroy(&numerator);
-        num_destroy(&denominator);
-        return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_FRACTION, .child_count = 2u}, parts);
-    }
-    num_destroy(&numerator);
-    num_destroy(&denominator);
-    string_t *text = num_to_string(value);
-    const TeX_model_node_t *result = text
-        ? notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_NUMBER, .text = text}, NULL) : NULL;
-    string_free(text);
     return result;
 }
 
@@ -491,8 +412,10 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
             if (ordered)
                 return ordered;
         }
-        if (kind == EXPR_KIND_MUL)
-            return expr_notation_product(build, expression);
+        if (kind == EXPR_KIND_MUL) {
+            const TeX_model_node_t *fraction = expr_notation_reciprocal_sum(build, expression);
+            return fraction ? fraction : expr_notation_product(build, expression);
+        }
         if (kind == EXPR_KIND_DIV) {
             const TeX_model_node_t *inverse_exponential = expr_notation_inverse_exponential(build, expression);
             if (inverse_exponential)
@@ -653,6 +576,9 @@ const TeX_model_node_t *notation_build_expr(notation_build_t *build, const expr_
         errno = EINVAL;
         return NULL;
     }
+    const char *temporary = expr_math_temporary_name(expression);
+    if (temporary)
+        return expr_notation_name(build, temporary);
     const expr_t *saved_centre = build->shift_centre;
     const expr_t *centre = expr_display_symmetric_shift_centre(expression);
     if (centre)
@@ -720,16 +646,17 @@ static bool has_qualified_distribution(const expr_t *expression)
 /* Results resolve available transforms; formal contexts retain the authored operation. */
 TeX_context_t *expr_TeX_result_context(const expr_t *expression)
 {
-    /* Nested qualifications still require the legacy scoped renderer. */
+    /* Resolve a transform before choosing the scope of any distribution it produces. */
+    expr_t *resolved = expression && expr_is_integral_transform(expression) && has_qualified_distribution(expression)
+        ? expr_transform_result(expression) : NULL;
+    if (resolved)
+        expression = resolved;
     bool qualified = expression && (expr_is_op(expression, &ops_principal_value) ||
                                      expr_is_op(expression, &ops_finite_part)) &&
                      !expr_is_distribution(expression->a);
     const expr_t *detached = NULL;
-    if (!qualified && has_qualified_distribution(expression)) {
-        if (expr_is_integral_transform(expression))
-            return NULL;
+    if (!qualified && has_qualified_distribution(expression))
         detached = expr_distribution_detachable(expression);
-    }
     notation_build_t *build = notation_build_new();
     if (build) {
         build->resolve_transforms = true;
@@ -760,6 +687,7 @@ TeX_context_t *expr_TeX_result_context(const expr_t *expression)
     }
     TeX_context_t *context = notation_build_context(build, root);
     notation_build_free(build);
+    expr_free(resolved);
     return context;
 }
 

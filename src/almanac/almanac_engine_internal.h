@@ -19,10 +19,13 @@
 #endif
 
 #include "almanac-t.h"
-#define MARS_ALMANAC_INTERNAL_ACCESS
-#include "almanac_cartesian.h"
 #include "sqlite-t.h"
 #include "string-t.h"
+
+#define MARS_SHARED_ALMANAC_INTERNAL_ACCESS
+#include "internal/almanac_internal.h"
+#define MARS_ALMANAC_INTERNAL_ACCESS
+#include "almanac_cartesian.h"
 
 /* Private position state and interfaces for the almanac implementation. */
 typedef struct _almanac_entry_t {
@@ -302,5 +305,53 @@ bool almanac_solar_eclipse_geometry(almanac_t *almanac, double jd, const almanac
 bool almanac_solar_eclipse_circumstance_from_geometry(const almanac_solar_eclipse_geometry_t *geometry,
     almanac_solar_eclipse_circumstance_t *out);
 double almanac_solar_eclipse_metric(almanac_t *almanac, double jd, void *context);
+
+/**
+ * @brief Find the nearest geographical location of solar totality.
+ * @param almanac Borrowed configured catalogue used for the calculation; no ownership transfers.
+ * @param observer Borrowed observer location used as the origin or candidate of the search.
+ * @param eclipse Borrowed eclipse event defining the time window to inspect.
+ * @param out Required caller-owned result structure; no dynamic output ownership transfers.
+ * @return True when screening or the search completes, including a result with found set to false; false on failure
+ * or cancellation.
+ */
+bool almanac_nearest_solar_totality(almanac_t *almanac, const almanac_observer_t *observer,
+                                    const almanac_solar_eclipse_t *eclipse, almanac_solar_totality_location_t *out);
+
+/**
+ * @brief Find the nearest land location of solar totality.
+ * @param almanac Borrowed configured catalogue used for the calculation; no ownership transfers.
+ * @param observer Borrowed observer location used as the origin or candidate of the search.
+ * @param eclipse Borrowed eclipse event defining the time window to inspect.
+ * @param out Required caller-owned result structure; no dynamic output ownership transfers.
+ * @return True when screening or the search completes, including a result with found set to false; false on failure
+ * or cancellation.
+ */
+bool almanac_nearest_solar_totality_land(almanac_t *almanac, const almanac_observer_t *observer,
+                                         const almanac_solar_eclipse_t *eclipse,
+                                         almanac_solar_totality_location_t *out);
+
+/**
+ * @brief Evaluate solar totality at the supplied observer.
+ * @param almanac Borrowed configured catalogue used for the calculation; no ownership transfers.
+ * @param observer Borrowed observer location used as the origin or candidate of the search.
+ * @param eclipse Borrowed eclipse event defining the time window to inspect.
+ * @param out Optional caller-owned result structure; NULL requests verification without retaining the result.
+ * @return True when a totality candidate is successfully refined; false when unavailable, invalid, cancelled
+ * or unsuccessful.
+ */
+bool almanac_solar_eclipse_totality_at(almanac_t *almanac, const almanac_observer_t *observer,
+                                       const almanac_solar_eclipse_t *eclipse, almanac_solar_totality_location_t *out);
+
+/**
+ * @brief Score a geographical seed for the solar totality search.
+ * @param almanac Borrowed configured catalogue used for the calculation; no ownership transfers.
+ * @param seed Borrowed observer location used to initialise local totality refinement.
+ * @param eclipse Borrowed eclipse event defining the time window to inspect.
+ * @param out_score_degrees Required caller-owned output receiving the angular totality-search score in degrees.
+ * @return True when the angular score is calculated; false on invalid input, calculation failure or cancellation.
+ */
+bool almanac_solar_eclipse_totality_seed_score(almanac_t *almanac, const almanac_observer_t *seed,
+                                               const almanac_solar_eclipse_t *eclipse, double *out_score_degrees);
 
 #endif /* MARS_ALMANAC_ENGINE_INTERNAL_H */

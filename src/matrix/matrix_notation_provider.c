@@ -12,10 +12,10 @@
 #include "matrix-t.h"
 #include "TeX-t.h"
 
-#define MARS_SHARED_EXPR_NOTATION_INTERNAL_ACCESS
-#include "internal/expr_notation_internal.h"
-#define MARS_SHARED_MATRIX_NOTATION_INTERNAL_ACCESS
-#include "internal/matrix_notation_internal.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
+#define MARS_MATRIX_INTERNAL_ACCESS
+#include "matrix_notation_internal.h"
 
 /* Traverse row-major entries once and preserve their native scalar semantics. */
 const TeX_model_node_t *notation_build_matrix(notation_build_t *build, const matrix_t *matrix)
@@ -59,4 +59,34 @@ TeX_context_t *mat_TeX_context(const matrix_t *matrix)
     TeX_context_t *context = notation_build_context(build, root);
     notation_build_free(build);
     return context;
+}
+
+static TeX_context_t *numeric_entry(void *state, size_t index, TeX_scalar_component_t component, bool *has_imaginary)
+{
+    const matrix_t *matrix = state;
+    size_t columns = mat_get_col_count(matrix);
+    number_t value = mat_get_num(matrix, index / columns, index % columns);
+    number_t imaginary = num_imag_part(value);
+    *has_imaginary = !num_is_zero(imaginary);
+    number_t selected = component == TeX_SCALAR_WHOLE ? num_clone(value)
+        : component == TeX_SCALAR_REAL ? num_real_part(value) : num_clone(imaginary);
+    notation_build_t *build = notation_build_new();
+    const TeX_model_node_t *root = notation_build_number(build, selected);
+    TeX_context_t *context = notation_build_context(build, root);
+    notation_build_free(build);
+    num_destroy(&selected);
+    num_destroy(&imaginary);
+    num_destroy(&value);
+    return context;
+}
+
+/* Let TeX choose layout while native numeric APIs supply the actual components. */
+string_t *mat_numeric_notation_TeX(const matrix_t *matrix)
+{
+    static const TeX_scalar_matrix_provider_t provider = {.entry = numeric_entry};
+    TeX_t *notation = matrix ? TeX_scalar_matrix(mat_get_row_count(matrix), mat_get_col_count(matrix),
+                                                &provider, (void *)matrix) : NULL;
+    string_t *result = notation ? TeX_render(notation) : NULL;
+    TeX_free(notation);
+    return result;
 }

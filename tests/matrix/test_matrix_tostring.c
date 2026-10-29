@@ -479,6 +479,20 @@ static void test_mat_to_string_symbolic_TeX_exact(void)
     free(tex);
     mat_bindings_free(bindings);
     mat_free(A);
+
+    bindings = NULL;
+    A = mat_from_string_expr("{ (x, c) | x = 1/3; c = sqrt(2) }", &bindings);
+    tex = mat_to_string(A, MAT_STRING_LATEX);
+    check_bool("matrix TeX bindings preserve exact fraction structure",
+               tex && strstr(tex, "x = \\frac{1}{3}") != NULL);
+    check_bool("matrix TeX bindings preserve symbolic root structure",
+               tex && strstr(tex, "c = \\sqrt{2}") != NULL);
+    check_bool("matrix TeX body retains symbols instead of substituted binding values",
+               tex && strstr(tex, "\\begin{bmatrix}x & c\\end{bmatrix}") != NULL);
+    free(tex);
+    mat_bindings_free(bindings);
+    mat_free(A);
+
 }
 
 static void test_mat_to_string_symbolic_TeX_no_bindings_exact(void)

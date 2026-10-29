@@ -11,7 +11,9 @@
 TeX output is delegated to the shared [TeX module](TeX.md), including ordered
 derivatives, repeated-quadratic and differential-form displays, boundary conditions
 and solver-specific explanations. Native solvers supply verified results and
-metadata; the presentation backend owns TeX syntax and associated derivation text.
+metadata and choose derivation steps; the presentation backend owns TeX syntax
+and layout. Private semantic providers carry these choices without exposing solver
+structures to TeX. The existing output APIs manage their contexts internally.
 Rendering does not reparse expressions or run the solver again.
 
 `de_problem_to_TeX(problem)` returns an owned `string_t` containing the equation

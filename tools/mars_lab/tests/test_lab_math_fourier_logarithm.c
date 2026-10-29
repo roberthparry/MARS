@@ -88,7 +88,7 @@ static void test_finite_part_fourier_pair_and_inverse(void)
                         log(fabs(forward_points[p])), 12);
     const json_t *inverse = math_fourier_fields("@Finv{ln(abs(ω))}", "t");
     lab_math_equal(math_fourier_before(math_fourier_text(inverse, "tex"), "\\quad"),
-        "-\\frac{1}{2}\\mkern-2mu \\left(\\frac{1}{\\left| t \\right|} + 2\\mkern-2mu \\gamma\\mkern-2mu \\delta(t)\\right)");
+        "-\\frac{\\frac{1}{\\left| t \\right|} + 2\\mkern-2mu \\gamma\\mkern-2mu \\delta(t)}{2}");
     for (size_t a = 0; a < 2; ++a) {
         const char *body = lab_math_format("%s(1/abs(x))", aliases[a]);
         lab_math_contains(math_fourier_text(math_fourier_fields(body, "x"), "value_note"), "distribution", true);

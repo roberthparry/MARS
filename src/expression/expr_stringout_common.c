@@ -14,15 +14,19 @@
 #include <ctype.h>
 #include <gmp.h>
 #include <limits.h>
+#include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "dictionary-t.h"
 #include "expression-t.h"
 #include "string-t.h"
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -501,22 +505,50 @@ typedef struct {
     const char *const *names;
     size_t count;
     const expr_t *expanded_node;
+    dictionary_t *lookup;
 } function_temporary_context_t;
 
 static _Thread_local function_temporary_context_t function_temporary_context;
 static _Thread_local bool mathematical_temporaries_active;
+
+static size_t temporary_hash(const void *key)
+{
+    return expr_struct_hash(*(const expr_t *const *)key);
+}
+
+static int temporary_compare(const void *left, const void *right)
+{
+    const expr_t *a = *(const expr_t *const *)left, *b = *(const expr_t *const *)right;
+    if (expr_struct_eq(a, b))
+        return 0;
+    return (uintptr_t)a < (uintptr_t)b ? -1 : 1;
+}
+
+/* Index temporary expressions once per rendering scope, retaining their first name. */
+static dictionary_t *temporary_lookup_new(const expr_t *const *nodes, const char *const *names, size_t count)
+{
+    dictionary_t *lookup = dictionary_create(sizeof(expr_t *), sizeof(char *), temporary_hash,
+                                              temporary_compare, NULL, NULL, NULL, NULL, NULL);
+    if (!lookup)
+        return NULL;
+    for (size_t index = 0u; index < count; ++index) {
+        const char *existing = NULL;
+        if (!dictionary_get(lookup, &nodes[index], &existing) && !dictionary_set(lookup, &nodes[index], &names[index])) {
+            dictionary_destroy(lookup);
+            return NULL;
+        }
+    }
+    return lookup;
+}
 
 const char *function_temporary_name(const expr_t *expr)
 {
     if (!expr || expr == function_temporary_context.expanded_node)
         return NULL;
 
-    for (size_t index = 0u; index < function_temporary_context.count; ++index) {
-        if (function_temporary_context.nodes[index] == expr ||
-            expr_struct_eq(function_temporary_context.nodes[index], expr))
-            return function_temporary_context.names[index];
-    }
-    return NULL;
+    const char *name = NULL;
+    return function_temporary_context.lookup && dictionary_get(function_temporary_context.lookup, &expr, &name)
+        ? name : NULL;
 }
 
 void flatten_func_mul(expr_t *f, expr_t **buf, int *count, int max)
@@ -945,8 +977,6 @@ void sort_factors(expr_t **fac, int n)
 void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_expr_abs_bars(const expr_t *f, sbuf_t *b);
-void TeX_emit_expr(const expr_t *f, sbuf_t *b, int parent_prec);
-void emit_TeX_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 
@@ -1064,12 +1094,18 @@ void emit_func_with_temporaries(const expr_t *f, sbuf_t *b, int parent_prec, con
     function_temporary_context.names = names;
     function_temporary_context.count = count;
     function_temporary_context.expanded_node = expanded_node;
+    function_temporary_context.lookup = count ? temporary_lookup_new(nodes, names, count) : NULL;
+    if (count && !function_temporary_context.lookup) {
+        fprintf(stderr, "expression temporary lookup: out of memory\n");
+        abort();
+    }
     emit_func(f, b, parent_prec);
+    dictionary_destroy(function_temporary_context.lookup);
     function_temporary_context = previous;
 }
 
 /* Use the same structural abbreviations in mathematical output as in executable functions. */
-void emit_math_with_temporaries(const expr_t *f, sbuf_t *b, style_t style, const expr_t *const *nodes,
+void emit_math_with_temporaries(const expr_t *f, sbuf_t *b, const expr_t *const *nodes,
                                 const char *const *names, size_t count)
 {
     function_temporary_context_t previous = function_temporary_context;
@@ -1079,12 +1115,35 @@ void emit_math_with_temporaries(const expr_t *f, sbuf_t *b, style_t style, const
     function_temporary_context.names = names;
     function_temporary_context.count = count;
     function_temporary_context.expanded_node = NULL;
-    if (style == style_LATEX)
-        TeX_emit_expr(f, b, PREC_LOWEST);
-    else
-        emit_expr(f, b, PREC_LOWEST);
+    function_temporary_context.lookup = count ? temporary_lookup_new(nodes, names, count) : NULL;
+    if (count && !function_temporary_context.lookup) {
+        fprintf(stderr, "expression temporary lookup: out of memory\n");
+        abort();
+    }
+    emit_expr(f, b, PREC_LOWEST);
+    dictionary_destroy(function_temporary_context.lookup);
     function_temporary_context = previous;
     mathematical_temporaries_active = previous_active;
+}
+
+/* Capture native temporary substitutions before returning the independent semantic context. */
+TeX_context_t *expr_notation_temporaries_context(const expr_t *expression, const expr_t *const *nodes,
+                                                 const char *const *names, size_t count)
+{
+    if (!expression || (count && (!nodes || !names)))
+        return NULL;
+    function_temporary_context_t previous = function_temporary_context;
+    bool previous_active = mathematical_temporaries_active;
+    dictionary_t *lookup = count ? temporary_lookup_new(nodes, names, count) : NULL;
+    if (count && !lookup)
+        return NULL;
+    function_temporary_context = (function_temporary_context_t){nodes, names, count, NULL, lookup};
+    mathematical_temporaries_active = true;
+    TeX_context_t *context = expr_TeX_context(expression);
+    mathematical_temporaries_active = previous_active;
+    function_temporary_context = previous;
+    dictionary_destroy(lookup);
+    return context;
 }
 
 

@@ -23,6 +23,8 @@
 #include "equation-t.h"
 #include "number-t.h"
 
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 
@@ -103,5 +105,20 @@ expr_bindings_t *equ_bindings_borrow(const equation_t *equation);
 
 /* Return one when inapplicable, zero after a bounded search, or minus one on allocation failure. */
 int equ_try_search_zeta_roots(const equation_t *equation, equation_solutions_t *solutions);
+
+/**
+ * @brief Create an owned equation notation snapshot, released with TeX_context_free.
+ * @param value Borrowed matrix or equation to copy into the semantic snapshot; the source remains unchanged.
+ * @return Owned rendering context released with TeX_context_free, or NULL on invalid input or failure.
+ */
+TeX_context_t *equ_TeX_context(const equation_t *value);
+
+/**
+ * @brief Snapshot both equation sides in a borrowed builder.
+ * @param build Borrowed semantic snapshot builder; it owns all nodes added by this call.
+ * @param value Borrowed matrix or equation to copy into the semantic snapshot; the source remains unchanged.
+ * @return Model-owned semantic node, or NULL on invalid input or allocation failure; do not free it individually.
+ */
+const TeX_model_node_t *notation_build_equation(notation_build_t *build, const equation_t *value);
 
 #endif
