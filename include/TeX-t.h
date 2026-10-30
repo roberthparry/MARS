@@ -2,11 +2,14 @@
  * @file TeX-t.h
  * @brief Owned mathematical notation independent of algebra and applications.
  *
- * TeX_t composes immutable TeX fragments, escaping literal text and supplying
- * fraction, root, script, tensor, calculus, equation and matrix syntax. Constructors copy their inputs;
- * children may therefore be released immediately after composition. Objects
- * may be read concurrently, but destruction requires external synchronisation.
- * Structured constructors perform no algebraic rewriting and do not run a TeX engine.
+ * TeX_builder_t constructs notation in reverse Polish order: push operands, then
+ * apply fractions, roots, scripts, tensors, calculus, equations or matrices.
+ * The builder owns every intermediate fragment; finish transfers its one completed
+ * TeX_t value to the caller. Failed operations preserve the stack and record a
+ * persistent error, preventing accidental completion after an unchecked failure.
+ * Literal text is escaped. Explicit composition performs no algebraic rewriting
+ * and never runs a TeX engine. Immutable values may be read concurrently;
+ * destruction and all access to a shared builder require external synchronisation.
  * TeX_from_expression uses the native mathematical modules for parsing and simplification.
  * The TeX module owns typesetting for expressions, matrices, equations and differential equations;
  * those modules retain their mathematical models and delegate notation to this module.
@@ -25,6 +28,9 @@
  * @see TeX_free
  */
 typedef struct _TeX_t TeX_t;
+
+/** @brief Opaque owner of an operand stack and its first uncleared construction error. */
+typedef struct _TeX_builder_t TeX_builder_t;
 
 /** @brief Equation presentation without changing either mathematical side. */
 typedef enum {
@@ -45,12 +51,6 @@ typedef enum {
     TeX_INDEX_UPPER  /**< Contravariant index slot. */
 } TeX_index_position_t;
 
-/** @brief One borrowed tensor index; slots retain their supplied left-to-right order. */
-typedef struct {
-    const TeX_t *value;          /**< Non-NULL index notation, copied during construction. */
-    TeX_index_position_t position; /**< Lower or upper placement. */
-} TeX_index_t;
-
 /** @brief Automatically sized mathematical delimiters. */
 typedef enum {
     TeX_FENCE_PARENTHESES, /**< Round parentheses. */
@@ -66,21 +66,373 @@ typedef enum {
     TeX_DERIVATIVE_PARTIAL   /**< Partial differential symbol. */
 } TeX_derivative_style_t;
 
-/**
- * @brief Copy trusted TeX syntax without escaping or validating commands.
- * @param source Borrowed, null-terminated TeX source. Must not be NULL or contain untrusted text.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note The source is copied and is not retained.
- */
-TeX_t *TeX_raw(const char *source);
+/** @brief Which bounds follow a summand or integrand on the operand stack. */
+typedef enum {
+    TeX_LIMIT_NONE,      /**< No bounds. */
+    TeX_LIMIT_LOWER,     /**< Lower bound only. */
+    TeX_LIMIT_UPPER,     /**< Upper bound only. */
+    TeX_LIMIT_BOTH       /**< Lower bound followed by upper bound. */
+} TeX_limits_t;
+
+/** @brief Explicit mathematical spacing supplied without knowing TeX commands. */
+typedef enum {
+    TeX_SPACE_THIN, /**< Thin space between mathematical factors. */
+    TeX_SPACE_QUAD  /**< Wide space before a caption. */
+} TeX_space_t;
 
 /**
- * @brief Escape literal UTF-8 text and enclose it in a TeX text command.
- * @param text Borrowed text, neither modified nor retained. Empty strings are permitted.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note NULL input or an embedded NUL is rejected with errno set to EINVAL.
+ * @brief Create an empty reverse Polish construction stack.
+ * @return Owned builder, released with TeX_builder_free(), or NULL with errno set to ENOMEM.
+ * @note Pushes copy inputs. Every operation replaces its top operands only after successful construction.
+ * Errors persist until cleared: EINVAL for invalid input, ERANGE for stack underflow,
+ * EOVERFLOW for excessive dimensions, and ENOMEM for allocation failure.
  */
-TeX_t *TeX_text(const string_t *text);
+TeX_builder_t *TeX_builder_new(void);
+
+/**
+ * @brief Release a builder and every intermediate value still on its stack.
+ * @param builder Owned builder to destroy, or NULL for no action.
+ * @note A value already returned by TeX_builder_finish() remains independently owned.
+ */
+void TeX_builder_free(TeX_builder_t *builder);
+
+/**
+ * @brief Return the current number of operands, including after a construction error.
+ * @param builder Borrowed builder, or NULL.
+ * @return Stack depth, or zero for NULL; ownership is unchanged.
+ */
+size_t TeX_builder_count(const TeX_builder_t *builder);
+
+/**
+ * @brief Inspect the first construction error without changing the stack.
+ * @param builder Borrowed builder, or NULL.
+ * @return Zero when healthy, the saved errno value after failure, or EINVAL for NULL.
+ */
+int TeX_builder_error(const TeX_builder_t *builder);
+
+/**
+ * @brief Clear a saved error so construction can continue with the preserved operands.
+ * @param builder Borrowed builder to update; NULL has no effect.
+ * @note This frees no operands and does not change errno.
+ */
+void TeX_builder_clear_error(TeX_builder_t *builder);
+
+/**
+ * @brief Discard all operands and clear the construction error, ready for another formula.
+ * @param builder Borrowed builder to reset; NULL has no effect.
+ * @note Previously returned finished values remain valid; borrowed stack views become invalid.
+ */
+void TeX_builder_clear(TeX_builder_t *builder);
+
+/**
+ * @brief Inspect a stack operand without transferring ownership.
+ * @param builder Borrowed builder; may be inspected after failure.
+ * @param level HP48-style stack level: one for the top operand, two for the next, and so on.
+ * @return Borrowed notation, valid until that operand is consumed or the builder is cleared or freed.
+ * NULL reports EINVAL for a NULL builder or ERANGE for zero or an unavailable level, without saving an error.
+ */
+const TeX_t *TeX_builder_peek(const TeX_builder_t *builder, size_t level);
+
+/**
+ * @brief Transfer the one completed formula out of a healthy builder.
+ * @param builder Borrowed builder, left empty on success and reusable immediately.
+ * @return Owned notation, released with TeX_free(), or NULL on a saved error or when depth is not exactly one.
+ * @note Invalid depth saves EINVAL. Failure leaves every operand intact; the builder always remains caller-owned.
+ */
+TeX_t *TeX_builder_finish(TeX_builder_t *builder);
+
+/**
+ * @brief Embed a copy of already rendered, trusted TeX source.
+ * @param builder Borrowed builder receiving an owned copy.
+ * @param source Borrowed NUL-terminated trusted source, neither retained nor validated; NULL is invalid.
+ * @return True on success; false saves an error and leaves the stack unchanged.
+ * @warning This is an escape hatch for existing renderers. Construct mathematics with symbols and operations;
+ * use TeX_push_text() for prose. Raw source has unknown structure and is conservatively grouped in arithmetic.
+ */
+bool TeX_push_raw(TeX_builder_t *builder, const char *source);
+
+/**
+ * @brief Push one plain mathematical symbol without accepting operator or TeX command fragments.
+ * @param builder Borrowed builder receiving owned notation.
+ * @param name Borrowed NUL-terminated name, copied and not retained. ASCII names such as psi, mu, lambda,
+ * Lambda, hbar, infinity and partial select symbols. Other identifier names and Unicode symbols are accepted too.
+ * @return True on success; false saves an error and preserves the stack. Empty names and punctuation are invalid.
+ * @note All standard Greek names are supported; an initial capital selects uppercase. No special keyboard is needed.
+ */
+bool TeX_push_symbol(TeX_builder_t *builder, const char *name);
+
+/**
+ * @brief Escape and push literal UTF-8 prose.
+ * @param builder Borrowed builder receiving the escaped value.
+ * @param text Borrowed string, neither modified nor retained; NULL and embedded NUL are invalid.
+ * @return True on success; false saves an error and preserves the stack. Empty text is permitted.
+ */
+bool TeX_push_text(TeX_builder_t *builder, const string_t *text);
+
+/**
+ * @brief Parse and push native mathematical text using TeX_from_expression().
+ * @param builder Borrowed builder receiving the result.
+ * @param text Borrowed mathematical string, neither modified nor retained.
+ * @return True on success; false saves an error and preserves the stack. Native parser diagnostics may appear.
+ */
+bool TeX_push_expression(TeX_builder_t *builder, const string_t *text);
+
+/**
+ * @brief Push native mathematical text supplied as a convenient C string.
+ * @param builder Borrowed builder receiving the result.
+ * @param text Borrowed NUL-terminated native mathematics, copied before parsing; NULL is invalid.
+ * @return True on success; false saves an error and preserves the stack.
+ * @note This is the C-string equivalent of TeX_push_expression(), with the same simplification conventions.
+ */
+bool TeX_push_math(TeX_builder_t *builder, const char *text);
+
+/**
+ * @brief Push a decimal integer without requiring source construction.
+ * @param builder Borrowed builder receiving the notation.
+ * @param value Integer to typeset; no evaluation is performed.
+ * @return True on success; false saves an error and preserves the stack.
+ * @note The literal value is retained for TeX_roll() controls, including after duplication or copying.
+ */
+bool TeX_push_integer(TeX_builder_t *builder, long value);
+
+/**
+ * @brief Push an independently owned copy of existing notation.
+ * @param builder Borrowed builder receiving a copy.
+ * @param notation Borrowed non-NULL notation, which may belong to this builder and is never retained.
+ * @return True on success; false saves an error and preserves the stack.
+ */
+bool TeX_push_notation(TeX_builder_t *builder, const TeX_t *notation);
+
+/**
+ * @brief Push explicit mathematical spacing.
+ * @param builder Borrowed builder receiving the spacing fragment.
+ * @param space Thin or quad spacing; other values are invalid.
+ * @return True on success; false saves an error and preserves the stack.
+ */
+bool TeX_push_space(TeX_builder_t *builder, TeX_space_t space);
+
+/**
+ * @brief Duplicate the top operand, following the HP48 DUP operation.
+ * @param builder Borrowed builder receiving an independent copy.
+ * @return True on success; false saves an error and preserves the stack, including ERANGE for an empty stack.
+ * @note Bottom-to-top stack effect: a becomes a a. The copy retains presentation and literal integer metadata.
+ */
+bool TeX_dup(TeX_builder_t *builder);
+
+/**
+ * @brief Consume a level number and move that operand to the top, following the HP48 ROLL operation.
+ * @param builder Borrowed builder with a literal integer level on top, pushed with TeX_push_integer() or copied.
+ * @return True on success; false preserves every operand, including the control, and saves EINVAL for a non-literal
+ * control or ERANGE for a level outside one through the remaining stack depth. Existing errors remain unchanged.
+ * @note Levels count from one after excluding the control. Thus a b c 3 becomes b c a, while a b 2 becomes b a.
+ * A level of one only consumes its control. Notation is moved without copying or allocation; only the selected
+ * pointers shift. Arithmetic notation is not evaluated to obtain a level, and generated TeX is never parsed.
+ * Borrowed operand views remain valid; the consumed control view does not. Shared builders need external locking.
+ */
+bool TeX_roll(TeX_builder_t *builder);
+
+/**
+ * @brief Rotate the top three operands, following the HP48 ROT operation, equivalent to pushing three then ROLL.
+ * @param builder Borrowed builder requiring at least three operands.
+ * @return True on success; false saves an error, including ERANGE for underflow, without changing the stack.
+ * @note Bottom-to-top stack effect: a b c becomes b c a. Lower operands and borrowed views remain unchanged;
+ * the operation moves three pointers in constant time without allocating or copying notation.
+ */
+bool TeX_rot(TeX_builder_t *builder);
+
+/**
+ * @brief Replace left then right operand by their displayed sum.
+ * @param builder Borrowed builder; the right operand must be on top.
+ * @return True on success; false saves an error and preserves both operands. No algebra is evaluated or reordered.
+ * @note Operator syntax and visible grouping are supplied by TeX.
+ */
+bool TeX_add(TeX_builder_t *builder);
+
+/**
+ * @brief Replace minuend then subtrahend by their displayed difference.
+ * @param builder Borrowed builder; the subtrahend must be on top.
+ * @return True on success; false saves an error and preserves both operands.
+ * @note A compound subtrahend is grouped, preserving the order of nested subtraction.
+ */
+bool TeX_sub(TeX_builder_t *builder);
+
+/**
+ * @brief Negate the complete top operand without evaluating it.
+ * @param builder Borrowed builder requiring one operand.
+ * @return True on success; false saves an error and preserves the operand. Compound operands retain grouping.
+ */
+bool TeX_neg(TeX_builder_t *builder);
+
+/**
+ * @brief Replace left then right factor by their product, retaining mathematical grouping.
+ * @param builder Borrowed builder; the right factor must be on top.
+ * @return True on success; false saves an error and preserves both factors. Exactly two factors are consumed.
+ */
+bool TeX_mul(TeX_builder_t *builder);
+
+/**
+ * @brief Apply a plain named function to its top arguments in push order.
+ * @param builder Borrowed builder receiving the call notation.
+ * @param name Borrowed NUL-terminated UTF-8 function name, validated like TeX_push_symbol() and not retained.
+ * @param count Number of arguments to consume; zero constructs an empty argument list.
+ * @return True on success; false saves an error and preserves the arguments. No function is evaluated.
+ * @note Standard function spelling is selected internally; callers supply names such as sin, P or psi.
+ */
+bool TeX_function(TeX_builder_t *builder, const char *name, size_t count);
+
+/**
+ * @brief Apply a function already on the stack to its following arguments.
+ * @param builder Borrowed builder; push the function first, then arguments in display order.
+ * @param count Number of arguments following the function; zero constructs an empty argument list.
+ * @return True on success; false saves an error and preserves every operand. No function is evaluated.
+ * @note Supports indexed function symbols built with TeX_subscript().
+ */
+bool TeX_call(TeX_builder_t *builder, size_t count);
+
+/**
+ * @brief Replace numerator then denominator by their fraction.
+ * @param builder Borrowed builder; the denominator must be on top.
+ * @return True on success; false saves an error and preserves both operands.
+ */
+bool TeX_frac(TeX_builder_t *builder);
+
+/**
+ * @brief Replace the top radicand by its square root.
+ * @param builder Borrowed builder requiring one operand.
+ * @return True on success; false saves an error and preserves the radicand.
+ */
+bool TeX_sqrt(TeX_builder_t *builder);
+
+/**
+ * @brief Replace radicand then index by an indexed root.
+ * @param builder Borrowed builder; the root index must be on top.
+ * @return True on success; false saves an error and preserves both operands.
+ */
+bool TeX_root(TeX_builder_t *builder);
+
+/**
+ * @brief Replace base then exponent by a grouped base with a superscript.
+ * @param builder Borrowed builder; the exponent must be on top.
+ * @return True on success; false saves an error and preserves both operands.
+ * @note Compound bases retain visible mathematical grouping from their stored construction structure.
+ */
+bool TeX_pow(TeX_builder_t *builder);
+
+/**
+ * @brief Replace base then subscript by indexed notation.
+ * @param builder Borrowed builder; the subscript must be on top.
+ * @return True on success; false saves an error and preserves both operands.
+ */
+bool TeX_subscript(TeX_builder_t *builder);
+
+/**
+ * @brief Replace base, lower script then upper script by notation bearing both scripts.
+ * @param builder Borrowed builder; the upper script must be on top.
+ * @return True on success; false saves an error and preserves all three operands.
+ */
+bool TeX_scripts(TeX_builder_t *builder);
+
+/**
+ * @brief Concatenate the top count operands in their original push order.
+ * @param builder Borrowed builder receiving the combined fragment.
+ * @param count Number to consume; zero pushes empty notation.
+ * @return True on success; false saves an error and preserves the stack.
+ */
+bool TeX_sequence(TeX_builder_t *builder, size_t count);
+
+/**
+ * @brief Replace left then right side by an equation.
+ * @param builder Borrowed builder; the right side must be on top.
+ * @param style Inline or top-aligned equation presentation.
+ * @return True on success; false saves an error and preserves both sides.
+ */
+bool TeX_equation(TeX_builder_t *builder, TeX_equation_style_t style);
+
+/**
+ * @brief Enclose the top operand in automatically sized delimiters.
+ * @param builder Borrowed builder requiring one operand.
+ * @param fence Delimiter pair selected from TeX_fence_t.
+ * @return True on success; false saves an error and preserves the operand.
+ */
+bool TeX_fence(TeX_builder_t *builder, TeX_fence_t fence);
+
+/**
+ * @brief Replace base then ordered indices by tensor notation.
+ * @param builder Borrowed builder; push the base first, then index values in left-to-right order.
+ * @param positions Borrowed array of count lower/upper positions; may be NULL only when count is zero.
+ * @param count Number of indices to consume after the base; zero groups the base alone.
+ * @return True on success; false saves an error and preserves every operand. The positions are not retained.
+ */
+bool TeX_tensor(TeX_builder_t *builder, const TeX_index_position_t *positions, size_t count);
+
+/**
+ * @brief Replace summand then selected bounds by summation notation.
+ * @param builder Borrowed builder; push the body first, then lower and/or upper bounds as selected.
+ * @param limits Which bounds are present; when both are present the upper bound is on top.
+ * @return True on success; false saves an error and preserves all operands. No sum is evaluated.
+ */
+bool TeX_sum(TeX_builder_t *builder, TeX_limits_t limits);
+
+/**
+ * @brief Replace integrand, variable then selected bounds by integral notation.
+ * @param builder Borrowed builder; push the body, variable, then lower and/or upper bounds in that order.
+ * @param limits Which bounds are present; none gives an indefinite integral.
+ * @return True on success; false saves an error and preserves all operands. No integration is performed.
+ */
+bool TeX_integral(TeX_builder_t *builder, TeX_limits_t limits);
+
+/**
+ * @brief Replace body then variable by an ordinary or partial derivative.
+ * @param builder Borrowed builder; the differentiation variable must be on top.
+ * @param order Positive derivative order.
+ * @param style Ordinary or partial differential notation.
+ * @return True on success; false saves an error and preserves both operands. No differentiation is performed.
+ */
+bool TeX_derivative(TeX_builder_t *builder, unsigned order, TeX_derivative_style_t style);
+
+/**
+ * @brief Replace row-major cells by a matrix without interpreting their contents.
+ * @param builder Borrowed builder; push the first row first and the final cell last.
+ * @param rows Positive number of rows.
+ * @param columns Positive number of columns; rows times columns must fit size_t.
+ * @param style Square brackets, parentheses or plain matrix presentation.
+ * @param row_spacing Extra row spacing in points, or zero for the environment default.
+ * @return True on success; false saves an error and preserves every cell.
+ * @note Push an empty raw fragment for an intentionally empty cell.
+ */
+bool TeX_matrix(TeX_builder_t *builder, size_t rows, size_t columns,
+                      TeX_matrix_style_t style, unsigned row_spacing);
+
+/**
+ * @brief Wrap the top body, optionally followed by bindings, in native bound notation.
+ * @param builder Borrowed builder; bindings, when present, must be on top.
+ * @param bindings Whether to consume a binding fragment after the body.
+ * @return True on success; false saves an error and preserves all operands.
+ */
+bool TeX_bound(TeX_builder_t *builder, bool bindings);
+
+/**
+ * @brief Place a scalar factor beside the following mathematical body with compact spacing.
+ * @param builder Borrowed builder; push the scalar first and the body last.
+ * @return True on success; false saves an error and preserves both operands.
+ */
+bool TeX_scaled(TeX_builder_t *builder);
+
+/**
+ * @brief Replace real then imaginary component by a two-row Cartesian presentation.
+ * @param builder Borrowed builder; the imaginary coefficient must be on top.
+ * @return True on success; false saves an error and preserves both operands.
+ */
+bool TeX_cartesian_sum(TeX_builder_t *builder);
+
+/**
+ * @brief Replace centre, offset and optional denominator by a symmetric pair.
+ * @param builder Borrowed builder; push centre, offset, then denominator when present.
+ * @param denominator Whether a denominator operand is present.
+ * @param group_offset Whether the offset requires visible parentheses.
+ * @return True on success; false saves an error and preserves every operand.
+ */
+bool TeX_symmetric_pair(TeX_builder_t *builder, bool denominator, bool group_offset);
 
 /**
  * @brief Parse ordinary MARS mathematical text and arrange it as readable TeX.
@@ -109,151 +461,6 @@ TeX_t *TeX_text(const string_t *text);
  * @note Simplification follows the expression module's algebra and domain conventions; this is not verbatim typesetting.
  */
 TeX_t *TeX_from_expression(const string_t *text);
-
-/**
- * @brief Compose a fraction from two mathematical fragments.
- * @param numerator Borrowed, non-NULL numerator notation.
- * @param denominator Borrowed, non-NULL denominator notation.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note Both fragments are copied. No algebraic validation or simplification is performed.
- */
-TeX_t *TeX_fraction(const TeX_t *numerator, const TeX_t *denominator);
-
-/**
- * @brief Compose a square or indexed radical.
- * @param radicand Borrowed, non-NULL notation beneath the radical.
- * @param index Borrowed root index, or NULL for a square root.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note Supplied fragments are copied and are not retained.
- */
-TeX_t *TeX_root(const TeX_t *radicand, const TeX_t *index);
-
-/**
- * @brief Group the complete base and attach optional lower and upper scripts.
- * @param base Borrowed, non-NULL base notation.
- * @param lower Borrowed subscript notation, or NULL to omit the subscript.
- * @param upper Borrowed superscript notation, or NULL to omit the superscript.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note Supplied fragments are copied. With both scripts omitted, the base is still grouped.
- */
-TeX_t *TeX_scripts(const TeX_t *base, const TeX_t *lower, const TeX_t *upper);
-
-/**
- * @brief Concatenate mathematical fragments in their supplied order without inserting separators.
- * @param parts Borrowed array of non-NULL fragments; may be NULL only when count is zero.
- * @param count Number of fragments. Zero produces empty notation.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note Fragments are copied; neither the array nor its entries are retained.
- */
-TeX_t *TeX_sequence(const TeX_t *const *parts, size_t count);
-
-/**
- * @brief Compose an equation from two trusted mathematical fragments.
- * @param left Borrowed, non-NULL left side.
- * @param right Borrowed, non-NULL right side.
- * @param style Inline or top-aligned display; no automatic line breaking is performed.
- * @return Independently owned notation; release with TeX_free(). NULL on invalid input or allocation failure.
- * @note Copies both sides. Aligned mode incorporates a native top-aligned right-side wrapper rather than nesting it.
- */
-TeX_t *TeX_equation(const TeX_t *left, const TeX_t *right, TeX_equation_style_t style);
-
-/**
- * @brief Enclose notation in automatically sized delimiters.
- * @param body Borrowed, non-NULL mathematical notation.
- * @param fence Delimiter pair selected from TeX_fence_t.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- */
-TeX_t *TeX_fenced(const TeX_t *body, TeX_fence_t fence);
-
-/**
- * @brief Attach ordered tensor index slots without aligning differently positioned slots on top of each other.
- * @param base Borrowed, non-NULL tensor symbol.
- * @param indices Borrowed array of non-NULL index values and their positions; may be NULL when count is zero.
- * @param count Number of index slots. Zero produces the grouped base alone.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note All inputs are copied. This formats indices; it does not contract tensors or check their dimensions.
- */
-TeX_t *TeX_tensor(const TeX_t *base, const TeX_index_t *indices, size_t count);
-
-/**
- * @brief Compose summation notation with optional bounds.
- * @param body Borrowed, non-NULL summand notation.
- * @param lower Borrowed lower annotation such as n = 0, or NULL to omit it.
- * @param upper Borrowed upper annotation, or NULL to omit it.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note Inputs are copied. No summation is evaluated.
- */
-TeX_t *TeX_sum(const TeX_t *body, const TeX_t *lower, const TeX_t *upper);
-
-/**
- * @brief Compose an integral with optional bounds and an upright differential.
- * @param body Borrowed, non-NULL integrand notation.
- * @param variable Borrowed, non-NULL integration variable.
- * @param lower Borrowed lower bound, or NULL to omit it.
- * @param upper Borrowed upper bound, or NULL to omit it.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note Inputs are copied. Nest this constructor for iterated integrals; no integration is evaluated.
- */
-TeX_t *TeX_integral(const TeX_t *body, const TeX_t *variable, const TeX_t *lower, const TeX_t *upper);
-
-/**
- * @brief Compose an ordinary or partial derivative fraction of positive integer order.
- * @param body Borrowed, non-NULL differentiated expression.
- * @param variable Borrowed, non-NULL differentiation variable.
- * @param order Positive derivative order; zero is invalid.
- * @param style Ordinary or partial notation selected from TeX_derivative_style_t.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note Inputs are copied. This emits notation only; coefficients should be composed beside this fraction.
- */
-TeX_t *TeX_derivative(const TeX_t *body, const TeX_t *variable, unsigned order, TeX_derivative_style_t style);
-
-/**
- * @brief Compose a matrix from row-major mathematical cells.
- * @param cells Borrowed, non-NULL array of rows times columns entries. NULL entries denote empty cells.
- * @param rows Number of rows; must be non-zero.
- * @param columns Number of columns; must be non-zero, and rows times columns must fit size_t.
- * @param style Delimiter style, selected from TeX_matrix_style_t.
- * @param row_spacing Extra row spacing in points. Zero uses the environment's default spacing.
- * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
- * @note Cells are copied; neither the array nor its entries are retained.
- */
-TeX_t *TeX_matrix(const TeX_t *const *cells, size_t rows, size_t columns,
-                  TeX_matrix_style_t style, unsigned row_spacing);
-
-/**
- * @brief Wrap a mathematical body and optional binding list in braces.
- * @param body Borrowed body; must not be NULL.
- * @param bindings Borrowed bindings, or NULL to omit the binding bar.
- * @return Independently owned notation, released with TeX_free(), or NULL on failure.
- */
-TeX_t *TeX_bound(const TeX_t *body, const TeX_t *bindings);
-
-/**
- * @brief Place a scalar factor beside a mathematical body with compact spacing.
- * @param factor Borrowed factor; must not be NULL.
- * @param body Borrowed body; must not be NULL.
- * @return Independently owned notation, released with TeX_free(), or NULL on failure.
- */
-TeX_t *TeX_scaled(const TeX_t *factor, const TeX_t *body);
-
-/**
- * @brief Compose aligned real and imaginary components on separate rows.
- * @param real Borrowed real component; must not be NULL.
- * @param imaginary Borrowed imaginary coefficient; must not be NULL.
- * @return Independently owned notation, released with TeX_free(), or NULL on failure.
- */
-TeX_t *TeX_cartesian_sum(const TeX_t *real, const TeX_t *imaginary);
-
-/**
- * @brief Compose a symmetric pair with an optional common denominator.
- * @param centre Borrowed common centre; must not be NULL.
- * @param offset Borrowed displacement; must not be NULL.
- * @param denominator Borrowed common denominator, or NULL for none.
- * @param group_offset Whether to enclose the displacement in parentheses.
- * @return Independently owned notation, released with TeX_free(), or NULL on failure.
- */
-TeX_t *TeX_symmetric_pair(const TeX_t *centre, const TeX_t *offset,
-                          const TeX_t *denominator, bool group_offset);
 
 /**
  * @brief Obtain the immutable TeX source without allocating a copy.

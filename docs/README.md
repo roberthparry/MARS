@@ -82,7 +82,7 @@ This directory contains the longer module documentation for MARS.
 - [Lerch transcendent support](./design-notes/lerch-transcendent.md)
 - [Future differential-equation work](./design-notes/differential-equations.md)
 - [Literate comments and notebook output](./design-notes/literate-comments-and-notebooks.md)
-- [Planned reverse Polish TeX construction](./TeX.md#planned-reverse-polish-construction)
+- [Reverse Polish TeX construction](./TeX.md#reverse-polish-construction-contract)
 
 ## Acknowledgements
 

@@ -11,6 +11,7 @@
     const startupRequests: string[] = [];
     const startupReveals: string[] = [];
     let startupMapReadyBeforeCalculation = false;
+    let startupSummaryReadyBeforeCalculation = false;
     if (startupCheck) {
         localStorage.setItem('mars.exprLab.lastMode', 'almanac');
         const originalFetch = window.fetch.bind(window);
@@ -23,6 +24,10 @@
                 const globe = Reflect.get(MarsAlmanacGlobe, 'instance') as {cameraRestored?: boolean} | undefined;
                 startupMapReadyBeforeCalculation = !document.documentElement.hasAttribute('data-starting') &&
                     Boolean(globe?.cameraRestored) && startupRequests.some(url => url.startsWith('/towns?'));
+                const summary = document.querySelector('#rendered .almanac-sheet-header');
+                startupSummaryReadyBeforeCalculation = Boolean(summary &&
+                    summary.querySelectorAll('.almanac-summary-row').length === 9 &&
+                    summary.textContent?.includes('Calculating for the selected observer'));
             }
             return originalFetch(input, options);
         };
@@ -3147,6 +3152,8 @@
             if (startupCheck) {
                 check(startupMapReadyBeforeCalculation,
                       'saved camera and towns start before the initial Almanac calculation completes');
+                check(startupSummaryReadyBeforeCalculation,
+                      'the restored observer summary appears before the initial Almanac calculation returns');
                 const validCamera = [1, 0, 0, 0, 4];
                 check(JSON.stringify(labDOM.call('lab_globe_saved_camera', validCamera)) === JSON.stringify(validCamera),
                       'startup camera validation preserves a valid displayed view');

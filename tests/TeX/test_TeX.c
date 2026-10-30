@@ -1,8 +1,9 @@
 /**
  * @file test_TeX.c
- * @brief Public TeX composition, escaping and ownership regressions.
+ * @brief TeX semantic rendering and authorised private fragment regressions.
  *
- * Exercises notation independently of expression trees and applications.
+ * Exercises native semantic callbacks and the private fragment constructors.
+ * Public RPN construction checks are registered from test_TeX_builder.c.
  * Standalone programmes in docs/TeX.md are compiled and run separately by the
  * Markdown example runner after ordinary regression checks.
  */
@@ -30,6 +31,7 @@
 #include "TeX/TeX_internal.h"
 #include "test_harness.h"
 #include "test_TeX_spellings.h"
+#include "test_TeX_builder.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -72,11 +74,11 @@ static void test_TeX_text_boundaries(void)
 static void test_TeX_composition(void)
 {
     TeX_t *x = TeX_raw("x"), *two = TeX_raw("2");
-    TeX_t *fraction = TeX_fraction(x, two);
-    TeX_t *root = TeX_root(fraction, two);
-    TeX_t *scripts = TeX_scripts(root, x, two);
+    TeX_t *fraction = TeX_compose_fraction(x, two);
+    TeX_t *root = TeX_compose_root(fraction, two);
+    TeX_t *scripts = TeX_compose_scripts(root, x, two);
     const TeX_t *parts[] = {fraction, scripts};
-    TeX_t *sequence = TeX_sequence(parts, 2);
+    TeX_t *sequence = TeX_compose_sequence(parts, 2);
     string_t *rendered = TeX_render(sequence);
     TeX_free(x);
     TeX_free(two);
@@ -94,27 +96,27 @@ static void test_TeX_matrices_and_invalid_inputs(void)
 {
     TeX_t *a = TeX_raw("a"), *b = TeX_raw("b");
     const TeX_t *cells[] = {a, NULL, b, a};
-    TeX_t *matrix = TeX_matrix(cells, 2, 2, TeX_MATRIX_BRACKETS, 10);
+    TeX_t *matrix = TeX_compose_matrix(cells, 2, 2, TeX_MATRIX_BRACKETS, 10);
     TEST_ASSERT_TRUE(matrix && strcmp(TeX_source(matrix),
         "\\begin{bmatrix}a &  \\\\[10pt] b & a\\end{bmatrix}") == 0,
         "matrix layout preserves spacing and empty entries");
     TeX_free(matrix);
-    matrix = TeX_matrix(cells, 1, 1, TeX_MATRIX_PARENTHESES, 0);
+    matrix = TeX_compose_matrix(cells, 1, 1, TeX_MATRIX_PARENTHESES, 0);
     TEST_ASSERT_TRUE(matrix && strcmp(TeX_source(matrix), "\\begin{pmatrix}a\\end{pmatrix}") == 0,
                      "parenthesised matrices are independent of application policy");
     TeX_free(matrix);
-    matrix = TeX_matrix(cells, 2, 1, TeX_MATRIX_PLAIN, 0);
+    matrix = TeX_compose_matrix(cells, 2, 1, TeX_MATRIX_PLAIN, 0);
     TEST_ASSERT_TRUE(matrix && strcmp(TeX_source(matrix), "\\begin{matrix}a \\\\ \\end{matrix}") == 0,
                      "plain matrices support default row spacing");
     TeX_free(matrix);
-    TEST_ASSERT_TRUE(!TeX_matrix(cells, SIZE_MAX, 2, TeX_MATRIX_PLAIN, 0) && errno == EINVAL,
+    TEST_ASSERT_TRUE(!TeX_compose_matrix(cells, SIZE_MAX, 2, TeX_MATRIX_PLAIN, 0) && errno == EINVAL,
                      "overflow is rejected before cell access");
-    TEST_ASSERT_TRUE(!TeX_matrix(cells, 1, 1, (TeX_matrix_style_t)-1, 0) &&
-                     !TeX_matrix(cells, 0, 1, TeX_MATRIX_PLAIN, 0) && !TeX_fraction(a, NULL) &&
-                     !TeX_root(NULL, a) && !TeX_scripts(NULL, a, b) && !TeX_text(NULL) &&
-                     !TeX_raw(NULL) && !TeX_sequence(NULL, 1) && !TeX_sequence(cells, 2),
+    TEST_ASSERT_TRUE(!TeX_compose_matrix(cells, 1, 1, (TeX_matrix_style_t)-1, 0) &&
+                     !TeX_compose_matrix(cells, 0, 1, TeX_MATRIX_PLAIN, 0) && !TeX_compose_fraction(a, NULL) &&
+                     !TeX_compose_root(NULL, a) && !TeX_compose_scripts(NULL, a, b) && !TeX_text(NULL) &&
+                     !TeX_raw(NULL) && !TeX_compose_sequence(NULL, 1) && !TeX_compose_sequence(cells, 2),
                      "invalid arguments never produce partial notation");
-    TeX_t *empty = TeX_sequence(NULL, 0);
+    TeX_t *empty = TeX_compose_sequence(NULL, 0);
     TEST_ASSERT_TRUE(empty && !*TeX_source(empty), "empty composition is valid");
     TeX_free(empty);
     TeX_free(a);
@@ -126,16 +128,16 @@ static void test_TeX_calculus(void)
 {
     TeX_t *body = TeX_raw("f(x)"), *x = TeX_raw("x");
     TeX_t *lower = TeX_raw("0"), *upper = TeX_raw("1");
-    TeX_t *sum = TeX_sum(body, lower, upper);
-    TeX_t *unbounded = TeX_sum(body, NULL, NULL);
-    TeX_t *upper_only = TeX_sum(body, NULL, upper);
-    TeX_t *integral = TeX_integral(body, x, lower, upper);
-    TeX_t *indefinite = TeX_integral(body, x, NULL, NULL);
-    TeX_t *iterated = TeX_integral(integral, x, NULL, NULL);
-    TeX_t *ordinary = TeX_derivative(body, x, 1, TeX_DERIVATIVE_ORDINARY);
-    TeX_t *partial = TeX_derivative(body, x, 2, TeX_DERIVATIVE_PARTIAL);
-    TeX_t *partial_first = TeX_derivative(body, x, 1, TeX_DERIVATIVE_PARTIAL);
-    TeX_t *ordinary_third = TeX_derivative(body, x, 3, TeX_DERIVATIVE_ORDINARY);
+    TeX_t *sum = TeX_compose_sum(body, lower, upper);
+    TeX_t *unbounded = TeX_compose_sum(body, NULL, NULL);
+    TeX_t *upper_only = TeX_compose_sum(body, NULL, upper);
+    TeX_t *integral = TeX_compose_integral(body, x, lower, upper);
+    TeX_t *indefinite = TeX_compose_integral(body, x, NULL, NULL);
+    TeX_t *iterated = TeX_compose_integral(integral, x, NULL, NULL);
+    TeX_t *ordinary = TeX_compose_derivative(body, x, 1, TeX_DERIVATIVE_ORDINARY);
+    TeX_t *partial = TeX_compose_derivative(body, x, 2, TeX_DERIVATIVE_PARTIAL);
+    TeX_t *partial_first = TeX_compose_derivative(body, x, 1, TeX_DERIVATIVE_PARTIAL);
+    TeX_t *ordinary_third = TeX_compose_derivative(body, x, 3, TeX_DERIVATIVE_ORDINARY);
     TeX_free(body);
     TeX_free(x);
     TeX_free(lower);
@@ -171,11 +173,11 @@ static void test_TeX_tensor_slots_and_fences(void)
 {
     TeX_t *base = TeX_raw("T"), *mu = TeX_raw("\\mu"), *nu = TeX_raw("\\nu");
     const TeX_index_t slots[] = {{mu, TeX_INDEX_UPPER}, {nu, TeX_INDEX_LOWER}, {mu, TeX_INDEX_UPPER}};
-    TeX_t *tensor = TeX_tensor(base, slots, 3);
-    TeX_t *scalar = TeX_tensor(base, NULL, 0);
-    TeX_t *round = TeX_fenced(base, TeX_FENCE_PARENTHESES);
-    TeX_t *square = TeX_fenced(base, TeX_FENCE_BRACKETS);
-    TeX_t *absolute = TeX_fenced(base, TeX_FENCE_ABSOLUTE);
+    TeX_t *tensor = TeX_compose_tensor(base, slots, 3);
+    TeX_t *scalar = TeX_compose_tensor(base, NULL, 0);
+    TeX_t *round = TeX_compose_fenced(base, TeX_FENCE_PARENTHESES);
+    TeX_t *square = TeX_compose_fenced(base, TeX_FENCE_BRACKETS);
+    TeX_t *absolute = TeX_compose_fenced(base, TeX_FENCE_ABSOLUTE);
     TeX_free(base);
     TeX_free(mu);
     TeX_free(nu);
@@ -198,15 +200,15 @@ static void test_TeX_calculus_invalid_inputs(void)
     TeX_t *x = TeX_raw("x");
     const TeX_index_t missing[] = {{NULL, TeX_INDEX_LOWER}};
     const TeX_index_t invalid[] = {{x, (TeX_index_position_t)-1}};
-    TEST_ASSERT_TRUE(!TeX_tensor(NULL, NULL, 0) && !TeX_tensor(x, NULL, 1) &&
-                     !TeX_tensor(x, missing, 1) && !TeX_tensor(x, invalid, 1) &&
-                     !TeX_fenced(NULL, TeX_FENCE_BRACKETS) && !TeX_fenced(x, (TeX_fence_t)-1) &&
-                     !TeX_fenced(x, (TeX_fence_t)5) && !TeX_sum(NULL, x, x) &&
-                     !TeX_integral(NULL, x, NULL, NULL) && !TeX_integral(x, NULL, NULL, NULL) &&
-                     !TeX_derivative(NULL, x, 1, TeX_DERIVATIVE_PARTIAL) &&
-                     !TeX_derivative(x, NULL, 1, TeX_DERIVATIVE_PARTIAL) &&
-                     !TeX_derivative(x, x, 0, TeX_DERIVATIVE_PARTIAL) &&
-                     !TeX_derivative(x, x, 1, (TeX_derivative_style_t)-1),
+    TEST_ASSERT_TRUE(!TeX_compose_tensor(NULL, NULL, 0) && !TeX_compose_tensor(x, NULL, 1) &&
+                     !TeX_compose_tensor(x, missing, 1) && !TeX_compose_tensor(x, invalid, 1) &&
+                     !TeX_compose_fenced(NULL, TeX_FENCE_BRACKETS) && !TeX_compose_fenced(x, (TeX_fence_t)-1) &&
+                     !TeX_compose_fenced(x, (TeX_fence_t)5) && !TeX_compose_sum(NULL, x, x) &&
+                     !TeX_compose_integral(NULL, x, NULL, NULL) && !TeX_compose_integral(x, NULL, NULL, NULL) &&
+                     !TeX_compose_derivative(NULL, x, 1, TeX_DERIVATIVE_PARTIAL) &&
+                     !TeX_compose_derivative(x, NULL, 1, TeX_DERIVATIVE_PARTIAL) &&
+                     !TeX_compose_derivative(x, x, 0, TeX_DERIVATIVE_PARTIAL) &&
+                     !TeX_compose_derivative(x, x, 1, (TeX_derivative_style_t)-1),
                      "invalid notation arguments and enum values are rejected before lookup");
     TeX_free(x);
 }
@@ -353,18 +355,18 @@ static void test_TeX_expression_style(void)
 static void test_TeX_equations(void)
 {
     TeX_t *left = TeX_raw("x"), *right = TeX_raw("y");
-    TeX_t *plain = TeX_equation(left, right, TeX_EQUATION_INLINE);
-    TeX_t *aligned = TeX_equation(left, right, TeX_EQUATION_ALIGNED);
+    TeX_t *plain = TeX_compose_equation(left, right, TeX_EQUATION_INLINE);
+    TeX_t *aligned = TeX_compose_equation(left, right, TeX_EQUATION_ALIGNED);
     TEST_ASSERT_TRUE(plain && strcmp(TeX_source(plain), "x = y") == 0, "inline equation");
     TEST_ASSERT_TRUE(aligned && strcmp(TeX_source(aligned),
         "\\begin{aligned}[t]\nx &= y\n\\end{aligned}") == 0, "aligned equation");
     TeX_t *wrapped = TeX_raw("\\begin{aligned}[t]\n&a + b\\\\\n&{}+ c  \n\\end{aligned}");
-    TeX_t *continued = TeX_equation(left, wrapped, TeX_EQUATION_ALIGNED);
+    TeX_t *continued = TeX_compose_equation(left, wrapped, TeX_EQUATION_ALIGNED);
     TEST_ASSERT_TRUE(continued && strcmp(TeX_source(continued),
         "\\begin{aligned}[t]\nx ={}& a + b\\\\\n&{}+ c\n\\end{aligned}") == 0,
         "wrapped right side is incorporated without nested alignment");
-    TEST_ASSERT_TRUE(!TeX_equation(NULL, right, TeX_EQUATION_INLINE), "missing side rejected");
-    TEST_ASSERT_TRUE(!TeX_equation(left, right, (TeX_equation_style_t)-1), "invalid style rejected");
+    TEST_ASSERT_TRUE(!TeX_compose_equation(NULL, right, TeX_EQUATION_INLINE), "missing side rejected");
+    TEST_ASSERT_TRUE(!TeX_compose_equation(left, right, (TeX_equation_style_t)-1), "invalid style rejected");
     TeX_free(right);
     TeX_free(left);
     TEST_ASSERT_TRUE(plain && strcmp(TeX_source(plain), "x = y") == 0, "equation owns copied sides");
@@ -442,10 +444,10 @@ static void test_TeX_native_layout(void)
 {
     TeX_t *x = TeX_raw("x"), *y = TeX_raw("y"), *two = TeX_raw("2");
     TeX_t *bindings = TeX_raw("x = 1");
-    TeX_t *bound = TeX_bound(x, bindings), *unbound = TeX_bound(x, NULL);
-    TeX_t *scaled = TeX_scaled(two, x), *cartesian = TeX_cartesian_sum(x, y);
-    TeX_t *pair = TeX_symmetric_pair(x, y, two, true);
-    TeX_t *plain_pair = TeX_symmetric_pair(x, y, NULL, false);
+    TeX_t *bound = TeX_compose_bound(x, bindings), *unbound = TeX_compose_bound(x, NULL);
+    TeX_t *scaled = TeX_compose_scaled(two, x), *cartesian = TeX_compose_cartesian_sum(x, y);
+    TeX_t *pair = TeX_compose_symmetric_pair(x, y, two, true);
+    TeX_t *plain_pair = TeX_compose_symmetric_pair(x, y, NULL, false);
     TeX_free(bindings);
     TeX_free(two);
     TeX_free(y);
@@ -458,10 +460,10 @@ static void test_TeX_native_layout(void)
         "\\begin{aligned}&x \\\\[10pt] &{}+ i\\mkern-2mu y\\end{aligned}"), "complex-component alignment");
     TEST_ASSERT_TRUE(pair && !strcmp(TeX_source(pair), "\\frac{x \\pm \\left(y\\right)}{2}"), "symmetric quotient");
     TEST_ASSERT_TRUE(plain_pair && !strcmp(TeX_source(plain_pair), "x \\pm y"), "optional denominator and grouping");
-    TEST_ASSERT_TRUE(!TeX_bound(NULL, NULL) && !TeX_scaled(NULL, scaled) && !TeX_scaled(scaled, NULL) &&
-                     !TeX_cartesian_sum(NULL, cartesian) && !TeX_cartesian_sum(cartesian, NULL) &&
-                     !TeX_symmetric_pair(NULL, pair, NULL, true) &&
-                     !TeX_symmetric_pair(pair, NULL, NULL, true), "layout constructors reject missing operands");
+    TEST_ASSERT_TRUE(!TeX_compose_bound(NULL, NULL) && !TeX_compose_scaled(NULL, scaled) && !TeX_compose_scaled(scaled, NULL) &&
+                     !TeX_compose_cartesian_sum(NULL, cartesian) && !TeX_compose_cartesian_sum(cartesian, NULL) &&
+                     !TeX_compose_symmetric_pair(NULL, pair, NULL, true) &&
+                     !TeX_compose_symmetric_pair(pair, NULL, NULL, true), "layout constructors reject missing operands");
     TeX_free(plain_pair);
     TeX_free(pair);
     TeX_free(cartesian);
@@ -1179,6 +1181,7 @@ static void test_TeX_native_aggregate_contexts(void)
 
 int tests_main(void)
 {
+    run_TeX_builder_tests();
     TEST_RUN_IN_GROUP(test_TeX_escaping, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_text_boundaries, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_composition, tests, NULL);

@@ -1626,6 +1626,7 @@
       "test_ireland_historic_whit_monday_exists_in_1960": true,
       "test_jurisdiction_alaska_default_location_uses_juneau": true,
       "test_jurisdiction_catalogue_visitors": true,
+      "test_jurisdiction_place_lookup": true,
       "test_jurisdiction_configuration_file_io": true,
       "test_jurisdiction_database_builds_and_opens": true,
       "test_jurisdiction_default_gmt_offset_uses_database_dst_rules": true,
@@ -2792,7 +2793,8 @@
       "docs_TeX_009": true,
       "docs_TeX_010": true,
       "docs_TeX_011": true,
-      "docs_TeX_012": true
+      "docs_TeX_012": true,
+      "docs_TeX_013": true
     }
   },
   "tools/mars_checks/tests/test_checks_build.c": {
@@ -3057,6 +3059,7 @@
     "tests": {
       "enabled": true,
       "test_cfg_textures_install": true,
+      "test_cfg_textures_capacity": true,
       "test_cfg_textures_migration": true,
       "test_cfg_textures_rollback": true,
       "test_cfg_textures_manifest": true,
@@ -3965,6 +3968,22 @@
       "test_tba_rows": true,
       "test_tba_stream": true,
       "test_tba_worker": true
+    }
+  },
+  "tests/TeX/test_TeX_builder.c": {
+    "tests": {
+      "enabled": true,
+      "test_TeX_builder_ownership": true,
+      "test_TeX_builder_stack": true,
+      "test_TeX_builder_hp48_stack": true,
+      "test_TeX_builder_stack_errors": true,
+      "test_TeX_builder_transactional_errors": true,
+      "test_TeX_builder_inputs": true,
+      "test_TeX_builder_layout": true,
+      "test_TeX_builder_calculus_and_tensors": true,
+      "test_TeX_builder_structured_arithmetic": true,
+      "test_TeX_builder_rejects_operator_symbols": true,
+      "test_TeX_builder_ascii_symbols": true
     }
   },
   "tests/TeX/test_TeX.c": {

@@ -73,7 +73,7 @@ static json_t *load(const string_t *path)
 {
     file_t *file = path ? file_new(path) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
-    string_t *data = info && file_info_size(info) <= 8388608 ? file_read_all_text(file) : NULL;
+    string_t *data = info && file_info_size(info) <= GLOBE_TEXTURE_MANIFEST_LIMIT ? file_read_all_text(file) : NULL;
     json_t *value = data ? json_from_text(data) : NULL;
     string_free(data); file_info_free(info); file_free(file);
     return value;

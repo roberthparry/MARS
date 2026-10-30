@@ -114,8 +114,14 @@ static TeX_t *mat_notation_product(const string_t *text, const string_t *binding
         TeX_t *factor = scalar_text && (!bindings || bound)
                             ? expr_notation_scalar(bound ? bound : scalar_text, false) : NULL;
         TeX_t *matrix = lm ? lhs : rhs;
-        if (factor && matrix)
-            result = TeX_scaled(factor, matrix);
+        if (factor && matrix) {
+            TeX_builder_t *builder = TeX_builder_new();
+            TeX_push_notation(builder, factor);
+            TeX_push_notation(builder, matrix);
+            TeX_scaled(builder);
+            result = TeX_builder_finish(builder);
+            TeX_builder_free(builder);
+        }
         TeX_free(factor);
         string_free(bound);
     }
@@ -207,8 +213,14 @@ TeX_t *mat_notation_input(const string_t *text, const string_t *bindings, bool *
             exponent = bound;
         }
         TeX_t *power = valid && exponent ? expr_notation_scalar(exponent, false) : NULL;
-        if (power)
-            result = TeX_scripts(base, NULL, power);
+        if (power) {
+            TeX_builder_t *builder = TeX_builder_new();
+            TeX_push_notation(builder, base);
+            TeX_push_notation(builder, power);
+            TeX_pow(builder);
+            result = TeX_builder_finish(builder);
+            TeX_builder_free(builder);
+        }
         TeX_free(power);
         string_free(exponent);
     }

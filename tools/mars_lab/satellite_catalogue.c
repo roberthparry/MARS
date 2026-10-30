@@ -32,6 +32,7 @@ typedef struct {
     satellite_entry_t entries[GLOBE_TEXTURE_REGION_LIMIT];
     size_t count;
     uint64_t bytes;
+    bool coastal;
 } satellite_catalogue_t;
 
 static const json_t *field(const json_t *object, const char *name)
@@ -68,7 +69,7 @@ static json_t *load(const string_t *path)
 {
     file_t *file = path ? file_new(path) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
-    string_t *s = info && file_info_size(info) <= 8388608 ? file_read_all_text(file) : NULL;
+    string_t *s = info && file_info_size(info) <= GLOBE_TEXTURE_MANIFEST_LIMIT ? file_read_all_text(file) : NULL;
     json_t *value = s ? json_from_text(s) : NULL;
     string_free(s); file_info_free(info); file_free(file);
     return value;
@@ -162,8 +163,10 @@ static bool add_batch(satellite_catalogue_t *catalogue, const char *label, const
         double valid = number(field(saved, "valid_pixels"));
         ok = number(field(saved, "slot")) == slot && (edge == 1800 || edge == 3600) &&
              number(field(asset, "width")) == edge && number(field(asset, "height")) == edge &&
-             valid > 0 && valid <= edge * edge && floor(valid) == valid &&
+             (valid > 0 || (valid == 0 && json_type(field(saved, "coastal_mask")) == JSON_STRING)) &&
+             valid <= edge * edge && floor(valid) == valid &&
              same_bounds(field(tile, "bounds"), field(region, "bounds"));
+        if (catalogue->coastal) ok = ok && strlen(text(field(saved, "coastal_mask"))) == 64;
         satellite_entry_t *entry = &catalogue->entries[slot];
         if (ok && slot < catalogue->count) ok = same_bounds(field(entry->region, "bounds"), field(region, "bounds"));
         json_t *next_region = ok ? json_clone(region) : NULL, *next_asset = ok ? json_clone(asset) : NULL;
@@ -171,6 +174,8 @@ static bool add_batch(satellite_catalogue_t *catalogue, const char *label, const
         json_t *title = name ? json_new_string(name) : NULL;
         ok = ok && next_region && next_asset && title && set(next_region, "name", title) &&
              set(next_region, "valid_pixels", field(saved, "valid_pixels"));
+        if (ok && field(saved, "coastal_mask"))
+            ok = set(next_region, "coastal_mask_identity", field(saved, "coastal_mask"));
         json_free(title); string_free(name);
         if (ok) {
             string_free(entry->source); json_free(entry->region); json_free(entry->asset);
@@ -194,8 +199,10 @@ static bool assemble(int argc, char **argv)
     json_t *manifest = load(path), *assets = json_clone(field(manifest, "assets"));
     string_free(path);
     const json_t *old = field(manifest, "regions");
+    size_t base_count = json_array_size(old);
     satellite_catalogue_t *catalogue = calloc(1, sizeof *catalogue);
     bool ok = manifest && assets && catalogue && json_array_size(old) <= GLOBE_TEXTURE_REGION_LIMIT;
+    if (catalogue) catalogue->coastal = json_type(field(manifest, "coastal_mask")) == JSON_OBJECT;
     for (size_t i = 0; ok && i < json_array_size(old); ++i) {
         string_t *relative = string_sprintf("regional/%02zu.png", i);
         satellite_entry_t *entry = &catalogue->entries[i];
@@ -237,6 +244,16 @@ static bool assemble(int argc, char **argv)
         }
     }
     ok = ok && set(manifest, "regions", regions) && set(manifest, "assets", assets);
+    if (ok && catalogue->coastal && catalogue->count > base_count) {
+        uint64_t bytes = 0;
+        for (size_t i = 0; i < catalogue->count; ++i) bytes += (uint64_t)number(field(catalogue->entries[i].asset, "bytes"));
+        json_t *mask = json_new_object();
+        string_t *one = string_new_with("1"), *length = string_sprintf("%llu", (unsigned long long)bytes);
+        json_t *version = one ? json_new_number(one) : NULL, *size = length ? json_new_number(length) : NULL;
+        ok = mask && set(mask, "previous_catalogue", field(manifest, "coastal_mask")) &&
+             set(mask, "version", version) && set(mask, "masked_bytes", size) && set(manifest, "coastal_mask", mask);
+        json_free(version); json_free(size); json_free(mask); string_free(one); string_free(length);
+    }
     string_t *serialised = ok ? json_to_string_pretty(manifest, 2) : NULL;
     path = string_sprintf("%s/manifest.json.part", argv[2]);
     string_t *final_path = string_sprintf("%s/manifest.json", argv[2]);

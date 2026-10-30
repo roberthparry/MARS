@@ -134,7 +134,7 @@ class GlobeSurfaceWorker {
     }
 
     private async tile(bounds: number[], signal: AbortSignal,
-                       preview: (bitmap: ImageBitmap) => void): Promise<ImageBitmap | ArrayBuffer> {
+                       preview: (bitmap: ImageBitmap, detailed: boolean) => void): Promise<ImageBitmap | ArrayBuffer> {
         await this.ready;
         signal.throwIfAborted();
         const plan = await this.request(bounds, 'surface-plan', signal);
@@ -160,21 +160,32 @@ class GlobeSurfaceWorker {
             // Unpainted antialiased crop edges must not masquerade as river coverage.
             context.fillStyle = '#183a32';
             context.fillRect(0, 0, 2048, 2048);
+            const publish = async (detailed: boolean) => {
+                signal.throwIfAborted();
+                const photograph = await createImageBitmap(canvas, {premultiplyAlpha: 'premultiply'});
+                if (signal.aborted) { photograph.close(); signal.throwIfAborted(); }
+                preview(photograph, detailed);
+            };
+            let baseDrawn = false, basePublished = false;
             for (const photo of plan.photos) {
-                if (!(photo.regional ? /^\/earth_regions\/\d{2,4}\.png$/ : /^\/earth_tiles\/\d{2}-\d{2}\.png$/).test(photo.url) ||
+                if (!(photo.regional ? /^\/earth_regions\/\d{2,5}\.png$/ : /^\/earth_tiles\/\d{2}-\d{2}\.png$/).test(photo.url) ||
                     !Array.isArray(photo.source) || photo.source.length !== 4 ||
                     !Array.isArray(photo.target) || photo.target.length !== 4 ||
                     ![...photo.source, ...photo.target].every(Number.isFinite)) throw new Error('Invalid photo crop');
+                // The native plan lists its complete NASA coverage before regional detail.
+                // A slow regional decode must not hide that already usable overview.
+                if (photo.regional && baseDrawn && !basePublished) {
+                    await publish(false);
+                    basePublished = true;
+                }
                 const bitmap = await this.photograph(photo, signal);
                 signal.throwIfAborted();
                 const [sx, sy, sw, sh] = photo.source, [dx, dy, dw, dh] = photo.target;
                 const scale = photo.width ? bitmap.width / photo.width : 1;
                 context.drawImage(bitmap, sx * scale, sy * scale, sw * scale, sh * scale, dx, dy, dw, dh);
+                if (!photo.regional) baseDrawn = true;
             }
-            signal.throwIfAborted();
-            const photograph = await createImageBitmap(canvas, {premultiplyAlpha: 'premultiply'});
-            if (signal.aborted) { photograph.close(); signal.throwIfAborted(); }
-            preview(photograph);
+            await publish(true);
             const {data, error} = await geometry;
             if (!data) throw error;
             signal.throwIfAborted();
@@ -225,9 +236,9 @@ class GlobeSurfaceWorker {
                 const controller = this.active = new AbortController();
                 try {
                     if (!message.bounds || !Number.isSafeInteger(message.id)) throw new Error('Invalid surface job');
-                    const bitmap = await this.tile(message.bounds, controller.signal, bitmap => {
+                    const bitmap = await this.tile(message.bounds, controller.signal, (bitmap, detailed) => {
                         if (controller.signal.aborted) bitmap.close();
-                        else this.port.postMessage({id: message.id, bitmap, preview: true}, [bitmap]);
+                        else this.port.postMessage({id: message.id, bitmap, preview: true, detailed}, [bitmap]);
                     });
                     if (controller.signal.aborted) {
                         if (bitmap instanceof ImageBitmap) bitmap.close();

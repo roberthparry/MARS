@@ -17,9 +17,10 @@ export class GlobeSurface {
     private worker: Worker | null = null;
     private next = 0;
     private current: {id: number; reject(error: Error): void; finish(bitmap: GlobeSurfaceTile): void;
-        preview?: (tile: GlobeSurfaceTile) => void} | null = null;
+        preview?: (tile: GlobeSurfaceTile, detailed: boolean) => void} | null = null;
 
-    load(bounds: number[], signal: AbortSignal, preview?: (tile: GlobeSurfaceTile) => void): Promise<GlobeSurfaceTile> {
+    load(bounds: number[], signal: AbortSignal,
+         preview?: (tile: GlobeSurfaceTile, detailed: boolean) => void): Promise<GlobeSurfaceTile> {
         if (signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
         this.current?.reject(new DOMException('Superseded', 'AbortError'));
         return new Promise((resolve, reject) => {
@@ -40,12 +41,12 @@ export class GlobeSurface {
                 if (!this.worker) {
                     const worker = this.worker = new Worker('/js/globe_surface_worker.js');
                     worker.onmessage = event => {
-                        const {id: response, bitmap, pixels, error, preview: intermediate} = event.data;
+                        const {id: response, bitmap, pixels, error, preview: intermediate, detailed} = event.data;
                         const current = this.current;
                         if (!current || current.id !== response) { bitmap?.close(); return; }
                         if (intermediate) {
                             if (bitmap) {
-                                try { current.preview?.(bitmap); }
+                                try { current.preview?.(bitmap, detailed === true); }
                                 catch (error) { current.reject(error instanceof Error ? error : new Error(String(error))); }
                                 finally { bitmap.close(); }
                             }

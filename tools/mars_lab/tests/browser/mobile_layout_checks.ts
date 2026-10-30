@@ -52,6 +52,7 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
         doc.body.className = document.body.className;
         for (const source of document.querySelectorAll<HTMLElement>('body > header, body > main'))
             doc.body.appendChild(source.cloneNode(true));
+        await doc.fonts.ready;
         const cards = [...doc.querySelectorAll<HTMLElement>(selectors)];
         check(cards.length === originals.length, 'complete card inventory copied');
         const originalClasses = doc.body.className;
@@ -68,6 +69,10 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                 const titleTop = doc.querySelector('h1')!.getBoundingClientRect().top;
                 check(Math.abs(titleTop - header.getBoundingClientRect().top - padding) < 1,
                       `${width}px: ${mode || 'expression'} title keeps the same top padding`);
+                const sky = doc.querySelector('.sky-status-strip');
+                if (width <= 900 && sky)
+                    check(sky.getBoundingClientRect().height === 0,
+                          `${width}px: ${mode || 'expression'} keeps the home-sky card out of the mobile header`);
             }
         }
         doc.body.className = originalClasses;
@@ -368,8 +373,9 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                     check(precisionValue.getBoundingClientRect().left >= doc.querySelector<HTMLElement>('.precision-label')!.getBoundingClientRect().right,
                           `${width}px: maximum precision readout does not overlap its label`);
                 }
-                check(doc.querySelector<HTMLElement>('.lab-topbar')!.getBoundingClientRect().bottom < 290,
-                      `${width}px: header/navigation takes too much vertical space`);
+                const headerBottom = doc.querySelector<HTMLElement>('.lab-topbar')!.getBoundingClientRect().bottom;
+                check(headerBottom < 290,
+                      `${width}px: header/navigation takes too much vertical space (${headerBottom}px)`);
             }
             const almanac = doc.getElementById('almanacControls')!;
             if (visible(almanac)) {

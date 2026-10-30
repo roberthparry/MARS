@@ -25,11 +25,12 @@ in the same transaction as the images, so its metadata describes the installed s
 without loading PNG bytes. Level 0 is the 2048 × 1024 overview; level 1 is the
 8192 × 4096 detail image. Both use column and row zero. Level 2 contains a 12 × 6
 grid of 1800 × 1800 tiles, indexed west to east and north to south from zero.
-Level 3 contains regional 1800 × 1800 or 3600 × 3600 photographs, addressed by slot 0–4095 and row zero.
+Level 3 contains regional 1800 × 1800 or 3600 × 3600 photographs, addressed by slot 0–16383 and row zero.
 `globe_texture_regions` enumerates intersecting slots and their geographic bounds through
 a `globe_texture_region_fn` callback without loading their PNGs. Older stores without
 the optional catalogue return an empty enumeration. New imports use an R-tree spatial index
-and the `GLOBE_TEXTURE_REGION_LIMIT` bound of 4096 slots. Older unindexed catalogues retain
+and the `GLOBE_TEXTURE_REGION_LIMIT` bound of 16384 slots. Serialised manifests are limited
+to `GLOBE_TEXTURE_MANIFEST_LIMIT` (16 MiB); their image bytes remain separate. Older unindexed catalogues retain
 their 64-slot bound. Results place larger photographs first, allowing finer photographs
 to overlay them. Catalogue capacity does not increase decoded-image cache budgets.
 Missing data or invalid addresses return false and clear the output structure.

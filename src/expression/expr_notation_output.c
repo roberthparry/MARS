@@ -43,8 +43,12 @@ TeX_t *expr_notation_append_primitive(TeX_t *body, const expr_t *initial)
         return body;
     TeX_context_t *context = expr_notation_primitive_context(initial);
     TeX_t *definition = context ? TeX_from_context(context) : NULL;
-    const TeX_t *parts[] = {body, definition};
-    TeX_t *result = definition ? TeX_sequence(parts, 2u) : NULL;
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_notation(builder, body);
+    TeX_push_notation(builder, definition);
+    TeX_sequence(builder, 2);
+    TeX_t *result = TeX_builder_finish(builder);
+    TeX_builder_free(builder);
     TeX_free(definition);
     TeX_context_free(context);
     TeX_free(body);
@@ -89,7 +93,13 @@ static int expr_to_TeX_parts_mode(const expr_t *expression, char **body_out, cha
     expr_t *display = expression ? expr_notation_primitive_display(expression, &initial) : NULL;
     TeX_context_t *surface = !display ? expr_notation_surface_context(expression, preserve_root_symbol) : NULL;
     if (surface || !expression) {
-        TeX_t *notation = surface ? TeX_from_context(surface) : TeX_raw("NULL");
+        TeX_t *notation = surface ? TeX_from_context(surface) : NULL;
+        if (!surface) {
+            TeX_builder_t *builder = TeX_builder_new();
+            TeX_push_raw(builder, "NULL");
+            notation = TeX_builder_finish(builder);
+            TeX_builder_free(builder);
+        }
         *body_out = notation ? strdup(TeX_source(notation)) : NULL;
         *bindings_out = strdup("");
         TeX_free(notation);
@@ -144,14 +154,17 @@ string_t *expr_to_TeX_text(const expr_t *expression)
     char *body_text = NULL, *binding_text = NULL;
     if (expr_to_TeX_parts(expression, &body_text, &binding_text) != 0)
         return NULL;
-    TeX_t *body = body_text ? TeX_raw(body_text) : NULL;
     bool bound = binding_text && *binding_text;
-    TeX_t *bindings = bound ? TeX_raw(binding_text) : NULL;
-    TeX_t *notation = body && bound && bindings ? TeX_bound(body, bindings) : NULL;
-    string_t *result = bound ? (notation ? TeX_render(notation) : NULL) : (body ? TeX_render(body) : NULL);
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_raw(builder, body_text);
+    if (bound) {
+        TeX_push_raw(builder, binding_text);
+        TeX_bound(builder, true);
+    }
+    TeX_t *notation = TeX_builder_finish(builder);
+    string_t *result = notation ? TeX_render(notation) : NULL;
     TeX_free(notation);
-    TeX_free(bindings);
-    TeX_free(body);
+    TeX_builder_free(builder);
     free(binding_text);
     free(body_text);
     return result;

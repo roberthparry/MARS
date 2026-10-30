@@ -86,6 +86,9 @@ Natural Earth retains covered portions of the previous detailed frame while the
 next region loads. Outside its geographic and image bounds, the original photograph
 remains visible. Corrections fade near the retained image edge and over 350 milliseconds
 when detail first arrives, avoiding an abrupt rectangular handoff.
+The photographic globe remains opaque while a coastline mask is being rebuilt;
+the retained flat SVG never replaces it during travel. Cached regional photographs
+and river coverage share a feathered boundary against the underlying NASA imagery.
 The launcher uses `lab_surface_service_start` before forking HTTP workers and
 `lab_surface_service_select` to retain each worker's channel. Shoreline requests
 use `lab_surface_service_request`; failed channels report service unavailability
@@ -229,6 +232,12 @@ This pending summary clears the previous observer's results and copy text;
 surface classification, weather and calculated results remain explicitly pending.
 The validated response replaces it with the complete worksheet. This improves
 selection feedback without claiming that the underlying calculations finish sooner.
+
+First-load and history-restored Almanac evaluations show the same pending observer
+summary before their calculation returns. Native coordinate recovery queries the
+town database's latitude index directly, rather than building a worldwide town
+catalogue separately in every calendar worker. Timezones and recorded heights
+retain the same ownership and manual-override rules.
 
 Shift-hover coordinates also show the independently resolved land country and its
 offline flag after a short pointer pause. Requests are asynchronous and cancelled
@@ -1107,6 +1116,20 @@ quarterly observations to fill gaps and leaves remaining missing observations
 transparent. Rendering writes checksummed per-tile checkpoints and verifies them
 before resuming. Its output requires validation and manifest installation before
 the Lab uses it; GDAL is not a runtime dependency.
+Its remote rendering mode reads bounded Cloud-Optimized GeoTIFF windows instead of
+downloading complete source archives. An in-memory R-tree selects intersecting RGB
+sources for each output tile. The optional shoreline argument applies coastal
+transparency before the tile's checksummed checkpoint is published. Inland waters
+remain in the imagery, and absent observations remain transparent.
+The native `satellite_fetch` utility retrieves paginated source metadata with
+bounded retries. `satellite_batch` supervises explicit JSON jobs, writes progress
+atomically and sends local desktop notifications every fifteen minutes and at
+phase boundaries. It verifies a complete candidate catalogue before publishing
+immutable image links and then replacing the source manifest. It leaves installed
+databases untouched, ready for the user's subsequent `make release`.
+Extended coast-masked catalogues preserve earlier masking statistics under
+`coastal_mask.previous_catalogue`, report the new regional `masked_bytes` total
+and retain `coastal_mask_identity` on each newly prepared region.
 The companion `satellite_catalogue.c` native preparation utility validates the
 checksummed render outputs and combines their metadata into an installable package.
 It preserves NASA and Copernicus attribution and publishes the manifest only after
@@ -1117,21 +1140,32 @@ Once the requested longitude and latitude spans are each
 at most 30°, independent asynchronous requests prepare a photographic river tile from
 the **globe database**. Native code supplies image crops and river paths; a dedicated
 browser worker composites the tile without holding up animation. Photographs are decoded
-concurrently with river geometry and published as a preview, then replaced by the
-completed river surface at the same cache address.
+concurrently with river geometry. The complete NASA coverage is published before
+regional image decoding starts, followed by the refined photograph and then the
+completed river surface at the same cache address. These previews remain outside
+the persistent cache until the geometry is complete.
 Only completed surfaces are written to the persistent cache. Native plans choose
 decoded image sizes for the display scale and contain at most 68 source photographs.
 The initial globe, towns and observer selection never wait for this layer.
-Padded coverage is refreshed during movement; useful
-pending requests continue until the view leaves their coverage. Requests are
+Padded coverage is refreshed during movement. Continuous panning lets an in-flight
+window finish before requesting the next, avoiding repeated cancellation before
+any detail can arrive. Choosing another observer can supersede that request. Requests are
 time-limited; obsolete responses cannot replace the current
 overlay. Mapped riverbanks and lakes have no fixed zoom cutoff; areas smaller than
 a quarter texture pixel are omitted until a closer view. Windows wider or taller
-than 6° use mapped areas without centreline detail. Up to four completed regional
+than 6° use mapped areas without centreline detail. Up to four regional
 textures remain on the GPU (64 MiB total), allowing recent destinations to be
 rebound without decoding or uploading them again. A destination preload does not
-evict the displayed surface. History navigation retains the outgoing detail;
-travel also requests visible route coverage when the destination request is idle.
+evict the displayed surface. Coarse NASA previews do not replace already displayed
+regional photography. Native selection prefers complete coverage and retains useful
+partial tiles while finer or wider coverage loads. Outgoing and incoming GPU tiles
+stay pinned within that same budget and blend over half a second, with both layers
+anchored to their geographic bounds. The outgoing tile still fills areas beyond
+the replacement's boundary. The renderer uses eight texture units, including the
+unit formerly reserved for the coarse map. History navigation retains the outgoing detail and
+prepares destination imagery immediately at the arrival scale. Intermediate flight
+frames do not displace that request or delay it behind a river overview; the global
+photograph remains available along the route.
 Stable geographic windows let small framing changes reuse the same disk entry.
 The native `lab_texture_cache` service uses `dictionary_t` for copied-key lookup,
 byte budgets and LRU eviction. `lab_globe_surface_bounds` selects stable windows;

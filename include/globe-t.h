@@ -43,7 +43,10 @@
 typedef struct _globe_t globe_t;
 
 /** @brief Maximum regional photographic catalogue size; pixel buffers remain independently bounded. */
-enum { GLOBE_TEXTURE_REGION_LIMIT = 4096 };
+enum { GLOBE_TEXTURE_REGION_LIMIT = 16384 };
+
+/** @brief Maximum serialised photographic catalogue bytes; image payloads are stored separately. */
+enum { GLOBE_TEXTURE_MANIFEST_LIMIT = 16 * 1024 * 1024 };
 
 /**
  * @brief Project a geographic point through a row-major world-to-camera rotation.

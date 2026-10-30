@@ -127,6 +127,34 @@ static void test_cfg_textures_manifest(void)
     file_free(source); string_free(expected); string_free(root); texture_database_close(db, fixture);
 }
 
+static void test_cfg_textures_capacity(void)
+{
+    file_t *directory = NULL;
+    sqlite_t *db = texture_database("", &directory);
+    string_t *root = texture_fixture_root();
+    bool ok = db && root && cfg_database_textures(db, root);
+    string_t *sql = string_sprintf(
+        "INSERT INTO globe_texture_region SELECT %u,west,south,east,north,attribution,source_url "
+        "FROM globe_texture_region WHERE slot=0;\n"
+        "INSERT INTO globe_texture_region_index SELECT %u,west,east,south,north "
+        "FROM globe_texture_region WHERE slot=0;\n"
+        "INSERT INTO globe_texture SELECT level,%u,row_index,width,height,byte_count,sha256,png "
+        "FROM globe_texture WHERE level=3 AND column_index=0 AND row_index=0;",
+        (unsigned)GLOBE_TEXTURE_REGION_LIMIT - 1, (unsigned)GLOBE_TEXTURE_REGION_LIMIT - 1,
+        (unsigned)GLOBE_TEXTURE_REGION_LIMIT - 1);
+    ok = ok && sql && sqlite_exec(db, sql);
+    globe_t *globe = ok ? globe_open(db, db) : NULL;
+    globe_texture_info_t info;
+    ok = ok && globe && globe_texture_metadata(globe, 3, GLOBE_TEXTURE_REGION_LIMIT - 1, 0, &info) &&
+         !globe_texture_metadata(globe, 3, GLOBE_TEXTURE_REGION_LIMIT, 0, &info);
+    string_t *invalid = string_sprintf(
+        "INSERT INTO globe_texture_region SELECT %u,west,south,east,north,attribution,source_url "
+        "FROM globe_texture_region WHERE slot=0", (unsigned)GLOBE_TEXTURE_REGION_LIMIT);
+    ok = ok && invalid && !sqlite_exec(db, invalid);
+    globe_close(globe); string_free(sql); string_free(invalid); string_free(root); texture_database_close(db, directory);
+    TEST_ASSERT_TRUE(ok, "expanded regional capacity reaches its final slot and rejects the next address");
+}
+
 static void test_cfg_textures_install(void)
 {
     string_t *root = texture_fixture_root();
@@ -427,6 +455,7 @@ void test_cfg_textures_cases(void)
 {
     (void)test_cfg_texture_root();
     TEST_RUN_IN_GROUP(test_cfg_textures_manifest, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_textures_capacity, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_textures_install, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_textures_rollback, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_textures_migration, tests, NULL);

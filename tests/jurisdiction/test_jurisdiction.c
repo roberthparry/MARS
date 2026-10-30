@@ -809,6 +809,60 @@ static void test_jurisdiction_catalogue_visitors(void)
     TEST_ASSERT_TRUE(ok, "catalogue enumeration, borrowed records, early stop and invalid arguments");
 }
 
+struct reference_position {
+    double latitude, longitude;
+    size_t count;
+    bool matches;
+};
+
+static bool reference_position_capture(const jurisdict_place_t *place, void *context)
+{
+    struct reference_position *position = context;
+    position->latitude = strtod(place->latitude, NULL);
+    position->longitude = strtod(place->longitude, NULL);
+    ++position->count;
+    return false;
+}
+
+static bool reference_position_match(const jurisdict_place_t *place, void *context)
+{
+    struct reference_position *position = context;
+    position->matches = fabs(strtod(place->latitude, NULL) - position->latitude) <= 0.0000005 &&
+                        fabs(strtod(place->longitude, NULL) - position->longitude) <= 0.0000005 &&
+                        place->name && *place->name && place->timezone && *place->timezone;
+    ++position->count;
+    return true;
+}
+
+static void test_jurisdiction_place_lookup(void)
+{
+    jurisdiction_t *engine = jurisdict_open(NULL);
+    struct reference_position position = {0};
+    bool ok = engine && jurisdict_each_town(engine, reference_position_capture, &position) && position.count == 1;
+    position.count = 0;
+    ok = ok && jurisdict_place_at(engine, position.latitude, position.longitude, reference_position_match, &position) &&
+         position.count == 1 && position.matches;
+    position.count = 0;
+    ok = ok && jurisdict_place_at(engine, round(position.latitude * 1e6) / 1e6,
+                                  round(position.longitude * 1e6) / 1e6, reference_position_match, &position) &&
+         position.count == 1 && position.matches;
+    position.count = 0;
+    ok = ok && jurisdict_place_at(engine, 0, -140, reference_position_match, &position) && !position.count;
+    ok = ok && !jurisdict_place_at(NULL, 0, 0, reference_position_match, &position) &&
+         !jurisdict_place_at(engine, 0, 0, NULL, &position) &&
+         !jurisdict_place_at(engine, NAN, 0, reference_position_match, &position) &&
+         !jurisdict_place_at(engine, 0, INFINITY, reference_position_match, &position) &&
+         !jurisdict_place_at(engine, 91, 0, reference_position_match, &position) &&
+         !jurisdict_place_at(engine, 0, -181, reference_position_match, &position);
+    position.count = 0;
+    ok = ok && jurisdict_each_location(engine, reference_position_capture, &position) && position.count == 1;
+    position.count = 0;
+    ok = ok && jurisdict_place_at(engine, position.latitude, position.longitude, reference_position_match, &position) &&
+         position.count == 1 && position.matches;
+    jurisdict_close(engine);
+    TEST_ASSERT_TRUE(ok, "indexed reference lookup retains rounded coordinates, defaults and bounded callback ownership");
+}
+
 static bool readme_location(const jurisdict_place_t *place, void *context)
 {
     bool *found = context;
@@ -928,6 +982,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_jurisdiction_dst_transition_datetimes_expose_forward_and_back_changes, tests, NULL);
     TEST_RUN_IN_GROUP(test_jurisdiction_working_days_between_counts_business_days, tests, NULL);
     TEST_RUN_IN_GROUP(test_jurisdiction_catalogue_visitors, tests, NULL);
+    TEST_RUN_IN_GROUP(test_jurisdiction_place_lookup, tests, NULL);
 
     TEST_SECTION("README Output Examples");
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);

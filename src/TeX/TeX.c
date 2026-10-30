@@ -15,8 +15,14 @@
 
 #include "TeX-t.h"
 
+#define MARS_TeX_INTERNAL_ACCESS
+#include "TeX_internal.h"
+
 struct _TeX_t {
     string_t *source;
+    TeX_node_kind_t kind;
+    bool has_integer;
+    long integer;
 };
 
 static TeX_t *TeX_adopt(string_t *source)
@@ -29,7 +35,56 @@ static TeX_t *TeX_adopt(string_t *source)
         return NULL;
     }
     notation->source = source;
+    notation->kind = TeX_NODE_COUNT;
+    notation->has_integer = false;
+    notation->integer = 0;
     return notation;
+}
+
+/* Retain presentation structure without exposing mathematical implementation objects. */
+TeX_t *TeX_classify(TeX_t *notation, TeX_node_kind_t kind)
+{
+    if (notation)
+        notation->kind = kind;
+    return notation;
+}
+
+/* Inspect the presentation kind without parsing generated TeX source. */
+TeX_node_kind_t TeX_kind(const TeX_t *notation)
+{
+    return notation ? notation->kind : TeX_NODE_COUNT;
+}
+
+/* Preserve structure when copying a finished or stack-owned value. */
+TeX_t *TeX_copy(const TeX_t *notation)
+{
+    TeX_t *copy = notation ? TeX_classify(TeX_raw(TeX_source(notation)), notation->kind) : NULL;
+    if (copy) {
+        copy->has_integer = notation->has_integer;
+        copy->integer = notation->integer;
+    }
+    return copy;
+}
+
+/* Keep literal integer controls separate from rendered mathematical source. */
+TeX_t *TeX_integer(long value)
+{
+    TeX_t *notation = TeX_adopt(string_sprintf("%ld", value));
+    if (notation) {
+        notation->kind = value < 0 ? TeX_NODE_NEGATIVE : TeX_NODE_NUMBER;
+        notation->has_integer = true;
+        notation->integer = value;
+    }
+    return notation;
+}
+
+/* Inspect an explicitly supplied integer without evaluating or parsing notation. */
+bool TeX_integer_value(const TeX_t *notation, long *value)
+{
+    if (!notation || !notation->has_integer || !value)
+        return false;
+    *value = notation->integer;
+    return true;
 }
 
 static TeX_t *TeX_invalid(void)
@@ -99,7 +154,7 @@ fail:
 }
 
 /* Construct ordinary algebraic fraction notation. */
-TeX_t *TeX_fraction(const TeX_t *numerator, const TeX_t *denominator)
+TeX_t *TeX_compose_fraction(const TeX_t *numerator, const TeX_t *denominator)
 {
     if (!numerator || !denominator)
         return TeX_invalid();
@@ -107,7 +162,7 @@ TeX_t *TeX_fraction(const TeX_t *numerator, const TeX_t *denominator)
 }
 
 /* Construct square or indexed radical notation. */
-TeX_t *TeX_root(const TeX_t *radicand, const TeX_t *index)
+TeX_t *TeX_compose_root(const TeX_t *radicand, const TeX_t *index)
 {
     if (!radicand)
         return TeX_invalid();
@@ -116,7 +171,7 @@ TeX_t *TeX_root(const TeX_t *radicand, const TeX_t *index)
 }
 
 /* Protect the complete base before attaching scripts. */
-TeX_t *TeX_scripts(const TeX_t *base, const TeX_t *lower, const TeX_t *upper)
+TeX_t *TeX_compose_scripts(const TeX_t *base, const TeX_t *lower, const TeX_t *upper)
 {
     if (!base)
         return TeX_invalid();
@@ -132,7 +187,7 @@ TeX_t *TeX_scripts(const TeX_t *base, const TeX_t *lower, const TeX_t *upper)
 }
 
 /* Copy each fragment exactly once in caller-selected order. */
-TeX_t *TeX_sequence(const TeX_t *const *parts, size_t count)
+TeX_t *TeX_compose_sequence(const TeX_t *const *parts, size_t count)
 {
     if (count && !parts)
         return TeX_invalid();
@@ -153,7 +208,7 @@ TeX_t *TeX_sequence(const TeX_t *const *parts, size_t count)
 }
 
 /* Join equation sides without interpreting their mathematics or introducing line breaks. */
-TeX_t *TeX_equation(const TeX_t *left, const TeX_t *right, TeX_equation_style_t style)
+TeX_t *TeX_compose_equation(const TeX_t *left, const TeX_t *right, TeX_equation_style_t style)
 {
     if (!left || !right || (unsigned)style > TeX_EQUATION_ALIGNED)
         return TeX_invalid();
@@ -180,7 +235,7 @@ TeX_t *TeX_equation(const TeX_t *left, const TeX_t *right, TeX_equation_style_t 
 }
 
 /* Enclose a mathematical body using directly indexed delimiter pairs. */
-TeX_t *TeX_fenced(const TeX_t *body, TeX_fence_t fence)
+TeX_t *TeX_compose_fenced(const TeX_t *body, TeX_fence_t fence)
 {
     static const char *const left[] = {"(", "[", "|", "\\lfloor", "\\lceil"};
     static const char *const right[] = {")", "]", "|", "\\rfloor", "\\rceil"};
@@ -190,7 +245,7 @@ TeX_t *TeX_fenced(const TeX_t *body, TeX_fence_t fence)
 }
 
 /* Preserve the caller's tensor slot order, including alternating variance. */
-TeX_t *TeX_tensor(const TeX_t *base, const TeX_index_t *indices, size_t count)
+TeX_t *TeX_compose_tensor(const TeX_t *base, const TeX_index_t *indices, size_t count)
 {
     static const char *const positions[] = {"_", "^"};
     if (!base || (count && !indices))
@@ -228,13 +283,13 @@ static string_t *TeX_bounded_body(const char *operator, const TeX_t *body, const
 }
 
 /* Compose summation notation without evaluating the summand. */
-TeX_t *TeX_sum(const TeX_t *body, const TeX_t *lower, const TeX_t *upper)
+TeX_t *TeX_compose_sum(const TeX_t *body, const TeX_t *lower, const TeX_t *upper)
 {
     return body ? TeX_adopt(TeX_bounded_body("\\sum", body, lower, upper)) : TeX_invalid();
 }
 
 /* Compose an integral and its differential without performing integration. */
-TeX_t *TeX_integral(const TeX_t *body, const TeX_t *variable, const TeX_t *lower, const TeX_t *upper)
+TeX_t *TeX_compose_integral(const TeX_t *body, const TeX_t *variable, const TeX_t *lower, const TeX_t *upper)
 {
     if (!body || !variable)
         return TeX_invalid();
@@ -249,7 +304,7 @@ TeX_t *TeX_integral(const TeX_t *body, const TeX_t *variable, const TeX_t *lower
 }
 
 /* Typeset the derivative's own fraction, leaving surrounding algebra to the caller. */
-TeX_t *TeX_derivative(const TeX_t *body, const TeX_t *variable, unsigned order, TeX_derivative_style_t style)
+TeX_t *TeX_compose_derivative(const TeX_t *body, const TeX_t *variable, unsigned order, TeX_derivative_style_t style)
 {
     static const char *const symbols[] = {"\\mathrm{d}", "\\partial"};
     if (!body || !variable || !order || (unsigned)style >= sizeof symbols / sizeof *symbols)
@@ -263,7 +318,7 @@ TeX_t *TeX_derivative(const TeX_t *body, const TeX_t *variable, unsigned order, 
 }
 
 /* Emit row-major mathematical cells without interpreting their contents. */
-TeX_t *TeX_matrix(const TeX_t *const *cells, size_t rows, size_t columns,
+TeX_t *TeX_compose_matrix(const TeX_t *const *cells, size_t rows, size_t columns,
                   TeX_matrix_style_t style, unsigned row_spacing)
 {
     static const char *const environments[] = {"bmatrix", "pmatrix", "matrix"};
@@ -315,7 +370,7 @@ void TeX_free(TeX_t *notation)
 }
 
 /* Compose bound notation without interpreting its binding values. */
-TeX_t *TeX_bound(const TeX_t *body, const TeX_t *bindings)
+TeX_t *TeX_compose_bound(const TeX_t *body, const TeX_t *bindings)
 {
     if (!body)
         return TeX_invalid();
@@ -325,7 +380,7 @@ TeX_t *TeX_bound(const TeX_t *body, const TeX_t *bindings)
 }
 
 /* Keep scalar factors close to matrices and other compound bodies. */
-TeX_t *TeX_scaled(const TeX_t *factor, const TeX_t *body)
+TeX_t *TeX_compose_scaled(const TeX_t *factor, const TeX_t *body)
 {
     if (!factor || !body)
         return TeX_invalid();
@@ -333,7 +388,7 @@ TeX_t *TeX_scaled(const TeX_t *factor, const TeX_t *body)
 }
 
 /* Stack complex components without changing their values or signs. */
-TeX_t *TeX_cartesian_sum(const TeX_t *real, const TeX_t *imaginary)
+TeX_t *TeX_compose_cartesian_sum(const TeX_t *real, const TeX_t *imaginary)
 {
     if (!real || !imaginary)
         return TeX_invalid();
@@ -342,7 +397,7 @@ TeX_t *TeX_cartesian_sum(const TeX_t *real, const TeX_t *imaginary)
 }
 
 /* Present a precomputed common centre and displacement as a symmetric pair. */
-TeX_t *TeX_symmetric_pair(const TeX_t *centre, const TeX_t *offset,
+TeX_t *TeX_compose_symmetric_pair(const TeX_t *centre, const TeX_t *offset,
                           const TeX_t *denominator, bool group_offset)
 {
     if (!centre || !offset)

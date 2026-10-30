@@ -15,11 +15,12 @@ window.labWorkspaceChecks = async function labWorkspaceChecks() {
     check(response.ok, 'could not load the native module');
     const module = await WebAssembly.compile(await response.arrayBuffer());
     const imports: WebAssembly.Imports = {};
-    // Workspace functions must not delegate their state decisions to a host import.
+    // The shared module declares the WebGL bridge too; workspace state decisions must call no host import.
     for (const entry of WebAssembly.Module.imports(module)) {
         check(entry.kind === 'function', 'unexpected non-function import');
         check(
-            entry.module === 'env' && /^(lab_host_|lab_dom_)/.test(entry.name),
+            entry.module === 'env' && (/^(lab_host_|lab_dom_)/.test(entry.name) ||
+                entry.name === 'lab_webgl_host_call'),
             `unexpected runtime import ${entry.module}.${entry.name}`);
         if (!imports[entry.module])
             imports[entry.module] = {};

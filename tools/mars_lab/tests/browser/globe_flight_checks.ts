@@ -24,6 +24,7 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
         move(dx: number, dy: number, factor: number): void;
         riverRequest: AbortController | null;
         riverRequestBounds: number[] | null; riverRequestZoom: number;
+        riverRequestObserver: string; observerSignature: string;
         shoreJob(entry: GlobeWorkerRequest['entry'], args: GlobeWorkerRequest['args'], signal?: AbortSignal): Promise<unknown>;
     };
     const savedMode = WorksheetWorkspace.mode.currentMode();
@@ -48,15 +49,23 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
         globe.stopRegionRequests();
         const pendingRivers = new AbortController();
         globe.riverRequest = pendingRivers;
+        globe.riverRequestObserver = globe.observerSignature;
+        globe.riverRequestBounds = globe.view.slice(3);
+        globe.riverRequestZoom = globe.view[2];
         globe.move(0, 0, 1);
         check(!pendingRivers.signal.aborted && globe.riverRequest === pendingRivers,
               'arrival refresh preserves an unfinished destination river request');
         globe.move(.001, 0, 1);
+        check(!pendingRivers.signal.aborted && globe.riverRequest === pendingRivers,
+              'manual panning preserves the photographic request while the camera crosses its boundary');
+        globe.riverRequestObserver = globe.observerSignature + '|previous';
+        globe.move(.001, 0, 1);
         check(pendingRivers.signal.aborted && !globe.riverRequest,
-              'manual camera movement still cancels obsolete river requests');
+              'selecting another observer still cancels obsolete river requests');
         const useful = new AbortController();
         const savedBounds = globe.riverRequestBounds, savedZoom = globe.riverRequestZoom;
         globe.riverRequest = useful;
+        globe.riverRequestObserver = globe.observerSignature;
         globe.riverRequestBounds = [globe.view[3] - 10, globe.view[4] - 10, globe.view[5] + 10, globe.view[6] + 10];
         globe.riverRequestZoom = globe.view[2];
         globe.move(.001, 0, 1);

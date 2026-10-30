@@ -14,6 +14,8 @@
 
 #define MARS_SHARED_TeX_INTERNAL_ACCESS
 #include "internal/TeX_internal.h"
+#define MARS_TeX_INTERNAL_ACCESS
+#include "TeX_internal.h"
 
 static TeX_t *component_matrix(size_t rows, size_t columns, const TeX_scalar_matrix_provider_t *provider,
                                void *state, TeX_scalar_component_t component, bool *wide, bool *complex)
@@ -40,7 +42,7 @@ static TeX_t *component_matrix(size_t rows, size_t columns, const TeX_scalar_mat
             row_width = 3u * (columns - 1u);
         }
     }
-    matrix = TeX_matrix((const TeX_t *const *)entries, rows, columns,
+    matrix = TeX_compose_matrix((const TeX_t *const *)entries, rows, columns,
         component == TeX_SCALAR_WHOLE ? TeX_MATRIX_BRACKETS : TeX_MATRIX_PARENTHESES, 10);
 cleanup:
     for (size_t i = 0; i < count; ++i)
@@ -60,7 +62,7 @@ TeX_t *TeX_scalar_matrix(size_t rows, size_t columns, const TeX_scalar_matrix_pr
         return whole;
     TeX_t *real = component_matrix(rows, columns, provider, state, TeX_SCALAR_REAL, &wide, &complex);
     TeX_t *imaginary = real ? component_matrix(rows, columns, provider, state, TeX_SCALAR_IMAGINARY, &wide, &complex) : NULL;
-    TeX_t *separated = imaginary ? TeX_cartesian_sum(real, imaginary) : NULL;
+    TeX_t *separated = imaginary ? TeX_compose_cartesian_sum(real, imaginary) : NULL;
     TeX_free(imaginary);
     TeX_free(real);
     if (!separated)

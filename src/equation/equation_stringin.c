@@ -387,7 +387,12 @@ TeX_t *equ_notation_input(const string_t *text, notation_read_fn read, void *con
         right = bound_right;
     }
     TeX_t *lhs = left ? read(context, left) : NULL, *rhs = right ? read(context, right) : NULL;
-    TeX_t *result = lhs && rhs ? TeX_equation(lhs, rhs, TeX_EQUATION_INLINE) : NULL;
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_notation(builder, lhs);
+    TeX_push_notation(builder, rhs);
+    TeX_equation(builder, TeX_EQUATION_INLINE);
+    TeX_t *result = TeX_builder_finish(builder);
+    TeX_builder_free(builder);
     TeX_free(lhs);
     TeX_free(rhs);
     string_free(left);

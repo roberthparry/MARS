@@ -110,6 +110,7 @@ static bool remove_fixture_tree(file_t *directory, unsigned depth, size_t *remai
     for (;;) {
         file_info_t *entry = NULL;
         if (!file_read_directory(directory, &entry)) {
+            string_fprintf(stderr, "Fixture directory read failed: %s, errno=%d\n", file_path(directory), errno);
             ok = false;
             break;
         }
@@ -126,6 +127,8 @@ static bool remove_fixture_tree(file_t *directory, unsigned depth, size_t *remai
         bool removed =
             child && (file_info_type(entry) == FILE_TYPE_DIRECTORY ? remove_fixture_tree(child, depth + 1, remaining)
                                                                    : file_delete(child));
+        if (!removed)
+            string_fprintf(stderr, "Fixture entry removal failed: %s, errno=%d\n", string_c_str(path), errno);
         ok = removed && ok;
         file_free(child);
         string_free(path);

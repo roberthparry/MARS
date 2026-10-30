@@ -1058,6 +1058,11 @@ namespace WorksheetRequests {
                 },
                 captureAlmanac: (context: MarsApiEvaluationContext) => {
                     context.state = this.dependencies.locations.currentAlmanacState();
+                    if (this.dependencies.workspace.currentMode() === 'almanac') {
+                        const jurisdiction = document.getElementById('almanacJurisdiction') as HTMLSelectElement | null;
+                        labDOM.call('lab_almanac_events_preview', document.getElementById('rendered'),
+                            jurisdiction ? WorksheetResults.tooltip.cachedCountry(jurisdiction.value) : null);
+                    }
                     return context.text = this.dependencies.locations.almanacSummaryText(context.state);
                 },
                 assemble: async (context: MarsApiEvaluationContext) => context.entered =

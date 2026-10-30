@@ -18,7 +18,7 @@
 typedef struct _texture_entry_t {
     char key[256];
     double bounds[4], zoom;
-    unsigned bytes;
+    unsigned bytes, quality;
     int previous, next;
     bool used, geographic;
 } texture_entry_t;
@@ -152,10 +152,22 @@ static jsref get_entry(texture_cache_t *cache, jsref request)
     return result(cache, slot, 0);
 }
 
+static bool protected_slot(jsref request, int slot)
+{
+    jsref protect = lab_dom_get(request, "protect");
+    if (lab_dom_type(protect) != LAB_VALUE_ARRAY) return field(request, "protect") == slot;
+    /* Only the two displayed GPU layers are normally pinned; never inspect more than four slots. */
+    int count = lab_dom_count(protect);
+    if (count < 0 || count > 4) return true;
+    for (int i = 0; i < count; ++i)
+        if (lab_dom_to_number(lab_dom_item(protect, i)) == slot) return true;
+    return false;
+}
+
 static jsref put_entry(texture_cache_t *cache, jsref request)
 {
     char key[256]; int slot = -1;
-    double bytes = field(request, "bytes"), zoom = field(request, "zoom"), protect = field(request, "protect");
+    double bytes = field(request, "bytes"), zoom = field(request, "zoom"), quality = field(request, "quality");
     if (!read_key(request, key) || !isfinite(bytes) || bytes < 1 || bytes > cache->budget || floor(bytes) != bytes) return 0;
     if (dictionary_get(cache->keys, key, &slot)) {
         if (isfinite(zoom)) cache->entries[slot].zoom = fmax(cache->entries[slot].zoom, zoom);
@@ -165,8 +177,8 @@ static jsref put_entry(texture_cache_t *cache, jsref request)
     jsref evicted = lab_dom_object(LAB_VALUE_ARRAY);
     while (dictionary_size(cache->keys) >= cache->limit || cache->bytes + (unsigned)bytes > cache->budget) {
         int victim = cache->oldest;
-        if (victim == protect) victim = cache->entries[victim].next;
-        if (victim < 0) return 0;
+        while (victim >= 0 && protected_slot(request, victim)) victim = cache->entries[victim].next;
+        if (victim < 0) return result(cache, -1, evicted);
         texture_entry_t *entry = &cache->entries[victim];
         dictionary_remove(cache->keys, entry->key);
         unlink_entry(cache, victim); cache->bytes -= entry->bytes; entry->used = false;
@@ -178,6 +190,7 @@ static jsref put_entry(texture_cache_t *cache, jsref request)
     texture_entry_t *entry = &cache->entries[slot];
     memset(entry, 0, sizeof *entry); memcpy(entry->key, key, sizeof key);
     entry->bytes = (unsigned)bytes; entry->used = true; entry->zoom = isfinite(zoom) ? zoom : 0;
+    entry->quality = isfinite(quality) && quality >= 0 && quality <= 2 ? (unsigned)quality : 0;
     entry->geographic = bounds_read(lab_dom_get(request, "bounds"), entry->bounds);
     cache->bytes += entry->bytes;
     touch(cache, slot, false);
@@ -188,16 +201,31 @@ static jsref cover_entry(texture_cache_t *cache, jsref request)
 {
     double bounds[4], zoom = field(request, "zoom");
     if (cache->limit > 4 || !isfinite(zoom) || zoom <= 0 || !bounds_read(lab_dom_get(request, "bounds"), bounds)) return 0;
+    bool partial = lab_dom_truth(lab_dom_get(request, "partial"));
+    double prefer = field(request, "prefer");
+    int selected = -1;
+    double best_area = -1;
     /* Coverage is a spatial predicate over at most four resident GPU textures. */
     for (int slot = cache->newest; slot >= 0; slot = cache->entries[slot].previous) {
         texture_entry_t *entry = &cache->entries[slot];
         double *b = entry->bounds;
-        if (entry->geographic && zoom <= entry->zoom * 1.5 && bounds[0] >= b[0] && bounds[1] >= b[1] &&
-            bounds[2] <= b[2] && bounds[3] <= b[3]) {
-            touch(cache, slot, true); return result(cache, slot, 0);
+        if (!entry->geographic) continue;
+        double centre = (bounds[0] + bounds[2] - b[0] - b[2]) * .5;
+        double shift = 360 * nearbyint(centre / 360);
+        double west = b[0] + shift, east = b[2] + shift;
+        bool contains = bounds[0] >= west && bounds[1] >= b[1] && bounds[2] <= east && bounds[3] <= b[3];
+        double area = fmax(0, fmin(bounds[2], east) - fmax(bounds[0], west)) *
+                      fmax(0, fmin(bounds[3], b[3]) - fmax(bounds[1], b[1]));
+        if (partial ? area <= 0 : !contains || zoom > entry->zoom * 1.5) continue;
+        if (selected < 0 || entry->quality > cache->entries[selected].quality ||
+            (entry->quality == cache->entries[selected].quality &&
+             (partial ? area > best_area : slot == prefer))) {
+            selected = slot;
+            best_area = area;
         }
     }
-    return 0;
+    if (selected >= 0) touch(cache, selected, true);
+    return selected >= 0 ? result(cache, selected, 0) : 0;
 }
 
 static jsref clear_cache(texture_cache_t *cache, jsref request)

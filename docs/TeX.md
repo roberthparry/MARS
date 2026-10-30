@@ -1,56 +1,55 @@
 # TeX notation
 
 `TeX_t`, declared in `TeX-t.h`, is an opaque, immutable mathematical notation
-value. It separates typesetting syntax from algebra and application code.
-Structured constructors emit notation without simplifying expressions.
-`TeX_from_expression` additionally delegates ordinary mathematical input to the
-expression module for parsing, simplification and readable arrangement. No
-constructor invokes a TeX engine.
+value. Use `TeX_builder_t` to construct one in reverse Polish order: push
+operands, then apply an operation. The builder owns every intermediate value;
+there is no separate cleanup list. `TeX_builder_finish` transfers the single
+completed formula to you. Free it with `TeX_free` and free the builder with
+`TeX_builder_free`.
 
-`TeX_fraction`, `TeX_root`, `TeX_scripts`, `TeX_sequence`, `TeX_equation` and `TeX_matrix`
-compose borrowed values into independent owned values. Inputs can be freed
-immediately afterwards. `TeX_scripts` groups the complete base before adding
-subscripts or superscripts. Matrices accept row-major cells, bracketed,
-parenthesised or plain styles, and extra row spacing in points; null cells are
-empty entries. Traversal is proportional to the notation being emitted.
+The builder supplies typesetting syntax without doing algebra. Native
+mathematical text goes through `TeX_from_expression` or `TeX_push_math`, which
+delegate parsing and simplification to the mathematical modules. Neither path
+runs a TeX engine. Existing expression, equation, matrix and differential-equation
+output APIs continue to manage their rendering contexts internally.
 
-`TeX_equation(left, right, style)` joins borrowed mathematical sides and returns
-independently owned notation. `TeX_EQUATION_INLINE` inserts an equals sign;
-`TeX_EQUATION_ALIGNED` uses a top-aligned equation and incorporates a native
-wrapped right side without nesting its alignment environment. It neither breaks
-lines nor changes either side's mathematics. Invalid sides or styles return null.
+Every push and operation returns a Boolean. A failure leaves the stack unchanged and
+saves the first error. Later operations and finish fail until you explicitly
+clear that error. This means the examples can check the finished result once,
+without accidentally accepting an incomplete formula after an ignored failure.
 
-`TeX_text(const string_t *text)` borrows literal UTF-8 text without modifying or
-retaining it and returns independently owned escaped notation. It uses the
-string cursor API and copies ordinary text in spans, with direct ASCII-indexed
-escape lookup. Empty strings are valid; null input and embedded NUL characters
-are rejected with `EINVAL` rather than silently truncating text.
-`TeX_raw` is exclusively for trusted TeX,
-including output from existing native renderers; it neither validates nor
-sanitises commands. `TeX_source` borrows the resulting source, while `TeX_render`
-returns an independent `string_t`. Free values with `TeX_free` and rendered
-strings with `string_free`. Constructors return null on invalid arguments or
-allocation failure. Read-only sharing is supported, but destruction must be
-synchronised by the caller.
+Arithmetic follows ordinary RPN: push the left operand, push the right operand,
+then apply one binary operator. For a further factor, push it and multiply again.
+There is no operand-count argument for arithmetic. Argument counts on function
+calls describe the function's arity; they are construction metadata, not printed numbers.
+
+`TeX_push_symbol` takes keyboard-friendly names such as `psi`, `mu`, `lambda`,
+`Lambda`, `hbar`, `partial` and `infinity`; Unicode is optional. Arithmetic operations
+supply their own syntax. `TeX_push_text` escapes literal prose. `TeX_push_raw`
+is reserved for embedding source from existing trusted renderers. None retains
+its input. `TeX_push_notation` copies an existing value,
+including an operand already on the stack. `TeX_source` returns a borrowed
+pointer, while `TeX_render` returns an independent `string_t`. Immutable values
+may be read concurrently; access to a shared builder and destruction require
+external synchronisation.
 
 ## Composition example
 
-Each C block below is a complete programme with its own `main`, headers,
-failure reporting and cleanup. The Markdown example tests extract and compile
+Each C block is a complete programme. The Markdown tests extract and compile
 these exact blocks, run them and compare their output with the accompanying
-text. They are registered with `make -j1 test-readme-examples`, which runs after
-the ordinary suites in `make -j1 test`.
-When invoking the example runner from the repository root, use
-`MARS_ROOT="$PWD" make -j1 test-readme-examples` so its temporary working
-directories do not affect executable lookup. A successful TeX-only run reports
-`README programs: 12 checked, 0 failed`; other enabled examples are counted too.
+text. Run them after the ordinary tests with
+`MARS_ROOT="$PWD" make -j1 test-readme-examples`. A TeX-only run checks thirteen
+programmes; other enabled examples are counted too.
+
+Push the numerator first and the denominator second, then apply the fraction
+and square root. Only the completed result and the builder require cleanup.
 
 ```c
 /**
  * @file TeX_example_1.c
- * @brief Standalone demonstration of mathematical TeX composition and ownership.
+ * @brief Construct a fraction inside a square root in reverse Polish order.
  *
- * Prints TeX source, releases owned values and reports construction or output failure.
+ * The builder owns every intermediate fragment and transfers the finished notation.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,17 +58,15 @@ directories do not affect executable lookup. A successful TeX-only run reports
 
 int main(void)
 {
-    int status = EXIT_FAILURE;
-    TeX_t *x = TeX_raw("x");
-    TeX_t *two = TeX_raw("2");
-    TeX_t *fraction = TeX_fraction(x, two);
-    TeX_t *root = TeX_root(fraction, NULL);
-    if (x && two && fraction && root)
-        status = puts(TeX_source(root)) == EOF ? EXIT_FAILURE : EXIT_SUCCESS;
-    TeX_free(root);
-    TeX_free(fraction);
-    TeX_free(two);
-    TeX_free(x);
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_symbol(builder, "x");
+    TeX_push_integer(builder, 2);
+    TeX_frac(builder);
+    TeX_sqrt(builder);
+    TeX_t *formula = TeX_builder_finish(builder);
+    TeX_builder_free(builder);
+    int status = formula && puts(TeX_source(formula)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+    TeX_free(formula);
     if (status != EXIT_SUCCESS)
         fputs("Could not construct or print TeX.\n", stderr);
     return status;
@@ -82,19 +79,23 @@ Output:
 \sqrt{\frac{x}{2}}
 ```
 
+Rendered mathematics:
+
+$\quad\begin{array}{l}\displaystyle \sqrt{\frac{x}{2}}\end{array}$
 
 ## Indexed expression with nested roots
 
-This combines subscripts and superscripts, sequences, an indexed cube root, a
-square root, a fraction and escaped literal text. Only trusted mathematical
-symbols and punctuation use `TeX_raw`; the caption goes through `TeX_text`.
+Leave the left side on the stack while constructing the right side. Push each
+root's radicand before its index; push both fraction operands before applying
+the fraction. The caption is escaped literal text, and the wide gap is selected
+by name rather than by writing a TeX spacing command.
 
 ```c
 /**
  * @file TeX_example_2.c
- * @brief Standalone demonstration of mathematical TeX composition and ownership.
+ * @brief Build an indexed equation, nested radicals and a literal caption using RPN.
  *
- * Prints TeX source, releases owned values and reports construction or output failure.
+ * ASCII symbol names and structured arithmetic preserve authored order without TeX source fragments.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,60 +104,38 @@ symbols and punctuation use `TeX_raw`; the caption goes through `TeX_text`.
 
 int main(void)
 {
-    int status = EXIT_FAILURE;
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_symbol(builder, "r");
+    TeX_push_symbol(builder, "n");
+    TeX_subscript(builder);
+
+    TeX_push_integer(builder, 1);
+    TeX_push_symbol(builder, "x");
+    TeX_push_symbol(builder, "n");
+    TeX_push_integer(builder, 2);
+    TeX_scripts(builder);
+    TeX_add(builder);
+    TeX_push_integer(builder, 3);
+    TeX_root(builder);
+
+    TeX_push_integer(builder, 1);
+    TeX_push_symbol(builder, "lambda");
+    TeX_push_integer(builder, 2);
+    TeX_pow(builder);
+    TeX_add(builder);
+    TeX_sqrt(builder);
+    TeX_frac(builder);
+    TeX_equation(builder, TeX_EQUATION_INLINE);
+
+    TeX_push_space(builder, TeX_SPACE_QUAD);
     string_t *caption = string_new_with("scaled & normalised");
-    TeX_t *label = TeX_text(caption);
-    string_free(caption); /* TeX_text copied the borrowed string. */
-
-    TeX_t *r = TeX_raw("r");
-    TeX_t *x = TeX_raw("x");
-    TeX_t *n = TeX_raw("n");
-    TeX_t *two = TeX_raw("2");
-    TeX_t *three = TeX_raw("3");
-    TeX_t *lambda = TeX_raw("\\lambda");
-    TeX_t *one_plus = TeX_raw("1 + ");
-    TeX_t *equals = TeX_raw(" = ");
-    TeX_t *gap = TeX_raw("\\qquad ");
-    TeX_t *r_n = TeX_scripts(r, n, NULL);
-    TeX_t *x_n_squared = TeX_scripts(x, n, two);
-    TeX_t *lambda_squared = TeX_scripts(lambda, NULL, two);
-
-    const TeX_t *top_parts[] = {one_plus, x_n_squared};
-    const TeX_t *bottom_parts[] = {one_plus, lambda_squared};
-    TeX_t *top_sum = TeX_sequence(top_parts, 2);
-    TeX_t *bottom_sum = TeX_sequence(bottom_parts, 2);
-    TeX_t *cube_root = TeX_root(top_sum, three);
-    TeX_t *square_root = TeX_root(bottom_sum, NULL);
-    TeX_t *ratio = TeX_fraction(cube_root, square_root);
-    const TeX_t *parts[] = {r_n, equals, ratio, gap, label};
-    TeX_t *formula = TeX_sequence(parts, 5);
-    string_t *output = TeX_render(formula);
-    int complete = label && r && x && n && two && three && lambda && one_plus && equals && gap &&
-                   r_n && x_n_squared && lambda_squared && top_sum && bottom_sum && cube_root &&
-                   square_root && ratio && formula && output;
-    TeX_free(formula); /* The rendered string remains independently owned. */
-    if (complete)
-        status = puts(string_c_str(output)) == EOF ? EXIT_FAILURE : EXIT_SUCCESS;
-    string_free(output);
-
-    TeX_free(ratio);
-    TeX_free(square_root);
-    TeX_free(cube_root);
-    TeX_free(bottom_sum);
-    TeX_free(top_sum);
-    TeX_free(lambda_squared);
-    TeX_free(x_n_squared);
-    TeX_free(r_n);
-    TeX_free(gap);
-    TeX_free(equals);
-    TeX_free(one_plus);
-    TeX_free(lambda);
-    TeX_free(three);
-    TeX_free(two);
-    TeX_free(n);
-    TeX_free(x);
-    TeX_free(r);
-    TeX_free(label);
+    TeX_push_text(builder, caption);
+    string_free(caption);
+    TeX_sequence(builder, 3);
+    TeX_t *formula = TeX_builder_finish(builder);
+    TeX_builder_free(builder);
+    int status = formula && puts(TeX_source(formula)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+    TeX_free(formula);
     if (status != EXIT_SUCCESS)
         fputs("Could not construct or print TeX.\n", stderr);
     return status;
@@ -175,17 +154,21 @@ $\quad\begin{array}{l}\displaystyle {r}_{n} = \frac{\sqrt[3]{1 + {x}_{n}^{2}}}{\
 
 ## A symmetric projection matrix
 
-For real $x$, this constructs the projection onto the direction $(1,x)$.
-The caller supplies the mathematics; the TeX module supplies the fraction,
-power and matrix syntax. Cells are row-major and the extra row spacing is six
-points. A repeated cell is borrowed twice but its original value is freed once.
+For real $x$, this projects onto the direction $(1,x)$. Matrix cells are pushed
+in row-major order. `TeX_dup(builder)` duplicates the top value without
+introducing shared ownership, following the ordinary RPN DUP operation.
+The scalar and matrix are combined with thin
+spacing by the binary `TeX_mul` operation.
+In the matrix call, `2, 2` specifies two rows and two columns,
+`TeX_MATRIX_BRACKETS` selects square brackets, and `6` requests six TeX points
+of extra row spacing. These settings describe the layout, not additional matrix entries.
 
 ```c
 /**
  * @file TeX_example_3.c
- * @brief Standalone demonstration of mathematical TeX composition and ownership.
+ * @brief Construct a scaled projection matrix from a row-major RPN stack.
  *
- * Prints TeX source, releases owned values and reports construction or output failure.
+ * Repeated cells use stack duplication; no intermediate notation needs manual cleanup.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -194,39 +177,30 @@ points. A repeated cell is borrowed twice but its original value is freed once.
 
 int main(void)
 {
-    int status = EXIT_FAILURE;
-    TeX_t *one = TeX_raw("1");
-    TeX_t *x = TeX_raw("x");
-    TeX_t *two = TeX_raw("2");
-    TeX_t *x_squared = TeX_scripts(x, NULL, two);
-    TeX_t *one_plus = TeX_raw("1 + ");
-    const TeX_t *denominator_parts[] = {one_plus, x_squared};
-    TeX_t *denominator = TeX_sequence(denominator_parts, 2);
-    TeX_t *scale = TeX_fraction(one, denominator);
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_symbol(builder, "x");
+    TeX_function(builder, "P", 1);
+    TeX_push_integer(builder, 1);
+    TeX_push_integer(builder, 1);
+    TeX_push_symbol(builder, "x");
+    TeX_push_integer(builder, 2);
+    TeX_pow(builder);
+    TeX_add(builder);
+    TeX_frac(builder);
 
-    /* A symmetric projection matrix: repeated cells may share a borrowed value. */
-    const TeX_t *cells[] = {one, x, x, x_squared};
-    TeX_t *matrix = TeX_matrix(cells, 2, 2, TeX_MATRIX_BRACKETS, 6);
-    TeX_t *heading = TeX_raw("P(x) = ");
-    TeX_t *gap = TeX_raw("\\,");
-    const TeX_t *parts[] = {heading, scale, gap, matrix};
-    TeX_t *formula = TeX_sequence(parts, 4);
+    TeX_push_integer(builder, 1);
+    TeX_push_symbol(builder, "x");
+    TeX_dup(builder);
+    TeX_dup(builder);
+    TeX_push_integer(builder, 2);
+    TeX_pow(builder);
+    TeX_matrix(builder, 2, 2, TeX_MATRIX_BRACKETS, 6);
+    TeX_mul(builder);
+    TeX_equation(builder, TeX_EQUATION_INLINE);
 
-    int complete = one && x && two && x_squared && one_plus && denominator && scale && matrix &&
-                   heading && gap && formula;
-    /* Composition copied these values; the completed formula survives their release. */
-    TeX_free(matrix);
-    TeX_free(scale);
-    TeX_free(denominator);
-    TeX_free(one_plus);
-    TeX_free(x_squared);
-    TeX_free(two);
-    TeX_free(x);
-    TeX_free(one);
-    TeX_free(gap);
-    TeX_free(heading);
-    if (complete)
-        status = puts(TeX_source(formula)) == EOF ? EXIT_FAILURE : EXIT_SUCCESS;
+    TeX_t *formula = TeX_builder_finish(builder);
+    TeX_builder_free(builder);
+    int status = formula && puts(TeX_source(formula)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
     TeX_free(formula);
     if (status != EXIT_SUCCESS)
         fputs("Could not construct or print TeX.\n", stderr);
@@ -237,175 +211,195 @@ int main(void)
 Output:
 
 ```text
-P(x) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2}\end{bmatrix}
+P\left(x\right) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2}\end{bmatrix}
 ```
 
 Rendered mathematics:
 
-$\quad\begin{array}{l}\displaystyle P(x) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2}\end{bmatrix}\end{array}$
+$\quad\begin{array}{l}\displaystyle P\left(x\right) = \frac{1}{1 + {x}^{2}}\,\begin{bmatrix}1 & x \\[6pt] x & {x}^{2}\end{bmatrix}\end{array}$
 
 ## Calculus and tensor notation
 
-`TeX_sum` and `TeX_integral` accept optional lower and upper bounds. Both bounds
-may be null for an unbounded sum or an indefinite integral. Nest integral
-constructors for iterated integrals. `TeX_derivative` emits an ordinary or
-partial derivative of positive integer order. Keep coefficients alongside
-that derivative's fraction, rather than enclosing it in another fraction.
-`TeX_fenced` supplies automatically sized parentheses, brackets or absolute-value
-bars.
+`TeX_sum` and `TeX_integral` take `TeX_LIMIT_NONE`,
+`TeX_LIMIT_LOWER`, `TeX_LIMIT_UPPER` or `TeX_LIMIT_BOTH`. Push the body first;
+for an integral push the variable next. Any bounds follow, lower before upper.
+Repeated integral operations construct iterated integrals. `TeX_derivative`
+consumes the body followed by its variable and takes the positive order and
+ordinary/partial presentation as arguments. Keep coefficients beside the
+derivative's own fraction rather than placing it inside another fraction.
 
-`TeX_tensor` accepts ordered upper and lower index slots. Unlike placing a
-subscript and superscript on the same base with `TeX_scripts`, it preserves
-horizontal slot order when variance alternates. The indices are notation only:
-this module does not perform tensor contractions, check dimensions or calculate
-derivatives, integrals or sums. Every new constructor returns an independently
-owned value requiring `TeX_free`; its inputs are borrowed and copied.
+`TeX_tensor` consumes a base followed by ordered index values, using the
+supplied lower/upper positions without contracting indices or checking dimensions.
+`TeX_fence` supplies visible mathematical delimiters. These are notation
+operations; the native mathematical modules own calculation and interpretation.
 
 ## Einstein, Schrödinger and Dirac equations
 
-The following single runnable programme prints five expressions:
-
-- Einstein's field equations with the cosmological constant and explicit $c$.
-- The time-dependent Schrödinger equation in one spatial dimension for a scalar potential.
-- The free Dirac equation in natural units, $\hbar=c=1$, with Minkowski signature
-  $(+,-,-,-)$. Its repeated $\mu$ index is summed over spacetime components;
-  the gamma symbols represent matrices acting on the spinor.
-- A wavefunction expanded in a complete orthonormal discrete basis.
-- Normalisation of that wavefunction over the real line.
-
-The equations follow the conventions described in David Tong's lectures on
+The following programme prints Einstein's field equations with explicit $c$,
+the one-dimensional time-dependent Schrödinger equation, the free Dirac equation
+in natural units, a wavefunction expansion and its normalisation. The Dirac
+convention is Minkowski signature $(+,-,-,-)$, with repeated $\mu$ summed.
+The equations follow David Tong's lectures on
 [general relativity](https://www.damtp.cam.ac.uk/user/tong/gr/grhtml/S4.html),
 [quantum mechanics](https://www.damtp.cam.ac.uk/user/tong/qm/qmhtml/S1.html) and
 [the Dirac equation](https://www.damtp.cam.ac.uk/user/tong/qft/qfthtml/S4.html).
-The gravitational equation restores the explicit factor of $c^{-4}$.
 
-The programme's small ownership list keeps intermediate fragments alive until
-cleanup. `keep` records construction failures even when a later constructor
-would permit a null optional argument; no incomplete equation is printed.
-Trusted raw fragments supply symbols and punctuation, while the structured API
-supplies tensor indices, powers, fractions, derivatives, sums, integrals and
-delimiters. No extra tensor package is required; the existing matrix examples
-use the standard `amsmath` environments.
+One reusable builder replaces the ownership list. A small helper pushes a
+repeated lower-index pair; another prints and frees each finished formula.
+Plain symbols and RPN operations supply every mathematical component, including
+arithmetic and function calls. No TeX command fragments are needed. No extra tensor package
+is needed; matrices use the standard `amsmath` environments.
 
 ```c
 /**
  * @file TeX_physics.c
- * @brief Runnable field-equation and wavefunction notation examples.
+ * @brief Construct field equations and wavefunction notation from structured RPN operations.
  *
- * Builds mathematical notation with the public TeX API. A small ownership list
- * releases every constructed value once, including intermediate fragments.
+ * Symbols use ASCII names; arithmetic, calls and calculus supply their own presentation syntax.
  */
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "TeX-t.h"
 
-typedef struct {
-    TeX_t *owned[128];
-    size_t count;
-    bool failed;
-} example_t;
-
-/* Adopt a result for cleanup, recording any failed construction. */
-static TeX_t *keep(example_t *example, TeX_t *value)
+static void lower_pair(TeX_builder_t *builder, const char *symbol)
 {
-    if (!value || example->count == sizeof example->owned / sizeof *example->owned) {
-        TeX_free(value);
-        example->failed = true;
-        return NULL;
-    }
-    example->owned[example->count++] = value;
-    return value;
+    const TeX_index_position_t positions[] = {TeX_INDEX_LOWER, TeX_INDEX_LOWER};
+    TeX_push_symbol(builder, symbol);
+    TeX_push_symbol(builder, "mu");
+    TeX_push_symbol(builder, "nu");
+    TeX_tensor(builder, positions, 2);
 }
 
-/* Copy a trusted mathematical atom and register its ownership. */
-static TeX_t *atom(example_t *example, const char *source)
+static void wavefunction(TeX_builder_t *builder)
 {
-    return keep(example, TeX_raw(source));
+    TeX_push_symbol(builder, "x");
+    TeX_push_symbol(builder, "t");
+    TeX_function(builder, "psi", 2);
+}
+
+static bool print_formula(TeX_builder_t *builder)
+{
+    TeX_t *formula = TeX_builder_finish(builder);
+    bool ok = formula && puts(TeX_source(formula)) != EOF;
+    TeX_free(formula);
+    return ok;
 }
 
 int main(void)
 {
-    example_t example = {0};
-    TeX_t *one = atom(&example, "1"), *two = atom(&example, "2"), *four = atom(&example, "4");
-    TeX_t *plus = atom(&example, " + "), *minus = atom(&example, " - ");
-    TeX_t *equals = atom(&example, " = "), *space = atom(&example, "\\,");
-    TeX_t *mu = atom(&example, "\\mu"), *nu = atom(&example, "\\nu");
-    TeX_t *ricci = atom(&example, "R"), *metric = atom(&example, "g"), *stress = atom(&example, "T");
-    TeX_t *c = atom(&example, "c"), *lambda = atom(&example, "\\Lambda");
-    TeX_t *coupling = atom(&example, "8\\pi G");
-
-    /* Einstein equations, with c explicit and a cosmological constant. */
-    const TeX_index_t lower_pair[] = {{mu, TeX_INDEX_LOWER}, {nu, TeX_INDEX_LOWER}};
-    TeX_t *r_mn = keep(&example, TeX_tensor(ricci, lower_pair, 2));
-    TeX_t *g_mn = keep(&example, TeX_tensor(metric, lower_pair, 2));
-    TeX_t *t_mn = keep(&example, TeX_tensor(stress, lower_pair, 2));
-    TeX_t *half = keep(&example, TeX_fraction(one, two));
-    TeX_t *c_fourth = keep(&example, TeX_scripts(c, NULL, four));
-    TeX_t *factor = keep(&example, TeX_fraction(coupling, c_fourth));
-    const TeX_t *einstein_parts[] = {
-        r_mn, minus, half, space, ricci, space, g_mn, plus, lambda, space, g_mn, equals, factor, space, t_mn
-    };
-    TeX_t *einstein = keep(&example, TeX_sequence(einstein_parts, 15));
-
-    /* One-dimensional time-dependent Schrodinger equation for a scalar potential. */
-    TeX_t *psi = atom(&example, "\\psi(x,t)");
-    TeX_t *x = atom(&example, "x"), *t = atom(&example, "t");
-    TeX_t *hbar = atom(&example, "\\hbar"), *imaginary_hbar = atom(&example, "i\\hbar");
-    TeX_t *two_m = atom(&example, "2m"), *potential = atom(&example, "V(x,t)");
-    TeX_t *negative = atom(&example, "-");
-    TeX_t *time_derivative = keep(&example, TeX_derivative(psi, t, 1, TeX_DERIVATIVE_PARTIAL));
-    TeX_t *space_derivative = keep(&example, TeX_derivative(psi, x, 2, TeX_DERIVATIVE_PARTIAL));
-    TeX_t *hbar_squared = keep(&example, TeX_scripts(hbar, NULL, two));
-    TeX_t *kinetic = keep(&example, TeX_fraction(hbar_squared, two_m));
-    const TeX_t *schrodinger_parts[] = {
-        imaginary_hbar, space, time_derivative, equals, negative, kinetic, space, space_derivative,
-        plus, potential, space, psi
-    };
-    TeX_t *schrodinger = keep(&example, TeX_sequence(schrodinger_parts, 12));
-
-    /* Free Dirac equation in natural units: hbar = c = 1. */
-    TeX_t *gamma = atom(&example, "\\gamma"), *partial = atom(&example, "\\partial");
-    TeX_t *imaginary = atom(&example, "i"), *mass = atom(&example, "m");
-    TeX_t *spinor = atom(&example, "\\psi"), *zero = atom(&example, "0");
-    const TeX_index_t upper_mu[] = {{mu, TeX_INDEX_UPPER}};
-    const TeX_index_t lower_mu[] = {{mu, TeX_INDEX_LOWER}};
-    TeX_t *gamma_mu = keep(&example, TeX_tensor(gamma, upper_mu, 1));
-    TeX_t *partial_mu = keep(&example, TeX_tensor(partial, lower_mu, 1));
-    const TeX_t *dirac_operator_parts[] = {imaginary, space, gamma_mu, space, partial_mu, minus, mass};
-    TeX_t *dirac_operator = keep(&example, TeX_sequence(dirac_operator_parts, 7));
-    TeX_t *group = keep(&example, TeX_fenced(dirac_operator, TeX_FENCE_PARENTHESES));
-    const TeX_t *dirac_parts[] = {group, space, spinor, equals, zero};
-    TeX_t *dirac = keep(&example, TeX_sequence(dirac_parts, 5));
-
-    /* Expansion in an orthonormal discrete basis, with normalisation on the real line. */
-    TeX_t *n = atom(&example, "n"), *coefficient = atom(&example, "a");
-    TeX_t *phi = atom(&example, "\\phi"), *argument = atom(&example, "(x)");
-    TeX_t *wave = atom(&example, "\\psi(x)");
-    TeX_t *lower = atom(&example, "n=0"), *infinity = atom(&example, "\\infty");
-    TeX_t *negative_infinity = atom(&example, "-\\infty");
-    TeX_t *a_n = keep(&example, TeX_scripts(coefficient, n, NULL));
-    TeX_t *phi_n = keep(&example, TeX_scripts(phi, n, NULL));
-    const TeX_t *summand_parts[] = {a_n, space, phi_n, argument};
-    TeX_t *summand = keep(&example, TeX_sequence(summand_parts, 4));
-    TeX_t *sum = keep(&example, TeX_sum(summand, lower, infinity));
-    const TeX_t *expansion_parts[] = {wave, equals, sum};
-    TeX_t *expansion = keep(&example, TeX_sequence(expansion_parts, 3));
-    TeX_t *magnitude = keep(&example, TeX_fenced(wave, TeX_FENCE_ABSOLUTE));
-    TeX_t *density = keep(&example, TeX_scripts(magnitude, NULL, two));
-    TeX_t *integral = keep(&example, TeX_integral(density, x, negative_infinity, infinity));
-    const TeX_t *normalisation_parts[] = {integral, equals, one};
-    TeX_t *normalisation = keep(&example, TeX_sequence(normalisation_parts, 3));
-
+    TeX_builder_t *b = TeX_builder_new();
     int status = EXIT_FAILURE;
-    if (!example.failed && puts(TeX_source(einstein)) != EOF && puts(TeX_source(schrodinger)) != EOF &&
-        puts(TeX_source(dirac)) != EOF && puts(TeX_source(expansion)) != EOF &&
-        puts(TeX_source(normalisation)) != EOF)
-        status = EXIT_SUCCESS;
-    /* Ownership traversal, not a lookup: every constructed value must be released. */
-    for (size_t i = 0; i < example.count; ++i)
-        TeX_free(example.owned[i]);
+
+    lower_pair(b, "R");
+    TeX_push_integer(b, 1);
+    TeX_push_integer(b, 2);
+    TeX_frac(b);
+    TeX_push_symbol(b, "R");
+    TeX_mul(b);
+    lower_pair(b, "g");
+    TeX_mul(b);
+    TeX_sub(b);
+    TeX_push_symbol(b, "Lambda");
+    lower_pair(b, "g");
+    TeX_mul(b);
+    TeX_add(b);
+    TeX_push_integer(b, 8);
+    TeX_push_symbol(b, "pi");
+    TeX_mul(b);
+    TeX_push_symbol(b, "G");
+    TeX_mul(b);
+    TeX_push_symbol(b, "c");
+    TeX_push_integer(b, 4);
+    TeX_pow(b);
+    TeX_frac(b);
+    lower_pair(b, "T");
+    TeX_mul(b);
+    TeX_equation(b, TeX_EQUATION_INLINE);
+    if (!print_formula(b)) goto done;
+
+    TeX_push_symbol(b, "i");
+    TeX_push_symbol(b, "hbar");
+    TeX_mul(b);
+    wavefunction(b);
+    TeX_push_symbol(b, "t");
+    TeX_derivative(b, 1, TeX_DERIVATIVE_PARTIAL);
+    TeX_mul(b);
+    TeX_push_symbol(b, "hbar");
+    TeX_push_integer(b, 2);
+    TeX_pow(b);
+    TeX_push_integer(b, 2);
+    TeX_push_symbol(b, "m");
+    TeX_mul(b);
+    TeX_frac(b);
+    wavefunction(b);
+    TeX_push_symbol(b, "x");
+    TeX_derivative(b, 2, TeX_DERIVATIVE_PARTIAL);
+    TeX_mul(b);
+    TeX_neg(b);
+    TeX_push_symbol(b, "x");
+    TeX_push_symbol(b, "t");
+    TeX_function(b, "V", 2);
+    wavefunction(b);
+    TeX_mul(b);
+    TeX_add(b);
+    TeX_equation(b, TeX_EQUATION_INLINE);
+    if (!print_formula(b)) goto done;
+
+    const TeX_index_position_t upper[] = {TeX_INDEX_UPPER}, lower[] = {TeX_INDEX_LOWER};
+    TeX_push_symbol(b, "i");
+    TeX_push_symbol(b, "gamma");
+    TeX_push_symbol(b, "mu");
+    TeX_tensor(b, upper, 1);
+    TeX_mul(b);
+    TeX_push_symbol(b, "partial");
+    TeX_push_symbol(b, "mu");
+    TeX_tensor(b, lower, 1);
+    TeX_mul(b);
+    TeX_push_symbol(b, "m");
+    TeX_sub(b);
+    TeX_fence(b, TeX_FENCE_PARENTHESES);
+    TeX_push_symbol(b, "psi");
+    TeX_mul(b);
+    TeX_push_integer(b, 0);
+    TeX_equation(b, TeX_EQUATION_INLINE);
+    if (!print_formula(b)) goto done;
+
+    TeX_push_symbol(b, "x");
+    TeX_function(b, "psi", 1);
+    TeX_push_symbol(b, "a");
+    TeX_push_symbol(b, "n");
+    TeX_subscript(b);
+    TeX_push_symbol(b, "phi");
+    TeX_push_symbol(b, "n");
+    TeX_subscript(b);
+    TeX_push_symbol(b, "x");
+    TeX_call(b, 1);
+    TeX_mul(b);
+    TeX_push_symbol(b, "n");
+    TeX_push_integer(b, 0);
+    TeX_equation(b, TeX_EQUATION_INLINE);
+    TeX_push_symbol(b, "infinity");
+    TeX_sum(b, TeX_LIMIT_BOTH);
+    TeX_equation(b, TeX_EQUATION_INLINE);
+    if (!print_formula(b)) goto done;
+
+    TeX_push_symbol(b, "x");
+    TeX_function(b, "psi", 1);
+    TeX_fence(b, TeX_FENCE_ABSOLUTE);
+    TeX_push_integer(b, 2);
+    TeX_pow(b);
+    TeX_push_symbol(b, "x");
+    TeX_push_symbol(b, "infinity");
+    TeX_neg(b);
+    TeX_push_symbol(b, "infinity");
+    TeX_integral(b, TeX_LIMIT_BOTH);
+    TeX_push_integer(b, 1);
+    TeX_equation(b, TeX_EQUATION_INLINE);
+    if (!print_formula(b)) goto done;
+    status = EXIT_SUCCESS;
+done:
+    TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
         fputs("Could not construct or print TeX.\n", stderr);
     return status;
@@ -415,24 +409,24 @@ int main(void)
 Output:
 
 ```text
-{R}_{\mu}{}_{\nu} - \frac{1}{2}\,R\,{g}_{\mu}{}_{\nu} + \Lambda\,{g}_{\mu}{}_{\nu} = \frac{8\pi G}{{c}^{4}}\,{T}_{\mu}{}_{\nu}
-i\hbar\,\frac{\partial {\psi(x,t)}}{\partial {t}} = -\frac{{\hbar}^{2}}{2m}\,\frac{\partial^{2} {\psi(x,t)}}{\partial {x}^{2}} + V(x,t)\,\psi(x,t)
+{R}_{\mu}{}_{\nu} - \frac{1}{2}\,R\,{g}_{\mu}{}_{\nu} + \Lambda\,{g}_{\mu}{}_{\nu} = \frac{8\,\pi\,G}{{c}^{4}}\,{T}_{\mu}{}_{\nu}
+i\,\hbar\,\frac{\partial {\psi\left(x, t\right)}}{\partial {t}} = -\frac{{\hbar}^{2}}{2\,m}\,\frac{\partial^{2} {\psi\left(x, t\right)}}{\partial {x}^{2}} + V\left(x, t\right)\,\psi\left(x, t\right)
 \left( i\,{\gamma}^{\mu}\,{\partial}_{\mu} - m \right)\,\psi = 0
-\psi(x) = \sum_{n=0}^{\infty} {{a}_{n}\,{\phi}_{n}(x)}
-\int_{-\infty}^{\infty} {{\left| \psi(x) \right|}^{2}}\,\mathrm{d}{x} = 1
+\psi\left(x\right) = \sum_{n = 0}^{\infty} {{a}_{n}\,{\phi}_{n}\left(x\right)}
+\int_{-\infty}^{\infty} {{\left| \psi\left(x\right) \right|}^{2}}\,\mathrm{d}{x} = 1
 ```
 
 Rendered mathematics:
 
-$\quad\begin{array}{l}\displaystyle {R}_{\mu}{}_{\nu} - \frac{1}{2}\,R\,{g}_{\mu}{}_{\nu} + \Lambda\,{g}_{\mu}{}_{\nu} = \frac{8\pi G}{{c}^{4}}\,{T}_{\mu}{}_{\nu}\end{array}$
+$\quad\begin{array}{l}\displaystyle {R}_{\mu}{}_{\nu} - \frac{1}{2}\,R\,{g}_{\mu}{}_{\nu} + \Lambda\,{g}_{\mu}{}_{\nu} = \frac{8\,\pi\,G}{{c}^{4}}\,{T}_{\mu}{}_{\nu}\end{array}$
 
-$\quad\begin{array}{l}\displaystyle i\hbar\,\frac{\partial {\psi(x,t)}}{\partial {t}} = -\frac{{\hbar}^{2}}{2m}\,\frac{\partial^{2} {\psi(x,t)}}{\partial {x}^{2}} + V(x,t)\,\psi(x,t)\end{array}$
+$\quad\begin{array}{l}\displaystyle i\,\hbar\,\frac{\partial {\psi\left(x, t\right)}}{\partial {t}} = -\frac{{\hbar}^{2}}{2\,m}\,\frac{\partial^{2} {\psi\left(x, t\right)}}{\partial {x}^{2}} + V\left(x, t\right)\,\psi\left(x, t\right)\end{array}$
 
 $\quad\begin{array}{l}\displaystyle \left( i\,{\gamma}^{\mu}\,{\partial}_{\mu} - m \right)\,\psi = 0\end{array}$
 
-$\quad\begin{array}{l}\displaystyle \psi(x) = \sum_{n=0}^{\infty} {{a}_{n}\,{\phi}_{n}(x)}\end{array}$
+$\quad\begin{array}{l}\displaystyle \psi\left(x\right) = \sum_{n = 0}^{\infty} {{a}_{n}\,{\phi}_{n}\left(x\right)}\end{array}$
 
-$\quad\begin{array}{l}\displaystyle \int_{-\infty}^{\infty} {{\left| \psi(x) \right|}^{2}}\,\mathrm{d}{x} = 1\end{array}$
+$\quad\begin{array}{l}\displaystyle \int_{-\infty}^{\infty} {{\left| \psi\left(x\right) \right|}^{2}}\,\mathrm{d}{x} = 1\end{array}$
 
 ## Ordinary mathematical text without TeX commands
 
@@ -491,9 +485,9 @@ Rendered mathematics:
 
 $\quad\begin{array}{l}\displaystyle \frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{2\mkern-2mu x\mkern-2mu \left(x - 1\right)}\end{array}$
 
-The result can also be supplied to `TeX_matrix`, `TeX_sequence` or any other
-structured constructor, just like a manually constructed fragment. `TeX_text`
-continues to escape literal text; `TeX_raw` continues to accept trusted TeX.
+Push the result with `TeX_push_notation` to use it in a matrix, sequence or any
+other builder operation. `TeX_push_text` escapes literal text;
+`TeX_push_raw` accepts trusted TeX.
 Neither of those constructors interprets an ordinary mathematical expression.
 
 ## Native calculus shorthand
@@ -647,9 +641,9 @@ thread-local. Recognised numeric constants use retained constant IDs directly,
 with a perfect-hash candidate lookup and full-precision equality for untagged
 values. Parsing, evaluation and solving remain native mathematical operations.
 
-`TeX_bound` composes a braced body with optional bindings, `TeX_scaled` places a
-scalar factor beside a body, and `TeX_cartesian_sum` aligns real and imaginary
-components. `TeX_symmetric_pair` composes a common centre plus or minus an offset,
+`TeX_bound` composes a braced body with optional bindings, `TeX_scaled`
+places a scalar factor beside a body, and `TeX_cartesian_sum` aligns real
+and imaginary components. `TeX_symmetric_pair` composes a common centre plus or minus an offset,
 with optional offset grouping and a common denominator. These constructors borrow
 their inputs and return independent values released with `TeX_free`.
 
@@ -966,38 +960,55 @@ $\quad\begin{array}{l}\displaystyle \frac{d^{2} y}{d x^{2}} + 3\mkern-2mu \frac{
 
 ## Native layout composition
 
-These constructors are also used by the native matrix and equation renderers.
-The operands can be released before the resulting notation is printed.
+These layouts are also used by the native matrix and equation renderers.
+The same builder can be reused immediately after each completed value is transferred.
 
 ```c
 /**
  * @file TeX_native_layout_example.c
  * @brief Compose binding, scalar, complex-component and symmetric-pair layouts.
  *
- * Demonstrates independent ownership of notation used by native mathematical renderers.
+ * Reuses an RPN builder, transferring and freeing one completed value at a time.
  */
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "TeX-t.h"
 
+static bool print_layout(TeX_builder_t *builder)
+{
+    TeX_t *layout = TeX_builder_finish(builder);
+    bool ok = layout && puts(TeX_source(layout)) != EOF;
+    TeX_free(layout);
+    return ok;
+}
+
 int main(void)
 {
-    TeX_t *x = TeX_raw("x"), *y = TeX_raw("y"), *two = TeX_raw("2"), *binding = TeX_raw("x = 1");
-    TeX_t *layouts[] = {
-        TeX_bound(x, binding), TeX_scaled(two, x), TeX_cartesian_sum(x, y),
-        TeX_symmetric_pair(x, y, two, true)
-    };
-    int status = EXIT_SUCCESS;
-    TeX_free(binding);
-    TeX_free(two);
-    TeX_free(y);
-    TeX_free(x);
-    for (size_t i = 0; i < sizeof layouts / sizeof *layouts; ++i) {
-        if (!layouts[i] || puts(TeX_source(layouts[i])) == EOF)
-            status = EXIT_FAILURE;
-        TeX_free(layouts[i]);
-    }
+    TeX_builder_t *b = TeX_builder_new();
+    int status = EXIT_FAILURE;
+    TeX_push_symbol(b, "x");
+    TeX_push_symbol(b, "x");
+    TeX_push_integer(b, 1);
+    TeX_equation(b, TeX_EQUATION_INLINE);
+    TeX_bound(b, true);
+    if (!print_layout(b)) goto done;
+    TeX_push_integer(b, 2);
+    TeX_push_symbol(b, "x");
+    TeX_scaled(b);
+    if (!print_layout(b)) goto done;
+    TeX_push_symbol(b, "x");
+    TeX_push_symbol(b, "y");
+    TeX_cartesian_sum(b);
+    if (!print_layout(b)) goto done;
+    TeX_push_symbol(b, "x");
+    TeX_push_symbol(b, "y");
+    TeX_push_integer(b, 2);
+    TeX_symmetric_pair(b, true, true);
+    if (!print_layout(b)) goto done;
+    status = EXIT_SUCCESS;
+done:
+    TeX_builder_free(b);
     if (status != EXIT_SUCCESS)
         fputs("Could not compose native mathematical layouts.\n", stderr);
     return status;
@@ -1023,42 +1034,149 @@ $\quad\begin{array}{l}\displaystyle \begin{aligned}&x \\[10pt] &{}+ i\mkern-2mu 
 
 $\quad\begin{array}{l}\displaystyle \frac{x \pm \left(y\right)}{2}\end{array}$
 
-## Planned reverse Polish construction
+## Reverse Polish construction contract
 
-**Design proposal recorded on 29 October 2026; deferred for later implementation.**
+The reverse Polish design uses `TeX_push_…` followed by concise operations such
+as `TeX_add`, `TeX_mul`, `TeX_frac` and `TeX_pow` as the public construction
+interface. The former fragment constructors are private TeX
+implementation details. Each operation consumes the stated tail of the stack,
+in push order, replacing it with one independently owned fragment. Stack
+selection uses direct indexing. ROLL shifts only the selected pointer range;
+ROT moves three pointers in constant time. Neither operation copies notation.
 
-Add a stack-based convenience interface with `TeX_push_…` and `TeX_apply_…`
-function families. Callers push operands, then apply an operation to the top
-operands, replacing them with the resulting notation. This reverse Polish
-construction should make the earlier complex examples much shorter, avoiding
-separate temporary variables and cleanup calls for every intermediate fragment.
-These are proposed API families, not functions available in the current header.
+| Purpose | API and operand order, oldest first |
+| --- | --- |
+| Lifetime | `TeX_builder_new`, `TeX_builder_free`; `TeX_builder_finish` transfers exactly one value |
+| Inspection | `TeX_builder_count`, `TeX_builder_error`, `TeX_builder_peek` with level one at the top |
+| Recovery | `TeX_builder_clear_error` retains operands; `TeX_builder_clear` discards operands and resets errors |
+| Symbols, integers | `TeX_push_symbol` takes ASCII names such as psi, mu or hbar; `TeX_push_integer` takes a long |
+| Trusted renderer output | `TeX_push_raw` embeds existing source; it is unnecessary for structured mathematics |
+| Native mathematics | `TeX_push_expression` takes `string_t`; `TeX_push_math` takes a C string |
+| Text and existing notation | `TeX_push_text` escapes prose; `TeX_push_notation` copies notation |
+| Spacing | `TeX_push_space` selects `TeX_SPACE_THIN` or `TeX_SPACE_QUAD` |
+| Stack operations | `TeX_dup`: a → a a; `TeX_rot`: a b c → b c a; push a level number then `TeX_roll` |
+| Arithmetic | `TeX_add`, `TeX_sub`, `TeX_mul`: left, right; `TeX_neg`: body |
+| Function calls | `TeX_function(name, count)` consumes arguments; `TeX_call(count)` consumes function, then arguments |
+| Fractions and roots | `TeX_frac`: numerator, denominator; `TeX_sqrt`: body; `TeX_root`: body, index |
+| Scripts | `TeX_pow`: base, exponent; `TeX_subscript`: base, lower; `TeX_scripts`: base, lower, upper |
+| Presentation sequences | `TeX_sequence(count)` concatenates already constructed presentation items |
+| Equations and delimiters | `TeX_equation(style)`: left, right; `TeX_fence(fence)`: body |
+| Tensors | `TeX_tensor(positions, count)`: base followed by ordered index values |
+| Sums | `TeX_sum(limits)`: body followed by selected lower and/or upper bounds |
+| Integrals | `TeX_integral(limits)`: body, variable, then selected bounds |
+| Derivatives | `TeX_derivative(order, style)`: body, variable |
+| Matrices | `TeX_matrix(rows, columns, style, row_spacing)`: row-major cells |
+| Bindings and scalar layout | `TeX_bound(has_bindings)`: body, optional bindings; `TeX_scaled`: factor, body |
+| Component and pair layouts | `TeX_cartesian_sum`: real, imaginary; `TeX_symmetric_pair`: centre, offset, optional denominator |
 
-The intended design is:
+Pushes copy their inputs; the caller retains ownership of strings and existing
+notation. The builder owns all pushed and intermediate values. A borrowed
+`TeX_builder_peek` result must not be freed; it remains valid through further
+pushes, but not after consumption, clearing or builder destruction.
+`TeX_builder_finish` transfers ownership without copying. Free its result with
+`TeX_free`; the builder is then empty and immediately reusable.
 
-- Push numbers, symbols, literal text, native mathematical expressions or existing
-  notation through appropriately named `TeX_push_…` calls. Copy borrowed inputs
-  into construction-owned values, with ownership documented explicitly.
-- Apply fractions, roots, powers, indices, equations, sequences, matrices,
-  integrals and sums through `TeX_apply_…` calls. TeX supplies the typesetting
-  syntax; callers describe the required structure.
-- Define operand order and arity explicitly, especially for fractions, indexed
-  roots, bounds and row-major matrix cells. Reject stack underflow, invalid
-  dimensions and allocation failures without losing the previous valid stack.
-- Let one opaque construction object own intermediate fragments. Finalisation
-  requires one completed formula and returns an independently owned `TeX_t`,
-  released with `TeX_free`. Releasing the construction object cleans up any
-  remaining fragments, including after failure.
-- Use direct stack indexing and ordinary function dispatch. Keep lifecycle
-  names, exact signatures and the error-reporting interface for the later API
-  design and implementation.
+All 24 Greek names are available in lowercase and with an initial capital for
+uppercase letters, together with `varepsilon`, `vartheta`, `varkappa`, `varpi`,
+`varrho`, `varsigma` and `varphi`. `hbar`, `partial`, `infinity` and `infty` select
+common mathematical symbols. These use a compact perfect hash rather than a scan.
+Other identifier names remain available. `TeX_function(b, "psi", 1)` uses
+the same ASCII naming; recognised standard functions retain their established
+spelling, so `gamma` as a function denotes the gamma function while
+`TeX_push_symbol(b, "gamma")` denotes the Greek letter. No special keyboard is needed.
 
-Preserve the existing module boundary: expression, matrix, equation and
-differential equation retain mathematical interpretation and provide semantic
-information through their internal callbacks. TeX owns presentation. Ordinary
-requests for TeX output continue to manage rendering contexts internally; the
-new stack interface is an optional convenience for explicit formula construction.
+Failures preserve the previous operands and save the first error:
+`ERANGE` for stack underflow, `EINVAL` for invalid input or incomplete finish,
+`EOVERFLOW` for dimensions that cannot fit and `ENOMEM` for allocation failure.
+Later mutations and finish remain blocked until `TeX_builder_clear_error` or
+`TeX_builder_clear` is called. Inspecting the stack remains possible after an
+error. Invalid peek requests report `errno` without changing the saved error.
 
-When this work is implemented, add runnable stack-based alternatives to the
-earlier complex examples and their README tests, with matching rendered output
-and explicit ownership and failure handling.
+Structured arithmetic retains operand precedence without parsing or simplifying
+algebra. Sums and differences used as factors or power bases are visibly grouped;
+subtraction preserves the scope of its right operand. Stack duplication and
+`TeX_push_notation` retain this structure. Raw source from another renderer has
+unknown structure and is conservatively grouped when used in arithmetic. Native
+mathematical text continues to obtain its meaning from the expression, matrix,
+equation and differential-equation modules through their internal callbacks.
+TeX supplies presentation; it does not parse TeX back into mathematics.
+
+## HP48-style stack operations
+
+Levels count down from one at the top, as in the [HP48 user guide, chapter 3](https://www.hp.com/ctg/Manual/c00442262.pdf).
+`TeX_dup` copies the top value. `TeX_rot` rotates the top three values;
+it has the same effect as pushing `3` and calling `TeX_roll`.
+ROLL consumes its level number, then moves that level of the remaining data
+to the top. With the top at the right, `a b c 3 ROLL` becomes `b c a`.
+Push `2` then ROLL to exchange the top two values. Lower levels are untouched.
+
+Push a ROLL control with `TeX_push_integer`; DUP and `TeX_push_notation`
+preserve that literal integer. The supported level range is one through the
+remaining stack depth. ROLL neither evaluates arithmetic notation nor parses
+rendered TeX to obtain the level. An invalid control leaves the entire stack,
+including the control, intact and saves an error for inspection or recovery.
+
+This programme demonstrates DUP, ROT and a four-level ROLL. Each row shows
+the stack from bottom to top; inspecting it does not transfer ownership.
+
+```c
+/**
+ * @file TeX_stack_example.c
+ * @brief Demonstrate HP48-style stack manipulation without exposing notation ownership.
+ *
+ * Prints stack levels in push order after DUP, ROT and a level-controlled ROLL.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "TeX-t.h"
+
+static int show(const TeX_builder_t *builder)
+{
+    if (TeX_builder_error(builder))
+        return -1;
+    for (size_t level = TeX_builder_count(builder); level; --level) {
+        const TeX_t *value = TeX_builder_peek(builder, level);
+        if (!value || printf("%s%s", TeX_source(value), level == 1 ? "\n" : " ") < 0)
+            return -1;
+    }
+    return 0;
+}
+
+int main(void)
+{
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_integer(builder, 12);
+    TeX_push_integer(builder, 34);
+    TeX_dup(builder);
+    int status = show(builder) ? EXIT_FAILURE : EXIT_SUCCESS;
+
+    TeX_builder_clear(builder);
+    TeX_push_integer(builder, 12);
+    TeX_push_integer(builder, 34);
+    TeX_push_integer(builder, 56);
+    TeX_rot(builder);
+    if (show(builder))
+        status = EXIT_FAILURE;
+
+    TeX_builder_clear(builder);
+    TeX_push_integer(builder, 555);
+    TeX_push_integer(builder, 444);
+    TeX_push_integer(builder, 333);
+    TeX_push_integer(builder, 222);
+    TeX_push_integer(builder, 4);
+    TeX_roll(builder);
+    if (show(builder))
+        status = EXIT_FAILURE;
+    TeX_builder_free(builder);
+    return status;
+}
+```
+
+Output:
+
+```text
+12 34 34
+34 56 12
+444 333 222 555
+```

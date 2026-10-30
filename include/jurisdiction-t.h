@@ -111,6 +111,23 @@ bool jurisdict_each_choice(jurisdiction_t *jurisdiction, jurisdict_choice_visit_
 bool jurisdict_each_location(jurisdiction_t *jurisdiction, jurisdict_place_visit_fn visitor, void *context);
 
 /**
+ * @brief Resolve one catalogue reference position without enumerating or retaining the world catalogue.
+ * @param jurisdiction Open catalogue engine; its selected jurisdiction does not restrict this lookup.
+ * @param latitude Finite latitude in degrees, within [-90, 90].
+ * @param longitude Finite longitude in degrees, within [-180, 180].
+ * @param visitor Required callback, called at most once with a borrowed record valid only during the call.
+ * @param context Caller-owned context passed unchanged; may be NULL. The visitor must not re-enter this engine.
+ * @return True when the query succeeds, including an absent position; false on invalid input or database failure.
+ *
+ * Positions must match within half a millionth of a degree on each axis. This recovers a rounded reference
+ * coordinate, not a nearby town or administrative owner. Indexed town latitude restricts candidates before
+ * longitude matching. Towns take precedence over representative jurisdiction locations; duplicate towns
+ * resolve by jurisdiction code and database ID. The visitor's return value is ignored. No record is retained.
+ */
+bool jurisdict_place_at(jurisdiction_t *jurisdiction, double latitude, double longitude,
+                       jurisdict_place_visit_fn visitor, void *context);
+
+/**
  * @brief Enumerate database towns by jurisdiction, default first, then case-insensitive name.
  * @param jurisdiction Open engine; enumeration covers all complete database town records.
  * @param visitor Required callback; must not close or re-enter this engine.

@@ -6,9 +6,9 @@
  * Each conversion saves and restores the complete TZ environment state and
  * calls tzset after both changes. This deliberately requires the Lab's prefork,
  * single-threaded worker model; it must not run alongside threads using libc
- * local-time functions. Town catalogue lookups are indexed once per worker by
- * name and exact reference coordinates. The same index recovers saved town
- * identity and catalogue heights without replacing explicitly manual heights.
+ * local-time functions. Indexed database lookups recover one exact reference
+ * position without building a world catalogue in each worker. Saved town identity
+ * and catalogue heights are recovered without replacing explicitly manual heights.
  */
 #include <math.h>
 #include <stdio.h>
@@ -19,9 +19,9 @@
 #include "file-t.h"
 #include "jurisdiction-t.h"
 #include "mars_paths.h"
+#include "lab_forms.h"
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
-#include "lab_page.h"
 
 static string_t *lab_cal_zone_file(const string_t *zone)
 {
@@ -151,56 +151,33 @@ bool lab_cal_timezone_noon(const string_t *zone, const string_t *date, double *o
     return valid;
 }
 
-static string_t *lab_cal_town_key(const char *jurisdiction, const char *name, const char *latitude,
-                                  const char *longitude)
+static bool lab_cal_reference_place(const jurisdict_place_t *place, void *context)
 {
-    double lat, lon;
-    if (!lab_cal_number(latitude, &lat) || !lab_cal_number(longitude, &lon))
-        return NULL;
-    /* Totality actions use six decimal places; normalise catalogue spelling to the same coordinates. */
-    return string_sprintf("%s|%s|%.6f|%.6f", jurisdiction, name, lat, lon);
+    json_t **result = context, *row = json_new_object();
+    if (!row) return false;
+    lab_cal_set(row, "name", place->name);
+    lab_cal_set(row, "latitude", place->latitude);
+    lab_cal_set(row, "longitude", place->longitude);
+    lab_cal_set(row, "elevation", place->elevation);
+    lab_cal_set(row, "timezone", place->timezone);
+    lab_cal_set(row, "jurisdiction", place->jurisdiction_code);
+    if (lab_forms_town_presentation(row)) *result = row;
+    else json_free(row);
+    return false;
 }
 
-static json_t *lab_cal_town_index(void)
+static json_t *lab_cal_reference_at(const char *latitude, const char *longitude)
 {
-    static json_t *index;
-    if (index)
-        return index;
-    json_t *data = lab_page_jurisdictions();
-    bool available = false;
-    if (!json_bool_value(lab_cal_get(data, "available"), &available) || !available) {
-        json_free(data);
-        return NULL;
+    double lat, lon;
+    if (!lab_cal_number(latitude, &lat) || !lab_cal_number(longitude, &lon)) return NULL;
+    jurisdiction_t *engine = jurisdict_open(NULL);
+    json_t *result = NULL;
+    if (!jurisdict_place_at(engine, lat, lon, lab_cal_reference_place, &result)) {
+        json_free(result);
+        result = NULL;
     }
-    const json_t *towns = lab_cal_get(data, "towns");
-    if (json_type(towns) == JSON_OBJECT) {
-        index = json_new_object();
-        /* One catalogue traversal constructs direct keys; request lookups never scan town arrays. */
-        for (size_t i = 0; i < json_object_size(towns); ++i) {
-            const string_t *jurisdiction = json_object_key_at(towns, i);
-            const json_t *rows = json_object_value_at(towns, i);
-            for (size_t j = 0; j < json_array_size(rows); ++j) {
-                const json_t *row = json_array_get(rows, j);
-                string_t *key = lab_cal_town_key(string_c_str(jurisdiction), lab_cal_text(row, "name"),
-                                                 lab_cal_text(row, "latitude"), lab_cal_text(row, "longitude"));
-                if (key)
-                    lab_cal_set(index, string_c_str(key), lab_cal_text(row, "timezone"));
-                string_free(key);
-                key = lab_cal_town_key("@", "", lab_cal_text(row, "latitude"), lab_cal_text(row, "longitude"));
-                if (key && !lab_cal_get(index, string_c_str(key))) {
-                    json_t *place = json_new_object();
-                    lab_cal_set(place, "value", lab_cal_text(row, "value"));
-                    lab_cal_set(place, "elevation", lab_cal_text(row, "elevation"));
-                    lab_cal_set(place, "timezone", lab_cal_text(row, "timezone"));
-                    lab_cal_set(place, "jurisdiction", string_c_str(jurisdiction));
-                    lab_cal_take(index, string_c_str(key), place);
-                }
-                string_free(key);
-            }
-        }
-    }
-    json_free(data);
-    return index;
+    jurisdict_close(engine);
+    return result;
 }
 
 /* Repair legacy named locations by exact catalogue coordinates; never infer terrain from a nearby town. */
@@ -208,9 +185,7 @@ void lab_cal_resolve_observer(json_t *options)
 {
     const char *mode = lab_cal_text(options, "elevation_mode");
     if (!*mode) return; /* Older API callers retain their explicitly supplied height. */
-    string_t *key = lab_cal_town_key("@", "", lab_cal_text(options, "lat"), lab_cal_text(options, "lon"));
-    const json_t *town = key ? lab_cal_get(lab_cal_town_index(), string_c_str(key)) : NULL;
-    string_free(key);
+    json_t *town = lab_cal_reference_at(lab_cal_text(options, "lat"), lab_cal_text(options, "lon"));
     if (town) {
         lab_cal_set(options, "town", lab_cal_text(town, "value"));
         const char *selected = lab_cal_text(options, "jurisdiction"), *code = lab_cal_text(town, "jurisdiction");
@@ -224,6 +199,7 @@ void lab_cal_resolve_observer(json_t *options)
     } else if (strcmp(mode, "manual")) {
         lab_cal_set(options, "elevation_mode", "retained");
     }
+    json_free(town);
 }
 
 /* Honour explicit town-zone metadata; otherwise look up the browser's exact town option value. */
@@ -234,7 +210,6 @@ string_t *lab_cal_town_timezone(const json_t *options)
         return string_new_with(explicit_zone);
     if (!*lab_cal_text(options, "town"))
         return string_new();
-    json_t *index = lab_cal_town_index();
     string_t *town = string_new_with(lab_cal_text(options, "town"));
     size_t town_count = 0;
     string_t **town_parts = lab_cal_split(town, "|", &town_count);
@@ -245,24 +220,11 @@ string_t *lab_cal_town_timezone(const json_t *options)
     }
     for (size_t i = 0; i < town_count; ++i)
         string_trim(town_parts[i]);
-    string_t *key = lab_cal_town_key(lab_cal_text(options, "jurisdiction"), string_c_str(town_parts[0]),
-                                     string_c_str(town_parts[1]), string_c_str(town_parts[2]));
-    string_t *zone = string_new_with(key ? lab_cal_text(index, string_c_str(key)) : "");
-    string_free(key);
-    if (!string_byte_length(zone)) {
-        string_t *jurisdiction = string_new_with(lab_cal_text(options, "jurisdiction"));
-        size_t count = 0;
-        string_t **parts = lab_cal_split(jurisdiction, "-", &count);
-        if (count > 1) {
-            key = lab_cal_town_key(string_c_str(parts[0]), string_c_str(town_parts[0]), string_c_str(town_parts[1]),
-                                   string_c_str(town_parts[2]));
-            string_free(zone);
-            zone = string_new_with(key ? lab_cal_text(index, string_c_str(key)) : "");
-            string_free(key);
-        }
-        string_split_free(parts, count);
-        string_free(jurisdiction);
-    }
+    json_t *place = lab_cal_reference_at(string_c_str(town_parts[1]), string_c_str(town_parts[2]));
+    const char *selected = lab_cal_text(options, "jurisdiction"), *code = lab_cal_text(place, "jurisdiction");
+    bool matches = !strcmp(selected, code) || (strlen(code) == 2 && !strncmp(selected, code, 2) && selected[2] == '-');
+    string_t *zone = string_new_with(matches ? lab_cal_text(place, "timezone") : "");
+    json_free(place);
     string_split_free(town_parts, town_count);
     string_free(town);
     return zone;

@@ -62,6 +62,15 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         } finally { indexed.dispose(); }
         check(released.includes(1) && released.includes(3) && indexed.size === 0,
               'native cache disposal releases each remaining host slot');
+        const spatial = new GlobeTextureCache<number>(4, 16, () => {});
+        try {
+            spatial.put('displayed', 1, 4, [0, 0, 1, 1], 100, -1, 2);
+            const original = spatial.covering([.1, .1, .9, .9], 100)!;
+            spatial.put('prefetched', 2, 4, [-.5, -.5, 1.5, 1.5], 100, -1, 2);
+            spatial.covering([-.4, -.4, 1.4, 1.4], 100);
+            check(spatial.covering([.1, .1, .9, .9], 100, false, original.slot)?.resource === 1,
+                  'prefetch recency cannot oscillate the displayed tile while equivalent coverage remains valid');
+        } finally { spatial.dispose(); }
         const firstBounds = GlobeSurfaceTiles.bounds([-2.8, 52.7, -2.7, 52.8]);
         const shiftedBounds = GlobeSurfaceTiles.bounds([-2.80000001, 52.70000001, -2.70000001, 52.80000001]);
         check(firstBounds.every((value, i) => value === shiftedBounds[i]),
@@ -83,15 +92,32 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
             resident.put([0, 0, 1, 1], 100, sample);
             const refined = resident.covering([0.1, 0.1, 0.9, 0.9], 100)!;
             check(refined.complete && refined.texture !== first.texture &&
-                  !gpu.isTexture(first.texture) && gpu.isTexture(refined.texture),
-                  'a completed tile replaces its photographic preview at the same geographic cache key');
+                  gpu.isTexture(first.texture) && gpu.isTexture(refined.texture),
+                  'a completed tile keeps its displayed preview alive for the photographic handoff');
+            const start = resident.bind([0.1, 0.1, 0.9, 0.9], 100, 100)!;
+            const middle = resident.bind([0.1, 0.1, 0.9, 0.9], 100, 350)!;
+            for (let i = 1; i <= 4; ++i) resident.put([i * 2, 0, i * 2 + 1, 1], 100, sample);
+            check(gpu.isTexture(first.texture) && gpu.isTexture(refined.texture),
+                  'cache pressure cannot evict either GPU layer during a geographic handoff');
+            const finish = resident.bind([0.1, 0.1, 0.9, 0.9], 100, 600)!;
+            check(start.blend === 0 && Boolean(start.previous) && middle.blend === .5 && finish.blend === 1,
+                  'resident photographs crossfade over half a second without deleting the outgoing GPU texture');
             first = refined;
+            resident.put([-.5, -.5, 1.5, 1.5], 100, sample, false);
+            check(resident.covering([0.1, 0.1, 0.9, 0.9], 100)?.texture === first.texture,
+                  'an unfinished wider preview cannot replace completed photography that still covers the view');
             for (let i = 1; i <= 4; ++i) resident.put([i * 2, 0, i * 2 + 1, 1], 100, sample);
             check(resident.covering([0.1, 0.1, 0.9, 0.9], 100)?.texture === first.texture && gpu.isTexture(first.texture),
                   'destination preloading retains and reuses the displayed GPU texture');
             check(!resident.covering([2, 0, 3, 1], 100) && resident.covering([8, 0, 9, 1], 100) !== null,
                   'the GPU working set evicts older non-visible regions after four textures');
             check(!resident.covering([0, 0, 1, 1], 200), 'a deep zoom requests adequate detail');
+            const overlap = resident.bind([-.2, -.2, 1.2, 1.2], 200, 700);
+            check(Boolean(overlap?.complete && overlap.bounds.join() === '0,0,1,1'),
+                  'drawing retains partial magnified photography while strict loading requests a larger replacement');
+            resident.put([179, -1, 181, 1], 100, sample);
+            check(Boolean(resident.covering([-180.5, -.5, -179.5, .5], 100)),
+                  'native cache coverage reuses equivalent longitudes across the date line');
             resident.dispose();
             check(!gpu.isTexture(first.texture), 'disposing the working set releases GPU textures');
         } finally { sample.close(); resident.dispose(); gpu.getExtension('WEBGL_lose_context')?.loseContext(); }
@@ -224,14 +250,30 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
             check(paths === 5, 'a damaged cache entry is rebuilt without losing the region');
             ++revision; holdNext = true;
             let previews = 0, completed = false;
-            const refining = surface.load([0, 0, 1, 1], new AbortController().signal, tile => {
+            const previewColours: Uint8ClampedArray[] = [];
+            const previewDetail: boolean[] = [];
+            const refining = surface.load([0, 0, 1, 1], new AbortController().signal, (tile, detailed) => {
                 check(tile.width === 2048 && tile.height === 2048,
                       'an independent photographic preview has the complete geographic extent');
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 2048;
+                const context = canvas.getContext('2d')!;
+                draw(context, tile);
+                previewColours.push(context.getImageData(1800, 1500, 1, 1).data);
+                previewDetail.push(detailed);
+                canvas.width = canvas.height = 1;
                 ++previews;
             }).then(tile => { completed = true; return tile; });
             for (let i = 0; i < 200 && !previews; ++i) await new Promise(resolve => setTimeout(resolve, 25));
-            check(previews === 1 && !completed && Boolean(held),
+            for (let i = 0; i < 200 && previews < 2; ++i) await new Promise(resolve => setTimeout(resolve, 25));
+            check(previews === 2 && !completed && Boolean(held),
                   'photography is visible while the river query is still pending');
+            check(previewDetail.join() === 'false,true',
+                  'worker previews distinguish coarse NASA coverage from completed regional photography');
+            check(previewColours[0][3] === 255 && previewColours[1][3] === 255 &&
+                  [0, 1, 2].some(i => Math.abs(previewColours[0][i] - previewColours[1][i]) > 3) &&
+                  [0, 1, 2].every(i => Math.abs(previewColours[1][i] - expectedRegional[i]) <= 3),
+                  'opaque NASA coverage appears first and regional refinement follows before geometry is ready');
             (held as (() => void) | null)?.();
             held = null;
             inspect(await refining);

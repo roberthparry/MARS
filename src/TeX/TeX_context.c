@@ -191,7 +191,7 @@ static TeX_t *render_binary(const TeX_node_view_t *view, const TeX_t *const *chi
 
 static TeX_t *render_fraction(const TeX_node_view_t *view, const TeX_t *const *children)
 {
-    return view->child_count == 2u ? TeX_fraction(children[0], children[1]) : invalid_node();
+    return view->child_count == 2u ? TeX_compose_fraction(children[0], children[1]) : invalid_node();
 }
 
 static TeX_t *render_power(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -203,7 +203,7 @@ static TeX_t *render_power(const TeX_node_view_t *view, const TeX_t *const *chil
 static TeX_t *render_root(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     return view->child_count == 1u || view->child_count == 2u
-        ? TeX_root(children[0], view->child_count == 2u ? children[1] : NULL) : invalid_node();
+        ? TeX_compose_root(children[0], view->child_count == 2u ? children[1] : NULL) : invalid_node();
 }
 
 static TeX_t *render_negative(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -214,7 +214,7 @@ static TeX_t *render_negative(const TeX_node_view_t *view, const TeX_t *const *c
 
 static TeX_t *render_equation(const TeX_node_view_t *view, const TeX_t *const *children)
 {
-    return view->child_count == 2u ? TeX_equation(children[0], children[1], TeX_EQUATION_INLINE) : invalid_node();
+    return view->child_count == 2u ? TeX_compose_equation(children[0], children[1], TeX_EQUATION_INLINE) : invalid_node();
 }
 
 static TeX_t *render_assignment(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -229,7 +229,7 @@ static TeX_t *render_matrix(const TeX_node_view_t *view, const TeX_t *const *chi
     if (!view->rows || !view->columns || view->rows > SIZE_MAX / view->columns ||
         view->rows * view->columns != view->child_count)
         return invalid_node();
-    return TeX_matrix(children, view->rows, view->columns, TeX_MATRIX_BRACKETS, 10u);
+    return TeX_compose_matrix(children, view->rows, view->columns, TeX_MATRIX_BRACKETS, 10u);
 }
 
 static TeX_t *render_function_name(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -265,6 +265,12 @@ static TeX_t *apply_function(const TeX_t *function, const TeX_t *const *argument
     return from_owned_source(source);
 }
 
+/* Apply an explicitly constructed function, including one with mathematical indices. */
+TeX_t *TeX_applied(const TeX_t *function, const TeX_t *const *arguments, size_t count)
+{
+    return TeX_classify(apply_function(function, arguments, count, true), TeX_NODE_CALL);
+}
+
 static TeX_t *render_call(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     TeX_node_view_t name = {.kind = TeX_NODE_FUNCTION_NAME, .text = view->text};
@@ -279,6 +285,20 @@ static TeX_t *render_call(const TeX_node_view_t *view, const TeX_t *const *child
                                              TeX_semantic_function(view->text) == NULL) : NULL;
     TeX_free(function);
     return result;
+}
+
+/* Share established function-name spelling with the explicit RPN construction interface. */
+TeX_t *TeX_named_call(const string_t *name, const TeX_t *const *arguments, size_t count)
+{
+    const char *alias = TeX_symbol_name(name);
+    if (alias && !TeX_semantic_function(name)) {
+        TeX_t *function = TeX_raw(alias);
+        TeX_t *result = function ? TeX_applied(function, arguments, count) : NULL;
+        TeX_free(function);
+        return result;
+    }
+    const TeX_node_view_t view = {.kind = TeX_NODE_CALL, .text = name, .child_count = count};
+    return TeX_classify(render_call(&view, arguments), TeX_NODE_CALL);
 }
 
 static TeX_t *render_apply(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -501,7 +521,7 @@ static TeX_t *render_integral(const TeX_node_view_t *view, const TeX_t *const *c
 
 static TeX_t *render_sequence(const TeX_node_view_t *view, const TeX_t *const *children)
 {
-    return TeX_sequence(children, view->child_count);
+    return TeX_compose_sequence(children, view->child_count);
 }
 
 static TeX_t *render_transform(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -687,13 +707,13 @@ static TeX_t *render_list(const TeX_node_view_t *view, const TeX_t *const *child
 
 static TeX_t *render_fenced(const TeX_node_view_t *view, const TeX_t *const *children)
 {
-    return view->child_count == 1u ? TeX_fenced(children[0], view->fence) : invalid_node();
+    return view->child_count == 1u ? TeX_compose_fenced(children[0], view->fence) : invalid_node();
 }
 
 static TeX_t *render_bound(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     return view->child_count == 1u || view->child_count == 2u
-        ? TeX_bound(children[0], view->child_count == 2u ? children[1] : NULL) : invalid_node();
+        ? TeX_compose_bound(children[0], view->child_count == 2u ? children[1] : NULL) : invalid_node();
 }
 
 static TeX_t *render_bindings(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -715,12 +735,12 @@ static TeX_t *render_bindings(const TeX_node_view_t *view, const TeX_t *const *c
 
 static TeX_t *render_scaled(const TeX_node_view_t *view, const TeX_t *const *children)
 {
-    return view->child_count == 2u ? TeX_scaled(children[0], children[1]) : invalid_node();
+    return view->child_count == 2u ? TeX_compose_scaled(children[0], children[1]) : invalid_node();
 }
 
 static TeX_t *render_cartesian(const TeX_node_view_t *view, const TeX_t *const *children)
 {
-    return view->child_count == 2u ? TeX_cartesian_sum(children[0], children[1]) : invalid_node();
+    return view->child_count == 2u ? TeX_compose_cartesian_sum(children[0], children[1]) : invalid_node();
 }
 
 static TeX_t *render_complex_literal(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -817,7 +837,8 @@ static const TeX_node_renderer_fn renderers[TeX_NODE_COUNT] = {
     [TeX_NODE_FUNCTION_ORDER] = render_function_order
 };
 
-static bool needs_fence(TeX_node_kind_t parent, TeX_node_kind_t child, size_t index)
+/* Share structural delimiter rules with the explicit construction interface. */
+bool TeX_needs_fence(TeX_node_kind_t parent, TeX_node_kind_t child, size_t index)
 {
     bool additive = child == TeX_NODE_SUM || child == TeX_NODE_DIFFERENCE || child == TeX_NODE_EQUATION ||
                     child == TeX_NODE_COMPLEX_LITERAL;
@@ -842,10 +863,10 @@ static bool needs_fence(TeX_node_kind_t parent, TeX_node_kind_t child, size_t in
 
 static TeX_t *render_calculus_quotient(const TeX_t *const *children)
 {
-    TeX_t *denominator = TeX_fenced(children[1], TeX_FENCE_PARENTHESES);
+    TeX_t *denominator = TeX_compose_fenced(children[1], TeX_FENCE_PARENTHESES);
     TeX_t *exponent = TeX_raw("-1");
-    TeX_t *reciprocal = denominator && exponent ? TeX_scripts(denominator, NULL, exponent) : NULL;
-    TeX_t *numerator = TeX_fenced(children[0], TeX_FENCE_PARENTHESES);
+    TeX_t *reciprocal = denominator && exponent ? TeX_compose_scripts(denominator, NULL, exponent) : NULL;
+    TeX_t *numerator = TeX_compose_fenced(children[0], TeX_FENCE_PARENTHESES);
     TeX_t *result = reciprocal && numerator ? from_owned_source(string_sprintf("%s\\,%s",
         TeX_source(numerator), TeX_source(reciprocal))) : NULL;
     TeX_free(numerator);
@@ -915,7 +936,7 @@ static const TeX_t *render_node(dictionary_t *nodes, TeX_node_ref_t ref, size_t 
                 projection_factor = projection_factor || entry.projection;
             if (i == 0u && (view.kind == TeX_NODE_NEGATIVE || view.kind == TeX_NODE_POWER))
                 projection = projection || entry.projection;
-            if (needs_fence(view.kind, entry.kind, i)) {
+            if (TeX_needs_fence(view.kind, entry.kind, i)) {
                 fenced[i] = from_owned_source(string_sprintf("\\left(%s\\right)", TeX_source(children[i])));
                 children[i] = fenced[i];
                 valid = children[i] != NULL;
@@ -944,6 +965,7 @@ static const TeX_t *render_node(dictionary_t *nodes, TeX_node_ref_t ref, size_t 
     string_free(text);
     if (!result)
         return NULL;
+    TeX_classify(result, view.kind);
     cached = (TeX_cached_node_t){.notation = result, .kind = view.kind, .calculus = calculus,
                                  .projection = projection, .negative_exponential = negative_exponential};
     if (!dictionary_set(nodes, &ref, &cached)) {
@@ -978,7 +1000,7 @@ TeX_t *TeX_from_context(const TeX_context_t *context)
     if (!nodes)
         return NULL;
     const TeX_t *root = render_node(nodes, context->root, 0u);
-    TeX_t *result = root ? TeX_raw(TeX_source(root)) : NULL;
+    TeX_t *result = TeX_copy(root);
     dictionary_destroy(nodes);
     return result;
 }

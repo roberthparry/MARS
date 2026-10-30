@@ -98,6 +98,16 @@ LAB_JPEG_LIBS ?= -ljpeg -lz
 $(LAB_BUILD_DIR)/satellite_catalogue: tools/mars_lab/satellite_catalogue.c $(STATIC_LIB)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -lz
 
+$(LAB_BUILD_DIR)/satellite_fetch: tools/mars_lab/satellite_fetch.c $(STATIC_LIB)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
+
+$(LAB_BUILD_DIR)/satellite_batch: tools/mars_lab/satellite_batch.c $(STATIC_LIB)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
+
+$(LAB_BUILD_DIR)/satellite_tiles: tools/mars_lab/satellite_tiles.c tools/mars_lab/satellite_mask.c tools/mars_lab/include/satellite_mask.h $(STATIC_LIB)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude -Itools/mars_lab/include $(LAB_GDAL_CFLAGS) $(LDFLAGS) \
+	    -o $@ tools/mars_lab/satellite_tiles.c tools/mars_lab/satellite_mask.c $(STATIC_LIB) $(LDLIBS) $(LAB_GDAL_LIBS)
+
 $(LAB_BUILD_DIR)/texture_tiles: tools/mars_lab/texture_tiles.c $(STATIC_LIB)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LAB_JPEG_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) $(LAB_JPEG_LIBS)
 

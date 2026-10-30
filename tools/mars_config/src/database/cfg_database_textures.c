@@ -135,9 +135,16 @@ static bool texture_regions(sqlite_t *db, sqlite_stmt_t *insert, const string_t 
     const json_t *regions = texture_field(manifest, "regions");
     size_t count = regions ? json_array_size(regions) : 0;
     if (regions && (json_type(regions) != JSON_ARRAY || count > GLOBE_TEXTURE_REGION_LIMIT)) return false;
-    if (!sqlite_exec_cstr(db, "drop table if exists globe_texture_region_index;drop table if exists globe_texture_region;"
-        "create table globe_texture_region(slot integer primary key check(slot>=0 and slot<4096),"
-        "west real,south real,east real,north real,attribution text,source_url text)")) return false;
+    string_t *schema = string_sprintf(
+        "DROP TABLE IF EXISTS globe_texture_region_index;\n"
+        "DROP TABLE IF EXISTS globe_texture_region;\n"
+        "CREATE TABLE globe_texture_region (\n"
+        "    slot INTEGER PRIMARY KEY CHECK (slot >= 0 AND slot < %u),\n"
+        "    west REAL, south REAL, east REAL, north REAL, attribution TEXT, source_url TEXT\n"
+        ")", (unsigned)GLOBE_TEXTURE_REGION_LIMIT);
+    bool prepared = schema && sqlite_exec(db, schema);
+    string_free(schema);
+    if (!prepared) return false;
     sqlite_stmt_t *q = sqlite_stmt_prepare(db, "insert into globe_texture_region values(?1,?2,?3,?4,?5,?6,?7)");
     bool ok = q != NULL;
     for (size_t i = 0; ok && i < count; ++i) {
@@ -174,7 +181,7 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     string_t *path = directory ? string_sprintf("%s/manifest.json", string_c_str(directory)) : NULL;
     file_t *file = path ? file_new(path) : NULL;
     file_info_t *info = file ? file_get_info(file) : NULL;
-    string_t *text = info && file_info_size(info) <= 8388608 ? file_read_all_text(file) : NULL;
+    string_t *text = info && file_info_size(info) <= GLOBE_TEXTURE_MANIFEST_LIMIT ? file_read_all_text(file) : NULL;
     json_t *manifest = text ? json_from_text(text) : NULL;
     const json_t *assets = texture_field(manifest, "assets");
     const json_t *regions = texture_field(manifest, "regions");

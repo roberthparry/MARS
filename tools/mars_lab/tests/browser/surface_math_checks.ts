@@ -1284,7 +1284,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     let source = gl.getShaderSource(original)!;
                     if (type === gl.FRAGMENT_SHADER) {
                         source = source.replace('uniform float viewport;', 'uniform float viewport; uniform vec2 probeCentre;')
-                            .replace('gl_FragColor=vectorReady && !naturalShore?overlay:vec4(surface,1.);',
+                            .replace('gl_FragColor=vectorReady && !naturalShore && !naturalStyle?overlay:vec4(surface,1.);',
                                      'gl_FragColor=vec4(.5+(vec2(lon,lat)-probeCentre)*256.,0.,1.);');
                         check(source.includes('gl_FragColor=vec4(.5+'), 'coordinate probe replaces the final colour output');
                     }
@@ -1324,13 +1324,17 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             const paletteBackend = await import(paletteModuleURL) as typeof import('../../typescript/globe_gpu.js');
             const activeTexture = gl.getParameter(gl.ACTIVE_TEXTURE) as number;
             const savedTextures: (WebGLTexture | null)[] = [], paletteTextures: WebGLTexture[] = [];
-            const paletteUniforms = ['mapMode', 'detailReady', 'grid', 'riverReady', 'riverComposite', 'vectorReady', 'naturalShore', 'palettesReady', 'photoReady'];
+            const paletteUniforms = ['mapMode', 'detailReady', 'grid', 'riverReady', 'riverComposite', 'previousRiverReady',
+                'vectorReady', 'naturalShore', 'naturalStyle', 'palettesReady', 'photoReady'];
             const savedUniforms = paletteUniforms.map(name => gl.getUniform(program, gl.getUniformLocation(program, name)!));
             const savedCamera = gl.getUniform(program, gl.getUniformLocation(program, 'camera')!) as Float32Array;
             const savedGridMatrix = gl.getUniform(program, gl.getUniformLocation(program, 'cameraToWorld')!) as Float32Array;
             const savedRiverBounds = gl.getUniform(program, gl.getUniformLocation(program, 'riverBounds')!) as Float32Array;
             const savedPhotoPixels = gl.getUniform(program, gl.getUniformLocation(program, 'photoPixels')!) as number;
+            const savedRiverBlend = gl.getUniform(program, gl.getUniformLocation(program, 'riverBlend')!) as number;
             try {
+                gl.uniform1i(gl.getUniformLocation(program, 'previousRiverReady'), 0);
+                gl.uniform1f(gl.getUniformLocation(program, 'riverBlend'), 1);
                 gl.uniform1i(gl.getUniformLocation(program, 'palettesReady'), 0);
                 gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), 0);
                 for (const unit of [0, 2, 3, 4]) {
@@ -1590,8 +1594,10 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 }
                 const previousVector = gl.getUniform(program, gl.getUniformLocation(program, 'vectorReady')!);
                 const previousShore = gl.getUniform(program, gl.getUniformLocation(program, 'naturalShore')!);
+                const previousStyle = gl.getUniform(program, gl.getUniformLocation(program, 'naturalStyle')!);
                 gl.uniform1i(gl.getUniformLocation(program, 'vectorReady'), 1);
                 gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), 0);
+                gl.uniform1i(gl.getUniformLocation(program, 'naturalStyle'), 0);
                 gl.uniform1i(gl.getUniformLocation(program, 'riverComposite'), 0);
                 gl.activeTexture(gl.TEXTURE3);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
@@ -1608,6 +1614,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 gl.uniform1f(gl.getUniformLocation(program, 'riverInk'), 1);
                 gl.uniform1i(gl.getUniformLocation(program, 'vectorReady'), Number(previousVector));
                 gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), Number(previousShore));
+                gl.uniform1i(gl.getUniformLocation(program, 'naturalStyle'), Number(previousStyle));
                 // Constant geographic coordinates isolate real shader grid coverage from projection and imagery.
                 gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 0);
                 gl.uniform3f(gl.getUniformLocation(program, 'camera'), -89.875, .125, 100);
@@ -1694,6 +1701,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     gl.uniform1f(gl.getUniformLocation(program, 'viewport'), 1);
                     gl.uniform3f(gl.getUniformLocation(program, 'camera'), 0, 0, zoom);
                     gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), Number(natural));
+                    gl.uniform1i(gl.getUniformLocation(program, 'naturalStyle'), Number(natural));
                     gl.drawArrays(gl.TRIANGLES, 0, 6);
                     const pixel = new Uint8Array(4);
                     gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
@@ -1760,6 +1768,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 paletteUniforms.forEach((name, index) =>
                     gl.uniform1i(gl.getUniformLocation(program, name), Number(savedUniforms[index])));
                 gl.uniform1f(gl.getUniformLocation(program, 'photoPixels'), savedPhotoPixels);
+                gl.uniform1f(gl.getUniformLocation(program, 'riverBlend'), savedRiverBlend);
                 gl.uniform3fv(gl.getUniformLocation(program, 'camera'), savedCamera);
                 gl.uniformMatrix3fv(gl.getUniformLocation(program, 'cameraToWorld'), false, savedGridMatrix);
                 gl.uniform4fv(gl.getUniformLocation(program, 'riverBounds'), savedRiverBounds);
@@ -1916,6 +1925,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 const sandTexture = gl.createTexture()!;
                 const photoReady = gl.getUniform(program, gl.getUniformLocation(program, 'photoReady')!);
                 const riverReady = gl.getUniform(program, gl.getUniformLocation(program, 'riverReady')!);
+                const previousRiverReady = gl.getUniform(program, gl.getUniformLocation(program, 'previousRiverReady')!);
                 const photoBounds = gl.getUniform(program, gl.getUniformLocation(program, 'photoBounds')!) as Float32Array;
                 gl.activeTexture(gl.TEXTURE7);
                 const naturalPatch = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
@@ -1924,6 +1934,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 try {
                     // Isolate the source photographs from an asynchronously completed river composite.
                     gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 0);
+                    gl.uniform1i(gl.getUniformLocation(program, 'previousRiverReady'), 0);
                     gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), 0);
                     gl.bindTexture(gl.TEXTURE_2D, sandTexture);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -1963,6 +1974,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                           'outside the photographic patch the overview remains intact');
                 } finally {
                     gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), Number(riverReady));
+                    gl.uniform1i(gl.getUniformLocation(program, 'previousRiverReady'), Number(previousRiverReady));
                     gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), Number(photoReady));
                     gl.uniform4fv(gl.getUniformLocation(program, 'photoBounds'), photoBounds);
                     gl.activeTexture(gl.TEXTURE7);
@@ -2566,6 +2578,14 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             });
             try {
                 // Exercise the SVG fallback explicitly; imagery-only databases now support the worker too.
+                const instance = Reflect.get(MarsAlmanacGlobe, 'instance') as object;
+                const resident = Reflect.get(instance, 'riverTiles') as {dispose(): void} | null;
+                resident?.dispose();
+                Reflect.set(instance, 'riverTiles', null);
+                Reflect.set(instance, 'riverReady', false);
+                Reflect.set(instance, 'riverComposite', false);
+                gl.activeTexture(gl.TEXTURE3);
+                gl.bindTexture(gl.TEXTURE_2D, (Reflect.get(instance, 'textures') as WebGLTexture[])[3]);
                 GlobeSurface.prototype.load = async () => { throw new Error('Surface worker unavailable in fallback fixture'); };
                 gl.texImage2D = function (...args: unknown[]): void {
                     if (gl.getParameter(gl.ACTIVE_TEXTURE) === gl.TEXTURE3 && args.length === 9 &&
@@ -2590,9 +2610,12 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 check(pendingSurface.length > 0, 'surface request remains in flight during movement');
                 pendingSurface.shift()!(riverReply());
                 check(!pending[0].signal?.aborted, 'small pans retain a useful river and photographic request');
-                for (let i = 0; i < 40 && !pending[0].signal?.aborted; ++i)
+                for (let i = 0; i < 40; ++i)
                     globeCanvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
-                check(pending[0].signal?.aborted === true, 'moving while rivers load cancels the obsolete request');
+                check(!pending[0].signal?.aborted, 'continuous panning lets the photographic request finish');
+                zoomOut.click();
+                zoomIn.click();
+                check(pending[0].signal?.aborted === true, 'a changed zoom cancels coverage that no longer fits');
                 for (let i = 0; i < 40 && pending.length < 2; ++i) await new Promise(resolve => setTimeout(resolve, 25));
                 check(pending.length === 2, 'new view fetches rivers without waiting for the old response');
                 for (let i = 0; i < 40 && !nearbyRequests; ++i) await new Promise(resolve => setTimeout(resolve, 25));

@@ -1056,6 +1056,19 @@ static bool route_textures(const char *directory)
     http_response_free(response);
     string_t *path = string_new_with(getenv("MARS_GLOBE_DB_PATH"));
     sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    string_t *extra = string_sprintf(
+        "INSERT INTO globe_texture SELECT level,%u,row_index,width,height,byte_count,sha256,png "
+        "FROM globe_texture WHERE level=3 AND column_index=0 AND row_index=0",
+        (unsigned)GLOBE_TEXTURE_REGION_LIMIT - 1);
+    ok = ok && db && extra && sqlite_exec(db, extra);
+    string_t *last = string_sprintf("/earth_regions/%u.png", (unsigned)GLOBE_TEXTURE_REGION_LIMIT - 1);
+    response = route_request(HTTP_GET, string_c_str(last), NULL, NULL, NULL, NULL);
+    ok = ok && response && http_response_status(response) == 200 && http_response_body_size(response) > 57;
+    http_response_free(response);
+    string_t *outside = string_sprintf("/earth_regions/%u.png", (unsigned)GLOBE_TEXTURE_REGION_LIMIT);
+    response = route_request(HTTP_GET, string_c_str(outside), NULL, NULL, NULL, NULL);
+    ok = ok && response && http_response_status(response) == 404;
+    http_response_free(response); string_free(extra); string_free(last); string_free(outside);
     ok = db && sqlite_exec_cstr(db, "update globe_texture set png=zeroblob(byte_count) where level=0") && ok;
     sqlite_close(db);
     response = route_request(HTTP_GET, "/earth_surface.png", NULL, NULL, NULL, NULL);

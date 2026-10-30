@@ -301,6 +301,12 @@ Ireland, Denmark, Netherlands, Italy, the requested Mediterranean and Atlantic
 islands, Portugal, Spain, coastal Svalbard and Cape Peninsula. Regional names,
 coverage bounds, processing details and output checksums are retained in the
 complete manifest imported into the globe database.
+Preparation for Brisbane, Sydney, Melbourne, Perth, the Sunshine Coast
+(Mooloolaba and Maroochydore), Canberra, Cairns, Alice Springs and the Gold Coast,
+New Zealand, Finland (including Åland), Sweden and mainland Norway uses the same
+quarterly source mosaics, reduced-resolution settings as Spain and lossless coastal
+transparency. Source footprints and completed output checksums are retained in resumable checkpoints;
+the validated catalogue records each photograph's provenance before installation.
 
 Historical provenance: before the July 2004 replacement, the overview was the unmodified 2048 × 1024 NASA
 Blue Marble composite, *Land Surface, Ocean Color and Sea Ice*, published

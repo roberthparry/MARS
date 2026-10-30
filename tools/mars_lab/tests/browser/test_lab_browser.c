@@ -242,13 +242,14 @@ static bool lab_browser_run(const char *directory)
     if (child > 0) {
         kill(-child, SIGTERM);
         struct timespec pause = {.tv_nsec = 20000000};
-        for (unsigned attempt = 0; !reaped && attempt < 100; ++attempt) {
-            reaped = waitpid(child, NULL, WNOHANG) == child;
-            if (!reaped)
-                nanosleep(&pause, NULL);
+        for (unsigned attempt = 0; attempt < 100; ++attempt) {
+            if (!reaped) reaped = waitpid(child, NULL, WNOHANG) == child;
+            /* Firefox's parent can exit while its content processes still flush IndexedDB. */
+            if (reaped && kill(-child, 0) < 0 && errno == ESRCH) break;
+            nanosleep(&pause, NULL);
         }
+        kill(-child, SIGKILL);
         if (!reaped) {
-            kill(-child, SIGKILL);
             while (waitpid(child, NULL, 0) < 0 && errno == EINTR) {
             }
         }

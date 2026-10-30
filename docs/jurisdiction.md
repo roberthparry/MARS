@@ -116,6 +116,12 @@ jurisdiction, default first, then case-insensitive name. All three use the whole
 configured database, independently of the engine's selected jurisdiction.
 Town enumeration visits indexed jurisdictions in order, limiting each name sort
 to one jurisdiction rather than sorting the entire worldwide catalogue in memory.
+`jurisdict_place_at()` resolves a single reference position through the numeric
+town-latitude index, without constructing a worldwide catalogue in memory. It
+accepts half a millionth of a degree of coordinate rounding on each axis and
+visits at most one borrowed record. Towns take precedence over representative
+jurisdiction locations. A successful query with no matching position makes no
+callback; this API does not infer a nearby town or determine geographic ownership.
 The offline town generator resolves British GeoNames administrative codes to
 England (`GB-ENG`), Northern Ireland (`GB-NIR`), Scotland (`GB-SCT`) and Wales
 (`GB-WLS`). These nation identifiers must be available in its staging catalogue,

@@ -11,7 +11,15 @@
 
 #include "lab_handle.h"
 
-/** @brief Dispatch create/get/put/cover/clear/stats operations numbered 0..5; return a scoped slot/eviction description. */
+/**
+ * @brief Dispatch native create/get/put/cover/clear/stats operations numbered 0..5.
+ * @param request Scoped browser object specifying an action, cache token and action-specific values. Insertions
+ * may pin one slot or an array of at most four slots, and rank photographic quality from zero to two. Coverage
+ * normally requires the entire view at an adequate scale; partial queries retain intersecting imagery for drawing.
+ * A preferred slot stabilises drawing while equivalent, overlapping photographs are being prefetched.
+ * @note The scoped host result describes the selected slot, bounds and evictions, or null on failure.
+ * Resource ownership remains with the browser adapter. No request handle survives this serialised call.
+ */
 void lab_texture_cache(jsref request);
 
 /** @brief Return stable padded geographic bounds for a four-number west/south/east/north window. */

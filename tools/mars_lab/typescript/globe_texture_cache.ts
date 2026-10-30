@@ -20,8 +20,9 @@ export class GlobeTextureCache<T> {
         return result ? this.resources[result.slot] : null;
     }
     get size(): number { return this.call({action: 5})?.count ?? 0; }
-    put(key: string, resource: T, bytes: number, bounds?: number[], zoom = 0, protect = -1): boolean {
-        const result = this.call({action: 2, key, bytes, bounds, zoom, protect});
+    put(key: string, resource: T, bytes: number, bounds?: number[], zoom = 0,
+        protect: number | number[] = -1, quality = 0): boolean {
+        const result = this.call({action: 2, key, bytes, bounds, zoom, protect, quality});
         if (!result) return false;
         for (const slot of result.evicted || []) {
             const previous = this.resources[slot];
@@ -34,8 +35,10 @@ export class GlobeTextureCache<T> {
         this.resources[result.slot] = resource;
         return true;
     }
-    covering(bounds: number[], zoom: number): {resource: T; slot: number; bounds: number[]; zoom: number} | null {
-        const result = this.call({action: 3, bounds, zoom});
+    covering(bounds: number[], zoom: number, partial = false, prefer = -1): {
+        resource: T; slot: number; bounds: number[]; zoom: number;
+    } | null {
+        const result = this.call({action: 3, bounds, zoom, partial, prefer});
         const resource = result ? this.resources[result.slot] : null;
         return result && resource !== null && result.bounds && result.zoom !== undefined
             ? {resource, slot: result.slot, bounds: result.bounds, zoom: result.zoom} : null;
