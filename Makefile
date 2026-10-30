@@ -349,6 +349,9 @@ check-native-deps:
 	check_dep "SQLCipher" "sqlcipher/sqlite3.h" "-lsqlcipher" "libsqlcipher-dev" "sqlite3 *db = 0; sqlite3_open(\":memory:\", &db); sqlite3_close(db)"; \
 	check_dep "Zstandard" "zstd.h" "$(ZSTD_CFLAGS) $(if $(strip $(ZSTD_LIBS)),$(ZSTD_LIBS),-lzstd)" "libzstd-dev" "ZSTD_CCtx *ctx = ZSTD_createCCtx(); ZSTD_inBuffer in = {0}; ZSTD_outBuffer out = {0}; ZSTD_compressStream2(ctx, &out, &in, ZSTD_e_end); ZSTD_freeCCtx(ctx)"; \
 	check_dep "libsodium secretstream" "sodium.h" "$(SODIUM_CFLAGS) $(if $(strip $(SODIUM_LIBS)),$(SODIUM_LIBS),-lsodium)" "libsodium-dev" "crypto_secretstream_xchacha20poly1305_state state; unsigned char key[crypto_secretstream_xchacha20poly1305_KEYBYTES], header[crypto_secretstream_xchacha20poly1305_HEADERBYTES]; if (sodium_init() < 0) return 1; crypto_secretstream_xchacha20poly1305_keygen(key); return crypto_secretstream_xchacha20poly1305_init_push(&state, header, key)"; \
+	if [ -n "$(CONFIG_TEST_PNG_LIBS)" ]; then \
+	    check_dep "zlib PNG fixtures" "zlib.h" "$(CONFIG_TEST_PNG_LIBS)" "zlib1g-dev" "z_stream stream = {0}; (void)deflateInit(&stream, 1); deflateEnd(&stream)"; \
+	fi; \
 	if [ "$(ENABLE_UNISTRING)" = "1" ]; then \
 	    check_dep "libunistring" "unistr.h" "-lunistring" "libunistring-dev" "(void)u8_strlen((const uint8_t *)\"x\")"; \
 	fi; \
