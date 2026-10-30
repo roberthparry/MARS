@@ -286,14 +286,17 @@ static void test_checks_markdown_command_failures(void)
 {
     string_t *root = test_checks_root();
     bool ok = test_checks_write(root, "include/file-t.h", "int file_open(void);\n") &&
-              test_checks_write(root, "docs/file.md", "`file_open()`\n");
+              test_checks_write(root, "docs/file.md", "`file_open()`\n") &&
+              test_checks_write(root, "include/TeX-t.h", "void TeX_free(void *notation);\n") &&
+              test_checks_write(root, "docs/TeX.md", "`TeX_free()`\n");
     ok = checks_markdown_api(root) == 0 && ok;
     ok = test_checks_write(root, "docs/file.md", "`file_open_extra()`\n") && ok;
     ok = checks_markdown_api(root) == 1 && ok;
     ok = test_checks_write(root, "include/unknown.h", "int unsupported(void);\n") && ok;
     ok = checks_markdown_api(root) == 1 && ok;
     ok = test_checks_finish(root) && ok;
-    TEST_ASSERT_TRUE(ok, "command accepts covered functions and rejects absent mentions and unassigned headers");
+    TEST_ASSERT_TRUE(ok, "command preserves mixed-case header and guide names "
+                         "and rejects absent mentions and unassigned headers");
 }
 
 static void test_checks_compliance_allow_untracked_and_safeguards(void)
