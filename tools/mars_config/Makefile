@@ -18,6 +18,8 @@ CONFIG_OBJS += $(APP_RESOURCE_OBJ)
 CONFIG_SUPPORT_OBJS := $(filter-out $(CONFIG_BUILD_DIR)/app/cfg_main.o,$(CONFIG_OBJS))
 CONFIG_PROGRAM := $(CONFIG_BUILD_DIR)/mars_config
 CONFIG_TEST_SRCS := $(sort $(wildcard tools/mars_config/tests/*.c))
+# PNG fixture generation requires zlib when its source is included in the test build.
+CONFIG_TEST_PNG_LIBS := $(if $(filter %/test_cfg_texture_fixture.c,$(CONFIG_TEST_SRCS)),-lz)
 CONFIG_TEST_OBJS := $(patsubst tools/mars_config/tests/%.c,$(CONFIG_BUILD_DIR)/tests/%.o,$(CONFIG_TEST_SRCS))
 CONFIG_TEST_BIN := $(CONFIG_BUILD_DIR)/tests/test_mars_config
 
@@ -87,7 +89,7 @@ $(CONFIG_BUILD_DIR)/tests/%.o: tools/mars_config/tests/%.c tools/mars_config/tes
 
 $(CONFIG_TEST_BIN): $(CONFIG_TEST_OBJS) $(CONFIG_SUPPORT_OBJS) $(LAB_BUILD_DIR)/process/lab_process.o $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(CONFIG_PROGRAM)
 	$(CC) $(LDFLAGS) -o $@ $(CONFIG_TEST_OBJS) $(CONFIG_SUPPORT_OBJS) \
-	    $(LAB_BUILD_DIR)/process/lab_process.o $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS) -lz
+	    $(LAB_BUILD_DIR)/process/lab_process.o $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS) $(CONFIG_TEST_PNG_LIBS)
 
 .PHONY: native-config clean-config
 native-config: $(CONFIG_PROGRAM) $(CONFIG_BUILD_DIR)/mars-config.db

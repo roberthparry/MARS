@@ -211,6 +211,11 @@ automatically. Run `make -j1 test_webserver` for its dedicated suite.
 
 ### File compression and encryption dependencies
 
+When the configuration tests include `test_cfg_texture_fixture.c`, their PNG
+generator also needs zlib development files (`zlib1g-dev` on Debian/Ubuntu).
+The dependency probe and test linker include zlib only when that generator is
+present in the source inventory.
+
 The Makefile requires Zstandard and libsodium for the file module's streaming
 compression and authenticated encryption APIs. Applications invoke these APIs
 explicitly; existing file operations do not automatically compress or encrypt.
