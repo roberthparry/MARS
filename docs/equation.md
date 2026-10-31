@@ -16,12 +16,19 @@ selection and solving remain here. Private semantic callbacks carry mathematical
 data without exposing native object layouts or reparsing TeX. The ordinary output
 APIs manage this internally; application callers need no rendering context.
 
-The `TeX_from_expression` convenience adapter uses this module's equation
+The `TeX_from_expression` convenience adapter uses this module's relation
 separator and binding parser. A native operand-reader callback interprets each
-side, including scalar–matrix products, and `TeX_equation` composes the result.
+side, including scalar–matrix products, and public TeX operations compose the result.
 Undeclared calls on equation sides remain symbolic functions; explicit multiplication
-distinguishes a product from a function call. Ordinary equation-solving APIs keep
-their existing grammar and evaluation behaviour.
+distinguishes a product from a function call. Presentation input accepts `<`, `<=`,
+`>=`, `>`, `!=`, `==`, `~~=` (approximately equal) and `~==` (congruent), together
+with Unicode relation signs and ordered chains. See the complete
+[RPN and text example](TeX.md#inequalities-and-approximate-relations).
+
+Ordinary `equ_from_text` and `equ_from_string` also accept `==` as an alias for
+the exact equality separator `=`. They require one exact equality: inequalities,
+approximate relations, congruence and relation chains cannot be passed to the exact
+equation solver. No tolerance or truth value is inferred by presentation input.
 
 The intended public workflow is:
 

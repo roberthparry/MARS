@@ -3704,6 +3704,18 @@ text converted directly to owned notation. It uses this module's public presenta
 beautifier for algebra-only input, and body renderer; grammar, algebra and domain conventions remain
 owned here rather than being duplicated in the notation module.
 
+For whole relations, that adapter delegates separators to the equation module.
+It accepts `<`, `<=`, `>=`, `>`, `!=`, `==`, `~~=` (approximately equal) and
+`~==` (congruent), including ordered relation chains and corresponding Unicode
+signs. This is notation construction; it does not add Boolean comparison values
+to the differentiable expression DAG. See the runnable
+[RPN and text relation example](TeX.md#inequalities-and-approximate-relations).
+
+Ordinary differential-equation text authored with primes retains those primes
+and function-style point conditions in this convenience path. Explicit coordinate
+derivatives retain differential fractions. The [RPN prime example](TeX.md#prime-notation-with-rpn)
+shows the equivalent construction with `TeX_prime` and `TeX_call`.
+
 Scalar symbolic indices accept `x_n` and `x_(n+1)` and round-trip in native
 expression output. They use the existing indexed-symbol model; this does not
 introduce tensor grammar. The [text alternatives example](TeX.md) uses these

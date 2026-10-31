@@ -95,8 +95,16 @@ $(LAB_BUILD_DIR)/tests/test_satellite_mask: tools/mars_lab/tests/satellite/test_
 
 LAB_JPEG_CFLAGS ?=
 LAB_JPEG_LIBS ?= -ljpeg -lz
-$(LAB_BUILD_DIR)/satellite_catalogue: tools/mars_lab/satellite_catalogue.c $(STATIC_LIB)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) -lz
+$(LAB_BUILD_DIR)/satellite_catalogue: tools/mars_lab/satellite_catalogue.c tools/mars_lab/satellite_overviews.c tools/mars_lab/include/satellite_overviews.h $(STATIC_LIB)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude -Itools/mars_lab/include $(LAB_GDAL_CFLAGS) $(LDFLAGS) \
+	    -o $@ tools/mars_lab/satellite_catalogue.c tools/mars_lab/satellite_overviews.c $(STATIC_LIB) $(LDLIBS) $(LAB_GDAL_LIBS) -lz
+
+$(LAB_BUILD_DIR)/tests/test_satellite_overviews: tools/mars_lab/tests/satellite/test_satellite_overviews.c tools/mars_lab/satellite_overviews.c tools/mars_lab/include/satellite_overviews.h $(LAB_BUILD_DIR)/satellite_tiles $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB)
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude -Itools/mars_lab/include -Itests/include $(LAB_GDAL_CFLAGS) $(LDFLAGS) \
+	    -DSATELLITE_PLANNER='"$(LAB_BUILD_DIR)/satellite_tiles"' \
+	    -o $@ tools/mars_lab/tests/satellite/test_satellite_overviews.c tools/mars_lab/satellite_overviews.c \
+	    $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS) $(LAB_GDAL_LIBS)
 
 $(LAB_BUILD_DIR)/satellite_fetch: tools/mars_lab/satellite_fetch.c $(STATIC_LIB)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)

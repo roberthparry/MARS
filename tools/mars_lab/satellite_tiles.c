@@ -4,7 +4,7 @@
  *
  * Uses the GDAL C geometry API and MARS JSON/file facilities to select source mosaics
  * and overlapping display tiles. This optional maintainer tool has no runtime role.
- * Existing packaged regions are reused by exact bounds when planning. Rendering reprojects
+ * Existing packaged regions are reused by exact bounds and proven complete observations when planning. Rendering reprojects
  * source rasters directly to PNG with transparent missing observations and verified checkpoints.
  * An in-memory R-tree restricts each output to intersecting local or remote raster windows. Optional
  * coastal masking clears offshore pixels before checkpoint publication, preserving source colours and lakes.
@@ -68,14 +68,25 @@ static OGRGeometryH rectangle(double west, double south, double east, double nor
     return polygon;
 }
 
-static bool existing(const json_t *regions, const double bounds[4])
+static bool existing(const json_t *manifest, const double bounds[4])
 {
+    const json_t *regions = field(manifest, "regions"), *assets = field(manifest, "assets");
     /* Existing packaged catalogues are bounded; this one-off comparison never runs in the application. */
     for (size_t i = 0; i < json_array_size(regions); ++i) {
         const json_t *b = field(json_array_get(regions, i), "bounds");
         bool same = json_array_size(b) == 4;
         for (unsigned j = 0; same && j < 4; ++j) same = fabs(number(json_array_get(b, j)) - bounds[j]) < 1e-8;
-        if (same) return true;
+        if (same) {
+            string_t *path = string_sprintf("regional/%02zu.png", i);
+            const json_t *asset = path ? json_object_get(assets, path) : NULL;
+            double width = number(field(asset, "width")), height = number(field(asset, "height"));
+            double valid = number(field(json_array_get(regions, i), "valid_pixels"));
+            string_free(path);
+            /* Bounds alone do not prove coverage: neighbouring countries may have
+             * observations in the transparent part of an earlier region's tile. */
+            if (isfinite(width) && isfinite(height) && width > 0 && height > 0 && valid == width * height)
+                return true;
+        }
     }
     return false;
 }
@@ -186,7 +197,7 @@ static int plan_main(int argc, char **argv)
             OGRGeometryH box = rectangle(b[0], b[1], b[2], b[3]);
             bool intersects = OGR_G_Intersects(detail && coast ? coast : country, box);
             OGR_G_DestroyGeometry(box);
-            if (!intersects || existing(regions, b)) continue;
+            if (!intersects || existing(manifest, b)) continue;
             string_append_format(tiles, "%s{\"slot\":%zu,\"detail\":%s,\"width\":%.0f,"
                 "\"bounds\":[%.12f,%.12f,%.12f,%.12f]}", tile_count ? "," : "", base + tile_count,
                 detail ? "true" : "false", tile_width, b[0], b[1], b[2], b[3]);

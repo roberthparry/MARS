@@ -7,6 +7,7 @@
  * no TeX command strings or native object layouts cross the provider boundary.
  */
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -37,6 +38,7 @@ struct _notation_build_t {
     const expr_t *detached_distribution;
     const expr_t *distribution_domain;
     bool partial;
+    bool prime_derivatives;
     bool dependent_variables;
     bool source_order;
     bool resolve_transforms;
@@ -46,6 +48,7 @@ typedef struct {
     const expr_t *expression;
     const expr_t *centre;
     bool partial;
+    bool prime_derivatives;
     bool dependent_variables;
     bool source_order;
     bool resolve_transforms;
@@ -56,7 +59,8 @@ static size_t expression_hash(const void *key)
     const notation_expression_key_t *item = key;
     return (size_t)(((uintptr_t)item->expression >> 3u) ^ ((uintptr_t)item->centre >> 4u) ^
                     (item->partial ? 1u : 0u) ^ (item->dependent_variables ? 2u : 0u) ^
-                    (item->source_order ? 4u : 0u) ^ (item->resolve_transforms ? 8u : 0u));
+                    (item->source_order ? 4u : 0u) ^ (item->resolve_transforms ? 8u : 0u) ^
+                    (item->prime_derivatives ? 16u : 0u));
 }
 
 static int expression_compare(const void *left, const void *right)
@@ -68,6 +72,8 @@ static int expression_compare(const void *left, const void *right)
         return (uintptr_t)a->centre < (uintptr_t)b->centre ? -1 : 1;
     if (a->partial != b->partial)
         return a->partial ? 1 : -1;
+    if (a->prime_derivatives != b->prime_derivatives)
+        return a->prime_derivatives ? 1 : -1;
     if (a->dependent_variables != b->dependent_variables)
         return a->dependent_variables ? 1 : -1;
     if (a->source_order != b->source_order)
@@ -114,6 +120,13 @@ void notation_build_derivatives(notation_build_t *build, bool partial)
 {
     if (build)
         build->partial = partial;
+}
+
+/* Preserve authored prime notation only where the native derivative has one unambiguous coordinate. */
+void expr_notation_prime_derivatives(notation_build_t *build, bool enabled)
+{
+    if (build)
+        build->prime_derivatives = enabled;
 }
 
 /* The differential-equation adapter identifies the dependent-variable interpretation. */
@@ -461,6 +474,16 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
                                     .child_count = lower ? 4u : upper ? 3u : 2u}, children);
     }
     if (kind == EXPR_KIND_FORMAL_DERIVATIVE && expression->formal_wrt_count) {
+        bool primes = build->prime_derivatives && !build->partial && build->dependent_variables &&
+                      expr_is_var(expression->a) && expression->formal_wrt_count <= UINT_MAX;
+        /* Every coordinate must agree before its name may be suppressed; this validates derivative order data. */
+        for (size_t i = 1u; primes && i < expression->formal_wrt_count; ++i)
+            primes = expr_struct_eq(expression->formal_wrts[0], expression->formal_wrts[i]);
+        if (primes) {
+            const TeX_model_node_t *body = notation_build_expr(build, expression->a);
+            return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRIME,
+                .child_count = 1u, .order = (unsigned)expression->formal_wrt_count}, &body);
+        }
         const TeX_model_node_t **children = calloc(expression->formal_wrt_count + 1u, sizeof *children);
         if (!children)
             return NULL;
@@ -583,7 +606,8 @@ const TeX_model_node_t *notation_build_expr(notation_build_t *build, const expr_
     const expr_t *centre = expr_display_symmetric_shift_centre(expression);
     if (centre)
         build->shift_centre = centre;
-    notation_expression_key_t key = {expression, build->shift_centre, build->partial, build->dependent_variables,
+    notation_expression_key_t key = {expression, build->shift_centre, build->partial, build->prime_derivatives,
+                                     build->dependent_variables,
                                      build->source_order, build->resolve_transforms};
     const TeX_model_node_t *node = NULL;
     if (dictionary_get(build->expressions, &key, &node)) {

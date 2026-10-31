@@ -29,6 +29,7 @@ typedef struct _diffequ_t {
     string_t *differential_form_text;
     bool differential_form_input;
     bool partial_derivative_input;
+    bool prime_derivative_input; /**< The authored governing equation contains ordinary derivative primes. */
 
     expr_t **independent_vars;
     size_t independent_count;

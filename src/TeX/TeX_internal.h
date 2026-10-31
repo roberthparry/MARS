@@ -229,6 +229,23 @@ TeX_t *TeX_arithmetic_multiply(const TeX_t *left, const TeX_t *right);
 TeX_t *TeX_arithmetic_scripts(const TeX_t *base, const TeX_t *lower, const TeX_t *upper);
 
 /**
+ * @brief Attach derivative primes after preserving the complete operand's visible scope.
+ * @param body Borrowed non-NULL notation, neither modified nor retained.
+ * @param order Positive derivative order; zero is invalid.
+ * @return Independently owned notation released with TeX_free(), or NULL for invalid input or allocation failure.
+ * @note No mathematical differentiation or evaluation occurs.
+ */
+TeX_t *TeX_arithmetic_prime(const TeX_t *body, unsigned order);
+
+/**
+ * @brief Reuse semantic prime notation for an already constructed operand.
+ * @param body Borrowed non-NULL notation, neither modified nor retained; grouping is supplied by the caller.
+ * @param order Positive derivative order; orders above three use a parenthesised superscript.
+ * @return Owned notation released with TeX_free(), or NULL with EINVAL for invalid input or on allocation failure.
+ */
+TeX_t *TeX_compose_prime(const TeX_t *body, unsigned order);
+
+/**
  * @brief Apply established function spelling to already selected mathematical arguments.
  * @param name Borrowed plain UTF-8 function name, valid throughout this call.
  * @param arguments Borrowed array of count non-NULL argument fragments, or NULL when count is zero.
@@ -331,6 +348,16 @@ TeX_t *TeX_compose_sequence(const TeX_t *const *parts, size_t count);
 TeX_t *TeX_compose_equation(const TeX_t *left, const TeX_t *right, TeX_equation_style_t style);
 
 /**
+ * @brief Compose two mathematical operands with a TeX-owned relation symbol.
+ * @param left Borrowed non-NULL left operand, neither modified nor retained.
+ * @param right Borrowed non-NULL right operand, neither modified nor retained.
+ * @param relation Mathematical relation selecting the symbol; invalid values are rejected.
+ * @return Independently owned notation released with TeX_free(), or NULL with EINVAL for invalid input
+ * or on allocation failure. Inputs remain caller-owned and no relation is evaluated.
+ */
+TeX_t *TeX_compose_relation(const TeX_t *left, const TeX_t *right, TeX_relation_t relation);
+
+/**
  * @brief Enclose notation in automatically sized delimiters.
  * @param body Borrowed, non-NULL mathematical notation.
  * @param fence Delimiter pair selected from TeX_fence_t.
@@ -357,6 +384,35 @@ TeX_t *TeX_compose_tensor(const TeX_t *base, const TeX_index_t *indices, size_t 
  * @note Inputs are copied. No summation is evaluated.
  */
 TeX_t *TeX_compose_sum(const TeX_t *body, const TeX_t *lower, const TeX_t *upper);
+
+/**
+ * @brief Compose indexed-product notation with optional lower and upper annotations.
+ * @param body Borrowed non-NULL product body, neither modified nor retained.
+ * @param lower Borrowed lower annotation, or NULL to omit it.
+ * @param upper Borrowed upper annotation, or NULL to omit it.
+ * @return Independently owned notation released with TeX_free(), or NULL for invalid input or allocation failure.
+ * @note Inputs are copied; no product is evaluated.
+ */
+TeX_t *TeX_compose_product(const TeX_t *body, const TeX_t *lower, const TeX_t *upper);
+
+/**
+ * @brief Reuse semantic transform layout for already constructed notation.
+ * @param operands Borrowed array of three non-NULL values: body, source variable, target variable.
+ * @param kind Forward or inverse Fourier or Laplace notation; other values are rejected.
+ * @return Owned notation released with TeX_free(), or NULL with EINVAL for invalid arguments or on allocation failure.
+ * @note No input is modified or retained; the result copies its inputs and no transform is evaluated.
+ */
+TeX_t *TeX_compose_transform(const TeX_t *const *operands, TeX_transform_kind_t kind);
+
+/**
+ * @brief Reuse semantic ordered partial-derivative layout for already constructed notation.
+ * @param operands Borrowed non-NULL array containing the body followed by count non-NULL variable values.
+ * @param count Positive variable count, no greater than UINT_MAX, with room for the body in size_t.
+ * @return Owned notation released with TeX_free(), or NULL with EINVAL for an invalid array or count,
+ * or on allocation failure. All values are copied; neither the array nor its members are retained.
+ * @note Variables arrive in application order. Layout reverses the denominator order and groups adjacent repetitions.
+ */
+TeX_t *TeX_compose_partial(const TeX_t *const *operands, size_t count);
 
 /**
  * @brief Compose an integral with optional bounds and an upright differential.

@@ -27,4 +27,13 @@
  */
 TeX_context_t *de_TeX_context(const diffequ_t *value);
 
+/**
+ * @brief Parse differential-equation presentation input and render its authored derivative notation.
+ * @param text Borrowed native source, neither modified nor retained; NULL or invalid input is rejected.
+ * @return Independently owned notation released with TeX_free(), or NULL on parse, formatting or allocation failure.
+ * @note A single-coordinate ODE authored with primes retains prime derivatives and function-style point conditions.
+ * Explicit coordinate derivatives and PDEs retain differential fractions. No solver runs and no native problem is retained.
+ */
+TeX_t *de_notation_input(const string_t *text);
+
 #endif

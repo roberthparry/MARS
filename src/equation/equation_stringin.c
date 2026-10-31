@@ -130,13 +130,13 @@ static bool equ_strip_outer_braces(string_view_t *view)
     return false;
 }
 
-static bool equ_parse_parts(const string_t *text, equation_parse_parts_t *parts)
+/* Share native wrappers and binding boundaries with relation presentation input. */
+bool equ_input_parts(const string_t *text, string_view_t *body, string_view_t *bindings, bool *has_bindings)
 {
     string_view_t view;
     size_t split_pos = 0u;
-    string_view_t equation_view;
 
-    if (!text || !parts)
+    if (!text || !body || !bindings || !has_bindings)
         return false;
 
     view = string_view_trim(string_view_all(text));
@@ -148,24 +148,34 @@ static bool equ_parse_parts(const string_t *text, equation_parse_parts_t *parts)
     if (!equ_strip_outer_braces(&view))
         return false;
 
-    parts->bindings = string_view_empty();
-    parts->has_bindings = equ_find_top_level_char(view, '|', &split_pos);
-    if (parts->has_bindings) {
-        equation_view = string_view_trim(string_view_slice(view, 0u, split_pos));
-        parts->bindings =
+    *bindings = string_view_empty();
+    *has_bindings = equ_find_top_level_char(view, '|', &split_pos);
+    if (*has_bindings) {
+        *body = string_view_trim(string_view_slice(view, 0u, split_pos));
+        *bindings =
             string_view_trim(string_view_slice(view, split_pos + 1u, string_view_length(view) - split_pos - 1u));
     } else {
-        equation_view = view;
+        *body = view;
     }
+    return true;
+}
 
-    if (!equ_find_top_level_char(equation_view, '=', &split_pos)) {
-        fprintf(stderr, "equ_from_text: expected top-level '='\n");
+static bool equ_parse_parts(const string_t *text, equation_parse_parts_t *parts)
+{
+    string_view_t body;
+    if (!parts || !equ_input_parts(text, &body, &parts->bindings, &parts->has_bindings))
+        return false;
+    size_t next = 0;
+    equ_input_relation_t relation, extra;
+    if (equ_input_next_relation(body, &next, &relation) != 1 || relation.kind != EQU_RELATION_EQUAL ||
+        equ_input_next_relation(body, &next, &extra) != 0) {
+        fprintf(stderr, "equ_from_text: expected one equality, written '=' or '=='\n");
         return false;
     }
-
-    parts->lhs = string_view_trim(string_view_slice(equation_view, 0u, split_pos));
+    parts->lhs = string_view_trim(string_view_slice(body, 0u, relation.position));
+    size_t right = relation.position + relation.width;
     parts->rhs = string_view_trim(
-        string_view_slice(equation_view, split_pos + 1u, string_view_length(equation_view) - split_pos - 1u));
+        string_view_slice(body, right, string_view_length(body) - right));
 
     if (string_view_is_empty(parts->lhs) || string_view_is_empty(parts->rhs)) {
         fprintf(stderr, "equ_from_text: equation side is empty\n");
@@ -356,47 +366,4 @@ equation_t *equ_from_string(const char *s)
     equation = equ_from_text(text);
     string_free(text);
     return equation;
-}
-
-/* Compose an equation from native sides supplied by a mathematical input reader. */
-TeX_t *equ_notation_input(const string_t *text, notation_read_fn read, void *context, bool *recognised)
-{
-    string_view_t view = string_view_trim(string_view_all(text));
-    size_t equality;
-    if (!equ_strip_outer_braces(&view)) {
-        *recognised = true;
-        return NULL;
-    }
-    size_t pipe;
-    if (equ_find_top_level_char(view, '|', &pipe))
-        view = string_view_slice(view, 0u, pipe);
-    if (!equ_find_top_level_char(view, '=', &equality))
-        return NULL;
-    *recognised = true;
-    equation_parse_parts_t parts;
-    if (!read || !equ_parse_parts(text, &parts))
-        return NULL;
-    string_t *left = string_from_view(&parts.lhs), *right = string_from_view(&parts.rhs);
-    string_t *bindings = parts.has_bindings ? string_from_view(&parts.bindings) : NULL;
-    if (parts.has_bindings) {
-        string_t *bound_left = left && bindings ? string_sprintf("{ %S | %S }", left, bindings) : NULL;
-        string_t *bound_right = right && bindings ? string_sprintf("{ %S | %S }", right, bindings) : NULL;
-        string_free(left);
-        string_free(right);
-        left = bound_left;
-        right = bound_right;
-    }
-    TeX_t *lhs = left ? read(context, left) : NULL, *rhs = right ? read(context, right) : NULL;
-    TeX_builder_t *builder = TeX_builder_new();
-    TeX_push_notation(builder, lhs);
-    TeX_push_notation(builder, rhs);
-    TeX_equation(builder, TeX_EQUATION_INLINE);
-    TeX_t *result = TeX_builder_finish(builder);
-    TeX_builder_free(builder);
-    TeX_free(lhs);
-    TeX_free(rhs);
-    string_free(left);
-    string_free(right);
-    string_free(bindings);
-    return result;
 }

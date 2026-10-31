@@ -2983,6 +2983,7 @@ fail:
 static bool de_parse_one_condition(diffequ_t *de, const char *text, const string_t *const *names,
                                    expr_t *const *symbols, size_t symbol_count)
 {
+    char *prime_normalized = NULL;
     char *lhs = NULL;
     char *rhs = NULL;
     char *core = NULL;
@@ -2994,6 +2995,14 @@ static bool de_parse_one_condition(diffequ_t *de, const char *text, const string
     size_t point_count = 0u;
     equation_t *condition = NULL;
     bool ok = false;
+
+    if (strchr(text, '\'')) {
+        const char *coordinate = de->independent_count == 1u ? expr_symbol_name(de->independent_vars[0]) : NULL;
+        prime_normalized = coordinate ? de_normalize_prime_condition(text, coordinate) : NULL;
+        if (!prime_normalized)
+            goto cleanup;
+        text = prime_normalized;
+    }
 
     if (!de_split_equation(text, &lhs, &rhs) || !de_extract_condition_point(lhs, &core, &point_text))
         goto cleanup;
@@ -3015,6 +3024,7 @@ static bool de_parse_one_condition(diffequ_t *de, const char *text, const string
     ok = true;
 
 cleanup:
+    free(prime_normalized);
     equ_free(condition);
     de_free_condition_points(points, point_count);
     string_free(canonical);
@@ -3238,6 +3248,7 @@ diffequ_t *de_from_string(const char *text)
     string_free(de->constant_text);
     de->equation_text = string_new_with(operator_display_equation ? operator_display_equation : parts.equation);
     de->partial_derivative_input = partial_derivative_input;
+    de->prime_derivative_input = source_form_equation && strchr(source_form_equation, '\'') != NULL;
     if (differential_form_input) {
         string_free(de->differential_form_text);
         de->differential_form_text = string_new_with(source_form_equation);

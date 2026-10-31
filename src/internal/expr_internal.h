@@ -1654,6 +1654,15 @@ notation_build_t *notation_build_new(void);
 void notation_build_derivatives(notation_build_t *build, bool partial);
 
 /**
+ * @brief Request prime notation for eligible ordinary dependent-variable derivatives in a semantic snapshot.
+ * @param build Borrowed snapshot builder; neither modified nodes nor ownership escape this call. NULL is ignored.
+ * @param enabled Whether subsequent single-coordinate dependent-variable derivative nodes prefer primes.
+ * @note Partial or mixed-coordinate derivatives retain explicit differential notation. Existing snapshots are
+ * unchanged; the choice participates in memoisation keys so shared nodes keep their requested presentation.
+ */
+void expr_notation_prime_derivatives(notation_build_t *build, bool enabled);
+
+/**
  * @brief Select the dependent-variable interpretation used by differential equations.
  * @param build Borrowed semantic snapshot builder; it owns all nodes added by this call.
  * @param enabled Whether to enable the documented snapshot interpretation for subsequently added nodes.

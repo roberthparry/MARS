@@ -71,6 +71,77 @@ static void test_TeX_builder_stack(void)
     finish_matches(builder, "\\frac{\\mathit{right}}{\\mathit{left}}");
 }
 
+static void test_TeX_builder_drop_swap(void)
+{
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_integer(builder, 12);
+    TeX_push_integer(builder, 34);
+    TeX_push_integer(builder, 56);
+    const TeX_t *a = TeX_builder_peek(builder, 3), *b = TeX_builder_peek(builder, 2);
+    const TeX_t *c = TeX_builder_peek(builder, 1);
+    TEST_ASSERT_TRUE(TeX_swap(builder) && TeX_builder_count(builder) == 3 &&
+                     TeX_builder_peek(builder, 3) == a && TeX_builder_peek(builder, 2) == c &&
+                     TeX_builder_peek(builder, 1) == b, "SWAP preserves operand identities and the lower stack");
+    TEST_ASSERT_TRUE(TeX_swap(builder) && TeX_builder_peek(builder, 2) == b && TeX_builder_peek(builder, 1) == c,
+                     "two swaps restore the exact original operands");
+    TEST_ASSERT_TRUE(TeX_drop(builder) && TeX_builder_count(builder) == 2 &&
+                     TeX_builder_peek(builder, 2) == a && TeX_builder_peek(builder, 1) == b,
+                     "DROP removes only the top operand and preserves surviving borrowed views");
+    TEST_ASSERT_TRUE(TeX_drop(builder) && TeX_builder_count(builder) == 1 && TeX_builder_peek(builder, 1) == a &&
+                     TeX_drop(builder) && TeX_builder_count(builder) == 0 && !TeX_builder_error(builder),
+                     "DROP can empty a stack without leaving an error or changing surviving values");
+    TeX_push_symbol(builder, "left");
+    TeX_push_symbol(builder, "right");
+    TeX_swap(builder);
+    TeX_frac(builder);
+    finish_matches(builder, "\\frac{\\mathit{right}}{\\mathit{left}}");
+
+    builder = TeX_builder_new();
+    TeX_push_symbol(builder, "x");
+    TeX_push_symbol(builder, "y");
+    TeX_push_symbol(builder, "unused");
+    TeX_push_integer(builder, 2);
+    TEST_ASSERT_TRUE(TeX_swap(builder) && TeX_drop(builder) && TeX_roll(builder),
+                     "SWAP and DROP preserve the literal integer metadata needed by ROLL");
+    TeX_frac(builder);
+    finish_matches(builder, "\\frac{y}{x}");
+}
+
+static void test_TeX_builder_drop_swap_errors(void)
+{
+    TeX_builder_t *builder = TeX_builder_new();
+    TEST_ASSERT_TRUE(!TeX_drop(builder) && errno == ERANGE && TeX_builder_error(builder) == ERANGE &&
+                     TeX_builder_count(builder) == 0, "DROP rejects an empty stack without changing it");
+    TeX_builder_clear_error(builder);
+    TEST_ASSERT_TRUE(!TeX_swap(builder) && errno == ERANGE && TeX_builder_error(builder) == ERANGE &&
+                     TeX_builder_count(builder) == 0, "SWAP requires two operands even on an empty stack");
+    TeX_builder_clear_error(builder);
+    TeX_push_symbol(builder, "a");
+    const TeX_t *a = TeX_builder_peek(builder, 1);
+    TEST_ASSERT_TRUE(!TeX_swap(builder) && TeX_builder_error(builder) == ERANGE &&
+                     TeX_builder_count(builder) == 1 && TeX_builder_peek(builder, 1) == a,
+                     "SWAP underflow preserves a lone operand");
+    TEST_ASSERT_TRUE(!TeX_drop(builder) && TeX_builder_count(builder) == 1 &&
+                     TeX_builder_peek(builder, 1) == a && TeX_builder_error(builder) == ERANGE,
+                     "DROP honours the earlier underflow until explicitly cleared");
+    TeX_builder_clear_error(builder);
+    TeX_push_symbol(builder, "b");
+    const TeX_t *b = TeX_builder_peek(builder, 1);
+    TeX_push_symbol(builder, "not + a symbol");
+    TEST_ASSERT_TRUE(!TeX_swap(builder) && !TeX_drop(builder) && errno == EINVAL &&
+                     TeX_builder_error(builder) == EINVAL && TeX_builder_count(builder) == 2 &&
+                     TeX_builder_peek(builder, 2) == a && TeX_builder_peek(builder, 1) == b,
+                     "both operations preserve operands and the first saved construction error");
+    TeX_builder_clear_error(builder);
+    TeX_swap(builder);
+    TeX_drop(builder);
+    finish_matches(builder, "b");
+    errno = 0;
+    TEST_ASSERT_TRUE(!TeX_drop(NULL) && errno == EINVAL, "DROP rejects NULL without dereferencing it");
+    errno = 0;
+    TEST_ASSERT_TRUE(!TeX_swap(NULL) && errno == EINVAL, "SWAP rejects NULL without dereferencing it");
+}
+
 static void test_TeX_builder_hp48_stack(void)
 {
     TeX_builder_t *builder = TeX_builder_new();
@@ -266,6 +337,33 @@ static void test_TeX_builder_inputs(void)
     TeX_builder_free(builder);
 }
 
+static void test_TeX_builder_raw_source(void)
+{
+    char source[] = "\\frac{\\sqrt{x^{2}+c}}{x+1}";
+    TeX_builder_t *builder = TeX_builder_new();
+    TEST_ASSERT_TRUE(TeX_push_raw(builder, source), "authored TeX source is accepted directly");
+    source[1] = '?';
+    finish_matches(builder, "\\frac{\\sqrt{x^{2}+c}}{x+1}");
+
+    builder = TeX_builder_new();
+    TeX_push_raw(builder, "\\sin x + \\cos x");
+    TeX_push_integer(builder, 2);
+    TeX_pow(builder);
+    finish_matches(builder, "{\\left( \\sin x + \\cos x \\right)}^{2}");
+
+    builder = TeX_builder_new();
+    TeX_push_raw(builder, "");
+    finish_matches(builder, "");
+
+    builder = TeX_builder_new();
+    TeX_push_symbol(builder, "x");
+    const TeX_t *saved = TeX_builder_peek(builder, 1);
+    TEST_ASSERT_TRUE(!TeX_push_raw(builder, NULL) && TeX_builder_error(builder) == EINVAL &&
+                     TeX_builder_count(builder) == 1 && TeX_builder_peek(builder, 1) == saved,
+                     "a missing raw source records an error and preserves the existing operand");
+    TeX_builder_free(builder);
+}
+
 static void test_TeX_builder_layout(void)
 {
     TeX_builder_t *builder = TeX_builder_new();
@@ -364,6 +462,237 @@ static void test_TeX_builder_calculus_and_tensors(void)
     TEST_ASSERT_TRUE(!TeX_sum(builder, (TeX_limits_t)4) && TeX_builder_error(builder) == EINVAL &&
                      TeX_builder_count(builder) == 1, "invalid bounds cannot reinterpret operands");
     TeX_builder_free(builder);
+}
+
+static void test_TeX_builder_general_indices(void)
+{
+    const TeX_index_position_t connection[] = {TeX_INDEX_UPPER, TeX_INDEX_LOWER, TeX_INDEX_LOWER};
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_symbol(builder, "Gamma");
+    TeX_push_symbol(builder, "rho");
+    TeX_push_symbol(builder, "mu");
+    TeX_push_symbol(builder, "nu");
+    TeX_tensor(builder, connection, 3);
+    finish_matches(builder, "{\\Gamma}^{\\rho}{}_{\\mu}{}_{\\nu}");
+
+    const TeX_index_position_t direction[] = {TeX_INDEX_LOWER}, vector[] = {TeX_INDEX_UPPER};
+    builder = TeX_builder_new();
+    TeX_push_symbol(builder, "nabla");
+    TeX_push_symbol(builder, "mu");
+    TeX_tensor(builder, direction, 1);
+    TeX_push_symbol(builder, "V");
+    TeX_push_symbol(builder, "nu");
+    TeX_tensor(builder, vector, 1);
+    TeX_mul(builder);
+    finish_matches(builder, "{\\nabla}_{\\mu}\\,{V}^{\\nu}");
+
+    const TeX_index_position_t mixed[] = {
+        TeX_INDEX_UPPER, TeX_INDEX_LOWER, TeX_INDEX_UPPER, TeX_INDEX_LOWER, TeX_INDEX_LOWER
+    };
+    builder = TeX_builder_new();
+    TeX_push_symbol(builder, "T");
+    TeX_push_symbol(builder, "rho");
+    TeX_push_symbol(builder, "sigma");
+    TeX_push_symbol(builder, "mu");
+    TeX_push_symbol(builder, "nu");
+    TeX_push_symbol(builder, "lambda");
+    TeX_tensor(builder, mixed, 5);
+    finish_matches(builder, "{T}^{\\rho}{}_{\\sigma}{}^{\\mu}{}_{\\nu}{}_{\\lambda}");
+
+    const TeX_index_position_t lower_pair[] = {TeX_INDEX_LOWER, TeX_INDEX_LOWER};
+    builder = TeX_builder_new();
+    TeX_push_symbol(builder, "G");
+    TeX_push_symbol(builder, "mu");
+    TeX_push_symbol(builder, "nu");
+    TeX_prime(builder, 1);
+    TeX_tensor(builder, lower_pair, 2);
+    finish_matches(builder, "{G}_{\\mu}{}_{\\nu'}");
+}
+
+static void test_TeX_builder_transforms(void)
+{
+    static const char *const expected[] = {
+        "\\mathcal{L}_{u\\to v}\\{f\\}", "\\mathcal{L}^{-1}_{u\\to v}\\{f\\}",
+        "\\mathcal{F}_{u\\to v}\\{f\\}", "\\mathcal{F}^{-1}_{u\\to v}\\{f\\}"
+    };
+    for (unsigned kind = 0; kind < sizeof expected / sizeof *expected; ++kind) {
+        TeX_builder_t *builder = TeX_builder_new();
+        TeX_push_symbol(builder, "f");
+        TeX_push_symbol(builder, "u");
+        TeX_push_symbol(builder, "v");
+        TeX_transform(builder, (TeX_transform_kind_t)kind);
+        finish_matches(builder, expected[kind]);
+    }
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_symbol(builder, "f");
+    TeX_push_symbol(builder, "u");
+    TeX_push_symbol(builder, "v");
+    const TeX_t *top = TeX_builder_peek(builder, 1);
+    TEST_ASSERT_TRUE(!TeX_transform(builder, (TeX_transform_kind_t)-1) &&
+                     TeX_builder_error(builder) == EINVAL && TeX_builder_count(builder) == 3 &&
+                     TeX_builder_peek(builder, 1) == top, "invalid transform kinds retain all three operands");
+    TeX_builder_clear(builder);
+    TeX_push_symbol(builder, "f");
+    TeX_push_symbol(builder, "u");
+    TEST_ASSERT_TRUE(!TeX_transform(builder, TeX_TRANSFORM_FOURIER) &&
+                     TeX_builder_error(builder) == ERANGE && TeX_builder_count(builder) == 2,
+                     "transform underflow retains the body and available variable");
+    TeX_builder_free(builder);
+}
+
+static void test_TeX_builder_products(void)
+{
+    static const char *const expected[] = {
+        "\\prod {k}", "\\prod_{1} {k}", "\\prod^{3} {k}", "\\prod_{1}^{3} {k}"
+    };
+    for (unsigned limits = 0; limits < sizeof expected / sizeof *expected; ++limits) {
+        TeX_builder_t *builder = TeX_builder_new();
+        TeX_push_symbol(builder, "k");
+        if (limits & TeX_LIMIT_LOWER) TeX_push_integer(builder, 1);
+        if (limits & TeX_LIMIT_UPPER) TeX_push_integer(builder, 3);
+        TeX_prod(builder, (TeX_limits_t)limits);
+        finish_matches(builder, expected[limits]);
+    }
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_symbol(builder, "k");
+    const TeX_t *body = TeX_builder_peek(builder, 1);
+    TEST_ASSERT_TRUE(!TeX_prod(builder, (TeX_limits_t)4) && TeX_builder_error(builder) == EINVAL &&
+                     TeX_builder_count(builder) == 1 && TeX_builder_peek(builder, 1) == body,
+                     "invalid product bounds preserve the exact original body");
+    TeX_builder_clear_error(builder);
+    TEST_ASSERT_TRUE(!TeX_prod(builder, TeX_LIMIT_BOTH) && TeX_builder_error(builder) == ERANGE &&
+                     TeX_builder_count(builder) == 1, "product underflow does not consume its body");
+    TeX_builder_free(builder);
+}
+
+static void test_TeX_builder_partials(void)
+{
+    static const struct {
+        const char *variables[3];
+        size_t count;
+        const char *expected;
+    } cases[] = {
+        {{"x"}, 1, "\\frac{\\partial}{\\partial x}\\left[f\\right]"},
+        {{"x", "x"}, 2, "\\frac{\\partial^{2}}{\\partial x^{2}}\\left[f\\right]"},
+        {{"x", "y"}, 2, "\\frac{\\partial^{2}}{\\partial y\\,\\partial x}\\left[f\\right]"},
+        {{"x", "y", "x"}, 3, "\\frac{\\partial^{3}}{\\partial x\\,\\partial y\\,\\partial x}\\left[f\\right]"},
+        {{"x", "x", "y"}, 3, "\\frac{\\partial^{3}}{\\partial y\\,\\partial x^{2}}\\left[f\\right]"}
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        TeX_builder_t *builder = TeX_builder_new();
+        TeX_push_symbol(builder, "f");
+        for (size_t j = 0; j < cases[i].count; ++j)
+            TeX_push_symbol(builder, cases[i].variables[j]);
+        TeX_partial(builder, cases[i].count);
+        finish_matches(builder, cases[i].expected);
+    }
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_symbol(builder, "f");
+    const TeX_t *body = TeX_builder_peek(builder, 1);
+    TEST_ASSERT_TRUE(!TeX_partial(builder, 0) && TeX_builder_error(builder) == EINVAL &&
+                     TeX_builder_count(builder) == 1 && TeX_builder_peek(builder, 1) == body,
+                     "a zero-order partial cannot consume the body");
+    TeX_builder_clear_error(builder);
+    TEST_ASSERT_TRUE(!TeX_partial(builder, SIZE_MAX) && TeX_builder_error(builder) == EOVERFLOW &&
+                     TeX_builder_count(builder) == 1, "partial order overflow precedes operand access");
+    TeX_builder_clear_error(builder);
+    TeX_push_symbol(builder, "x");
+    TEST_ASSERT_TRUE(!TeX_partial(builder, 2) && TeX_builder_error(builder) == ERANGE &&
+                     TeX_builder_count(builder) == 2 && TeX_builder_peek(builder, 2) == body,
+                     "missing differentiation variables preserve every supplied operand");
+    TeX_builder_free(builder);
+}
+
+static void test_TeX_builder_primes(void)
+{
+    static const struct { unsigned order; const char *expected; } cases[] = {
+        {1u, "y'"}, {2u, "y''"}, {3u, "y'''"}, {4u, "y^{(4)}"}, {1000u, "y^{(1000)}"}
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        TeX_builder_t *builder = TeX_builder_new();
+        TeX_push_symbol(builder, "y");
+        TeX_prime(builder, cases[i].order);
+        finish_matches(builder, cases[i].expected);
+    }
+    TeX_builder_t *builder = TeX_builder_new();
+    TEST_ASSERT_TRUE(!TeX_prime(builder, 1u) && TeX_builder_error(builder) == ERANGE,
+                     "a prime operation requires an operand");
+    TeX_builder_clear_error(builder);
+    TeX_push_symbol(builder, "y");
+    const TeX_t *saved = TeX_builder_peek(builder, 1);
+    TEST_ASSERT_TRUE(!TeX_prime(builder, 0u) && TeX_builder_error(builder) == EINVAL &&
+                     TeX_builder_count(builder) == 1u && TeX_builder_peek(builder, 1u) == saved,
+                     "zero derivative order preserves the exact operand");
+    TeX_builder_clear_error(builder);
+    TeX_prime(builder, 1u);
+    TeX_push_integer(builder, 0);
+    TeX_call(builder, 1u);
+    finish_matches(builder, "y'\\left(0\\right)");
+
+    builder = TeX_builder_new();
+    TeX_push_symbol(builder, "a");
+    TeX_push_symbol(builder, "b");
+    TeX_add(builder);
+    TeX_prime(builder, 2u);
+    finish_matches(builder, "\\left( a + b \\right)''");
+
+    builder = TeX_builder_new();
+    TeX_push_symbol(builder, "y");
+    TeX_prime(builder, 4u);
+    TeX_prime(builder, 1u);
+    finish_matches(builder, "\\left( y^{(4)} \\right)'");
+}
+
+static void test_TeX_builder_relations(void)
+{
+    static const struct {
+        bool (*operation)(TeX_builder_t *);
+        const char *expected;
+    } cases[] = {
+        {TeX_eq, "x = y"}, {TeX_ne, "x \\ne y"}, {TeX_lt, "x < y"}, {TeX_le, "x \\le y"},
+        {TeX_gt, "x > y"}, {TeX_ge, "x \\ge y"}, {TeX_approx, "x \\approx y"}, {TeX_cong, "x \\cong y"}
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        TeX_builder_t *builder = TeX_builder_new();
+        TeX_push_symbol(builder, "x");
+        const TeX_t *saved = TeX_builder_peek(builder, 1);
+        TEST_ASSERT_TRUE(!cases[i].operation(builder) && TeX_builder_error(builder) == ERANGE &&
+                         TeX_builder_count(builder) == 1 && TeX_builder_peek(builder, 1) == saved,
+                         "relation underflow preserves the exact available operand");
+        TEST_ASSERT_TRUE(!TeX_push_symbol(builder, "y") && TeX_builder_error(builder) == ERANGE,
+                         "a saved relation error blocks subsequent pushes until cleared");
+        TeX_builder_clear_error(builder);
+        TeX_push_symbol(builder, "y");
+        cases[i].operation(builder);
+        finish_matches(builder, cases[i].expected);
+        TEST_ASSERT_TRUE(!cases[i].operation(NULL) && errno == EINVAL, "a NULL relation builder is rejected");
+    }
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_integer(builder, 0);
+    TeX_push_symbol(builder, "x");
+    TeX_lt(builder);
+    TeX_push_integer(builder, 1);
+    TeX_le(builder);
+    finish_matches(builder, "0 < x \\le 1");
+}
+
+static void test_TeX_builder_relation_scope(void)
+{
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_push_symbol(builder, "x");
+    TeX_push_symbol(builder, "y");
+    TeX_lt(builder);
+    TeX_push_integer(builder, 2);
+    TeX_mul(builder);
+    finish_matches(builder, "\\left( x < y \\right)\\,2");
+
+    builder = TeX_builder_new();
+    TeX_push_symbol(builder, "x");
+    TeX_push_symbol(builder, "y");
+    TeX_approx(builder);
+    TeX_push_integer(builder, 1);
+    TeX_add(builder);
+    finish_matches(builder, "\\left( x \\approx y \\right) + 1");
 }
 
 static void test_TeX_builder_structured_arithmetic(void)
@@ -501,6 +830,7 @@ static void test_TeX_builder_ascii_symbols(void)
         {"infinity"    , 0x221eu},
         {"infty"       , 0x221eu},
         {"partial"     , 0x2202u},
+        {"nabla"       , 0x2207u},
     };
     TeX_builder_t *builder = TeX_builder_new();
     for (size_t i = 0; i < sizeof aliases / sizeof *aliases; ++i) {
@@ -550,12 +880,22 @@ void run_TeX_builder_tests(void)
 {
     TEST_RUN_IN_GROUP(test_TeX_builder_ownership, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_stack, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_drop_swap, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_drop_swap_errors, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_hp48_stack, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_stack_errors, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_transactional_errors, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_inputs, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_raw_source, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_layout, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_calculus_and_tensors, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_general_indices, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_transforms, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_products, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_partials, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_primes, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_relations, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_relation_scope, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_structured_arithmetic, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_rejects_operator_symbols, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_ascii_symbols, tests, NULL);

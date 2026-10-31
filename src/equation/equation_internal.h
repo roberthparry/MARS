@@ -28,6 +28,49 @@
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 
+/** @brief Mathematical relation tokens owned by the native equation input grammar. */
+typedef enum {
+    EQU_RELATION_EQUAL,       /**< Exact equality, written = or ==. */
+    EQU_RELATION_NOT_EQUAL,   /**< Unequal operands, written != or its Unicode sign. */
+    EQU_RELATION_LESS,        /**< Strict ordering, written <. */
+    EQU_RELATION_LESS_EQUAL,  /**< Inclusive ordering, written <= or its Unicode sign. */
+    EQU_RELATION_GREATER,     /**< Strict ordering, written >. */
+    EQU_RELATION_GREATER_EQUAL, /**< Inclusive ordering, written >= or its Unicode sign. */
+    EQU_RELATION_APPROXIMATE, /**< Approximate equality, written ~~= or its Unicode sign. */
+    EQU_RELATION_CONGRUENT,   /**< Congruence, written ~== or its Unicode sign. */
+    EQU_RELATION_COUNT        /**< Direct-dispatch table bound; not a valid relation. */
+} equ_relation_kind_t;
+
+/** @brief One relation token located in a borrowed native mathematical input view. */
+typedef struct {
+    size_t position; /**< Byte position of the relation's first rune in the input view. */
+    size_t width; /**< Number of bytes occupied by the complete relation token. */
+    equ_relation_kind_t kind; /**< Mathematical meaning; no TeX syntax is stored. */
+} equ_input_relation_t;
+
+/**
+ * @brief Borrow an equation body's outer envelope and optional binding declarations.
+ * @param text Borrowed source kept alive while either output view is used; never modified or retained.
+ * @param[out] body Required output receiving the trimmed body, without outer braces or bindings.
+ * @param[out] bindings Required output receiving a borrowed binding view, or an empty view if absent.
+ * @param[out] has_bindings Required output distinguishing an explicit binding bar from an absent one.
+ * @return True on success; false for invalid arguments, empty input or an invalid outer wrapper.
+ * @note No ownership transfers and no expression or binding is evaluated. Outputs require no release.
+ */
+bool equ_input_parts(const string_t *text, string_view_t *body, string_view_t *bindings, bool *has_bindings);
+
+/**
+ * @brief Read the next top-level mathematical relation using longest-token matching.
+ * @param body Borrowed source view, neither modified nor retained.
+ * @param[in,out] start Required byte offset, initially zero or immediately after the previous relation.
+ * On a match it advances beyond the token; at end it becomes the view length.
+ * @param[out] relation Required output receiving a matched token; unchanged if no token is returned.
+ * @return One for a match, zero for the end, or minus one with EINVAL for malformed input or arguments.
+ * @note Parentheses, matrix brackets and transform braces hide their internal separators. Text is traversed
+ * once between matches; dispatch on each token prefix has bounded cost. No allocation or ownership transfer occurs.
+ */
+int equ_input_next_relation(string_view_t body, size_t *start, equ_input_relation_t *relation);
+
 equation_t *equ_new_with_owned_bindings(const expr_t *lhs, const expr_t *rhs, expr_bindings_t *bindings);
 
 struct _expr_function_temporaries_t;

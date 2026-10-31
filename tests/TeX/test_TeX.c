@@ -330,6 +330,7 @@ static void test_TeX_calculus_shorthand(void)
 static void test_TeX_expression_style(void)
 {
     static const struct { const char *input; const char *expected; } cases[] = {
+        {"{sqrt(x^2+c)/(x+1) | x=2; c=4}", "\\frac{\\sqrt{x^{2} + c}}{x + 1}"},
         {"{x²+c | x=[1,2,3]; c=4}", "x^{2} + c"},
         {"{[radius]^2 | [radius]=5}", "\\mathit{radius}^{2}"},
         {"{sin²(x)+cos²(x) | x=?}", "1"},
@@ -376,6 +377,56 @@ static void test_TeX_equations(void)
     TeX_free(plain);
 }
 
+static void test_TeX_relation_input(void)
+{
+    static const struct { const char *input; const char *expected; } cases[] = {
+        {"x < y", "x < y"}, {"x<=y", "x \\le y"}, {"x >= y", "x \\ge y"}, {"x>y", "x > y"},
+        {"x != y", "x \\ne y"}, {"x == y", "x = y"}, {"x = y", "x = y"},
+        {"x ~~= y", "x \\approx y"}, {"x ~== y", "x \\cong y"},
+        {"x ≤ y", "x \\le y"}, {"x ≥ y", "x \\ge y"}, {"x ≠ y", "x \\ne y"},
+        {"x ≈ y", "x \\approx y"}, {"x ≅ y", "x \\cong y"},
+        {"0 < x <= 1", "0 < x \\le 1"}, {"a>=b>c!=d==e~~=f~==g", "a \\ge b > c \\ne d = e \\approx f \\cong g"},
+        {"x=y=z", "x = y = z"},
+        {"{x <= y | x = 3, y = 4}", "x \\le y"},
+        {"sin(x)~~=x", "\\sin(x) \\approx x"},
+        {"@Z_(k=1)^3 k == 6", "\\sum_{k=1}^{3}k = 6"},
+        {"{x | x != 0}", "x\\quad \\left( x \\ne 0 \\right)"},
+        {"{x | x = 1}", "x"},
+        {"(1,2;3,4) == (5,6;7,8)",
+         "\\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix} = "
+         "\\begin{bmatrix}5 & 6 \\\\[10pt] 7 & 8\\end{bmatrix}"}
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        string_t *input = string_new_with(cases[i].input);
+        TeX_t *notation = TeX_from_expression(input);
+        TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), cases[i].expected), cases[i].input);
+        TeX_builder_t *builder = TeX_builder_new();
+        bool pushed = TeX_push_math(builder, cases[i].input);
+        TeX_t *stack_result = TeX_builder_finish(builder);
+        TEST_ASSERT_TRUE(pushed && stack_result && !strcmp(TeX_source(stack_result), cases[i].expected),
+                         "pushed mathematical text uses the same native relation grammar");
+        TeX_free(stack_result);
+        TeX_builder_free(builder);
+        TeX_free(notation);
+        string_free(input);
+    }
+}
+
+static void test_TeX_relation_input_invalid(void)
+{
+    static const char *const invalid[] = {
+        "x <", "<= y", "x < <= y", "x === y", "x ~= y", "x ~=== y", "x ~~== y",
+        "x < = y", "x >< y", "x !=", "x ≅", "x <= y >", "x) < y", "x < (y", "sin(x<y)"
+    };
+    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
+        string_t *input = string_new_with(invalid[i]);
+        TeX_t *notation = TeX_from_expression(input);
+        TEST_ASSERT_TRUE(!notation, invalid[i]);
+        TeX_free(notation);
+        string_free(input);
+    }
+}
+
 static void test_TeX_matrix_input(void)
 {
     static const struct { const char *input; const char *expected; } cases[] = {
@@ -414,8 +465,8 @@ static void test_TeX_bound_problems(void)
         {"{(1,2;3,4)^(x+1) | x=3}", "{\\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix}}^{x + 1}"},
         {"{x | x=3}", "x"},
         {"{ y'' + 3y' + 40y | y'(0) = 1, y(0) = 0 }",
-         "\\frac{d^{2} y}{d x^{2}} + 3\\mkern-2mu \\frac{d y}{d x} + 40\\mkern-2mu y = 0,\\qquad "
-         "\\left. \\frac{d y}{d x}\\right|_{x=0} = 1,\\qquad \\left. y\\right|_{x=0} = 0"},
+         "y'' + 3\\mkern-2mu y' + 40\\mkern-2mu y = 0,\\qquad "
+         "y'\\left(0\\right) = 1,\\qquad y\\left(0\\right) = 0"},
         {"{ Dx(y) = x*y | x = ?;; y(0) = 1 }",
          "\\frac{d y}{d x} = x\\mkern-2mu y,\\qquad \\left. y\\right|_{x=0} = 1"},
         {"{ Dx(u)+Dy(u)=0 | x=?, y=?;; u(x,0)=sin(x) }",
@@ -438,6 +489,53 @@ static void test_TeX_bound_problems(void)
         TeX_free(notation);
         string_free(input);
     }
+}
+
+static void test_TeX_prime_input(void)
+{
+    static const struct { const char *input; const char *expected; } cases[] = {
+        {"y''+y=0", "y'' + y = 0"},
+        {"{y''''+y | y'''(0)=1, y(0)=0}",
+         "y^{(4)} + y = 0,\\qquad y'''\\left(0\\right) = 1,\\qquad y\\left(0\\right) = 0"},
+        {"{z''+z | z'(1)=2, z(1)=0}",
+         "z'' + z = 0,\\qquad z'\\left(1\\right) = 2,\\qquad z\\left(1\\right) = 0"},
+        {"{ y''+y=0 | t=?;; y'(0)=1 }", "y'' + y = 0,\\qquad y'\\left(0\\right) = 1"},
+        {"{Dx(y)+y=0 | x=?;; y'(0)=1}",
+         "\\frac{d y}{d x} + y = 0,\\qquad \\left. \\frac{d y}{d x}\\right|_{x=0} = 1"}
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        string_t *input = string_new_with(cases[i].input);
+        TeX_t *notation = input ? TeX_from_expression(input) : NULL;
+        TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), cases[i].expected), cases[i].input);
+        TeX_free(notation);
+        string_free(input);
+    }
+}
+
+static void test_TeX_prime_snapshot_modes(void)
+{
+    string_t *input = string_new_with("Dxx(y)");
+    expr_t *expression = expr_from_text_preserving_calculus(input, NULL);
+    notation_build_t *build = notation_build_new();
+    notation_build_derivatives(build, false);
+    notation_build_dependent_variables(build, true);
+    const TeX_model_node_t *fraction = notation_build_expr(build, expression);
+    expr_notation_prime_derivatives(build, true);
+    const TeX_model_node_t *prime = notation_build_expr(build, expression);
+    expr_notation_prime_derivatives(build, false);
+    const TeX_model_node_t *again = notation_build_expr(build, expression);
+    TEST_ASSERT_TRUE(fraction && prime && fraction != prime && fraction == again,
+                     "snapshot memoisation distinguishes prime and differential-fraction preferences");
+    const TeX_model_node_t *rows[] = {fraction, prime};
+    const TeX_model_node_t *root = notation_build_node(build,
+        (TeX_node_view_t){.kind = TeX_NODE_LINES, .child_count = 2u}, rows);
+    string_t *rendered = notation_build_render(build, root);
+    TEST_ASSERT_TRUE(rendered && strstr(string_c_str(rendered), "\\frac") && strstr(string_c_str(rendered), "y''"),
+                     "the same native derivative supports either presentation in one immutable snapshot");
+    string_free(rendered);
+    notation_build_free(build);
+    expr_free(expression);
+    string_free(input);
 }
 
 static void test_TeX_native_layout(void)
@@ -500,7 +598,7 @@ static void test_TeX_native_text_array(void)
         TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), cases[i].expected) == 0, cases[i].input);
         TeX_free(notation);
     }
-    const char *invalid[] = {"x=", "=x", "x=y=z", "2*(1,2;3)", "(1,2)*", "x_()", "x_(n+1",
+    const char *invalid[] = {"x=", "=x", "2*(1,2;3)", "(1,2)*", "x_()", "x_(n+1",
                             "1/(1+x^2)+2*(1,2)", "(1,2)*(3,4)"};
     for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
         string_t *input = string_new_with(invalid[i]);
@@ -1194,8 +1292,12 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_TeX_calculus_shorthand, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_expression_style, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_equations, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_relation_input, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_relation_input_invalid, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_matrix_input, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_bound_problems, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_prime_input, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_prime_snapshot_modes, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_native_layout, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_native_text_array, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_native_index_roundtrip, tests, NULL);

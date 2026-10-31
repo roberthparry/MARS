@@ -510,6 +510,34 @@ static void test_diffequ_parses_ode_shorthand(void)
     de_free(de);
 }
 
+static void test_diffequ_prime_conditions_with_declared_coordinate(void)
+{
+    const char *sources[] = {
+        "{y''+y=0 | t=?;; y'(0)=1}",
+        "{Dx(y)+y=0 | x=?;; y'(0)=1}"
+    };
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        diffequ_t *problem = de_from_string(sources[i]);
+        WANT_POINTER("explicit-coordinate prime condition", problem, true);
+        if (!problem)
+            continue;
+        WANT_LONG("one recorded prime condition", (long)de_condition_count(problem), 1L);
+        const char *name = expr_symbol_name(de_independent_at(problem, 0));
+        WANT_TEXT("the declared coordinate is retained", name, i ? "x" : "t");
+        string_t *native = de_to_text(problem, style_EXPRESSION);
+        diffequ_t *copy = native ? de_from_text(native) : NULL;
+        WANT_POINTER("normalised prime condition round trip", copy, true);
+        string_t *first = de_problem_to_TeX(problem), *second = copy ? de_problem_to_TeX(copy) : NULL;
+        if (first && second)
+            WANT_TEXT("canonical derivative presentation remains stable", string_c_str(first), string_c_str(second));
+        string_free(second);
+        string_free(first);
+        de_free(copy);
+        string_free(native);
+        de_free(problem);
+    }
+}
+
 static void test_diffequ_parses_greek_differential_forms(void)
 {
     const char *alias_source = "(sin(@theta)-2r^2 cos^2(@theta))dr + "
@@ -5133,6 +5161,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_ordered_equation_TeX);
     RUN_TEST_CASE(test_diffequ_autonomous_transport_scope);
     RUN_TEST_CASE(test_diffequ_parses_ode_shorthand);
+    RUN_TEST_CASE(test_diffequ_prime_conditions_with_declared_coordinate);
     RUN_TEST_CASE(test_diffequ_parses_greek_differential_forms);
     RUN_TEST_CASE(test_diffequ_solves_exact_differential_form);
     RUN_TEST_CASE(test_diffequ_applies_initial_condition_to_exact_differential_form);

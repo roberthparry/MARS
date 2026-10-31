@@ -362,6 +362,17 @@ static TeX_t *render_derivative(const TeX_node_view_t *view, const TeX_t *const 
     return from_owned_source(source);
 }
 
+/* Share ordered coordinate-derivative notation with the public construction stack. */
+TeX_t *TeX_compose_partial(const TeX_t *const *operands, size_t count)
+{
+    if (!operands || !count || count > UINT_MAX || count == SIZE_MAX)
+        return invalid_node();
+    const TeX_node_view_t view = {
+        .kind = TeX_NODE_DERIVATIVE, .child_count = count + 1, .order = (unsigned)count, .partial = true
+    };
+    return render_derivative(&view, operands);
+}
+
 static TeX_t *render_subscript(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     return view->child_count == 2u ? from_owned_source(string_sprintf("%s_{%s}",
@@ -381,6 +392,15 @@ static TeX_t *render_prime(const TeX_node_view_t *view, const TeX_t *const *chil
     return from_owned_source(view->order <= 3u
         ? string_sprintf("%s%.*s", TeX_source(children[0]), (int)view->order, "'''")
         : string_sprintf("%s^{(%u)}", TeX_source(children[0]), view->order));
+}
+
+/* Share derivative-prime spelling with the explicit operand stack. */
+TeX_t *TeX_compose_prime(const TeX_t *body, unsigned order)
+{
+    if (!body || !order)
+        return invalid_node();
+    const TeX_node_view_t view = {.kind = TeX_NODE_PRIME, .child_count = 1u, .order = order};
+    return render_prime(&view, &body);
 }
 
 static TeX_t *render_bold(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -538,6 +558,15 @@ static TeX_t *render_transform(const TeX_node_view_t *view, const TeX_t *const *
         TeX_source(children[1]), TeX_source(children[2]), TeX_source(children[0])));
 }
 
+/* Share transform presentation with callers that already own their mathematical operands. */
+TeX_t *TeX_compose_transform(const TeX_t *const *operands, TeX_transform_kind_t kind)
+{
+    if (!operands || !operands[0] || !operands[1] || !operands[2])
+        return invalid_node();
+    const TeX_node_view_t view = {.kind = TeX_NODE_TRANSFORM, .child_count = 3, .transform = kind};
+    return render_transform(&view, operands);
+}
+
 static TeX_t *render_relation(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     static const char *const operators[] = {
@@ -549,12 +578,24 @@ static TeX_t *render_relation(const TeX_node_view_t *view, const TeX_t *const *c
         [TeX_RELATION_GREATER_EQUAL] = " \\ge ",
         [TeX_RELATION_MEMBER]        = "\\in ",
         [TeX_RELATION_DEFINITION]    = ":=",
-        [TeX_RELATION_IMPLIES]       = " \\Longrightarrow "
+        [TeX_RELATION_IMPLIES]       = " \\Longrightarrow ",
+        [TeX_RELATION_APPROXIMATE]   = " \\approx ",
+        [TeX_RELATION_CONGRUENT]     = " \\cong "
     };
     if (view->child_count != 2u || (unsigned)view->relation >= sizeof operators / sizeof *operators)
         return invalid_node();
     return from_owned_source(string_sprintf("%s%s%s", TeX_source(children[0]), operators[view->relation],
         TeX_source(children[1])));
+}
+
+/* Share relation symbols with explicit construction without exposing semantic contexts. */
+TeX_t *TeX_compose_relation(const TeX_t *left, const TeX_t *right, TeX_relation_t relation)
+{
+    if (!left || !right)
+        return invalid_node();
+    const TeX_t *const children[] = {left, right};
+    const TeX_node_view_t view = {.kind = TeX_NODE_RELATION, .child_count = 2, .relation = relation};
+    return render_relation(&view, children);
 }
 
 static TeX_t *render_domain_relation(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -840,15 +881,18 @@ static const TeX_node_renderer_fn renderers[TeX_NODE_COUNT] = {
 /* Share structural delimiter rules with the explicit construction interface. */
 bool TeX_needs_fence(TeX_node_kind_t parent, TeX_node_kind_t child, size_t index)
 {
-    bool additive = child == TeX_NODE_SUM || child == TeX_NODE_DIFFERENCE || child == TeX_NODE_EQUATION ||
+    bool statement = child == TeX_NODE_EQUATION || child == TeX_NODE_RELATION;
+    bool additive = child == TeX_NODE_SUM || child == TeX_NODE_DIFFERENCE || statement ||
                     child == TeX_NODE_COMPLEX_LITERAL;
     bool aggregate = child == TeX_NODE_SUMMATION || child == TeX_NODE_INDEXED_PRODUCT ||
                      child == TeX_NODE_CONDITIONAL_PRODUCT;
-    return (parent == TeX_NODE_PRODUCT && (additive || aggregate)) ||
+    return (statement && (parent == TeX_NODE_SUM || parent == TeX_NODE_DIFFERENCE)) ||
+           (parent == TeX_NODE_PRODUCT && (additive || aggregate)) ||
            ((parent == TeX_NODE_SUMMATION || parent == TeX_NODE_INDEXED_PRODUCT ||
              parent == TeX_NODE_CONDITIONAL_PRODUCT) && index == 0u && additive) ||
            (parent == TeX_NODE_DIFFERENCE && index == 1u && additive) ||
            (parent == TeX_NODE_NEGATIVE && additive) ||
+           (parent == TeX_NODE_PRIME && child == TeX_NODE_PRIME) ||
            ((parent == TeX_NODE_FACTORIAL || parent == TeX_NODE_PRIME) &&
             (additive || child == TeX_NODE_PRODUCT || child == TeX_NODE_NEGATIVE)) ||
            (parent == TeX_NODE_POWER && index == 0u &&

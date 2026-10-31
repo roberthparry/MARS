@@ -183,11 +183,7 @@ TeX_t *expr_notation_from_text(const string_t *text)
     }
     TeX_t *notation = NULL;
     if (differential) {
-        diffequ_t *problem = de_from_text(text);
-        TeX_context_t *context = problem ? de_TeX_context(problem) : NULL;
-        notation = context ? TeX_from_context(context) : NULL;
-        TeX_context_free(context);
-        de_free(problem);
+        notation = de_notation_input(text);
     } else {
         bool equation = false;
         notation = equ_notation_input(text, expr_notation_read_value, NULL, &equation);

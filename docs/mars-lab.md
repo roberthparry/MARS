@@ -1116,6 +1116,9 @@ quarterly observations to fill gaps and leaves remaining missing observations
 transparent. Rendering writes checksummed per-tile checkpoints and verifies them
 before resuming. Its output requires validation and manifest installation before
 the Lab uses it; GDAL is not a runtime dependency.
+An existing tile is reused during planning only when its recorded valid observations
+cover every pixel. Matching rectangular bounds alone are insufficient: an earlier
+country's sources may leave transparent gaps in its neighbour's part of the tile.
 Its remote rendering mode reads bounded Cloud-Optimized GeoTIFF windows instead of
 downloading complete source archives. An in-memory R-tree selects intersecting RGB
 sources for each output tile. The optional shoreline argument applies coastal
@@ -1127,6 +1130,8 @@ atomically and sends local desktop notifications every fifteen minutes and at
 phase boundaries. It verifies a complete candidate catalogue before publishing
 immutable image links and then replacing the source manifest. It leaves installed
 databases untouched, ready for the user's subsequent `make release`.
+The requested mainland France batch uses Spain's 1800-square preparation setting;
+previously prepared higher-resolution Corsican images are retained.
 Extended coast-masked catalogues preserve earlier masking statistics under
 `coastal_mask.previous_catalogue`, report the new regional `masked_bytes` total
 and retain `coastal_mask_identity` on each newly prepared region.
@@ -1135,6 +1140,14 @@ checksummed render outputs and combines their metadata into an installable packa
 It preserves NASA and Copernicus attribution and publishes the manifest only after
 every image passes validation. The database importer then replaces imagery in a
 transaction, preserving geographic layers, saved settings and location history.
+Its `--repair-overviews` mode accepts an existing package and a new output directory,
+optionally followed by west, south, east and north degrees to limit the repair area.
+An R-tree selects intersecting detailed images, which are resampled to fill transparent
+overview pixels. Existing observations and source gaps remain unchanged; no new downloads
+or drawing-time processing are needed. Original files remain untouched, even when the
+candidate package initially shares their hard links. The completed manifest records
+updated PNG checksums, sizes, observation counts and repair provenance before publication.
+Gaps without detailed observations remain transparent and require additional source coverage.
 
 Once the requested longitude and latitude spans are each
 at most 30°, independent asynchronous requests prepare a photographic river tile from

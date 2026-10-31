@@ -21,14 +21,6 @@
 /** @brief Opaque binding between a semantic provider and a root node. */
 typedef struct _TeX_context_t TeX_context_t;
 
-/** @brief Integral-transform meaning, independent of the native expression representation. */
-typedef enum {
-    TeX_TRANSFORM_LAPLACE,         /**< Forward Laplace transformation. */
-    TeX_TRANSFORM_INVERSE_LAPLACE, /**< Inverse Laplace transformation. */
-    TeX_TRANSFORM_FOURIER,         /**< Forward Fourier transformation. */
-    TeX_TRANSFORM_INVERSE_FOURIER  /**< Inverse Fourier transformation. */
-} TeX_transform_kind_t;
-
 /** @brief Mathematical relations supplied without typesetting commands. */
 typedef enum {
     TeX_RELATION_EQUAL,       /**< Equality. */
@@ -39,7 +31,9 @@ typedef enum {
     TeX_RELATION_GREATER_EQUAL, /**< Greater than or equal to. */
     TeX_RELATION_MEMBER,      /**< Membership of a set or region. */
     TeX_RELATION_DEFINITION,  /**< Defining equality. */
-    TeX_RELATION_IMPLIES      /**< Logical implication. */
+    TeX_RELATION_IMPLIES,     /**< Logical implication. */
+    TeX_RELATION_APPROXIMATE, /**< Approximate equality, without a numerical tolerance. */
+    TeX_RELATION_CONGRUENT    /**< Congruence, without testing geometric or algebraic equivalence. */
 } TeX_relation_t;
 
 /** @brief Standard number sets, supplied as mathematical meaning rather than commands. */

@@ -301,7 +301,7 @@ Ireland, Denmark, Netherlands, Italy, the requested Mediterranean and Atlantic
 islands, Portugal, Spain, coastal Svalbard and Cape Peninsula. Regional names,
 coverage bounds, processing details and output checksums are retained in the
 complete manifest imported into the globe database.
-Preparation for Brisbane, Sydney, Melbourne, Perth, the Sunshine Coast
+Preparation for mainland France, Brisbane, Sydney, Melbourne, Perth, the Sunshine Coast
 (Mooloolaba and Maroochydore), Canberra, Cairns, Alice Springs and the Gold Coast,
 New Zealand, Finland (including Åland), Sweden and mainland Norway uses the same
 quarterly source mosaics, reduced-resolution settings as Spain and lossless coastal

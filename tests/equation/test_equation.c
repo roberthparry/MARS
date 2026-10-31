@@ -2455,6 +2455,28 @@ static void example_equation_root_inverse(void)
     ASSERT_EQ_INT(status, EXIT_SUCCESS);
 }
 
+static void test_equation_relation_separators(void)
+{
+    static const char *const accepted[] = {"2*x + 3 == 7", "{2*x+3==7 | x=?}"};
+    for (size_t i = 0; i < sizeof accepted / sizeof *accepted; ++i) {
+        equation_t *equation = equ_from_string(accepted[i]);
+        equation_solutions_t *solutions = equ_derive_solutions(equation);
+        TEST_ASSERT_TRUE(equation && test_equation_result_contains_long(solutions, 2),
+                         "double equals retains ordinary exact-equation solving");
+        string_t *native = equation ? equ_to_text(equation, style_UNBOUND) : NULL;
+        TEST_ASSERT_TRUE(native && strstr(string_c_str(native), " = "), "native output uses one equality sign");
+        string_free(native);
+        equ_solutions_free(solutions);
+        equ_free(equation);
+    }
+    static const char *const rejected[] = {"x<=1", "x>=1", "x!=1", "x~~=1", "x~==1", "0<x<=1", "x==y==z"};
+    for (size_t i = 0; i < sizeof rejected / sizeof *rejected; ++i) {
+        equation_t *equation = equ_from_string(rejected[i]);
+        TEST_ASSERT_TRUE(!equation, "equation solvers must not reinterpret non-equality relations as exact equations");
+        equ_free(equation);
+    }
+}
+
 static void test_equation_basics(void)
 {
     TEST_RUN_SUBTEST(test_equation_compact_symmetric_surds, NULL);
@@ -2538,6 +2560,7 @@ int tests_main(void)
     TEST_SECTION("Equation Basics");
     TEST_RUN_IN_GROUP(test_equation_inverts_roots_and_constant_powers, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_preserves_principal_root_domain, tests, NULL);
+    TEST_RUN_IN_GROUP(test_equation_relation_separators, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_basics, tests, NULL);
 
     TEST_SECTION("Future Solver Cases");

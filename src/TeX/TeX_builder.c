@@ -8,6 +8,7 @@
  * remains supplied by the TeX module's private fragment constructors.
  */
 #include <errno.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -232,6 +233,27 @@ bool TeX_dup(TeX_builder_t *builder)
     return value ? TeX_push_notation(builder, value) : TeX_builder_fail(builder, ERANGE);
 }
 
+/* Release the validated top operand through the array's notation destructor. */
+bool TeX_drop(TeX_builder_t *builder)
+{
+    if (!TeX_operands(builder, 1))
+        return false;
+    array_remove(builder->values, array_size(builder->values) - 1);
+    return true;
+}
+
+/* Exchange the top two owned pointers while preserving their notation and metadata. */
+bool TeX_swap(TeX_builder_t *builder)
+{
+    if (!TeX_operands(builder, 2))
+        return false;
+    TeX_t **entries = array_get(builder->values, array_size(builder->values) - 2);
+    TeX_t *first = entries[0];
+    entries[0] = entries[1];
+    entries[1] = first;
+    return true;
+}
+
 /* Consume a literal level and shift only the selected HP48 ROLL pointer range. */
 bool TeX_roll(TeX_builder_t *builder)
 {
@@ -347,6 +369,13 @@ bool TeX_pow(TeX_builder_t *builder)
     return p && TeX_replace(builder, 2, TeX_arithmetic_scripts(p[0], NULL, p[1]));
 }
 
+/* Mark one complete operand with derivative primes without differentiating it. */
+bool TeX_prime(TeX_builder_t *builder, unsigned order)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1);
+    return p && TeX_replace(builder, 1, TeX_arithmetic_prime(p[0], order));
+}
+
 /* Consume base followed by its lower index. */
 bool TeX_subscript(TeX_builder_t *builder)
 {
@@ -373,6 +402,60 @@ bool TeX_equation(TeX_builder_t *builder, TeX_equation_style_t style)
 {
     const TeX_t *const *p = TeX_operands(builder, 2);
     return p && TeX_replace(builder, 2, TeX_classify(TeX_compose_equation(p[0], p[1], style), TeX_NODE_EQUATION));
+}
+
+static bool TeX_relation(TeX_builder_t *builder, TeX_relation_t relation)
+{
+    const TeX_t *const *p = TeX_operands(builder, 2);
+    return p && TeX_replace(builder, 2, TeX_classify(TeX_compose_relation(p[0], p[1], relation), TeX_NODE_RELATION));
+}
+
+/* Join the two top operands by an equality sign. */
+bool TeX_eq(TeX_builder_t *builder)
+{
+    return TeX_relation(builder, TeX_RELATION_EQUAL);
+}
+
+/* Join the two top operands by a not-equal sign. */
+bool TeX_ne(TeX_builder_t *builder)
+{
+    return TeX_relation(builder, TeX_RELATION_NOT_EQUAL);
+}
+
+/* Join the two top operands by a strictly-less-than sign. */
+bool TeX_lt(TeX_builder_t *builder)
+{
+    return TeX_relation(builder, TeX_RELATION_LESS);
+}
+
+/* Join the two top operands by a less-than-or-equal sign. */
+bool TeX_le(TeX_builder_t *builder)
+{
+    return TeX_relation(builder, TeX_RELATION_LESS_EQUAL);
+}
+
+/* Join the two top operands by a strictly-greater-than sign. */
+bool TeX_gt(TeX_builder_t *builder)
+{
+    return TeX_relation(builder, TeX_RELATION_GREATER);
+}
+
+/* Join the two top operands by a greater-than-or-equal sign. */
+bool TeX_ge(TeX_builder_t *builder)
+{
+    return TeX_relation(builder, TeX_RELATION_GREATER_EQUAL);
+}
+
+/* Join the two top operands by approximate equality without selecting a tolerance. */
+bool TeX_approx(TeX_builder_t *builder)
+{
+    return TeX_relation(builder, TeX_RELATION_APPROXIMATE);
+}
+
+/* Join the two top operands by congruence without comparing their values. */
+bool TeX_cong(TeX_builder_t *builder)
+{
+    return TeX_relation(builder, TeX_RELATION_CONGRUENT);
 }
 
 /* Apply visible delimiters without interpreting the enclosed notation. */
@@ -435,6 +518,23 @@ bool TeX_sum(TeX_builder_t *builder, TeX_limits_t limits)
     return p && TeX_replace(builder, count, TeX_classify(TeX_compose_sum(p[0], lower, upper), TeX_NODE_SUMMATION));
 }
 
+/* Compose optional product bounds after its mathematical body. */
+bool TeX_prod(TeX_builder_t *builder, TeX_limits_t limits)
+{
+    size_t count;
+    const TeX_t *lower, *upper;
+    const TeX_t *const *p = TeX_limit_operands(builder, 1, limits, &count, &lower, &upper);
+    return p && TeX_replace(builder, count,
+                           TeX_classify(TeX_compose_product(p[0], lower, upper), TeX_NODE_INDEXED_PRODUCT));
+}
+
+/* Consume the body and explicit source and target variables without evaluating the transform. */
+bool TeX_transform(TeX_builder_t *builder, TeX_transform_kind_t kind)
+{
+    const TeX_t *const *p = TeX_operands(builder, 3);
+    return p && TeX_replace(builder, 3, TeX_classify(TeX_compose_transform(p, kind), TeX_NODE_TRANSFORM));
+}
+
 /* Consume the body and integration variable before optional bounds. */
 bool TeX_integral(TeX_builder_t *builder, TeX_limits_t limits)
 {
@@ -449,6 +549,19 @@ bool TeX_derivative(TeX_builder_t *builder, unsigned order, TeX_derivative_style
 {
     const TeX_t *const *p = TeX_operands(builder, 2);
     return p && TeX_replace(builder, 2, TeX_classify(TeX_compose_derivative(p[0], p[1], order, style), TeX_NODE_DERIVATIVE));
+}
+
+/* Consume ordered coordinate variables and retain the native mixed-derivative presentation. */
+bool TeX_partial(TeX_builder_t *builder, size_t count)
+{
+    if (!TeX_builder_ready(builder))
+        return false;
+    if (!count)
+        return TeX_builder_fail(builder, EINVAL);
+    if (count > UINT_MAX || count == SIZE_MAX)
+        return TeX_builder_fail(builder, EOVERFLOW);
+    const TeX_t *const *p = TeX_operands(builder, count + 1);
+    return p && TeX_replace(builder, count + 1, TeX_classify(TeX_compose_partial(p, count), TeX_NODE_DERIVATIVE));
 }
 
 /* Pass a directly indexed row-major tail to matrix layout after overflow validation. */

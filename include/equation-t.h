@@ -359,6 +359,9 @@ void equ_print(const equation_t *equation);
  *   { lhs = rhs }
  *   { lhs = rhs | x = val, ...; [name] = val, ... }
  *
+ * The equality separator may also be written ==. Inequalities, approximate relations and relation chains
+ * belong to presentation input through TeX_from_expression(); this equation model accepts one exact equality.
+ *
  * A top-level additive arithmetic or quadratic sequence may abbreviate its
  * omitted terms with @c ... or @c … when three preceding like terms establish
  * its finite differences and one following like term supplies the endpoint.
@@ -375,6 +378,8 @@ equation_t *equ_from_string(const char *s);
 
 /**
  * @brief Construct an equation from text stored in a string.
+ *
+ * Accepts the same single exact equality, written = or ==, and optional bindings as equ_from_string().
  *
  * @param[in] text Borrowed string containing equation text; not consumed or modified.
  * @return Caller-owned equation, or NULL on invalid input or failure; release with equ_free.

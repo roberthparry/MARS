@@ -5,7 +5,8 @@
  * This optional offline maintainer tool combines a base texture package with labelled rendering plans. It checks
  * contiguous slot identities, bounds, dimensions, observation counts, PNG chunk CRCs and content digests before
  * publishing the manifest. Images are immutable hard links where possible, or copies across filesystems. File and
- * JSON operations use MARS APIs; only one encoded image is resident at a time. No database is changed here.
+ * JSON operations use MARS APIs; only one encoded image is resident at a time. An optional repair mode fills
+ * transparent overview gaps from indexed detail in a disposable output package. No database is changed here.
  */
 #include <errno.h>
 #include <math.h>
@@ -15,12 +16,14 @@
 #include <string.h>
 #include <sodium.h>
 #include <zlib.h>
+#include <gdal.h>
 
 #include "array-t.h"
 #include "file-t.h"
 #include "globe-t.h"
 #include "json-t.h"
 #include "string-t.h"
+#include "satellite_overviews.h"
 
 typedef struct {
     string_t *source;
@@ -193,7 +196,7 @@ static bool add_batch(satellite_catalogue_t *catalogue, const char *label, const
     return ok;
 }
 
-static bool assemble(int argc, char **argv)
+static bool assemble(int argc, char **argv, bool repair, const double *window)
 {
     string_t *path = string_sprintf("%s/manifest.json", argv[1]);
     json_t *manifest = load(path), *assets = json_clone(field(manifest, "assets"));
@@ -244,6 +247,17 @@ static bool assemble(int argc, char **argv)
         }
     }
     ok = ok && set(manifest, "regions", regions) && set(manifest, "assets", assets);
+    size_t repaired = 0;
+    string_t *output_directory = repair ? string_new_with(argv[2]) : NULL;
+    if (ok && repair) ok = output_directory && satellite_overviews_repair(output_directory, manifest, window, &repaired);
+    string_free(output_directory);
+    if (ok && repair) {
+        const json_t *updated = field(manifest, "assets");
+        catalogue->bytes = 0;
+        for (size_t i = 0; i < json_object_size(updated); ++i)
+            catalogue->bytes += (uint64_t)number(field(json_object_value_at(updated, i), "bytes"));
+        printf("Overview repair complete: %zu images updated.\n", repaired);
+    }
     if (ok && catalogue->coastal && catalogue->count > base_count) {
         uint64_t bytes = 0;
         for (size_t i = 0; i < catalogue->count; ++i) bytes += (uint64_t)number(field(catalogue->entries[i].asset, "bytes"));
@@ -273,9 +287,23 @@ static bool assemble(int argc, char **argv)
 /* Assemble a new package; the caller chooses when to replace the active source package and install it. */
 int main(int argc, char **argv)
 {
+    bool repair = (argc == 4 || argc == 8) && !strcmp(argv[1], "--repair-overviews");
+    double window[4];
+    bool bounded = repair && argc == 8;
+    for (unsigned i = 0; bounded && i < 4; ++i) {
+        char *end = NULL;
+        window[i] = strtod(argv[4 + i], &end);
+        if (!end || !*argv[4 + i] || *end || !isfinite(window[i])) return EXIT_FAILURE;
+    }
+    if (bounded && (window[0] < -180 || window[2] > 180 || window[1] < -90 || window[3] > 90 ||
+        window[0] >= window[2] || window[1] >= window[3])) return EXIT_FAILURE;
+    if (bounded) argc = 4;
+    if (repair) { --argc; ++argv; }
     if (argc < 3 || (argc - 3) % 3) {
-        fprintf(stderr, "Usage: %s base-textures output-textures [label plan.json rendered-directory]...\n", argv[0]);
+        fprintf(stderr, "Usage: %s base-textures output-textures [label plan.json rendered-directory]...\n"
+                        "       %s --repair-overviews base-textures output-textures [west south east north]\n", argv[0], argv[0]);
         return EXIT_FAILURE;
     }
-    return sodium_init() >= 0 && assemble(argc, argv) ? EXIT_SUCCESS : EXIT_FAILURE;
+    if (repair) GDALAllRegister();
+    return sodium_init() >= 0 && assemble(argc, argv, repair, bounded ? window : NULL) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

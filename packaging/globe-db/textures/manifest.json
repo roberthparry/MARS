@@ -1471,9 +1471,9 @@
       "width": 3600
     },
     "regional/1144.png": {
-      "bytes": 5438522,
+      "bytes": 14374341,
       "height": 3600,
-      "sha256": "c66589c44780715cc0199efbb1415168804e389e76181d77204931c69acdc8c3",
+      "sha256": "67b814ffbd752180432b0047060d61b762525bc500ca34300e2975e824e785a9",
       "width": 3600
     },
     "regional/1145.png": {
@@ -1483,9 +1483,9 @@
       "width": 3600
     },
     "regional/1146.png": {
-      "bytes": 16910088,
+      "bytes": 28599859,
       "height": 3600,
-      "sha256": "79dd71bcd077e7fcd0393c70e39c21f9a96337bff7be4f26a6547ddc118c0119",
+      "sha256": "e435d2318280ef54642d75948c13222050b4c71d0b293878fe5037bee704f623",
       "width": 3600
     },
     "regional/1147.png": {
@@ -1495,9 +1495,9 @@
       "width": 3600
     },
     "regional/1148.png": {
-      "bytes": 26601914,
+      "bytes": 29488982,
       "height": 3600,
-      "sha256": "862d17f1f805e398d40ecbb98d3b345d051a8d3e4b6dfdd38c0d65bfb2d26543",
+      "sha256": "c3f6b7d6aa761050070908f1e505476de6bc2d68393248744f215e4b910bd505",
       "width": 3600
     },
     "regional/1149.png": {
@@ -13197,7 +13197,7 @@
   },
   "attribution": "NASA Earth Observatory; Reto Stoeckli, NASA Goddard Space Flight Center. Historical July 2004 reference imagery. NASA imagery reuse policy applies; no endorsement implied.",
   "coastal_mask": {
-    "masked_bytes": 22251081477,
+    "masked_bytes": 22274594135,
     "removed_pixels": 8190962335,
     "shoreline_identity": "7092ec16da29f8e46c63affbebdbe5f19d3682ab0b1f7bdfc6324b7836ba3381",
     "source_bytes": 30896850652,
@@ -29234,9 +29234,16 @@
       ],
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "portugal Sentinel tile 1144",
+      "overview_gap_fill": {
+        "additional_source_pixels": 232142,
+        "additional_source_sha256": "47ca01580cb16577f69e434ba7ca845239d2434b71c4df86a3fb8d8a33f5ea97",
+        "filled_pixels": 3414706,
+        "method": "Transparent overview pixels filled from indexed packaged detail; area resampling; existing observations unchanged.",
+        "version": 1
+      },
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 3600-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
-      "valid_pixels": 2283086
+      "valid_pixels": 5929934
     },
     {
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
@@ -29262,9 +29269,16 @@
       ],
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "portugal Sentinel tile 1146",
+      "overview_gap_fill": {
+        "additional_source_pixels": 559914,
+        "additional_source_sha256": "a50827c4f988e109881e91cb50829f218bfa08c93506f02ce2855ee7edb5da45",
+        "filled_pixels": 4809813,
+        "method": "Transparent overview pixels filled from indexed packaged detail; area resampling; existing observations unchanged.",
+        "version": 1
+      },
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 3600-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent.",
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
-      "valid_pixels": 7590272
+      "valid_pixels": 12959999
     },
     {
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
@@ -29290,9 +29304,16 @@
       ],
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "portugal Sentinel tile 1148",
+      "overview_gap_fill": {
+        "additional_source_pixels": 197444,
+        "additional_source_sha256": "a80af80fcbf480960111ea7b8f52bc0a0402f97bab95cde9d8ce60dcb9a067f2",
+        "filled_pixels": 1098323,
+        "method": "Transparent overview pixels filled from indexed packaged detail; area resampling; existing observations unchanged.",
+        "version": 1
+      },
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 3600-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent.",
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
-      "valid_pixels": 11664233
+      "valid_pixels": 12960000
     },
     {
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",

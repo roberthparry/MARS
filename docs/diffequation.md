@@ -170,6 +170,14 @@ is normalised to the formal derivative notation used internally:
 | `y'(0) = 1` | `Dx(y)(0) = 1` | $\left.\dfrac{dy}{dx}\right\rvert_{x=0}=1$ |
 
 Prime notation can also be used directly in an ordinary differential equation.
+When this authored text is passed to `TeX_from_expression`, the presentation
+adapter retains prime notation and shows single-coordinate point conditions
+with function arguments. Canonical `de_to_text` output continues to normalise
+derivatives for consistent native round trips. Explicit coordinate derivatives
+and partial differential equations retain their labelled differential fractions.
+The complete [TeX prime example](TeX.md#prime-notation-with-rpn) also constructs
+the same ordinary equation and initial conditions through the RPN builder.
+
 An explicit independent-variable declaration takes precedence. Otherwise, an
 explicit derivative operator supplies the coordinate; without one, the parser
 uses `t` or `x` when exactly one occurs as a free symbol other than the dependent

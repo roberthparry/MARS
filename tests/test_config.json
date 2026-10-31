@@ -1,4 +1,63 @@
 {
+  "tests/TeX/test_TeX.c": {
+    "tests": {
+      "enabled": true,
+      "test_TeX_bound_problems": true,
+      "test_TeX_calculus": true,
+      "test_TeX_calculus_invalid_inputs": true,
+      "test_TeX_calculus_shorthand": true,
+      "test_TeX_compact_symbol_lookups": true,
+      "test_TeX_composition": true,
+      "test_TeX_context_calculus": true,
+      "test_TeX_context_callback_lifetime": true,
+      "test_TeX_context_semantics": true,
+      "test_TeX_context_validation": true,
+      "test_TeX_equations": true,
+      "test_TeX_escaping": true,
+      "test_TeX_expression_style": true,
+      "test_TeX_from_expression": true,
+      "test_TeX_from_expression_invalid": true,
+      "test_TeX_matrices_and_invalid_inputs": true,
+      "test_TeX_matrix_input": true,
+      "test_TeX_native_aggregate_contexts": true,
+      "test_TeX_native_contexts": true,
+      "test_TeX_native_index_roundtrip": true,
+      "test_TeX_native_layout": true,
+      "test_TeX_native_text_array": true,
+      "test_TeX_prime_input": true,
+      "test_TeX_prime_snapshot_modes": true,
+      "test_TeX_relation_input": true,
+      "test_TeX_relation_input_invalid": true,
+      "test_TeX_tensor_slots_and_fences": true,
+      "test_TeX_text_boundaries": true
+    }
+  },
+  "tests/TeX/test_TeX_builder.c": {
+    "tests": {
+      "enabled": true,
+      "test_TeX_builder_ascii_symbols": true,
+      "test_TeX_builder_calculus_and_tensors": true,
+      "test_TeX_builder_drop_swap": true,
+      "test_TeX_builder_drop_swap_errors": true,
+      "test_TeX_builder_general_indices": true,
+      "test_TeX_builder_hp48_stack": true,
+      "test_TeX_builder_inputs": true,
+      "test_TeX_builder_layout": true,
+      "test_TeX_builder_ownership": true,
+      "test_TeX_builder_partials": true,
+      "test_TeX_builder_primes": true,
+      "test_TeX_builder_products": true,
+      "test_TeX_builder_raw_source": true,
+      "test_TeX_builder_rejects_operator_symbols": true,
+      "test_TeX_builder_relation_scope": true,
+      "test_TeX_builder_relations": true,
+      "test_TeX_builder_stack": true,
+      "test_TeX_builder_stack_errors": true,
+      "test_TeX_builder_structured_arithmetic": true,
+      "test_TeX_builder_transactional_errors": true,
+      "test_TeX_builder_transforms": true
+    }
+  },
   "tests/almanac/test_almanac.c": {
     "readme_examples": {
       "enabled": true,
@@ -367,6 +426,7 @@
     "test_diffequ_nonlinear_characteristic_uses_power_rule": true,
     "test_diffequ_normalizes_bernoulli_arbitrary_constant": true,
     "test_diffequ_normalizes_variable_coefficient_sturm_liouville": true,
+    "test_diffequ_notation_rule_families": true,
     "test_diffequ_ordered_equation_TeX": true,
     "test_diffequ_parameter_linear_pde_accepts_parameter_rate": true,
     "test_diffequ_parameter_linear_pde_uses_general_rule": true,
@@ -378,6 +438,7 @@
     "test_diffequ_parses_separable_ode": true,
     "test_diffequ_parses_subscript_partial_derivatives": true,
     "test_diffequ_preserves_zero_singular_solution": true,
+    "test_diffequ_prime_conditions_with_declared_coordinate": true,
     "test_diffequ_radial_euler_pde": true,
     "test_diffequ_radial_euler_rejects_nonmatching_pde": true,
     "test_diffequ_rejects_noncanonical_text": true,
@@ -482,8 +543,7 @@
     "test_diffequ_wave_kirchhoff_family": true,
     "test_diffequ_wave_polynomial_data": true,
     "test_diffequ_wave_rejects_outside_family": true,
-    "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true,
-    "test_diffequ_notation_rule_families": true
+    "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true
   },
   "tests/equation/test_equation.c": {
     "readme_examples": {
@@ -491,8 +551,8 @@
       "example_equation_kepler": true,
       "example_equation_output_form": true,
       "example_equation_quadratic_solve": true,
-      "example_equation_sextic_solve": true,
-      "example_equation_root_inverse": true
+      "example_equation_root_inverse": true,
+      "example_equation_sextic_solve": true
     },
     "tests": {
       "enabled": true,
@@ -573,7 +633,8 @@
         "test_equation_future_solves_sin_family": true
       },
       "test_equation_inverts_roots_and_constant_powers": true,
-      "test_equation_preserves_principal_root_domain": true
+      "test_equation_preserves_principal_root_domain": true,
+      "test_equation_relation_separators": true
     }
   },
   "tests/executor/test_executor.c": {
@@ -1626,7 +1687,6 @@
       "test_ireland_historic_whit_monday_exists_in_1960": true,
       "test_jurisdiction_alaska_default_location_uses_juneau": true,
       "test_jurisdiction_catalogue_visitors": true,
-      "test_jurisdiction_place_lookup": true,
       "test_jurisdiction_configuration_file_io": true,
       "test_jurisdiction_database_builds_and_opens": true,
       "test_jurisdiction_default_gmt_offset_uses_database_dst_rules": true,
@@ -1634,6 +1694,7 @@
       "test_jurisdiction_default_location_returns_capital_coordinates": true,
       "test_jurisdiction_dst_transition_datetimes_expose_forward_and_back_changes": true,
       "test_jurisdiction_iceland_default_location_uses_reykjavik": true,
+      "test_jurisdiction_place_lookup": true,
       "test_jurisdiction_queries_weekend_and_holiday_status": true,
       "test_jurisdiction_svalbard_default_location_uses_longyearbyen": true,
       "test_jurisdiction_working_days_between_counts_business_days": true,
@@ -2587,6 +2648,13 @@
     "test_regression_and_forecast": true,
     "test_transforms_and_aggregation": true
   },
+  "tests/webgl/test_webgl.c": {
+    "tests": {
+      "enabled": true,
+      "test_globe_cap_has_no_application_zoom_policy": true,
+      "test_webgl_texture_unit_is_caller_owned": true
+    }
+  },
   "tests/webserver/test_webserver.c": {
     "readme_examples": {
       "enabled": true,
@@ -2640,6 +2708,25 @@
       "README_003": true,
       "README_004": true,
       "README_005": true,
+      "docs_TeX_001": true,
+      "docs_TeX_002": true,
+      "docs_TeX_003": true,
+      "docs_TeX_004": true,
+      "docs_TeX_005": true,
+      "docs_TeX_006": true,
+      "docs_TeX_007": true,
+      "docs_TeX_008": true,
+      "docs_TeX_009": true,
+      "docs_TeX_010": true,
+      "docs_TeX_011": true,
+      "docs_TeX_012": true,
+      "docs_TeX_013": true,
+      "docs_TeX_014": true,
+      "docs_TeX_015": true,
+      "docs_TeX_016": true,
+      "docs_TeX_017": true,
+      "docs_TeX_018": true,
+      "docs_TeX_019": true,
       "docs_almanac_001": true,
       "docs_array_001": true,
       "docs_array_002": true,
@@ -2781,20 +2868,7 @@
       "docs_xml_001": true,
       "docs_xml_002": true,
       "docs_xml_003": true,
-      "enabled": true,
-      "docs_TeX_001": true,
-      "docs_TeX_002": true,
-      "docs_TeX_003": true,
-      "docs_TeX_004": true,
-      "docs_TeX_005": true,
-      "docs_TeX_006": true,
-      "docs_TeX_007": true,
-      "docs_TeX_008": true,
-      "docs_TeX_009": true,
-      "docs_TeX_010": true,
-      "docs_TeX_011": true,
-      "docs_TeX_012": true,
-      "docs_TeX_013": true
+      "enabled": true
     }
   },
   "tools/mars_checks/tests/test_checks_build.c": {
@@ -2942,6 +3016,7 @@
       "test_cfg_database_failure": true,
       "test_cfg_database_globe": true,
       "test_cfg_database_globe_packaged": true,
+      "test_cfg_database_globe_plain": true,
       "test_cfg_database_jurisdiction": true,
       "test_cfg_database_jurisdiction_plain": true,
       "test_cfg_database_large": true,
@@ -2949,14 +3024,13 @@
       "test_cfg_database_paths": true,
       "test_cfg_database_plain": true,
       "test_cfg_database_precedence": true,
+      "test_cfg_database_public_ddl": true,
       "test_cfg_database_rivers": true,
       "test_cfg_database_sardinia": true,
       "test_cfg_database_stream": true,
       "test_cfg_database_trace": true,
-      "test_cfg_database_update": true,
-      "test_cfg_database_globe_plain": true,
       "test_cfg_database_transaction_finish": true,
-      "test_cfg_database_public_ddl": true
+      "test_cfg_database_update": true
     }
   },
   "tools/mars_config/tests/test_cfg_locales.c": {
@@ -3027,6 +3101,7 @@
     "tests": {
       "enabled": true,
       "test_cfg_rivers_compressed_input": true,
+      "test_cfg_rivers_main_selection": true,
       "test_cfg_rivers_neighbourhoods": true,
       "test_cfg_rivers_numeric_decoder": true,
       "test_cfg_rivers_osm_import_and_display": true,
@@ -3034,8 +3109,7 @@
       "test_cfg_rivers_stage": true,
       "test_cfg_rivers_storage_budget": true,
       "test_cfg_rivers_storage_chunks": true,
-      "test_cfg_rivers_storage_detail": true,
-      "test_cfg_rivers_main_selection": true
+      "test_cfg_rivers_storage_detail": true
     }
   },
   "tools/mars_config/tests/test_cfg_storage.c": {
@@ -3058,11 +3132,11 @@
     },
     "tests": {
       "enabled": true,
-      "test_cfg_textures_install": true,
       "test_cfg_textures_capacity": true,
+      "test_cfg_textures_install": true,
+      "test_cfg_textures_manifest": true,
       "test_cfg_textures_migration": true,
       "test_cfg_textures_rollback": true,
-      "test_cfg_textures_manifest": true,
       "test_cfg_textures_staged": true
     }
   },
@@ -3078,6 +3152,19 @@
     "tests": {
       "enabled": true,
       "test_lab_browser": true
+    }
+  },
+  "tools/mars_lab/tests/satellite/test_satellite_mask.c": {
+    "tests": {
+      "enabled": true,
+      "test_satellite_coastal_mask": true
+    }
+  },
+  "tools/mars_lab/tests/satellite/test_satellite_overviews.c": {
+    "tests": {
+      "enabled": true,
+      "test_overview_observations": true,
+      "test_planner_requires_observations": true
     }
   },
   "tools/mars_lab/tests/test_lab_almanac_presentation.c": {
@@ -3191,6 +3278,7 @@
       "test_lab_extra_mesh_closed": true,
       "test_lab_extra_mesh_crossings": true,
       "test_lab_extra_native_records": true,
+      "test_lab_extra_nested_root_equation": true,
       "test_lab_extra_number_card_markup": true,
       "test_lab_extra_plot": true,
       "test_lab_extra_plot_availability": true,
@@ -3216,8 +3304,7 @@
       "test_lab_extra_surface_slices": true,
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,
-      "test_lab_extra_unsafe_TeX_input": true,
-      "test_lab_extra_nested_root_equation": true
+      "test_lab_extra_unsafe_TeX_input": true
     }
   },
   "tools/mars_lab/tests/test_lab_forms.c": {
@@ -3968,64 +4055,6 @@
       "test_tba_rows": true,
       "test_tba_stream": true,
       "test_tba_worker": true
-    }
-  },
-  "tests/TeX/test_TeX_builder.c": {
-    "tests": {
-      "enabled": true,
-      "test_TeX_builder_ownership": true,
-      "test_TeX_builder_stack": true,
-      "test_TeX_builder_hp48_stack": true,
-      "test_TeX_builder_stack_errors": true,
-      "test_TeX_builder_transactional_errors": true,
-      "test_TeX_builder_inputs": true,
-      "test_TeX_builder_layout": true,
-      "test_TeX_builder_calculus_and_tensors": true,
-      "test_TeX_builder_structured_arithmetic": true,
-      "test_TeX_builder_rejects_operator_symbols": true,
-      "test_TeX_builder_ascii_symbols": true
-    }
-  },
-  "tests/TeX/test_TeX.c": {
-    "tests": {
-      "enabled": true,
-      "test_TeX_bound_problems": true,
-      "test_TeX_calculus": true,
-      "test_TeX_calculus_invalid_inputs": true,
-      "test_TeX_calculus_shorthand": true,
-      "test_TeX_composition": true,
-      "test_TeX_context_callback_lifetime": true,
-      "test_TeX_context_semantics": true,
-      "test_TeX_context_validation": true,
-      "test_TeX_equations": true,
-      "test_TeX_escaping": true,
-      "test_TeX_expression_style": true,
-      "test_TeX_from_expression": true,
-      "test_TeX_from_expression_invalid": true,
-      "test_TeX_matrices_and_invalid_inputs": true,
-      "test_TeX_matrix_input": true,
-      "test_TeX_native_contexts": true,
-      "test_TeX_native_index_roundtrip": true,
-      "test_TeX_native_layout": true,
-      "test_TeX_native_text_array": true,
-      "test_TeX_tensor_slots_and_fences": true,
-      "test_TeX_text_boundaries": true,
-      "test_TeX_context_calculus": true,
-      "test_TeX_native_aggregate_contexts": true,
-      "test_TeX_compact_symbol_lookups": true
-    }
-  },
-  "tests/webgl/test_webgl.c": {
-    "tests": {
-      "enabled": true,
-      "test_globe_cap_has_no_application_zoom_policy": true,
-      "test_webgl_texture_unit_is_caller_owned": true
-    }
-  },
-  "tools/mars_lab/tests/satellite/test_satellite_mask.c": {
-    "tests": {
-      "enabled": true,
-      "test_satellite_coastal_mask": true
     }
   }
 }

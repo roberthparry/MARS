@@ -35,14 +35,15 @@
 typedef TeX_t *(*notation_read_fn)(void *context, const string_t *text);
 
 /**
- * @brief Parse native equation input and delegate its operands through a borrowed reader.
- * @param text Borrowed input containing the sides and optional native bindings.
- * @param read Required operand reader returning owned notation for each side.
+ * @brief Parse a native equation or relation chain and delegate operands through a borrowed reader.
+ * @param text Borrowed input containing relation operands and optional native bindings.
+ * @param read Required operand reader returning owned notation for each operand.
  * @param context Borrowed reader state passed unchanged to read.
  * @param recognised Required caller-owned flag initialised to false; set true when this parser claims input.
  * @return Owned notation released with TeX_free, or NULL for unrecognised input or failure.
  * @note A true recognised flag with NULL output indicates a failed claimed input, not permission to try
  * another grammar. Operands are read sequentially and all intermediate notation is released internally.
+ * Relations are presented without numerical comparison, tolerance selection or inequality solving.
  */
 TeX_t *equ_notation_input(const string_t *text, notation_read_fn read, void *context, bool *recognised);
 

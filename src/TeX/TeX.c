@@ -288,6 +288,12 @@ TeX_t *TeX_compose_sum(const TeX_t *body, const TeX_t *lower, const TeX_t *upper
     return body ? TeX_adopt(TeX_bounded_body("\\sum", body, lower, upper)) : TeX_invalid();
 }
 
+/* Compose a bounded product using the same annotation layout as summation. */
+TeX_t *TeX_compose_product(const TeX_t *body, const TeX_t *lower, const TeX_t *upper)
+{
+    return body ? TeX_adopt(TeX_bounded_body("\\prod", body, lower, upper)) : TeX_invalid();
+}
+
 /* Compose an integral and its differential without performing integration. */
 TeX_t *TeX_compose_integral(const TeX_t *body, const TeX_t *variable, const TeX_t *lower, const TeX_t *upper)
 {

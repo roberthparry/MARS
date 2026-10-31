@@ -40,8 +40,9 @@ TeX_t *TeX_symbol(const char *name)
     while (valid && !string_cursor_done(cursor)) {
         rune_t rune = string_cursor_peek(cursor);
         unsigned cp = rune_value(rune);
-        bool glyph = cp == 0x2202 || cp == 0x221e;
-        valid = (rune_is_alpha_numeric(rune) || cp == '_' || (first && glyph)) &&
+        bool alphanumeric = rune_is_alpha_numeric(rune);
+        bool glyph = !alphanumeric && TeX_symbol_codepoint(cp) != NULL;
+        valid = (alphanumeric || cp == '_' || (first && glyph)) &&
                 (!first || !rune_is_digit(rune)) && (!singleton || first);
         if (first && glyph) singleton = cp;
         if (string_cursor_next(cursor)) valid = false;
@@ -116,4 +117,18 @@ TeX_t *TeX_arithmetic_scripts(const TeX_t *base, const TeX_t *lower, const TeX_t
     TeX_t *result = body ? TeX_compose_scripts(body, lower, upper) : NULL;
     TeX_free(owned);
     return TeX_classify(result, kind);
+}
+
+/* Preserve the scope of a complete operand before attaching derivative primes. */
+TeX_t *TeX_arithmetic_prime(const TeX_t *body, unsigned order)
+{
+    if (!order) {
+        errno = EINVAL;
+        return NULL;
+    }
+    TeX_t *owned = NULL;
+    const TeX_t *operand = TeX_grouped(TeX_NODE_PRIME, body, 0, &owned);
+    TeX_t *result = operand ? TeX_compose_prime(operand, order) : NULL;
+    TeX_free(owned);
+    return TeX_classify(result, TeX_NODE_PRIME);
 }
