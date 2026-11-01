@@ -385,13 +385,19 @@ coordinates produce one result with the more specific membership; distinct
 places with the same name remain separate.
 Callback records belong to the catalogue and are valid only during the callback.
 A country or region match selects its default catalogue town, falling back to
-the first indexed local town. For example, `Svalbard` finds Longyearbyen. Exact
-town and named-place matches take precedence over prefix-only results; areas
+the first indexed local town. For example, `Svalbard` finds Longyearbyen. An exact
+country or region match precedes a town with the same name; searching `Wales`
+therefore returns the Welsh reference before the English namesake village.
+Exact town and named-place matches take precedence over prefix-only results; areas
 without catalogue towns have no result.
 Named-place aliases provide reference towns for geographic names outside the
 administrative catalogue. The managed aliases include Pico → Madalena, Faial →
 Horta, Terceira → Angra do Heroísmo, and São Miguel or Azores → Ponta Delgada.
 Cornwall resolves to Newquay, and Isle of Wight resolves to Newport on that island.
+Mersea Island resolves to the existing West Mersea reference town in Essex.
+Hayling Island resolves to South Hayling in Hampshire.
+Qualified aliases such as `Wales, Sheffield` also label ordinary town matches
+without changing their identity, coordinates or English jurisdiction.
 The alternative spelling `Isle of White` is indexed as context for Isle of Wight.
 Constituent-country and Isle of Man names use their existing jurisdiction indexes
 and representative towns.

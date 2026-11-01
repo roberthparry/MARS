@@ -212,7 +212,7 @@ static int cfg_databases_prepare(bool install_missing)
          CFG_GLOBE_DATA_REVISION, cfg_database_globe_refresh, NULL, true},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac, false},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 14, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
+         "jurisdiction/mars_jurisdiction_rules.db", 17, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)

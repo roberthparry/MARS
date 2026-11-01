@@ -64,6 +64,8 @@ void lab_location_search_status(node_jsref select, lab_location_search_state_t s
  * @return True after rendering, including no matches; false for malformed data or native allocation failure.
  * @note Copied town data enter the bounded native catalogue. Suggestions show catalogue-owned country/region
  * labels, while original names and selection keys remain unchanged. No country or worksheet field is selected.
+ * Towns sharing a returned area name receive a jurisdiction qualifier. A temporary native dictionary owns
+ * these comparisons and is released before return; no name lookup scans the result list.
  */
 bool lab_location_search_results(node_jsref select, jsref response);
 

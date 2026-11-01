@@ -185,8 +185,11 @@ bool jurisdict_each_town_country_batch(jurisdiction_t *jurisdiction, const char 
  * @return True on completion, including no matches, or visitor stop; false on invalid arguments or query failure.
  * @note Requires the managed Unicode town and area indexes. Missing indexes fail without a full catalogue scan.
  * A matching country or region contributes its default town, or first indexed local town when no default exists.
- * Exact town and place names precede prefix-only matches; areas without catalogue towns contribute no result.
+ * Exact country and region names precede same-named towns. Exact town and place names precede prefix-only
+ * matches; areas without catalogue towns contribute no result.
  * A named-place alias retains the original town record and supplies matched_name for optional display.
+ * A recorded qualified alias beginning with the town name and a comma also supplies matched_name when the
+ * ordinary town name matches, allowing namesake places to keep their catalogue-owned locality labels.
  * Only 256 ranked candidates reach duplicate elimination. Identical names and coordinates within one country
  * prefer the regional record; distinct places retain their identity. Borrowed fields live only during the callback;
  * no ownership transfers. Names, elevations, time zones and regional rule memberships remain unchanged.

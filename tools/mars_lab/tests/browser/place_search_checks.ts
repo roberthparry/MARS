@@ -38,12 +38,14 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
     const wales = new Option('Britain (UK) - Wales', 'GB-WLS');
     wales.dataset.countryParent = 'GB-WLS';
     country.append(wales);
-    country.append(new Option('Britain (UK) - England', 'GB-ENG'));
+    const england = new Option('Britain (UK) - England', 'GB-ENG');
+    england.dataset.countryParent = 'GB-ENG';
+    country.append(england, new Option('Singapore', 'SG'));
     country.value = 'GB'; town.append(new Option('Previous town', 'previous'));
     Reflect.set(country, 'labJurisdictionLabels', {
         NA: 'Namibia', GB: 'United Kingdom', SJ: 'Svalbard & Jan Mayen', PT: 'Portugal',
         'PT-20': 'Portugal — Região Autónoma dos Açores', 'GB-WLS': 'Britain (UK) - Wales',
-        'GB-ENG': 'Britain (UK) - England'
+        'GB-ENG': 'Britain (UK) - England', SG: 'Singapore'
     });
     root.append(country, town, select); document.body.append(root);
     const menu = WorksheetLocations.selects.enhance(select, {searchable: true, details: true});
@@ -74,6 +76,7 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
     WorksheetResults.tooltip.rememberCountry('PT-20', 'Portugal', flag);
     WorksheetResults.tooltip.rememberCountry('SJ', 'Svalbard & Jan Mayen', '');
     WorksheetResults.tooltip.rememberCountry('GB-CON', 'Cornwall, England', cornishFlag);
+    WorksheetResults.tooltip.rememberCountry('SG', 'Singapore', '');
     async function edit(query: string): Promise<void> {
         input.value = query;
         input.dispatchEvent(new Event('input', {bubbles: true}));
@@ -169,6 +172,38 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
         await flagVisible(region, cornishFlag);
         check(region.textContent?.includes('Cornwall — Newquay') && region.textContent.includes('Britain (UK) - England'),
               'regional artwork preserves both the named place and its country label');
+        const welshFlag = 'data:image/svg+xml;base64,' + btoa(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 18"><path fill="#c23" d="M0 0h24v18H0z"/></svg>');
+        WorksheetResults.tooltip.rememberCountry('GB-WLS', 'Wales', welshFlag);
+        WorksheetResults.tooltip.rememberCountry('GB-ENG', 'England', flag);
+        const welshCountry: LabTown = {...welsh, matched_name: 'Wales', country_code: 'GB-WLS'};
+        const englishVillage: LabTown = {...english, name: 'Wales', matched_name: 'Wales, Sheffield', country_code: 'GB-ENG',
+            value: 'Wales|53.34061|-1.28162|110', latitude: '53.34061', longitude: '-1.28162', elevation: '110'};
+        check(labDOM.call('lab_location_search_results', select, {available: true, matches: [welshCountry, englishVillage]}),
+              'the country and its English namesake are independently prepared');
+        const namesakes = shell.querySelectorAll<HTMLButtonElement>('.select-option:not(.hidden)');
+        check(namesakes[0]?.textContent?.includes('Wales — Rhyl') && namesakes[0].dataset.countryCode === 'GB-WLS',
+              'the country Wales retains its Welsh flag identity');
+        check(namesakes[1]?.querySelector('.select-option-label')?.textContent === 'Wales, Sheffield' &&
+              namesakes[1].dataset.countryCode === 'GB-ENG',
+              'the English village is explicitly qualified instead of masquerading as the country');
+        await flagVisible(namesakes[0], welshFlag);
+        await flagVisible(namesakes[1], flag);
+        select.value = 'GB-WLS:' + welsh.value;
+        check(labDOM.call('lab_location_search_choose', select) && country.value === 'GB-WLS' && town.value === welsh.value,
+              'selecting the Welsh country reference cannot choose the English namesake');
+        check(labDOM.call('lab_location_search_results', select, {
+            available: true, matches: [welshCountry, {...englishVillage, matched_name: undefined}]
+        }), 'a catalogue without a recorded locality label still supports namesake results');
+        check(shell.querySelectorAll('.select-option:not(.hidden) .select-option-label')[1]?.textContent === 'Wales, England',
+              'unqualified namesakes receive a native jurisdiction fallback until locality data are installed');
+        const singapore: LabTown = {...row, name: 'Singapore', matched_name: 'Singapore', jurisdiction: 'SG',
+            value: 'Singapore|1.28967|103.85007|23', latitude: '1.28967', longitude: '103.85007',
+            elevation: '23', timezone: 'Asia/Singapore'};
+        check(labDOM.call('lab_location_search_results', select, {available: true, matches: [singapore]}),
+              'a country and representative town may share a name');
+        const sameName = shell.querySelector('.select-option:not(.hidden) .select-option-label');
+        check(sameName?.textContent === 'Singapore', 'identical country and town names are displayed once');
     } finally {
         WorksheetResults.tooltip.hide();
         controller.dispose(); menu?.dispose();

@@ -113,6 +113,9 @@ END;
 -- Island/town associations: official Azores guide, https://www.visitazores.com/storage/media/2022/03/feel-alive-en.pdf
 -- Coordinates identify existing catalogue references; no new town, height, time zone or jurisdiction is invented.
 -- UK references use coordinates already recorded in the packaged GeoNames town catalogue.
+-- Mersea Island's reference town: https://westmerseatowncouncil.gov.uk/visit-mersea
+-- Hayling Island's reference settlement: https://www.havant.gov.uk/sites/default/files/documents/LCASection5Hayling35to40.pdf
+-- Wales / Sheffield locality: https://www.walesparishcouncil.gov.uk/
 WITH seeds(name, context, code, latitude, longitude) AS (
     VALUES ('Pico', 'Azores, Portugal', 'PT-20', 38.53642, -28.5266),
            ('Faial', 'Azores, Portugal', 'PT-20', 38.5333, -28.6333),
@@ -120,7 +123,10 @@ WITH seeds(name, context, code, latitude, longitude) AS (
            ('São Miguel', 'Azores, Portugal', 'PT-20', 37.7412, -25.6756),
            ('Azores', 'Portugal', 'PT-20', 37.7412, -25.6756),
            ('Cornwall', 'England, Britain (UK)', 'GB-ENG', 50.41557, -5.07319),
-           ('Isle of Wight', 'Isle of White, England, Britain (UK)', 'GB-ENG', 50.70146, -1.29124)
+           ('Isle of Wight', 'Isle of White, England, Britain (UK)', 'GB-ENG', 50.70146, -1.29124),
+           ('Mersea Island', 'Essex, England, Britain (UK)', 'GB-ENG', 51.77798, 0.91873),
+           ('Hayling Island', 'Hampshire, England, Britain (UK)', 'GB-ENG', 50.78773, -0.97697),
+           ('Wales, Sheffield', 'South Yorkshire, England, Britain (UK)', 'GB-ENG', 53.34061, -1.28162)
 )
 INSERT OR IGNORE INTO jurisdiction_place_alias(name, context, jurisdiction_town_id)
 SELECT seed.name, seed.context, town.jurisdiction_town_id

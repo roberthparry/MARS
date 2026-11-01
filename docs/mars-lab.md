@@ -333,6 +333,12 @@ such as Picos in other countries. Faial, Terceira and São Miguel are also index
 England, Wales, Scotland, Northern Ireland and the Isle of Man can be searched by
 name. Cornwall selects Newquay, and the Isle of Wight selects Newport; the search
 also accepts `Isle of White` and displays the correct Isle of Wight name.
+`Mersea Island` finds **Mersea Island — West Mersea** in Essex, England.
+`Hayling Island` finds **Hayling Island — South Hayling** in Hampshire, England.
+Exact country and region matches appear before same-named towns. Searching
+`Wales` puts **Wales — Rhyl**, with the Welsh flag, before **Wales, Sheffield**,
+the English village. Namesake towns receive jurisdiction qualifiers through a
+temporary native dictionary; their original selection keys and flags stay intact.
 Suggestions show the available country or regional SVG flag beside the place name,
 followed by their country or region
 to distinguish places with the same name. Typing leaves the observer unchanged;
