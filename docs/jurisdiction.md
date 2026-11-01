@@ -368,6 +368,37 @@ updating the globe database alone does not update towns.
 one non-empty jurisdiction code, without implicit parent or child expansion.
 It shares the page limits, cursor semantics and borrowed callback records below.
 
+`jurisdict_each_town_country_batch()` includes both a country's own town records
+and those belonging to its direct administrative subdivisions. Pass a two-letter
+uppercase country code. Paging remains in ascending town-ID order; each callback
+retains the town's actual jurisdiction, time zone and default marker. This lets
+country pickers offer all regions together without merging their calendar rules.
+The ownership, limits and cursor lifetime match the other paged visitors.
+
+`jurisdict_search_towns()` searches the installed worldwide town, country and
+region name indexes without requiring a selected country. Matching ignores case
+and accents and completes the final word as a prefix: `Luderitz` finds `Lüderitz`
+in Namibia. Input is literal text,
+not query syntax. Supply at least two characters, at most 256 UTF-8 bytes, and a
+result limit of 1–64. Duplicate national and regional records at the same
+coordinates produce one result with the more specific membership; distinct
+places with the same name remain separate.
+Callback records belong to the catalogue and are valid only during the callback.
+A country or region match selects its default catalogue town, falling back to
+the first indexed local town. For example, `Svalbard` finds Longyearbyen. Exact
+town and named-place matches take precedence over prefix-only results; areas
+without catalogue towns have no result.
+Named-place aliases provide reference towns for geographic names outside the
+administrative catalogue. The managed aliases include Pico → Madalena, Faial →
+Horta, Terceira → Angra do Heroísmo, and São Miguel or Azores → Ponta Delgada.
+`Pico Azores` also matches through its indexed context. Exact town and alias names
+rank before prefix-only matches such as Picos. The callback's optional
+`matched_name` supplies the geographic label; the town identity, elevation and
+time zone remain unchanged. Aliases are stored in `jurisdiction_place_alias`, with
+foreign keys and triggers maintaining `jurisdiction_place_search` when edited.
+A missing index reports failure rather than scanning the catalogue; installing
+or updating the jurisdiction database builds the index and its maintenance triggers.
+
 `jurisdict_each_town_batch()` provides indexed, ascending-ID pagination for
 bounded transports. Start with ID zero, request 1–1024 records, and continue
 with the returned last ID until an empty batch returns zero. Records are borrowed

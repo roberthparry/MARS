@@ -588,9 +588,9 @@ and land/water classification. Harbour water, inland water and the 500-metre
 near-shore band do not suppress a covered country's name or flag code. If a point
 falls outside every administrative polygon, an exact detailed-shoreline test can
 confirm that it is land despite the generalised country outline. An indexed search
-then accepts a country only if its outline is within one kilometre and no other
+then accepts a country only if its outline is within 2.5 kilometres and no other
 country's outline occurs within that distance. This covers small coastal gaps such
-as central Juneau without a saved town or selected jurisdiction. Water, missing
+as central Juneau and narrow Norwegian headlands without a saved town or selected jurisdiction. Water, missing
 shoreline, administrative border points, overlapping polygons and competing nearby
 countries do not use this fallback. Distances use the same local tangent-plane
 approximation as shoreline proximity queries. No maritime buffer is introduced,
@@ -721,6 +721,10 @@ Town batches use the same elevation fallback as the jurisdiction catalogue:
 missing elevations and legacy `-9999` DEM no-data markers become `0` metres.
 Valid negative elevations remain unchanged. The fallback is an assumption for
 observer selection, not a measured altitude; users should supply their actual height.
+
+The shared `globe_place_t` record also has an optional `matched_name` for
+geographic searches that resolve an island or area to a reference town. Ordinary
+enumeration leaves it NULL; the original town name and selection identity remain unchanged.
 
 ## Ownership and layer availability
 
@@ -858,6 +862,13 @@ catalogue identities nor selection values change.
 `globe_towns_jurisdiction_batch()` uses indexed membership to read only one
 jurisdiction, with the same cursor and callback ownership as `globe_towns_batch()`.
 It does not implicitly include parent or child jurisdictions.
+
+`globe_towns_country_batch()` includes a country's own towns and those of its
+direct administrative subdivisions, using the catalogue hierarchy. It accepts
+a two-letter uppercase country code and preserves each town's original
+jurisdiction and time zone. Page sizes, ascending-ID cursors and borrowed
+callback lifetimes match the other town visitors; it does not merge duplicates
+or change regional calendar rules.
 
 `globe_towns_batch()` reads bounded, ascending-ID pages of at most 1024 towns
 through `globe_place_visit_fn`. Its borrowed `globe_place_t` fields retain stored

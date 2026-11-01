@@ -113,6 +113,12 @@ typedef enum {
     TeX_NODE_ASSIGNMENT,  /**< A variable and its assigned evaluation value. */
     TeX_NODE_BINDING_ASSIGNMENT, /**< A symbol and its value in an expression binding list. */
     TeX_NODE_HAT,         /**< One mathematical object marked with a wide hat. */
+    TeX_NODE_DAGGER,      /**< One mathematical object marked as an adjoint, without evaluation. */
+    TeX_NODE_BRA,         /**< One state label enclosed as a bra. */
+    TeX_NODE_KET,         /**< One state label enclosed as a ket. */
+    TeX_NODE_BRAKET,      /**< Left and right state labels of an inner product. */
+    TeX_NODE_KETBRA,      /**< Ket and bra labels of an outer product, in that order. */
+    TeX_NODE_MATRIX_ELEMENT, /**< Left state label, operator and right state label, in that order. */
     TeX_NODE_PRIME,       /**< One object with a positive derivative order in prime notation. */
     TeX_NODE_BOLD,        /**< One mathematical symbol or expression in bold. */
     TeX_NODE_CALLIGRAPHIC, /**< One mathematical symbol in calligraphic style. */
@@ -137,6 +143,8 @@ typedef enum {
  * variable and optionally an upper bound alone or both bounds. SUBSCRIPT supplies base and index.
  * EVALUATION supplies a body and one or more variable-assignment children.
  * PRIME supplies one object and a positive derivative order for prime notation.
+ * HAT, DAGGER, BRA and KET each supply one object or state label. BRAKET and KETBRA supply two labels;
+ * MATRIX_ELEMENT supplies left state label, operator and right state label. None evaluates its operands.
  * BOLD and CALLIGRAPHIC each supply one mathematical object. INTEGRAL_CONDITION
  * supplies an integrand, an integration condition and a differential measure.
  * DOMAIN contains a body followed by conditions; domain_qualification marks its

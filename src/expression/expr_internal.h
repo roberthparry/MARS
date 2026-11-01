@@ -461,6 +461,16 @@ bool expr_match_neg_expr(const expr_t *expr, const expr_t **arg_out);
 /** @brief Parse authored mathematical presentation while retaining functions and calculus operations. */
 expr_t *expr_from_presentation_text_internal(const string_t *text);
 
+/**
+ * @brief Parse operator-notation input without evaluating or reordering its arithmetic.
+ * @param text Borrowed native mathematical text; neither retained nor modified.
+ * @param formal Allow ordinary undeclared function calls, as required for equation-side presentation.
+ * @return Owned expression released with expr_free(), or NULL for invalid input or allocation failure.
+ * @note Operator accents and Dirac forms are notation-only arbitrary calls. This private entry point does
+ * not add quantum evaluation to the public expression parser; its scoped parsing flags are restored on return.
+ */
+expr_t *expr_from_notation_text_internal(const string_t *text, bool formal);
+
 /** Simplify a forward or inverse integral-transform operator, retaining unsupported transforms. */
 expr_t *expr_transform_result(const expr_t *transform);
 

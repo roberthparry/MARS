@@ -84,7 +84,7 @@ static bool lab_browser_prepare(const char *directory)
                                           "calendar_checks.js",       "persist_checks.js",
                                           "widgets_checks.js",        "evaluation_checks.js",
                                           "select_checks.js",         "projection_checks.js",
-                                          "workspace_dom_checks.js",  "location_dom_checks.js",
+                                          "workspace_dom_checks.js",  "location_dom_checks.js", "place_search_checks.js",
                                           "result_dom_checks.js",     "binding_dom_checks.js",
                                           "payload_checks.js",        "picker_dom_checks.js",
                                           "storage_checks.js",        "evaluation_cards_checks.js",
@@ -153,6 +153,7 @@ static bool lab_browser_run(const char *directory)
     bool profile_ready = profile && file_create_directory(profile, 0700, false);
     file_t *preferences = profile_ready ? lab_browser_file(file_path(profile), "user.js") : NULL;
     string_t *settings = string_new_with("user_pref(\"dom.ipc.processCount\", 1);\n"
+                                         "user_pref(\"browser.dom.window.dump.enabled\", true);\n"
                                          "user_pref(\"fission.autostart\", false);\n"
                                          "user_pref(\"browser.startup.page\", 0);\n"
                                          "user_pref(\"browser.shell.checkDefaultBrowser\", false);\n"
@@ -170,13 +171,14 @@ static bool lab_browser_run(const char *directory)
     bool catalogue_check = getenv("MARS_LAB_CATALOGUE_CHECKS") && !strcmp(getenv("MARS_LAB_CATALOGUE_CHECKS"), "1");
     bool globe_check = getenv("MARS_LAB_GLOBE_CHECKS") && !strcmp(getenv("MARS_LAB_GLOBE_CHECKS"), "1");
     bool select_check = getenv("MARS_LAB_SELECT_CHECKS") && !strcmp(getenv("MARS_LAB_SELECT_CHECKS"), "1");
+    bool country_check = getenv("MARS_LAB_COUNTRY_CHECKS") && !strcmp(getenv("MARS_LAB_COUNTRY_CHECKS"), "1");
     bool history_check = getenv("MARS_LAB_HISTORY_CHECKS") && !strcmp(getenv("MARS_LAB_HISTORY_CHECKS"), "1");
     bool evaluation_check = getenv("MARS_LAB_EVALUATION_CHECKS") && !strcmp(getenv("MARS_LAB_EVALUATION_CHECKS"), "1");
     string_t *url =
         server ? string_sprintf("http://127.0.0.1:%u/%s", lab_svr_port(server),
                                 startup_check ? "?startup-check=1" : evaluation_check ? "?evaluation-check=1" :
                                 history_check ? "?history-check=1" :
-                                select_check ? "?select-check=1" :
+                                country_check ? "?country-check=1" : select_check ? "?select-check=1" :
                                 globe_check ? "?globe-check=1" :
                                 catalogue_check ? "?catalogue-check=success" :
                                 profiling ? "?profile=1" : "") : NULL;

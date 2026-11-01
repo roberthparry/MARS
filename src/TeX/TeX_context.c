@@ -379,10 +379,9 @@ static TeX_t *render_subscript(const TeX_node_view_t *view, const TeX_t *const *
         TeX_source(children[0]), TeX_source(children[1]))) : invalid_node();
 }
 
-static TeX_t *render_hat(const TeX_node_view_t *view, const TeX_t *const *children)
+static TeX_t *render_quantum(const TeX_node_view_t *view, const TeX_t *const *children)
 {
-    return view->child_count == 1u ? from_owned_source(string_sprintf("\\widehat{%s}",
-        TeX_source(children[0]))) : invalid_node();
+    return TeX_compose_quantum(view->kind, children, view->child_count);
 }
 
 static TeX_t *render_prime(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -871,7 +870,13 @@ static const TeX_node_renderer_fn renderers[TeX_NODE_COUNT] = {
     [TeX_NODE_LEFT_SUBSCRIPT] = render_left_subscript,
     [TeX_NODE_ASSIGNMENT] = render_assignment,
     [TeX_NODE_BINDING_ASSIGNMENT] = render_assignment,
-    [TeX_NODE_HAT]        = render_hat,
+    [TeX_NODE_HAT]        = render_quantum,
+    [TeX_NODE_DAGGER]     = render_quantum,
+    [TeX_NODE_BRA]        = render_quantum,
+    [TeX_NODE_KET]        = render_quantum,
+    [TeX_NODE_BRAKET]     = render_quantum,
+    [TeX_NODE_KETBRA]     = render_quantum,
+    [TeX_NODE_MATRIX_ELEMENT] = render_quantum,
     [TeX_NODE_PRIME]      = render_prime,
     [TeX_NODE_BOLD]       = render_bold,
     [TeX_NODE_CALLIGRAPHIC] = render_calligraphic,
@@ -898,6 +903,10 @@ bool TeX_needs_fence(TeX_node_kind_t parent, TeX_node_kind_t child, size_t index
              parent == TeX_NODE_CONDITIONAL_PRODUCT) && index == 0u && additive) ||
            (parent == TeX_NODE_DIFFERENCE && index == 1u && additive) ||
            (parent == TeX_NODE_NEGATIVE && additive) ||
+           (parent == TeX_NODE_DAGGER && (additive || child == TeX_NODE_PRODUCT ||
+            child == TeX_NODE_FRACTION || child == TeX_NODE_NEGATIVE || child == TeX_NODE_POWER ||
+            child == TeX_NODE_DAGGER || child == TeX_NODE_PRIME || child == TeX_NODE_INTEGRAL ||
+            child == TeX_NODE_DERIVATIVE || child == TeX_NODE_VARIABLE_DERIVATIVE)) ||
            (parent == TeX_NODE_PRIME && child == TeX_NODE_PRIME) ||
            ((parent == TeX_NODE_FACTORIAL || parent == TeX_NODE_PRIME) &&
             (additive || child == TeX_NODE_PRODUCT || child == TeX_NODE_NEGATIVE)) ||

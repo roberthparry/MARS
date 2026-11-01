@@ -81,6 +81,8 @@
 #include "expr_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_series_notation.h"
+#define MARS_EXPR_INTERNAL_ACCESS
+#include "expr_notation_internal.h"
 
 /* Restore detached bound-Expression qualifications before parsing the body. */
 
@@ -98,6 +100,8 @@ typedef enum {
 
 /* Scoped to source-programme parsing; ordinary @S parsing still evaluates symbolically. */
 static _Thread_local bool preserve_calculus_operations;
+/* Explicit operator-notation input must retain operand order instead of using commutative simplification. */
+static _Thread_local bool preserve_notation_operations;
 
 typedef struct {
     symtab_t functions;
@@ -1214,7 +1218,22 @@ static string_t *read_any_name_cursor(string_cursor_t *cursor)
 
 static string_t *read_name_for_syntax_cursor(string_cursor_t *cursor, expr_parse_syntax_t syntax)
 {
-    return expr_parse_read_name(cursor, syntax == EXPR_PARSE_FUNCTION_SYNTAX);
+    if (preserve_notation_operations) {
+        string_t *function = expr_notation_read_quantum_function(cursor);
+        if (function)
+            return function;
+    }
+    string_t *name = expr_parse_read_name(cursor, syntax == EXPR_PARSE_FUNCTION_SYNTAX);
+    string_pos_t position = string_cursor_position(cursor);
+    if (name && preserve_notation_operations && string_cursor_match_at(cursor, position, "_op") &&
+        expr_parse_cursor_at_identifier_boundary(cursor, position + 3u)) {
+        if (string_append_cstr(name, "_op")) {
+            string_free(name);
+            return NULL;
+        }
+        string_cursor_skip(cursor, 3u);
+    }
+    return name;
 }
 
 static expr_t *parse_unregistered_function_call(expr_parse_state_t *p)
@@ -1240,6 +1259,8 @@ static expr_t *parse_unregistered_function_call(expr_parse_state_t *p)
         return NULL;
     }
     ordinary_calls = ordinary_calls || symtab_has_text(&p->symbolic_functions, name);
+    ordinary_calls = ordinary_calls || (preserve_notation_operations &&
+        expr_notation_quantum_function(string_c_str(name), NULL) != TeX_NODE_COUNT);
     /* A declared scalar remains a multiplier; only otherwise undeclared calls denote symbolic functions. */
     if (p->syntax == EXPR_PARSE_DIFFERENTIAL_SYNTAX && symtab_has_text(p->syms, name)) {
         string_free(name);
@@ -2310,6 +2331,8 @@ static expr_t *const_node_from_binding_expr(expr_binding_expr_t *expr)
 
 static expr_t *apply_unary_preserving_constexpr(const expr_ops_t *ops, expr_t *arg, expr_t *(*fallback)(const expr_t *))
 {
+    if (preserve_notation_operations && ops)
+        return arg ? expr_new_unary_internal(ops, arg) : NULL;
     if (ops && ops != &ops_principal_value && ops != &ops_finite_part && node_has_preserved_constexpr(arg)) {
         expr_binding_expr_t *child = expr_binding_expr_clone(arg->binding_expr);
         expr_binding_expr_t *expr =
@@ -2366,6 +2389,13 @@ static expr_binding_expr_t *binding_expr_from_const_node(const expr_t *node)
 static expr_t *apply_binary_preserving_constexpr(const expr_ops_t *ops, expr_t *left, expr_t *right,
                                                  expr_t *(*fallback)(const expr_t *, const expr_t *))
 {
+    if (preserve_notation_operations) {
+        if (left && right)
+            return expr_new_binary_internal(ops, left, right);
+        expr_free(left);
+        expr_free(right);
+        return NULL;
+    }
     expr_binding_expr_t *left_binding = binding_expr_from_const_node(left);
     expr_binding_expr_t *right_binding = binding_expr_from_const_node(right);
 
@@ -2403,6 +2433,10 @@ static expr_t *apply_binary_preserving_constexpr(const expr_ops_t *ops, expr_t *
 
 static expr_t *apply_pow_const_preserving_constexpr(expr_t *base, const number_t *exponent)
 {
+    if (preserve_notation_operations) {
+        expr_t *power = expr_new_const(*exponent);
+        return apply_binary_preserving_constexpr(&ops_pow, base, power, expr_pow_xp);
+    }
     if (node_has_preserved_constexpr(base)) {
         string_t *text = num_to_string(*exponent);
         expr_binding_expr_t *rhs = expr_binding_expr_new_number_text(text ? string_c_str(text) : "NAN");
@@ -4899,7 +4933,8 @@ static int collect_implicit_symbols(string_view_t text, symtab_t *syms, expr_par
             }
         }
 
-        if (syntax == EXPR_PARSE_FUNCTION_SYNTAX || syntax == EXPR_PARSE_DIFFERENTIAL_SYNTAX) {
+        if (syntax == EXPR_PARSE_FUNCTION_SYNTAX || syntax == EXPR_PARSE_DIFFERENTIAL_SYNTAX ||
+            preserve_notation_operations) {
             string_cursor_t *scan = string_cursor_clone(cursor);
             string_t *function_name = scan ? read_name_for_syntax_cursor(scan, syntax) : NULL;
 
@@ -4908,7 +4943,10 @@ static int collect_implicit_symbols(string_view_t text, symtab_t *syms, expr_par
 
                 string_cursor_skip_spaces(scan);
                 if (expr_parse_cursor_consume_char(scan, '(') &&
-                    (syntax == EXPR_PARSE_FUNCTION_SYNTAX || !symtab_has_text(syms, function_name))) {
+                    (syntax == EXPR_PARSE_FUNCTION_SYNTAX ||
+                     (preserve_notation_operations &&
+                      expr_notation_quantum_function(string_c_str(function_name), NULL) != TeX_NODE_COUNT) ||
+                     (syntax == EXPR_PARSE_DIFFERENTIAL_SYNTAX && !symtab_has_text(syms, function_name)))) {
                     string_cursor_seek(cursor, after_name);
                     string_free(function_name);
                     string_cursor_free(scan);
@@ -5753,6 +5791,20 @@ expr_t *expr_from_presentation_text_internal(const string_t *text)
     preserve_calculus_operations = true;
     expr_t *result = expr_from_text_internal(text, NULL, NULL, NULL, EXPR_PARSE_DIFFERENTIAL_SYNTAX);
     preserve_calculus_operations = previous;
+    return result;
+}
+
+/* Parse explicit operator notation while restoring both thread-local parsing modes on every return. */
+expr_t *expr_from_notation_text_internal(const string_t *text, bool formal)
+{
+    bool previous_calculus = preserve_calculus_operations;
+    bool previous_notation = preserve_notation_operations;
+    preserve_calculus_operations = true;
+    preserve_notation_operations = true;
+    expr_t *result = expr_from_text_internal(text, NULL, NULL, NULL,
+        formal ? EXPR_PARSE_DIFFERENTIAL_SYNTAX : EXPR_PARSE_EXPRESSION_SYNTAX);
+    preserve_notation_operations = previous_notation;
+    preserve_calculus_operations = previous_calculus;
     return result;
 }
 

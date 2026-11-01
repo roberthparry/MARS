@@ -9,7 +9,7 @@
  * ISO identifiers join to jurisdiction-owned presentation metadata. Import also matches shared polygon edges
  * into indexed display chunks, omitting unmatched administrative coastlines. A bounded ordinary-heap buffer holds
  * only public source geometry during matching; no SQLCipher temporary table competes for locked memory.
- * Confirmed detailed land can bridge a gap of at most one kilometre in the generalised country outline,
+ * Confirmed detailed land can bridge a gap of at most 2.5 kilometres in the generalised country outline,
  * provided only one country occurs within that distance. Water, overlaps and boundary points are not inferred.
  */
 #include <math.h>
@@ -327,10 +327,10 @@ static string_t *country_lookup(sqlite_t *db, double latitude, double longitude,
     return name;
 }
 
-/* Search only the one-kilometre neighbourhood; competing country codes make the gap ambiguous. */
+/* Search only the 2.5-kilometre neighbourhood; competing country codes make the gap ambiguous. */
 static string_t *country_land_gap(sqlite_t *db, double latitude, double longitude, bool code)
 {
-    const double radius = 1000, scale_y = 111195;
+    const double radius = 2500, scale_y = 111195;
     double scale_x = fmax(1, scale_y * cos(latitude * 0.017453292519943295));
     double latitude_radius = radius / scale_y, longitude_radius = radius / scale_x;
     sqlite_stmt_t *q = sqlite_stmt_prepare(db,

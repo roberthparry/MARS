@@ -147,7 +147,8 @@ static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root
     sqlite_stmt_finalize(emblem);
     file_free(source); string_free(path);
     return ok && cfg_database_source(db, root, "packaging/jurisdiction-db/location_additions.sql", false) &&
-           cfg_database_source(db, root, "packaging/jurisdiction-db/location_subdivisions.sql", false);
+           cfg_database_source(db, root, "packaging/jurisdiction-db/location_subdivisions.sql", false) &&
+           cfg_database_source(db, root, "packaging/jurisdiction-db/town_search.sql", false);
 }
 
 static bool cfg_database_update_one(const cfg_database_migration *migration, bool install_missing)
@@ -211,7 +212,7 @@ static int cfg_databases_prepare(bool install_missing)
          CFG_GLOBE_DATA_REVISION, cfg_database_globe_refresh, NULL, true},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac, false},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 10, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
+         "jurisdiction/mars_jurisdiction_rules.db", 13, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)
@@ -502,6 +503,7 @@ static const cfg_database_source_label_t *cfg_database_source_label(const string
         {"packaging/jurisdiction-db/flag_regions.sql", "Installing regional flag definitions"},
         {"packaging/jurisdiction-db/location_additions.sql", "Adding named reference locations"},
         {"packaging/jurisdiction-db/location_subdivisions.sql", "Updating Kaliningrad towns and location defaults"},
+        {"packaging/jurisdiction-db/town_search.sql", "Indexing worldwide place names"},
         {"packaging/jurisdiction-db/mars_calendar_local.sql", "Installing local calendar settings"},
         {"packaging/jurisdiction-db/mars_calendar_locale_names.sql", "Installing translated calendar names"},
         {"packaging/jurisdiction-db/mars_country_jurisdictions.sql", "Installing country jurisdictions"},

@@ -205,7 +205,7 @@ static void test_TeX_calculus_invalid_inputs(void)
     TEST_ASSERT_TRUE(!TeX_compose_tensor(NULL, NULL, 0) && !TeX_compose_tensor(x, NULL, 1) &&
                      !TeX_compose_tensor(x, missing, 1) && !TeX_compose_tensor(x, invalid, 1) &&
                      !TeX_compose_fenced(NULL, TeX_FENCE_BRACKETS) && !TeX_compose_fenced(x, (TeX_fence_t)-1) &&
-                     !TeX_compose_fenced(x, (TeX_fence_t)5) && !TeX_compose_sum(NULL, x, x) &&
+                     !TeX_compose_fenced(x, (TeX_fence_t)(TeX_FENCE_ANGLE + 1)) && !TeX_compose_sum(NULL, x, x) &&
                      !TeX_compose_integral(NULL, x, NULL, NULL) && !TeX_compose_integral(x, NULL, NULL, NULL) &&
                      !TeX_compose_derivative(NULL, x, 1, TeX_DERIVATIVE_PARTIAL) &&
                      !TeX_compose_derivative(x, NULL, 1, TeX_DERIVATIVE_PARTIAL) &&
@@ -1288,9 +1288,68 @@ static void test_TeX_native_aggregate_contexts(void)
     }
 }
 
+static void test_TeX_quantum_input(void)
+{
+    static const struct { const char *input; const char *expected; } cases[] = {
+        {"hat(H)", "\\widehat{H}"},
+        {"H_op", "\\widehat{H}"},
+        {"p_op^2", "\\widehat{p}^{2}"},
+        {"hat(A+B)", "\\widehat{A + B}"},
+        {"B_op*A_op", "\\widehat{B}\\mkern-2mu \\widehat{A}"},
+        {"dagger(A)*B_op", "{A}^{\\dagger}\\mkern-2mu \\widehat{B}"},
+        {"hat(x)*0", "\\widehat{x}\\mkern-2mu 0"},
+        {"sqrt(A_op^2)", "\\sqrt{\\widehat{A}^{2}}"},
+        {"hat(0)+sin(0)", "\\widehat{0} + \\sin(0)"},
+        {"dagger(p_op)", "{\\widehat{p}}^{\\dagger}"},
+        {"dagger(A*B)", "{\\left(A\\mkern-2mu B\\right)}^{\\dagger}"},
+        {"bra(@phi)", "\\left\\langle \\phi \\right|"},
+        {"ket(@psi)", "\\left| \\psi \\right\\rangle"},
+        {"braket(@phi,@psi)", "\\left\\langle \\phi \\middle| \\psi \\right\\rangle"},
+        {"ketbra(@psi,@phi)", "\\left| \\psi \\right\\rangle\\!\\left\\langle \\phi \\right|"},
+        {"matrix_element(@psi,p_op,@psi)",
+         "\\left\\langle \\psi \\middle| \\widehat{p} \\middle| \\psi \\right\\rangle"},
+        {"expect(p)", "\\left\\langle p \\right\\rangle"},
+        {"expect(p)=matrix_element(@psi,p_op,@psi)",
+         "\\left\\langle p \\right\\rangle = "
+         "\\left\\langle \\psi \\middle| \\widehat{p} \\middle| \\psi \\right\\rangle"},
+        {"hat (H)", "\\widehat{H}"},
+        {"dagger(dagger(A))", "{\\left({A}^{\\dagger}\\right)}^{\\dagger}"}
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        string_t *input = string_new_with(cases[i].input);
+        TeX_t *notation = TeX_from_expression(input);
+        TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), cases[i].expected), cases[i].input);
+        TeX_free(notation);
+        string_free(input);
+    }
+}
+
+static void test_TeX_quantum_input_errors(void)
+{
+    static const char *const cases[] = {
+        "hat()", "hat(A,B)", "bra(x,y)", "ket(x,y)", "dagger(A,B)", "braket(x)",
+        "ketbra(x,y,z)", "matrix_element(x,A)", "matrix_element(x,A,y,z)", "expect(x,y)", "hat(x"
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        string_t *input = string_new_with(cases[i]);
+        TeX_t *notation = TeX_from_expression(input);
+        TEST_ASSERT_TRUE(!notation, "invalid operator notation must not return partial or ordinary-call notation");
+        TeX_free(notation);
+        string_free(input);
+    }
+    string_t *ordinary = string_new_with("2+3");
+    TeX_t *result = TeX_from_expression(ordinary);
+    TEST_ASSERT_TRUE(result && !strcmp(TeX_source(result), "5"),
+                     "failed operator input restores ordinary arithmetic simplification for subsequent conversions");
+    TeX_free(result);
+    string_free(ordinary);
+}
+
 int tests_main(void)
 {
     run_TeX_builder_tests();
+    TEST_RUN_IN_GROUP(test_TeX_quantum_input, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_quantum_input_errors, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_escaping, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_text_boundaries, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_composition, tests, NULL);

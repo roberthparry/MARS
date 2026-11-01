@@ -585,17 +585,69 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
         equal(WorksheetContext.datetimeJurisdiction.innerHTML, previousOptions, 'invalid catalogue leaves existing menus untouched');
         const bootstrapCatalogue: {available: boolean; options: string[][]; towns: object; error?: string} = {
             available: true,
-            options: [['GB', 'United <Kingdom>'], ['IE', 'Ireland']],
+            options: [['GB', 'United <Kingdom>'], ['IE', 'Ireland'],
+                      ['AU', 'Australia'], ['AU-ACT', 'Australia - Australian Capital Territory'],
+                      ['AU-QLD', 'Australia - Queensland']],
             towns: {}
         };
         equal(labDOM.call('lab_location_catalogue', bootstrapCatalogue), 1, 'valid bootstrap catalogue accepted');
         for (const jurisdiction of [WorksheetContext.datetimeJurisdiction, WorksheetContext.almanacJurisdiction]) {
             const unknown = jurisdiction === WorksheetContext.almanacJurisdiction ? 1 : 0;
-            equal(jurisdiction.options.length, 2 + unknown, 'Almanac retains its unidentified-country option');
+            equal(jurisdiction.options.length, 5 + unknown, 'regional identities remain available for restoration');
+            equal(Array.from(jurisdiction.options).filter(option => !option.hidden).length, 3 + unknown,
+                  'only one visible entry per country');
             equal(jurisdiction.options[unknown].textContent, 'United <Kingdom>', 'jurisdiction labels remain plain text');
             equal(jurisdiction.value, unknown ? '' : 'GB', 'Almanac does not invent a country before identification');
             equal(jurisdiction.disabled, false, 'available catalogue enables jurisdiction');
+            jurisdiction.value = 'AU-ACT';
+            WorksheetLocations.selects.rebuild(jurisdiction);
+            const shell = jurisdiction.closest('.select-shell')!;
+            equal(shell.querySelector('.select-button')!.textContent, 'Australia',
+                  'restored territory displays its country');
+            const search = shell.querySelector<HTMLInputElement>('.select-search')!;
+            search.value = 'australia';
+            search.dispatchEvent(new Event('input', {bubbles: true}));
+            const visible = shell.querySelectorAll<HTMLElement>('.select-option:not(.hidden)');
+            equal(visible.length, 1, 'country search does not redisplay the states');
+            equal(visible[0].dataset.value, 'AU', 'search returns the single country');
+            search.value = 'queensland';
+            search.dispatchEvent(new Event('input', {bubbles: true}));
+            equal(shell.querySelectorAll('.select-option:not(.hidden)').length,
+                  0, 'search cannot expose a hidden regional choice');
         }
+        const countryPanel = document.createElement('div');
+        countryPanel.className = 'mode-panel';
+        const countryControl = WorksheetContext.almanacJurisdiction.cloneNode(true) as HTMLSelectElement;
+        countryControl.id = 'fixtureJurisdiction';
+        countryControl.value = 'AU';
+        const countryTown = document.createElement('select');
+        countryPanel.append(countryControl, countryTown);
+        const territoryTown = {
+            name: 'Canberra', value: 'canberra', jurisdiction: 'AU-ACT',
+            latitude: '-35.2835', longitude: '149.1281', elevation: '571', timezone: 'Australia/Sydney'
+        };
+        labDOM.call('lab_location_populate', countryTown, [territoryTown], 1);
+        const countryControls = {
+            townSelect: countryTown, latitudeInput: input('0'), longitudeInput: input('0'),
+            elevationInput: input('0'), zoneInput: input('0'), resetOffsetTouched: false
+        };
+        check(labDOM.call('lab_location_apply_town', countryControls, '11', savedContext),
+              'country-wide town selection applies local metadata');
+        equal(countryControl.value, 'AU-ACT', 'Canberra selects its actual territory rules internally');
+        equal(countryControls.latitudeInput.value, '-35.2835', 'Canberra sets the reference latitude');
+        equal(countryControls.elevationInput.value, '571', 'Canberra sets the reference altitude');
+        equal(countryControls.zoneInput.value, '11', 'Canberra retains its date-specific offset');
+        countryTown.remove();
+        const previousGlobalCountry = WorksheetContext.datetimeJurisdiction.value;
+        WorksheetContext.datetimeJurisdiction.value = 'IE';
+        try {
+            labDOM.call('lab_location_apply_town', countryControls, '11', savedContext);
+            equal(WorksheetContext.datetimeJurisdiction.value, 'IE',
+                  'a detached town control cannot change another panel\'s country');
+        } finally {
+            WorksheetContext.datetimeJurisdiction.value = previousGlobalCountry;
+        }
+
         bootstrapCatalogue.available = false;
         bootstrapCatalogue.error = 'Fixture <unavailable>';
         equal(

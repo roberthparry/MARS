@@ -168,10 +168,12 @@ static bool cfg_jurisdiction_populate(sqlite_t *db, const string_t *path, const 
 {
     string_t *root = string_new();
     bool flags = root && cfg_database_flags(db, root);
-    string_free(root);
-    return flags && cfg_calendar_populate(db, path, options->key, options->requested_location,
+    bool populated = flags && cfg_calendar_populate(db, path, options->key, options->requested_location,
                                  options->saved_location, interactive, options->requested_language,
                                  options->saved_language, location, language);
+    bool indexed = populated && cfg_database_source(db, root, "packaging/jurisdiction-db/town_search.sql", false);
+    string_free(root);
+    return indexed;
 }
 
 static bool cfg_jurisdiction_export(string_t *body, const string_t *location, const string_t *language)

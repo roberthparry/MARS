@@ -78,7 +78,23 @@ json_t *lab_page_town_batch(int64_t after_id);
 /** @brief Return up to 512 towns within five degrees of a centre, with an ascending-ID cursor. */
 json_t *lab_page_town_near_batch(int64_t after_id, double latitude, double longitude);
 
-/** @brief Return a bounded ID page for one non-empty jurisdiction code. */
+/**
+ * @brief Return a bounded town page for a country or one regional jurisdiction.
+ * @param after_id Zero initially, then the previous response's decimal next cursor.
+ * @param jurisdiction Borrowed non-empty code; two-letter countries include their direct subdivisions.
+ * @return Owned transport object, released with json_free(), or NULL on invalid input or allocation failure.
+ * Town groups retain their original jurisdiction codes. At most 512 towns are returned, with next="0" for an
+ * empty terminal page. An unavailable catalogue is represented by available=false and explanatory metadata.
+ */
 json_t *lab_page_town_jurisdiction_batch(int64_t after_id, const char *jurisdiction);
+
+/**
+ * @brief Search worldwide town names through the installed Unicode index.
+ * @param query Borrowed literal UTF-8 text, with at least two characters and at most 256 bytes; not retained.
+ * @return Owned object released with json_free(), or NULL on allocation failure. Contains available and matches;
+ * an unavailable index gives an empty array and explanatory error. At most 25 ranked, deduplicated matches retain
+ * their original names, jurisdiction codes, coordinates, time zones, elevations and prepared selection values.
+ */
+json_t *lab_page_town_search(const string_t *query);
 
 #endif

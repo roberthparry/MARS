@@ -49,7 +49,7 @@ external synchronisation.
 Each C block is a complete programme. The Markdown tests extract and compile
 these exact blocks, run them and compare their output with the accompanying
 text. Run them after the ordinary tests with
-`MARS_ROOT="$PWD" make -j1 test-readme-examples`. A TeX-only run checks twenty-six
+`MARS_ROOT="$PWD" make -j1 test-readme-examples`. A TeX-only run checks twenty-eight
 programmes; other enabled examples are counted too.
 
 Push the numerator first and the denominator second, then apply the fraction
@@ -150,6 +150,9 @@ it does not by itself make that function an operand-entry operation.
 | Derivatives | `TeX_derivative(style)`: body, variable, integer order |
 | Derivative primes | `TeX_prime`: body, integer order; `TeX_call` can then apply the primed function to an argument list |
 | Overbars | `TeX_bar`: body → barred body; apply before indices to bar the base symbol |
+| Operator accents | `TeX_hat`: body → hatted body; `TeX_dagger`: body → displayed adjoint |
+| State notation | `TeX_bra`, `TeX_ket`: state label; `TeX_braket`: left label, right label; `TeX_ketbra`: ket label, bra label |
+| Matrix elements | `TeX_matrix_element`: left state label, operator, right state label |
 | Ordered partial derivatives | `TeX_partial`: body, list of variables in differentiation application order |
 | Matrices | `TeX_matrix`: list of row lists, or row-major cells followed by a dimension list `{rows, columns}` |
 | Matrix presentation | `TeX_matrix_style(style)` changes delimiters; `TeX_matrix_spacing`: matrix, integer points |
@@ -2845,6 +2848,223 @@ $$
 {F}_{\mu \nu;\lambda} + {F}_{\nu \lambda;\mu} + {F}_{\lambda \mu;\nu} &= 0
 \end{aligned}
 $$
+
+## Quantum operators, states and adjoints
+
+`TeX_hat` covers the complete top operand with a hat. Apply it before
+`TeX_pow` to show the square of a hatted operator; applying it afterwards
+puts the hat over the entire power. `TeX_dagger` marks an adjoint and groups
+compound operands. For a matrix the adjoint is its complex conjugate transpose;
+a scalar complex conjugate is a different operation.
+
+State operations consume labels: `TeX_bra` and `TeX_ket` consume one,
+`TeX_braket` consumes left and right labels, and `TeX_ketbra` consumes ket
+and bra labels. `TeX_matrix_element` consumes left label, operator and right
+label, in that order. The delimiters scale with their contents. Angle fences
+also express an expectation value.
+
+This programme constructs a Hamiltonian, an expectation value, an inner
+product, an outer product, an operator adjoint and the ket–bra adjoint identity.
+The expectation-value identity assumes a normalised state. These are
+presentation operations: they do not evaluate, normalise or rearrange operators.
+
+```c
+/**
+ * @file TeX_quantum_rpn_example.c
+ * @brief Construct quantum operators, state products and adjoints with the RPN interface.
+ *
+ * Every operand is owned by the builder. This example constructs notation, without evaluating operators
+ * or state products. The expectation-value identity assumes a normalised state.
+ */
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "TeX-t.h"
+
+static bool print_formula(TeX_builder_t *b)
+{
+    TeX_t *formula = TeX_builder_finish(b);
+    bool ok = formula && puts(TeX_source(formula)) != EOF;
+    TeX_free(formula);
+    return ok;
+}
+
+int main(void)
+{
+    TeX_builder_t *b = TeX_builder_new();
+    int status = EXIT_FAILURE;
+
+    /* H_op = p_op^2/(2*m) + V(x,t) */
+    TeX_symbol(b, "H");
+    TeX_hat(b);
+    TeX_symbol(b, "p");
+    TeX_hat(b);
+    TeX_integer(b, 2);
+    TeX_pow(b);
+    TeX_integer(b, 2);
+    TeX_symbol(b, "m");
+    TeX_mul(b);
+    TeX_frac(b);
+    TeX_symbol(b, "x");
+    TeX_symbol(b, "t");
+    TeX_integer(b, 2);
+    TeX_list(b);
+    TeX_function(b, "V");
+    TeX_add(b);
+    TeX_eq(b);
+    if (!print_formula(b)) goto done;
+
+    /* <p> = <psi|p_op|psi> */
+    TeX_symbol(b, "p");
+    TeX_fence(b, TeX_FENCE_ANGLE);
+    TeX_symbol(b, "psi");
+    TeX_symbol(b, "p");
+    TeX_hat(b);
+    TeX_symbol(b, "psi");
+    TeX_matrix_element(b);
+    TeX_eq(b);
+    if (!print_formula(b)) goto done;
+
+    /* <phi|psi> */
+    TeX_symbol(b, "phi");
+    TeX_symbol(b, "psi");
+    TeX_braket(b);
+    if (!print_formula(b)) goto done;
+
+    /* |psi><phi| */
+    TeX_symbol(b, "psi");
+    TeX_symbol(b, "phi");
+    TeX_ketbra(b);
+    if (!print_formula(b)) goto done;
+
+    /* (A_op)^dagger */
+    TeX_symbol(b, "A");
+    TeX_hat(b);
+    TeX_dagger(b);
+    if (!print_formula(b)) goto done;
+
+    /* (|psi>)^dagger = <psi| */
+    TeX_symbol(b, "psi");
+    TeX_ket(b);
+    TeX_dagger(b);
+    TeX_symbol(b, "psi");
+    TeX_bra(b);
+    TeX_eq(b);
+    if (!print_formula(b)) goto done;
+
+    status = EXIT_SUCCESS;
+done:
+    TeX_builder_free(b);
+    if (status != EXIT_SUCCESS)
+        fputs("Could not construct quantum notation.\n", stderr);
+    return status;
+}
+```
+
+Output:
+
+```text
+\widehat{H} = \frac{{\widehat{p}}^{2}}{2\,m} + V\left(x, t\right)
+\left\langle p \right\rangle = \left\langle \psi \middle| \widehat{p} \middle| \psi \right\rangle
+\left\langle \phi \middle| \psi \right\rangle
+\left| \psi \right\rangle\!\left\langle \phi \right|
+{\widehat{A}}^{\dagger}
+{\left| \psi \right\rangle}^{\dagger} = \left\langle \psi \right|
+```
+
+Rendered mathematics:
+
+$$
+\widehat{H} = \frac{{\widehat{p}}^{2}}{2\,m} + V\left(x, t\right)
+$$
+
+$$
+\left\langle p \right\rangle = \left\langle \psi \middle| \widehat{p} \middle| \psi \right\rangle
+$$
+
+$$
+\left\langle \phi \middle| \psi \right\rangle
+$$
+
+$$
+\left| \psi \right\rangle\!\left\langle \phi \right|
+$$
+
+$$
+{\widehat{A}}^{\dagger}
+$$
+
+$$
+{\left| \psi \right\rangle}^{\dagger} = \left\langle \psi \right|
+$$
+
+### ASCII text equivalents
+
+The same notation can be entered using `hat(H)` or the suffix `H_op`,
+`dagger(A)`, `bra(@psi)`, `ket(@psi)`, `braket(@phi,@psi)`,
+`ketbra(@psi,@phi)`, `matrix_element(@psi,p_op,@psi)` and `expect(p)`.
+All these spellings use a normal keyboard. Native mathematical text uses
+`@psi`; RPN symbol entry uses `"psi"`.
+
+Explicit operator input preserves its arithmetic order without ordinary scalar
+simplification. For example, `B_op*A_op` stays B followed by A. Named calls
+are used instead of literal angle/bar input, which would conflict with
+inequalities and binding separators. This adds notation support to
+`TeX_from_expression`; it does not add quantum algebra to expression evaluation.
+
+```c
+/**
+ * @file TeX_quantum_text_example.c
+ * @brief Convert ASCII operator and Dirac notation into mathematical TeX.
+ *
+ * The native presentation reader retains explicit operator order without evaluating quantum expressions.
+ * Returned notation owns its output independently of the temporary input string.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "TeX-t.h"
+
+int main(void)
+{
+    const char *const sources[] = {
+        "H_op=p_op^2/(2*m)+V(x,t)",
+        "expect(p)=matrix_element(@psi,p_op,@psi)",
+        "braket(@phi,@psi)",
+        "ketbra(@psi,@phi)",
+        "dagger(hat(A))",
+        "dagger(ket(@psi))=bra(@psi)"
+    };
+    for (size_t i = 0u; i < sizeof sources / sizeof *sources; ++i) {
+        string_t *input = string_new_with(sources[i]);
+        TeX_t *notation = input ? TeX_from_expression(input) : NULL;
+        string_free(input);
+        int printed = notation ? puts(TeX_source(notation)) : EOF;
+        TeX_free(notation);
+        if (printed == EOF) {
+            fputs("Could not convert quantum notation.\n", stderr);
+            return EXIT_FAILURE;
+        }
+    }
+    return EXIT_SUCCESS;
+}
+```
+
+Output:
+
+```text
+\widehat{H} = \frac{\widehat{p}^{2}}{2\mkern-2mu m} + V\left(x, t\right)
+\left\langle p \right\rangle = \left\langle \psi \middle| \widehat{p} \middle| \psi \right\rangle
+\left\langle \phi \middle| \psi \right\rangle
+\left| \psi \right\rangle\!\left\langle \phi \right|
+{\widehat{A}}^{\dagger}
+{\left| \psi \right\rangle}^{\dagger} = \left\langle \psi \right|
+```
+
+These render as the same six mathematical statements above. Native text and
+RPN retain their existing spacing conventions.
+
 ## Optional input shortcuts
 
 Use the RPN builder for new formulas. These shortcuts are useful when the input

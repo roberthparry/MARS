@@ -27,6 +27,7 @@ typedef struct _menu_row_t {
     char *key, *text;
     double latitude, longitude;
     unsigned index, seen;
+    bool hidden;
 } menu_row_t;
 
 typedef struct _menu_suffix_t { const char *text; unsigned row; } menu_suffix_t;
@@ -186,6 +187,7 @@ static menu_index_t *build_index(node_jsref select, unsigned version)
         menu_row_t *row = calloc(1, sizeof *row);
         if (!row) { lab_dom_release(mark); goto failed; }
         row->index = i;
+        row->hidden = lab_dom_truth(lab_dom_get(option, "hidden"));
         row->key = copy_text(value);
         row->text = copy_text(text);
         row->latitude = lab_menu_index_number_owned(lab_dom_read(option, LAB_DOM_DATASET, "latitude"));
@@ -203,11 +205,11 @@ static menu_index_t *build_index(node_jsref select, unsigned version)
         if (isfinite(row->latitude) && isfinite(row->longitude)) {
             if (!array_append_carray(index->latitude, &row, 1) || !array_append_carray(index->longitude, &row, 1)) goto failed;
         }
-        for (const char *p = row->text; *p; ++p) {
+        for (const char *p = row->text; !row->hidden && *p; ++p) {
             menu_suffix_t suffix = {p, i};
             if (!array_append_carray(index->suffixes, &suffix, 1)) goto failed;
         }
-        if (!array_append_carray(index->visible, &i, 1)) goto failed;
+        if (!row->hidden && !array_append_carray(index->visible, &i, 1)) goto failed;
     }
     array_sort(index->latitude, latitude_compare);
     array_sort(index->longitude, longitude_compare);
@@ -330,7 +332,7 @@ static jsref lab_menu_index_filter_owned(node_jsref select, jsref query_value)
         ++index->text_candidates;
         unsigned row_number = suffix ? suffix->row : (unsigned)i;
         menu_row_t *row = *(menu_row_t **)array_get(index->rows, row_number);
-        if (row->seen == index->epoch) continue;
+        if (row->hidden || row->seen == index->epoch) continue;
         row->seen = index->epoch;
         if (!array_append_carray(visible, &row_number, 1)) {
             free(query); array_destroy(visible); lab_menu_index_invalidate_owned(select); return 0;

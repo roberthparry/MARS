@@ -31,13 +31,19 @@
 /* Interpret scalar mathematics here and request notation from the existing TeX backend. */
 TeX_t *expr_notation_scalar(const string_t *text, bool formal)
 {
-    expr_t *parsed = formal ? expr_from_presentation_text_internal(text)
+    bool quantum = expr_notation_quantum_input(text);
+    expr_t *parsed = quantum ? expr_from_notation_text_internal(text, formal)
+                            : formal ? expr_from_presentation_text_internal(text)
                             : expr_from_text_preserving_calculus_internal(text, NULL);
     if (!parsed)
         return NULL;
-    bool calculus = expr_contains_calculus_request(parsed);
+    bool calculus = quantum || expr_contains_calculus_request(parsed);
     expr_t *arranged = calculus ? NULL : expr_beautify(parsed);
-    TeX_context_t *context = expr_TeX_context(calculus ? parsed : arranged);
+    notation_build_t *build = quantum ? notation_build_new() : NULL;
+    expr_notation_operator_order(build);
+    TeX_context_t *context = quantum ? notation_build_context(build, notation_build_expr(build, parsed))
+                                     : expr_TeX_context(calculus ? parsed : arranged);
+    notation_build_free(build);
     TeX_t *result = context ? TeX_from_context(context) : NULL;
     TeX_context_free(context);
     expr_free(arranged);

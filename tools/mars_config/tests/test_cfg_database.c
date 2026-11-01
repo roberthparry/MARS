@@ -708,6 +708,12 @@ static bool test_cfg_database_jurisdiction_mode(const char *directory, const cha
                                  "SELECT CAST(utc_offset_hours AS INTEGER) FROM calendar_local_days "
                                  "WHERE calendar_date='2024-06-21'",
                                  "2") &&
+         test_cfg_database_query(db,
+                                 "SELECT count(*)>0 FROM jurisdiction_town_search "
+                                 "WHERE jurisdiction_town_search MATCH '\"Luderitz\"*'", "1") &&
+         test_cfg_database_query(db,
+                                 "SELECT (SELECT count(*) FROM jurisdiction_town_search)="
+                                 "(SELECT count(*) FROM jurisdiction_town_name)", "1") &&
          test_cfg_database_mode(database, 0600) && test_cfg_database_mode(configuration, 0600);
     sqlite_close(db);
     ok = ok && !cfg_database_run(true, NULL, NULL, NULL, NULL, false) &&
@@ -1081,6 +1087,8 @@ static bool test_cfg_database_update_fixture(const char *directory)
         "parent_jurisdiction_id text,iso_subdivision_code text,cldr_region_code text,name text);"
         "insert into jurisdiction(jurisdiction_id,jurisdiction_type,iso_country_code) values('GB','country','GB'),"
         "('ZA','country','ZA'),('RU','country','RU');"
+        "create table jurisdiction_name(jurisdiction_id text primary key,name text not null);"
+        "insert into jurisdiction_name select jurisdiction_id,coalesce(name,jurisdiction_id) from jurisdiction;"
         "create table jurisdiction_town_entity(jurisdiction_town_id integer primary key);"
         "create table jurisdiction_town_name(jurisdiction_town_id integer primary key,town_name);"
         "create table jurisdiction_town_jurisdiction_id(jurisdiction_town_id integer primary key,jurisdiction_id);"
@@ -1131,7 +1139,12 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && cfg_databases_update() == 0 &&
          !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "10") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "13") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"GB\"*'", "1") &&
+         test_cfg_database_query(db,
+             "SELECT count(*) FROM jurisdiction_town_search WHERE jurisdiction_town_search MATCH '\"Kaliningrad\"*'",
+             "1") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "27") &&
          test_cfg_database_query(db, "select jurisdiction_id from jurisdiction_town where town_name='Kaliningrad'", "RU-KGD") &&
          test_cfg_database_query(db, "select locality_name from jurisdiction_location_default_locality where jurisdiction_id='RU'", "Moscow") &&
@@ -1140,7 +1153,7 @@ static bool test_cfg_database_update_fixture(const char *directory)
          test_cfg_database_query(db, "select count(*) from jurisdiction_town_timezone where timezone_code=24", "3") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction where jurisdiction_id='ZZ-SEA'", "0") &&
          test_cfg_database_query(db, "select value from retained", "42") &&
-         cfg_database_revision(db, "jurisdiction", 11);
+         cfg_database_revision(db, "jurisdiction", 14);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
          cfg_databases_update() == 1;

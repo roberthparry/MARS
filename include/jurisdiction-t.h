@@ -159,6 +159,42 @@ bool jurisdict_each_town_jurisdiction_batch(jurisdiction_t *jurisdiction, const 
                                             jurisdict_place_visit_fn visitor, void *context, int64_t *next_id);
 
 /**
+ * @brief Enumerate one country's towns across national and direct subdivision memberships.
+ * @param jurisdiction Borrowed open catalogue engine; its selected jurisdiction does not restrict the query.
+ * @param code Required country code comprising two uppercase ASCII letters; not retained.
+ * @param after_id Zero initially, then the last ID returned by the previous page.
+ * @param limit Maximum visited records, from 1 to 1024.
+ * @param visitor Required borrowed-record callback; false stops successfully. Must not close or re-enter the engine.
+ * @param context Caller-owned callback state, optionally NULL; not retained.
+ * @param[out] next_id Required output receiving the last visited ID, or zero for an empty or invalid page.
+ * @return True on completion or visitor stop; false on invalid arguments, unavailable storage or query failure.
+ * @note Each place retains its original jurisdiction, time zone and default marker. Fields live only during the
+ * callback and require no release. Continue until next_id is zero; cursors require an unchanged database.
+ */
+bool jurisdict_each_town_country_batch(jurisdiction_t *jurisdiction, const char *code, int64_t after_id, size_t limit,
+                                      jurisdict_place_visit_fn visitor, void *context, int64_t *next_id);
+
+/**
+ * @brief Find town references by town, country, region or named-place alias without loading the whole catalogue.
+ * @param jurisdiction Borrowed open catalogue engine; its selected jurisdiction does not restrict the search.
+ * @param text Borrowed literal UTF-8 place name or phrase, with at least two characters after trimming and at most
+ * 256 bytes. Case and accents are ignored; the final word accepts a prefix. FTS operators are treated as text.
+ * @param limit Maximum returned places, from 1 to 64.
+ * @param visitor Required callback; false stops successfully. Must not close or re-enter this engine.
+ * @param context Caller-owned callback state, optionally NULL; not retained.
+ * @return True on completion, including no matches, or visitor stop; false on invalid arguments or query failure.
+ * @note Requires the managed Unicode town and area indexes. Missing indexes fail without a full catalogue scan.
+ * A matching country or region contributes its default town, or first indexed local town when no default exists.
+ * Exact town and place names precede prefix-only matches; areas without catalogue towns contribute no result.
+ * A named-place alias retains the original town record and supplies matched_name for optional display.
+ * Only 256 ranked candidates reach duplicate elimination. Identical names and coordinates within one country
+ * prefer the regional record; distinct places retain their identity. Borrowed fields live only during the callback;
+ * no ownership transfers. Names, elevations, time zones and regional rule memberships remain unchanged.
+ */
+bool jurisdict_search_towns(jurisdiction_t *jurisdiction, const string_t *text, size_t limit,
+                            jurisdict_place_visit_fn visitor, void *context);
+
+/**
  * @brief Enumerate an ascending-ID town page within five degrees of a centre on both axes.
  * Latitude must be finite and within [-90,90], longitude within [-180,180]. Longitude
  * wraps at the date line. This is a rectangular priority window, not a distance ranking.

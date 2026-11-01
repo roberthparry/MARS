@@ -54,7 +54,8 @@ typedef enum {
     TeX_FENCE_BRACKETS,    /**< Square brackets. */
     TeX_FENCE_ABSOLUTE,    /**< Absolute-value bars. */
     TeX_FENCE_FLOOR,       /**< Greatest-integer floor delimiters. */
-    TeX_FENCE_CEILING      /**< Least-integer ceiling delimiters. */
+    TeX_FENCE_CEILING,     /**< Least-integer ceiling delimiters. */
+    TeX_FENCE_ANGLE        /**< Angle brackets, for example an expectation value. */
 } TeX_fence_t;
 
 /** @brief Derivative notation, without any differentiation or evaluation. */
@@ -460,6 +461,70 @@ bool TeX_prime(TeX_builder_t *builder);
 bool TeX_bar(TeX_builder_t *builder);
 
 /**
+ * @brief Replace the top operand by the same notation with a wide hat.
+ * @param builder Borrowed builder requiring one operand; neither consumed nor retained.
+ * @return True on success; false saves EINVAL for NULL, ERANGE for underflow, or an allocation error.
+ * Failure preserves the stack; a saved error blocks subsequent operations until cleared.
+ * @note The hat covers the complete operand. This constructs operator notation without evaluating it.
+ */
+bool TeX_hat(TeX_builder_t *builder);
+
+/**
+ * @brief Replace the top operand by its displayed adjoint, marked with a dagger.
+ * @param builder Borrowed builder requiring one operand; neither consumed nor retained.
+ * @return True on success; false saves EINVAL for NULL, ERANGE for underflow, or an allocation error.
+ * Failure preserves the stack; a saved error blocks subsequent operations until cleared.
+ * @note Compound operands retain visible grouping. No conjugation, transposition or operator evaluation occurs.
+ * An adjoint means complex conjugate transpose for a matrix, rather than scalar conjugation alone.
+ */
+bool TeX_dagger(TeX_builder_t *builder);
+
+/**
+ * @brief Replace one state label by a bra with an opening angle bracket and closing vertical bar.
+ * @param builder Borrowed builder requiring one operand; neither consumed nor retained.
+ * @return True on success; false saves EINVAL for NULL, ERANGE for underflow, or an allocation error.
+ * Failure preserves the stack; a saved error blocks subsequent operations until cleared.
+ * @note Supply the state label, not an already enclosed ket. The result is notation, not a computed dual vector.
+ */
+bool TeX_bra(TeX_builder_t *builder);
+
+/**
+ * @brief Replace one state label by a ket with an opening vertical bar and closing angle bracket.
+ * @param builder Borrowed builder requiring one operand; neither consumed nor retained.
+ * @return True on success; false saves EINVAL for NULL, ERANGE for underflow, or an allocation error.
+ * Failure preserves the stack; a saved error blocks subsequent operations until cleared.
+ */
+bool TeX_ket(TeX_builder_t *builder);
+
+/**
+ * @brief Consume left and right state labels, in that order, to display an inner product.
+ * @param builder Borrowed builder requiring two operands; neither consumed nor retained.
+ * @return True on success; false saves EINVAL for NULL, ERANGE for underflow, or an allocation error.
+ * Failure preserves the stack; a saved error blocks subsequent operations until cleared.
+ * @note Labels are enclosed together with one separating bar; no inner product is evaluated.
+ */
+bool TeX_braket(TeX_builder_t *builder);
+
+/**
+ * @brief Consume ket and bra labels, in that order, to display their outer product.
+ * @param builder Borrowed builder requiring two operands; neither consumed nor retained.
+ * @return True on success; false saves EINVAL for NULL, ERANGE for underflow, or an allocation error.
+ * Failure preserves the stack; a saved error blocks subsequent operations until cleared.
+ * @note No outer product is evaluated, and the supplied label order is retained.
+ */
+bool TeX_ketbra(TeX_builder_t *builder);
+
+/**
+ * @brief Consume left state label, operator and right state label to display a matrix element.
+ * @param builder Borrowed builder requiring three operands; neither consumed nor retained.
+ * @return True on success; false saves EINVAL for NULL, ERANGE for underflow, or an allocation error.
+ * Failure preserves the stack; a saved error blocks subsequent operations until cleared.
+ * @note The operator remains between the state labels. Equal labels give expectation-value notation;
+ * normalisation and all mathematical evaluation remain the caller's responsibility.
+ */
+bool TeX_matrix_element(TeX_builder_t *builder);
+
+/**
  * @brief Replace base then subscript by indexed notation.
  * @param builder Borrowed builder; the subscript must be on top.
  * @return True on success; false saves an error and preserves both operands.
@@ -728,6 +793,11 @@ bool TeX_symmetric_pair(TeX_builder_t *builder, bool group_offset);
  * Unicode relation signs are also accepted. Relations are presentation input, not requests to solve inequalities.
  * Accepts scalar indices such as x_n or x_(n+1). Undeclared calls on equation sides remain
  * symbolic functions; use explicit multiplication to distinguish P*x from P(x). Tensor syntax is not supported.
+ * Operator notation accepts hat(H), H_op, dagger(A), bra(@psi), ket(@psi), braket(@phi,@psi),
+ * ketbra(@psi,@phi), matrix_element(@psi,p_op,@psi) and expect(p). Explicit operator input retains authored
+ * arithmetic order without scalar simplification; these forms supply notation, not quantum evaluation.
+ * Use ASCII Greek aliases such as @psi in native text, or psi with TeX_symbol(). A dagger denotes an adjoint.
+ * Literal angle/bar Dirac input is not parsed: use the named calls to avoid ambiguity with relations and bindings.
  * Also accepts a parenthesised matrix literal containing an explicit column comma or row semicolon,
  * optionally followed by a scalar power or multiplied explicitly by a scalar on either side.
  * Entries use the native matrix parser; compound powers must be parenthesised.

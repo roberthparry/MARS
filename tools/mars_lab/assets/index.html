@@ -165,7 +165,7 @@
             <div class="datetime-field-group-title">Holiday calendar</div>
             <div class="datetime-grid">
               <div class="integrator-bound-field">
-                <label for="datetimeJurisdiction">Country or jurisdiction</label>
+                <label for="datetimeJurisdiction">Country</label>
                 <select id="datetimeJurisdiction">
 __HOLIDAY_JURISDICTION_OPTIONS__
                 </select>
@@ -194,6 +194,10 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <div class="datetime-field-group">
             <div class="datetime-field-group-title">Observer</div>
             <div class="datetime-grid location-grid">
+              <div class="integrator-bound-field place-search-field">
+                <label for="datetimePlaceSearch">Find a place anywhere</label>
+                <select id="datetimePlaceSearch" data-global-search="1"></select>
+              </div>
               <div class="integrator-bound-field">
                 <label for="datetimeTown">Town/location</label>
                 <select id="datetimeTown"></select>
@@ -267,8 +271,12 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <div class="datetime-field-group">
             <div class="datetime-field-group-title">Observer</div>
             <div class="datetime-grid location-grid">
+              <div class="integrator-bound-field place-search-field">
+                <label for="almanacPlaceSearch">Find a place anywhere</label>
+                <select id="almanacPlaceSearch" data-global-search="1"></select>
+              </div>
               <div class="integrator-bound-field">
-                <label for="almanacJurisdiction">Jurisdiction</label>
+                <label for="almanacJurisdiction">Country</label>
                 <select id="almanacJurisdiction">
 __HOLIDAY_JURISDICTION_OPTIONS__
                 </select>
@@ -715,7 +723,7 @@ __HOLIDAY_JURISDICTION_OPTIONS__
           <ul>
             <li><code>Date</code> and <code>GMT time</code> define the instant used by the ephemeris. The body table is calculated for that GMT instant.</li>
             <li><code>Zone</code> is used to present local event times, such as eclipse contacts. It does not change the GMT instant entered above.</li>
-            <li><code>Jurisdiction</code> and <code>Town/location</code> fill in latitude, longitude, altitude, and local time rules where available.</li>
+            <li><code>Country</code> and <code>Town/location</code> fill in latitude, longitude, altitude, and local time rules where available.</li>
             <li>Towns load progressively for the selected jurisdiction and the area you are viewing, rather than downloading the world catalogue. Available towns and observer coordinates remain usable while further pages arrive.</li>
             <li>You can type latitude, longitude, and altitude directly if the exact observing point is not in the town list.</li>
             <li>Clicking a globe location or town marker preserves the current view and zoom. Selecting a location from the dropdown centres the globe; Centre on observer remains available when you want to centre a clicked point.</li>

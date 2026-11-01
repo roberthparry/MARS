@@ -17,27 +17,26 @@ void lab_bootstrap_widgets(void)
 {
     static const struct {
         const char *id;
-        unsigned town;
-        unsigned searchable;
+        const char *placeholder, *search, *empty;
+        bool details;
     } controls[] = {
-        {"datetimeJurisdiction", 0, 1}, {"almanacJurisdiction", 0, 1}, {"datetimeTown", 1, 1}, {"almanacTown", 1, 1}};
+        {"datetimeJurisdiction", "Select country", "Search countries", "No matching country", false},
+        {"almanacJurisdiction", "Select country", "Search countries", "No matching country", false},
+        {"datetimeTown", "Custom location", "Search towns", "No towns for this country", true},
+        {"almanacTown", "Custom location", "Search towns", "No towns for this country", true},
+        {"datetimePlaceSearch", "Find a place anywhere…", "Town, country or region", "Type at least two characters", true},
+        {"almanacPlaceSearch", "Find a place anywhere…", "Town, country or region", "Type at least two characters", true}
+    };
     int result = lab_dom_object(LAB_VALUE_OBJECT), calls = lab_dom_object(LAB_VALUE_ARRAY);
     lab_dom_set(result, "calls", calls);
     for (unsigned i = 0; i < sizeof controls / sizeof *controls; ++i) {
         int options = lab_dom_object(LAB_VALUE_OBJECT), args = lab_dom_object(LAB_VALUE_ARRAY),
             call = lab_dom_object(LAB_VALUE_OBJECT);
-        lab_dom_set(options, "searchable", lab_dom_scalar(LAB_VALUE_BOOLEAN, controls[i].searchable));
-        if (controls[i].searchable) {
-            lab_dom_set(options, "searchPlaceholder",
-                        lab_dom_string(controls[i].town ? "Search towns" : "Search jurisdictions"));
-            lab_dom_set(
-                options, "emptyText",
-                lab_dom_string(controls[i].town ? "No towns for this jurisdiction" : "No matching jurisdiction"));
-        }
-        if (controls[i].town) {
-            lab_dom_set(options, "placeholder", lab_dom_string("Custom location"));
-            lab_dom_set(options, "details", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
-        }
+        lab_dom_set(options, "searchable", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
+        lab_dom_set(options, "searchPlaceholder", lab_dom_string(controls[i].search));
+        lab_dom_set(options, "emptyText", lab_dom_string(controls[i].empty));
+        lab_dom_set(options, "placeholder", lab_dom_string(controls[i].placeholder));
+        lab_dom_set(options, "details", lab_dom_scalar(LAB_VALUE_BOOLEAN, controls[i].details));
         lab_dom_push(args, lab_dom_id(controls[i].id));
         lab_dom_push(args, options);
         lab_dom_set(call, "service", lab_dom_string("enhance"));
@@ -190,7 +189,7 @@ static jsref lab_bootstrap_step_fail_7(struct lab_bootstrap_step_context *ctx)
         return lab_flow_call(ctx->frame, LAB_BOOTSTRAP_FINISHED, "fail", 0, 0, 1,
                              lab_dom_string("The Lab catalogue is invalid"));
     int scripts = lab_dom_object(LAB_VALUE_ARRAY);
-    static const char *const names[] = {"api", "bindings_controller", "bindings", "locations", "globe", "results",
+    static const char *const names[] = {"api", "bindings_controller", "bindings", "locations", "place_search", "globe", "results",
                                        "results_services", "state", "history", "surface_camera", "surface_export", "surface_hover",
                                        "surface_volume", "surface", "workspace_native", "workspace_controllers"};
     for (unsigned i = 0; i < sizeof names / sizeof *names; ++i)

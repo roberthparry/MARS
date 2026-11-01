@@ -98,6 +98,10 @@ supervision where needed. The computation guide includes a tested recovery examp
 
 ## Imaginary-axis presentation
 
+For authored quantum notation, use the TeX module's [operator and Dirac input](TeX.md#quantum-operators-states-and-adjoints).
+Its presentation reader accepts hats, the `_op` suffix, state products and adjoints while retaining operator order.
+These are notation-only forms; the ordinary expression evaluator does not implement quantum operator algebra.
+
 Native presentation reduces trigonometric and hyperbolic functions on the imaginary
 axis using exact identities, removing zero real or imaginary terms before rendering.
 Cartesian separation preserves this reduction for symbolic arguments as well as

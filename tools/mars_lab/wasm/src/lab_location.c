@@ -117,6 +117,8 @@ static jsref lab_location_town_list(jsref context, jsref value)
     int config = lab_dom_get(context, "config");
     int code = lab_location_validated(LAB_PROFILE_JURISDICTION, value, lab_dom_get(config, "DEFAULT_DATETIME_JURISDICTION"),
                                       lab_dom_get(context, "jurisdictions"));
+    int country = lab_dom_slice(code, 0, 2);
+    if (lab_dom_member(lab_dom_get(context, "jurisdictions"), country)) code = country;
     int catalogue = lab_dom_get(context, "towns");
     bool native = lab_dom_truth(lab_dom_get(catalogue, "nativeStore"));
     int towns = native ? lab_town_store_snapshot(code) : lab_dom_key_get(catalogue, code);
@@ -141,7 +143,7 @@ static jsref lab_location_town_list(jsref context, jsref value)
     return lab_dom_type(towns) == LAB_VALUE_ARRAY ? towns : lab_dom_object(LAB_VALUE_ARRAY);
 }
 
-/* Validate bootstrap data before projecting both jurisdiction menus and database availability. */
+/* Keep regional identities for rules and restoration, projecting only parent countries into visible menus. */
 bool lab_location_catalogue(jsref catalogue)
 {
     int options = lab_dom_get(catalogue, "options"), towns = lab_dom_get(catalogue, "towns");
@@ -179,10 +181,16 @@ bool lab_location_catalogue(jsref catalogue)
         unsigned row_mark = lab_dom_mark();
         for (unsigned index = 0; index < count; ++index) {
             int row = lab_dom_item(options, index), option = lab_dom_create("option");
-            lab_dom_write(option, LAB_DOM_VALUE, "", lab_dom_item(row, 0));
+            int code = lab_dom_item(row, 0), parent = lab_dom_slice(code, 0, 2);
+            int parent_label = lab_dom_key_get(labels, parent);
+            bool subdivision = !lab_dom_equal(code, parent) && lab_dom_length(parent_label);
+            lab_dom_write(option, LAB_DOM_VALUE, "", code);
             lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_item(row, 1));
-            lab_dom_write(option, LAB_DOM_DATASET, "countryCode", lab_dom_item(row, 0));
+            lab_dom_write(option, LAB_DOM_DATASET, "countryCode", code);
             lab_dom_write(option, LAB_DOM_DATASET, "countryOption", lab_dom_string("1"));
+            lab_dom_write(option, LAB_DOM_DATASET, "countryParent", subdivision ? parent : code);
+            lab_dom_write(option, LAB_DOM_DATASET, "countryLabel", subdivision ? parent_label : lab_dom_item(row, 1));
+            lab_dom_set(option, "hidden", lab_dom_scalar(LAB_VALUE_BOOLEAN, subdivision));
             lab_dom_append(select, option);
             lab_dom_release(row_mark);
         }
@@ -228,7 +236,9 @@ static jsref lab_location_menu_jurisdiction(node_jsref select)
 
 static node_jsref lab_location_town_option(jsref town, jsref value, jsref jurisdiction)
 {
-    static const char *const attributes[] = {"latitude", "longitude", "elevation", "timezone", "detail"};
+    static const char *const attributes[] = {
+        "latitude", "longitude", "elevation", "timezone", "detail", "jurisdiction", "townValue", "searchDetail"
+    };
     int option = lab_dom_create("option"), name = lab_dom_get(town, "name");
     lab_dom_write(option, LAB_DOM_VALUE, "", value);
     lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_truth(name) ?
@@ -450,6 +460,11 @@ bool lab_location_apply_town(jsref controls, jsref offset, jsref context)
     int select = lab_dom_get(controls, "townSelect"), option = lab_location_selected_option(select);
     if (!option)
         return false;
+    int panel = lab_dom_closest(select, ".mode-panel");
+    int jurisdiction = panel ? lab_dom_query(panel, "select[id$='Jurisdiction']") : 0;
+    int code = lab_dom_read(option, LAB_DOM_DATASET, "jurisdiction");
+    if (jurisdiction && lab_dom_length(code) && lab_menu_index_key(jurisdiction, code) >= 0)
+        lab_location_write(jurisdiction, code);
     static const char *const attributes[] = {"latitude", "longitude", "elevation"};
     static const char *const inputs[] = {"latitudeInput", "longitudeInput", "elevationInput"};
     for (unsigned field = 0; field < 3; ++field) {

@@ -159,7 +159,8 @@ void lab_cal_surface(json_t *options)
     if (lab_cal_number(lab_cal_text(options, "lat"), &latitude) &&
         lab_cal_number(lab_cal_text(options, "lon"), &longitude)) {
         globe_t *globe = globe_open_configured(NULL);
-        surface = globe_hit_test(globe, latitude, longitude);
+        /* The card reports the mapped footprint, rather than merging both sides of a coast into one label. */
+        surface = globe_hit_test_radius(globe, latitude, longitude, 0);
         if (surface == GLOBE_SEA) {
             /* Water beyond the uncertainty band is not necessarily offshore: harbour basins can be kilometres wide.
              * A conservative proximity policy avoids assuming a clear sea horizon beside mapped land. */
@@ -213,9 +214,10 @@ json_t *lab_cal_country(const json_t *payload, unsigned *status)
     lab_cal_take(response, "ok", json_new_bool(true));
     bool identified = lab_country_metadata(response, globe, latitude, longitude);
     bool boundaries = globe_has_layer(globe, GLOBE_LAYER_COUNTRIES);
-    bool inland_water = !identified && boundaries && globe_hit_test(globe, latitude, longitude) == GLOBE_INLAND_WATER;
+    globe_surface_t surface = globe_hit_test_radius(globe, latitude, longitude, 0);
+    bool inland_water = !identified && boundaries && surface == GLOBE_INLAND_WATER;
     lab_cal_nautical_zone(response, inland_water, identified, boundaries, longitude);
-    if (!identified && globe_hit_test(globe, latitude, longitude) == GLOBE_SEA)
+    if (!identified && surface == GLOBE_SEA)
         lab_country_catalogue(response, "ZZ-SEA");
     globe_close(globe);
     return response;

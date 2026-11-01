@@ -7,6 +7,12 @@
 
 /** Real-browser regressions injected only into a private test copy of the page. */
 (function installBrowserChecks() {
+    /** @brief Report fixture stages without changing application or persisted worksheet state. */
+    function browserProgress(stage: string): void {
+        const dump = Reflect.get(window, 'dump');
+        if (typeof dump === 'function') dump('Browser check: ' + stage + '\n');
+    }
+    browserProgress('test script loaded');
     const startupCheck = new URLSearchParams(location.search).get('startup-check') === '1';
     const startupRequests: string[] = [];
     const startupReveals: string[] = [];
@@ -96,6 +102,7 @@
 
     /** @brief Bound each group so an unresolved mock identifies its owning regression. */
     async function runBrowserGroup(name: string, run: () => unknown, timeout = 60000): Promise<void> {
+        browserProgress(name);
         let timer = 0;
         const deadline = new Promise(function startDeadline(_resolve, reject) {
             function timedOut(): void {
@@ -3090,7 +3097,7 @@
                 await labApplication.townsReady;
                 if (catalogueCheck === 'success') {
                     check(JSON.stringify(WorksheetLocations.townSelection.townsForJurisdiction('GB-WLS')) ===
-                          JSON.stringify(labDOM.call('lab_town_store_list', 'GB-WLS')),
+                          JSON.stringify(labDOM.call('lab_town_store_list', 'GB')),
                           'native town resolution projects the shared catalogue for incremental menu updates');
                     await checkTownPublicationScheduling();
                     await checkCountrySelectionReadiness();
@@ -3147,8 +3154,22 @@
                 location.href = '/?failure=server-missing';
                 return;
             }
+            browserProgress('waiting for application startup');
             await window.labReady;
+            browserProgress('waiting for country towns');
             await labApplication.townsReady;
+            browserProgress('application and country towns ready');
+            if (new URLSearchParams(location.search).get('country-check') === '1') {
+                await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
+                await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
+                await runBrowserGroup('checkLabPlaceSearch', window.checkLabPlaceSearch);
+                await runBrowserGroup('checkLabResultFlows', window.checkLabResultFlows);
+                await runBrowserGroup('checkLabSelects', window.checkLabSelects);
+                await runBrowserGroup('checkLabSelectEvents', window.checkLabSelectEvents);
+                await runBrowserGroup('checkLabCountryTowns', window.checkLabCountryTowns);
+                await report('PASS: worldwide search, country-only menus, regional town lists and local rules');
+                return;
+            }
             if (startupCheck) {
                 check(startupMapReadyBeforeCalculation,
                       'saved camera and towns start before the initial Almanac calculation completes');

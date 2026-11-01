@@ -539,7 +539,7 @@ class LabDOMBridge {
                 entry.observer = new MutationObserver(() => { ++entry.version; });
                 entry.observer.observe(node, {
                     subtree: true, childList: true, characterData: true, attributes: true,
-                    attributeFilter: ['value', 'label', 'disabled', 'data-latitude', 'data-longitude', 'data-detail']
+                    attributeFilter: ['value', 'label', 'disabled', 'hidden', 'data-latitude', 'data-longitude', 'data-detail']
                 });
                 this.optionVersions.set(node, state = entry);
                 this.optionObservers.add(entry.observer);

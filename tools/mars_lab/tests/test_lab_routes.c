@@ -673,6 +673,204 @@ static void test_lab_catalogue_elevation(void)
         "legacy no-data and absent elevations use zero; real below-sea-level elevations survive all catalogue paths");
 }
 
+static bool route_catalogue_country_towns(const char *directory)
+{
+    if (!test_lab_catalogue_database(directory)) return false;
+    json_t *page = lab_page_town_jurisdiction_batch(0, "GB");
+    const json_t *groups = test_lab_member(page, "towns");
+    bool available = false;
+    bool ok = page && json_bool_value(test_lab_member(page, "available"), &available) && available &&
+              json_array_size(test_lab_member(groups, "GB-ENG")) == 1 &&
+              json_array_size(test_lab_member(groups, "GB-WLS")) == 1 &&
+              json_array_size(test_lab_member(groups, "US")) == 0 && !strcmp(test_lab_text(page, "next"), "2");
+    json_free(page);
+    page = lab_page_town_jurisdiction_batch(1, "GB");
+    groups = test_lab_member(page, "towns");
+    ok = ok && json_array_size(test_lab_member(groups, "GB-ENG")) == 0 &&
+         json_array_size(test_lab_member(groups, "GB-WLS")) == 1 && !strcmp(test_lab_text(page, "next"), "2");
+    json_free(page);
+    page = lab_page_town_jurisdiction_batch(2, "GB");
+    ok = ok && json_object_size(test_lab_member(page, "towns")) == 0 &&
+         !strcmp(test_lab_text(page, "next"), "0");
+    json_free(page);
+    page = lab_page_town_jurisdiction_batch(0, "GB-ENG");
+    groups = test_lab_member(page, "towns");
+    ok = ok && json_array_size(test_lab_member(groups, "GB-ENG")) == 1 &&
+         json_array_size(test_lab_member(groups, "GB-WLS")) == 0;
+    json_free(page);
+    return ok;
+}
+
+static void test_lab_catalogue_country_towns(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(route_catalogue_country_towns),
+        "country pages include regional towns, retain their memberships and cursors, and exclude foreign towns");
+}
+
+static bool search_count(const jurisdict_place_t *place, void *context)
+{
+    size_t *count = context;
+    ++*count;
+    return place && place->name;
+}
+
+static bool search_stop(const jurisdict_place_t *place, void *context)
+{
+    search_count(place, context);
+    return false;
+}
+
+static bool route_place_search(const char *directory)
+{
+    if (!test_lab_catalogue_database(directory)) return false;
+    string_t *path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    string_t *key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
+    sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    file_t *source = file_new_cstr("packaging/jurisdiction-db/town_search.sql");
+    string_t *sql = source ? file_read_all_text(source) : NULL;
+    bool ok = db && sql && sqlite_exec_cstr(db,
+        "ALTER TABLE jurisdiction_town RENAME TO jurisdiction_town_entity;"
+        "CREATE TABLE jurisdiction_town_name(jurisdiction_town_id INTEGER PRIMARY KEY,town_name TEXT);"
+        "INSERT INTO jurisdiction_town_name SELECT jurisdiction_town_id,town_name FROM jurisdiction_town_entity;"
+        "CREATE VIEW jurisdiction_town AS SELECT e.jurisdiction_town_id,e.jurisdiction_id,n.town_name "
+        "FROM jurisdiction_town_entity e JOIN jurisdiction_town_name n USING(jurisdiction_town_id);"
+        "INSERT INTO jurisdiction VALUES('NA',NULL,'country','Namibia'),('NA-KA','NA','subdivision','Karas'),"
+        "('FR',NULL,'country','France'),('BY',NULL,'country','Belarus'),"
+        "('SJ',NULL,'country','Svalbard & Jan Mayen'),('PT',NULL,'country','Portugal'),"
+        "('PT-20','PT','subdivision','Região Autónoma dos Açores'),('BR',NULL,'country','Brazil');"
+        "CREATE TABLE jurisdiction_name(jurisdiction_id TEXT PRIMARY KEY,name TEXT NOT NULL);"
+        "INSERT INTO jurisdiction_name SELECT jurisdiction_id,name FROM jurisdiction;"
+        "INSERT INTO jurisdiction_town_entity VALUES(4,'NA','Lüderitz'),(5,'NA-KA','Lüderitz'),"
+        "(6,'FR','Brest'),(7,'BY','Brest'),(8,'SJ','Longyearbyen'),(9,'SJ','Olonkinbyen'),"
+        "(10,'PT-20','Madalena (GeoNames 3372908)'),(11,'PT-20','Horta'),"
+        "(12,'PT-20','Ponta Delgada'),(13,'PT-20','Angra do Heroísmo'),(14,'BR','Picos');"
+        "INSERT INTO jurisdiction_town_name VALUES(4,'Lüderitz'),(5,'Lüderitz'),(6,'Brest'),(7,'Brest'),"
+        "(8,'Longyearbyen'),(9,'Olonkinbyen'),(10,'Madalena (GeoNames 3372908)'),"
+        "(11,'Horta'),(12,'Ponta Delgada'),(13,'Angra do Heroísmo'),(14,'Picos');"
+        "INSERT INTO jurisdiction_town_latitude VALUES(4,'-26.6481'),(5,'-26.6481'),(6,'48.39'),(7,'52.10'),"
+        "(8,'78.2232'),(9,'70.9221'),(10,'38.53642'),(11,'38.5333'),(12,'37.7412'),(13,'38.6590'),(14,'-7.07694');"
+        "INSERT INTO jurisdiction_town_longitude VALUES(4,'15.1594'),(5,'15.1594'),(6,'-4.48'),(7,'23.69'),"
+        "(8,'15.6469'),(9,'-8.7187'),(10,'-28.5266'),(11,'-28.6333'),(12,'-25.6756'),(13,'-27.2208'),(14,'-41.46694');"
+        "INSERT INTO jurisdiction_town_elevation VALUES(4,'15'),(5,'15'),(6,'34'),(7,'142'),(8,'28'),(9,'5'),"
+        "(10,'8'),(11,'39'),(12,'35'),(13,'76'),(14,'203');"
+        "INSERT INTO timezone_code VALUES('Africa/Windhoek',3),('Arctic/Longyearbyen',4),"
+        "('Atlantic/Azores',5),('America/Fortaleza',6);"
+        "INSERT INTO jurisdiction_town_timezone VALUES(4,3),(5,3),(6,1),(7,1),(8,4),(9,4),"
+        "(10,5),(11,5),(12,5),(13,5),(14,6);"
+        "INSERT INTO jurisdiction_default_town VALUES('GB',1),('SJ',8),('PT-20',12);") && sqlite_exec(db, sql);
+    if (!ok && db) string_fprintf(stderr, "Search fixture: %s\n", string_c_str(sqlite_last_error(db)));
+    sqlite_close(db);
+    string_free(path); string_free(key);
+    jurisdiction_t *engine = ok ? jurisdict_open(NULL) : NULL;
+    static const struct { const char *text; size_t count; } cases[] = {
+        {"Luderitz", 1}, {"lüDER", 1}, {"  Luderitz  ", 1}, {"Bre", 2},
+        {"Brest OR Shrewsbury", 0}, {"\" OR \"", 0}, {"NoSuchTown", 0},
+        {"Svalbard", 1}, {"United Kingdom", 1}, {"Wales", 1}, {"Namibia", 1},
+        {"Pico", 2}, {"Pico Azores", 1}, {"Faial", 1}, {"Terceira", 1}, {"sao miguel", 1}, {"Azores", 4}
+    };
+    for (size_t i = 0; engine && i < sizeof cases / sizeof *cases; ++i) {
+        string_t *name = string_new_with(cases[i].text);
+        size_t count = 0;
+        bool found = name && jurisdict_search_towns(engine, name, 25, search_count, &count);
+        if (!found || count != cases[i].count)
+            string_fprintf(stderr, "Search '%s': %zu, %s\n", cases[i].text, count, jurisdict_last_error(engine));
+        ok = found && count == cases[i].count && ok;
+        string_free(name);
+    }
+    string_t *name = string_new_with("Bre"), *short_name = string_new_with(" ");
+    size_t count = 0;
+    ok = engine && jurisdict_search_towns(engine, name, 1, search_count, &count) && count == 1 && ok;
+    count = 0;
+    ok = jurisdict_search_towns(engine, name, 25, search_stop, &count) && count == 1 && ok;
+    ok = !jurisdict_search_towns(engine, short_name, 25, search_count, &count) &&
+         !jurisdict_search_towns(engine, name, 65, search_count, &count) && ok;
+    jurisdict_close(engine);
+    string_free(name); string_free(short_name);
+    http_response_t *response = route_request(HTTP_POST, "/place-search", "{\"query\":\"Luderitz\"}",
+                                             "application/x-protobuf", NULL, NULL);
+    json_t *result = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    const json_t *matches = test_lab_member(result, "matches"), *town = json_array_get(matches, 0);
+    ok = route_check(response, 200, json_array_size(matches) == 1 &&
+        !strcmp(test_lab_text(town, "name"), "Lüderitz") &&
+        !strcmp(test_lab_text(town, "jurisdiction"), "NA-KA") &&
+        !strcmp(test_lab_text(town, "timezone"), "Africa/Windhoek"), "worldwide accent-insensitive town search") && ok;
+    json_free(result); http_response_free(response);
+    response = route_request(HTTP_POST, "/place-search", "{\"query\":\"Pico\"}",
+                             "application/x-protobuf", NULL, NULL);
+    result = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    matches = test_lab_member(result, "matches"); town = json_array_get(matches, 0);
+    ok = route_check(response, 200, json_array_size(matches) == 2 &&
+        !strcmp(test_lab_text(town, "matched_name"), "Pico") &&
+        strstr(test_lab_text(town, "name"), "Madalena") &&
+        !strcmp(test_lab_text(town, "jurisdiction"), "PT-20") &&
+        !strcmp(test_lab_text(town, "elevation"), "8") &&
+        !strcmp(test_lab_text(town, "timezone"), "Atlantic/Azores"),
+        "the exact Pico island alias ranks before Picos without replacing its reference town") && ok;
+    json_free(result); http_response_free(response);
+    response = route_request(HTTP_POST, "/place-search", "{\"query\":\"svalbard\"}",
+                             "application/x-protobuf", NULL, NULL);
+    result = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+    matches = test_lab_member(result, "matches"); town = json_array_get(matches, 0);
+    ok = route_check(response, 200, json_array_size(matches) == 1 &&
+        !strcmp(test_lab_text(town, "name"), "Longyearbyen") &&
+        !strcmp(test_lab_text(town, "jurisdiction"), "SJ") &&
+        !strcmp(test_lab_text(town, "timezone"), "Arctic/Longyearbyen"), "Svalbard selects its default town") && ok;
+    json_free(result); http_response_free(response);
+    response = route_request(HTTP_POST, "/place-search", "{\"query\":\"  \"}",
+                             "application/x-protobuf", NULL, NULL);
+    ok = route_check(response, 400, true, "blank searches are rejected") && ok;
+    http_response_free(response);
+    path = string_new_with(getenv("MARS_JURISDICTION_DB_PATH"));
+    key = string_new_with(getenv("MARS_JURISDICTION_DB_KEY"));
+    db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    ok = db && sqlite_exec_cstr(db,
+        "UPDATE jurisdiction_town_name SET town_name='Brest renamed' WHERE jurisdiction_town_id=6;"
+        "DELETE FROM jurisdiction_town_name WHERE jurisdiction_town_id=7;"
+        "INSERT INTO jurisdiction_town_name VALUES(7,'Restored Brest');") && ok;
+    sqlite_stmt_t *query = db ? sqlite_stmt_prepare(db,
+        "SELECT count(*) FROM jurisdiction_town_search WHERE jurisdiction_town_search MATCH '\"Restored\"*'") : NULL;
+    ok = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW && sqlite_stmt_column_int(query, 0) == 1 && ok;
+    sqlite_stmt_finalize(query);
+    ok = db && sqlite_exec_cstr(db,
+        "INSERT INTO jurisdiction_place_alias(name,context,jurisdiction_town_id) VALUES('Test island','Azores',10);"
+        "UPDATE jurisdiction_place_alias SET name='Renamed island' WHERE name='Test island';") && ok;
+    query = db ? sqlite_stmt_prepare(db,
+        "SELECT count(*) FROM jurisdiction_place_search WHERE jurisdiction_place_search MATCH '\"Renamed\"*'") : NULL;
+    ok = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW && sqlite_stmt_column_int(query, 0) == 1 && ok;
+    sqlite_stmt_finalize(query);
+    ok = db && sqlite_exec_cstr(db, "DELETE FROM jurisdiction_place_alias WHERE name='Renamed island'") && ok;
+    query = db ? sqlite_stmt_prepare(db,
+        "SELECT count(*) FROM jurisdiction_place_search WHERE jurisdiction_place_search MATCH '\"Renamed\"*'") : NULL;
+    ok = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW && sqlite_stmt_column_int(query, 0) == 0 && ok;
+    sqlite_stmt_finalize(query);
+    ok = db && sqlite_exec_cstr(db,
+        "UPDATE jurisdiction_name SET name='Arctic Isles' WHERE jurisdiction_id='SJ';"
+        "DELETE FROM jurisdiction_name WHERE jurisdiction_id='BY';"
+        "INSERT INTO jurisdiction_name VALUES('BY','Belarus restored');") && ok;
+    query = db ? sqlite_stmt_prepare(db,
+        "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"Arctic\"*'") : NULL;
+    ok = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW && sqlite_stmt_column_int(query, 0) == 1 && ok;
+    sqlite_stmt_finalize(query);
+    query = db ? sqlite_stmt_prepare(db,
+        "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"Belarus\"*'") : NULL;
+    ok = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW && sqlite_stmt_column_int(query, 0) == 1 && ok;
+    sqlite_stmt_finalize(query);
+    ok = db && sqlite_exec(db, sql) && ok; /* Rebuilding the managed index is idempotent. */
+    ok = db && sqlite_exec_cstr(db, "DROP TABLE jurisdiction_town_search") && ok;
+    sqlite_close(db); string_free(path); string_free(key); string_free(sql); file_free(source);
+    engine = jurisdict_open(NULL); name = string_new_with("Luderitz"); count = 0;
+    ok = engine && name && !jurisdict_search_towns(engine, name, 25, search_count, &count) && !count &&
+         *jurisdict_last_error(engine) && ok;
+    jurisdict_close(engine); string_free(name);
+    return ok;
+}
+
+static void test_lab_place_search(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(route_place_search),
+        "worldwide town and area prefixes ignore accents, preserve identity, select local defaults and track name edits");
+}
+
 static bool route_catalogue_country(const char *directory)
 {
     if (!test_lab_catalogue_database(directory)) return false;
@@ -1101,6 +1299,8 @@ void test_lab_route_cases(void)
     TEST_RUN_IN_GROUP(test_lab_http_catalogue, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_catalogue_elevation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_catalogue_country, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_catalogue_country_towns, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_place_search, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_rejections, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_rivers, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_http_textures, tests, NULL);

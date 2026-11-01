@@ -113,6 +113,22 @@ static bool lab_page_town_country(struct lab_page_places *places, json_t *row, c
     return ok;
 }
 
+static json_t *lab_page_town_row(struct lab_page_places *places, const jurisdict_place_t *place)
+{
+    json_t *row = json_new_object(), *is_default = json_new_bool(place->is_default);
+    bool ok = row && is_default && lab_page_catalogue_text(row, "name", place->name) &&
+              lab_page_catalogue_text(row, "latitude", place->latitude) &&
+              lab_page_catalogue_text(row, "longitude", place->longitude) &&
+              lab_page_catalogue_text(row, "elevation", place->elevation) &&
+              lab_page_catalogue_text(row, "timezone", place->timezone) &&
+              lab_page_catalogue_text(row, "jurisdiction", place->jurisdiction_code) &&
+              lab_page_town_country(places, row, place) &&
+              lab_page_catalogue_set(row, "default", is_default) && lab_forms_town_presentation(row);
+    json_free(is_default);
+    if (!ok) { json_free(row); return NULL; }
+    return row;
+}
+
 static bool lab_page_town(const jurisdict_place_t *place, void *context)
 {
     struct lab_page_places *places = context;
@@ -124,17 +140,9 @@ static bool lab_page_town(const jurisdict_place_t *place, void *context)
         const json_t *existing = places->group_code ? json_object_get(places->towns, places->group_code) : NULL;
         places->group = existing ? json_clone(existing) : json_new_array();
     }
-    json_t *row = json_new_object(), *is_default = json_new_bool(place->is_default);
-    places->ok = places->ok && places->group && places->group_code && row && is_default &&
-                 lab_page_catalogue_text(row, "name", place->name) &&
-                 lab_page_catalogue_text(row, "latitude", place->latitude) &&
-                 lab_page_catalogue_text(row, "longitude", place->longitude) &&
-                 lab_page_catalogue_text(row, "elevation", place->elevation) &&
-                 lab_page_catalogue_text(row, "timezone", place->timezone) &&
-                 lab_page_town_country(places, row, place) &&
-                 lab_page_catalogue_set(row, "default", is_default) && lab_forms_town_presentation(row) &&
+    json_t *row = lab_page_town_row(places, place);
+    places->ok = places->ok && places->group && places->group_code && row &&
                  json_array_append(places->group, row);
-    json_free(is_default);
     json_free(row);
     return places->ok;
 }
@@ -152,6 +160,9 @@ static json_t *lab_page_places(bool metadata, bool all_towns, int64_t after_id,
     int64_t next_id = 0;
     if (available && (all_towns || !metadata))
         available = (all_towns ? jurisdict_each_town(engine, lab_page_town, &places)
+                              : jurisdiction && strlen(jurisdiction) == 2 ?
+                                  jurisdict_each_town_country_batch(engine, jurisdiction, after_id, 512,
+                                                                    lab_page_town, &places, &next_id)
                               : jurisdiction ? jurisdict_each_town_jurisdiction_batch(engine, jurisdiction, after_id, 512,
                                                                                       lab_page_town, &places, &next_id)
                               : nearby ? jurisdict_each_town_near_batch(engine, latitude, longitude, after_id, 512,
@@ -217,9 +228,45 @@ json_t *lab_page_town_near_batch(int64_t after_id, double latitude, double longi
     return after_id >= 0 ? lab_page_places(false, false, after_id, true, latitude, longitude, NULL) : NULL;
 }
 
-/* Return only the requested jurisdiction, leaving unrelated countries on disk. */
+/* Include every regional membership for a country request; leave unrelated countries on disk. */
 json_t *lab_page_town_jurisdiction_batch(int64_t after_id, const char *jurisdiction)
 {
     return after_id >= 0 && jurisdiction && *jurisdiction ?
         lab_page_places(false, false, after_id, false, 0, 0, jurisdiction) : NULL;
+}
+
+struct lab_page_search {
+    struct lab_page_places places;
+    json_t *matches;
+};
+
+static bool lab_page_search_town(const jurisdict_place_t *place, void *context)
+{
+    struct lab_page_search *search = context;
+    json_t *row = lab_page_town_row(&search->places, place);
+    if (row && place->matched_name && !lab_page_catalogue_text(row, "matched_name", place->matched_name)) {
+        json_free(row); row = NULL;
+    }
+    search->places.ok = row && json_array_append(search->matches, row);
+    json_free(row);
+    return search->places.ok;
+}
+
+/* Preserve ranked order and original town metadata in a small worldwide response. */
+json_t *lab_page_town_search(const string_t *query)
+{
+    struct lab_page_search search = {.places.ok = true, .matches = json_new_array()};
+    jurisdiction_t *engine = jurisdict_open(NULL);
+    bool available = engine && search.matches &&
+                     jurisdict_search_towns(engine, query, 25, lab_page_search_town, &search) && search.places.ok;
+    if (!available) { json_free(search.matches); search.matches = json_new_array(); }
+    json_t *result = json_new_object(), *flag = json_new_bool(available);
+    bool ok = result && flag && lab_page_catalogue_set(result, "available", flag) &&
+              lab_page_catalogue_set(result, "matches", search.matches);
+    if (ok && !available)
+        ok = lab_page_catalogue_text(result, "error", "The worldwide place index is unavailable; update the jurisdiction database");
+    if (!ok) { json_free(result); result = NULL; }
+    json_free(flag); json_free(search.matches);
+    jurisdict_close(engine); globe_close(search.places.globe);
+    return result;
 }

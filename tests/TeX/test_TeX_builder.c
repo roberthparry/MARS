@@ -1406,6 +1406,105 @@ static void test_TeX_builder_index_derivative_errors(void)
                      "index punctuation rejects NULL builders safely");
 }
 
+static void test_TeX_builder_quantum(void)
+{
+    TeX_builder_t *b = TeX_builder_new();
+    TeX_symbol(b, "p");
+    TeX_hat(b);
+    TeX_dagger(b);
+    finish_matches(b, "{\\widehat{p}}^{\\dagger}");
+
+    b = TeX_builder_new();
+    TeX_symbol(b, "phi");
+    TeX_bra(b);
+    finish_matches(b, "\\left\\langle \\phi \\right|");
+    b = TeX_builder_new();
+    TeX_symbol(b, "psi");
+    TeX_ket(b);
+    finish_matches(b, "\\left| \\psi \\right\\rangle");
+    b = TeX_builder_new();
+    TeX_symbol(b, "phi");
+    TeX_symbol(b, "psi");
+    TeX_braket(b);
+    finish_matches(b, "\\left\\langle \\phi \\middle| \\psi \\right\\rangle");
+    b = TeX_builder_new();
+    TeX_symbol(b, "psi");
+    TeX_symbol(b, "phi");
+    TeX_ketbra(b);
+    finish_matches(b, "\\left| \\psi \\right\\rangle\\!\\left\\langle \\phi \\right|");
+    b = TeX_builder_new();
+    TeX_symbol(b, "phi");
+    TeX_symbol(b, "A");
+    TeX_hat(b);
+    TeX_symbol(b, "psi");
+    TeX_matrix_element(b);
+    finish_matches(b, "\\left\\langle \\phi \\middle| \\widehat{A} \\middle| \\psi \\right\\rangle");
+    b = TeX_builder_new();
+    TeX_symbol(b, "p");
+    TeX_fence(b, TeX_FENCE_ANGLE);
+    finish_matches(b, "\\left\\langle p \\right\\rangle");
+}
+
+static void test_TeX_builder_quantum_scope(void)
+{
+    TeX_builder_t *b = TeX_builder_new();
+    TeX_symbol(b, "A");
+    TeX_symbol(b, "B");
+    TeX_add(b);
+    TeX_hat(b);
+    finish_matches(b, "\\widehat{A + B}");
+    b = TeX_builder_new();
+    TeX_symbol(b, "A");
+    TeX_symbol(b, "B");
+    TeX_mul(b);
+    TeX_dagger(b);
+    finish_matches(b, "{\\left( A\\,B \\right)}^{\\dagger}");
+    b = TeX_builder_new();
+    TeX_symbol(b, "A");
+    TeX_integer(b, 2);
+    TeX_pow(b);
+    TeX_dagger(b);
+    finish_matches(b, "{\\left( {A}^{2} \\right)}^{\\dagger}");
+    b = TeX_builder_new();
+    TeX_symbol(b, "A");
+    TeX_dagger(b);
+    TeX_dagger(b);
+    finish_matches(b, "{\\left( {A}^{\\dagger} \\right)}^{\\dagger}");
+    b = TeX_builder_new();
+    TeX_raw(b, "A+B");
+    TeX_dagger(b);
+    finish_matches(b, "{\\left( A+B \\right)}^{\\dagger}");
+}
+
+static void test_TeX_builder_quantum_errors(void)
+{
+    static const struct {
+        bool (*apply)(TeX_builder_t *);
+        size_t arity;
+    } operations[] = {
+        {TeX_hat, 1u}, {TeX_dagger, 1u}, {TeX_bra, 1u}, {TeX_ket, 1u},
+        {TeX_braket, 2u}, {TeX_ketbra, 2u}, {TeX_matrix_element, 3u}
+    };
+    for (size_t i = 0u; i < sizeof operations / sizeof *operations; ++i) {
+        TeX_builder_t *b = TeX_builder_new();
+        for (size_t j = 1u; j < operations[i].arity; ++j)
+            TeX_symbol(b, "psi");
+        const TeX_t *top = TeX_builder_peek(b, 1u);
+        TEST_ASSERT_TRUE(!operations[i].apply(b) && TeX_builder_error(b) == ERANGE &&
+                         TeX_builder_count(b) == operations[i].arity - 1u,
+                         "quantum operations preserve all operands on stack underflow");
+        if (top)
+            TEST_ASSERT_TRUE(TeX_builder_peek(b, 1u) == top, "underflow preserves operand identity");
+        TEST_ASSERT_TRUE(!TeX_symbol(b, "x"), "a saved quantum-operation error blocks later pushes");
+        TeX_builder_clear_error(b);
+        TeX_symbol(b, "psi");
+        TEST_ASSERT_TRUE(operations[i].apply(b) && !TeX_builder_error(b) && TeX_builder_count(b) == 1u,
+                         "clearing the saved error permits successful reuse with the missing operand supplied");
+        TeX_builder_free(b);
+        TEST_ASSERT_TRUE(!operations[i].apply(NULL) && errno == EINVAL, "NULL builders are rejected safely");
+    }
+}
+
 /* Register these public-API cases through the TeX suite's shared harness. */
 void run_TeX_builder_tests(void)
 {
@@ -1434,6 +1533,9 @@ void run_TeX_builder_tests(void)
     TEST_RUN_IN_GROUP(test_TeX_builder_partials, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_primes, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_bars, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_quantum, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_quantum_scope, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_builder_quantum_errors, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_relations, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_relation_scope, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_builder_structured_arithmetic, tests, NULL);

@@ -53,6 +53,10 @@ interface LabConfiguration {
 
 /** @brief One native town object, including prepared selection and display text. */
 interface LabTown {
+    /** @brief Optional geographic search label; the original town identity remains unchanged. */
+    matched_name?: string;
+    /** @brief Original local rule membership retained when the menu combines a country's regions. */
+    jurisdiction?: string;
     /** @brief Native display jurisdiction, distinct from the catalogue grouping when necessary. */
     country_code?: string;
 

@@ -93,6 +93,16 @@ bool jurisdict_each_town_jurisdiction_batch(jurisdiction_t *jurisdiction, const 
     return ok;
 }
 
+/* Enumerate national and regional towns together while retaining their original rule memberships. */
+bool jurisdict_each_town_country_batch(jurisdiction_t *jurisdiction, const char *code, int64_t after_id, size_t limit,
+                                      jurisdict_place_visit_fn visitor, void *context, int64_t *next_id)
+{
+    globe_t *globe = jurisdict_globe_open(jurisdiction);
+    bool ok = globe_towns_country_batch(globe, code, after_id, limit, visitor, context, next_id);
+    globe_close(globe);
+    return ok;
+}
+
 /* Enumerate a bounded ID page of the complete catalogue. */
 bool jurisdict_each_town_batch(jurisdiction_t *jurisdiction, int64_t after_id, size_t limit,
                                jurisdict_place_visit_fn visitor, void *context, int64_t *next_id)

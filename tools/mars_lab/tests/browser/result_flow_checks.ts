@@ -46,10 +46,10 @@ window.checkLabResultFlows = async function checkLabResultFlows() {
     check(scripts.indexOf('results') >= 0 && scripts.indexOf('results_services') > scripts.indexOf('results'),
           'result services follow their controllers in the startup catalogue');
     const widgets = labDOM.call<ResultFlowWidgetPlan>('lab_bootstrap_widgets');
-    check(widgets.calls.length === 4 && widgets.calls.every(call => call.args[0].tagName === 'SELECT'),
+    check(widgets.calls.length === 6 && widgets.calls.every(call => call.args[0].tagName === 'SELECT'),
           'only location dropdowns need native menu enhancement; plot settings are radio buttons');
     check(
-        widgets.calls[0].args[1].searchPlaceholder === 'Search jurisdictions' &&
+        widgets.calls[0].args[1].searchPlaceholder === 'Search countries' &&
             widgets.calls[2].args[1].placeholder === 'Custom location',
         'native search-control labels');
     function replace(name: string, callback: MarsTransportService): void {

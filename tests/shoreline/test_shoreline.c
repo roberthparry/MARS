@@ -555,8 +555,11 @@ static void country_test_land_gaps(sqlite_t *db, file_t *directory)
     const double land[][2] = {{-134.50,58.20},{-134.30,58.20},{-134.30,58.40},
                               {-134.50,58.40},{-134.50,58.20}};
     const double remote[][2] = {{-31,-1},{-29,-1},{-29,1},{-31,1},{-31,-1}};
+    const double narrow[][2] = {{25.67,71.18},{25.68,71.18},{25.68,71.22},
+                                {25.67,71.22},{25.67,71.18}};
     TEST_ASSERT_TRUE(file_open_write(surface) && write_bytes(surface, "MARSCF64", 8) &&
         write_precise_ring(surface, 1, land, 5) && write_precise_ring(surface, 2, remote, 5) &&
+        write_precise_ring(surface, 1, narrow, 5) &&
         file_close(surface) && file_open_read(surface) && globe_import_shoreline(db, surface) && file_close(surface),
         "detailed land for administrative outline gaps");
     globe_t *globe = globe_open_databases(db, NULL, NULL);
@@ -567,6 +570,15 @@ static void country_test_land_gaps(sqlite_t *db, file_t *directory)
                      name && !strcmp(string_c_str(name), "United States of America"),
                      "detailed land resolves Juneau without any town catalogue or selected jurisdiction");
     string_free(code); string_free(name);
+    TEST_ASSERT_INT_EQ(globe_hit_test(globe, 71.183, 25.675), GLOBE_COAST);
+    TEST_ASSERT_INT_EQ(globe_hit_test_radius(globe, 71.183, 25.675, 0), GLOBE_LAND);
+    TEST_ASSERT_TRUE(!countries_at(db, 71.183, 25.675), "generalised outline omits the narrow peninsula");
+    code = globe_country_code_at(globe, 71.183, 25.675);
+    TEST_ASSERT_TRUE(code && !strcmp(string_c_str(code), "NO"),
+                     "confirmed narrow coastal land bridges the two-kilometre Norwegian outline gap");
+    string_free(code);
+    TEST_ASSERT_TRUE(!globe_country_code_at(globe, 71.21, 25.675),
+                     "confirmed land beyond the bounded outline gap has no inferred country");
     TEST_ASSERT_TRUE(!globe_country_code_at(globe, 0, -30), "remote uncovered land does not select a distant country");
     TEST_ASSERT_TRUE(!globe_country_code_at(globe, 58.315131, -134.446278),
                      "exact administrative boundary remains ambiguous even on confirmed land");
@@ -574,6 +586,7 @@ static void country_test_land_gaps(sqlite_t *db, file_t *directory)
     TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "UPDATE shoreline_chunk SET level=2"), "inland water in an outline gap");
     globe = globe_open_databases(db, NULL, NULL);
     TEST_ASSERT_TRUE(!globe_country_code_at(globe, latitude, longitude), "gap inference never assigns inland water");
+    TEST_ASSERT_TRUE(!globe_country_code_at(globe, 71.183, 25.675), "the widened gap never assigns inland water");
     globe_close(globe);
     TEST_ASSERT_TRUE(sqlite_exec_cstr(db, "UPDATE shoreline_chunk SET level=1; SAVEPOINT competing_country;"
         "INSERT INTO country_name VALUES(1001,'Competing country','CA');"

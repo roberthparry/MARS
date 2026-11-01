@@ -67,7 +67,10 @@ static bool vector_surface_policy(void)
     const struct { const char *latitude, *surface, *horizon, *location; } cases[] = {
         {"5.01", "Coastal water", "false", "Custom — Coastal water"},
         {"5.1", "Sea", "true", "Custom — Offshore"},
-        {"5.001", "Coastal", "false", "Custom — Coastal"},
+        {"5.001", "Coastal water", "false", "Custom — Coastal water"},
+        {"4.999", "Land", "false", "Custom — Land"},
+        {"5", "Coastal", "false", "Custom — Coastal"},
+        {"2.999", "Inland water", "false", "Custom — Inland water"},
         {"4", "Land", "false", "Custom — Land"},
         {"2", "Inland water", "false", "Custom — Inland water"}
     };

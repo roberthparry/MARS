@@ -7,6 +7,7 @@
  */
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #define MARS_GLOBE_INTERNAL_ACCESS
 #include "globe_layers.h"
@@ -246,7 +247,8 @@ bool globe_import_rivers(sqlite_t *db, file_t *source)
 
 /* Page through indexed town identifiers; preserve existing catalogue ordering and geographic priority semantics. */
 static bool globe_town_page(globe_t *globe, int64_t after_id, size_t limit, bool nearby, double latitude, double longitude,
-                            const char *jurisdiction, globe_place_visit_fn visitor, void *context, int64_t *next_id)
+                            const char *jurisdiction, bool country, globe_place_visit_fn visitor, void *context,
+                            int64_t *next_id)
 {
     if (next_id)
         *next_id = 0;
@@ -264,7 +266,16 @@ static bool globe_town_page(globe_t *globe, int64_t after_id, size_t limit, bool
         "left join jurisdiction_town_elevation elev using(jurisdiction_town_id) "
         "left join jurisdiction_default_town def on def.jurisdiction_town_id=town.jurisdiction_town_id "
         "and def.jurisdiction_id=town.jurisdiction_id ";
-    const char *filter = jurisdiction ?
+    const char *filter = country ?
+        "WHERE town.jurisdiction_town_id IN (\n"
+        "    SELECT membership.jurisdiction_town_id\n"
+        "    FROM jurisdiction_town_jurisdiction_id AS membership\n"
+        "    WHERE membership.jurisdiction_id IN (\n"
+        "        SELECT jurisdiction_id FROM jurisdiction\n"
+        "        WHERE jurisdiction_id=?3 OR parent_jurisdiction_id=?3\n"
+        "    ) AND membership.jurisdiction_town_id>?1\n"
+        ")\n"
+        "ORDER BY town.jurisdiction_town_id LIMIT ?2" : jurisdiction ?
         "where town.jurisdiction_id=?3 and town.jurisdiction_town_id>?1 "
         "order by town.jurisdiction_town_id limit ?2" : nearby ?
         "where cast(lat.latitude as real) between ?3-5 and ?3+5 "
@@ -302,7 +313,7 @@ static bool globe_town_page(globe_t *globe, int64_t after_id, size_t limit, bool
 bool globe_towns_batch(globe_t *globe, int64_t after_id, size_t limit, bool nearby, double latitude, double longitude,
                        globe_place_visit_fn visitor, void *context, int64_t *next_id)
 {
-    return globe_town_page(globe, after_id, limit, nearby, latitude, longitude, NULL, visitor, context, next_id);
+    return globe_town_page(globe, after_id, limit, nearby, latitude, longitude, NULL, false, visitor, context, next_id);
 }
 
 /* Load only the requested jurisdiction through its indexed catalogue membership. */
@@ -313,5 +324,17 @@ bool globe_towns_jurisdiction_batch(globe_t *globe, const char *jurisdiction, in
         if (next_id) *next_id = 0;
         return false;
     }
-    return globe_town_page(globe, after_id, limit, false, 0, 0, jurisdiction, visitor, context, next_id);
+    return globe_town_page(globe, after_id, limit, false, 0, 0, jurisdiction, false, visitor, context, next_id);
+}
+
+/* Include a country's regional memberships without changing each town's actual jurisdiction. */
+bool globe_towns_country_batch(globe_t *globe, const char *country, int64_t after_id, size_t limit,
+                               globe_place_visit_fn visitor, void *context, int64_t *next_id)
+{
+    if (!country || strlen(country) != 2 || country[0] < 'A' || country[0] > 'Z' ||
+        country[1] < 'A' || country[1] > 'Z') {
+        if (next_id) *next_id = 0;
+        return false;
+    }
+    return globe_town_page(globe, after_id, limit, false, 0, 0, country, true, visitor, context, next_id);
 }

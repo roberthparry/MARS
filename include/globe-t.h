@@ -175,7 +175,7 @@ typedef enum _globe_surface_t {
     GLOBE_LAND,        /**< Land, including islands within inland water. */
     GLOBE_SEA,         /**< Ocean outside the mapped land polygons. */
     GLOBE_INLAND_WATER, /**< Mapped lake or river-lake. */
-    GLOBE_COAST        /**< Within 500 metres of a mapped boundary. */
+    GLOBE_COAST        /**< Within the requested shoreline proximity radius; 500 metres by default. */
 } globe_surface_t;
 
 /**
@@ -282,7 +282,7 @@ string_t *globe_water_name_at(globe_t *globe, double latitude_degrees, double lo
  * @brief Return an owned country name for a covered point, or NULL when unavailable or ambiguous.
  * Uses indexed Natural Earth administrative boundaries. Water and near-shore classifications do not suppress
  * administrative coverage. For uncovered points only, detailed shoreline-confirmed land can bridge an outline
- * gap of up to one kilometre if exactly one country occurs within that distance. Missing shoreline, water,
+ * gap of up to 2.5 kilometres if exactly one country occurs within that distance. Missing shoreline, water,
  * administrative border points and competing countries cannot use this fallback. Distances use a local tangent
  * plane; these generalised polygons and the gap policy are not legal or navigational boundary determinations.
  * The caller releases the result with string_free; access to the borrowed database must be serialised.
@@ -415,6 +415,7 @@ typedef struct _globe_place_t {
     const char *elevation;         /**< Elevation in metres, or "0" when absent or the source uses -9999 for no data. */
     const char *timezone;          /**< IANA timezone name. */
     bool is_default;               /**< Whether this is the jurisdiction's selected default. */
+    const char *matched_name;      /**< Optional matched geographic name; NULL for ordinary catalogue enumeration. */
 } globe_place_t;
 
 
@@ -445,5 +446,22 @@ bool globe_towns_batch(globe_t *globe, int64_t after_id, size_t limit, bool near
  */
 bool globe_towns_jurisdiction_batch(globe_t *globe, const char *jurisdiction, int64_t after_id, size_t limit,
                                     globe_place_visit_fn visit, void *context, int64_t *next_id);
+
+/**
+ * @brief Page through a country's towns, including its administrative subdivisions.
+ * @param globe Borrowed open controller with an available town catalogue; not retained or closed.
+ * @param country Two uppercase ASCII letters identifying the catalogue country. NULL is invalid.
+ * @param after_id Zero initially, then the previous page's last visited town ID.
+ * @param limit Maximum visited rows, from 1 to 1024.
+ * @param visit Required callback; false stops this page successfully. Must not re-enter or close the controller.
+ * @param context Caller-owned callback state, optionally NULL; not retained.
+ * @param[out] next_id Required output receiving the last visited ID, or zero when empty or invalid.
+ * @return True on completion or visitor stop; false on invalid arguments, unavailable data or query failure.
+ * @note Each borrowed place retains its actual jurisdiction and is valid only during its callback. No result
+ * ownership transfers. Continue until next_id is zero; cursors require an unchanged database. Country and direct
+ * subdivision memberships come from the catalogue hierarchy; regional holiday or time-zone rules are not merged.
+ */
+bool globe_towns_country_batch(globe_t *globe, const char *country, int64_t after_id, size_t limit,
+                               globe_place_visit_fn visit, void *context, int64_t *next_id);
 
 #endif

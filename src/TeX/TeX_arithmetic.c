@@ -29,6 +29,17 @@ static const TeX_t *TeX_grouped(TeX_node_kind_t parent, const TeX_t *body, size_
     return *owned;
 }
 
+/* Preserve the scope of an adjoint, including an already scripted or daggered operand. */
+TeX_t *TeX_arithmetic_dagger(const TeX_t *body)
+{
+    if (!body || !TeX_source(body)) { errno = EINVAL; return NULL; }
+    TeX_t *owned = NULL;
+    const TeX_t *operand = TeX_grouped(TeX_NODE_DAGGER, body, 0u, &owned);
+    TeX_t *result = operand ? TeX_compose_quantum(TeX_NODE_DAGGER, &operand, 1u) : NULL;
+    TeX_free(owned);
+    return result;
+}
+
 /* Validate an identifier once, selecting recognised singleton glyphs by direct indexing. */
 TeX_t *TeX_compose_symbol(const char *name)
 {

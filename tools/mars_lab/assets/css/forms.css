@@ -1,4 +1,13 @@
 /* Input states and searchable rounded selection menus. */
+.place-search-field {
+  grid-column: 1 / -1;
+}
+
+.place-search-field .select-option-detail {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 :is(.target-row, .integrator-bound-field) input {
   color-scheme: dark;
   caret-color: var(--code);

@@ -11,6 +11,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "dictionary-t.h"
 #include "expression-t.h"
@@ -41,6 +42,7 @@ struct _notation_build_t {
     bool prime_derivatives;
     bool dependent_variables;
     bool source_order;
+    bool operator_order;
     bool resolve_transforms;
 };
 
@@ -141,6 +143,15 @@ void notation_build_source_order(notation_build_t *build, bool enabled)
 {
     if (build)
         build->source_order = enabled;
+}
+
+/* Explicit operator notation preserves order even where scalar formatting normally rearranges products. */
+void expr_notation_operator_order(notation_build_t *build)
+{
+    if (build) {
+        build->source_order = true;
+        build->operator_order = true;
+    }
 }
 
 /* Render evaluated transforms and their distribution qualifications as results. */
@@ -276,7 +287,7 @@ static bool collect_arguments(notation_build_t *build, const expr_t *argument,
 }
 
 /* Split the native trailing subscript digits into their mathematical index. */
-const TeX_model_node_t *expr_notation_name(notation_build_t *build, const char *name)
+static const TeX_model_node_t *expr_notation_plain_name(notation_build_t *build, const char *name)
 {
     if (!build || !name)
         return NULL;
@@ -302,6 +313,21 @@ const TeX_model_node_t *expr_notation_name(notation_build_t *build, const char *
     const TeX_model_node_t *result = valid ? notation_build_node(build,
         (TeX_node_view_t){.kind = TeX_NODE_SUBSCRIPT, .child_count = 2u}, children) : NULL;
     string_free(index); string_free(base);
+    return result;
+}
+
+/* Interpret an explicit operator suffix once, preserving any native subscript in the base label. */
+const TeX_model_node_t *expr_notation_name(notation_build_t *build, const char *name)
+{
+    size_t length = name ? strlen(name) : 0u;
+    if (length <= 3u || strcmp(name + length - 3u, "_op"))
+        return expr_notation_plain_name(build, name);
+    string_t *base = string_new();
+    bool valid = base && string_append_bytes(base, name, length - 3u) == 0;
+    const TeX_model_node_t *child = valid ? expr_notation_plain_name(build, string_c_str(base)) : NULL;
+    const TeX_model_node_t *result = child ? notation_build_node(build,
+        (TeX_node_view_t){.kind = TeX_NODE_HAT, .child_count = 1u}, &child) : NULL;
+    string_free(base);
     return result;
 }
 
@@ -402,6 +428,13 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
             .kind = kind == EXPR_KIND_POW_D ? TeX_NODE_POWER : TeX_NODE_ROOT, .child_count = 2u}, children);
     }
     if ((unsigned)kind < EXPR_KIND_COUNT && binary_kinds[kind]) {
+        if (build->operator_order && kind != EXPR_KIND_DIV) {
+            const TeX_model_node_t *parts[] = {
+                notation_build_expr(build, expression->a), notation_build_expr(build, expression->b)
+            };
+            return notation_build_node(build,
+                (TeX_node_view_t){.kind = binary_kinds[kind], .child_count = 2u}, parts);
+        }
         if (kind == EXPR_KIND_ADD || kind == EXPR_KIND_SUB) {
             const expr_t *centre = NULL, *coefficient = NULL;
             bool centre_negative = false, coefficient_negative = false;
@@ -503,6 +536,16 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
         size_t count = 0u;
         if (!collect_arguments(build, expression->a, children, &count, 0u))
             return NULL;
+        size_t arity = 0u;
+        TeX_node_kind_t quantum = expr_notation_quantum_function(expression->name, &arity);
+        if (quantum != TeX_NODE_COUNT) {
+            if (count != arity) {
+                errno = EINVAL;
+                return NULL;
+            }
+            return notation_build_node(build, (TeX_node_view_t){.kind = quantum, .child_count = count,
+                .fence = TeX_FENCE_ANGLE}, children);
+        }
         string_t *name = expression->name ? string_new_with(expression->name) : NULL;
         const TeX_model_node_t *result = name ? notation_build_node(build,
             (TeX_node_view_t){.kind = TeX_NODE_CALL, .text = name, .child_count = count}, children) : NULL;

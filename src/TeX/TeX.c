@@ -418,8 +418,8 @@ TeX_t *TeX_compose_equation(const TeX_t *left, const TeX_t *right, TeX_equation_
 /* Enclose a mathematical body using directly indexed delimiter pairs. */
 TeX_t *TeX_compose_fenced(const TeX_t *body, TeX_fence_t fence)
 {
-    static const char *const left[] = {"(", "[", "|", "\\lfloor", "\\lceil"};
-    static const char *const right[] = {")", "]", "|", "\\rfloor", "\\rceil"};
+    static const char *const left[] = {"(", "[", "|", "\\lfloor", "\\lceil", "\\langle"};
+    static const char *const right[] = {")", "]", "|", "\\rfloor", "\\rceil", "\\rangle"};
     if (!body || (unsigned)fence >= sizeof left / sizeof *left)
         return TeX_invalid();
     return TeX_adopt(string_sprintf("\\left%s %s \\right%s", left[fence], TeX_source(body), right[fence]));

@@ -496,6 +496,55 @@ bool TeX_bar(TeX_builder_t *builder)
     return p && TeX_replace(builder, 1, TeX_classify(TeX_compose_bar(p[0]), TeX_NODE_FENCED));
 }
 
+/* Cover the complete top operand with an operator hat. */
+bool TeX_hat(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1u);
+    return p && TeX_replace(builder, 1u, TeX_compose_quantum(TeX_NODE_HAT, p, 1u));
+}
+
+/* Mark the complete top operand as an adjoint without changing its mathematics. */
+bool TeX_dagger(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1u);
+    return p && TeX_replace(builder, 1u, TeX_arithmetic_dagger(p[0]));
+}
+
+/* Enclose one state label as a bra. */
+bool TeX_bra(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1u);
+    return p && TeX_replace(builder, 1u, TeX_compose_quantum(TeX_NODE_BRA, p, 1u));
+}
+
+/* Enclose one state label as a ket. */
+bool TeX_ket(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1u);
+    return p && TeX_replace(builder, 1u, TeX_compose_quantum(TeX_NODE_KET, p, 1u));
+}
+
+/* Construct an inner product from left and right state labels. */
+bool TeX_braket(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 2u);
+    return p && TeX_replace(builder, 2u, TeX_compose_quantum(TeX_NODE_BRAKET, p, 2u));
+}
+
+/* Construct an outer product from ket and bra labels. */
+bool TeX_ketbra(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 2u);
+    return p && TeX_replace(builder, 2u, TeX_compose_quantum(TeX_NODE_KETBRA, p, 2u));
+}
+
+/* Retain the operator between the left and right state labels. */
+bool TeX_matrix_element(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 3u);
+    return p && TeX_replace(builder, 3u, TeX_compose_quantum(TeX_NODE_MATRIX_ELEMENT, p, 3u));
+}
+
 /* Consume base followed by its lower index. */
 bool TeX_subscript(TeX_builder_t *builder)
 {

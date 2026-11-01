@@ -3,7 +3,9 @@
  * @brief Shared native town records, jurisdiction lists and direct spatial buckets.
  *
  * dictionary_t provides selection-key lookup, while array_t owns record pointers
- * and jurisdiction/bucket sequences. JavaScript receives temporary display copies,
+ * and jurisdiction/bucket sequences. Direct country slots collect regional memberships;
+ * country snapshots merge duplicate keys without changing the retained local rule identity.
+ * JavaScript receives temporary display copies,
  * never native pointers or retained bridge handles. An 8 MiB admission budget
  * accounts for copied text plus a conservative per-record index allowance.
  * Mutable resident state belongs to a private singleton. Public operations enter its serial dispatcher;
@@ -38,6 +40,7 @@ typedef struct _town_store_t {
     lab_serial_t serial;
     array_t *records;
     array_t *buckets[37 * 72];
+    array_t *countries[26 * 26];
     dictionary_t *by_key;
     dictionary_t *by_country;
     dictionary_t *long_names;
@@ -134,6 +137,7 @@ static jsref town_value(const town_record_t *record, bool place)
     for (unsigned i = 0; i < sizeof field_names / sizeof *field_names; ++i)
         lab_dom_set(town, field_names[i], text_value(record->fields[i]));
     lab_dom_set(town, "default", lab_dom_scalar(LAB_VALUE_BOOLEAN, record->preferred));
+    lab_dom_set(town, "jurisdiction", text_value(record->code));
     if (!place) return town;
     jsref result = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(result, "town", town);
@@ -193,6 +197,9 @@ static int lab_town_store_add_owned(jsref code_value, jsref rows)
     if (!copy_code(code_value, code) || !initialise() || lab_dom_type(rows) != LAB_VALUE_ARRAY) {
         return -1;
     }
+    array_t **national = &state->countries[(code[0] - 'A') * 26 + code[1] - 'A'];
+    if (!*national) *national = array_create(sizeof(town_record_t *), NULL, NULL);
+    if (!*national) return -1;
     const char *country_key = code;
     char *created_key = NULL;
     array_t *country = NULL;
@@ -230,14 +237,16 @@ static int lab_town_store_add_owned(jsref code_value, jsref rows)
         record->preferred = lab_dom_truth(lab_dom_get(row, "default"));
         array_t **bucket = town_bucket(record);
         if (bucket && !*bucket) *bucket = array_create(sizeof(town_record_t *), NULL, NULL);
-        bool indexed = false, owned = false, listed = false, spatial = false;
+        bool indexed = false, owned = false, listed = false, spatial = false, grouped = false;
         if (state->text_bytes + record->bytes <= state->text_limit && (!bucket || *bucket)) {
             indexed = dictionary_set(state->by_key, &record->key, &record);
             if (indexed) owned = array_append_carray(state->records, &record, 1);
             if (owned) listed = array_append_carray(country, &record, 1);
             if (listed) spatial = !bucket || array_append_carray(*bucket, &record, 1);
+            if (spatial) grouped = array_append_carray(*national, &record, 1);
         }
-        if (!spatial) {
+        if (!grouped) {
+            if (spatial && bucket) array_remove(*bucket, array_size(*bucket) - 1);
             if (listed) array_remove(country, array_size(country) - 1);
             if (owned) array_remove(state->records, array_size(state->records) - 1);
             if (indexed) dictionary_remove(state->by_key, &record->key);
@@ -256,6 +265,7 @@ rollback:
         town_record_t *record = *(town_record_t **)array_get(state->records, array_size(state->records) - 1);
         array_t **bucket = town_bucket(record);
         if (bucket) array_remove(*bucket, array_size(*bucket) - 1);
+        array_remove(*national, array_size(*national) - 1);
         array_remove(country, array_size(country) - 1);
         array_remove(state->records, array_size(state->records) - 1);
         dictionary_remove(state->by_key, &record->key);
@@ -269,6 +279,55 @@ rollback:
     return -1;
 }
 
+typedef struct _country_town_t {
+    town_record_t *record;
+    bool preferred;
+} country_town_t;
+
+static int country_town_compare(const void *left, const void *right)
+{
+    const country_town_t *a = left, *b = right;
+    if (a->preferred != b->preferred) return b->preferred - a->preferred;
+    unsigned mark = lab_dom_mark();
+    int result = lab_dom_locale_compare(text_value(a->record->fields[0]), text_value(b->record->fields[0]), false);
+    lab_dom_release(mark);
+    return result;
+}
+
+/* Only this country's directly indexed members are materialised; a dictionary merges repeated selection keys. */
+static jsref country_town_snapshot(array_t *family)
+{
+    dictionary_t *unique = dictionary_create(sizeof(char *), sizeof(country_town_t), text_hash, text_compare,
+                                             NULL, NULL, NULL, NULL, NULL);
+    array_t *ordered = array_create(sizeof(country_town_t), NULL, NULL);
+    bool ok = unique && ordered;
+    for (size_t i = 0; ok && i < array_size(family); ++i) {
+        town_record_t *record = *(town_record_t **)array_get(family, i);
+        const char *key = record->fields[5];
+        country_town_t entry = {.record = record};
+        if (dictionary_get(unique, &key, &entry)) {
+            if (strlen(entry.record->code) == 2 && strlen(record->code) > 2) entry.record = record;
+        }
+        entry.preferred = entry.preferred || (strlen(record->code) == 2 && record->preferred);
+        ok = dictionary_set(unique, &key, &entry);
+    }
+    for (size_t i = 0; ok && i < dictionary_size(unique); ++i)
+        ok = array_append_carray(ordered, dictionary_get_value(unique, i), 1);
+    if (ok) array_sort(ordered, country_town_compare);
+    jsref result = ok ? lab_dom_object(LAB_VALUE_ARRAY) : 0;
+    unsigned mark = lab_dom_mark();
+    for (size_t i = 0; ok && i < array_size(ordered); ++i) {
+        const country_town_t *entry = array_get(ordered, i);
+        jsref town = town_value(entry->record, false);
+        lab_dom_set(town, "default", lab_dom_scalar(LAB_VALUE_BOOLEAN, entry->preferred));
+        lab_dom_push(result, town);
+        lab_dom_release(mark);
+    }
+    dictionary_destroy(unique);
+    array_destroy(ordered);
+    return result;
+}
+
 /* Build an independent snapshot within the caller's bridge scope. */
 static jsref lab_town_store_snapshot_owned(jsref code_value)
 {
@@ -276,6 +335,11 @@ static jsref lab_town_store_snapshot_owned(jsref code_value)
     char code[7];
     const char *key = code;
     array_t *country = NULL;
+    if (!copy_code(code_value, code)) return 0;
+    if (strlen(code) == 2) {
+        array_t *family = state->countries[(code[0] - 'A') * 26 + code[1] - 'A'];
+        if (family) return country_town_snapshot(family);
+    }
     if (!copy_code(code_value, code) || !state->by_country || !dictionary_get(state->by_country, &key, &country)) {
         return 0;
     }
@@ -348,6 +412,7 @@ static void lab_town_store_clear_owned(void)
     dictionary_destroy(state->by_key); state->by_key = NULL;
     dictionary_destroy(state->long_names); state->long_names = NULL;
     for (unsigned i = 0; i < 37 * 72; ++i) { array_destroy(state->buckets[i]); state->buckets[i] = NULL; }
+    for (unsigned i = 0; i < 26 * 26; ++i) { array_destroy(state->countries[i]); state->countries[i] = NULL; }
     if (state->records) for (size_t i = 0; i < array_size(state->records); ++i)
         release_record(*(town_record_t **)array_get(state->records, i));
     array_destroy(state->records); state->records = NULL; state->text_bytes = 0;

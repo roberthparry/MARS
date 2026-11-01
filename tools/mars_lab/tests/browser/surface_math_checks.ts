@@ -9,7 +9,26 @@
 interface Window {
     /** @brief Check linked maths, viewport limits and the browser module's imports. */
     checkLabSurfaceMath(): Promise<void>;
+    /** @brief Check country aggregation independently of the GPU and travel assertions. */
+    checkLabCountryTowns(): void;
 }
+
+/** @brief Verify national menus merge regional records without losing their actual calendar memberships. */
+window.checkLabCountryTowns = function checkLabCountryTowns(): void {
+    const town = (name: string, latitude: string, longitude: string): LabTown => ({
+        name, latitude, longitude, elevation: '0', timezone: '', default: false, value: name, detail: name
+    });
+    const canberra = {...town('Canberra', '-35.2835', '149.1281'), timezone: 'Australia/Sydney', default: true};
+    const inserted = labDOM.call('lab_town_store_add', 'AU', [canberra]) === 1 &&
+        labDOM.call('lab_town_store_add', 'AU-ACT', [canberra]) === 1 &&
+        labDOM.call('lab_town_store_add', 'AU-QLD', [town('Gold Coast', '-28', '153.4')]) === 1;
+    if (!inserted) throw new Error('Country towns: regional memberships were not retained');
+    const australia = labDOM.call<LabTown[]>('lab_town_store_list', 'AU');
+    if (!(australia.length === 2 && australia[0].name === 'Canberra' &&
+          australia[0].jurisdiction === 'AU-ACT' && australia[0].default &&
+          australia[0].timezone === 'Australia/Sydney' && australia[1].name === 'Gold Coast'))
+        throw new Error('Country towns: duplicate merging, national default or local rules were lost');
+};
 
 /** @brief Exercise linked maths through native exports and the scoped camera and gesture APIs. */
 window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void> {
@@ -572,6 +591,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     });
     const townBatch = [town('Native western', '0', '-180'), town('Native eastern', '0', '180'),
         town('Native pole', '90', '0')];
+    window.checkLabCountryTowns();
     check(labDOM.call('lab_town_store_add', 'ZZ', townBatch) === 3,
           'native array stores a town batch');
     check(labDOM.call('lab_town_store_add', 'ZZ', townBatch) === 0,

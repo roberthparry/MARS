@@ -144,6 +144,7 @@ static const struct lab_svr_asset lab_svr_assets[] = {
     {"/js/bindings.js", "@scripts/bindings.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/bindings_controller.js", "@scripts/bindings_controller.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/locations.js", "@scripts/locations.js", "text/javascript; charset=utf-8", 4194304},
+    {"/js/place_search.js", "@scripts/place_search.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/globe.js", "@scripts/globe.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/globe_gpu.js", "@scripts/globe_gpu.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/globe_photo.js", "@scripts/globe_photo.js", "text/javascript; charset=utf-8", 4194304},
@@ -334,6 +335,19 @@ static bool lab_svr_dispatch(const websrv_request_t *request, websrv_response_t 
         json_free(payload);
         return lab_svr_message(request, response, 400, "Expected a valid versioned Protobuf request object");
     }
+    if (lab_svr_equal(path, "/place-search")) {
+        string_t *key = string_new_with("query");
+        const string_t *source = key ? json_string_value(json_object_get(payload, key)) : NULL;
+        string_t *query = source ? string_clone(source) : NULL;
+        if (query) string_trim(query);
+        bool valid = query && string_byte_length(query) <= 256 && string_length(query) >= 2;
+        json_t *result = valid ? lab_page_town_search(query) : NULL;
+        string_free(query); string_free(key); json_free(payload);
+        if (!valid) return lab_svr_message(request, response, 400, "Enter a town name of 2 to 256 characters");
+        bool ok = result && lab_svr_value(request, response, result);
+        json_free(result);
+        return ok;
+    }
     if (lab_svr_equal(path, "/history")) {
         unsigned status = 400;
         json_t *result = lab_history_request(payload, &status);
@@ -393,6 +407,7 @@ static bool lab_svr_register_routes(lab_server_t *server)
                                              "/icon-512.png",
                                              "/manifest.webmanifest"};
     static const char *const post_routes[] = {"/state",
+                                              "/place-search",
                                               "/history",
                                               "/presentation",
                                               "/forms",

@@ -239,9 +239,8 @@ class LabApplication {
     private async loadSelectedTowns(): Promise<void> {
         const pending: Promise<void>[] = [];
         const codes = new Set(['almanacJurisdiction', 'datetimeJurisdiction'].map(id =>
-            (document.getElementById(id) as HTMLSelectElement)?.value || '').filter(code => /^[A-Z0-9-]{2,32}$/.test(code)));
-        // Include parent fallback only when its subdivision is selected, never the whole world.
-        for (const code of Array.from(codes)) if (code.includes('-')) codes.add(code.split('-')[0]);
+            ((document.getElementById(id) as HTMLSelectElement)?.value || '').split('-')[0])
+            .filter(code => /^[A-Z]{2}$/.test(code)));
         for (const code of this.failedTownCodes) if (!codes.has(code)) this.failedTownCodes.delete(code);
         for (const [code, job] of this.townJobs) if (!codes.has(code)) job.controller.abort();
         for (const code of codes) {
@@ -278,7 +277,7 @@ class LabApplication {
     public async prepareCountrySelection(code: string): Promise<void> {
         if (!this.catalogue?.available) return;
         void this.loadSelectedTowns();
-        await this.townJobs.get(code)?.ready;
+        await this.townJobs.get(code.split('-')[0])?.ready;
         if (code.includes('-') && !labDOM.call('lab_town_store_list', code))
             await this.townJobs.get(code.split('-')[0])?.promise;
     }
@@ -673,6 +672,11 @@ class LabApplication {
     /** Browser observers and host callbacks for controls whose policies are native. */
     private initialiseWidgets(): void {
         labDOM.services(labDOM.call('lab_bootstrap_widgets') as NativeServicePlan, {enhance: WorksheetLocations.selects.enhance});
+        for (const mode of ['datetime', 'almanac'] as const) {
+            const select = document.getElementById(`${mode}PlaceSearch`) as WorksheetSelect;
+            const search = new WorksheetPlaces.SearchController(select, mode);
+            this.cleanupCallbacks.push(search.dispose.bind(search));
+        }
         if (typeof ResizeObserver === 'function') {
             this.observe(WorksheetContext.rendered, this.scheduleRenderedFit.bind(this));
             this.observe(document.getElementById('plotRendered'), this.scheduleRenderedFit.bind(this));

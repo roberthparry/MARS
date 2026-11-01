@@ -105,8 +105,9 @@ static jsref lab_select_selected(jsref shell)
 
 static void lab_select_filter(jsref shell)
 {
-    int query = lab_dom_normalize(lab_dom_read(lab_dom_query(shell, ".select-search"), LAB_DOM_VALUE, ""));
     int select = lab_dom_query(shell, "select");
+    int query = lab_dom_truth(lab_dom_read(select, LAB_DOM_DATASET, "globalSearch")) ? lab_dom_string("") :
+                lab_dom_normalize(lab_dom_read(lab_dom_query(shell, ".select-search"), LAB_DOM_VALUE, ""));
     int changes = lab_menu_index_filter(select, query);
     if (changes) {
         if (lab_dom_truth(lab_dom_get(changes, "unchanged"))) return;
@@ -132,7 +133,8 @@ static void lab_select_filter(jsref shell)
     unsigned visible = 0, navigation = 0, count = lab_dom_count(items), mark = lab_dom_mark();
     for (unsigned i = 0; i < count; ++i) {
         int item = lab_dom_item(items, i);
-        int match = lab_dom_contains(lab_dom_read(item, LAB_DOM_DATASET, "searchText"), query);
+        int match = !lab_dom_truth(lab_dom_read(item, LAB_DOM_DATASET, "excluded")) &&
+                    lab_dom_contains(lab_dom_read(item, LAB_DOM_DATASET, "searchText"), query);
         lab_dom_class(item, "hidden", !match);
         visible += match != 0;
         if (match && !lab_dom_is_disabled(item))
@@ -159,10 +161,15 @@ void lab_select_rebuild(node_jsref select, bool details)
         int option = lab_dom_item(options, i), item = lab_select_child(wrap, "button", "select-option");
         int label = lab_dom_read(option, LAB_DOM_TEXT, ""), value = lab_dom_read(option, LAB_DOM_VALUE, "");
         int detail = details ? lab_dom_read(option, LAB_DOM_DATASET, "detail") : 0;
+        int search_detail = details ? lab_dom_read(option, LAB_DOM_DATASET, "searchDetail") : 0;
+        if (lab_dom_length(search_detail)) detail = search_detail;
         lab_select_text(item, LAB_DOM_ATTRIBUTE, "type", "button");
         lab_select_text(item, LAB_DOM_ATTRIBUTE, "role", "option");
         lab_select_text(item, LAB_DOM_ATTRIBUTE, "aria-selected", "false");
         lab_dom_write(item, LAB_DOM_DATASET, "value", value);
+        bool hidden = lab_dom_truth(lab_dom_get(option, "hidden"));
+        lab_dom_write(item, LAB_DOM_DATASET, "excluded", lab_dom_string(hidden ? "1" : ""));
+        lab_dom_class(item, "hidden", hidden);
         lab_select_town_metadata(item, option);
         lab_dom_disabled(item, lab_dom_is_disabled(option));
         if (lab_dom_length(detail)) {
@@ -187,15 +194,19 @@ void lab_select_sync(node_jsref select)
         return;
     int button = lab_dom_query(shell, ".select-button"), selected = lab_dom_selected(select);
     lab_select_town_metadata(button, selected);
+    int label = lab_dom_read(selected, LAB_DOM_DATASET, "countryLabel");
     lab_dom_write(button, LAB_DOM_TEXT, "",
-                  selected ? lab_dom_read(selected, LAB_DOM_TEXT, "")
+                  selected ? (lab_dom_length(label) ? label : lab_dom_read(selected, LAB_DOM_TEXT, ""))
                            : lab_dom_read(shell, LAB_DOM_DATASET, "placeholder"));
     lab_dom_disabled(button, lab_dom_is_disabled(select));
     if (lab_dom_is_disabled(select))
         lab_select_close(shell);
     int previous = lab_dom_get(shell, "marsSelectedOption");
     int items = lab_dom_get(lab_dom_query(shell, ".select-options"), "children");
-    int current = selected ? lab_dom_item(items, (unsigned)lab_dom_number(lab_dom_get(select, "selectedIndex"))) : 0;
+    int parent = lab_dom_read(selected, LAB_DOM_DATASET, "countryParent");
+    int position = lab_dom_length(parent) ? lab_menu_index_key(select, parent) : -1;
+    if (position < 0) position = (int)lab_dom_number(lab_dom_get(select, "selectedIndex"));
+    int current = selected && position >= 0 ? lab_dom_item(items, (unsigned)position) : 0;
     if (!lab_dom_equal(previous, current)) {
         if (previous) {
             lab_dom_class(previous, "selected", 0);

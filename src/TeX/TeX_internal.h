@@ -398,6 +398,23 @@ TeX_t *TeX_compose_prime(const TeX_t *body, unsigned order);
 TeX_t *TeX_compose_bar(const TeX_t *body);
 
 /**
+ * @brief Compose a hat, adjoint or Dirac state construct from ordered mathematical operands.
+ * @param kind HAT, DAGGER, BRA, KET, BRAKET, KETBRA or MATRIX_ELEMENT semantic kind.
+ * @param operands Borrowed array of count non-NULL operands, neither modified nor retained.
+ * @param count Operand count, validated against the selected kind's fixed arity.
+ * @return Owned notation released with TeX_free(), or NULL with EINVAL or an allocation error.
+ * @note The caller supplies any grouping required by TeX_needs_fence(); no mathematics is evaluated.
+ */
+TeX_t *TeX_compose_quantum(TeX_node_kind_t kind, const TeX_t *const *operands, size_t count);
+
+/**
+ * @brief Attach a dagger to a complete operand while retaining its visible scope.
+ * @param body Borrowed non-NULL operand, neither modified nor retained.
+ * @return Owned notation released with TeX_free(), or NULL with EINVAL or an allocation error.
+ */
+TeX_t *TeX_arithmetic_dagger(const TeX_t *body);
+
+/**
  * @brief Apply established function spelling to already selected mathematical arguments.
  * @param name Borrowed plain UTF-8 function name, valid throughout this call.
  * @param arguments Borrowed array of count non-NULL argument fragments, or NULL when count is zero.

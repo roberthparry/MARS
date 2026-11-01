@@ -41,6 +41,41 @@ typedef enum {
     LAB_LOCATION_RESTORE_RESPONSE = 1 /**< Apply the server match or fall back to coordinates. */
 } lab_location_restore_stage_t;
 
+/** @brief Presentation states for the independent worldwide place-search menu. */
+typedef enum {
+    LAB_LOCATION_SEARCH_EMPTY = 0, /**< Prompt for at least two characters. */
+    LAB_LOCATION_SEARCH_PENDING, /**< A cancellable request is in progress. */
+    LAB_LOCATION_SEARCH_NOT_FOUND, /**< The valid search returned no matches. */
+    LAB_LOCATION_SEARCH_UNAVAILABLE /**< Search transport or catalogue is unavailable. */
+} lab_location_search_state_t;
+
+/**
+ * @brief Clear suggestions and present a search status without changing worksheet location controls.
+ * @param select Scoped handle to the dedicated place-search select; NULL is ignored.
+ * @param state Valid native search state; invalid values are ignored.
+ * @note Updates only the search menu. No input ownership transfers and no handles are retained.
+ */
+void lab_location_search_status(node_jsref select, lab_location_search_state_t state);
+
+/**
+ * @brief Retain and project up to 25 worldwide search matches, leaving the observer unchanged.
+ * @param select Scoped search-select node inside its owning worksheet panel.
+ * @param response Scoped decoded response containing available and matches; not consumed or retained.
+ * @return True after rendering, including no matches; false for malformed data or native allocation failure.
+ * @note Copied town data enter the bounded native catalogue. Suggestions show catalogue-owned country/region
+ * labels, while original names and selection keys remain unchanged. No country or worksheet field is selected.
+ */
+bool lab_location_search_results(node_jsref select, jsref response);
+
+/**
+ * @brief Apply an explicitly chosen search result to the owning country and town controls.
+ * @param select Scoped search-select node inside a worksheet panel; not retained or consumed.
+ * @return True when a known result was applied; false for an empty, invalid or unavailable selection.
+ * @note Does not change coordinates, offsets or calculation state. The host dispatches the ordinary town-change
+ * event afterwards, preserving existing history, travel and calendar behaviour. The independent search menu resets.
+ */
+bool lab_location_search_choose(node_jsref select);
+
 /** @brief Validate an opaque form value using browser conversion and native calendar policy.
  * @param kind Date 1, jurisdiction 2 or visibility 3; other values only trim the supplied text.
  * @param boxed Scoped object whose value property contains the candidate, including boxed numbers.

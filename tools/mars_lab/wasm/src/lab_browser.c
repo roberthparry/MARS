@@ -324,7 +324,7 @@ unsigned char *lab_browser_input_buffer(void)
 /* Identify the complete browser ABI independently of the stable wire schema. */
 unsigned lab_browser_abi_version(void)
 {
-    return 47;
+    return 51;
 }
 
 /* Share the codec's staging bound with browser stream and buffer admission. */

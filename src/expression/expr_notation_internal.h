@@ -20,6 +20,37 @@
 #include "expr_internal.h"
 
 /**
+ * @brief Recognise one ASCII operator-notation function through a perfect-hash lookup.
+ * @param name Borrowed NUL-terminated name; neither retained nor modified.
+ * @param arity Optional output receiving the recognised function's required argument count.
+ * @return Its semantic kind, or TeX_NODE_COUNT for an unrecognised name. No TeX syntax is returned.
+ */
+TeX_node_kind_t expr_notation_quantum_function(const char *name, size_t *arity);
+
+/**
+ * @brief Read a recognised ASCII operator-notation function name immediately followed by a call.
+ * @param cursor Borrowed input cursor; advanced past the name only on success, otherwise unchanged.
+ * @return Owned name released with string_free(), or NULL on mismatch or allocation failure.
+ * @note Whitespace before the opening parenthesis is allowed; the parenthesis is not consumed.
+ */
+string_t *expr_notation_read_quantum_function(string_cursor_t *cursor);
+
+/**
+ * @brief Detect explicit operator-notation calls or an operator suffix in mathematical text.
+ * @param text Borrowed mathematical input; neither retained nor modified.
+ * @return True when an operator-notation function call or a complete _op suffix is present.
+ * @note This lexical pass selects order-preserving parsing; it does not validate the complete expression.
+ */
+bool expr_notation_quantum_input(const string_t *text);
+
+/**
+ * @brief Preserve the authored order of operator expressions while preparing semantic notation.
+ * @param build Borrowed snapshot builder; NULL is ignored. No ownership transfers.
+ * @note This disables scalar product rearrangement for notation-only operators, without evaluating them.
+ */
+void expr_notation_operator_order(notation_build_t *build);
+
+/**
  * @brief Report whether native authored or Cartesian semantics require a single unwrapped body.
  * @param expression Borrowed source expression to inspect or transform without transferring ownership.
  * @return True when the requested operation succeeds; false when unavailable, invalid or unsuccessful.

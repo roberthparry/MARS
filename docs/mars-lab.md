@@ -307,7 +307,33 @@ normal path, not a claim that every operation or low-memory fallback is constant
 coordinate/town-country metadata in a native dictionary, with FIFO eviction at
 64 entries or a 1 MiB text-allocation budget. Flags are not duplicated in this cache.
 
-Country/jurisdiction dropdowns also show available flags beside visible entries
+The Country picker offers one visible entry per country, covering all its
+states and provinces. Country town requests include regional memberships in
+bounded database pages. The native town store combines that country's directly
+indexed lists, removes repeated town selection keys and sorts the resulting menu.
+A duplicate with a more specific jurisdiction supplies local rules; the national
+default still takes precedence when choosing the initial town. Selecting Canberra
+therefore requires only Australia, while its territory membership and time zone
+remain available internally. Restored regional selections show their parent
+country in the picker. Geographic names and regional flag artwork remain local
+to the selected place.
+
+In Almanac and Datetime, **Find a place anywhere** searches towns, countries and
+regions independently of the Country picker. Enter at least two characters;
+accents are optional, so
+`Luderitz` finds `Lüderitz` in Namibia. An area name such as `Svalbard` finds its
+default town, Longyearbyen, so you need not know a town name beforehand.
+Island aliases also resolve to existing town references: `Pico` or `Pico Azores`
+shows **Pico — Madalena** in the Azores. Choosing it retains Madalena's recorded
+position, elevation and time zone. Exact named places rank before prefix matches
+such as Picos in other countries. Faial, Terceira and São Miguel are also indexed.
+Suggestions show their country or region
+to distinguish places with the same name. Typing leaves the observer unchanged;
+choosing a suggestion selects its country, town, coordinates, height and local
+time rules through the usual history and globe-travel controls. Search uses the
+installed catalogue and works without an internet connection.
+
+Country dropdowns also show available flags beside visible entries
 and the selected label, as well as in their tooltips. Opening or focusing the menu
 starts lazy observation: artwork loads sequentially for visible rows, sharing the
 32-entry native `dictionary_t` cache with a 1 MiB UTF-8 text budget. C owns copied
@@ -4594,6 +4620,9 @@ Temperature changes refraction, not parallax. Below −0.575° the displayed alt
 receives no refraction correction. The native globe hit-test classifies the
 observer's latitude and longitude using the installed, spatially indexed shoreline
 in the globe database. Town and Custom selections use the same geographical rule.
+The card uses exact polygon containment for its surface label: mapped land remains
+**Land** even on a narrow peninsula or small island within 500 metres of the shore.
+The library's default proximity classification remains available independently.
 Sea points within five kilometres of mapped shoreline are labelled **Coastal water**,
 not **Offshore**. This conservative presentation policy covers near-shore basins
 without claiming to identify a harbour or its jurisdiction; administrative polygons
@@ -4604,7 +4633,7 @@ fails, sea mode is withheld rather than assuming an unobstructed horizon.
 Sea beyond this proximity band uses sea mode: the entered altitude is height of eye above sea level
 (non-negative), and geometric horizon dip is added to the predicted body-centre
 altitude above the assumed unobstructed sea horizon. Land, inland water, the
-500-metre uncertain coastal band and unavailable data do not receive sea-horizon
+exact shoreline boundary and unavailable data do not receive sea-horizon
 dip. The summary identifies the classification and
 corrections. This is not a sextant sight reduction, for which dip is subtracted
 from a measured altitude. Waves and terrestrial refraction are not modelled.
