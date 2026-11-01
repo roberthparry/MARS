@@ -2895,6 +2895,10 @@
     }
   },
   "tools/mars_checks/tests/test_checks_build.c": {
+    "readme_examples": {
+      "enabled": true,
+      "test_checks_sqlcipher_readme": true
+    },
     "tests": {
       "enabled": true,
       "test_checks_sqlcipher_dependencies": true,

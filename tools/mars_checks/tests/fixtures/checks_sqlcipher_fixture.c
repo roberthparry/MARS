@@ -2,8 +2,8 @@
  * @file checks_sqlcipher_fixture.c
  * @brief Simulate old or feature-limited SQLCipher runtimes in dependency-check regressions.
  *
- * The test linker wraps only version reporting and SQL execution. All other operations use the installed
- * SQLCipher library, including allocation, statement handling and cipher-version reporting. Overrides belong
+ * The test linker wraps version reporting, the cipher-version query and SQL execution. All other operations
+ * use the installed SQLCipher library, including allocation and statement handling. Overrides belong
  * solely to disposable test processes; the installed library and user databases are never modified.
  */
 #include <stdlib.h>
@@ -15,6 +15,16 @@ int __real_sqlite3_libversion_number(void);
 const char *__real_sqlite3_libversion(void);
 int __real_sqlite3_exec(sqlite3 *db, const char *sql, int (*callback)(void *, int, char **, char **),
                        void *context, char **error);
+int __real_sqlite3_prepare_v2(sqlite3 *db, const char *sql, int length, sqlite3_stmt **query, const char **tail);
+
+/* Model an unsupported cipher release independently of the embedded SQLite version. */
+int __wrap_sqlite3_prepare_v2(sqlite3 *db, const char *sql, int length, sqlite3_stmt **query, const char **tail)
+{
+    const char *mode = getenv("MARS_TEST_SQLCIPHER");
+    if (mode && !strcmp(mode, "cipher") && !strcmp(sql, "PRAGMA cipher_version"))
+        return __real_sqlite3_prepare_v2(db, "SELECT '4.0.1 community'", -1, query, tail);
+    return __real_sqlite3_prepare_v2(db, sql, length, query, tail);
+}
 
 /* Return an older runtime version only in the corresponding child-process fixture. */
 int __wrap_sqlite3_libversion_number(void)

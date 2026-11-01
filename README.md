@@ -111,7 +111,8 @@ worked examples, all seven modes and private mobile access through Tailscale.
 - GCC or Clang on Linux, compiling C99/GNU C
 - Standard C library plus `libm` and pthreads
 - GMP, MPFR, and MPC development libraries
-- SQLCipher development libraries with embedded SQLite >= 3.27.0, FTS5 and window functions
+- SQLCipher 4.1.0 or newer development libraries, with embedded SQLite >= 3.27.0, FTS5 and window functions
+  (SQLCipher 4.13.0 is verified; see the [database build requirements](docs/building.md#sqlcipher-version-and-database-features))
 - Zstandard and libsodium development libraries (streaming file compression and authenticated encryption)
 - libcurl 7.86.0 or newer development library (HTTP/HTTPS transport)
 - `pkg-config` for discovery of library compiler and linker flags
@@ -131,7 +132,10 @@ Put `tsc` on PATH, or set the Make variable `TSC` to its absolute path. Use `mak
 to check development headers, link libraries and the configured TypeScript
 compilers; it reports compiler versions and confirms that all dependency checks
 passed on success. `make check-native-deps`
-checks only the C development libraries and remains quiet on success.
+checks only the C development libraries and reports the linked SQLCipher and SQLite
+versions. `make release` checks them before building or updating databases. If the
+SQLCipher version or required SQL features are insufficient, it stops and prints
+the [Debian/Ubuntu upgrade commands](docs/building.md#updating-sqlcipher-on-debian-or-ubuntu).
 
 MARS Lab runs as a native C server with calculation modes linked into the same
 `mars_lab` executable. It launches isolated child instances with `--worker MODE`,

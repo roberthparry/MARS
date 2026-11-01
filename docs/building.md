@@ -19,20 +19,103 @@ Use a SQLCipher development build whose embedded SQLite and headers are version
 and window functions enabled. FTS5 is optional at build time, so a recent version
 number alone does not establish that the library is suitable.
 
+**SQLCipher version baseline: 4.1.0 or newer.** The upstream
+[SQLCipher 4.1.0 release](https://discuss.zetetic.net/t/sqlcipher-4-1-0-release/3490)
+includes SQLite 3.27.2, meeting the minimum SQLite version above.
+**Verified build: SQLCipher 4.13.0 with SQLite 3.51.2.** The version baseline
+does not replace the FTS5 and window-function requirements: distribution packages
+can omit optional features, so the dependency probe checks the actual linked library.
+
 `make check-sqlcipher-deps` compiles and runs a small probe using the same
 `SQLCIPHER_CFLAGS`, `SQLCIPHER_LIBS` and linker flags as the build. It prints the
 SQLCipher version, embedded SQLite runtime version and SQLite header version,
 then exercises the required search and window-function SQL in an in-memory
-database. The `sqlcipher` command-line programme is not needed.
+database. It rejects SQLCipher releases older than 4.1.0, SQLite runtimes or
+headers older than 3.27.0, and builds missing required features. The `sqlcipher`
+command-line programme is not needed.
 `make check-native-deps` and `make check-deps` include this probe.
 `make release` runs the native dependency gate before compliance or compilation,
 and database installation/update targets check it before changing installed data.
+On failure, the build prints the Debian/Ubuntu commands below to install the
+verified release with the required features, including when Lab is already installed.
 
 On Debian/Ubuntu, the development package is `libsqlcipher-dev`. An older
 distribution may require a newer SQLCipher package or a source build with
 `SQLITE_ENABLE_FTS5`; upgrading to another build without FTS5 will still fail
 the feature probe. After selecting the upgraded library and matching headers,
 run `make check-native-deps` before retrying `make release`.
+
+#### Updating SQLCipher on Debian or Ubuntu
+
+If the probe reports SQLCipher 4.5.6 with SQLite 3.44.2 but `no such module: fts5`,
+the version is sufficient; that particular library was built without FTS5.
+Reinstalling the same distribution package will not add it. The following commands
+build the verified SQLCipher 4.13.0 release with FTS5 and R-tree support on the
+computer reporting the failure. They follow the
+[upstream Linux build requirements](https://www.zetetic.net/sqlcipher/sqlcipher-linux-community/).
+
+Close MARS Lab before replacing its shared library. Install the build prerequisites:
+
+```sh
+sudo apt update
+sudo apt install build-essential git pkg-config libssl-dev tcl-dev
+```
+
+APT reports the packages installed or already current. Then build and install:
+
+```sh
+(
+    set -eu
+    sqlcipher_build=$(mktemp -d)
+    trap 'rm -rf "$sqlcipher_build"' EXIT
+    git clone --depth 1 --branch v4.13.0 \
+        https://github.com/sqlcipher/sqlcipher.git "$sqlcipher_build/source"
+    cd "$sqlcipher_build/source"
+    ./configure --prefix=/usr/local --libdir=/usr/local/lib \
+        --includedir=/usr/local/include/sqlcipher --disable-tcl \
+        --with-tempstore=yes --enable-fts5 --enable-rtree \
+        CFLAGS="-O2 -DSQLITE_HAS_CODEC -DSQLITE_EXTRA_INIT=sqlcipher_extra_init -DSQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown" \
+        LDFLAGS="-lcrypto"
+    make -j2 libsqlite3.DLL.basename=libsqlcipher \
+        LDFLAGS.libsqlite3.soname=-Wl,-soname,libsqlcipher.so.0 so
+    sudo make -j1 libsqlite3.DLL.basename=libsqlcipher \
+        LDFLAGS.libsqlite3.soname=-Wl,-soname,libsqlcipher.so.0 install-dll install-headers
+    sudo install -d /usr/local/lib/pkgconfig
+    sed -e 's/^Name: SQLite$/Name: SQLCipher/' \
+        -e 's/-lsqlite3/-lsqlcipher/g' sqlite3.pc \
+        | sudo tee /usr/local/lib/pkgconfig/sqlcipher.pc >/dev/null
+    sudo ldconfig
+)
+```
+
+The build reports `SQLITE_ENABLE_FTS5` and `SQLITE_ENABLE_RTREE` among its feature
+flags. It installs `libsqlcipher.so` and its versioned links under `/usr/local/lib`,
+headers under `/usr/local/include/sqlcipher`, and `sqlcipher.pc` under
+`/usr/local/lib/pkgconfig`. The explicit library name and installation targets
+avoid installing SQLCipher as the ordinary `libsqlite3` library. The distribution's
+SQLCipher package remains installed; the source build takes precedence for MARS.
+The temporary source and build files are removed when the subshell exits.
+
+From the MARS checkout, select the new package metadata and check the library:
+
+```sh
+export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+make check-native-deps
+```
+
+The SQLCipher part of the successful output is:
+
+```text
+SQLCipher 4.13.0 community; SQLite runtime 3.51.2; SQLite headers 3.51.2.
+SQLCipher version and required SQL features verified.
+```
+
+After the checks pass, run `make release` in that same terminal and restart Lab.
+If the probe still reports the old version, run
+`pkg-config --variable=pcfiledir sqlcipher`; it should print
+`/usr/local/lib/pkgconfig`. Explicit `SQLCIPHER_CFLAGS`, `SQLCIPHER_LIBS`,
+`LD_LIBRARY_PATH` or `LD_PRELOAD` overrides can select a different library and
+must agree with this installation.
 
 ### Native maintenance applications
 

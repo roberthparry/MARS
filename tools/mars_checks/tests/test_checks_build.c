@@ -24,6 +24,7 @@ static bool test_build_makefiles(const string_t *temporary)
         "Makefile", "tools/mars_lab/Makefile", "tools/to_be_announced_lab/Makefile",
         "tools/mars_config/Makefile", "tools/mars_checks/Makefile", "tools/mars_checks/sqlcipher_probe.c",
         "tools/mars_checks/tests/fixtures/checks_sqlcipher_fixture.c",
+        "docs/building.md",
         "include/array-t.h", "include/string-t.h", "src/array/array.c", "src/array/array_mutex.h"
     };
     string_t *root = checks_text(MARS_CHECKS_ROOT_DIR);
@@ -153,7 +154,7 @@ static void test_checks_typescript_dependencies(void)
 }
 
 static bool test_build_sqlcipher_probe(const string_t *root, const char *target, const char *mode,
-                                      const char *diagnostic)
+                                      const char *diagnostic, string_t **instructions)
 {
     checks_strings_t *arguments = checks_strings_new();
     checks_strings_add(arguments, checks_text("env"));
@@ -167,9 +168,11 @@ static bool test_build_sqlcipher_probe(const string_t *root, const char *target,
     checks_strings_add(arguments, checks_text("--no-print-directory"));
     checks_strings_add(arguments, checks_text("-j1"));
     checks_strings_add(arguments, checks_text(target));
+    checks_strings_add(arguments, checks_text("MARS_LAB_LAUNCHER=/bin/true"));
     checks_strings_add(arguments, checks_text(
         "LDFLAGS=tools/mars_checks/tests/fixtures/checks_sqlcipher_fixture.c "
-        "-Wl,--wrap=sqlite3_libversion_number -Wl,--wrap=sqlite3_libversion -Wl,--wrap=sqlite3_exec"));
+        "-Wl,--wrap=sqlite3_libversion_number -Wl,--wrap=sqlite3_libversion "
+        "-Wl,--wrap=sqlite3_exec -Wl,--wrap=sqlite3_prepare_v2"));
     string_t *output = NULL, *errors = NULL;
     int status = -1;
     bool ran = checks_process_run(arguments, root, 30, &output, &errors, &status);
@@ -178,6 +181,10 @@ static bool test_build_sqlcipher_probe(const string_t *root, const char *target,
     if (diagnostic)
         ok = status != 0 && errors && string_find(errors, diagnostic) >= 0 &&
              string_find(errors, "Updating the separate sqlite3 package") >= 0 &&
+             string_find(errors, "sudo apt install build-essential git pkg-config libssl-dev tcl-dev") >= 0 &&
+             string_find(errors, "--branch v4.13.0") >= 0 &&
+             string_find(errors, "--enable-fts5 --enable-rtree") >= 0 &&
+             string_find(errors, "make check-native-deps") >= 0 &&
              string_find(output, "SQLCipher version and required SQL features verified.") < 0 &&
              string_find(output, "check-compliance") < 0 && string_find(output, "Updating jurisdiction") < 0 && ok;
     else
@@ -186,6 +193,10 @@ static bool test_build_sqlcipher_probe(const string_t *root, const char *target,
         fprintf(stderr, "SQLCipher dependency probe %s/%s: status %d\n%s\n%s\n", target, mode, status,
                 output ? string_c_str(output) : "", errors ? string_c_str(errors) : "");
     string_free(output);
+    if (instructions) {
+        *instructions = errors;
+        errors = NULL;
+    }
     string_free(errors);
     checks_strings_free(arguments);
     return ok;
@@ -198,16 +209,69 @@ static void test_checks_sqlcipher_dependencies(void)
     static const struct { const char *target, *mode, *diagnostic; } cases[] = {
         {"check-sqlcipher-deps", "current", NULL},
         {"check-sqlcipher-deps", "old", "requires SQLite 3.27.0 or newer"},
+        {"check-sqlcipher-deps", "cipher", "requires SQLCipher 4.1.0 or newer"},
         {"check-native-deps", "fts5", "required FTS5 with Unicode accent removal"},
         {"check-deps", "window", "required SQLite window functions"},
         {"release", "fts5", "required FTS5 with Unicode accent removal"},
+        {"release", "old", "requires SQLite 3.27.0 or newer"},
+        {"release", "cipher", "requires SQLCipher 4.1.0 or newer"},
+        {"release", "window", "required SQLite window functions"},
         {"update-mars-db", "fts5", "required FTS5 with Unicode accent removal"},
         {"install-jurisdiction-db", "fts5", "required FTS5 with Unicode accent removal"}
     };
     for (size_t i = 0; ok && i < sizeof cases / sizeof *cases; ++i)
-        ok = test_build_sqlcipher_probe(root, cases[i].target, cases[i].mode, cases[i].diagnostic);
+        ok = test_build_sqlcipher_probe(root, cases[i].target, cases[i].mode, cases[i].diagnostic, NULL);
     ok = test_checks_finish(root) && ok;
     TEST_ASSERT_TRUE(ok, "dependency checks report linked versions and stop unsupported SQLCipher before database work");
+}
+
+static void test_checks_sqlcipher_readme(void)
+{
+    string_t *root = test_checks_root(), *instructions = NULL;
+    bool ok = test_build_makefiles(root) && test_build_sqlcipher_probe(root, "release", "fts5",
+        "required FTS5 with Unicode accent removal", &instructions);
+    string_t *path = checks_path(root, "docs/building.md"), *guide = checks_read(path);
+    const char *text = guide ? string_c_str(guide) : "";
+    const char *section = strstr(text, "#### Updating SQLCipher on Debian or Ubuntu\n");
+    const char *end = section ? strstr(section, "\n### ") : NULL;
+    const char *next = section;
+    ok = section && end && ok;
+    /* README example: verify all three repair command blocks, without running sudo or modifying the host. */
+    for (unsigned block = 0; ok && block < 3; ++block) {
+        const char *begin = strstr(next, "```sh\n");
+        const char *close = begin ? strstr(begin + 6, "\n```") : NULL;
+        ok = begin && close && begin < end && close < end;
+        if (!ok)
+            break;
+        begin += 6;
+        string_t *example = checks_slice(guide, (size_t)(begin - text), (size_t)(close - begin + 1));
+        ok = example && instructions && string_find(instructions, string_c_str(example)) >= 0;
+        string_free(example);
+        next = close + 4;
+    }
+    if (ok) {
+        const char *begin = strstr(string_c_str(instructions), "sudo apt update\n");
+        const char *close = begin ? strstr(begin, "make check-native-deps\n") : NULL;
+        string_t *commands = close ? checks_slice(instructions, (size_t)(begin - string_c_str(instructions)),
+            (size_t)(close - begin) + strlen("make check-native-deps\n")) : NULL;
+        ok = commands && test_checks_write(root, "upgrade-commands.sh", string_c_str(commands));
+        checks_strings_t *arguments = checks_strings_new();
+        checks_strings_add(arguments, checks_text("bash"));
+        checks_strings_add(arguments, checks_text("-n"));
+        checks_strings_add(arguments, checks_text("upgrade-commands.sh"));
+        string_t *output = NULL, *errors = NULL;
+        int status = -1;
+        ok = checks_process_run(arguments, root, 30, &output, &errors, &status) && status == 0 && ok;
+        string_free(errors);
+        string_free(output);
+        checks_strings_free(arguments);
+        string_free(commands);
+    }
+    string_free(guide);
+    string_free(path);
+    string_free(instructions);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "README SQLCipher repair commands match release diagnostics and parse as shell input");
 }
 
 /* Register database and compiler dependency checks before the README examples. */
@@ -215,4 +279,10 @@ void test_checks_build_cases(void)
 {
     TEST_RUN_IN_GROUP(test_checks_sqlcipher_dependencies, tests, "build,sqlcipher");
     TEST_RUN_IN_GROUP(test_checks_typescript_dependencies, tests, "build,typescript");
+}
+
+/* Check the documented repair commands after ordinary dependency regressions. */
+void test_checks_build_readme_cases(void)
+{
+    TEST_RUN_IN_GROUP(test_checks_sqlcipher_readme, readme_examples, "build,sqlcipher");
 }

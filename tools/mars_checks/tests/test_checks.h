@@ -49,6 +49,14 @@ void test_checks_control_cases(void);
 void test_checks_build_cases(void);
 
 /**
+ * @brief Register the documented SQLCipher repair-command check after ordinary tests.
+ * @return No value; results are recorded by the shared harness.
+ * @details Compares release failure instructions with the build guide and checks shell syntax without
+ * running installation commands. The sequential test harness owns fixture lifetimes and result reporting.
+ */
+void test_checks_build_readme_cases(void);
+
+/**
  * @brief Register all migrated Python Markdown coverage and layout cases.
  * @return No value; results are recorded by the shared harness.
  */

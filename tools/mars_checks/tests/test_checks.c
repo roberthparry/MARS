@@ -76,6 +76,7 @@ int tests_main(void)
     TEST_SECTION("Migrated Markdown API coverage and mathematical presentation");
     test_checks_documentation_cases();
     TEST_SECTION("README examples (last)");
+    test_checks_build_readme_cases();
     test_checks_readme_cases();
     test_checks_policy_readme_cases();
     return TEST_EXIT_CODE();
