@@ -2866,9 +2866,9 @@ not need intermediate ownership lists, layout styles or rendering contexts.
 ## Ordinary mathematical text without TeX commands
 
 Use `TeX_from_expression` when the input is a mathematical expression rather
-than literal prose or trusted TeX source. It delegates to `expr_from_text_preserving_calculus`,
-the expression module's body renderer, and `expr_beautify` for algebra-only input. Fractions, powers,
-function names and grouping are handled by the existing mathematical engine.
+than literal prose or trusted TeX source. The native mathematical modules handle
+parsing, simplification and presentation automatically. Fractions, powers,
+function names and grouping require no separate parser configuration.
 The input is borrowed; free the returned object with `TeX_free`.
 
 Algebra-only input deliberately includes native simplification, so it is not a

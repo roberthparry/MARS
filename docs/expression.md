@@ -3704,9 +3704,8 @@ no builder or rendering context needs setting up in application code.
 
 The [TeX module](TeX.md#ordinary-mathematical-text-without-tex-commands) offers
 `TeX_from_expression(const string_t *)` for callers who want ordinary mathematical
-text converted directly to owned notation. It uses this module's public presentation parser,
-beautifier for algebra-only input, and body renderer; grammar, algebra and domain conventions remain
-owned here rather than being duplicated in the notation module.
+text converted directly to owned notation. Source interpretation, algebra and domain
+conventions remain with the mathematical modules; callers need no separate parser setup.
 
 For whole relations, that adapter delegates separators to the equation module.
 It accepts `<`, `<=`, `>=`, `>`, `!=`, `==`, `~~=` (approximately equal) and
@@ -3725,21 +3724,17 @@ expression output. They use the existing indexed-symbol model; this does not
 introduce tensor grammar. The [text alternatives example](TeX.md) uses these
 indices alongside complete equations in one array of input strings.
 
-`expr_from_text_preserving_calculus(text, bindings_out)` retains authored integral
-and derivative operations for presentation. It returns an owned `expr_t` that
-requires `expr_free`; optional binding metadata requires `expr_bindings_free`.
-The ordinary parser still evaluates explicit calculus requests as before.
-`expr_contains_calculus_request(expr)` detects derivatives, integrals, transforms,
-sums and products so presentation callers can avoid simplifying those operations
-away. The complete runnable [calculus example](TeX.md#native-calculus-shorthand)
-demonstrates the presentation path.
+TeX text conversion retains authored integrals, derivatives, transforms, sums
+and products automatically. The ordinary expression parser still evaluates
+explicit calculus requests as before. The complete runnable
+[calculus example](TeX.md#native-calculus-shorthand) demonstrates this presentation
+behaviour without any separate parser configuration.
 
 `expr_to_TeX_operation_body(expr)` renders the authored operation tree without
 evaluating nested Fourier or Laplace transforms. Its returned C string is owned
-and must be released with `free`. Pair it with the preserving parser when the
-operator itself must remain visible. The TeX adapter uses this public path for
-calculus, and the ordinary beautifier for algebra-only input. All registered
-function names and aliases are shared with the native expression parser.
+and must be released with `free`. It formats operation nodes already present
+in the supplied tree; it cannot recover operations evaluated earlier. All
+registered function names and aliases are shared with the native expression parser.
 
 The [native-output conversion example](TeX.md#converting-native-expression-output)
 passes `expr_to_text(expression, style_EXPRESSION)` directly to `TeX_from_expression`.

@@ -32,7 +32,7 @@
 TeX_t *expr_notation_scalar(const string_t *text, bool formal)
 {
     expr_t *parsed = formal ? expr_from_presentation_text_internal(text)
-                            : expr_from_text_preserving_calculus(text, NULL);
+                            : expr_from_text_preserving_calculus_internal(text, NULL);
     if (!parsed)
         return NULL;
     bool calculus = expr_contains_calculus_request(parsed);

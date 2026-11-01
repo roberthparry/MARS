@@ -19,6 +19,8 @@
 #include "matrix-t.h"
 #include "equation-t.h"
 #include "diffequation-t.h"
+#define MARS_SHARED_EXPR_INTERNAL_ACCESS
+#include "internal/expr_internal.h"
 #define MARS_SHARED_DIFFEQUATION_INTERNAL_ACCESS
 #include "internal/diffequation_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -342,7 +344,7 @@ static void test_TeX_expression_style(void)
     };
     for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
         string_t *input = string_new_with(cases[i].input);
-        expr_t *expression = expr_from_text_preserving_calculus(input, NULL);
+        expr_t *expression = expr_from_string_preserving_calculus_internal(string_c_str(input));
         string_t *serialised = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
         TeX_t *notation = serialised ? TeX_from_expression(serialised) : NULL;
         TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), cases[i].expected) == 0, cases[i].input);
@@ -524,7 +526,7 @@ static void test_TeX_prime_input(void)
 static void test_TeX_prime_snapshot_modes(void)
 {
     string_t *input = string_new_with("Dxx(y)");
-    expr_t *expression = expr_from_text_preserving_calculus(input, NULL);
+    expr_t *expression = expr_from_string_preserving_calculus_internal(string_c_str(input));
     notation_build_t *build = notation_build_new();
     notation_build_derivatives(build, false);
     notation_build_dependent_variables(build, true);
@@ -623,7 +625,7 @@ static void test_TeX_native_index_roundtrip(void)
     const char *inputs[] = {"x_(n+1)^2", "r_n+x_(n)", "{x_(n)|n=3}", "@S_0^1 x^2 dx"};
     for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i) {
         string_t *input = string_new_with(inputs[i]);
-        expr_t *parsed = expr_from_text_preserving_calculus(input, NULL);
+        expr_t *parsed = expr_from_string_preserving_calculus_internal(string_c_str(input));
         string_t *native = parsed ? expr_to_text(parsed, style_EXPRESSION) : NULL;
         TeX_t *original = TeX_from_expression(input), *roundtrip = native ? TeX_from_expression(native) : NULL;
         TEST_ASSERT_TRUE(original && roundtrip && !strcmp(TeX_source(original), TeX_source(roundtrip)), inputs[i]);
@@ -1273,7 +1275,7 @@ static void test_TeX_native_aggregate_contexts(void)
     };
     for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
         string_t *input = string_new_with(cases[i].input);
-        expr_t *expression = expr_from_text_preserving_calculus(input, NULL);
+        expr_t *expression = expr_from_string_preserving_calculus_internal(string_c_str(input));
         TeX_context_t *context = expression ? expr_TeX_context(expression) : NULL;
         expr_free(expression);
         string_free(input);

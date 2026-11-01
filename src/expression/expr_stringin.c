@@ -5735,7 +5735,7 @@ string_t *expr_source_TeX_internal(const char *source)
 }
 
 /* Retain authored calculus nodes without changing ordinary parser evaluation. */
-expr_t *expr_from_text_preserving_calculus(const string_t *text, expr_bindings_t **bnd_out)
+expr_t *expr_from_text_preserving_calculus_internal(const string_t *text, expr_bindings_t **bnd_out)
 {
     bool previous = preserve_calculus_operations;
     expr_t *result;
@@ -5756,11 +5756,11 @@ expr_t *expr_from_presentation_text_internal(const string_t *text)
     return result;
 }
 
-/* Adapt legacy internal callers to the public string-based presentation parser. */
+/* Adapt native presentation callers to expression's private string-based parser. */
 expr_t *expr_from_string_preserving_calculus_internal(const char *source)
 {
     string_t *text = source ? string_new_with(source) : NULL;
-    expr_t *result = text ? expr_from_text_preserving_calculus(text, NULL) : NULL;
+    expr_t *result = text ? expr_from_text_preserving_calculus_internal(text, NULL) : NULL;
     string_free(text);
     return result;
 }

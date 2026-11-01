@@ -39,6 +39,27 @@
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_computation_internal.h"
 
+/**
+ * @brief Retain authored calculus nodes whilst parsing source for the expression module's presentation adapter.
+ * @param[in] text Borrowed native mathematical source; not modified or retained. NULL is invalid.
+ * @param[out] bnd_out Optional output receiving owned binding metadata, released with expr_bindings_free().
+ * @return Owned expression released with expr_free(), or NULL on invalid source or allocation failure.
+ * Parser diagnostics may be written to stderr. No input ownership transfers to the parser.
+ * @note Uses the ordinary expression grammar with calculus evaluation temporarily disabled for this thread.
+ * The previous parsing mode is restored on success and failure. Explicit later simplification may evaluate nodes.
+ * This function is private to expression; public TeX conversion selects its presentation behaviour automatically.
+ */
+expr_t *expr_from_text_preserving_calculus_internal(const string_t *text, expr_bindings_t **bnd_out);
+
+/**
+ * @brief Detect calculus nodes that expression presentation must retain without ordinary beautification.
+ * @param[in] expr Borrowed expression kept alive by the caller throughout inspection, or NULL.
+ * @return True when any visited node is a derivative, integral, integral transform, summation or product;
+ * false for NULL or when none is present. The function neither allocates a result nor transfers ownership.
+ * @note Inspects graph structure without evaluating or modifying nodes. Intended only for expression internals.
+ */
+bool expr_contains_calculus_request(const expr_t *expr);
+
 typedef enum { EXPR_OP_ATOM, EXPR_OP_UNARY, EXPR_OP_BINARY } expr_arity_t;
 
 typedef enum {
