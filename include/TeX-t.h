@@ -2,15 +2,24 @@
  * @file TeX-t.h
  * @brief Owned mathematical notation independent of algebra and applications.
  *
- * TeX_builder_t constructs notation in reverse Polish order: push operands, then
+ * TeX_builder_t is the preferred authoring interface. Construct notation in reverse Polish order: enter operands, then
  * apply fractions, roots, scripts, tensors, calculus, relations, equations or matrices.
  * The builder owns every intermediate fragment; finish transfers its one completed
  * TeX_t value to the caller. Failed operations preserve the stack and record a
  * persistent error, preventing accidental completion after an unchecked failure.
+ * Operand-entry names imply a push: TeX_symbol(), TeX_integer(), TeX_math() and
+ * the other entry functions append one value without consuming existing operands.
+ * Formula operators such as TeX_add(), TeX_frac() and TeX_tensor() apply to values
+ * already on the stack. Stack controls and notation access have their own documented effects.
+ * Lists are immutable stack objects: push members, push their count, then TeX_list().
+ * Collections, matrix dimensions and derivative orders are operands rather than C arrays
+ * or operation arguments. Nested lists are limited to 128 levels. Presentation selectors
+ * choose notation only; no operation evaluates the supplied mathematics.
  * Literal text is escaped. Explicit composition performs no algebraic rewriting
  * and never runs a TeX engine. Immutable values may be read concurrently;
  * destruction and all access to a shared builder require external synchronisation.
- * TeX_from_expression uses the native mathematical modules for parsing and simplification.
+ * Optional native-text entry uses the native mathematical modules for parsing and simplification.
+ * TeX_from_expression is a standalone conversion convenience, not a fragment-construction API.
  * The TeX module owns typesetting for expressions, matrices, equations and differential equations;
  * those modules retain their mathematical models and delegate notation to this module.
  * Trusted fragments support composition; never use them for untrusted text.
@@ -32,24 +41,12 @@ typedef struct _TeX_t TeX_t;
 /** @brief Opaque owner of an operand stack and its first uncleared construction error. */
 typedef struct _TeX_builder_t TeX_builder_t;
 
-/** @brief Equation presentation without changing either mathematical side. */
-typedef enum {
-    TeX_EQUATION_INLINE, /**< Separate the sides by an equals sign. */
-    TeX_EQUATION_ALIGNED /**< Top-aligned equation, preserving an already wrapped right side. */
-} TeX_equation_style_t;
-
 /** @brief Matrix delimiter styles for entries containing mathematical notation. */
 typedef enum {
     TeX_MATRIX_BRACKETS,    /**< Square brackets using the bmatrix environment. */
     TeX_MATRIX_PARENTHESES, /**< Parentheses using the pmatrix environment. */
     TeX_MATRIX_PLAIN        /**< No delimiters, using the matrix environment. */
 } TeX_matrix_style_t;
-
-/** @brief Vertical position of a tensor index slot. */
-typedef enum {
-    TeX_INDEX_LOWER, /**< Covariant index slot. */
-    TeX_INDEX_UPPER  /**< Contravariant index slot. */
-} TeX_index_position_t;
 
 /** @brief Automatically sized mathematical delimiters. */
 typedef enum {
@@ -73,14 +70,6 @@ typedef enum {
     TeX_TRANSFORM_FOURIER,         /**< Forward Fourier transformation. */
     TeX_TRANSFORM_INVERSE_FOURIER  /**< Inverse Fourier transformation. */
 } TeX_transform_kind_t;
-
-/** @brief Which bounds follow a sum, product or integral body on the operand stack. */
-typedef enum {
-    TeX_LIMIT_NONE,      /**< No bounds. */
-    TeX_LIMIT_LOWER,     /**< Lower bound only. */
-    TeX_LIMIT_UPPER,     /**< Upper bound only. */
-    TeX_LIMIT_BOTH       /**< Lower bound followed by upper bound. */
-} TeX_limits_t;
 
 /** @brief Explicit mathematical spacing supplied without knowing TeX commands. */
 typedef enum {
@@ -150,17 +139,13 @@ const TeX_t *TeX_builder_peek(const TeX_builder_t *builder, size_t level);
 TeX_t *TeX_builder_finish(TeX_builder_t *builder);
 
 /**
- * @brief Push mathematical source written directly in TeX syntax.
- * @param builder Borrowed builder receiving an owned copy.
- * @param source Borrowed NUL-terminated trusted TeX body, authored directly or generated elsewhere.
- * The source is copied verbatim, neither retained nor syntax-checked; NULL is invalid.
- * @return True on success; false saves an error and leaves the stack unchanged.
- * @note No escaping, native mathematical parsing, simplification or evaluation occurs. Supply the mathematical
- * body without dollar signs or display-mode delimiters. Raw source can be combined with ordinary stack operations;
- * its unknown structure is conservatively grouped in arithmetic. Use TeX_push_text() to escape literal prose.
- * @note This function stores source; a TeX engine performs typesetting and diagnoses invalid TeX syntax.
+ * @name Operand entry (push)
+ * Each entry function has the stack effect S -> S value: one owned operand is
+ * added and no existing operand is consumed. The builder copies borrowed input;
+ * failure leaves the stack unchanged. The push is implied by the operation name.
+ * TeX_depth() separately enters the current depth as an integer stack control.
+ * @{
  */
-bool TeX_push_raw(TeX_builder_t *builder, const char *source);
 
 /**
  * @brief Push one plain mathematical symbol without accepting operator or TeX command fragments.
@@ -170,7 +155,7 @@ bool TeX_push_raw(TeX_builder_t *builder, const char *source);
  * @return True on success; false saves an error and preserves the stack. Empty names and punctuation are invalid.
  * @note All standard Greek names are supported; an initial capital selects uppercase. No special keyboard is needed.
  */
-bool TeX_push_symbol(TeX_builder_t *builder, const char *name);
+bool TeX_symbol(TeX_builder_t *builder, const char *name);
 
 /**
  * @brief Escape and push literal UTF-8 prose.
@@ -178,7 +163,7 @@ bool TeX_push_symbol(TeX_builder_t *builder, const char *name);
  * @param text Borrowed string, neither modified nor retained; NULL and embedded NUL are invalid.
  * @return True on success; false saves an error and preserves the stack. Empty text is permitted.
  */
-bool TeX_push_text(TeX_builder_t *builder, const string_t *text);
+bool TeX_text(TeX_builder_t *builder, const string_t *text);
 
 /**
  * @brief Parse and push native mathematical text using TeX_from_expression().
@@ -186,16 +171,16 @@ bool TeX_push_text(TeX_builder_t *builder, const string_t *text);
  * @param text Borrowed mathematical string, neither modified nor retained.
  * @return True on success; false saves an error and preserves the stack. Native parser diagnostics may appear.
  */
-bool TeX_push_expression(TeX_builder_t *builder, const string_t *text);
+bool TeX_expression(TeX_builder_t *builder, const string_t *text);
 
 /**
  * @brief Push native mathematical text supplied as a convenient C string.
  * @param builder Borrowed builder receiving the result.
  * @param text Borrowed NUL-terminated native mathematics, copied before parsing; NULL is invalid.
  * @return True on success; false saves an error and preserves the stack.
- * @note This is the C-string equivalent of TeX_push_expression(), with the same simplification conventions.
+ * @note This is the C-string equivalent of TeX_expression(), with the same simplification conventions.
  */
-bool TeX_push_math(TeX_builder_t *builder, const char *text);
+bool TeX_math(TeX_builder_t *builder, const char *text);
 
 /**
  * @brief Push a decimal integer without requiring source construction.
@@ -204,7 +189,7 @@ bool TeX_push_math(TeX_builder_t *builder, const char *text);
  * @return True on success; false saves an error and preserves the stack.
  * @note The literal value is retained for TeX_roll() controls, including after duplication or copying.
  */
-bool TeX_push_integer(TeX_builder_t *builder, long value);
+bool TeX_integer(TeX_builder_t *builder, long value);
 
 /**
  * @brief Push an independently owned copy of existing notation.
@@ -212,7 +197,7 @@ bool TeX_push_integer(TeX_builder_t *builder, long value);
  * @param notation Borrowed non-NULL notation, which may belong to this builder and is never retained.
  * @return True on success; false saves an error and preserves the stack.
  */
-bool TeX_push_notation(TeX_builder_t *builder, const TeX_t *notation);
+bool TeX_notation(TeX_builder_t *builder, const TeX_t *notation);
 
 /**
  * @brief Push explicit mathematical spacing.
@@ -220,7 +205,29 @@ bool TeX_push_notation(TeX_builder_t *builder, const TeX_t *notation);
  * @param space Thin or quad spacing; other values are invalid.
  * @return True on success; false saves an error and preserves the stack.
  */
-bool TeX_push_space(TeX_builder_t *builder, TeX_space_t space);
+bool TeX_space(TeX_builder_t *builder, TeX_space_t space);
+
+/**
+ * @brief Push mathematical source written directly in TeX syntax.
+ * @param builder Borrowed builder receiving an owned copy.
+ * @param source Borrowed NUL-terminated trusted TeX body, authored directly or generated elsewhere.
+ * The source is copied verbatim, neither retained nor syntax-checked; NULL is invalid.
+ * @return True on success; false saves an error and leaves the stack unchanged.
+ * @note No escaping, native mathematical parsing, simplification or evaluation occurs. Supply the mathematical
+ * body without dollar signs or display-mode delimiters. Raw source can be combined with ordinary stack operations;
+ * its unknown structure is conservatively grouped in arithmetic. Use TeX_text() to escape literal prose.
+ * @note This function stores source; a TeX engine performs typesetting and diagnoses invalid TeX syntax.
+ */
+bool TeX_raw(TeX_builder_t *builder, const char *source);
+
+/** @} */
+
+/**
+ * @name Stack manipulation and index annotations
+ * These functions have their individual HP48-style or unary annotation effects.
+ * They preserve existing operand ownership rules and the saved-error contract.
+ * @{
+ */
 
 /**
  * @brief Duplicate the top operand, following the HP48 DUP operation.
@@ -255,7 +262,7 @@ bool TeX_swap(TeX_builder_t *builder);
 
 /**
  * @brief Consume a level number and move that operand to the top, following the HP48 ROLL operation.
- * @param builder Borrowed builder with a literal integer level on top, pushed with TeX_push_integer() or copied.
+ * @param builder Borrowed builder with a literal integer level on top, pushed with TeX_integer() or copied.
  * @return True on success; false preserves every operand, including the control, and saves EINVAL for a non-literal
  * control or ERANGE for a level outside one through the remaining stack depth. Existing errors remain unchanged.
  * @note Levels count from one after excluding the control. Thus a b c 3 becomes b c a, while a b 2 becomes b a.
@@ -273,6 +280,82 @@ bool TeX_roll(TeX_builder_t *builder);
  * the operation moves three pointers in constant time without allocating or copying notation.
  */
 bool TeX_rot(TeX_builder_t *builder);
+
+/**
+ * @brief Assemble an HP48-style list from preceding objects and a count on top.
+ * @param builder Borrowed builder; push members in order, then their non-negative literal integer count.
+ * @return True on success; false saves EINVAL for a non-integer or negative count, ERANGE for missing
+ * members, EOVERFLOW for excessive nesting or size, or ENOMEM. All inputs survive failure unchanged.
+ * @note Zero constructs an empty list. Lists own independent copies and may contain other lists,
+ * matrices and marked indices. DUP, DROP, SWAP, ROT and ROLL treat each list as one operand.
+ */
+bool TeX_list(TeX_builder_t *builder);
+
+/**
+ * @brief Expand the top list into its members followed by their literal integer count.
+ * @param builder Borrowed builder requiring a list on top.
+ * @return True on success; false saves an error and preserves the complete stack.
+ * @note Matches HP48 LIST->. Members are independent copies; the consumed list's views expire,
+ * whilst lower operands retain their identities. No ownership transfers to the caller.
+ */
+bool TeX_unlist(TeX_builder_t *builder);
+
+/**
+ * @brief Push the current stack depth as a literal integer, as with HP48 DEPTH.
+ * @param builder Borrowed builder; all existing operands are preserved.
+ * @return True on success; false saves an error and leaves the stack unchanged.
+ * @note TeX_depth(), TeX_list() gathers the entire stack into one list without a C-side count.
+ */
+bool TeX_depth(TeX_builder_t *builder);
+
+/**
+ * @brief Mark the top label as an upper index operand for a later index list.
+ * @param builder Borrowed builder requiring one label.
+ * @return True on success; false saves an error and preserves the label.
+ * @note Replaces any existing variance mark; the underlying label is copied unchanged.
+ * The same mark selects an upper bound in a calculus bound list.
+ */
+bool TeX_upper(TeX_builder_t *builder);
+
+/**
+ * @brief Mark the top label as a lower index operand for a later index list.
+ * @param builder Borrowed builder requiring one label.
+ * @return True on success; false saves an error and preserves the label.
+ * @note Unmarked labels in a tensor index list also occupy lower slots.
+ */
+bool TeX_lower(TeX_builder_t *builder);
+
+/**
+ * @brief Mark the top index label or index list with a comma for partial-derivative notation.
+ * @param builder Borrowed builder requiring one label or non-empty list of derivative labels.
+ * @return True on success; false saves an error and preserves the operand. The builder owns the marked copy.
+ * @note Include this object after the component's own indices in the list consumed by TeX_tensor().
+ * Labels default to lower placement; TeX_upper() or TeX_lower() may explicitly select placement.
+ * A marked list supplies ordered higher derivatives. No differentiation, evaluation or coordinate change occurs.
+ */
+bool TeX_comma(TeX_builder_t *builder);
+
+/**
+ * @brief Mark the top index label or index list with a semicolon for covariant-derivative notation.
+ * @param builder Borrowed builder requiring one label or non-empty list of derivative labels.
+ * @return True on success; false saves an error and preserves the operand. The builder owns the marked copy.
+ * @note Use in a tensor index list as with TeX_comma(). Component and derivative indices retain their order;
+ * a following lower derivative index shares the existing lower script, giving forms such as V_{i;j}.
+ * No connection is chosen or calculated, and covariant derivatives are never commuted or evaluated.
+ */
+bool TeX_semicolon(TeX_builder_t *builder);
+
+/** @} */
+
+/**
+ * @name Formula construction (apply)
+ * Operators consume their documented top operands and replace them with the
+ * constructed notation. Counts, dimensions, orders and collections are stack
+ * operands. Function-name and presentation arguments select the operation.
+ * For example, TeX_function() applies a name to an existing argument list;
+ * TeX_math() instead enters a new formula supplied as native mathematical text.
+ * @{
+ */
 
 /**
  * @brief Replace left then right operand by their displayed sum.
@@ -305,23 +388,21 @@ bool TeX_neg(TeX_builder_t *builder);
 bool TeX_mul(TeX_builder_t *builder);
 
 /**
- * @brief Apply a plain named function to its top arguments in push order.
- * @param builder Borrowed builder receiving the call notation.
- * @param name Borrowed NUL-terminated UTF-8 function name, validated like TeX_push_symbol() and not retained.
- * @param count Number of arguments to consume; zero constructs an empty argument list.
+ * @brief Apply a plain named function to the top argument list.
+ * @param builder Borrowed builder requiring one list; member order is argument order.
+ * @param name Borrowed NUL-terminated UTF-8 function name, validated like TeX_symbol() and not retained.
  * @return True on success; false saves an error and preserves the arguments. No function is evaluated.
  * @note Standard function spelling is selected internally; callers supply names such as sin, P or psi.
  */
-bool TeX_function(TeX_builder_t *builder, const char *name, size_t count);
+bool TeX_function(TeX_builder_t *builder, const char *name);
 
 /**
  * @brief Apply a function already on the stack to its following arguments.
- * @param builder Borrowed builder; push the function first, then arguments in display order.
- * @param count Number of arguments following the function; zero constructs an empty argument list.
+ * @param builder Borrowed builder; push the function first, then one argument list in display order.
  * @return True on success; false saves an error and preserves every operand. No function is evaluated.
  * @note Supports indexed function symbols built with TeX_subscript().
  */
-bool TeX_call(TeX_builder_t *builder, size_t count);
+bool TeX_call(TeX_builder_t *builder);
 
 /**
  * @brief Replace numerator then denominator by their fraction.
@@ -353,15 +434,30 @@ bool TeX_root(TeX_builder_t *builder);
 bool TeX_pow(TeX_builder_t *builder);
 
 /**
- * @brief Replace the top operand by derivative prime notation.
- * @param builder Borrowed builder requiring one operand, retained unchanged on failure.
- * @param order Positive derivative order; one through three use primes and larger orders use a parenthesised superscript.
- * @return True on success; false records EINVAL for zero order, ERANGE for missing operands, or an allocation error.
+ * @brief Replace an operand and its literal integer order by prime notation.
+ * @param builder Borrowed builder; push the body followed by its positive order, at most UINT_MAX.
+ * @return True on success; false records EINVAL for a non-integer or non-positive order,
+ * EOVERFLOW for an excessive order, ERANGE for missing operands, or an allocation error.
  * The builder owns the result; no notation ownership transfers to the caller.
  * @note This constructs notation without differentiation. Compound operands retain visible grouping;
  * use TeX_call() afterwards to show an evaluation point such as y'(0).
+ * To prime a tensor index, apply this operation to its label before TeX_upper() or TeX_lower(), then
+ * assemble the index list for TeX_tensor(). Such a prime labels a coordinate chart, not a derivative.
+ * Orders one through three use primes; larger orders use a parenthesised superscript.
  */
-bool TeX_prime(TeX_builder_t *builder, unsigned order);
+bool TeX_prime(TeX_builder_t *builder);
+
+/**
+ * @brief Replace the top operand by the same notation with an overbar.
+ * @param builder Borrowed builder requiring one operand; the builder is neither consumed nor retained.
+ * @return True on success; false records EINVAL for a NULL builder, ERANGE for an empty stack, or an
+ * allocation error. A saved error blocks the operation. Failure preserves the stack and its existing operands.
+ * @note The bar covers the complete operand without assigning a mathematical meaning or evaluating it.
+ * To construct barred coordinates, apply it to the base symbol before attaching tensor indices.
+ * Applying it after tensor assembly instead bars the complete indexed notation. The builder owns the
+ * replacement; finish transfers the completed formula, which the caller releases with TeX_free().
+ */
+bool TeX_bar(TeX_builder_t *builder);
 
 /**
  * @brief Replace base then subscript by indexed notation.
@@ -378,20 +474,40 @@ bool TeX_subscript(TeX_builder_t *builder);
 bool TeX_scripts(TeX_builder_t *builder);
 
 /**
- * @brief Concatenate the top count operands in their original push order.
- * @param builder Borrowed builder receiving the combined fragment.
- * @param count Number to consume; zero pushes empty notation.
+ * @brief Concatenate members of the top list in their original push order.
+ * @param builder Borrowed builder requiring one list; an empty list gives empty notation.
  * @return True on success; false saves an error and preserves the stack.
  */
-bool TeX_sequence(TeX_builder_t *builder, size_t count);
+bool TeX_sequence(TeX_builder_t *builder);
 
 /**
- * @brief Replace left then right side by an equation.
- * @param builder Borrowed builder; the right side must be on top.
- * @param style Inline or top-aligned equation presentation.
- * @return True on success; false saves an error and preserves both sides.
+ * @brief Combine two mathematical rows or blocks with a visible line break.
+ * @param builder Borrowed builder; push the first row followed by the next row.
+ * @return True on success; false saves an error and preserves both operands.
+ * @note Repeated calls append rows to one block without nesting environments. Rows initially share
+ * a left edge; TeX_align() aligns their stored relation signs. Adding to an aligned block retains alignment.
+ * No mathematical source is parsed. The builder owns the resulting block and all copied row data.
  */
-bool TeX_equation(TeX_builder_t *builder, TeX_equation_style_t style);
+bool TeX_newline(TeX_builder_t *builder);
+
+/**
+ * @brief Indent the top mathematical body by a spacing value supplied on the stack.
+ * @param builder Borrowed builder; push the body then a non-negative literal integer in TeX points, at most UINT_MAX.
+ * @return True on success; false saves an error and preserves body and spacing. Zero adds no visible indentation.
+ * @note Indentation may be applied to a row or a complete block. Retained row structure permits later alignment.
+ */
+bool TeX_indent(TeX_builder_t *builder);
+
+/**
+ * @brief Align a list of rows or an existing multiline block without interpreting its mathematics.
+ * @param builder Borrowed builder requiring a non-empty row list or a block made with TeX_newline().
+ * @return True on success; false saves an error and preserves the input object, including invalid or empty lists.
+ * @note Rows constructed with TeX_eq() and the other RPN relation operations align at their outermost
+ * relation sign. Row lists supply explicit left-aligned cells with visible spacing between columns. Other rows,
+ * including raw TeX and native text, remain whole left-aligned cells; their rendered source is never parsed.
+ * A new line appended after alignment retains the block's alignment. All row copies belong to the builder.
+ */
+bool TeX_align(TeX_builder_t *builder);
 
 /**
  * @brief Replace left then right operand by an equality, or extend an existing relation chain.
@@ -467,34 +583,38 @@ bool TeX_fence(TeX_builder_t *builder, TeX_fence_t fence);
 
 /**
  * @brief Replace a base and ordered indices by arbitrary-rank indexed notation in any coordinate basis.
- * @param builder Borrowed builder; push the base first, then index values in left-to-right order.
- * @param positions Borrowed array of count lower/upper positions; may be NULL only when count is zero.
- * @param count Number of indices to consume after the base; zero groups the base alone.
- * @return True on success; false saves an error and preserves every operand. The positions are not retained.
+ * @param builder Borrowed builder; push the base, then one list of index labels in left-to-right order.
+ * Mark upper slots with TeX_upper(); lower slots may be unmarked or marked with TeX_lower().
+ * Index labels may be primed with TeX_prime() before selecting their placement and assembling the list.
+ * Mark derivative labels or label lists with TeX_comma() or TeX_semicolon() before outer list assembly.
+ * @return True on success; false saves an error and preserves both operands. An empty list groups the base alone.
  * @note There is no dimension, metric signature or Cartesian-coordinate restriction. All-lower, all-upper and
  * mixed slots retain their authored order. Repeated labels are displayed without performing contractions.
+ * Adjacent labels of the same placement share one script, including comma and semicolon derivative groups.
+ * Changes between upper and lower placement retain distinct horizontal slots and the supplied index order.
  * The same placement operation can format indexed operators or connection coefficients, including Christoffel
  * symbols; it does not assert that those objects transform as tensors or calculate a covariant derivative.
  */
-bool TeX_tensor(TeX_builder_t *builder, const TeX_index_position_t *positions, size_t count);
+bool TeX_tensor(TeX_builder_t *builder);
 
 /**
- * @brief Replace summand then selected bounds by summation notation.
- * @param builder Borrowed builder; push the body first, then lower and/or upper bounds as selected.
- * @param limits Which bounds are present; when both are present the upper bound is on top.
+ * @brief Replace a summand and a bound list by summation notation.
+ * @param builder Borrowed builder; push the body followed by a list of zero, one or two bounds.
  * @return True on success; false saves an error and preserves all operands. No sum is evaluated.
+ * @note An empty list means no bounds; one unmarked member is lower, two are lower then upper.
+ * TeX_upper() marks a lone upper bound; TeX_lower() can explicitly mark a lower bound.
+ * Duplicate upper or lower bounds are rejected.
  */
-bool TeX_sum(TeX_builder_t *builder, TeX_limits_t limits);
+bool TeX_sum(TeX_builder_t *builder);
 
 /**
  * @brief Replace a product body then selected bounds by indexed-product notation.
- * @param builder Borrowed builder; push the body first, then lower and/or upper annotations as selected.
- * @param limits Which annotations are present; with both present the upper annotation must be on top.
+ * @param builder Borrowed builder; push the body followed by one bound list, as documented for TeX_sum().
  * @return True on success; false saves an error and preserves all operands. The builder retains ownership.
  * @note This constructs a large product sign with optional bounds. Each lower annotation may be an equation
- * constructed with TeX_equation(). No multiplication or evaluation is performed.
+ * constructed with TeX_eq(). No multiplication or evaluation is performed.
  */
-bool TeX_prod(TeX_builder_t *builder, TeX_limits_t limits);
+bool TeX_prod(TeX_builder_t *builder);
 
 /**
  * @brief Replace a body, source variable and target variable by integral-transform notation.
@@ -508,53 +628,64 @@ bool TeX_transform(TeX_builder_t *builder, TeX_transform_kind_t kind);
 
 /**
  * @brief Replace integrand, variable then selected bounds by integral notation.
- * @param builder Borrowed builder; push the body, variable, then lower and/or upper bounds in that order.
- * @param limits Which bounds are present; none gives an indefinite integral.
+ * @param builder Borrowed builder; push the body, variable, then a bound list as documented for TeX_sum().
+ * An empty list gives an indefinite integral.
  * @return True on success; false saves an error and preserves all operands. No integration is performed.
  */
-bool TeX_integral(TeX_builder_t *builder, TeX_limits_t limits);
+bool TeX_integral(TeX_builder_t *builder);
 
 /**
- * @brief Replace body then variable by an ordinary or partial derivative.
- * @param builder Borrowed builder; the differentiation variable must be on top.
- * @param order Positive derivative order.
+ * @brief Replace body, variable then literal integer order by a derivative.
+ * @param builder Borrowed builder; the positive derivative order, at most UINT_MAX, must be on top.
  * @param style Ordinary or partial differential notation.
- * @return True on success; false saves an error and preserves both operands. No differentiation is performed.
+ * @return True on success; false saves an error and preserves all three operands. No differentiation is performed.
  */
-bool TeX_derivative(TeX_builder_t *builder, unsigned order, TeX_derivative_style_t style);
+bool TeX_derivative(TeX_builder_t *builder, TeX_derivative_style_t style);
 
 /**
  * @brief Replace a body and ordered coordinate variables by partial-derivative operator notation.
- * @param builder Borrowed builder; push the body first, then the variables in differentiation application order.
- * @param count Positive number of variable operands to consume after the body; it is the total derivative order.
- * @return True on success; false saves an error and preserves all operands. Zero saves EINVAL, an excessive
+ * @param builder Borrowed builder; push the body first, then a non-empty list of variables in application order.
+ * @return True on success; false saves an error and preserves all operands. An empty list saves EINVAL, an excessive
  * order saves EOVERFLOW, and unavailable operands save ERANGE. No notation ownership escapes the builder.
  * @note Variables x then y produce a denominator with partial y then partial x. Adjacent repeated variables
  * combine into a power; non-adjacent repetitions retain their order. One variable gives a first derivative.
  * The differentiated body follows the operator in brackets. This typesets mathematics without differentiating it.
  */
-bool TeX_partial(TeX_builder_t *builder, size_t count);
+bool TeX_partial(TeX_builder_t *builder);
 
 /**
- * @brief Replace row-major cells by a matrix without interpreting their contents.
- * @param builder Borrowed builder; push the first row first and the final cell last.
- * @param rows Positive number of rows.
- * @param columns Positive number of columns; rows times columns must fit size_t.
- * @param style Square brackets, parentheses or plain matrix presentation.
- * @param row_spacing Extra row spacing in points, or zero for the environment default.
- * @return True on success; false saves an error and preserves every cell.
- * @note Push an empty raw fragment for an intentionally empty cell.
+ * @brief Assemble a matrix from row lists or HP48-style dimensions supplied on the stack.
+ * @param builder Borrowed builder; supply either one list of equally sized, non-empty row lists,
+ * or row-major cell operands followed by a two-member list containing positive literal row and column counts.
+ * @return True on success; false saves an error and preserves all cells and dimension objects.
+ * @note The result uses square brackets and default row spacing. TeX_matrix_style() changes its
+ * delimiters; TeX_matrix_spacing() consumes an explicit spacing operand. Rows remain structural data
+ * through DUP and copying. Ragged, empty or excessive dimensions are rejected. Nothing is evaluated.
  */
-bool TeX_matrix(TeX_builder_t *builder, size_t rows, size_t columns,
-                      TeX_matrix_style_t style, unsigned row_spacing);
+bool TeX_matrix(TeX_builder_t *builder);
 
 /**
- * @brief Wrap the top body, optionally followed by bindings, in native bound notation.
- * @param builder Borrowed builder; bindings, when present, must be on top.
- * @param bindings Whether to consume a binding fragment after the body.
+ * @brief Change the top structural matrix's delimiter style.
+ * @param builder Borrowed builder requiring a matrix constructed with TeX_matrix().
+ * @param style Square brackets, parentheses or plain presentation; no mathematical operands are supplied here.
+ * @return True on success; false saves an error and preserves the matrix. Its cells and row spacing are unchanged.
+ */
+bool TeX_matrix_style(TeX_builder_t *builder, TeX_matrix_style_t style);
+
+/**
+ * @brief Apply extra row spacing from a literal integer on the stack.
+ * @param builder Borrowed builder; push a structural matrix then a non-negative spacing in points, at most UINT_MAX.
+ * @return True on success; false saves an error and preserves both operands. Zero restores default spacing.
+ */
+bool TeX_matrix_spacing(TeX_builder_t *builder);
+
+/**
+ * @brief Wrap a body and a binding list in native bound notation.
+ * @param builder Borrowed builder; push the body followed by a list of presentation fragments.
+ * Members are concatenated as supplied; an empty list means no bindings.
  * @return True on success; false saves an error and preserves all operands.
  */
-bool TeX_bound(TeX_builder_t *builder, bool bindings);
+bool TeX_bound(TeX_builder_t *builder);
 
 /**
  * @brief Place a scalar factor beside the following mathematical body with compact spacing.
@@ -571,16 +702,17 @@ bool TeX_scaled(TeX_builder_t *builder);
 bool TeX_cartesian_sum(TeX_builder_t *builder);
 
 /**
- * @brief Replace centre, offset and optional denominator by a symmetric pair.
- * @param builder Borrowed builder; push centre, offset, then denominator when present.
- * @param denominator Whether a denominator operand is present.
+ * @brief Replace centre, offset and a denominator list by a symmetric pair.
+ * @param builder Borrowed builder; push centre, offset, then an empty or one-member denominator list.
  * @param group_offset Whether the offset requires visible parentheses.
  * @return True on success; false saves an error and preserves every operand.
  */
-bool TeX_symmetric_pair(TeX_builder_t *builder, bool denominator, bool group_offset);
+bool TeX_symmetric_pair(TeX_builder_t *builder, bool group_offset);
+
+/** @} */
 
 /**
- * @brief Parse ordinary MARS mathematical text and arrange it as readable TeX.
+ * @brief Convert existing MARS mathematical text into readable TeX as a standalone convenience.
  *
  * Uses the expression module's presentation parser and renders the expression body without a binding wrapper.
  * Accepts native style_EXPRESSION output, including braces, bindings, Unicode notation and domain conditions.
@@ -609,6 +741,8 @@ bool TeX_symmetric_pair(TeX_builder_t *builder, bool denominator, bool group_off
  * @return Independently owned notation, released with TeX_free(), or NULL on parse, formatting or allocation failure.
  * @note Invalid source follows the expression parser's diagnostics, including messages on stderr.
  * @note Simplification follows the expression module's algebra and domain conventions; this is not verbatim typesetting.
+ * @note Prefer TeX_builder_t for authoring formulas. TeX_math() and TeX_expression() optionally enter native text
+ * within that same stack; use this standalone converter when a complete native mathematical string already exists.
  */
 TeX_t *TeX_from_expression(const string_t *text);
 

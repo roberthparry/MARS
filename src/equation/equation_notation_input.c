@@ -197,7 +197,7 @@ TeX_t *equ_notation_input(const string_t *text, notation_read_fn read, void *con
     TeX_builder_t *builder = TeX_builder_new();
     string_view_t first = string_view_slice(body, 0, relation.position);
     TeX_t *operand = equ_read_operand(first, bindings, bound, read, context);
-    bool valid = operand && TeX_push_notation(builder, operand);
+    bool valid = operand && TeX_notation(builder, operand);
     TeX_free(operand);
     while (valid && matched > 0) {
         equ_relation_kind_t operation = relation.kind;
@@ -210,7 +210,7 @@ TeX_t *equ_notation_input(const string_t *text, notation_read_fn read, void *con
         size_t end = matched ? relation.position : string_view_length(body);
         string_view_t side = string_view_slice(body, start, end - start);
         operand = equ_read_operand(side, bindings, bound, read, context);
-        valid = operand && TeX_push_notation(builder, operand) && operations[operation](builder);
+        valid = operand && TeX_notation(builder, operand) && operations[operation](builder);
         TeX_free(operand);
     }
     TeX_t *result = valid ? TeX_builder_finish(builder) : NULL;

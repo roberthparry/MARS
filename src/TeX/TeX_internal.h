@@ -20,6 +20,12 @@
 #define MARS_SHARED_TeX_INTERNAL_ACCESS
 #include "internal/TeX_internal.h"
 
+/** @brief Private equation layouts used by semantic rendering and the native equation adapter. */
+typedef enum {
+    TeX_EQUATION_INLINE, /**< Separate the sides by an equals sign. */
+    TeX_EQUATION_ALIGNED /**< Top-aligned equation, preserving an already wrapped right side. */
+} TeX_equation_style_t;
+
 /** @brief Forward declaration of a provider's read-only callback table. */
 typedef struct _TeX_provider_t TeX_provider_t;
 
@@ -154,7 +160,7 @@ TeX_t *TeX_copy(const TeX_t *notation);
  * @return Owned notation released with TeX_free(), or NULL on allocation failure.
  * @note Used by the RPN builder so stack controls never require parsing generated TeX.
  */
-TeX_t *TeX_integer(long value);
+TeX_t *TeX_compose_integer(long value);
 
 /**
  * @brief Inspect literal integer metadata independently of the rendered source.
@@ -163,6 +169,143 @@ TeX_t *TeX_integer(long value);
  * @return True only for an explicitly stored integer, including its copies. No ownership transfers or allocation occurs.
  */
 bool TeX_integer_value(const TeX_t *notation, long *value);
+
+/** @brief Structural stack-object tags; formula fragments have no collection payload. */
+typedef enum {
+    TeX_OBJECT_FORMULA, /**< Ordinary immutable notation. */
+    TeX_OBJECT_LIST,    /**< Ordered, possibly nested list. */
+    TeX_OBJECT_LOWER,   /**< One lower index label. */
+    TeX_OBJECT_UPPER,   /**< One upper index label. */
+    TeX_OBJECT_MATRIX,  /**< Matrix retaining its row lists. */
+    TeX_OBJECT_RELATION, /**< Left side, literal relation selector and right side. */
+    TeX_OBJECT_LINES,   /**< Ordered mathematical rows with common left alignment. */
+    TeX_OBJECT_ALIGNED, /**< Ordered rows aligned at stored relation signs or explicit cells. */
+    TeX_OBJECT_INDENT,  /**< Body followed by literal indentation in points. */
+    TeX_OBJECT_COMMA,   /**< Partial-derivative index label or group. */
+    TeX_OBJECT_SEMICOLON /**< Covariant-derivative index label or group. */
+} TeX_object_kind_t;
+
+/**
+ * @brief Inspect a stack object's stored structural tag without parsing notation.
+ * @param notation Borrowed object, or NULL.
+ * @return Its tag; NULL reports TeX_OBJECT_FORMULA. No ownership changes.
+ */
+TeX_object_kind_t TeX_object_kind(const TeX_t *notation);
+
+/**
+ * @brief Borrow directly indexed collection members for the lifetime of their owner.
+ * @param notation Borrowed object, or NULL.
+ * @param[out] count Required output receiving the member count, zero for NULL.
+ * @return Borrowed member array, possibly NULL for an empty collection. Never release its entries.
+ */
+const TeX_t *const *TeX_object_items(const TeX_t *notation, size_t *count);
+
+/**
+ * @brief Copy members into an immutable structural stack object, bounded to 128 nested levels.
+ * @param kind Stored collection tag.
+ * @param items Borrowed member array, NULL permitted for zero count; no ownership transfers.
+ * @param count Number of members to copy in display order.
+ * @return Owned object released with TeX_free(), or NULL with errno set on failure.
+ */
+TeX_t *TeX_object_new(TeX_object_kind_t kind, const TeX_t *const *items, size_t count);
+
+/**
+ * @brief Attach copied structural members to independently owned rendered notation.
+ * @param kind Structural object tag.
+ * @param items Borrowed members, copied without transferring their ownership.
+ * @param count Number of members, bounded as for TeX_object_new().
+ * @param rendered Owned notation, consumed on every path, including failure; NULL reports failure.
+ * @return Owned structural value released with TeX_free(), or NULL with errno set.
+ */
+TeX_t *TeX_object_rendered(TeX_object_kind_t kind, const TeX_t *const *items, size_t count, TeX_t *rendered);
+
+/**
+ * @brief Construct a relation retaining its sides and operator for later alignment.
+ * @param left Borrowed left side, unchanged and not retained.
+ * @param right Borrowed right side, unchanged and not retained.
+ * @param relation Valid relation selector, stored as structural integer data.
+ * @return Owned notation released with TeX_free(), or NULL with errno set; input ownership is unchanged.
+ */
+TeX_t *TeX_object_relation(const TeX_t *left, const TeX_t *right, TeX_relation_t relation);
+
+/**
+ * @brief Render a collection of rows without parsing any mathematical source.
+ * @param rows Borrowed row array, copied into the resulting block.
+ * @param count Positive row count; each row may be notation, a relation or a list of column cells.
+ * @param align True to align stored relation signs or explicit cell boundaries; false for common left alignment.
+ * @return Owned block released with TeX_free(), or NULL with errno set; all input ownership is unchanged.
+ * @note Explicit cell lists use a left-aligned array whose width is the widest row. Other aligned blocks
+ * retain relation alignment. Empty cell lists are invalid; shorter rows leave their trailing cells empty.
+ */
+TeX_t *TeX_object_lines(const TeX_t *const *rows, size_t count, bool align);
+
+/**
+ * @brief Combine two rows or existing blocks, flattening their retained row collections.
+ * @param first Borrowed first row or block; copied rather than consumed.
+ * @param second Borrowed following row or block; copied rather than consumed.
+ * @return Owned block released with TeX_free(), or NULL with errno set; aligned blocks retain alignment.
+ */
+TeX_t *TeX_object_newline(const TeX_t *first, const TeX_t *second);
+
+/**
+ * @brief Indent notation while retaining the body for structural alignment.
+ * @param body Borrowed body, unchanged and not retained.
+ * @param spacing Non-negative indentation in TeX points.
+ * @return Owned notation released with TeX_free(), or NULL with errno set.
+ */
+TeX_t *TeX_object_indent(const TeX_t *body, unsigned spacing);
+
+/**
+ * @brief Look up a relation's typesetting operator by direct enumeration indexing.
+ * @param relation Relation selector to inspect.
+ * @return Borrowed process-lifetime syntax, or NULL for an invalid selector; never release it.
+ */
+const char *TeX_relation_operator(TeX_relation_t relation);
+
+/**
+ * @brief Copy one label into a variance-marked index operand.
+ * @param label Borrowed notation; an existing variance mark is replaced rather than nested.
+ * @param upper True for an upper index, false for a lower index.
+ * @return Owned object released with TeX_free(), or NULL on failure; input ownership is unchanged.
+ */
+TeX_t *TeX_object_index(const TeX_t *label, bool upper);
+
+/**
+ * @brief Mark a copied index label or non-empty list as a partial or covariant derivative group.
+ * @param label Borrowed label or group, unchanged and not retained; NULL and empty lists are rejected.
+ * @param covariant True for a semicolon, false for a comma; an existing punctuation mark is replaced.
+ * @return Owned marked notation released with TeX_free(), or NULL with errno set; input ownership is unchanged.
+ */
+TeX_t *TeX_object_derivative_index(const TeX_t *label, bool covariant);
+
+/**
+ * @brief Compose ordered component and derivative indices from their structural list objects.
+ * @param base Borrowed non-NULL base notation, unchanged and not retained.
+ * @param list Borrowed index list; labels, variance marks and derivative groups are copied during composition.
+ * @return Owned notation released with TeX_free(), or NULL with errno set. Empty component lists are permitted;
+ * empty derivative groups are rejected. No index is reordered or interpreted as a mathematical operation.
+ */
+TeX_t *TeX_compose_tensor_indices(const TeX_t *base, const TeX_t *list);
+
+/**
+ * @brief Compose a rectangular matrix from an immutable list of non-empty row lists.
+ * @param rows Borrowed row collection; no ownership transfers.
+ * @param style Valid matrix delimiter selection.
+ * @param spacing Additional row spacing in points, zero for the default.
+ * @return Owned matrix retaining copied rows, released with TeX_free(), or NULL with errno set.
+ */
+TeX_t *TeX_object_matrix(const TeX_t *rows, TeX_matrix_style_t style, unsigned spacing);
+
+/**
+ * @brief Reformat retained matrix data without parsing generated TeX.
+ * @param matrix Borrowed structural matrix, unchanged on every path.
+ * @param style New delimiter style when change_style is true.
+ * @param spacing New row spacing when change_style is false.
+ * @param change_style Select which presentation setting to change.
+ * @return Owned replacement released with TeX_free(), or NULL with errno set; no ownership transfers.
+ */
+TeX_t *TeX_object_matrix_format(const TeX_t *matrix, TeX_matrix_style_t style, unsigned spacing,
+                              bool change_style);
 
 /**
  * @brief Decide whether a semantic child requires visible grouping within an operation.
@@ -178,7 +321,7 @@ bool TeX_needs_fence(TeX_node_kind_t parent, TeX_node_kind_t child, size_t index
  * @param name Borrowed NUL-terminated symbol name, not retained; punctuation and commands are rejected.
  * @return Owned notation released with TeX_free(), or NULL with errno on invalid input or allocation failure.
  */
-TeX_t *TeX_symbol(const char *name);
+TeX_t *TeX_compose_symbol(const char *name);
 
 /**
  * @brief Resolve an ASCII symbol name through a compact perfect hash.
@@ -229,9 +372,9 @@ TeX_t *TeX_arithmetic_multiply(const TeX_t *left, const TeX_t *right);
 TeX_t *TeX_arithmetic_scripts(const TeX_t *base, const TeX_t *lower, const TeX_t *upper);
 
 /**
- * @brief Attach derivative primes after preserving the complete operand's visible scope.
+ * @brief Attach primes to an operand or index label while preserving its visible scope.
  * @param body Borrowed non-NULL notation, neither modified nor retained.
- * @param order Positive derivative order; zero is invalid.
+ * @param order Positive prime count, or parenthesised order above three; zero is invalid.
  * @return Independently owned notation released with TeX_free(), or NULL for invalid input or allocation failure.
  * @note No mathematical differentiation or evaluation occurs.
  */
@@ -240,10 +383,19 @@ TeX_t *TeX_arithmetic_prime(const TeX_t *body, unsigned order);
 /**
  * @brief Reuse semantic prime notation for an already constructed operand.
  * @param body Borrowed non-NULL notation, neither modified nor retained; grouping is supplied by the caller.
- * @param order Positive derivative order; orders above three use a parenthesised superscript.
+ * @param order Positive prime count, or parenthesised order above three; zero is invalid.
  * @return Owned notation released with TeX_free(), or NULL with EINVAL for invalid input or on allocation failure.
  */
 TeX_t *TeX_compose_prime(const TeX_t *body, unsigned order);
+
+/**
+ * @brief Place an overbar over one complete mathematical operand.
+ * @param body Borrowed non-NULL notation; neither modified nor retained.
+ * @return Independently owned notation released with TeX_free(), or NULL with EINVAL for NULL input
+ * or an allocation error. No mathematical interpretation, simplification or evaluation is performed.
+ * @note The overbar delimits its complete body, so subsequent scripts can treat it as a grouped operand.
+ */
+TeX_t *TeX_compose_bar(const TeX_t *body);
 
 /**
  * @brief Apply established function spelling to already selected mathematical arguments.
@@ -278,6 +430,12 @@ char *TeX_from_unicode_math(const char *text);
  */
 TeX_context_t *TeX_context_new(TeX_node_ref_t root);
 
+/** @brief Private vertical placement used only when composing already selected index labels. */
+typedef enum {
+    TeX_INDEX_LOWER, /**< Lower index slot. */
+    TeX_INDEX_UPPER  /**< Upper index slot. */
+} TeX_index_position_t;
+
 /** @brief One borrowed tensor index; slots retain their supplied left-to-right order. */
 typedef struct {
     const TeX_t *value;          /**< Non-NULL index notation, copied during construction. */
@@ -290,7 +448,7 @@ typedef struct {
  * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
  * @note The source is copied and is not retained.
  */
-TeX_t *TeX_raw(const char *source);
+TeX_t *TeX_compose_raw(const char *source);
 
 /**
  * @brief Escape literal UTF-8 text and enclose it in a TeX text command.
@@ -298,7 +456,7 @@ TeX_t *TeX_raw(const char *source);
  * @return Independently owned notation, released with TeX_free(), or NULL on invalid input or allocation failure.
  * @note NULL input or an embedded NUL is rejected with errno set to EINVAL.
  */
-TeX_t *TeX_text(const string_t *text);
+TeX_t *TeX_compose_text(const string_t *text);
 
 /**
  * @brief Compose a fraction from two mathematical fragments.

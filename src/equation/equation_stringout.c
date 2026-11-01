@@ -19,7 +19,8 @@
 
 #include "TeX-t.h"
 
-
+#define MARS_SHARED_TeX_INTERNAL_ACCESS
+#include "internal/TeX_internal.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #define MARS_EQUATION_INTERNAL_ACCESS
@@ -415,9 +416,9 @@ static string_t *equ_to_text_TeX(const equation_t *equation)
     string_t *lhs = lhs_display ? string_clone(lhs_display) : expr_to_text(equ_lhs(equation), style_LATEX);
     string_t *rhs = rhs_display ? string_clone(rhs_display) : expr_to_text(equ_rhs(equation), style_LATEX);
     TeX_builder_t *builder = TeX_builder_new();
-    TeX_push_raw(builder, lhs ? string_c_str(lhs) : NULL);
-    TeX_push_raw(builder, rhs ? string_c_str(rhs) : NULL);
-    TeX_equation(builder, TeX_EQUATION_INLINE);
+    TeX_raw(builder, lhs ? string_c_str(lhs) : NULL);
+    TeX_raw(builder, rhs ? string_c_str(rhs) : NULL);
+    TeX_eq(builder);
     TeX_t *notation = TeX_builder_finish(builder);
     string_t *out = notation ? TeX_render(notation) : NULL;
     TeX_free(notation);
@@ -442,9 +443,9 @@ char *equ_to_TeX_body_wrapped(const equation_t *equation, size_t line_limit)
     char *lhs = equ_side_TeX_body_dup(equ_lhs(equation), equ_lhs_display_TeX(equation), line_limit);
     char *rhs = equ_side_TeX_body_dup(equ_rhs(equation), equ_rhs_display_TeX(equation), line_limit);
     TeX_builder_t *builder = TeX_builder_new();
-    TeX_push_raw(builder, lhs);
-    TeX_push_raw(builder, rhs);
-    TeX_equation(builder, TeX_EQUATION_ALIGNED);
+    TeX_raw(builder, lhs);
+    TeX_raw(builder, rhs);
+    TeX_builder_aligned_equation(builder);
     TeX_t *notation = TeX_builder_finish(builder);
     char *out = notation ? strdup(TeX_source(notation)) : NULL;
     TeX_free(notation);

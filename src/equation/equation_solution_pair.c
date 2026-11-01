@@ -26,11 +26,13 @@
 static string_t *equ_pair_TeX(const char *centre, const char *offset, const char *denominator, bool group_offset)
 {
     TeX_builder_t *builder = TeX_builder_new();
-    TeX_push_raw(builder, centre);
-    TeX_push_raw(builder, offset);
+    TeX_raw(builder, centre);
+    TeX_raw(builder, offset);
     if (denominator)
-        TeX_push_raw(builder, denominator);
-    TeX_symmetric_pair(builder, denominator != NULL, group_offset);
+        TeX_raw(builder, denominator);
+    TeX_integer(builder, denominator != NULL);
+    TeX_list(builder);
+    TeX_symmetric_pair(builder, group_offset);
     TeX_t *pair = TeX_builder_finish(builder);
     string_t *out = pair ? TeX_render(pair) : NULL;
     TeX_free(pair);
@@ -153,7 +155,7 @@ static bool equ_pair_symmetric(const expr_function_temporaries_t *plan, const ex
             string_t *root;
             if (style == style_LATEX) {
                 TeX_builder_t *builder = TeX_builder_new();
-                TeX_push_raw(builder, string_c_str(texts[side]));
+                TeX_raw(builder, string_c_str(texts[side]));
                 TeX_sqrt(builder);
                 TeX_t *notation = TeX_builder_finish(builder);
                 root = notation ? TeX_render(notation) : NULL;

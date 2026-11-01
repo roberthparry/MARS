@@ -30,7 +30,7 @@ static const TeX_t *TeX_grouped(TeX_node_kind_t parent, const TeX_t *body, size_
 }
 
 /* Validate an identifier once, selecting recognised singleton glyphs by direct indexing. */
-TeX_t *TeX_symbol(const char *name)
+TeX_t *TeX_compose_symbol(const char *name)
 {
     if (!name || !*name) { errno = EINVAL; return NULL; }
     string_t *input = string_new_with(name);
@@ -54,7 +54,7 @@ TeX_t *TeX_symbol(const char *name)
         const char *alias = TeX_symbol_name(input);
         if (!alias && singleton)
             alias = TeX_symbol_codepoint(singleton);
-        result = alias ? TeX_raw(alias) : TeX_identifier(input);
+        result = alias ? TeX_compose_raw(alias) : TeX_identifier(input);
         TeX_classify(result, TeX_NODE_IDENTIFIER);
     } else errno = cursor ? EINVAL : ENOMEM;
     string_cursor_free(cursor);
@@ -69,7 +69,7 @@ TeX_t *TeX_arithmetic_binary(const TeX_t *left, const TeX_t *right, bool subtrac
     TeX_t *owned_left = NULL, *owned_right = NULL;
     const TeX_t *lhs = TeX_grouped(kind, left, 0, &owned_left);
     const TeX_t *rhs = TeX_grouped(kind, right, 1, &owned_right);
-    TeX_t *separator = TeX_raw(subtract ? " - " : " + ");
+    TeX_t *separator = TeX_compose_raw(subtract ? " - " : " + ");
     const TeX_t *parts[] = {lhs, separator, rhs};
     TeX_t *result = lhs && rhs && separator ? TeX_compose_sequence(parts, 3) : NULL;
     TeX_free(owned_left); TeX_free(owned_right); TeX_free(separator);
@@ -82,7 +82,7 @@ TeX_t *TeX_arithmetic_negative(const TeX_t *body)
     TeX_t *owned = NULL;
     const TeX_t *operand = TeX_grouped(TeX_NODE_NEGATIVE, body, 0, &owned);
     string_t *source = operand ? string_sprintf("-%s", TeX_source(operand)) : NULL;
-    TeX_t *result = source ? TeX_raw(string_c_str(source)) : NULL;
+    TeX_t *result = source ? TeX_compose_raw(string_c_str(source)) : NULL;
     string_free(source); TeX_free(owned);
     return TeX_classify(result, TeX_NODE_NEGATIVE);
 }
@@ -102,7 +102,7 @@ TeX_t *TeX_arithmetic_multiply(const TeX_t *left, const TeX_t *right)
                    (rkind == TeX_NODE_NUMBER && lkind == TeX_NODE_PRODUCT);
     string_t *source = lhs && rhs ? string_sprintf("%s%s%s", TeX_source(lhs), numeric ? " \\times " : "\\,",
                                                  TeX_source(rhs)) : NULL;
-    TeX_t *result = source ? TeX_raw(string_c_str(source)) : NULL;
+    TeX_t *result = source ? TeX_compose_raw(string_c_str(source)) : NULL;
     string_free(source);
     TeX_free(owned_left); TeX_free(owned_right);
     return TeX_classify(result, TeX_NODE_PRODUCT);
@@ -119,7 +119,7 @@ TeX_t *TeX_arithmetic_scripts(const TeX_t *base, const TeX_t *lower, const TeX_t
     return TeX_classify(result, kind);
 }
 
-/* Preserve the scope of a complete operand before attaching derivative primes. */
+/* Preserve the scope of a complete operand or index label before attaching primes. */
 TeX_t *TeX_arithmetic_prime(const TeX_t *body, unsigned order)
 {
     if (!order) {

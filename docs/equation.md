@@ -8,8 +8,8 @@ Internally, `src/equation/equation_polynomial_match.c` groups the affine and
 quadratic coefficient recognisers. General polynomial storage and the
 degree-specific root algorithms remain separate implementation units.
 
-TeX output composes its sides through `TeX_equation` in the shared [TeX module](TeX.md),
-including top-aligned wrapped output. Equation selects compact root families and
+TeX output composes its sides through the RPN `TeX_eq` operation in the shared [TeX module](TeX.md).
+Top-aligned wrapped output uses an internal layout adapter. Equation selects compact root families and
 symmetric pairs; TeX composes their
 notation through `TeX_root` and `TeX_symmetric_pair`. Equation metadata, root
 selection and solving remain here. Private semantic callbacks carry mathematical

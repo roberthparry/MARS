@@ -44,9 +44,11 @@ TeX_t *expr_notation_append_primitive(TeX_t *body, const expr_t *initial)
     TeX_context_t *context = expr_notation_primitive_context(initial);
     TeX_t *definition = context ? TeX_from_context(context) : NULL;
     TeX_builder_t *builder = TeX_builder_new();
-    TeX_push_notation(builder, body);
-    TeX_push_notation(builder, definition);
-    TeX_sequence(builder, 2);
+    TeX_notation(builder, body);
+    TeX_notation(builder, definition);
+    TeX_integer(builder, 2);
+    TeX_list(builder);
+    TeX_sequence(builder);
     TeX_t *result = TeX_builder_finish(builder);
     TeX_builder_free(builder);
     TeX_free(definition);
@@ -96,7 +98,7 @@ static int expr_to_TeX_parts_mode(const expr_t *expression, char **body_out, cha
         TeX_t *notation = surface ? TeX_from_context(surface) : NULL;
         if (!surface) {
             TeX_builder_t *builder = TeX_builder_new();
-            TeX_push_raw(builder, "NULL");
+            TeX_raw(builder, "NULL");
             notation = TeX_builder_finish(builder);
             TeX_builder_free(builder);
         }
@@ -156,10 +158,12 @@ string_t *expr_to_TeX_text(const expr_t *expression)
         return NULL;
     bool bound = binding_text && *binding_text;
     TeX_builder_t *builder = TeX_builder_new();
-    TeX_push_raw(builder, body_text);
+    TeX_raw(builder, body_text);
     if (bound) {
-        TeX_push_raw(builder, binding_text);
-        TeX_bound(builder, true);
+        TeX_raw(builder, binding_text);
+        TeX_integer(builder, 1);
+        TeX_list(builder);
+        TeX_bound(builder);
     }
     TeX_t *notation = TeX_builder_finish(builder);
     string_t *result = notation ? TeX_render(notation) : NULL;

@@ -38,7 +38,7 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static void test_TeX_escaping(void)
 {
     string_t *input = string_new_with("£ α #$%&\\^_{}~");
-    TeX_t *text = TeX_text(input);
+    TeX_t *text = TeX_compose_text(input);
     TEST_ASSERT_TRUE(input && strcmp(string_c_str(input), "£ α #$%&\\^_{}~") == 0,
                      "escaping does not modify the borrowed input");
     string_free(input);
@@ -51,20 +51,20 @@ static void test_TeX_escaping(void)
 static void test_TeX_text_boundaries(void)
 {
     string_t *input = string_new();
-    TeX_t *empty = TeX_text(input);
+    TeX_t *empty = TeX_compose_text(input);
     TEST_ASSERT_TRUE(empty && strcmp(TeX_source(empty), "\\text{}") == 0, "empty strings are valid text");
     TeX_free(empty);
     const char bytes[] = {'a', '\0', '&', 'b'};
     TEST_ASSERT_TRUE(input && string_append_bytes(input, bytes, sizeof bytes) == 0,
                      "construct a length-delimited string containing NUL");
     errno = 0;
-    TeX_t *invalid = TeX_text(input);
+    TeX_t *invalid = TeX_compose_text(input);
     TEST_ASSERT_TRUE(!invalid && errno == EINVAL, "embedded NUL is rejected instead of truncating text");
     TeX_free(invalid);
     string_free(input);
 
     input = string_new_with("ordinary £ α text & final é text");
-    TeX_t *spans = TeX_text(input);
+    TeX_t *spans = TeX_compose_text(input);
     string_free(input);
     TEST_ASSERT_TRUE(spans && strcmp(TeX_source(spans), "\\text{ordinary £ α text \\& final é text}") == 0,
                      "ordinary spans on both sides of an escape survive release of the input");
@@ -73,7 +73,7 @@ static void test_TeX_text_boundaries(void)
 
 static void test_TeX_composition(void)
 {
-    TeX_t *x = TeX_raw("x"), *two = TeX_raw("2");
+    TeX_t *x = TeX_compose_raw("x"), *two = TeX_compose_raw("2");
     TeX_t *fraction = TeX_compose_fraction(x, two);
     TeX_t *root = TeX_compose_root(fraction, two);
     TeX_t *scripts = TeX_compose_scripts(root, x, two);
@@ -94,7 +94,7 @@ static void test_TeX_composition(void)
 
 static void test_TeX_matrices_and_invalid_inputs(void)
 {
-    TeX_t *a = TeX_raw("a"), *b = TeX_raw("b");
+    TeX_t *a = TeX_compose_raw("a"), *b = TeX_compose_raw("b");
     const TeX_t *cells[] = {a, NULL, b, a};
     TeX_t *matrix = TeX_compose_matrix(cells, 2, 2, TeX_MATRIX_BRACKETS, 10);
     TEST_ASSERT_TRUE(matrix && strcmp(TeX_source(matrix),
@@ -113,8 +113,8 @@ static void test_TeX_matrices_and_invalid_inputs(void)
                      "overflow is rejected before cell access");
     TEST_ASSERT_TRUE(!TeX_compose_matrix(cells, 1, 1, (TeX_matrix_style_t)-1, 0) &&
                      !TeX_compose_matrix(cells, 0, 1, TeX_MATRIX_PLAIN, 0) && !TeX_compose_fraction(a, NULL) &&
-                     !TeX_compose_root(NULL, a) && !TeX_compose_scripts(NULL, a, b) && !TeX_text(NULL) &&
-                     !TeX_raw(NULL) && !TeX_compose_sequence(NULL, 1) && !TeX_compose_sequence(cells, 2),
+                     !TeX_compose_root(NULL, a) && !TeX_compose_scripts(NULL, a, b) && !TeX_compose_text(NULL) &&
+                     !TeX_compose_raw(NULL) && !TeX_compose_sequence(NULL, 1) && !TeX_compose_sequence(cells, 2),
                      "invalid arguments never produce partial notation");
     TeX_t *empty = TeX_compose_sequence(NULL, 0);
     TEST_ASSERT_TRUE(empty && !*TeX_source(empty), "empty composition is valid");
@@ -126,8 +126,8 @@ static void test_TeX_matrices_and_invalid_inputs(void)
 
 static void test_TeX_calculus(void)
 {
-    TeX_t *body = TeX_raw("f(x)"), *x = TeX_raw("x");
-    TeX_t *lower = TeX_raw("0"), *upper = TeX_raw("1");
+    TeX_t *body = TeX_compose_raw("f(x)"), *x = TeX_compose_raw("x");
+    TeX_t *lower = TeX_compose_raw("0"), *upper = TeX_compose_raw("1");
     TeX_t *sum = TeX_compose_sum(body, lower, upper);
     TeX_t *unbounded = TeX_compose_sum(body, NULL, NULL);
     TeX_t *upper_only = TeX_compose_sum(body, NULL, upper);
@@ -171,7 +171,7 @@ static void test_TeX_calculus(void)
 
 static void test_TeX_tensor_slots_and_fences(void)
 {
-    TeX_t *base = TeX_raw("T"), *mu = TeX_raw("\\mu"), *nu = TeX_raw("\\nu");
+    TeX_t *base = TeX_compose_raw("T"), *mu = TeX_compose_raw("\\mu"), *nu = TeX_compose_raw("\\nu");
     const TeX_index_t slots[] = {{mu, TeX_INDEX_UPPER}, {nu, TeX_INDEX_LOWER}, {mu, TeX_INDEX_UPPER}};
     TeX_t *tensor = TeX_compose_tensor(base, slots, 3);
     TeX_t *scalar = TeX_compose_tensor(base, NULL, 0);
@@ -197,7 +197,7 @@ static void test_TeX_tensor_slots_and_fences(void)
 
 static void test_TeX_calculus_invalid_inputs(void)
 {
-    TeX_t *x = TeX_raw("x");
+    TeX_t *x = TeX_compose_raw("x");
     const TeX_index_t missing[] = {{NULL, TeX_INDEX_LOWER}};
     const TeX_index_t invalid[] = {{x, (TeX_index_position_t)-1}};
     TEST_ASSERT_TRUE(!TeX_compose_tensor(NULL, NULL, 0) && !TeX_compose_tensor(x, NULL, 1) &&
@@ -355,17 +355,26 @@ static void test_TeX_expression_style(void)
 
 static void test_TeX_equations(void)
 {
-    TeX_t *left = TeX_raw("x"), *right = TeX_raw("y");
+    TeX_t *left = TeX_compose_raw("x"), *right = TeX_compose_raw("y");
     TeX_t *plain = TeX_compose_equation(left, right, TeX_EQUATION_INLINE);
     TeX_t *aligned = TeX_compose_equation(left, right, TeX_EQUATION_ALIGNED);
     TEST_ASSERT_TRUE(plain && strcmp(TeX_source(plain), "x = y") == 0, "inline equation");
     TEST_ASSERT_TRUE(aligned && strcmp(TeX_source(aligned),
         "\\begin{aligned}[t]\nx &= y\n\\end{aligned}") == 0, "aligned equation");
-    TeX_t *wrapped = TeX_raw("\\begin{aligned}[t]\n&a + b\\\\\n&{}+ c  \n\\end{aligned}");
+    TeX_t *wrapped = TeX_compose_raw("\\begin{aligned}[t]\n&a + b\\\\\n&{}+ c  \n\\end{aligned}");
     TeX_t *continued = TeX_compose_equation(left, wrapped, TeX_EQUATION_ALIGNED);
     TEST_ASSERT_TRUE(continued && strcmp(TeX_source(continued),
         "\\begin{aligned}[t]\nx ={}& a + b\\\\\n&{}+ c\n\\end{aligned}") == 0,
         "wrapped right side is incorporated without nested alignment");
+    TeX_builder_t *builder = TeX_builder_new();
+    TeX_notation(builder, left);
+    TeX_notation(builder, wrapped);
+    TEST_ASSERT_TRUE(TeX_builder_aligned_equation(builder), "the internal equation adapter consumes both sides");
+    TeX_t *adapted = TeX_builder_finish(builder);
+    TeX_builder_free(builder);
+    TEST_ASSERT_TRUE(adapted && continued && !strcmp(TeX_source(adapted), TeX_source(continued)),
+                     "the native adapter preserves an already wrapped side after its builder is freed");
+    TeX_free(adapted);
     TEST_ASSERT_TRUE(!TeX_compose_equation(NULL, right, TeX_EQUATION_INLINE), "missing side rejected");
     TEST_ASSERT_TRUE(!TeX_compose_equation(left, right, (TeX_equation_style_t)-1), "invalid style rejected");
     TeX_free(right);
@@ -401,7 +410,7 @@ static void test_TeX_relation_input(void)
         TeX_t *notation = TeX_from_expression(input);
         TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), cases[i].expected), cases[i].input);
         TeX_builder_t *builder = TeX_builder_new();
-        bool pushed = TeX_push_math(builder, cases[i].input);
+        bool pushed = TeX_math(builder, cases[i].input);
         TeX_t *stack_result = TeX_builder_finish(builder);
         TEST_ASSERT_TRUE(pushed && stack_result && !strcmp(TeX_source(stack_result), cases[i].expected),
                          "pushed mathematical text uses the same native relation grammar");
@@ -540,8 +549,8 @@ static void test_TeX_prime_snapshot_modes(void)
 
 static void test_TeX_native_layout(void)
 {
-    TeX_t *x = TeX_raw("x"), *y = TeX_raw("y"), *two = TeX_raw("2");
-    TeX_t *bindings = TeX_raw("x = 1");
+    TeX_t *x = TeX_compose_raw("x"), *y = TeX_compose_raw("y"), *two = TeX_compose_raw("2");
+    TeX_t *bindings = TeX_compose_raw("x = 1");
     TeX_t *bound = TeX_compose_bound(x, bindings), *unbound = TeX_compose_bound(x, NULL);
     TeX_t *scaled = TeX_compose_scaled(two, x), *cartesian = TeX_compose_cartesian_sum(x, y);
     TeX_t *pair = TeX_compose_symmetric_pair(x, y, two, true);

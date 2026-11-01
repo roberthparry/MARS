@@ -68,7 +68,7 @@ static TeX_t *invalid_node(void)
 
 static TeX_t *from_owned_source(string_t *source)
 {
-    TeX_t *result = source ? TeX_raw(string_c_str(source)) : NULL;
+    TeX_t *result = source ? TeX_compose_raw(string_c_str(source)) : NULL;
     string_free(source);
     return result;
 }
@@ -99,13 +99,13 @@ static TeX_t *render_number(const TeX_node_view_t *view, const TeX_t *const *chi
         if (start == p)
             return invalid_node();
     }
-    return (size_t)(p - text) == string_byte_length(view->text) ? TeX_raw(text) : invalid_node();
+    return (size_t)(p - text) == string_byte_length(view->text) ? TeX_compose_raw(text) : invalid_node();
 }
 
 static TeX_t *render_text(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     (void)children;
-    return view->text && !view->child_count ? TeX_text(view->text) : invalid_node();
+    return view->text && !view->child_count ? TeX_compose_text(view->text) : invalid_node();
 }
 
 static TeX_t *render_identifier(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -118,15 +118,15 @@ static TeX_t *render_identifier(const TeX_node_view_t *view, const TeX_t *const 
     if (bytes == 2u && name[0] >= 0xc2u && name[0] <= 0xdfu && (name[1] & 0xc0u) == 0x80u) {
         const char *symbol = TeX_semantic_greek(((name[0] & 0x1fu) << 6u) | (name[1] & 0x3fu));
         if (symbol)
-            return TeX_raw(symbol);
+            return TeX_compose_raw(symbol);
     }
     if (!strcmp((const char *)name, "∞"))
-        return TeX_raw("\\infty");
+        return TeX_compose_raw("\\infty");
     if (!strcmp((const char *)name, "−∞"))
-        return TeX_raw("-\\infty");
+        return TeX_compose_raw("-\\infty");
     if (!strcmp((const char *)name, "?"))
-        return TeX_raw("?");
-    TeX_t *literal = TeX_text(view->text);
+        return TeX_compose_raw("?");
+    TeX_t *literal = TeX_compose_text(view->text);
     if (!literal)
         return NULL;
     const char *escaped = TeX_source(literal);
@@ -239,7 +239,7 @@ static TeX_t *render_function_name(const TeX_node_view_t *view, const TeX_t *con
         return invalid_node();
     TeX_node_view_t name = {.kind = TeX_NODE_IDENTIFIER, .text = view->text};
     const char *standard = TeX_semantic_function(view->text);
-    TeX_t *identifier = standard ? TeX_raw(standard) : render_identifier(&name, NULL);
+    TeX_t *identifier = standard ? TeX_compose_raw(standard) : render_identifier(&name, NULL);
     if (identifier && !strncmp(TeX_source(identifier), "\\mathit{", 8u)) {
         string_t *operator = string_sprintf("\\operatorname%s", TeX_source(identifier) + 7u);
         TeX_free(identifier);
@@ -292,7 +292,7 @@ TeX_t *TeX_named_call(const string_t *name, const TeX_t *const *arguments, size_
 {
     const char *alias = TeX_symbol_name(name);
     if (alias && !TeX_semantic_function(name)) {
-        TeX_t *function = TeX_raw(alias);
+        TeX_t *function = TeX_compose_raw(alias);
         TeX_t *result = function ? TeX_applied(function, arguments, count) : NULL;
         TeX_free(function);
         return result;
@@ -435,8 +435,7 @@ static TeX_t *render_real_part(const TeX_node_view_t *view, const TeX_t *const *
 
 static TeX_t *render_conjugate(const TeX_node_view_t *view, const TeX_t *const *children)
 {
-    return view->child_count == 1u ? from_owned_source(string_sprintf("\\overline{%s}",
-        TeX_source(children[0]))) : invalid_node();
+    return view->child_count == 1u ? TeX_compose_bar(children[0]) : invalid_node();
 }
 
 static TeX_t *render_projection(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -567,7 +566,8 @@ TeX_t *TeX_compose_transform(const TeX_t *const *operands, TeX_transform_kind_t 
     return render_transform(&view, operands);
 }
 
-static TeX_t *render_relation(const TeX_node_view_t *view, const TeX_t *const *children)
+/* Share the compact operator table with structural RPN alignment. */
+const char *TeX_relation_operator(TeX_relation_t relation)
 {
     static const char *const operators[] = {
         [TeX_RELATION_EQUAL]         = " = ",
@@ -582,9 +582,15 @@ static TeX_t *render_relation(const TeX_node_view_t *view, const TeX_t *const *c
         [TeX_RELATION_APPROXIMATE]   = " \\approx ",
         [TeX_RELATION_CONGRUENT]     = " \\cong "
     };
-    if (view->child_count != 2u || (unsigned)view->relation >= sizeof operators / sizeof *operators)
+    return (unsigned)relation < sizeof operators / sizeof *operators ? operators[relation] : NULL;
+}
+
+static TeX_t *render_relation(const TeX_node_view_t *view, const TeX_t *const *children)
+{
+    const char *operator = TeX_relation_operator(view->relation);
+    if (view->child_count != 2u || !operator)
         return invalid_node();
-    return from_owned_source(string_sprintf("%s%s%s", TeX_source(children[0]), operators[view->relation],
+    return from_owned_source(string_sprintf("%s%s%s", TeX_source(children[0]), operator,
         TeX_source(children[1])));
 }
 
@@ -637,7 +643,7 @@ static TeX_t *render_distribution_condition(const TeX_node_view_t *view, const T
 {
     if (view->child_count != 1u || !view->text)
         return invalid_node();
-    TeX_t *caption = TeX_text(view->text);
+    TeX_t *caption = TeX_compose_text(view->text);
     TeX_t *result = caption ? from_owned_source(string_sprintf("%s:\\;%s", TeX_source(children[0]),
                                                                TeX_source(caption))) : NULL;
     TeX_free(caption);
@@ -730,7 +736,7 @@ static TeX_t *render_number_set(const TeX_node_view_t *view, const TeX_t *const 
         [TeX_SET_PRIMES]              = "\\mathbb{P}"
     };
     return !view->child_count && (unsigned)view->number_set < sizeof sets / sizeof *sets
-        ? TeX_raw(sets[view->number_set]) : invalid_node();
+        ? TeX_compose_raw(sets[view->number_set]) : invalid_node();
 }
 
 static TeX_t *render_list(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -908,7 +914,7 @@ bool TeX_needs_fence(TeX_node_kind_t parent, TeX_node_kind_t child, size_t index
 static TeX_t *render_calculus_quotient(const TeX_t *const *children)
 {
     TeX_t *denominator = TeX_compose_fenced(children[1], TeX_FENCE_PARENTHESES);
-    TeX_t *exponent = TeX_raw("-1");
+    TeX_t *exponent = TeX_compose_raw("-1");
     TeX_t *reciprocal = denominator && exponent ? TeX_compose_scripts(denominator, NULL, exponent) : NULL;
     TeX_t *numerator = TeX_compose_fenced(children[0], TeX_FENCE_PARENTHESES);
     TeX_t *result = reciprocal && numerator ? from_owned_source(string_sprintf("%s\\,%s",

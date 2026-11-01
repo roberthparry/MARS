@@ -56,7 +56,7 @@ TeX_t *TeX_wrap_sum(const TeX_context_t *context, size_t line_limit,
     }
     if (valid)
         valid = string_append_cstr(source, "\n\\end{aligned}") >= 0;
-    TeX_t *wrapped = valid ? TeX_raw(string_c_str(source)) : NULL;
+    TeX_t *wrapped = valid ? TeX_compose_raw(string_c_str(source)) : NULL;
     string_free(source);
     if (!wrapped)
         return body;

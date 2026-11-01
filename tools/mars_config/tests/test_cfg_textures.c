@@ -285,6 +285,11 @@ static bool texture_migration_fixture(const char *directory)
                              "where level=3 and column_index=1") &&
          !cfg_database_textures_valid(db) && cfg_database_globe_refresh(db, root, staging) &&
          cfg_database_textures_valid(db);
+    /* The expanded catalogue must also replace photographs installed by revision fifteen. */
+    ok = ok && cfg_database_revision(db, "globe", 15) &&
+         sqlite_exec_cstr(db, "delete from globe_texture where level=3 and column_index=1") &&
+         !cfg_database_textures_valid(db) && cfg_database_globe_refresh(db, root, staging) &&
+         cfg_database_textures_valid(db);
     q = sqlite_stmt_prepare(db, "select source from rivers_dataset");
     ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && !strcmp(sqlite_stmt_column_text(q, 0), "retained");
     sqlite_stmt_finalize(q);
@@ -298,7 +303,7 @@ static bool texture_migration_fixture(const char *directory)
 static void test_cfg_textures_migration(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(texture_migration_fixture),
-                     "photograph migrations include revision fourteen and preserve shoreline and rivers");
+                     "photograph migrations include revision fifteen and preserve shoreline and rivers");
 }
 
 static bool texture_scalar_is(sqlite_t *db, const char *sql, int64_t expected)
@@ -339,7 +344,7 @@ static bool texture_staged_fixture(const char *directory)
     string_t *staging = parent ? cfg_database_stage(parent) : NULL;
     file_t *installed = path ? file_new(path) : NULL;
     bool ok = db && root && installed && staging && cfg_database_textures(db, root) &&
-        cfg_database_revision(db, "globe", 14) && sqlite_exec_cstr(db,
+        cfg_database_revision(db, "globe", 15) && sqlite_exec_cstr(db,
             "PRAGMA application_id=1296126547; PRAGMA user_version=27;\n"
             "CREATE TABLE retained(value BLOB, label TEXT, optional INTEGER);\n"
             "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<5001)\n"
@@ -365,7 +370,7 @@ static bool texture_staged_fixture(const char *directory)
             "CREATE TABLE audit(value TEXT);INSERT INTO audit VALUES('original');\n"
             "CREATE TRIGGER retained_audit AFTER INSERT ON retained BEGIN\n"
             "  INSERT INTO audit VALUES(new.label);END;");
-    if (ok) ok = cfg_database_rebuild_globe(&db, path, root, staging, cfg_database_globe_refresh, 15, false) && !db;
+    if (ok) ok = cfg_database_rebuild_globe(&db, path, root, staging, cfg_database_globe_refresh, 16, false) && !db;
     cfg_database_cleanup(staging); string_free(staging);
     db = ok ? sqlite_open_plain(path) : db;
     ok = ok && db && cfg_database_textures_valid(db) && texture_scalar_is(db, "PRAGMA page_size", 65536) &&
@@ -383,40 +388,40 @@ static bool texture_staged_fixture(const char *directory)
          texture_scalar_is(db, "SELECT count(*) FROM retained_view", 5004) &&
          texture_scalar_is(db, "SELECT count(*) FROM audit", 1) &&
          texture_scalar_is(db, "SELECT seq FROM sqlite_sequence WHERE name='numbered'", 99) &&
-         texture_scalar_is(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", 15) &&
+         texture_scalar_is(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", 16) &&
          sqlite_exec_cstr(db, "INSERT INTO retained(label) VALUES('after');INSERT INTO numbered(v) VALUES('next')") &&
          texture_scalar_is(db, "SELECT count(*) FROM audit WHERE value='after'", 1) &&
          texture_scalar_is(db, "SELECT id FROM numbered WHERE v='next'", 100);
     /* Exercise the release dispatch, not just its staging helper, using the same miniature installed store. */
-    ok = ok && cfg_database_revision(db, "globe", 14);
+    ok = ok && cfg_database_revision(db, "globe", 15);
     sqlite_close(db); db = NULL;
     ok = ok && !setenv("MARS_GLOBE_DB_PATH", string_c_str(path), 1) && !setenv("MARS_GLOBE_DB_KEY", "", 1) &&
          !setenv("MARS_ROOT", string_c_str(root), 1) && cfg_databases_update() == 0;
     db = ok ? sqlite_open_plain(path) : NULL;
-    ok = ok && db && texture_scalar_is(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", 15) &&
+    ok = ok && db && texture_scalar_is(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", 16) &&
          texture_scalar_is(db, "SELECT count(*) FROM audit", 2);
     string_t *before = ok ? file_sha256(installed) : NULL;
     staging = ok ? cfg_database_stage(parent) : NULL;
     texture_failed_updates = 0;
     ok = ok && before && staging &&
-         cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, 15, false) &&
+         cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, 16, false) &&
          !db && !texture_failed_updates;
     cfg_database_cleanup(staging); string_free(staging);
     staging = ok ? cfg_database_stage(parent) : NULL;
-    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, 15, true) &&
+    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, 16, true) &&
          !db && texture_failed_updates == 1;
     string_t *after = ok ? file_sha256(installed) : NULL;
     ok = ok && after && !strcmp(string_c_str(before), string_c_str(after));
     cfg_database_cleanup(staging); string_free(staging); string_free(after);
     staging = ok ? cfg_database_stage(parent) : NULL;
-    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_invalid_update, 15, true) && !db;
+    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_invalid_update, 16, true) && !db;
     after = ok ? file_sha256(installed) : NULL;
     ok = ok && after && !strcmp(string_c_str(before), string_c_str(after));
     cfg_database_cleanup(staging); string_free(staging); string_free(after);
     sqlite_t *writer = ok ? sqlite_open_plain(path) : NULL;
     ok = ok && writer && sqlite_exec_cstr(writer, "BEGIN IMMEDIATE");
     staging = ok ? cfg_database_stage(parent) : NULL;
-    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, 15, true) &&
+    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, 16, true) &&
          !db && texture_failed_updates == 1;
     if (writer) ok = sqlite_exec_cstr(writer, "ROLLBACK") && ok;
     sqlite_close(writer);

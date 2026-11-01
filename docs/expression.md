@@ -3698,6 +3698,10 @@ string_t *expr_vsprintf_text(const char *fmt, va_list ap);
 
 ### TeX notation ownership
 
+For authoring new formulas, prefer the [TeX RPN builder](TeX.md#rpn-quick-start).
+For an existing expression, request `expr_to_text(expression, style_LATEX)`;
+no builder or rendering context needs setting up in application code.
+
 The [TeX module](TeX.md#ordinary-mathematical-text-without-tex-commands) offers
 `TeX_from_expression(const string_t *)` for callers who want ordinary mathematical
 text converted directly to owned notation. It uses this module's public presentation parser,

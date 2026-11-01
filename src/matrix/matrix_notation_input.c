@@ -116,8 +116,8 @@ static TeX_t *mat_notation_product(const string_t *text, const string_t *binding
         TeX_t *matrix = lm ? lhs : rhs;
         if (factor && matrix) {
             TeX_builder_t *builder = TeX_builder_new();
-            TeX_push_notation(builder, factor);
-            TeX_push_notation(builder, matrix);
+            TeX_notation(builder, factor);
+            TeX_notation(builder, matrix);
             TeX_scaled(builder);
             result = TeX_builder_finish(builder);
             TeX_builder_free(builder);
@@ -215,8 +215,8 @@ TeX_t *mat_notation_input(const string_t *text, const string_t *bindings, bool *
         TeX_t *power = valid && exponent ? expr_notation_scalar(exponent, false) : NULL;
         if (power) {
             TeX_builder_t *builder = TeX_builder_new();
-            TeX_push_notation(builder, base);
-            TeX_push_notation(builder, power);
+            TeX_notation(builder, base);
+            TeX_notation(builder, power);
             TeX_pow(builder);
             result = TeX_builder_finish(builder);
             TeX_builder_free(builder);

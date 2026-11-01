@@ -1088,12 +1088,16 @@ of the 8192-pixel image. Each of the 72 bundled tiles is 1800 × 1800 pixels;
 tiles are stored as lossless PNGs. The NASA source was already JPEG-encoded; PNG preserves its decoded pixels without
 recovering lost detail. The regional Sentinel photographs are generated directly
 from their satellite rasters. They are served locally, including when offline.
-The prepared Sentinel-2 catalogue contains 2,125 regional images covering the UK,
+The prepared Sentinel-2 catalogue contains 4,775 regional images covering the UK,
 Ireland, Denmark, Netherlands, Italy and the requested Mediterranean and Atlantic
-islands, mainland Portugal and Spain, coastal Svalbard and Cape Peninsula. Spain and
-Svalbard use reduced-resolution 1800-square images; other new regions use 3600-square
-images. Remaining missing observations are transparent. Managed globe revision 14
-imports the approximately 29 GiB catalogue with `make release`; only photographs
+islands, mainland Portugal and Spain, coastal Svalbard and Cape Peninsula. It also
+includes mainland France, New Zealand and its offshore islands, Finland and Åland,
+Sweden, Norway, and the requested areas around Brisbane, Sydney, Melbourne, Perth,
+Mooloolaba, Maroochydore, Canberra, Cairns, Alice Springs and Gold Coast.
+Spain, Svalbard and this latest expansion use reduced-resolution 1800-square images;
+earlier regional coverage generally uses 3600-square images. Remaining missing
+observations are transparent. Managed globe revision 16 imports the approximately
+32.9 GiB PNG package with `make release`; only photographs
 needed for the current view are loaded, using the existing bounded caches.
 
 The native `lab_globe_photo_patch` planner wraps longitude at the date line and

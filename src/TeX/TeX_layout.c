@@ -20,7 +20,7 @@ string_t *TeX_qualification(const string_t *operand, const char *caption, TeX_qu
     if (style == TeX_QUALIFICATION_FINITE_PART)
         return string_sprintf("\\operatorname{Fp}\\!\\left[%S\\right]", operand);
     string_t *plain = string_new_with(caption);
-    TeX_t *label = plain ? TeX_text(plain) : NULL;
+    TeX_t *label = plain ? TeX_compose_text(plain) : NULL;
     string_free(plain);
     if (!label)
         return NULL;

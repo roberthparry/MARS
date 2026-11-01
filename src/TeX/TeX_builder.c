@@ -160,25 +160,25 @@ TeX_t *TeX_builder_finish(TeX_builder_t *builder)
 }
 
 /* Copy trusted syntax before any operand-array allocation can invalidate a view. */
-bool TeX_push_raw(TeX_builder_t *builder, const char *source)
+bool TeX_raw(TeX_builder_t *builder, const char *source)
 {
-    return TeX_builder_ready(builder) && TeX_replace(builder, 0, TeX_raw(source));
+    return TeX_builder_ready(builder) && TeX_replace(builder, 0, TeX_compose_raw(source));
 }
 
 /* Push a mathematical name without making its caller write or parse TeX commands. */
-bool TeX_push_symbol(TeX_builder_t *builder, const char *name)
+bool TeX_symbol(TeX_builder_t *builder, const char *name)
 {
-    return TeX_builder_ready(builder) && TeX_replace(builder, 0, TeX_symbol(name));
+    return TeX_builder_ready(builder) && TeX_replace(builder, 0, TeX_compose_symbol(name));
 }
 
 /* Escape literal prose and place its owned copy on the construction stack. */
-bool TeX_push_text(TeX_builder_t *builder, const string_t *text)
+bool TeX_text(TeX_builder_t *builder, const string_t *text)
 {
-    return TeX_builder_ready(builder) && TeX_replace(builder, 0, TeX_text(text));
+    return TeX_builder_ready(builder) && TeX_replace(builder, 0, TeX_compose_text(text));
 }
 
 /* Delegate mathematical interpretation to the established native input adapters. */
-bool TeX_push_expression(TeX_builder_t *builder, const string_t *text)
+bool TeX_expression(TeX_builder_t *builder, const string_t *text)
 {
     if (!TeX_builder_ready(builder))
         return false;
@@ -187,26 +187,26 @@ bool TeX_push_expression(TeX_builder_t *builder, const string_t *text)
 }
 
 /* Adapt a convenient C string without exposing temporary string ownership. */
-bool TeX_push_math(TeX_builder_t *builder, const char *text)
+bool TeX_math(TeX_builder_t *builder, const char *text)
 {
     if (!TeX_builder_ready(builder))
         return false;
     if (!text)
         return TeX_builder_fail(builder, EINVAL);
     string_t *input = string_new_with(text);
-    bool ok = input ? TeX_push_expression(builder, input) : TeX_builder_fail(builder, ENOMEM);
+    bool ok = input ? TeX_expression(builder, input) : TeX_builder_fail(builder, ENOMEM);
     string_free(input);
     return ok;
 }
 
 /* Supply integer notation without requiring callers to create a source string. */
-bool TeX_push_integer(TeX_builder_t *builder, long value)
+bool TeX_integer(TeX_builder_t *builder, long value)
 {
-    return TeX_builder_ready(builder) && TeX_replace(builder, 0, TeX_integer(value));
+    return TeX_builder_ready(builder) && TeX_replace(builder, 0, TeX_compose_integer(value));
 }
 
 /* Copy a finished or stack-owned value; the original remains with its owner. */
-bool TeX_push_notation(TeX_builder_t *builder, const TeX_t *notation)
+bool TeX_notation(TeX_builder_t *builder, const TeX_t *notation)
 {
     if (!TeX_builder_ready(builder))
         return false;
@@ -214,14 +214,14 @@ bool TeX_push_notation(TeX_builder_t *builder, const TeX_t *notation)
 }
 
 /* Select fixed spacing syntax by direct enum indexing. */
-bool TeX_push_space(TeX_builder_t *builder, TeX_space_t space)
+bool TeX_space(TeX_builder_t *builder, TeX_space_t space)
 {
     static const char *const source[] = {"\\,", "\\qquad "};
     if (!TeX_builder_ready(builder))
         return false;
     if ((unsigned)space >= sizeof source / sizeof *source)
         return TeX_builder_fail(builder, EINVAL);
-    return TeX_push_raw(builder, source[space]);
+    return TeX_raw(builder, source[space]);
 }
 
 /* Duplicate level one with independently owned notation and literal metadata. */
@@ -230,7 +230,7 @@ bool TeX_dup(TeX_builder_t *builder)
     if (!TeX_builder_ready(builder))
         return false;
     const TeX_t *value = TeX_builder_peek(builder, 1);
-    return value ? TeX_push_notation(builder, value) : TeX_builder_fail(builder, ERANGE);
+    return value ? TeX_notation(builder, value) : TeX_builder_fail(builder, ERANGE);
 }
 
 /* Release the validated top operand through the array's notation destructor. */
@@ -288,6 +288,117 @@ bool TeX_rot(TeX_builder_t *builder)
     return true;
 }
 
+static bool TeX_control(TeX_builder_t *builder, const TeX_t *value, unsigned long maximum,
+                       bool positive, unsigned long *control)
+{
+    long integer;
+    if (!TeX_integer_value(value, &integer) || integer < 0 || (positive && !integer))
+        return TeX_builder_fail(builder, EINVAL);
+    if ((unsigned long)integer > maximum)
+        return TeX_builder_fail(builder, EOVERFLOW);
+    *control = (unsigned long)integer;
+    return true;
+}
+
+static const TeX_t *const *TeX_list_members(TeX_builder_t *builder, const TeX_t *value, size_t *count)
+{
+    static const TeX_t *const empty[] = {NULL};
+    if (TeX_object_kind(value) != TeX_OBJECT_LIST) {
+        TeX_builder_fail(builder, EINVAL);
+        return NULL;
+    }
+    const TeX_t *const *items = TeX_object_items(value, count);
+    return *count ? items : empty;
+}
+
+/* HP48 ->LIST consumes its literal count and replaces that many preceding objects. */
+bool TeX_list(TeX_builder_t *builder)
+{
+    const TeX_t *const *top = TeX_operands(builder, 1);
+    unsigned long count;
+    if (!top || !TeX_control(builder, top[0], SIZE_MAX - 1, false, &count))
+        return false;
+    const TeX_t *const *items = TeX_operands(builder, (size_t)count + 1);
+    return items && TeX_replace(builder, (size_t)count + 1,
+                               TeX_object_new(TeX_OBJECT_LIST, items, (size_t)count));
+}
+
+/* Expand a list and push its count, constructing the replacement stack before mutation. */
+bool TeX_unlist(TeX_builder_t *builder)
+{
+    const TeX_t *const *top = TeX_operands(builder, 1);
+    size_t count;
+    const TeX_t *const *items = top ? TeX_list_members(builder, top[0], &count) : NULL;
+    if (!items)
+        return false;
+    if (count > LONG_MAX)
+        return TeX_builder_fail(builder, EOVERFLOW);
+    array_t *replacement = array_create(sizeof(TeX_t *), NULL, TeX_stack_destroy);
+    if (!replacement)
+        return TeX_builder_fail(builder, ENOMEM);
+    size_t previous = array_size(builder->values) - 1;
+    if (previous && !array_append_carray(replacement, array_get(builder->values, 0), previous)) {
+        array_destroy(replacement);
+        return TeX_builder_fail(builder, ENOMEM);
+    }
+    for (size_t i = 0; i <= count; ++i) {
+        TeX_t *copy = i < count ? TeX_copy(items[i]) : TeX_compose_integer((long)count);
+        if (!copy || !array_append_carray(replacement, &copy, 1)) {
+            TeX_free(copy);
+            /* Lower pointers still belong to the unchanged original stack. */
+            for (size_t j = 0; j < previous; ++j)
+                *(TeX_t **)array_get(replacement, j) = NULL;
+            array_destroy(replacement);
+            return TeX_builder_fail(builder, errno ? errno : ENOMEM);
+        }
+    }
+    /* Transfer surviving operands without changing their identity or cloning them. */
+    for (size_t i = 0; i < previous; ++i)
+        *(TeX_t **)array_get(builder->values, i) = NULL;
+    array_destroy(builder->values);
+    builder->values = replacement;
+    return true;
+}
+
+/* Push HP48 DEPTH as a literal control, leaving all previous objects in place. */
+bool TeX_depth(TeX_builder_t *builder)
+{
+    if (!TeX_builder_ready(builder))
+        return false;
+    size_t count = array_size(builder->values);
+    if (count > LONG_MAX)
+        return TeX_builder_fail(builder, EOVERFLOW);
+    return TeX_integer(builder, (long)count);
+}
+
+/* Mark an upper index as a single stack operand, including its original label data. */
+bool TeX_upper(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1);
+    return p && TeX_replace(builder, 1, TeX_object_index(p[0], true));
+}
+
+/* Mark a lower index without requiring a separate positions array. */
+bool TeX_lower(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1);
+    return p && TeX_replace(builder, 1, TeX_object_index(p[0], false));
+}
+
+/* Mark an index operand without consuming its tensor base or evaluating a derivative. */
+bool TeX_comma(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1);
+    return p && TeX_replace(builder, 1, TeX_object_derivative_index(p[0], false));
+}
+
+/* Preserve a covariant-derivative index group as one independently owned operand. */
+bool TeX_semicolon(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1);
+    return p && TeX_replace(builder, 1, TeX_object_derivative_index(p[0], true));
+}
+
 /* Consume two operands and let TeX supply the plus sign. */
 bool TeX_add(TeX_builder_t *builder)
 {
@@ -317,28 +428,28 @@ bool TeX_mul(TeX_builder_t *builder)
 }
 
 /* Apply a validated function name to already selected notation, without evaluation. */
-bool TeX_function(TeX_builder_t *builder, const char *name, size_t count)
+bool TeX_function(TeX_builder_t *builder, const char *name)
 {
-    const TeX_t *const *p = TeX_operands(builder, count);
+    const TeX_t *const *top = TeX_operands(builder, 1);
+    size_t count;
+    const TeX_t *const *p = top ? TeX_list_members(builder, top[0], &count) : NULL;
     if (!p)
         return false;
-    TeX_t *validated = TeX_symbol(name);
+    TeX_t *validated = TeX_compose_symbol(name);
     string_t *input = validated ? string_new_with(name) : NULL;
     TeX_t *result = input ? TeX_named_call(input, p, count) : NULL;
     TeX_free(validated);
     string_free(input);
-    return TeX_replace(builder, count, result);
+    return TeX_replace(builder, 1, result);
 }
 
 /* Consume function notation followed by arguments, retaining their push order. */
-bool TeX_call(TeX_builder_t *builder, size_t count)
+bool TeX_call(TeX_builder_t *builder)
 {
-    if (!TeX_builder_ready(builder))
-        return false;
-    if (count == SIZE_MAX)
-        return TeX_builder_fail(builder, EOVERFLOW);
-    const TeX_t *const *p = TeX_operands(builder, count + 1);
-    return p && TeX_replace(builder, count + 1, TeX_applied(p[0], p + 1, count));
+    const TeX_t *const *p = TeX_operands(builder, 2);
+    size_t count;
+    const TeX_t *const *arguments = p ? TeX_list_members(builder, p[1], &count) : NULL;
+    return arguments && TeX_replace(builder, 2, TeX_applied(p[0], arguments, count));
 }
 
 /* Consume numerator followed by denominator. */
@@ -369,11 +480,20 @@ bool TeX_pow(TeX_builder_t *builder)
     return p && TeX_replace(builder, 2, TeX_arithmetic_scripts(p[0], NULL, p[1]));
 }
 
-/* Mark one complete operand with derivative primes without differentiating it. */
-bool TeX_prime(TeX_builder_t *builder, unsigned order)
+/* Mark a complete operand or index label with primes without differentiating it. */
+bool TeX_prime(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 2);
+    unsigned long order;
+    return p && TeX_control(builder, p[1], UINT_MAX, true, &order) &&
+           TeX_replace(builder, 2, TeX_arithmetic_prime(p[0], (unsigned)order));
+}
+
+/* Decorate the top operand without treating the bar as a mathematical operation. */
+bool TeX_bar(TeX_builder_t *builder)
 {
     const TeX_t *const *p = TeX_operands(builder, 1);
-    return p && TeX_replace(builder, 1, TeX_arithmetic_prime(p[0], order));
+    return p && TeX_replace(builder, 1, TeX_classify(TeX_compose_bar(p[0]), TeX_NODE_FENCED));
 }
 
 /* Consume base followed by its lower index. */
@@ -391,23 +511,56 @@ bool TeX_scripts(TeX_builder_t *builder)
 }
 
 /* Compose exactly the requested tail, retaining its original push order. */
-bool TeX_sequence(TeX_builder_t *builder, size_t count)
+bool TeX_sequence(TeX_builder_t *builder)
 {
-    const TeX_t *const *p = TeX_operands(builder, count);
-    return p && TeX_replace(builder, count, TeX_compose_sequence(p, count));
+    const TeX_t *const *top = TeX_operands(builder, 1);
+    size_t count;
+    const TeX_t *const *p = top ? TeX_list_members(builder, top[0], &count) : NULL;
+    return p && TeX_replace(builder, 1, TeX_compose_sequence(p, count));
 }
 
-/* Consume left side followed by right side. */
-bool TeX_equation(TeX_builder_t *builder, TeX_equation_style_t style)
+/* Add rows without requiring callers to know a TeX environment or line-break command. */
+bool TeX_newline(TeX_builder_t *builder)
 {
     const TeX_t *const *p = TeX_operands(builder, 2);
-    return p && TeX_replace(builder, 2, TeX_classify(TeX_compose_equation(p[0], p[1], style), TeX_NODE_EQUATION));
+    return p && TeX_replace(builder, 2, TeX_object_newline(p[0], p[1]));
+}
+
+/* Keep indentation magnitude on the stack alongside the body it affects. */
+bool TeX_indent(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 2);
+    unsigned long spacing;
+    return p && TeX_control(builder, p[1], UINT_MAX, false, &spacing) &&
+           TeX_replace(builder, 2, TeX_object_indent(p[0], (unsigned)spacing));
+}
+
+/* Align typed relations or explicit column lists using their retained structure. */
+bool TeX_align(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1);
+    if (!p)
+        return false;
+    TeX_object_kind_t kind = TeX_object_kind(p[0]);
+    if (kind != TeX_OBJECT_LIST && kind != TeX_OBJECT_LINES && kind != TeX_OBJECT_ALIGNED)
+        return TeX_builder_fail(builder, EINVAL);
+    size_t count;
+    const TeX_t *const *rows = TeX_object_items(p[0], &count);
+    return TeX_replace(builder, 1, TeX_object_lines(rows, count, true));
+}
+
+/* Preserve the native equation renderer's wrapped-side layout behind its private interface. */
+bool TeX_builder_aligned_equation(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 2);
+    return p && TeX_replace(builder, 2,
+        TeX_classify(TeX_compose_equation(p[0], p[1], TeX_EQUATION_ALIGNED), TeX_NODE_EQUATION));
 }
 
 static bool TeX_relation(TeX_builder_t *builder, TeX_relation_t relation)
 {
     const TeX_t *const *p = TeX_operands(builder, 2);
-    return p && TeX_replace(builder, 2, TeX_classify(TeX_compose_relation(p[0], p[1], relation), TeX_NODE_RELATION));
+    return p && TeX_replace(builder, 2, TeX_object_relation(p[0], p[1], relation));
 }
 
 /* Join the two top operands by an equality sign. */
@@ -466,65 +619,54 @@ bool TeX_fence(TeX_builder_t *builder, TeX_fence_t fence)
 }
 
 /* Consume a base and ordered tensor slots, validating variance before mutation. */
-bool TeX_tensor(TeX_builder_t *builder, const TeX_index_position_t *positions, size_t count)
+bool TeX_tensor(TeX_builder_t *builder)
 {
-    if (!TeX_builder_ready(builder))
-        return false;
-    if (count == SIZE_MAX || count > SIZE_MAX / sizeof(TeX_index_t))
-        return TeX_builder_fail(builder, EOVERFLOW);
-    if (count && !positions)
-        return TeX_builder_fail(builder, EINVAL);
-    const TeX_t *const *p = TeX_operands(builder, count + 1);
-    if (!p)
-        return false;
-    for (size_t i = 0; i < count; ++i)
-        if ((unsigned)positions[i] > TeX_INDEX_UPPER)
-            return TeX_builder_fail(builder, EINVAL);
-    TeX_index_t *indices = count ? malloc(count * sizeof *indices) : NULL;
-    if (count && !indices)
-        return TeX_builder_fail(builder, ENOMEM);
-    for (size_t i = 0; i < count; ++i)
-        indices[i] = (TeX_index_t){p[i + 1], positions[i]};
-    TeX_t *result = TeX_compose_tensor(p[0], indices, count);
-    free(indices);
-    return TeX_replace(builder, count + 1, TeX_classify(result, TeX_NODE_IDENTIFIER));
+    const TeX_t *const *p = TeX_operands(builder, 2);
+    return p && TeX_replace(builder, 2, TeX_compose_tensor_indices(p[0], p[1]));
 }
 
-static const TeX_t *const *TeX_limit_operands(TeX_builder_t *builder, size_t base, TeX_limits_t limits,
-                                            size_t *count, const TeX_t **lower, const TeX_t **upper)
+static const TeX_t *const *TeX_limit_operands(TeX_builder_t *builder, size_t base,
+                                            const TeX_t **lower, const TeX_t **upper)
 {
-    if (!TeX_builder_ready(builder))
+    const TeX_t *const *p = TeX_operands(builder, base + 1);
+    size_t count;
+    const TeX_t *const *bounds = p ? TeX_list_members(builder, p[base], &count) : NULL;
+    if (!bounds)
         return NULL;
-    if ((unsigned)limits > TeX_LIMIT_BOTH) {
+    if (count > 2) {
         TeX_builder_fail(builder, EINVAL);
         return NULL;
     }
-    bool has_lower = limits & TeX_LIMIT_LOWER, has_upper = limits & TeX_LIMIT_UPPER;
-    *count = base + has_lower + has_upper;
-    const TeX_t *const *p = TeX_operands(builder, *count);
-    if (p) {
-        *lower = has_lower ? p[base] : NULL;
-        *upper = has_upper ? p[base + has_lower] : NULL;
+    *lower = *upper = NULL;
+    for (size_t i = 0; i < count; ++i) {
+        TeX_object_kind_t kind = TeX_object_kind(bounds[i]);
+        size_t n;
+        const TeX_t *const *label = TeX_object_items(bounds[i], &n);
+        bool is_upper = kind == TeX_OBJECT_UPPER || (kind != TeX_OBJECT_LOWER && i == 1);
+        const TeX_t **slot = is_upper ? upper : lower;
+        if (*slot) {
+            TeX_builder_fail(builder, EINVAL);
+            return NULL;
+        }
+        *slot = kind == TeX_OBJECT_UPPER || kind == TeX_OBJECT_LOWER ? label[0] : bounds[i];
     }
     return p;
 }
 
 /* Compose optional sum bounds in the same lower-then-upper order as their pushes. */
-bool TeX_sum(TeX_builder_t *builder, TeX_limits_t limits)
+bool TeX_sum(TeX_builder_t *builder)
 {
-    size_t count;
     const TeX_t *lower, *upper;
-    const TeX_t *const *p = TeX_limit_operands(builder, 1, limits, &count, &lower, &upper);
-    return p && TeX_replace(builder, count, TeX_classify(TeX_compose_sum(p[0], lower, upper), TeX_NODE_SUMMATION));
+    const TeX_t *const *p = TeX_limit_operands(builder, 1, &lower, &upper);
+    return p && TeX_replace(builder, 2, TeX_classify(TeX_compose_sum(p[0], lower, upper), TeX_NODE_SUMMATION));
 }
 
 /* Compose optional product bounds after its mathematical body. */
-bool TeX_prod(TeX_builder_t *builder, TeX_limits_t limits)
+bool TeX_prod(TeX_builder_t *builder)
 {
-    size_t count;
     const TeX_t *lower, *upper;
-    const TeX_t *const *p = TeX_limit_operands(builder, 1, limits, &count, &lower, &upper);
-    return p && TeX_replace(builder, count,
+    const TeX_t *const *p = TeX_limit_operands(builder, 1, &lower, &upper);
+    return p && TeX_replace(builder, 2,
                            TeX_classify(TeX_compose_product(p[0], lower, upper), TeX_NODE_INDEXED_PRODUCT));
 }
 
@@ -536,56 +678,118 @@ bool TeX_transform(TeX_builder_t *builder, TeX_transform_kind_t kind)
 }
 
 /* Consume the body and integration variable before optional bounds. */
-bool TeX_integral(TeX_builder_t *builder, TeX_limits_t limits)
+bool TeX_integral(TeX_builder_t *builder)
 {
-    size_t count;
     const TeX_t *lower, *upper;
-    const TeX_t *const *p = TeX_limit_operands(builder, 2, limits, &count, &lower, &upper);
-    return p && TeX_replace(builder, count, TeX_classify(TeX_compose_integral(p[0], p[1], lower, upper), TeX_NODE_INTEGRAL));
+    const TeX_t *const *p = TeX_limit_operands(builder, 2, &lower, &upper);
+    return p && TeX_replace(builder, 3, TeX_classify(TeX_compose_integral(p[0], p[1], lower, upper), TeX_NODE_INTEGRAL));
 }
 
 /* Supply derivative presentation without asking the builder to differentiate. */
-bool TeX_derivative(TeX_builder_t *builder, unsigned order, TeX_derivative_style_t style)
+bool TeX_derivative(TeX_builder_t *builder, TeX_derivative_style_t style)
 {
-    const TeX_t *const *p = TeX_operands(builder, 2);
-    return p && TeX_replace(builder, 2, TeX_classify(TeX_compose_derivative(p[0], p[1], order, style), TeX_NODE_DERIVATIVE));
+    const TeX_t *const *p = TeX_operands(builder, 3);
+    unsigned long order;
+    return p && TeX_control(builder, p[2], UINT_MAX, true, &order) &&
+           TeX_replace(builder, 3, TeX_classify(TeX_compose_derivative(p[0], p[1], (unsigned)order, style),
+                                               TeX_NODE_DERIVATIVE));
 }
 
 /* Consume ordered coordinate variables and retain the native mixed-derivative presentation. */
-bool TeX_partial(TeX_builder_t *builder, size_t count)
+bool TeX_partial(TeX_builder_t *builder)
 {
-    if (!TeX_builder_ready(builder))
+    const TeX_t *const *p = TeX_operands(builder, 2);
+    size_t count;
+    const TeX_t *const *variables = p ? TeX_list_members(builder, p[1], &count) : NULL;
+    if (!variables)
         return false;
     if (!count)
         return TeX_builder_fail(builder, EINVAL);
-    if (count > UINT_MAX || count == SIZE_MAX)
+    if (count > UINT_MAX || count >= SIZE_MAX / sizeof(TeX_t *))
         return TeX_builder_fail(builder, EOVERFLOW);
-    const TeX_t *const *p = TeX_operands(builder, count + 1);
-    return p && TeX_replace(builder, count + 1, TeX_classify(TeX_compose_partial(p, count), TeX_NODE_DERIVATIVE));
+    const TeX_t **operands = malloc((count + 1) * sizeof *operands);
+    if (!operands)
+        return TeX_builder_fail(builder, ENOMEM);
+    operands[0] = p[0];
+    memcpy(operands + 1, variables, count * sizeof *operands);
+    TeX_t *result = TeX_compose_partial(operands, count);
+    free(operands);
+    return TeX_replace(builder, 2, TeX_classify(result, TeX_NODE_DERIVATIVE));
 }
 
 /* Pass a directly indexed row-major tail to matrix layout after overflow validation. */
-bool TeX_matrix(TeX_builder_t *builder, size_t rows, size_t columns,
-                      TeX_matrix_style_t style, unsigned row_spacing)
+bool TeX_matrix(TeX_builder_t *builder)
 {
-    if (!TeX_builder_ready(builder))
+    const TeX_t *const *top = TeX_operands(builder, 1);
+    size_t count;
+    const TeX_t *const *items = top ? TeX_list_members(builder, top[0], &count) : NULL;
+    if (!items)
         return false;
-    if (!rows || !columns)
+    if (count && TeX_object_kind(items[0]) == TeX_OBJECT_LIST)
+        return TeX_replace(builder, 1, TeX_object_matrix(top[0], TeX_MATRIX_BRACKETS, 0));
+    unsigned long rows, columns;
+    if (count != 2)
         return TeX_builder_fail(builder, EINVAL);
-    if (rows > SIZE_MAX / columns)
+    if (!TeX_control(builder, items[0], SIZE_MAX, true, &rows) ||
+        !TeX_control(builder, items[1], SIZE_MAX, true, &columns))
+        return false;
+    if (rows > (SIZE_MAX - 1) / columns || rows > SIZE_MAX / sizeof(TeX_t *))
         return TeX_builder_fail(builder, EOVERFLOW);
-    size_t count = rows * columns;
-    const TeX_t *const *p = TeX_operands(builder, count);
-    return p && TeX_replace(builder, count,
-                           TeX_classify(TeX_compose_matrix(p, rows, columns, style, row_spacing), TeX_NODE_MATRIX));
+    size_t cells = (size_t)rows * columns;
+    const TeX_t *const *p = TeX_operands(builder, cells + 1);
+    if (!p)
+        return false;
+    TeX_t **row = calloc(rows, sizeof *row);
+    if (!row)
+        return TeX_builder_fail(builder, ENOMEM);
+    for (size_t r = 0; r < rows; ++r) {
+        row[r] = TeX_object_new(TeX_OBJECT_LIST, p + r * columns, columns);
+        if (!row[r]) {
+            for (size_t i = 0; i < r; ++i)
+                TeX_free(row[i]);
+            free(row);
+            return TeX_builder_fail(builder, errno ? errno : ENOMEM);
+        }
+    }
+    TeX_t *row_list = TeX_object_new(TeX_OBJECT_LIST, (const TeX_t *const *)row, rows);
+    for (size_t r = 0; r < rows; ++r)
+        TeX_free(row[r]);
+    free(row);
+    TeX_t *result = row_list ? TeX_object_matrix(row_list, TeX_MATRIX_BRACKETS, 0) : NULL;
+    TeX_free(row_list);
+    return TeX_replace(builder, cells + 1, result);
+}
+
+/* Change matrix delimiters while preserving retained cell structure and spacing. */
+bool TeX_matrix_style(TeX_builder_t *builder, TeX_matrix_style_t style)
+{
+    const TeX_t *const *p = TeX_operands(builder, 1);
+    return p && TeX_replace(builder, 1, TeX_object_matrix_format(p[0], style, 0, true));
+}
+
+/* Consume matrix then spacing, keeping layout numbers on the operand stack too. */
+bool TeX_matrix_spacing(TeX_builder_t *builder)
+{
+    const TeX_t *const *p = TeX_operands(builder, 2);
+    unsigned long spacing;
+    return p && TeX_control(builder, p[1], UINT_MAX, false, &spacing) &&
+           TeX_replace(builder, 2, TeX_object_matrix_format(p[0], TeX_MATRIX_BRACKETS, (unsigned)spacing, false));
 }
 
 /* Wrap a body, optionally followed by its native binding list. */
-bool TeX_bound(TeX_builder_t *builder, bool bindings)
+bool TeX_bound(TeX_builder_t *builder)
 {
-    size_t count = bindings ? 2 : 1;
-    const TeX_t *const *p = TeX_operands(builder, count);
-    return p && TeX_replace(builder, count, TeX_classify(TeX_compose_bound(p[0], bindings ? p[1] : NULL), TeX_NODE_BOUND));
+    const TeX_t *const *p = TeX_operands(builder, 2);
+    size_t count;
+    const TeX_t *const *items = p ? TeX_list_members(builder, p[1], &count) : NULL;
+    if (!items)
+        return false;
+    TeX_t *bindings = count ? TeX_compose_sequence(items, count) : NULL;
+    if (count && !bindings)
+        return TeX_builder_fail(builder, errno ? errno : ENOMEM);
+    TeX_t *result = TeX_compose_bound(p[0], bindings);
+    TeX_free(bindings);
+    return TeX_replace(builder, 2, TeX_classify(result, TeX_NODE_BOUND));
 }
 
 /* Consume a scalar followed by the body it scales. */
@@ -603,9 +807,14 @@ bool TeX_cartesian_sum(TeX_builder_t *builder)
 }
 
 /* Consume a common centre, offset and optional denominator already selected by mathematics. */
-bool TeX_symmetric_pair(TeX_builder_t *builder, bool denominator, bool group_offset)
+bool TeX_symmetric_pair(TeX_builder_t *builder, bool group_offset)
 {
-    size_t count = denominator ? 3 : 2;
-    const TeX_t *const *p = TeX_operands(builder, count);
-    return p && TeX_replace(builder, count, TeX_compose_symmetric_pair(p[0], p[1], denominator ? p[2] : NULL, group_offset));
+    const TeX_t *const *p = TeX_operands(builder, 3);
+    size_t count;
+    const TeX_t *const *denominator = p ? TeX_list_members(builder, p[2], &count) : NULL;
+    if (!denominator)
+        return false;
+    if (count > 1)
+        return TeX_builder_fail(builder, EINVAL);
+    return TeX_replace(builder, 3, TeX_compose_symmetric_pair(p[0], p[1], count ? denominator[0] : NULL, group_offset));
 }

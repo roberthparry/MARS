@@ -2,7 +2,9 @@
  * @file test_cfg_support.c
  * @brief Disposable process and filesystem fixtures for native installer tests.
  *
- * Owns only private directories created beneath TMPDIR, or /tmp by default. Runs one child at a time,
+ * Owns only private directories created beneath TMPDIR, or the project's build directory by default.
+ * Large database fixtures therefore use the build filesystem rather than memory-backed system temporary space.
+ * Runs one child at a time,
  * then removes its bounded tree through the file module without following symlinks.
  */
 #include <errno.h>
@@ -59,7 +61,7 @@ static bool test_cfg_remove_tree(file_t *directory, unsigned depth, size_t *rema
 bool test_cfg_isolated(bool (*callback)(const char *directory))
 {
     const char *temporary = getenv("TMPDIR");
-    string_t *parent = string_new_with(temporary && *temporary ? temporary : "/tmp");
+    string_t *parent = string_new_with(temporary && *temporary ? temporary : MARS_CONFIG_ROOT_DIR "/build");
     file_t *root = parent ? file_create_temp_directory(parent) : NULL;
     string_free(parent);
     if (!root)

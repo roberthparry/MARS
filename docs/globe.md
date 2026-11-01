@@ -10,8 +10,8 @@ SVG and WebGL rendering remain application responsibilities.
 `globe.db` stores the photographic PNG layers alongside the geographic data.
 The offline source package is `packaging/globe-db/textures/`; its manifest records
 dimensions, byte counts, SHA-256 digests and NASA source attribution.
-Fresh installations include the 74 NASA images and 2,125 regional Sentinel-2 photographs.
-Managed database revision 15 installs the coastal PNG catalogue and its complete manifest
+Fresh installations include the 74 NASA images and 4,775 regional Sentinel-2 photographs.
+Managed database revision 16 installs the expanded coastal PNG catalogue and its complete manifest
 to existing installations through `make update-mars-db` or `make release`,
 preserving coastline, country, regional and river layers. Import validates every
 image before committing; a missing or damaged image rolls back the replacement.
@@ -38,9 +38,12 @@ Missing data or invalid addresses return false and clear the output structure.
 The prepared catalogue covers the UK, Ireland, Denmark, Netherlands, Italy, Corsica,
 Sardinia, Capri, Greek islands, mainland Portugal, Azores, Madeira, Spain, Canaries,
 Falklands, Ascension, Isle of Man, Jersey, Guernsey, coastal Svalbard and Cape Peninsula.
-It occupies about 20.9 GiB as encoded PNGs after coastline trimming, about 8.05 GiB less
-than the unmasked package. Spain and Svalbard use 1800-square tiles;
-other new regions use 3600-square tiles. These dimensions describe individual images,
+The completed expansion adds mainland France, New Zealand and its offshore islands,
+Finland including Åland, Sweden, Norway, and selected Australian areas: Brisbane,
+Sydney, Melbourne, Perth, Mooloolaba, Maroochydore, Canberra, Cairns, Alice Springs and Gold Coast.
+The complete PNG package occupies about 32.9 GiB after coastline trimming.
+France, New Zealand, Finland, Sweden, Norway, the Australian areas, Spain and Svalbard use
+1800-square tiles; earlier regional coverage generally uses 3600-square tiles. These dimensions describe individual images,
 not an allocation of the whole catalogue: indexed queries select only the visible
 coverage and existing decoded-image and GPU cache limits still apply.
 The source observations are fixed 2025 quarterly mosaics, with transparent remaining

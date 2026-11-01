@@ -20,6 +20,9 @@
 #include "json-t.h"
 #include "sqlite-t.h"
 
+/** @brief Current managed globe revision, including the expanded coast-masked photographic catalogue. */
+enum { CFG_GLOBE_DATA_REVISION = 16 };
+
 /** Open the selected format: an empty key means plaintext; NULL is a configuration failure. */
 sqlite_t *cfg_database_open(const string_t *path, const string_t *key);
 

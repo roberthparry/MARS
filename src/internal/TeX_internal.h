@@ -21,6 +21,18 @@
 /** @brief Opaque binding between a semantic provider and a root node. */
 typedef struct _TeX_context_t TeX_context_t;
 
+/**
+ * @brief Combine the top two equation sides using the native renderer's top-aligned layout.
+ * @param[in,out] builder Caller-owned builder containing the left side followed by the right side.
+ * Both notation operands belong to the builder and are replaced by one owned result only on success.
+ * @return True on success; false records the first construction error and preserves both operands.
+ * NULL reports EINVAL, insufficient operands save ERANGE, and allocation failure saves ENOMEM.
+ * @note Intended for the equation module's wrapped output, including an already wrapped right side.
+ * Ordinary callers use TeX_eq(), then TeX_newline() and TeX_align() for multiline equations.
+ * No pointers escape the builder. Access to a shared builder requires external synchronisation.
+ */
+bool TeX_builder_aligned_equation(TeX_builder_t *builder);
+
 /** @brief Mathematical relations supplied without typesetting commands. */
 typedef enum {
     TeX_RELATION_EQUAL,       /**< Equality. */

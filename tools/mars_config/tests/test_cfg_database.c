@@ -7,6 +7,7 @@
  * Packaged almanac coverage checks the complete coefficient imports and encrypted
  * reopening. The jurisdiction fixture checks saved choices and failed replacements.
  * Globe fixtures distinguish fresh reinstallation from layer-preserving updates in both storage modes.
+ * Fresh-install checks use the shared compact PNG catalogue rather than the production imagery collection.
  * Release preparation restores missing stores while retaining existing data, paths and credentials.
  * Every fixture runs beneath the
  * disposable test_cfg_isolated home; no user's configuration is accessed.
@@ -34,6 +35,15 @@ static file_t *test_cfg_database_file(const char *directory, const char *name)
     file_t *file = path ? file_new(path) : NULL;
     string_free(path);
     return file;
+}
+
+static bool test_cfg_database_texture_fixture(void)
+{
+    const char *root = test_cfg_texture_root();
+    string_t *textures = root ? string_sprintf("%s/packaging/globe-db/textures", root) : NULL;
+    bool ok = textures && !setenv("MARS_GLOBE_TEXTURE_DIR", string_c_str(textures), 1);
+    string_free(textures);
+    return ok;
 }
 
 static bool test_cfg_database_write(const char *directory, const char *name, const char *text)
@@ -1157,7 +1167,8 @@ static bool test_cfg_database_ensure_fixture(const char *directory)
     };
     static const char *const keys[] = {"", "ensure-fixture-key", ""};
     file_t *almanac = test_cfg_database_file(directory, paths[1]);
-    bool ok = almanac && !unsetenv("MARS_GLOBE_DB_PATH") && !unsetenv("MARS_GLOBE_DB_KEY") &&
+    bool ok = test_cfg_database_texture_fixture() && almanac &&
+              !unsetenv("MARS_GLOBE_DB_PATH") && !unsetenv("MARS_GLOBE_DB_KEY") &&
               !unsetenv("MARS_HOLIDAY_JURISDICTION") &&
               !unsetenv("MARS_CALENDAR_LOCATION_ARGUMENT") && !unsetenv("MARS_CALENDAR_LANGUAGE_ARGUMENT") &&
               !setenv("LANG", "en_GB.UTF-8", 1) && !setenv("LC_ALL", "en_GB.UTF-8", 1) &&
@@ -1431,7 +1442,7 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
     string_t *code = globe_country_code_at(globe, 44.95, 34.1);
     ok = ok && code && !strcmp(string_c_str(code), "UA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "15") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "16") &&
          test_cfg_database_query(db, "select count(distinct iso_country_code) from region_name", "19") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "7") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained") &&
@@ -1459,7 +1470,7 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe = db ? globe_open_databases(db, db, NULL) : NULL;
     code = globe_country_code_at(globe, -33.8064, 18.3688);
     ok = ok && code && !strcmp(string_c_str(code), "ZA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "15") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "16") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained");
     string_free(code); globe_close(globe); sqlite_close(db);
     /* Revision eight adds display coverage and regional photographs, retaining installed countries. */
@@ -1473,7 +1484,7 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe = db ? globe_open_databases(db, db, NULL) : NULL;
     ok = ok && test_cfg_kashubian_coverage(globe) && test_cfg_sami_coverage(globe) &&
          test_cfg_german_region_coverage(globe) && test_cfg_kazakh_coverage(globe) &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "15");
+         test_cfg_database_query(db, "select revision from mars_database_revision", "16");
     globe_close(globe); sqlite_close(db);
     /* A current database must remain usable even when the migration sources are no longer available. */
     string_t *missing = string_sprintf("%s/missing", directory);
@@ -1602,7 +1613,7 @@ static void test_cfg_database_coast_corrections(void)
 
 static bool test_cfg_database_globe_packaged_mode(const char *directory, const char *key)
 {
-    bool ok = !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) &&
+    bool ok = test_cfg_database_texture_fixture() && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) &&
               !setenv("MARS_GLOBE_DB_KEY", "ignored-per-database-key", 1) && !unsetenv("MARS_GLOBE_DB_PATH") &&
               !cfg_globe_install_key(key) && !unsetenv("MARS_GLOBE_DB_KEY") && !cfg_globe_run("globe-check");
     file_t *database = test_cfg_database_file(directory, "globe/globe.db");
@@ -1610,7 +1621,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "SELECT count(*) FROM country_name", "299") &&
          test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "15") &&
+         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "16") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
                                     "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
          test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
@@ -1623,7 +1634,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
          test_cfg_database_query(db, "select value from retained", "42") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "15");
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "16");
     sqlite_close(db);
     /* Country metadata is independent of town selection and land/water classification. */
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1652,7 +1663,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_coast_sydney(db) && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "select count(*) from country_name", "299") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "15") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "16") &&
          test_cfg_database_query(db, "select count(*) from sqlite_master where name in ('retained','rivers_dataset')", "0") &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_KEY", key) &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_PATH", file_path(database)) &&
@@ -1670,12 +1681,7 @@ static bool test_cfg_database_globe_packaged_fixture(const char *directory)
 
 static bool test_cfg_database_globe_plain_fixture(const char *directory)
 {
-    string_t *textures = string_sprintf("%s/packaging/globe-db/textures", directory);
-    bool ok = textures && test_cfg_copy_textures(directory) &&
-              !setenv("MARS_GLOBE_TEXTURE_DIR", string_c_str(textures), 1) &&
-              test_cfg_database_globe_packaged_mode(directory, "");
-    string_free(textures);
-    return ok;
+    return test_cfg_database_globe_packaged_mode(directory, "");
 }
 
 static void test_cfg_database_globe_packaged(void)
@@ -1756,6 +1762,8 @@ static void test_cfg_database_plain(void)
 
 void test_cfg_database_cases(void)
 {
+    /* Prepare in the parent so its exit cleanup also covers fixtures used by isolated children. */
+    (void)test_cfg_texture_root();
     TEST_RUN_IN_GROUP(test_cfg_database_plain, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_almanac_plain, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_database_jurisdiction_plain, tests, NULL);
