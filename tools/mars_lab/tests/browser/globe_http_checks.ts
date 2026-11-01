@@ -9,9 +9,10 @@
 /** @brief Serve controlled HTTP responses inside real drawing workers; other worker types are unchanged. */
 function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Response>,
                           options: {endpoint: string; script: string; nativeShore: boolean; storageDenied?: boolean;
-                                    surfaceProbe?: boolean; regionalAliases?: boolean} =
+                                    surfaceProbe?: boolean; regionalAliases?: boolean; holdPhotograph?: boolean} =
                               {endpoint: '/almanac-globe', script: '/js/globe_worker.js', nativeShore: true}): {
-    Worker: typeof Worker; releaseSurfaceCache(): void; dispose(): void;
+    Worker: typeof Worker; releaseSurfaceCache(): void; waitForPhotograph(): Promise<void>;
+    releasePhotograph(): void; dispose(): void;
 } {
     const BrowserWorker = globalThis.Worker;
     const source = `
@@ -22,10 +23,15 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
         const photographs = new Set();
         let releaseCache;
         const cacheReady = new Promise(resolve => { releaseCache = resolve; });
+        let releasePhotograph;
+        const photographReady = new Promise(resolve => { releasePhotograph = resolve; });
         let next = 0;
         addEventListener('message', event => {
             if (event.data.fixturePersist) {
                 event.stopImmediatePropagation(); releaseCache(); return;
+            }
+            if (event.data.fixturePhotographRelease) {
+                event.stopImmediatePropagation(); releasePhotograph(); return;
             }
             if (!event.data.fixtureReply) return;
             event.stopImmediatePropagation();
@@ -40,6 +46,14 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                 String(url).startsWith('/earth_regions/'))) {
                 if (photographs.has(url)) throw new Error('Photograph decoded repeatedly');
                 photographs.add(url);
+            }
+            if (${Boolean(options.holdPhotograph)} && String(url).startsWith('/earth_tiles/')) {
+                postMessage({fixturePhotograph: true});
+                return new Promise((resolve, reject) => {
+                    options.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), {once: true});
+                    photographReady.then(() => networkFetch(new URL(url, ${JSON.stringify(location.origin)}), options)
+                        .then(resolve, reject));
+                });
             }
             if (${Boolean(options.regionalAliases)} &&
                 (url === '/earth_regions/123.png' || url === '/earth_regions/4095.png'))
@@ -72,6 +86,8 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
     `;
     const url = URL.createObjectURL(new Blob([source], {type: 'text/javascript'}));
     const workers = new Set<Worker>();
+    let photographStarted: () => void = () => {};
+    const photographPending = new Promise<void>(resolve => { photographStarted = resolve; });
     const fixtureScript = options.script;
     class FixtureWorker extends BrowserWorker {
         constructor(scriptURL: string | URL, options?: WorkerOptions) {
@@ -80,6 +96,9 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
             if (!globe) return;
             workers.add(this);
             this.addEventListener('message', event => {
+                if (event.data.fixturePhotograph) {
+                    event.stopImmediatePropagation(); photographStarted(); return;
+                }
                 if (!event.data.fixtureFetch) return;
                 event.stopImmediatePropagation();
                 const id = event.data.id;
@@ -93,6 +112,8 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
     }
     return {Worker: FixtureWorker, releaseSurfaceCache() {
         for (const worker of workers) worker.postMessage({fixturePersist: true});
+    }, waitForPhotograph() { return photographPending; }, releasePhotograph() {
+        for (const worker of workers) worker.postMessage({fixturePhotographRelease: true});
     }, dispose() {
         for (const worker of workers) {
             worker.dispatchEvent(new ErrorEvent('error', {message: 'Globe HTTP fixture disposed'}));

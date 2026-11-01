@@ -81,7 +81,8 @@ static bool surface_region(unsigned slot, const double region[4], void *context)
         lab_cal_take(photo, "target", surface_numbers(target, 4));
         lab_cal_take(photo, "regional", json_new_bool(true));
         double scale = fmax(target[2] / source[2], target[3] / source[3]);
-        double decode = fmin(info.width, fmax(64, ceil(info.width * scale / 64) * 64));
+        /* Stable resolution tiers reuse decoded source photographs across nearby windows and wheel steps. */
+        double decode = fmin(info.width, exp2(ceil(log2(fmax(64, info.width * scale)))));
         string_t *width = string_sprintf("%u", info.width), *decoded = string_sprintf("%.0f", decode);
         lab_cal_take(photo, "width", width ? json_new_number(width) : NULL);
         lab_cal_take(photo, "decode_size", decoded ? json_new_number(decoded) : NULL);
@@ -143,7 +144,7 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
     globe_reader_t *reader = globe_reader_new();
     string_t *identity = globe_reader_identity(reader);
     globe_t *globe = identity ? globe_reader_get(reader) : NULL;
-    string_t *key = identity ? string_sprintf("river-surface-6:%s:%.12g:%.12g:%.12g:%.12g",
+    string_t *key = identity ? string_sprintf("river-surface-7:%s:%.12g:%.12g:%.12g:%.12g",
         string_c_str(identity), b[0], b[1], b[2], b[3]) : NULL;
     bool ok = key && globe;
     bool rivers = ok && globe_has_layer(globe, GLOBE_LAYER_RIVERS);

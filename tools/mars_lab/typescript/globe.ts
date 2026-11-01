@@ -1008,8 +1008,11 @@ class MarsAlmanacGlobe {
         if (this.shoreClosed || !this.root.getClientRects().length || this.gl.isContextLost()) return;
         this.riverTiles ??= new GlobeSurfaceTiles(this.gl);
         const view = labDOM.call('lab_globe_view', orientation, zoom, 1) as GlobeView;
-        const reserve = labDOM.call('lab_globe_view', orientation, zoom / 1.25, 1) as GlobeView;
+        const prediction = !target && performance.now() - this.dragSampleTime < 250 ? this.dragPrediction : null;
+        const reserve = labDOM.call('lab_globe_view', prediction || orientation, zoom / 1.5, 1) as GlobeView;
         let bounds = GlobeSurfaceTiles.bounds(reserve.slice(3));
+        if (!this.riverCovers(view, bounds))
+            bounds = GlobeSurfaceTiles.bounds((labDOM.call('lab_globe_view', orientation, zoom / 1.5, 1) as GlobeView).slice(3));
         if (bounds[2] - bounds[0] > 30 || bounds[3] - bounds[1] > 30)
             bounds = (labDOM.call('lab_globe_view', orientation, zoom / 1.15, 1) as GlobeView).slice(3);
         if (bounds[2] - bounds[0] > 30 || bounds[3] - bounds[1] > 30) return;
@@ -1022,7 +1025,6 @@ class MarsAlmanacGlobe {
             zoom <= this.riverZoom * 1.5) return;
         const key = bounds.join(',');
         if (this.riverRequest && !this.riverRequest.signal.aborted && (this.riverRequestKey === key ||
-            (!target && this.riverRequestObserver === this.observerSignature) ||
             (this.riverRequestBounds && this.riverCovers(view, this.riverRequestBounds) &&
              zoom <= this.riverRequestZoom * 1.5))) return;
         const generation = ++this.riverGeneration;

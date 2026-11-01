@@ -51,6 +51,54 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         const {GlobeSurfaceTiles} = await import(tilesURL) as typeof import('../../typescript/globe_surface_tiles.js');
         const cacheURL = '/js/globe_texture_cache.js';
         const {GlobeTextureCache} = await import(cacheURL) as typeof import('../../typescript/globe_texture_cache.js');
+        const navigationCanvas = document.createElement('canvas'), navigationGPU = navigationCanvas.getContext('webgl')!;
+        const navigationTiles = new GlobeSurfaceTiles(navigationGPU);
+        const root = document.createElement('div');
+        root.style.cssText = 'width:1px;height:1px';
+        document.body.append(root);
+        const orientation = labDOM.call('lab_globe_centre', 50.88, -1.03) as number[];
+        const view = labDOM.call('lab_globe_view', orientation, 150, 1) as number[];
+        const originalRequest = new AbortController();
+        let windowLoads = 0;
+        const navigation = {
+            orientation, view, flightTarget: null, shoreClosed: false, root, gl: navigationGPU,
+            riverTiles: navigationTiles, observerSignature: 'unchanged observer',
+            riverRequestObserver: 'unchanged observer', riverRequest: originalRequest,
+            riverRequestBounds: [view[3] - 1, view[4] - 1, view[5] + 1, view[6] + 1],
+            riverRequestZoom: 150, riverRequestKey: 'existing', riverGeneration: 0,
+            riverReady: false, riverPreview: false, riverRetryDelay: 1000,
+            dragPrediction: labDOM.call('lab_globe_centre', 50.89, -1.02) as number[],
+            dragSampleTime: performance.now(),
+            riverCovers: Reflect.get(MarsAlmanacGlobe.prototype, 'riverCovers'),
+            riverSurface: {load: (_bounds: number[], signal: AbortSignal) => {
+                ++windowLoads;
+                return new Promise((_, reject) => {
+                    signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), {once: true});
+                });
+            }},
+            draw() {}, scheduleRivers() {}
+        };
+        const loadWindow = Reflect.get(MarsAlmanacGlobe.prototype, 'loadRivers');
+        let navigationLoad: Promise<void> | null = null;
+        try {
+            await loadWindow.call(navigation);
+            check(!originalRequest.signal.aborted && windowLoads === 0,
+                  'panning inside a pending photographic window preserves useful asynchronous work');
+            navigation.riverRequestBounds = [-5, 55, -4, 56];
+            navigationLoad = loadWindow.call(navigation);
+            for (let i = 0; i < 100 && !windowLoads; ++i) await new Promise(resolve => setTimeout(resolve, 5));
+            check(originalRequest.signal.aborted && windowLoads === 1,
+                  'panning away replaces an obsolete tile request even when the selected observer has not changed');
+            const bounds = navigation.riverRequestBounds;
+            check(bounds[0] <= view[3] && bounds[1] <= view[4] && bounds[2] >= view[5] && bounds[3] >= view[6],
+                  'predictive photographic loading always covers the current view');
+        } finally {
+            ++navigation.riverGeneration;
+            navigation.riverRequest?.abort();
+            await navigationLoad;
+            navigationTiles.dispose(); root.remove();
+            navigationGPU.getExtension('WEBGL_lose_context')?.loseContext();
+        }
         const released: number[] = [], indexed = new GlobeTextureCache<number>(4, 10, value => released.push(value));
         try {
             check(indexed.put('one', 1, 4) && indexed.put('two', 2, 4) && indexed.get('one') === 1,
@@ -265,11 +313,11 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
                 ++previews;
             }).then(tile => { completed = true; return tile; });
             for (let i = 0; i < 200 && !previews; ++i) await new Promise(resolve => setTimeout(resolve, 25));
-            for (let i = 0; i < 200 && previews < 2; ++i) await new Promise(resolve => setTimeout(resolve, 25));
-            check(previews === 2 && !completed && Boolean(held),
+            for (let i = 0; i < 200 && previews < 3; ++i) await new Promise(resolve => setTimeout(resolve, 25));
+            check(previews === 3 && !completed && Boolean(held),
                   'photography is visible while the river query is still pending');
-            check(previewDetail.join() === 'false,true',
-                  'worker previews distinguish coarse NASA coverage from completed regional photography');
+            check(previewDetail.join() === 'false,true,true',
+                  'a complete regional overview appears before the final photographic refinement');
             check(previewColours[0][3] === 255 && previewColours[1][3] === 255 &&
                   [0, 1, 2].some(i => Math.abs(previewColours[0][i] - previewColours[1][i]) > 3) &&
                   [0, 1, 2].every(i => Math.abs(previewColours[1][i] - expectedRegional[i]) <= 3),
@@ -315,6 +363,25 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         } finally {
             (held as (() => void) | null)?.();
             surface.dispose(); fixture.dispose(); globalThis.Worker = OriginalWorker;
+        }
+        const warming = globeHTTPFixture(respond, {endpoint: '/almanac-rivers', script: '/js/globe_surface_worker.js',
+            nativeShore: false, storageDenied: true, surfaceProbe: true, regionalAliases: true, holdPhotograph: true});
+        globalThis.Worker = warming.Worker;
+        surface = new GlobeSurface();
+        try {
+            const controller = new AbortController();
+            const obsolete = surface.load([0, 0, 1, 1], controller.signal).then(tile => {
+                tile.close(); return false;
+            }, error => error.name === 'AbortError');
+            await warming.waitForPhotograph();
+            controller.abort();
+            check(await obsolete, 'an obsolete window cancels promptly during its source photograph download');
+            const replacement = surface.load([.1, .1, 1.1, 1.1], new AbortController().signal);
+            warming.releasePhotograph();
+            // The fixture rejects a second fetch of either source, so successful rendering proves cache reuse.
+            inspect(await replacement);
+        } finally {
+            surface.dispose(); warming.dispose(); globalThis.Worker = OriginalWorker;
         }
         deny = false;
         const denied = globeHTTPFixture(respond, {endpoint: '/almanac-rivers', script: '/js/globe_surface_worker.js',

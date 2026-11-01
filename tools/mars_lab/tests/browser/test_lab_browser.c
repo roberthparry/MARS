@@ -170,6 +170,7 @@ static bool lab_browser_run(const char *directory)
     bool profiling = getenv("MARS_LAB_PROFILE") && !strcmp(getenv("MARS_LAB_PROFILE"), "1");
     bool catalogue_check = getenv("MARS_LAB_CATALOGUE_CHECKS") && !strcmp(getenv("MARS_LAB_CATALOGUE_CHECKS"), "1");
     bool globe_check = getenv("MARS_LAB_GLOBE_CHECKS") && !strcmp(getenv("MARS_LAB_GLOBE_CHECKS"), "1");
+    bool surface_check = getenv("MARS_LAB_SURFACE_CHECKS") && !strcmp(getenv("MARS_LAB_SURFACE_CHECKS"), "1");
     bool select_check = getenv("MARS_LAB_SELECT_CHECKS") && !strcmp(getenv("MARS_LAB_SELECT_CHECKS"), "1");
     bool country_check = getenv("MARS_LAB_COUNTRY_CHECKS") && !strcmp(getenv("MARS_LAB_COUNTRY_CHECKS"), "1");
     bool history_check = getenv("MARS_LAB_HISTORY_CHECKS") && !strcmp(getenv("MARS_LAB_HISTORY_CHECKS"), "1");
@@ -179,7 +180,7 @@ static bool lab_browser_run(const char *directory)
                                 startup_check ? "?startup-check=1" : evaluation_check ? "?evaluation-check=1" :
                                 history_check ? "?history-check=1" :
                                 country_check ? "?country-check=1" : select_check ? "?select-check=1" :
-                                globe_check ? "?globe-check=1" :
+                                surface_check ? "?surface-check=1" : globe_check ? "?globe-check=1" :
                                 catalogue_check ? "?catalogue-check=success" :
                                 profiling ? "?profile=1" : "") : NULL;
     pid_t workers[4] = {-1, -1, -1, -1};

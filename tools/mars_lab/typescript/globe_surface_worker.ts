@@ -2,8 +2,9 @@
  * @file globe_surface_worker.ts
  * @brief Off-main-thread rasterisation and persistent reuse of photographic river surface tiles.
  *
- * Native code supplies crop rectangles and paths. PNG input is read into bounded encoded-byte buffers. A bounded decoded-photo cache avoids repeat PNG work during
- * panning. Completed pixels are published before optional raw-pixel persistence. River cut-outs retain exact coverage.
+ * Native code supplies crop rectangles and paths. PNG input is read into bounded encoded-byte buffers. A bounded
+ * decoded-photo cache retains completed source reads even when their original window was cancelled during panning.
+ * Regional overviews and completed pixels precede optional raw-pixel persistence. River cut-outs retain exact coverage.
  */
 interface GlobeSurfacePhoto {
     url: string; sha256: string; source: number[]; target: number[]; regional?: boolean;
@@ -36,7 +37,10 @@ class GlobeSurfaceWorker {
         }
         const saved = this.photographs.get(key);
         if (saved) return saved;
-        const response = await fetch(photo.url, {signal});
+        signal.throwIfAborted();
+        // A moving window can be cancelled while its source photograph is still useful to the next window.
+        // Finish one bounded source read instead of repeatedly aborting and downloading the same PNG.
+        const response = await fetch(photo.url, {signal: AbortSignal.timeout(8000)});
         if (!response.ok || response.headers.get('ETag') !== `"sha256-${photo.sha256}"`)
             throw new Error('Photographic source changed');
         const encoded = await response.arrayBuffer();
@@ -46,7 +50,6 @@ class GlobeSurfaceWorker {
             resizeWidth: photo.decode_size, resizeHeight: photo.decode_size, resizeQuality: 'high'
         } : {});
         try {
-            signal.throwIfAborted();
             const size = bitmap.width;
             if ((reduced ? size !== photo.decode_size : size !== 1800 && !(photo.regional && size === 3600)) ||
                 bitmap.height !== size)
@@ -72,7 +75,6 @@ class GlobeSurfaceWorker {
                     bitmap = feathered.transferToImageBitmap();
                 } finally { feathered.width = feathered.height = 1; }
             }
-            signal.throwIfAborted();
             if (!this.photographs.put(key, bitmap, bytes)) throw new Error('Photograph cache unavailable');
             return bitmap;
         } catch (error) { bitmap.close(); throw error; }
@@ -166,7 +168,7 @@ class GlobeSurfaceWorker {
                 if (signal.aborted) { photograph.close(); signal.throwIfAborted(); }
                 preview(photograph, detailed);
             };
-            let baseDrawn = false, basePublished = false;
+            let baseDrawn = false, basePublished = false, overviewPublished = false;
             for (const photo of plan.photos) {
                 if (!(photo.regional ? /^\/earth_regions\/\d{2,5}\.png$/ : /^\/earth_tiles\/\d{2}-\d{2}\.png$/).test(photo.url) ||
                     !Array.isArray(photo.source) || photo.source.length !== 4 ||
@@ -184,6 +186,12 @@ class GlobeSurfaceWorker {
                 const scale = photo.width ? bitmap.width / photo.width : 1;
                 context.drawImage(bitmap, sx * scale, sy * scale, sw * scale, sh * scale, dx, dy, dw, dh);
                 if (!photo.regional) baseDrawn = true;
+                // A complete regional overview is useful immediately; finer photographs must not hold it back.
+                if (photo.regional && !overviewPublished && dx <= .001 && dy <= .001 &&
+                    dx + dw >= 2047.999 && dy + dh >= 2047.999) {
+                    await publish(true);
+                    overviewPublished = true;
+                }
             }
             await publish(true);
             const {data, error} = await geometry;

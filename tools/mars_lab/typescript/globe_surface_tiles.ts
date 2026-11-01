@@ -44,7 +44,7 @@ export class GlobeSurfaceTiles {
         let previous = this.previous;
         if (previous && !this.gl.isTexture(previous.resource.texture)) previous = this.previous = null;
         const blend = Math.min(1, Math.max(0, (now - this.changed) / 500));
-        if (previous && blend === 1 && previous.bounds.every((value, i) => value === current.bounds[i]))
+        if (previous && blend === 1 && this.entries.covering(bounds, zoom, false, current.slot)?.slot === current.slot)
             previous = this.previous = null;
         this.gl.activeTexture(this.gl.TEXTURE3);
         this.gl.bindTexture(this.gl.TEXTURE_2D, current.resource.texture);
@@ -59,6 +59,8 @@ export class GlobeSurfaceTiles {
     put(bounds: number[], zoom: number, tile: GlobeSurfaceTile, complete = true): void {
         const gl = this.gl, key = `${bounds.join(',')}:${zoom}:${++this.revision}`;
         if (gl.isContextLost()) return;
+        // An already surveyed window needs no second, less useful GPU allocation for its photographic preview.
+        if (!complete && this.entries.covering(bounds, zoom)?.resource.complete) return;
         const texture = gl.createTexture();
         if (!texture) throw new Error('Surface texture unavailable');
         const active = gl.getParameter(gl.ACTIVE_TEXTURE) as number;

@@ -3324,6 +3324,11 @@
                 await report('PASS: calendar Back/Forward, selection menus, 5000-town selection and globe busy-state interactions');
                 return;
             }
+            if (new URLSearchParams(location.search).get('surface-check') === '1') {
+                await runBrowserGroup('checkLabSurfaceTiles', window.checkLabSurfaceTiles, 120000);
+                await report('PASS: photographic loading, camera windows, resident GPU tiles and raw disk caching');
+                return;
+            }
             if (new URLSearchParams(location.search).get('globe-check') === '1') {
                 await runBrowserGroup('checkLabSurfaceMath', window.checkLabSurfaceMath, 1200000);
                 await report('PASS: globe projection, picking and water-preserving photographic colours; ' +

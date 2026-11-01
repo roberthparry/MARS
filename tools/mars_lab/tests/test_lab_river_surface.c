@@ -197,7 +197,16 @@ static bool surface_fixture(const char *directory)
     ok = ok && status == 200 && json_array_size(regional_photos) == 2 &&
          !strcmp(test_lab_text(approach, "url"), "/earth_regions/01.png") &&
          decoded_text && original_text && lab_cal_number(string_c_str(decoded_text), &decoded) &&
-         lab_cal_number(string_c_str(original_text), &original) && decoded >= 64 && decoded < original;
+         lab_cal_number(string_c_str(original_text), &original) && decoded >= 64 && decoded < original &&
+         floor(log2(decoded)) == log2(decoded);
+    json_free(regional);
+    regional = surface_request("\"west\":-6.02,\"south\":49.98,\"east\":0,\"north\":56",
+                               "surface-plan", NULL, &status);
+    approach = json_array_get(test_lab_member(regional, "photos"), 1);
+    decoded_text = json_number_text(test_lab_member(approach, "decode_size"));
+    double nearby_decoded = 0;
+    ok = ok && status == 200 && decoded_text &&
+         lab_cal_number(string_c_str(decoded_text), &nearby_decoded) && nearby_decoded == decoded;
     json_free(regional);
     regional = surface_request(welsh_bounds, "surface-plan", NULL, &status);
     ok = ok && status == 200 && json_array_size(test_lab_member(regional, "photos")) == 3;

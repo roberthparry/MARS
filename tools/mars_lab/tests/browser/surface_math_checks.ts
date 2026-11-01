@@ -9,6 +9,8 @@
 interface Window {
     /** @brief Check linked maths, viewport limits and the browser module's imports. */
     checkLabSurfaceMath(): Promise<void>;
+    /** @brief Check asynchronous surface loading, GPU retention, disk caching and camera-window replacement. */
+    checkLabSurfaceTiles(): Promise<void>;
     /** @brief Check country aggregation independently of the GPU and travel assertions. */
     checkLabCountryTowns(): void;
 }
@@ -30,19 +32,25 @@ window.checkLabCountryTowns = function checkLabCountryTowns(): void {
         throw new Error('Country towns: duplicate merging, national default or local rules were lost');
 };
 
-/** @brief Exercise linked maths through native exports and the scoped camera and gesture APIs. */
-window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void> {
-    const native = labWire.exports();
-
-    /** @brief Report one failed maths or linkage assertion. */
+/** @brief Check real-worker source reuse, GPU ownership, raw persistence and photographic request replacement. */
+window.checkLabSurfaceTiles = async function checkLabSurfaceTiles(): Promise<void> {
     function check(condition: boolean, message: string): void {
-        if (!condition) throw new Error('Surface maths: ' + message);
+        if (!condition) throw new Error('Globe surface: ' + message);
     }
 
     await checkGlobeHTTP(check);
     await checkGlobeGPU(check);
     await checkGlobePhoto(check);
     await checkGlobeSurface(check);
+};
+
+/** @brief Exercise linked maths through native exports and the scoped camera and gesture APIs. */
+window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void> {
+    const native = labWire.exports();
+    function check(condition: boolean, message: string): void {
+        if (!condition) throw new Error('Surface maths: ' + message);
+    }
+    await window.checkLabSurfaceTiles();
     const regionalSvg = window.labAlmanacFixtures()[3];
     const regionalFlag = 'data:image/svg+xml;base64,' + btoa(regionalSvg);
     const existingCountry = document.getElementById('almanacJurisdiction');

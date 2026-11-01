@@ -4629,6 +4629,17 @@ station-timezone-unknown label; named stations retain their own timezone rules.
 Magnified photographic tiles use bounded sharpening, while the observer crosshair
 has a dark outline that remains visible over bright ice. The source photograph
 still limits the real detail available at close viewing distances.
+During dragging, photographic requests follow the camera rather than remaining
+attached to the selected town. Padded windows anticipate the drag direction;
+requests that still cover the view continue, while obsolete windows are replaced.
+Completed GPU tiles remain available during refinement. Regional overviews appear
+before finer photographs finish, and source images use stable decode-size tiers
+so nearby views can reuse decoded pixels. Disposable disk-cache eviction counts
+indexed keys without reading the stored pixel blobs.
+Cancelling an obsolete view still allows its current source photograph to finish
+under an eight-second timeout, so the next window can reuse it instead of starting
+the same download again. Source reads remain serial and the decoded cache keeps
+its existing 64 MiB limit.
 
 Temperature changes refraction, not parallax. Below −0.575° the displayed altitude
 receives no refraction correction. The native globe hit-test classifies the

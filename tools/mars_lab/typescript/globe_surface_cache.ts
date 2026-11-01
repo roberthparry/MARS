@@ -64,30 +64,19 @@ class GlobeSurfaceCache {
             try {
                 const transaction = db.transaction('tiles', 'readwrite'), store = transaction.objectStore('tiles');
                 store.put({key, blob, size: blob.size, used: Date.now()} satisfies GlobeSurfaceRecord);
-                // At most 33 metadata records are examined. Pixel payloads remain in browser storage.
-                const entries: {key: IDBValidKey; size: number}[] = [];
-                let bytes = 0;
-                const cursor = store.index('used').openCursor();
-                cursor.onsuccess = () => {
-                    const current = cursor.result;
-                    if (current) {
-                        const record = current.value as GlobeSurfaceRecord;
-                        if (!(record.blob instanceof Blob) || record.size !== record.blob.size ||
-                            record.blob.type !== 'application/octet-stream' || record.size !== GlobeSurfaceCache.tileBytes) current.delete();
-                        else {
-                            entries.push({key: current.primaryKey, size: record.size});
-                            bytes += record.size;
-                        }
-                        current.continue();
-                    } else {
-                        let count = entries.length;
-                        for (const entry of entries) {
-                            if (bytes <= GlobeSurfaceCache.maximumBytes && count <= GlobeSurfaceCache.maximumEntries) break;
-                            store.delete(entry.key);
-                            bytes -= entry.size;
-                            --count;
-                        }
-                    }
+                // Every accepted record has the same raw size. Count keys, without reading or cloning pixel blobs.
+                const count = store.count();
+                count.onsuccess = () => {
+                    let excess = count.result - Math.min(GlobeSurfaceCache.maximumEntries,
+                        Math.floor(GlobeSurfaceCache.maximumBytes / GlobeSurfaceCache.tileBytes));
+                    if (excess <= 0) return;
+                    const cursor = store.index('used').openKeyCursor();
+                    cursor.onsuccess = () => {
+                        const current = cursor.result;
+                        if (!current || excess <= 0) return;
+                        store.delete(current.primaryKey);
+                        if (--excess > 0) current.continue();
+                    };
                 };
                 transaction.oncomplete = transaction.onabort = transaction.onerror = () => resolve();
             } catch { resolve(); }
