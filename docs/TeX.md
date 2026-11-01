@@ -135,7 +135,7 @@ it does not by itself make that function an operand-entry operation.
 | Stack operations | `TeX_dup`: a → a a; `TeX_drop`: a b → a; `TeX_swap`: a b → b a; `TeX_rot`: a b c → b c a; push a level number then `TeX_roll` |
 | Arithmetic | `TeX_add`, `TeX_sub`, `TeX_mul`: left, right; `TeX_neg`: body |
 | Lists | `TeX_list`: members, count → list; `TeX_unlist`: list → members, count; `TeX_depth` pushes the current stack depth |
-| Function calls | `TeX_function(name)` consumes an argument list; `TeX_call` consumes a function followed by an argument list |
+| Function application | `TeX_function(name)` consumes an argument list; `TeX_apply` consumes a function followed by an argument list |
 | Fractions and roots | `TeX_frac`: numerator, denominator; `TeX_sqrt`: body; `TeX_root`: body, index |
 | Scripts | `TeX_pow`: base, exponent; `TeX_subscript`: base, lower; `TeX_scripts`: base, lower, upper |
 | Presentation sequences | `TeX_sequence` concatenates the members of one list |
@@ -148,7 +148,7 @@ it does not by itself make that function an operand-entry operation.
 | Integral transforms | `TeX_transform(kind)`: body, source variable, target variable; Fourier or Laplace, forward or inverse |
 | Integrals | `TeX_integral`: body, variable, bound list |
 | Derivatives | `TeX_derivative(style)`: body, variable, integer order |
-| Derivative primes | `TeX_prime`: body, integer order; `TeX_call` can then apply the primed function to an argument list |
+| Derivative primes | `TeX_prime`: body, integer order; `TeX_apply` can then apply the primed function to an argument list |
 | Overbars | `TeX_bar`: body → barred body; apply before indices to bar the base symbol |
 | Operator accents | `TeX_hat`: body → hatted body; `TeX_dagger`: body → displayed adjoint |
 | State notation | `TeX_bra`, `TeX_ket`: state label; `TeX_braket`: left label, right label; `TeX_ketbra`: ket label, bra label |
@@ -652,7 +652,7 @@ int main(void)
     TeX_symbol(b, "x");
     TeX_integer(b, 1);
     TeX_list(b);
-    TeX_call(b);
+    TeX_apply(b);
     TeX_mul(b);
     TeX_symbol(b, "n");
     TeX_integer(b, 0);
@@ -867,7 +867,7 @@ with `TeX_eq` before applying the product or sum.
 `TeX_partial` consumes the body followed by the coordinate variables in application
 order. Repeating a variable gives a higher derivative; different variables give mixed
 derivatives. The displayed denominator reverses that order to show operator composition.
-The Bessel and Lambert functions use a subscripted function name followed by `TeX_call`.
+The Bessel and Lambert functions use a subscripted function name followed by `TeX_apply`.
 
 The resulting operators match the native-text example, with the explicit grouping and
 spacing supplied by the builder. These operations construct notation without evaluating it.
@@ -970,7 +970,7 @@ int main(void)
     TeX_symbol(b, "x");
     TeX_integer(b, 1);
     TeX_list(b);
-    TeX_call(b);
+    TeX_apply(b);
     if (!print_formula(b)) goto done;
 
     /* lambertw0(x) */
@@ -980,7 +980,7 @@ int main(void)
     TeX_symbol(b, "x");
     TeX_integer(b, 1);
     TeX_list(b);
-    TeX_call(b);
+    TeX_apply(b);
     if (!print_formula(b)) goto done;
 
     /* @S x^2 dx */
@@ -1613,7 +1613,7 @@ is attached. The operation constructs notation without differentiating.
 It also primes index labels, as shown in the
 [coordinate-transformation example](#primed-indices-and-coordinate-transformations).
 
-Apply `TeX_call` after a prime to show a point condition: the function and its
+Use `TeX_apply` after a prime to show a point condition: the function and its
 argument list are separate stack operands. This complete programme constructs the
 same equation and initial conditions as the
 [primed native-text example](#bound-matrix-powers-and-differential-equation-problems).
@@ -1663,7 +1663,7 @@ int main(void)
     TeX_integer(b, 0);
     TeX_integer(b, 1);
     TeX_list(b);
-    TeX_call(b);
+    TeX_apply(b);
     TeX_integer(b, 1);
     TeX_eq(b);
 
@@ -1674,7 +1674,7 @@ int main(void)
     TeX_integer(b, 0);
     TeX_integer(b, 1);
     TeX_list(b);
-    TeX_call(b);
+    TeX_apply(b);
     TeX_integer(b, 0);
     TeX_eq(b);
 

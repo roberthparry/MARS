@@ -444,7 +444,7 @@ bool TeX_function(TeX_builder_t *builder, const char *name)
 }
 
 /* Consume function notation followed by arguments, retaining their push order. */
-bool TeX_call(TeX_builder_t *builder)
+bool TeX_apply(TeX_builder_t *builder)
 {
     const TeX_t *const *p = TeX_operands(builder, 2);
     size_t count;

@@ -746,7 +746,7 @@ static void test_TeX_builder_primes(void)
     TeX_integer(builder, 0);
     TeX_integer(builder, 1);
     TeX_list(builder);
-    TeX_call(builder);
+    TeX_apply(builder);
     finish_matches(builder, "y'\\left(0\\right)");
 
     builder = TeX_builder_new();
@@ -934,7 +934,7 @@ static void test_TeX_builder_structured_arithmetic(void)
     TeX_symbol(b, "x");
     TeX_integer(b, 1);
     TeX_list(b);
-    TeX_call(b);
+    TeX_apply(b);
     finish_matches(b, "{f}_{n}\\left(x\\right)");
 
     b = TeX_builder_new();
@@ -1054,8 +1054,8 @@ static void test_TeX_builder_rejects_operator_symbols(void)
     TEST_ASSERT_TRUE(!TeX_function(b, "a+b") && TeX_builder_error(b) == EINVAL &&
                      TeX_builder_peek(b, 1) == saved, "function names reject operator fragments transactionally");
     TeX_builder_clear_error(b);
-    TEST_ASSERT_TRUE(!TeX_call(b) && TeX_builder_error(b) == ERANGE &&
-                     TeX_builder_count(b) == 1, "a call requires both a function and its argument list");
+    TEST_ASSERT_TRUE(!TeX_apply(b) && TeX_builder_error(b) == ERANGE &&
+                     TeX_builder_count(b) == 1, "function application requires both a function and its argument list");
     TeX_builder_free(b);
 }
 
@@ -1108,7 +1108,7 @@ static void test_TeX_builder_lists(void)
     TeX_symbol(b, "f");
     TeX_integer(b, 0);
     TeX_list(b);
-    TeX_call(b);
+    TeX_apply(b);
     finish_matches(b, "f\\left(\\right)");
 }
 

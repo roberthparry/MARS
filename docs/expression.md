@@ -3721,7 +3721,7 @@ to the differentiable expression DAG. See the runnable
 Ordinary differential-equation text authored with primes retains those primes
 and function-style point conditions in this convenience path. Explicit coordinate
 derivatives retain differential fractions. The [RPN prime example](TeX.md#prime-notation-with-rpn)
-shows the equivalent construction with `TeX_prime` and `TeX_call`.
+shows the equivalent construction with `TeX_prime` and `TeX_apply`.
 
 Scalar symbolic indices accept `x_n` and `x_(n+1)` and round-trip in native
 expression output. They use the existing indexed-symbol model; this does not

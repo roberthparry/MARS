@@ -398,12 +398,15 @@ bool TeX_mul(TeX_builder_t *builder);
 bool TeX_function(TeX_builder_t *builder, const char *name);
 
 /**
- * @brief Apply a function already on the stack to its following arguments.
- * @param builder Borrowed builder; push the function first, then one argument list in display order.
- * @return True on success; false saves an error and preserves every operand. No function is evaluated.
- * @note Supports indexed function symbols built with TeX_subscript().
+ * @brief Apply the stacked function to the argument list above it, constructing function-application notation.
+ * @param builder Borrowed builder requiring two operands: the function, then one argument list in display order.
+ * The builder is neither consumed nor retained and owns the resulting notation.
+ * @return True on success; false saves EINVAL for NULL or a non-list argument, ERANGE for underflow, or an
+ * allocation error. Failure preserves every operand; a saved error blocks further operations until cleared.
+ * @note Supports indexed and primed functions. The two operands are replaced by one displayed application;
+ * no function is evaluated and no notation ownership transfers to the caller.
  */
-bool TeX_call(TeX_builder_t *builder);
+bool TeX_apply(TeX_builder_t *builder);
 
 /**
  * @brief Replace numerator then denominator by their fraction.
@@ -441,7 +444,7 @@ bool TeX_pow(TeX_builder_t *builder);
  * EOVERFLOW for an excessive order, ERANGE for missing operands, or an allocation error.
  * The builder owns the result; no notation ownership transfers to the caller.
  * @note This constructs notation without differentiation. Compound operands retain visible grouping;
- * use TeX_call() afterwards to show an evaluation point such as y'(0).
+ * use TeX_apply() afterwards to show an evaluation point such as y'(0).
  * To prime a tensor index, apply this operation to its label before TeX_upper() or TeX_lower(), then
  * assemble the index list for TeX_tensor(). Such a prime labels a coordinate chart, not a derivative.
  * Orders one through three use primes; larger orders use a parenthesised superscript.
