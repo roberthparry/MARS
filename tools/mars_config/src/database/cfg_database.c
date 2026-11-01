@@ -503,7 +503,6 @@ static const cfg_database_source_label_t *cfg_database_source_label(const string
         {"packaging/jurisdiction-db/flag_regions.sql", "Installing regional flag definitions"},
         {"packaging/jurisdiction-db/location_additions.sql", "Adding named reference locations"},
         {"packaging/jurisdiction-db/location_subdivisions.sql", "Updating Kaliningrad towns and location defaults"},
-        {"packaging/jurisdiction-db/town_search.sql", "Indexing worldwide place names"},
         {"packaging/jurisdiction-db/mars_calendar_local.sql", "Installing local calendar settings"},
         {"packaging/jurisdiction-db/mars_calendar_locale_names.sql", "Installing translated calendar names"},
         {"packaging/jurisdiction-db/mars_country_jurisdictions.sql", "Installing country jurisdictions"},
@@ -519,6 +518,7 @@ static const cfg_database_source_label_t *cfg_database_source_label(const string
         {"packaging/jurisdiction-db/mars_manual_holiday_instance_overrides.sql", "Installing holiday date overrides"},
         {"packaging/jurisdiction-db/mars_target_subdivisions.sql", "Installing jurisdiction subdivisions"},
         {"packaging/jurisdiction-db/mars_timezone_rules.sql", "Installing time zone rules"},
+        {"packaging/jurisdiction-db/town_search.sql", "Indexing worldwide place names"},
     };
     if (!path)
         return NULL;

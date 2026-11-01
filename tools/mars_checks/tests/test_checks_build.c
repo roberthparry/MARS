@@ -1,9 +1,10 @@
 /**
  * @file test_checks_build.c
- * @brief Native regressions for browser compiler dependency diagnostics.
+ * @brief Native regressions for database runtime and browser compiler dependency diagnostics.
  *
  * Copies the maintained Makefiles into a disposable tree and invokes their
- * dependency and TypeScript targets sequentially. Missing or unusable compilers
+ * dependency and TypeScript targets sequentially. SQLCipher runtime probes reject old libraries and absent
+ * search features before release or database-update recipes can run. Missing or unusable compilers
  * must fail before compilation and print usable installation instructions,
  * while native-only checks remain independent. The overall success message
  * must appear only after every dependency check has passed.
@@ -21,7 +22,8 @@ static bool test_build_makefiles(const string_t *temporary)
 {
     const char *const files[] = {
         "Makefile", "tools/mars_lab/Makefile", "tools/to_be_announced_lab/Makefile",
-        "tools/mars_config/Makefile", "tools/mars_checks/Makefile",
+        "tools/mars_config/Makefile", "tools/mars_checks/Makefile", "tools/mars_checks/sqlcipher_probe.c",
+        "tools/mars_checks/tests/fixtures/checks_sqlcipher_fixture.c",
         "include/array-t.h", "include/string-t.h", "src/array/array.c", "src/array/array_mutex.h"
     };
     string_t *root = checks_text(MARS_CHECKS_ROOT_DIR);
@@ -150,8 +152,67 @@ static void test_checks_typescript_dependencies(void)
     TEST_ASSERT_TRUE(ok, "compiler checks reject unavailable tools, honour overrides and keep native builds independent");
 }
 
-/* Register compiler dependency checks before the README examples. */
+static bool test_build_sqlcipher_probe(const string_t *root, const char *target, const char *mode,
+                                      const char *diagnostic)
+{
+    checks_strings_t *arguments = checks_strings_new();
+    checks_strings_add(arguments, checks_text("env"));
+    const char *const inherited[] = {"MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "MAKEFILES"};
+    for (size_t i = 0; i < sizeof inherited / sizeof *inherited; ++i) {
+        checks_strings_add(arguments, checks_text("-u"));
+        checks_strings_add(arguments, checks_text(inherited[i]));
+    }
+    checks_strings_add(arguments, string_sprintf("MARS_TEST_SQLCIPHER=%s", mode));
+    checks_strings_add(arguments, checks_text("make"));
+    checks_strings_add(arguments, checks_text("--no-print-directory"));
+    checks_strings_add(arguments, checks_text("-j1"));
+    checks_strings_add(arguments, checks_text(target));
+    checks_strings_add(arguments, checks_text(
+        "LDFLAGS=tools/mars_checks/tests/fixtures/checks_sqlcipher_fixture.c "
+        "-Wl,--wrap=sqlite3_libversion_number -Wl,--wrap=sqlite3_libversion -Wl,--wrap=sqlite3_exec"));
+    string_t *output = NULL, *errors = NULL;
+    int status = -1;
+    bool ran = checks_process_run(arguments, root, 30, &output, &errors, &status);
+    bool ok = ran && output && string_find(output, "SQLCipher ") >= 0 &&
+        string_find(output, "SQLite runtime ") >= 0 && string_find(output, "SQLite headers ") >= 0;
+    if (diagnostic)
+        ok = status != 0 && errors && string_find(errors, diagnostic) >= 0 &&
+             string_find(errors, "Updating the separate sqlite3 package") >= 0 &&
+             string_find(output, "SQLCipher version and required SQL features verified.") < 0 &&
+             string_find(output, "check-compliance") < 0 && string_find(output, "Updating jurisdiction") < 0 && ok;
+    else
+        ok = status == 0 && string_find(output, "SQLCipher version and required SQL features verified.") >= 0 && ok;
+    if (!ok)
+        fprintf(stderr, "SQLCipher dependency probe %s/%s: status %d\n%s\n%s\n", target, mode, status,
+                output ? string_c_str(output) : "", errors ? string_c_str(errors) : "");
+    string_free(output);
+    string_free(errors);
+    checks_strings_free(arguments);
+    return ok;
+}
+
+static void test_checks_sqlcipher_dependencies(void)
+{
+    string_t *root = test_checks_root();
+    bool ok = test_build_makefiles(root);
+    static const struct { const char *target, *mode, *diagnostic; } cases[] = {
+        {"check-sqlcipher-deps", "current", NULL},
+        {"check-sqlcipher-deps", "old", "requires SQLite 3.27.0 or newer"},
+        {"check-native-deps", "fts5", "required FTS5 with Unicode accent removal"},
+        {"check-deps", "window", "required SQLite window functions"},
+        {"release", "fts5", "required FTS5 with Unicode accent removal"},
+        {"update-mars-db", "fts5", "required FTS5 with Unicode accent removal"},
+        {"install-jurisdiction-db", "fts5", "required FTS5 with Unicode accent removal"}
+    };
+    for (size_t i = 0; ok && i < sizeof cases / sizeof *cases; ++i)
+        ok = test_build_sqlcipher_probe(root, cases[i].target, cases[i].mode, cases[i].diagnostic);
+    ok = test_checks_finish(root) && ok;
+    TEST_ASSERT_TRUE(ok, "dependency checks report linked versions and stop unsupported SQLCipher before database work");
+}
+
+/* Register database and compiler dependency checks before the README examples. */
 void test_checks_build_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_checks_sqlcipher_dependencies, tests, "build,sqlcipher");
     TEST_RUN_IN_GROUP(test_checks_typescript_dependencies, tests, "build,typescript");
 }

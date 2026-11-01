@@ -111,7 +111,7 @@ worked examples, all seven modes and private mobile access through Tailscale.
 - GCC or Clang on Linux, compiling C99/GNU C
 - Standard C library plus `libm` and pthreads
 - GMP, MPFR, and MPC development libraries
-- SQLCipher development libraries
+- SQLCipher development libraries with embedded SQLite >= 3.27.0, FTS5 and window functions
 - Zstandard and libsodium development libraries (streaming file compression and authenticated encryption)
 - libcurl 7.86.0 or newer development library (HTTP/HTTPS transport)
 - `pkg-config` for discovery of library compiler and linker flags

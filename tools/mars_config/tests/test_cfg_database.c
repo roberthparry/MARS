@@ -882,6 +882,7 @@ static void test_cfg_database_trace(void)
         "packaging/jurisdiction-db/flag_regions.sql",
         "packaging/jurisdiction-db/location_additions.sql",
         "packaging/jurisdiction-db/location_subdivisions.sql",
+        "packaging/jurisdiction-db/town_search.sql",
         "packaging/jurisdiction-db/mars_generated_holiday_instances.sql",
         "packaging/jurisdiction-db/mars_manual_holiday_instance_overrides.sql",
         "packaging/jurisdiction-db/mars_holiday_rules_queries.sql",
@@ -927,7 +928,8 @@ static void test_cfg_database_trace(void)
     static const char *const updates[][2] = {
         {"packaging/globe-db/jurisdiction_subdivisions.sql", "Identifying Kaliningrad Oblast on the globe"},
         {"packaging/jurisdiction-db/location_additions.sql", "Adding named reference locations"},
-        {"packaging/jurisdiction-db/location_subdivisions.sql", "Updating Kaliningrad towns and location defaults"}
+        {"packaging/jurisdiction-db/location_subdivisions.sql", "Updating Kaliningrad towns and location defaults"},
+        {"packaging/jurisdiction-db/town_search.sql", "Indexing worldwide place names"}
     };
     bool described = true;
     for (size_t i = 0; i < sizeof updates / sizeof *updates; ++i) {

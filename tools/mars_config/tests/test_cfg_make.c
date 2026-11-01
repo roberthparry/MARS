@@ -317,8 +317,8 @@ static bool test_cfg_make_release_fixture(const char *directory)
     file_t *launcher = launcher_path ? file_new(launcher_path) : NULL;
     ok = ok && program && launcher_arg && launcher && !setenv("MARS_TEST_MAKE_PROGRAM", target, 1) &&
          !setenv("MARS_TEST_MAKE_RELEASE", "1", 1) && !unsetenv("MARS_TEST_MAKE_FAIL");
-    const char *args[] = {"make", "--no-print-directory", "-j1", "-o", "check-compliance",
-        "MAKE=make --no-print-directory -j1 -o all -o native-config -o check-native-deps",
+    const char *args[] = {"make", "--no-print-directory", "-j1", "-o", "check-native-deps",
+        "MAKE=make --no-print-directory -j1 -o check-compliance -o all -o native-config -o check-native-deps",
         program ? string_c_str(program) : "", launcher_arg ? string_c_str(launcher_arg) : "", "release", NULL};
     for (unsigned pass = 0; pass < 6 && ok; ++pass) {
         if (pass == 1) ok = file_write_all_bytes(launcher, "fixture", 7) && file_chmod(launcher, 0600);

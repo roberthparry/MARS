@@ -10,6 +10,30 @@ space in the system temporary filesystem during a large build.
 
 ## Requirements
 
+### SQLCipher version and database features
+
+MARS links to SQLCipher, including for plaintext databases. Updating the separate
+`sqlite3` programme or SQLite development package does not update that library.
+Use a SQLCipher development build whose embedded SQLite and headers are version
+3.27.0 or newer, with FTS5, the Unicode tokenizer's `remove_diacritics 2` option
+and window functions enabled. FTS5 is optional at build time, so a recent version
+number alone does not establish that the library is suitable.
+
+`make check-sqlcipher-deps` compiles and runs a small probe using the same
+`SQLCIPHER_CFLAGS`, `SQLCIPHER_LIBS` and linker flags as the build. It prints the
+SQLCipher version, embedded SQLite runtime version and SQLite header version,
+then exercises the required search and window-function SQL in an in-memory
+database. The `sqlcipher` command-line programme is not needed.
+`make check-native-deps` and `make check-deps` include this probe.
+`make release` runs the native dependency gate before compliance or compilation,
+and database installation/update targets check it before changing installed data.
+
+On Debian/Ubuntu, the development package is `libsqlcipher-dev`. An older
+distribution may require a newer SQLCipher package or a source build with
+`SQLITE_ENABLE_FTS5`; upgrading to another build without FTS5 will still fail
+the feature probe. After selecting the upgraded library and matching headers,
+run `make check-native-deps` before retrying `make release`.
+
 ### Native maintenance applications
 
 `tools/mars_checks` owns the repository's compliance, public-distribution,

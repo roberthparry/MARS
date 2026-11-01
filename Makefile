@@ -214,7 +214,8 @@ all: check-deps native-tools check-public-distribution check-native-numeric-boun
 debug:
 	$(MAKE) DEBUG=1 all
 
-release: check-compliance
+release: check-native-deps
+	$(MAKE) DEBUG=0 check-compliance
 	$(MAKE) DEBUG=0 all
 	@if [ -x "$(MARS_LAB_LAUNCHER)" ]; then \
 		$(MAKE) --no-print-directory DEBUG=0 configure-mars && \
@@ -259,7 +260,7 @@ check-native-numeric-boundaries: $(QFLOAT_OBJS) $(QCOMPLEX_OBJS) | native-tools
 build-temporary:
 	@mkdir -p "$(TMPDIR)"
 
-check-native-deps check-lab-wasm-deps check-tba-crypto-deps check-http-fixture-deps: | build-temporary
+check-native-deps check-sqlcipher-deps check-lab-wasm-deps check-tba-crypto-deps check-http-fixture-deps: | build-temporary
 
 check-deps: check-native-deps check-lab-typescript-deps check-tba-typescript-deps check-lab-wasm-deps
 	@echo "All dependency checks passed (C development libraries, native TypeScript compilers and WebAssembly runtime)."
@@ -324,8 +325,22 @@ typescript-install-help:
 	    '  export PATH="$$HOME/.local/bin:$$PATH"' \
 	    '  make check-deps'
 
+.PHONY: check-sqlcipher-deps
+check-sqlcipher-deps:
+	@probe_dir=$$(mktemp -d -t mars-check-sqlcipher.XXXXXX) || exit 1; \
+	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
+	trap 'exit 1' HUP INT TERM; \
+	if ! $(CC) $(CFLAGS) $(SQLCIPHER_CFLAGS) tools/mars_checks/sqlcipher_probe.c \
+	    $(LDFLAGS) -o "$$probe_dir/probe" $(if $(strip $(SQLCIPHER_LIBS)),$(SQLCIPHER_LIBS),-lsqlcipher); then \
+	    printf '%s\n' 'Cannot compile/link the SQLCipher dependency probe.' \
+	        '  Debian/Ubuntu: sudo apt install libsqlcipher-dev' \
+	        '  Custom installations: check SQLCIPHER_CFLAGS, SQLCIPHER_LIBS and the runtime library path.'; \
+	    exit 1; \
+	fi; \
+	"$$probe_dir/probe"
+
 # Library, installation and maintenance-tool targets do not need TypeScript.
-check-native-deps:
+check-native-deps: check-sqlcipher-deps
 	@missing=0; \
 	probe_dir=$$(mktemp -d -t mars-check-deps.XXXXXX) || exit 1; \
 	trap 'rm -f "$$probe_dir/probe"; rmdir "$$probe_dir"' EXIT; \
@@ -347,7 +362,6 @@ check-native-deps:
 	check_dep "libcurl >= 7.86.0" "curl/curl.h" "$(CURL_CFLAGS) $(if $(strip $(CURL_LIBS)),$(CURL_LIBS),-lcurl)" "libcurl4-openssl-dev" "_Static_assert(LIBCURL_VERSION_NUM >= 0x075600, \"libcurl too old\"); CURL *c = curl_easy_init(); curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, \"https\"); size_t n = 0; char b = 0; curl_ws_send(c, &b, 0, &n, 0, CURLWS_TEXT); curl_easy_cleanup(c)"; \
 	check_dep "MPFR" "mpfr.h" "-lmpfr -lgmp" "libmpfr-dev" "mpfr_t x; mpfr_init2(x, 53); mpfr_clear(x)"; \
 	check_dep "MPC" "mpc.h" "-lmpc -lmpfr -lgmp" "libmpc-dev" "mpc_t x; mpc_init2(x, 53); mpc_clear(x)"; \
-	check_dep "SQLCipher" "sqlcipher/sqlite3.h" "-lsqlcipher" "libsqlcipher-dev" "sqlite3 *db = 0; sqlite3_open(\":memory:\", &db); sqlite3_close(db)"; \
 	check_dep "Zstandard" "zstd.h" "$(ZSTD_CFLAGS) $(if $(strip $(ZSTD_LIBS)),$(ZSTD_LIBS),-lzstd)" "libzstd-dev" "ZSTD_CCtx *ctx = ZSTD_createCCtx(); ZSTD_inBuffer in = {0}; ZSTD_outBuffer out = {0}; ZSTD_compressStream2(ctx, &out, &in, ZSTD_e_end); ZSTD_freeCCtx(ctx)"; \
 	check_dep "libsodium secretstream" "sodium.h" "$(SODIUM_CFLAGS) $(if $(strip $(SODIUM_LIBS)),$(SODIUM_LIBS),-lsodium)" "libsodium-dev" "crypto_secretstream_xchacha20poly1305_state state; unsigned char key[crypto_secretstream_xchacha20poly1305_KEYBYTES], header[crypto_secretstream_xchacha20poly1305_HEADERBYTES]; if (sodium_init() < 0) return 1; crypto_secretstream_xchacha20poly1305_keygen(key); return crypto_secretstream_xchacha20poly1305_init_push(&state, header, key)"; \
 	if [ -n "$(CONFIG_TEST_PNG_LIBS)" ]; then \
@@ -893,6 +907,7 @@ help:
 	@printf '\n%s\n' "Dependencies"
 	@printf '  %-40s %s\n' "make check-deps" "Check development libraries and native TypeScript compilers"
 	@printf '  %-40s %s\n' "make check-native-deps" "Check development libraries without browser build tools"
+	@printf '  %-40s %s\n' "make check-sqlcipher-deps" "Report linked SQLCipher/SQLite versions and verify required SQL features"
 	@printf '  %-40s %s\n' "make check-lab-deps" "Check development libraries and MARS Lab TypeScript/TeX/WebAssembly tools"
 	@printf '  %-40s %s\n' "make check-lab-wasm-deps" "Probe Clang's WebAssembly target and the LLVM linker"
 	@printf '  %-40s %s\n' "make typescript-install-help" "Print native compiler installation commands without installing anything"

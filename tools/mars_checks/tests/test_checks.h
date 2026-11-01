@@ -45,7 +45,7 @@ void test_checks_parser_cases(void);
  */
 void test_checks_control_cases(void);
 
-/** @brief Register browser compiler dependency regressions. @return No value. */
+/** @brief Register SQLCipher runtime and browser compiler dependency regressions. @return No value. */
 void test_checks_build_cases(void);
 
 /**

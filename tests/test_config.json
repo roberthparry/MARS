@@ -2897,6 +2897,7 @@
   "tools/mars_checks/tests/test_checks_build.c": {
     "tests": {
       "enabled": true,
+      "test_checks_sqlcipher_dependencies": true,
       "test_checks_typescript_dependencies": true
     }
   },
