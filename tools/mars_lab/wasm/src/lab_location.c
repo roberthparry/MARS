@@ -110,6 +110,13 @@ void lab_location_validate(lab_profile_kind_t kind, jsref boxed, jsref fallback,
     lab_dom_return(lab_location_validated(kind, lab_dom_get(boxed, "value"), fallback, jurisdictions));
 }
 
+/* These four constituent countries retain their own menus instead of their shared sovereign-country list. */
+static bool lab_location_distinct_country(jsref code)
+{
+    return lab_location_is(code, "GB-ENG") || lab_location_is(code, "GB-WLS") ||
+           lab_location_is(code, "GB-SCT") || lab_location_is(code, "GB-NIR");
+}
+
 static jsref lab_location_town_list(jsref context, jsref value)
 {
     if (lab_dom_type(value) == LAB_VALUE_STRING && !lab_dom_length(value))
@@ -118,12 +125,15 @@ static jsref lab_location_town_list(jsref context, jsref value)
     int code = lab_location_validated(LAB_PROFILE_JURISDICTION, value, lab_dom_get(config, "DEFAULT_DATETIME_JURISDICTION"),
                                       lab_dom_get(context, "jurisdictions"));
     int country = lab_dom_slice(code, 0, 2);
-    if (lab_dom_member(lab_dom_get(context, "jurisdictions"), country)) code = country;
+    if (!lab_location_distinct_country(code) && lab_dom_member(lab_dom_get(context, "jurisdictions"), country))
+        code = country;
     int catalogue = lab_dom_get(context, "towns");
     bool native = lab_dom_truth(lab_dom_get(catalogue, "nativeStore"));
     int towns = native ? lab_town_store_snapshot(code) : lab_dom_key_get(catalogue, code);
     if (lab_dom_type(towns) == LAB_VALUE_ARRAY)
         return towns;
+    if (lab_location_distinct_country(code))
+        return lab_dom_object(LAB_VALUE_ARRAY);
     int parent = lab_dom_item(lab_dom_split(code, "-"), 0);
     towns = native ? lab_town_store_snapshot(parent) : lab_dom_key_get(catalogue, parent);
     if (!lab_dom_equal(parent, code) && lab_dom_type(towns) == LAB_VALUE_ARRAY) {
@@ -143,7 +153,7 @@ static jsref lab_location_town_list(jsref context, jsref value)
     return lab_dom_type(towns) == LAB_VALUE_ARRAY ? towns : lab_dom_object(LAB_VALUE_ARRAY);
 }
 
-/* Keep regional identities for rules and restoration, projecting only parent countries into visible menus. */
+/* Keep regional identities for restoration, including separate visible menus for the four UK countries. */
 bool lab_location_catalogue(jsref catalogue)
 {
     int options = lab_dom_get(catalogue, "options"), towns = lab_dom_get(catalogue, "towns");
@@ -183,7 +193,8 @@ bool lab_location_catalogue(jsref catalogue)
             int row = lab_dom_item(options, index), option = lab_dom_create("option");
             int code = lab_dom_item(row, 0), parent = lab_dom_slice(code, 0, 2);
             int parent_label = lab_dom_key_get(labels, parent);
-            bool subdivision = !lab_dom_equal(code, parent) && lab_dom_length(parent_label);
+            bool subdivision = !lab_location_distinct_country(code) &&
+                               !lab_dom_equal(code, parent) && lab_dom_length(parent_label);
             lab_dom_write(option, LAB_DOM_VALUE, "", code);
             lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_item(row, 1));
             lab_dom_write(option, LAB_DOM_DATASET, "countryCode", code);
@@ -244,7 +255,9 @@ static node_jsref lab_location_town_option(jsref town, jsref value, jsref jurisd
     lab_dom_write(option, LAB_DOM_TEXT, "", lab_dom_truth(name) ?
                   lab_location_town_text(lab_location_text(name)) : lab_dom_string("Location"));
     int country = lab_dom_get(town, "country_code");
-    lab_dom_write(option, LAB_DOM_DATASET, "countryCode", lab_dom_length(country) ? country : jurisdiction);
+    int membership = lab_dom_get(town, "jurisdiction");
+    if (!lab_dom_length(membership)) membership = jurisdiction;
+    lab_dom_write(option, LAB_DOM_DATASET, "countryCode", lab_dom_length(country) ? country : membership);
     for (unsigned field = 0; field < sizeof attributes / sizeof *attributes; ++field)
         lab_dom_write(option, LAB_DOM_DATASET, attributes[field], lab_location_text(lab_dom_get(town, attributes[field])));
     return option;

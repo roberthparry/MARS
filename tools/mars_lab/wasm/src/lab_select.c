@@ -8,6 +8,7 @@
  * retains real select objects as subscription contexts; handles never survive a call.
  * Rendering necessarily visits each option; temporary handles are released after
  * each row, so even large town catalogues use bounded bridge storage.
+ * Worldwide search rows opt into the same asynchronous inline flag artwork as country menus.
  */
 #include "lab_dom.h"
 #include "lab_menu_index.h"
@@ -32,12 +33,14 @@ static jsref lab_select_shell(node_jsref select)
 }
 
 /* Copy only small catalogue identifiers; artwork is loaded lazily by the tooltip owner. */
-static void lab_select_town_metadata(jsref button, jsref option)
+static void lab_select_town_metadata(jsref button, jsref option, node_jsref select)
 {
     int code = lab_dom_read(option, LAB_DOM_DATASET, "countryCode");
     lab_dom_write(button, LAB_DOM_DATASET, "countryCode", code);
     int country = lab_dom_read(option, LAB_DOM_DATASET, "countryOption");
     lab_dom_write(button, LAB_DOM_DATASET, "countryOption", country);
+    bool inline_flag = lab_dom_truth(lab_dom_read(select, LAB_DOM_DATASET, "globalSearch"));
+    lab_dom_write(button, LAB_DOM_DATASET, "inlineFlag", lab_dom_string(inline_flag ? "1" : ""));
     int name = lab_dom_length(code) && !lab_dom_length(country) ?
                lab_dom_read(option, LAB_DOM_TEXT, "") : lab_dom_string("");
     lab_dom_write(button, LAB_DOM_DATASET, "townTooltipName", name);
@@ -170,7 +173,7 @@ void lab_select_rebuild(node_jsref select, bool details)
         bool hidden = lab_dom_truth(lab_dom_get(option, "hidden"));
         lab_dom_write(item, LAB_DOM_DATASET, "excluded", lab_dom_string(hidden ? "1" : ""));
         lab_dom_class(item, "hidden", hidden);
-        lab_select_town_metadata(item, option);
+        lab_select_town_metadata(item, option, select);
         lab_dom_disabled(item, lab_dom_is_disabled(option));
         if (lab_dom_length(detail)) {
             lab_dom_class(item, "two-column", 1);
@@ -193,7 +196,7 @@ void lab_select_sync(node_jsref select)
     if (!shell)
         return;
     int button = lab_dom_query(shell, ".select-button"), selected = lab_dom_selected(select);
-    lab_select_town_metadata(button, selected);
+    lab_select_town_metadata(button, selected, select);
     int label = lab_dom_read(selected, LAB_DOM_DATASET, "countryLabel");
     lab_dom_write(button, LAB_DOM_TEXT, "",
                   selected ? (lab_dom_length(label) ? label : lab_dom_read(selected, LAB_DOM_TEXT, ""))

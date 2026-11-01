@@ -93,13 +93,14 @@ namespace WorksheetResults {
         }
 
         private countryArtwork(button: HTMLElement, flag: string): void {
-            if ((button.dataset.countryOption !== '1' && button.dataset.selectedFlagCode !== 'ZZ-SEA') || !flag) return;
+            if ((button.dataset.countryOption !== '1' && button.dataset.inlineFlag !== '1' &&
+                 button.dataset.selectedFlagCode !== 'ZZ-SEA') || !flag) return;
             let image = button.querySelector<HTMLImageElement>('img.country-flag');
             if (!image) {
                 image = document.createElement('img');
                 image.decoding = 'async';
                 image.className = 'country-flag'; image.alt = '';
-                button.prepend(image);
+                (button.querySelector('.select-option-label') || button).prepend(image);
             }
             if (image.getAttribute('src') !== flag) image.src = flag;
         }
@@ -156,7 +157,7 @@ namespace WorksheetResults {
         }
 
         private observeCountryMenu(button: HTMLElement): void {
-            if (button.dataset.countryOption !== '1') return;
+            if (button.dataset.countryOption !== '1' && button.dataset.inlineFlag !== '1') return;
             const shell = button.closest('.select-shell');
             if (!shell) return;
             if (shell === this.countryShell) { void this.fillCountryMenu(); return; }
@@ -178,7 +179,8 @@ namespace WorksheetResults {
                 if (!this.visibleCountries.size) this.menuRequest?.abort();
                 void this.fillCountryMenu();
             });
-            shell.querySelectorAll<HTMLElement>('[data-country-option="1"]').forEach(item => this.countryObserver!.observe(item));
+            const candidates = '[data-country-option="1"], [data-inline-flag="1"]';
+            shell.querySelectorAll<HTMLElement>(candidates).forEach(item => this.countryObserver!.observe(item));
             this.countryMutation = new MutationObserver(records => {
                 for (const item of this.visibleCountries) {
                     if (!item.isConnected) {
@@ -189,7 +191,7 @@ namespace WorksheetResults {
                 if (records.some(record => (record.target as Element).classList?.contains('select-options'))) {
                     this.countryObserver?.disconnect();
                     this.visibleCountries.clear();
-                    shell.querySelectorAll<HTMLElement>('[data-country-option="1"]').forEach(item => this.countryObserver!.observe(item));
+                    shell.querySelectorAll<HTMLElement>(candidates).forEach(item => this.countryObserver!.observe(item));
                 }
                 void this.fillCountryMenu();
             });

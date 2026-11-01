@@ -112,12 +112,15 @@ END;
 
 -- Island/town associations: official Azores guide, https://www.visitazores.com/storage/media/2022/03/feel-alive-en.pdf
 -- Coordinates identify existing catalogue references; no new town, height, time zone or jurisdiction is invented.
+-- UK references use coordinates already recorded in the packaged GeoNames town catalogue.
 WITH seeds(name, context, code, latitude, longitude) AS (
     VALUES ('Pico', 'Azores, Portugal', 'PT-20', 38.53642, -28.5266),
            ('Faial', 'Azores, Portugal', 'PT-20', 38.5333, -28.6333),
            ('Terceira', 'Azores, Portugal', 'PT-20', 38.6590, -27.2208),
            ('São Miguel', 'Azores, Portugal', 'PT-20', 37.7412, -25.6756),
-           ('Azores', 'Portugal', 'PT-20', 37.7412, -25.6756)
+           ('Azores', 'Portugal', 'PT-20', 37.7412, -25.6756),
+           ('Cornwall', 'England, Britain (UK)', 'GB-ENG', 50.41557, -5.07319),
+           ('Isle of Wight', 'Isle of White, England, Britain (UK)', 'GB-ENG', 50.70146, -1.29124)
 )
 INSERT OR IGNORE INTO jurisdiction_place_alias(name, context, jurisdiction_town_id)
 SELECT seed.name, seed.context, town.jurisdiction_town_id

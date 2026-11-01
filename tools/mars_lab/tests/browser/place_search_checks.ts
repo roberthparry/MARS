@@ -3,7 +3,8 @@
  * @brief Worldwide search selection, accent handling and asynchronous ownership regressions.
  *
  * Uses the actual native menu and town store with cancellable, controlled responses. Typing must not alter the
- * observer; choosing a result must retain its real identity. Superseded or disposed requests cannot change rows.
+ * observer; choosing a result must retain its real identity. Visible suggestions reuse cached SVG flags, including
+ * regional artwork, without replacing names or country details. Superseded or disposed requests cannot change rows.
  */
 
 interface Window {
@@ -16,6 +17,13 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
     function check(condition: unknown, message: string): void {
         if (!condition) throw new Error('Place search: ' + message);
     }
+    async function flagVisible(item: HTMLElement, flag: string): Promise<void> {
+        const deadline = performance.now() + 2500;
+        while (item.querySelector('img.country-flag')?.getAttribute('src') !== flag && performance.now() < deadline)
+            await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        check(item.querySelector('.select-option-label > img.country-flag')?.getAttribute('src') === flag,
+              'available artwork appears beside the place name without replacing its country detail');
+    }
     const root = document.createElement('section');
     root.className = 'mode-panel';
     root.style.cssText = 'position:fixed;left:0;top:0;z-index:10000;width:500px';
@@ -27,10 +35,15 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
                    new Option('Svalbard & Jan Mayen', 'SJ'), new Option('Portugal', 'PT'));
     const azores = new Option('Região Autónoma dos Açores', 'PT-20');
     azores.hidden = true; country.append(azores);
+    const wales = new Option('Britain (UK) - Wales', 'GB-WLS');
+    wales.dataset.countryParent = 'GB-WLS';
+    country.append(wales);
+    country.append(new Option('Britain (UK) - England', 'GB-ENG'));
     country.value = 'GB'; town.append(new Option('Previous town', 'previous'));
     Reflect.set(country, 'labJurisdictionLabels', {
         NA: 'Namibia', GB: 'United Kingdom', SJ: 'Svalbard & Jan Mayen', PT: 'Portugal',
-        'PT-20': 'Portugal — Região Autónoma dos Açores'
+        'PT-20': 'Portugal — Região Autónoma dos Açores', 'GB-WLS': 'Britain (UK) - Wales',
+        'GB-ENG': 'Britain (UK) - England'
     });
     root.append(country, town, select); document.body.append(root);
     const menu = WorksheetLocations.selects.enhance(select, {searchable: true, details: true});
@@ -54,6 +67,13 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
         detail: '26° 38.89′ S, 15° 9.56′ E', default: false
     };
     const response: WorksheetPlaces.SearchResponse = {available: true, matches: [row]};
+    const flag = 'data:image/svg+xml;base64,' + btoa(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 18"><path fill="#356" d="M0 0h24v18H0z"/></svg>');
+    const cornishFlag = 'data:image/svg+xml;base64,' + btoa(window.labAlmanacFixtures()[3]);
+    WorksheetResults.tooltip.rememberCountry('NA', 'Namibia', flag);
+    WorksheetResults.tooltip.rememberCountry('PT-20', 'Portugal', flag);
+    WorksheetResults.tooltip.rememberCountry('SJ', 'Svalbard & Jan Mayen', '');
+    WorksheetResults.tooltip.rememberCountry('GB-CON', 'Cornwall, England', cornishFlag);
     async function edit(query: string): Promise<void> {
         input.value = query;
         input.dispatchEvent(new Event('input', {bubbles: true}));
@@ -62,12 +82,16 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
     async function settle(): Promise<void> { await Promise.resolve(); await Promise.resolve(); }
     try {
         shell.querySelector<HTMLButtonElement>('.select-button')!.click();
+        WorksheetResults.tooltip.show(shell.querySelector<HTMLButtonElement>('.select-button')!);
         await edit('Luderitz');
         check(requests.length === 1 && requests[0].query === 'Luderitz', 'typing issues a bounded debounced query');
         requests[0].resolve(response); await settle();
         const suggestion = shell.querySelector<HTMLButtonElement>('.select-option:not(.hidden)')!;
         check(suggestion?.textContent?.includes('Lüderitz') && suggestion.textContent.includes('Namibia'),
               'accent-insensitive results show the country and remain visible under the original query');
+        check(suggestion.dataset.inlineFlag === '1' && suggestion.dataset.countryCode === 'NA',
+              'native search rows request inline artwork using their actual country code');
+        await flagVisible(suggestion, flag);
         check(country.value === 'GB' && town.value === 'previous' && !remembered && !selected,
               'suggestions cannot select a different observer');
         suggestion.click();
@@ -86,6 +110,7 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
         const area = shell.querySelector<HTMLButtonElement>('.select-option:not(.hidden)')!;
         check(area?.textContent?.includes('Longyearbyen') && area.textContent.includes('Svalbard'),
               'an area query retains a suitable town despite the different town name');
+        check(!area.querySelector('img.country-flag'), 'unavailable artwork leaves a usable textual result');
         area.click();
         check(country.value === 'SJ' && town.value === longyearbyen.value && selected === 2 && remembered === 2,
               'Svalbard selects Longyearbyen through the same ordinary location workflow');
@@ -102,6 +127,7 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
         const island = shell.querySelector<HTMLButtonElement>('.select-option:not(.hidden)')!;
         check(island?.textContent?.includes('Pico — Madalena') && !island.textContent.includes('GeoNames'),
               'island matches show the island and clean reference-town name');
+        await flagVisible(island, flag);
         island.click();
         check(country.value === 'PT-20' && town.value === madalena.value && selected === 3 && remembered === 3,
               'choosing Pico selects the real Madalena reference and its Azores membership');
@@ -121,7 +147,30 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
         check(!shell.querySelector('.select-option:not(.hidden)'), 'disposed searches cannot redraw the menu');
         check(country.value === 'PT-20' && town.value === madalena.value && selected === 3,
               'cancellation never changes worksheet state');
+        const english: LabTown = {...row, name: 'London', jurisdiction: 'GB-ENG',
+            value: 'London|51.5085|-0.1257|25', latitude: '51.5085', longitude: '-0.1257',
+            elevation: '25', timezone: 'Europe/London'};
+        labDOM.call('lab_town_store_add', 'GB-ENG', [english]);
+        const welsh: LabTown = {...row, name: 'Rhyl', jurisdiction: 'GB-WLS',
+            value: 'Rhyl|53.319|-3.4916|5', latitude: '53.319', longitude: '-3.4916',
+            elevation: '5', timezone: 'Europe/London'};
+        check(labDOM.call('lab_location_search_results', select, {available: true, matches: [welsh]}),
+              'a constituent-country search result is prepared');
+        select.value = 'GB-WLS:' + welsh.value;
+        check(labDOM.call('lab_location_search_choose', select) && country.value === 'GB-WLS' && town.value === welsh.value,
+              'choosing Wales preserves its separate country selection');
+        check(!Array.from(town.options).some(option => option.value === english.value),
+              'a Welsh search selection does not populate the English town list');
+        const cornish: LabTown = {...english, name: 'Newquay', matched_name: 'Cornwall', country_code: 'GB-CON',
+            value: 'Newquay|50.41557|-5.07319|31', latitude: '50.41557', longitude: '-5.07319', elevation: '31'};
+        check(labDOM.call('lab_location_search_results', select, {available: true, matches: [cornish]}),
+              'regional flag metadata survives replacement of the search results');
+        const region = shell.querySelector<HTMLButtonElement>('.select-option:not(.hidden)')!;
+        await flagVisible(region, cornishFlag);
+        check(region.textContent?.includes('Cornwall — Newquay') && region.textContent.includes('Britain (UK) - England'),
+              'regional artwork preserves both the named place and its country label');
     } finally {
+        WorksheetResults.tooltip.hide();
         controller.dispose(); menu?.dispose();
         labDOM.call('lab_menu_index_invalidate', select);
         labDOM.call('lab_menu_index_invalidate', town);

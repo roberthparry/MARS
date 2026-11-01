@@ -88,6 +88,8 @@ void lab_location_validate(lab_profile_kind_t kind, jsref boxed, jsref fallback,
 /** @brief Validate bootstrap data before projecting both jurisdiction menus and database availability.
  * @param catalogue Scoped bootstrap record with options, towns, available and optional error properties.
  * @return True after projection, including an unavailable database; false for invalid data or missing selects.
+ * @note Country entries aggregate subdivisions except England, Wales, Scotland and Northern Ireland, which
+ * retain visible, independently selected country entries. No scoped handles are consumed or retained.
  */
 bool lab_location_catalogue(jsref catalogue);
 

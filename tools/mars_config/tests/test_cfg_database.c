@@ -1141,7 +1141,7 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && cfg_databases_update() == 0 &&
          !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "13") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "14") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"GB\"*'", "1") &&
          test_cfg_database_query(db,
@@ -1155,7 +1155,7 @@ static bool test_cfg_database_update_fixture(const char *directory)
          test_cfg_database_query(db, "select count(*) from jurisdiction_town_timezone where timezone_code=24", "3") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction where jurisdiction_id='ZZ-SEA'", "0") &&
          test_cfg_database_query(db, "select value from retained", "42") &&
-         cfg_database_revision(db, "jurisdiction", 14);
+         cfg_database_revision(db, "jurisdiction", 15);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
          cfg_databases_update() == 1;

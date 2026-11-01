@@ -391,6 +391,10 @@ without catalogue towns have no result.
 Named-place aliases provide reference towns for geographic names outside the
 administrative catalogue. The managed aliases include Pico → Madalena, Faial →
 Horta, Terceira → Angra do Heroísmo, and São Miguel or Azores → Ponta Delgada.
+Cornwall resolves to Newquay, and Isle of Wight resolves to Newport on that island.
+The alternative spelling `Isle of White` is indexed as context for Isle of Wight.
+Constituent-country and Isle of Man names use their existing jurisdiction indexes
+and representative towns.
 `Pico Azores` also matches through its indexed context. Exact town and alias names
 rank before prefix-only matches such as Picos. The callback's optional
 `matched_name` supplies the geographic label; the town identity, elevation and

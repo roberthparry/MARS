@@ -308,14 +308,17 @@ coordinate/town-country metadata in a native dictionary, with FIFO eviction at
 64 entries or a 1 MiB text-allocation budget. Flags are not duplicated in this cache.
 
 The Country picker offers one visible entry per country, covering all its
-states and provinces. Country town requests include regional memberships in
+states and provinces. The four UK countries also have separate visible entries:
+**Britain (UK) - England**, **Britain (UK) - Wales**, **Britain (UK) - Scotland** and
+**Britain (UK) - Northern Ireland**. Each keeps its own town list and selected label.
+Country town requests include regional memberships in
 bounded database pages. The native town store combines that country's directly
 indexed lists, removes repeated town selection keys and sorts the resulting menu.
 A duplicate with a more specific jurisdiction supplies local rules; the national
 default still takes precedence when choosing the initial town. Selecting Canberra
 therefore requires only Australia, while its territory membership and time zone
 remain available internally. Restored regional selections show their parent
-country in the picker. Geographic names and regional flag artwork remain local
+country in the picker, except for the four UK countries. Geographic names and regional flag artwork remain local
 to the selected place.
 
 In Almanac and Datetime, **Find a place anywhere** searches towns, countries and
@@ -327,7 +330,11 @@ Island aliases also resolve to existing town references: `Pico` or `Pico Azores`
 shows **Pico — Madalena** in the Azores. Choosing it retains Madalena's recorded
 position, elevation and time zone. Exact named places rank before prefix matches
 such as Picos in other countries. Faial, Terceira and São Miguel are also indexed.
-Suggestions show their country or region
+England, Wales, Scotland, Northern Ireland and the Isle of Man can be searched by
+name. Cornwall selects Newquay, and the Isle of Wight selects Newport; the search
+also accepts `Isle of White` and displays the correct Isle of Wight name.
+Suggestions show the available country or regional SVG flag beside the place name,
+followed by their country or region
 to distinguish places with the same name. Typing leaves the observer unchanged;
 choosing a suggestion selects its country, town, coordinates, height and local
 time rules through the usual history and globe-travel controls. Search uses the
@@ -335,7 +342,8 @@ installed catalogue and works without an internet connection.
 
 Country dropdowns also show available flags beside visible entries
 and the selected label, as well as in their tooltips. Opening or focusing the menu
-starts lazy observation: artwork loads sequentially for visible rows, sharing the
+starts lazy observation, including in worldwide place-search menus: artwork loads
+sequentially for visible rows, sharing the
 32-entry native `dictionary_t` cache with a 1 MiB UTF-8 text budget. C owns copied
 country names and flag data, validation, replacement, FIFO eviction and cleanup;
 no scoped JavaScript handles survive a native call. Dictionary lookup and linked

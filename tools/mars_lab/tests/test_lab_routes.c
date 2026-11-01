@@ -737,27 +737,35 @@ static bool route_place_search(const char *directory)
         "INSERT INTO jurisdiction VALUES('NA',NULL,'country','Namibia'),('NA-KA','NA','subdivision','Karas'),"
         "('FR',NULL,'country','France'),('BY',NULL,'country','Belarus'),"
         "('SJ',NULL,'country','Svalbard & Jan Mayen'),('PT',NULL,'country','Portugal'),"
-        "('PT-20','PT','subdivision','Região Autónoma dos Açores'),('BR',NULL,'country','Brazil');"
+        "('PT-20','PT','subdivision','Região Autónoma dos Açores'),('BR',NULL,'country','Brazil'),"
+        "('GB-SCT','GB','subdivision','Scotland'),('GB-NIR','GB','subdivision','Northern Ireland'),"
+        "('IM',NULL,'country','Isle of Man');"
         "CREATE TABLE jurisdiction_name(jurisdiction_id TEXT PRIMARY KEY,name TEXT NOT NULL);"
         "INSERT INTO jurisdiction_name SELECT jurisdiction_id,name FROM jurisdiction;"
         "INSERT INTO jurisdiction_town_entity VALUES(4,'NA','Lüderitz'),(5,'NA-KA','Lüderitz'),"
         "(6,'FR','Brest'),(7,'BY','Brest'),(8,'SJ','Longyearbyen'),(9,'SJ','Olonkinbyen'),"
         "(10,'PT-20','Madalena (GeoNames 3372908)'),(11,'PT-20','Horta'),"
-        "(12,'PT-20','Ponta Delgada'),(13,'PT-20','Angra do Heroísmo'),(14,'BR','Picos');"
+        "(12,'PT-20','Ponta Delgada'),(13,'PT-20','Angra do Heroísmo'),(14,'BR','Picos'),"
+        "(15,'GB-ENG','Newquay'),(16,'GB-ENG','Newport (GeoNames 2641599)'),"
+        "(17,'GB-SCT','Edinburgh'),(18,'GB-NIR','Belfast'),(19,'IM','Douglas');"
         "INSERT INTO jurisdiction_town_name VALUES(4,'Lüderitz'),(5,'Lüderitz'),(6,'Brest'),(7,'Brest'),"
         "(8,'Longyearbyen'),(9,'Olonkinbyen'),(10,'Madalena (GeoNames 3372908)'),"
-        "(11,'Horta'),(12,'Ponta Delgada'),(13,'Angra do Heroísmo'),(14,'Picos');"
+        "(11,'Horta'),(12,'Ponta Delgada'),(13,'Angra do Heroísmo'),(14,'Picos'),"
+        "(15,'Newquay'),(16,'Newport (GeoNames 2641599)'),(17,'Edinburgh'),(18,'Belfast'),(19,'Douglas');"
         "INSERT INTO jurisdiction_town_latitude VALUES(4,'-26.6481'),(5,'-26.6481'),(6,'48.39'),(7,'52.10'),"
-        "(8,'78.2232'),(9,'70.9221'),(10,'38.53642'),(11,'38.5333'),(12,'37.7412'),(13,'38.6590'),(14,'-7.07694');"
+        "(8,'78.2232'),(9,'70.9221'),(10,'38.53642'),(11,'38.5333'),(12,'37.7412'),(13,'38.6590'),(14,'-7.07694'),"
+        "(15,'50.41557'),(16,'50.70146'),(17,'55.9533'),(18,'54.5973'),(19,'54.15');"
         "INSERT INTO jurisdiction_town_longitude VALUES(4,'15.1594'),(5,'15.1594'),(6,'-4.48'),(7,'23.69'),"
-        "(8,'15.6469'),(9,'-8.7187'),(10,'-28.5266'),(11,'-28.6333'),(12,'-25.6756'),(13,'-27.2208'),(14,'-41.46694');"
+        "(8,'15.6469'),(9,'-8.7187'),(10,'-28.5266'),(11,'-28.6333'),(12,'-25.6756'),(13,'-27.2208'),(14,'-41.46694'),"
+        "(15,'-5.07319'),(16,'-1.29124'),(17,'-3.1883'),(18,'-5.9301'),(19,'-4.4833');"
         "INSERT INTO jurisdiction_town_elevation VALUES(4,'15'),(5,'15'),(6,'34'),(7,'142'),(8,'28'),(9,'5'),"
-        "(10,'8'),(11,'39'),(12,'35'),(13,'76'),(14,'203');"
+        "(10,'8'),(11,'39'),(12,'35'),(13,'76'),(14,'203'),(15,'31'),(16,'6'),(17,'66'),(18,'7'),(19,'31');"
         "INSERT INTO timezone_code VALUES('Africa/Windhoek',3),('Arctic/Longyearbyen',4),"
         "('Atlantic/Azores',5),('America/Fortaleza',6);"
         "INSERT INTO jurisdiction_town_timezone VALUES(4,3),(5,3),(6,1),(7,1),(8,4),(9,4),"
-        "(10,5),(11,5),(12,5),(13,5),(14,6);"
-        "INSERT INTO jurisdiction_default_town VALUES('GB',1),('SJ',8),('PT-20',12);") && sqlite_exec(db, sql);
+        "(10,5),(11,5),(12,5),(13,5),(14,6),(15,1),(16,1),(17,1),(18,1),(19,1);"
+        "INSERT INTO jurisdiction_default_town VALUES('GB',1),('SJ',8),('PT-20',12),('GB-SCT',17),('GB-NIR',18),('IM',19);") &&
+        sqlite_exec(db, sql);
     if (!ok && db) string_fprintf(stderr, "Search fixture: %s\n", string_c_str(sqlite_last_error(db)));
     sqlite_close(db);
     string_free(path); string_free(key);
@@ -766,6 +774,8 @@ static bool route_place_search(const char *directory)
         {"Luderitz", 1}, {"lüDER", 1}, {"  Luderitz  ", 1}, {"Bre", 2},
         {"Brest OR Shrewsbury", 0}, {"\" OR \"", 0}, {"NoSuchTown", 0},
         {"Svalbard", 1}, {"United Kingdom", 1}, {"Wales", 1}, {"Namibia", 1},
+        {"England", 3}, {"Scotland", 1}, {"Northern Ireland", 1}, {"Cornwall", 1},
+        {"Isle of Man", 1}, {"Isle of Wight", 1}, {"Isle of White", 1},
         {"Pico", 2}, {"Pico Azores", 1}, {"Faial", 1}, {"Terceira", 1}, {"sao miguel", 1}, {"Azores", 4}
     };
     for (size_t i = 0; engine && i < sizeof cases / sizeof *cases; ++i) {
@@ -816,6 +826,23 @@ static bool route_place_search(const char *directory)
         !strcmp(test_lab_text(town, "jurisdiction"), "SJ") &&
         !strcmp(test_lab_text(town, "timezone"), "Arctic/Longyearbyen"), "Svalbard selects its default town") && ok;
     json_free(result); http_response_free(response);
+    static const struct { const char *query, *town, *code; } british_places[] = {
+        {"England", "Shrewsbury", "GB-ENG"}, {"Wales", "Rhyl", "GB-WLS"},
+        {"Scotland", "Edinburgh", "GB-SCT"}, {"Northern Ireland", "Belfast", "GB-NIR"},
+        {"Cornwall", "Newquay", "GB-ENG"}, {"Isle of Man", "Douglas", "IM"},
+        {"Isle of Wight", "Newport", "GB-ENG"}, {"Isle of White", "Newport", "GB-ENG"}
+    };
+    for (size_t i = 0; i < sizeof british_places / sizeof *british_places; ++i) {
+        string_t *body = string_sprintf("{\"query\":\"%s\"}", british_places[i].query);
+        response = body ? route_request(HTTP_POST, "/place-search", string_c_str(body),
+                                       "application/x-protobuf", NULL, NULL) : NULL;
+        result = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+        matches = test_lab_member(result, "matches"); town = json_array_get(matches, 0);
+        ok = route_check(response, 200, json_array_size(matches) >= 1 &&
+            strstr(test_lab_text(town, "name"), british_places[i].town) &&
+            !strcmp(test_lab_text(town, "jurisdiction"), british_places[i].code), british_places[i].query) && ok;
+        json_free(result); http_response_free(response); string_free(body);
+    }
     response = route_request(HTTP_POST, "/place-search", "{\"query\":\"  \"}",
                              "application/x-protobuf", NULL, NULL);
     ok = route_check(response, 400, true, "blank searches are rejected") && ok;

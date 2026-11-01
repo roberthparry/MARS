@@ -97,8 +97,11 @@ bool lab_location_search_choose(node_jsref select)
     int value = lab_dom_read(option, LAB_DOM_DATASET, "townValue");
     int country = search_control(select, "select[id$='Jurisdiction']");
     int town = search_control(select, "select[id$='Town']");
-    if (!country || !town || !lab_dom_length(value) || lab_menu_index_key(country, code) < 0) return false;
-    int rows = lab_town_store_snapshot(lab_dom_slice(code, 0, 2));
+    int index = country ? lab_menu_index_key(country, code) : -1;
+    if (!country || !town || !lab_dom_length(value) || index < 0) return false;
+    int country_option = lab_dom_item(lab_dom_get(country, "options"), (unsigned)index);
+    int group = lab_dom_read(country_option, LAB_DOM_DATASET, "countryParent");
+    int rows = lab_town_store_snapshot(lab_dom_length(group) ? group : lab_dom_slice(code, 0, 2));
     if (lab_dom_type(rows) != LAB_VALUE_ARRAY) return false;
     lab_dom_write(country, LAB_DOM_VALUE, "", code);
     lab_location_populate(town, rows, false);

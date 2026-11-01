@@ -88,8 +88,8 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             labDOM.call<unknown[]>('lab_location_towns', catalogue, {value: 'GB-WLS'}), catalogue.towns['GB-WLS'],
             'explicit empty catalogue does not fall through to country');
         equal(
-            labDOM.call<unknown[]>('lab_location_towns', catalogue, {value: 'GB-SCT'}), towns,
-            'missing regional catalogue uses country');
+            labDOM.call<unknown[]>('lab_location_towns', catalogue, {value: 'GB-SCT'}).length, 0,
+            'Scotland waits for its own catalogue instead of using towns from other UK countries');
         const labels = Reflect.get(WorksheetContext.almanacJurisdiction, 'labJurisdictionLabels');
         try {
             Reflect.set(WorksheetContext.almanacJurisdiction, 'labJurisdictionLabels', {'IT-PR': 'Italy - Parma', 'IT-MI': 'Italy - Milan'});
@@ -587,18 +587,41 @@ window.checkLabLocationDom = async function checkLabLocationDom() {
             available: true,
             options: [['GB', 'United <Kingdom>'], ['IE', 'Ireland'],
                       ['AU', 'Australia'], ['AU-ACT', 'Australia - Australian Capital Territory'],
-                      ['AU-QLD', 'Australia - Queensland']],
+                      ['AU-QLD', 'Australia - Queensland'],
+                      ['GB-ENG', 'Britain (UK) - England'], ['GB-WLS', 'Britain (UK) - Wales'],
+                      ['GB-SCT', 'Britain (UK) - Scotland'], ['GB-NIR', 'Britain (UK) - Northern Ireland']],
             towns: {}
         };
         equal(labDOM.call('lab_location_catalogue', bootstrapCatalogue), 1, 'valid bootstrap catalogue accepted');
         for (const jurisdiction of [WorksheetContext.datetimeJurisdiction, WorksheetContext.almanacJurisdiction]) {
             const unknown = jurisdiction === WorksheetContext.almanacJurisdiction ? 1 : 0;
-            equal(jurisdiction.options.length, 5 + unknown, 'regional identities remain available for restoration');
-            equal(Array.from(jurisdiction.options).filter(option => !option.hidden).length, 3 + unknown,
-                  'only one visible entry per country');
+            equal(jurisdiction.options.length, 9 + unknown, 'regional identities remain available for restoration');
+            equal(Array.from(jurisdiction.options).filter(option => !option.hidden).length, 7 + unknown,
+                  'UK constituent countries remain visible alongside the sovereign-country entries');
             equal(jurisdiction.options[unknown].textContent, 'United <Kingdom>', 'jurisdiction labels remain plain text');
             equal(jurisdiction.value, unknown ? '' : 'GB', 'Almanac does not invent a country before identification');
             equal(jurisdiction.disabled, false, 'available catalogue enables jurisdiction');
+            for (const [code, name] of [['GB-ENG', 'England'], ['GB-WLS', 'Wales'],
+                                        ['GB-SCT', 'Scotland'], ['GB-NIR', 'Northern Ireland']]) {
+                jurisdiction.value = code;
+                WorksheetLocations.selects.rebuild(jurisdiction);
+                equal(jurisdiction.selectedOptions[0].hidden, false, `${name} is a visible country`);
+                equal(jurisdiction.closest('.select-shell')!.querySelector('.select-button')!.textContent,
+                      `Britain (UK) - ${name}`, `${name} retains its own selected label`);
+                equal(jurisdiction.selectedOptions[0].dataset.countryParent, code,
+                      `${name} retains its own country menu identity`);
+                const local = {name, value: code};
+                const rows = labDOM.call<LabTown[]>('lab_location_towns', {
+                    config: {DEFAULT_DATETIME_JURISDICTION: 'GB'}, jurisdictions: new Set(['GB', code]),
+                    towns: {GB: [{name: 'Shared UK list'}], [code]: [local]}
+                }, {value: code});
+                equal(rows[0]?.name, name, `${name} uses its own town list`);
+                const pending = labDOM.call<LabTown[]>('lab_location_towns', {
+                    config: {DEFAULT_DATETIME_JURISDICTION: 'GB'}, jurisdictions: new Set(['GB', code]),
+                    towns: {GB: [{name: 'Shared UK list'}]}
+                }, {value: code});
+                equal(pending.length, 0, `${name} waits for its own towns instead of displaying other countries`);
+            }
             jurisdiction.value = 'AU-ACT';
             WorksheetLocations.selects.rebuild(jurisdiction);
             const shell = jurisdiction.closest('.select-shell')!;
