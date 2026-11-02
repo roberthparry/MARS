@@ -6,8 +6,9 @@
  * and jurisdiction/bucket sequences. Direct country slots collect regional memberships;
  * country snapshots merge duplicate keys without changing the retained local rule identity.
  * JavaScript receives temporary display copies,
- * never native pointers or retained bridge handles. An 8 MiB admission budget
- * accounts for copied text plus a conservative per-record index allowance.
+ * never native pointers or retained bridge handles. A 16 MiB admission budget
+ * accounts for copied text plus a conservative per-record index allowance. Native country LRU lists release
+ * inactive catalogues under pressure; selected countries remain pinned and dropped catalogues can be reloaded.
  * Mutable resident state belongs to a private singleton. Public operations enter its serial dispatcher;
  * internal helpers execute only within that ownership boundary. No scoped browser handles are retained.
  * Place snapshots provide formatted display names separately from unchanged catalogue names and selection keys.
@@ -30,7 +31,10 @@ typedef struct _town_record_t {
     double latitude, longitude;
     bool preferred;
     size_t bytes;
+    size_t slots[4];
 } town_record_t;
+
+enum { TOWN_OWNER_SLOT, TOWN_GROUP_SLOT, TOWN_COUNTRY_SLOT, TOWN_BUCKET_SLOT };
 
 static const char *const field_names[] = {
     "name", "latitude", "longitude", "elevation", "timezone", "value", "detail", "country_code"
@@ -46,12 +50,15 @@ typedef struct _town_store_t {
     dictionary_t *long_names;
     size_t text_bytes;
     const size_t text_limit;
+    unsigned previous[26 * 26], next[26 * 26], oldest, newest;
+    bool linked[26 * 26], pinned[26 * 26], discarded[26 * 26];
+    unsigned evicted[26 * 26], evicted_count;
 } town_store_t;
 
 /* The singleton is private; only dispatched operations may access its resident state. */
 static town_store_t *town_store(void)
 {
-    static town_store_t instance = {.serial = LAB_SERIAL_INITIALIZER, .text_limit = 8 * 1048576};
+    static town_store_t instance = {.serial = LAB_SERIAL_INITIALIZER, .text_limit = 16 * 1048576};
     return &instance;
 }
 
@@ -168,6 +175,95 @@ static array_t **town_bucket(const town_record_t *record)
     return &state->buckets[y * 72 + x];
 }
 
+static unsigned country_index(const char *code)
+{
+    return (unsigned)(code[0] - 'A') * 26 + (unsigned)(code[1] - 'A');
+}
+
+static void country_unlink(unsigned index)
+{
+    town_store_t *state = town_store();
+    if (!state->linked[index]) return;
+    unsigned previous = state->previous[index], next = state->next[index];
+    if (previous) state->next[previous - 1] = next;
+    else state->oldest = next;
+    if (next) state->previous[next - 1] = previous;
+    else state->newest = previous;
+    state->linked[index] = false;
+}
+
+static void country_touch(unsigned index)
+{
+    town_store_t *state = town_store();
+    country_unlink(index);
+    state->previous[index] = state->newest; state->next[index] = 0;
+    if (state->newest) state->next[state->newest - 1] = index + 1;
+    else state->oldest = index + 1;
+    state->newest = index + 1; state->linked[index] = true;
+}
+
+static void release_empty_group(const char *code)
+{
+    town_store_t *state = town_store();
+    const char *key = code;
+    dictionary_entry_t *entry = NULL;
+    if (!state->by_country || !dictionary_get_entry(state->by_country, &key, &entry)) return;
+    array_t *group = *(array_t *const *)dictionary_entry_value(entry);
+    if (array_size(group)) return;
+    char *owned = *(char *const *)dictionary_entry_key(entry);
+    dictionary_remove(state->by_country, &key);
+    array_destroy(group); free(owned);
+}
+
+/* Swap the last pointer into each vacated slot; no owner, jurisdiction or spatial list is searched. */
+static void discard_record(town_record_t *record)
+{
+    town_store_t *state = town_store();
+    const char *key = record->code;
+    array_t *group = NULL, **bucket = town_bucket(record);
+    dictionary_get(state->by_country, &key, &group);
+    array_t *lists[] = {state->records, group, state->countries[country_index(record->code)], bucket ? *bucket : NULL};
+    for (unsigned i = 0; i < sizeof lists / sizeof *lists; ++i) {
+        if (!lists[i]) continue;
+        size_t last = array_size(lists[i]) - 1;
+        town_record_t *moved = *(town_record_t **)array_get(lists[i], last);
+        *(town_record_t **)array_get(lists[i], record->slots[i]) = moved;
+        moved->slots[i] = record->slots[i];
+        array_remove(lists[i], last);
+    }
+    release_empty_group(record->code);
+    dictionary_remove(state->by_key, &record->key);
+    state->text_bytes -= record->bytes;
+    release_record(record);
+}
+
+static void discard_country(unsigned index)
+{
+    town_store_t *state = town_store();
+    array_t *family = state->countries[index];
+    bool populated = array_size(family) != 0;
+    while (array_size(family)) discard_record(*(town_record_t **)array_get(family, array_size(family) - 1));
+    array_destroy(family); state->countries[index] = NULL;
+    country_unlink(index);
+    if (populated && !state->discarded[index]) {
+        state->discarded[index] = true; state->evicted[state->evicted_count++] = index;
+    }
+}
+
+/* At most 676 directly indexed country nodes can be considered; active countries and the incoming batch stay pinned. */
+static bool make_room(unsigned incoming, size_t bytes)
+{
+    town_store_t *state = town_store();
+    if (bytes > state->text_limit) return false;
+    while (state->text_bytes + bytes > state->text_limit) {
+        unsigned victim = state->oldest;
+        while (victim && (victim - 1 == incoming || state->pinned[victim - 1])) victim = state->next[victim - 1];
+        if (!victim) return false;
+        discard_country(victim - 1);
+    }
+    return true;
+}
+
 static bool initialise(void)
 {
     town_store_t *state = town_store();
@@ -197,11 +293,12 @@ static int lab_town_store_add_owned(jsref code_value, jsref rows)
     if (!copy_code(code_value, code) || !initialise() || lab_dom_type(rows) != LAB_VALUE_ARRAY) {
         return -1;
     }
-    array_t **national = &state->countries[(code[0] - 'A') * 26 + code[1] - 'A'];
+    unsigned root = country_index(code);
+    array_t **national = &state->countries[root];
     if (!*national) *national = array_create(sizeof(town_record_t *), NULL, NULL);
     if (!*national) return -1;
+    country_touch(root);
     const char *country_key = code;
-    char *created_key = NULL;
     array_t *country = NULL;
     if (!dictionary_get(state->by_country, &country_key, &country)) {
         char *owned = copy_text(code_value);
@@ -209,10 +306,8 @@ static int lab_town_store_add_owned(jsref code_value, jsref rows)
         if (!owned || !country || !dictionary_set(state->by_country, &owned, &country)) {
             free(owned); array_destroy(country); return -1;
         }
-        created_key = owned;
     }
     int added = 0;
-    size_t initial_count = array_size(state->records);
     unsigned mark = lab_dom_mark();
     for (unsigned index = 0; index < lab_dom_count(rows); ++index) {
         lab_dom_release(mark);
@@ -238,7 +333,11 @@ static int lab_town_store_add_owned(jsref code_value, jsref rows)
         array_t **bucket = town_bucket(record);
         if (bucket && !*bucket) *bucket = array_create(sizeof(town_record_t *), NULL, NULL);
         bool indexed = false, owned = false, listed = false, spatial = false, grouped = false;
-        if (state->text_bytes + record->bytes <= state->text_limit && (!bucket || *bucket)) {
+        if (make_room(root, record->bytes) && (!bucket || *bucket)) {
+            record->slots[TOWN_OWNER_SLOT] = array_size(state->records);
+            record->slots[TOWN_GROUP_SLOT] = array_size(country);
+            record->slots[TOWN_COUNTRY_SLOT] = array_size(*national);
+            record->slots[TOWN_BUCKET_SLOT] = bucket ? array_size(*bucket) : 0;
             indexed = dictionary_set(state->by_key, &record->key, &record);
             if (indexed) owned = array_append_carray(state->records, &record, 1);
             if (owned) listed = array_append_carray(country, &record, 1);
@@ -256,26 +355,21 @@ static int lab_town_store_add_owned(jsref code_value, jsref rows)
         ++added;
     }
     lab_dom_release(mark);
-    if (added) array_sort(country, town_compare);
+    if (added) {
+        array_sort(country, town_compare);
+        for (size_t i = 0; i < array_size(country); ++i)
+            (*(town_record_t **)array_get(country, i))->slots[TOWN_GROUP_SLOT] = i;
+    }
     return added;
 
 rollback:
     lab_dom_release(mark);
-    while (array_size(state->records) > initial_count) {
-        town_record_t *record = *(town_record_t **)array_get(state->records, array_size(state->records) - 1);
-        array_t **bucket = town_bucket(record);
-        if (bucket) array_remove(*bucket, array_size(*bucket) - 1);
-        array_remove(*national, array_size(*national) - 1);
-        array_remove(country, array_size(country) - 1);
-        array_remove(state->records, array_size(state->records) - 1);
-        dictionary_remove(state->by_key, &record->key);
-        state->text_bytes -= record->bytes;
-        release_record(record);
+    while (added > 0) {
+        --added;
+        discard_record(*(town_record_t **)array_get(country, array_size(country) - 1));
     }
-    if (created_key) {
-        dictionary_remove(state->by_country, &created_key);
-        free(created_key); array_destroy(country);
-    }
+    release_empty_group(code);
+    if (!array_size(*national)) discard_country(root);
     return -1;
 }
 
@@ -336,6 +430,7 @@ static jsref lab_town_store_snapshot_owned(jsref code_value)
     const char *key = code;
     array_t *country = NULL;
     if (!copy_code(code_value, code)) return 0;
+    if (state->countries[country_index(code)]) country_touch(country_index(code));
     if (strlen(code) == 2) {
         array_t *family = state->countries[(code[0] - 'A') * 26 + code[1] - 'A'];
         if (family) return country_town_snapshot(family);
@@ -367,6 +462,7 @@ static void lab_town_store_get_owned(jsref code_value, jsref key_value)
     char *key = value && copy_code(code_value, code) ? record_key(code, value) : NULL;
     town_record_t *record = NULL;
     bool found = key && state->by_key && dictionary_get(state->by_key, &key, &record);
+    if (found) country_touch(country_index(code));
     free(value); free(key);
     lab_dom_return(found ? town_value(record, true) : 0);
 }
@@ -375,6 +471,7 @@ static void lab_town_store_get_owned(jsref code_value, jsref key_value)
 static void lab_town_store_region_owned(double west, double south, double east, double north)
 {
     town_store_t *state = town_store();
+    bool touched[26 * 26] = {0};
     jsref result = lab_dom_object(LAB_VALUE_ARRAY);
     if (!isfinite(west) || !isfinite(east) || !isfinite(south) || !isfinite(north) ||
         west > east || south > north || south > 90 || north < -90 || fabs(west) > 1080 || fabs(east) > 1080) {
@@ -389,7 +486,10 @@ static void lab_town_store_region_owned(double west, double south, double east, 
             if (!bucket) continue;
             unsigned mark = lab_dom_mark();
             for (size_t i = 0; i < array_size(bucket); ++i) {
-                lab_dom_push(result, town_value(*(town_record_t **)array_get(bucket, i), true));
+                town_record_t *record = *(town_record_t **)array_get(bucket, i);
+                unsigned root = country_index(record->code);
+                if (!touched[root]) { country_touch(root); touched[root] = true; }
+                lab_dom_push(result, town_value(record, true));
                 lab_dom_release(mark);
             }
         }
@@ -416,6 +516,42 @@ static void lab_town_store_clear_owned(void)
     if (state->records) for (size_t i = 0; i < array_size(state->records); ++i)
         release_record(*(town_record_t **)array_get(state->records, i));
     array_destroy(state->records); state->records = NULL; state->text_bytes = 0;
+    memset(state->linked, 0, sizeof state->linked); memset(state->pinned, 0, sizeof state->pinned);
+    memset(state->discarded, 0, sizeof state->discarded); state->evicted_count = state->oldest = state->newest = 0;
+}
+
+static void town_store_policy_dispatch(void *context)
+{
+    town_store_t *state = town_store();
+    jsref request = *(jsref *)context, pins = lab_dom_get(request, "pins");
+    if (lab_dom_type(pins) == LAB_VALUE_ARRAY) {
+        if (lab_dom_count(pins) > 8) { lab_dom_return(0); return; }
+        bool pinned[26 * 26] = {0};
+        for (unsigned i = 0; i < lab_dom_count(pins); ++i) {
+            char code[7];
+            if (!copy_code(lab_dom_item(pins, i), code)) { lab_dom_return(0); return; }
+            pinned[country_index(code)] = true;
+        }
+        memcpy(state->pinned, pinned, sizeof pinned);
+    }
+    jsref result = lab_dom_object(LAB_VALUE_OBJECT), evicted = lab_dom_object(LAB_VALUE_ARRAY);
+    for (unsigned i = 0; i < state->evicted_count; ++i) {
+        unsigned index = state->evicted[i];
+        char code[] = {(char)('A' + index / 26), (char)('A' + index % 26), 0};
+        lab_dom_push(evicted, lab_dom_string(code)); state->discarded[index] = false;
+    }
+    state->evicted_count = 0;
+    lab_dom_set(result, "evicted", evicted);
+    lab_dom_set(result, "bytes", lab_dom_numeric(state->text_bytes));
+    lab_dom_set(result, "limit", lab_dom_numeric(state->text_limit));
+    lab_dom_set(result, "count", lab_dom_numeric(array_size(state->records)));
+    lab_dom_return(result);
+}
+
+/* Update active-country pins and acknowledge discarded catalogue identities within one native operation. */
+void lab_town_store_policy(jsref request)
+{
+    if (!lab_serial_dispatch(&town_store()->serial, town_store_policy_dispatch, &request)) lab_dom_return(0);
 }
 
 typedef struct _town_store_add_request_t {

@@ -175,6 +175,26 @@ function checkGlobeComposite(check: (condition: boolean, message: string) => voi
         gl.uniform4f(gl.getUniformLocation(program, 'riverBounds'), 1, -1, 2, 1);
         check(pixel().every((value, i) => i === 3 ? value === 255 : Math.abs(value - [40, 180, 160][i] * light) <= 2),
               'outgoing detail remains visible beyond the replacement tile instead of flashing to the world overview');
+        const page = gl.createTexture()!;
+        textures.push(page);
+        gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, page);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        const addresses = new Uint8Array(8 * 8 * 4);
+        for (let i = 0; i < addresses.length; i += 4) addresses[i] = 1;
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 8, 8, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
+        gl.uniform1i(gl.getUniformLocation(program, 'photoPatch'), 7);
+        gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasEnabled'), 1);
+        gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasReady'), 1);
+        gl.uniform1i(gl.getUniformLocation(program, 'previousRiverReady'), 0);
+        gl.uniform4f(gl.getUniformLocation(program, 'photoAtlasBounds'), -1, -1, 1, 1);
+        gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasSpan'), .25);
+        gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasColumns'), 1);
+        for (const blend of [0, .5, 1]) {
+            gl.uniform1f(gl.getUniformLocation(program, 'riverBlend'), blend);
+            check(pixel().every((value, i) => i === 3 ? value === 255 : Math.abs(value - [40, 180, 160][i] * light) <= 2),
+                  'fixed photographic pixels remain sharp through river-mask and coarse-preview handoffs');
+        }
         check(gl.getError() === gl.NO_ERROR, 'photographic handoffs complete without GPU errors');
     } finally {
         textures.forEach(texture => gl.deleteTexture(texture));

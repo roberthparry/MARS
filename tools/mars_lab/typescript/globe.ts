@@ -168,6 +168,9 @@ class MarsAlmanacGlobe {
     private palettesReady = false;
     private photo: import('./globe_photo.js').GlobePhoto | null = null;
     private photoModule: Promise<typeof import('./globe_photo.js')> | null = null;
+    private photoAtlas: import('./globe_photo_atlas.js').GlobePhotoAtlas | null = null;
+    private photoAtlasModule: Promise<typeof import('./globe_photo_atlas.js')> | null = null;
+    private photoAtlasFailed = false;
     private detailZoom = 0;
     private requestBounds: number[] | null = null;
     private readonly markerNodes = new Map<string | null, HTMLElement>();
@@ -482,6 +485,7 @@ class MarsAlmanacGlobe {
             if (event.persisted) return;
             this.shoreClosed = true;
             this.photo?.dispose();
+            this.photoAtlas?.dispose();
             this.riverRequest?.abort();
             window.clearTimeout(this.riverTimer);
             this.riverSurface?.dispose();
@@ -860,6 +864,7 @@ class MarsAlmanacGlobe {
     }
 
     private async loadPhoto(): Promise<void> {
+        if (this.photoAtlas) return;
         const target = this.flightTarget;
         if ((target?.[4] ?? this.view[2]) < 6 || this.shoreClosed) return;
         const latitude = target ? Number(this.input('Latitude').value) : this.view[0];
@@ -867,7 +872,7 @@ class MarsAlmanacGlobe {
         ++this.photoLoading;
         try {
             const module = await (this.photoModule ||= import('./globe_photo.js'));
-            if (this.shoreClosed || this.flightTarget !== target) return;
+            if (this.shoreClosed || this.flightTarget !== target || this.photoAtlas) return;
             this.photo ||= new module.GlobePhoto(this.gl, () => {
                 this.root.dataset.photoResolution = '21600';
                 this.draw();
@@ -1016,6 +1021,19 @@ class MarsAlmanacGlobe {
         if (bounds[2] - bounds[0] > 30 || bounds[3] - bounds[1] > 30)
             bounds = (labDOM.call('lab_globe_view', orientation, zoom / 1.15, 1) as GlobeView).slice(3);
         if (bounds[2] - bounds[0] > 30 || bounds[3] - bounds[1] > 30) return;
+        if (!this.photoAtlas && !this.photoAtlasFailed) {
+            try {
+                const {GlobePhotoAtlas} = await (this.photoAtlasModule ||= import('./globe_photo_atlas.js'));
+                if (this.shoreClosed) return;
+                if (!this.photoAtlas) {
+                    try { this.photoAtlas = new GlobePhotoAtlas(this.gl, () => this.draw()); }
+                    catch { this.photoAtlas = new GlobePhotoAtlas(this.gl, () => this.draw(), 2048); }
+                    this.photo?.dispose(); this.photo = null;
+                    this.root.dataset.photoAtlas = 'ready';
+                    this.draw();
+                }
+            } catch { this.photoAtlasFailed = true; this.root.dataset.photoAtlas = 'unavailable'; }
+        }
         if (this.riverTiles.covering(reserve.slice(3), zoom)?.complete) {
             this.draw();
             return;
@@ -1051,7 +1069,7 @@ class MarsAlmanacGlobe {
                     this.riverTiles!.put(bounds, zoom, tile, false);
                     this.root.dataset.riverSurface = 'preview';
                     this.draw();
-                });
+                }, Boolean(this.photoAtlas));
             } catch {
                 request.signal.throwIfAborted();
                 image = await this.riverImage(bounds, request.signal);
@@ -1245,6 +1263,14 @@ class MarsAlmanacGlobe {
             gl.bindTexture(gl.TEXTURE_2D, this.textures[2]);
             const regional = this.view[5] - this.view[3] <= 30 && this.view[6] - this.view[4] <= 30;
             const resident = regional ? this.riverTiles?.bind(this.view.slice(3), this.view[2]) : null;
+            const photographic = this.photoAtlas?.bind(this.view.slice(3), pixels);
+            gl.uniform1i(this.uniform('photoAtlasEnabled'), Number(Boolean(this.photoAtlas)));
+            gl.uniform1i(this.uniform('photoAtlasReady'), Number(Boolean(photographic)));
+            if (photographic) {
+                gl.uniform4fv(this.uniform('photoAtlasBounds'), photographic.bounds);
+                gl.uniform1f(this.uniform('photoAtlasSpan'), photographic.span);
+                gl.uniform1f(this.uniform('photoAtlasColumns'), this.photoAtlas!.atlasColumns);
+            }
             if (resident) {
                 this.riverBounds = resident.bounds;
                 this.riverZoom = resident.zoom;
@@ -1267,7 +1293,7 @@ class MarsAlmanacGlobe {
             gl.uniform1i(this.uniform('naturalStyle'), 1);
             gl.uniform1i(this.uniform('palettesReady'), Number(this.palettesReady));
             gl.uniform1f(this.uniform('photoPixels'), Number(this.root.dataset.resolution) || 0);
-            gl.uniform1i(this.uniform('photoReady'), Number(Boolean(this.photo?.ready)));
+            gl.uniform1i(this.uniform('photoReady'), Number(!this.photoAtlas && Boolean(this.photo?.ready)));
             if (this.photo?.ready) gl.uniform4fv(this.uniform('photoBounds'), this.photo.bounds);
             if (colourTransform) {
                 gl.uniform4fv(this.uniform('shoreBounds'), this.shoreFrameBounds);
@@ -1288,7 +1314,7 @@ class MarsAlmanacGlobe {
             gl.uniform1i(this.uniform('riverReady'), Number(this.riverReady));
             gl.uniform1i(this.uniform('riverComposite'), Number(this.riverComposite));
             gl.uniform1f(this.uniform('riverBlend'), resident?.blend ?? 1);
-            gl.uniform1i(this.uniform('previousRiverReady'), Number(Boolean(resident?.previous)));
+            gl.uniform1i(this.uniform('previousRiverReady'), Number(!this.photoAtlas && Boolean(resident?.previous)));
             if (resident?.previous) {
                 gl.uniform4fv(this.uniform('previousRiverBounds'), resident.previous.bounds);
                 gl.uniform1f(this.uniform('previousRiverInk'), resident.previous.complete ?

@@ -104,7 +104,8 @@ json_t *lab_cal_borders(const json_t *payload, unsigned *status)
 json_t *lab_cal_rivers(const json_t *payload, unsigned *status)
 {
     const char *format = lab_cal_text(payload, "format");
-    if (!strcmp(format, "surface-plan") || !strcmp(format, "surface-data"))
+    if (!strcmp(format, "surface-plan") || !strcmp(format, "surface-data") ||
+        !strcmp(format, "photo-plan") || !strcmp(format, "mask-plan"))
         return lab_cal_river_surface(payload, status);
     double b[4];
     const char *keys[] = {"west", "south", "east", "north"};

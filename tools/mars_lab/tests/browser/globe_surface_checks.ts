@@ -13,15 +13,16 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         script.onerror = () => reject(new Error('Surface cache script unavailable'));
         document.head.appendChild(script);
     });
+    const cache = new GlobeSurfaceCache();
+    await cache.get('initialise');
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open('mars.globe.surface.v1', 3);
-        request.onupgradeneeded = () => request.result.createObjectStore('tiles', {keyPath: 'key'}).createIndex('used', 'used');
+        const request = indexedDB.open('mars.globe.surface.v1', 4);
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
     });
     const clear = () => new Promise<void>((resolve, reject) => {
-        const transaction = database.transaction('tiles', 'readwrite');
-        transaction.objectStore('tiles').clear();
+        const transaction = database.transaction(['tiles', 'metadata', 'state'], 'readwrite');
+        for (const name of ['tiles', 'metadata', 'state']) transaction.objectStore(name).clear();
         transaction.oncomplete = () => resolve();
         transaction.onabort = () => reject(transaction.error);
     });
@@ -30,11 +31,10 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         request.onsuccess = () => resolve(request.result as GlobeSurfaceRecord[]);
         request.onerror = () => reject(request.error);
     });
-    const cache = new GlobeSurfaceCache();
     try {
         await clear();
         const raw = new Blob([new Uint8Array(2048 * 2048 * 4)], {type: 'application/octet-stream'});
-        for (let i = 0; i < GlobeSurfaceCache.maximumEntries; ++i) await cache.put(`tile-${i}`, raw);
+        for (let i = 0; i < GlobeSurfaceCache.maximumBytes / GlobeSurfaceCache.tileBytes; ++i) await cache.put(`tile-${i}`, raw);
         await new Promise(resolve => setTimeout(resolve, 5));
         check(Boolean(await cache.get('tile-0')), 'a raw cache hit refreshes its recency');
         await cache.put('newest', raw);
@@ -97,6 +97,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
             navigation.riverRequest?.abort();
             await navigationLoad;
             navigationTiles.dispose(); root.remove();
+            Reflect.get(navigation, 'photoAtlas')?.dispose();
             navigationGPU.getExtension('WEBGL_lose_context')?.loseContext();
         }
         const released: number[] = [], indexed = new GlobeTextureCache<number>(4, 10, value => released.push(value));
@@ -191,6 +192,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         const respond = async (bytes: Uint8Array<ArrayBuffer>): Promise<Response> => {
             const payload = labWire.decode(bytes) as {format: string; key: string};
             if (deny) return new Response('', {status: 503});
+            if (payload.format === 'mask-plan') return new Response(labWire.encode({ok: true, key: key()}));
             if (payload.format === 'surface-plan') {
                 ++plans;
                 return new Response(labWire.encode({ok: true, key: key(), bounds: [0, 0, 1, 1], photos: [
@@ -359,6 +361,16 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
             check(Math.abs(alpha(1200, 600) - 128) <= 1 && alpha(1000, 600) === 0,
                   'cached GPU-ready pixels retain half-alpha surveyed land and transparent water');
             cachedSurveyed.close(); canvas.width = canvas.height = 1;
+            const planCount = plans;
+            const maskOnly = await surface.load([0, 0, 1, 1], new AbortController().signal, undefined, true);
+            const maskCanvas = document.createElement('canvas');
+            maskCanvas.width = maskCanvas.height = 2048;
+            const maskContext = maskCanvas.getContext('2d')!;
+            draw(maskContext, maskOnly);
+            check(plans === planCount && Math.abs(maskContext.getImageData(1200, 600, 1, 1).data[3] - 128) <= 1 &&
+                  maskContext.getImageData(1000, 600, 1, 1).data[3] === 0,
+                  'river-only refinement preserves surveyed land and water without requesting photographic plans');
+            maskOnly.close(); maskCanvas.width = maskCanvas.height = 1;
             complete = false; ++revision;
         } finally {
             (held as (() => void) | null)?.();

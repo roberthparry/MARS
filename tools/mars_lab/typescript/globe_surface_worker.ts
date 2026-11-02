@@ -14,7 +14,7 @@ interface GlobeSurfacePlan {
     ok: boolean; key: string; bounds: number[]; photos: GlobeSurfacePhoto[];
     path?: string; fill?: string; banks?: string[]; complete?: boolean;
 }
-interface GlobeSurfaceMessage { id: number; bounds?: number[]; cancel?: boolean; }
+interface GlobeSurfaceMessage { id: number; bounds?: number[]; cancel?: boolean; maskOnly?: boolean; }
 class GlobeSurfaceWorker {
     private readonly ready: Promise<void>;
     private readonly cache: GlobeSurfaceCache;
@@ -136,11 +136,13 @@ class GlobeSurfaceWorker {
     }
 
     private async tile(bounds: number[], signal: AbortSignal,
-                       preview: (bitmap: ImageBitmap, detailed: boolean) => void): Promise<ImageBitmap | ArrayBuffer> {
+                       preview: (bitmap: ImageBitmap, detailed: boolean) => void,
+                       maskOnly = false): Promise<ImageBitmap | ArrayBuffer> {
         await this.ready;
         signal.throwIfAborted();
-        const plan = await this.request(bounds, 'surface-plan', signal);
-        const saved = await this.cache.get(plan.key);
+        const plan = await this.request(bounds, maskOnly ? 'mask-plan' : 'surface-plan', signal);
+        const cacheKey = maskOnly ? `mask-only:${plan.key}` : plan.key;
+        const saved = await this.cache.get(cacheKey);
         if (saved) {
             try {
                 const pixels = await saved.arrayBuffer();
@@ -148,7 +150,7 @@ class GlobeSurfaceWorker {
                 if (pixels.byteLength === GlobeSurfaceCache.tileBytes) return pixels;
             } catch { signal.throwIfAborted(); }
         }
-        if (!Array.isArray(plan.photos) || !plan.photos.length || plan.photos.length > 68)
+        if (!maskOnly && (!Array.isArray(plan.photos) || !plan.photos.length || plan.photos.length > 68))
             throw new Error('Invalid photographic tile plan');
         // Geometry and photographic reads are independent. Publish imagery while the native
         // river query runs; its latency must not leave the destination on the global overview.
@@ -160,7 +162,7 @@ class GlobeSurfaceWorker {
             if (!context) throw new Error('Surface canvas unavailable');
             context.imageSmoothingQuality = 'high';
             // Unpainted antialiased crop edges must not masquerade as river coverage.
-            context.fillStyle = '#183a32';
+            context.fillStyle = maskOnly ? '#fff' : '#183a32';
             context.fillRect(0, 0, 2048, 2048);
             const publish = async (detailed: boolean) => {
                 signal.throwIfAborted();
@@ -169,7 +171,7 @@ class GlobeSurfaceWorker {
                 preview(photograph, detailed);
             };
             let baseDrawn = false, basePublished = false, overviewPublished = false;
-            for (const photo of plan.photos) {
+            for (const photo of maskOnly ? [] : plan.photos) {
                 if (!(photo.regional ? /^\/earth_regions\/\d{2,5}\.png$/ : /^\/earth_tiles\/\d{2}-\d{2}\.png$/).test(photo.url) ||
                     !Array.isArray(photo.source) || photo.source.length !== 4 ||
                     !Array.isArray(photo.target) || photo.target.length !== 4 ||
@@ -193,7 +195,7 @@ class GlobeSurfaceWorker {
                     overviewPublished = true;
                 }
             }
-            await publish(true);
+            if (!maskOnly) await publish(true);
             const {data, error} = await geometry;
             if (!data) throw error;
             signal.throwIfAborted();
@@ -225,10 +227,10 @@ class GlobeSurfaceWorker {
             retained = true;
             if (!this.saving) {
                 this.saving = true;
-                void this.persist(plan.key, canvas);
+                void this.persist(cacheKey, canvas);
             } else {
                 if (this.pendingSave) this.pendingSave.canvas.width = this.pendingSave.canvas.height = 1;
-                this.pendingSave = {key: plan.key, canvas};
+                this.pendingSave = {key: cacheKey, canvas};
             }
             return bitmap;
         } finally { if (!retained) canvas.width = canvas.height = 1; }
@@ -247,7 +249,7 @@ class GlobeSurfaceWorker {
                     const bitmap = await this.tile(message.bounds, controller.signal, (bitmap, detailed) => {
                         if (controller.signal.aborted) bitmap.close();
                         else this.port.postMessage({id: message.id, bitmap, preview: true, detailed}, [bitmap]);
-                    });
+                    }, message.maskOnly === true);
                     if (controller.signal.aborted) {
                         if (bitmap instanceof ImageBitmap) bitmap.close();
                     } else if (bitmap instanceof ArrayBuffer) this.port.postMessage({id: message.id, pixels: bitmap}, [bitmap]);

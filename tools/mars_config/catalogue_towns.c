@@ -135,7 +135,7 @@ int main(int argc, char **argv)
         load_sql(db, "packaging/jurisdiction-db/mars_country_jurisdictions.sql", NULL) &&
         load_sql(db, "packaging/jurisdiction-db/mars_target_subdivisions.sql", NULL) &&
         load_sql(db, "packaging/jurisdiction-db/mars_timezone_rules.sql", "insert into timezone_definition(") &&
-        load_sql(db, "packaging/jurisdiction-db/mars_jurisdiction_towns.sql", "-- Worldwide supplement") &&
+        load_sql(db, "packaging/jurisdiction-db/town_catalogue_seed.sql", NULL) &&
         sqlite_exec_cstr(db,
             /* British nations live in the holiday seed, not mars_target_subdivisions.sql. */
             "INSERT OR IGNORE INTO jurisdiction(jurisdiction_id,parent_jurisdiction_id,iso_country_code,name) VALUES"

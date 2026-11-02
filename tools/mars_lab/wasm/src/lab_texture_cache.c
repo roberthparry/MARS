@@ -3,10 +3,12 @@
  * @brief Dictionary-backed photographic cache policy, stable windows and bounded pixel preparation.
  *
  * Browser resources remain in host slots, while native dictionaries own keys and select reusable slots.
- * Each cache has a linked LRU order and a byte budget. Geographic coverage examines at most four GPU entries.
+ * Each cache has a linked LRU order, a free-slot stack and a byte budget. Legacy windows inspect four GPU entries;
+ * fixed photographic pages use direct dictionary lookups and pin only visible ancestors among at most 64 cells.
  * Serial dispatch protects native state; worker pixel batches use a fixed 512 KiB scratch buffer and never block drawing.
  */
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,7 +27,9 @@ typedef struct _texture_entry_t {
 
 typedef struct _texture_cache_t {
     dictionary_t *keys;
-    texture_entry_t entries[32];
+    texture_entry_t entries[64];
+    unsigned free_slots[64], free_count;
+    unsigned char page[8 * 8 * 4];
     unsigned token, limit, budget, bytes;
     int oldest, newest;
 } texture_cache_t;
@@ -120,12 +124,14 @@ static jsref create_cache(texture_cache_t *unused, jsref request)
     (void)unused;
     texture_service_t *state = texture_service();
     double limit = field(request, "limit"), budget = field(request, "bytes");
-    if (!isfinite(limit) || limit < 1 || limit > 32 || floor(limit) != limit ||
+    if (!isfinite(limit) || limit < 1 || limit > 64 || floor(limit) != limit ||
         !isfinite(budget) || budget < 1 || budget > 67108864 || floor(budget) != budget ||
         (state->caches && dictionary_size(state->caches) >= 16)) return 0;
     texture_cache_t *cache = calloc(1, sizeof *cache);
     if (!cache) return 0;
     cache->limit = (unsigned)limit; cache->budget = (unsigned)budget;
+    cache->free_count = cache->limit;
+    for (unsigned i = 0; i < cache->limit; ++i) cache->free_slots[i] = cache->limit - i - 1;
     cache->oldest = cache->newest = -1;
     cache->keys = dictionary_create(256, sizeof(int), text_hash, text_compare, NULL, NULL, NULL, NULL, NULL);
     if (!state->caches) state->caches = dictionary_create(sizeof(unsigned), sizeof(texture_cache_t *),
@@ -152,16 +158,21 @@ static jsref get_entry(texture_cache_t *cache, jsref request)
     return result(cache, slot, 0);
 }
 
-static bool protected_slot(jsref request, int slot)
+static uint64_t protected_slots(jsref request)
 {
     jsref protect = lab_dom_get(request, "protect");
-    if (lab_dom_type(protect) != LAB_VALUE_ARRAY) return field(request, "protect") == slot;
-    /* Only the two displayed GPU layers are normally pinned; never inspect more than four slots. */
+    if (lab_dom_type(protect) != LAB_VALUE_ARRAY) {
+        double slot = field(request, "protect");
+        return isfinite(slot) && slot >= 0 && slot < 64 && floor(slot) == slot ? UINT64_C(1) << (unsigned)slot : 0;
+    }
     int count = lab_dom_count(protect);
-    if (count < 0 || count > 4) return true;
-    for (int i = 0; i < count; ++i)
-        if (lab_dom_to_number(lab_dom_item(protect, i)) == slot) return true;
-    return false;
+    if (count < 0 || count > 64) return UINT64_MAX;
+    uint64_t slots = 0;
+    for (int i = 0; i < count; ++i) {
+        double slot = lab_dom_to_number(lab_dom_item(protect, i));
+        if (isfinite(slot) && slot >= 0 && slot < 64 && floor(slot) == slot) slots |= UINT64_C(1) << (unsigned)slot;
+    }
+    return slots;
 }
 
 static jsref put_entry(texture_cache_t *cache, jsref request)
@@ -175,18 +186,21 @@ static jsref put_entry(texture_cache_t *cache, jsref request)
         return result(cache, slot, 0);
     }
     jsref evicted = lab_dom_object(LAB_VALUE_ARRAY);
+    uint64_t pinned = protected_slots(request);
     while (dictionary_size(cache->keys) >= cache->limit || cache->bytes + (unsigned)bytes > cache->budget) {
         int victim = cache->oldest;
-        while (victim >= 0 && protected_slot(request, victim)) victim = cache->entries[victim].next;
+        while (victim >= 0 && (pinned & (UINT64_C(1) << victim))) victim = cache->entries[victim].next;
         if (victim < 0) return result(cache, -1, evicted);
         texture_entry_t *entry = &cache->entries[victim];
         dictionary_remove(cache->keys, entry->key);
         unlink_entry(cache, victim); cache->bytes -= entry->bytes; entry->used = false;
+        cache->free_slots[cache->free_count++] = (unsigned)victim;
         lab_dom_push(evicted, lab_dom_numeric(victim));
     }
-    /* At most 32 native metadata slots; resource lookup itself is dictionary indexed. */
-    for (unsigned i = 0; i < cache->limit; ++i) if (!cache->entries[i].used) { slot = (int)i; break; }
-    if (slot < 0 || !dictionary_set(cache->keys, key, &slot)) return result(cache, -1, evicted);
+    if (!cache->free_count) return result(cache, -1, evicted);
+    slot = (int)cache->free_slots[cache->free_count - 1];
+    if (!dictionary_set(cache->keys, key, &slot)) return result(cache, -1, evicted);
+    --cache->free_count;
     texture_entry_t *entry = &cache->entries[slot];
     memset(entry, 0, sizeof *entry); memcpy(entry->key, key, sizeof key);
     entry->bytes = (unsigned)bytes; entry->used = true; entry->zoom = isfinite(zoom) ? zoom : 0;
@@ -242,11 +256,131 @@ static jsref cache_stats(texture_cache_t *cache, jsref request)
     return result(cache, -1, 0);
 }
 
+static jsref remove_entry(texture_cache_t *cache, jsref request)
+{
+    char key[256];
+    int slot;
+    if (!read_key(request, key) || !dictionary_get(cache->keys, key, &slot)) return 0;
+    texture_entry_t *entry = &cache->entries[slot];
+    dictionary_remove(cache->keys, key); unlink_entry(cache, slot);
+    cache->bytes -= entry->bytes; entry->used = false;
+    cache->free_slots[cache->free_count++] = (unsigned)slot;
+    jsref evicted = lab_dom_object(LAB_VALUE_ARRAY);
+    lab_dom_push(evicted, lab_dom_numeric(slot));
+    return result(cache, -1, evicted);
+}
+
+static char *photo_integer(char *out, unsigned value)
+{
+    char digits[10];
+    unsigned count = 0;
+    do { digits[count++] = (char)('0' + value % 10); value /= 10; } while (value);
+    while (count) *out++ = digits[--count];
+    *out++ = ':'; *out = 0;
+    return out;
+}
+
+static void photo_key(char key[256], unsigned level, int x, unsigned y)
+{
+    int columns = 1 << level;
+    unsigned column = (unsigned)((x % columns + columns) % columns);
+    memcpy(key, "photo:", 7);
+    char *out = photo_integer(key + 6, level);
+    out = photo_integer(out, column);
+    photo_integer(out, y);
+}
+
+static int photo_slot(texture_cache_t *cache, unsigned level, int x, unsigned y)
+{
+    char key[256] = {0};
+    int slot = -1;
+    photo_key(key, level, x, y);
+    return dictionary_get(cache->keys, key, &slot) ? slot : -1;
+}
+
+/* A page has exactly 64 spatial cells. Each cell performs at most 18 indexed ancestor lookups; no source list is scanned. */
+static jsref photo_page(texture_cache_t *cache, jsref request)
+{
+    double view[4], pixels = field(request, "pixels");
+    if (!bounds_read(lab_dom_get(request, "bounds"), view) || !isfinite(pixels) || pixels < 1 || pixels > 4096 ||
+        view[0] < -360 || view[2] > 360 || view[1] < -90 || view[3] > 90) return 0;
+    double extent = fmax(view[2] - view[0], view[3] - view[1]);
+    if (extent > 30 || extent < .000001) return 0;
+    unsigned level = (unsigned)fmax(4, fmin(18, floor(log2(360 * fmin(pixels, 1536) / (extent * 512)))));
+    double step = 360.0 / (1u << level);
+    unsigned fine = level + (extent <= step * 3 && level < 18);
+    double cell = 360.0 / (1u << fine);
+    int left = (int)floor(((view[0] + view[2]) * .5 + 180) / cell) - 4;
+    int top = (int)floor((90 - (view[1] + view[3]) * .5) / cell) - 4;
+    int rows = 1 << (fine - 1);
+    top = (int)fmax(0, fmin(rows - 8, top));
+    double page_bounds[] = {left * cell - 180, 90 - (top + 8) * cell, (left + 8) * cell - 180, 90 - top * cell};
+    uint64_t pinned = 0;
+    double best = INFINITY;
+    int next_x = 0, next_y = -1;
+    char avoid[64] = {0};
+    lab_dom_utf8_copy(lab_dom_get(request, "avoid"), (unsigned char *)avoid, sizeof avoid - 1);
+    memset(cache->page, 0, sizeof cache->page);
+    for (unsigned y = 0; y < 8; ++y) {
+        for (unsigned x = 0; x < 8; ++x) {
+            int column = left + (int)x, row = top + (int)y;
+            double west = column * cell - 180, north = 90 - row * cell;
+            bool visible = west < view[2] && west + cell > view[0] && north > view[1] && north - cell < view[3];
+            for (unsigned ancestor = fine; ancestor >= 1; --ancestor) {
+                unsigned shift = fine - ancestor;
+                int ax = (int)floor((double)column / (1u << shift));
+                int slot = photo_slot(cache, ancestor, ax, (unsigned)row >> shift);
+                if (slot < 0) continue;
+                cache->page[4 * (y * 8 + x)] = (unsigned char)(slot + 1);
+                cache->page[4 * (y * 8 + x) + 1] = (unsigned char)shift;
+                if (visible) { pinned |= UINT64_C(1) << slot; touch(cache, slot, true); }
+                break;
+            }
+            unsigned shift = fine - level;
+            int tx = (int)floor((double)column / (1u << shift)), ty = row >> shift;
+            double tile_west = tx * step - 180, tile_north = 90 - ty * step;
+            if (tile_west > view[2] + step * .5 || tile_west + step < view[0] - step * .5 ||
+                tile_north < view[1] - step * .5 || tile_north - step > view[3] + step * .5) continue;
+            if (photo_slot(cache, level, tx, (unsigned)ty) >= 0) continue;
+            if (level < 18 && photo_slot(cache, level + 1, tx * 2, (unsigned)ty * 2) >= 0 &&
+                photo_slot(cache, level + 1, tx * 2 + 1, (unsigned)ty * 2) >= 0 &&
+                photo_slot(cache, level + 1, tx * 2, (unsigned)ty * 2 + 1) >= 0 &&
+                photo_slot(cache, level + 1, tx * 2 + 1, (unsigned)ty * 2 + 1) >= 0) continue;
+            char key[256] = {0};
+            photo_key(key, level, tx, (unsigned)ty);
+            if (*avoid && !strcmp(key, avoid)) continue;
+            double dx = ((tx + .5) * step - 180 - (view[0] + view[2]) * .5) / step;
+            double dy = (90 - (ty + .5) * step - (view[1] + view[3]) * .5) / step;
+            double score = dx * dx + dy * dy + (visible ? 0 : 100);
+            if (score < best) { best = score; next_x = tx; next_y = ty; }
+        }
+    }
+    jsref object = lab_dom_object(LAB_VALUE_OBJECT), protect = lab_dom_object(LAB_VALUE_ARRAY);
+    lab_dom_set(object, "bounds", bounds_result(page_bounds));
+    lab_dom_set(object, "span", lab_dom_numeric(cell));
+    lab_dom_set(object, "pointer", lab_dom_numeric((unsigned)(size_t)cache->page));
+    for (unsigned slot = 0; slot < cache->limit; ++slot)
+        if (pinned & (UINT64_C(1) << slot)) lab_dom_push(protect, lab_dom_numeric(slot));
+    lab_dom_set(object, "protect", protect);
+    if (next_y >= 0) {
+        char key[256] = {0};
+        photo_key(key, level, next_x, (unsigned)next_y);
+        int columns = 1 << level, wrapped = (next_x % columns + columns) % columns;
+        double b[] = {wrapped * step - 180, 90 - (next_y + 1) * step, (wrapped + 1) * step - 180, 90 - next_y * step};
+        jsref next = lab_dom_object(LAB_VALUE_OBJECT);
+        lab_dom_set(next, "key", lab_dom_string(key));
+        lab_dom_set(next, "bounds", bounds_result(b));
+        lab_dom_set(next, "level", lab_dom_numeric(level));
+        lab_dom_set(object, "next", next);
+    }
+    return object;
+}
+
 static void cache_dispatch(void *context)
 {
     jsref request = *(jsref *)context;
     static jsref (*const operations[])(texture_cache_t *, jsref) = {
-        create_cache, get_entry, put_entry, cover_entry, clear_cache, cache_stats
+        create_cache, get_entry, put_entry, cover_entry, clear_cache, cache_stats, photo_page, remove_entry
     };
     double action = field(request, "action"), token = field(request, "token");
     if (!isfinite(action) || action < 0 || action >= sizeof operations / sizeof *operations || floor(action) != action) {

@@ -11,6 +11,8 @@ interface Window {
     checkLabSurfaceMath(): Promise<void>;
     /** @brief Check asynchronous surface loading, GPU retention, disk caching and camera-window replacement. */
     checkLabSurfaceTiles(): Promise<void>;
+    /** @brief Check fixed photographic cells, persistent source blocks and atlas uploads independently. */
+    checkLabPhotoAtlas(): Promise<void>;
     /** @brief Check country aggregation independently of the GPU and travel assertions. */
     checkLabCountryTowns(): void;
 }
@@ -25,7 +27,8 @@ window.checkLabCountryTowns = function checkLabCountryTowns(): void {
         labDOM.call('lab_town_store_add', 'AU-ACT', [canberra]) === 1 &&
         labDOM.call('lab_town_store_add', 'AU-QLD', [town('Gold Coast', '-28', '153.4')]) === 1;
     if (!inserted) throw new Error('Country towns: regional memberships were not retained');
-    const australia = labDOM.call<LabTown[]>('lab_town_store_list', 'AU');
+    const australia = labDOM.call<LabTown[]>('lab_town_store_list', 'AU').filter(item =>
+        item.value === canberra.value || item.value === 'Gold Coast');
     if (!(australia.length === 2 && australia[0].name === 'Canberra' &&
           australia[0].jurisdiction === 'AU-ACT' && australia[0].default &&
           australia[0].timezone === 'Australia/Sydney' && australia[1].name === 'Gold Coast'))
@@ -42,6 +45,20 @@ window.checkLabSurfaceTiles = async function checkLabSurfaceTiles(): Promise<voi
     await checkGlobeGPU(check);
     await checkGlobePhoto(check);
     await checkGlobeSurface(check);
+    await checkGlobeAtlas(check);
+};
+
+/** @brief Initialise optional cache support and exercise the complete fixed-cell photographic path. */
+window.checkLabPhotoAtlas = async function checkLabPhotoAtlas(): Promise<void> {
+    if (typeof GlobeSurfaceCache === 'undefined') await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = '/js/globe_surface_cache.js';
+        script.onload = () => resolve(); script.onerror = () => reject(new Error('Raw cache script unavailable'));
+        document.head.append(script);
+    });
+    const check = (condition: boolean, message: string) => { if (!condition) throw new Error('Photo atlas: ' + message); };
+    checkGlobeComposite(check);
+    await checkGlobeAtlas(check);
 };
 
 /** @brief Exercise linked maths through native exports and the scoped camera and gesture APIs. */

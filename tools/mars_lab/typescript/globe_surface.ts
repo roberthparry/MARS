@@ -20,7 +20,7 @@ export class GlobeSurface {
         preview?: (tile: GlobeSurfaceTile, detailed: boolean) => void} | null = null;
 
     load(bounds: number[], signal: AbortSignal,
-         preview?: (tile: GlobeSurfaceTile, detailed: boolean) => void): Promise<GlobeSurfaceTile> {
+         preview?: (tile: GlobeSurfaceTile, detailed: boolean) => void, maskOnly = false): Promise<GlobeSurfaceTile> {
         if (signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
         this.current?.reject(new DOMException('Superseded', 'AbortError'));
         return new Promise((resolve, reject) => {
@@ -65,7 +65,7 @@ export class GlobeSurface {
                         this.current?.reject(new Error(event.message));
                     };
                 }
-                this.worker.postMessage({id, bounds});
+                this.worker.postMessage({id, bounds, maskOnly});
             } catch (error) { finish(null, error instanceof Error ? error : new Error(String(error))); }
         });
     }

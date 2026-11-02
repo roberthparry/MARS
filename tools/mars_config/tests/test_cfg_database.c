@@ -102,10 +102,9 @@ static bool test_cfg_database_query(sqlite_t *db, const char *query, const char 
 /* Check the packaged town rows without importing unrelated calendar or ephemeris data. */
 static bool test_cfg_database_towns_fixture(const char *directory)
 {
-    file_t *source = file_new_cstr(MARS_CONFIG_ROOT_DIR "/packaging/jurisdiction-db/mars_jurisdiction_towns.sql");
+    file_t *source = file_new_cstr(MARS_CONFIG_ROOT_DIR "/packaging/jurisdiction-db/town_catalogue_seed.sql");
     string_t *sql = source ? file_read_all_text(source) : NULL;
-    string_offset_t end = sql ? string_find(sql, "-- Worldwide supplement") : -1;
-    string_t *seed = end > 0 ? string_substr(sql, 0, (size_t)end) : NULL;
+    string_t *seed = sql ? string_clone(sql) : NULL;
     string_t *path = string_sprintf("%s/towns.db", directory), *key = string_new_with("town-catalogue-fixture");
     sqlite_t *db = path && key ? sqlite_open_encrypted(path, key) : NULL;
     string_t *seed_root = string_new_with(directory), *seed_name = string_new_with("town_seed.sql");
@@ -883,6 +882,8 @@ static void test_cfg_database_trace(void)
         "packaging/jurisdiction-db/location_additions.sql",
         "packaging/jurisdiction-db/location_subdivisions.sql",
         "packaging/jurisdiction-db/town_search.sql",
+        "packaging/jurisdiction-db/town_catalogue_refresh.sql",
+        "packaging/jurisdiction-db/town_catalogue_seed.sql",
         "packaging/jurisdiction-db/mars_generated_holiday_instances.sql",
         "packaging/jurisdiction-db/mars_manual_holiday_instance_overrides.sql",
         "packaging/jurisdiction-db/mars_holiday_rules_queries.sql",
@@ -1088,7 +1089,12 @@ static bool test_cfg_database_update_fixture(const char *directory)
         "create table jurisdiction(jurisdiction_id text primary key,jurisdiction_type text,iso_country_code text,"
         "parent_jurisdiction_id text,iso_subdivision_code text,cldr_region_code text,name text);"
         "insert into jurisdiction(jurisdiction_id,jurisdiction_type,iso_country_code) values('GB','country','GB'),"
-        "('ZA','country','ZA'),('RU','country','RU');"
+        "('ZA','country','ZA'),('RU','country','RU'),('AU','country','AU');"
+        "insert into jurisdiction(jurisdiction_id,jurisdiction_type,iso_country_code,parent_jurisdiction_id) values"
+        "('AU-ACT','subdivision','AU','AU'),('AU-NSW','subdivision','AU','AU'),"
+        "('AU-NT','subdivision','AU','AU'),('AU-QLD','subdivision','AU','AU'),"
+        "('AU-SA','subdivision','AU','AU'),('AU-TAS','subdivision','AU','AU'),"
+        "('AU-VIC','subdivision','AU','AU'),('AU-WA','subdivision','AU','AU');"
         "create table jurisdiction_name(jurisdiction_id text primary key,name text not null);"
         "insert into jurisdiction_name select jurisdiction_id,coalesce(name,jurisdiction_id) from jurisdiction;"
         "create table jurisdiction_town_entity(jurisdiction_town_id integer primary key);"
@@ -1106,11 +1112,20 @@ static bool test_cfg_database_update_fixture(const char *directory)
         "create table timezone_code(timezone_name,timezone_code);"
         "insert into timezone_code values('Africa/Johannesburg',24);"
         "insert into timezone_code values('Europe/Kaliningrad',246),('Europe/Moscow',257);"
+        "insert into timezone_code values('Australia/Adelaide',221),('Australia/Brisbane',222),"
+        "('Australia/Darwin',223),('Australia/Hobart',224),('Australia/Melbourne',225),"
+        "('Australia/Perth',226),('Australia/Sydney',227);"
         "insert into jurisdiction_town values(101,'RU','Kaliningrad'),(102,'RU','Moscow');"
+        "insert into jurisdiction_town values(103,'AU','Armidale');"
+        "insert into jurisdiction_town_latitude values(103,'-30.5');"
+        "insert into jurisdiction_town_longitude values(103,'151.6');"
+        "insert into jurisdiction_town_elevation values(103,'999');"
+        "insert into jurisdiction_town_timezone values(103,227);"
         "insert into jurisdiction_town_latitude values(101,'54.70639'),(102,'55.7522');"
         "insert into jurisdiction_town_longitude values(101,'20.51102'),(102,'37.6156');"
         "insert into jurisdiction_town_timezone values(101,246),(102,257);"
         "create table jurisdiction_default_town(jurisdiction_id text primary key,jurisdiction_town_id);"
+        "insert into jurisdiction_default_town values('AU',103);"
         "create table jurisdiction_location_default(jurisdiction_id text primary key);"
         "create table jurisdiction_location_default_latitude(jurisdiction_id text primary key,latitude);"
         "create table jurisdiction_location_default_longitude(jurisdiction_id text primary key,longitude);"
@@ -1141,21 +1156,47 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && cfg_databases_update() == 0 &&
          !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "17") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "18") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"GB\"*'", "1") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_town_search WHERE jurisdiction_town_search MATCH '\"Kaliningrad\"*'",
              "1") &&
-         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "27") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_country_flag", "28") &&
          test_cfg_database_query(db, "select jurisdiction_id from jurisdiction_town where town_name='Kaliningrad'", "RU-KGD") &&
          test_cfg_database_query(db, "select locality_name from jurisdiction_location_default_locality where jurisdiction_id='RU'", "Moscow") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction_town where jurisdiction_id='ZA' "
                                    "and town_name in ('Robben Island','Seal Island','Duiker Island')", "3") &&
-         test_cfg_database_query(db, "select count(*) from jurisdiction_town_timezone where timezone_code=24", "3") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_town where jurisdiction_id='AU'", "261") &&
+         test_cfg_database_query(db, "select count(distinct town_name) from jurisdiction_town "
+                                   "where substr(jurisdiction_id,1,2)='AU'", "277") &&
+         test_cfg_database_query(db,
+             "select latitude||'|'||longitude||'|'||elevation_metres from jurisdiction_town_latitude "
+             "join jurisdiction_town_longitude using(jurisdiction_town_id) "
+             "join jurisdiction_town_elevation using(jurisdiction_town_id) where jurisdiction_town_id=103",
+             "-30.5|151.6|999") &&
+         test_cfg_database_query(db, "select jurisdiction_town_id from jurisdiction_default_town "
+                                   "where jurisdiction_id='AU'", "103") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_town where jurisdiction_id='AU' "
+                                   "and town_name in ('Byron Bay','Broome','Yamba')", "3") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_town_search "
+                                   "where jurisdiction_town_search match '\"Perth\"*'", "2") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_town_search "
+                                   "where jurisdiction_town_search match '\"Pretoria\"*'", "1") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction where jurisdiction_id='ZZ-SEA'", "0") &&
          test_cfg_database_query(db, "select value from retained", "42") &&
-         cfg_database_revision(db, "jurisdiction", 18);
+         cfg_database_revision(db, "jurisdiction", 17);
+    sqlite_close(db);
+    ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && cfg_databases_update() == 0;
+    db = test_cfg_database_open(database, "saved-update-key");
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "18") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_town where jurisdiction_id='AU'", "261") &&
+         test_cfg_database_query(db, "select count(distinct town_name) from jurisdiction_town "
+                                   "where substr(jurisdiction_id,1,2)='AU'", "277") &&
+         test_cfg_database_query(db, "select count(*) from jurisdiction_town where town_name='Kaliningrad'", "1") &&
+         test_cfg_database_query(db, "select jurisdiction_town_id from jurisdiction_default_town "
+                                   "where jurisdiction_id='AU'", "103") &&
+         cfg_database_revision(db, "jurisdiction", 19);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
          cfg_databases_update() == 1;

@@ -6,6 +6,8 @@
  * Slots are direct indexed; no JavaScript Map duplicates the native dictionary.
  */
 interface TextureSlot { token: number; slot: number; count: number; bytes: number; evicted?: number[]; bounds?: number[]; zoom?: number; }
+export interface GlobePhotoCell { key: string; bounds: number[]; level: number; }
+export interface GlobePhotoPage { bounds: number[]; span: number; pointer: number; protect: number[]; next?: GlobePhotoCell; }
 export class GlobeTextureCache<T> {
     private token: number;
     private readonly resources: (T | null)[];
@@ -20,20 +22,36 @@ export class GlobeTextureCache<T> {
         return result ? this.resources[result.slot] : null;
     }
     get size(): number { return this.call({action: 5})?.count ?? 0; }
+    remove(key: string): void {
+        const result = this.call({action: 7, key});
+        for (const slot of result?.evicted || []) {
+            const resource = this.resources[slot];
+            if (resource !== null) this.release(resource);
+            this.resources[slot] = null;
+        }
+    }
     put(key: string, resource: T, bytes: number, bounds?: number[], zoom = 0,
         protect: number | number[] = -1, quality = 0): boolean {
+        return this.putSlot(key, resource, bytes, bounds, zoom, protect, quality) >= 0;
+    }
+    putSlot(key: string, resource: T, bytes: number, bounds?: number[], zoom = 0,
+            protect: number | number[] = -1, quality = 0): number {
         const result = this.call({action: 2, key, bytes, bounds, zoom, protect, quality});
-        if (!result) return false;
+        if (!result) return -1;
         for (const slot of result.evicted || []) {
             const previous = this.resources[slot];
             if (previous !== null) this.release(previous);
             this.resources[slot] = null;
         }
-        if (result.slot < 0) return false;
+        if (result.slot < 0) return -1;
         const previous = this.resources[result.slot];
         if (previous !== null && previous !== resource) this.release(previous);
         this.resources[result.slot] = resource;
-        return true;
+        return result.slot;
+    }
+    page(bounds: number[], pixels: number, avoid = ''): GlobePhotoPage | null {
+        return this.token ? labDOM.call('lab_texture_cache',
+            {action: 6, token: this.token, bounds, pixels, avoid}) as GlobePhotoPage | null : null;
     }
     covering(bounds: number[], zoom: number, partial = false, prefer = -1): {
         resource: T; slot: number; bounds: number[]; zoom: number;

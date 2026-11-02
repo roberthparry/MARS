@@ -1,30 +1,41 @@
 /**
  * @file globe_surface_cache.ts
- * @brief Bounded IndexedDB storage of completed photographic river tiles.
+ * @brief Bounded asynchronous storage of reusable photographic cells and river masks.
  *
- * Stores disposable, uncompressed 2048-square premultiplied RGBA tiles ready for WebGL upload. One serial transaction evicts
- * the least recently used entries. Storage denial or quota failure is an optional-cache miss, not a drawing error.
+ * Raw RGBA payloads share a 512 MiB budget. Separate small metadata records maintain recency and byte totals,
+ * so eviction never reads image blobs. Read-only hits publish before their asynchronous recency update.
  */
 interface GlobeSurfaceRecord { key: string; blob: Blob; size: number; used: number; }
+interface GlobeSurfaceMetadata { key: string; size: number; used: number; }
+interface GlobeSurfaceBudget { key: string; bytes: number; count: number; }
 class GlobeSurfaceCache {
     static readonly maximumBytes = 512 * 1024 * 1024;
-    static readonly maximumEntries = 32;
+    static readonly maximumEntries = 512;
     static readonly tileBytes = 2048 * 2048 * 4;
+    readonly tileBytes: number;
     private database: Promise<IDBDatabase | null> | null = null;
+
+    constructor(readonly width = 2048, readonly height = width) {
+        if (![512, 514, 2048].includes(width) || height !== width) throw new Error('Invalid raw cache dimensions');
+        this.tileBytes = width * height * 4;
+    }
 
     private open(): Promise<IDBDatabase | null> {
         return this.database ??= new Promise(resolve => {
             let unavailable = false;
             try {
-                const request = indexedDB.open('mars.globe.surface.v1', 3);
+                const request = indexedDB.open('mars.globe.surface.v1', 4);
                 request.onupgradeneeded = () => {
-                    if (request.result.objectStoreNames.contains('tiles')) request.result.deleteObjectStore('tiles');
+                    for (const name of ['tiles', 'metadata', 'state'])
+                        if (request.result.objectStoreNames.contains(name)) request.result.deleteObjectStore(name);
                     request.result.createObjectStore('tiles', {keyPath: 'key'}).createIndex('used', 'used');
+                    request.result.createObjectStore('metadata', {keyPath: 'key'}).createIndex('used', 'used');
+                    request.result.createObjectStore('state', {keyPath: 'key'});
                 };
                 request.onerror = request.onblocked = () => { unavailable = true; resolve(null); };
                 request.onsuccess = () => {
                     if (unavailable) { request.result.close(); return; }
-                    request.result.onversionchange = () => request.result.close();
+                    request.result.onversionchange = () => { request.result.close(); this.database = null; };
                     resolve(request.result);
                 };
             } catch { resolve(null); }
@@ -36,48 +47,81 @@ class GlobeSurfaceCache {
         if (!db) return null;
         return new Promise(resolve => {
             try {
-                const transaction = db.transaction('tiles', 'readwrite');
-                const store = transaction.objectStore('tiles'), request = store.get(key);
-                let blob: Blob | null = null;
+                const transaction = db.transaction('tiles', 'readonly');
+                const request = transaction.objectStore('tiles').get(key);
+                let blob: Blob | null = null, damaged = false;
                 request.onsuccess = () => {
                     const record = request.result as GlobeSurfaceRecord | undefined;
                     if (!record) return;
-                    if (!(record.blob instanceof Blob) || record.blob.type !== 'application/octet-stream' ||
-                        record.size !== GlobeSurfaceCache.tileBytes || record.blob.size !== record.size) {
-                        store.delete(key);
-                        return;
-                    }
-                    blob = record.blob;
-                    store.put({...record, used: Date.now()});
+                    damaged = !(record.blob instanceof Blob) || record.blob.type !== 'application/octet-stream' ||
+                        record.size !== this.tileBytes || record.blob.size !== record.size;
+                    if (!damaged) blob = record.blob;
                 };
-                transaction.oncomplete = () => resolve(blob);
+                transaction.oncomplete = () => {
+                    if (blob || damaged) this.touch(db, key, damaged);
+                    resolve(blob);
+                };
                 transaction.onabort = transaction.onerror = () => resolve(null);
             } catch { resolve(null); }
         });
     }
 
+    private touch(db: IDBDatabase, key: string, remove: boolean): void {
+        try {
+            const transaction = db.transaction(remove ? ['tiles', 'metadata', 'state'] : ['metadata'], 'readwrite');
+            const metadata = transaction.objectStore('metadata'), request = metadata.get(key);
+            request.onsuccess = () => {
+                const record = request.result as GlobeSurfaceMetadata | undefined;
+                if (!record) { if (remove) transaction.objectStore('tiles').delete(key); return; }
+                if (!remove) { metadata.put({...record, used: Date.now()}); return; }
+                metadata.delete(key); transaction.objectStore('tiles').delete(key);
+                const state = transaction.objectStore('state'), budget = state.get('budget');
+                budget.onsuccess = () => {
+                    const value = budget.result as GlobeSurfaceBudget | undefined;
+                    if (value) state.put({...value, bytes: Math.max(0, value.bytes - record.size),
+                        count: Math.max(0, value.count - 1)});
+                };
+            };
+        } catch { /* Cache recency never holds up drawing. */ }
+    }
+
     async put(key: string, blob: Blob): Promise<void> {
-        if (blob.size !== GlobeSurfaceCache.tileBytes || blob.type !== 'application/octet-stream') return;
+        if (blob.size !== this.tileBytes || blob.type !== 'application/octet-stream') return;
         const db = await this.open();
         if (!db) return;
         await new Promise<void>(resolve => {
             try {
-                const transaction = db.transaction('tiles', 'readwrite'), store = transaction.objectStore('tiles');
-                store.put({key, blob, size: blob.size, used: Date.now()} satisfies GlobeSurfaceRecord);
-                // Every accepted record has the same raw size. Count keys, without reading or cloning pixel blobs.
-                const count = store.count();
-                count.onsuccess = () => {
-                    let excess = count.result - Math.min(GlobeSurfaceCache.maximumEntries,
-                        Math.floor(GlobeSurfaceCache.maximumBytes / GlobeSurfaceCache.tileBytes));
-                    if (excess <= 0) return;
-                    const cursor = store.index('used').openKeyCursor();
+                const transaction = db.transaction(['tiles', 'metadata', 'state'], 'readwrite');
+                const tiles = transaction.objectStore('tiles'), metadata = transaction.objectStore('metadata');
+                const state = transaction.objectStore('state'), old = metadata.get(key), budget = state.get('budget');
+                let oldReady = false, budgetReady = false;
+                const insert = () => {
+                    if (!oldReady || !budgetReady) return;
+                    const previous = old.result as GlobeSurfaceMetadata | undefined;
+                    const value = (budget.result as GlobeSurfaceBudget | undefined) || {key: 'budget', bytes: 0, count: 0};
+                    value.bytes += blob.size - (previous?.size || 0);
+                    value.count += previous ? 0 : 1;
+                    const used = Date.now();
+                    tiles.put({key, blob, size: blob.size, used} satisfies GlobeSurfaceRecord);
+                    metadata.put({key, size: blob.size, used} satisfies GlobeSurfaceMetadata);
+                    if (value.bytes <= GlobeSurfaceCache.maximumBytes && value.count <= GlobeSurfaceCache.maximumEntries) {
+                        state.put(value); return;
+                    }
+                    const cursor = metadata.index('used').openCursor();
                     cursor.onsuccess = () => {
                         const current = cursor.result;
-                        if (!current || excess <= 0) return;
-                        store.delete(current.primaryKey);
-                        if (--excess > 0) current.continue();
+                        if (!current || (value.bytes <= GlobeSurfaceCache.maximumBytes &&
+                            value.count <= GlobeSurfaceCache.maximumEntries)) { state.put(value); return; }
+                        if (current.primaryKey !== key) {
+                            const expired = current.value as GlobeSurfaceMetadata;
+                            tiles.delete(expired.key); current.delete();
+                            value.bytes -= expired.size; --value.count;
+                        }
+                        current.continue();
                     };
                 };
+                old.onsuccess = () => { oldReady = true; insert(); };
+                budget.onsuccess = () => { budgetReady = true; insert(); };
                 transaction.oncomplete = transaction.onabort = transaction.onerror = () => resolve();
             } catch { resolve(); }
         });

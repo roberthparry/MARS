@@ -3036,6 +3036,27 @@
             check(evaluations === 1, 'a town resolved after startup refreshes the active worksheet');
             await fixture.publishTowns({GB: [row('fifth')]});
             check(evaluations === 1, 'later pages do not repeatedly evaluate an already named observer');
+            const countries = [WorksheetContext.almanacJurisdiction, WorksheetContext.datetimeJurisdiction];
+            const originals = countries.map(select => ({children: Array.from(select.childNodes), value: select.value}));
+            const before = builds;
+            try {
+                for (const select of countries) {
+                    select.append(new Option('Australia', 'AU'));
+                    select.value = 'AU';
+                }
+                selection.selectTownByCoordinates = () => true;
+                await fixture.publishTowns({'AU-ACT': [row('Canberra')], 'AU-QLD': [row('Cairns')]});
+                check(builds === before + 2 && (labDOM.call('lab_town_store_list', 'AU') as LabTown[])
+                    .some(town => town.name === 'Cairns'),
+                    'state-only batches refresh both national menus and expose the merged Australian towns');
+                await fixture.publishTowns({'AU-NSW': [row('Armidale')]});
+                check(builds === before + 4,
+                    'later regional pages refresh Australia after its first town page has already appeared');
+            } finally {
+                countries.forEach((select, i) => {
+                    select.replaceChildren(...originals[i].children); select.value = originals[i].value;
+                });
+            }
         } finally {
             selection.townsForJurisdiction = saved.towns;
             selection.populateTownSelect = saved.populate;
@@ -3097,8 +3118,8 @@
                 await labApplication.townsReady;
                 if (catalogueCheck === 'success') {
                     check(JSON.stringify(WorksheetLocations.townSelection.townsForJurisdiction('GB-WLS')) ===
-                          JSON.stringify(labDOM.call('lab_town_store_list', 'GB')),
-                          'native town resolution projects the shared catalogue for incremental menu updates');
+                          JSON.stringify(labDOM.call('lab_town_store_list', 'GB-WLS')),
+                          'Wales retains its own catalogue while national aggregation updates other countries');
                     await checkTownPublicationScheduling();
                     await checkCountrySelectionReadiness();
                     check((labDOM.call('lab_town_store_list', 'GB-WLS') as LabTown[])[0].name === 'Rhyl', 'Background towns not published');
@@ -3324,8 +3345,13 @@
                 await report('PASS: calendar Back/Forward, selection menus, 5000-town selection and globe busy-state interactions');
                 return;
             }
+            if (new URLSearchParams(location.search).get('atlas-check') === '1') {
+                await runBrowserGroup('checkLabPhotoAtlas', window.checkLabPhotoAtlas, 180000);
+                await report('PASS: fixed photographic cells, source-cache pressure, persistent blocks and GPU upload');
+                return;
+            }
             if (new URLSearchParams(location.search).get('surface-check') === '1') {
-                await runBrowserGroup('checkLabSurfaceTiles', window.checkLabSurfaceTiles, 120000);
+                await runBrowserGroup('checkLabSurfaceTiles', window.checkLabSurfaceTiles, 300000);
                 await report('PASS: photographic loading, camera windows, resident GPU tiles and raw disk caching');
                 return;
             }

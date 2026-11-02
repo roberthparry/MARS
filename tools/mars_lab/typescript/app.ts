@@ -237,6 +237,7 @@ class LabApplication {
     }
 
     private async loadSelectedTowns(): Promise<void> {
+        this.syncTownCache();
         const pending: Promise<void>[] = [];
         const codes = new Set(['almanacJurisdiction', 'datetimeJurisdiction'].map(id =>
             ((document.getElementById(id) as HTMLSelectElement)?.value || '').split('-')[0])
@@ -310,6 +311,7 @@ class LabApplication {
     public async loadNearbyTowns(latitude: number, longitude: number): Promise<void> {
         if (!this.catalogue?.available ||
             !Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+        this.syncTownCache();
         if (this.nearbyComplete && this.nearbyCentre &&
             labDOM.call('lab_globe_nearby_covers', latitude, longitude, ...this.nearbyCentre)) return;
         this.nearbyTowns?.abort();
@@ -350,8 +352,10 @@ class LabApplication {
             if (inserted) {
                 added += inserted;
                 this.pendingTownCodes.add(code);
+                this.pendingTownCodes.add(code.split('-')[0]);
             }
         }
+        this.syncTownCache();
         if (!added) return;
         document.dispatchEvent(new CustomEvent('lab-town-catalogue-ready'));
         // Local and jurisdiction pages share one refresh queue to avoid concurrent menu rebuilds.
@@ -359,6 +363,18 @@ class LabApplication {
             this.townRefresh = this.refreshTownMenus();
         }
         await this.townRefresh;
+    }
+
+    private syncTownCache(): void {
+        const pins = ['almanacJurisdiction', 'datetimeJurisdiction'].map(id =>
+            (document.getElementById(id) as HTMLSelectElement)?.value || '')
+            .filter(code => /^[A-Z]{2}(?:-[A-Z0-9]{1,3})?$/.test(code));
+        const status = labDOM.call<{evicted: string[]} | null>('lab_town_store_policy', {pins});
+        for (const code of status?.evicted || []) {
+            this.townJurisdictions.delete(code);
+            this.failedTownCodes.delete(code);
+            this.nearbyComplete = false;
+        }
     }
 
     private async refreshTownMenus(): Promise<void> {

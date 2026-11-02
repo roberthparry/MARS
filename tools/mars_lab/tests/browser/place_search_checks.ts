@@ -12,6 +12,81 @@ interface Window {
     checkLabPlaceSearch(): Promise<void>;
 }
 
+/** @brief Exceed the former admission cap in an isolated real WASM worker while retaining active countries. */
+async function checkTownCacheRetention(): Promise<void> {
+    const origin = JSON.stringify(location.origin);
+    const source = `
+        const base = ${origin};
+        const read = globalThis.fetch.bind(globalThis);
+        globalThis.fetch = (input, options) => read(typeof input === 'string' ? new URL(input, base) : input, options);
+        importScripts(new URL('/js/transport.js', base).href);
+        (async () => {
+            const check = (ok, message) => { if (!ok) throw new Error(message); };
+            await labWire.start(false);
+            const row = (name, latitude = '5', longitude = '5', detail = '') => ({
+                name, value: name + '|' + latitude + '|' + longitude + '|0', latitude, longitude, detail,
+                elevation: '0', timezone: 'UTC', country_code: '', default: false
+            });
+            labDOM.call('lab_town_store_policy', {pins: ['GB', 'US']});
+            check(labDOM.call('lab_town_store_add', 'GB', [row('Retained British town', '51', '-2')]) === 1 &&
+                  labDOM.call('lab_town_store_add', 'US', [row('Retained American town', '40', '-74')]) === 1,
+                  'initial selected-country records are retained');
+            for (const code of ['GB', 'US']) for (let page = 0; page < 2; ++page) {
+                const rows = Array.from({length: 512}, (_, i) => row(code + ' pinned ' + (page * 512 + i),
+                    '5', '5', 'p'.repeat(4096)));
+                check(labDOM.call('lab_town_store_add', code, rows) === 512,
+                      'two active catalogues can together exceed the former eight-MiB allowance');
+            }
+            const countries = ['FR','DE','CA','NZ','ES','IT','NO','SE','DK','FI',
+                               'PT','JP','BR','IN','CN','NL','IE','CH','AT','BE'];
+            for (const code of countries) {
+                const rows = Array.from({length: 512}, (_, i) => row(code + i, '5', '5', 'x'.repeat(4096)));
+                check(labDOM.call('lab_town_store_add', code, rows) === 512,
+                      'visiting ' + code + ' must recycle inactive catalogue space');
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+            const status = labDOM.call('lab_town_store_policy', {});
+            check(status.bytes <= status.limit && status.limit === 16 * 1048576 && status.evicted.includes('FR'),
+                  'country LRU retention stays within its fixed byte allowance');
+            check(labDOM.call('lab_town_store_list', 'GB').length === 1025 &&
+                  labDOM.call('lab_town_store_list', 'US').length === 1025 &&
+                  labDOM.call('lab_town_store_list', 'FR') === null,
+                  'both selected countries survive whilst an older inactive catalogue is removed');
+            check(labDOM.call('lab_town_store_add', 'AU-WA', [row('Perth', '-31.9522', '115.8614')]) === 1 &&
+                  labDOM.call('lab_town_store_add', 'ZA', [row('Pretoria', '-25.7449', '28.1878')]) === 1,
+                  'uncached Perth and Pretoria are admitted after repeated country visits');
+            check(labDOM.call('lab_town_store_list', 'AU')[0].name === 'Perth' &&
+                  labDOM.call('lab_town_store_list', 'ZA')[0].name === 'Pretoria',
+                  'new search references remain available through native selection keys');
+            check(labDOM.call('lab_town_store_add', 'CO', [row('Existing')]) === 1,
+                  'a rollback fixture is retained before its failing batch');
+            check(labDOM.call('lab_town_store_add', 'CO', [row('Rolled back'), row('z'.repeat(65537))]) === -1 &&
+                  labDOM.call('lab_town_store_list', 'CO').length === 1,
+                  'failed batches roll back their additions without removing existing records');
+            check(labDOM.call('lab_town_store_region', -3, 50, -1, 53)[0].town.name === 'Retained British town',
+                  'spatial bucket slots remain valid after multiple country removals');
+            check(labDOM.call('lab_town_store_add', 'FR', [row('Reloaded')]) === 1 &&
+                  labDOM.call('lab_town_store_list', 'FR')[0].name === 'Reloaded',
+                  'discarded countries can be loaded again without stale keys or list slots');
+            labDOM.call('lab_town_store_clear');
+            const empty = labDOM.call('lab_town_store_policy', {});
+            check(empty.bytes === 0 && empty.count === 0 && !empty.evicted.length,
+                  'disposal releases the cache and its eviction notices');
+            postMessage({ok: true});
+        })().catch(error => postMessage({error: String(error)}));
+    `;
+    const url = URL.createObjectURL(new Blob([source], {type: 'text/javascript'}));
+    const worker = new Worker(url);
+    let timeout = 0;
+    try {
+        await new Promise<void>((resolve, reject) => {
+            timeout = window.setTimeout(() => reject(new Error('Town-cache retention check timed out')), 60000);
+            worker.onmessage = event => event.data.ok ? resolve() : reject(new Error(event.data.error));
+            worker.onerror = event => { event.preventDefault(); reject(new Error(event.message)); };
+        });
+    } finally { window.clearTimeout(timeout); worker.terminate(); URL.revokeObjectURL(url); }
+}
+
 /** @brief Select Lüderitz without knowing Namibia and reject stale suggestions through the real menu. */
 window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void> {
     function check(condition: unknown, message: string): void {
@@ -41,11 +116,15 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
     const england = new Option('Britain (UK) - England', 'GB-ENG');
     england.dataset.countryParent = 'GB-ENG';
     country.append(england, new Option('Singapore', 'SG'));
+    const westernAustralia = new Option('Western Australia', 'AU-WA');
+    westernAustralia.hidden = true; westernAustralia.dataset.countryParent = 'AU';
+    country.append(new Option('Australia', 'AU'), westernAustralia, new Option('South Africa', 'ZA'));
     country.value = 'GB'; town.append(new Option('Previous town', 'previous'));
     Reflect.set(country, 'labJurisdictionLabels', {
         NA: 'Namibia', GB: 'United Kingdom', SJ: 'Svalbard & Jan Mayen', PT: 'Portugal',
         'PT-20': 'Portugal — Região Autónoma dos Açores', 'GB-WLS': 'Britain (UK) - Wales',
-        'GB-ENG': 'Britain (UK) - England', SG: 'Singapore'
+        'GB-ENG': 'Britain (UK) - England', SG: 'Singapore', AU: 'Australia',
+        'AU-WA': 'Australia - Western Australia', ZA: 'South Africa'
     });
     root.append(country, town, select); document.body.append(root);
     const menu = WorksheetLocations.selects.enhance(select, {searchable: true, details: true});
@@ -204,6 +283,24 @@ window.checkLabPlaceSearch = async function checkLabPlaceSearch(): Promise<void>
               'a country and representative town may share a name');
         const sameName = shell.querySelector('.select-option:not(.hidden) .select-option-label');
         check(sameName?.textContent === 'Singapore', 'identical country and town names are displayed once');
+        const corePlaces: LabTown[] = [
+            {...row, name: 'Perth', jurisdiction: 'AU-WA', latitude: '-31.9522', longitude: '115.8614',
+             value: 'Perth|-31.9522|115.8614|34', elevation: '34', timezone: 'Australia/Perth'},
+            {...row, name: 'Pretoria', jurisdiction: 'ZA', latitude: '-25.7449', longitude: '28.1878',
+             value: 'Pretoria|-25.7449|28.1878|1332', elevation: '1332', timezone: 'Africa/Johannesburg'}
+        ];
+        for (const place of corePlaces) {
+            check(labDOM.call('lab_location_search_results', select, {available: true, matches: [place]}),
+                  `${place.name} is available independently of the selected country`);
+            const item = shell.querySelector<HTMLButtonElement>('.select-option:not(.hidden)');
+            check(item?.querySelector('.select-option-label')?.textContent === place.name,
+                  `${place.name} remains visible even when its regional country option is hidden`);
+            select.value = place.jurisdiction + ':' + place.value;
+            check(labDOM.call('lab_location_search_choose', select) && town.value === place.value &&
+                  town.selectedOptions[0]?.dataset.timezone === place.timezone,
+                  `selecting ${place.name} preserves its location and local time zone`);
+        }
+        await checkTownCacheRetention();
     } finally {
         WorksheetResults.tooltip.hide();
         controller.dispose(); menu?.dispose();

@@ -9,7 +9,8 @@
 /** @brief Serve controlled HTTP responses inside real drawing workers; other worker types are unchanged. */
 function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Response>,
                           options: {endpoint: string; script: string; nativeShore: boolean; storageDenied?: boolean;
-                                    surfaceProbe?: boolean; regionalAliases?: boolean; holdPhotograph?: boolean} =
+                                    surfaceProbe?: boolean; regionalAliases?: boolean; holdPhotograph?: boolean;
+                                    denyPhotographs?: boolean} =
                               {endpoint: '/almanac-globe', script: '/js/globe_worker.js', nativeShore: true}): {
     Worker: typeof Worker; releaseSurfaceCache(): void; waitForPhotograph(): Promise<void>;
     releasePhotograph(): void; dispose(): void;
@@ -42,6 +43,8 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                 event.data.bytes, {status: event.data.status, headers: event.data.headers}));
         });
         globalThis.fetch = (url, options) => {
+            if (${Boolean(options.denyPhotographs)} && (String(url).startsWith('/earth_tiles/') ||
+                String(url).startsWith('/earth_regions/'))) throw new Error('Photograph decoding is forbidden by this cache test');
             if (${Boolean(options.surfaceProbe)} && (String(url).startsWith('/earth_tiles/') ||
                 String(url).startsWith('/earth_regions/'))) {
                 if (photographs.has(url)) throw new Error('Photograph decoded repeatedly');

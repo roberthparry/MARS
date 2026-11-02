@@ -272,13 +272,19 @@ plus small dictionary and entry bookkeeping allocations.
 Town records are shared by menus and the globe in native `array_t` storage.
 `dictionary_t` indexes jurisdiction lists, selection keys and long-name exceptions;
 direct five-degree spatial buckets restrict globe queries to the visible region.
-`lab_town_store_add`, `lab_town_store_list`, `lab_town_store_get` and
+`lab_town_store_add`, `lab_town_store_list`, `lab_town_store_get`, `lab_town_store_policy` and
 `lab_town_store_region` copy data across the bridge without retaining scoped browser
 handles. Menus receive sorted snapshots and markers use stable jurisdiction/town
 keys rather than object identity. Failed batch allocations roll back that batch.
-An 8 MiB admission budget covers copied town text and a conservative per-record
-index allowance; exhausted storage reports a catalogue-loading error instead of
-silently discarding existing towns. Page disposal releases the records and indexes.
+A 16 MiB admission budget covers copied town text and a conservative per-record
+index allowance. The two selected countries are protected; native country LRU
+links discard older inactive catalogues when space is needed. Direct slot indexes
+remove their records from selection and spatial indexes without searching the lists.
+Discarded-country notices invalidate completed-loading markers, so revisiting a
+country reloads it from the database. Search results can therefore admit new places
+after repeated country visits without exhausting a permanent resident catalogue.
+Failed batches roll back their own additions; previously discarded inactive
+catalogues remain reloadable. Page disposal releases the records and indexes.
 Temporary display arrays, DOM nodes, request promises and GPU resources remain
 browser-owned. Binding and result-presentation collections are unchanged by this
 geography migration.
@@ -1140,8 +1146,8 @@ observations are transparent. Managed globe revision 16 imports the approximatel
 32.9 GiB PNG package with `make release`; only photographs
 needed for the current view are loaded, using the existing bounded caches.
 
-The native `lab_globe_photo_patch` planner wraps longitude at the date line and
-clamps tile rows at the poles. The browser retains at most four decoded tiles
+The fallback `lab_globe_photo_patch` planner wraps longitude at the date line and
+clamps tile rows at the poles. This fallback retains at most four decoded tiles
 and one 3600 × 3600 GPU patch (about 49.4 MiB each), plus transient replacement
 storage. Devices whose texture limit is below 3600 retain the existing image.
 Downloads and decoding are asynchronous; failed or cancelled work cannot replace
@@ -1193,63 +1199,55 @@ candidate package initially shares their hard links. The completed manifest reco
 updated PNG checksums, sizes, observation counts and repair provenance before publication.
 Gaps without detailed observations remain transparent and require additional source coverage.
 
-Once the requested longitude and latitude spans are each
-at most 30°, independent asynchronous requests prepare a photographic river tile from
-the **globe database**. Native code supplies image crops and river paths; a dedicated
-browser worker composites the tile without holding up animation. Photographs are decoded
-concurrently with river geometry. The complete NASA coverage is published before
-regional image decoding starts, followed by the refined photograph and then the
-completed river surface at the same cache address. These previews remain outside
-the persistent cache until the geometry is complete.
-Only completed surfaces are written to the persistent cache. Native plans choose
-decoded image sizes for the display scale and contain at most 68 source photographs.
-The initial globe, towns and observer selection never wait for this layer.
-Padded coverage is refreshed during movement. Continuous panning lets an in-flight
-window finish before requesting the next, avoiding repeated cancellation before
-any detail can arrive. Choosing another observer can supersede that request. Requests are
-time-limited; obsolete responses cannot replace the current
-overlay. Mapped riverbanks and lakes have no fixed zoom cutoff; areas smaller than
-a quarter texture pixel are omitted until a closer view. Windows wider or taller
-than 6° use mapped areas without centreline detail. Up to four regional
-textures remain on the GPU (64 MiB total), allowing recent destinations to be
-rebound without decoding or uploading them again. A destination preload does not
-evict the displayed surface. Coarse NASA previews do not replace already displayed
-regional photography. Native selection prefers complete coverage and retains useful
-partial tiles while finer or wider coverage loads. Outgoing and incoming GPU tiles
-stay pinned within that same budget and blend over half a second, with both layers
-anchored to their geographic bounds. The outgoing tile still fills areas beyond
-the replacement's boundary. The renderer uses eight texture units, including the
-unit formerly reserved for the coarse map. History navigation retains the outgoing detail and
-prepares destination imagery immediately at the arrival scale. Intermediate flight
-frames do not displace that request or delay it behind a river overview; the global
-photograph remains available along the route.
-Stable geographic windows let small framing changes reuse the same disk entry.
-The native `lab_texture_cache` service uses `dictionary_t` for copied-key lookup,
-byte budgets and LRU eviction. `lab_globe_surface_bounds` selects stable windows;
-`lab_texture_premultiply` prepares bounded pixel batches in WASM. JavaScript keeps
-only indexed browser-resource slots and performs WebGL and IndexedDB operations.
-The worker retains up to 64 MiB of decoded photograph pixels, including feathered
-regional edges, to reuse them across nearby views. This excludes temporary decoding
-and drawing buffers. Finished pixels are displayed before optional raw-pixel readback
-and storage. Pixel preparation yields in small worker batches, and travel never
-waits for a disk write. At most two additional 16 MiB canvases are retained for
-background persistence: the active write and the newest pending destination.
-Rapid intermediate views may replace a pending write, keeping memory bounded.
-Completed tiles persist in a per-browser, per-Lab-origin IndexedDB cache, bounded
-to 32 2048-square RGBA tiles: 16 MiB each and 512 MiB in total. These disposable
-raw tiles store premultiplied RGBA bytes, transferred from the worker directly into
-a WebGL texture without image decoding, canvas conversion or rebuilding an ImageBitmap.
-Reading the bytes and uploading them to GPU memory are still necessary; resident
-GPU textures are reused directly. Older straight-alpha cache entries are discarded.
-GPU upload buffers and driver allocations are additional to the retained-texture budget.
-Browser storage and transient readback
-buffers are additional; least recently used entries are evicted as needed. Database
-changes invalidate cached images. Returning after release reuses a valid cached
-tile without querying or rasterising its rivers again. Storage denial still allows
-uncached drawing; unavailable worker or photo support falls back to the river SVG
-overlay. This cache does not reduce the source river database's storage. Towns
-remain resident to preserve immediate selection; this river policy does not
-evict the selected town or introduce a town-cache memory cap.
+Once the requested longitude and latitude spans are each at most 30°, the
+photographic globe uses fixed 512-square geographic cells from the **globe database**.
+Cell keys describe geography and resolution, independently of the camera window.
+Panning reuses those cells directly through a WebGL atlas instead of rebuilding a
+large photograph of each new view. A small indirection texture selects the finest
+resident cell or its cached lower-resolution ancestor. Sharp cells remain visible
+while adjacent cells load; a coarse regional overview cannot replace them during
+a river-mask handover. The initial globe, towns and observer selection never wait
+for photographic refinement.
+
+The native `lab_texture_cache` service owns cell keys, page selection, visible-cell
+pinning, byte accounting and LRU eviction through `dictionary_t`. Its photographic
+page describes 64 spatial cells and a centre-first next request, with prefetch
+limited to half a cell beyond the current view. Free slots use a
+stack and protected slots use a bitset. `lab_photo_source` supplies exact pixel
+crops and stable source-block keys; JavaScript performs the browser codec, storage
+and graphics calls. The renderer still uses eight texture units. The photographic
+atlas retains at most 64 one-MiB cells, or 16 cells on a smaller graphics budget;
+its geographic lookup texture occupies only 256 bytes.
+
+A dedicated worker decodes one source PNG at a time. It splits the source into
+512-square cores with one-pixel gutters and persists their raw pixels. Only needed
+small blocks stay decoded, within a separate 64 MiB cache. Adjacent cells and worker
+restarts can therefore reuse source blocks without decoding two full 3600-square
+photographs repeatedly. A complete geographic cell is uploaded as premultiplied
+RGBA without another image decode. Initial codec allocations, the currently decoded
+source image, upload buffers and driver allocations are additional temporary memory.
+Source reads have an eight-second timeout; finishing useful source blocks does not
+hold up the animation thread.
+
+River masks are requested and rasterised independently of the photographs. Their
+alpha coverage preserves surveyed water, islands and land without painting another
+photographic preview over the atlas. Stable padded mask windows follow the camera;
+requests that still cover the view continue, while obsolete requests are replaced.
+Up to four 2048-square masks use a separate GPU budget of 64 MiB. Mapped riverbanks
+and lakes have no fixed zoom cutoff; areas smaller than a quarter mask pixel are
+omitted until a closer view. Windows wider or taller than 6° use mapped areas
+without centreline detail. The global photograph remains available along a journey.
+
+Completed photographic cells, source blocks and masks share a disposable,
+per-browser, per-Lab-origin IndexedDB cache limited to **512 MiB and 512 entries**.
+Small metadata records maintain byte totals and recency; eviction never reads image
+blobs. Cache hits use read-only transactions and update recency asynchronously.
+Database identities and source digests invalidate stale data. Older disposable cache
+formats are rebuilt automatically. Storage denial still permits uncached drawing;
+unavailable worker or graphics support retains the global photograph and independent
+river overlay. These caches do not reduce the source river database's storage.
+Photographic storage is independent of the native town cache. Active-country pins
+protect the selected towns while inactive country catalogues remain reloadable.
 Only spatially indexed chunks intersecting the view are read. Missing
 river data leave the globe usable. The WDBII dataset has been withdrawn because
 it misses important town-scale meanders. Updated builds reject it even in older
@@ -1275,10 +1273,18 @@ asynchronous calculations, including their search fields and option buttons.
 Busy-state presentation does not disable these selectors or override a selector
 already disabled because its catalogue is unavailable.
 Background town batches refresh only menus whose native-selected catalogue has
-changed, including country-level fallback lists. Nearby and worldwide arrivals
+changed, including country-level fallback lists and national lists expanded by
+state or territory entries. Nearby and worldwide arrivals
 share a serial refresh queue, coalescing overlapping updates and yielding to
 browser input between menu rebuilds. Duplicate or unrelated batches do not rebuild
 the menus; the existing coordinate-selection policy remains native-owned.
+Managed jurisdiction revision 18 also adds missing towns from both the packaged
+core catalogue and worldwide supplement to older databases, then rebuilds the
+worldwide search index. This includes core entries such as Perth and Pretoria.
+`make release` applies this update
+when Lab is installed, preserving existing town IDs, local memberships, heights
+and default selections. The packaged Australian catalogue contains 277 distinct
+town names across national, state and territory records.
 
 The photograph remains visible while the initial shoreline mask loads. A failed
 mask request leaves the photograph in place; subsequent detail requests can retry.
@@ -4626,20 +4632,14 @@ an explicit location action can also supply a new observer altitude.
 Where a subdivision has no separate town catalogue, a unique namesake seat takes
 precedence over the national capital. Unnamed Antarctic locations use UTC with a
 station-timezone-unknown label; named stations retain their own timezone rules.
-Magnified photographic tiles use bounded sharpening, while the observer crosshair
-has a dark outline that remains visible over bright ice. The source photograph
-still limits the real detail available at close viewing distances.
-During dragging, photographic requests follow the camera rather than remaining
-attached to the selected town. Padded windows anticipate the drag direction;
-requests that still cover the view continue, while obsolete windows are replaced.
-Completed GPU tiles remain available during refinement. Regional overviews appear
-before finer photographs finish, and source images use stable decode-size tiers
-so nearby views can reuse decoded pixels. Disposable disk-cache eviction counts
-indexed keys without reading the stored pixel blobs.
-Cancelling an obsolete view still allows its current source photograph to finish
-under an eight-second timeout, so the next window can reuse it instead of starting
-the same download again. Source reads remain serial and the decoded cache keeps
-its existing 64 MiB limit.
+The observer crosshair has a dark outline that remains visible over bright ice.
+Photographic refinement loads finer geographic cells as the view approaches;
+the source photograph still limits the real detail available at close viewing distances.
+During dragging, fixed photographic cells follow their geographic coordinates.
+Already resident sharp cells remain visible while adjacent cells load, and cached
+lower-resolution ancestors cover refinement until finer cells are ready. River masks
+follow the camera independently; neither a selected town nor a coarse preview locks
+the photographic layer to an obsolete view.
 
 Temperature changes refraction, not parallax. Below −0.575° the displayed altitude
 receives no refraction correction. The native globe hit-test classifies the

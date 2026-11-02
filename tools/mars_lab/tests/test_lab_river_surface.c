@@ -154,6 +154,26 @@ static bool surface_fixture(const char *directory)
     imagery_only = imagery_only && initial_status == 200 && !*test_lab_text(initial_data, "path") &&
                    json_array_size(test_lab_member(initial_data, "banks")) == 0;
     json_free(initial_data); json_free(initial);
+    json_t *photographic = surface_request(welsh_bounds, "photo-plan", NULL, &initial_status);
+    const json_t *photographs = test_lab_member(photographic, "photos");
+    imagery_only = imagery_only && initial_status == 200 && json_array_size(photographs) == 2 &&
+                   !strncmp(test_lab_text(photographic, "key"), "photo-cell-1:", 13);
+    for (size_t i = 0; imagery_only && i < json_array_size(photographs); ++i) {
+        const json_t *photo = json_array_get(photographs, i), *target = test_lab_member(photo, "target");
+        double rectangle[4];
+        for (unsigned j = 0; j < 4; ++j) {
+            const string_t *text = json_number_text(json_array_get(target, j));
+            imagery_only = text && lab_cal_number(string_c_str(text), &rectangle[j]) && imagery_only;
+        }
+        imagery_only = imagery_only && rectangle[0] >= 0 && rectangle[1] >= 0 && rectangle[2] > 0 && rectangle[3] > 0 &&
+                       rectangle[0] + rectangle[2] <= 512.001 && rectangle[1] + rectangle[3] <= 512.001 &&
+                       json_number_text(test_lab_member(photo, "width"));
+    }
+    json_free(photographic);
+    json_t *mask_plan = surface_request(welsh_bounds, "mask-plan", NULL, &initial_status);
+    imagery_only = imagery_only && initial_status == 200 && !test_lab_member(mask_plan, "photos") &&
+                   !strncmp(test_lab_text(mask_plan, "key"), "river-surface-7:", 16);
+    json_free(mask_plan);
     string_t *path = string_new_with(getenv("MARS_GLOBE_DB_PATH"));
     sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
     bool ok = imagery_only && db && sqlite_exec_cstr(db,

@@ -167,6 +167,8 @@ The 54 Sardinian town records added to
 come from the [GeoNames cities5000 extract](https://download.geonames.org/export/dump/cities5000.zip),
 under [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/).
 Credit: GeoNames, <https://www.geonames.org/>. No endorsement is implied.
+The shared core seed is now `packaging/jurisdiction-db/town_catalogue_seed.sql`,
+read by both fresh installation and catalogue refresh; the source records are unchanged.
 The selection uses country `IT` and administrative region `14` (Sardinia),
 excluding the neighbourhood records Li Punti-San Giovanni (3205826),
 Monte Rosello (12188754), and the southern namesake La Maddalena (2524463).

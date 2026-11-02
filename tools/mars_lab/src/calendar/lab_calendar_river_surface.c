@@ -51,6 +51,7 @@ typedef struct {
     globe_t *globe;
     json_t *photos;
     const double *bounds;
+    unsigned pixels;
 } surface_regions_t;
 
 static bool surface_region(unsigned slot, const double region[4], void *context)
@@ -67,11 +68,14 @@ static bool surface_region(unsigned slot, const double region[4], void *context)
     if (!globe_texture_metadata(state->globe, 3, slot, 0, &info)) return false;
     double left = fmax(b[0], region[0]), right = fmin(b[2], region[2]);
     double south = fmax(b[1], region[1]), north = fmin(b[3], region[3]);
+    if (right <= left || north <= south) return true;
     double sx = info.width / (region[2] - region[0]), sy = info.height / (region[3] - region[1]);
     double source[] = {(left - region[0]) * sx, (region[3] - north) * sy,
                        (right - left) * sx, (north - south) * sy};
-    double target[] = {(left - b[0]) * 2048 / (b[2] - b[0]), (b[3] - north) * 2048 / (b[3] - b[1]),
-                       (right - left) * 2048 / (b[2] - b[0]), (north - south) * 2048 / (b[3] - b[1])};
+    double target[] = {(left - b[0]) * state->pixels / (b[2] - b[0]),
+                       (b[3] - north) * state->pixels / (b[3] - b[1]),
+                       (right - left) * state->pixels / (b[2] - b[0]),
+                       (north - south) * state->pixels / (b[3] - b[1])};
     json_t *photo = json_new_object();
     string_t *url = string_sprintf("/earth_regions/%02u.png", slot);
     if (photo && url) {
@@ -93,7 +97,7 @@ static bool surface_region(unsigned slot, const double region[4], void *context)
     return ok;
 }
 
-static json_t *surface_photographs(globe_t *globe, const double b[4])
+static json_t *surface_photographs(globe_t *globe, const double b[4], unsigned pixels)
 {
     json_t *photos = json_new_array();
     int first = (int)floor((b[0] + 180) / 30), last = (int)ceil((b[2] + 180) / 30) - 1;
@@ -108,21 +112,23 @@ static json_t *surface_photographs(globe_t *globe, const double b[4])
             double left = fmax(b[0], west), right = fmin(b[2], west + 30);
             double south = fmax(b[1], north - 30), upper = fmin(b[3], north);
             double source[] = {(left - west) * 60, (north - upper) * 60, (right - left) * 60, (upper - south) * 60};
-            double target[] = {(left - b[0]) * 2048 / (b[2] - b[0]), (b[3] - upper) * 2048 / (b[3] - b[1]),
-                               (right - left) * 2048 / (b[2] - b[0]), (upper - south) * 2048 / (b[3] - b[1])};
+            double target[] = {(left - b[0]) * pixels / (b[2] - b[0]), (b[3] - upper) * pixels / (b[3] - b[1]),
+                               (right - left) * pixels / (b[2] - b[0]), (upper - south) * pixels / (b[3] - b[1])};
             json_t *photo = ok ? json_new_object() : NULL;
             string_t *url = ok ? string_sprintf("/earth_tiles/%02u-%02u.png", wrapped, (unsigned)row) : NULL;
+            string_t *width = string_new_with("1800");
             if (photo && url) {
                 lab_cal_set(photo, "url", string_c_str(url));
                 lab_cal_set(photo, "sha256", info.sha256);
+                lab_cal_take(photo, "width", width ? json_new_number(width) : NULL);
                 lab_cal_take(photo, "source", surface_numbers(source, 4));
                 lab_cal_take(photo, "target", surface_numbers(target, 4));
             }
             ok = photo && url && json_array_append(photos, photo);
-            json_free(photo); string_free(url);
+            json_free(photo); string_free(url); string_free(width);
         }
     }
-    surface_regions_t state = {globe, photos, b};
+    surface_regions_t state = {globe, photos, b, pixels};
     if (ok) ok = globe_texture_regions(globe, b, surface_region, &state);
     if (ok) return photos;
     json_free(photos);
@@ -141,16 +147,18 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
         b[1] < -90 || b[3] > 90 || b[3] - b[1] < .000001 || b[3] - b[1] > 30)
         return lab_cal_error(status, 400, "River surface tiles require a close view");
     bool data = !strcmp(lab_cal_text(payload, "format"), "surface-data");
+    bool photograph = !strcmp(lab_cal_text(payload, "format"), "photo-plan");
+    bool mask = !strcmp(lab_cal_text(payload, "format"), "mask-plan");
     globe_reader_t *reader = globe_reader_new();
     string_t *identity = globe_reader_identity(reader);
     globe_t *globe = identity ? globe_reader_get(reader) : NULL;
-    string_t *key = identity ? string_sprintf("river-surface-7:%s:%.12g:%.12g:%.12g:%.12g",
-        string_c_str(identity), b[0], b[1], b[2], b[3]) : NULL;
+    string_t *key = identity ? string_sprintf("%s:%s:%.12g:%.12g:%.12g:%.12g",
+        photograph ? "photo-cell-1" : "river-surface-7", string_c_str(identity), b[0], b[1], b[2], b[3]) : NULL;
     bool ok = key && globe;
     bool rivers = ok && globe_has_layer(globe, GLOBE_LAYER_RIVERS);
     bool complete = ok && globe_river_water_complete(globe, b[0], b[1], b[2], b[3]);
     bool changed = data && ok && strcmp(lab_cal_text(payload, "key"), string_c_str(key));
-    json_t *photos = ok && !data ? surface_photographs(globe, b) : NULL;
+    json_t *photos = ok && !data && !mask ? surface_photographs(globe, b, photograph ? 512 : 2048) : NULL;
     river_surface_t surface = {.path = data ? string_new() : NULL, .west = b[0], .north = b[3],
                                .fill = data ? string_new() : NULL, .globe = globe,
                                .sx = 2048 / (b[2] - b[0]), .sy = 2048 / (b[3] - b[1])};
@@ -158,7 +166,7 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
     if (data) ok = ok && !changed && surface.path && surface.fill && (!rivers || complete || !regional ||
         globe_river_display_segments(globe, b[0], b[1], b[2], b[3],
             fmin(b[2] - b[0], b[3] - b[1]) / 2048, surface_segment, &surface));
-    else ok = ok && photos;
+    else ok = ok && (mask || photos);
     json_t *banks = ok && data ? (rivers ? lab_cal_river_banks(globe, b) : json_new_array()) : NULL;
     if (data) ok = ok && banks;
     string_t *after = ok ? globe_reader_identity(reader) : NULL;
@@ -175,7 +183,7 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
             lab_cal_set(result, "fill", string_c_str(surface.fill));
             lab_cal_take(result, "banks", banks); banks = NULL;
         }
-        else { lab_cal_take(result, "photos", photos); photos = NULL; }
+        else if (!mask) { lab_cal_take(result, "photos", photos); photos = NULL; }
         if (status) *status = 200;
     }
     json_free(photos); json_free(banks); string_free(surface.path); string_free(surface.fill);

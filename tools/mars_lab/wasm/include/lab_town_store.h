@@ -15,8 +15,29 @@
 
 #include "lab_handle.h"
 
-/** @brief Merge a jurisdiction's records; return the inserted count, or -1 after rolling back a failed batch. */
+/**
+ * @brief Merge one jurisdiction's records within the bounded, country-aware native catalogue.
+ * @param code Scoped country or subdivision string, borrowed only during this call.
+ * @param rows Scoped array of town records; copied strings and indexes remain owned by the store.
+ * @return Number of new records, zero for duplicates, or -1 after rolling back this batch on invalid input or failure.
+ * @note The 16 MiB text and index admission allowance retains the incoming country and the active-country pins.
+ * Older unpinned countries may be discarded to make room, including before a later batch failure. Use
+ * lab_town_store_policy() to acknowledge discarded country codes and invalidate completed-loading markers.
+ * Calls are serialised; no scoped browser handle is retained. lab_town_store_clear() releases resident records.
+ */
 int lab_town_store_add(jsref code, jsref rows);
+
+/**
+ * @brief Update selected-country protection and report bounded cache accounting and discarded catalogues.
+ * @param request Scoped object, optionally containing pins: an array of at most eight country or subdivision codes.
+ * Subdivision codes protect their whole country. Omit pins to preserve the existing protection set.
+ * @return No C value; the scoped host result contains bytes, limit, count and evicted country codes. Invalid pins
+ * return null without changing protection or consuming pending eviction notices.
+ * @note Reading the result acknowledges its eviction notices. Strings and arrays are independent browser copies;
+ * no ownership transfers or host handles survive this serialised call. The caller must invalidate its completed
+ * catalogue markers for discarded countries so later selections reload them from the database.
+ */
+void lab_town_store_policy(jsref request);
 
 /**
  * @brief Publish a town-menu snapshot, combining regional memberships for a country code.
