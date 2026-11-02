@@ -180,21 +180,56 @@ function checkGlobeComposite(check: (condition: boolean, message: string) => voi
         gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, page);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        const addresses = new Uint8Array(8 * 8 * 4);
+        const addresses = new Uint8Array(16 * 16 * 4);
         for (let i = 0; i < addresses.length; i += 4) addresses[i] = 1;
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 8, 8, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 16, 16, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
         gl.uniform1i(gl.getUniformLocation(program, 'photoPatch'), 7);
         gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasEnabled'), 1);
         gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasReady'), 1);
         gl.uniform1i(gl.getUniformLocation(program, 'previousRiverReady'), 0);
         gl.uniform4f(gl.getUniformLocation(program, 'photoAtlasBounds'), -1, -1, 1, 1);
-        gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasSpan'), .25);
+        gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasSpan'), .125);
         gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasColumns'), 1);
         for (const blend of [0, .5, 1]) {
             gl.uniform1f(gl.getUniformLocation(program, 'riverBlend'), blend);
             check(pixel().every((value, i) => i === 3 ? value === 255 : Math.abs(value - [40, 180, 160][i] * light) <= 2),
                   'fixed photographic pixels remain sharp through river-mask and coarse-preview handoffs');
         }
+        gl.activeTexture(gl.TEXTURE2);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                      new Uint8Array([20, 90, 80, 128]));
+        check(pixel().every((value, i) => i === 3 ? value === 255 :
+            Math.abs(value - ([80, 100, 40][i] * (1 - 128 / 255) + [20, 90, 80][i]) * light) <= 2),
+            'transparent regional shore edges blend with the resident world image using premultiplied pixels');
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+        check(pixel().every((value, i) => i === 3 ? value === 255 : Math.abs(value - base[i]) <= 1),
+              'unobserved regional gaps retain the world image without decoding a separate NASA underlay');
+        const joined = new Uint8Array(1024 * 1024 * 4);
+        for (let y = 0; y < 512; ++y) {
+            for (let x = 0; x < 1024; ++x) {
+                const offset = (y * 1024 + x) * 4;
+                joined[offset] = x >= 511 && x !== 512 ? 255 : 0;
+                joined[offset + 3] = 255;
+            }
+        }
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1024, 1024, 0, gl.RGBA, gl.UNSIGNED_BYTE, joined);
+        for (let y = 0; y < 16; ++y) for (let x = 0; x < 16; ++x) {
+            const at = (y * 16 + x) * 4;
+            addresses[at] = x < 8 ? 1 : 2;
+            addresses[at + 1] = 3;
+        }
+        gl.activeTexture(gl.TEXTURE7);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 16, 16, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
+        gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasColumns'), 2);
+        const seam: number[] = [];
+        for (const longitude of [-.00002, .00002]) {
+            const angle = longitude * Math.PI / 180;
+            gl.uniformMatrix3fv(gl.getUniformLocation(program, 'cameraToWorld'), false,
+                [0, 0, 0, 0, 0, 0, Math.sin(angle), 0, Math.cos(angle)]);
+            seam.push(pixel()[0]);
+        }
+        check(seam.every(value => value > 100 && value < 150) && Math.abs(seam[0] - seam[1]) < 24,
+              `geographic gutters interpolate across adjacent atlas cells without a bright or dark seam (${seam})`);
         check(gl.getError() === gl.NO_ERROR, 'photographic handoffs complete without GPU errors');
     } finally {
         textures.forEach(texture => gl.deleteTexture(texture));

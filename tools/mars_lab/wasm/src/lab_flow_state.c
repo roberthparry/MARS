@@ -1197,7 +1197,21 @@ static jsref lab_flow_state_selection_finish(frame_jsref frame)
     static const char *const finishers[] = {"stateFocusEditor",  "stateFocusEditor",      "stateFocusEditor",
                                             "stateFocusEditor",  "stateFinishIntegrator", "stateFinishDatetime",
                                             "stateFinishAlmanac"};
-    return (unsigned)index < LAB_MODE_COUNT ? lab_flow_state_next(frame, 40, finishers[index]) : lab_flow_done(0);
+    return (unsigned)index < LAB_MODE_COUNT
+               ? lab_flow_call(frame, 40, finishers[index], "calendarResult", 0, 0)
+               : lab_flow_done(0);
+}
+
+/* Almanac has no Evaluate button: first entry and interrupted calculations must start without adding history. */
+static jsref lab_flow_state_selection_calendar(frame_jsref frame)
+{
+    if (lab_dom_number(lab_dom_get(frame, "index")) != LAB_MODE_ALMANAC ||
+        (lab_dom_truth(lab_dom_get(frame, "calendarResult")) &&
+         lab_dom_query(0, "#rendered .almanac-grid-table")))
+        return lab_flow_done(0);
+    jsref options = lab_dom_object(LAB_VALUE_OBJECT);
+    lab_dom_set(options, "skipHistoryUpdate", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
+    return lab_flow_call(frame, 41, "stateEvaluate", 0, 0, 1, options);
 }
 
 static jsref lab_flow_state_selection_error_guard(frame_jsref frame)
@@ -1242,6 +1256,7 @@ static jsref lab_flow_state_selection(frame_jsref frame, view_jsref view)
         [16] = lab_flow_state_selection_finish,
         [30] = lab_flow_state_selection_error_guard,
         [31] = lab_flow_state_selection_state_status,
+        [40] = lab_flow_state_selection_calendar,
     };
     unsigned selected = lab_flow_state_stage(frame);
     return selected < sizeof handlers / sizeof *handlers && handlers[selected]

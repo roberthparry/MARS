@@ -80,7 +80,7 @@ int lab_worker_complex_plot(const char *source, const expr_t *expression, const 
     sampler_options_t options = sampler_options_default();
     options.intervals = preview ? 32 : 64;
     options.max_evaluations = preview ? 2049 : 16385;
-    options.max_depth = preview ? 4 : 8;
+    options.max_depth = lab_worker_plot_depth(options.intervals, options.max_evaluations, preview ? 4u : 8u);
     size_t saved = num_get_default_prec_bits(), required = lab_worker_plot_range_precision(lo, hi);
     if (required > saved)
         num_set_default_prec_bits(required);

@@ -2,19 +2,25 @@
  * @file globe_photo_worker.ts
  * @brief Off-thread preparation of fixed photographic cells from reusable decoded source blocks.
  *
- * Decodes one PNG at a time, splits it into native-planned 512-pixel cores with one-pixel gutters and persists
- * raw blocks. Only needed small blocks stay decoded. Completed geographic cells are transferred directly to WebGL;
+ * Decodes one PNG at a time and prepares only the native-selected source cores, with one-pixel gutters.
+ * A bounded browser-resource queue persists raw blocks independently of drawing. Completed cells transfer directly to WebGL;
  * coarse regional overviews are never published as replacements for existing fine imagery.
  */
 interface PhotoSource { url: string; sha256: string; width: number; source: number[]; target: number[]; }
 interface PhotoSourcePart { key: string; needed: number; read: number[]; write: number[]; source?: number[]; target?: number[]; }
 interface PhotoCellRequest { key: string; bounds: number[]; level: number; }
+interface PhotoCacheWrite { cache: GlobeSurfaceCache; key: string; blob: Blob; }
 class GlobePhotoWorker {
     private readonly ready: Promise<void>;
     private readonly cells: GlobeSurfaceCache;
     private readonly sources: GlobeSurfaceCache;
     private parts: import('./globe_texture_cache.js').GlobeTextureCache<ImageBitmap> | null = null;
     private running = false;
+    // The ring owns browser Blobs only; native dictionaries still own decoded-block lookup and admission.
+    private readonly writes: (PhotoCacheWrite | undefined)[] = new Array(24);
+    private writeHead = 0;
+    private writeCount = 0;
+    private writing = false;
 
     constructor(private readonly port: {
         importScripts(...urls: string[]): void;
@@ -31,6 +37,31 @@ class GlobePhotoWorker {
     private paint(context: OffscreenCanvasRenderingContext2D, image: CanvasImageSource, part: PhotoSourcePart): void {
         const [sx, sy, sw, sh] = part.source!, [dx, dy, dw, dh] = part.target!;
         context.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+    }
+
+    private save(cache: GlobeSurfaceCache, key: string, blob: Blob): void {
+        // Retain at most twenty-four pending blocks plus the active write, below 26 MiB including source gutters.
+        if (this.writeCount === this.writes.length) {
+            this.writes[this.writeHead] = undefined;
+            this.writeHead = (this.writeHead + 1) % this.writes.length;
+            --this.writeCount;
+        }
+        this.writes[(this.writeHead + this.writeCount++) % this.writes.length] = {cache, key, blob};
+        if (!this.writing) void this.persist();
+    }
+
+    private async persist(): Promise<void> {
+        this.writing = true;
+        try {
+            while (this.writeCount) {
+                const write = this.writes[this.writeHead]!;
+                this.writes[this.writeHead] = undefined;
+                this.writeHead = (this.writeHead + 1) % this.writes.length;
+                --this.writeCount;
+                try { await write.cache.put(write.key, write.blob); }
+                catch { /* Optional browser storage cannot reject a visible photograph. */ }
+            }
+        } finally { this.writing = false; }
     }
 
     private async source(context: OffscreenCanvasRenderingContext2D, photo: PhotoSource): Promise<void> {
@@ -67,20 +98,17 @@ class GlobePhotoWorker {
         const canvas = new OffscreenCanvas(514, 514), patch = canvas.getContext('2d')!;
         try {
             if (image.width !== photo.width || image.height !== photo.width || !patch) throw new Error('Invalid photograph size');
-            for (let i = 0; i < parts.length; ++i) {
+            for (let i = first; i < parts.length; ++i) {
                 const part = parts[i];
+                if (!part.needed) continue;
                 const [sx, sy, sw, sh] = part.read, [dx, dy, dw, dh] = part.write;
                 patch.clearRect(0, 0, 514, 514);
                 patch.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
                 const pixels = patch.getImageData(0, 0, 514, 514);
-                if (part.needed) {
-                    if (i >= first) this.paint(context, canvas, part);
-                    const bitmap = await createImageBitmap(canvas);
-                    if (!this.parts!.put(part.key, bitmap, 514 * 514 * 4)) bitmap.close();
-                }
-                await this.sources.put(part.key, new Blob([pixels.data], {type: 'application/octet-stream'}));
-                // A bounded source read may finish after its originating camera has moved; all cells remain reusable.
-                await new Promise(resolve => setTimeout(resolve, 0));
+                this.paint(context, canvas, part);
+                const bitmap = await createImageBitmap(canvas);
+                if (!this.parts!.put(part.key, bitmap, 514 * 514 * 4)) bitmap.close();
+                this.save(this.sources, part.key, new Blob([pixels.data], {type: 'application/octet-stream'}));
             }
         } finally { image.close(); canvas.width = canvas.height = 1; }
     }
@@ -126,7 +154,7 @@ class GlobePhotoWorker {
             const blob = new Blob([pixels], {type: 'application/octet-stream'});
             const buffer = pixels.buffer;
             this.port.postMessage({key: request.key, pixels: buffer}, [buffer]);
-            void this.cells.put(plan.key, blob);
+            this.save(this.cells, plan.key, blob);
         } catch (error) { this.port.postMessage({key: request.key, error: String(error)}); }
         finally { canvas.width = canvas.height = 1; this.running = false; }
     }

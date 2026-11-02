@@ -12,7 +12,8 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                                     surfaceProbe?: boolean; regionalAliases?: boolean; holdPhotograph?: boolean;
                                     denyPhotographs?: boolean} =
                               {endpoint: '/almanac-globe', script: '/js/globe_worker.js', nativeShore: true}): {
-    Worker: typeof Worker; releaseSurfaceCache(): void; waitForPhotograph(): Promise<void>;
+    Worker: typeof Worker; releaseSurfaceCache(): void; waitForCache(key: string): Promise<void>; cacheCount(): number;
+    waitForPhotograph(): Promise<void>;
     releasePhotograph(): void; dispose(): void;
 } {
     const BrowserWorker = globalThis.Worker;
@@ -79,7 +80,8 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
             const put = GlobeSurfaceCache.prototype.put;
             GlobeSurfaceCache.prototype.put = async function(key, blob) {
                 await cacheReady;
-                return put.call(this, key, blob);
+                await put.call(this, key, blob);
+                postMessage({fixtureCached: key});
             };
         }
         if (${options.nativeShore}) {
@@ -89,6 +91,7 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
     `;
     const url = URL.createObjectURL(new Blob([source], {type: 'text/javascript'}));
     const workers = new Set<Worker>();
+    const cached = new Set<string>();
     let photographStarted: () => void = () => {};
     const photographPending = new Promise<void>(resolve => { photographStarted = resolve; });
     const fixtureScript = options.script;
@@ -99,6 +102,9 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
             if (!globe) return;
             workers.add(this);
             this.addEventListener('message', event => {
+                if (typeof event.data.fixtureCached === 'string') {
+                    event.stopImmediatePropagation(); cached.add(event.data.fixtureCached); return;
+                }
                 if (event.data.fixturePhotograph) {
                     event.stopImmediatePropagation(); photographStarted(); return;
                 }
@@ -115,6 +121,11 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
     }
     return {Worker: FixtureWorker, releaseSurfaceCache() {
         for (const worker of workers) worker.postMessage({fixturePersist: true});
+    }, cacheCount() { return cached.size; }, async waitForCache(key) {
+        const deadline = performance.now() + 15000;
+        while (!cached.has(key) && performance.now() < deadline)
+            await new Promise(resolve => window.setTimeout(resolve, 25));
+        if (!cached.has(key)) throw new Error('Fixture cache write did not complete: ' + key);
     }, waitForPhotograph() { return photographPending; }, releasePhotograph() {
         for (const worker of workers) worker.postMessage({fixturePhotographRelease: true});
     }, dispose() {

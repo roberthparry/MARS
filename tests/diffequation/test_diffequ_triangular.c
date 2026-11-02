@@ -149,7 +149,7 @@ void test_diffequ_triangular_transport(void)
         bool solved = de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
         bool verified = solution && triangular_verify(de, solution);
         const char *steps = de_solve_result_steps(result), *TeX = de_solve_result_steps_TeX(result);
-        bool explained = steps && strstr(steps, "real charts") && strstr(steps, "!= 0") &&
+        bool explained = steps && strstr(steps, "real charts") && strstr(steps, "≠ 0") &&
                          !strstr(steps, "NAN") && TeX && !strstr(TeX, "NAN") &&
                          strstr(TeX, "\\frac{") && strstr(TeX, "\\ne") && strstr(TeX, "F\\left(");
         de_free(de);

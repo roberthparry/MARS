@@ -234,6 +234,9 @@ static bool lab_pres_integrator_text(json_t *metadata, const json_t *fields)
                            string_find(folded, "closed-form") >= 0 || string_find(folded, "fast path") >= 0));
     const char *antiderivative = lab_eval_text(fields, "antiderivative"), *symbolic = lab_eval_text(fields, "symbolic");
     if (ok && *antiderivative) ok = string_append_format(detail, "Antiderivative:\n%s", antiderivative) >= 0;
+    const char *working = lab_eval_text(fields, "symbolic_working");
+    if (ok && *working && !antiderivative_status)
+        ok = lab_pres_join(detail, working, "\n\n");
     if (ok && *symbolic && !antiderivative_status) {
         string_t *line = string_sprintf("Definite result:\n%s", symbolic);
         ok = line && lab_pres_join(detail, string_c_str(line), "\n\n");

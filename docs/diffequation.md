@@ -27,7 +27,8 @@ demonstrates both through the TeX convenience API.
 
 The module supports construction, parsing, inspection, formatting, and
 symbolic solvers for first-order separable, linear, homogeneous, affine and
-linear-coordinate substitutions, and quadratic Bernoulli ODEs. Second-order
+linear-coordinate substitutions, quadratic Bernoulli ODEs, and Riccati
+linearisations with supported monomial normal potentials. Second-order
 linear equations are normalised to self-adjoint Sturm–Liouville form, with
 closed-form solutions for constant coefficients and affine Riccati
 factorisations. Selected modified-Emden equations are point-linearised and
@@ -42,6 +43,110 @@ PDE solvers include transport and characteristic families, selected
 second-order equations, one-dimensional forced wave initial-value problems
 using d'Alembert–Duhamel integrals, and the three-dimensional homogeneous wave
 equation using Kirchhoff's formula.
+
+## Riccati equations and linearisation
+
+For $y'=a(x)y^2+b(x)y+c(x)$, with regular coefficients and $a\ne0$,
+the substitution $y=-a^{-1}(u'/u)$ gives
+
+$$u''-\left(b+\frac{a'}a\right)u'+ac\,u=0.$$
+
+This is the linear lift associated with the Riccati
+[SL(2, ℝ) Lie system](https://arxiv.org/abs/1212.5779).
+It does not require an elementary solution or a same-order point transformation.
+The native solver removes the first derivative by setting
+$r=(b+a'/a)/2$ and using $y=-a^{-1}(v'/v+r)$. Then
+
+$$v''+Q(x)v=0,\qquad Q=ac+r'-r^2.$$
+
+The native derivation simplifies the substitution coefficients and auxiliary equation before
+formatting either plain text or TeX. It removes zero shifts and redundant unit factors,
+omits non-zero restrictions on known non-zero constants, and uses superscripts for
+literal integer powers. The logarithmic derivative is shown directly as $v'/v$,
+with any remaining coefficient alongside it.
+
+`DE_SOLVER_RICCATI` provides explicit solutions when $Q=kx^n$, where $k$ is
+a known finite real number and $n$ is a supported non-negative polynomial degree.
+For positive $k$ and even $n$, unbound and TeX output use the corresponding
+[power-law Bessel solutions](https://dlmf.nist.gov/10.13#E3). The auxiliary
+equation has two basis coefficients, but their common scale cancels in the
+logarithmic derivative: the first-order solution has only one arbitrary constant.
+For the example $y'=y^2+x^2$, put $z=x^2/2$. On $x>0$ the displayed family is
+
+$$y=x\,\frac{J_{3/4}(z)-C J_{-3/4}(z)}{J_{-1/4}(z)+C J_{1/4}(z)},$$
+
+with the separate limiting member $y=-xJ_{-3/4}(z)/J_{1/4}(z)$, corresponding to
+$C\to\infty$. This is not a second independent integration constant.
+For the real continuation to $x<0$, replace $C$ in the quotient by
+$C\operatorname{sgn}(x)$. The finite origin value is
+$y(0)=-2\sqrt{2}\,\pi C/\Gamma(1/4)^2$; the limiting member has a pole there.
+The displayed origin value uses the exact reflection identity
+$\Gamma(3/4)/\Gamma(1/4)=\sqrt{2}\,\pi/\Gamma(1/4)^2$, retaining the same $C$.
+Plain output lists this origin value separately after the quotient and its domain;
+TeX uses conventional piecewise notation for the same continuous extension.
+
+Native evaluation retains an equivalent analytic basis, with $m=n+2$ and
+$w=-kx^m/m^2$:
+
+$$u_0={}_0F_1\left(;1-\frac1m;w\right),\qquad
+u_1=x\,{}_0F_1\left(;1+\frac1m;w\right).$$
+
+These are analytic across zero, with Wronskian one. This avoids evaluating
+singular Bessel factors separately at a removable singularity. Expression and
+Function styles retain the evaluation graph; faithful Bessel display metadata
+does not change its values or its integration constant. Other supported signs
+and degrees retain the analytic form. A single finite real initial value fixes the
+coefficients when the original coefficients and the shift are finite and real there.
+Initial data at a zero quadratic coefficient or at a singular point are declined.
+Every result is local to intervals where the original coefficients are regular,
+$a\ne0$ and $v\ne0$; zeros of $v$ are poles of $y$.
+For other normal potentials or unsupported conditions, the solver reports
+`DE_SOLVE_STATUS_UNSUPPORTED` and retains the linearisation in its requested
+derivation steps. This is not a general closed-form Riccati solver.
+
+This runnable README example solves $y'-y^2=x^2$ with $y(0)=0$:
+
+```c
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "diffequation-t.h"
+
+int main(void)
+{
+    diffequ_t *problem = de_from_string("y' - y^2 = x^2; y(0)=0");
+    diffequ_solve_result_t *result = problem ? de_solve_with_options(problem, DE_SOLVE_OPTION_STEPS) : NULL;
+    bool solved = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
+    printf("Solved: %s\n", solved ? "yes" : "no");
+    printf("Solutions: %zu\n", de_solve_result_count(result));
+    printf("Lie system: %s\n", result ? de_solve_result_symmetry(result) : "unavailable");
+    const equation_t *solution = de_solve_result_at(result, 0u);
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    printf("Solution: %s\n", text ? string_c_str(text) : "unavailable");
+    int status = solved && text ? EXIT_SUCCESS : EXIT_FAILURE;
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(problem);
+    return status;
+}
+```
+
+Output:
+
+```text
+Solved: yes
+Solutions: 1
+Lie system: SL(2, ℝ) Lie system
+Solution: y = x·J_{¾}(½·x²)/J_{-¼}(½·x²); x ≠ 0; y(0) = 0
+```
+
+Here the auxiliary equation is $v''+x^2v=0$, and the displayed solution is
+
+$$y=\begin{cases}
+x\,J_{3/4}(x^2/2)/J_{-1/4}(x^2/2),&x\ne0,\\
+0,&x=0.
+\end{cases}$$
 
 ## Context-aware results
 
@@ -922,7 +1027,7 @@ For the input:
 the output is:
 
 ```text
-Singular travelling-wave family (not the general solution): u = (v·cosech²(½n·√v·(x - x₀ - vt)))^(1/n); n is a positive integer; v > 0, x₀ real; positive real root; x - x₀ - vt != 0 (moving singularity excluded).
+Singular travelling-wave family (not the general solution): u = (v·cosech²(½n·√v·(x - x₀ - vt)))^(1/n); n is a positive integer; v > 0, x₀ real; positive real root; x - x₀ - vt ≠ 0 (moving singularity excluded).
 ```
 
 Equivalently,

@@ -65,7 +65,7 @@ bool de_autonomous_steps(diffequ_solve_result_t *result, const expr_t *dependent
             "Coefficients must be defined; no initial or boundary data are imposed.\n"
             "This is a classical local solution, not a continuation through characteristic crossings.\n",
             text[2], text[1], text[4], text[0], text[1], text[0], text[5], text[0], text[5], text[6], text[0], text[0]);
-    if (plain && assumption && string_append_format(plain, "Normalisation requires %s != 0.\n", text[3]) < 0) {
+    if (plain && assumption && string_append_format(plain, "Normalisation requires %s ≠ 0.\n", text[3]) < 0) {
         string_free(plain);
         plain = NULL;
     }

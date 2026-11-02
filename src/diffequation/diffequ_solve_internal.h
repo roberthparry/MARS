@@ -24,6 +24,72 @@
 
 typedef enum { DE_ATTEMPT_NOT_MATCHED, DE_ATTEMPT_SOLVED, DE_ATTEMPT_FAILED } de_attempt_t;
 
+/**
+ * @brief Reduce a first-order Riccati equation and solve supported monomial normal potentials.
+ * @param de Borrowed original problem; not changed or retained.
+ * @param independent Borrowed independent variable of the isolated derivative.
+ * @param dependent Borrowed dependent variable of the isolated derivative.
+ * @param derivative_right Borrowed right side of the isolated first derivative.
+ * @param include_steps Whether to construct native and TeX explanations through semantic notation.
+ * @return Owned result, released with de_solve_result_free, or NULL when the equation is not quadratic in
+ * the dependent variable or allocation fails. A recognised but unsolved reduction reports unsupported;
+ * solved results retain the exceptional projective branch and any supported single finite real value condition.
+ * The caller's current computation control applies; no input ownership transfers.
+ */
+diffequ_solve_result_t *de_solve_riccati(const diffequ_t *de, const expr_t *independent,
+                                       const expr_t *dependent, const expr_t *derivative_right, bool include_steps);
+
+/** @brief Private owner of a real Bessel basis and its analytic normalisation for a Riccati reduction. */
+typedef struct _de_riccati_bessel_t de_riccati_bessel_t;
+
+/**
+ * @brief Construct a real Bessel presentation for a positive even monomial normal potential.
+ * @param potential Borrowed coefficient in v'' + potential*v = 0; not changed or retained.
+ * @param independent Borrowed real coordinate; retained by the constructed expressions.
+ * @return Owned presentation, released with de_riccati_bessel_free, or NULL for an unsupported potential or failure.
+ * Only the differential-equation implementation uses this interface; it exposes no notation context publicly.
+ */
+de_riccati_bessel_t *de_riccati_bessel_new(const expr_t *potential, const expr_t *independent);
+
+/**
+ * @brief Release a private Bessel presentation and every expression it owns.
+ * @param bessel Owned presentation to release; may be NULL. All borrowed getters become invalid afterwards.
+ * @return Nothing. No caller-owned expressions or solver results are freed.
+ */
+void de_riccati_bessel_free(de_riccati_bessel_t *bessel);
+
+/**
+ * @brief Borrow the scale converting the displayed Bessel constant into the analytic basis constant.
+ * @param bessel Borrowed non-NULL presentation; not changed or retained.
+ * @return Borrowed expression, valid until de_riccati_bessel_free; do not free it. NULL for a NULL presentation.
+ */
+const expr_t *de_riccati_bessel_scale(const de_riccati_bessel_t *bessel);
+
+/**
+ * @brief Borrow the two real Bessel basis functions with their removable origin singularities understood.
+ * @param bessel Borrowed presentation; not changed or retained.
+ * @param first Required output receiving the first borrowed basis function, or NULL for a NULL presentation.
+ * @param second Required output receiving the second borrowed basis function, or NULL for a NULL presentation.
+ * @return Nothing. Both outputs remain valid until de_riccati_bessel_free; neither is independently freed.
+ */
+void de_riccati_bessel_basis(const de_riccati_bessel_t *bessel, const expr_t **first, const expr_t **second);
+
+/**
+ * @brief Attach faithful one-constant Bessel notation and the real continuation at the origin to a solution.
+ * @param bessel Borrowed presentation; not changed or retained.
+ * @param solution Borrowed mutable equation whose independently owned display metadata is replaced.
+ * @param quadratic Borrowed quadratic Riccati coefficient; not retained.
+ * @param shift Borrowed logarithmic-derivative shift; not retained.
+ * @param constant Borrowed sole arbitrary constant, or NULL for initial data or the limiting member.
+ * @param point Borrowed initial coordinate, or NULL without an initial value.
+ * @param value Borrowed initial value; non-NULL exactly when point is supplied.
+ * @return True on success; false for invalid operands, allocation or rendering failure. With neither constant
+ * nor point, the second basis function supplies the limiting member. Evaluation graphs remain independently owned.
+ */
+bool de_riccati_bessel_present(const de_riccati_bessel_t *bessel, equation_t *solution,
+                              const expr_t *quadratic, const expr_t *shift, const expr_t *constant,
+                              const expr_t *point, const expr_t *value);
+
 /** @brief Construct native derivation text for the scaled modified-Emden family. */
 bool de_modified_emden_steps(const expr_t *independent, const expr_t *dependent, const expr_t *scale,
                              char **steps_out, char **steps_TeX_out);

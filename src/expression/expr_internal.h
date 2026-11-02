@@ -936,6 +936,15 @@ int expr_inverse_trig_exact_pi_ratio(const expr_ops_t *ops, const number_t *in, 
 int expr_fold_exp_const(const number_t *in, number_t *out);
 int expr_fold_log_const(const number_t *in, number_t *out);
 int expr_fold_sqrt_const(const number_t *in, number_t *out);
+/**
+ * @brief Certify an exact rational value for a non-integral power of a non-negative rational base.
+ * @param base Borrowed numeric base; no input value is retained or changed.
+ * @param exponent Borrowed rational exponent. Explicit roots other than square roots retain their root-family meaning.
+ * @param out Required initialised numeric output, replaced only on success; release its value with num_destroy().
+ * @return True when perfect integer roots prove a finite exact result; false for unsupported values or failure.
+ * Irrational values and complex branches are never inferred from floating-point proximity.
+ */
+bool expr_fold_rational_power_const(const number_t *base, number_t exponent, number_t *out);
 int expr_fold_cubrt_const(const number_t *in, number_t *out);
 int expr_fold_floor_const(const number_t *in, number_t *out);
 int expr_fold_erf_const(const number_t *in, number_t *out);

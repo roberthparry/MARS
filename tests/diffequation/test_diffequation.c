@@ -30,6 +30,7 @@
 #include "test_diffequ_gkdv.h"
 #include "test_diffequ_heat.h"
 #include "test_diffequ_notation.h"
+#include "test_diffequ_riccati.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -1116,7 +1117,7 @@ static void test_diffequ_solves_rational_integrating_factor_problem(void)
     text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     WANT_POINTER("rational integrating-factor solution text", text, true);
     if (text)
-        WANT_TEXT("rational integrating-factor solution", string_c_str(text), "y = ¼/x·(x⁴ + 3)");
+        WANT_TEXT("rational integrating-factor solution", string_c_str(text), "y = ¼·(x⁴ + 3)/x");
 
     string_free(text);
     de_solve_result_free(result);
@@ -1183,7 +1184,7 @@ static void test_diffequ_linear_solution_uses_special_function(void)
     WANT_POINTER("special-function solution text", text, true);
     if (text)
         WANT_TEXT("special-function linear solution", string_c_str(text),
-                    "y = √π/(2·√(-1)·exp(x²))·(erf(x·√(-1)) - erf(0))");
+                    "y = √π·(erf(x·√(-1)) - erf(0))/(2·√(-1)·exp(x²))");
 
     string_free(text);
     de_solve_result_free(result);
@@ -2416,7 +2417,7 @@ static void test_diffequ_solves_power_law_bessel_family(void)
 {
     const char *sources[] = {"y'' + x^2*y = 0", "y'' + 9*x^4*y = 0"};
     const char *orders[] = {"¼", "⅙"};
-    const char *arguments[] = {"½·x^2", "x^3"};
+    const char *arguments[] = {"½·x²", "x³"};
 
     for (size_t i = 0u; i < 2u; ++i) {
         diffequ_t *de = de_from_string(sources[i]);
@@ -5192,6 +5193,9 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_retains_arbitrary_constant);
     RUN_TEST_CASE(test_diffequ_preserves_zero_singular_solution);
     RUN_TEST_CASE(test_diffequ_solves_quadratic_bernoulli_problem);
+    RUN_TEST_CASE(test_diffequ_riccati_families);
+    RUN_TEST_CASE(test_diffequ_riccati_initial_values);
+    RUN_TEST_CASE(test_diffequ_riccati_scope);
     RUN_TEST_CASE(test_diffequ_normalizes_bernoulli_arbitrary_constant);
     RUN_TEST_CASE(test_diffequ_solves_derivative_quadratic_problem);
     RUN_TEST_CASE(test_diffequ_linearizes_exact_third_order_problem);
@@ -5377,6 +5381,9 @@ int tests_main(void)
                                   "diffequation,readme,output,heat");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_prime_time_ivp, readme_examples,
                                   "diffequation,readme,output,notation");
+
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_riccati, readme_examples,
+                                  "diffequation,readme,output,riccati");
 
     return TESTS_EXIT_CODE();
 }

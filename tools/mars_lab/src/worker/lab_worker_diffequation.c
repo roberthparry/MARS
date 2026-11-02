@@ -58,6 +58,7 @@ static const char *solver_name(de_solver_t solver)
         [DE_SOLVER_KDV_SOLITARY_WAVE]              = "KdV solitary waves",
         [DE_SOLVER_GKDV_TRAVELLING_WAVE]           = "generalised KdV travelling waves",
         [DE_SOLVER_HALF_LINE_HEAT]                = "half-line heat boundary kernel",
+        [DE_SOLVER_RICCATI]                       = "Riccati linearisation",
     };
     return (size_t)solver < sizeof(names) / sizeof(*names) && names[solver] ? names[solver] : "none";
 }

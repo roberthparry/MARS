@@ -59,6 +59,13 @@ expr_binding_expr_t *binding_expr_try_simplify_scaled_const_addsub(expr_binding_
 expr_binding_expr_t *binding_expr_try_combine_mul_powers(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_combine_positive_numeric_square_roots(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_integer_power(expr_binding_expr_t *expr);
+/**
+ * @brief Reduce a preserved rational power when perfect integer roots certify an exact rational value.
+ * @param expr Owned binding tree, consumed on replacement and returned unchanged when the rule does not match.
+ * @return Owned replacement or unchanged input, released with expr_binding_expr_free(); NULL on allocation failure.
+ * Named constants and variable bindings remain symbolic; unsupported roots retain their authored branches.
+ */
+expr_binding_expr_t *binding_expr_try_simplify_exact_rational_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_exact_complex_rational_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_nested_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *expr);

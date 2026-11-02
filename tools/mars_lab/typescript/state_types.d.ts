@@ -592,8 +592,8 @@ interface WorksheetWorkspaceCapabilities {
     /** @brief Fill blank DateTime defaults and focus its date input. */
     stateFinishDatetime(): void;
 
-    /** @brief Fill blank almanac defaults and focus its date input. */
-    stateFinishAlmanac(): void;
+    /** @brief Restore almanac controls and return its retained native response, or null before completion. */
+    stateFinishAlmanac(): WorksheetEvaluationData | null;
 
     /** @brief Focus the worksheet source editor. */
     stateFocusEditor(): void;
@@ -733,8 +733,8 @@ interface WorksheetEvaluationCapabilities {
     /** @brief Re-evaluate the last expression input without adding history. */
     statePrecisionExpression(): Promise<unknown> | undefined;
 
-    /** @brief Evaluate the currently selected worksheet mode. */
-    stateEvaluate(): Promise<void>;
+    /** @brief Evaluate the selected mode with native-supplied history and input-reuse options. */
+    stateEvaluate(options?: WorksheetEvaluationOptions): Promise<void>;
 
     /** @brief Report whether the expression is ready for evaluation. */
     stateReady: typeof WorksheetBindings.editor.expressionReadyToEvaluate;

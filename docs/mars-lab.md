@@ -1204,30 +1204,63 @@ photographic globe uses fixed 512-square geographic cells from the **globe datab
 Cell keys describe geography and resolution, independently of the camera window.
 Panning reuses those cells directly through a WebGL atlas instead of rebuilding a
 large photograph of each new view. A small indirection texture selects the finest
-resident cell or its cached lower-resolution ancestor. Sharp cells remain visible
+resident cell or its cached lower-resolution ancestor, retaining up to two finer
+resolution tiers when zooming out. Sharp cells remain visible
 while adjacent cells load; a coarse regional overview cannot replace them during
 a river-mask handover. The initial globe, towns and observer selection never wait
 for photographic refinement.
 
 The native `lab_texture_cache` service owns cell keys, page selection, visible-cell
 pinning, byte accounting and LRU eviction through `dictionary_t`. Its photographic
-page describes 64 spatial cells and a centre-first next request, with prefetch
+page describes 256 spatial cells and a centre-first next request. Missing coverage
+first loads a broad parent two resolution levels below the requested detail, then
+refines it. Both the visible fine cells and their broad parent stay protected, so
+zooming out does not uncover an avoidable low-resolution gap. Prefetch is
 limited to half a cell beyond the current view. Free slots use a
 stack and protected slots use a bitset. `lab_photo_source` supplies exact pixel
 crops and stable source-block keys; JavaScript performs the browser codec, storage
 and graphics calls. The renderer still uses eight texture units. The photographic
 atlas retains at most 64 one-MiB cells, or 16 cells on a smaller graphics budget;
-its geographic lookup texture occupies only 256 bytes.
+its geographic lookup texture occupies only 1 KiB.
+Each 512-square GPU slot contains a 510-square geographic core and a one-pixel
+overlap on every edge. Native crop planning includes those neighbouring pixels,
+with longitude wrapping and polar clipping; the shader filters through the overlap
+instead of exposing a bright or dark tile seam. Existing cache entries have a
+different identity and are rebuilt using the corrected edge sampling.
+
+Where regional photographs exist, fixed cells contain those photographs with
+transparent gaps. WebGL supplies the already resident global image underneath;
+the worker does not fetch and decode another NASA tile for each regional cell.
+A finer source covering the entire cell supersedes its broader regional overviews.
+Unobserved areas retain the global image, and cells without regional coverage can
+still use the finer NASA source tiles. Existing opaque cached cells have a separate
+identity and cannot be mistaken for the new transparent cells.
 
 A dedicated worker decodes one source PNG at a time. It splits the source into
-512-square cores with one-pixel gutters and persists their raw pixels. Only needed
-small blocks stay decoded, within a separate 64 MiB cache. Adjacent cells and worker
+the needed 512-square cores with one-pixel gutters and queues their raw pixels for
+background persistence. Unused portions of the photograph are neither read back
+from the canvas nor written to disk. Only needed small blocks stay decoded, within
+a separate 64 MiB cache. Adjacent cells and worker
 restarts can therefore reuse source blocks without decoding two full 3600-square
 photographs repeatedly. A complete geographic cell is uploaded as premultiplied
 RGBA without another image decode. Initial codec allocations, the currently decoded
 source image, upload buffers and driver allocations are additional temporary memory.
 Source reads have an eight-second timeout; finishing useful source blocks does not
 hold up the animation thread.
+Visible cells publish before optional disk writes finish. One active write and a
+ring of at most 24 pending browser Blobs use less than 26 MiB; older queued work
+yields to the newest view under pressure. Only one queued pixel write is submitted
+at a time, allowing visible reads to enter between writes.
+During a flight, destination cells and the visible page remain pinned together.
+WASM predicts the camera four percentage points ahead on the same eased great
+circle. Its scheduler first fills missing visible, predicted and arrival coverage,
+then shares fine refinement between the visible route and destination. Preparation
+continues asynchronously along the route. A native factor gently slows
+travel according to the actual visible pixel resolution, increasing towards full
+pace as fine detail arrives, with a minimum pace that allows unavailable
+imagery to be passed. A failed cell has its own retry delay and does not suspend
+its neighbours.
+Photographic and mask planning do not query river coverage or load river geometry.
 
 River masks are requested and rasterised independently of the photographs. Their
 alpha coverage preserves surveyed water, islands and land without painting another
@@ -1384,12 +1417,13 @@ Town catalogue key refreshes alone cannot interrupt an active journey.
 observer. A mismatched legacy camera recentres north-up while retaining its valid zoom;
 matching cameras retain their pan and roll. This repair occurs on restoration without
 rewriting the history database or removing entries.
-The destination's detailed photographic patch is prepared before departure, with an
-eight-second download deadline; missing tiles leave the existing photograph usable.
+Destination photographs are requested when navigation starts and prepared
+asynchronously during travel. Source-image reads have an eight-second deadline;
+missing tiles leave the existing photograph usable.
 A travelling notice names the destination and route distance; the selected destination
 marker remains visible whenever it projects into view.
-A broad regional overview loads before the close destination tile, so approach imagery
-does not shrink to a tiny isolated rectangle. Old raster river ink fades when magnified
+Broad geographic cells supply the approach while finer route and destination cells
+are prepared and retained; the global photograph remains the fallback. Old raster river ink fades when magnified
 beyond its prepared scale while its photographs remain useful during refinement.
 Town labels allow up to 220 CSS pixels, including padding and borders, and can use
 the space on either side of the marker. Labels truncate only when that budget is exceeded.
@@ -1398,8 +1432,10 @@ texture uploads wait until arrival so they cannot stall GPU travel rendering.
 The global photograph covers the
 journey; flight rendering does not parse invisible SVG paths. The duplicate SVG
 surface is hidden whenever WebGL supplies the full surface, avoiding compositor
-repaints beneath its alpha canvas. Travel waits for
-the photographic texture before departure, then accelerates gently. Local vector
+repaints beneath its alpha canvas. Native reprojection rejects a retained coastline
+mask when its spherical depth error can exceed one CSS pixel, keeping the photograph
+visible until a suitable replacement is available. Travel waits for
+the base photographic texture before departure, then accelerates gently. Local vector
 requests do not brake and restart the camera: photographic coverage remains visible
 while they refine it. Slow rendering still limits the display clock and frame steps.
 Town requests and local SVG border projection wait until arrival; enabled
@@ -1428,6 +1464,10 @@ the globe, above the worksheet introduction. Their former area below the observe
 fields remains empty to leave room for country and town dropdowns. Other modes
 retain the usual action-row position; the same buttons and handlers are reused.
 Almanac hides **Evaluate** and **Clear** because its results update automatically.
+Opening Almanac with no completed worksheet starts its calculation automatically,
+showing the observer summary while the result is prepared. Returning after an
+interrupted calculation starts a replacement; returning to a completed worksheet
+reuses it. Mode entry preserves both directions of location history.
 
 The selected town keeps a gold label beside the observer marker, including at overview zoom;
 it takes priority over nearby labels while its location is visible on the globe.
@@ -3131,6 +3171,11 @@ an adaptive sampling budget of 513 evaluations per curve instead of 8193, with f
 no derivative construction; numerical precision checks remain enabled. Release
 finishes at full detail. Escape or pointer cancellation restores the starting
 view. Reset restores the view from before zooming or panning.
+Adaptive subdivision depth fits the callback allowance even when every interval
+needs refinement. Unresolved edges remain gaps, rather than exhausting the budget
+and discarding the whole curve. Automatic ranges prefer a smaller informative
+window when repeated value jumps contradict the endpoint tangents; explicit
+range endpoints are preserved.
 Spread two fingers to zoom in and bring them together to zoom out. Curves track
 the midpoint by changing sampled ranges, with coarse previews and full sampling
 when either finger lifts. Further fingers are ignored.
@@ -3235,6 +3280,7 @@ title shows the solved equation or equations; a single solution has no redundant
 legend, while multiple branches retain numbered legends. With no or incomplete
 initial conditions, up to two free integration constants per branch produce representative
 family curves: one selects five values; two select a nine-member Cartesian grid.
+The parameter selection retains an exact zero reference when that member is defined.
 Private copies promote the generated constants to sampling variables. Adaptive
 sweeps use first and second derivatives with respect to each constant over
 −4 to 4, at x = −2, 0 and 2 and companion-constant values −1 and 1.
@@ -4407,6 +4453,10 @@ integrator. Add one bound row for each variable to be integrated. Leave both
 bounds blank for an antiderivative, or enter lower and upper bounds for a
 definite integral. Mark a symbol **Free** when it is a parameter rather than an
 integration variable. The work-budget selector limits numerical fallback.
+
+For exact definite results, the Exact Result card retains the antiderivative and
+bound-substitution working. Certified rational power reductions are shown before
+the final simplified value, rather than discarding those intermediate steps.
 
 The calculation deadline is separate from that numerical work ceiling. In
 seconds it is the smaller of 120 and the sum of three allowances: a 30-second

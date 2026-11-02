@@ -155,7 +155,7 @@ int lab_worker_distribution_plot(const char *source, const expr_t *expression, c
         sampler_options_t sampling = sampler_options_default();
         sampling.intervals = preview ? 16 : 64;
         sampling.max_evaluations = preview ? 513 : 8193;
-        sampling.max_depth = preview ? 4 : 8;
+        sampling.max_depth = lab_worker_plot_depth(sampling.intervals, sampling.max_evaluations, preview ? 4u : 8u);
         size_t saved_precision = num_get_default_prec_bits();
         size_t required = lab_worker_plot_range_precision(lo, hi);
         if (required > saved_precision)

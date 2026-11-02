@@ -43,6 +43,8 @@ static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimension
     unsigned side = dimensions == 2 ? 7 : 33, rows = dimensions == 2 ? side : 1;
     unsigned minimum[] = {side, side}, maximum[] = {0, 0}, finite = 0;
     double values[49], peak = 0;
+    double previous_value = 0, previous_slope = 0;
+    unsigned previous_column = side, reversals = 0;
     for (unsigned row = 0; row < rows; ++row) {
         NUM_SCOPE(row_numbers);
         if (dimensions == 2)
@@ -50,10 +52,27 @@ static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimension
         for (unsigned col = 0; col < side; ++col) {
             NUM_SCOPE(point_numbers);
             expr_set_val(axes[0], coordinate(bounds[0], bounds[1], col, side));
-            number_t result = expr_eval(formula);
+            number_t result = NUM_NAN, derivative = NUM_NAN;
+            const expr_t *variables[] = {axes[0]};
+            if (dimensions != 1u || expr_eval_derivatives(formula, 1u, variables, &result, &derivative) != 0) {
+                num_destroy(&result);
+                result = expr_eval(formula);
+            }
             double value = num_to_double(result);
             if (!num_is_real(result) || !num_is_finite(result) || !isfinite(value))
                 continue;
+            if (dimensions == 1u) {
+                double slope = num_to_double(derivative);
+                /* Repeated value jumps against both endpoint tangents indicate poles or unresolved oscillations.
+                 * Prefer a smaller automatic window; explicit bounds still retain every requested endpoint. */
+                if (col == previous_column + 1u && isfinite(slope) && isfinite(previous_slope) &&
+                    ((slope > 0 && previous_slope > 0 && value < previous_value) ||
+                     (slope < 0 && previous_slope < 0 && value > previous_value)))
+                    ++reversals;
+                previous_column = col;
+                previous_value = value;
+                previous_slope = slope;
+            }
             values[finite++] = value;
             peak = fmax(peak, fabs(value));
             if (col < minimum[0])
@@ -66,7 +85,7 @@ static bool candidate(expr_t *formula, expr_t *const axes[2], unsigned dimension
                 maximum[1] = row;
         }
     }
-    if (finite < (side * rows + 3) / 4 || (!peak && !constant))
+    if (finite < (side * rows + 3) / 4 || (!peak && !constant) || reversals >= 3u)
         return false;
     if (!peak)
         peak = 1;

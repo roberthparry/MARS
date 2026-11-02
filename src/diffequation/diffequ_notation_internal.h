@@ -15,11 +15,36 @@
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 
+/**
+ * @brief Describe a simplified Riccati reduction and its optional linear basis without typesetting syntax.
+ * @param result Borrowed mutable result receiving independent copies of both explanations.
+ * @param independent Borrowed differentiation coordinate; not retained.
+ * @param dependent Borrowed original dependent variable; not retained.
+ * @param quadratic Borrowed coefficient of the dependent variable squared; not retained.
+ * @param shift Borrowed half coefficient of the lifted equation's negative first derivative; not retained.
+ * @param potential Borrowed normal-form potential in the auxiliary linear equation; not retained.
+ * @param first Borrowed first fundamental solution, or NULL when the linear equation remains unsolved.
+ * @param second Borrowed second fundamental solution; NULL exactly when first is NULL.
+ * @param bessel Whether the supplied basis uses Bessel functions with continuous values at the origin.
+ * @return True after installing both explanations; false for invalid input, rendering or allocation failure.
+ * All temporary notation is released internally. No input ownership transfers or thread sharing is introduced.
+ * Native coefficient simplification removes zero terms and unit factors in both explanations. The logarithmic
+ * derivative is presented as v′/v; plain mathematical powers use the native superscript formatter.
+ */
+bool de_riccati_steps(diffequ_solve_result_t *result, const expr_t *independent, const expr_t *dependent,
+                      const expr_t *quadratic, const expr_t *shift, const expr_t *potential,
+                      const expr_t *first, const expr_t *second, bool bessel);
+
 /** @brief Return a borrowed entry from a verified generator matrix. */
 const expr_t *de_lie_entry(const matrix_t *matrix, size_t row, size_t column);
 
-/** @brief Return owned native text for a modified-Emden expression. */
-char *de_emden_symbolic_text(const expr_t *expression);
+/**
+ * @brief Format native mathematical text while preserving the name of a bare symbolic coefficient.
+ * @param expression Borrowed expression; not changed or retained. Unset variable and constant names remain symbolic.
+ * @return Independently owned text released with string_free(), or NULL on invalid input or formatting failure.
+ * Used privately by solver and derivation adapters; does not substitute or modify binding values.
+ */
+string_t *de_notation_symbol_text(const expr_t *expression);
 
 /** @brief Return the borrowed base if the squared wave speed is a perfect square. */
 const expr_t *de_wave_square_base(const expr_t *squared);

@@ -11,20 +11,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
-#include "diffequ_solve_internal.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
-
-char *de_emden_symbolic_text(const expr_t *expression)
-{
-    const char *name = expr_symbol_name(expression);
-    expr_t *symbol = name && (expr_is_variable(expression) || expr_is_named_const(expression))
-                         ? expr_new_named_var(NUM_NAN, name) : NULL;
-    char *text = expr_to_string(symbol ? symbol : expression, style_UNBOUND);
-    expr_free(symbol);
-    return text;
-}
+#define MARS_DIFFEQUATION_SOLVE_INTERNAL_ACCESS
+#include "diffequ_solve_internal.h"
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
 
 /* Describe the native logarithmic-derivative substitution without browser rewriting. */
 
@@ -156,15 +148,15 @@ de_attempt_t de_attempt_modified_emden_linearization(const diffequ_t *de, const 
     solutions_out[0] = right ? equ_new(dependent, right) : NULL;
     if (solutions_out[0]) {
         /* Preserve the quotient presentation even when simplification stores a reciprocal product. */
-        char *numerator_text = de_emden_symbolic_text(numerator);
-        char *denominator_text = de_emden_symbolic_text(solution_denominator);
+        string_t *numerator_text = de_notation_symbol_text(numerator);
+        string_t *denominator_text = de_notation_symbol_text(solution_denominator);
         string_t *quotient = string_new();
         bool displayed = numerator_text && denominator_text && quotient &&
-                         string_append_format(quotient, "(%s)/(%s)", numerator_text, denominator_text) >= 0 &&
+                         string_append_format(quotient, "(%S)/(%S)", numerator_text, denominator_text) >= 0 &&
                          equ_set_display_unbound(solutions_out[0], NULL, quotient) == 0;
         string_free(quotient);
-        free(denominator_text);
-        free(numerator_text);
+        string_free(denominator_text);
+        string_free(numerator_text);
         if (!displayed)
             goto cleanup;
         *solution_count_out = 1u;

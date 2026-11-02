@@ -583,6 +583,26 @@ expr_binding_expr_t *binding_expr_try_simplify_integer_power(expr_binding_expr_t
     return expr_binding_expr_simplify(expr_binding_expr_new_powi(base, exponent));
 }
 
+expr_binding_expr_t *binding_expr_try_simplify_exact_rational_power(expr_binding_expr_t *expr)
+{
+    number_t base = NUM_NAN, exponent = NUM_NAN, value = NUM_NAN;
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_BINARY_OP || expr->u.binary_op.ops != &ops_pow ||
+        !expr_binding_expr_is_numeric_literal(expr->u.binary_op.left) ||
+        !expr_binding_expr_is_numeric_literal(expr->u.binary_op.right))
+        return expr;
+
+    bool folded = expr_binding_expr_number_value(expr->u.binary_op.left, &base) &&
+                  expr_binding_expr_number_value(expr->u.binary_op.right, &exponent) &&
+                  expr_fold_rational_power_const(&base, exponent, &value);
+    num_destroy(&exponent);
+    num_destroy(&base);
+    if (!folded) {
+        num_destroy(&value);
+        return expr;
+    }
+    return binding_expr_fold_to_number_owned(expr, value);
+}
+
 expr_binding_expr_t *binding_expr_try_simplify_exact_complex_rational_power(expr_binding_expr_t *expr)
 {
     binding_exact_complex_t base = {number_invalid(), number_invalid()};
@@ -2705,6 +2725,12 @@ cleanup:
     expr_binding_expr_free(trig);
     expr_binding_expr_free(ratio);
     return out;
+}
+
+/* Share certified sine values with native reductions without exposing the binding representation or ops table. */
+expr_t *expr_exact_sin_pi_ratio(long numerator, unsigned long denominator)
+{
+    return binding_expr_exact_trig_pi_ratio(&ops_sin, numerator, denominator);
 }
 
 expr_binding_expr_t *binding_expr_try_simplify_direct_inverse(expr_binding_expr_t *expr)

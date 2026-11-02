@@ -1367,6 +1367,47 @@ static void test_to_string_polynomial_degree_order_expr(void)
     }
 }
 
+static void test_to_string_binary_integer_superscripts(void)
+{
+    static const struct { const char *base; long exponent; const char *expected; } cases[] = {
+        {"x",     3L, "x³"},
+        {"x",    12L, "x¹²"},
+        {"x+1",   4L, "(x + 1)⁴"},
+        {"x",    -3L, "1/x³"},
+        {"x+1",  -2L, "1/(x + 1)²"}
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        expr_bindings_t *bindings = NULL, *copied_bindings = NULL;
+        expr_t *base = expr_from_string(cases[i].base, &bindings);
+        expr_t *exponent = expr_const_long(cases[i].exponent);
+        expr_t *power = expr_pow_xp(base, exponent);
+        char *native = expr_to_string(power, style_UNBOUND);
+        char *function = expr_to_string(power, style_FUNCTION);
+        bool matched = native && !strcmp(native, cases[i].expected);
+        bool executable = function && strstr(function, "^") && !strstr(function, "³") && !strstr(function, "⁴");
+        expr_t *copied = native ? expr_from_string(native, &copied_bindings) : NULL;
+        expr_set_val(expr_bindings_get(bindings, "x"), NUM_ONE);
+        expr_set_val(expr_bindings_get(copied_bindings, "x"), NUM_ONE);
+        number_t expected_value = expr_eval(power), copied_value = copied ? expr_eval(copied) : num_clone(NUM_NAN);
+        bool round_trip = copied && num_eq(expected_value, copied_value);
+        num_destroy(&copied_value); num_destroy(&expected_value);
+        printf("  binary integer power: %s\n", native ? native : "NULL");
+        expr_free(copied); expr_bindings_free(copied_bindings);
+        free(function); free(native);
+        expr_free(power); expr_free(exponent); expr_free(base);
+        expr_bindings_free(bindings);
+        ASSERT_TRUE(matched);
+        ASSERT_TRUE(executable);
+        ASSERT_TRUE(round_trip);
+    }
+    expr_t *x = expr_new_named_var(NUM_NAN, "x"), *n = expr_new_named_const(NUM_TWO, "n");
+    expr_t *power = expr_pow_xp(x, n);
+    char *native = expr_to_string(power, style_UNBOUND);
+    bool symbolic = native && !strcmp(native, "x^n");
+    free(native); expr_free(power); expr_free(n); expr_free(x);
+    ASSERT_TRUE(symbolic);
+}
+
 static void test_to_string_series_ascending_powers(void)
 {
     static const struct {
@@ -1428,6 +1469,7 @@ void test_to_string_nested_mul_add(void)
     TEST_RUN_SUBTEST(test_to_string_nested_mul_add_func, NULL);
     TEST_RUN_SUBTEST(test_to_string_polynomial_degree_order_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_series_ascending_powers, NULL);
+    TEST_RUN_SUBTEST(test_to_string_binary_integer_superscripts, NULL);
 }
 
 static void test_to_string_atan2_expr(void)
@@ -2563,8 +2605,72 @@ static void test_to_string_exact_rational_TeX(void)
     }
 }
 
+static void test_to_string_exact_rational_powers(void)
+{
+    static const struct { const char *source, *value; } cases[] = {
+        {"4^(3/2)", "8"}, {"9^(3/2)", "27"}, {"36^(3/2)", "216"},
+        {"9^(-3/2)", "1/27"}, {"(9/4)^(3/2)", "27/8"}, {"8^(2/3)", "4"},
+        {"625^(3/4)", "125"}, {"(169/144)^(3/2)", "2197/1728"},
+        {"2/5*(4*9^(3/2)+4^(3/2))", "232/5"}
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
+        expr_t *source = expr_from_string(cases[i].source, NULL), *result = expr_simplify(source);
+        number_t value = NUM_NAN, expected = num_create_from_string(cases[i].value);
+        bool ok = result && expr_match_const_value(result, &value) && num_is_exact(value) && num_eq(value, expected);
+        char *text = result ? expr_to_string(result, style_UNBOUND) : NULL;
+        printf("  %s = %s\n", cases[i].source, text ? text : "NULL");
+        free(text);
+        num_destroy(&expected);
+        num_destroy(&value);
+        expr_free(result);
+        expr_free(source);
+        ASSERT_TRUE(ok);
+    }
+    expr_t *symbolic = expr_from_string("{x^(3/2) | x=9}", NULL);
+    expr_t *irrational = expr_from_string("2^(3/2)", NULL);
+    expr_t *binding = expr_from_string("{x+c | x=?; c=9^(3/2)}", NULL);
+    char *symbolic_text = expr_to_string(symbolic, style_UNBOUND);
+    char *binding_text = expr_to_string(binding, style_EXPRESSION);
+    number_t value = expr_eval(irrational);
+    ASSERT_TRUE(symbolic_text && strstr(symbolic_text, "x") && !strstr(symbolic_text, "27"));
+    ASSERT_TRUE(binding_text && strstr(binding_text, "c = 27"));
+    ASSERT_TRUE(!num_is_exact(value));
+    num_destroy(&value);
+    free(binding_text);
+    free(symbolic_text);
+    expr_free(binding);
+    expr_free(irrational);
+    expr_free(symbolic);
+
+    /* Retain native working before the same exact powers disappear from the result. */
+    number_t nine_value = num_create_from_long(9), four_value = num_create_from_long(4);
+    expr_t *nine = expr_new_const(nine_value), *four = expr_new_const(four_value);
+    number_t exponent = num_create_from_frac(3, 2);
+    expr_t *upper = expr_pow(nine, &exponent), *lower = expr_pow(four, &exponent);
+    expr_t *sum = expr_add(upper, lower);
+    string_t *working = expr_exact_power_working(sum);
+    ASSERT_TRUE(working && string_find(working, " = 27") >= 0 && string_find(working, " = 8") >= 0);
+    string_free(working);
+    expr_free(sum);
+    expr_free(lower);
+    expr_free(upper);
+    expr_free(four);
+    expr_free(nine);
+    num_destroy(&four_value);
+    num_destroy(&nine_value);
+    num_destroy(&exponent);
+}
+
 static void test_to_string_indexed_principal_roots(void)
 {
+    expr_t *quarter = expr_from_string("1/4", NULL), *half = expr_new_const(NUM_HALF);
+    expr_t *raw = expr_pow_xp(quarter, half), *simplified = expr_simplify(raw);
+    number_t exact = NUM_NAN;
+    bool folded = expr_match_const_value(simplified, &exact) && num_is_exact(exact) && num_eq(exact, NUM_HALF);
+    num_destroy(&exact);
+    expr_free(simplified); expr_free(raw); expr_free(half); expr_free(quarter);
+    ASSERT_TRUE(folded);
+
     static const struct { const char *source, *expected; } cases[] = {
         {"{cubrt(x) | x=2}", "³√x"},
         {"{root(x,4) | x=2}", "⁴√x"},
@@ -2649,6 +2755,10 @@ static void test_to_string_compact_product_quotient_TeX(void)
     for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
         expr_t *expr = expr_from_string(sources[i], NULL);
         char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+        char *native = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+        const char *slash = native ? strchr(native, '/') : NULL;
+        const char *sum = native ? strpbrk(native, "+-") : NULL;
+        bool numerator_first = slash && sum && sum < slash;
         const char *cursor = TeX && !strncmp(TeX, "\\frac{", 6) ? TeX + 5 : NULL;
         /* A single complete fraction must contain both the coefficient and its sum. */
         for (unsigned part = 0; cursor && part < 2; ++part) {
@@ -2667,8 +2777,10 @@ static void test_to_string_compact_product_quotient_TeX(void)
         bool complete = cursor && !*cursor;
         printf("Compact quotient: %s -> %s\n", sources[i], TeX ? TeX : "(null)");
         free(TeX);
+        free(native);
         expr_free(expr);
         ASSERT_TRUE(complete);
+        ASSERT_TRUE(numerator_first);
     }
 }
 
@@ -2816,6 +2928,7 @@ static void test_to_string_integrals_outside_fractions_TeX(void)
 void test_to_string_all(void)
 {
     TEST_RUN_SUBTEST(test_to_string_indexed_principal_roots, NULL);
+    TEST_RUN_SUBTEST(test_to_string_exact_rational_powers, NULL);
     TEST_RUN_SUBTEST(test_to_string_conjugate_overbar_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_complex_projection_TeX, NULL);
     TEST_RUN_SUBTEST(test_to_string_compact_product_quotient_TeX, NULL);

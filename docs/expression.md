@@ -111,8 +111,13 @@ For example, `sinh(ix)` produces `{ sin(x)·i | x = ? }` in Expression output;
 the TeX body is the same formula without the binding section.
 
 Compact algebraic quotients retain the entire numerator, including factored
-products, above a single TeX fraction bar. Derivatives and integrals remain
-outside enclosing algebraic fractions; lengthy sums may be separated for readability.
+products, before the division sign in native output and above a single TeX
+fraction bar. Derivatives and integrals remain outside enclosing algebraic
+fractions; lengthy sums may be separated for readability.
+Proven rational powers simplify exactly when their integer roots are perfect:
+`4^(3/2)` becomes `8`, `9^(3/2)` becomes `27`, and `(9/4)^(3/2)` becomes `27/8`.
+Irrational roots retain their symbolic form, and a supplied variable binding does
+not turn a symbolic power into a constant.
 
 Exact function endpoint identities also simplify composite constant arguments
 that evaluate to real infinity. This includes scaled infinite arguments of
@@ -1969,6 +1974,11 @@ superscripts as well as caret powers, so displayed powers can be copied back
 into a binding. Power chains retain the parser's left-associative convention;
 superscripts outside the supported integer range are rejected.
 
+Native mathematical output uses superscripts for literal integer powers in both
+power representations, including powers constructed with `expr_pow_xp()`.
+Negative integer powers use reciprocals with superscript denominator powers.
+Named exponents remain symbolic, and Function output retains executable caret syntax.
+
 An unset named constant remains a symbolic quantity: copies with the same name
 and binding combine during simplification. Different named constants remain
 independent, and an unnamed numerical `NaN` is not treated as such a symbol.
@@ -2591,7 +2601,8 @@ Explicit fractional powers retain their complete-root-family meaning and are
 not rewritten as principal radicals. Function output retains `cubrt`/`root`,
 and TeX continues to use its existing indexed radicals.
 
-This complete example prints three principal roots without evaluating `x`:
+This complete example prints three principal roots without evaluating `x`,
+then simplifies three exact rational powers:
 
 ```c
 #include <stdio.h>
@@ -2601,10 +2612,12 @@ This complete example prints three principal roots without evaluating `x`:
 
 int main(void)
 {
-    const char *sources[] = {"cubrt(x)", "root(x,4)", "root(x,12)"};
+    const char *sources[] = {"cubrt(x)", "root(x,4)", "root(x,12)", "4^(3/2)", "9^(3/2)", "(9/4)^(3/2)"};
     for (size_t i = 0; i < sizeof(sources) / sizeof(*sources); ++i) {
         expr_t *expr = expr_from_string(sources[i], NULL);
-        char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+        expr_t *simplified = expr_simplify(expr);
+        char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+        expr_free(simplified);
         if (!text) {
             expr_free(expr);
             return EXIT_FAILURE;
@@ -2623,6 +2636,9 @@ Output:
 ³√x
 ⁴√x
 ¹²√x
+8
+27
+²⁷⁄₈
 ```
 
 The string grammar accepts `conj(z)` and `conjugate(z)` for complex

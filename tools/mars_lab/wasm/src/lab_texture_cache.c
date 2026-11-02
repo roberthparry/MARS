@@ -4,7 +4,7 @@
  *
  * Browser resources remain in host slots, while native dictionaries own keys and select reusable slots.
  * Each cache has a linked LRU order, a free-slot stack and a byte budget. Legacy windows inspect four GPU entries;
- * fixed photographic pages use direct dictionary lookups and pin only visible ancestors among at most 64 cells.
+ * fixed photographic pages use direct dictionary lookups and pin visible and arrival ancestors among at most 64 slots.
  * Serial dispatch protects native state; worker pixel batches use a fixed 512 KiB scratch buffer and never block drawing.
  */
 #include <math.h>
@@ -29,8 +29,8 @@ typedef struct _texture_cache_t {
     dictionary_t *keys;
     texture_entry_t entries[64];
     unsigned free_slots[64], free_count;
-    unsigned char page[8 * 8 * 4];
-    unsigned token, limit, budget, bytes;
+    unsigned char page[16 * 16 * 4];
+    unsigned token, limit, budget, bytes, journey_turn;
     int oldest, newest;
 } texture_cache_t;
 
@@ -298,89 +298,179 @@ static int photo_slot(texture_cache_t *cache, unsigned level, int x, unsigned y)
     return dictionary_get(cache->keys, key, &slot) ? slot : -1;
 }
 
-/* A page has exactly 64 spatial cells. Each cell performs at most 18 indexed ancestor lookups; no source list is scanned. */
-static jsref photo_page(texture_cache_t *cache, jsref request)
+typedef struct _photo_plan_t {
+    unsigned char page[16 * 16 * 4];
+    double bounds[4], span, coverage, detail;
+    uint64_t pinned;
+    unsigned next_level;
+    int next_x, next_y;
+    bool base;
+} photo_plan_t;
+
+/* A fixed 256-cell grid uses indexed ancestors; broad coverage precedes detail, with no resource-list scan. */
+static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, const char *avoid, photo_plan_t *plan)
 {
-    double view[4], pixels = field(request, "pixels");
-    if (!bounds_read(lab_dom_get(request, "bounds"), view) || !isfinite(pixels) || pixels < 1 || pixels > 4096 ||
-        view[0] < -360 || view[2] > 360 || view[1] < -90 || view[3] > 90) return 0;
+    double view[4];
+    memset(plan, 0, sizeof *plan);
+    plan->next_y = -1;
+    if (!bounds_read(bounds, view) || !isfinite(pixels) || pixels < 1 || pixels > 4096 ||
+        view[0] < -360 || view[2] > 360 || view[1] < -90 || view[3] > 90) return false;
     double extent = fmax(view[2] - view[0], view[3] - view[1]);
-    if (extent > 30 || extent < .000001) return 0;
+    if (extent > 30 || extent < .000001) return false;
     unsigned level = (unsigned)fmax(4, fmin(18, floor(log2(360 * fmin(pixels, 1536) / (extent * 512)))));
+    unsigned base = level > 6 ? level - 2 : 4;
     double step = 360.0 / (1u << level);
-    unsigned fine = level + (extent <= step * 3 && level < 18);
+    unsigned fine = level + (level < 18) + (level < 17);
     double cell = 360.0 / (1u << fine);
-    int left = (int)floor(((view[0] + view[2]) * .5 + 180) / cell) - 4;
-    int top = (int)floor((90 - (view[1] + view[3]) * .5) / cell) - 4;
+    int left = (int)floor(((view[0] + view[2]) * .5 + 180) / cell) - 8;
+    int top = (int)floor((90 - (view[1] + view[3]) * .5) / cell) - 8;
     int rows = 1 << (fine - 1);
-    top = (int)fmax(0, fmin(rows - 8, top));
-    double page_bounds[] = {left * cell - 180, 90 - (top + 8) * cell, (left + 8) * cell - 180, 90 - top * cell};
-    uint64_t pinned = 0;
-    double best = INFINITY;
-    int next_x = 0, next_y = -1;
-    char avoid[64] = {0};
-    lab_dom_utf8_copy(lab_dom_get(request, "avoid"), (unsigned char *)avoid, sizeof avoid - 1);
-    memset(cache->page, 0, sizeof cache->page);
-    for (unsigned y = 0; y < 8; ++y) {
-        for (unsigned x = 0; x < 8; ++x) {
+    top = (int)fmax(0, fmin(rows - 16, top));
+    plan->bounds[0] = left * cell - 180; plan->bounds[1] = 90 - (top + 16) * cell;
+    plan->bounds[2] = (left + 16) * cell - 180; plan->bounds[3] = 90 - top * cell;
+    plan->span = cell;
+    double best = INFINITY, visible_area = 0, covered_area = 0, detail_area = 0;
+    for (unsigned y = 0; y < 16; ++y) {
+        for (unsigned x = 0; x < 16; ++x) {
             int column = left + (int)x, row = top + (int)y;
             double west = column * cell - 180, north = 90 - row * cell;
             bool visible = west < view[2] && west + cell > view[0] && north > view[1] && north - cell < view[3];
+            bool found = false, covered = false;
+            unsigned shown_level = 0;
             for (unsigned ancestor = fine; ancestor >= 1; --ancestor) {
                 unsigned shift = fine - ancestor;
                 int ax = (int)floor((double)column / (1u << shift));
                 int slot = photo_slot(cache, ancestor, ax, (unsigned)row >> shift);
                 if (slot < 0) continue;
-                cache->page[4 * (y * 8 + x)] = (unsigned char)(slot + 1);
-                cache->page[4 * (y * 8 + x) + 1] = (unsigned char)shift;
-                if (visible) { pinned |= UINT64_C(1) << slot; touch(cache, slot, true); }
-                break;
+                if (visible && (!found || ancestor == base)) {
+                    plan->pinned |= UINT64_C(1) << slot;
+                    touch(cache, slot, true);
+                }
+                if (!found) {
+                    plan->page[4 * (y * 16 + x)] = (unsigned char)(slot + 1);
+                    plan->page[4 * (y * 16 + x) + 1] = (unsigned char)shift;
+                    found = true;
+                    shown_level = ancestor;
+                    covered = ancestor >= base;
+                }
+                if (ancestor <= base) break;
             }
-            unsigned shift = fine - level;
+            if (visible) {
+                double area = (fmin(west + cell, view[2]) - fmax(west, view[0])) *
+                              (fmin(north, view[3]) - fmax(north - cell, view[1]));
+                visible_area += area;
+                if (covered) covered_area += area;
+                unsigned reduction = shown_level < level ? level - shown_level : 0;
+                if (found) detail_area += area / (1u << reduction);
+            }
+            bool missing_base = visible && !covered;
+            unsigned wanted = missing_base ? base : level, shift = fine - wanted;
+            double wanted_step = missing_base ? 360.0 / (1u << base) : step;
             int tx = (int)floor((double)column / (1u << shift)), ty = row >> shift;
-            double tile_west = tx * step - 180, tile_north = 90 - ty * step;
-            if (tile_west > view[2] + step * .5 || tile_west + step < view[0] - step * .5 ||
-                tile_north < view[1] - step * .5 || tile_north - step > view[3] + step * .5) continue;
-            if (photo_slot(cache, level, tx, (unsigned)ty) >= 0) continue;
-            if (level < 18 && photo_slot(cache, level + 1, tx * 2, (unsigned)ty * 2) >= 0 &&
-                photo_slot(cache, level + 1, tx * 2 + 1, (unsigned)ty * 2) >= 0 &&
-                photo_slot(cache, level + 1, tx * 2, (unsigned)ty * 2 + 1) >= 0 &&
-                photo_slot(cache, level + 1, tx * 2 + 1, (unsigned)ty * 2 + 1) >= 0) continue;
+            double tile_west = tx * wanted_step - 180, tile_north = 90 - ty * wanted_step;
+            if (tile_west > view[2] + wanted_step * .5 || tile_west + wanted_step < view[0] - wanted_step * .5 ||
+                tile_north < view[1] - wanted_step * .5 || tile_north - wanted_step > view[3] + wanted_step * .5) continue;
+            if (photo_slot(cache, wanted, tx, (unsigned)ty) >= 0) continue;
+            if (wanted < 18 && photo_slot(cache, wanted + 1, tx * 2, (unsigned)ty * 2) >= 0 &&
+                photo_slot(cache, wanted + 1, tx * 2 + 1, (unsigned)ty * 2) >= 0 &&
+                photo_slot(cache, wanted + 1, tx * 2, (unsigned)ty * 2 + 1) >= 0 &&
+                photo_slot(cache, wanted + 1, tx * 2 + 1, (unsigned)ty * 2 + 1) >= 0) continue;
             char key[256] = {0};
-            photo_key(key, level, tx, (unsigned)ty);
+            photo_key(key, wanted, tx, (unsigned)ty);
             if (*avoid && !strcmp(key, avoid)) continue;
-            double dx = ((tx + .5) * step - 180 - (view[0] + view[2]) * .5) / step;
-            double dy = (90 - (ty + .5) * step - (view[1] + view[3]) * .5) / step;
-            double score = dx * dx + dy * dy + (visible ? 0 : 100);
-            if (score < best) { best = score; next_x = tx; next_y = ty; }
+            double dx = ((tx + .5) * wanted_step - 180 - (view[0] + view[2]) * .5) / wanted_step;
+            double dy = (90 - (ty + .5) * wanted_step - (view[1] + view[3]) * .5) / wanted_step;
+            double score = dx * dx + dy * dy + (visible ? 0 : 100) + (missing_base ? 0 : 1000);
+            if (score < best) {
+                best = score; plan->next_x = tx; plan->next_y = ty;
+                plan->next_level = wanted; plan->base = missing_base;
+            }
         }
     }
+    plan->coverage = visible_area > 0 ? fmax(0, fmin(1, covered_area / visible_area)) : 1;
+    plan->detail = visible_area > 0 ? fmax(0, fmin(1, detail_area / visible_area)) : 1;
+    return true;
+}
+
+static jsref photo_result(texture_cache_t *cache, const photo_plan_t *visible, const photo_plan_t *next,
+                          uint64_t pinned, double pace)
+{
+    if (visible) memcpy(cache->page, visible->page, sizeof cache->page);
+    else memset(cache->page, 0, sizeof cache->page);
     jsref object = lab_dom_object(LAB_VALUE_OBJECT), protect = lab_dom_object(LAB_VALUE_ARRAY);
-    lab_dom_set(object, "bounds", bounds_result(page_bounds));
-    lab_dom_set(object, "span", lab_dom_numeric(cell));
+    const double fallback[] = {-180, -90, 180, 90};
+    lab_dom_set(object, "visible", lab_dom_scalar(LAB_VALUE_BOOLEAN, visible != NULL));
+    lab_dom_set(object, "bounds", bounds_result(visible ? visible->bounds : fallback));
+    lab_dom_set(object, "span", lab_dom_numeric(visible ? visible->span : 360));
+    lab_dom_set(object, "pace", lab_dom_numeric(pace));
+    lab_dom_set(object, "coverage", lab_dom_numeric(visible ? visible->coverage : 1));
     lab_dom_set(object, "pointer", lab_dom_numeric((unsigned)(size_t)cache->page));
     for (unsigned slot = 0; slot < cache->limit; ++slot)
         if (pinned & (UINT64_C(1) << slot)) lab_dom_push(protect, lab_dom_numeric(slot));
     lab_dom_set(object, "protect", protect);
-    if (next_y >= 0) {
+    if (next && next->next_y >= 0) {
         char key[256] = {0};
-        photo_key(key, level, next_x, (unsigned)next_y);
-        int columns = 1 << level, wrapped = (next_x % columns + columns) % columns;
-        double b[] = {wrapped * step - 180, 90 - (next_y + 1) * step, (wrapped + 1) * step - 180, 90 - next_y * step};
-        jsref next = lab_dom_object(LAB_VALUE_OBJECT);
-        lab_dom_set(next, "key", lab_dom_string(key));
-        lab_dom_set(next, "bounds", bounds_result(b));
-        lab_dom_set(next, "level", lab_dom_numeric(level));
-        lab_dom_set(object, "next", next);
+        unsigned level = next->next_level;
+        photo_key(key, level, next->next_x, (unsigned)next->next_y);
+        int columns = 1 << level, wrapped = (next->next_x % columns + columns) % columns;
+        double step = 360.0 / columns;
+        double b[] = {wrapped * step - 180, 90 - (next->next_y + 1) * step,
+                      (wrapped + 1) * step - 180, 90 - next->next_y * step};
+        jsref cell = lab_dom_object(LAB_VALUE_OBJECT);
+        lab_dom_set(cell, "key", lab_dom_string(key));
+        lab_dom_set(cell, "bounds", bounds_result(b));
+        lab_dom_set(cell, "level", lab_dom_numeric(level));
+        lab_dom_set(cell, "coverage", lab_dom_scalar(LAB_VALUE_BOOLEAN, next->base));
+        lab_dom_set(object, "next", cell);
     }
     return object;
+}
+
+static void photo_avoid(jsref request, char avoid[64])
+{
+    memset(avoid, 0, 64);
+    lab_dom_utf8_copy(lab_dom_get(request, "avoid"), (unsigned char *)avoid, 63);
+}
+
+static jsref photo_page(texture_cache_t *cache, jsref request)
+{
+    photo_plan_t plan;
+    char avoid[64];
+    photo_avoid(request, avoid);
+    if (!photo_plan(cache, lab_dom_get(request, "bounds"), field(request, "pixels"), avoid, &plan)) return 0;
+    return photo_result(cache, &plan, &plan, plan.pinned | protected_slots(request), 1);
+}
+
+/* Three bounded spatial plans share one native scheduling decision; the host submits only that selected job. */
+static jsref photo_journey(texture_cache_t *cache, jsref request)
+{
+    photo_plan_t visible, ahead, arrival;
+    char avoid[64];
+    photo_avoid(request, avoid);
+    bool display = photo_plan(cache, lab_dom_get(request, "bounds"), field(request, "pixels"), avoid, &visible);
+    bool predicted = photo_plan(cache, lab_dom_get(request, "ahead"), field(request, "pixels"), avoid, &ahead);
+    bool destination = photo_plan(cache, lab_dom_get(request, "arrival"), field(request, "arrival_pixels"), avoid, &arrival);
+    const photo_plan_t *next = NULL;
+    if (display && visible.base) next = &visible;
+    else if (predicted && ahead.base) next = &ahead;
+    else if (destination && arrival.base) next = &arrival;
+    else {
+        bool prefer_arrival = cache->journey_turn % 2;
+        if (prefer_arrival && destination && arrival.next_y >= 0) next = &arrival;
+        else if (display && visible.next_y >= 0) next = &visible;
+        else if (predicted && ahead.next_y >= 0) next = &ahead;
+        else if (destination && arrival.next_y >= 0) next = &arrival;
+    }
+    if (next && lab_dom_truth(lab_dom_get(request, "idle"))) ++cache->journey_turn;
+    uint64_t pinned = (display ? visible.pinned : 0) | (destination ? arrival.pinned : 0);
+    return photo_result(cache, display ? &visible : NULL, next, pinned, display ? .3 + .7 * visible.detail : 1);
 }
 
 static void cache_dispatch(void *context)
 {
     jsref request = *(jsref *)context;
     static jsref (*const operations[])(texture_cache_t *, jsref) = {
-        create_cache, get_entry, put_entry, cover_entry, clear_cache, cache_stats, photo_page, remove_entry
+        create_cache, get_entry, put_entry, cover_entry, clear_cache, cache_stats, photo_page, remove_entry, photo_journey
     };
     double action = field(request, "action"), token = field(request, "token");
     if (!isfinite(action) || action < 0 || action >= sizeof operations / sizeof *operations || floor(action) != action) {

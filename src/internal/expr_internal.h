@@ -675,6 +675,26 @@ size_t expr_formal_derivative_order(const expr_t *expr);
 const expr_t *expr_formal_derivative_wrt_at(const expr_t *expr, size_t index);
 
 /**
+ * @brief Construct an exact sine at a rational multiple of pi when the native angle table supports it.
+ * @param numerator Signed numerator of the rational multiple; no input object is retained.
+ * @param denominator Positive denominator; zero is unsupported.
+ * @return Owned algebraic expression released with expr_free(), or NULL for an unsupported angle or allocation failure.
+ * Used by native mathematical reductions that need certified exact constants rather than floating-point recognition.
+ * The result has independent ownership; no mutable state is shared between callers.
+ */
+expr_t *expr_exact_sin_pi_ratio(long numerator, unsigned long denominator);
+
+/**
+ * @brief Describe certified rational power reductions in an expression before its working is simplified away.
+ * @param expr Borrowed source graph, kept alive throughout the call; neither it nor its bindings are changed.
+ * @return Owned native mathematical text released with string_free(), empty when no exact power reduces;
+ * NULL for invalid input or allocation failure. Each line is an equality, such as 9^(3/2) = 27.
+ * Native integration presentation uses this controlled interface to retain endpoint working. It does not evaluate
+ * supplied variable bindings or approximate irrational powers, and its output is independent of the graph lifetime.
+ */
+string_t *expr_exact_power_working(const expr_t *expr);
+
+/**
  * @brief Borrow the operand of an explicit negation; return false for another expression kind.
  * @param expr Borrowed source expression to inspect or transform without transferring ownership.
  * @param arg_out Required caller-owned output receiving the borrowed matched operand; keep the source expression

@@ -18,6 +18,17 @@
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_internal.h"
 
+/* A bare symbolic coefficient keeps its name even when its numerical binding is unset. */
+string_t *de_notation_symbol_text(const expr_t *expression)
+{
+    const char *name = expr_symbol_name(expression);
+    expr_t *symbol = name && (expr_is_variable(expression) || expr_is_named_const(expression))
+                         ? expr_new_named_var(NUM_NAN, name) : NULL;
+    string_t *text = expr_to_text(symbol ? symbol : expression, style_UNBOUND);
+    expr_free(symbol);
+    return text;
+}
+
 /* Every row is projected before any result text is replaced. */
 bool de_notation_steps(diffequ_solve_result_t *result, const char *plain,
                        const de_notation_step_t *steps, size_t count)

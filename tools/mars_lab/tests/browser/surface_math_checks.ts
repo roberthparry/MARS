@@ -297,6 +297,12 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     check(Math.abs(affine[0] * 400 + affine[2] * 400 + affine[4] - (400 + centrePoint[0] * 800 * 64 / 2.24)) < 1e-7 &&
           Math.abs(affine[1] * 400 + affine[3] * 400 + affine[5] - (400 + centrePoint[1] * 800 * 64 / 2.24)) < 1e-7,
           'native retained vectors track the same camera centre as markers and picking');
+    const distant = labDOM.call('lab_globe_centre', 10, 10) as number[];
+    check(labDOM.call('lab_globe_frame_transform', localFrame, [...distant, 4096, 800]) === null,
+          'magnifying a distant retained mask rejects more than one pixel of spherical reprojection error');
+    const enlarged = labDOM.call('lab_globe_frame_transform', localFrame, [0, 0, 0, 1, 4096, 800]) as number[];
+    check(enlarged?.[0] === 64 && enlarged?.[3] === 64,
+          'exact centre-preserving zooms keep valid retained masks without unnecessary projection work');
     const shoreLoad = (text: string | Uint8Array<ArrayBuffer>, bounds = [-180, -90, 180, 90]) =>
         Boolean(labDOM.call('lab_globe_shore_load', text, bounds));
     const shoreSvg = (camera = borderCamera, zoom = 1) =>
@@ -732,7 +738,10 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
     }
     check(labDOM.call('lab_town_store_add', 'ZZ', [town('rollback', '0', '0'), town('bad\ud800', '0', '0')]) === -1 &&
           !labDOM.call('lab_town_store_get', 'ZZ', 'rollback'), 'invalid UTF-8 input rolls back the complete batch');
-    const overBudget = Array.from({length: 130}, (_, i) => ({...town(`quota-${i}`, '1', '1'), detail: 'x'.repeat(65536)}));
+    const townBudget = labDOM.call<{limit: number}>('lab_town_store_policy', {}).limit;
+    const overBudget = Array.from({length: Math.ceil(townBudget / 65536) + 1}, (_, i) => ({
+        ...town(`quota-${i}`, '1', '1'), detail: 'x'.repeat(65536)
+    }));
     check(labDOM.call('lab_town_store_add', 'ZZ', overBudget) === -1 &&
           !labDOM.call('lab_town_store_get', 'ZZ', 'quota-0') &&
           Boolean(labDOM.call('lab_town_store_get', 'ZZ', 'Native western')),
@@ -1370,7 +1379,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             const activeTexture = gl.getParameter(gl.ACTIVE_TEXTURE) as number;
             const savedTextures: (WebGLTexture | null)[] = [], paletteTextures: WebGLTexture[] = [];
             const paletteUniforms = ['mapMode', 'detailReady', 'grid', 'riverReady', 'riverComposite', 'previousRiverReady',
-                'vectorReady', 'naturalShore', 'naturalStyle', 'palettesReady', 'photoReady'];
+                'vectorReady', 'naturalShore', 'naturalStyle', 'palettesReady', 'photoReady', 'photoAtlasEnabled'];
             const savedUniforms = paletteUniforms.map(name => gl.getUniform(program, gl.getUniformLocation(program, name)!));
             const savedCamera = gl.getUniform(program, gl.getUniformLocation(program, 'camera')!) as Float32Array;
             const savedGridMatrix = gl.getUniform(program, gl.getUniformLocation(program, 'cameraToWorld')!) as Float32Array;
@@ -1382,6 +1391,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 gl.uniform1f(gl.getUniformLocation(program, 'riverBlend'), 1);
                 gl.uniform1i(gl.getUniformLocation(program, 'palettesReady'), 0);
                 gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), 0);
+                gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasEnabled'), 0);
                 for (const unit of [0, 2, 3, 4]) {
                     gl.activeTexture(gl.TEXTURE0 + unit);
                     savedTextures.push(gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture | null);
@@ -1969,6 +1979,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 const naturalTexture = gl.getParameter(gl.TEXTURE_BINDING_2D) as WebGLTexture;
                 const sandTexture = gl.createTexture()!;
                 const photoReady = gl.getUniform(program, gl.getUniformLocation(program, 'photoReady')!);
+                const atlasEnabled = gl.getUniform(program, gl.getUniformLocation(program, 'photoAtlasEnabled')!);
                 const riverReady = gl.getUniform(program, gl.getUniformLocation(program, 'riverReady')!);
                 const previousRiverReady = gl.getUniform(program, gl.getUniformLocation(program, 'previousRiverReady')!);
                 const photoBounds = gl.getUniform(program, gl.getUniformLocation(program, 'photoBounds')!) as Float32Array;
@@ -1981,6 +1992,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 0);
                     gl.uniform1i(gl.getUniformLocation(program, 'previousRiverReady'), 0);
                     gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), 0);
+                    gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasEnabled'), 0);
                     gl.bindTexture(gl.TEXTURE_2D, sandTexture);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -2021,6 +2033,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), Number(riverReady));
                     gl.uniform1i(gl.getUniformLocation(program, 'previousRiverReady'), Number(previousRiverReady));
                     gl.uniform1i(gl.getUniformLocation(program, 'photoReady'), Number(photoReady));
+                    gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasEnabled'), Number(atlasEnabled));
                     gl.uniform4fv(gl.getUniformLocation(program, 'photoBounds'), photoBounds);
                     gl.activeTexture(gl.TEXTURE7);
                     gl.bindTexture(gl.TEXTURE_2D, naturalPatch);

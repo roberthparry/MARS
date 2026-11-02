@@ -435,7 +435,10 @@ bool intg_integrand_has_unbound_parameters(const expr_t *integrand, size_t ndim,
 
 ### `intg_integrate_iterated_symbolic()`
 
-Returns the public result described by integrate iterated symbolic.
+Returns an owned exact expression after applying the requested integration bounds.
+Certified rational endpoint powers are reduced before the final result is returned.
+The optional first antiderivative remains available independently, so callers can
+retain the integration working alongside the simplified result.
 
 ```c
 expr_t *intg_integrate_iterated_symbolic(const expr_t *integrand, size_t ndim, expr_t *const *vars, const intg_bound_kind_t *kinds, expr_t *const *lo, expr_t *const *hi, size_t max_steps, size_t *completed_steps_out, expr_t **first_antiderivative_out);

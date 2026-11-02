@@ -6,8 +6,11 @@
  * Slots are direct indexed; no JavaScript Map duplicates the native dictionary.
  */
 interface TextureSlot { token: number; slot: number; count: number; bytes: number; evicted?: number[]; bounds?: number[]; zoom?: number; }
-export interface GlobePhotoCell { key: string; bounds: number[]; level: number; }
-export interface GlobePhotoPage { bounds: number[]; span: number; pointer: number; protect: number[]; next?: GlobePhotoCell; }
+export interface GlobePhotoCell { key: string; bounds: number[]; level: number; coverage?: boolean; }
+export interface GlobePhotoPage {
+    bounds: number[]; span: number; pointer: number; protect: number[]; next?: GlobePhotoCell;
+    visible: boolean; pace: number; coverage: number;
+}
 export class GlobeTextureCache<T> {
     private token: number;
     private readonly resources: (T | null)[];
@@ -49,9 +52,14 @@ export class GlobeTextureCache<T> {
         this.resources[result.slot] = resource;
         return result.slot;
     }
-    page(bounds: number[], pixels: number, avoid = ''): GlobePhotoPage | null {
+    page(bounds: number[], pixels: number, avoid = '', protect: number[] = []): GlobePhotoPage | null {
         return this.token ? labDOM.call('lab_texture_cache',
-            {action: 6, token: this.token, bounds, pixels, avoid}) as GlobePhotoPage | null : null;
+            {action: 6, token: this.token, bounds, pixels, avoid, protect}) as GlobePhotoPage | null : null;
+    }
+    journey(bounds: number[], pixels: number, arrival: number[], arrivalPixels: number, ahead: number[] | null,
+            avoid: string, idle: boolean): GlobePhotoPage | null {
+        return this.token ? labDOM.call('lab_texture_cache', {action: 8, token: this.token, bounds, pixels,
+            arrival, arrival_pixels: arrivalPixels, ahead, avoid, idle}) as GlobePhotoPage | null : null;
     }
     covering(bounds: number[], zoom: number, partial = false, prefer = -1): {
         resource: T; slot: number; bounds: number[]; zoom: number;

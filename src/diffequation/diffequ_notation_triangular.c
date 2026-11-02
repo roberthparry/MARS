@@ -62,7 +62,7 @@ bool de_triangular_steps(diffequ_solve_result_t *result, const expr_t *dependent
             "%s\nInvariant: I = %s. Particular solution: P = %s.\n"
             "Thus %s = P + F(I), with F an arbitrary differentiable function.\n"
             "The invariant and complete solution are verified on both real charts %s>0 and %s<0.\n"
-            "This representation requires %s != 0; no extension across that axis is asserted.\n"
+            "This representation requires %s ≠ 0; no extension across that axis is asserted.\n"
             "No initial or boundary data are imposed.\n", text[0], text[2], text[1], text[3], text[7], text[4],
             repeated ? "Equal diagonal rates produce a logarithmic invariant." : "Distinct diagonal rates give a scaled invariant.",
             text[5], text[6], text[7], text[0], text[0], text[0]);

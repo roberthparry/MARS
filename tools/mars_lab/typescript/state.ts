@@ -1164,10 +1164,11 @@ namespace WorksheetPersistence {
             WorksheetContext.datetimeDate?.focus({preventScroll: true});
         },
 
-        /** @brief Fill blank almanac defaults and focus its date input without scrolling below the globe. */
+        /** @brief Restore almanac controls and return its retained native response for first-entry evaluation policy. */
         stateFinishAlmanac() {
             WorksheetLocations.calendar.restoreAlmanacDefaultsIfBlank();
             WorksheetContext.almanacDate?.focus({preventScroll: true});
+            return WorksheetContext.worksheetSession.calendar.almanacLastWorksheetData;
         },
 
         /** @brief Clear the editor's manually selected size. */
@@ -1413,8 +1414,8 @@ namespace WorksheetPersistence {
         },
 
         /** @brief Evaluate the currently selected worksheet mode. */
-        stateEvaluate() {
-            return WorksheetWorkspace.mode.evaluateCurrentMode();
+        stateEvaluate(options: WorksheetEvaluationOptions = {}) {
+            return WorksheetWorkspace.mode.evaluateCurrentMode(options);
         },
 
         /** @brief Evaluate the current expression worksheet. */

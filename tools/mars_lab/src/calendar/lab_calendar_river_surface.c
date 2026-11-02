@@ -52,12 +52,16 @@ typedef struct {
     json_t *photos;
     const double *bounds;
     unsigned pixels;
+    bool transparent;
+    double longitude_shift;
 } surface_regions_t;
 
-static bool surface_region(unsigned slot, const double region[4], void *context)
+static bool surface_region(unsigned slot, const double original[4], void *context)
 {
     surface_regions_t *state = context;
     const double *b = state->bounds;
+    const double region[] = {original[0] + state->longitude_shift, original[1],
+                             original[2] + state->longitude_shift, original[3]};
     /* Broad views use regional overviews, not dozens of full-detail PNGs. */
     if (fmax(b[2] - b[0], b[3] - b[1]) > 1 && fmax(region[2] - region[0], region[3] - region[1]) <= 1)
         return true;
@@ -92,17 +96,45 @@ static bool surface_region(unsigned slot, const double region[4], void *context)
         lab_cal_take(photo, "decode_size", decoded ? json_new_number(decoded) : NULL);
         string_free(width); string_free(decoded);
     }
-    bool ok = photo && url && json_array_append(state->photos, photo);
+    /* A finer source covering this entire cell supersedes broader regional photographs.
+     * Transparent coastline pixels fall through to the globe's already resident world texture. */
+    if (photo && url && state->transparent && left <= b[0] && south <= b[1] && right >= b[2] && north >= b[3]) {
+        json_free(state->photos);
+        state->photos = json_new_array();
+    }
+    bool ok = photo && url && state->photos && json_array_append(state->photos, photo);
     json_free(photo); string_free(url);
     return ok;
 }
 
-static json_t *surface_photographs(globe_t *globe, const double b[4], unsigned pixels)
+static bool surface_regions(surface_regions_t *state)
+{
+    const double *b = state->bounds;
+    int first = (int)floor((b[0] + 180) / 360), last = (int)ceil((b[2] + 180) / 360) - 1;
+    if (last - first > 1) return false;
+    for (int wrap = first; wrap <= last; ++wrap) {
+        state->longitude_shift = wrap * 360;
+        double query[] = {fmax(-180, b[0] - state->longitude_shift), fmax(-90, b[1]),
+                          fmin(180, b[2] - state->longitude_shift), fmin(90, b[3])};
+        if (!globe_texture_regions(state->globe, query, surface_region, state)) return false;
+    }
+    return true;
+}
+
+static json_t *surface_photographs(globe_t *globe, const double b[4], unsigned pixels, bool transparent)
 {
     json_t *photos = json_new_array();
+    surface_regions_t state = {.globe = globe, .photos = photos, .bounds = b, .pixels = pixels,
+                               .transparent = transparent};
+    if (transparent) {
+        bool ready = photos && surface_regions(&state);
+        photos = state.photos;
+        if (!ready) { json_free(photos); return NULL; }
+        if (json_array_size(photos)) return photos;
+    }
     int first = (int)floor((b[0] + 180) / 30), last = (int)ceil((b[2] + 180) / 30) - 1;
-    int top = (int)floor((90 - b[3]) / 30), bottom = (int)ceil((90 - b[1]) / 30) - 1;
-    bool ok = photos && first <= last && last - first <= 1 && top >= 0 && bottom < 6 && bottom - top <= 1;
+    int top = (int)fmax(0, floor((90 - b[3]) / 30)), bottom = (int)fmin(5, ceil((90 - b[1]) / 30) - 1);
+    bool ok = photos && first <= last && last - first <= 2 && top >= 0 && bottom < 6 && bottom - top <= 2;
     for (int row = top; ok && row <= bottom; ++row) {
         for (int column = first; ok && column <= last; ++column) {
             unsigned wrapped = (unsigned)((column % 12 + 12) % 12);
@@ -128,8 +160,7 @@ static json_t *surface_photographs(globe_t *globe, const double b[4], unsigned p
             json_free(photo); string_free(url); string_free(width);
         }
     }
-    surface_regions_t state = {globe, photos, b, pixels};
-    if (ok) ok = globe_texture_regions(globe, b, surface_region, &state);
+    if (ok && !transparent) ok = surface_regions(&state);
     if (ok) return photos;
     json_free(photos);
     return NULL;
@@ -153,12 +184,16 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
     string_t *identity = globe_reader_identity(reader);
     globe_t *globe = identity ? globe_reader_get(reader) : NULL;
     string_t *key = identity ? string_sprintf("%s:%s:%.12g:%.12g:%.12g:%.12g",
-        photograph ? "photo-cell-1" : "river-surface-7", string_c_str(identity), b[0], b[1], b[2], b[3]) : NULL;
+        photograph ? "photo-cell-3" : "river-surface-7", string_c_str(identity), b[0], b[1], b[2], b[3]) : NULL;
     bool ok = key && globe;
-    bool rivers = ok && globe_has_layer(globe, GLOBE_LAYER_RIVERS);
-    bool complete = ok && globe_river_water_complete(globe, b[0], b[1], b[2], b[3]);
+    bool rivers = data && ok && globe_has_layer(globe, GLOBE_LAYER_RIVERS);
+    bool complete = data && ok && globe_river_water_complete(globe, b[0], b[1], b[2], b[3]);
     bool changed = data && ok && strcmp(lab_cal_text(payload, "key"), string_c_str(key));
-    json_t *photos = ok && !data && !mask ? surface_photographs(globe, b, photograph ? 512 : 2048) : NULL;
+    /* A 510-square core has a one-pixel geographic gutter on each side in the existing 512-square GPU slot. */
+    double xg = photograph ? (b[2] - b[0]) / 510 : 0, yg = photograph ? (b[3] - b[1]) / 510 : 0;
+    const double image_bounds[] = {b[0] - xg, b[1] - yg, b[2] + xg, b[3] + yg};
+    json_t *photos = ok && !data && !mask ?
+        surface_photographs(globe, image_bounds, photograph ? 512 : 2048, photograph) : NULL;
     river_surface_t surface = {.path = data ? string_new() : NULL, .west = b[0], .north = b[3],
                                .fill = data ? string_new() : NULL, .globe = globe,
                                .sx = 2048 / (b[2] - b[0]), .sy = 2048 / (b[3] - b[1])};

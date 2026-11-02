@@ -455,6 +455,27 @@ static void render_exact_result(const expr_t *expr, char **text, char **TeX)
     expr_free(display);
 }
 
+/* Keep endpoint substitution and certified power identities alongside the simplified exact result. */
+static string_t *render_bound_working(const expr_t *antiderivative, const expr_t *variable,
+                                     const expr_t *lower, const expr_t *upper)
+{
+    expr_t *display = expr_beautify(antiderivative);
+    expr_t *hi = display ? expr_substitute(display, variable, upper) : NULL;
+    expr_t *lo = display ? expr_substitute(display, variable, lower) : NULL;
+    expr_t *difference = hi && lo ? expr_sub(hi, lo) : NULL;
+    string_t *powers = difference ? expr_exact_power_working(difference) : NULL;
+    string_t *applied = powers && string_byte_length(powers) ? expr_to_text(difference, style_UNBOUND) : NULL;
+    string_t *working = applied ? string_sprintf("Applying bounds:\n%s\n\nExact powers:\n%s",
+                                                string_c_str(applied), string_c_str(powers)) : NULL;
+    string_free(applied);
+    string_free(powers);
+    expr_free(difference);
+    expr_free(lo);
+    expr_free(hi);
+    expr_free(display);
+    return working;
+}
+
 static char *combine_equation_TeX(const char *lhs, const char *rhs)
 {
     size_t lhs_n;
@@ -701,6 +722,7 @@ int lab_worker_integrator(int argc, char **argv)
     expr_t *display_expr = NULL;
     expr_t *symbolic_result = NULL;
     expr_t *first_antiderivative = NULL;
+    string_t *symbolic_working = NULL;
     expr_t *partially_symbolic_result = NULL;
     expr_t **remaining_numeric_vars = NULL;
     number_t *remaining_lo_num = NULL;
@@ -900,6 +922,8 @@ int lab_worker_integrator(int argc, char **argv)
         }
         if (symbolic_result) {
             render_exact_result(symbolic_result, &symbolic_text, &symbolic_TeX);
+            if (first_antiderivative && ndim == 1u && bound_kinds[0] == INTG_BOUND_DEFINITE)
+                symbolic_working = render_bound_working(first_antiderivative, vars[0], lo_expr[0], hi_expr[0]);
             symbolic_num = expr_eval(symbolic_result);
             if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num))
                 symbolic_value_text = number_text(symbolic_num);
@@ -1020,6 +1044,7 @@ int lab_worker_integrator(int argc, char **argv)
     printf("antiderivative_TeX %s\n", antiderivative_TeX ? antiderivative_TeX : "");
     printf("symbolic    %s\n", symbolic_text ? symbolic_text : "");
     printf("symbolic_TeX %s\n", symbolic_TeX ? symbolic_TeX : "");
+    printf("symbolic_working %s\n", symbolic_working ? string_c_str(symbolic_working) : "");
     printf("symbolic_value %s\n", symbolic_value_text ? symbolic_value_text : "");
     printf("value       %s\n", value_text ? value_text : "");
     printf("error       %s\n", error_text ? error_text : "");
@@ -1051,6 +1076,7 @@ int lab_worker_integrator(int argc, char **argv)
     rc = 0;
 
 cleanup:
+    string_free(symbolic_working);
     free(antiderivative_TeX);
     free(antiderivative_text);
     free(symbolic_value_text);

@@ -320,6 +320,7 @@ class MarsAlmanacGlobe {
             globe.applyCamera(target);
             if (globe.historyRestoring) {
                 globe.flightTarget = null;
+                globe.photoAtlas?.prefetch(null);
                 globe.flightFrame = 0;
                 globe.draw();
                 return;
@@ -350,7 +351,8 @@ class MarsAlmanacGlobe {
                 (progress === 0 && (globe.travelBordersLoading || globe.photoLoading > 0));
             // Warm the photographic surface before departure. Local vectors refine that complete
             // surface asynchronously, without braking and restarting at each coverage boundary.
-            speed += Math.max(-elapsed / 600, Math.min(elapsed / 1200, (loading ? 0 : 1) - speed));
+            speed += Math.max(-elapsed / 600, Math.min(elapsed / 1200,
+                (loading ? 0 : globe.photoAtlas?.travelPace ?? 1) - speed));
             const ready = !loading;
             if (!ready) speed = 0;
             globe.flightSpeed = speed;
@@ -360,6 +362,8 @@ class MarsAlmanacGlobe {
                 if (advanced === null) { complete(); return; }
                 progress = advanced;
                 const next = labDOM.call('lab_globe_flight', start, target, progress, Number(redirect)) as number[];
+                globe.photoAtlas?.follow(labDOM.call('lab_globe_flight_ahead', start, target,
+                    progress, Number(redirect)) as number[] | null);
                 globe.applyCamera(next);
             }
             globe.flightFrame = requestAnimationFrame(tick);
@@ -372,6 +376,7 @@ class MarsAlmanacGlobe {
         cancelAnimationFrame(this.flightFrame);
         this.flightFrame = 0;
         this.flightTarget = null;
+        this.photoAtlas?.prefetch(null);
         this.travelNotice.hidden = true;
         this.flightSpeed = 0;
         this.historyZoom = null;
@@ -1034,6 +1039,10 @@ class MarsAlmanacGlobe {
                 }
             } catch { this.photoAtlasFailed = true; this.root.dataset.photoAtlas = 'unavailable'; }
         }
+        if (target !== this.flightTarget) return;
+        this.photoAtlas?.prefetch(target ? view.slice(3) : null,
+            Math.min(1536, Math.round(this.canvas.clientWidth * Math.min(devicePixelRatio, 1.5))));
+        this.draw();
         if (this.riverTiles.covering(reserve.slice(3), zoom)?.complete) {
             this.draw();
             return;

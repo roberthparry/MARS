@@ -67,7 +67,7 @@ static void parameter_values(const expr_t *formula, expr_bindings_t *bindings, c
             sampler_options_t options = sampler_options_default();
             options.intervals = 32;
             options.max_evaluations = 257;
-            options.max_depth = 6;
+            options.max_depth = lab_worker_plot_depth(options.intervals, options.max_evaluations, 6u);
             number_t lower = num_create_from_long(-4), upper = num_create_from_long(4);
             sampler_t *samples = sampler_expression(copy, parameters[p], NULL, lower, upper, &options);
             num_destroy(&lower);
@@ -108,6 +108,12 @@ static void parameter_values(const expr_t *formula, expr_bindings_t *bindings, c
                 cumulative += weight;
             }
         }
+        /* Keep an exact zero reference among at most five ordered representatives. */
+        size_t nearest = 0u;
+        for (size_t k = 1u; k < side; ++k)
+            if (fabs(selected[p][k]) < fabs(selected[p][nearest]))
+                nearest = k;
+        selected[p][nearest] = 0;
     }
     expr_free(copy);
     expr_free(x);

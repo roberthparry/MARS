@@ -61,7 +61,7 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         const originalRequest = new AbortController();
         let windowLoads = 0;
         const navigation = {
-            orientation, view, flightTarget: null, shoreClosed: false, root, gl: navigationGPU,
+            orientation, view, flightTarget: null, shoreClosed: false, root, canvas: navigationCanvas, gl: navigationGPU,
             riverTiles: navigationTiles, observerSignature: 'unchanged observer',
             riverRequestObserver: 'unchanged observer', riverRequest: originalRequest,
             riverRequestBounds: [view[3] - 1, view[4] - 1, view[5] + 1, view[6] + 1],

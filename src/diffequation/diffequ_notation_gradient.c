@@ -134,7 +134,7 @@ bool de_gradient_present(diffequ_solve_result_t *result, const expr_t *dependent
         valid = plain[i] != NULL;
     }
     string_t *left = valid ? string_sprintf("Local envelope: %s", plain[0]) : NULL;
-    string_t *right = valid ? string_sprintf("%s\n  subject to H = %s = 0; %s != 0; dH/d%s != 0.\n"
+    string_t *right = valid ? string_sprintf("%s\n  subject to H = %s = 0; %s ≠ 0; dH/d%s ≠ 0.\n"
         "  %s is arbitrary and twice continuously differentiable; solve jointly for %s.",
         plain[5], plain[6], plain[2], plain[1], plain[8], plain[1]) : NULL;
     string_t *left_notation = valid ? gradient_render(values, GRADIENT_LEFT_ENVELOPE) : NULL;
@@ -144,7 +144,7 @@ bool de_gradient_present(diffequ_solve_result_t *result, const expr_t *dependent
         equ_set_display_TeX(result->solutions[0], left_notation, right_notation) == 0;
     string_free(left); string_free(right); string_free(left_notation); string_free(right_notation);
     left = valid ? string_sprintf("Affine complete integral: %s", plain[0]) : NULL;
-    right = valid ? string_sprintf("%s; %s != 0; %s and %s are arbitrary constants.",
+    right = valid ? string_sprintf("%s; %s ≠ 0; %s and %s are arbitrary constants.",
                                     plain[7], plain[2], plain[1], plain[4]) : NULL;
     left_notation = valid ? gradient_render(values, GRADIENT_LEFT_AFFINE) : NULL;
     right_notation = valid ? gradient_render(values, GRADIENT_RIGHT_AFFINE) : NULL;
@@ -156,12 +156,12 @@ bool de_gradient_present(diffequ_solve_result_t *result, const expr_t *dependent
         string_t *steps = string_sprintf(
             "Gradient-only equation: set p and q equal to the two first partial derivatives.\n"
             "The characteristic equations keep p and q constant along each characteristic.\n"
-            "Parameterise the gradient curve by p = %s, q = %s, with %s != 0.\n"
+            "Parameterise the gradient curve by p = %s, q = %s, with %s ≠ 0.\n"
             "Integrating constant gradients gives the affine complete integral.\n"
             "Replace its additive constant by %s(%s) and differentiate the resulting expression with respect to %s.\n"
             "Setting that derivative H to zero gives the envelope constraint.\n"
             "On H=0 the chain rule gives the original gradients p and q; the native solver verifies their PDE identity.\n"
-            "dH/d%s != 0 determines a regular local branch. Affine solutions are listed separately.\n"
+            "dH/d%s ≠ 0 determines a regular local branch. Affine solutions are listed separately.\n"
             "No initial data, boundary data or continuation through envelope singularities are asserted.",
             plain[1], plain[3], plain[2], plain[8], plain[1], plain[1], plain[1]);
         string_t *notation = gradient_render(values, GRADIENT_STEPS);

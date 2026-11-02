@@ -6,6 +6,7 @@
  * or network access. Literal expectations distinguish numerical solutions from
  * symbolic constants and preserve authored matrix cells and binding values.
  */
+#include <stdio.h>
 #include <string.h>
 
 #include "expression-t.h"
@@ -383,6 +384,10 @@ static void test_lab_presentation_integrator_text(void)
         {"{\"antiderivative\":\"x^2/2\",\"symbolic\":\"1/2\",\"bound\":\"0 ≤ x ≤ 1\","
          "\"status\":\"SYMBOLIC result\",\"work_units\":\"2\",\"work_cap\":\"8\",\"value\":\"0.5\"}",
          "Antiderivative:\nx^2/2\n\nDefinite result:\n1/2\n\n0 ≤ x ≤ 1\nstatus: SYMBOLIC result", "0.5"},
+        {"{\"antiderivative\":\"F(x)\",\"symbolic\":\"232/5\",\"symbolic_working\":\"9^(3/2) = 27\\n4^(3/2) = 8\","
+         "\"status\":\"symbolic exact result\",\"value\":\"46.4\"}",
+         "Antiderivative:\nF(x)\n\n9^(3/2) = 27\n4^(3/2) = 8\n\nDefinite result:\n232/5\n\n"
+         "status: symbolic exact result", "46.4"},
         {"{\"antiderivative\":\"x^2/2\",\"symbolic\":\"x^2/2\",\"status\":\"Antiderivative\","
          "\"intervals\":\"2\"}",
          "Antiderivative:\nx^2/2\n\nstatus: Antiderivative", "Antiderivative"},
@@ -404,8 +409,12 @@ static void test_lab_presentation_integrator_text(void)
         json_t *fields = test_lab_json(cases[i].payload);
         bool adapted = fields && lab_presentation_adapt(fields);
         const json_t *integrator = test_lab_member(test_lab_member(fields, "presentation"), "integrator");
-        ok = ok && adapted && !strcmp(test_lab_text(integrator, "detail_text"), cases[i].detail) &&
-             !strcmp(test_lab_text(integrator, "value_text"), cases[i].value);
+        bool matches = adapted && !strcmp(test_lab_text(integrator, "detail_text"), cases[i].detail) &&
+                       !strcmp(test_lab_text(integrator, "value_text"), cases[i].value);
+        if (!matches)
+            printf("Integrator presentation case %zu:\n%s\nValue: %s\n", i,
+                   test_lab_text(integrator, "detail_text"), test_lab_text(integrator, "value_text"));
+        ok = ok && matches;
         json_free(fields);
     }
     TEST_ASSERT_TRUE(

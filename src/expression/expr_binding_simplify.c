@@ -111,6 +111,7 @@ static const binding_simplify_rule_t s_binding_unary_exact_rules[] = {{binding_e
 
 static const binding_simplify_rule_t s_binding_binary_op_rules[] = {
     {binding_expr_try_simplify_integer_power},
+    {binding_expr_try_simplify_exact_rational_power},
     {binding_expr_try_simplify_exact_complex_rational_power},
     {binding_expr_try_simplify_sqrt_square},
     {binding_expr_try_simplify_e_power},

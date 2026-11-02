@@ -101,6 +101,11 @@ void lab_globe_frame_transform(jsref previous, jsref current)
             for (unsigned k = 0; k < 3; ++k) relative[row * 3 + col] += b[row * 3 + k] * a[col * 3 + k];
     if (relative[8] <= 0) { lab_dom_return(0); return; }
     double scale = now[4] * now[5] / 2.24, ratio = now[4] * now[5] / (old[4] * old[5]);
+    /* The affine transform omits the sphere's changing depth. Bound its error over the
+     * double-width retained mask, so a distant or magnified mask cannot distort the photograph. */
+    double edge = 2.24 / old[4], radius_squared = 2 * edge * edge;
+    double depth = 1 - sqrt(fmax(0, 1 - radius_squared));
+    if (old[4] >= 8 && scale * hypot(relative[2], relative[5]) * depth > 1) { lab_dom_return(0); return; }
     double result[6] = {ratio * relative[0], -ratio * relative[3], -ratio * relative[1], ratio * relative[4]};
     result[4] = now[5] / 2 + scale * relative[2] - (result[0] + result[2]) * old[5] / 2;
     result[5] = now[5] / 2 - scale * relative[5] - (result[1] + result[3]) * old[5] / 2;
@@ -324,6 +329,20 @@ void lab_globe_flight(jsref start, jsref target, double progress, bool redirect)
     if (!isfinite(progress) || !globe_camera_read(start, a) || !globe_camera_read(target, b) ||
         !globe_flight_frame(a, b, progress, redirect, result)) { lab_dom_return(0); return; }
     globe_result(result, 5);
+}
+
+/* Predict coverage along the same eased great circle, without moving the displayed camera. */
+void lab_globe_flight_ahead(jsref start, jsref target, double progress, bool redirect)
+{
+    double a[5], b[5], frame[5], matrix[9], cap[6];
+    if (!isfinite(progress) || progress < 0 || progress > 1 || !globe_camera_read(start, a) ||
+        !globe_camera_read(target, b) || !globe_flight_frame(a, b, fmin(1, progress + .04), redirect, frame) ||
+        !quaternion_matrix3(matrix, frame) ||
+        !globe_view_bounds(matrix, asin(fmin(1, 1.6 / frame[4])) / globe_radian, cap)) {
+        lab_dom_return(0); return;
+    }
+    const double view[] = {cap[0], cap[1], frame[4], cap[2], cap[3], cap[4], cap[5]};
+    globe_result(view, 7);
 }
 
 /* Measure the actual camera route, including a redirected flight's current starting point. */

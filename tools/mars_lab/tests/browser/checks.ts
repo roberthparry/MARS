@@ -3263,6 +3263,8 @@
             }
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('evaluation-check') === '1') {
+                await runBrowserGroup('first Almanac entry and interrupted re-entry', checkAlmanacFirstEntry);
+                await runBrowserGroup('checkLabStateFlow', window.checkLabStateFlow);
                 await runBrowserGroup('checkLabResultDom', window.checkLabResultDom);
                 await runBrowserGroup('checkLabEvaluation', window.checkLabEvaluation);
                 await runBrowserGroup('checkLabEvaluationInstall', window.checkLabEvaluationInstall);

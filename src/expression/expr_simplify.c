@@ -2022,6 +2022,30 @@ int expr_fold_sqrt_const(const number_t *in, number_t *out)
     return 1;
 }
 
+/* Certify rational powers using integer roots, without rounding or changing complex branches. */
+bool expr_fold_rational_power_const(const number_t *base, number_t exponent, number_t *out)
+{
+    long numerator, denominator, power, order, root_numerator, root_denominator;
+    if (!base || !out || !num_is_exact(*base) || !num_get_small_rational(*base, &numerator, &denominator) ||
+        numerator < 0L || denominator <= 0L || !num_get_small_rational(exponent, &power, &order) ||
+        order <= 1L || power < INT_MIN || power > INT_MAX || (numerator == 0L && power < 0L) ||
+        (power == 1L && order != 2L) ||
+        !expr_long_perfect_nth_root_local(numerator, (unsigned long)order, &root_numerator) ||
+        !expr_long_perfect_nth_root_local(denominator, (unsigned long)order, &root_denominator))
+        return false;
+
+    number_t root = num_create_from_frac(root_numerator, root_denominator);
+    number_t value = num_pow_int(root, (int)power);
+    num_destroy(&root);
+    if (!num_is_exact(value) || !num_is_finite(value)) {
+        num_destroy(&value);
+        return false;
+    }
+    num_destroy(out);
+    *out = value;
+    return true;
+}
+
 int expr_fold_cubrt_const(const number_t *in, number_t *out)
 {
     long numerator;
@@ -2387,6 +2411,21 @@ static expr_t *expr_try_simplify_preserved_integer_power_local(expr_t *base, num
     return out;
 }
 
+/* Fold certified rational powers, preserving irrational and named symbolic values. */
+static expr_t *expr_try_simplify_exact_rational_power_local(expr_t *base, number_t exponent)
+{
+    number_t exact = NUM_NAN;
+    if (!expr_simplify_is_plain_real_const(base) || !expr_fold_rational_power_const(&base->c, exponent, &exact)) {
+        num_destroy(&exact);
+        return NULL;
+    }
+    expr_t *result = expr_new_const(exact);
+    num_destroy(&exact);
+    if (result)
+        expr_free(base);
+    return result;
+}
+
 static expr_t *expr_try_simplify_preserved_rational_const_power_local(expr_t *base, number_t exponent)
 {
     long numerator;
@@ -2402,6 +2441,10 @@ static expr_t *expr_try_simplify_preserved_rational_const_power_local(expr_t *ba
         !num_get_small_rational(exponent, &numerator, &denominator) || denominator == 1L) {
         return NULL;
     }
+
+    expr_t *exact_root = expr_try_simplify_exact_rational_power_local(base, exponent);
+    if (exact_root)
+        return exact_root;
 
     if (base->binding_expr) {
         base_expr = expr_binding_expr_clone(base->binding_expr);
@@ -5925,6 +5968,13 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *expr, expr_t *a, expr_t *b)
 expr_t *expr_simplify_pow_operator(const expr_t *expr, expr_t *a, expr_t *b)
 {
     (void)expr;
+    if (expr_simplify_is_plain_real_const(b)) {
+        expr_t *exact_root = expr_try_simplify_exact_rational_power_local(a, b->c);
+        if (exact_root) {
+            expr_free(b);
+            return exact_root;
+        }
+    }
     if (expr_is_op(a, &ops_neg) && expr_simplify_is_plain_real_const(b) &&
         num_is_finite(b->c) && num_is_integer(b->c)) {
         expr_t *out = expr_make_pow_like_owned_local(a, b->c);

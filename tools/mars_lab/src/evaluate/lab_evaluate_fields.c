@@ -104,6 +104,7 @@ static const field_t field_table[] = {
     {"symbolic", "symbolic", false},
     {"symbolic_TeX", "symbolic_TeX", true},
     {"symbolic_value", "symbolic_value", false},
+    {"symbolic_working", "symbolic_working", true},
     {"symmetry", "symmetry", false},
     {"tex", "tex", true},
     {"transform_identity_TeX", "transform_identity_TeX", false},

@@ -18,7 +18,8 @@
  * bindings, and optional initial or boundary conditions. The first symbolic
  * solvers cover exact differential forms, separable, linear, homogeneous,
  * affine-substitution, linear
- * changes of variables, quadratic Bernoulli, and autonomous
+ * changes of variables, quadratic Bernoulli, Riccati linearisations with supported
+ * monomial normal potentials, and autonomous
  * derivative-quadratic first-order ordinary differential equations, together
  * with arbitrary-order constant-coefficient linear ODEs and second-order
  * equations that can be completed through Sturm-Liouville normalisation.
@@ -213,7 +214,10 @@ typedef enum {
     DE_SOLVER_GKDV_TRAVELLING_WAVE,
 
     /** Heat-reaction equation on the right half-line with zero initial data and a Dirichlet boundary history. */
-    DE_SOLVER_HALF_LINE_HEAT
+    DE_SOLVER_HALF_LINE_HEAT,
+
+    /** Riccati logarithmic-derivative reduction to a supported second-order linear equation. */
+    DE_SOLVER_RICCATI
 } de_solver_t;
 
 /**
@@ -403,13 +407,16 @@ char *de_to_string(const diffequ_t *de, style_t style);
  * @brief Attempt to solve a differential-equation problem symbolically.
  *
  * The implementation recognises first-order separable, first-order linear,
- * homogeneous, substitution, quadratic Bernoulli, and autonomous
+ * homogeneous, substitution, quadratic Bernoulli, supported Riccati linearisations, and autonomous
  * derivative-quadratic ordinary differential equations. Exact third-order
  * forms `a*y''' + k*y'*y'' = f(x)` are integrated once and logarithmically
  * linearized. The solver also normalizes regular second-order linear equations
  * to Sturm-Liouville form and solves arbitrary-order constant-coefficient
  * linear ODEs, including nonhomogeneous forcing.
  * First-order linear equations use an integrating factor.
+ * Riccati equations reduce to a second-order linear equation; monomial normal potentials
+ * admit entire hypergeometric bases, including the exceptional projective branch.
+ * A single finite real initial value is supported at a regular real point with non-zero quadratic coefficient.
  * Homogeneous equations use the substitution `y = u*x`. Equations depending
  * on an affine combination use `u = a*x + b*y + c`; ratios of two
  * non-parallel affine combinations are translated to homogeneous form.
@@ -552,10 +559,14 @@ const char *de_solve_result_steps(const diffequ_solve_result_t *result);
 const char *de_solve_result_steps_TeX(const diffequ_solve_result_t *result);
 
 /**
- * @brief Borrow the symmetry group identified by the selected solver.
+ * @brief Borrow the symmetry group or labelled Lie system identified by the selected solver.
  *
- * @param result Result to inspect.
- * @return Borrowed UTF-8 group name, or `NULL` when none was identified.
+ * A Riccati result labels its associated SL(2, R) Lie system explicitly; this does not assert
+ * that these vector fields form the point-symmetry algebra of that particular ODE.
+ *
+ * @param result Borrowed result to inspect; may be NULL. It is not changed or retained.
+ * @return Borrowed UTF-8 description, or NULL when none was identified. Do not free it;
+ * its lifetime ends with de_solve_result_free(result). Callers must synchronise concurrent release or mutation.
  */
 const char *de_solve_result_symmetry(const diffequ_solve_result_t *result);
 

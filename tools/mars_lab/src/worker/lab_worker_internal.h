@@ -119,6 +119,16 @@ size_t lab_worker_plot_range_precision(number_t lower, number_t upper);
 /** @brief Choose validation precision for cancellation on a tiny range. */
 size_t lab_worker_plot_check_precision(number_t lower, number_t upper);
 
+/**
+ * @brief Fit an adaptive curve's requested depth within its complete binary-subdivision budget.
+ * @param intervals Number of initial intervals; must be positive.
+ * @param max_evaluations Total callback allowance, including endpoints; allow at least 2*intervals+1.
+ * @param preferred Requested maximum depth; the result never exceeds it.
+ * @return Largest permitted depth, or zero when even the first midpoint level cannot fit or inputs are invalid.
+ * No storage is allocated or borrowed. This isolated-worker policy preserves the sampler's strict budget semantics.
+ */
+unsigned lab_worker_plot_depth(size_t intervals, size_t max_evaluations, unsigned preferred);
+
 /** @brief Check the chart byte budget, reserving transport space for titles and other result fields. */
 bool lab_worker_plot_fits(const string_t *svg);
 

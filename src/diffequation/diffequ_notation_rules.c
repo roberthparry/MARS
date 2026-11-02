@@ -318,7 +318,7 @@ static const char plain_laplace[] = "Identify the Laplacian in the parsed coordi
                                     "from conjugate characteristic coordinates.";
 static const char plain_bessel[] =
     "For y″ + a*x^m*y = b*x^n, set ν = 1/(m+2), p = (m+2)/2, z = sqrt(a)*x^p/p, and y = sqrt(x)*u(z). "
-    "For monomial forcing b != 0, set μ = (2n-m+1)/(m+2) and K = b*(p/sqrt(a))^(μ+1)/p^2. "
+    "For monomial forcing b ≠ 0, set μ = (2n-m+1)/(m+2) and K = b*(p/sqrt(a))^(μ+1)/p^2. "
     "The transformed equation z^2*u″ + z*u′ + (z^2-ν^2)*u = K*z^(μ+1) has the Lommel particular K*s_(μ,ν)(z).";
 
 static const char title_none[] = "symbolic differential-equation rule";

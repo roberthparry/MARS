@@ -156,8 +156,9 @@ static bool surface_fixture(const char *directory)
     json_free(initial_data); json_free(initial);
     json_t *photographic = surface_request(welsh_bounds, "photo-plan", NULL, &initial_status);
     const json_t *photographs = test_lab_member(photographic, "photos");
-    imagery_only = imagery_only && initial_status == 200 && json_array_size(photographs) == 2 &&
-                   !strncmp(test_lab_text(photographic, "key"), "photo-cell-1:", 13);
+    imagery_only = imagery_only && initial_status == 200 && json_array_size(photographs) == 1 &&
+                   !strcmp(test_lab_text(json_array_get(photographs, 0), "url"), "/earth_regions/00.png") &&
+                   !strncmp(test_lab_text(photographic, "key"), "photo-cell-3:", 13);
     for (size_t i = 0; imagery_only && i < json_array_size(photographs); ++i) {
         const json_t *photo = json_array_get(photographs, i), *target = test_lab_member(photo, "target");
         double rectangle[4];
@@ -169,6 +170,11 @@ static bool surface_fixture(const char *directory)
                        rectangle[0] + rectangle[2] <= 512.001 && rectangle[1] + rectangle[3] <= 512.001 &&
                        json_number_text(test_lab_member(photo, "width"));
     }
+    const json_t *crop = test_lab_member(json_array_get(photographs, 0), "source");
+    const string_t *crop_width = json_number_text(json_array_get(crop, 2));
+    double guttered_width = 0;
+    imagery_only = imagery_only && crop_width && lab_cal_number(string_c_str(crop_width), &guttered_width) &&
+                   fabs(guttered_width - .04 / .25 * 1800 * 512 / 510) < .000001;
     json_free(photographic);
     json_t *mask_plan = surface_request(welsh_bounds, "mask-plan", NULL, &initial_status);
     imagery_only = imagery_only && initial_status == 200 && !test_lab_member(mask_plan, "photos") &&
@@ -231,6 +237,16 @@ static bool surface_fixture(const char *directory)
     regional = surface_request(welsh_bounds, "surface-plan", NULL, &status);
     ok = ok && status == 200 && json_array_size(test_lab_member(regional, "photos")) == 3;
     json_free(regional);
+    regional = surface_request(welsh_bounds, "photo-plan", NULL, &status);
+    regional_photos = test_lab_member(regional, "photos");
+    ok = ok && status == 200 && json_array_size(regional_photos) == 1 &&
+         !strcmp(test_lab_text(json_array_get(regional_photos, 0), "url"), "/earth_regions/00.png");
+    json_free(regional);
+    regional = surface_request(bounds[0], "photo-plan", NULL, &status);
+    regional_photos = test_lab_member(regional, "photos");
+    ok = ok && status == 200 && json_array_size(regional_photos) == 4 &&
+         !strcmp(test_lab_text(json_array_get(regional_photos, 0), "url"), "/earth_tiles/05-02.png");
+    json_free(regional);
     string_t *key = NULL;
     for (unsigned i = 0; ok && i < 4; ++i) {
         json_t *plan = surface_request(bounds[i], "surface-plan", NULL, &status);
@@ -241,6 +257,9 @@ static bool surface_fixture(const char *directory)
             ok = ok && !strcmp(test_lab_text(json_array_get(photos, 0), "url"), "/earth_tiles/11-02.png") &&
                  !strcmp(test_lab_text(json_array_get(photos, 1), "url"), "/earth_tiles/00-02.png");
         }
+        json_free(plan);
+        plan = surface_request(bounds[i], "photo-plan", NULL, &status);
+        ok = ok && status == 200 && json_array_size(test_lab_member(plan, "photos")) > 0;
         json_free(plan);
     }
     json_t *data = surface_request(bounds[0], "surface-data", key ? string_c_str(key) : "", &status);

@@ -9,10 +9,12 @@
  * No standalone main, conditional test build or Python runtime is used.
  */
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
+#include "diffequation-t.h"
 #include "xml-t.h"
 #include "lab_presentation.h"
 #include "lab_wire.h"
@@ -1402,6 +1404,45 @@ static void test_lab_extra_solution_families(void)
     TEST_ASSERT_TRUE(fabs(first[1]) < fabs(first[0]),
                      "higher parameter sensitivity concentrates representatives nearer the active region");
 
+    diffequ_t *riccati = de_from_string("y' - y^2 = x^2");
+    diffequ_solve_result_t *riccati_result = de_solve(riccati);
+    const expr_t *riccati_branches[] = {equ_rhs(de_solve_result_at(riccati_result, 0u)),
+                                       equ_rhs(de_solve_result_at(riccati_result, 1u))};
+    ok = riccati && de_solve_result_count(riccati_result) == 2u &&
+         lab_worker_plot_family(de_constants(riccati), "x", riccati_branches, 2u,
+                                 curves, labels, &count, &family) && family && count == 6u;
+    expr_t *normalisation = expr_from_string("2*gamma(3/4)/gamma(1/4)", NULL);
+    number_t normalisation_value = expr_eval(normalisation);
+    double scale = num_to_double(normalisation_value);
+    num_destroy(&normalisation_value);
+    expr_free(normalisation);
+    bool zero_reference = false;
+    for (size_t i = 0u; ok && i < count; ++i) {
+        char *text = expr_to_string(curves[i], style_EXPRESSION);
+        expr_bindings_t *values = NULL;
+        expr_t *curve = text ? expr_from_string(text, &values) : NULL;
+        expr_t *axis = values ? expr_bindings_get(values, "x") : NULL;
+        if (axis)
+            expr_set_val(axis, NUM_ZERO);
+        number_t origin = curve ? expr_eval(curve) : num_clone(NUM_NAN);
+        double c = NAN, actual = num_to_double(origin);
+        if (i < 5u) {
+            ok = sscanf(string_c_str(labels[i]), "Solution 1: C = %lf", &c) == 1 &&
+                 isfinite(actual) && fabs(actual + scale*c) < 1e-9;
+            zero_reference |= c == 0;
+        } else {
+            ok = !num_is_finite(origin);
+        }
+        num_destroy(&origin);
+        expr_free(curve); expr_bindings_free(values); free(text);
+    }
+    for (size_t i = 0u; i < count; ++i) {
+        expr_free(curves[i]); string_free(labels[i]);
+    }
+    de_solve_result_free(riccati_result); de_free(riccati);
+    TEST_ASSERT_TRUE(ok && zero_reference,
+                     "five one-constant Bessel members include C=0; the limiting member retains its pole");
+
     unsigned status = 0;
     json_t *result = request("/eval", "{\"expression\":\"y''+6yy'+4y^3=0\",\"action\":\"plot\","
                                      "\"plot_source_mode\":\"diffequation\"}", &status);
@@ -1485,6 +1526,18 @@ static void test_lab_extra_plot_tangent_bounds(void)
 
 static void test_lab_extra_plot_precision(void)
 {
+    static const struct { size_t intervals, budget; unsigned preferred, expected; } depths[] = {
+        {64u,  8193u, 8u, 6u},
+        {16u,   513u, 4u, 4u},
+        {64u, 16385u, 8u, 7u},
+        {32u,   257u, 6u, 2u}
+    };
+    for (size_t i = 0u; i < sizeof depths / sizeof *depths; ++i) {
+        unsigned depth = lab_worker_plot_depth(depths[i].intervals, depths[i].budget, depths[i].preferred);
+        bool fits = depth == depths[i].expected &&
+                    depths[i].intervals * ((size_t)1u << (depth + 1u)) + 1u <= depths[i].budget;
+        TEST_ASSERT_TRUE(fits, "complete adaptive subdivision fits the curve's callback allowance");
+    }
     size_t saved = num_get_default_prec_bits(), bits = 0;
     num_set_default_prec_bits(1536);
     number_t lo = num_create_from_long(-2), hi = num_create_from_long(2);
@@ -2449,6 +2502,43 @@ static void test_lab_extra_diffequation(void)
     TEST_ASSERT_TRUE(ok, "Local-series results do not advertise plotting coordinates");
     expect_response("/diffequation-eval", "{\"diffequation\":\"y''+6y*y'+4y^3=0; y(0)=0; y'(0)=1\"}",
                     200u, "solutions", "y = (x)/(x² + 1)");
+    response = request("/diffequation-eval", "{\"diffequation\":\"y' - y^2 = x^2\"}", &status);
+    ok = status == 200 && contains(response, "solver", "Riccati linearisation") &&
+         contains(response, "status", "solved") && contains(response, "steps", "auxiliary linear equation") &&
+         contains(response, "solutions", "J_{¾}") && contains(response, "solutions", "x²") &&
+         !contains(response, "solutions", "Hypergeometric") && !contains(response, "solutions", "x^") &&
+         contains(response, "steps", "Set y = -v′/v.") && !contains(response, "steps", "1/(1)") &&
+         !contains(response, "steps", "(0)/(1)") && !contains(response, "steps", "^") &&
+         contains(response, "steps", "J_{-¼}") && lab_presentation_adapt(response);
+    const json_t *solver_card = test_lab_member(response, "presentation");
+    ok = ok && contains(solver_card, "solver_text", "Set y = -v′/v.") &&
+         contains(solver_card, "solver_text", "x²") && !contains(solver_card, "solver_text", "NAN");
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "Riccati equations expose their explicit native family and linear reduction");
+    expect_response("/eval", "{\"expression\":\"y' - y^2 = x^2; y(0)=0\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-1\",\"plot_upper\":\"1\"}",
+                    200u, "plot_svg", "data-series=");
+    expect_response("/eval", "{\"expression\":\"y' - y^2 = x^2\",\"action\":\"plot\","
+                             "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-1\",\"plot_upper\":\"1\"}",
+                    200u, "plot_svg", "data-series=");
+    response = request("/eval", "{\"expression\":\"y' - y^2 = x^2\",\"action\":\"plot\","
+                                "\"plot_source_mode\":\"diffequation\",\"precision\":32}", &status);
+    const char *svg = test_lab_text(response, "plot_svg");
+    const char *minimum = strstr(svg, "data-x-min=\""), *maximum = strstr(svg, "data-x-max=\"");
+    double lower = NAN, upper = NAN;
+    bool framed = minimum && maximum && sscanf(minimum, "data-x-min=\"%lf", &lower) == 1 &&
+                  sscanf(maximum, "data-x-max=\"%lf", &upper) == 1 && lower < 0 && upper > 0 && upper - lower <= 4;
+    size_t segments = 0u;
+    for (const char *path = svg; (path = strstr(path, "<path d=\"M ")); ++path)
+        ++segments;
+    ok = status == 200 && test_lab_ok(response, true) && contains(response, "plot_svg", "data-series=\"5\"") &&
+         framed && segments > 6u;
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "automatic Riccati plots show six finite curves at the displayed 32-digit precision");
 }
 
 static void test_lab_extra_context_results(void)
@@ -2514,6 +2604,19 @@ static void test_lab_extra_integrator(void)
         show_failure(response);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "exact half integral retains its root integrand and native editor binding");
+    response = request("/integrator-eval",
+                       "{\"expression\":\"x*sqrt(x+3)\",\"bounds\":[{\"name\":\"x\",\"lo\":\"1\",\"hi\":\"6\"}],"
+                       "\"precision\":40}", &status);
+    ok = status == 200u && test_lab_ok(response, true) &&
+         contains(response, "symbolic_TeX", "\\frac{232}{5}") &&
+         contains(response, "value", "²³²⁄₅") && contains(response, "antiderivative", "x") &&
+         contains(response, "symbolic_working", "Applying bounds:") &&
+         contains(response, "symbolic_working", "Exact powers:") &&
+         contains(response, "symbolic_working", " = 27") && contains(response, "symbolic_working", " = 8");
+    if (!ok)
+        show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "exact endpoint powers reduce to a rational result without losing intermediate working");
     /* Exercise both infinity parsers and the numerical output slots under worker memory checks. */
     expect_response("/integrator-eval",
                     "{\"expression\":\"exp(x)\",\"bounds\":[{\"name\":\"x\",\"lo\":\"-inf\",\"hi\":\"0\"}],"

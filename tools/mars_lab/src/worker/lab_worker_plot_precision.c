@@ -19,6 +19,20 @@
 
 static const size_t plot_precision_limit = 65536;
 
+/* A complete adaptive tree uses intervals*2^(depth+1)+1 callbacks, including midpoint probes. */
+unsigned lab_worker_plot_depth(size_t intervals, size_t max_evaluations, unsigned preferred)
+{
+    if (!intervals || max_evaluations <= intervals)
+        return 0u;
+    size_t per_interval = (max_evaluations - 1u) / intervals;
+    unsigned depth = 0u;
+    while (depth < preferred && per_interval >= 4u) {
+        per_interval /= 2u;
+        ++depth;
+    }
+    return depth;
+}
+
 static bool finite_real(number_t value)
 {
     return num_is_real(value) && num_is_finite(value);
@@ -167,7 +181,7 @@ static sampler_t *sample_at(const char *source, const char *variable, number_t l
     options.intervals = probes || preview ? 16 : 64;
     options.max_evaluations = probes ? 17 : preview ? 513 : 8193;
     options.method = probes ? SAMPLER_UNIFORM : SAMPLER_ADAPTIVE;
-    options.max_depth = preview ? 4 : 8;
+    options.max_depth = lab_worker_plot_depth(options.intervals, options.max_evaluations, preview ? 4u : 8u);
     options.absolute_tolerance = 1e-5;
     options.relative_tolerance = preview ? 0.01 : 0.002;
     plot_evaluation_t evaluation = {.expression = expression, .axis = axis};

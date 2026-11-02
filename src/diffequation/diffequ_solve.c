@@ -657,6 +657,12 @@ static diffequ_solve_result_t *de_solve_with_options_impl(const diffequ_t *de, u
         goto append;
     }
 
+    if (!computation_step_current("diffequation.method"))
+        goto cleanup;
+    result = de_solve_riccati(de, independent, dependent, derivative_right, include_steps);
+    if (result)
+        goto cleanup;
+
     result = de_solve_result_new(separable == DE_ATTEMPT_FAILED || exact_first_order == DE_ATTEMPT_FAILED ||
                                          linear == DE_ATTEMPT_FAILED || bernoulli == DE_ATTEMPT_FAILED ||
                                          homogeneous == DE_ATTEMPT_FAILED || linear_substitution == DE_ATTEMPT_FAILED ||

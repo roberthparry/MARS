@@ -37,7 +37,7 @@ bool de_gkdv_present(equation_t *solution, const expr_t *n, const expr_t *v, con
                                              singular ? "Singular" : "Solitary", plain[0]) : NULL;
     string_t *right = valid ? string_sprintf("%s; %s is a positive integer; %s > 0, %s real; positive real root%s%s%s.",
         plain[1], plain[2], plain[3], plain[4], singular ? "; " : "",
-        singular ? plain[5] : "", singular ? " != 0 (moving singularity excluded)" : "") : NULL;
+        singular ? plain[5] : "", singular ? " ≠ 0 (moving singularity excluded)" : "") : NULL;
     notation_build_t *build = notation_build_new();
     const TeX_model_node_t *zero = notation_build_literal(build, TeX_NODE_NUMBER, "0");
     const TeX_model_node_t *order = notation_build_expr(build, n);

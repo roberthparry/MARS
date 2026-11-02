@@ -617,14 +617,16 @@ static void example_round(void)
     }
 }
 
-/* README example: principal indexed radicals in docs/expression.md. */
+/* README example: principal indexed radicals and exact rational powers in docs/expression.md. */
 static void example_indexed_roots(void)
 {
-    const char *sources[] = {"cubrt(x)", "root(x,4)", "root(x,12)"};
-    const char *expected[] = {"³√x", "⁴√x", "¹²√x"};
+    const char *sources[] = {"cubrt(x)", "root(x,4)", "root(x,12)", "4^(3/2)", "9^(3/2)", "(9/4)^(3/2)"};
+    const char *expected[] = {"³√x", "⁴√x", "¹²√x", "8", "27", "²⁷⁄₈"};
     for (size_t i = 0; i < sizeof(sources) / sizeof(*sources); ++i) {
         expr_t *expr = expr_from_string(sources[i], NULL);
-        char *text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+        expr_t *simplified = expr_simplify(expr);
+        char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+        expr_free(simplified);
         bool ok = text && strcmp(text, expected[i]) == 0;
         if (text)
             puts(text);

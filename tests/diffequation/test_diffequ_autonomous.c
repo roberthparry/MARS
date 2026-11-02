@@ -78,7 +78,7 @@ void test_diffequ_autonomous_transport(void)
         bool rendered = TeX && strstr(TeX, "\\partial H") && strstr(TeX, "\\ne") &&
                         strstr(TeX, "F\\left(") && !strstr(TeX, "NAN");
         if (i == 7u)
-            explained = explained && strstr(steps, "Normalisation requires a != 0");
+            explained = explained && strstr(steps, "Normalisation requires a ≠ 0");
         de_free(de);
         string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
         printf("  %s\n  %s\n", sources[i], text ? string_c_str(text) : "NULL");

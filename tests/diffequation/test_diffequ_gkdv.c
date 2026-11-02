@@ -162,7 +162,7 @@ void example_diffequation_gkdv(void)
     string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
     const char *expected = "Singular travelling-wave family (not the general solution): u = "
         "(v·cosech²(½n·√v·(x - x₀ - vt)))^(1/n); n is a positive integer; v > 0, x₀ real; "
-        "positive real root; x - x₀ - vt != 0 (moving singularity excluded).";
+        "positive real root; x - x₀ - vt ≠ 0 (moving singularity excluded).";
     bool valid = text && de_solve_result_solver(result) == DE_SOLVER_GKDV_TRAVELLING_WAVE &&
                  strcmp(string_c_str(text), expected) == 0;
     printf("  %s\n  %s\n", gkdv_source, text ? string_c_str(text) : "NULL");

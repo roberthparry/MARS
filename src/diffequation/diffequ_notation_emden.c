@@ -46,8 +46,10 @@ bool de_modified_emden_steps(const expr_t *independent, const expr_t *dependent,
     *steps_out = NULL;
     *steps_TeX_out = NULL;
     const char *x = independent ? expr_symbol_name(independent) : NULL;
-    char *y = dependent ? de_emden_symbolic_text(dependent) : NULL;
-    char *a = scale ? de_emden_symbolic_text(scale) : NULL;
+    string_t *y_text = dependent ? de_notation_symbol_text(dependent) : NULL;
+    string_t *a_text = scale ? de_notation_symbol_text(scale) : NULL;
+    const char *y = y_text ? string_c_str(y_text) : NULL;
+    const char *a = a_text ? string_c_str(a_text) : NULL;
     bool unit = a && strcmp(a, "1") == 0;
     char *ay = NULL, *au = NULL, *ay_den = NULL, *au_den = NULL;
     if (a && y) {
@@ -120,6 +122,7 @@ bool de_modified_emden_steps(const expr_t *independent, const expr_t *dependent,
     }
     notation_build_free(build);
     string_free(rendered); string_free(plain);
-    free(au_den); free(ay_den); free(au); free(ay); free(a); free(y);
+    free(au_den); free(ay_den); free(au); free(ay);
+    string_free(a_text); string_free(y_text);
     return success;
 }

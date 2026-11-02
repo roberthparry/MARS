@@ -16,6 +16,90 @@ function labStateDeferred(): LabWorksheetTestDeferred {
     return {promise, resolve, reject};
 }
 
+/** @brief Enter Almanac with populated controls but no result, cancel it, and recover without creating history. */
+async function checkAlmanacFirstEntry(): Promise<void> {
+    const check = (ok: unknown, message: string) => {
+        if (!ok) throw new Error('Almanac entry: ' + message);
+    };
+    const previousMode = WorksheetWorkspace.mode.currentMode();
+    const previousResult = WorksheetWorkspace.presentation.resultStates.almanac;
+    const calendar = WorksheetContext.worksheetSession.calendar;
+    const previousWorksheet = calendar.almanacLastWorksheetData;
+    const previousControls = WorksheetLocations.calendar.readCalendarControls('almanac');
+    const fetch = window.fetch;
+    const native = labWire.exports() as unknown as LabWorksheetTestNative;
+    const history = [native.lab_workspace_history_count(6, 0), native.lab_workspace_history_count(6, 1)];
+    const pending: ((response: Response) => void)[] = [];
+    const reply = () => new Response(labWire.encode({...window.labAlmanacFixtures()[4], ok: true}), {
+        headers: {'Content-Type': 'application/x-protobuf'}
+    });
+    const waitFor = async (ready: () => boolean) => {
+        const deadline = performance.now() + 10000;
+        while (!ready() && performance.now() < deadline)
+            await new Promise(resolve => window.setTimeout(resolve, 10));
+        check(ready(), 'the automatic calculation did not reach its expected stage');
+    };
+    try {
+        if (previousMode === 'almanac') await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+        WorksheetWorkspace.presentation.resultStates.almanac = undefined;
+        calendar.almanacLastWorksheetData = null;
+        window.fetch = (url, options) => String(url) === '/almanac-eval'
+            ? new Promise<Response>(resolve => pending.push(resolve)) : fetch(url, options);
+        await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
+        await waitFor(() => pending.length === 1);
+        check(WorksheetContext.rendered.querySelectorAll('.almanac-summary-row').length === 9 &&
+              WorksheetContext.rendered.textContent?.includes('Calculating for the selected observer'),
+              'first entry immediately shows the observer summary while its calculation is held');
+        check(WorksheetWorkspace.mode.currentMode() === 'almanac' &&
+              !WorksheetContext.almanacJurisdiction.disabled,
+              'the country selector remains usable before the response arrives');
+
+        await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+        await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
+        await waitFor(() => pending.length === 2);
+        pending[0](reply());
+        await new Promise(resolve => window.setTimeout(resolve, 50));
+        check(calendar.almanacLastWorksheetData === null &&
+              WorksheetContext.rendered.textContent?.includes('Calculating for the selected observer'),
+              'the cancelled first calculation cannot replace the new pending worksheet');
+        pending[1](reply());
+        await waitFor(() => calendar.almanacLastWorksheetData !== null && !WorksheetRequests.labRequests.busy());
+        check(WorksheetContext.rendered.querySelector('.almanac-grid-table'),
+              'the accepted automatic calculation installs the native worksheet');
+
+        await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+        await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
+        await new Promise(resolve => window.setTimeout(resolve, 50));
+        check(pending.length === 2 && WorksheetContext.rendered.querySelector('.almanac-grid-table'),
+              're-entering a completed worksheet restores it without another calculation');
+        const refresh = WorksheetRequests.evaluation.evaluateAlmanac({skipHistoryUpdate: true});
+        await waitFor(() => pending.length === 3);
+        await WorksheetWorkspace.mode.selectWorksheetMode('expression');
+        await WorksheetWorkspace.mode.selectWorksheetMode('almanac');
+        await waitFor(() => pending.length === 4);
+        check(WorksheetContext.rendered.textContent?.includes('Calculating for the selected observer'),
+              'an interrupted refresh resumes even when an older completed response remains cached');
+        pending[2](reply());
+        pending[3](reply());
+        await refresh;
+        await waitFor(() => !WorksheetRequests.labRequests.busy());
+        check(WorksheetContext.rendered.querySelector('.almanac-grid-table'),
+              'resuming a pending refresh restores its completed native worksheet');
+        check(native.lab_workspace_history_count(6, 0) === history[0] &&
+              native.lab_workspace_history_count(6, 1) === history[1],
+              'entering and resuming Almanac leaves both history directions intact');
+    } finally {
+        WorksheetWorkspace.mode.setMode(previousMode);
+        window.fetch = fetch;
+        for (const resolve of pending) resolve(reply());
+        WorksheetWorkspace.presentation.resultStates.almanac = previousResult;
+        calendar.almanacLastWorksheetData = previousWorksheet;
+        WorksheetLocations.calendar.applyCalendarState('almanac', previousControls);
+        WorksheetWorkspace.presentation.syncModeUI();
+        WorksheetWorkspace.presentation.restoreModeResultState(previousMode);
+    }
+}
+
 /** Native state continuations: isolated frames, recovery boundaries and awaited cleanup. */
 window.checkLabStateFlow = async function checkLabStateFlow() {
     function check(condition: unknown, message: string): void {
@@ -198,6 +282,23 @@ window.checkLabStateFlow = async function checkLabStateFlow() {
     equal(step(21, obsolete).value, false, 'stale history cannot reach control projection');
     const obsoleteSelection = {stage: 11, current: false};
     equal(step(24, obsoleteSelection).done, true, 'stale selection stops before bounds/default projection');
+    const firstAlmanac = step(24, {stage: 40, index: 6, calendarResult: null});
+    equal(firstAlmanac.calls[0].service, 'stateEvaluate', 'an empty Almanac starts evaluation after defaults');
+    equal((firstAlmanac.calls[0].args[0] as WorksheetEvaluationOptions).skipHistoryUpdate, true,
+          'automatic first entry does not append or clear history');
+    equal(firstAlmanac.wait, false, 'mode selection does not wait for astronomy calculations');
+    const savedResultHTML = WorksheetContext.rendered.innerHTML;
+    try {
+        WorksheetContext.rendered.innerHTML = '<table class="almanac-grid-table"></table>';
+        equal(step(24, {stage: 40, index: 6, calendarResult: {ok: true}}).done, true,
+              'a completed Almanac remains reusable');
+        WorksheetContext.rendered.textContent = '';
+        equal(step(24, {stage: 40, index: 6, calendarResult: {ok: true}}).calls[0].service, 'stateEvaluate',
+              'a cached response cannot suppress evaluation of an empty or interrupted worksheet');
+    } finally { WorksheetContext.rendered.innerHTML = savedResultHTML; }
+    for (let index = 0; index < 6; ++index)
+        equal(step(24, {stage: 40, index, calendarResult: null}).done, true,
+              'manual evaluation modes retain their existing entry policy');
     for (const [action, service] of [
              [1, 'statePrecisionGoal'], [2, 'statePrecisionExpression'], [3, 'stateEvaluate']]) {
         const frame = {stage: 4, plan: {action, source: 'native source', target: '1/3'}};

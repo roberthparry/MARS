@@ -119,7 +119,7 @@ void test_diffequ_gradient_envelope(void)
         de_free(de);
         string_t *text = envelope ? equ_to_text(envelope, style_UNBOUND) : NULL;
         bool retained = text && strstr(string_c_str(text), "subject to H =") &&
-                        strstr(string_c_str(text), "!= 0") && !strstr(string_c_str(text), "NAN") &&
+                        strstr(string_c_str(text), "≠ 0") && !strstr(string_c_str(text), "NAN") &&
                         !strstr(string_c_str(text), "291/");
         string_t *envelope_TeX = envelope ? equ_to_text(envelope, style_LATEX) : NULL;
         string_t *plane_TeX = plane ? equ_to_text(plane, style_LATEX) : NULL;
@@ -204,7 +204,7 @@ void example_diffequation_gradient_envelope(void)
     for (size_t i = 0u; i < de_solve_result_count(result); ++i) {
         string_t *text = equ_to_text(de_solve_result_at(result, i), style_UNBOUND);
         printf("  %s\n", text ? string_c_str(text) : "NULL");
-        valid = valid && text && strstr(string_c_str(text), "a != 0");
+        valid = valid && text && strstr(string_c_str(text), "a ≠ 0");
         if (i == 0u)
             valid = valid && text && strstr(string_c_str(text), "ax + y·(1/a - 1) + F(a)") &&
                     strstr(string_c_str(text), "x - y/a² + F'(a) = 0");

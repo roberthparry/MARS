@@ -42,9 +42,12 @@ void lab_globe_project(double latitude, double longitude, quaternion_jsref orien
 
 /**
  * @brief Return a constant-cost local affine reprojection of retained SVG geometry.
- * Frames contain [quaternion x,y,z,w, zoom, CSS size]. Returns SVG matrix coefficients
- * [a,b,c,d,e,f], or null for invalid frames or a centre rotated behind the globe.
- * This tangent-plane preview is for close views; worker projection supplies exact updates.
+ * @param previous Borrowed source frame [quaternion x,y,z,w, zoom, CSS size], valid during this call.
+ * @param current Borrowed destination frame with the same six-number layout, valid during this call.
+ * @return No C value; the browser result contains independently copied SVG matrix coefficients [a,b,c,d,e,f],
+ * or null for invalid frames, a centre rotated behind the globe, or more than one CSS pixel of bounded
+ * tangent-plane error over a close-view mask's double-width extent. No host reference is retained.
+ * @note Worker projection supplies exact replacements when this temporary approximation is unsuitable.
  */
 void lab_globe_frame_transform(jsref previous, jsref current);
 
@@ -129,6 +132,19 @@ void lab_globe_history_camera(jsref camera, double latitude, double longitude, d
  * @return Via the bridge, a five-number camera, or null for malformed input.
  */
 void lab_globe_flight(jsref start, jsref target, double progress, bool redirect);
+
+/**
+ * @brief Predict photographic coverage shortly ahead on the current great-circle journey.
+ * @param start Borrowed departure camera [quaternion x,y,z,w, zoom], valid during this call.
+ * @param target Borrowed destination camera in the same layout, valid during this call.
+ * @param progress Current finite display-clock fraction in 0..1.
+ * @param redirect Whether this route continues an interrupted journey without a departure turn.
+ * @return No C value; the browser result contains an independently copied seven-number view
+ * [latitude,longitude,zoom,west,south,east,north], or null for invalid input or projection failure.
+ * @note Uses the production flight interpolation four percentage points ahead, clamped at arrival.
+ * It changes no observer, camera or history state and retains no host reference.
+ */
+void lab_globe_flight_ahead(jsref start, jsref target, double progress, bool redirect);
 
 /** @brief Return the camera route's great-circle distance in kilometres, independent of zoom and roll; null if invalid. */
 void lab_globe_flight_distance(jsref start, jsref target);

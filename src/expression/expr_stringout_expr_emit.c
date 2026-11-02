@@ -33,6 +33,28 @@
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
 
+/* Reciprocal integer powers share the same grouping in both native power representations. */
+static void emit_expr_reciprocal_power(const expr_t *base, sbuf_t *b, int parent_prec, long exponent)
+{
+    bool grouped = PREC_MUL < parent_prec;
+    bool base_grouped = pow_base_needs_visible_parens(base);
+    if (grouped)
+        sbuf_putc(b, '(');
+    sbuf_puts(b, "1/");
+    if (exponent == 1L) {
+        emit_expr(base, b, PREC_POW);
+    } else {
+        if (base_grouped)
+            sbuf_putc(b, '(');
+        emit_expr(base, b, base_grouped ? PREC_LOWEST : PREC_POW);
+        if (base_grouped)
+            sbuf_putc(b, ')');
+        emit_superscript_int(b, exponent);
+    }
+    if (grouped)
+        sbuf_putc(b, ')');
+}
+
 /* Keep complex radicands and powered roots delimited; a lone letter needs no brackets. */
 void emit_expr_root_argument(const expr_t *arg, sbuf_t *b, int parent_prec)
 {
@@ -347,7 +369,7 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_pow_d_expr(f)) {
         int need = PREC_POW < parent_prec;
         long ei = 0;
-        int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei);
+        int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei) && ei != LONG_MIN;
 
         if (num_eq(f->c, NUM_HALF)) {
             emit_expr_sqrt_power(f->a, b, parent_prec, false);
@@ -360,25 +382,7 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         }
 
         if (exponent_has_small_int && ei < 0) {
-            int recip_need = PREC_MUL < parent_prec;
-            int base_needs_parens = pow_base_needs_visible_parens(f->a);
-            long positive_exponent = -ei;
-
-            if (recip_need)
-                sbuf_putc(b, '(');
-            sbuf_puts(b, "1/");
-            if (positive_exponent == 1L) {
-                emit_expr(f->a, b, PREC_POW);
-            } else {
-                if (base_needs_parens)
-                    sbuf_putc(b, '(');
-                emit_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
-                if (base_needs_parens)
-                    sbuf_putc(b, ')');
-                emit_superscript_int(b, positive_exponent);
-            }
-            if (recip_need)
-                sbuf_putc(b, ')');
+            emit_expr_reciprocal_power(f->a, b, parent_prec, -ei);
             return;
         }
 
@@ -612,7 +616,7 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
 
         /* Keep ordinary sums in the numerator; do not manufacture a reciprocal coefficient. */
         if (!expr_is_rendered_log_local(f->b) && match_sum_quotient(f, &common_numerator_factor, &common_sum) &&
-            (common_numerator_factor || expr_contains_calculus_request(common_sum))) {
+            expr_contains_calculus_request(common_sum)) {
             if (need)
                 sbuf_putc(b, '(');
             if (common_numerator_factor)
@@ -667,6 +671,10 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
         int base_needs_parens = pow_base_needs_visible_parens(f->a);
+        long integer = 0L;
+        bool literal_integer = expr_is_unnamed_const(f->b) &&
+            (!f->b->binding_expr || expr_binding_expr_is_numeric_literal(f->b->binding_expr)) &&
+            expr_try_get_small_integer_exponent(f->b->c, &integer) && integer != LONG_MIN;
 
         if (expr_const_half_can_render_as_sqrt_local(f->b)) {
             emit_expr_sqrt_power(f->a, b, parent_prec, false);
@@ -678,6 +686,11 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
+        if (literal_integer && integer < 0L) {
+            emit_expr_reciprocal_power(f->a, b, parent_prec, -integer);
+            return;
+        }
+
         if (need)
             sbuf_putc(b, '(');
 
@@ -686,13 +699,17 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
         emit_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
         if (base_needs_parens)
             sbuf_putc(b, ')');
-        sbuf_putc(b, '^');
-        int ep = pow_exp_needs_parens(f->b);
-        if (ep)
-            sbuf_putc(b, '(');
-        emit_expr(f->b, b, 0);
-        if (ep)
-            sbuf_putc(b, ')');
+        if (literal_integer) {
+            emit_superscript_int(b, integer);
+        } else {
+            sbuf_putc(b, '^');
+            int ep = pow_exp_needs_parens(f->b);
+            if (ep)
+                sbuf_putc(b, '(');
+            emit_expr(f->b, b, 0);
+            if (ep)
+                sbuf_putc(b, ')');
+        }
 
         if (need)
             sbuf_putc(b, ')');

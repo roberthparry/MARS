@@ -21,6 +21,9 @@ export class GlobePhotoAtlas {
     private retryAt = 0;
     private retryTimer = 0;
     private current: GlobePhotoCell | null = null;
+    private destination: {bounds: number[]; pixels: number} | null = null;
+    private ahead: number[] | null = null;
+    private pace = 1;
 
     constructor(private readonly gl: WebGLRenderingContext, private readonly redraw: () => void, maximumSize = 4096) {
         const size = Math.min(maximumSize, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);
@@ -38,7 +41,7 @@ export class GlobePhotoAtlas {
         try {
             for (const [texture, unit, width, height, filter] of [
                 [atlas, gl.TEXTURE2, this.columns * 512, this.columns * 512, gl.LINEAR],
-                [page, gl.TEXTURE7, 8, 8, gl.NEAREST]
+                [page, gl.TEXTURE7, 16, 16, gl.NEAREST]
             ] as const) {
                 gl.activeTexture(unit); gl.bindTexture(gl.TEXTURE_2D, texture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
@@ -54,18 +57,36 @@ export class GlobePhotoAtlas {
 
     bind(bounds: number[], pixels: number): GlobePhotoPage | null {
         if (this.closed || this.gl.isContextLost()) return null;
-        const plan = this.cells.page(bounds, Math.min(pixels, (this.columns - 2) * 256),
-            performance.now() < this.retryAt ? this.failed : '');
-        if (!plan) return null;
-        this.protect = plan.protect;
+        const avoid = performance.now() < this.retryAt ? this.failed : '';
+        const target = this.destination;
+        const size = Math.min(pixels, (this.columns - 2) * 256);
+        const plan = target ? this.cells.journey(bounds, size, target.bounds,
+            Math.min(target.pixels, (this.columns - 2) * 256), this.ahead, avoid, !this.busy) :
+            this.cells.page(bounds, size, avoid);
+        this.protect = plan?.protect || [];
+        this.pace = plan?.pace ?? 1;
         const gl = this.gl;
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.atlas);
         gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.page);
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 8, 8, gl.RGBA, gl.UNSIGNED_BYTE,
-            new Uint8Array(labWire.exports().memory.buffer, plan.pointer, 256));
-        if (!this.busy && plan.next && performance.now() >= this.retryAt) this.load(plan.next);
-        return plan;
+        if (plan?.visible) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE,
+            new Uint8Array(labWire.exports().memory.buffer, plan.pointer, 1024));
+        if (!this.busy) {
+            const next = plan?.next;
+            if (next) this.load(next);
+        }
+        return plan?.visible ? plan : null;
     }
+
+    /** @brief Prefer the current flight's arrival cells without replacing or unpinning the displayed page. */
+    prefetch(bounds: number[] | null, pixels = 0): void {
+        this.destination = bounds ? {bounds: bounds.slice(), pixels} : null;
+        if (!bounds) { this.ahead = null; this.pace = 1; }
+    }
+
+    /** @brief Hand the native scheduler its independently predicted coverage; no camera arithmetic lives here. */
+    follow(view: number[] | null): void { this.ahead = view?.slice(3) || null; }
+
+    get travelPace(): number { return this.pace; }
 
     private load(cell: GlobePhotoCell): void {
         this.busy = true; this.current = cell;
