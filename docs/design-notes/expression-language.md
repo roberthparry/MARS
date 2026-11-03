@@ -627,6 +627,31 @@ variable and any semantic context affecting that derivative match. The frontend
 must neither assume that one cached derivative applies to every variable nor
 build a competing differentiation cache over rendered text.
 
+## Proposed Tensor Values
+
+The [tensor design](./tensors.md) proposes first-class native tensors, geometry
+and indexed relations, using MTW as the notation baseline. Tensor construction,
+contraction and differentiation should compose without converting values to
+text. Native scalar expressions remain the coefficients and component functions;
+the frontend must retain tensor types, bundle identities and free-index signatures.
+
+Keep the candidate indexed spelling `T[^a, _b]`, distinct from powers and
+subscripted scalar names. The working derivative spellings are `V[^a],b` for
+partial differentiation and `V[^a];b` for covariant differentiation. Standalone
+`[X, Y]` is proposed for a Lie bracket, with `[X, Y][^a]` for an indexed result.
+Its compatibility with existing array literals and bracketed names, and the
+role of commas in argument lists and statements, must be resolved explicitly.
+These are design proposals, not implemented grammar. Keep geometric
+declarations scoped to the execution context and preserve existing scalar
+powers, array bindings, symbol names and derivative syntax. Tensor relations and
+component selections need typed results rather than an implicit scalar cast.
+
+The native expression examples in that design use `*` for multiplication.
+Ophelia retains its separate decision: `.` is multiplication and `*` is
+convolution. Resolve indexed products and statement punctuation explicitly
+before adopting tensor syntax in Function output; do not change these operators
+according to the type of an operand.
+
 ## Source and Presentation
 
 Preserve established Function-style declarations, canonical built-in names,

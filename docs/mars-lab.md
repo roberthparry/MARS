@@ -1260,6 +1260,11 @@ travel according to the actual visible pixel resolution, increasing towards full
 pace as fine detail arrives, with a minimum pace that allows unavailable
 imagery to be passed. A failed cell has its own retry delay and does not suspend
 its neighbours.
+The native scheduler also checks the running photographic job against the current
+visible, predicted and arrival windows. A job that cannot supply useful coverage
+is replaced; its HTTP and raw-cache reads are cancelled without discarding the
+worker's decoded source blocks. Request identities reject late replies, and
+superseded work does not start the failed-cell retry delay.
 Photographic and mask planning do not query river coverage or load river geometry.
 
 River masks are requested and rasterised independently of the photographs. Their

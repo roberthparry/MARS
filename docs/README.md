@@ -81,6 +81,7 @@ This directory contains the longer module documentation for MARS.
 - [Integral transform syntax and implemented pairs](./design-notes/integral-transforms.md)
 - [Lerch transcendent support](./design-notes/lerch-transcendent.md)
 - [Future differential-equation work](./design-notes/differential-equations.md)
+- [Tensor algebra, MTW conventions and proposed Tensor mode](./design-notes/tensors.md)
 - [Literate comments and notebook output](./design-notes/literate-comments-and-notebooks.md)
 - [Reverse Polish TeX construction](./TeX.md#reverse-polish-construction-contract)
 

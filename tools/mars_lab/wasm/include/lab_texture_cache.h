@@ -31,6 +31,9 @@
  * then alternates refinement fairly. Its pace factor in 0.3..1 follows the actual visible pixel resolution,
  * increasing smoothly towards full pace as requested detail arrives, without blocking drawing.
  * Journey planning preserves the displayed page bytes and pins visible and arrival resources together.
+ * Page and journey requests may describe a current image job by bounds and level. The replace flag is true
+ * only when that job cannot provide adequate coverage for any current visible, predicted or arrival window;
+ * the browser may then abort its transport and submit the selected replacement. No browser job is retained.
  */
 void lab_texture_cache(jsref request);
 

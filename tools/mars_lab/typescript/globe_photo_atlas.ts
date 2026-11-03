@@ -20,7 +20,8 @@ export class GlobePhotoAtlas {
     private failed = '';
     private retryAt = 0;
     private retryTimer = 0;
-    private current: GlobePhotoCell | null = null;
+    private current: (GlobePhotoCell & {id: number}) | null = null;
+    private serial = 0;
     private destination: {bounds: number[]; pixels: number} | null = null;
     private ahead: number[] | null = null;
     private pace = 1;
@@ -61,8 +62,8 @@ export class GlobePhotoAtlas {
         const target = this.destination;
         const size = Math.min(pixels, (this.columns - 2) * 256);
         const plan = target ? this.cells.journey(bounds, size, target.bounds,
-            Math.min(target.pixels, (this.columns - 2) * 256), this.ahead, avoid, !this.busy) :
-            this.cells.page(bounds, size, avoid);
+            Math.min(target.pixels, (this.columns - 2) * 256), this.ahead, avoid, !this.busy, this.current) :
+            this.cells.page(bounds, size, avoid, [], this.current);
         this.protect = plan?.protect || [];
         this.pace = plan?.pace ?? 1;
         const gl = this.gl;
@@ -70,7 +71,7 @@ export class GlobePhotoAtlas {
         gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.page);
         if (plan?.visible) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE,
             new Uint8Array(labWire.exports().memory.buffer, plan.pointer, 1024));
-        if (!this.busy) {
+        if (!this.busy || plan?.replace) {
             const next = plan?.next;
             if (next) this.load(next);
         }
@@ -89,15 +90,16 @@ export class GlobePhotoAtlas {
     get travelPace(): number { return this.pace; }
 
     private load(cell: GlobePhotoCell): void {
-        this.busy = true; this.current = cell;
+        this.busy = true; this.current = {...cell, id: ++this.serial};
         try {
             if (!this.worker) {
                 const worker = this.worker = new Worker('/js/globe_photo_worker.js');
                 worker.onmessage = event => {
                     if (this.closed || this.worker !== worker || !this.current) return;
                     const cell = this.current, pixels: unknown = event.data.pixels;
+                    if (event.data.key !== cell.key || event.data.id !== cell.id) return;
                     try {
-                        if (event.data.key !== cell.key || !(pixels instanceof ArrayBuffer) || pixels.byteLength !== 512 * 512 * 4)
+                        if (!(pixels instanceof ArrayBuffer) || pixels.byteLength !== 512 * 512 * 4)
                             throw new Error('Photographic cell unavailable');
                         const slot = this.cells.putSlot(cell.key, 1, pixels.byteLength, cell.bounds, cell.level, this.protect);
                         if (slot < 0) throw new Error('Photographic cells remain pinned');
@@ -115,7 +117,7 @@ export class GlobePhotoAtlas {
                     this.busy = false; this.current = null; this.redraw();
                 };
             }
-            this.worker.postMessage(cell);
+            this.worker.postMessage(this.current);
         } catch {
             this.retry(cell.key);
             this.busy = false; this.current = null;

@@ -21,6 +21,21 @@ several relations inside one expression. Any extension must preserve the shared
 symbol identity used by equations, independent variables, constants, and
 conditions.
 
+## Tensor and Geometric Systems
+
+Coordinate with the [tensor design and proposed Lab Tensor mode](./tensors.md).
+Einstein, Maxwell, Killing, geodesic and transport equations should be
+constructible as typed geometric relations before a solver supports their full
+solution families. The tensor module owns index algebra, connections and
+curvature; the differential-equation module owns supported solving methods.
+
+Component reduction must carry the geometry, chart domain, conventions,
+constraints, unknown functions and independent variables into the resulting
+system. Preserve tensor symmetries when identifying independent component
+equations. Do not report a complete tensor solution after solving only a subset
+of components, and distinguish verification of a proposed Killing field from
+finding every Killing field.
+
 ## Numerical Solver Boundary
 
 The first numerical scope should be non-stiff ordinary differential-equation

@@ -9,7 +9,7 @@ interface TextureSlot { token: number; slot: number; count: number; bytes: numbe
 export interface GlobePhotoCell { key: string; bounds: number[]; level: number; coverage?: boolean; }
 export interface GlobePhotoPage {
     bounds: number[]; span: number; pointer: number; protect: number[]; next?: GlobePhotoCell;
-    visible: boolean; pace: number; coverage: number;
+    visible: boolean; pace: number; coverage: number; replace: boolean;
 }
 export class GlobeTextureCache<T> {
     private token: number;
@@ -52,14 +52,15 @@ export class GlobeTextureCache<T> {
         this.resources[result.slot] = resource;
         return result.slot;
     }
-    page(bounds: number[], pixels: number, avoid = '', protect: number[] = []): GlobePhotoPage | null {
+    page(bounds: number[], pixels: number, avoid = '', protect: number[] = [],
+         current: GlobePhotoCell | null = null): GlobePhotoPage | null {
         return this.token ? labDOM.call('lab_texture_cache',
-            {action: 6, token: this.token, bounds, pixels, avoid, protect}) as GlobePhotoPage | null : null;
+            {action: 6, token: this.token, bounds, pixels, avoid, protect, current}) as GlobePhotoPage | null : null;
     }
     journey(bounds: number[], pixels: number, arrival: number[], arrivalPixels: number, ahead: number[] | null,
-            avoid: string, idle: boolean): GlobePhotoPage | null {
+            avoid: string, idle: boolean, current: GlobePhotoCell | null = null): GlobePhotoPage | null {
         return this.token ? labDOM.call('lab_texture_cache', {action: 8, token: this.token, bounds, pixels,
-            arrival, arrival_pixels: arrivalPixels, ahead, avoid, idle}) as GlobePhotoPage | null : null;
+            arrival, arrival_pixels: arrivalPixels, ahead, avoid, idle, current}) as GlobePhotoPage | null : null;
     }
     covering(bounds: number[], zoom: number, partial = false, prefer = -1): {
         resource: T; slot: number; bounds: number[]; zoom: number;

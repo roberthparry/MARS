@@ -1742,7 +1742,10 @@ The signs and index conventions follow
 
 This is presentation support. It preserves the supplied formulas without
 computing a connection, transforming components, inferring symmetries or carrying
-out tensor calculus. Tensor algebra and native-text tensor grammar remain deferred.
+out tensor calculus. Tensor algebra and native-text tensor grammar remain deferred;
+the [tensor design](design-notes/tensors.md) records their proposed native module,
+MTW conventions and Lab mode. That module will supply mathematical semantics to
+the existing notation interface; the TeX builder remains a typesetting API.
 Raw TeX remains available for further specialised notation.
 
 ```c

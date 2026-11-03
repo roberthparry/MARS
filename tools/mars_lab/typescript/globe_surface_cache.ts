@@ -42,14 +42,26 @@ class GlobeSurfaceCache {
         });
     }
 
-    async get(key: string): Promise<Blob | null> {
+    async get(key: string, signal?: AbortSignal): Promise<Blob | null> {
+        if (signal?.aborted) return null;
         const db = await this.open();
-        if (!db) return null;
+        if (!db || signal?.aborted) return null;
         return new Promise(resolve => {
             try {
                 const transaction = db.transaction('tiles', 'readonly');
                 const request = transaction.objectStore('tiles').get(key);
                 let blob: Blob | null = null, damaged = false;
+                let finished = false;
+                const finish = (value: Blob | null) => {
+                    if (finished) return;
+                    finished = true;
+                    signal?.removeEventListener('abort', cancel);
+                    resolve(value);
+                };
+                const cancel = () => {
+                    try { transaction.abort(); } catch { /* Completion may already be queued. */ }
+                    finish(null);
+                };
                 request.onsuccess = () => {
                     const record = request.result as GlobeSurfaceRecord | undefined;
                     if (!record) return;
@@ -58,10 +70,13 @@ class GlobeSurfaceCache {
                     if (!damaged) blob = record.blob;
                 };
                 transaction.oncomplete = () => {
+                    if (signal?.aborted) { finish(null); return; }
                     if (blob || damaged) this.touch(db, key, damaged);
-                    resolve(blob);
+                    finish(blob);
                 };
-                transaction.onabort = transaction.onerror = () => resolve(null);
+                transaction.onabort = transaction.onerror = () => finish(null);
+                signal?.addEventListener('abort', cancel, {once: true});
+                if (signal?.aborted) cancel();
             } catch { resolve(null); }
         });
     }

@@ -302,7 +302,7 @@ typedef struct _photo_plan_t {
     unsigned char page[16 * 16 * 4];
     double bounds[4], span, coverage, detail;
     uint64_t pinned;
-    unsigned next_level;
+    unsigned next_level, minimum_level;
     int next_x, next_y;
     bool base;
 } photo_plan_t;
@@ -319,6 +319,7 @@ static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, cons
     if (extent > 30 || extent < .000001) return false;
     unsigned level = (unsigned)fmax(4, fmin(18, floor(log2(360 * fmin(pixels, 1536) / (extent * 512)))));
     unsigned base = level > 6 ? level - 2 : 4;
+    plan->minimum_level = base;
     double step = 360.0 / (1u << level);
     unsigned fine = level + (level < 18) + (level < 17);
     double cell = 360.0 / (1u << fine);
@@ -392,8 +393,20 @@ static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, cons
     return true;
 }
 
+/* A running job remains useful only at a suitable resolution in one of the current journey windows. */
+static bool photo_job_useful(jsref job, const photo_plan_t *plan)
+{
+    double bounds[4], level = field(job, "level");
+    if (!plan || !bounds_read(lab_dom_get(job, "bounds"), bounds) || !isfinite(level) ||
+        level < plan->minimum_level || level > 18 || floor(level) != level)
+        return false;
+    double shift = 360 * nearbyint((plan->bounds[0] + plan->bounds[2] - bounds[0] - bounds[2]) / 720);
+    return bounds[0] + shift < plan->bounds[2] && bounds[2] + shift > plan->bounds[0] &&
+           bounds[1] < plan->bounds[3] && bounds[3] > plan->bounds[1];
+}
+
 static jsref photo_result(texture_cache_t *cache, const photo_plan_t *visible, const photo_plan_t *next,
-                          uint64_t pinned, double pace)
+                          uint64_t pinned, double pace, bool replace)
 {
     if (visible) memcpy(cache->page, visible->page, sizeof cache->page);
     else memset(cache->page, 0, sizeof cache->page);
@@ -404,6 +417,7 @@ static jsref photo_result(texture_cache_t *cache, const photo_plan_t *visible, c
     lab_dom_set(object, "span", lab_dom_numeric(visible ? visible->span : 360));
     lab_dom_set(object, "pace", lab_dom_numeric(pace));
     lab_dom_set(object, "coverage", lab_dom_numeric(visible ? visible->coverage : 1));
+    lab_dom_set(object, "replace", lab_dom_scalar(LAB_VALUE_BOOLEAN, replace));
     lab_dom_set(object, "pointer", lab_dom_numeric((unsigned)(size_t)cache->page));
     for (unsigned slot = 0; slot < cache->limit; ++slot)
         if (pinned & (UINT64_C(1) << slot)) lab_dom_push(protect, lab_dom_numeric(slot));
@@ -438,7 +452,9 @@ static jsref photo_page(texture_cache_t *cache, jsref request)
     char avoid[64];
     photo_avoid(request, avoid);
     if (!photo_plan(cache, lab_dom_get(request, "bounds"), field(request, "pixels"), avoid, &plan)) return 0;
-    return photo_result(cache, &plan, &plan, plan.pinned | protected_slots(request), 1);
+    jsref job = lab_dom_get(request, "current");
+    return photo_result(cache, &plan, &plan, plan.pinned | protected_slots(request), 1,
+                         lab_dom_truth(job) && !photo_job_useful(job, &plan));
 }
 
 /* Three bounded spatial plans share one native scheduling decision; the host submits only that selected job. */
@@ -463,7 +479,11 @@ static jsref photo_journey(texture_cache_t *cache, jsref request)
     }
     if (next && lab_dom_truth(lab_dom_get(request, "idle"))) ++cache->journey_turn;
     uint64_t pinned = (display ? visible.pinned : 0) | (destination ? arrival.pinned : 0);
-    return photo_result(cache, display ? &visible : NULL, next, pinned, display ? .3 + .7 * visible.detail : 1);
+    jsref job = lab_dom_get(request, "current");
+    bool replace = lab_dom_truth(job) && !photo_job_useful(job, display ? &visible : NULL) &&
+                   !photo_job_useful(job, predicted ? &ahead : NULL) &&
+                   !photo_job_useful(job, destination ? &arrival : NULL);
+    return photo_result(cache, display ? &visible : NULL, next, pinned, display ? .3 + .7 * visible.detail : 1, replace);
 }
 
 static void cache_dispatch(void *context)

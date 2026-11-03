@@ -28,6 +28,12 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
         const view = [-2.82, 52.62, -2.68, 52.70];
         const low = spatial.page(view, 400)!;
         check(Boolean(low?.next), 'a fixed photographic page supplies a centre-first missing geographic cell');
+        check(!spatial.page(view, 400, '', [], low.next!)!.replace,
+              'native admission retains a running image that still covers the current view at a useful scale');
+        check(spatial.page([149.1, -35.32, 149.2, -35.22], 800, '', [], low.next!)!.replace,
+              'native admission replaces old-view work when Canberra needs a different photographic cell');
+        check(spatial.page(view, 400, '', [], {...low.next!, level: 4})!.replace,
+              'a running continental photograph cannot delay useful close-view detail');
         spatial.put(low.next!.key, 1, 512 * 512 * 4, low.next!.bounds, low.next!.level);
         const high = spatial.page(view, 800)!;
         const pixels = new Uint8Array(labWire.exports().memory.buffer, high.pointer, 1024).slice();
@@ -74,11 +80,16 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
             check(Boolean(page?.next) && page.bounds[0] <= bounds[0] && page.bounds[1] <= bounds[1] &&
                   page.bounds[2] >= bounds[2] && page.bounds[3] >= bounds[3],
                   'fixed geographic pages cover polar and date-line views');
+            check(!spatial.page(bounds, 800, '', [], page.next!)!.replace,
+                  'wrapped and polar photographic jobs retain their usefulness under native geographic matching');
         }
     } finally { spatial.dispose(); }
     const travelling = new GlobeTextureCache<number>(64, 64 * 1024 * 1024, () => {});
     try {
         const view = [-2.82, 52.62, -2.68, 52.70], ahead = [0, 52.62, .14, 52.70], arrival = [50, 10, 50.1, 10.1];
+        const arrivalJob = travelling.page(arrival, 400)!.next!;
+        check(!travelling.journey(view, 400, arrival, 400, ahead, '', false, arrivalJob)!.replace,
+              'current arrival preparation survives route redraws even when the destination is off screen');
         let plan = travelling.journey(view, 400, arrival, 400, ahead, '', true)!;
         check(plan.pace === .3 && plan.next!.bounds[0] < 0,
               'native travel planning first fills missing visible coverage and reduces its display-clock pace');
@@ -148,6 +159,56 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
         ]}));
     };
     const OriginalWorker = globalThis.Worker;
+    if (typeof GlobeSurfaceCache === 'undefined') await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = '/js/globe_surface_cache.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Raw cache script unavailable'));
+        document.head.appendChild(script);
+    });
+    const cancellableCache = new GlobeSurfaceCache(512);
+    await cancellableCache.put('atlas-cancelled-read',
+        new Blob([new Uint8Array(512 * 512 * 4)], {type: 'application/octet-stream'}));
+    const cacheAbort = new AbortController();
+    const pendingRead = cancellableCache.get('atlas-cancelled-read', cacheAbort.signal);
+    await Promise.resolve();
+    cacheAbort.abort();
+    check(!await pendingRead && Boolean(await cancellableCache.get('atlas-cancelled-read')),
+          'cancelling an obsolete raw read leaves the stored pixels available for a later view');
+    const interrupted = globeHTTPFixture(async bytes => {
+        const view = labWire.decode(bytes) as {west: number; south: number};
+        return new Response(labWire.encode({ok: true, key: `interrupt:${view.west}:${view.south}`, photos: [
+            {url: view.west < 0 ? '/earth_tiles/00-00.png' : '/earth_regions/123.png', sha256: digest,
+             width: view.west < 0 ? 1800 : 3600, source: [800, 600, 512, 512], target: [0, 0, 512, 512]}
+        ]}));
+    }, {endpoint: '/almanac-rivers', script: '/js/globe_photo_worker.js', nativeShore: false,
+        holdPhotograph: true, regionalAliases: true, storageDenied: true});
+    globalThis.Worker = interrupted.Worker;
+    const interruptedAtlasURL = '/js/globe_photo_atlas.js';
+    const {GlobePhotoAtlas: InterruptibleAtlas} = await import(interruptedAtlasURL) as
+        typeof import('../../typescript/globe_photo_atlas.js');
+    const interruptedCanvas = document.createElement('canvas'), interruptedGL = interruptedCanvas.getContext('webgl')!;
+    let interruptedPublished = 0;
+    const interruptedAtlas = new InterruptibleAtlas(interruptedGL, () => ++interruptedPublished, 2048);
+    try {
+        interruptedAtlas.bind([-2.82, 52.62, -2.68, 52.70], 800);
+        await interrupted.waitForPhotograph();
+        const previous = Reflect.get(interruptedAtlas, 'current') as {key: string; id: number};
+        const started = performance.now();
+        interruptedAtlas.bind([149.1, -35.32, 149.2, -35.22], 800);
+        const replacement = Reflect.get(interruptedAtlas, 'current') as {key: string; id: number};
+        const transport = Reflect.get(interruptedAtlas, 'worker') as Worker;
+        transport.dispatchEvent(new MessageEvent('message', {data: {...previous, pixels: new ArrayBuffer(0)}}));
+        check(replacement.id !== previous.id && !Reflect.get(interruptedAtlas, 'retryAt') && interruptedPublished === 0,
+              'late old-view replies cannot fail or complete the replacement photographic request');
+        while (!interruptedPublished && performance.now() - started < 5000)
+            await new Promise(resolve => setTimeout(resolve, 20));
+        check(interruptedPublished === 1 && !Reflect.get(interruptedAtlas, 'retryAt'),
+              `Canberra reaches the GPU while the old photograph remains blocked: ${performance.now() - started} ms`);
+    } finally {
+        interruptedAtlas.dispose(); globalThis.Worker = OriginalWorker; interrupted.dispose();
+        interruptedCanvas.width = interruptedCanvas.height = 1;
+    }
     const fixture = globeHTTPFixture(respond, {endpoint: '/almanac-rivers', script: '/js/globe_photo_worker.js',
         nativeShore: false, surfaceProbe: true, regionalAliases: true});
     let worker: Worker | null = null;
