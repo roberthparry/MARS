@@ -5,8 +5,9 @@
  * Owns setting precedence, explicit storage-mode selection, streaming SQL imports, staging and
  * rollback-safe publication. Dispatches to the almanac and jurisdiction policies;
  * the combined installer preserves each database's individually configured mode.
- * Release preparation installs missing stores and migrates existing ones. Photographic globe updates build a
- * replacement file while preserving unrelated installed data, avoiding journal copies of previous image pages.
+ * Release preparation installs missing stores and migrates existing ones. Older photographic globe updates build
+ * replacement files; compatible catalogues retain validated images in place. Missing optional preparation sources
+ * leave a current installed catalogue usable, without triggering an unavailable replacement.
  *
  * Fixed-size file-module reads preserve UTF-8 SQL in string_t. SQLCipher checks
  * statement completeness, including quotes, comments and trigger bodies. Input
@@ -152,6 +153,17 @@ static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root
            cfg_database_source(db, root, "packaging/jurisdiction-db/town_search.sql", false);
 }
 
+/* Missing offline preparation files do not imply that an installed, current catalogue has changed. */
+static bool cfg_database_texture_catalogue_changed(sqlite_t *db, const string_t *root)
+{
+    string_t *path = root ? mars_path_resource(MARS_PATH_TEXTURES, root, "manifest.json") : NULL;
+    file_t *manifest = path ? file_new(path) : NULL;
+    bool changed = manifest && file_exists(manifest) && !cfg_database_textures_current(db, root);
+    file_free(manifest);
+    string_free(path);
+    return changed;
+}
+
 static bool cfg_database_update_one(const cfg_database_migration *migration, bool install_missing)
 {
     string_t *home = cfg_storage_home();
@@ -169,11 +181,16 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
     if (ok && exists)
         ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-16384; PRAGMA temp.cache_size=-512;") &&
              cfg_database_current_revision(db, migration->name, &revision) && revision <= migration->revision;
-    if (ok && exists && revision < migration->revision) {
+    string_t *texture_root = ok && exists && migration->rebuild_globe && revision == migration->revision ?
+        string_new() : NULL;
+    bool catalogue_changed = texture_root && cfg_database_texture_catalogue_changed(db, texture_root);
+    string_free(texture_root);
+    if (ok && exists && (revision < migration->revision || catalogue_changed)) {
         string_t *root = string_new();
         string_t *parent = cfg_storage_parent(path);
         string_t *staging = parent ? cfg_database_stage(parent) : NULL;
-        bool staged_update = root && staging && migration->rebuild_globe && key && !string_byte_length(key) && revision >= 9;
+        bool staged_update = root && staging && migration->rebuild_globe && key && !string_byte_length(key) &&
+                             revision >= 9 && revision < CFG_GLOBE_TEXTURE_PATCH_BASE;
         if (staged_update) {
             printf("Updating %s database to managed-data revision %d...\n", migration->name, migration->revision);
             ok = cfg_database_rebuild_globe(&db, path, root, staging, migration->apply, migration->revision, false);
@@ -186,6 +203,9 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
             printf("Updating %s database to managed-data revision %d...\n", migration->name, migration->revision);
             ok = migration->apply && migration->apply(db, root, staging) &&
                  cfg_database_revision(db, migration->name, migration->revision);
+        } else if (!staged_update && ok && catalogue_changed && !cfg_database_textures_current(db, root)) {
+            puts("Updating globe photographic catalogue...");
+            ok = cfg_database_textures(db, root);
         }
         if (transaction) ok = cfg_database_finish_transaction(db, ok);
         cfg_database_cleanup(staging);

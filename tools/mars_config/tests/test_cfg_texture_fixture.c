@@ -146,6 +146,14 @@ bool test_cfg_copy_textures(const char *directory)
         }
         file_free(from); file_free(to); string_free(source); string_free(target); string_free(relative);
     }
+    /* This legacy fixture deliberately omits the optional full-resolution global grid. */
+    json_t *legacy = json_new_object();
+    for (size_t i = 0; ok && i < json_object_size(manifest); ++i) {
+        const string_t *key = json_object_key_at(manifest, i);
+        if (strcmp(string_c_str(key), "global_detail"))
+            ok = legacy && json_object_set(legacy, key, json_object_value_at(manifest, i));
+    }
+    json_free(manifest); manifest = legacy;
     ok = ok && set(manifest, "regions", regions) && set(manifest, "assets", assets);
     string_t *output = ok ? json_to_string_pretty(manifest, 2) : NULL;
     string_t *target = string_sprintf("%s/manifest.json", string_c_str(base));

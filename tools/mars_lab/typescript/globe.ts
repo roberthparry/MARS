@@ -347,10 +347,9 @@ class MarsAlmanacGlobe {
                 complete();
                 return;
             }
-            const loading = globe.worldLoading || globe.highResolutionLoading ||
-                (progress === 0 && (globe.travelBordersLoading || globe.photoLoading > 0));
-            // Warm the photographic surface before departure. Local vectors refine that complete
-            // surface asynchronously, without braking and restarting at each coverage boundary.
+            const loading = globe.worldLoading;
+            // The resident world surface permits departure. Finer photographs, borders and local vectors
+            // refine it asynchronously; optional downloads must never hold the camera at its origin.
             speed += Math.max(-elapsed / 600, Math.min(elapsed / 1200,
                 (loading ? 0 : globe.photoAtlas?.travelPace ?? 1) - speed));
             const ready = !loading;
@@ -1272,6 +1271,11 @@ class MarsAlmanacGlobe {
             gl.bindTexture(gl.TEXTURE_2D, this.textures[2]);
             const regional = this.view[5] - this.view[3] <= 30 && this.view[6] - this.view[4] <= 30;
             const resident = regional ? this.riverTiles?.bind(this.view.slice(3), this.view[2]) : null;
+            if (!this.flightTarget && this.photoAtlas) {
+                const prediction = performance.now() - this.dragSampleTime < 250 ? this.dragPrediction : null;
+                this.photoAtlas.follow(prediction ?
+                    labDOM.call('lab_globe_view', prediction, this.view[2], 1) as GlobeView : null);
+            }
             const photographic = this.photoAtlas?.bind(this.view.slice(3), pixels);
             gl.uniform1i(this.uniform('photoAtlasEnabled'), Number(Boolean(this.photoAtlas)));
             gl.uniform1i(this.uniform('photoAtlasReady'), Number(Boolean(photographic)));

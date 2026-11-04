@@ -130,9 +130,74 @@ static void test_rivers_index_and_rollback(void)
 }
 
 
+typedef struct {
+    double bounds[4], area;
+    unsigned count;
+    bool valid, cancel;
+} survey_hits_t;
+
+static bool survey_hit(const double bounds[4], void *context)
+{
+    survey_hits_t *hits = context;
+    ++hits->count;
+    hits->valid = hits->valid && bounds[0] >= hits->bounds[0] && bounds[1] >= hits->bounds[1] &&
+        bounds[2] <= hits->bounds[2] && bounds[3] <= hits->bounds[3] && bounds[0] < bounds[2] && bounds[1] < bounds[3];
+    hits->area += (bounds[2] - bounds[0]) * (bounds[3] - bounds[1]);
+    return !hits->cancel;
+}
+
+static void test_rivers_survey_coverage(void)
+{
+    sqlite_t *db = test_database();
+    TEST_ASSERT_TRUE(db && sqlite_exec_cstr(db,
+        "CREATE TABLE rivers_dataset(id, format_version, point_count, source);\n"
+        "INSERT INTO rivers_dataset VALUES(1, 1, 2, 'synthetic survey fixture');\n"
+        "CREATE TABLE rivers_chunk(id INTEGER PRIMARY KEY, feature_id, kind, vertices);\n"
+        "CREATE VIRTUAL TABLE rivers_bounds USING rtree_i32(id, min_x, max_x, min_y, max_y);"),
+        "prepare compact river metadata without optional survey coverage");
+    globe_t *globe = globe_open(db, db);
+    survey_hits_t hits = {.bounds = {-1, -1, 2, 2}, .valid = true};
+    TEST_ASSERT_TRUE(globe && globe_river_water_coverage(globe, -1, -1, 2, 2, survey_hit, &hits) && !hits.count,
+                     "legacy stores without explicit coverage return no surveyed land");
+    globe_close(globe);
+    TEST_ASSERT_TRUE(sqlite_exec_cstr(db,
+        "CREATE VIRTUAL TABLE rivers_water_coverage USING rtree_i32(id, min_x, max_x, min_y, max_y);\n"
+        "INSERT INTO rivers_water_coverage VALUES(1, 0, 1000000, 0, 1000000);\n"
+        "INSERT INTO rivers_water_coverage VALUES(2, 500000, 1500000, 500000, 1500000);\n"
+        "INSERT INTO rivers_water_coverage VALUES(3, 179500000, 180000000, 0, 1000000);\n"
+        "INSERT INTO rivers_water_coverage VALUES(4, -180000000, -179500000, 0, 1000000);"),
+        "prepare overlapping and date-line survey rectangles");
+    globe = globe_open(db, db);
+    hits = (survey_hits_t){.bounds = {-1, -1, 2, 2}, .valid = true};
+    TEST_ASSERT_TRUE(!globe_river_water_complete(globe, -1, -1, 2, 2) &&
+        globe_river_water_coverage(globe, -1, -1, 2, 2, survey_hit, &hits) && hits.valid && hits.count == 2,
+        "partial survey coverage does not falsely declare the whole window complete");
+    hits = (survey_hits_t){.bounds = {.25, .25, .75, .75}, .valid = true};
+    TEST_ASSERT_TRUE(globe_river_water_coverage(globe, .25, .25, .75, .75, survey_hit, &hits) && hits.valid &&
+        hits.count == 2 && fabs(hits.area - .3125) < 1e-12,
+        "coverage is clipped without discarding overlapping regions");
+    for (unsigned i = 0; i < 2; ++i) {
+        double west = i ? -181 : 179;
+        hits = (survey_hits_t){.bounds = {west, -1, west + 2, 2}, .valid = true};
+        TEST_ASSERT_TRUE(globe_river_water_coverage(globe, west, -1, west + 2, 2, survey_hit, &hits) && hits.valid &&
+            hits.count == 2 && fabs(hits.area - 1) < 1e-12, "survey coverage follows either date-line frame");
+    }
+    hits = (survey_hits_t){.bounds = {-1, -1, 2, 2}, .valid = true, .cancel = true};
+    TEST_ASSERT_TRUE(!globe_river_water_coverage(globe, -1, -1, 2, 2, survey_hit, &hits) && hits.count == 1,
+                     "visitor cancellation rejects partial output");
+    hits = (survey_hits_t){.bounds = {-1, -1, 2, 2}, .valid = true};
+    TEST_ASSERT_TRUE(globe_river_water_coverage(globe, -1, -1, 2, 2, survey_hit, &hits) && hits.count == 2 &&
+        !globe_river_water_coverage(globe, NAN, -1, 2, 2, survey_hit, &hits) &&
+        !globe_river_water_coverage(globe, -1, -1, 2, 2, NULL, &hits) &&
+        !globe_river_water_coverage(globe, -1, -1, 400, 2, survey_hit, &hits),
+        "cancellation releases the reader and invalid windows or visitors are rejected");
+    globe_close(globe); sqlite_close(db);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Indexed river network");
     TEST_RUN_IN_GROUP(test_rivers_index_and_rollback, tests, NULL);
+    TEST_RUN_IN_GROUP(test_rivers_survey_coverage, tests, NULL);
     return TEST_EXIT_CODE();
 }

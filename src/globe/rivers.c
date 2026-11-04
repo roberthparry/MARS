@@ -18,6 +18,7 @@ typedef struct _rivers_t {
     sqlite_stmt_t *width_query;
     sqlite_stmt_t *bank_query;
     sqlite_stmt_t *coverage_query;
+    sqlite_stmt_t *coverage_regions_query;
     int64_t width_id;
     double width;
     bool busy;
@@ -37,6 +38,39 @@ bool rivers_water_complete(rivers_t *r, double west, double south, double east, 
                    sqlite_stmt_step(q) == SQLITE_STEP_ROW;
     sqlite_stmt_reset(q);
     return covered;
+}
+
+/* A larger rendering window must not discard a smaller, explicitly surveyed portion of that window. */
+bool rivers_water_coverage(rivers_t *r, double west, double south, double east, double north,
+                           globe_water_coverage_fn visit, void *context)
+{
+    if (!r || r->busy || !visit || !isfinite(west) || !isfinite(south) || !isfinite(east) || !isfinite(north) ||
+        west < -360 || west > 180 || east <= west || east - west > 360 || south < -90 || north > 90 || north <= south)
+        return false;
+    if (!r->coverage_regions_query) return true;
+    r->busy = true;
+    bool ok = true;
+    unsigned count = 0;
+    sqlite_stmt_t *q = r->coverage_regions_query;
+    for (int wrap = -2; ok && wrap <= 2; ++wrap) {
+        double shift = wrap * 360.;
+        if (east - shift < -180 || west - shift > 180) continue;
+        ok = sqlite_stmt_bind_double(q, 1, (west - shift) * 1e6) &&
+             sqlite_stmt_bind_double(q, 2, (east - shift) * 1e6) &&
+             sqlite_stmt_bind_double(q, 3, south * 1e6) && sqlite_stmt_bind_double(q, 4, north * 1e6);
+        sqlite_step_result_t step = SQLITE_STEP_DONE;
+        while (ok && (step = sqlite_stmt_step(q)) == SQLITE_STEP_ROW) {
+            double a = sqlite_stmt_column_int64(q, 0) / 1e6, b = sqlite_stmt_column_int64(q, 1) / 1e6;
+            double c = sqlite_stmt_column_int64(q, 2) / 1e6, d = sqlite_stmt_column_int64(q, 3) / 1e6;
+            ok = a >= -180 && b <= 180 && c >= -90 && d <= 90 && a < b && c < d && ++count <= 4096;
+            double clipped[] = {fmax(west, a + shift), fmax(south, c), fmin(east, b + shift), fmin(north, d)};
+            if (ok && clipped[0] < clipped[2] && clipped[1] < clipped[3]) ok = visit(clipped, context);
+        }
+        ok = ok && step == SQLITE_STEP_DONE;
+        sqlite_stmt_reset(q);
+    }
+    r->busy = false;
+    return ok;
 }
 
 int32_t rivers_coordinate(const unsigned char *p)
@@ -83,7 +117,12 @@ rivers_t *rivers_open(sqlite_t *db)
     sqlite_stmt_finalize(tables);
     if (coverage) r->coverage_query = sqlite_stmt_prepare(db,
         "select 1 from rivers_water_coverage where min_x<=?1 and min_y<=?2 and max_x>=?3 and max_y>=?4 limit 1");
-    if (coverage && !r->coverage_query) { rivers_close(r); return NULL; }
+    if (coverage) r->coverage_regions_query = sqlite_stmt_prepare(db,
+        "SELECT min_x, max_x, min_y, max_y\n"
+        "FROM rivers_water_coverage\n"
+        "WHERE max_x > ?1 AND min_x < ?2\n"
+        "  AND max_y > ?3 AND min_y < ?4");
+    if (coverage && (!r->coverage_query || !r->coverage_regions_query)) { rivers_close(r); return NULL; }
     if (!r->query || (widths && !r->width_query) || (banks && !r->bank_query)) { rivers_close(r); return NULL; }
     return r;
 }
@@ -96,6 +135,7 @@ void rivers_close(rivers_t *r)
     sqlite_stmt_finalize(r->width_query);
     sqlite_stmt_finalize(r->bank_query);
     sqlite_stmt_finalize(r->coverage_query);
+    sqlite_stmt_finalize(r->coverage_regions_query);
     free(r);
 }
 

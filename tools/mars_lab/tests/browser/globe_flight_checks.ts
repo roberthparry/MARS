@@ -159,6 +159,25 @@ async function checkGlobeFlights(check: (condition: boolean, message: string) =>
                 check(globe.orientation.every((value, i) => value === from[i]) && globe.view[2] === from[4],
                       `${name}: travel waits for the global surface without consuming its display clock`);
             } finally { globe.worldLoading = loading; }
+            if (name === 'Edinburgh–Juneau') {
+                const optional = ['highResolutionLoading', 'travelBordersLoading'].map(name => {
+                    const descriptor = Object.getOwnPropertyDescriptor(globe, name)!;
+                    const entry = {name, descriptor, latest: descriptor.value as unknown};
+                    Object.defineProperty(globe, name, {configurable: true, enumerable: descriptor.enumerable,
+                        get: () => true, set: (value: unknown) => { entry.latest = value; }});
+                    return entry;
+                });
+                try {
+                    const deadline = performance.now() + 2000;
+                    while (flightProgress <= 0 && performance.now() < deadline)
+                        await new Promise(resolve => setTimeout(resolve, 20));
+                    check(flightProgress > 0,
+                          'a resident world surface allows departure while optional textures and borders remain pending');
+                } finally {
+                    for (const entry of optional)
+                        Object.defineProperty(globe, entry.name, {...entry.descriptor, value: entry.latest});
+                }
+            }
             for (let i = 0; i < 200 && !globe.palettesReady; ++i) await new Promise(resolve => setTimeout(resolve, 25));
             check(globe.palettesReady, 'photographic correction palettes are ready before travelling');
             if (name === 'Edinburgh–Juneau') {

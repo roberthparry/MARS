@@ -4,7 +4,8 @@
  *
  * Imports global PNGs and a bounded, spatially indexed regional catalogue into the independent globe store. A bounded
  * manifest supplies content digests and source attribution; each PNG must match its declared size, dimensions
- * and digest. The complete original manifest is retained alongside the indexed fields, preserving all provenance.
+ * and digest. Compatible updates retain content-identical, already validated PNG rows and replace changed photographs
+ * without copying the whole catalogue. The complete manifest is retained alongside the indexed fields and provenance.
  * Savepoints preserve an existing image set on missing or corrupt input, including within migrations.
  * Live reporters cover blocking table replacement, validated image counts and transaction completion or rollback.
  * No image transcoding, network download or geometry replacement occurs here.
@@ -26,12 +27,19 @@
 
 typedef struct _texture_progress_t {
     cfg_progress_t *reporter;
+    sqlite_stmt_t *existing;
     uint64_t imported;
+    uint64_t retained;
     uint64_t total;
 } texture_progress_t;
 
 static const char texture_import_label[] = "Installing photographic globe textures";
 static const char texture_import_unit[] = "tiles imported";
+
+static const char *texture_unit(const texture_progress_t *progress)
+{
+    return progress->existing ? "tiles checked" : texture_import_unit;
+}
 
 static const json_t *texture_field(const json_t *value, const char *name)
 {
@@ -86,11 +94,28 @@ static bool texture_dimensions(const unsigned char *data, size_t size, unsigned 
     return false;
 }
 
+/* A matching content address retains its previously validated image without reading the PNG body again. */
+static int texture_retained(sqlite_stmt_t *query, unsigned level, unsigned column, unsigned row,
+                            unsigned width, unsigned height, uint64_t bytes, const char *digest)
+{
+    if (!query) return 0;
+    bool bound = sqlite_stmt_bind_int(query, 1, level) && sqlite_stmt_bind_int(query, 2, column) &&
+                 sqlite_stmt_bind_int(query, 3, row);
+    sqlite_step_result_t step = bound ? sqlite_stmt_step(query) : SQLITE_STEP_ERROR;
+    int retained = step == SQLITE_STEP_ERROR ? -1 : step == SQLITE_STEP_ROW &&
+        sqlite_stmt_column_int64(query, 0) == width && sqlite_stmt_column_int64(query, 1) == height &&
+        sqlite_stmt_column_int64(query, 2) == (int64_t)bytes &&
+        !strcmp(sqlite_stmt_column_text(query, 3), digest) && sqlite_stmt_column_int64(query, 4) == (int64_t)bytes;
+    sqlite_stmt_reset(query);
+    return retained;
+}
+
 static bool texture_import(sqlite_stmt_t *insert, const string_t *directory, const json_t *assets,
                            unsigned level, unsigned column, unsigned row, texture_progress_t *progress)
 {
-    static const unsigned widths[] = {2048, 8192, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800};
-    string_t *relative = level == 3 ? string_sprintf("regional/%02u.png", column) :
+    static const unsigned widths[] = {2048, 8192, 1800, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800, 1800};
+    string_t *relative = level == 4 ? string_sprintf("earth_tiles_detail/%02u-%02u.png", column, row) :
+                        level == 3 ? string_sprintf("regional/%02u.png", column) :
                         level == 2 ? string_sprintf("earth_tiles/%02u-%02u.png", column, row)
                                    : string_new_with(level ? "earth_surface_detail.png" : "earth_surface.png");
     const json_t *asset = relative ? json_object_get(assets, relative) : NULL;
@@ -105,12 +130,15 @@ static bool texture_import(sqlite_stmt_t *insert, const string_t *directory, con
     bool ok = info && file_info_type(info) == FILE_TYPE_REGULAR && file_info_size(info) <= maximum &&
               expected && strlen(expected) == 64 && texture_number(asset, "width", width) &&
               texture_number(asset, "height", height) && texture_number(asset, "bytes", file_info_size(info));
-    array_t *bytes = ok ? file_read_all_bytes(file) : NULL;
+    int retained = ok ? texture_retained(progress->existing, level, column, row, width, height,
+                                        file_info_size(info), expected) : 0;
+    ok = ok && retained >= 0;
+    array_t *bytes = ok && !retained ? file_read_all_bytes(file) : NULL;
     size_t size = array_size(bytes);
     const unsigned char *data = bytes && size ? array_get(bytes, 0) : NULL;
     unsigned char digest[crypto_hash_sha256_BYTES];
     char hex[65];
-    ok = data && size <= maximum && size == file_info_size(info) &&
+    if (ok && !retained) ok = data && size <= maximum && size == file_info_size(info) &&
          texture_dimensions(data, size, width, height) &&
          crypto_hash_sha256(digest, data, size) == 0 && sodium_bin2hex(hex, sizeof hex, digest, sizeof digest) &&
          !strcmp(hex, expected) && sqlite_stmt_bind_int(insert, 1, level) &&
@@ -122,8 +150,9 @@ static bool texture_import(sqlite_stmt_t *insert, const string_t *directory, con
     array_destroy(bytes); file_info_free(info); file_free(file); string_free(path); string_free(relative);
     if (ok) {
         ++progress->imported;
+        progress->retained += retained != 0;
         cfg_progress_update_items(progress->reporter, texture_import_label, progress->imported, progress->total,
-                                  texture_import_unit);
+                                  texture_unit(progress));
     }
     return ok;
 }
@@ -173,7 +202,7 @@ static bool texture_regions(sqlite_t *db, sqlite_stmt_t *insert, const string_t 
         "insert into globe_texture_region_index select slot,west,east,south,north from globe_texture_region");
 }
 
-/* Keep blocking table replacement visible before importing the new photographs. */
+/* Replace changed PNG rows in compatible stores; older formats retain the complete validated rebuild. */
 bool cfg_database_textures(sqlite_t *db, const string_t *root)
 {
     if (!db || !root) return false;
@@ -186,20 +215,35 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     const json_t *assets = texture_field(manifest, "assets");
     const json_t *regions = texture_field(manifest, "regions");
     size_t region_count = json_array_size(regions);
+    const json_t *detail = texture_field(manifest, "global_detail");
+    size_t detail_count = detail ? 1152 : 0;
     const char *name = texture_text(manifest, "name", 256), *url = texture_text(manifest, "source_url", 2048);
     const char *source_digest = texture_text(manifest, "source_sha256", 64);
     const char *attribution = texture_text(manifest, "attribution", 4096);
     const char *month = texture_text(manifest, "reference_month", 7);
     bool ok = texture_number(manifest, "format_version", 2) && json_type(assets) == JSON_OBJECT &&
               (!regions || (json_type(regions) == JSON_ARRAY && region_count <= GLOBE_TEXTURE_REGION_LIMIT)) &&
-              json_object_size(assets) == 74 + region_count &&
+              (!detail || (texture_number(detail, "width", 86400) && texture_number(detail, "height", 43200) &&
+                  texture_number(detail, "columns", 48) && texture_number(detail, "rows", 24) &&
+                  texture_number(detail, "tile_size", 1800))) &&
+              json_object_size(assets) == 74 + region_count + detail_count &&
               name && url && source_digest && strlen(source_digest) == 64 &&
               attribution && month && !strcmp(month, "2004-07");
+    int64_t revision = 0;
+    ok = ok && cfg_database_current_revision(db, "globe", &revision);
+    sqlite_stmt_t *tables = ok ? sqlite_stmt_prepare(db,
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'globe_texture'") : NULL;
+    sqlite_step_result_t found = tables ? sqlite_stmt_step(tables) : SQLITE_STEP_ERROR;
+    bool incremental = revision >= CFG_GLOBE_TEXTURE_PATCH_BASE && found == SQLITE_STEP_ROW;
+    ok = ok && found != SQLITE_STEP_ERROR;
+    sqlite_stmt_finalize(tables);
     cfg_progress_t *progress = ok ? cfg_progress_start("Preparing photographic texture tables") : NULL;
     cfg_progress_explain(progress,
+        incremental ? "Keeping validated images; only changed PNG rows will be read and replaced." :
         "Releasing the previous image tables. Large catalogues can take several minutes; this step has no tile count.");
     bool transaction = ok && sqlite_exec_cstr(db, "savepoint globe_texture_import");
-    ok = transaction && cfg_database_public_ddl(db,
+    ok = transaction && cfg_database_public_ddl(db, incremental ?
+        "delete from globe_texture_manifest;delete from globe_texture_dataset;" :
         "drop table if exists globe_texture;drop table if exists globe_texture_dataset;"
         "drop table if exists globe_texture_manifest;"
         "create table globe_texture_manifest(id integer primary key check(id=1),json text not null);"
@@ -210,9 +254,16 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
         "primary key(level,column_index,row_index));");
     cfg_progress_finish(progress, ok);
     progress = ok ? cfg_progress_start(texture_import_label) : NULL;
-    texture_progress_t imported = {.reporter = progress, .total = 74 + region_count};
-    cfg_progress_update_items(progress, texture_import_label, 0, imported.total, texture_import_unit);
+    sqlite_stmt_t *existing = ok && incremental ? sqlite_stmt_prepare(db,
+        "SELECT width, height, byte_count, sha256, length(png)\n"
+        "FROM globe_texture\n"
+        "WHERE level = ?1 AND column_index = ?2 AND row_index = ?3") : NULL;
+    ok = ok && (!incremental || existing);
+    texture_progress_t imported = {.reporter = progress, .existing = existing,
+                                  .total = 74 + region_count + detail_count};
+    cfg_progress_update_items(progress, texture_import_label, 0, imported.total, texture_unit(&imported));
     cfg_progress_explain(progress,
+        incremental ? "Checking content addresses. Unchanged images stay in place; changed images are validated and imported." :
         "Importing local images. Each tile is counted after validation and insertion; individual tiles vary in size.");
     sqlite_stmt_t *meta = ok ? sqlite_stmt_prepare(db, "insert into globe_texture_dataset values(1,2,?1,?2,?3,?4,?5)") : NULL;
     ok = meta && sqlite_stmt_bind_text(meta, 1, name) && sqlite_stmt_bind_text(meta, 2, url) &&
@@ -224,18 +275,38 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     ok = snapshot && sqlite_stmt_bind_text(snapshot, 1, string_c_str(text)) &&
          sqlite_stmt_step(snapshot) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(snapshot);
-    sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db, "insert into globe_texture values(?1,?2,?3,?4,?5,?6,?7,?8)") : NULL;
+    sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db,
+        "INSERT INTO globe_texture VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)\n"
+        "ON CONFLICT (level, column_index, row_index) DO UPDATE SET\n"
+        "    width = excluded.width, height = excluded.height, byte_count = excluded.byte_count,\n"
+        "    sha256 = excluded.sha256, png = excluded.png") : NULL;
     ok = ok && insert;
     for (unsigned level = 0; ok && level < 3; ++level)
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row)
             for (unsigned column = 0; ok && column < (level == 2 ? 12u : 1u); ++column)
                 ok = texture_import(insert, directory, assets, level, column, row, &imported);
+    for (unsigned row = 0; ok && detail && row < 24; ++row)
+        for (unsigned column = 0; ok && column < 48; ++column)
+            ok = texture_import(insert, directory, assets, 4, column, row, &imported);
     if (ok) ok = texture_regions(db, insert, directory, manifest, &imported);
     sqlite_stmt_finalize(insert);
+    sqlite_stmt_finalize(existing);
+    if (ok && incremental) {
+        sqlite_stmt_t *obsolete = sqlite_stmt_prepare(db,
+            "DELETE FROM globe_texture WHERE level = 3 AND column_index >= ?1");
+        ok = obsolete && sqlite_stmt_bind_int64(obsolete, 1, region_count) &&
+             sqlite_stmt_step(obsolete) == SQLITE_STEP_DONE;
+        sqlite_stmt_finalize(obsolete);
+        if (ok && !detail) ok = sqlite_exec_cstr(db, "DELETE FROM globe_texture WHERE level = 4");
+    }
     if (ok) {
         cfg_progress_update_items(progress, "Finalising photographic globe textures", imported.imported, imported.total,
-                                  texture_import_unit);
-        cfg_progress_explain(progress, "All images are inserted. Completing this texture stage can still take time.");
+                                  texture_unit(&imported));
+        string_t *summary = incremental ? string_sprintf("%llu images replaced; %llu unchanged images retained.",
+            (unsigned long long)(imported.imported - imported.retained), (unsigned long long)imported.retained) : NULL;
+        cfg_progress_explain(progress, summary ? string_c_str(summary) :
+            "All images are inserted. Completing this texture stage can still take time.");
+        string_free(summary);
         ok = sqlite_exec_cstr(db, "release globe_texture_import");
     }
     cfg_progress_finish(progress, ok);
@@ -248,12 +319,34 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     return ok;
 }
 
+/* Compare the small manifest snapshot; never load image bodies just to decide whether an update is needed. */
+bool cfg_database_textures_current(sqlite_t *db, const string_t *root)
+{
+    string_t *directory = root ? mars_path_resource(MARS_PATH_TEXTURES, root, "") : NULL;
+    string_t *path = directory ? string_sprintf("%s/manifest.json", string_c_str(directory)) : NULL;
+    file_t *file = path ? file_new(path) : NULL;
+    file_info_t *info = file ? file_get_info(file) : NULL;
+    string_t *text = info && file_info_size(info) <= GLOBE_TEXTURE_MANIFEST_LIMIT ? file_read_all_text(file) : NULL;
+    sqlite_stmt_t *query = db && text ? sqlite_stmt_prepare(db,
+        "SELECT json FROM globe_texture_manifest WHERE id = 1") : NULL;
+    bool current = query && sqlite_stmt_step(query) == SQLITE_STEP_ROW &&
+        sqlite_stmt_column_bytes(query, 0) == string_byte_length(text) &&
+        !memcmp(sqlite_stmt_column_text(query, 0), string_c_str(text), string_byte_length(text));
+    sqlite_stmt_finalize(query); string_free(text); file_info_free(info); file_free(file);
+    string_free(path); string_free(directory);
+    return current;
+}
+
 bool cfg_database_textures_valid(sqlite_t *db)
 {
     globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
     sqlite_stmt_t *count = db ? sqlite_stmt_prepare(db, "select count(*) from globe_texture") : NULL;
     int total = count && sqlite_stmt_step(count) == SQLITE_STEP_ROW ? sqlite_stmt_column_int(count, 0) : 0;
-    bool ok = globe && total >= 74 && total <= 74 + GLOBE_TEXTURE_REGION_LIMIT;
+    sqlite_stmt_t *detail = db ? sqlite_stmt_prepare(db, "SELECT count(*) FROM globe_texture WHERE level = 4") : NULL;
+    int detail_count = detail && sqlite_stmt_step(detail) == SQLITE_STEP_ROW ? sqlite_stmt_column_int(detail, 0) : -1;
+    bool ok = globe && (detail_count == 0 || detail_count == 1152) && total >= 74 + detail_count &&
+              total <= 74 + detail_count + GLOBE_TEXTURE_REGION_LIMIT;
+    sqlite_stmt_finalize(detail);
     sqlite_stmt_finalize(count);
     for (unsigned level = 0; ok && level < 3; ++level) {
         for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row) {
@@ -266,7 +359,16 @@ bool cfg_database_textures_valid(sqlite_t *db)
             }
         }
     }
-    for (int slot = 0; ok && slot < total - 74; ++slot) {
+    for (unsigned row = 0; ok && detail_count && row < 24; ++row) {
+        for (unsigned column = 0; ok && column < 48; ++column) {
+            globe_texture_info_t info;
+            array_t *png = globe_texture_metadata(globe, 4, column, row, &info)
+                ? globe_texture_png(globe, 4, column, row, &info) : NULL;
+            ok = png != NULL;
+            array_destroy(png);
+        }
+    }
+    for (int slot = 0; ok && slot < total - 74 - detail_count; ++slot) {
         globe_texture_info_t info;
         array_t *png = globe_texture_metadata(globe, 3, (unsigned)slot, 0, &info)
             ? globe_texture_png(globe, 3, (unsigned)slot, 0, &info) : NULL;

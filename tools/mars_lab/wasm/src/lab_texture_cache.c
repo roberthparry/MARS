@@ -3,8 +3,10 @@
  * @brief Dictionary-backed photographic cache policy, stable windows and bounded pixel preparation.
  *
  * Browser resources remain in host slots, while native dictionaries own keys and select reusable slots.
- * Each cache has a linked LRU order, a free-slot stack and a byte budget. Legacy windows inspect four GPU entries;
- * fixed photographic pages use direct dictionary lookups and pin visible and arrival ancestors among at most 64 slots.
+ * Each cache has a linked LRU order, a free-slot stack and a byte budget. Legacy windows inspect four GPU entries.
+ * Fixed photographic pages use direct dictionary lookups, populated-level bitsets and sparse child nodes to retain
+ * detail across scale changes. Visible and arrival ancestors are pinned among at most 64 slots; unchanged page bytes
+ * keep their revision so camera redraws do not upload another GPU lookup texture.
  * Serial dispatch protects native state; worker pixel batches use a fixed 512 KiB scratch buffer and never block drawing.
  */
 #include <math.h>
@@ -15,6 +17,7 @@
 #include "dictionary-t.h"
 #include "lab_dom.h"
 #include "lab_serial.h"
+#include "lab_photo_source.h"
 #include "lab_texture_cache.h"
 
 typedef struct _texture_entry_t {
@@ -29,8 +32,9 @@ typedef struct _texture_cache_t {
     dictionary_t *keys;
     texture_entry_t entries[64];
     unsigned free_slots[64], free_count;
-    unsigned char page[16 * 16 * 4];
-    unsigned token, limit, budget, bytes, journey_turn;
+    unsigned char page[64 * 64 * 4];
+    uint64_t photo_levels[19];
+    unsigned token, limit, budget, bytes, journey_turn, page_revision;
     int oldest, newest;
 } texture_cache_t;
 
@@ -38,6 +42,7 @@ typedef struct _texture_service_t {
     lab_serial_t serial;
     dictionary_t *caches;
     unsigned next_token;
+    bool opaque;
     unsigned char pixels[2048 * 64 * 4];
 } texture_service_t;
 
@@ -175,6 +180,22 @@ static uint64_t protected_slots(jsref request)
     return slots;
 }
 
+/* A completed geographic replacement may reuse a protected cell only if it covers that entire cell.
+ * Walking the bounded LRU admission chain never searches resource keys or exposes an uncovered region. */
+static int replacement_slot(texture_cache_t *cache, uint64_t pinned, const double *bounds, bool complete)
+{
+    for (int slot = cache->oldest; slot >= 0; slot = cache->entries[slot].next) {
+        if (!(pinned & (UINT64_C(1) << slot))) return slot;
+        const texture_entry_t *entry = &cache->entries[slot];
+        if (!complete || !bounds || !entry->geographic || strncmp(entry->key, "photo:", 6)) continue;
+        const double *b = entry->bounds;
+        double shift = 360 * nearbyint((bounds[0] + bounds[2] - b[0] - b[2]) / 720);
+        if (b[0] + shift >= bounds[0] && b[2] + shift <= bounds[2] && b[1] >= bounds[1] && b[3] <= bounds[3])
+            return slot;
+    }
+    return -1;
+}
+
 static jsref put_entry(texture_cache_t *cache, jsref request)
 {
     char key[256]; int slot = -1;
@@ -182,18 +203,21 @@ static jsref put_entry(texture_cache_t *cache, jsref request)
     if (!read_key(request, key) || !isfinite(bytes) || bytes < 1 || bytes > cache->budget || floor(bytes) != bytes) return 0;
     if (dictionary_get(cache->keys, key, &slot)) {
         if (isfinite(zoom)) cache->entries[slot].zoom = fmax(cache->entries[slot].zoom, zoom);
+        if (quality == 2) cache->entries[slot].quality = 2;
         touch(cache, slot, true);
         return result(cache, slot, 0);
     }
     jsref evicted = lab_dom_object(LAB_VALUE_ARRAY);
     uint64_t pinned = protected_slots(request);
+    double bounds[4];
+    bool geographic = !strncmp(key, "photo:", 6) && bounds_read(lab_dom_get(request, "bounds"), bounds);
     while (dictionary_size(cache->keys) >= cache->limit || cache->bytes + (unsigned)bytes > cache->budget) {
-        int victim = cache->oldest;
-        while (victim >= 0 && (pinned & (UINT64_C(1) << victim))) victim = cache->entries[victim].next;
+        int victim = replacement_slot(cache, pinned, geographic ? bounds : NULL, quality != 1);
         if (victim < 0) return result(cache, -1, evicted);
         texture_entry_t *entry = &cache->entries[victim];
         dictionary_remove(cache->keys, entry->key);
         unlink_entry(cache, victim); cache->bytes -= entry->bytes; entry->used = false;
+        for (unsigned level = 1; level <= 18; ++level) cache->photo_levels[level] &= ~(UINT64_C(1) << victim);
         cache->free_slots[cache->free_count++] = (unsigned)victim;
         lab_dom_push(evicted, lab_dom_numeric(victim));
     }
@@ -206,6 +230,8 @@ static jsref put_entry(texture_cache_t *cache, jsref request)
     entry->bytes = (unsigned)bytes; entry->used = true; entry->zoom = isfinite(zoom) ? zoom : 0;
     entry->quality = isfinite(quality) && quality >= 0 && quality <= 2 ? (unsigned)quality : 0;
     entry->geographic = bounds_read(lab_dom_get(request, "bounds"), entry->bounds);
+    if (entry->geographic && !strncmp(key, "photo:", 6) && zoom >= 1 && zoom <= 18 && floor(zoom) == zoom)
+        cache->photo_levels[(unsigned)zoom] |= UINT64_C(1) << slot;
     cache->bytes += entry->bytes;
     touch(cache, slot, false);
     return result(cache, slot, evicted);
@@ -263,6 +289,7 @@ static jsref remove_entry(texture_cache_t *cache, jsref request)
     if (!read_key(request, key) || !dictionary_get(cache->keys, key, &slot)) return 0;
     texture_entry_t *entry = &cache->entries[slot];
     dictionary_remove(cache->keys, key); unlink_entry(cache, slot);
+    for (unsigned level = 1; level <= 18; ++level) cache->photo_levels[level] &= ~(UINT64_C(1) << slot);
     cache->bytes -= entry->bytes; entry->used = false;
     cache->free_slots[cache->free_count++] = (unsigned)slot;
     jsref evicted = lab_dom_object(LAB_VALUE_ARRAY);
@@ -298,17 +325,102 @@ static int photo_slot(texture_cache_t *cache, unsigned level, int x, unsigned y)
     return dictionary_get(cache->keys, key, &slot) ? slot : -1;
 }
 
+static int photo_complete_slot(texture_cache_t *cache, unsigned level, int x, unsigned y)
+{
+    int slot = photo_slot(cache, level, x, y);
+    return slot >= 0 && cache->entries[slot].quality != 1 ? slot : -1;
+}
+
 typedef struct _photo_plan_t {
-    unsigned char page[16 * 16 * 4];
+    unsigned char page[64 * 64 * 4];
     double bounds[4], span, coverage, detail;
     uint64_t pinned;
-    unsigned next_level, minimum_level;
+    unsigned next_level, minimum_level, nodes;
     int next_x, next_y;
     bool base;
 } photo_plan_t;
 
+typedef struct _photo_area_t { double coverage, detail; } photo_area_t;
+
+/* Measure actual quadtree leaves, including finer retained imagery. Empty and clipped branches stop immediately;
+ * each populated child is visited once, rather than scanning resource keys or counting only root ancestors. */
+static photo_area_t photo_area(texture_cache_t *cache, photo_plan_t *plan, unsigned index,
+                               const double cell[4], const double view[4], unsigned base, unsigned level)
+{
+    photo_area_t area = {0};
+    double width = fmin(cell[2], view[2]) - fmax(cell[0], view[0]);
+    double height = fmin(cell[3], view[3]) - fmax(cell[1], view[1]);
+    if (width <= 0 || height <= 0 || index >= plan->nodes) return area;
+    const unsigned char *entry = plan->page + index * 4;
+    unsigned branch = entry[2] | (unsigned)entry[3] << 8;
+    if (branch && branch + 4 <= plan->nodes) {
+        double half_x = (cell[0] + cell[2]) * .5, half_y = (cell[1] + cell[3]) * .5;
+        for (unsigned child = 0; child < 4; ++child) {
+            double bounds[] = {child & 1 ? half_x : cell[0], child & 2 ? cell[1] : half_y,
+                               child & 1 ? cell[2] : half_x, child & 2 ? half_y : cell[3]};
+            photo_area_t part = photo_area(cache, plan, branch + child, bounds, view, base, level);
+            area.coverage += part.coverage; area.detail += part.detail;
+        }
+    } else if (entry[0] && entry[0] <= cache->limit) {
+        const texture_entry_t *source = &cache->entries[entry[0] - 1];
+        plan->pinned |= UINT64_C(1) << (entry[0] - 1);
+        if (source->quality == 1) return area;
+        unsigned shown = (unsigned)source->zoom, reduction = shown < level ? level - shown : 0;
+        area.coverage = shown >= base ? width * height : 0;
+        area.detail = width * height / (1u << reduction);
+    }
+    return area;
+}
+
+/* Each four-child node refines one root cell. At most 64 resident tiles and twelve additional levels need
+ * 3328 entries, below the fixed 4096-entry budget. Populated level bitsets avoid scanning resource keys. */
+static void photo_retain(texture_cache_t *cache, photo_plan_t *plan, unsigned fine, int left, int top,
+                         const double view[4])
+{
+    plan->nodes = 256;
+    for (unsigned level = fine + 1; level <= 18; ++level) {
+        uint64_t slots = cache->photo_levels[level];
+        while (slots) {
+            unsigned slot = (unsigned)__builtin_ctzll(slots);
+            slots &= slots - 1;
+            texture_entry_t *entry = &cache->entries[slot];
+            double width = entry->bounds[2] - entry->bounds[0];
+            double shift = 360 * nearbyint((plan->bounds[0] + plan->bounds[2] -
+                                           entry->bounds[0] - entry->bounds[2]) / 720);
+            double west = entry->bounds[0] + shift, north = entry->bounds[3];
+            if (west >= view[2] || west + width <= view[0] || north <= view[1] || north - width >= view[3]) continue;
+            int column = (int)nearbyint((west + 180) / width), row = (int)nearbyint((90 - north) / width);
+            unsigned depth = level - fine;
+            int x = (int)floor((double)column / (1u << depth)) - left, y = (row >> depth) - top;
+            if (x < 0 || x >= 16 || y < 0 || y >= 16) continue;
+            unsigned index = (unsigned)y * 16 + (unsigned)x;
+            for (unsigned remaining = depth; remaining; --remaining) {
+                unsigned char *parent = plan->page + index * 4;
+                unsigned branch = parent[2] | (unsigned)parent[3] << 8;
+                if (!branch) {
+                    if (plan->nodes + 4 > 4096) break;
+                    branch = plan->nodes; plan->nodes += 4;
+                    parent[2] = (unsigned char)branch; parent[3] = (unsigned char)(branch >> 8);
+                    for (unsigned child = 0; child < 4; ++child) {
+                        unsigned char *target = plan->page + (branch + child) * 4;
+                        target[0] = parent[0]; target[1] = parent[0] ? parent[1] + 1 : 0;
+                    }
+                }
+                unsigned bit = remaining - 1;
+                index = branch + (((unsigned)row >> bit) & 1) * 2 + (((unsigned)column >> bit) & 1);
+            }
+            unsigned char *target = plan->page + index * 4;
+            if (entry->quality == 1 && target[0] && cache->entries[target[0] - 1].quality != 1) continue;
+            target[0] = (unsigned char)(slot + 1);
+            target[1] = 0;
+            touch(cache, (int)slot, true);
+        }
+    }
+}
+
 /* A fixed 256-cell grid uses indexed ancestors; broad coverage precedes detail, with no resource-list scan. */
-static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, const char *avoid, photo_plan_t *plan)
+static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, const char *avoid, bool broad,
+                       photo_plan_t *plan)
 {
     double view[4];
     memset(plan, 0, sizeof *plan);
@@ -317,11 +429,17 @@ static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, cons
         view[0] < -360 || view[2] > 360 || view[1] < -90 || view[3] > 90) return false;
     double extent = fmax(view[2] - view[0], view[3] - view[1]);
     if (extent > 30 || extent < .000001) return false;
-    unsigned level = (unsigned)fmax(4, fmin(18, floor(log2(360 * fmin(pixels, 1536) / (extent * 512)))));
-    unsigned base = level > 6 ? level - 2 : 4;
+    double requested = log2(360 * fmin(pixels, 1536) / (extent * 510));
+    /* Settled views must not stretch a lower-resolution page over more display pixels. Travel retains its
+     * bounded progressive scale; resident finer cells remain eligible while the camera is moving. */
+    unsigned level = (unsigned)fmax(4, fmin(18, broad ? floor(requested) : ceil(requested)));
+    unsigned base = level > 6 ? (unsigned)fmax(6, level - 2) : level;
     plan->minimum_level = base;
-    double step = 360.0 / (1u << level);
     unsigned fine = level + (level < 18) + (level < 17);
+    /* A root page needs the whole viewport plus an alignment margin. Requested photographs retain their
+     * original detail level; sparse children carry any finer resident pixels below this wider root. */
+    unsigned page_level = (unsigned)floor(log2(360 * 14 / extent));
+    if (fine > page_level) fine = page_level;
     double cell = 360.0 / (1u << fine);
     int left = (int)floor(((view[0] + view[2]) * .5 + 180) / cell) - 8;
     int top = (int)floor((90 - (view[1] + view[3]) * .5) / cell) - 8;
@@ -330,52 +448,80 @@ static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, cons
     plan->bounds[0] = left * cell - 180; plan->bounds[1] = 90 - (top + 16) * cell;
     plan->bounds[2] = (left + 16) * cell - 180; plan->bounds[3] = 90 - top * cell;
     plan->span = cell;
-    double best = INFINITY, visible_area = 0, covered_area = 0, detail_area = 0;
+    double halo = cache->limit >= 32 ? .5 : 0;
+    double requested_step = 360.0 / (1u << level);
+    double columns = ceil((view[2] + 180) / requested_step + halo) -
+                     floor((view[0] + 180) / requested_step - halo);
+    double lines = ceil((90 - view[1]) / requested_step + halo) -
+                   floor((90 - view[3]) / requested_step - halo);
+    if (columns * lines > cache->limit) halo = 0;
+    double best = INFINITY, visible_area = (view[2] - view[0]) * (view[3] - view[1]);
     for (unsigned y = 0; y < 16; ++y) {
         for (unsigned x = 0; x < 16; ++x) {
             int column = left + (int)x, row = top + (int)y;
             double west = column * cell - 180, north = 90 - row * cell;
             bool visible = west < view[2] && west + cell > view[0] && north > view[1] && north - cell < view[3];
-            bool found = false, covered = false;
-            unsigned shown_level = 0;
+            bool found = false, partial = false;
             for (unsigned ancestor = fine; ancestor >= 1; --ancestor) {
+                if (!cache->photo_levels[ancestor]) continue;
                 unsigned shift = fine - ancestor;
                 int ax = (int)floor((double)column / (1u << shift));
                 int slot = photo_slot(cache, ancestor, ax, (unsigned)row >> shift);
                 if (slot < 0) continue;
-                if (visible && (!found || ancestor == base)) {
-                    plan->pinned |= UINT64_C(1) << slot;
-                    touch(cache, slot, true);
-                }
-                if (!found) {
+                if (visible && (!found || ancestor == base)) touch(cache, slot, true);
+                bool incomplete = cache->entries[slot].quality == 1;
+                if (!found || (partial && !incomplete)) {
                     plan->page[4 * (y * 16 + x)] = (unsigned char)(slot + 1);
                     plan->page[4 * (y * 16 + x) + 1] = (unsigned char)shift;
                     found = true;
-                    shown_level = ancestor;
-                    covered = ancestor >= base;
+                    partial = incomplete;
                 }
                 if (ancestor <= base) break;
             }
-            if (visible) {
-                double area = (fmin(west + cell, view[2]) - fmax(west, view[0])) *
-                              (fmin(north, view[3]) - fmax(north - cell, view[1]));
-                visible_area += area;
-                if (covered) covered_area += area;
-                unsigned reduction = shown_level < level ? level - shown_level : 0;
-                if (found) detail_area += area / (1u << reduction);
-            }
-            bool missing_base = visible && !covered;
-            unsigned wanted = missing_base ? base : level, shift = fine - wanted;
-            double wanted_step = missing_base ? 360.0 / (1u << base) : step;
+        }
+    }
+    photo_retain(cache, plan, fine, left, top, view);
+    photo_area_t total = {0};
+    photo_area_t areas[256];
+    /* Finish protection for the entire displayed page before considering any neighbour or arrival work. */
+    for (unsigned y = 0; y < 16; ++y) {
+        for (unsigned x = 0; x < 16; ++x) {
+            double west = (left + (int)x) * cell - 180, north = 90 - (top + (int)y) * cell;
+            const double bounds[] = {west, north - cell, west + cell, north};
+            photo_area_t measured = photo_area(cache, plan, y * 16 + x, bounds, view, base, level);
+            areas[y * 16 + x] = measured;
+            total.coverage += measured.coverage; total.detail += measured.detail;
+        }
+    }
+    for (unsigned y = 0; y < 16; ++y) {
+        for (unsigned x = 0; x < 16; ++x) {
+            int column = left + (int)x, row = top + (int)y;
+            double west = column * cell - 180, north = 90 - row * cell;
+            double bounds[] = {west, north - cell, west + cell, north};
+            double area = fmax(0, fmin(bounds[2], view[2]) - fmax(bounds[0], view[0])) *
+                          fmax(0, fmin(bounds[3], view[3]) - fmax(bounds[1], view[1]));
+            photo_area_t measured = areas[y * 16 + x];
+            bool visible = area > 0;
+            if (visible && measured.detail >= area * .999999999) continue;
+            /* Padding must not displace an almost fully protected visible fine mosaic. */
+            if (!visible && (unsigned)__builtin_popcountll(plan->pinned) + 1 >= cache->limit) continue;
+            bool missing_base = visible && measured.coverage < area * .999999999;
+            unsigned wanted = missing_base && broad ? base : level, shift = fine - wanted;
+            double wanted_step = 360.0 / (1u << wanted);
             int tx = (int)floor((double)column / (1u << shift)), ty = row >> shift;
             double tile_west = tx * wanted_step - 180, tile_north = 90 - ty * wanted_step;
-            if (tile_west > view[2] + wanted_step * .5 || tile_west + wanted_step < view[0] - wanted_step * .5 ||
-                tile_north < view[1] - wanted_step * .5 || tile_north - wanted_step > view[3] + wanted_step * .5) continue;
-            if (photo_slot(cache, wanted, tx, (unsigned)ty) >= 0) continue;
-            if (wanted < 18 && photo_slot(cache, wanted + 1, tx * 2, (unsigned)ty * 2) >= 0 &&
-                photo_slot(cache, wanted + 1, tx * 2 + 1, (unsigned)ty * 2) >= 0 &&
-                photo_slot(cache, wanted + 1, tx * 2, (unsigned)ty * 2 + 1) >= 0 &&
-                photo_slot(cache, wanted + 1, tx * 2 + 1, (unsigned)ty * 2 + 1) >= 0) continue;
+            if (tile_west >= view[2] + wanted_step * halo || tile_west + wanted_step <= view[0] - wanted_step * halo ||
+                tile_north <= view[1] - wanted_step * halo || tile_north - wanted_step >= view[3] + wanted_step * halo)
+                continue;
+            const double replacement[] = {tile_west, tile_north - wanted_step, tile_west + wanted_step, tile_north};
+            if ((!cache->free_count || cache->bytes + 512 * 512 * 4 > cache->budget) &&
+                photo_slot(cache, wanted, tx, (unsigned)ty) < 0 &&
+                replacement_slot(cache, plan->pinned, replacement, true) < 0) continue;
+            if (photo_complete_slot(cache, wanted, tx, (unsigned)ty) >= 0) continue;
+            if (wanted < 18 && photo_complete_slot(cache, wanted + 1, tx * 2, (unsigned)ty * 2) >= 0 &&
+                photo_complete_slot(cache, wanted + 1, tx * 2 + 1, (unsigned)ty * 2) >= 0 &&
+                photo_complete_slot(cache, wanted + 1, tx * 2, (unsigned)ty * 2 + 1) >= 0 &&
+                photo_complete_slot(cache, wanted + 1, tx * 2 + 1, (unsigned)ty * 2 + 1) >= 0) continue;
             char key[256] = {0};
             photo_key(key, wanted, tx, (unsigned)ty);
             if (*avoid && !strcmp(key, avoid)) continue;
@@ -388,8 +534,8 @@ static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, cons
             }
         }
     }
-    plan->coverage = visible_area > 0 ? fmax(0, fmin(1, covered_area / visible_area)) : 1;
-    plan->detail = visible_area > 0 ? fmax(0, fmin(1, detail_area / visible_area)) : 1;
+    plan->coverage = visible_area > 0 ? fmax(0, fmin(1, total.coverage / visible_area)) : 1;
+    plan->detail = visible_area > 0 ? fmax(0, fmin(1, total.detail / visible_area)) : 1;
     return true;
 }
 
@@ -408,8 +554,10 @@ static bool photo_job_useful(jsref job, const photo_plan_t *plan)
 static jsref photo_result(texture_cache_t *cache, const photo_plan_t *visible, const photo_plan_t *next,
                           uint64_t pinned, double pace, bool replace)
 {
-    if (visible) memcpy(cache->page, visible->page, sizeof cache->page);
-    else memset(cache->page, 0, sizeof cache->page);
+    if (visible && (!cache->page_revision || memcmp(cache->page, visible->page, sizeof cache->page))) {
+        memcpy(cache->page, visible->page, sizeof cache->page);
+        if (!++cache->page_revision) ++cache->page_revision;
+    }
     jsref object = lab_dom_object(LAB_VALUE_OBJECT), protect = lab_dom_object(LAB_VALUE_ARRAY);
     const double fallback[] = {-180, -90, 180, 90};
     lab_dom_set(object, "visible", lab_dom_scalar(LAB_VALUE_BOOLEAN, visible != NULL));
@@ -419,6 +567,7 @@ static jsref photo_result(texture_cache_t *cache, const photo_plan_t *visible, c
     lab_dom_set(object, "coverage", lab_dom_numeric(visible ? visible->coverage : 1));
     lab_dom_set(object, "replace", lab_dom_scalar(LAB_VALUE_BOOLEAN, replace));
     lab_dom_set(object, "pointer", lab_dom_numeric((unsigned)(size_t)cache->page));
+    lab_dom_set(object, "revision", lab_dom_numeric(cache->page_revision));
     for (unsigned slot = 0; slot < cache->limit; ++slot)
         if (pinned & (UINT64_C(1) << slot)) lab_dom_push(protect, lab_dom_numeric(slot));
     lab_dom_set(object, "protect", protect);
@@ -430,6 +579,11 @@ static jsref photo_result(texture_cache_t *cache, const photo_plan_t *visible, c
         double step = 360.0 / columns;
         double b[] = {wrapped * step - 180, 90 - (next->next_y + 1) * step,
                       (wrapped + 1) * step - 180, 90 - next->next_y * step};
+        /* Speculative work must not evict displayed geography. A complete broader tile can replace a fully
+         * enclosed finer cell atomically; partial uploads cannot claim that coverage. */
+        if (photo_slot(cache, level, next->next_x, (unsigned)next->next_y) < 0 &&
+            (!cache->free_count || cache->bytes + 512 * 512 * 4 > cache->budget) &&
+            replacement_slot(cache, pinned, b, true) < 0) return object;
         jsref cell = lab_dom_object(LAB_VALUE_OBJECT);
         lab_dom_set(cell, "key", lab_dom_string(key));
         lab_dom_set(cell, "bounds", bounds_result(b));
@@ -448,13 +602,16 @@ static void photo_avoid(jsref request, char avoid[64])
 
 static jsref photo_page(texture_cache_t *cache, jsref request)
 {
-    photo_plan_t plan;
+    photo_plan_t plan, ahead;
     char avoid[64];
     photo_avoid(request, avoid);
-    if (!photo_plan(cache, lab_dom_get(request, "bounds"), field(request, "pixels"), avoid, &plan)) return 0;
+    if (!photo_plan(cache, lab_dom_get(request, "bounds"), field(request, "pixels"), avoid, false, &plan)) return 0;
+    bool predicted = photo_plan(cache, lab_dom_get(request, "ahead"), field(request, "pixels"), avoid, false, &ahead);
+    const photo_plan_t *next = predicted && plan.detail >= .999999 && ahead.next_y >= 0 ? &ahead : &plan;
     jsref job = lab_dom_get(request, "current");
-    return photo_result(cache, &plan, &plan, plan.pinned | protected_slots(request), 1,
-                         lab_dom_truth(job) && !photo_job_useful(job, &plan));
+    return photo_result(cache, &plan, next, plan.pinned | protected_slots(request), 1,
+                         lab_dom_truth(job) && !photo_job_useful(job, &plan) &&
+                         !photo_job_useful(job, predicted ? &ahead : NULL));
 }
 
 /* Three bounded spatial plans share one native scheduling decision; the host submits only that selected job. */
@@ -463,9 +620,10 @@ static jsref photo_journey(texture_cache_t *cache, jsref request)
     photo_plan_t visible, ahead, arrival;
     char avoid[64];
     photo_avoid(request, avoid);
-    bool display = photo_plan(cache, lab_dom_get(request, "bounds"), field(request, "pixels"), avoid, &visible);
-    bool predicted = photo_plan(cache, lab_dom_get(request, "ahead"), field(request, "pixels"), avoid, &ahead);
-    bool destination = photo_plan(cache, lab_dom_get(request, "arrival"), field(request, "arrival_pixels"), avoid, &arrival);
+    bool display = photo_plan(cache, lab_dom_get(request, "bounds"), field(request, "pixels"), avoid, true, &visible);
+    bool predicted = photo_plan(cache, lab_dom_get(request, "ahead"), field(request, "pixels"), avoid, true, &ahead);
+    bool destination = photo_plan(cache, lab_dom_get(request, "arrival"), field(request, "arrival_pixels"),
+                                  avoid, true, &arrival);
     const photo_plan_t *next = NULL;
     if (display && visible.base) next = &visible;
     else if (predicted && ahead.base) next = &ahead;
@@ -486,11 +644,50 @@ static jsref photo_journey(texture_cache_t *cache, jsref request)
     return photo_result(cache, display ? &visible : NULL, next, pinned, display ? .3 + .7 * visible.detail : 1, replace);
 }
 
+typedef struct _photo_sources_t { texture_cache_t *resident, *buffered; dictionary_t *stored; } photo_sources_t;
+
+static bool photo_source_cached(const char *key, void *context)
+{
+    photo_sources_t *sources = context;
+    int slot;
+    return dictionary_get(sources->resident->keys, key, &slot) ||
+           (sources->buffered && dictionary_get(sources->buffered->keys, key, &slot)) ||
+           (sources->stored && dictionary_get(sources->stored, key, &slot));
+}
+
+static jsref photo_source_plan(texture_cache_t *cache, jsref request)
+{
+    photo_sources_t sources = {.resident = cache};
+    double buffered = field(request, "buffered");
+    if (isfinite(buffered) && buffered >= 1 && buffered <= 4294967295.0 && floor(buffered) == buffered) {
+        unsigned token = (unsigned)buffered;
+        dictionary_get(texture_service()->caches, &token, &sources.buffered);
+    }
+    jsref keys = lab_dom_get(request, "stored");
+    if (lab_dom_type(keys) == LAB_VALUE_ARRAY) {
+        unsigned count = lab_dom_count(keys);
+        if (count > 512) return 0;
+        sources.stored = dictionary_create(256, sizeof(int), text_hash, text_compare, NULL, NULL, NULL, NULL, NULL);
+        if (!sources.stored) return 0;
+        for (unsigned i = 0; i < count; ++i) {
+            char key[256] = {0};
+            int length = lab_dom_utf8_copy(lab_dom_item(keys, i), (unsigned char *)key, sizeof key - 1), present = 1;
+            if (length <= 0 || length >= (int)sizeof key || !dictionary_set(sources.stored, key, &present)) {
+                dictionary_destroy(sources.stored); return 0;
+            }
+        }
+    }
+    jsref plan = lab_photo_source_plan(lab_dom_get(request, "photo"), photo_source_cached, &sources);
+    dictionary_destroy(sources.stored);
+    return plan;
+}
+
 static void cache_dispatch(void *context)
 {
     jsref request = *(jsref *)context;
     static jsref (*const operations[])(texture_cache_t *, jsref) = {
-        create_cache, get_entry, put_entry, cover_entry, clear_cache, cache_stats, photo_page, remove_entry, photo_journey
+        create_cache, get_entry, put_entry, cover_entry, clear_cache, cache_stats, photo_page, remove_entry,
+        photo_journey, photo_source_plan
     };
     double action = field(request, "action"), token = field(request, "token");
     if (!isfinite(action) || action < 0 || action >= sizeof operations / sizeof *operations || floor(action) != action) {
@@ -535,10 +732,14 @@ static void pixels_dispatch(void *context)
     texture_pixels_t *request = context;
     unsigned char *pixels = texture_service()->pixels;
     int count = lab_dom_bytes_copy(request->bytes, pixels, sizeof texture_service()->pixels);
+    texture_service()->opaque = false;
     if (count < 0 || count % 4) return;
-    for (int i = 0; i < count; i += 4)
+    texture_service()->opaque = count > 0;
+    for (int i = 0; i < count; i += 4) {
+        if (pixels[i + 3] != 255) texture_service()->opaque = false;
         for (int channel = 0; channel < 3; ++channel)
             pixels[i + channel] = (unsigned char)((pixels[i + channel] * pixels[i + 3] + 127) / 255);
+    }
     request->pointer = (unsigned)(size_t)pixels;
 }
 
@@ -548,4 +749,10 @@ unsigned lab_texture_premultiply(jsref bytes)
     texture_pixels_t request = {.bytes = bytes};
     lab_serial_dispatch(&texture_service()->serial, pixels_dispatch, &request);
     return request.pointer;
+}
+
+/* Read the opacity already measured during the immediately preceding synchronous pixel batch. */
+bool lab_texture_opaque(void)
+{
+    return texture_service()->opaque;
 }

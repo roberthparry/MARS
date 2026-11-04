@@ -20,8 +20,11 @@
 #include "json-t.h"
 #include "sqlite-t.h"
 
-/** @brief Current managed globe revision, including the expanded coast-masked photographic catalogue. */
-enum { CFG_GLOBE_DATA_REVISION = 16 };
+/** @brief Managed photographic migrations and their compatible in-place update boundary. */
+enum {
+    CFG_GLOBE_TEXTURE_PATCH_BASE = 16, /**< First catalogue whose validated PNG rows support selective replacement. */
+    CFG_GLOBE_DATA_REVISION = 17      /**< Current catalogue, including finer Sydney photographs. */
+};
 
 /** Open the selected format: an empty key means plaintext; NULL is a configuration failure. */
 sqlite_t *cfg_database_open(const string_t *path, const string_t *key);
@@ -72,8 +75,29 @@ bool cfg_database_select_main_rivers(sqlite_t *source, const string_t *output);
 /** Refresh versioned geography and textures using a caller-owned staging directory; retain rivers and credentials. */
 bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging);
 
-/** @brief Atomically import all packaged photographic images and their verified metadata, preserving other layers. */
+/**
+ * @brief Atomically synchronise packaged photographs and their provenance, preserving other layers.
+ * @param[in,out] db Borrowed writable database; may already have an outer transaction and remains open.
+ * @param[in] root Borrowed resource context used by the configured texture-path resolver; not retained.
+ * @return True after releasing the import savepoint. False attempts rollback to the previous complete catalogue
+ * when metadata, changed PNG validation, SQL work or allocation fails. No argument is consumed.
+ * @note Compatible stores retain rows whose dimensions, encoded length and content digest match the manifest;
+ * only new or changed PNGs are read, validated and written. Older stores receive a complete import. Unchanged
+ * rows rely on their earlier content validation; cfg_database_textures_valid() performs a full integrity audit.
+ * Call serially, without another writer or concurrent operations on db. An outer transaction still controls commit.
+ */
 bool cfg_database_textures(sqlite_t *db, const string_t *root);
+
+/**
+ * @brief Compare the prepared texture manifest with the installed snapshot without loading PNG payloads.
+ * @param[in] db Borrowed readable globe database; access must be serialised for the call.
+ * @param[in] root Borrowed resource-location context, resolved through the normal path configuration.
+ * @return True only for byte-identical, bounded manifests. False reports changed or missing metadata,
+ * invalid arguments or a read failure; the normal importer must validate a requested replacement.
+ * @note Reads at most GLOBE_TEXTURE_MANIFEST_LIMIT bytes from each manifest. No argument is retained,
+ * consumed or modified, and no image body is read. Callers retain ownership of both arguments.
+ */
+bool cfg_database_textures_current(sqlite_t *db, const string_t *root);
 
 /** @brief Validate the complete installed photographic image set, including content digests. */
 bool cfg_database_textures_valid(sqlite_t *db);

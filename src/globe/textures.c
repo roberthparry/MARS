@@ -16,7 +16,7 @@
 
 static bool texture_address(unsigned level, unsigned column, unsigned row)
 {
-    return level == 3 ? column < GLOBE_TEXTURE_REGION_LIMIT && row == 0 :
+    return level == 4 ? column < 48 && row < 24 : level == 3 ? column < GLOBE_TEXTURE_REGION_LIMIT && row == 0 :
         level < 3 && (level == 2 ? column < 12 && row < 6 : column == 0 && row == 0);
 }
 
@@ -38,7 +38,7 @@ bool textures_metadata(sqlite_t *db, unsigned level, unsigned column, unsigned r
         "and exists(select 1 from globe_texture_dataset where id=1 and format_version=2)");
     bool ok = q && sqlite_stmt_bind_int(q, 1, level) && sqlite_stmt_bind_int(q, 2, column) &&
               sqlite_stmt_bind_int(q, 3, row) && sqlite_stmt_step(q) == SQLITE_STEP_ROW;
-    static const int widths[] = {2048, 8192, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800};
+    static const int widths[] = {2048, 8192, 1800, 1800, 1800}, heights[] = {1024, 4096, 1800, 1800, 1800};
     int width = ok && level == 3 && sqlite_stmt_column_int(q, 0) == 3600 ? 3600 : widths[level];
     int height = level == 3 ? width : heights[level];
     int64_t size = ok ? sqlite_stmt_column_int64(q, 2) : 0;

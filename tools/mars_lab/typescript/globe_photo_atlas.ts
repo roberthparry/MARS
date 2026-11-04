@@ -25,6 +25,7 @@ export class GlobePhotoAtlas {
     private destination: {bounds: number[]; pixels: number} | null = null;
     private ahead: number[] | null = null;
     private pace = 1;
+    private pageRevision = -1;
 
     constructor(private readonly gl: WebGLRenderingContext, private readonly redraw: () => void, maximumSize = 4096) {
         const size = Math.min(maximumSize, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);
@@ -42,7 +43,7 @@ export class GlobePhotoAtlas {
         try {
             for (const [texture, unit, width, height, filter] of [
                 [atlas, gl.TEXTURE2, this.columns * 512, this.columns * 512, gl.LINEAR],
-                [page, gl.TEXTURE7, 16, 16, gl.NEAREST]
+                [page, gl.TEXTURE7, 64, 64, gl.NEAREST]
             ] as const) {
                 gl.activeTexture(unit); gl.bindTexture(gl.TEXTURE_2D, texture);
                 gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
@@ -63,14 +64,17 @@ export class GlobePhotoAtlas {
         const size = Math.min(pixels, (this.columns - 2) * 256);
         const plan = target ? this.cells.journey(bounds, size, target.bounds,
             Math.min(target.pixels, (this.columns - 2) * 256), this.ahead, avoid, !this.busy, this.current) :
-            this.cells.page(bounds, size, avoid, [], this.current);
+            this.cells.page(bounds, size, avoid, [], this.current, this.ahead);
         this.protect = plan?.protect || [];
         this.pace = plan?.pace ?? 1;
         const gl = this.gl;
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.atlas);
         gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.page);
-        if (plan?.visible) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 16, 16, gl.RGBA, gl.UNSIGNED_BYTE,
-            new Uint8Array(labWire.exports().memory.buffer, plan.pointer, 1024));
+        if (plan?.visible && plan.revision !== this.pageRevision) {
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array(labWire.exports().memory.buffer, plan.pointer, 64 * 64 * 4));
+            this.pageRevision = plan.revision;
+        }
         if (!this.busy || plan?.replace) {
             const next = plan?.next;
             if (next) this.load(next);
@@ -97,19 +101,30 @@ export class GlobePhotoAtlas {
                 worker.onmessage = event => {
                     if (this.closed || this.worker !== worker || !this.current) return;
                     const cell = this.current, pixels: unknown = event.data.pixels;
-                    if (event.data.key !== cell.key || event.data.id !== cell.id) return;
+                    let complete = event.data.partial !== true;
+                    if (event.data.key !== (complete ? cell.key : cell.key + ':partial') || event.data.id !== cell.id) return;
+                    let uploading = false;
                     try {
                         if (!(pixels instanceof ArrayBuffer) || pixels.byteLength !== 512 * 512 * 4)
                             throw new Error('Photographic cell unavailable');
-                        const slot = this.cells.putSlot(cell.key, 1, pixels.byteLength, cell.bounds, cell.level, this.protect);
-                        if (slot < 0) throw new Error('Photographic cells remain pinned');
+                        const slot = this.cells.putSlot(cell.key, 1, pixels.byteLength, cell.bounds, cell.level,
+                            this.protect, complete ? 2 : 1);
+                        // Capacity pressure postpones this upload, not the job or its already displayed pixels.
+                        if (slot < 0) return;
                         const gl = this.gl;
                         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.atlas);
+                        uploading = true;
                         gl.texSubImage2D(gl.TEXTURE_2D, 0, slot % this.columns * 512,
                             Math.floor(slot / this.columns) * 512, 512, 512, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(pixels));
                         if (gl.getError() !== gl.NO_ERROR) throw new Error('Photographic cell upload failed');
-                    } catch { this.cells.remove(cell.key); this.retry(cell.key); }
-                    finally { this.busy = false; this.current = null; this.redraw(); }
+                    } catch {
+                        if (uploading) this.cells.remove(cell.key);
+                        complete = true; this.retry(cell.key);
+                    }
+                    finally {
+                        if (complete) { this.busy = false; this.current = null; }
+                        this.redraw();
+                    }
                 };
                 worker.onerror = event => {
                     event.preventDefault(); worker.terminate(); this.worker = null;

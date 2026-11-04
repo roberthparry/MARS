@@ -12,7 +12,7 @@ interface GlobeSurfacePhoto {
 }
 interface GlobeSurfacePlan {
     ok: boolean; key: string; bounds: number[]; photos: GlobeSurfacePhoto[];
-    path?: string; fill?: string; banks?: string[]; complete?: boolean;
+    path?: string; fill?: string; banks?: string[]; complete?: boolean; coverage?: number[][];
 }
 interface GlobeSurfaceMessage { id: number; bounds?: number[]; cancel?: boolean; maskOnly?: boolean; }
 class GlobeSurfaceWorker {
@@ -172,7 +172,7 @@ class GlobeSurfaceWorker {
             };
             let baseDrawn = false, basePublished = false, overviewPublished = false;
             for (const photo of maskOnly ? [] : plan.photos) {
-                if (!(photo.regional ? /^\/earth_regions\/\d{2,5}\.png$/ : /^\/earth_tiles\/\d{2}-\d{2}\.png$/).test(photo.url) ||
+                if (!(photo.regional ? /^\/earth_regions\/\d{2,5}\.png$/ : /^\/earth_tiles(?:_detail)?\/\d{2}-\d{2}\.png$/).test(photo.url) ||
                     !Array.isArray(photo.source) || photo.source.length !== 4 ||
                     !Array.isArray(photo.target) || photo.target.length !== 4 ||
                     ![...photo.source, ...photo.target].every(Number.isFinite)) throw new Error('Invalid photo crop');
@@ -205,6 +205,19 @@ class GlobeSurfaceWorker {
             if (data.complete === true) {
                 context.fillStyle = 'rgba(0,0,0,0.5)';
                 context.fillRect(0, 0, 2048, 2048);
+            } else if (data.coverage?.length) {
+                if (data.coverage.length > 4096) throw new Error('Surveyed coverage exceeds its limit');
+                const surveyed = new Path2D();
+                for (const rectangle of data.coverage) {
+                    if (rectangle.length !== 4 || !rectangle.every(Number.isFinite) ||
+                        rectangle[0] < 0 || rectangle[1] < 0 || rectangle[2] <= 0 || rectangle[3] <= 0 ||
+                        rectangle[0] + rectangle[2] > 2048.001 || rectangle[1] + rectangle[3] > 2048.001)
+                        throw new Error('Invalid surveyed coverage');
+                    surveyed.rect(rectangle[0], rectangle[1], rectangle[2], rectangle[3]);
+                }
+                // Fill the union once: overlapping survey rectangles must not compound the half-alpha land marker.
+                context.fillStyle = 'rgba(0,0,0,0.5)';
+                context.fill(surveyed);
             }
             context.fillStyle = '#000';
             context.strokeStyle = '#000';

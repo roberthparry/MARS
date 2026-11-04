@@ -1368,6 +1368,16 @@ static bool route_textures(const char *directory)
     response = route_request(HTTP_GET, string_c_str(outside), NULL, NULL, NULL, NULL);
     ok = ok && response && http_response_status(response) == 404;
     http_response_free(response); string_free(extra); string_free(last); string_free(outside);
+    ok = db && sqlite_exec_cstr(db,
+        "INSERT INTO globe_texture\n"
+        "SELECT 4, 47, 23, width, height, byte_count, sha256, png\n"
+        "FROM globe_texture WHERE level = 2 AND column_index = 0 AND row_index = 0") && ok;
+    response = route_request(HTTP_GET, "/earth_tiles_detail/47-23.png", NULL, NULL, NULL, NULL);
+    ok = ok && response && http_response_status(response) == 200 && http_response_body_size(response) > 57;
+    http_response_free(response);
+    response = route_request(HTTP_GET, "/earth_tiles_detail/48-00.png", NULL, NULL, NULL, NULL);
+    ok = ok && response && http_response_status(response) == 404;
+    http_response_free(response);
     ok = db && sqlite_exec_cstr(db, "update globe_texture set png=zeroblob(byte_count) where level=0") && ok;
     sqlite_close(db);
     response = route_request(HTTP_GET, "/earth_surface.png", NULL, NULL, NULL, NULL);

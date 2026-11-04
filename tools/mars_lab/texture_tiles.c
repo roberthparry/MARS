@@ -137,10 +137,12 @@ static string_t *retain_regions(file_t *output, const string_t *text)
     json_t *old = previous ? json_from_text(previous) : NULL;
     json_t *next = json_from_text(text);
     string_t *regions_key = string_new_with("regions"), *assets_key = string_new_with("assets");
+    string_t *detail_key = string_new_with("global_detail");
     const json_t *regions = old && regions_key ? json_object_get(old, regions_key) : NULL;
     const json_t *old_assets = old && assets_key ? json_object_get(old, assets_key) : NULL;
     json_t *assets = next && assets_key ? json_clone(json_object_get(next, assets_key)) : NULL;
-    bool ok = next && assets && regions_key && assets_key && (!previous || old);
+    const json_t *detail = detail_key ? json_object_get(old, detail_key) : NULL;
+    bool ok = next && assets && regions_key && assets_key && detail_key && (!previous || old);
     if (regions) {
         size_t count = json_array_size(regions);
         ok = ok && json_type(regions) == JSON_ARRAY && count <= GLOBE_TEXTURE_REGION_LIMIT && json_object_set(next, regions_key, regions);
@@ -150,11 +152,22 @@ static string_t *retain_regions(file_t *output, const string_t *text)
             ok = asset && json_object_set(assets, key, asset);
             string_free(key);
         }
-        ok = ok && json_object_set(next, assets_key, assets);
     }
+    if (detail) {
+        ok = ok && json_object_set(next, detail_key, detail);
+        for (unsigned row = 0; ok && row < 24; ++row) {
+            for (unsigned column = 0; ok && column < 48; ++column) {
+                string_t *key = string_sprintf("earth_tiles_detail/%02u-%02u.png", column, row);
+                const json_t *asset = key ? json_object_get(old_assets, key) : NULL;
+                ok = asset && json_object_set(assets, key, asset);
+                string_free(key);
+            }
+        }
+    }
+    ok = ok && json_object_set(next, assets_key, assets);
     string_t *result = ok ? json_to_string_pretty(next, 2) : NULL;
     json_free(assets); json_free(next); json_free(old);
-    string_free(previous); string_free(regions_key); string_free(assets_key);
+    string_free(previous); string_free(regions_key); string_free(assets_key); string_free(detail_key);
     return result;
 }
 

@@ -6,7 +6,8 @@
  * unchanged existing and partially transparent pixels, retained source gaps and safe
  * replacement of a hard-linked image. Repeated preparation is idempotent; unavailable
  * intersecting sources must fail without publishing metadata. A planning regression
- * distinguishes proven complete coverage from a neighbouring tile's empty rectangle.
+ * distinguishes proven complete coverage from a neighbouring tile's empty rectangle,
+ * and requires sufficient pixel resolution before reusing a complete photograph.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -134,11 +135,11 @@ static void test_planner_requires_observations(void)
     file_t *parent_directory = file_new(parent);
     bool ok = parent_directory && (file_exists(parent_directory) || file_create_directory(parent_directory, 0755, true));
     file_t *directory = ok ? file_create_temp_directory(parent) : NULL;
-    const char *names[] = {"catalogue.json", "countries.geojson", "manifest.json", "plan.json"};
-    string_t *paths[4] = {0};
-    file_t *files[4] = {0};
+    const char *names[] = {"catalogue.json", "countries.geojson", "manifest.json", "plan.json", "region.json"};
+    string_t *paths[5] = {0};
+    file_t *files[5] = {0};
     ok = directory != NULL;
-    for (unsigned i = 0; ok && i < 4; ++i) {
+    for (unsigned i = 0; ok && i < 5; ++i) {
         paths[i] = string_sprintf("%s/%s", file_path(directory), names[i]);
         files[i] = paths[i] ? file_new(paths[i]) : NULL;
         ok = files[i] != NULL;
@@ -149,14 +150,19 @@ static void test_planner_requires_observations(void)
         "\"properties\":{\"ADMIN\":\"United Kingdom\"},\"geometry\":{\"type\":\"Polygon\","
         "\"coordinates\":[[[-5.4,51.3],[-5.3,51.3],[-5.3,51.4],[-5.4,51.4],[-5.4,51.3]]]}}]}");
     ok = ok && catalogue && countries && file_write_all_text(files[0], catalogue) && file_write_all_text(files[1], countries);
-    for (unsigned complete = 0; ok && complete < 2; ++complete) {
+    const unsigned stored_widths[] = {1800, 1800, 3600, 3600};
+    const unsigned requested_widths[] = {1800, 3600, 3600, 1800};
+    for (unsigned scenario = 0; ok && scenario < 4; ++scenario) {
+        unsigned edge = stored_widths[scenario];
         string_t *input = string_sprintf(
             "{\"regions\":[{\"bounds\":[-5.51,51.24,-2.61,53.493333333333],\"valid_pixels\":%u}],"
-            "\"assets\":{\"regional/00.png\":{\"width\":1800,\"height\":1800}}}", complete ? 3240000 : 3239999);
-        ok = input && file_write_all_text(files[2], input);
-        string_free(input);
+            "\"assets\":{\"regional/00.png\":{\"width\":%u,\"height\":%u}}}",
+            edge * edge - (scenario == 0), edge, edge);
+        string_t *selection = string_sprintf("{\"country\":\"United Kingdom\",\"width\":%u}", requested_widths[scenario]);
+        ok = input && selection && file_write_all_text(files[2], input) && file_write_all_text(files[4], selection);
+        string_free(input); string_free(selection);
         char *const args[] = {SATELLITE_PLANNER, (char *)string_c_str(paths[0]), (char *)string_c_str(paths[1]),
-            (char *)string_c_str(paths[2]), (char *)string_c_str(paths[3]), NULL};
+            (char *)string_c_str(paths[2]), (char *)string_c_str(paths[3]), (char *)string_c_str(paths[4]), NULL};
         pid_t child;
         int status = 0;
         ok = ok && !posix_spawn(&child, args[0], NULL, NULL, args, environ) &&
@@ -168,17 +174,17 @@ static void test_planner_requires_observations(void)
         const json_t *first = json_array_get(tiles, 0);
         bool detailed = false;
         ok = ok && first && detail_key && json_bool_value(json_object_get(first, detail_key), &detailed) &&
-            detailed == (complete != 0);
+            detailed == (scenario >= 2);
         json_free(plan); string_free(output); string_free(tiles_key); string_free(detail_key);
     }
     string_free(catalogue); string_free(countries);
-    for (unsigned i = 0; i < 4; ++i) {
+    for (unsigned i = 0; i < 5; ++i) {
         if (files[i] && file_exists(files[i])) file_delete(files[i]);
         file_free(files[i]); string_free(paths[i]);
     }
     if (directory) file_remove_directory(directory);
     file_free(directory); file_free(parent_directory); string_free(parent);
-    TEST_ASSERT_TRUE(ok, "planning reuses complete observations and retains tiles needed behind partial neighbouring coverage");
+    TEST_ASSERT_TRUE(ok, "planning reuses complete imagery only at sufficient resolution and retains incomplete coverage");
 }
 
 /* Run the optional offline preparation regression independently of ordinary Lab tests. */

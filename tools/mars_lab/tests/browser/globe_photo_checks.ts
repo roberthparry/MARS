@@ -4,6 +4,8 @@
  *
  * Uses real bundled PNGs and WebGL uploads, including seam wrapping, cache reuse,
  * cancellation, unavailable tiles and rejection of obsolete asynchronous completions.
+ * Probes the production photographic lookup against independently interpolated texels
+ * at close-view coordinates, with both current cells and cached ancestors.
  */
 async function checkGlobePhoto(check: (condition: boolean, message: string) => void): Promise<void> {
     checkGlobeComposite(check);
@@ -95,7 +97,12 @@ function checkGlobeComposite(check: (condition: boolean, message: string) => voi
         for (const [fragment, type] of [[0, gl.VERTEX_SHADER], [1, gl.FRAGMENT_SHADER]]) {
             const shader = gl.createShader(type)!;
             shaders.push(shader);
-            gl.shaderSource(shader, labDOM.call('lab_globe_shader', fragment, 0) as string);
+            let source = labDOM.call('lab_globe_shader', fragment, 0) as string;
+            if (fragment) source = source.replace('void main(){', 'void globe_original_main(){') +
+                '\nuniform bool geographicSample; uniform vec2 sampleLocation;\n' +
+                'void main(){if(geographicSample) gl_FragColor=vec4(mapColour(vec3(70.,85.,34.)/255.,sampleLocation),1.);' +
+                'else globe_original_main();}\n';
+            gl.shaderSource(shader, source);
             gl.compileShader(shader);
             check(Boolean(gl.getShaderParameter(shader, gl.COMPILE_STATUS)), 'photographic handoff shader compiles');
             gl.attachShader(program, shader);
@@ -180,9 +187,9 @@ function checkGlobeComposite(check: (condition: boolean, message: string) => voi
         gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, page);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        const addresses = new Uint8Array(16 * 16 * 4);
+        const addresses = new Uint8Array(64 * 64 * 4);
         for (let i = 0; i < addresses.length; i += 4) addresses[i] = 1;
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 16, 16, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 64, 64, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
         gl.uniform1i(gl.getUniformLocation(program, 'photoPatch'), 7);
         gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasEnabled'), 1);
         gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasReady'), 1);
@@ -219,7 +226,7 @@ function checkGlobeComposite(check: (condition: boolean, message: string) => voi
             addresses[at + 1] = 3;
         }
         gl.activeTexture(gl.TEXTURE7);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 16, 16, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 64, 64, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
         gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasColumns'), 2);
         const seam: number[] = [];
         for (const longitude of [-.00002, .00002]) {
@@ -230,6 +237,163 @@ function checkGlobeComposite(check: (condition: boolean, message: string) => voi
         }
         check(seam.every(value => value > 100 && value < 150) && Math.abs(seam[0] - seam[1]) < 24,
               `geographic gutters interpolate across adjacent atlas cells without a bright or dark seam (${seam})`);
+        for (const [unit, name, rgba] of [[3, 'shoreMask', [255, 0, 0, 255]],
+                                         [5, 'landPalette', [80, 100, 40, 255]],
+                                         [6, 'waterPalette', [7, 20, 64, 255]]] as const) {
+            const texture = gl.createTexture()!;
+            textures.push(texture);
+            gl.activeTexture(gl.TEXTURE0 + unit);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(rgba));
+            gl.uniform1i(gl.getUniformLocation(program, name), unit);
+        }
+        gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 0);
+        gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), 1);
+        gl.uniform1i(gl.getUniformLocation(program, 'palettesReady'), 1);
+        gl.uniform1f(gl.getUniformLocation(program, 'shoreBlend'), 1);
+        gl.uniform4f(gl.getUniformLocation(program, 'shoreBounds'), -1, -1, 1, 1);
+        gl.uniform4f(gl.getUniformLocation(program, 'shoreTransform'), 1, 0, 0, 1);
+        gl.uniform3f(gl.getUniformLocation(program, 'shoreOffset'), 0, 0, 1);
+        gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasColumns'), 1);
+        gl.uniformMatrix3fv(gl.getUniformLocation(program, 'cameraToWorld'), false, [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+        gl.activeTexture(gl.TEXTURE7);
+        for (let i = 0; i < addresses.length; i += 4) { addresses[i] = 1; addresses[i + 1] = 0; }
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 64, 64, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
+        for (const rgb of [[96, 96, 96], [150, 150, 150], [160, 150, 140]]) {
+            gl.activeTexture(gl.TEXTURE2);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                          new Uint8Array([...rgb, 255]));
+            const actual = pixel();
+            check(actual[3] === 255 && rgb.every((value, i) => Math.abs(actual[i] - value * light) <= 2),
+                  `surveyed land preserves neutral roofs and roads instead of the blurred green palette (${rgb}: ${actual})`);
+        }
+        for (const [land, rgb, expected] of [[true, [40, 80, 160], [80, 100, 40]],
+                                            [false, [40, 80, 160], [40, 80, 160]],
+                                            [false, [96, 96, 96], [7, 20, 64]]] as const) {
+            gl.activeTexture(gl.TEXTURE3);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                          new Uint8Array([land ? 255 : 0, 0, 0, 255]));
+            gl.activeTexture(gl.TEXTURE2);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                          new Uint8Array([...rgb, 255]));
+            const actual = pixel();
+            check(actual[3] === 255 && expected.every((value, i) => Math.abs(actual[i] - value * light) <= 2),
+                  `shoreline correction retains water colours and repairs genuine surface mismatches (${land}: ${actual})`);
+        }
+        const photograph = new Uint8Array(512 * 512 * 4);
+        for (let y = 0; y < 512; ++y) for (let x = 0; x < 512; ++x) {
+            const at = (y * 512 + x) * 4;
+            photograph[at] = x % 13 < 6 ? 48 : 176;
+            photograph[at + 1] = y % 11 < 5 ? 80 : 208;
+            photograph[at + 2] = 16;
+            photograph[at + 3] = 255;
+        }
+        gl.activeTexture(gl.TEXTURE2);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 512, 0, gl.RGBA, gl.UNSIGNED_BYTE, photograph);
+        gl.uniform1i(gl.getUniformLocation(program, 'geographicSample'), 1);
+        let maximumError = 0, worstSample = '';
+        for (const [longitude, latitude] of [[-2.7541, 52.7077], [151.21, -33.87], [179.9, 10], [-179.9, -20]]) {
+            const lon = Math.fround(longitude), lat = Math.fround(latitude);
+            for (const level of [14, 18]) {
+                const span = 360 / 2 ** level;
+                const left = Math.floor((lon + 180) / span) - 8, top = Math.floor((90 - lat) / span) - 8;
+                gl.uniform4f(gl.getUniformLocation(program, 'photoAtlasBounds'),
+                    left * span - 180, 90 - (top + 16) * span, (left + 16) * span - 180, 90 - top * span);
+                gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasSpan'), span);
+                gl.uniform2f(gl.getUniformLocation(program, 'sampleLocation'), lon, lat);
+                for (const ancestor of [0, 3]) {
+                    for (let i = 0; i < addresses.length; i += 4) addresses[i + 1] = ancestor;
+                    gl.activeTexture(gl.TEXTURE7);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 64, 64, 0, gl.RGBA, gl.UNSIGNED_BYTE, addresses);
+                    const extent = span * 2 ** ancestor;
+                    const x = .5 + ((lon + 180) / extent % 1) * 510;
+                    const y = .5 + ((90 - lat) / extent % 1) * 510;
+                    const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+                    const expected = [0, 1, 2].map(channel => {
+                        const a = photograph[(iy * 512 + ix) * 4 + channel];
+                        const b = photograph[(iy * 512 + ix + 1) * 4 + channel];
+                        const c = photograph[((iy + 1) * 512 + ix) * 4 + channel];
+                        const d = photograph[((iy + 1) * 512 + ix + 1) * 4 + channel];
+                        return (a + (b - a) * fx) * (1 - fy) + (c + (d - c) * fx) * fy;
+                    });
+                    const actual = pixel();
+                    check(actual[3] === 255, 'precision probes retain opaque photographic coverage');
+                    const error = Math.max(...expected.map((value, i) => Math.abs(actual[i] - value)));
+                    if (error > maximumError) {
+                        maximumError = error;
+                        worstSample = `${lon},${lat}, level ${level}, ancestor ${ancestor}, ` +
+                            `actual ${actual}, expected ${expected}`;
+                    }
+                }
+            }
+        }
+        // Allow byte rounding in GPU interpolation, while rejecting sampling from a different source texel.
+        check(maximumError <= 3.01, `GPU photographic addressing retains subpixel detail: ${maximumError}; ${worstSample}`);
+        const cache = labDOM.call('lab_texture_cache', {action: 0, limit: 64, bytes: 64 * 1024 * 1024}) as {token: number};
+        try {
+            const close = labDOM.call('lab_texture_cache', {action: 6, token: cache.token,
+                bounds: [-2.76, 52.70, -2.75, 52.71], pixels: 800}) as {
+                    next: {key: string; bounds: number[]; level: number};
+                };
+            const fine = close.next;
+            labDOM.call('lab_texture_cache', {action: 2, token: cache.token, key: fine.key,
+                bounds: fine.bounds, zoom: fine.level, bytes: 512 * 512 * 4});
+            const lon = Math.fround((fine.bounds[0] + fine.bounds[2]) / 2);
+            const lat = Math.fround((fine.bounds[1] + fine.bounds[3]) / 2);
+            const extent = (fine.bounds[2] - fine.bounds[0]) * 64;
+            const wide = labDOM.call('lab_texture_cache', {action: 6, token: cache.token,
+                bounds: [lon - extent, lat - extent, lon + extent, lat + extent], pixels: 200}) as {
+                    bounds: number[]; span: number; pointer: number;
+                };
+            gl.activeTexture(gl.TEXTURE7);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 64, 64, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array(labWire.exports().memory.buffer, wide.pointer, 64 * 64 * 4));
+            gl.uniform4fv(gl.getUniformLocation(program, 'photoAtlasBounds'), wide.bounds);
+            gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasSpan'), wide.span);
+            gl.uniform2f(gl.getUniformLocation(program, 'sampleLocation'), lon, lat);
+            const actual = pixel();
+            check(actual[3] === 255 && actual[2] === 16 && Math.abs(actual[0] - 176) <= 3 && actual[1] === 80,
+                  `native sparse photographic descendants reach the GPU after a large zoom-out (${actual})`);
+            gl.uniform2f(gl.getUniformLocation(program, 'sampleLocation'), lon + extent / 4, lat);
+            const outside = pixel();
+            check(outside[3] === 255 && [80, 100, 40].every((value, i) => Math.abs(outside[i] - value) <= 1),
+                  'a sparse child never stretches its photograph across an uncached sibling');
+        } finally { labDOM.call('lab_texture_cache', {action: 4, token: cache.token}); }
+        const dense = labDOM.call('lab_texture_cache', {action: 0, limit: 64, bytes: 64 * 1024 * 1024}) as {token: number};
+        try {
+            const view = [-2.8, 46, 5.2, 54];
+            const request = {action: 6, token: dense.token, bounds: view, pixels: 1536};
+            type DensePage = {bounds: number[]; span: number; pointer: number;
+                next?: {key: string; bounds: number[]; level: number}};
+            let page = labDOM.call('lab_texture_cache', request) as DensePage;
+            for (let count = 0; count < 65 && page.next; ++count) {
+                const next = page.next;
+                labDOM.call('lab_texture_cache', {action: 2, token: dense.token, key: next.key,
+                    bounds: next.bounds, zoom: next.level, bytes: 512 * 512 * 4});
+                page = labDOM.call('lab_texture_cache', request) as DensePage;
+            }
+            check(!page.next, 'the high-density viewport finishes its bounded photographic requests');
+            gl.activeTexture(gl.TEXTURE7);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 64, 64, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array(labWire.exports().memory.buffer, page.pointer, 64 * 64 * 4));
+            gl.activeTexture(gl.TEXTURE2);
+            // A uniform atlas isolates spatial admission from the already tested per-slot pixel addressing.
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                new Uint8Array([144, 96, 48, 255]));
+            gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasColumns'), 8);
+            gl.uniform4fv(gl.getUniformLocation(program, 'photoAtlasBounds'), page.bounds);
+            gl.uniform1f(gl.getUniformLocation(program, 'photoAtlasSpan'), page.span);
+            for (const lon of [view[0] + .01, (view[0] + view[2]) / 2, view[2] - .01]) {
+                for (const lat of [view[1] + .01, (view[1] + view[3]) / 2, view[3] - .01]) {
+                    gl.uniform2f(gl.getUniformLocation(program, 'sampleLocation'), lon, lat);
+                    const actual = pixel();
+                    check(actual[3] === 255 && [144, 96, 48].every((value, i) => Math.abs(actual[i] - value) <= 1),
+                          `high-density photography reaches every viewport edge and corner (${lon},${lat}: ${actual})`);
+                }
+            }
+        } finally { labDOM.call('lab_texture_cache', {action: 4, token: dense.token}); }
         check(gl.getError() === gl.NO_ERROR, 'photographic handoffs complete without GPU errors');
     } finally {
         textures.forEach(texture => gl.deleteTexture(texture));

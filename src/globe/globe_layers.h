@@ -81,6 +81,22 @@ bool rivers_banks(rivers_t *rivers, double west, double south, double east, doub
 
 /** @brief Check indexed complete water coverage without inferring coverage from polygon bounds. */
 bool rivers_water_complete(rivers_t *rivers, double west, double south, double east, double north);
+
+/**
+ * @brief Stream spatially indexed survey rectangles clipped into the requested longitude frame.
+ * @param[in] rivers Borrowed river reader; serialise calls and do not re-enter it through the visitor.
+ * @param[in] west Western longitude in [-360,180] degrees.
+ * @param[in] south Southern latitude in [-90,90] degrees.
+ * @param[in] east Eastern longitude greater than west by at most 360 degrees.
+ * @param[in] north Northern latitude greater than south and at most 90 degrees; all bounds must be finite.
+ * @param[in] visit Required synchronous visitor; its bounds are borrowed only for the callback duration.
+ * @param[in,out] context Optional caller-owned state, neither consumed nor retained.
+ * @return True on completion or absent optional coverage; false on invalid or corrupt input, query failure,
+ * cancellation or more than 4096 intersections. Discard partial output after false.
+ * @note Only the globe controller calls this private layer interface. No argument ownership transfers.
+ */
+bool rivers_water_coverage(rivers_t *rivers, double west, double south, double east, double north,
+                           globe_water_coverage_fn visit, void *context);
 /** @brief Stream clipped river segments. */
 bool rivers_segments(rivers_t *rivers, double west, double south, double east, double north,
                      rivers_segment_fn visit, void *context);

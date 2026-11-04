@@ -187,7 +187,9 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
         reference.width = reference.height = 1;
         let plans = 0, paths = 0, revision = 1, held: (() => void) | null = null;
         let holdNext = false, deny = false, complete = false;
+        let partialCoverage = false;
         let regionalURL = '/earth_regions/123.png';
+        let globalURL = '/earth_tiles/05-01.png', globalSha = sha256;
         const key = () => `surface-browser-${revision}`;
         const respond = async (bytes: Uint8Array<ArrayBuffer>): Promise<Response> => {
             const payload = labWire.decode(bytes) as {format: string; key: string};
@@ -196,21 +198,24 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
             if (payload.format === 'surface-plan') {
                 ++plans;
                 return new Response(labWire.encode({ok: true, key: key(), bounds: [0, 0, 1, 1], photos: [
-                    {url: '/earth_tiles/05-01.png', sha256, source: [0, 0, 1800, 1800], target: [0, 0, 1024.3, 2048]},
-                    {url: '/earth_tiles/05-01.png', sha256, source: [0, 0, 1800, 1800], target: [1024.3, 0, 1023.7, 2048]},
+                    {url: globalURL, sha256: globalSha, source: [0, 0, 1800, 1800], target: [0, 0, 1024.3, 2048]},
+                    {url: globalURL, sha256: globalSha, source: [0, 0, 1800, 1800], target: [1024.3, 0, 1023.7, 2048]},
                     {url: regionalURL, sha256: regionalSha, regional: true, width: 3600, decode_size: 3600,
                      source: [0, 0, 3600, 3600], target: [0, 0, 2048, 2048]}
                 ]}));
             }
             ++paths;
             if (holdNext) { holdNext = false; await new Promise<void>(resolve => { held = resolve; }); }
-            return new Response(labWire.encode({ok: true, key: payload.key, complete, path: 'M0 1024L2048 1024',
+            return new Response(labWire.encode({ok: true, key: payload.key, complete,
+                coverage: partialCoverage ? [[400, 0, 1000, 2048], [800, 0, 1000, 2048]] : [],
+                path: 'M0 1024L2048 1024',
                 fill: 'M100 300L700 300L700 700L100 700Z',
                 banks: ['M900 300L1500 300L1500 900L900 900ZM1100 500L1100 700L1300 700L1300 500Z',
                     'M1450 600L1650 600L1650 900L1450 900Z']}));
         };
         const fixture = globeHTTPFixture(respond,
-            {endpoint: '/almanac-rivers', script: '/js/globe_surface_worker.js', nativeShore: false, surfaceProbe: true, regionalAliases: true});
+            {endpoint: '/almanac-rivers', script: '/js/globe_surface_worker.js', nativeShore: false,
+             surfaceProbe: true, regionalAliases: true, globalAliases: true});
         const persisted = async () => {
             for (let attempt = 0; attempt < 200 && !await cache.get(key()); ++attempt)
                 await new Promise(resolve => setTimeout(resolve, 25));
@@ -372,7 +377,43 @@ async function checkGlobeSurface(check: (condition: boolean, message: string) =>
                   'river-only refinement preserves surveyed land and water without requesting photographic plans');
             maskOnly.close(); maskCanvas.width = maskCanvas.height = 1;
             complete = false; ++revision;
+            partialCoverage = true;
+            const partial = await surface.load([0, 0, 1, 1], new AbortController().signal, undefined, true);
+            const partialCanvas = document.createElement('canvas');
+            partialCanvas.width = partialCanvas.height = 2048;
+            const partialContext = partialCanvas.getContext('2d')!;
+            draw(partialContext, partial);
+            const partialAlpha = (x: number, y: number) => partialContext.getImageData(x, y, 1, 1).data[3];
+            check(Math.abs(partialAlpha(500, 100) - 128) <= 1 &&
+                  Math.abs(partialAlpha(1000, 100) - 128) <= 1 &&
+                  partialAlpha(100, 100) === 255 && partialAlpha(1900, 100) === 255 &&
+                  Math.abs(partialAlpha(1200, 600) - 128) <= 1 && partialAlpha(1000, 600) === 0,
+                  'partial surveys restore known land and islands, preserve water, and do not double-apply overlaps');
+            partial.close(); partialCanvas.width = partialCanvas.height = 1;
+            for (let attempt = 0; attempt < 200 && !await cache.get(`mask-only:${key()}`); ++attempt)
+                await new Promise(resolve => setTimeout(resolve, 25));
+            check(Boolean(await cache.get(`mask-only:${key()}`)), 'the partial-survey mask persists asynchronously');
+            const partialCached = await surface.load([0, 0, 1, 1], new AbortController().signal, undefined, true);
+            const cacheCanvas = document.createElement('canvas');
+            cacheCanvas.width = cacheCanvas.height = 2048;
+            const cacheContext = cacheCanvas.getContext('2d')!;
+            draw(cacheContext, partialCached);
+            check(Math.abs(cacheContext.getImageData(1000, 100, 1, 1).data[3] - 128) <= 1 &&
+                  cacheContext.getImageData(100, 100, 1, 1).data[3] === 255,
+                  'GPU-ready cached masks retain surveyed subregions and unknown surroundings');
+            partialCached.close(); cacheCanvas.width = cacheCanvas.height = 1;
+            partialCoverage = false; ++revision;
+            const globalResponse = await fetch('/earth_tiles/00-00.png');
+            check(globalResponse.ok, 'the finer global-route fixture has a real PNG source');
+            globalURL = '/earth_tiles_detail/47-23.png';
+            globalSha = globalResponse.headers.get('ETag')!.replace(/^"sha256-|"$/g, '');
+            await globalResponse.body?.cancel();
+            const previousPaths = paths;
+            inspect(await surface.load([0, 0, 1, 1], new AbortController().signal));
+            check(paths === previousPaths + 1,
+                  'the photographic fallback renders a fresh finer NASA tile with mapped water and islands');
         } finally {
+            globalURL = '/earth_tiles/05-01.png'; globalSha = sha256;
             (held as (() => void) | null)?.();
             surface.dispose(); fixture.dispose(); globalThis.Worker = OriginalWorker;
         }

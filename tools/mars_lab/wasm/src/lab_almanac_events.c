@@ -31,6 +31,14 @@ static jsref lab_almanac_preview_value(const char *selector)
     return lab_dom_read(lab_dom_query(0, selector), LAB_DOM_VALUE, "");
 }
 
+static jsref lab_almanac_preview_height(void)
+{
+    jsref input = lab_almanac_preview_value("#almanacElevation");
+    double height = lab_dom_to_number(input);
+    return lab_dom_length(input) && isfinite(height) ? lab_dom_format(round(height) + 0.0, "", " m · Updating…") :
+                                                    lab_dom_string("Updating…");
+}
+
 /* Match the completed native observer summary, including minute carry and hemisphere at zero. */
 static jsref lab_almanac_preview_angle(const char *selector, bool latitude)
 {
@@ -73,7 +81,7 @@ void lab_almanac_events_preview(jsref target, jsref country)
         lab_almanac_preview_value("#almanacZone"),
         lab_almanac_preview_angle("#almanacLatitude", true),
         lab_almanac_preview_angle("#almanacLongitude", false),
-        lab_dom_join(lab_almanac_preview_value("#almanacElevation"), lab_dom_string(" m · Updating…"), ""),
+        lab_almanac_preview_height(),
         pending, pending, pending,
     };
     static const char *const labels[] = {"GMT moment", "Location", "Zone", "Latitude", "Longitude",

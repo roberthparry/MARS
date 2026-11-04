@@ -226,7 +226,8 @@ the clicked coordinates and does not wait for the town catalogue.
 Observer selections show a native-rendered summary immediately from the current
 controls and resident country/flag cache, before the almanac response arrives.
 The pending summary uses the completed worksheet's degrees-and-minutes coordinate
-format from its first frame. A known country without a selected town is displayed
+format from its first frame, and observer heights use whole metres immediately.
+Missing or invalid heights remain pending. A known country without a selected town is displayed
 by itself, without a “Custom” prefix; an unresolved location remains “Updating…”.
 This pending summary clears the previous observer's results and copy text;
 surface classification, weather and calculated results remain explicitly pending.
@@ -1134,16 +1135,28 @@ of the 8192-pixel image. Each of the 72 bundled tiles is 1800 × 1800 pixels;
 tiles are stored as lossless PNGs. The NASA source was already JPEG-encoded; PNG preserves its decoded pixels without
 recovering lost detail. The regional Sentinel photographs are generated directly
 from their satellite rasters. They are served locally, including when offline.
-The prepared Sentinel-2 catalogue contains 4,775 regional images covering the UK,
+An additional global grid uses NASA's eight full-resolution July 2004 GeoTIFF quadrants with
+topography and bathymetry: 86400 × 43200 source pixels, nominally 500 metres per pixel. The offline
+`tools/mars_lab/texture_global.c` utility splits these into 1,152 lossless 1800-square PNGs without
+resampling, checking the written pixels against the source before discarding a downloaded quadrant.
+Each tile covers 7.5 × 7.5 degrees. Native surface planning selects this grid when its extra detail improves
+the requested output; broad views retain the lighter grid. Regional Sentinel photographs still supply
+the closest detail. Existing GPU and decoded-source cache budgets are unchanged, and older databases
+without the additional grid continue using the original tiles. Source GeoTIFFs are preparation inputs,
+not runtime dependencies. `make release` imports a changed prepared manifest even when the managed-data
+revision is unchanged, retaining matching PNG rows and the other geographic layers.
+The prepared Sentinel-2 catalogue contains 4,971 regional images covering the UK,
 Ireland, Denmark, Netherlands, Italy and the requested Mediterranean and Atlantic
 islands, mainland Portugal and Spain, coastal Svalbard and Cape Peninsula. It also
 includes mainland France, New Zealand and its offshore islands, Finland and Åland,
-Sweden, Norway, and the requested areas around Brisbane, Sydney, Melbourne, Perth,
+Sweden, Norway, Iceland, and the requested areas around Brisbane, Sydney, Melbourne, Perth,
 Mooloolaba, Maroochydore, Canberra, Cairns, Alice Springs and Gold Coast.
-Spain, Svalbard and this latest expansion use reduced-resolution 1800-square images;
-earlier regional coverage generally uses 3600-square images. Remaining missing
-observations are transparent. Managed globe revision 16 imports the approximately
-32.9 GiB PNG package with `make release`; only photographs
+Spain, Svalbard and most of this latest expansion use reduced-resolution 1800-square images;
+earlier regional coverage generally uses 3600-square images. Sydney's four tiles now use
+3600-square images rebuilt from the original Sentinel rasters, giving approximately
+10–13 metres per pixel instead of 20–26 metres. Remaining missing observations are
+transparent. Managed globe revision 17 imports the approximately
+35.7 GiB PNG package with `make release`; only photographs
 needed for the current view are loaded, using the existing bounded caches.
 
 The fallback `lab_globe_photo_patch` planner wraps longitude at the date line and
@@ -1167,7 +1180,8 @@ transparent. Rendering writes checksummed per-tile checkpoints and verifies them
 before resuming. Its output requires validation and manifest installation before
 the Lab uses it; GDAL is not a runtime dependency.
 An existing tile is reused during planning only when its recorded valid observations
-cover every pixel. Matching rectangular bounds alone are insufficient: an earlier
+cover every pixel and its dimensions meet or exceed the requested resolution.
+Matching rectangular bounds alone are insufficient: an earlier
 country's sources may leave transparent gaps in its neighbour's part of the tile.
 Its remote rendering mode reads bounded Cloud-Optimized GeoTIFF windows instead of
 downloading complete source archives. An in-memory R-tree selects intersecting RGB
@@ -1190,6 +1204,13 @@ checksummed render outputs and combines their metadata into an installable packa
 It preserves NASA and Copernicus attribution and publishes the manifest only after
 every image passes validation. The database importer then replaces imagery in a
 transaction, preserving geographic layers, saved settings and location history.
+From managed revision 16, compatible updates retain previously validated PNG rows
+whose dimensions, encoded lengths and content digests match the new manifest.
+Only new or changed photographs are read and inserted; the small coverage index
+and complete provenance manifest are refreshed together. The progress bar counts
+all tiles checked. This avoids rebuilding the full image database for a small
+regional upgrade. Older formats retain the complete staged rebuild, and a full
+integrity check still validates every installed PNG's contents.
 Its `--repair-overviews` mode accepts an existing package and a new output directory,
 optionally followed by west, south, east and north degrees to limit the repair area.
 An R-tree selects intersecting detailed images, which are resampled to fill transparent
@@ -1204,24 +1225,58 @@ photographic globe uses fixed 512-square geographic cells from the **globe datab
 Cell keys describe geography and resolution, independently of the camera window.
 Panning reuses those cells directly through a WebGL atlas instead of rebuilding a
 large photograph of each new view. A small indirection texture selects the finest
-resident cell or its cached lower-resolution ancestor, retaining up to two finer
-resolution tiers when zooming out. Sharp cells remain visible
+resident cell or its cached lower-resolution ancestor. Sparse refinement nodes retain
+finer resident cells through larger zoom-outs, rather than dropping them after two
+resolution tiers. Coverage and detail are measured on the final sparse leaves,
+including those finer retained cells. A fully cached fine mosaic therefore does
+not request lower-resolution replacements after zooming out. Every displayed cell
+is protected before neighbouring work is selected. Offscreen padding and destination
+preparation cannot displace the only visible copy of a region. A full atlas defers
+speculative work; a complete broader replacement can reuse a finer slot only when
+it covers that entire cell, so the replacement does not uncover a hole. Sharp cells remain visible
 while adjacent cells load; a coarse regional overview cannot replace them during
 a river-mask handover. The initial globe, towns and observer selection never wait
 for photographic refinement.
 
 The native `lab_texture_cache` service owns cell keys, page selection, visible-cell
 pinning, byte accounting and LRU eviction through `dictionary_t`. Its photographic
-page describes 256 spatial cells and a centre-first next request. Missing coverage
-first loads a broad parent two resolution levels below the requested detail, then
-refines it. Both the visible fine cells and their broad parent stay protected, so
+page describes 256 spatial root cells and a centre-first next request. Populated
+resolution bitsets avoid searching empty cache levels. A stationary view
+rounds the chosen 510-pixel geographic core up to meet display pixel demand, avoiding
+extra enlargement of a smaller prepared image. It requests that detail immediately,
+using the resident world image as its background.
+It does not wait for coarse photographs at the view edges. During travel, missing
+coverage first loads a broad parent up to two levels below the requested detail,
+with initial cells limited to 5.625° where the requested scale permits, then refines it.
+Displayed fine cells and the ancestors supplying uncovered areas stay protected, so
 zooming out does not uncover an avoidable low-resolution gap. Prefetch is
-limited to half a cell beyond the current view. Free slots use a
+limited to half a cell beyond the current view on larger caches; caches with fewer
+than 32 slots load visible cells only, avoiding repeated offscreen eviction. During
+dragging, the existing native camera prediction directs prefetch towards the next
+view once current detail is complete, ahead of padding behind the camera. Missing
+visible detail always takes priority. Free slots use a
 stack and protected slots use a bitset. `lab_photo_source` supplies exact pixel
 crops and stable source-block keys; JavaScript performs the browser codec, storage
 and graphics calls. The renderer still uses eight texture units. The photographic
 atlas retains at most 64 one-MiB cells, or 16 cells on a smaller graphics budget;
-its geographic lookup texture occupies only 1 KiB.
+its geographic lookup texture occupies 16 KiB, including bounded sparse children.
+The native revision changes only when lookup contents change, so ordinary camera
+redraws reuse the GPU table instead of uploading it again every frame.
+Within each fragment, coastline correction and river colouring reuse the existing
+photographic sample rather than resolving the atlas repeatedly for the same point.
+The spatial root expands as necessary to cover the entire viewport at high display
+densities, while the requested photograph detail stays the same. Coverage is measured
+against the whole view, so cropped edges cannot be reported as fully loaded. Offscreen
+padding is omitted when its grid would exceed the slot budget; this prevents a large
+view from continuously evicting and reloading its own neighbouring cells.
+The GPU carries geographic degrees directly into the detailed photographic lookup
+and calculates fractional texture positions relative to the small current page.
+Aligned global page indices are rounded to integers before adding the local phase,
+including when sampling a cached ancestor. This avoids close-view rounding errors
+from converting through a whole-Earth UV coordinate or taking the fractional part
+of a large global tile index. Longitude wrapping and cell gutters remain continuous.
+Retained photographic patches and river masks also receive geographic positions
+directly, avoiding repeated conversions through the coordinates of the world texture.
 Each 512-square GPU slot contains a 510-square geographic core and a one-pixel
 overlap on every edge. Native crop planning includes those neighbouring pixels,
 with longitude wrapping and polar clipping; the shader filters through the overlap
@@ -1231,26 +1286,95 @@ different identity and are rebuilt using the corrected edge sampling.
 Where regional photographs exist, fixed cells contain those photographs with
 transparent gaps. WebGL supplies the already resident global image underneath;
 the worker does not fetch and decode another NASA tile for each regional cell.
-A finer source covering the entire cell supersedes its broader regional overviews.
+Bounding rectangles do not prove image coverage: an overlapping photograph may
+have transparent observation gaps, including large gaps near a neighbouring
+country. The native planner retains those potentially useful backgrounds. The
+worker draws the finest photographs first and places each required background
+behind them. During its existing pixel preparation pass, WASM checks actual alpha
+values; once the composed cell is fully opaque, deeper backgrounds are unnecessary.
+This preserves Finnish imagery beneath incomplete Norwegian coverage near Inari,
+without letting a coarse image paint over detail already supplied by a finer one.
+The corrected composition has a new cell-cache identity, so previously cached
+holes are rebuilt while decoded source pixels remain reusable. Windows wider than
+six degrees use the global source grid, avoiding a truncated regional source list.
 Unobserved areas retain the global image, and cells without regional coverage can
 still use the finer NASA source tiles. Existing opaque cached cells have a separate
 identity and cannot be mistaken for the new transparent cells.
 
-A dedicated worker decodes one source PNG at a time. It splits the source into
+A dedicated worker can prepare the next source PNG while the current one is being
+drawn. Read-ahead is limited by native admission to one additional photograph of
+at most 2048 square (16 MiB), keeping at most two PNG reads or decodes in flight.
+It splits the source into
 the needed 512-square cores with one-pixel gutters and queues their raw pixels for
-background persistence. Unused portions of the photograph are neither read back
-from the canvas nor written to disk. Only needed small blocks stay decoded, within
-a separate 64 MiB cache. Adjacent cells and worker
-restarts can therefore reuse source blocks without decoding two full 3600-square
-photographs repeatedly. A complete geographic cell is uploaded as premultiplied
-RGBA without another image decode. Initial codec allocations, the currently decoded
-source image, upload buffers and driver allocations are additional temporary memory.
+background persistence. WASM chooses a stable decoded resolution from the actual
+destination pixel demand. A photograph occupying a small part of a broad view
+therefore uses a small working image, rather than dozens of full-resolution blocks.
+Native planning of the visible crop visits and returns only intersecting source
+rows and columns, avoiding construction and transport of unused block records
+during dragging.
+Decoded photographs and needed blocks share one 64 MiB cache. Resident photographs
+are drawn directly using native crop coordinates, without keeping duplicate block
+bitmaps or waiting for raw-cache reads. New source blocks still enter background
+persistence; a bounded native dictionary tracks queued or saved blocks without
+duplicating their pixels, and dropped queue entries remain eligible for saving.
+WASM retains a whole photograph only up to 16 MiB. Larger coastal overviews retain
+their needed blocks instead, so one 3600-square image cannot evict nearly the entire
+neighbourhood. Queued source Blobs also have a native dictionary index: a raw block
+can be read immediately before its disk write completes, without another PNG
+download after the whole photograph is evicted. These are references to the
+existing bounded write queue, rather than additional copies of its pixel data.
+Completed geographic cells also remain readable from that queue while their
+disk write is pending, avoiding reconstruction during a quick revisit.
+Adjacent cells can reuse new parts of a resident
+photograph without another PNG read or decode. One background job can retain a
+snapshot of the decoded photograph and cache its remaining source blocks, one at
+a time during idle gaps. This avoids another full PNG decode when a
+later view needs a previously unseen part of that same source. The job yields
+between blocks and never runs on the drawing thread. It retains at most one
+additional decoded image of at most 16 MiB, plus a 514-square scratch canvas. Native
+dictionaries track completed sources; a missing raw block invalidates that marker
+so evicted data can be cached again. Unavailable storage skips this extra work.
+Resolution-specific source keys preserve finer detail on zoom-in. Before another
+decode, native source planning probes the minimum adequate tier and then the
+sharper cached tiers using dictionary lookups. A whole resident image, or every
+intersecting source block across the resident, queued and persistent caches, can satisfy the
+request. Crop coordinates are remapped to the reused tier. One missing block
+rejects that tier, and lower-resolution data never satisfies finer demand. Zooming
+out therefore reuses already decoded sharper pixels instead of necessarily
+reading the same PNG again at a smaller size. The standalone source planner
+remains independent of cache state, and worker restarts can reuse persisted blocks.
+When resident pixels do not suffice, one bounded key-range read of the persistent
+metadata index supplies up to 512 content addresses; it does not load image Blobs.
+Native dictionaries then choose an adequate stored tier. The worker reads and
+validates only its required raw blocks, so restarting the browser does not force
+another PNG decode merely because the next view uses a different resolution.
+Initial coverage stays within 5.625-degree cells for views requesting that scale
+or finer, avoiding large photographic requests far beyond the current map.
+A complete geographic cell is uploaded as premultiplied
+RGBA without another image decode. WASM checks the PNG header before the browser
+decodes directly to the selected resolution, avoiding a separate full-size bitmap
+and resize pass. Encoded input, temporary codec allocations, upload buffers and
+driver allocations use additional temporary memory.
 Source reads have an eight-second timeout; finishing useful source blocks does not
 hold up the animation thread.
 Visible cells publish before optional disk writes finish. One active write and a
 ring of at most 24 pending browser Blobs use less than 26 MiB; older queued work
 yields to the newest view under pressure. Only one queued pixel write is submitted
-at a time, allowing visible reads to enter between writes.
+at a time. While imagery loads, a timer submits one asynchronous write every
+100 ms, without waiting for the journey or loading queue to become idle. Drawing
+never awaits those writes, and new requests do not cancel the write timer.
+Idle periods drain the queue promptly; unused-block preparation still waits for
+visible work to finish. A queue of disk transactions cannot hold up the next view.
+Each finished source crop may update the GPU immediately, rather than waiting
+for every PNG contributing to a cell. The native page keeps these partial cells
+pending and retains an existing complete ancestor until the fine cell finishes.
+Final completion promotes the same GPU slot without an extra texture allocation;
+interrupting or failing a request retains its already uploaded partial pixels.
+Those pixels also survive zoom-out where no complete ancestor is available, but
+never claim complete coverage or enter storage as completed geographic images.
+Temporary atlas pressure skips a partial upload while the worker continues its
+remaining sources, instead of treating it as a failed request. Requested final detail, source PNGs and water
+colouring remain unchanged.
 During a flight, destination cells and the visible page remain pinned together.
 WASM predicts the camera four percentage points ahead on the same eased great
 circle. Its scheduler first fills missing visible, predicted and arrival coverage,
@@ -1391,9 +1515,13 @@ these local journeys also retain their departure heading instead of turning to f
 Destination rivers and mapped water areas load asynchronously from departure, and
 unfinished requests survive arrival without restarting. The notice names the destination
 without claiming that the independently updating worksheet has already caught up.
-At Inari, complete mapped-water coverage lets the photographic surface replace the
-coarse lake outline and preserve the river connection and islands. Outside complete
-coverage, mapped water remains an additive overlay; missing polygons do not imply land.
+At Inari, explicitly recorded mapped-water survey coverage lets the photographic surface replace the
+coarse lake outline and preserve the river connection, islands and surrounding land. Native indexed
+queries clip each surveyed rectangle into the requested surface tile; a survey smaller than the
+tile still corrects its own portion. Overlapping survey rectangles are filled as one coverage union,
+so they cannot turn the half-alpha land marker into water through repeated blending. Outside those
+rectangles, mapped water remains an additive overlay; missing polygons do not imply land.
+Older cached river masks have a different identity and are rebuilt; decoded photographic caches remain reusable.
 Close shoreline rendering samples four subpixel positions per screen pixel to soften
 stencil stair-steps at harbour edges without altering the mapped geometry.
 Reciprocal magnification
@@ -1440,12 +1568,13 @@ surface is hidden whenever WebGL supplies the full surface, avoiding compositor
 repaints beneath its alpha canvas. Native reprojection rejects a retained coastline
 mask when its spherical depth error can exceed one CSS pixel, keeping the photograph
 visible until a suitable replacement is available. Travel waits for
-the base photographic texture before departure, then accelerates gently. Local vector
+only the base photographic texture before departure, then accelerates gently. Higher-resolution
+global textures, regional photographs and border downloads continue without holding departure. Local vector
 requests do not brake and restart the camera: photographic coverage remains visible
 while they refine it. Slow rendering still limits the display clock and frame steps.
 Town requests and local SVG border projection wait until arrival; enabled
 world borders rotate on the GPU throughout travel, alongside the selected marker.
-Travel starts after its first border buffer is prepared, and later journeys reuse it.
+The first border buffer appears as soon as it is prepared, and later journeys reuse it.
 Flight camera updates render in the same animation frame at up to one drawing pixel
 per CSS pixel; stationary views restore up to 1.5 pixels per CSS pixel. Photographic
 source resolution is unchanged by this reduction in moving-frame GPU work.
@@ -1453,7 +1582,7 @@ The native pacing bridge limits combined translation, roll and scale motion to
 360 CSS pixels per second, allowing six pixels at 60 Hz, twelve at 30 Hz and at
 most eighteen at 20 Hz. This avoids multiplying journey time on slower displays.
 It caps elapsed time at 50 milliseconds per frame;
-slow rendering never creates catch-up jumps. The global photographic textures load
+slow rendering never creates catch-up jumps. The base global photograph is ready
 before departure, and source-imaged polar ice is preserved
 in both hemispheres. This historical imagery does not represent current sea-ice coverage.
 New navigation or manual globe input
@@ -4694,7 +4823,11 @@ During dragging, fixed photographic cells follow their geographic coordinates.
 Already resident sharp cells remain visible while adjacent cells load, and cached
 lower-resolution ancestors cover refinement until finer cells are ready. River masks
 follow the camera independently; neither a selected town nor a coarse preview locks
-the photographic layer to an obsolete view.
+the photographic layer to an obsolete view. The shoreline colour correction preserves
+neutral-grey roofs, roads and rock on surveyed land, rather than substituting a coarse
+green palette. A positive blue-water signal can still be corrected where the detailed
+shoreline identifies land; the water colour rule is unchanged. The same eligibility
+rule supplies both the photographic surface and its correction palettes.
 
 Temperature changes refraction, not parallax. Below −0.575° the displayed altitude
 receives no refraction correction. The native globe hit-test classifies the

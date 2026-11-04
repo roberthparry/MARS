@@ -86,9 +86,11 @@ bool globe_texture_regions(globe_t *globe, const double bounds[4], globe_texture
 /**
  * @brief Read indexed texture metadata without loading its PNG payload.
  * @param globe Borrowed controller; calls must be serialised.
- * @param level Zero for the overview, one for global detail, two for NASA tiles, three for regional photographs.
- * @param column Zero for global images; 0..11 for NASA tiles; 0..63 regional slot.
- * @param row Zero for global and regional images; 0..5 north to south for NASA tiles.
+ * @param level Zero for the overview, one for global detail, two for the original NASA grid,
+ * three for regional photographs, or four for the optional full-resolution NASA grid.
+ * @param column Zero for global images; 0..11 for level two; 0..16383 for regional slots;
+ * 0..47 west to east for level four.
+ * @param row Zero for global and regional images; 0..5 north to south for level two, or 0..23 for level four.
  * @param info Required output, cleared on failure.
  * @return True for installed, structurally valid metadata; false for missing data or invalid arguments.
  */
@@ -385,6 +387,34 @@ bool globe_river_banks(globe_t *globe, double west, double south, double east, d
  * Missing coverage returns false; absence of a water polygon alone never establishes land.
  */
 bool globe_river_water_complete(globe_t *globe, double west, double south, double east, double north);
+
+/**
+ * @brief Receive the surveyed part of a query window, clipped to one complete open-water survey rectangle.
+ * @param[in] bounds Borrowed west, south, east and north degrees, valid only during this synchronous callback.
+ * Longitudes use the query's unwrapped frame. Rectangles may overlap; consumers must combine their coverage.
+ * @param[in,out] context Caller-owned optional state; neither retained nor released by the library.
+ * @return True to continue, or false to cancel enumeration and discard partial output.
+ * @note Do not re-enter or close the controller from this callback. No argument ownership transfers.
+ */
+typedef bool (*globe_water_coverage_fn)(const double bounds[4], void *context);
+
+/**
+ * @brief Enumerate indexed complete-survey coverage intersecting a window, including partial intersections.
+ * @param[in] globe Borrowed open controller with river storage; serialise access and retain it through all callbacks.
+ * @param[in] west Western longitude in [-360,180] degrees.
+ * @param[in] south Southern latitude in [-90,90] degrees.
+ * @param[in] east Eastern longitude, greater than west by at most 360 degrees; date-line wrapping is supported.
+ * @param[in] north Northern latitude, greater than south and at most 90 degrees. All bounds must be finite.
+ * @param[in] visit Required synchronous visitor receiving each non-empty clipped coverage rectangle.
+ * @param[in,out] context Caller-owned optional visitor state, not retained or consumed.
+ * @return True on completion, including absent optional coverage. False reports invalid input, unavailable river
+ * storage, corrupt bounds, query failure, cancellation or more than 4096 intersections; discard partial output.
+ * @note Coverage establishes where the complete mapped water polygons may replace a coarser lake outline.
+ * A polygon's bounding box alone never establishes surveyed coverage. No polygon or image payload is read,
+ * no argument is consumed, and no database or classification state is changed.
+ */
+bool globe_river_water_coverage(globe_t *globe, double west, double south, double east, double north,
+                               globe_water_coverage_fn visit, void *context);
 
 /** @brief Stream bounded river segments; false means unavailable, invalid, corrupt or cancelled. Discard partial output. */
 bool globe_river_segments(globe_t *globe, double west, double south, double east, double north,

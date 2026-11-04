@@ -7,6 +7,7 @@
  * on cache misses. No observer, history, jurisdiction or source database is modified.
  */
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "globe-t.h"
@@ -33,6 +34,25 @@ static json_t *surface_numbers(const double *values, size_t count)
     return array;
 }
 
+typedef struct {
+    json_t *rectangles;
+    const double *bounds;
+} surface_coverage_t;
+
+static bool surface_coverage(const double surveyed[4], void *context)
+{
+    surface_coverage_t *state = context;
+    const double *b = state->bounds;
+    double rectangle[] = {(surveyed[0] - b[0]) * 2048 / (b[2] - b[0]),
+                           (b[3] - surveyed[3]) * 2048 / (b[3] - b[1]),
+                           (surveyed[2] - surveyed[0]) * 2048 / (b[2] - b[0]),
+                           (surveyed[3] - surveyed[1]) * 2048 / (b[3] - b[1])};
+    json_t *value = surface_numbers(rectangle, 4);
+    bool ok = value && json_array_append(state->rectangles, value);
+    json_free(value);
+    return ok;
+}
+
 static bool surface_segment(int64_t id, unsigned kind, double ax, double ay, double bx, double by, void *context)
 {
     (void)kind;
@@ -52,7 +72,6 @@ typedef struct {
     json_t *photos;
     const double *bounds;
     unsigned pixels;
-    bool transparent;
     double longitude_shift;
 } surface_regions_t;
 
@@ -96,12 +115,8 @@ static bool surface_region(unsigned slot, const double original[4], void *contex
         lab_cal_take(photo, "decode_size", decoded ? json_new_number(decoded) : NULL);
         string_free(width); string_free(decoded);
     }
-    /* A finer source covering this entire cell supersedes broader regional photographs.
-     * Transparent coastline pixels fall through to the globe's already resident world texture. */
-    if (photo && url && state->transparent && left <= b[0] && south <= b[1] && right >= b[2] && north >= b[3]) {
-        json_free(state->photos);
-        state->photos = json_new_array();
-    }
+    /* Bounding rectangles cannot prove pixel coverage. An overlapping image may contain large transparent
+     * observation gaps; retain its background until the worker has inspected the composed pixel alpha. */
     bool ok = photo && url && state->photos && json_array_append(state->photos, photo);
     json_free(photo); string_free(url);
     return ok;
@@ -124,30 +139,39 @@ static bool surface_regions(surface_regions_t *state)
 static json_t *surface_photographs(globe_t *globe, const double b[4], unsigned pixels, bool transparent)
 {
     json_t *photos = json_new_array();
-    surface_regions_t state = {.globe = globe, .photos = photos, .bounds = b, .pixels = pixels,
-                               .transparent = transparent};
-    if (transparent) {
+    surface_regions_t state = {.globe = globe, .photos = photos, .bounds = b, .pixels = pixels};
+    if (transparent && fmax(b[2] - b[0], b[3] - b[1]) <= 6) {
         bool ready = photos && surface_regions(&state);
         photos = state.photos;
         if (!ready) { json_free(photos); return NULL; }
         if (json_array_size(photos)) return photos;
     }
-    int first = (int)floor((b[0] + 180) / 30), last = (int)ceil((b[2] + 180) / 30) - 1;
-    int top = (int)fmax(0, floor((90 - b[3]) / 30)), bottom = (int)fmin(5, ceil((90 - b[1]) / 30) - 1);
-    bool ok = photos && first <= last && last - first <= 2 && top >= 0 && bottom < 6 && bottom - top <= 2;
+    /* Choose the finer global grid only when its extra pixels improve this output. Metadata reads stay indexed;
+     * older databases retain the complete original grid without an installation or a network dependency. */
+    globe_texture_info_t available;
+    bool detail = pixels / fmax(b[2] - b[0], b[3] - b[1]) > 60 &&
+                  globe_texture_metadata(globe, 4, 0, 0, &available);
+    unsigned level = detail ? 4 : 2, columns = detail ? 48 : 12, rows = columns / 2;
+    double degrees = 360. / columns, density = 1800 / degrees;
+    int first = (int)floor((b[0] + 180) / degrees), last = (int)ceil((b[2] + 180) / degrees) - 1;
+    int top = (int)fmax(0, floor((90 - b[3]) / degrees));
+    int bottom = (int)fmin(rows - 1, ceil((90 - b[1]) / degrees) - 1);
+    bool ok = photos && first <= last && top <= bottom && (last - first + 1) * (bottom - top + 1) <= 36;
     for (int row = top; ok && row <= bottom; ++row) {
         for (int column = first; ok && column <= last; ++column) {
-            unsigned wrapped = (unsigned)((column % 12 + 12) % 12);
+            unsigned wrapped = (unsigned)((column % (int)columns + (int)columns) % (int)columns);
             globe_texture_info_t info;
-            ok = globe_texture_metadata(globe, 2, wrapped, (unsigned)row, &info);
-            double west = column * 30 - 180, north = 90 - row * 30;
-            double left = fmax(b[0], west), right = fmin(b[2], west + 30);
-            double south = fmax(b[1], north - 30), upper = fmin(b[3], north);
-            double source[] = {(left - west) * 60, (north - upper) * 60, (right - left) * 60, (upper - south) * 60};
+            ok = globe_texture_metadata(globe, level, wrapped, (unsigned)row, &info);
+            double west = column * degrees - 180, north = 90 - row * degrees;
+            double left = fmax(b[0], west), right = fmin(b[2], west + degrees);
+            double south = fmax(b[1], north - degrees), upper = fmin(b[3], north);
+            double source[] = {(left - west) * density, (north - upper) * density,
+                               (right - left) * density, (upper - south) * density};
             double target[] = {(left - b[0]) * pixels / (b[2] - b[0]), (b[3] - upper) * pixels / (b[3] - b[1]),
                                (right - left) * pixels / (b[2] - b[0]), (upper - south) * pixels / (b[3] - b[1])};
             json_t *photo = ok ? json_new_object() : NULL;
-            string_t *url = ok ? string_sprintf("/earth_tiles/%02u-%02u.png", wrapped, (unsigned)row) : NULL;
+            string_t *url = ok ? string_sprintf("/earth_tiles%s/%02u-%02u.png", detail ? "_detail" : "",
+                                               wrapped, (unsigned)row) : NULL;
             string_t *width = string_new_with("1800");
             if (photo && url) {
                 lab_cal_set(photo, "url", string_c_str(url));
@@ -184,7 +208,7 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
     string_t *identity = globe_reader_identity(reader);
     globe_t *globe = identity ? globe_reader_get(reader) : NULL;
     string_t *key = identity ? string_sprintf("%s:%s:%.12g:%.12g:%.12g:%.12g",
-        photograph ? "photo-cell-3" : "river-surface-7", string_c_str(identity), b[0], b[1], b[2], b[3]) : NULL;
+        photograph ? "photo-cell-5" : "river-surface-8", string_c_str(identity), b[0], b[1], b[2], b[3]) : NULL;
     bool ok = key && globe;
     bool rivers = data && ok && globe_has_layer(globe, GLOBE_LAYER_RIVERS);
     bool complete = data && ok && globe_river_water_complete(globe, b[0], b[1], b[2], b[3]);
@@ -204,16 +228,21 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
     else ok = ok && (mask || photos);
     json_t *banks = ok && data ? (rivers ? lab_cal_river_banks(globe, b) : json_new_array()) : NULL;
     if (data) ok = ok && banks;
+    surface_coverage_t coverage = {.rectangles = data ? json_new_array() : NULL, .bounds = b};
+    if (data) ok = ok && coverage.rectangles && (!rivers || complete ||
+        globe_river_water_coverage(globe, b[0], b[1], b[2], b[3], surface_coverage, &coverage));
     string_t *after = ok ? globe_reader_identity(reader) : NULL;
     changed = changed || (after && string_compare(identity, after));
     ok = ok && after && !changed;
     json_t *result = ok ? json_new_object() : NULL;
     if (result) {
         lab_cal_take(result, "ok", json_new_bool(true));
+        if (photograph) lab_cal_take(result, "alpha", json_new_bool(true));
         lab_cal_set(result, "key", string_c_str(key));
         lab_cal_take(result, "bounds", surface_numbers(b, 4));
         if (data) {
             lab_cal_take(result, "complete", json_new_bool(complete));
+            lab_cal_take(result, "coverage", coverage.rectangles); coverage.rectangles = NULL;
             lab_cal_set(result, "path", string_c_str(surface.path));
             lab_cal_set(result, "fill", string_c_str(surface.fill));
             lab_cal_take(result, "banks", banks); banks = NULL;
@@ -222,6 +251,7 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
         if (status) *status = 200;
     }
     json_free(photos); json_free(banks); string_free(surface.path); string_free(surface.fill);
+    json_free(coverage.rectangles);
     string_free(key); string_free(identity); string_free(after);
     globe_reader_free(reader);
     return result ? result : lab_cal_error(status, changed ? 409 : 503,

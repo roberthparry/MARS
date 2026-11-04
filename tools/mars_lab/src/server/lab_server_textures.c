@@ -22,7 +22,7 @@ typedef struct {
 
 struct _lab_texture_routes_t {
     globe_reader_t *reader;
-    lab_texture_route_t routes[74 + GLOBE_TEXTURE_REGION_LIMIT];
+    lab_texture_route_t routes[74 + 1152 + GLOBE_TEXTURE_REGION_LIMIT];
 };
 
 /* GET revalidation uses weak comparison and accepts an HTTP entity-tag list. Header length is server-bounded. */
@@ -80,12 +80,15 @@ lab_texture_routes_t *lab_svr_textures_new(websrv_t *listener)
     if (!owner) return NULL;
     unsigned index = 0;
     bool ok = true;
-    for (unsigned level = 0; ok && level < 4; ++level) {
-        for (unsigned row = 0; ok && row < (level == 2 ? 6u : 1u); ++row) {
-            for (unsigned column = 0; ok && column < (level == 3 ? GLOBE_TEXTURE_REGION_LIMIT : level == 2 ? 12u : 1u); ++column) {
+    for (unsigned level = 0; ok && level < 5; ++level) {
+        unsigned rows = level == 4 ? 24 : level == 2 ? 6 : 1;
+        unsigned columns = level == 4 ? 48 : level == 3 ? GLOBE_TEXTURE_REGION_LIMIT : level == 2 ? 12 : 1;
+        for (unsigned row = 0; ok && row < rows; ++row) {
+            for (unsigned column = 0; ok && column < columns; ++column) {
                 lab_texture_route_t *route = &owner->routes[index++];
                 *route = (lab_texture_route_t){owner, level, column, row};
-                string_t *path = level == 3 ? string_sprintf("/earth_regions/%02u.png", column) :
+                string_t *path = level == 4 ? string_sprintf("/earth_tiles_detail/%02u-%02u.png", column, row) :
+                                level == 3 ? string_sprintf("/earth_regions/%02u.png", column) :
                                 level == 2 ? string_sprintf("/earth_tiles/%02u-%02u.png", column, row)
                                            : string_new_with(level ? "/earth_surface_detail.png" : "/earth_surface.png");
                 ok = path && websrv_route(listener, HTTP_GET, path, texture_request, route);

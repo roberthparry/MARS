@@ -176,7 +176,13 @@ time during blocking SQLite work; it has no estimated percentage. Image import s
 inserted PNGs against the manifest total alongside the bar and percentage. The count includes global images
 and regional tiles, advances only after a successful insertion, and remains visible during finalisation.
 Managed updates also report the final database commit or restoration after a failure.
-Plaintext photographic globe migrations build a replacement beside the installed database. They copy the
+Compatible photographic updates from globe revision 16 retain validated PNG rows with matching dimensions,
+encoded lengths and content digests. Only changed or new photographs are read and inserted; the complete
+coverage index and provenance manifest are refreshed in the same transaction. The progress bar counts tiles
+checked, including retained rows. A small regional upgrade therefore avoids copying the whole image database.
+The explicit integrity check still reads and validates every installed photograph.
+A current installed catalogue remains usable when optional preparation sources are unavailable.
+Older plaintext photographic globe migrations build a replacement beside the installed database. They copy the
 non-image tables and preserve their rowids, indexes, views, triggers, sequence counters and database metadata,
 then import the verified photographs once into new pages. The source is writer-locked until publication.
 The replacement uses 64 KiB pages, a bounded 64 MiB main cache and an 8 MiB source cache; rollback journalling

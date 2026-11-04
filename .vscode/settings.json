@@ -194,8 +194,6 @@
         "editor.wordWrap": "off"
     },
     "markdown.styles": [
-        "docs/books/ESAA/preview.css",
-        "docs/books/Applied Differential Equations/preview.css",
         "docs/preview.css"
     ],
     "makefile.buildLog": "",

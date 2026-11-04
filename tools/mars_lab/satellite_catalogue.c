@@ -219,8 +219,9 @@ static bool assemble(int argc, char **argv, bool repair, const double *window)
     for (int i = 3; ok && i < argc; i += 3) ok = add_batch(catalogue, argv[i], argv[i + 1], argv[i + 2]);
     file_t *directory = file_new_cstr(argv[2]);
     ok = ok && directory && !file_exists(directory) && file_create_directory(directory, 0755, true);
-    static const char *folders[] = {"earth_tiles", "regional"};
-    for (unsigned i = 0; ok && i < 2; ++i) {
+    bool global_detail = field(manifest, "global_detail") != NULL;
+    static const char *folders[] = {"earth_tiles", "regional", "earth_tiles_detail"};
+    for (unsigned i = 0; ok && i < (global_detail ? 3u : 2u); ++i) {
         path = string_sprintf("%s/%s", argv[2], folders[i]);
         file_t *folder = file_new(path);
         ok = folder && file_create_directory(folder, 0755, true);
@@ -233,6 +234,15 @@ static bool assemble(int argc, char **argv, bool repair, const double *window)
         path = relative ? string_sprintf("%s/%s", argv[2], string_c_str(relative)) : NULL;
         ok = relative && publish_image(source, path, json_object_get(assets, relative), &catalogue->bytes);
         string_free(relative); string_free(source); string_free(path);
+    }
+    for (unsigned row = 0; ok && global_detail && row < 24; ++row) {
+        for (unsigned column = 0; ok && column < 48; ++column) {
+            string_t *relative = string_sprintf("earth_tiles_detail/%02u-%02u.png", column, row);
+            string_t *source = relative ? string_sprintf("%s/%s", argv[1], string_c_str(relative)) : NULL;
+            path = relative ? string_sprintf("%s/%s", argv[2], string_c_str(relative)) : NULL;
+            ok = relative && publish_image(source, path, json_object_get(assets, relative), &catalogue->bytes);
+            string_free(relative); string_free(source); string_free(path);
+        }
     }
     json_t *regions = json_new_array();
     for (size_t i = 0; ok && i < catalogue->count; ++i) {

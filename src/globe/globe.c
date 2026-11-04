@@ -233,6 +233,13 @@ bool globe_river_water_complete(globe_t *g, double west, double south, double ea
     return g && rivers_water_complete(g->rivers, west, south, east, north);
 }
 
+/* Preserve partial surveyed coverage independently of the dimensions chosen by a rendering client. */
+bool globe_river_water_coverage(globe_t *g, double west, double south, double east, double north,
+                               globe_water_coverage_fn visit, void *context)
+{
+    return g && rivers_water_coverage(g->rivers, west, south, east, north, visit, context);
+}
+
 /* Preserve transactional shoreline import without changing catalogue ownership. */
 bool globe_import_shoreline(sqlite_t *db, file_t *source)
 {

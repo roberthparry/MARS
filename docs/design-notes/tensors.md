@@ -21,6 +21,18 @@ Expressing a field equation, evaluating its residual and finding all its
 solutions are separate capabilities. General Einstein or Killing PDE systems
 must remain representable even when no supported solver can complete them.
 
+The concrete proposed Lab workflows are recorded in:
+
+- [Coordinate transformations](#first-useful-workflow-change-coordinates),
+  including custom toroidal coordinates and worked component transformations.
+- [Line elements and field equations](#line-elements-field-equations-and-solutions),
+  including the distinction between changing coordinates and solving for a metric.
+- [Physical predictions](#physical-predictions-from-a-supplied-metric), including
+  Mercury's orbit, Doppler shifts, clock comparisons and length measurements.
+
+Their solver requirements are also recorded in the
+[differential-equation design notes](./differential-equations.md#tensor-and-geometric-systems).
+
 ## Mathematical objects and their identities
 
 Start with opaque `tensor_t` values in `include/tensor-t.h`, implemented in
@@ -407,12 +419,513 @@ UI state as versioned reconstructible data. Never store native pointers or depen
 on a process-global default geometry. Restoring a history entry restores the
 mathematics needed to reproduce it, not just its rendered formula.
 
+### First useful workflow: change coordinates
+
+Make **Change coordinates** a named operation with a small structured form. A
+user supplies two charts, their coordinate relationship, the tensor's ordered
+slot types and its source components. MARS constructs the Jacobians and applies
+the transformation. Users need not write the indexed transformation law or
+declare a metric for an ordinary tensor transformation.
+
+This is a proposed interface and a set of future acceptance examples, not
+currently supported Lab input or a final declaration grammar. Coordinate
+transformation, tensor simplification, curvature calculation and verification of
+supplied fields can make the initial mode useful before coupled differential
+equations can be solved. Geodesic and transport solving depend on coupled ODE
+support; more general Maxwell, Killing and Einstein systems need separately
+supported PDE methods. Keep derived equations, verified candidates and solved
+systems distinct in the result cards.
+
+#### Problem entry and reusable transformations
+
+The form should contain:
+
+- **Source and target charts:** ordered coordinate names and optional descriptive
+  names. The coordinate lists determine the dimension and component ordering.
+- **Coordinate relations:** equations expressing either the source coordinates
+  in terms of the target coordinates or the target coordinates in terms of the
+  source coordinates. Label the supplied direction explicitly.
+- **Object and slots:** a vector, one-form, metric or general tensor, with ordered
+  upper and lower slots such as `V[^a]`, `omega[_a]` or `T[^a, _b]`.
+- **Source components and frame:** a component table attached to the source
+  coordinate basis by default. Use a matrix grid for two slots and indexed
+  component selection for higher ranks. Unknown entries remain distinct from
+  zero entries; declared symmetries can reduce the entries required.
+- **Domain and assumptions:** coordinate ranges, angular branches, excluded
+  singularities and assumptions needed for simplification or invertibility.
+- **Action:** transform to the selected target chart, with optional derivation
+  steps and numerical evaluation at a supplied point.
+
+Provide Cartesian, polar, cylindrical and spherical presets that populate the
+coordinate relations and their domain restrictions. Custom charts use the same
+form. A saved transformation should be reusable for several tensors without
+re-entering its equations. Changing a tensor's variance must change its actual
+type and transformation rule, not merely its displayed index position.
+
+The initial workflow uses coordinate bases. An orthonormal-frame option would
+add an explicit frame transformation and its geometric data; selecting polar
+coordinates alone must not silently select unit radial and angular basis
+vectors. Label the chart and frame on input, component results and copied output.
+
+#### Worked vector example: Cartesian to polar
+
+Proposed problem fields:
+
+| Field | Input |
+| --- | --- |
+| Source chart | Cartesian, ordered coordinates `x, y` |
+| Target chart | Polar, ordered coordinates `r, phi` |
+| Coordinate relations | `x = r*cos(phi)` and `y = r*sin(phi)` |
+| Relation direction | Source coordinates expressed in target coordinates |
+| Object | Vector `V[^a]` |
+| Source components | $V^x=-y$, $V^y=x$ |
+| Source and target frames | Their respective coordinate bases |
+| Domain | $r>0$, $-\pi<\phi<\pi$; this branch excludes the origin and the negative Cartesian $x$-axis |
+| Action | Transform to polar coordinates |
+
+The authored source field is
+
+$$
+V=-y\,\partial_x+x\,\partial_y.
+$$
+
+Expected result, labelled **Polar coordinate-basis components**:
+
+$$
+V^r=0,\qquad V^\phi=1,\qquad V=\partial_\phi.
+$$
+
+For comparison, if the Euclidean metric and the orthonormal polar frame are
+explicitly selected, the expected components are $(0,r)$. The two component
+lists represent the same field in different bases. The
+[SageMath coordinate and frame tutorial](https://doc.sagemath.org/html/en/thematic_tutorials/vector_calculus/vector_calc_change.html)
+provides an independent reference for making these distinctions visible.
+
+#### Reuse for one-forms and metrics
+
+With the same coordinate relations, enter the one-form `omega[_a]` with
+Cartesian components $\omega_x=-y$, $\omega_y=x$. Its expected output is
+
+$$
+\omega=-y\,dx+x\,dy=r^2\,d\phi,
+\qquad \omega_r=0,\quad \omega_\phi=r^2.
+$$
+
+This deliberately uses the same source component values as the vector example:
+the different slot variance requires a different transformation.
+
+Select the metric `g[_a, _b]` and supply its Cartesian component matrix
+
+$$
+g_{\mathrm{Cartesian}}=
+\begin{pmatrix}1&0\\0&1\end{pmatrix}.
+$$
+
+Expected polar coordinate-basis output:
+
+$$
+g_{\mathrm{polar}}=
+\begin{pmatrix}1&0\\0&r^2\end{pmatrix},
+\qquad ds^2=dr^2+r^2\,d\phi^2.
+$$
+
+The general tensor workflow uses the same chart relationship and an arbitrary
+ordered slot declaration. Each upper slot receives a forward Jacobian and each
+lower slot an inverse Jacobian, as specified in the
+[mixed-tensor transformation](#mixed-tensor-coordinate-transformation).
+
+#### Custom chart example: toroidal coordinates
+
+The **Custom coordinates** option accepts coordinate relations and parameter
+domains without requiring a built-in name for the chart. For example, take
+Cartesian source coordinates $(t,x,y,z)$, toroidal target coordinates
+$(t,u,v,\phi)$, unchanged time, a constant scale $a>0$ and the relations
+
+$$
+D=\cosh v-\cos u,\qquad
+x=\frac{a\sinh v\cos\phi}{D},\quad
+y=\frac{a\sinh v\sin\phi}{D},\quad
+z=\frac{a\sin u}{D}.
+$$
+
+Here $v>0$ and $u,\phi$ have explicitly chosen open angular branches, for example
+$(0,2\pi)$. The focal circle, axis and chart seams require other patches when
+they are part of the requested domain. This follows the coordinate ordering in
+the [MathWorld toroidal-coordinate reference](https://mathworld.wolfram.com/ToroidalCoordinates.html).
+
+With flat spacetime as the supplied source geometry, the expected transformed
+line element is
+
+$$
+ds^2=-dt^2+\frac{a^2}{D^2}
+\left(du^2+dv^2+\sinh^2v\,d\phi^2\right).
+$$
+
+The connection coefficients need not vanish, while the Riemann tensor remains
+zero. MARS should derive these results from the coordinate relations and source
+metric. A custom chart alone supplies neither a metric nor axial symmetry,
+stationarity or a matter model. For an unknown geometry, the user instead
+supplies unknown metric components or a declared metric ansatz in that chart.
+
+#### Native calculation and result cards
+
+When source coordinates are supplied as functions of target coordinates,
+differentiate those functions to obtain
+
+$$
+K^a{}_{b'}=\frac{\partial x^a}{\partial x^{b'}},
+\qquad J^{a'}{}_b=(K^{-1})^{a'}{}_b.
+$$
+
+Substitute the supplied coordinate relations into the source component
+functions and apply the appropriate factors of $J$ and $K$. In the polar
+example, $\det K=r$, so the specified domain permits inversion of the Jacobian
+matrix without solving explicitly for an inverse angle function. Matrix
+inversion supplies the local inverse differential; it does not establish a
+global inverse coordinate map. Where the supplied direction does not allow
+component functions to be expressed in target coordinates, request inverse
+relations or display the remaining source-coordinate dependencies explicitly.
+
+The native result should supply the transformed components, their rendered
+tensor expression, chart and frame labels, domain restrictions and, when
+requested, both Jacobians, determinant and transformation steps. All tensor
+slots and Jacobian factors must refer to the same geometric point. The browser
+displays these results without deriving matrices, substituting expressions or
+simplifying mathematics itself.
+
+History entries retain both chart declarations, the relation direction and
+equations, domain, source tensor and frame, selected target frame and requested
+action. Restoring the entry must reproduce the transformation independently of
+later edits to another problem's charts or tensors.
+
+### Line elements, field equations and solutions
+
+The expression $ds^2=g_{ab}\,dx^a dx^b$ specifies a metric. Its role depends on
+the requested operation:
+
+| Requested operation | Supplied information | Result |
+| --- | --- | --- |
+| Change coordinates | Known metric and chart transition | The same geometry expressed in another chart |
+| Expand field equations | Metric with unknown functions, connection choice and tensor equations | A component differential-equation system with its assumptions and constraints |
+| Verify a proposed solution | Candidate metric, matter fields and governing equations | Simplified residuals and the domain on which they vanish |
+| Solve for a metric | Unknown metric functions, matter model, equations and appropriate conditions | Supported solution branches, their conditions and residual verification |
+
+Thus the flat toroidal line element above is a coordinate-transformation result.
+It also satisfies the vacuum Einstein equations when $T_{ab}=0$ and
+$\Lambda=0$, because the source geometry was already flat. Changing its
+coordinates did not discover a new gravitational solution. An unknown line
+element becomes a verified solution only after its functions and accompanying
+fields satisfy the specified equations and conditions.
+
+### Component reduction example: spherical Einstein equations
+
+The user could select spherical polar coordinates $(t,r,\theta,\phi)$ and
+declare the additional assumption of spherical symmetry. On a patch admitting
+diagonal areal-radius coordinates, supply the unknown metric
+
+$$
+ds^2=-e^{2\nu(t,r)}dt^2+e^{2\lambda(t,r)}dr^2
+     +r^2\left(d\theta^2+\sin^2\theta\,d\phi^2\right).
+$$
+
+Choosing spherical coordinates alone must not impose this ansatz. With the MTW
+profile and $G=c=1$, request expansion of
+$G_{ab}+\Lambda g_{ab}=8\pi T_{ab}$. Write primes for partial differentiation
+with respect to $r$ and dots for partial differentiation with respect to $t$.
+Expected normalised non-trivial component equations are
+
+$$
+\begin{aligned}
+e^{-2\lambda}\left(\frac2r\lambda'-\frac1{r^2}\right)
+  +\frac1{r^2}-\Lambda&=8\pi e^{-2\nu}T_{tt},\\[6pt]
+e^{-2\lambda}\left(\frac2r\nu'+\frac1{r^2}\right)
+  -\frac1{r^2}+\Lambda&=8\pi e^{-2\lambda}T_{rr},\\[6pt]
+\frac2r\dot\lambda&=8\pi T_{tr}.
+\end{aligned}
+$$
+
+The angular component is
+
+$$
+\begin{aligned}
+&e^{-2\lambda}\left[\nu''+(\nu')^2-\nu'\lambda'
+                     +\frac1r(\nu'-\lambda')\right]\\
+&\quad-e^{-2\nu}\left[\ddot\lambda+(\dot\lambda)^2
+                        -\dot\nu\dot\lambda\right]+\Lambda
+  =\frac{8\pi}{r^2}T_{\theta\theta}.
+\end{aligned}
+$$
+
+Before normalisation, the $\phi\phi$ equation is the $\theta\theta$ equation
+multiplied by $\sin^2\theta$, requiring
+$T_{\phi\phi}=\sin^2\theta\,T_{\theta\theta}$;
+the other mixed stress components vanish. Show component relations and Bianchi
+dependencies rather than calling all displayed equations independent. A matter
+model and its evolution or conservation equations are additional problem data.
+
+For $T_{ab}=0$ and $\Lambda=0$, the mixed component gives $\dot\lambda=0$.
+After the remaining equations and a time-coordinate normalisation, the exterior
+solution is $e^{2\nu}=e^{-2\lambda}=1-2M/r$. The
+[Cambridge black-hole notes](https://www.damtp.cam.ac.uk/user/tong/gr/six.pdf)
+provide a reference derivation. Keep this proposed spherical reduction
+distinct from a general Einstein PDE solver.
+
+### Physical predictions from a supplied metric
+
+A useful mode should derive observables from known metrics before it can solve
+general field equations. Treat the following as planned problem templates and
+future acceptance examples, not implemented solvers. Geometric units and the
+signature $(-,+,+,+)$ apply unless a displayed formula explicitly restores $c$
+or $G$.
+
+| Operation | Additional user input | Requested output |
+| --- | --- | --- |
+| Derive or integrate an orbit | Body, metric, initial event and timelike initial velocity, or specified orbital turning points | Geodesic equations, first integrals, reduced orbit equation and supported trajectory plot |
+| Measure a frequency shift | Emission and reception events, observer four-velocities and the connecting light ray | Emitted and received frequencies, their ratio and redshift |
+| Compare clocks | Clock worldlines, comparison events and any clock-synchronisation prescription | Proper times and a clearly defined rate or elapsed-time comparison |
+| Measure a length | Rod endpoint worldlines or a specified spatial curve, measuring observer and simultaneity prescription | Proper rest length or measured length under the selected protocol |
+
+#### Deriving Mercury's orbit
+
+Use the exterior Schwarzschild metric as a supplied or independently verified
+geometry. Approximate Mercury as a test body around an isolated, non-rotating,
+spherical Sun, with $\Lambda=0$. This establishes a leading relativistic
+comparison case, not a complete planetary ephemeris. Set
+
+$$
+f(r)=1-\frac{2M}{r},\qquad
+ds^2=-f(r)dt^2+f(r)^{-1}dr^2
+     +r^2(d\theta^2+\sin^2\theta\,d\phi^2),
+$$
+
+where $M$ is the Sun's geometric mass parameter; physical input supplies
+$M=GM_\odot/c^2$. Work in the exterior $r>2M$ and choose the orbital plane
+$\theta=\pi/2$. From the metric,
+derive the timelike geodesic equations and normalisation
+
+$$
+\frac{dU^a}{d\tau}+\Gamma^a{}_{bc}U^bU^c=0,
+\qquad U^a=\frac{dx^a}{d\tau},\qquad g_{ab}U^aU^b=-1.
+$$
+
+The time-translation and rotation symmetries give conserved specific energy
+$E=f\dot t$ and specific angular momentum $\ell=r^2\dot\phi$, where dots
+in this subsection mean proper-time derivatives. Expected radial first integral:
+
+$$
+\dot r^2+f(r)\left(1+\frac{\ell^2}{r^2}\right)=E^2.
+$$
+
+For a non-radial orbit with $\ell\ne0$, define $u=1/r$. Reducing the geodesic
+equations gives the expected orbit equation
+
+$$
+\boxed{\frac{d^2u}{d\phi^2}+u=\frac{M}{\ell^2}+3Mu^2.}
+$$
+
+Retain circular solutions and extend the equation through turning points;
+division by $du/d\phi$ must not discard them. A numerical first-order system is
+$du/d\phi=w$, $dw/d\phi=M/\ell^2+3Mu^2-u$. Perihelion and aphelion radii
+can determine $E,\ell$ from the radial first integral at both turning points.
+Record how any supplied orbital elements are converted into those radii.
+
+The native derivation should expose the Newtonian limit obtained by omitting
+$3Mu^2$. Starting with $u_0=(1+e\cos\phi)/p$, where
+$p=\ell^2/M$ at Newtonian order, perturbation of the orbit equation produces
+a secular term. Its leading precession can be written
+
+$$
+u(\phi)\simeq\frac1p\left[1+e\cos\left((1-\delta)\phi\right)\right],
+\qquad \delta=\frac{3M}{p}.
+$$
+
+This expression retains the leading secular effect and omits bounded
+first-order corrections. With $p\simeq a(1-e^2)$, the expected advance is
+
+$$
+\Delta\phi\simeq\frac{6\pi GM_\odot}{a(1-e^2)c^2}
+\quad\text{radians per orbit}.
+$$
+
+For representative Mercury data $a=57.909\times10^9$ metres,
+$e=0.2056$ and period $87.969$ days, use the nominal solar mass parameter
+$GM_\odot=1.3271244\times10^{20}\ \mathrm{m^3\,s^{-2}}$ and
+$c=299792458\ \mathrm{m\,s^{-1}}$. The expected relativistic contribution is
+approximately $0.1035$ arcseconds per orbit, or $43$ arcseconds per Julian
+century of $36525$ days. Keep this contribution
+separate from Newtonian planetary perturbations, solar multipoles and the total
+observed precession. Label approximation order, element source and epoch;
+numerical plots should locate successive perihelia and compare the measured
+advance with this leading formula. Use
+[Cambridge's orbit derivation](https://www.damtp.cam.ac.uk/user/tong/gr/grhtml/S1.html),
+the [Edinburgh derivation](https://www.roe.ac.uk/japwww/teaching/gr/GR_notes_2021.pdf)
+and [NASA's Mercury parameters](https://nssdc.gsfc.nasa.gov/planetary/factsheet/mercuryfact.html)
+as independent references for the future tests. The nominal solar parameter is
+defined by [IAU 2015 Resolution B3](https://iauarchive.eso.org/static/resolutions/IAU2015_English.pdf);
+distinguish a nominal conversion constant from fitted ephemeris parameters.
+
+#### Doppler shifts and gravitational redshift
+
+Work in vacuum geometric optics. Specify future-directed unit observer
+four-velocities $U^a$, emission and reception events, and a connecting null ray
+with wave covector $k_a$. Expected local angular frequency and frequency ratio:
+
+$$
+\omega=-k_aU^a,\qquad
+\frac{\omega_{\mathrm r}}{\omega_{\mathrm e}}
+=\frac{(-k_aU^a)_{\mathrm r}}{(-k_aU^a)_{\mathrm e}},
+\qquad 1+z=\frac{\omega_{\mathrm e}}{\omega_{\mathrm r}}.
+$$
+
+Use the same propagated ray at both endpoints. Its affine tangent obeys
+$k^b\nabla_bk^a=0$ and $g_{ab}k^ak^b=0$; it is not a photon four-velocity.
+The emission frequency fixes its scale, while the ratio is invariant under a
+common constant rescaling. Observer worldlines may be prescribed or accelerated;
+do not require every observer to be geodesic. This invariant contraction is the
+common foundation for motion and gravitational frequency shifts. See
+[Kasai's covariant treatment](https://arxiv.org/html/2302.11146v3).
+
+For longitudinal recession in flat spacetime, use the emitter's inertial frame
+and choose the positive $x$ direction along the light ray. With relative speed
+$0<\beta=v/c<1$ and $\gamma=(1-\beta^2)^{-1/2}$, the native derivation should
+construct
+
+$$
+U_{\mathrm e}^a=(1,0,0,0),\quad
+U_{\mathrm r}^a=\gamma(1,\beta,0,0),\quad
+k_a=\omega_{\mathrm e}(-1,1,0,0).
+$$
+
+Contracting gives $\omega_{\mathrm r}=\gamma(1-\beta)\omega_{\mathrm e}$,
+and the expected ratio is
+
+$$
+\frac{\omega_{\mathrm r}}{\omega_{\mathrm e}}
+=\sqrt{\frac{1-\beta}{1+\beta}}.
+$$
+
+At $\beta=3/5$ this is $1/2$; the corresponding approaching case gives $2$.
+The [Einstein Online Doppler discussion](https://www.einstein-online.info/en/spotlight/doppler/)
+provides a physical reference for the recession/approach convention.
+
+For static observers in the Schwarzschild exterior, conservation of the ray's
+time-translation energy $E_\gamma=-k_t$ and the observer normalisation
+$U^t=f(r)^{-1/2}$ give $\omega=E_\gamma f(r)^{-1/2}$. The expected
+gravitational ratio is
+
+$$
+\frac{\omega_{\mathrm r}}{\omega_{\mathrm e}}
+=\sqrt{\frac{f(r_{\mathrm e})}{f(r_{\mathrm r})}}.
+$$
+
+Emission at $r_{\mathrm e}=4M$ and reception at $r_{\mathrm r}=8M$ give
+$\sqrt{2/3}<1$. The result card should identify the observers, events, ray and
+sign of the shift; separating motion and gravity is optional and requires a
+specified reference observer family. Arbitrary connecting rays may require a
+boundary-value solver, beyond the initial ODE initial-value scope.
+
+#### Proper time and time dilation
+
+Calculate elapsed clock time along the specified timelike worldline from
+
+$$
+d\tau^2=-g_{ab}\,dx^a dx^b.
+$$
+
+With a monotonic coordinate time $t$ and spatial coordinate velocities
+$v^i=dx^i/dt$, the expected rate is
+
+$$
+\frac{d\tau}{dt}
+=\sqrt{-g_{tt}-2g_{ti}v^i-g_{ij}v^iv^j}.
+$$
+
+Integrate this rate over the requested worldline segment. Identify the event
+pair and comparison protocol; two clocks departing from the same event and
+reuniting at another event have directly comparable accumulated proper times.
+
+For constant inertial speed in Minkowski spacetime, restore $c$ to obtain
+$\gamma=(1-v^2/c^2)^{-1/2}$ and the expected relation
+$\Delta t=\gamma\Delta\tau$. At $v=3c/5$, a moving clock accumulates
+$\Delta\tau=4\Delta t/5$. For a static Schwarzschild clock,
+$d\tau=\sqrt{f(r)}\,dt$. Comparing static clocks at $4M$ and $8M$ over the
+same Killing-time interval gives $d\tau_{4M}/d\tau_{8M}=\sqrt{2/3}$.
+Keep coordinate time, proper time and light-signal arrival intervals labelled.
+References include the [proper-time and redshift treatment](https://arxiv.org/html/2302.11146v3)
+and [Einstein Online's clock discussion](https://www.einstein-online.info/en/relativity_space_time/).
+
+#### Length measurements and contraction
+
+The measurement definition is part of the input. A rod's rest length, a
+coordinate separation, a length measured using simultaneous endpoint events
+and an optical image are different outputs.
+
+For an observer with $U^aU_a=-1$, construct the local rest-space projector and
+its covariant spatial metric
+
+$$
+h^a{}_b=\delta^a{}_b+U^aU_b,\qquad h_{ab}=g_{ab}+U_aU_b.
+$$
+
+For an infinitesimal simultaneous displacement satisfying $U_a\,dx^a=0$,
+the expected measured length is $d\ell^2=h_{ab}\,dx^a dx^b$. For a finite
+rod moving inertially in flat spacetime, first choose endpoint events that are
+simultaneous in the measuring inertial frame, then evaluate their spatial
+separation. The expected result for motion parallel to the rod is
+
+$$
+L=\frac{L_0}{\gamma},\qquad \gamma=(1-v^2/c^2)^{-1/2},
+$$
+
+where $L_0$ is its proper rest length. At $v=3c/5$, $L=4L_0/5$; transverse
+dimensions are unchanged. To derive this, let primed coordinates denote the
+rod's rest frame and unprimed coordinates the measuring frame. The Lorentz
+relation $\Delta x'=\gamma(\Delta x-v\Delta t)$, evaluated at
+$\Delta t=0$, gives $L_0=\gamma L$. Transforming a pair of events simultaneous
+only in the rod's rest frame cannot by itself produce the measuring frame's
+rod length.
+The [UNSW simultaneity and length discussion](https://www.phys.unsw.edu.au/einsteinlight/jw/module4_time_dilation.htm)
+provides a reference for this measurement prescription.
+
+In curved spacetime, a local projector does not alone select a global surface
+of simultaneity. Extended lengths need an explicit spatial slice or operational
+definition. For example, on a static Schwarzschild $t=\mathrm{constant}$ slice,
+the expected radial proper distance and circumferential length are
+
+$$
+\ell_{12}=\int_{r_1}^{r_2}f(r)^{-1/2}\,dr,
+\qquad C(r)=2\pi r,\qquad r_2>r_1>2M.
+$$
+
+This describes a spatial measurement on that slice; it is not a universal
+material stretching law. Return the observer, slice, endpoint events and units
+alongside every reported length.
+
+#### Solver and presentation boundaries
+
+The tensor module derives connections, first integrals, observer contractions
+and typed component systems. Supported evolution and trajectory calculations
+belong to the [differential-equation module](./differential-equations.md);
+endpoint, turning-point and intersection conditions require suitable event or
+boundary-value handling. Algebraic frequency ratios and Lorentz transformations
+can be useful before trajectory integration is available.
+
+Native results should provide assumptions, conserved quantities, reduced
+equations, measurement definitions, symbolic and numerical results, approximation
+orders and residual or invariant checks. Plotting consumes native trajectory
+data. The browser must not implement geodesic integration, tensor contractions,
+frequency-shift formulae or mathematical simplification. Persist the geometry,
+observers, conditions and measurement protocol with the problem history.
+
 ## Delivery and acceptance
 
 Implement in independently useful stages, with ordinary tests first and matching
 README examples last. Every syntax example above is a future acceptance fixture;
 turn it into an executable test when its parser and operation land. Do not
 present unimplemented design examples as successful runtime tests.
+The coordinate and physical-prediction examples also require executable native
+tests when their operations land, including the stated input assumptions,
+measurement definitions and expected outputs.
 
 1. **Typed algebra:** vectors, one-forms, arbitrary slots, pairing, outer products,
    contraction, free-index validation and capture-free dummy renaming.
@@ -426,7 +939,8 @@ present unimplemented design examples as successful runtime tests.
    searches, transport, geodesics, Einstein–Maxwell residuals and component PDEs.
 6. **Lab integration:** the dedicated mode, reusable geometry input, responsive
    native operations and reproducible bounded history. A minimal abstract-algebra
-   interface can precede the complete geometry controls.
+   interface and the coordinate-transformation workflow can precede the complete
+   geometry controls and differential-equation system solvers.
 7. **Further geometry:** action variations, perturbations, hypersurfaces, ADM
    decompositions and separately designed spinor/gauge-bundle extensions.
 
@@ -434,6 +948,10 @@ Required independent reference cases include:
 
 | Geometry or operation | Expected result |
 | --- | --- |
+| Cartesian rotation field $V^x=-y$, $V^y=x$, transformed to polar coordinates | Coordinate-basis components $(0,1)$; explicitly selected Euclidean orthonormal polar components $(0,r)$ |
+| One-form $\omega_x=-y$, $\omega_y=x$ under the same transformation | Polar coordinate-basis components $(0,r^2)$, preserving the distinction from the vector |
+| Cartesian metric $\operatorname{diag}(1,1)$ transformed to polar coordinates | Polar coordinate-basis metric $\operatorname{diag}(1,r^2)$; the chart transformation itself requires no supplied metric |
+| Flat spacetime transformed to the custom toroidal chart | The displayed toroidal line element with zero Riemann curvature, despite non-zero connection coefficients |
 | Flat spacetime in Cartesian coordinates | Zero Levi–Civita coefficients and curvature |
 | Flat plane in polar coordinates, `g = diag(1,r^2)` | Non-zero coefficients, including $\Gamma^r{}_{\theta\theta}=-r$, but zero curvature |
 | Sphere of radius `L` | Scalar curvature $2/L^2$ under the stated curvature convention |
@@ -445,6 +963,13 @@ Required independent reference cases include:
 | A mixed tensor under a non-linear chart transition | Forward and inverse Jacobian factors, with invariant scalar contractions |
 | Connection coefficients under that transition | The required inhomogeneous term; ordinary tensor transformation must fail |
 | Symmetric/antisymmetric contracted slots | Zero, with remaining tensor type retained |
+| Schwarzschild equatorial timelike geodesic reduction | $u''+u=M/\ell^2+3Mu^2$, with correct radial first integral and circular/turning-point branches retained |
+| Weak-field Mercury orbit | Approximately $43$ arcseconds per Julian century for the relativistic perihelion contribution, with the approximation and input data recorded |
+| Longitudinal flat-spacetime Doppler shift at speed $3c/5$ | Received/emitted frequency ratios $1/2$ for recession and $2$ for approach |
+| Static Schwarzschild emission at $4M$, reception at $8M$ | Frequency ratio $\sqrt{2/3}$; coordinate changes preserve the observer contractions |
+| Clock moving inertially at speed $3c/5$ | Proper elapsed time $4/5$ of the measuring frame's coordinate-time interval |
+| Rod moving parallel to its length at speed $3c/5$ | Measured length $4/5$ of its rest length, using endpoint events simultaneous in the measuring frame |
+| Local observer rest-space projector | $h_{ab}U^b=0$ and $h^a{}_ch^c{}_b=h^a{}_b$, with explicitly selected simultaneity for finite-length measurements |
 
 Also test invalid repeated indices, incompatible free indices, missing metrics,
 non-invertible transitions, coordinate-domain exclusions, torsion and orientation

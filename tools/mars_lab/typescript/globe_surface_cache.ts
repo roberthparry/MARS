@@ -42,6 +42,36 @@ class GlobeSurfaceCache {
         });
     }
 
+    /** @brief Report optional raw-storage availability before preparing speculative cache pixels. */
+    async available(): Promise<boolean> { return Boolean(await this.open()); }
+
+    /** @brief Read bounded content addresses through the metadata key index without loading image Blobs. */
+    async keys(prefix: string, signal?: AbortSignal): Promise<string[]> {
+        if (signal?.aborted) return [];
+        const db = await this.open();
+        if (!db || signal?.aborted) return [];
+        return new Promise(resolve => {
+            try {
+                const transaction = db.transaction('metadata', 'readonly');
+                const request = transaction.objectStore('metadata').getAllKeys(
+                    IDBKeyRange.bound(prefix, prefix + '\uffff'), GlobeSurfaceCache.maximumEntries);
+                let finished = false;
+                const finish = (keys: string[]) => {
+                    if (finished) return;
+                    finished = true; signal?.removeEventListener('abort', cancel); resolve(keys);
+                };
+                const cancel = () => {
+                    try { transaction.abort(); } catch { /* The indexed read may already have completed. */ }
+                    finish([]);
+                };
+                transaction.oncomplete = () => finish(signal?.aborted ? [] : request.result as string[]);
+                transaction.onabort = transaction.onerror = () => finish([]);
+                signal?.addEventListener('abort', cancel, {once: true});
+                if (signal?.aborted) cancel();
+            } catch { resolve([]); }
+        });
+    }
+
     async get(key: string, signal?: AbortSignal): Promise<Blob | null> {
         if (signal?.aborted) return null;
         const db = await this.open();

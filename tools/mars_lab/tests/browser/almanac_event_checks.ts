@@ -154,7 +154,8 @@ window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
         const longitude = document.getElementById('almanacLongitude') as HTMLInputElement;
         const date = document.getElementById('almanacDate') as HTMLInputElement;
         const time = document.getElementById('almanacTime') as HTMLInputElement;
-        const inputs = [town, latitude, longitude, date, time];
+        const elevation = document.getElementById('almanacElevation') as HTMLInputElement;
+        const inputs = [town, latitude, longitude, date, time, elevation];
         const saved = inputs.map(input => input.value);
         const fixtureTown = new Option('Dublin', 'preview-dublin');
         const cell = (label: string): string | null | undefined =>
@@ -175,6 +176,15 @@ window.checkLabAlmanacEvents = function checkLabAlmanacEvents() {
             town.value = fixtureTown.value;
             labDOM.call('lab_almanac_events_preview', target, {name: 'Ireland'});
             check(cell('Location') === 'Dublin, Ireland', 'preview separates a real town from its country');
+            for (const [height, expected] of [
+                ['1767.000000', '1767 m · Updating…'], ['0.000000', '0 m · Updating…'],
+                ['12.6', '13 m · Updating…'], ['-429.4', '-429 m · Updating…'], ['', 'Updating…']
+            ]) {
+                elevation.value = height;
+                labDOM.call('lab_almanac_events_preview', target, {name: 'Ireland'});
+                check(cell('Observer altitude') === expected,
+                      `pending observer height uses whole metres without inventing an absent height: ${height}`);
+            }
             town.value = '';
             for (const [lat, lon, expectedLat, expectedLon] of [
                 ['-33.925', '18.4231666667', '33° 55.50′ S', '18° 25.39′ E'],

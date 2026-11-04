@@ -8,7 +8,7 @@
 interface TextureSlot { token: number; slot: number; count: number; bytes: number; evicted?: number[]; bounds?: number[]; zoom?: number; }
 export interface GlobePhotoCell { key: string; bounds: number[]; level: number; coverage?: boolean; }
 export interface GlobePhotoPage {
-    bounds: number[]; span: number; pointer: number; protect: number[]; next?: GlobePhotoCell;
+    bounds: number[]; span: number; pointer: number; revision: number; protect: number[]; next?: GlobePhotoCell;
     visible: boolean; pace: number; coverage: number; replace: boolean;
 }
 export class GlobeTextureCache<T> {
@@ -21,10 +21,20 @@ export class GlobeTextureCache<T> {
         this.resources = Array.from({length: limit}, () => null);
     }
     get(key: string): T | null {
+        return this.getSlot(key)?.resource ?? null;
+    }
+    /** @brief Borrow an indexed resource and its native slot so an active drawing operation can pin it. */
+    getSlot(key: string): {resource: T; slot: number} | null {
         const result = this.call({action: 1, key});
-        return result ? this.resources[result.slot] : null;
+        const resource = result ? this.resources[result.slot] : null;
+        return result && resource !== null ? {resource, slot: result.slot} : null;
     }
     get size(): number { return this.call({action: 5})?.count ?? 0; }
+    /** @brief Let native source planning reuse adequate resident or queued pixels across resolution changes. */
+    source<U>(photo: unknown, buffered?: GlobeTextureCache<U>, stored?: string[]): unknown {
+        return this.token ? labDOM.call('lab_texture_cache',
+            {action: 9, token: this.token, photo, buffered: buffered?.token, stored}) : null;
+    }
     remove(key: string): void {
         const result = this.call({action: 7, key});
         for (const slot of result?.evicted || []) {
@@ -53,9 +63,9 @@ export class GlobeTextureCache<T> {
         return result.slot;
     }
     page(bounds: number[], pixels: number, avoid = '', protect: number[] = [],
-         current: GlobePhotoCell | null = null): GlobePhotoPage | null {
+         current: GlobePhotoCell | null = null, ahead: number[] | null = null): GlobePhotoPage | null {
         return this.token ? labDOM.call('lab_texture_cache',
-            {action: 6, token: this.token, bounds, pixels, avoid, protect, current}) as GlobePhotoPage | null : null;
+            {action: 6, token: this.token, bounds, pixels, avoid, protect, current, ahead}) as GlobePhotoPage | null : null;
     }
     journey(bounds: number[], pixels: number, arrival: number[], arrivalPixels: number, ahead: number[] | null,
             avoid: string, idle: boolean, current: GlobePhotoCell | null = null): GlobePhotoPage | null {

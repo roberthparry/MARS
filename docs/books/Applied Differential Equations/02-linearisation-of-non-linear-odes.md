@@ -1,6 +1,60 @@
 <a id="linearisation-of-non-linear-differential-equations"></a>
 ## Linearisation of non-linear differential equations
 
+<style>
+/* Keep the free-particle generator equations with their surrounding list item. */
+div[data-aligned-equations="generator-definitions"] {
+    width: max-content;
+    max-width: 100%;
+    margin: 0.75rem 0 1rem;
+}
+
+div[data-aligned-equations="generator-definitions"] .katex-display {
+    margin: 0;
+    text-align: left;
+}
+
+/* The free-particle commutator table is dense, so give its mathematical
+ * structure more contrast without making the grid dominate the entries. */
+:is(a#free-particle-commutators, p:has(> a#free-particle-commutators)) + table {
+    width: 100%;
+    margin: 1rem 0 1.5rem;
+    border-collapse: collapse;
+    font-size: 1rem;
+    line-height: 1.35;
+}
+
+:is(a#free-particle-commutators, p:has(> a#free-particle-commutators)) + table th,
+:is(a#free-particle-commutators, p:has(> a#free-particle-commutators)) + table td {
+    padding: 0.55rem 0.7rem;
+    border-color: color-mix(
+        in srgb,
+        var(--vscode-editor-foreground, currentColor) 35%,
+        transparent
+    );
+    text-align: center;
+    vertical-align: middle;
+}
+
+:is(a#free-particle-commutators, p:has(> a#free-particle-commutators)) + table thead th,
+:is(a#free-particle-commutators, p:has(> a#free-particle-commutators)) + table tbody td:first-child {
+    background: color-mix(
+        in srgb,
+        var(--vscode-editor-foreground, currentColor) 10%,
+        transparent
+    );
+    font-weight: 600;
+}
+
+:is(a#free-particle-commutators, p:has(> a#free-particle-commutators)) + table tbody tr:nth-child(even) td:not(:first-child) {
+    background: color-mix(
+        in srgb,
+        var(--vscode-editor-foreground, currentColor) 4%,
+        transparent
+    );
+}
+</style>
+
 Confine our attention to $2^\mathrm{nd}$ order ODEs
 
 Consider

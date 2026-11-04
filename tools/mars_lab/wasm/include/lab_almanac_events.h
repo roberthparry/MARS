@@ -43,10 +43,15 @@ void lab_almanac_events_install(jsref root, jsref state);
  */
 void lab_almanac_events_render(jsref target, jsref data, jsref state);
 
-/** @brief Show selected observer controls immediately, with unresolved calculated fields explicitly pending.
- * @param target Worksheet container whose obsolete results are replaced.
- * @param country Optional cached country name and flag; no network lookup is performed.
+/**
+ * @brief Show selected observer controls immediately, with unresolved calculated fields explicitly pending.
+ * @param[in] target Borrowed scoped worksheet container whose obsolete results are replaced.
+ * @param[in] country Borrowed optional cached country name and flag; zero is allowed and no network lookup is performed.
+ * @return No C value. A missing target is a no-op; unresolved or invalid controls remain pending or unavailable.
  * @details Reads current Almanac controls without modifying them or predicting surface/weather results.
+ * Coordinates use degrees and minutes immediately; finite observer heights are rounded to whole metres,
+ * matching the completed native card. Missing or invalid heights remain explicitly pending.
+ * @note No ownership transfers. Created nodes belong to the target DOM; scoped handles are not retained after the call.
  */
 void lab_almanac_events_preview(jsref target, jsref country);
 

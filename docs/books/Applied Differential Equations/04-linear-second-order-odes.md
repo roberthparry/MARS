@@ -486,9 +486,39 @@ $\quad\begin{array}{l}\displaystyle H_n(x)=\frac{n!}{2\pi i} \oint_\Gamma\frac{e
 
 
 <figure data-chart="residue-contour" style="margin: 1.5em auto; max-width: 23rem;">
-  <img src="img/residue-contour.svg"
-       alt="A positively oriented closed contour Gamma enclosing the poles z one, z two and z three."
-       style="display: block; width: 100%; height: auto;" />
+  <svg id="ade-residue-contour" style="display: block; width: 100%; height: auto;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 300" role="img"
+       aria-labelledby="ade-residue-contour-title ade-residue-contour-description">
+    <title id="ade-residue-contour-title">Closed contour enclosing three poles</title>
+    <desc id="ade-residue-contour-description">A positively oriented irregular closed contour Gamma enclosing z one, z two and z three.</desc>
+    <style>
+      #ade-residue-contour { color-scheme: light dark; }
+      #ade-residue-contour path, #ade-residue-contour line { stroke: #c8d0ca; fill: none; stroke-width: 1.7; stroke-linecap: round; }
+      #ade-residue-contour text { fill: #d2d8d3; font-family: "Latin Modern Roman", Georgia, serif; font-size: 22px; font-style: italic; }
+      @media (prefers-color-scheme: light) {
+        #ade-residue-contour path, #ade-residue-contour line { stroke: #465049; }
+        #ade-residue-contour text { fill: #465049; }
+      }
+      @media (prefers-color-scheme: dark) {
+        #ade-residue-contour path, #ade-residue-contour line { stroke: #aeb7b0; }
+        #ade-residue-contour text { fill: #b6beb8; }
+      }
+    </style>
+    <defs>
+      <marker id="ade-residue-contour-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 Z" fill="context-stroke" stroke="none"/>
+      </marker>
+    </defs>
+    <path d="M93 238 C38 184, 54 72, 149 35 C245 2, 338 48, 338 143 C338 235, 249 276, 155 265 C128 262, 107 252, 93 238 Z"/>
+    <path marker-end="url(#ade-residue-contour-arrow)" d="M327 91 C337 108, 340 126, 339 145"/>
+    <line x1="171" y1="192" x2="181" y2="202"/><line x1="181" y1="192" x2="171" y2="202"/>
+    <line x1="132" y1="125" x2="142" y2="135"/><line x1="142" y1="125" x2="132" y2="135"/>
+    <line x1="125" y1="62" x2="135" y2="72"/><line x1="135" y1="62" x2="125" y2="72"/>
+    <text x="187" y="204">z₁</text>
+    <text x="146" y="137">z₂</text>
+    <text x="139" y="76">z₃</text>
+    <text x="348" y="105">Γ</text>
+  </svg>
 </figure>
 
 $f(z)$ has poles at $z_1$, $z_2$ and $z_3$.
@@ -721,9 +751,63 @@ $\quad\begin{array}{l}\displaystyle \mathcal H_l^{m+1}\mathcal H_l^{\dagger,m+1}
 Chart for class 1 solutions: $L(m)$ is increasing.
 
 <figure data-chart="factorisation-class-i" style="margin: 1.5em auto; max-width: 40rem;">
-  <img src="img/factorisation-class-i.svg"
-       alt="Chart for class I solutions, with L of m increasing."
-       style="display: block; width: 100%; height: auto;" />
+  <svg id="ade-factorisation-class-i" style="display: block; width: 100%; height: auto;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 430" role="img"
+       aria-labelledby="ade-factorisation-class-i-title ade-factorisation-class-i-description">
+    <title id="ade-factorisation-class-i-title">Chart for class I solutions</title>
+    <desc id="ade-factorisation-class-i-description">The notebook chart for class I solutions. The axes are l and m, known solutions lie on m equals l, and dashed vertical ladders descend from m equals l.</desc>
+    <style>
+      #ade-factorisation-class-i { color-scheme: light dark; }
+      #ade-factorisation-class-i .axis, #ade-factorisation-class-i .tick, #ade-factorisation-class-i .ladder, #ade-factorisation-class-i .diagonal, #ade-factorisation-class-i .cross, #ade-factorisation-class-i use { stroke: #c8d0ca; fill: none; }
+      #ade-factorisation-class-i .axis { stroke-width: 1.7; }
+      #ade-factorisation-class-i .tick { stroke-width: 1.25; }
+      #ade-factorisation-class-i .ladder { stroke-width: 1.2; stroke-dasharray: 8 9; }
+      #ade-factorisation-class-i .diagonal { stroke-width: 1.35; stroke-dasharray: 10 9; }
+      #ade-factorisation-class-i .cross, #ade-factorisation-class-i use { stroke-width: 1.6; stroke-linecap: round; }
+      #ade-factorisation-class-i text { fill: #d2d8d3; font-family: "Latin Modern Roman", Georgia, serif; }
+      #ade-factorisation-class-i .axis-label { font-size: 24px; font-style: italic; }
+      #ade-factorisation-class-i .number { font-size: 18px; }
+      #ade-factorisation-class-i .note { font-size: 20px; font-style: italic; }
+      @media (prefers-color-scheme: light) {
+        #ade-factorisation-class-i .axis, #ade-factorisation-class-i .tick, #ade-factorisation-class-i .ladder, #ade-factorisation-class-i .diagonal, #ade-factorisation-class-i .cross, #ade-factorisation-class-i use { stroke: #465049; }
+        #ade-factorisation-class-i text { fill: #465049; }
+      }
+      @media (prefers-color-scheme: dark) {
+        #ade-factorisation-class-i .axis, #ade-factorisation-class-i .tick, #ade-factorisation-class-i .ladder, #ade-factorisation-class-i .diagonal, #ade-factorisation-class-i .cross, #ade-factorisation-class-i use { stroke: #aeb7b0; }
+        #ade-factorisation-class-i text { fill: #b6beb8; }
+      }
+    </style>
+    <defs>
+      <marker id="ade-factorisation-class-i-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 Z" fill="context-stroke"/>
+      </marker>
+      <g id="ade-factorisation-class-i-x" class="cross"><path d="M-4,-4 L4,4 M-4,4 L4,-4"/></g>
+    </defs>
+    <path class="axis" marker-end="url(#ade-factorisation-class-i-arrow)" d="M90 370 H650"/>
+    <path class="axis" marker-end="url(#ade-factorisation-class-i-arrow)" d="M90 370 V42"/>
+    <text class="axis-label" x="660" y="379">l</text>
+    <text class="axis-label" x="77" y="38">m</text>
+    <path class="diagonal" d="M90 370 L490 70"/>
+    <text class="note" x="505" y="67">m = l</text>
+    <text class="note" x="255" y="222" transform="rotate(-37 255 222)">Known solutions</text>
+    <text class="note" x="520" y="194">assume m₀ = 0</text>
+    <g class="tick">
+      <path d="M170 364 V376 M250 364 V376 M330 364 V376 M410 364 V376 M490 364 V376"/>
+      <path d="M84 310 H96 M84 250 H96 M84 190 H96 M84 130 H96 M84 70 H96"/>
+    </g>
+    <text class="number" x="170" y="401" text-anchor="middle">1</text>
+    <text class="number" x="68" y="316" text-anchor="middle">1</text>
+    <g class="ladder">
+      <path d="M170 370 V310 M250 370 V250 M330 370 V190 M410 370 V130 M490 370 V70"/>
+    </g>
+    <g>
+      <use href="#ade-factorisation-class-i-x" x="170" y="310"/>
+      <use href="#ade-factorisation-class-i-x" x="250" y="310"/><use href="#ade-factorisation-class-i-x" x="250" y="250"/>
+      <use href="#ade-factorisation-class-i-x" x="330" y="310"/><use href="#ade-factorisation-class-i-x" x="330" y="250"/><use href="#ade-factorisation-class-i-x" x="330" y="190"/>
+      <use href="#ade-factorisation-class-i-x" x="410" y="310"/><use href="#ade-factorisation-class-i-x" x="410" y="250"/><use href="#ade-factorisation-class-i-x" x="410" y="190"/><use href="#ade-factorisation-class-i-x" x="410" y="130"/>
+      <use href="#ade-factorisation-class-i-x" x="490" y="310"/><use href="#ade-factorisation-class-i-x" x="490" y="250"/><use href="#ade-factorisation-class-i-x" x="490" y="190"/><use href="#ade-factorisation-class-i-x" x="490" y="130"/><use href="#ade-factorisation-class-i-x" x="490" y="70"/>
+    </g>
+  </svg>
 </figure>
 
 Basic solution $y_l^l$ comes from
@@ -743,9 +827,64 @@ $\quad\begin{array}{l}\displaystyle \mathcal H_l^mY_l^m=Y_l^{m-1}, \qquad m=l,l-
 Chart for class II solutions: $L(m)$ is a decreasing function.
 
 <figure data-chart="factorisation-class-ii" style="margin: 1.5em auto; max-width: 40rem;">
-  <img src="img/factorisation-class-ii.svg"
-       alt="Chart for class II solutions, with L of m decreasing."
-       style="display: block; width: 100%; height: auto;" />
+  <svg id="ade-factorisation-class-ii" style="display: block; width: 100%; height: auto;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 430" role="img"
+       aria-labelledby="ade-factorisation-class-ii-title ade-factorisation-class-ii-description">
+    <title id="ade-factorisation-class-ii-title">Chart for class II solutions</title>
+    <desc id="ade-factorisation-class-ii-description">The notebook chart for class II solutions. The axes are l and m, known solutions lie on m equals l, dashed vertical ladders rise above them, and there are no solutions below the diagonal.</desc>
+    <style>
+      #ade-factorisation-class-ii { color-scheme: light dark; }
+      #ade-factorisation-class-ii .axis, #ade-factorisation-class-ii .tick, #ade-factorisation-class-ii .ladder, #ade-factorisation-class-ii .diagonal, #ade-factorisation-class-ii .cross, #ade-factorisation-class-ii use { stroke: #c8d0ca; fill: none; }
+      #ade-factorisation-class-ii .axis { stroke-width: 1.7; }
+      #ade-factorisation-class-ii .tick { stroke-width: 1.25; }
+      #ade-factorisation-class-ii .ladder { stroke-width: 1.2; stroke-dasharray: 8 9; }
+      #ade-factorisation-class-ii .diagonal { stroke-width: 1.35; stroke-dasharray: 10 9; }
+      #ade-factorisation-class-ii .cross, #ade-factorisation-class-ii use { stroke-width: 1.6; stroke-linecap: round; }
+      #ade-factorisation-class-ii text { fill: #d2d8d3; font-family: "Latin Modern Roman", Georgia, serif; }
+      #ade-factorisation-class-ii .axis-label { font-size: 24px; font-style: italic; }
+      #ade-factorisation-class-ii .number { font-size: 18px; }
+      #ade-factorisation-class-ii .note { font-size: 20px; font-style: italic; }
+      #ade-factorisation-class-ii .none { font-size: 21px; letter-spacing: .5px; }
+      @media (prefers-color-scheme: light) {
+        #ade-factorisation-class-ii .axis, #ade-factorisation-class-ii .tick, #ade-factorisation-class-ii .ladder, #ade-factorisation-class-ii .diagonal, #ade-factorisation-class-ii .cross, #ade-factorisation-class-ii use { stroke: #465049; }
+        #ade-factorisation-class-ii text { fill: #465049; }
+      }
+      @media (prefers-color-scheme: dark) {
+        #ade-factorisation-class-ii .axis, #ade-factorisation-class-ii .tick, #ade-factorisation-class-ii .ladder, #ade-factorisation-class-ii .diagonal, #ade-factorisation-class-ii .cross, #ade-factorisation-class-ii use { stroke: #aeb7b0; }
+        #ade-factorisation-class-ii text { fill: #b6beb8; }
+      }
+    </style>
+    <defs>
+      <marker id="ade-factorisation-class-ii-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10 Z" fill="context-stroke"/>
+      </marker>
+      <g id="ade-factorisation-class-ii-x" class="cross"><path d="M-4,-4 L4,4 M-4,4 L4,-4"/></g>
+    </defs>
+    <path class="axis" marker-end="url(#ade-factorisation-class-ii-arrow)" d="M90 370 H650"/>
+    <path class="axis" marker-end="url(#ade-factorisation-class-ii-arrow)" d="M90 370 V42"/>
+    <text class="axis-label" x="660" y="379">l</text>
+    <text class="axis-label" x="77" y="44">m</text>
+    <path class="diagonal" d="M90 370 L490 70"/>
+    <text class="note" x="203" y="311" transform="rotate(-37 203 311)">Known solutions</text>
+    <text class="note" x="520" y="167">assume m₀ = 0</text>
+    <text class="none" x="397" y="302">NO SOLUTIONS</text>
+    <g class="tick">
+      <path d="M170 364 V376 M250 364 V376 M330 364 V376 M410 364 V376 M490 364 V376"/>
+      <path d="M84 310 H96 M84 250 H96 M84 190 H96 M84 130 H96 M84 70 H96"/>
+    </g>
+    <text class="number" x="170" y="401" text-anchor="middle">1</text>
+    <text class="number" x="68" y="316" text-anchor="middle">1</text>
+    <g class="ladder">
+      <path d="M170 310 V70 M250 250 V70 M330 190 V70 M410 130 V70"/>
+    </g>
+    <g>
+      <use href="#ade-factorisation-class-ii-x" x="170" y="310"/><use href="#ade-factorisation-class-ii-x" x="170" y="250"/><use href="#ade-factorisation-class-ii-x" x="170" y="190"/><use href="#ade-factorisation-class-ii-x" x="170" y="130"/><use href="#ade-factorisation-class-ii-x" x="170" y="70"/>
+      <use href="#ade-factorisation-class-ii-x" x="250" y="250"/><use href="#ade-factorisation-class-ii-x" x="250" y="190"/><use href="#ade-factorisation-class-ii-x" x="250" y="130"/><use href="#ade-factorisation-class-ii-x" x="250" y="70"/>
+      <use href="#ade-factorisation-class-ii-x" x="330" y="190"/><use href="#ade-factorisation-class-ii-x" x="330" y="130"/><use href="#ade-factorisation-class-ii-x" x="330" y="70"/>
+      <use href="#ade-factorisation-class-ii-x" x="410" y="130"/><use href="#ade-factorisation-class-ii-x" x="410" y="70"/>
+      <use href="#ade-factorisation-class-ii-x" x="490" y="70"/>
+    </g>
+  </svg>
 </figure>
 
 Basic solutions $Y_l^l$ come from
@@ -1284,9 +1423,87 @@ $\quad\begin{array}{l}\displaystyle \psi_{l,l-1}\mathrel{\boldsymbol{=}} -\frac1
 And so on.
 
 <figure style="margin: 1.5em auto; max-width: 46rem;">
-  <img src="img/spherical-harmonic-ladder.svg"
-       alt="Triangular spherical-harmonic ladder of the allowed integer states l and m, bounded by the known solutions m equals plus or minus l."
-       style="display: block; width: 100%; height: auto;" />
+  <svg id="ade-spherical-harmonic-ladder" style="display: block; width: 100%; height: auto;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 500" role="img"
+       aria-labelledby="ade-spherical-harmonic-ladder-title ade-spherical-harmonic-ladder-description">
+    <title id="ade-spherical-harmonic-ladder-title">Spherical-harmonic ladder in l and m</title>
+    <desc id="ade-spherical-harmonic-ladder-description">
+      The allowed integer pairs l,m form a triangular lattice bounded by m equals
+      minus l and m equals l.  The two boundary diagonals are the known highest-
+      and lowest-weight solutions.
+    </desc>
+    <style>
+      #ade-spherical-harmonic-ladder { color-scheme: light dark; }
+      #ade-spherical-harmonic-ladder .axis, #ade-spherical-harmonic-ladder .tick, #ade-spherical-harmonic-ladder .bound, #ade-spherical-harmonic-ladder .cross, #ade-spherical-harmonic-ladder use { stroke: #c8d0ca; }
+      #ade-spherical-harmonic-ladder .axis { stroke-width: 2.2; }
+      #ade-spherical-harmonic-ladder .tick { stroke-width: 1.7; }
+      #ade-spherical-harmonic-ladder .bound { stroke-width: 1.8; stroke-dasharray: 9 8; }
+      #ade-spherical-harmonic-ladder .cross, #ade-spherical-harmonic-ladder use { stroke-width: 2.1; stroke-linecap: round; }
+      #ade-spherical-harmonic-ladder text { fill: #d2d8d3; font-family: "Latin Modern Roman", Georgia, serif; }
+      #ade-spherical-harmonic-ladder .axis-label { font-size: 26px; font-style: italic; }
+      #ade-spherical-harmonic-ladder .tick-label { font-size: 20px; }
+      #ade-spherical-harmonic-ladder .bound-label { font-size: 21px; font-style: italic; }
+      @media (prefers-color-scheme: light) {
+        #ade-spherical-harmonic-ladder .axis, #ade-spherical-harmonic-ladder .tick, #ade-spherical-harmonic-ladder .bound, #ade-spherical-harmonic-ladder .cross, #ade-spherical-harmonic-ladder use { stroke: #505a53; }
+        #ade-spherical-harmonic-ladder text { fill: #3f4942; }
+      }
+      @media (prefers-color-scheme: dark) {
+        #ade-spherical-harmonic-ladder .axis, #ade-spherical-harmonic-ladder .tick, #ade-spherical-harmonic-ladder .bound, #ade-spherical-harmonic-ladder .cross, #ade-spherical-harmonic-ladder use { stroke: #aeb8b0; }
+        #ade-spherical-harmonic-ladder text { fill: #b8c1ba; }
+      }
+    </style>
+    <defs>
+      <marker id="ade-spherical-harmonic-ladder-arrow" viewBox="0 0 10 10" refX="9" refY="5"
+              markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/>
+      </marker>
+      <g id="ade-spherical-harmonic-ladder-state" class="cross">
+        <path d="M -5 -5 L 5 5 M -5 5 L 5 -5"/>
+      </g>
+    </defs>
+    <!-- Axes: m is horizontal and l is vertical. -->
+    <path class="axis" marker-end="url(#ade-spherical-harmonic-ladder-arrow)" d="M 90 420 H 700"/>
+    <path class="axis" marker-end="url(#ade-spherical-harmonic-ladder-arrow)" d="M 380 460 V 55"/>
+    <text class="axis-label" x="713" y="428">m</text>
+    <text class="axis-label" x="390" y="48">l</text>
+    <!-- Integer ticks on the m-axis. -->
+    <g class="tick">
+      <path d="M 140 412 V 428 M 220 412 V 428 M 300 412 V 428
+               M 460 412 V 428 M 540 412 V 428 M 620 412 V 428"/>
+    </g>
+    <g class="tick-label" text-anchor="middle">
+      <text x="140" y="454">−3</text>
+      <text x="220" y="454">−2</text>
+      <text x="300" y="454">−1</text>
+      <text x="460" y="454">1</text>
+      <text x="540" y="454">2</text>
+      <text x="620" y="454">3</text>
+    </g>
+    <!-- Highest- and lowest-weight boundaries m = ±l. -->
+    <path class="bound" d="M 380 420 L 120 95"/>
+    <path class="bound" d="M 380 420 L 640 95"/>
+    <text class="bound-label" x="164" y="207"
+          transform="rotate(51 164 207)">known solutions</text>
+    <text class="bound-label" x="536" y="277"
+          transform="rotate(-51 536 277)">known solutions</text>
+    <!-- Triangular arrangement shown in the original notes. -->
+    <g>
+      <use href="#ade-spherical-harmonic-ladder-state" x="380" y="420"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="320" y="345"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="440" y="345"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="260" y="270"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="380" y="270"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="500" y="270"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="200" y="195"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="320" y="195"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="440" y="195"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="560" y="195"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="140" y="120"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="260" y="120"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="380" y="120"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="500" y="120"/>
+      <use href="#ade-spherical-harmonic-ladder-state" x="620" y="120"/>
+    </g>
+  </svg>
 </figure>
 
 ---

@@ -10,7 +10,8 @@ SVG and WebGL rendering remain application responsibilities.
 `globe.db` stores the photographic PNG layers alongside the geographic data.
 The offline source package is `packaging/globe-db/textures/`; its manifest records
 dimensions, byte counts, SHA-256 digests and NASA source attribution.
-Fresh installations include the 74 NASA images and 4,775 regional Sentinel-2 photographs.
+Fresh installations include the 74 overview and original NASA images, 1,152 full-resolution NASA tiles
+and 4,971 regional Sentinel-2 photographs.
 Managed database revision 16 installs the expanded coastal PNG catalogue and its complete manifest
 to existing installations through `make update-mars-db` or `make release`,
 preserving coastline, country, regional and river layers. Import validates every
@@ -20,12 +21,20 @@ column (row `id=1`), including regional names, processing notes, gap-fill source
 and any additional provenance fields. Indexed texture and regional tables support
 runtime lookups without repeatedly parsing that document. The snapshot is replaced
 in the same transaction as the images, so its metadata describes the installed set.
+Release preparation also compares this snapshot with the prepared manifest. A changed catalogue is imported
+even when the managed-data revision is unchanged; matching PNG rows remain in place. This allows a separately
+completed imagery batch to be installed by the next `make release` without rebuilding geographic layers.
 
 `globe_texture_metadata(globe, level, column, row, &info)` reads an indexed record
 without loading PNG bytes. Level 0 is the 2048 × 1024 overview; level 1 is the
 8192 × 4096 detail image. Both use column and row zero. Level 2 contains a 12 × 6
 grid of 1800 × 1800 tiles, indexed west to east and north to south from zero.
 Level 3 contains regional 1800 × 1800 or 3600 × 3600 photographs, addressed by slot 0–16383 and row zero.
+Level 4 contains the optional 48 × 24 full-resolution NASA grid, with 1800-square tiles covering 7.5 degrees
+on each axis. Its source mosaic is 86400 × 43200 pixels, nominally 500 metres per pixel. Addresses run from
+column 0–47 west to east and row 0–23 north to south. Older databases without this grid return false;
+applications can retain level 2. The `global_detail` manifest entry records the layout and all eight source
+GeoTIFF URLs and SHA-256 digests. Level 4 uses the existing encoded-image bounds and decoded-image cache budgets.
 `globe_texture_regions` enumerates intersecting slots and their geographic bounds through
 a `globe_texture_region_fn` callback without loading their PNGs. Older stores without
 the optional catalogue return an empty enumeration. New imports use an R-tree spatial index
@@ -39,10 +48,11 @@ The prepared catalogue covers the UK, Ireland, Denmark, Netherlands, Italy, Cors
 Sardinia, Capri, Greek islands, mainland Portugal, Azores, Madeira, Spain, Canaries,
 Falklands, Ascension, Isle of Man, Jersey, Guernsey, coastal Svalbard and Cape Peninsula.
 The completed expansion adds mainland France, New Zealand and its offshore islands,
-Finland including Åland, Sweden, Norway, and selected Australian areas: Brisbane,
+Finland including Åland, Sweden, Norway, Iceland, and selected Australian areas: Brisbane,
 Sydney, Melbourne, Perth, Mooloolaba, Maroochydore, Canberra, Cairns, Alice Springs and Gold Coast.
-The complete PNG package occupies about 32.9 GiB after coastline trimming.
-France, New Zealand, Finland, Sweden, Norway, the Australian areas, Spain and Svalbard use
+The regional PNG package occupies about 33.5 GiB after coastline trimming. The full-resolution NASA grid
+adds 2,199,613,908 bytes (about 2.05 GiB); its temporary source GeoTIFF downloads are removed after verification.
+France, New Zealand, Finland, Sweden, Norway, Iceland, the Australian areas, Spain and Svalbard use
 1800-square tiles; earlier regional coverage generally uses 3600-square tiles. These dimensions describe individual images,
 not an allocation of the whole catalogue: indexed queries select only the visible
 coverage and existing decoded-image and GPU cache limits still apply.
@@ -55,8 +65,8 @@ coastal islands. A 3600-square overview and 42 overlapping 3600-square detail ti
 use July–September 2025 Copernicus Sentinel-2 observations, filling missing pixels
 from April–June 2025. The source resolution is 10 metres; reprojection to WGS84 gives
 approximately 9–10 metre detail pixels. The original Cambrian Mountains patch is retained.
-The manifest records sources, processing, bounds and attribution. Regenerating the NASA
-manifest preserves the regional catalogue. Regional PNGs may be 1800 or 3600 pixels square.
+The manifest records sources, processing, bounds and attribution. Regenerating the original NASA
+manifest preserves both the full-resolution global grid and the regional catalogue. Regional PNGs may be 1800 or 3600 pixels square.
 Both RGB and RGBA PNGs are accepted; transparent missing observations retain the underlying image.
 Browser PNG reads use bounded encoded-byte buffers before decoding, avoiding
 temporary-file-backed response Blobs. The decoded photographs and completed GPU
@@ -1669,10 +1679,17 @@ individual towns or water bodies. Other regions still need mapped-water imports.
 The Inari extension supplies 322 mapped water pieces, including the Juutuanjoki
 connection and Lake Inari islands. `globe_river_water_complete()` checks the optional
 `rivers_water_coverage` integer R-tree for a complete survey enclosing the requested
-window. Only such windows allow mapped water polygons to replace the coarse lake
-mask, including restoring islands and surrounding land. Polygon bounds alone never
-establish completeness; missing metadata and partially covered windows retain the
-ordinary overlays. This describes completeness of the imported mapped areas, not
+window. `globe_river_water_coverage()` streams the indexed survey rectangles intersecting a
+window, clipped into its longitude frame, including windows crossing the date line. Its
+`globe_water_coverage_fn` visitor receives borrowed west, south, east and north degrees for
+the duration of each call; false cancels the query. Rectangles may overlap and must be combined
+as coverage, rather than accumulating opacity. Missing optional coverage yields an empty
+successful enumeration; invalid data or more than 4096 intersections fail the query.
+Only the explicitly surveyed portions may replace the coarse lake mask, restoring islands
+and surrounding land even when a rendering tile is larger than the surveyed area. Remaining
+portions retain ordinary overlays. Polygon bounds alone never establish completeness.
+The query reads coverage metadata, not the water-polygon or image payloads, and keeps
+the existing bounded rendering caches. This describes completeness of the imported mapped areas, not
 a guarantee that every real water feature has been surveyed.
 
 The Nykøbing Mors extension retains 256 mapped inland-water polygons after source review. These remain
@@ -1763,17 +1780,17 @@ This classification is a practical reduction in clutter, not a ranking of river 
 Installing this candidate replaces the previous centreline tables; discarded rows are removed from the
 installed dataset rather than hidden by a rendering filter. Existing mapped water areas and widths remain.
 
-The retained local inputs and prepared candidate are kept in the ignored
+The prepared candidate and mapped-water inputs are kept in the ignored
 `packaging/globe-db/source-cache/` directory, outside all build directories. This cache contains the
-completed `waterways-261012.osm.pbf` extract and `rivers-main-8m.sqlite3` candidate; `make clean` leaves
-them intact. The selected candidate retains source attribution, original point counts, the eight-metre
-storage tolerance and its selection policy. The original extract retains water-area geometry for later
-work. River strokes do not establish channel width, depth or navigability.
+`rivers-main-8m.sqlite3` candidate, reviewed water-area databases and compact satellite preparation records;
+`make clean` leaves them intact. The selected candidate retains source attribution, original point counts,
+the eight-metre storage tolerance and its selection policy. River strokes do not establish channel width,
+depth or navigability.
 
 Display simplification should use zoom-dependent error bounds, preserve junctions
-and shared boundaries. Retain the original extract separately for future finer
-derivatives and geographic checks. Fewer points must not erase narrow waterways or disconnect river
-mouths from coastal water. Unconstrained B-spline interpolation is unsuitable:
+and shared boundaries. Finer derivatives require source geometry with sufficient detail;
+the prepared candidate cannot recover discarded source coordinates. Fewer points must not erase narrow waterways
+or disconnect river mouths from coastal water. Unconstrained B-spline interpolation is unsuitable:
 smooth curves can cut across land or overshoot a bend. Any future curve fitting
 must respect the source geometry's error bounds and connectivity; it is not a
 substitute for missing coordinates. The new centreline reader implements bounded

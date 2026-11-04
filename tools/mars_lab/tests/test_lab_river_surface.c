@@ -156,9 +156,12 @@ static bool surface_fixture(const char *directory)
     json_free(initial_data); json_free(initial);
     json_t *photographic = surface_request(welsh_bounds, "photo-plan", NULL, &initial_status);
     const json_t *photographs = test_lab_member(photographic, "photos");
-    imagery_only = imagery_only && initial_status == 200 && json_array_size(photographs) == 1 &&
+    bool alpha = false;
+    imagery_only = imagery_only && initial_status == 200 &&
+                   json_bool_value(test_lab_member(photographic, "alpha"), &alpha) && alpha &&
+                   json_array_size(photographs) == 1 &&
                    !strcmp(test_lab_text(json_array_get(photographs, 0), "url"), "/earth_regions/00.png") &&
-                   !strncmp(test_lab_text(photographic, "key"), "photo-cell-3:", 13);
+                   !strncmp(test_lab_text(photographic, "key"), "photo-cell-5:", 13);
     for (size_t i = 0; imagery_only && i < json_array_size(photographs); ++i) {
         const json_t *photo = json_array_get(photographs, i), *target = test_lab_member(photo, "target");
         double rectangle[4];
@@ -178,7 +181,7 @@ static bool surface_fixture(const char *directory)
     json_free(photographic);
     json_t *mask_plan = surface_request(welsh_bounds, "mask-plan", NULL, &initial_status);
     imagery_only = imagery_only && initial_status == 200 && !test_lab_member(mask_plan, "photos") &&
-                   !strncmp(test_lab_text(mask_plan, "key"), "river-surface-7:", 16);
+                   !strncmp(test_lab_text(mask_plan, "key"), "river-surface-8:", 16);
     json_free(mask_plan);
     string_t *path = string_new_with(getenv("MARS_GLOBE_DB_PATH"));
     sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
@@ -239,8 +242,9 @@ static bool surface_fixture(const char *directory)
     json_free(regional);
     regional = surface_request(welsh_bounds, "photo-plan", NULL, &status);
     regional_photos = test_lab_member(regional, "photos");
-    ok = ok && status == 200 && json_array_size(regional_photos) == 1 &&
-         !strcmp(test_lab_text(json_array_get(regional_photos, 0), "url"), "/earth_regions/00.png");
+    ok = ok && status == 200 && json_array_size(regional_photos) == 2 &&
+         !strcmp(test_lab_text(json_array_get(regional_photos, 0), "url"), "/earth_regions/01.png") &&
+         !strcmp(test_lab_text(json_array_get(regional_photos, 1), "url"), "/earth_regions/00.png");
     json_free(regional);
     regional = surface_request(bounds[0], "photo-plan", NULL, &status);
     regional_photos = test_lab_member(regional, "photos");
@@ -294,16 +298,166 @@ static bool surface_fixture(const char *directory)
     return ok;
 }
 
+static bool surface_coverage_fixture(const char *directory)
+{
+    if (!test_lab_texture_database(directory)) return false;
+    string_t *path = string_new_with(getenv("MARS_GLOBE_DB_PATH"));
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    bool ok = db && sqlite_exec_cstr(db,
+        "delete from globe_texture_region;"
+        "insert into globe_texture_region values(0,-1,-1,1,1),(1,-1,-1,0,1),(2,0,-1,1,1);"
+        "insert into globe_texture select level,2,row_index,width,height,byte_count,sha256,png "
+        "from globe_texture where level=3 and column_index=0");
+    sqlite_close(db);
+    unsigned status = 0;
+    const char *bounds = "\"west\":-0.4,\"south\":-0.4,\"east\":0.4,\"north\":0.4";
+    json_t *plan = ok ? surface_request(bounds, "photo-plan", NULL, &status) : NULL;
+    const json_t *photos = test_lab_member(plan, "photos");
+    ok = ok && status == 200 && json_array_size(photos) == 3 &&
+         !strcmp(test_lab_text(json_array_get(photos, 0), "url"), "/earth_regions/00.png") &&
+         !strcmp(test_lab_text(json_array_get(photos, 1), "url"), "/earth_regions/01.png") &&
+         !strcmp(test_lab_text(json_array_get(photos, 2), "url"), "/earth_regions/02.png");
+    json_free(plan);
+    db = sqlite_open_plain(path);
+    ok = db && sqlite_exec_cstr(db, "update globe_texture_region set west=0.1 where slot=2") && ok;
+    sqlite_close(db);
+    plan = surface_request(bounds, "photo-plan", NULL, &status);
+    photos = test_lab_member(plan, "photos");
+    ok = ok && status == 200 && json_array_size(photos) == 3 &&
+         !strcmp(test_lab_text(json_array_get(photos, 0), "url"), "/earth_regions/00.png");
+    json_free(plan);
+    db = sqlite_open_plain(path);
+    ok = db && sqlite_exec_cstr(db, "update globe_texture_region set west=-0.1 where slot=2") && ok;
+    sqlite_close(db);
+    plan = surface_request(bounds, "photo-plan", NULL, &status);
+    ok = ok && status == 200 && json_array_size(test_lab_member(plan, "photos")) == 3;
+    json_free(plan);
+    plan = surface_request("\"west\":-1,\"south\":-1,\"east\":8,\"north\":8", "photo-plan", NULL, &status);
+    photos = test_lab_member(plan, "photos");
+    ok = ok && status == 200 && json_array_size(photos) == 4;
+    for (size_t i = 0; ok && i < json_array_size(photos); ++i)
+        ok = !strncmp(test_lab_text(json_array_get(photos, i), "url"), "/earth_tiles/", 13);
+    json_free(plan); string_free(path);
+    return ok;
+}
+
 static void test_lab_river_surface(void)
 {
     TEST_ASSERT_TRUE(test_lab_isolated(surface_fixture),
                      "photographic river plans wrap at the date line and invalidate cached geometry after database changes");
+    TEST_ASSERT_TRUE(test_lab_isolated(surface_coverage_fixture),
+                     "overlapping image rectangles preserve their backgrounds until actual pixel alpha proves coverage");
+}
+
+static bool surface_partial_coverage_fixture(const char *directory)
+{
+    if (!test_lab_texture_database(directory)) return false;
+    string_t *path = string_sprintf("%s/textures.db", directory);
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    bool ok = db && sqlite_exec_cstr(db,
+        "CREATE TABLE rivers_dataset(id, format_version, point_count, source);\n"
+        "INSERT INTO rivers_dataset VALUES(1, 1, 2, 'synthetic survey fixture');\n"
+        "CREATE TABLE rivers_chunk(id INTEGER PRIMARY KEY, feature_id, kind, vertices);\n"
+        "CREATE VIRTUAL TABLE rivers_bounds USING rtree_i32(id, min_x, max_x, min_y, max_y);\n"
+        "CREATE VIRTUAL TABLE rivers_water_coverage USING rtree_i32(id, min_x, max_x, min_y, max_y);\n"
+        "INSERT INTO rivers_water_coverage VALUES(1, 0, 1000000, 0, 1000000);\n"
+        "INSERT INTO rivers_water_coverage VALUES(2, 500000, 1500000, 500000, 1500000);");
+    sqlite_close(db);
+    unsigned status = 0;
+    const char *bounds = "\"west\":-1,\"south\":-1,\"east\":2,\"north\":2";
+    json_t *plan = ok ? surface_request(bounds, "mask-plan", NULL, &status) : NULL;
+    json_t *data = plan ? surface_request(bounds, "surface-data", test_lab_text(plan, "key"), &status) : NULL;
+    const json_t *coverage = test_lab_member(data, "coverage");
+    bool complete = true;
+    ok = ok && status == 200 && json_bool_value(test_lab_member(data, "complete"), &complete) && !complete &&
+         json_array_size(coverage) == 2;
+    double rectangles[2][4] = {{0}};
+    for (unsigned i = 0; ok && i < 2; ++i) {
+        const json_t *rectangle = json_array_get(coverage, i);
+        ok = json_array_size(rectangle) == 4;
+        for (unsigned j = 0; ok && j < 4; ++j) {
+            const string_t *number = json_number_text(json_array_get(rectangle, j));
+            ok = number && lab_cal_number(string_c_str(number), &rectangles[i][j]);
+        }
+        ok = ok && rectangles[i][0] >= 0 && rectangles[i][1] >= 0 &&
+             fabs(rectangles[i][2] - 2048. / 3) < .000001 && fabs(rectangles[i][3] - 2048. / 3) < .000001;
+    }
+    ok = ok && fabs(fmin(rectangles[0][0], rectangles[1][0]) - 2048. / 3) < .000001 &&
+         fabs(fmin(rectangles[0][1], rectangles[1][1]) - 2048. / 6) < .000001;
+    json_free(data); json_free(plan); string_free(path);
+    return ok;
+}
+
+static void test_lab_surface_partial_coverage(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(surface_partial_coverage_fixture),
+                     "surveyed subregions survive a larger surface tile without declaring the whole tile surveyed");
+}
+
+static bool surface_global_detail_fixture(const char *directory)
+{
+    if (!test_lab_texture_database(directory)) return false;
+    string_t *path = string_sprintf("%s/textures.db", directory);
+    sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
+    /* Plans require metadata only. Compact placeholders keep this regression independent of the large image set. */
+    bool ok = db && sqlite_exec_cstr(db,
+        "WITH RECURSIVE columns(n) AS (\n"
+        "    SELECT 0 UNION ALL SELECT n + 1 FROM columns WHERE n < 47\n"
+        "), rows(n) AS (\n"
+        "    SELECT 0 UNION ALL SELECT n + 1 FROM rows WHERE n < 23\n"
+        ")\n"
+        "INSERT INTO globe_texture\n"
+        "SELECT 4, columns.n, rows.n, 1800, 1800, 57,\n"
+        "       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', zeroblob(57)\n"
+        "FROM columns CROSS JOIN rows");
+    sqlite_close(db);
+    unsigned status = 0;
+    json_t *plan = ok ? surface_request("\"west\":-100.1,\"south\":10.1,\"east\":-99.9,\"north\":10.3",
+                                      "surface-plan", NULL, &status) : NULL;
+    const json_t *photos = test_lab_member(plan, "photos");
+    const json_t *photo = json_array_get(photos, 0);
+    const string_t *width = json_number_text(json_array_get(test_lab_member(photo, "source"), 2));
+    double source_width = 0;
+    ok = ok && status == 200 && surface_crops(plan, 1) &&
+         !strcmp(test_lab_text(photo, "url"), "/earth_tiles_detail/10-10.png") && width &&
+         lab_cal_number(string_c_str(width), &source_width) && fabs(source_width - 48) < .000001;
+    json_free(plan);
+    plan = surface_request("\"west\":178,\"south\":1,\"east\":182,\"north\":2", "surface-plan", NULL, &status);
+    photos = test_lab_member(plan, "photos");
+    ok = ok && status == 200 && surface_crops(plan, 2) &&
+         !strcmp(test_lab_text(json_array_get(photos, 0), "url"), "/earth_tiles_detail/47-11.png") &&
+         !strcmp(test_lab_text(json_array_get(photos, 1), "url"), "/earth_tiles_detail/00-11.png");
+    json_free(plan);
+    plan = surface_request("\"west\":-15,\"south\":-15,\"east\":15,\"north\":15", "photo-plan", NULL, &status);
+    photos = test_lab_member(plan, "photos");
+    ok = ok && status == 200 && json_array_size(photos) == 4;
+    for (size_t i = 0; ok && i < json_array_size(photos); ++i)
+        ok = !strncmp(test_lab_text(json_array_get(photos, i), "url"), "/earth_tiles/", 13);
+    json_free(plan);
+    db = sqlite_open_plain(path);
+    ok = db && sqlite_exec_cstr(db, "DELETE FROM globe_texture WHERE level = 4") && ok;
+    sqlite_close(db);
+    plan = surface_request("\"west\":-100.1,\"south\":10.1,\"east\":-99.9,\"north\":10.3",
+                           "surface-plan", NULL, &status);
+    photos = test_lab_member(plan, "photos");
+    ok = ok && status == 200 && surface_crops(plan, 1) &&
+         !strcmp(test_lab_text(json_array_get(photos, 0), "url"), "/earth_tiles/02-02.png");
+    json_free(plan); string_free(path);
+    return ok;
+}
+
+static void test_lab_surface_global_detail(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(surface_global_detail_fixture),
+                     "NASA detail supplies fourfold density, wraps at the date line and retains bounded overview and legacy plans");
 }
 
 /* Register native regional surface preparation independently of browser rasterisation. */
 void test_lab_river_surface_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_river_surface, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_surface_partial_coverage, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_surface_global_detail, tests, NULL);
 }
 
 static bool surface_readme_fixture(const char *directory)

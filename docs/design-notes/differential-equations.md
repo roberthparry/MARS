@@ -36,6 +36,23 @@ equations. Do not report a complete tensor solution after solving only a subset
 of components, and distinguish verification of a proposed Killing field from
 finding every Killing field.
 
+The [tensor prediction workflows](./tensors.md#physical-predictions-from-a-supplied-metric)
+identify timelike and null geodesics as initial coupled-ODE applications. A
+four-dimensional geodesic can produce eight first-order state equations for
+position and tangent, together with its timelike or null normalisation
+constraint. The tensor module supplies the native right-hand sides; the solver
+must preserve chart domains and report constraint drift. Mercury's reduced
+orbit supplies a smaller two-state reference problem with perihelion event
+detection and a known leading precession formula.
+
+Frequency-shift problems with a prescribed ray can use algebraic observer
+contractions. Finding a ray connecting two specified events may instead require
+a boundary-value or shooting method; an initial-value integrator alone does
+not provide that capability. Clock comparisons may accumulate proper time as
+an auxiliary state or quadrature. Finite-length measurements also require an
+explicit observer and simultaneity or spatial-slice prescription, independently
+of numerical integration.
+
 ## Numerical Solver Boundary
 
 The first numerical scope should be non-stiff ordinary differential-equation

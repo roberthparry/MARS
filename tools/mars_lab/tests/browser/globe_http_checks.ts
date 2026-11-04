@@ -10,10 +10,13 @@
 function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Response>,
                           options: {endpoint: string; script: string; nativeShore: boolean; storageDenied?: boolean;
                                     surfaceProbe?: boolean; regionalAliases?: boolean; holdPhotograph?: boolean;
-                                    denyPhotographs?: boolean} =
+                                    denyPhotographs?: boolean; decodeProbe?: boolean; persistProbe?: boolean;
+                                    alphaProbe?: boolean; globalAliases?: boolean} =
                               {endpoint: '/almanac-globe', script: '/js/globe_worker.js', nativeShore: true}): {
     Worker: typeof Worker; releaseSurfaceCache(): void; waitForCache(key: string): Promise<void>; cacheCount(): number;
+    sourcePlanCount(): number;
     waitForPhotograph(): Promise<void>;
+    waitForDecode(count?: number): Promise<void>; bypassPhotographs(active: boolean): Promise<void>;
     releasePhotograph(): void; dispose(): void;
 } {
     const BrowserWorker = globalThis.Worker;
@@ -28,7 +31,23 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
         let releasePhotograph;
         const photographReady = new Promise(resolve => { releasePhotograph = resolve; });
         let next = 0;
+        let bypassPhotographs = false, photographLookup;
         addEventListener('message', event => {
+            if (typeof event.data.fixtureBypassPhotographs === 'boolean') {
+                event.stopImmediatePropagation();
+                bypassPhotographs = event.data.fixtureBypassPhotographs;
+                void import(${JSON.stringify(new URL('/js/globe_texture_cache.js', location.href).href)}).then(module => {
+                    if (!photographLookup) {
+                        photographLookup = module.GlobeTextureCache.prototype.getSlot;
+                        module.GlobeTextureCache.prototype.getSlot = function(key) {
+                            if (bypassPhotographs && /^\\/earth_.*:[a-f0-9]{64}:\\d+:$/.test(key)) return null;
+                            return photographLookup.call(this, key);
+                        };
+                    }
+                    postMessage({fixturePhotographsBypassed: true});
+                });
+                return;
+            }
             if (event.data.fixturePersist) {
                 event.stopImmediatePropagation(); releaseCache(); return;
             }
@@ -44,6 +63,18 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                 event.data.bytes, {status: event.data.status, headers: event.data.headers}));
         });
         globalThis.fetch = (url, options) => {
+            if (${Boolean(options.globalAliases)} && url === '/earth_tiles_detail/47-23.png')
+                return networkFetch(new URL('/earth_tiles/00-00.png', ${JSON.stringify(location.origin)}), options);
+            if (${Boolean(options.alphaProbe)} && (url === '/earth_regions/123.png' || url === '/earth_regions/4095.png')) {
+                return (async () => {
+                    const canvas = new OffscreenCanvas(1800, 1800), context = canvas.getContext('2d');
+                    context.fillStyle = url.endsWith('/123.png') ? 'rgb(180,80,40)' : 'rgb(20,80,180)';
+                    context.fillRect(0, 0, 1800, url.endsWith('/123.png') ? 1800 : 600);
+                    const blob = await canvas.convertToBlob({type: 'image/png'});
+                    canvas.width = canvas.height = 1;
+                    return new Response(blob, {headers: {'ETag': '"sha256-' + 'c'.repeat(64) + '"'}});
+                })();
+            }
             if (${Boolean(options.denyPhotographs)} && (String(url).startsWith('/earth_tiles/') ||
                 String(url).startsWith('/earth_regions/'))) throw new Error('Photograph decoding is forbidden by this cache test');
             if (${Boolean(options.surfaceProbe)} && (String(url).startsWith('/earth_tiles/') ||
@@ -75,13 +106,28 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
         if (${Boolean(options.storageDenied)}) Object.defineProperty(globalThis, 'indexedDB', {
             value: {open() { throw new Error('Fixture storage denied'); }}
         });
+        if (${Boolean(options.decodeProbe)}) {
+            const decode = globalThis.createImageBitmap.bind(globalThis);
+            globalThis.createImageBitmap = async (...args) => {
+                const bitmap = await decode(...args);
+                if (args[0] instanceof Blob && args[0].type === 'image/png') postMessage({fixtureDecoded: true});
+                return bitmap;
+            };
+        }
         importScripts(${JSON.stringify(new URL(options.script, location.href).href)});
-        if (${Boolean(options.surfaceProbe)}) {
+        if (${Boolean(options.surfaceProbe || options.persistProbe)}) {
             const put = GlobeSurfaceCache.prototype.put;
             GlobeSurfaceCache.prototype.put = async function(key, blob) {
                 await cacheReady;
                 await put.call(this, key, blob);
                 postMessage({fixtureCached: key});
+            };
+        }
+        if (${Boolean(options.surfaceProbe)}) {
+            const call = labDOM.call;
+            labDOM.call = (name, ...args) => {
+                if (name === 'lab_texture_cache' && args[0]?.action === 9) postMessage({fixtureSourcePlan: true});
+                return call(name, ...args);
             };
         }
         if (${options.nativeShore}) {
@@ -94,6 +140,7 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
     const cached = new Set<string>();
     let photographStarted: () => void = () => {};
     const photographPending = new Promise<void>(resolve => { photographStarted = resolve; });
+    let decodedCount = 0, sourcePlans = 0, bypassed: () => void = () => {};
     const fixtureScript = options.script;
     class FixtureWorker extends BrowserWorker {
         constructor(scriptURL: string | URL, options?: WorkerOptions) {
@@ -102,6 +149,9 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
             if (!globe) return;
             workers.add(this);
             this.addEventListener('message', event => {
+                if (event.data.fixtureDecoded) { event.stopImmediatePropagation(); ++decodedCount; return; }
+                if (event.data.fixtureSourcePlan) { event.stopImmediatePropagation(); ++sourcePlans; return; }
+                if (event.data.fixturePhotographsBypassed) { event.stopImmediatePropagation(); bypassed(); return; }
                 if (typeof event.data.fixtureCached === 'string') {
                     event.stopImmediatePropagation(); cached.add(event.data.fixtureCached); return;
                 }
@@ -121,13 +171,23 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
     }
     return {Worker: FixtureWorker, releaseSurfaceCache() {
         for (const worker of workers) worker.postMessage({fixturePersist: true});
-    }, cacheCount() { return cached.size; }, async waitForCache(key) {
+    }, cacheCount() { return cached.size; }, sourcePlanCount() { return sourcePlans; }, async waitForCache(key) {
         const deadline = performance.now() + 15000;
         while (!cached.has(key) && performance.now() < deadline)
             await new Promise(resolve => window.setTimeout(resolve, 25));
         if (!cached.has(key)) throw new Error('Fixture cache write did not complete: ' + key);
     }, waitForPhotograph() { return photographPending; }, releasePhotograph() {
         for (const worker of workers) worker.postMessage({fixturePhotographRelease: true});
+    }, async waitForDecode(count = 1) {
+        const deadline = performance.now() + 5000;
+        while (decodedCount < count && performance.now() < deadline)
+            await new Promise(resolve => window.setTimeout(resolve, 20));
+        if (decodedCount < count) throw new Error('Read-ahead PNG did not decode while the current source was blocked');
+    }, bypassPhotographs(active) {
+        return new Promise<void>(resolve => {
+            bypassed = resolve;
+            for (const worker of workers) worker.postMessage({fixtureBypassPhotographs: active});
+        });
     }, dispose() {
         for (const worker of workers) {
             worker.dispatchEvent(new ErrorEvent('error', {message: 'Globe HTTP fixture disposed'}));

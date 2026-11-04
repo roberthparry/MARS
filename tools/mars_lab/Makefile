@@ -119,6 +119,12 @@ $(LAB_BUILD_DIR)/satellite_tiles: tools/mars_lab/satellite_tiles.c tools/mars_la
 $(LAB_BUILD_DIR)/texture_tiles: tools/mars_lab/texture_tiles.c $(STATIC_LIB)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LAB_JPEG_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) $(LAB_JPEG_LIBS)
 
+LAB_TIFF_CFLAGS ?= $(shell pkg-config --cflags libtiff-4 2>/dev/null)
+LAB_TIFF_LIBS ?= -ltiff -lz
+$(LAB_BUILD_DIR)/texture_global: tools/mars_lab/texture_global.c $(STATIC_LIB)
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LAB_TIFF_CFLAGS) $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS) $(LAB_TIFF_LIBS)
+
 .PHONY: lab-typescript lab-test-typescript lab-typecheck
 lab-typescript: check-lab-typescript-deps
 	"$(LAB_TSC)" --project $(LAB_TS_CONFIG)

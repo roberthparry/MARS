@@ -14,6 +14,7 @@
 
 #include "array-t.h"
 #include "globe-t.h"
+#include "json-t.h"
 #include "string-t.h"
 #include "cfg_database.h"
 #define MARS_CFG_DATABASE_INTERNAL_ACCESS
@@ -155,6 +156,75 @@ static void test_cfg_textures_capacity(void)
     TEST_ASSERT_TRUE(ok, "expanded regional capacity reaches its final slot and rejects the next address");
 }
 
+static bool texture_global_fixture(const char *directory)
+{
+    (void)directory;
+    string_t *root = texture_fixture_root();
+    file_t *manifest_file = texture_file(test_cfg_texture_root(), "manifest.json");
+    string_t *original = manifest_file ? file_read_all_text(manifest_file) : NULL;
+    json_t *manifest = original ? json_from_text(original) : NULL;
+    string_t *assets_key = string_new_with("assets"), *detail_key = string_new_with("global_detail");
+    json_t *assets = assets_key ? json_clone(json_object_get(manifest, assets_key)) : NULL;
+    string_t *layout = string_new_with("{\"width\":86400,\"height\":43200,\"columns\":48,\"rows\":24,\"tile_size\":1800}");
+    json_t *detail = json_from_text(layout);
+    file_t *pattern = texture_file(test_cfg_texture_root(), "pattern-1800.png");
+    file_t *folder = texture_file(test_cfg_texture_root(), "earth_tiles_detail");
+    string_t *pattern_key = string_new_with("earth_tiles/00-00.png");
+    const json_t *description = pattern_key ? json_object_get(assets, pattern_key) : NULL;
+    file_t *database_directory = NULL;
+    sqlite_t *db = texture_database("", &database_directory);
+    bool ok = root && original && manifest && assets && detail && pattern && folder && description && db &&
+              file_create_directory(folder, 0700, true) && cfg_database_textures(db, root) &&
+              cfg_database_textures_current(db, root) && cfg_database_revision(db, "globe", CFG_GLOBE_TEXTURE_PATCH_BASE);
+    for (unsigned row = 0; ok && row < 24; ++row) {
+        for (unsigned column = 0; ok && column < 48; ++column) {
+            string_t *relative = string_sprintf("earth_tiles_detail/%02u-%02u.png", column, row);
+            file_t *target = relative ? texture_file(test_cfg_texture_root(), string_c_str(relative)) : NULL;
+            ok = target && file_create_hard_link(pattern, target) && json_object_set(assets, relative, description);
+            file_free(target); string_free(relative);
+        }
+    }
+    ok = ok && json_object_set(manifest, assets_key, assets) && json_object_set(manifest, detail_key, detail);
+    string_t *updated = ok ? json_to_string_pretty(manifest, 2) : NULL;
+    ok = updated && file_write_all_text(manifest_file, updated) && !cfg_database_textures_current(db, root) &&
+         cfg_database_textures(db, root) && cfg_database_textures_current(db, root) && cfg_database_textures_valid(db);
+    globe_t *globe = ok ? globe_open_databases(db, db, NULL) : NULL;
+    globe_texture_info_t info;
+    array_t *bytes = globe && globe_texture_metadata(globe, 4, 47, 23, &info) ?
+        globe_texture_png(globe, 4, 47, 23, &info) : NULL;
+    ok = ok && bytes && info.width == 1800 && info.height == 1800 &&
+         !globe_texture_metadata(globe, 4, 48, 0, &info) && !globe_texture_metadata(globe, 4, 0, 24, &info);
+    array_destroy(bytes); globe_close(globe);
+    file_t *last = texture_file(test_cfg_texture_root(), "earth_tiles_detail/47-23.png");
+    ok = ok && last && file_delete(last) && !cfg_database_textures(db, root) && cfg_database_textures_valid(db);
+    bool restored = original && file_write_all_text(manifest_file, original);
+    ok = restored && cfg_database_textures(db, root) && cfg_database_textures_valid(db) && ok;
+    globe = globe_open_databases(db, db, NULL);
+    ok = !globe_texture_metadata(globe, 4, 0, 0, &info) && ok;
+    globe_close(globe);
+    for (unsigned row = 0; row < 24; ++row) {
+        for (unsigned column = 0; column < 48; ++column) {
+            string_t *relative = string_sprintf("earth_tiles_detail/%02u-%02u.png", column, row);
+            file_t *target = relative ? texture_file(test_cfg_texture_root(), string_c_str(relative)) : NULL;
+            ok = target && (!file_exists(target) || file_delete(target)) && ok;
+            file_free(target); string_free(relative);
+        }
+    }
+    ok = folder && file_remove_directory(folder) && ok;
+    texture_database_close(db, database_directory);
+    file_free(last); file_free(pattern); file_free(folder); file_free(manifest_file);
+    string_free(root); string_free(original); string_free(updated); string_free(layout);
+    string_free(assets_key); string_free(detail_key); string_free(pattern_key);
+    json_free(manifest); json_free(assets); json_free(detail);
+    return ok;
+}
+
+static void test_cfg_textures_global_detail(void)
+{
+    TEST_ASSERT_TRUE(test_cfg_isolated(texture_global_fixture),
+                     "full-resolution global grid imports all 1152 images, validates final addresses and rolls back missing input");
+}
+
 static void test_cfg_textures_install(void)
 {
     string_t *root = texture_fixture_root();
@@ -237,6 +307,8 @@ static bool texture_rollback_fixture(const char *directory)
     string_t *broken = string_new_with("not a PNG");
     ok = ok && broken && file_write_all_text(last, broken) && !cfg_database_textures(db, bad_root) &&
          cfg_database_textures_valid(db);
+    ok = ok && cfg_database_revision(db, "globe", CFG_GLOBE_TEXTURE_PATCH_BASE) &&
+         !cfg_database_textures(db, bad_root) && cfg_database_textures_valid(db);
     file_free(last); string_free(broken); string_free(root); string_free(bad_root); texture_database_close(db, fixture);
     return ok;
 }
@@ -290,6 +362,47 @@ static bool texture_migration_fixture(const char *directory)
          sqlite_exec_cstr(db, "delete from globe_texture where level=3 and column_index=1") &&
          !cfg_database_textures_valid(db) && cfg_database_globe_refresh(db, root, staging) &&
          cfg_database_textures_valid(db);
+    /* Compatible migrations keep the image table, import changed rows once and retain all matching PNG bodies. */
+    ok = ok && cfg_database_revision(db, "globe", CFG_GLOBE_TEXTURE_PATCH_BASE) && sqlite_exec_cstr(db,
+        "UPDATE globe_texture SET width = 1800, height = 1800 WHERE level = 3 AND column_index = 1;\n"
+        "CREATE TABLE texture_update_audit (changed INTEGER NOT NULL);\n"
+        "INSERT INTO texture_update_audit VALUES (0);\n"
+        "CREATE TRIGGER texture_update_probe AFTER UPDATE ON globe_texture BEGIN\n"
+        "    UPDATE texture_update_audit SET changed = changed + 1;\n"
+        "END;\n"
+        "INSERT INTO globe_texture SELECT level, 8191, row_index, width, height, byte_count, sha256, png\n"
+        "FROM globe_texture WHERE level = 3 AND column_index = 0;") &&
+        cfg_database_globe_refresh(db, root, staging) && cfg_database_textures_valid(db) &&
+        cfg_database_globe_refresh(db, root, staging) && cfg_database_textures_valid(db);
+    q = sqlite_stmt_prepare(db, "SELECT changed FROM texture_update_audit");
+    ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int(q, 0) == 1;
+    sqlite_stmt_finalize(q);
+    q = sqlite_stmt_prepare(db, "SELECT count(*) FROM sqlite_master WHERE name = 'texture_update_probe'");
+    ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int(q, 0) == 1;
+    sqlite_stmt_finalize(q);
+    string_t *installed_path = fixture ? string_sprintf("%s/textures.db", file_path(fixture)) : NULL;
+    ok = ok && installed_path && !setenv("MARS_GLOBE_DB_PATH", string_c_str(installed_path), 1) &&
+         !setenv("MARS_GLOBE_DB_KEY", "", 1);
+    sqlite_close(db);
+    db = NULL;
+    ok = ok && cfg_databases_update() == 0;
+    db = installed_path ? sqlite_open_plain(installed_path) : NULL;
+    /* An independently prepared catalogue must be imported even when its managed-data revision is unchanged. */
+    ok = ok && db && cfg_database_textures_current(db, root) &&
+         sqlite_exec_cstr(db, "UPDATE globe_texture_manifest SET json = '{}' WHERE id = 1") &&
+         !cfg_database_textures_current(db, root);
+    sqlite_close(db);
+    db = NULL;
+    ok = ok && cfg_databases_update() == 0 && cfg_databases_update() == 0;
+    db = installed_path ? sqlite_open_plain(installed_path) : NULL;
+    ok = ok && cfg_database_textures_current(db, root);
+    string_free(installed_path);
+    q = db ? sqlite_stmt_prepare(db,
+        "SELECT changed FROM texture_update_audit WHERE EXISTS (\n"
+        "    SELECT 1 FROM sqlite_master WHERE name = 'texture_update_probe'\n"
+        ") AND EXISTS (SELECT 1 FROM mars_database_revision WHERE name = 'globe' AND revision = 17)") : NULL;
+    ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int(q, 0) == 1;
+    sqlite_stmt_finalize(q);
     q = sqlite_stmt_prepare(db, "select source from rivers_dataset");
     ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && !strcmp(sqlite_stmt_column_text(q, 0), "retained");
     sqlite_stmt_finalize(q);
@@ -303,7 +416,7 @@ static bool texture_migration_fixture(const char *directory)
 static void test_cfg_textures_migration(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(texture_migration_fixture),
-                     "photograph migrations include revision fifteen and preserve shoreline and rivers");
+                     "photograph migrations preserve geography, replace changed rows once and retain matching PNGs");
 }
 
 static bool texture_scalar_is(sqlite_t *db, const char *sql, int64_t expected)
@@ -370,7 +483,8 @@ static bool texture_staged_fixture(const char *directory)
             "CREATE TABLE audit(value TEXT);INSERT INTO audit VALUES('original');\n"
             "CREATE TRIGGER retained_audit AFTER INSERT ON retained BEGIN\n"
             "  INSERT INTO audit VALUES(new.label);END;");
-    if (ok) ok = cfg_database_rebuild_globe(&db, path, root, staging, cfg_database_globe_refresh, 16, false) && !db;
+    if (ok) ok = cfg_database_rebuild_globe(&db, path, root, staging, cfg_database_globe_refresh,
+                                           CFG_GLOBE_DATA_REVISION, false) && !db;
     cfg_database_cleanup(staging); string_free(staging);
     db = ok ? sqlite_open_plain(path) : db;
     ok = ok && db && cfg_database_textures_valid(db) && texture_scalar_is(db, "PRAGMA page_size", 65536) &&
@@ -388,7 +502,7 @@ static bool texture_staged_fixture(const char *directory)
          texture_scalar_is(db, "SELECT count(*) FROM retained_view", 5004) &&
          texture_scalar_is(db, "SELECT count(*) FROM audit", 1) &&
          texture_scalar_is(db, "SELECT seq FROM sqlite_sequence WHERE name='numbered'", 99) &&
-         texture_scalar_is(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", 16) &&
+         texture_scalar_is(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", CFG_GLOBE_DATA_REVISION) &&
          sqlite_exec_cstr(db, "INSERT INTO retained(label) VALUES('after');INSERT INTO numbered(v) VALUES('next')") &&
          texture_scalar_is(db, "SELECT count(*) FROM audit WHERE value='after'", 1) &&
          texture_scalar_is(db, "SELECT id FROM numbered WHERE v='next'", 100);
@@ -398,30 +512,34 @@ static bool texture_staged_fixture(const char *directory)
     ok = ok && !setenv("MARS_GLOBE_DB_PATH", string_c_str(path), 1) && !setenv("MARS_GLOBE_DB_KEY", "", 1) &&
          !setenv("MARS_ROOT", string_c_str(root), 1) && cfg_databases_update() == 0;
     db = ok ? sqlite_open_plain(path) : NULL;
-    ok = ok && db && texture_scalar_is(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", 16) &&
+    ok = ok && db && texture_scalar_is(db, "SELECT revision FROM mars_database_revision WHERE name='globe'",
+                                     CFG_GLOBE_DATA_REVISION) &&
          texture_scalar_is(db, "SELECT count(*) FROM audit", 2);
     string_t *before = ok ? file_sha256(installed) : NULL;
     staging = ok ? cfg_database_stage(parent) : NULL;
     texture_failed_updates = 0;
     ok = ok && before && staging &&
-         cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, 16, false) &&
+         cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, CFG_GLOBE_DATA_REVISION, false) &&
          !db && !texture_failed_updates;
     cfg_database_cleanup(staging); string_free(staging);
     staging = ok ? cfg_database_stage(parent) : NULL;
-    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, 16, true) &&
+    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update,
+                                                   CFG_GLOBE_DATA_REVISION, true) &&
          !db && texture_failed_updates == 1;
     string_t *after = ok ? file_sha256(installed) : NULL;
     ok = ok && after && !strcmp(string_c_str(before), string_c_str(after));
     cfg_database_cleanup(staging); string_free(staging); string_free(after);
     staging = ok ? cfg_database_stage(parent) : NULL;
-    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_invalid_update, 16, true) && !db;
+    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_invalid_update,
+                                                   CFG_GLOBE_DATA_REVISION, true) && !db;
     after = ok ? file_sha256(installed) : NULL;
     ok = ok && after && !strcmp(string_c_str(before), string_c_str(after));
     cfg_database_cleanup(staging); string_free(staging); string_free(after);
     sqlite_t *writer = ok ? sqlite_open_plain(path) : NULL;
     ok = ok && writer && sqlite_exec_cstr(writer, "BEGIN IMMEDIATE");
     staging = ok ? cfg_database_stage(parent) : NULL;
-    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update, 16, true) &&
+    ok = ok && staging && !cfg_database_rebuild_globe(&db, path, root, staging, texture_failed_update,
+                                                   CFG_GLOBE_DATA_REVISION, true) &&
          !db && texture_failed_updates == 1;
     if (writer) ok = sqlite_exec_cstr(writer, "ROLLBACK") && ok;
     sqlite_close(writer);
@@ -461,6 +579,7 @@ void test_cfg_textures_cases(void)
     (void)test_cfg_texture_root();
     TEST_RUN_IN_GROUP(test_cfg_textures_manifest, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_textures_capacity, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_textures_global_detail, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_textures_install, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_textures_rollback, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_textures_migration, tests, NULL);

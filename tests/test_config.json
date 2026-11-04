@@ -1268,6 +1268,7 @@
           "test_to_string_double_negative_expr": true,
           "test_to_string_equal_conjugate_sums": true,
           "test_to_string_exact_rational_TeX": true,
+          "test_to_string_exact_rational_powers": true,
           "test_to_string_exp_unit_fraction_root_TeX": true,
           "test_to_string_floor_ceil": {
             "enabled": true,
@@ -1289,7 +1290,6 @@
           "test_to_string_gamma_polygamma_standard_names": true,
           "test_to_string_gammainv_TeX": true,
           "test_to_string_indexed_principal_roots": true,
-          "test_to_string_exact_rational_powers": true,
           "test_to_string_integrals_outside_fractions_TeX": true,
           "test_to_string_lambert_w_TeX": true,
           "test_to_string_log10_TeX": true,
@@ -2504,7 +2504,8 @@
   "tests/rivers/test_rivers.c": {
     "tests": {
       "enabled": true,
-      "test_rivers_index_and_rollback": true
+      "test_rivers_index_and_rollback": true,
+      "test_rivers_survey_coverage": true
     }
   },
   "tests/sampler/test_sampler.c": {
@@ -3167,6 +3168,7 @@
     "tests": {
       "enabled": true,
       "test_cfg_textures_capacity": true,
+      "test_cfg_textures_global_detail": true,
       "test_cfg_textures_install": true,
       "test_cfg_textures_manifest": true,
       "test_cfg_textures_migration": true,
@@ -3991,7 +3993,9 @@
     },
     "tests": {
       "enabled": true,
-      "test_lab_river_surface": true
+      "test_lab_river_surface": true,
+      "test_lab_surface_global_detail": true,
+      "test_lab_surface_partial_coverage": true
     }
   },
   "tools/mars_lab/tests/test_lab_routes.c": {

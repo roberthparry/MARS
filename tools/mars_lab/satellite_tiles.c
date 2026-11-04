@@ -68,7 +68,7 @@ static OGRGeometryH rectangle(double west, double south, double east, double nor
     return polygon;
 }
 
-static bool existing(const json_t *manifest, const double bounds[4])
+static bool existing(const json_t *manifest, const double bounds[4], unsigned requested_width)
 {
     const json_t *regions = field(manifest, "regions"), *assets = field(manifest, "assets");
     /* Existing packaged catalogues are bounded; this one-off comparison never runs in the application. */
@@ -84,7 +84,8 @@ static bool existing(const json_t *manifest, const double bounds[4])
             string_free(path);
             /* Bounds alone do not prove coverage: neighbouring countries may have
              * observations in the transparent part of an earlier region's tile. */
-            if (isfinite(width) && isfinite(height) && width > 0 && height > 0 && valid == width * height)
+            if (isfinite(width) && isfinite(height) && width >= requested_width && height >= requested_width &&
+                valid == width * height)
                 return true;
         }
     }
@@ -197,7 +198,7 @@ static int plan_main(int argc, char **argv)
             OGRGeometryH box = rectangle(b[0], b[1], b[2], b[3]);
             bool intersects = OGR_G_Intersects(detail && coast ? coast : country, box);
             OGR_G_DestroyGeometry(box);
-            if (!intersects || existing(manifest, b)) continue;
+            if (!intersects || existing(manifest, b, (unsigned)tile_width)) continue;
             string_append_format(tiles, "%s{\"slot\":%zu,\"detail\":%s,\"width\":%.0f,"
                 "\"bounds\":[%.12f,%.12f,%.12f,%.12f]}", tile_count ? "," : "", base + tile_count,
                 detail ? "true" : "false", tile_width, b[0], b[1], b[2], b[3]);
