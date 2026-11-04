@@ -574,6 +574,15 @@ rebuilds the server and browser assets when necessary and launches it again.
 before starting the browser client; the installed desktop launcher starts the
 native executable directly.
 
+The native Lab server and its calculation workers dynamically link to the matching
+`libmars.so`. The build places a relative library link beside the executable; its
+`$ORIGIN` runtime search path finds that library independently of the working
+directory, without `LD_LIBRARY_PATH` or a system-wide installation. Keep the build
+tree together, or copy the executable and the resolved shared library together
+when relocating them. Rebuild for API or ABI changes and restart Lab after updating
+the library; an existing process continues using its loaded copy. Browser
+WebAssembly modules remain separate builds and do not load the native shared library.
+
 The database-only targets `make install-mars-db` and `make uninstall-mars-db` are
 listed in `make help`. When MARS Lab is installed, `make release` also installs any
 missing databases and applies pending updates to existing ones, preserving their other

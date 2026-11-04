@@ -635,6 +635,16 @@ separate debug build. The superseded Python server and repository shell launcher
 have been removed. Reinstall an older desktop launcher once so it references the
 native executable directly.
 
+The server and built-in calculation modes link dynamically against `libmars.so`.
+Each release or debug build has a relative link to its matching library beside
+`mars_lab`. An executable-relative `$ORIGIN` search path makes the desktop launcher,
+worker subprocesses and direct execution independent of the current working
+directory; no `LD_LIBRARY_PATH` setting or system-wide library installation is
+needed. When copying the executable elsewhere, copy the resolved shared library
+beside it as well. Restart Lab after rebuilding the library, and rebuild the
+executable too when its API or ABI changes. Browser WebAssembly still uses its
+separately compiled MARS code.
+
 Child processes use argument vectors rather than a shell, with deadlines,
 bounded captured output and process-group cancellation. State retains the
 existing `MARS_HOME` and `MARS_LAB_STATE_FILE` locations, uses private files and

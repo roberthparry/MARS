@@ -4058,6 +4058,7 @@
     "tests": {
       "enabled": true,
       "test_lab_serial_dispatch": true,
+      "test_lab_shared_library_relocation": true,
       "test_lab_wasm_array_headers": true,
       "test_lab_wasm_assembly_plans": true,
       "test_lab_wasm_header_boundaries": true,

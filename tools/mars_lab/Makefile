@@ -53,6 +53,7 @@ LAB_SRCS := $(sort $(wildcard tools/mars_lab/src/*/*.c))
 LAB_OBJS := $(patsubst tools/mars_lab/src/%.c,$(LAB_BUILD_DIR)/%.o,$(LAB_SRCS))
 LAB_OBJS += $(APP_RESOURCE_OBJ)
 LAB_SERVER := $(LAB_BUILD_DIR)/mars_lab
+LAB_SHARED_LIB := $(LAB_BUILD_DIR)/$(notdir $(SHARED_LIB))
 LAB_SUPPORT_OBJS := $(filter-out $(LAB_BUILD_DIR)/app/lab_main.o,$(LAB_OBJS))
 LAB_TEST_SRCS := $(filter-out tools/mars_lab/tests/test_lab_cache_memory.c,$(sort $(wildcard tools/mars_lab/tests/*.c)))
 LAB_TEST_HEADERS := $(wildcard tools/mars_lab/tests/*.h)
@@ -306,9 +307,14 @@ $(LAB_BUILD_DIR)/%.o: tools/mars_lab/src/%.c tools/mars_lab/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_lab/include -Itools/mars_lab/src -c $< -o $@
 
-$(LAB_SERVER): $(LAB_OBJS) $(STATIC_LIB) $(LAB_WASM) $(LAB_CODEC_WASM) | lab-typescript
+# Keep the runtime library beside the executable through a relocatable link to this build's library.
+$(LAB_SHARED_LIB): $(SHARED_LIB) tools/mars_lab/Makefile
 	@mkdir -p $(dir $@)
-	$(CC) $(LDFLAGS) -o $@ $(LAB_OBJS) $(STATIC_LIB) $(LDLIBS)
+	ln -sfr "$(SHARED_LIB)" "$@"
+
+$(LAB_SERVER): $(LAB_OBJS) $(LAB_SHARED_LIB) $(LAB_WASM) $(LAB_CODEC_WASM) | lab-typescript
+	@mkdir -p $(dir $@)
+	$(CC) $(LDFLAGS) -Wl,-rpath,'$$ORIGIN' -o $@ $(LAB_OBJS) -L"$(LAB_BUILD_DIR)" -l:$(notdir $(SHARED_LIB)) $(LDLIBS)
 
 $(LAB_BUILD_DIR)/tests/%.o: tools/mars_lab/tests/%.c $(LAB_TEST_HEADERS) $(TEST_SHARED_HEADERS) tools/mars_lab/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps

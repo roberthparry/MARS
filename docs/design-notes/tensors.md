@@ -172,7 +172,8 @@ one of them to have an explicit component reduction:
 Include the Lie bracket of vector fields and Cartan's identity on forms,
 $\mathcal L_X=i_Xd+di_X$. For a `p`-form in dimension `n` with `s` negative
 metric directions, test the Hodge convention
-$\star\star\omega=(-1)^{p(n-p)+s}\omega$. Keep the volume tensor distinct from
+${}^{\star}({}^{\star}\omega)=(-1)^{p(n-p)+s}\omega$. Display each Hodge star as a
+left superscript. Keep the volume tensor distinct from
 the alternating permutation symbol: its components involve the metric
 determinant and the chosen orientation. Neither can be replaced by a hard-coded
 Cartesian epsilon array in a curved chart.
@@ -280,7 +281,7 @@ connection and assumptions before these expressions are parsed.
 | `lie(K, g)` | $\mathcal L_Kg$; the Killing residual before simplification |
 | `exterior(A)` | $dA$; a two-form when `A` is a one-form |
 | `wedge(alpha, beta)` | $\alpha\wedge\beta$ with the appropriate form degree |
-| `hodge(F)` | $\star F$ under the selected metric and orientation |
+| `hodge(F)` | ${}^{\star}F$ under the selected metric and orientation |
 | `F[^a, ^b];b = 4*@pi*J[^a]` | The sourced MTW-profile Maxwell equation; only `a` is free |
 | `Einstein[_a, _b] + @Lambda*g[_a, _b] = 8*@pi*Stress[_a, _b]` | Einstein's equation in geometric units |
 

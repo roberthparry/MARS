@@ -1,6 +1,6 @@
 /**
  * @file test_lab_wasm_build.c
- * @brief WebAssembly header boundaries, optional assembly builds and their documented command.
+ * @brief Native shared-library discovery, WebAssembly header boundaries and optional assembly builds.
  *
  * Dry runs verify release/debug paths, local delegation and independence from normal WASM linking.
  * The README case executes the real assembly target, then inspects a listing and its own dependencies.
@@ -8,10 +8,12 @@
  * Header probes ensure application APIs need no private grant and implementation headers reject
  * ungranted includes, including repeated includes and IntelliSense translation units.
  * Dependency checks reject absent maths headers and invalid archives with installation guidance.
+ * A relocated native worker must use the shared library beside it, without loader environment overrides.
  */
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "file-t.h"
 #include "lab_process.h"
@@ -75,6 +77,69 @@ static bool wasm_make_environment(void)
 {
     return !unsetenv("MAKEFLAGS") && !unsetenv("MFLAGS") && !unsetenv("MAKEOVERRIDES") &&
            !unsetenv("MAKEFILES") && !unsetenv("DEBUG");
+}
+
+static file_t *shared_library_file(const char *directory, const char *name)
+{
+    string_t *path = string_sprintf("%s/%s", directory, name);
+    file_t *file = path ? file_new(path) : NULL;
+    string_free(path);
+    return file;
+}
+
+/* Relocation must retain a real library dependency and executable-relative discovery, even with a system library. */
+static bool shared_library_relocation(const char *directory)
+{
+    bool ok = !unsetenv("MARS_LAB_BINARY") && !unsetenv("LD_LIBRARY_PATH") && !unsetenv("LD_PRELOAD");
+    string_t *worker = ok ? lab_proc_worker_path("mars_lab") : NULL;
+    file_t *source = worker ? file_new(worker) : NULL;
+    file_t *resolved = source ? file_resolve(source) : NULL;
+    string_t *resolved_name = resolved ? string_new_with(file_path(resolved)) : NULL;
+    const char *text = resolved_name ? string_c_str(resolved_name) : NULL;
+    const char *slash = text ? strrchr(text, '/') : NULL;
+    string_t *parent = slash ? string_substr(resolved_name, 0, (size_t)(slash - text)) : NULL;
+    file_t *library_link = parent ? shared_library_file(string_c_str(parent), "libmars.so") : NULL;
+    file_t *library_source = library_link ? file_resolve(library_link) : NULL;
+    file_t *folder = shared_library_file(directory, "relocated");
+    bool ready = folder && file_create_directory(folder, 0700, false);
+    file_t *binary = ready ? shared_library_file(file_path(folder), "mars_lab") : NULL;
+    file_t *library = ready ? shared_library_file(file_path(folder), "libmars.so") : NULL;
+    string_t *invalid = string_new_with("Invalid shared library fixture.\n");
+    ok = ok && resolved && library_source && binary && library && invalid &&
+         file_copy(resolved, binary, false) && file_chmod(binary, 0700) && file_write_all_text(library, invalid);
+    const char *args[] = {binary ? file_path(binary) : "", "--worker-control", "10000", "0",
+                          "mars_lab", "2+3", "x", "32", NULL};
+    string_t *output = NULL;
+    int status = -1;
+    ok = ok && lab_proc_run(args, directory, 15000, 65536, &output, &status) && status != 0 && output &&
+         string_find(output, "libmars.so") >= 0;
+    string_free(output);
+    output = NULL;
+    ok = ok && file_copy(library_source, library, true) &&
+         lab_proc_run(args, directory, 15000, 65536, &output, &status) && status == 0 && output &&
+         string_find(output, "value        5\n") >= 0;
+    if (!ok)
+        string_fprintf(stderr, "Relocated shared-library worker failed (%d): %s\n", status,
+                       output ? string_c_str(output) : "no output");
+    string_free(output);
+    string_free(invalid);
+    file_free(library);
+    file_free(binary);
+    file_free(folder);
+    file_free(library_source);
+    file_free(library_link);
+    string_free(parent);
+    string_free(resolved_name);
+    file_free(resolved);
+    file_free(source);
+    string_free(worker);
+    return ok;
+}
+
+static void test_lab_shared_library_relocation(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(shared_library_relocation),
+                     "relocated calculations require and load the adjacent shared library without loader overrides");
 }
 
 static string_t *wasm_make(const char *const *args)
@@ -298,6 +363,7 @@ static void example_lab_wasm_assembly(void)
 /* Register ordinary build-graph checks before README output. */
 void test_lab_wasm_build_cases(void)
 {
+    TEST_RUN_IN_GROUP(test_lab_shared_library_relocation, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_serial_dispatch, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wasm_assembly_plans, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_wasm_header_boundaries, tests, NULL);
