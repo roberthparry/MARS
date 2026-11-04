@@ -283,7 +283,7 @@ connection and assumptions before these expressions are parsed.
 | `wedge(alpha, beta)` | $\alpha\wedge\beta$ with the appropriate form degree |
 | `hodge(F)` | ${}^{\star}F$ under the selected metric and orientation |
 | `F[^a, ^b];b = 4*@pi*J[^a]` | The sourced MTW-profile Maxwell equation; only `a` is free |
-| `Einstein[_a, _b] + @Lambda*g[_a, _b] = 8*@pi*Stress[_a, _b]` | Einstein's equation in geometric units |
+| `G[_a, _b] + @Lambda*g[_a, _b] = 8*@pi*T[_a, _b]` | $G_{ab}+\Lambda g_{ab}=8\pi T_{ab}$ in geometric units |
 
 Comma and semicolon derivatives are distinct semantic operations. Explicit
 function forms can select a chart or connection when more than one is available,
