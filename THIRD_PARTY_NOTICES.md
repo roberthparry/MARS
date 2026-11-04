@@ -344,6 +344,7 @@ Flight Center. [Dataset description and acknowledgements](https://science.nasa.g
 The NASA imagery reuse policy linked above applies; no endorsement is implied.
 
 Source dimensions: 21600 × 10800. Source size: 27,201,049 bytes.
+
 Source SHA-256: `d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0`.
 The native `tools/mars_lab/texture_tiles.c` utility crops a 12 × 6 grid without
 resampling, then encodes each 1800 × 1800 tile as lossless PNG. The current assets
@@ -364,6 +365,16 @@ Rendering blends these matching images with independent shoreline layers.
 Its `--manifest` mode records the packaged images' dimensions, sizes, digests and
 source attribution. Installation copies their unchanged PNG bytes and attribution
 into `globe.db`; runtime image routes read that database.
+
+The additional full-resolution grid in `packaging/globe-db/textures/earth_tiles_detail/` uses the eight
+July 2004 GeoTIFF quadrants (A1–D1 and A2–D2) from
+[NASA's full-resolution topography and bathymetry downloads](https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-topography-bathymetry/).
+Each quadrant is 21600 × 21600 pixels; together they form an 86400 × 43200 mosaic at a nominal
+500 metres per pixel. The optional native `texture_global.c` preparation tool splits the original RGB
+pixels into a 48 × 24 grid of 1800-square lossless PNGs without resampling or JPEG re-encoding.
+The `global_detail` manifest entry records every quadrant URL and SHA-256 digest. Attribution and the
+NASA reuse policy above apply equally to this historical imagery; no current ice conditions or endorsement
+are implied. The smaller global images remain available for broad views and older databases.
 
 ## WASI libc maths, memory and strings
 
