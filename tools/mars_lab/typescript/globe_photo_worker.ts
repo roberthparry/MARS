@@ -8,6 +8,7 @@
  * Ready source crops transfer directly to WebGL before the whole cell finishes; only completed cells enter persistent storage.
  * Coarse regional overviews are never published as replacements for existing fine imagery. One bounded decoded snapshot
  * supplies unused source cores during idle gaps, avoiding another PNG decode after neighbouring crops or restarts.
+ * Native alpha bitsets skip fully hidden source rectangles; only disjoint sources are read ahead concurrently.
  */
 interface PhotoSource { url: string; sha256: string; width: number; source: number[]; target: number[]; }
 interface PhotoSourcePart { key: string; needed: number; read: number[]; write: number[]; source?: number[]; target?: number[]; }
@@ -263,6 +264,7 @@ class GlobePhotoWorker {
         this.opaque = true;
         for (let start = 0; start < pixels.byteLength; start += 512 * 64 * 4) {
             const chunk = new Uint8Array(pixels.buffer, start, Math.min(512 * 64 * 4, pixels.byteLength - start));
+            labDOM.call('lab_photo_coverage_rows', chunk, start / (512 * 4));
             const pointer = labDOM.call('lab_texture_premultiply', chunk) as number;
             if (!pointer) throw new Error('Native photographic preparation failed');
             this.opaque = Boolean(labDOM.call('lab_texture_opaque')) && this.opaque;
@@ -290,6 +292,12 @@ class GlobePhotoWorker {
         try {
             signal.throwIfAborted();
             if (!patch) throw new Error('Photographic block unavailable');
+            if (paint && first === 0) {
+                // Paint a newly decoded photograph once. Reassembling its fractional block rectangles
+                // adds unnecessary drawing and can leave partly transparent seams between opaque crops.
+                this.paint(context, image!, {source: plan.source, target: photo.target});
+                paint = false;
+            }
             const parts = plan.parts;
             for (let i = first; i < parts.length; ++i) {
                 signal.throwIfAborted();
@@ -360,12 +368,21 @@ class GlobePhotoWorker {
             if (!context) throw new Error('Photographic raster unavailable');
             context.imageSmoothingQuality = 'high';
             if (plan.alpha) context.globalCompositeOperation = 'destination-over';
+            labDOM.call('lab_photo_coverage_rows', new Uint8Array(0), 0);
             let completed: Uint8ClampedArray<ArrayBuffer> | null = null;
             for (let position = 0; position < plan.photos.length; ++position) {
                 const i = plan.alpha ? plan.photos.length - 1 - position : position;
                 const next = i + (plan.alpha ? -1 : 1);
                 const current = ahead;
-                ahead = next >= 0 && next < plan.photos.length ? this.readAhead(plan.photos[next], signal) : null;
+                ahead = null;
+                if (plan.alpha && labDOM.call('lab_photo_target_covered', plan.photos[i].target)) {
+                    this.releaseAhead(current);
+                    continue;
+                }
+                if (next >= 0 && next < plan.photos.length && (!plan.alpha ||
+                    (!labDOM.call('lab_photo_target_covered', plan.photos[next].target) &&
+                     !labDOM.call('lab_photo_targets_overlap', plan.photos[i].target, plan.photos[next].target))))
+                    ahead = this.readAhead(plan.photos[next], signal);
                 try { await this.source(context, plan.photos[i], signal, current); }
                 finally { this.releaseAhead(current); }
                 signal.throwIfAborted();
@@ -378,7 +395,8 @@ class GlobePhotoWorker {
                 this.port.postMessage({key: request.key + ':partial', id: request.id, partial: true, pixels: buffer}, [buffer]);
             }
             signal.throwIfAborted();
-            if (!completed) throw new Error('Photographic pixels unavailable');
+            // The remaining sources may all be hidden although the cell still contains genuine observation gaps.
+            completed ??= this.pixels(context);
             const pixels = completed;
             const blob = new Blob([pixels], {type: 'application/octet-stream'});
             const buffer = pixels.buffer;

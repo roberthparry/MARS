@@ -333,7 +333,7 @@ static int photo_complete_slot(texture_cache_t *cache, unsigned level, int x, un
 
 typedef struct _photo_plan_t {
     unsigned char page[64 * 64 * 4];
-    double bounds[4], span, coverage, detail;
+    double bounds[4], view[4], span, coverage, detail;
     uint64_t pinned;
     unsigned next_level, minimum_level, nodes;
     int next_x, next_y;
@@ -429,6 +429,7 @@ static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, cons
         view[0] < -360 || view[2] > 360 || view[1] < -90 || view[3] > 90) return false;
     double extent = fmax(view[2] - view[0], view[3] - view[1]);
     if (extent > 30 || extent < .000001) return false;
+    memcpy(plan->view, view, sizeof plan->view);
     double requested = log2(360 * fmin(pixels, 1536) / (extent * 510));
     /* Settled views must not stretch a lower-resolution page over more display pixels. Travel retains its
      * bounded progressive scale; resident finer cells remain eligible while the camera is moving. */
@@ -546,9 +547,12 @@ static bool photo_job_useful(jsref job, const photo_plan_t *plan)
     if (!plan || !bounds_read(lab_dom_get(job, "bounds"), bounds) || !isfinite(level) ||
         level < plan->minimum_level || level > 18 || floor(level) != level)
         return false;
-    double shift = 360 * nearbyint((plan->bounds[0] + plan->bounds[2] - bounds[0] - bounds[2]) / 720);
-    return bounds[0] + shift < plan->bounds[2] && bounds[2] + shift > plan->bounds[0] &&
-           bounds[1] < plan->bounds[3] && bounds[3] > plan->bounds[1];
+    const double *view = plan->view;
+    double shift = 360 * nearbyint((view[0] + view[2] - bounds[0] - bounds[2]) / 720);
+    /* Lookup padding is a sampling margin, not useful work while visible detail is missing. */
+    double padding = plan->detail >= .999999 ? (bounds[2] - bounds[0]) * .5 : 0;
+    return bounds[0] + shift < view[2] + padding && bounds[2] + shift > view[0] - padding &&
+           bounds[1] < view[3] + padding && bounds[3] > view[1] - padding;
 }
 
 static jsref photo_result(texture_cache_t *cache, const photo_plan_t *visible, const photo_plan_t *next,

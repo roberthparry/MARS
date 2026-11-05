@@ -29,6 +29,27 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
         check(Boolean(labDOM.call('lab_texture_opaque')) === opaque,
               'native opacity requires every prepared alpha value to equal 255');
     }
+    const rows = new Uint8Array(512 * 64 * 4).fill(255);
+    labDOM.call('lab_photo_coverage_rows', rows, 0);
+    check(!labDOM.call('lab_photo_target_covered', [0, 0, 256, 64]),
+          'an incomplete alpha pass cannot skip photographic source reads');
+    for (let row = 64; row < 512; row += 64) {
+        rows.fill(255);
+        if (row === 64) rows[((100 - row) * 512 + 300) * 4 + 3] = 254;
+        labDOM.call('lab_photo_coverage_rows', rows, row);
+    }
+    check(Boolean(labDOM.call('lab_photo_target_covered', [0, 0, 256, 512])) &&
+          !labDOM.call('lab_photo_target_covered', [256, 0, 256, 512]) &&
+          !labDOM.call('lab_photo_target_covered', [299.5, 100, 1, 1]),
+          'native source coverage skips only wholly opaque rectangles, including fractional pixel edges');
+    check(!labDOM.call('lab_photo_target_covered', [512, 0, .0000001, 1]) &&
+          !labDOM.call('lab_photo_target_covered', [0, 0, NaN, 1]) &&
+          !labDOM.call('lab_photo_targets_overlap', [0, 0, 256, 512], [256, 0, 256, 512]) &&
+          Boolean(labDOM.call('lab_photo_targets_overlap', [0, 0, 256.1, 512], [256, 0, 256, 512])),
+          'native read-ahead keeps disjoint crops concurrent and defers overlapping or invalid rectangles');
+    labDOM.call('lab_photo_coverage_rows', new Uint8Array(0), 0);
+    check(!labDOM.call('lab_photo_target_covered', [0, 0, 1, 1]),
+          'the next photographic cell cannot reuse the previous cell\'s alpha coverage');
     const descendants = new GlobeTextureCache<number>(64, 64 * 512 * 512 * 4, () => {});
     try {
         const level = 18, step = 360 / 2 ** level;
@@ -76,6 +97,11 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
               'stationary detail starts immediately instead of waiting for coarse coverage at the view edges');
         check(!spatial.page(view, 400, '', [], low.next!)!.replace,
               'native admission retains a running image that still covers the current view at a useful scale');
+        const width = low.next!.bounds[2] - low.next!.bounds[0];
+        const offscreen = {...low.next!, bounds: [view[2] + width / 10, view[1],
+            view[2] + width * 1.1, view[1] + width]};
+        check(spatial.page(view, 400, '', [], offscreen)!.replace,
+              'an offscreen job inside the lookup padding cannot delay missing visible detail');
         check(spatial.page([149.1, -35.32, 149.2, -35.22], 800, '', [], low.next!)!.replace,
               'native admission replaces old-view work when Canberra needs a different photographic cell');
         check(spatial.page(view, 400, '', [], {...low.next!, level: 4})!.replace,
@@ -394,6 +420,36 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
               bottom[0] === 180 && bottom[2] === 40 && bottom[3] === 255,
               'a transparent foreground keeps its detailed pixels while revealing the complete image underneath');
     } finally { alphaWorker.terminate(); alphaFixture.dispose(); }
+    const coveredFixture = globeHTTPFixture(async bytes => {
+        const request = labWire.decode(bytes) as {west: number};
+        const foreground = {url: '/earth_regions/4095.png', sha256: 'c'.repeat(64), width: 1800,
+            source: [0, 0, 1800, 500], target: [0, 0, 256, 512]};
+        const hidden = {...foreground, url: '/earth_regions/9999.png'};
+        const background = {...foreground, url: '/earth_regions/123.png',
+            source: [0, 0, 1800, 1800], target: [256, 0, 256, 512]};
+        return new Response(labWire.encode({ok: true, alpha: true, key: `covered-source:${request.west}`,
+            photos: [...(request.west ? [] : [background]), hidden, hidden, foreground]}));
+    }, {endpoint: '/almanac-rivers', script: '/js/globe_photo_worker.js', nativeShore: false,
+        alphaProbe: true, storageDenied: true});
+    const coveredWorker = new coveredFixture.Worker('/js/globe_photo_worker.js');
+    try {
+        for (const west of [0, 1]) {
+            const result = await new Promise<ArrayBuffer>((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Covered-source fixture timed out')), 15000);
+                coveredWorker.onmessage = event => {
+                    if (event.data.partial) return;
+                    clearTimeout(timeout);
+                    event.data.error ? reject(new Error(event.data.error)) : resolve(event.data.pixels);
+                };
+                coveredWorker.onerror = event => { clearTimeout(timeout); reject(new Error(event.message)); };
+                coveredWorker.postMessage({key: `covered-source-${west}`, bounds: [west, 0, west + .1, .1], level: 8});
+            });
+            const left = new Uint8Array(result, (256 * 512 + 128) * 4, 4);
+            const right = new Uint8Array(result, (256 * 512 + 384) * 4, 4);
+            check(left[2] === 180 && left[3] === 255 && (west ? right[3] === 0 : right[0] === 180 && right[3] === 255),
+                  'opaque source rectangles skip unavailable overlapping PNGs while uncovered areas retain their own background or gap');
+        }
+    } finally { coveredWorker.terminate(); coveredFixture.dispose(); }
     if (typeof GlobeSurfaceCache === 'undefined') await new Promise<void>((resolve, reject) => {
         const script = document.createElement('script');
         script.src = '/js/globe_surface_cache.js';

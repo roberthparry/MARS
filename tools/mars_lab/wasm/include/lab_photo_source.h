@@ -65,4 +65,35 @@ void lab_photo_source(jsref photo);
  */
 bool lab_photo_source_header(jsref bytes, unsigned width);
 
+/**
+ * @brief Replace the exact alpha coverage of sequential rows in one 512-square photographic cell.
+ * @param bytes Borrowed scoped RGBA byte array containing one to 64 complete 512-pixel rows.
+ * An empty array with row zero resets coverage without supplying pixels.
+ * @param row First destination row; zero starts a new coverage pass. Subsequent batches must be contiguous.
+ * @return No value. Invalid, oversized or out-of-order input invalidates the current coverage pass.
+ * @note Copies only alpha coverage into a fixed 32 KiB bitset; no image or host handle is retained. Only alpha 255
+ * counts as opaque. Serial worker calls must complete all 512 rows before querying covered targets. No release is needed.
+ */
+void lab_photo_coverage_rows(jsref bytes, unsigned row);
+
+/**
+ * @brief Test whether every pixel touched by a source's destination rectangle is already opaque.
+ * @param target Borrowed scoped four-number array containing x, y, width and height within the 512-square cell.
+ * @return True only for complete recorded coverage of the entire rectangle; false for incomplete coverage,
+ * invalid coordinates, or any transparent or partly transparent pixel. Fractional edges are checked conservatively.
+ * @note Uses the latest complete lab_photo_coverage_rows pass on the same serial worker. No ownership transfers,
+ * allocations or host handles survive the call; there is nothing to release.
+ */
+bool lab_photo_target_covered(jsref target);
+
+/**
+ * @brief Test whether two destination rectangles overlap before starting speculative photographic reads.
+ * @param first Borrowed scoped x, y, width, height array describing the current foreground source.
+ * @param second Borrowed scoped destination rectangle of a possible following source.
+ * @return True for positive-area overlap or invalid rectangles; false for valid disjoint or merely touching edges.
+ * @note Stateless and synchronous; no ownership transfers or release is required. An overlapping source should
+ * be considered after the foreground's real alpha coverage is available, rather than fetched speculatively.
+ */
+bool lab_photo_targets_overlap(jsref first, jsref second);
+
 #endif

@@ -1378,7 +1378,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
             const paletteBackend = await import(paletteModuleURL) as typeof import('../../typescript/globe_gpu.js');
             const activeTexture = gl.getParameter(gl.ACTIVE_TEXTURE) as number;
             const savedTextures: (WebGLTexture | null)[] = [], paletteTextures: WebGLTexture[] = [];
-            const paletteUniforms = ['mapMode', 'detailReady', 'grid', 'riverReady', 'riverComposite', 'previousRiverReady',
+            const paletteUniforms = ['mapMode', 'detailReady', 'grid', 'riverReady', 'riverComposite',
+                'riverCorrectionsReady', 'previousRiverReady',
                 'vectorReady', 'naturalShore', 'naturalStyle', 'palettesReady', 'photoReady', 'photoAtlasEnabled'];
             const savedUniforms = paletteUniforms.map(name => gl.getUniform(program, gl.getUniformLocation(program, name)!));
             const savedCamera = gl.getUniform(program, gl.getUniformLocation(program, 'camera')!) as Float32Array;
@@ -1593,6 +1594,7 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                     check(sea.every((channel, i) => Math.abs(channel - river[i]) <= 1),
                           'river colour matches adjoining sea and fjord water, including missing-photo fallback');
                     gl.uniform1i(gl.getUniformLocation(program, 'riverComposite'), 1);
+                    gl.uniform1i(gl.getUniformLocation(program, 'riverCorrectionsReady'), 1);
                     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
                                   new Uint8Array([0, 0, 0, 0]));
                     gl.drawArrays(gl.TRIANGLES, 0, 6);

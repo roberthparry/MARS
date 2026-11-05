@@ -193,9 +193,6 @@
     "[markdown]": {
         "editor.wordWrap": "off"
     },
-    "markdown.styles": [
-        "docs/preview.css"
-    ],
     "makefile.buildLog": "",
     "terminal.integrated.scrollback": 10000,
     "C_Cpp.default.compilerPath": "/usr/bin/gcc",

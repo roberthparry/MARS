@@ -1326,8 +1326,11 @@ class MarsAlmanacGlobe {
             gl.uniform4fv(this.uniform('riverBounds'), this.riverBounds);
             gl.uniform1i(this.uniform('riverReady'), Number(this.riverReady));
             gl.uniform1i(this.uniform('riverComposite'), Number(this.riverComposite));
+            gl.uniform1i(this.uniform('riverCorrectionsReady'),
+                         Number(this.riverReady && this.riverComposite && !this.riverPreview));
             gl.uniform1f(this.uniform('riverBlend'), resident?.blend ?? 1);
             gl.uniform1i(this.uniform('previousRiverReady'), Number(!this.photoAtlas && Boolean(resident?.previous)));
+            gl.uniform1i(this.uniform('previousRiverCorrectionsReady'), Number(Boolean(resident?.previous?.complete)));
             if (resident?.previous) {
                 gl.uniform4fv(this.uniform('previousRiverBounds'), resident.previous.bounds);
                 gl.uniform1f(this.uniform('previousRiverInk'), resident.previous.complete ?
@@ -1335,6 +1338,7 @@ class MarsAlmanacGlobe {
             }
             // Retained photography remains useful at a new scale. Its rasterised minimum-width
             // river ink must not expand into thick artificial channels while refinement loads.
+            // Surveyed land corrections remain independent of that stroke fade.
             gl.uniform1f(this.uniform('riverInk'), this.riverPreview ? 0 :
                 Math.max(0, Math.min(1, (2 - this.view[2] / Math.max(1, this.riverZoom)) * 2)));
             gl.uniform1i(this.uniform('grid'), Number(this.grid));
@@ -1344,7 +1348,8 @@ class MarsAlmanacGlobe {
             gl.drawArrays(gl.TRIANGLES, 0, 6);
             this.drawBorders(size);
             this.drawMarkers(size);
-            if (!this.flightTarget && ((colourTransform && blend < 1) || (resident && resident.blend < 1)))
+            if (!this.flightTarget && ((colourTransform && blend < 1) ||
+                (!this.photoAtlas && resident && resident.blend < 1)))
                 this.frame = requestAnimationFrame(render);
         };
         // Flight ticks already run on the animation clock; submit their camera in the same frame.

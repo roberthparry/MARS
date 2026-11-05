@@ -17509,9 +17509,9 @@
       "width": 1800
     },
     "regional/2514.png": {
-      "bytes": 3623345,
+      "bytes": 5951921,
       "height": 1800,
-      "sha256": "bb6200fe7b6cd0b91e59e9207b80e4a81d400ea2608babd4f1e8a6315f331c11",
+      "sha256": "9dd1552dd3fbd8975ad5c2625ca2421f5fbd473f02f72a587cc8f044c2b3704d",
       "width": 1800
     },
     "regional/2515.png": {
@@ -25249,9 +25249,9 @@
       "width": 1800
     },
     "regional/3677.png": {
-      "bytes": 2248443,
+      "bytes": 6057107,
       "height": 1800,
-      "sha256": "6d3fac7931ec5e0d9c1213b15e8cfe4530b45f9c4aae24b579c3f4920e1a5549",
+      "sha256": "c0aba77b36deb214f2c4ec549fd653765d2252484e3a9926b4a04b2af132e99c",
       "width": 1800
     },
     "regional/3678.png": {
@@ -37185,7 +37185,7 @@
   },
   "attribution": "NASA Earth Observatory; Reto Stoeckli, NASA Goddard Space Flight Center. Historical July 2004 reference imagery. NASA imagery reuse policy applies; no endorsement implied.",
   "coastal_mask": {
-    "masked_bytes": 35935992628,
+    "masked_bytes": 35942129868,
     "previous_catalogue": {
       "masked_bytes": 35188355880,
       "previous_catalogue": {
@@ -72863,9 +72863,14 @@
       "coastal_mask_identity": "4ee04b2e7d649614e2f763c67f1e4a7fa441fdadfd5510b4622d12f931dcb326",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Finland Sentinel tile 2514",
+      "overview_gap_fill": {
+        "filled_pixels": 1253755,
+        "method": "Transparent overview pixels filled from indexed packaged detail; area resampling; existing observations unchanged.",
+        "version": 1
+      },
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
-      "valid_pixels": 1986245
+      "valid_pixels": 3240000
     },
     {
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",
@@ -90308,9 +90313,14 @@
       "coastal_mask_identity": "4ee04b2e7d649614e2f763c67f1e4a7fa441fdadfd5510b4622d12f931dcb326",
       "gap_fill_source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q2/",
       "name": "Norway Sentinel tile 3677",
+      "overview_gap_fill": {
+        "filled_pixels": 2020063,
+        "method": "Transparent overview pixels filled from indexed packaged detail; area resampling; existing observations unchanged.",
+        "version": 1
+      },
       "processing": "Q3 valid observations over Q2; WGS84 bilinear reprojection; overlapping 1800-square tiles. DN 0..3000 scaled to 0..255 with exponent 0.7. Lossless RGBA PNG directly from source rasters; missing observations transparent. Offshore pixels cleared using the packaged coastline; inland waters retained; coastline alpha uses two-by-two coverage samples.",
       "source_url": "https://data.source.coop/tge-labs/sentinel-2-quarterly-cloudless-mosaics/2025/Q3/",
-      "valid_pixels": 1219937
+      "valid_pixels": 3240000
     },
     {
       "attribution": "Contains modified Copernicus Sentinel data 2025. ESA/CDSE quarterly mosaics; Taylor Geospatial Engine mirror. RGB B04/B03/B02, 10-metre source resolution.",

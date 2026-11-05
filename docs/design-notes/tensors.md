@@ -861,12 +861,21 @@ The measurement definition is part of the input. A rod's rest length, a
 coordinate separation, a length measured using simultaneous endpoint events
 and an optical image are different outputs.
 
-For an observer with $U^aU_a=-1$, construct the local rest-space projector and
-its covariant spatial metric
+Let $U^a=dx^a/d\tau$ be the measuring observer's four-velocity, tangent to their
+worldline, where $\tau$ is the proper time measured by that observer's clock.
+These formulas use $c=1$ and metric signature $(-,+,+,+)$, so the timelike
+normalisation is $U^aU_a=-1$. Lower the index with the metric: $U_a=g_{ab}U^b$.
+Construct the local rest-space projector and its covariant spatial metric
 
 $$
 h^a{}_b=\delta^a{}_b+U^aU_b,\qquad h_{ab}=g_{ab}+U_aU_b.
 $$
+
+Here $\delta^a{}_b$ is the identity map. The mixed tensor $h^a{}_b$ removes the
+component along $U^a$, leaving spatial directions in the observer's local rest
+frame; $h_{ab}$ supplies their spatial metric. Thus $h^a{}_bU^b=0$.
+When $c$ is explicit, use $U^aU_a=-c^2$ and divide both four-velocity product
+terms in these definitions by $c^2$.
 
 For an infinitesimal simultaneous displacement satisfying $U_a\,dx^a=0$,
 the expected measured length is $d\ell^2=h_{ab}\,dx^a dx^b$. For a finite
@@ -988,3 +997,26 @@ solvers to implement first; and whether spinors, perturbations or action
 variation belong in the first substantial release. MTW is the notation baseline;
 the final public contract should remain small enough to use without setting up
 typesetting machinery or learning internal tensor representations.
+
+<style data-mars-formula-preview>
+/* Formula placement belongs to the preview container, not to the alignment
+ * of columns inside a TeX array. Apply this to every Markdown guide. */
+body .katex-display {
+    margin: 1em 0;
+    padding-left: 1em;
+    text-align: left;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+body .katex-display > .katex {
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Standalone inline formulae already contain their small TeX indentation.
+ * Do not add padding here or prevent ordinary prose from wrapping. */
+body p:has(> .katex) {
+    text-align: left;
+}
+</style>

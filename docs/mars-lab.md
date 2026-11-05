@@ -1399,12 +1399,28 @@ visible, predicted and arrival windows. A job that cannot supply useful coverage
 is replaced; its HTTP and raw-cache reads are cancelled without discarding the
 worker's decoded source blocks. Request identities reject late replies, and
 superseded work does not start the failed-cell retry delay.
+An off-screen job cannot hold up missing visible detail merely because it still
+intersects the lookup texture's padding. Neighbour prefetch continues once the
+visible view is complete, while useful predicted-route and arrival jobs remain valid.
 Photographic and mask planning do not query river coverage or load river geometry.
+During photographic composition, WASM records exact opaque-pixel coverage for the
+current cell. Sources hidden by an already filled rectangle incur no image download,
+cache read or decode. Disjoint crops retain concurrent read-ahead; overlapping crops
+wait for the foreground's alpha before deciding whether their background is needed.
+Transparent observation gaps continue to reveal available imagery underneath.
+Newly decoded photographs paint their complete requested crop once; reusable
+source blocks are retained separately, avoiding repeated drawing and fractional
+block seams during that first composition.
 
 River masks are requested and rasterised independently of the photographs. Their
 alpha coverage preserves surveyed water, islands and land without painting another
 photographic preview over the atlas. Stable padded mask windows follow the camera;
 requests that still cover the view continue, while obsolete requests are replaced.
+Completed land and island corrections remain visible when enlarged river strokes
+fade during zooming. With the photographic atlas active, a replacement mask applies
+its completed geometry immediately, so repeated window changes cannot fade back to
+the old lake outline. Unfinished photographic previews cannot declare surveyed land
+or erase a retained correction. Existing decoded mask pixels remain reusable.
 Up to four 2048-square masks use a separate GPU budget of 64 MiB. Mapped riverbanks
 and lakes have no fixed zoom cutoff; areas smaller than a quarter mask pixel are
 omitted until a closer view. Windows wider or taller than 6° use mapped areas
@@ -1568,6 +1584,7 @@ marker remains visible whenever it projects into view.
 Broad geographic cells supply the approach while finer route and destination cells
 are prepared and retained; the global photograph remains the fallback. Old raster river ink fades when magnified
 beyond its prepared scale while its photographs remain useful during refinement.
+This stroke fade does not remove surveyed land or island corrections.
 Town labels allow up to 220 CSS pixels, including padding and borders, and can use
 the space on either side of the marker. Labels truncate only when that budget is exceeded.
 Destination shoreline detail is prefetched off-thread. Projection and large stencil
@@ -4995,3 +5012,26 @@ code.
   in expanded cards.
 - **A previous result is still visible:** evaluate the new input or use
   **Clear**. **Back** and **Forward** navigate the Lab's own workspace history.
+
+<style data-mars-formula-preview>
+/* Formula placement belongs to the preview container, not to the alignment
+ * of columns inside a TeX array. Apply this to every Markdown guide. */
+body .katex-display {
+    margin: 1em 0;
+    padding-left: 1em;
+    text-align: left;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+body .katex-display > .katex {
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Standalone inline formulae already contain their small TeX indentation.
+ * Do not add padding here or prevent ordinary prose from wrapping. */
+body p:has(> .katex) {
+    text-align: left;
+}
+</style>

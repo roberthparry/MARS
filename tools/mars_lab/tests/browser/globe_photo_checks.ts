@@ -6,6 +6,7 @@
  * cancellation, unavailable tiles and rejection of obsolete asynchronous completions.
  * Probes the production photographic lookup against independently interpolated texels
  * at close-view coordinates, with both current cells and cached ancestors.
+ * Surveyed land remains corrected through stroke fading, mask replacements and incomplete previews.
  */
 async function checkGlobePhoto(check: (condition: boolean, message: string) => void): Promise<void> {
     checkGlobeComposite(check);
@@ -394,6 +395,70 @@ function checkGlobeComposite(check: (condition: boolean, message: string) => voi
                 }
             }
         } finally { labDOM.call('lab_texture_cache', {action: 4, token: dense.token}); }
+        gl.uniform1i(gl.getUniformLocation(program, 'geographicSample'), 0);
+        gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasEnabled'), 1);
+        gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasReady'), 0);
+        gl.uniformMatrix3fv(gl.getUniformLocation(program, 'cameraToWorld'), false, [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+        gl.uniform1i(gl.getUniformLocation(program, 'naturalShore'), 1);
+        gl.uniform1f(gl.getUniformLocation(program, 'shoreBlend'), 1);
+        gl.uniform4f(gl.getUniformLocation(program, 'shoreBounds'), -1, -1, 1, 1);
+        gl.uniform4f(gl.getUniformLocation(program, 'shoreTransform'), 1, 0, 0, 1);
+        gl.uniform3f(gl.getUniformLocation(program, 'shoreOffset'), 0, 0, 1);
+        gl.activeTexture(gl.TEXTURE3);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                      new Uint8Array([0, 0, 0, 255]));
+        gl.activeTexture(gl.TEXTURE1);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                      new Uint8Array([128, 128, 128, 128]));
+        gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 1);
+        gl.uniform1i(gl.getUniformLocation(program, 'riverComposite'), 1);
+        gl.uniform1i(gl.getUniformLocation(program, 'riverCorrectionsReady'), 1);
+        gl.uniform1i(gl.getUniformLocation(program, 'previousRiverReady'), 0);
+        gl.uniform4f(gl.getUniformLocation(program, 'riverBounds'), -1, -1, 1, 1);
+        gl.uniform1f(gl.getUniformLocation(program, 'riverInk'), 1);
+        gl.uniform1f(gl.getUniformLocation(program, 'riverBlend'), 1);
+        const correctedLand = pixel();
+        check(correctedLand[3] === 255 && [80, 100, 40].every((value, i) =>
+            Math.abs(correctedLand[i] - value * light) <= 2), 'surveyed land replaces an obsolete coarse lake mask');
+        for (const ink of [.5, 0]) {
+            gl.uniform1f(gl.getUniformLocation(program, 'riverInk'), ink);
+            const actual = pixel();
+            check(actual.every((value, i) => Math.abs(value - correctedLand[i]) <= 1),
+                  `surveyed land survives zoom-dependent river-stroke fading (${ink}: ${actual})`);
+        }
+        for (const blend of [0, .25, .5, 1]) {
+            gl.uniform1f(gl.getUniformLocation(program, 'riverBlend'), blend);
+            const actual = pixel();
+            check(actual.every((value, i) => Math.abs(value - correctedLand[i]) <= 1),
+                  `atlas mask replacements never fade surveyed land back to the coarse lake (${blend}: ${actual})`);
+        }
+        gl.uniform1i(gl.getUniformLocation(program, 'riverCorrectionsReady'), 0);
+        const previewLand = pixel();
+        check(previewLand[3] === 255 && [7, 20, 64].every((value, i) =>
+            Math.abs(previewLand[i] - value * light) <= 2), 'photographic previews cannot declare surveyed land');
+        gl.uniform1i(gl.getUniformLocation(program, 'riverCorrectionsReady'), 1);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                      new Uint8Array([80, 100, 40, 255]));
+        check(pixel().every((value, i) => Math.abs(value - previewLand[i]) <= 1),
+              'completed masks cannot infer land outside their recorded survey coverage');
+        gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 0);
+        gl.uniform1i(gl.getUniformLocation(program, 'previousRiverReady'), 1);
+        gl.uniform1i(gl.getUniformLocation(program, 'previousRiverCorrectionsReady'), 1);
+        gl.uniform1f(gl.getUniformLocation(program, 'previousRiverInk'), 0);
+        gl.uniform1i(gl.getUniformLocation(program, 'photoAtlasEnabled'), 0);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                      new Uint8Array([40, 50, 20, 128]));
+        const previousLand = pixel();
+        check(previousLand.every((value, i) => Math.abs(value - correctedLand[i]) <= 1),
+              'a retained completed mask preserves surveyed land independently of its faded river strokes');
+        gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 1);
+        gl.uniform1i(gl.getUniformLocation(program, 'riverCorrectionsReady'), 0);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
+                      new Uint8Array([40, 50, 20, 128]));
+        check(pixel().every((value, i) => Math.abs(value - previousLand[i]) <= 1),
+              'an unfinished replacement preview preserves the retained surveyed land correction');
         check(gl.getError() === gl.NO_ERROR, 'photographic handoffs complete without GPU errors');
     } finally {
         textures.forEach(texture => gl.deleteTexture(texture));

@@ -96,3 +96,26 @@ Expression construction, simplification, parsing, rendering, multi-argument
 differentiation, formal integration dispatch, matrix power-series evaluation,
 stable finite-sum evaluation and round-trip recovery are implemented. General
 branch-aware analytic continuation remains a future extension.
+
+<style data-mars-formula-preview>
+/* Formula placement belongs to the preview container, not to the alignment
+ * of columns inside a TeX array. Apply this to every Markdown guide. */
+body .katex-display {
+    margin: 1em 0;
+    padding-left: 1em;
+    text-align: left;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+body .katex-display > .katex {
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Standalone inline formulae already contain their small TeX indentation.
+ * Do not add padding here or prevent ordinary prose from wrapping. */
+body p:has(> .katex) {
+    text-align: left;
+}
+</style>

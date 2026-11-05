@@ -7,6 +7,8 @@
  * native; no JavaScript shader generation or binary-shader extension is required.
  * Detailed photographic addresses use local page coordinates to retain fractional
  * precision at close zoom, including cached ancestors and date-line wrapping.
+ * Completed land corrections survive zoom-dependent river-stroke fading and
+ * photographic atlas handoffs; unfinished previews cannot declare surveyed land.
  */
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +44,7 @@ static const char globe_fragment[] =
     "uniform vec4 riverBounds;\n"
     "uniform bool riverReady;\n"
     "uniform bool riverComposite;\n"
+    "uniform bool riverCorrectionsReady, previousRiverCorrectionsReady;\n"
     "uniform float riverInk;\n"
     "uniform float riverBlend, previousRiverInk;\n"
     "uniform bool previousRiverReady;\n"
@@ -270,13 +273,18 @@ static const char globe_fragment[] =
     "    colour.rgb=surfacePhoto(vec2(lon,lat));\n"
     "    vec2 waterLand=vec2(0.);\n"
     "    vec2 geographic=vec2(lon,lat);\n"
-    "    if(previousRiverReady)\n"
-    "        waterLand=riverLayer(previousRivers,regionalUV(geographic,previousRiverBounds),true)*previousRiverInk;\n"
+    "    if(previousRiverReady) {\n"
+    "        vec2 previous=riverLayer(previousRivers,regionalUV(geographic,previousRiverBounds),true);\n"
+    "        waterLand=previous*vec2(previousRiverInk,previousRiverCorrectionsReady?1.:0.);\n"
+    "    }\n"
     "    if(riverReady) {\n"
     "        vec2 local=regionalUV(geographic,riverBounds);\n"
-    "        float blend=smoothstep(0.,1.,riverBlend);\n"
-    "        float coverage=riverComposite?regionalBlend(local)*blend:0.;\n"
-    "        waterLand=waterLand*(1.-coverage)+riverLayer(rivers,local,riverComposite)*riverInk*blend;\n"
+    "        // The atlas occupies the outgoing-mask sampler, so a completed mask replaces it directly.\n"
+    "        float blend=photoAtlasEnabled?1.:smoothstep(0.,1.,riverBlend);\n"
+    "        float coverage=riverComposite && riverCorrectionsReady?regionalBlend(local)*blend:0.;\n"
+    "        vec2 next=riverLayer(rivers,local,riverComposite);\n"
+    "        next*=vec2(riverInk,riverCorrectionsReady?1.:0.);\n"
+    "        waterLand=waterLand*(1.-coverage)+next*blend;\n"
     "    }\n"
     "    float riverCoverage=waterLand.x,riverLand=waterLand.y;\n"
     "    vec3 photographic=colour.rgb;\n"

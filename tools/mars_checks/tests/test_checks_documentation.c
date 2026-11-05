@@ -2,12 +2,13 @@
  * @file test_checks_documentation.c
  * @brief Native port of the Python Markdown coverage and formula-layout tests.
  *
- * Checks the real module guides, preview stylesheet and tracked Markdown formulae.
+ * Checks the real module guides, embedded preview styles and tracked Markdown formulae.
  * The original extractor fixture is registered in test_checks_parsers.c. These
  * are read-only repository regressions controlled by the global test harness.
  */
 #include <ctype.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "checks_process.h"
 #include "checks_controls.h"
@@ -45,15 +46,65 @@ static string_t *test_checks_css_rule(const string_t *css, const char *selector)
     return NULL;
 }
 
-static void test_checks_preview_formula_alignment_applies_to_every_guide(void)
+static bool test_checks_document_has_math(const string_t *text)
 {
-    string_t *settings_text = test_checks_document(".vscode/settings.json");
-    string_t *css_text = test_checks_document("docs/preview.css");
-    json_t *settings = settings_text ? json_from_text(settings_text) : NULL;
-    const json_t *styles = checks_member(settings, "markdown.styles");
-    size_t count = styles ? json_array_size(styles) : 0;
-    bool ok = count && checks_equal(json_string_value(json_array_get(styles, count - 1)), "docs/preview.css");
+    const char *p = string_c_str(text);
+    unsigned fence = 0, inline_ticks = 0, dollars = 0;
+    char fence_char = 0;
+    while (*p) {
+        const char *end = strchr(p, '\n');
+        if (!end)
+            end = p + strlen(p);
+        const char *line = p;
+        while (line < end && (*line == ' ' || *line == '\t' || *line == '>'))
+            ++line;
+        unsigned count = 0;
+        if (line < end && (*line == '`' || *line == '~'))
+            while (line + count < end && line[count] == *line)
+                ++count;
+        if (count >= 3 && (!fence || (*line == fence_char && count >= fence))) {
+            if (fence) {
+                fence = 0;
+            } else {
+                fence = count;
+                fence_char = *line;
+            }
+        } else if (!fence) {
+            for (const char *at = line; at < end; ++at) {
+                if (*at == '\\' && at + 1 < end) {
+                    if (!inline_ticks && (at[1] == '[' || at[1] == '('))
+                        return true;
+                    ++at;
+                } else if (*at == '`') {
+                    unsigned ticks = 1;
+                    while (at + 1 < end && at[1] == '`') {
+                        ++ticks;
+                        ++at;
+                    }
+                    if (!inline_ticks)
+                        inline_ticks = ticks;
+                    else if (inline_ticks == ticks)
+                        inline_ticks = 0;
+                } else if (!inline_ticks && *at == '$' && ++dollars >= 2) {
+                    return true;
+                }
+            }
+        }
+        p = *end ? end + 1 : end;
+    }
+    return false;
+}
+
+static bool test_checks_formula_styles(const string_t *text)
+{
+    const char *marker = "<style data-mars-formula-preview>";
+    string_offset_t start = string_find(text, marker);
+    size_t content_start = start >= 0 ? (size_t)start + strlen(marker) : 0;
+    string_t *tail = start >= 0 ? checks_slice(text, content_start, string_byte_length(text) - content_start) : NULL;
+    string_offset_t end = tail ? string_find(tail, "</style>") : -1;
+    string_t *css_text = end >= 0 ? checks_slice(tail, 0, (size_t)end) : NULL;
     string_t *css = css_text ? checks_strip_c(css_text, false) : NULL;
+    bool ok = css && string_find(tail, marker) < 0;
     const char *const selectors[] = {"body .katex-display", "body .katex-display > .katex", "body p:has(> .katex)"};
     for (size_t i = 0; i < 3 && css; ++i) {
         string_t *rule = test_checks_css_rule(css, selectors[i]);
@@ -67,13 +118,37 @@ static void test_checks_preview_formula_alignment_applies_to_every_guide(void)
             ok = !checks_match(rule, "white-space[[:space:]]*:", 0, NULL) && ok;
         string_free(rule);
     }
-    ok = css && ok;
     string_free(css);
     string_free(css_text);
-    string_free(settings_text);
-    json_free(settings);
+    string_free(tail);
+    return ok;
+}
+
+static void test_checks_preview_formula_alignment_applies_to_every_guide(void)
+{
+    string_t *root = checks_text(MARS_CHECKS_ROOT_DIR);
+    checks_strings_t *paths = checks_git_paths(root, false);
+    bool ok = paths != NULL;
+    size_t styled = 0;
+    for (size_t i = 0; paths && i < checks_strings_count(paths); ++i) {
+        const string_t *relative = checks_strings_get(paths, i);
+        if (!string_ends_with(relative, ".md"))
+            continue;
+        string_t *text = test_checks_document(string_c_str(relative));
+        if (text && test_checks_document_has_math(text)) {
+            bool valid = test_checks_formula_styles(text);
+            if (!valid)
+                fprintf(stderr, "%s: missing or invalid embedded formula styles\n", string_c_str(relative));
+            ok = valid && ok;
+            ++styled;
+        }
+        ok = text && ok;
+        string_free(text);
+    }
+    checks_strings_free(paths);
+    string_free(root);
     TEST_ASSERT_TRUE(
-        ok, "ported preview regression applies left alignment to every guide without preventing prose wrapping");
+        ok && styled, "mathematical guides embed left alignment and scrolling without preventing prose wrapping");
 }
 
 static string_t *test_checks_unquote(const string_t *line)

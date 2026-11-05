@@ -3774,3 +3774,26 @@ through a private callback only when wrapping is necessary. It has no access to
 expression graphs or operation tables, and does not reparse rendered fragments.
 Parsing, evaluation, simplification, naming scopes and mathematical display
 selection remain expression responsibilities; callers need no rendering context.
+
+<style data-mars-formula-preview>
+/* Formula placement belongs to the preview container, not to the alignment
+ * of columns inside a TeX array. Apply this to every Markdown guide. */
+body .katex-display {
+    margin: 1em 0;
+    padding-left: 1em;
+    text-align: left;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+body .katex-display > .katex {
+    text-align: left;
+    white-space: nowrap;
+}
+
+/* Standalone inline formulae already contain their small TeX indentation.
+ * Do not add padding here or prevent ordinary prose from wrapping. */
+body p:has(> .katex) {
+    text-align: left;
+}
+</style>
