@@ -385,14 +385,21 @@ coordinates produce one result with the more specific membership; distinct
 places with the same name remain separate.
 Callback records belong to the catalogue and are valid only during the callback.
 A country or region match selects its default catalogue town, falling back to
-the first indexed local town. For example, `Svalbard` finds Longyearbyen. An exact
+the first indexed local town or a direct subdivision's town. For example, `Svalbard` finds Longyearbyen. An exact
 country or region match precedes a town with the same name; searching `Wales`
 therefore returns the Welsh reference before the English namesake village.
-Exact town and named-place matches take precedence over prefix-only results; areas
-without catalogue towns have no result.
+An exact country name also precedes a same-named subdivision: `Georgia` puts the
+country's reference before the US state's, whilst retaining both results.
+Exact town and named-place matches take precedence over prefix-only results. Areas
+without towns use their recorded default location, so uninhabited territories remain
+searchable without adding fictitious towns. These references retain their recorded time
+zone and use zero for an unavailable surveyed height. Areas without either reference have no result.
 Named-place aliases provide reference towns for geographic names outside the
 administrative catalogue. The managed aliases include Pico → Madalena, Faial →
 Horta, Terceira → Angra do Heroísmo, and São Miguel or Azores → Ponta Delgada.
+Sardinia or Sardegna resolves to Cagliari, and Corsica or Corse resolves to Ajaccio.
+Managed-data revision 20 adds these island aliases and missing country references to existing installations,
+refreshing the search indexes whilst retaining town identities, heights and saved defaults.
 Cornwall resolves to Newquay, and Isle of Wight resolves to Newport on that island.
 Mersea Island resolves to the existing West Mersea reference town in Essex.
 Hayling Island resolves to South Hayling in Hampshire.

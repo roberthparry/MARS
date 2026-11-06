@@ -679,6 +679,42 @@ static bool test_cfg_database_packaged_almanac_fixture(const char *directory)
     return ok;
 }
 
+struct test_cfg_country_search {
+    const char *code;
+    bool found;
+};
+
+static bool test_cfg_country_search_place(const jurisdict_place_t *place, void *context)
+{
+    struct test_cfg_country_search *search = context;
+    search->found = place && place->jurisdiction_code && !strncmp(place->jurisdiction_code, search->code, 2) &&
+                    place->name && *place->name && place->latitude && *place->latitude &&
+                    place->longitude && *place->longitude && place->timezone && *place->timezone;
+    return false;
+}
+
+/* Exercise every shipped country name through the public API, including uninhabited territories and namesakes. */
+static bool test_cfg_country_searches(sqlite_t *db)
+{
+    jurisdiction_t *engine = jurisdict_open(NULL);
+    sqlite_stmt_t *countries = db ? sqlite_stmt_prepare(db,
+        "SELECT jurisdiction_id,name FROM jurisdiction WHERE jurisdiction_type='country' ORDER BY name") : NULL;
+    bool ok = engine && countries;
+    sqlite_step_result_t step = SQLITE_STEP_DONE;
+    size_t checked = 0;
+    while (ok && (step = sqlite_stmt_step(countries)) == SQLITE_STEP_ROW) {
+        string_t *name = string_new_with(sqlite_stmt_column_text(countries, 1));
+        struct test_cfg_country_search search = {.code = sqlite_stmt_column_text(countries, 0)};
+        ok = name && jurisdict_search_towns(engine, name, 1, test_cfg_country_search_place, &search) && search.found;
+        if (!ok) fprintf(stderr, "Country search failed: %s\n", sqlite_stmt_column_text(countries, 1));
+        string_free(name);
+        ++checked;
+    }
+    sqlite_stmt_finalize(countries);
+    jurisdict_close(engine);
+    return ok && step == SQLITE_STEP_DONE && checked == 249;
+}
+
 static bool test_cfg_database_jurisdiction_mode(const char *directory, const char *password)
 {
     bool ok = !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && !unsetenv("MARS_CALENDAR_LOCATION_ARGUMENT") &&
@@ -713,7 +749,8 @@ static bool test_cfg_database_jurisdiction_mode(const char *directory, const cha
          test_cfg_database_query(db,
                                  "SELECT (SELECT count(*) FROM jurisdiction_town_search)="
                                  "(SELECT count(*) FROM jurisdiction_town_name)", "1") &&
-         test_cfg_database_mode(database, 0600) && test_cfg_database_mode(configuration, 0600);
+         test_cfg_database_mode(database, 0600) && test_cfg_database_mode(configuration, 0600) &&
+         test_cfg_country_searches(db);
     sqlite_close(db);
     ok = ok && !cfg_database_run(true, NULL, NULL, NULL, NULL, false) &&
          test_cfg_database_setting(configuration, "MARS_CALENDAR_LOCATION", "Limmen, NL") &&
@@ -1110,6 +1147,9 @@ static bool test_cfg_database_update_fixture(const char *directory)
         "create table jurisdiction_town_elevation(jurisdiction_town_id integer primary key,elevation_metres);"
         "create table jurisdiction_town_timezone(jurisdiction_town_id integer primary key,timezone_code);"
         "create table timezone_code(timezone_name,timezone_code);"
+        "create table timezone_definition(timezone_name text primary key);"
+        "create table timezone_canonical(timezone_name text primary key,canonical_timezone_name);"
+        "create table timezone_era(timezone_name,sequence_no,gmtoff_minutes,rules_kind,format_text);"
         "insert into timezone_code values('Africa/Johannesburg',24);"
         "insert into timezone_code values('Europe/Kaliningrad',246),('Europe/Moscow',257);"
         "insert into timezone_code values('Australia/Adelaide',221),('Australia/Brisbane',222),"
@@ -1156,7 +1196,7 @@ static bool test_cfg_database_update_fixture(const char *directory)
     ok = ok && cfg_databases_update() == 0 &&
          !setenv("MARS_ROOT", directory, 1) && cfg_databases_update() == 0; /* No source access on a current DB. */
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "18") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "20") &&
          test_cfg_database_query(db,
              "SELECT count(*) FROM jurisdiction_area_search WHERE jurisdiction_area_search MATCH '\"GB\"*'", "1") &&
          test_cfg_database_query(db,
@@ -1189,14 +1229,56 @@ static bool test_cfg_database_update_fixture(const char *directory)
     sqlite_close(db);
     ok = ok && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) && cfg_databases_update() == 0;
     db = test_cfg_database_open(database, "saved-update-key");
-    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "18") &&
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "20") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction_town where jurisdiction_id='AU'", "261") &&
          test_cfg_database_query(db, "select count(distinct town_name) from jurisdiction_town "
                                    "where substr(jurisdiction_id,1,2)='AU'", "277") &&
          test_cfg_database_query(db, "select count(*) from jurisdiction_town where town_name='Kaliningrad'", "1") &&
          test_cfg_database_query(db, "select jurisdiction_town_id from jurisdiction_default_town "
                                    "where jurisdiction_id='AU'", "103") &&
+         sqlite_exec_cstr(db,
+             "INSERT INTO jurisdiction(jurisdiction_id,jurisdiction_type,iso_country_code,name) "
+             "VALUES('IT','country','IT','Italy'),('FR','country','FR','France'),"
+             "('BV','country','BV','Bouvet Island'),('HM','country','HM','Heard Island & McDonald Islands');"
+             "INSERT INTO jurisdiction_name VALUES('IT','Italy'),('FR','France'),"
+             "('BV','Bouvet Island'),('HM','Heard Island & McDonald Islands');"
+             "INSERT INTO jurisdiction_town_entity VALUES(1048576),(1048577);"
+             "INSERT INTO jurisdiction_town VALUES(1048576,'IT','Cagliari'),(1048577,'FR','Ajaccio');"
+             "INSERT INTO jurisdiction_town_latitude VALUES(1048576,'39.23054'),(1048577,'41.91886');"
+             "INSERT INTO jurisdiction_town_longitude VALUES(1048576,'9.11917'),(1048577,'8.73812');"
+             "INSERT INTO jurisdiction_town_elevation VALUES(1048576,'41'),(1048577,'12');"
+             "INSERT INTO timezone_code VALUES('Europe/Rome',263),('Europe/Paris',259),('Indian/Kerguelen',287);"
+             "INSERT INTO jurisdiction_town_timezone VALUES(1048576,263),(1048577,259);") &&
+         cfg_database_revision(db, "jurisdiction", 18);
+    sqlite_close(db);
+    ok = ok && cfg_databases_update() == 0;
+    db = test_cfg_database_open(database, "saved-update-key");
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "20") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_place_alias "
+             "WHERE name IN ('Sardinia','Sardegna','Corsica','Corse')", "4") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_place_search "
+             "WHERE jurisdiction_place_search MATCH '\"Sardinia\"*'", "1") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town WHERE jurisdiction_id='IT'", "1") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_town WHERE jurisdiction_id='FR'", "1") &&
+         test_cfg_database_query(db, "SELECT elevation_metres FROM jurisdiction_town_elevation "
+             "WHERE jurisdiction_town_id=1048576", "41") &&
+         test_cfg_database_query(db, "SELECT jurisdiction_town_id FROM jurisdiction_default_town "
+             "WHERE jurisdiction_id='AU'", "103") &&
+         test_cfg_database_query(db, "SELECT value FROM retained", "42") &&
+         test_cfg_database_query(db, "SELECT latitude||'|'||longitude FROM jurisdiction_location_default_latitude "
+             "JOIN jurisdiction_location_default_longitude USING(jurisdiction_id) WHERE jurisdiction_id='HM'",
+             "-53.01888867|73.39205128") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM jurisdiction_location_default_timezone "
+             "WHERE jurisdiction_id IN ('BV','HM')", "2") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM timezone_era WHERE timezone_name='Etc/UTC' "
+             "AND gmtoff_minutes=0 AND rules_kind='none'", "1") &&
          cfg_database_revision(db, "jurisdiction", 19);
+    sqlite_close(db);
+    ok = ok && cfg_databases_update() == 0;
+    db = test_cfg_database_open(database, "saved-update-key");
+    ok = ok && db && test_cfg_database_query(db, "select revision from mars_database_revision", "20") &&
+         test_cfg_database_query(db, "SELECT count(*) FROM timezone_code WHERE timezone_name='Etc/UTC'", "1") &&
+         cfg_database_revision(db, "jurisdiction", 21);
     sqlite_close(db);
     ok = ok && cfg_databases_update() == 1 && !setenv("MARS_JURISDICTION_DB_KEY", "wrong-key", 1) &&
          cfg_databases_update() == 1;

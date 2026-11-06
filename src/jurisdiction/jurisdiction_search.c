@@ -3,7 +3,8 @@
  * @brief Bounded worldwide searches through Unicode town, jurisdiction and geographic alias indexes.
  *
  * Treats input as literal text, not FTS syntax. Unicode tokenisation supplies case- and accent-insensitive
- * name-prefix matching. Country and region matches select their default town or first indexed local town.
+ * name-prefix matching. Country and region matches select their default town or first indexed local town,
+ * falling back to their recorded reference location when there are no towns.
  * Only the best 256 indexed candidates reach coordinate joins and duplicate elimination;
  * returned records retain their actual regional membership, reference height and time zone.
  * Missing indexes report failure without scanning the world catalogue or writing to the database.
@@ -34,7 +35,12 @@ bool jurisdict_search_towns(jurisdiction_t *engine, const string_t *text, size_t
         "    WHERE jurisdiction_town_search MATCH ?1\n"
         "    ORDER BY rank, rowid LIMIT 256\n"
         "), area_matches AS (\n"
-        "    SELECT jurisdiction_id, name, rank AS relevance\n"
+        "    SELECT jurisdiction_id, name, rank AS relevance,\n"
+        "           CASE WHEN lower(name)=lower(?2) THEN\n"
+        "               CASE (SELECT jurisdiction_type FROM jurisdiction\n"
+        "                     WHERE jurisdiction_id=jurisdiction_area_search.jurisdiction_id)\n"
+        "               WHEN 'country' THEN -2 ELSE -1 END\n"
+        "           ELSE 3 END AS priority\n"
         "    FROM jurisdiction_area_search\n"
         "    WHERE jurisdiction_area_search MATCH ?1\n"
         "    ORDER BY rank, rowid LIMIT 64\n"
@@ -43,8 +49,13 @@ bool jurisdict_search_towns(jurisdiction_t *engine, const string_t *text, size_t
         "        (SELECT jurisdiction_town_id FROM jurisdiction_default_town\n"
         "         WHERE jurisdiction_id=area.jurisdiction_id),\n"
         "        (SELECT jurisdiction_town_id FROM jurisdiction_town_jurisdiction_id\n"
-        "         WHERE jurisdiction_id=area.jurisdiction_id ORDER BY jurisdiction_town_id LIMIT 1)\n"
-        "    ) AS id, relevance, name\n"
+        "         WHERE jurisdiction_id=area.jurisdiction_id ORDER BY jurisdiction_town_id LIMIT 1),\n"
+        "        (SELECT town.jurisdiction_town_id\n"
+        "         FROM jurisdiction AS child\n"
+        "         JOIN jurisdiction_town_jurisdiction_id AS town ON town.jurisdiction_id=child.jurisdiction_id\n"
+        "         WHERE child.parent_jurisdiction_id=area.jurisdiction_id\n"
+        "         ORDER BY town.jurisdiction_town_id LIMIT 1)\n"
+        "    ) AS id, jurisdiction_id, relevance, name, priority\n"
         "    FROM area_matches AS area\n"
         "), alias_matches AS (\n"
         "    SELECT jurisdiction_town_id AS id, name, rank AS relevance,\n"
@@ -55,7 +66,7 @@ bool jurisdict_search_towns(jurisdiction_t *engine, const string_t *text, size_t
         "), references_found AS (\n"
         "        SELECT id, priority, relevance, NULL AS matched_name FROM town_matches\n"
         "        UNION ALL\n"
-        "        SELECT id, CASE WHEN lower(name)=lower(?2) THEN -1 ELSE 3 END, relevance, name\n"
+        "        SELECT id, priority, relevance, name\n"
         "        FROM area_towns WHERE id IS NOT NULL\n"
         "        UNION ALL\n"
         "        SELECT id, priority, relevance, name FROM alias_matches\n"
@@ -93,9 +104,24 @@ bool jurisdict_search_towns(jurisdiction_t *engine, const string_t *text, size_t
         "    LEFT JOIN jurisdiction_default_town AS def\n"
         "           ON def.jurisdiction_town_id=town.jurisdiction_town_id\n"
         "          AND def.jurisdiction_id=town.jurisdiction_id\n"
+        "), found_places AS (\n"
+        "    SELECT jurisdiction_id, town_name, latitude, longitude, elevation, timezone_name,\n"
+        "           is_default, matched_name, priority, relevance, id\n"
+        "    FROM places WHERE occurrence=1\n"
+        "    UNION ALL\n"
+        "    SELECT area.jurisdiction_id, COALESCE(locality.locality_name, area.name),\n"
+        "           lat.latitude, lon.longitude, '0', zone.timezone_name, 1, area.name,\n"
+        "           area.priority, area.relevance, 0\n"
+        "    FROM area_towns AS area\n"
+        "    JOIN jurisdiction_location_default_latitude AS lat USING (jurisdiction_id)\n"
+        "    JOIN jurisdiction_location_default_longitude AS lon USING (jurisdiction_id)\n"
+        "    JOIN jurisdiction_location_default_timezone AS tz USING (jurisdiction_id)\n"
+        "    JOIN timezone_code AS zone ON zone.timezone_code=tz.timezone_code\n"
+        "    LEFT JOIN jurisdiction_location_default_locality AS locality USING (jurisdiction_id)\n"
+        "    WHERE area.id IS NULL\n"
         ")\n"
         "SELECT jurisdiction_id, town_name, latitude, longitude, elevation, timezone_name, is_default, matched_name\n"
-        "FROM places WHERE occurrence=1\n"
+        "FROM found_places\n"
         "ORDER BY priority, lower(town_name)<>lower(?2), is_default DESC, relevance,\n"
         "         town_name COLLATE NOCASE, jurisdiction_id, id\n"
         "LIMIT ?3";

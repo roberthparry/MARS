@@ -48,6 +48,15 @@ Its reference point, −34.05861, 18.32694, follows
 to Wikipedia contributors under CC BY-SA 4.0, checked 25 October 2026. No surveyed
 elevation is supplied. Its existing South African land coverage and shoreline are unchanged.
 
+Country search references for uninhabited territories use recorded geographic locations rather than invented towns.
+Bouvet Island's approximate reference, 54°25.3′S, 3°21.5′E, follows the Norwegian Polar Institute entry in the
+[SCAR Antarctic Gazetteer](https://data.aad.gov.au/aadc/gaz/place_names_within_map.cfm?east=3.44722222222&north=-54.3805555556&south=-54.4611111111&west=3.26111111111).
+UTC is the observer reference-time convention for that uninhabited location, not an asserted local civil-time rule.
+Heard Island uses Atlas Cove survey mark AUS347, −53.01888867, 73.39205128, published by the
+[Australian Antarctic Division](https://www.antarctica.gov.au/antarctic-operations/stations-and-field-locations/heard-island/mapping/),
+with the existing Indian/Kerguelen time-zone record. No surveyed observer height is supplied by these default
+location records. Sources checked 6 November 2026.
+
 The temporary Danish former-lake inspection references used these sources:
 Kolindsund, Tastum Sø, Gårdbo Sø, Sjørring Sø and Sperring Sø. Their approximate
 reference points followed Kjeld Hansen's *Det tabte land* site accounts:

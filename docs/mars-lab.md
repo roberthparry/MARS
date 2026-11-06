@@ -337,6 +337,11 @@ Island aliases also resolve to existing town references: `Pico` or `Pico Azores`
 shows **Pico — Madalena** in the Azores. Choosing it retains Madalena's recorded
 position, elevation and time zone. Exact named places rank before prefix matches
 such as Picos in other countries. Faial, Terceira and São Miguel are also indexed.
+`Sardinia` or `Sardegna` finds **Sardinia — Cagliari** or **Sardegna — Cagliari** in Italy.
+`Corsica` or `Corse` similarly finds Ajaccio in France. Every country and territory in the
+country catalogue can also be searched by its displayed name. Where there are no towns,
+the result uses the country's recorded reference location. Managed jurisdiction revision 20
+adds missing references and the island aliases when `make release` updates the database.
 England, Wales, Scotland, Northern Ireland and the Isle of Man can be searched by
 name. Cornwall selects Newquay, and the Isle of Wight selects Newport; the search
 also accepts `Isle of White` and displays the correct Isle of Wight name.

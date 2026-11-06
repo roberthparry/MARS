@@ -136,6 +136,11 @@ bool cfg_database_public_ddl(sqlite_t *db, const char *sql)
 static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root, const string_t *staging)
 {
     (void)staging;
+    int64_t revision = 0;
+    if (!cfg_database_current_revision(db, "jurisdiction", &revision)) return false;
+    if (revision >= 18)
+        return cfg_database_source(db, root, "packaging/jurisdiction-db/location_additions.sql", false) &&
+               cfg_database_source(db, root, "packaging/jurisdiction-db/town_search.sql", false);
     /* Unlike optional installation assets, a declared migration must not succeed without its source. */
     string_t *path = mars_path_resource(MARS_PATH_JURISDICTION, root, "flags/LICENSE");
     file_t *source = path ? file_new(path) : NULL;
@@ -233,7 +238,7 @@ static int cfg_databases_prepare(bool install_missing)
          CFG_GLOBE_DATA_REVISION, cfg_database_globe_refresh, NULL, true},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac, false},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 18, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
+         "jurisdiction/mars_jurisdiction_rules.db", 20, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)

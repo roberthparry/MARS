@@ -720,6 +720,20 @@ static bool search_stop(const jurisdict_place_t *place, void *context)
     return false;
 }
 
+struct search_country_result {
+    const char *code;
+    bool found;
+};
+
+static bool search_country(const jurisdict_place_t *place, void *context)
+{
+    struct search_country_result *result = context;
+    result->found = place && place->jurisdiction_code && !strncmp(place->jurisdiction_code, result->code, 2) &&
+                    place->latitude && *place->latitude && place->longitude && *place->longitude &&
+                    place->timezone && *place->timezone;
+    return false;
+}
+
 static bool route_place_search(const char *directory)
 {
     if (!test_lab_catalogue_database(directory)) return false;
@@ -740,7 +754,11 @@ static bool route_place_search(const char *directory)
         "('PT-20','PT','subdivision','Região Autónoma dos Açores'),('BR',NULL,'country','Brazil'),"
         "('GB-SCT','GB','subdivision','Scotland'),('GB-NIR','GB','subdivision','Northern Ireland'),"
         "('IM',NULL,'country','Isle of Man'),('AU',NULL,'country','Australia'),"
-        "('AU-WA','AU','subdivision','Western Australia'),('ZA',NULL,'country','South Africa');"
+        "('AU-WA','AU','subdivision','Western Australia'),('ZA',NULL,'country','South Africa'),"
+        "('IT',NULL,'country','Italy'),('AQ',NULL,'country','Antarctica'),"
+        "('BV',NULL,'country','Bouvet Island'),('HM',NULL,'country','Heard Island & McDonald Islands'),"
+        "('IO',NULL,'country','British Indian Ocean Territory'),('UM',NULL,'country','US minor outlying islands'),"
+        "('GE',NULL,'country','Georgia'),('US-GA','US','subdivision','Georgia');"
         "CREATE TABLE jurisdiction_name(jurisdiction_id TEXT PRIMARY KEY,name TEXT NOT NULL);"
         "INSERT INTO jurisdiction_name SELECT jurisdiction_id,name FROM jurisdiction;"
         "INSERT INTO jurisdiction_town_entity VALUES(4,'NA','Lüderitz'),(5,'NA-KA','Lüderitz'),"
@@ -750,34 +768,48 @@ static bool route_place_search(const char *directory)
         "(15,'GB-ENG','Newquay'),(16,'GB-ENG','Newport (GeoNames 2641599)'),"
         "(17,'GB-SCT','Edinburgh'),(18,'GB-NIR','Belfast'),(19,'IM','Douglas'),(20,'GB-ENG','West Mersea'),"
         "(21,'GB-ENG','Wales'),(22,'GB-ENG','South Hayling'),(23,'AU','Perth'),"
-        "(24,'AU-WA','Perth'),(25,'ZA','Pretoria'),(26,'GB-SCT','Perth');"
+        "(24,'AU-WA','Perth'),(25,'ZA','Pretoria'),(26,'GB-SCT','Perth'),"
+        "(27,'IT','Cagliari'),(28,'FR','Ajaccio'),(29,'GE','Tbilisi'),(30,'US-GA','Atlanta');"
         "INSERT INTO jurisdiction_town_name VALUES(4,'Lüderitz'),(5,'Lüderitz'),(6,'Brest'),(7,'Brest'),"
         "(8,'Longyearbyen'),(9,'Olonkinbyen'),(10,'Madalena (GeoNames 3372908)'),"
         "(11,'Horta'),(12,'Ponta Delgada'),(13,'Angra do Heroísmo'),(14,'Picos'),"
         "(15,'Newquay'),(16,'Newport (GeoNames 2641599)'),(17,'Edinburgh'),(18,'Belfast'),(19,'Douglas'),"
         "(20,'West Mersea'),(21,'Wales'),(22,'South Hayling'),(23,'Perth'),(24,'Perth'),"
-        "(25,'Pretoria'),(26,'Perth');"
+        "(25,'Pretoria'),(26,'Perth'),(27,'Cagliari'),(28,'Ajaccio'),(29,'Tbilisi'),(30,'Atlanta');"
         "INSERT INTO jurisdiction_town_latitude VALUES(4,'-26.6481'),(5,'-26.6481'),(6,'48.39'),(7,'52.10'),"
         "(8,'78.2232'),(9,'70.9221'),(10,'38.53642'),(11,'38.5333'),(12,'37.7412'),(13,'38.6590'),(14,'-7.07694'),"
         "(15,'50.41557'),(16,'50.70146'),(17,'55.9533'),(18,'54.5973'),(19,'54.15'),(20,'51.77798'),"
-        "(21,'53.34061'),(22,'50.78773'),(23,'-31.9522'),(24,'-31.9522'),(25,'-25.7449'),(26,'56.3952');"
+        "(21,'53.34061'),(22,'50.78773'),(23,'-31.9522'),(24,'-31.9522'),(25,'-25.7449'),(26,'56.3952'),"
+        "(27,'39.23054'),(28,'41.91886'),(29,'41.69411'),(30,'33.749');"
         "INSERT INTO jurisdiction_town_longitude VALUES(4,'15.1594'),(5,'15.1594'),(6,'-4.48'),(7,'23.69'),"
         "(8,'15.6469'),(9,'-8.7187'),(10,'-28.5266'),(11,'-28.6333'),(12,'-25.6756'),(13,'-27.2208'),(14,'-41.46694'),"
         "(15,'-5.07319'),(16,'-1.29124'),(17,'-3.1883'),(18,'-5.9301'),(19,'-4.4833'),(20,'0.91873'),"
-        "(21,'-1.28162'),(22,'-0.97697'),(23,'115.8614'),(24,'115.8614'),(25,'28.1878'),(26,'-3.4314');"
+        "(21,'-1.28162'),(22,'-0.97697'),(23,'115.8614'),(24,'115.8614'),(25,'28.1878'),(26,'-3.4314'),"
+        "(27,'9.11917'),(28,'8.73812'),(29,'44.83368'),(30,'-84.38798');"
         "INSERT INTO jurisdiction_town_elevation VALUES(4,'15'),(5,'15'),(6,'34'),(7,'142'),(8,'28'),(9,'5'),"
         "(10,'8'),(11,'39'),(12,'35'),(13,'76'),(14,'203'),(15,'31'),(16,'6'),(17,'66'),(18,'7'),(19,'31'),"
-        "(20,'15'),(21,'110'),(22,'5'),(23,'34'),(24,'34'),(25,'1332'),(26,'10');"
+        "(20,'15'),(21,'110'),(22,'5'),(23,'34'),(24,'34'),(25,'1332'),(26,'10'),(27,'41'),(28,'12'),"
+        "(29,'491'),(30,'336');"
         "INSERT INTO timezone_code VALUES('Africa/Windhoek',3),('Arctic/Longyearbyen',4),"
-        "('Atlantic/Azores',5),('America/Fortaleza',6),('Australia/Perth',7),('Africa/Johannesburg',8);"
+        "('Atlantic/Azores',5),('America/Fortaleza',6),('Australia/Perth',7),('Africa/Johannesburg',8),"
+        "('Europe/Rome',9),('Europe/Paris',10),('Etc/UTC',11),('Indian/Kerguelen',12),"
+        "('Antarctica/McMurdo',13),('Indian/Chagos',14),('Pacific/Midway',15),('Asia/Tbilisi',16);"
+        "INSERT INTO jurisdiction_location_default VALUES('AQ'),('BV'),('HM'),('IO'),('UM');"
+        "INSERT INTO jurisdiction_location_default_latitude VALUES('AQ','-77.8333'),('BV','-54.42166667'),"
+        "('HM','-53.01888867'),('IO','-7.3333'),('UM','28.2167');"
+        "INSERT INTO jurisdiction_location_default_longitude VALUES('AQ','166.6000'),('BV','3.35833333'),"
+        "('HM','73.39205128'),('IO','72.4167'),('UM','-177.3667');"
+        "INSERT INTO jurisdiction_location_default_timezone VALUES('AQ',13),('BV',11),('HM',12),('IO',14),('UM',15);"
+        "INSERT INTO jurisdiction_location_default_locality VALUES('AQ','McMurdo'),('HM','Atlas Cove'),"
+        "('IO','Chagos'),('UM','Midway Islands');"
         "INSERT INTO jurisdiction_town_timezone VALUES(4,3),(5,3),(6,1),(7,1),(8,4),(9,4),"
         "(10,5),(11,5),(12,5),(13,5),(14,6),(15,1),(16,1),(17,1),(18,1),(19,1),(20,1),(21,1),(22,1),"
-        "(23,7),(24,7),(25,8),(26,1);"
+        "(23,7),(24,7),(25,8),(26,1),(27,9),(28,10),(29,16),(30,2);"
+        "INSERT INTO jurisdiction_default_town VALUES('GE',29),('US-GA',30);"
         "INSERT INTO jurisdiction_default_town VALUES('GB',1),('SJ',8),('PT-20',12),('GB-SCT',17),('GB-NIR',18),('IM',19);") &&
         sqlite_exec(db, sql);
     if (!ok && db) string_fprintf(stderr, "Search fixture: %s\n", string_c_str(sqlite_last_error(db)));
     sqlite_close(db);
-    string_free(path); string_free(key);
     jurisdiction_t *engine = ok ? jurisdict_open(NULL) : NULL;
     static const struct { const char *text; size_t count; } cases[] = {
         {"Luderitz", 1}, {"lüDER", 1}, {"  Luderitz  ", 1}, {"Bre", 2},
@@ -789,7 +821,11 @@ static bool route_place_search(const char *directory)
         {"mersea island", 1}, {"Mersea", 1}, {"West Mersea", 1}, {"Mersea Island Essex", 1},
         {"hayling island", 1}, {"Hayling", 1}, {"South Hayling", 1}, {"Hayling Island Hampshire", 1},
         {"Wales, Sheffield", 1}, {"Wales Sheffield", 1}, {"Sheffield", 1},
-        {"Pico", 2}, {"Pico Azores", 1}, {"Faial", 1}, {"Terceira", 1}, {"sao miguel", 1}, {"Azores", 4}
+        {"Pico", 2}, {"Pico Azores", 1}, {"Faial", 1}, {"Terceira", 1}, {"sao miguel", 1}, {"Azores", 4},
+        {"Sardinia", 1}, {"sardinia", 1}, {"Sardegna", 1}, {"Sardin", 1}, {"Sardinia Italy", 1}, {"Sardegna Italy", 1},
+        {"Corsica", 1}, {"Corse", 1}, {"Corsica France", 1}, {"Corse France", 1},
+        {"Antarctica", 1}, {"Bouvet Island", 1}, {"Heard Island & McDonald Islands", 1},
+        {"British Indian Ocean Territory", 1}, {"US minor outlying islands", 1}, {"Portugal", 4}, {"Georgia", 2}
     };
     for (size_t i = 0; engine && i < sizeof cases / sizeof *cases; ++i) {
         string_t *name = string_new_with(cases[i].text);
@@ -800,6 +836,23 @@ static bool route_place_search(const char *directory)
         ok = found && count == cases[i].count && ok;
         string_free(name);
     }
+    db = path && key ? sqlite_open_encrypted(path, key) : NULL;
+    sqlite_stmt_t *countries = db ? sqlite_stmt_prepare(db,
+        "SELECT jurisdiction_id,name FROM jurisdiction WHERE jurisdiction_type='country' ORDER BY name") : NULL;
+    sqlite_step_result_t step = SQLITE_STEP_DONE;
+    size_t checked = 0;
+    ok = countries && engine && ok;
+    while (ok && (step = sqlite_stmt_step(countries)) == SQLITE_STEP_ROW) {
+        string_t *country_name = string_new_with(sqlite_stmt_column_text(countries, 1));
+        struct search_country_result found = {.code = sqlite_stmt_column_text(countries, 0)};
+        ok = country_name && jurisdict_search_towns(engine, country_name, 1, search_country, &found) && found.found;
+        if (!ok) fprintf(stderr, "Country search failed: %s\n", sqlite_stmt_column_text(countries, 1));
+        ++checked;
+        string_free(country_name);
+    }
+    ok = step == SQLITE_STEP_DONE && checked >= 18 && ok;
+    sqlite_stmt_finalize(countries); sqlite_close(db);
+    string_free(path); string_free(key);
     string_t *name = string_new_with("Bre"), *short_name = string_new_with(" ");
     size_t count = 0;
     ok = engine && jurisdict_search_towns(engine, name, 1, search_count, &count) && count == 1 && ok;
@@ -818,6 +871,32 @@ static bool route_place_search(const char *directory)
         !strcmp(test_lab_text(town, "jurisdiction"), "NA-KA") &&
         !strcmp(test_lab_text(town, "timezone"), "Africa/Windhoek"), "worldwide accent-insensitive town search") && ok;
     json_free(result); http_response_free(response);
+    static const struct { const char *query, *town, *code, *zone, *height; } reference_places[] = {
+        {"Sardinia", "Cagliari", "IT", "Europe/Rome", "41"},
+        {"Sardegna", "Cagliari", "IT", "Europe/Rome", "41"},
+        {"Corsica", "Ajaccio", "FR", "Europe/Paris", "12"},
+        {"Corse", "Ajaccio", "FR", "Europe/Paris", "12"},
+        {"Antarctica", "McMurdo", "AQ", "Antarctica/McMurdo", "0"},
+        {"Bouvet Island", "Bouvet Island", "BV", "Etc/UTC", "0"},
+        {"Heard Island & McDonald Islands", "Atlas Cove", "HM", "Indian/Kerguelen", "0"},
+        {"British Indian Ocean Territory", "Chagos", "IO", "Indian/Chagos", "0"},
+        {"US minor outlying islands", "Midway Islands", "UM", "Pacific/Midway", "0"}
+    };
+    for (size_t i = 0; i < sizeof reference_places / sizeof *reference_places; ++i) {
+        string_t *body = string_sprintf("{\"query\":\"%s\"}", reference_places[i].query);
+        response = body ? route_request(HTTP_POST, "/place-search", string_c_str(body),
+                                       "application/x-protobuf", NULL, NULL) : NULL;
+        result = response ? lab_wire_decode(http_response_body(response), http_response_body_size(response)) : NULL;
+        matches = test_lab_member(result, "matches"); town = json_array_get(matches, 0);
+        ok = route_check(response, 200, json_array_size(matches) == 1 &&
+            !strcmp(test_lab_text(town, "name"), reference_places[i].town) &&
+            !strcmp(test_lab_text(town, "matched_name"), reference_places[i].query) &&
+            !strcmp(test_lab_text(town, "jurisdiction"), reference_places[i].code) &&
+            !strcmp(test_lab_text(town, "timezone"), reference_places[i].zone) &&
+            !strcmp(test_lab_text(town, "elevation"), reference_places[i].height),
+            "island and country searches preserve recorded references, countries, time zones and altitudes") && ok;
+        json_free(result); http_response_free(response); string_free(body);
+    }
     static const struct { const char *query, *code, *zone, *height; size_t count; } core_places[] = {
         {"Perth", "AU-WA", "Australia/Perth", "34", 2},
         {"Pretoria", "ZA", "Africa/Johannesburg", "1332", 1}

@@ -112,6 +112,7 @@ END;
 
 -- Island/town associations: official Azores guide, https://www.visitazores.com/storage/media/2022/03/feel-alive-en.pdf
 -- Coordinates identify existing catalogue references; no new town, height, time zone or jurisdiction is invented.
+-- Sardinian and Corsican references use Cagliari and Ajaccio from the packaged GeoNames core catalogue.
 -- UK references use coordinates already recorded in the packaged GeoNames town catalogue.
 -- Mersea Island's reference town: https://westmerseatowncouncil.gov.uk/visit-mersea
 -- Hayling Island's reference settlement: https://www.havant.gov.uk/sites/default/files/documents/LCASection5Hayling35to40.pdf
@@ -122,6 +123,10 @@ WITH seeds(name, context, code, latitude, longitude) AS (
            ('Terceira', 'Azores, Portugal', 'PT-20', 38.6590, -27.2208),
            ('São Miguel', 'Azores, Portugal', 'PT-20', 37.7412, -25.6756),
            ('Azores', 'Portugal', 'PT-20', 37.7412, -25.6756),
+           ('Sardinia', 'Italy', 'IT', 39.23054, 9.11917),
+           ('Sardegna', 'Italy', 'IT', 39.23054, 9.11917),
+           ('Corsica', 'France', 'FR', 41.91886, 8.73812),
+           ('Corse', 'France', 'FR', 41.91886, 8.73812),
            ('Cornwall', 'England, Britain (UK)', 'GB-ENG', 50.41557, -5.07319),
            ('Isle of Wight', 'Isle of White, England, Britain (UK)', 'GB-ENG', 50.70146, -1.29124),
            ('Mersea Island', 'Essex, England, Britain (UK)', 'GB-ENG', 51.77798, 0.91873),
