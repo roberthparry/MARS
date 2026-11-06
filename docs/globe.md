@@ -264,6 +264,9 @@ existing plaintext globe path for immediate incremental installation. `--notify`
 adds desktop reports at fifteen-minute intervals and completion. The image module
 supplies PNG decoding, resizing and encoding; this tool requires no GDAL installation.
 Geographic source selection and SQLite block storage remain in globe.
+The `--plan plan.json` selector prepares only the regional slots named by a
+satellite rendering plan. This allows a new batch to gain prepared blocks without
+recreating disposable shards whose contents are already installed for older imagery.
 
 `make prepare-globe-blocks` prepares the packaged catalogue. Existing complete
 shards are reused. These generated SQLite shards are local preparation data and

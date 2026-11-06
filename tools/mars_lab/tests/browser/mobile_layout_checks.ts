@@ -403,9 +403,12 @@ window.checkLabMobileLayout = async function checkLabMobileLayout(state: string,
                     const globe = bounds('almanacGlobe');
                     const actions = bounds('almanacActions');
                     check(actions.top >= globe.bottom && actions.top - globe.bottom < 32 && actions.height < 120,
-                          `${width}px: navigation should sit compactly below the globe`);
+                          `${width}px: Help should sit compactly below the globe`);
+                    check(doc.getElementById('back')!.closest('.almanac-globe-toolbar') &&
+                          doc.getElementById('forward')!.closest('.almanac-globe-toolbar'),
+                          `${width}px: history navigation belongs in the globe toolbar`);
                     check(date.top >= actions.bottom && date.bottom - actions.bottom < 160,
-                          `${width}px: Almanac moment controls should sit compactly below navigation`);
+                          `${width}px: Almanac moment controls should sit compactly below Help`);
                     check(zone.bottom - date.top < 124, `${width}px: moment controls are too tall`);
                 }
             }

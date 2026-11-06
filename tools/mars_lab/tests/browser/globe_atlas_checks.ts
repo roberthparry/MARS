@@ -8,6 +8,17 @@
  */
 async function checkGlobeAtlas(check: (condition: boolean, message: string) => void): Promise<void> {
     await checkImageModule(check);
+    for (const boundary of [4, 12, 60, 240, 1200]) {
+        const before = labDOM.call('lab_globe_grid_spacing', boundary * .999, 800) as number[];
+        const after = labDOM.call('lab_globe_grid_spacing', boundary * 1.001, 800) as number[];
+        check(before[0] === after[0] && before[1] === after[1] && Math.abs(before[2] - after[2]) < .02,
+              'grid intervals fade continuously across each old zoom threshold');
+    }
+    check(!labDOM.call('lab_globe_grid_spacing', NaN, 800), 'invalid display scales cannot select a grid');
+    for (const latitude of [-89.875, 89.875]) {
+        const picked = labDOM.call('lab_globe_grid', latitude, 0, 100, 800) as number[];
+        check(!(picked[2] & 2), 'hover does not select meridians hidden by the polar density limit');
+    }
     for (const [lat, lon] of [[52, -2], [-33, 151], [89.99, -179.9], [0, 180]]) {
         const start = [...labDOM.call('lab_globe_centre', 0, 179.9) as number[], 150];
         const end = [...labDOM.call('lab_globe_rotate',
@@ -90,6 +101,14 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
         check(!descendants.put('photo:12:3744:1415:', 1, 512 * 512 * 4,
             [149.0625, -34.453125, 149.150390625, -34.365234375], 12, arrival.protect, 2) && descendants.size === 64,
               'even a completed offscreen image cannot displace the only displayed copy of a geographic cell');
+        const departing = descendants.journey([149.1, -35.32, 149.2, -35.22], 800,
+            view, 100, null, '', true)!;
+        check(Boolean(departing.next) && departing.next!.bounds[0] < 149.2 && departing.next!.bounds[2] > 149.1,
+              'a fully cached arrival cannot prevent missing current-view imagery from entering the atlas');
+        const firstVisible = departing.next!;
+        check(descendants.put(firstVisible.key, 1, 512 * 512 * 4, firstVisible.bounds,
+            firstVisible.level, departing.protect, 2),
+              'a full cached destination leaves an actual GPU admission slot for the visible view');
     } finally { descendants.dispose(); }
     const spatial = new GlobeTextureCache<number>(64, 64 * 1024 * 1024, () => {});
     try {
@@ -223,6 +242,23 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
         check(!page.next && page.coverage === 1 && small.size <= 16,
               'small budgets finish visible detail without continuously evicting and reloading offscreen neighbours');
     } finally { small.dispose(); }
+    for (const [latitude, longitude] of [[52.707, -2.754], [-33.869, 151.209], [-33.925, 18.424]]) {
+        const camera = labDOM.call('lab_globe_centre', latitude, longitude) as number[];
+        const view = (labDOM.call('lab_globe_view', camera, 4096, 1) as number[]).slice(3);
+        const maximum = new GlobeTextureCache<number>(64, 64 * 512 * 512 * 4, () => {});
+        try {
+            let plan = maximum.journey(view, 1536, view, 1536, null, '', true)!;
+            for (let i = 0; i < 128 && plan.next; ++i) {
+                const cell = plan.next;
+                check(maximum.put(cell.key, 1, 512 * 512 * 4, cell.bounds, cell.level, plan.protect, 2),
+                      'maximum-zoom refinement can replace its progressive parents without losing visible coverage');
+                plan = maximum.page(view, 1536)!;
+            }
+            check(plan.detail > .999999 && !plan.next,
+                  `maximum-zoom views finish at their full display demand: ${latitude},${longitude}; ` +
+                  `detail=${plan.detail}; next=${plan.next?.key}`);
+        } finally { maximum.dispose(); }
+    }
     const progress = new GlobeTextureCache<number>(64, 64 * 512 * 512 * 4, () => {});
     try {
         const view = [-2.82, 52.62, -2.68, 52.70], initial = progress.page(view, 800)!;
@@ -266,6 +302,16 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
         check(wide.protect.length === 64 && packed.put(next.key, 1, 512 * 512 * 4,
             next.bounds, next.level, wide.protect, 2) && packed.size === 64,
             'a completed broader cell replaces an enclosed finer cell without unprotecting displayed pixels');
+        let expanded = packed.page([-3, 52.5, -2.5, 53], 400)!;
+        for (let i = 0; i < 128 && expanded.next; ++i) {
+            const cell = expanded.next;
+            check(packed.put(cell.key, 2, 512 * 512 * 4, cell.bounds, cell.level, expanded.protect, 2),
+                  'a full atlas admits each useful replacement while preserving drawable geographic coverage');
+            expanded = packed.page([-3, 52.5, -2.5, 53], 400)!;
+        }
+        check(expanded.coverage > .999999 && expanded.detail > .999999 && !expanded.next,
+              `a large zoom-out finishes refinement under a full fine cache: coverage=${expanded.coverage}; ` +
+              `detail=${expanded.detail}; next=${expanded.next?.key}`);
     } finally { packed.dispose(); }
     const travelling = new GlobeTextureCache<number>(64, 64 * 1024 * 1024, () => {});
     try {
@@ -308,6 +354,12 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
         parts: {needed: number; target?: number[]; key: string; url?: string}[];
     };
     const planned = labDOM.call('lab_photo_source', source) as SourcePlan;
+    for (const width of [1800, 3600]) {
+        const maximum = labDOM.call('lab_photo_source', {...source, width,
+            source: [500, 500, 20, 20], target: [0, 0, 512, 512], pyramid: true}) as SourcePlan;
+        check(maximum.width === width && maximum.parts.every(part => part.url!.includes(`&tier=${width}&`)),
+              `magnified crops use the original ${width}-pixel PNG tier and its original prepared blocks`);
+    }
     const parts = planned.parts;
     const needed = parts.filter(part => part.needed);
     check(planned.width === 3600 && !planned.retain,

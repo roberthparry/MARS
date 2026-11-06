@@ -125,24 +125,50 @@ void lab_globe_pick(double x, double y, quaternion_jsref orientation)
     globe_result(values, 2);
 }
 
-/* Match the shader's graticule spacing and allow a small pointer tolerance around its strokes. */
+static bool globe_grid_spacing(double zoom, double size, double values[3])
+{
+    if (!isfinite(zoom) || !isfinite(size) || zoom < 1 || zoom > 4096 || size <= 0 || size > 16384) return false;
+    static const double limits[] = {4, 12, 60, 240, 1200};
+    static const double steps[] = {15, 5, 1, .25, .05, .01};
+    double scale = zoom * size / 800;
+    unsigned left = 0, right = 5;
+    while (left < right) {
+        unsigned middle = left + (right - left) / 2;
+        if (scale > limits[middle] * 1.15) left = middle + 1;
+        else right = middle;
+    }
+    values[0] = steps[left]; values[1] = steps[left < 5 ? left + 1 : left]; values[2] = 0;
+    if (left < 5) {
+        double fraction = fmax(0, fmin(1, (scale / limits[left] - .85) / .3));
+        values[2] = fraction * fraction * (3 - 2 * fraction);
+    }
+    return true;
+}
+
+/* Keep grid density in native policy; the GPU receives adjacent intervals and their continuous blend. */
+void lab_globe_grid_spacing(double zoom, double size)
+{
+    double values[3];
+    if (!globe_grid_spacing(zoom, size, values)) { lab_dom_return(0); return; }
+    globe_result(values, 3);
+}
+
+/* Match the dominant displayed grid and allow a small pointer tolerance around its strokes. */
 void lab_globe_grid(double latitude, double longitude, double zoom, double size)
 {
-    if (!isfinite(latitude) || !isfinite(longitude) || !isfinite(zoom) || !isfinite(size) ||
-        fabs(latitude) > 90 || zoom < 1 || zoom > 4096 || size <= 0) {
+    double spacing[3];
+    if (!isfinite(latitude) || !isfinite(longitude) || fabs(latitude) > 90 ||
+        !globe_grid_spacing(zoom, size, spacing)) {
         lab_dom_return(0);
         return;
     }
-    static const double limits[] = {4, 12, 60, 240, 1200, INFINITY};
-    static const double steps[] = {15, 5, 1, 0.25, 0.05, 0.01};
-    unsigned index = 0;
-    /* Six fixed display levels, mirroring the fragment shader. */
-    while (zoom >= limits[index]) ++index;
-    double step = steps[index], lat = round(latitude / step) * step;
+    double step = spacing[spacing[2] >= .5 ? 1 : 0], lat = round(latitude / step) * step;
     double lon = globe_longitude(round(longitude / step) * step);
-    double tolerance = 384 / (size * zoom);
-    unsigned flags = fabs(latitude - lat) <= tolerance;
-    if (fabs(globe_longitude(longitude - lon)) * cos(latitude * globe_radian) <= tolerance &&
+    double width = 128 / (size * zoom), tolerance = 3 * width;
+    double longitude_scale = cos(latitude * globe_radian);
+    unsigned flags = step / width > 6 && fabs(latitude - lat) <= tolerance;
+    if (step * longitude_scale / width > 6 &&
+        fabs(globe_longitude(longitude - lon)) * longitude_scale <= tolerance &&
         fabs(latitude) < 89.999) flags |= 2;
     double values[] = {lat, lon, flags};
     globe_result(values, 3);

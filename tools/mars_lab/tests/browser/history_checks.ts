@@ -70,6 +70,7 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
         const matchMedia = window.matchMedia, historyFetch = window.fetch, scroll = window.scrollY;
         const globe = Reflect.get(MarsAlmanacGlobe, 'instance') as {
             orientation: number[]; view: number[]; worldLoading: boolean; flightTarget: number[] | null; started: boolean;
+            flightGeneration: number; flightFrame: number; travelNotice: HTMLElement;
             applyCamera(camera: number[]): void;
         };
         const locationState = (lat: number, lon: number, cameraLat = lat, cameraLon = lon): WorksheetSnapshot => ({
@@ -118,6 +119,25 @@ window.checkLabHistoryPersistence = async (): Promise<void> => {
                         drawingAdvanced = Boolean(globe.flightTarget) && !calculationFinished;
                         break;
                     }
+                }
+                if (drawingAdvanced) {
+                    const target = globe.flightTarget, generation = globe.flightGeneration;
+                    const beforeToggles = globe.orientation.slice();
+                    for (const action of ['grid', 'borders']) {
+                        const button = document.querySelector<HTMLButtonElement>(`[data-globe-action="${action}"]`)!;
+                        const pressed = button.getAttribute('aria-pressed');
+                        button.click();
+                        check(button.getAttribute('aria-pressed') !== pressed && globe.flightTarget === target &&
+                              globe.flightGeneration === generation && globe.flightFrame !== 0 && !globe.travelNotice.hidden,
+                              `${action} enables during travel without cancelling or restarting the journey`);
+                        button.click();
+                        check(button.getAttribute('aria-pressed') === pressed && globe.flightTarget === target &&
+                              globe.flightGeneration === generation && globe.flightFrame !== 0 && !globe.travelNotice.hidden,
+                              `${action} disables during travel without cancelling or restarting the journey`);
+                    }
+                    for (let i = 0; i < 12; ++i) await new Promise(requestAnimationFrame);
+                    check(globe.orientation.some((value, index) => Math.abs(value - beforeToggles[index]) > 1e-7),
+                          'the real journey continues moving after its grid and border toggles change');
                 }
             } finally {
                 calculation.resolve(new Response(labWire.encode({...window.labAlmanacFixtures()[4], ok: true}),

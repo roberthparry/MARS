@@ -122,6 +122,12 @@ $(LAB_BUILD_DIR)/satellite_fetch: tools/mars_lab/satellite_fetch.c $(STATIC_LIB)
 $(LAB_BUILD_DIR)/satellite_batch: tools/mars_lab/satellite_batch.c $(STATIC_LIB)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude $(LDFLAGS) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
+$(LAB_BUILD_DIR)/tests/test_texture_preparation: tools/mars_lab/tests/satellite/test_texture_preparation.c $(LAB_BUILD_DIR)/texture_pyramid $(LAB_BUILD_DIR)/satellite_batch $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB)
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude -Itests/include $(LDFLAGS) \
+	    -DTEXTURE_PREPARER='"$(LAB_BUILD_DIR)/texture_pyramid"' -DSATELLITE_BATCH='"$(LAB_BUILD_DIR)/satellite_batch"' \
+	    -o $@ $< $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS)
+
 $(LAB_BUILD_DIR)/satellite_tiles: tools/mars_lab/satellite_tiles.c tools/mars_lab/satellite_mask.c tools/mars_lab/include/satellite_mask.h $(STATIC_LIB)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude -Itools/mars_lab/include $(LAB_GDAL_CFLAGS) $(LDFLAGS) \
 	    -o $@ tools/mars_lab/satellite_tiles.c tools/mars_lab/satellite_mask.c $(STATIC_LIB) $(LDLIBS) $(LAB_GDAL_LIBS)
@@ -267,7 +273,7 @@ lab-wasm-asm: $(LAB_WASM_ASM)
 # Export application definitions, not the library's hidden helpers and WASI entry points.
 $(LAB_WASM): $(LAB_WASM_OBJS) $(LAB_WASM_LIBC) tools/mars_lab/wasm/lab_browser.imports tools/mars_lab/Makefile
 	"$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory --allow-undefined-file=tools/mars_lab/wasm/lab_browser.imports \
-	    $(LAB_WASM_MEMORY_EXPORTS) $(IMAGE_WASM_EXPORTS) --initial-memory=69206016 --max-memory=100663296 \
+	    $(LAB_WASM_MEMORY_EXPORTS) --initial-memory=69206016 --max-memory=100663296 \
 	    $(LAB_WASM_OBJS) "$(LAB_WASM_LIBC)" -o $@
 
 # Probe the actual compiler target and linker, not merely their presence on PATH.

@@ -6,6 +6,7 @@
  * PNG decoding, alpha-weighted resizing and padded blocks; globe publishes each complete source atomically.
  * Interrupted runs resume from completed shards. Optional installation streams each completed source into a
  * caller-selected plaintext globe; original photographs remain available throughout preparation.
+ * A plan selector restricts preparation to one newly rendered batch without recreating older installed shards.
  */
 #include <math.h>
 #include <stdint.h>
@@ -102,14 +103,50 @@ static bool prepare(const string_t *root, const string_t *relative, const char *
     return ok;
 }
 
+static json_t *plan_images(const char *path)
+{
+    file_t *file = file_new_cstr(path);
+    file_info_t *info = file ? file_get_info(file) : NULL;
+    string_t *source = info && file_info_size(info) <= GLOBE_TEXTURE_MANIFEST_LIMIT ? file_read_all_text(file) : NULL;
+    json_t *plan = source ? json_from_text(source) : NULL, *images = json_new_array();
+    const json_t *tiles = field(plan, "tiles");
+    size_t count = json_array_size(tiles);
+    bool ok = plan && images && count && count <= GLOBE_TEXTURE_REGION_LIMIT;
+    for (size_t i = 0; ok && i < count; ++i) {
+        const string_t *value = json_number_text(field(json_array_get(tiles, i), "slot"));
+        char *end = NULL;
+        unsigned long slot = value ? strtoul(string_c_str(value), &end, 10) : GLOBE_TEXTURE_REGION_LIMIT;
+        ok = end && !*end && slot < GLOBE_TEXTURE_REGION_LIMIT;
+        string_t *relative = ok ? string_sprintf("regional/%02lu.png", slot) : NULL;
+        json_t *image = relative ? json_new_string(relative) : NULL;
+        ok = ok && image && json_array_append(images, image);
+        json_free(image); string_free(relative);
+    }
+    json_free(plan); string_free(source); file_info_free(info); file_free(file);
+    if (!ok) { json_free(images); images = NULL; }
+    return images;
+}
+
+static const string_t *selection_image(const json_t *assets, const json_t *images, const string_t *single, size_t i)
+{
+    if (images) return json_string_value(json_array_get(images, i));
+    return single ? single : json_object_key_at(assets, i);
+}
+
+/* Prepare selected photographs; a plan never expands into the complete source catalogue. */
 int main(int argc, char **argv)
 {
     bool notifications = argc > 2 && !strcmp(argv[argc - 1], "--notify");
     if (notifications) --argc;
     if (argc < 2 || argc > 4) {
-        fprintf(stderr, "Usage: %s texture-directory [relative-image|all] [plaintext-globe.db] [--notify]\n", argv[0]);
+        fprintf(stderr, "Usage: %s texture-directory [relative-image|all] [plaintext-globe.db] [--notify]\n"
+                        "       %s texture-directory --plan plan.json [--notify]\n", argv[0], argv[0]);
         return EXIT_FAILURE;
     }
+    bool subset = argc >= 3 && !strcmp(argv[2], "--plan");
+    if (subset && argc != 4) return EXIT_FAILURE;
+    json_t *images = subset ? plan_images(argv[3]) : NULL;
+    if (subset && !images) { fputs("Invalid photographic preparation plan.\n", stderr); return EXIT_FAILURE; }
     string_t *root = string_new_with(argv[1]), *manifest_path = string_sprintf("%s/manifest.json", argv[1]);
     string_t *folder_path = string_sprintf("%s/pyramid", argv[1]);
     file_t *manifest_file = file_new(manifest_path), *folder = file_new(folder_path);
@@ -118,10 +155,11 @@ int main(int argc, char **argv)
         file_read_all_text(manifest_file) : NULL;
     json_t *manifest = text ? json_from_text(text) : NULL;
     const json_t *assets = field(manifest, "assets");
-    string_t *installed_path = argc == 4 ? string_new_with(argv[3]) : NULL;
+    string_t *installed_path = argc == 4 && !subset ? string_new_with(argv[3]) : NULL;
     file_t *installed_file = installed_path ? file_new(installed_path) : NULL;
     sqlite_t *installed = installed_file && file_exists(installed_file) ? sqlite_open_plain(installed_path) : NULL;
-    bool ok = root && assets && folder && file_create_directory(folder, 0755, true) && (argc < 4 || installed);
+    bool ok = root && assets && folder && file_create_directory(folder, 0755, true) &&
+              (argc < 4 || subset || installed);
     if (installed) {
         ok = ok && sqlite_exec_cstr(installed, "PRAGMA busy_timeout=30000; PRAGMA cache_size=-8192;");
         sqlite_stmt_t *catalogue = ok ? sqlite_stmt_prepare(installed,
@@ -132,19 +170,22 @@ int main(int argc, char **argv)
         sqlite_stmt_finalize(catalogue);
         if (!ok) fputs("Installed photograph catalogue differs; update the globe catalogue before importing blocks.\n", stderr);
     }
-    bool single = argc >= 3 && strcmp(argv[2], "all");
+    bool single = argc >= 3 && !subset && strcmp(argv[2], "all");
     string_t *selected = single ? string_new_with(argv[2]) : NULL;
-    size_t entries = single ? 1 : json_object_size(assets), total = 0, prepared = 0;
+    size_t entries = images ? json_array_size(images) : single ? 1 : json_object_size(assets), total = 0, prepared = 0;
     for (size_t i = 0; i < entries; ++i) {
-        const string_t *relative = single ? selected : json_object_key_at(assets, i);
+        const string_t *relative = selection_image(assets, images, selected, i);
         const json_t *asset = json_object_get(assets, relative);
         const string_t *width = json_number_text(field(asset, "width")), *height = json_number_text(field(asset, "height"));
-        if (width && height && !strcmp(string_c_str(width), string_c_str(height))) ++total;
+        bool valid = width && height && !strcmp(string_c_str(width), string_c_str(height)) &&
+                     (!strcmp(string_c_str(width), "1800") || !strcmp(string_c_str(width), "3600"));
+        if (valid) ++total;
+        else if (subset || single) ok = false;
     }
     time_t start = time(NULL), last_notification = start;
     texture_pyramid_notify(notifications, "Preparing small photographic blocks; completed sources are retained when resuming.");
     for (size_t i = 0; ok && i < entries; ++i) {
-        const string_t *relative = single ? selected : json_object_key_at(assets, i);
+        const string_t *relative = selection_image(assets, images, selected, i);
         const json_t *asset = json_object_get(assets, relative);
         const string_t *width = json_number_text(field(asset, "width")), *height = json_number_text(field(asset, "height"));
         const string_t *sha = json_string_value(field(asset, "sha256"));
@@ -166,7 +207,7 @@ int main(int argc, char **argv)
     texture_pyramid_notify(notifications, ok ? "Photographic block preparation completed." :
                                              "Photographic preparation stopped; rerun to resume.");
     sqlite_close(installed); file_free(installed_file); string_free(installed_path); string_free(selected);
-    json_free(manifest); string_free(text); file_info_free(info); file_free(manifest_file); file_free(folder);
+    json_free(images); json_free(manifest); string_free(text); file_info_free(info); file_free(manifest_file); file_free(folder);
     string_free(manifest_path); string_free(folder_path); string_free(root);
     return ok ? EXIT_SUCCESS : EXIT_FAILURE;
 }

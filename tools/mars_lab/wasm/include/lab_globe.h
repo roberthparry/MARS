@@ -64,12 +64,25 @@ bool lab_globe_nearby_covers(double latitude, double longitude, double cached_la
 void lab_globe_pick(double x, double y, quaternion_jsref orientation);
 
 /**
+ * @brief Select adjacent graticule intervals and a continuous transition for the current display scale.
+ * @param zoom Finite camera magnification, from 1 to 4096.
+ * @param size Finite canvas width in CSS pixels, greater than zero and at most 16384.
+ * @return Via the scoped bridge, [coarse degrees,fine degrees,fine weight], or null for invalid input.
+ * @note Runs on the browser owner thread without retaining handles. The returned value is copied by the
+ * bridge; callers have no native allocation to release. The shader and hover picker use this same policy.
+ */
+void lab_globe_grid_spacing(double zoom, double size);
+
+/**
  * @brief Identify displayed graticule lines near a visible geographic point.
- * @param latitude Picked latitude in degrees.
- * @param longitude Picked longitude in degrees.
- * @param zoom Camera magnification, from 1 to 4096.
- * @param size Canvas width in CSS pixels.
- * @return Via the bridge, [nearest latitude,nearest longitude,flags], with bits 1 and 2 identifying nearby lines.
+ * @param latitude Finite picked latitude in degrees, from -90 to 90.
+ * @param longitude Finite picked longitude in degrees; wrapped to the geographic interval.
+ * @param zoom Finite camera magnification, from 1 to 4096.
+ * @param size Finite canvas width in CSS pixels, greater than zero and at most 16384.
+ * @return Via the scoped bridge, [nearest latitude,nearest longitude,flags], or null for invalid input.
+ * Bits 1 and 2 identify nearby displayed latitude and longitude lines; densely suppressed lines are excluded.
+ * @note Runs on the browser owner thread. The bridge copies the returned values; no handle or allocation is
+ * retained, and callers have nothing to release. Uses the dominant interval during a spacing transition.
  */
 void lab_globe_grid(double latitude, double longitude, double zoom, double size);
 

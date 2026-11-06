@@ -84,12 +84,18 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             check(hidden(WorksheetContext.clear) === (mode === 6), 'automatic Almanac hides Clear; other modes retain it');
             const actions = document.getElementById('workspaceActions')!;
             const actionHome = document.getElementById(mode === 6 ? 'almanacActions' : 'workspaceActionsHome')!;
-            check(actions.parentElement === actionHome && actions.contains(WorksheetContext.back),
-                  'original action buttons move below the globe only in Almanac mode');
+            check(actions.parentElement === actionHome && actions.contains(WorksheetContext.help),
+                  'Help follows the shared action row below the Almanac globe');
+            const historyHome = document.getElementById(mode === 6 ? 'almanacGlobeHistory' : 'workspaceHistoryHome')!;
+            check(WorksheetContext.back.parentElement === historyHome && WorksheetContext.forward.parentElement === historyHome,
+                  'original history buttons move into the globe toolbar only in Almanac mode');
             if (mode === 6) {
                 check(actionHome.previousElementSibling?.id === 'almanacGlobe' &&
                       actionHome.nextElementSibling?.classList.contains('datetime-field-groups'),
-                      'Almanac actions sit between globe and worksheet controls');
+                      'Almanac Help sits between globe and worksheet controls');
+                check(Boolean(historyHome.closest('.almanac-globe-toolbar')) &&
+                      document.querySelectorAll('#back, #forward').length === 2,
+                      'the toolbar reuses the two existing history controls without duplicate buttons');
                 check(document.getElementById('workspaceActionsHome')!.getBoundingClientRect().height >= 48,
                       'former button area remains reserved for country and town dropdowns');
                 const backDisabled = WorksheetContext.back.disabled;
@@ -118,6 +124,10 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         labDOM.call('lab_workspace_dom_mode', 0, '');
         check(document.getElementById('workspaceActions')!.parentElement?.id === 'workspaceActionsHome',
               'leaving Almanac restores the original action-row position');
+        check(WorksheetContext.run.nextElementSibling?.contains(WorksheetContext.back) &&
+              WorksheetContext.back.nextElementSibling === WorksheetContext.forward &&
+              WorksheetContext.back.parentElement?.nextElementSibling === WorksheetContext.help,
+              'leaving Almanac restores Evaluate, Back, Forward and Help in their original order');
         check(WorksheetContext.rightPaneTitle.textContent === 'Help', 'mode projection retains the heading of visible Help');
         labDOM.call('lab_workspace_dom_help', 0);
         WorksheetContext.targetRow.classList.remove('hidden');

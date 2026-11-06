@@ -28,11 +28,14 @@
  * 256 entries form a 16-by-16 geographic root, with bounded four-child refinement nodes thereafter.
  * Root resolution always covers the entire submitted viewport with an alignment margin, independently of
  * requested photograph detail. Coverage is measured against the full viewport area, including all edges.
- * Coverage and detail are measured at the final sparse leaves, so finer retained descendants count after a
- * zoom-out. Fully detailed visible cells do not trigger coarser replacements. Every displayed sparse leaf is
+ * The coverage and detail result fields are fractions in [0,1]: drawable completed coverage at the progressive
+ * base level, and achieved resolution relative to the requested level, respectively. They are measured at the
+ * final sparse leaves, so finer retained descendants count after a zoom-out. Fully detailed visible cells do
+ * not trigger coarser replacements. Every displayed sparse leaf is
  * protected before neighbour selection begins. Offscreen padding and arrival preparation cannot evict the
  * only displayed copy of a geographic region. If all slots are protected, a completed broader replacement
- * may reuse a finer slot only when it encloses that entire cell; partial uploads cannot make that substitution.
+ * may reuse a finer slot when it encloses that entire cell, or when another pinned complete ancestor already
+ * covers the victim. Partial uploads cannot make either substitution.
  * Jobs with no safe admission slot wait for camera movement or eviction of an offscreen entry rather than
  * repeatedly removing and rebuilding displayed imagery.
  * The revision changes only when these lookup bytes change, allowing camera redraws to reuse the GPU table.
@@ -52,7 +55,9 @@
  * ahead bounds and whether the worker is idle. It prioritises missing visible, predicted and arrival coverage,
  * then alternates refinement fairly. Its pace factor in 0.3..1 follows the actual visible pixel resolution,
  * increasing smoothly towards full pace as requested detail arrives, without blocking drawing.
- * Journey planning preserves the displayed page bytes and pins visible and arrival resources together.
+ * Journey planning preserves the displayed page bytes and pins arrival resources within the capacity left by
+ * visible cells. While visible detail is incomplete, one remaining slot is reserved for admission, preventing
+ * a fully cached destination from blocking current-view imagery. Capacity respects both the slot and byte budgets.
  * Page and journey requests may describe a current image job by bounds and level. The replace flag is true
  * only when that job cannot provide adequate coverage for any current visible, predicted or arrival window;
  * the browser may then abort its transport and submit the selected replacement. No browser job is retained.

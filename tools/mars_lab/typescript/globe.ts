@@ -1342,6 +1342,8 @@ class MarsAlmanacGlobe {
             gl.uniform1f(this.uniform('riverInk'), this.riverPreview ? 0 :
                 Math.max(0, Math.min(1, (2 - this.view[2] / Math.max(1, this.riverZoom)) * 2)));
             gl.uniform1i(this.uniform('grid'), Number(this.grid));
+            if (this.grid) gl.uniform3fv(this.uniform('gridSpacing'),
+                labDOM.call('lab_globe_grid_spacing', this.view[2], size) as number[]);
             gl.uniform1i(this.uniform('mapMode'), Number(mapReady));
             gl.uniform1i(this.uniform('interactionPreview'), 0);
             gl.uniform1f(this.uniform('viewport'), size);
@@ -1787,7 +1789,6 @@ class MarsAlmanacGlobe {
         });
         this.root.querySelectorAll<HTMLButtonElement>('[data-globe-action]').forEach(button => {
             button.addEventListener('click', () => {
-                this.cancelFlight();
                 if (button.dataset.globeAction === 'grid') {
                     this.grid = !this.grid;
                     this.hideGridHover();
@@ -1804,8 +1805,10 @@ class MarsAlmanacGlobe {
                     }
                     else this.unloadBorders();
                     this.draw();
-                } else if (button.dataset.globeAction === 'centre') this.centre();
-                else this.move(0, 0, button.dataset.globeAction === 'in' ? 1.6 : 1 / 1.6);
+                } else if (button.dataset.globeAction === 'centre') {
+                    this.cancelFlight();
+                    this.centre();
+                } else this.move(0, 0, button.dataset.globeAction === 'in' ? 1.6 : 1 / 1.6);
             });
         });
         this.root.querySelector<HTMLElement>('.almanac-globe-view')!.addEventListener('wheel', event => {

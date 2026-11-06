@@ -1120,7 +1120,11 @@ zoom, not a map-style selection, so existing entries need no database migration.
 Close views combine photographic colouring with visible-window coastline vectors
 from the installed shoreline database. Space is black with faint stars.
 “Lat/long: off/on” toggles a subtle latitude/longitude grid, initially off. Grid spacing
-becomes finer as the globe is zoomed in; toggling it does not change the observer or evaluate.
+becomes finer as the globe is zoomed in, with a continuous fade between adjacent intervals.
+Native policy accounts for the canvas width as well as zoom; the GPU suppresses meridians
+where their projected spacing would merge near the poles. Toggling the grid does not
+change the observer or evaluate. Grid and border toggles remain available during a
+journey and update the overlays without stopping or restarting camera travel.
 One left click on a town immediately applies its observer location; one left click on
 the globe selects a custom point. Both start evaluation once and preserve entered
 observer elevation. Small pointer movement is tolerated; dragging, cancelled gestures
@@ -1209,6 +1213,11 @@ atomically and sends local desktop notifications every fifteen minutes and at
 phase boundaries. It verifies a complete candidate catalogue before publishing
 immutable image links and then replacing the source manifest. It leaves installed
 databases untouched, ready for the user's subsequent `make release`.
+Jobs may supply `pyramid_builder`, `block_log` and `publication_marker` to prepare
+their image blocks before reporting readiness. The builder's `--plan plan.json`
+selector prepares only the listed regional slots, without recreating older
+installed preparation copies. A digest marker written before manifest publication
+allows an interrupted job to resume block preparation after its catalogue is published.
 The requested mainland France batch uses Spain's 1800-square preparation setting;
 previously prepared higher-resolution Corsican images are retained.
 Extended coast-masked catalogues preserve earlier masking statistics under
@@ -1381,6 +1390,9 @@ rejects that tier, and lower-resolution data never satisfies finer demand. Zoomi
 out therefore reuses already decoded sharper pixels instead of necessarily
 reading the same PNG again at a smaller size. The standalone source planner
 remains independent of cache state, and worker restarts can reuse persisted blocks.
+When a close crop requires the original pixels, both 1800-square and 3600-square
+sources select their original tier, including prepared blocks. Further magnification
+cannot recover detail beyond the source photograph's ground resolution.
 When resident pixels do not suffice, one bounded key-range read of the persistent
 metadata index supplies up to 512 content addresses; it does not load image Blobs.
 Native dictionaries then choose an adequate stored tier. The worker reads and
@@ -1414,7 +1426,13 @@ never claim complete coverage or enter storage as completed geographic images.
 Temporary atlas pressure skips a partial upload while the worker continues its
 remaining sources, instead of treating it as a failed request. Requested final detail, source PNGs and water
 colouring remain unchanged.
-During a flight, destination cells and the visible page remain pinned together.
+During a flight, visible cells remain pinned, and destination cells use the remaining
+GPU capacity. Whilst visible refinement remains incomplete, one available slot stays
+unreserved so a fully cached destination cannot prevent current-view loading.
+A full atlas can also release redundant fine cells where a pinned complete ancestor
+already supplies their pixels. This allows refinement after a large zoom-out to
+continue instead of stopping after its first broader replacement; partial uploads
+cannot evict that sole complete coverage.
 WASM predicts the camera four percentage points ahead on the same eased great
 circle. Its scheduler first fills missing visible, predicted and arrival coverage,
 then shares fine refinement between the visible route and destination. Preparation
@@ -1652,8 +1670,8 @@ interpolates zoom and quaternion orientation. `lab_globe_flight_advance()` suppl
 the bounded display clock; the browser schedules frames and reports loading readiness.
 Saving an unchanged observer does not reset a rotated view.
 
-In Almanac mode, **Back**, **Forward** and **Help** sit directly below
-the globe, above the worksheet introduction. Their former area below the observer
+In Almanac mode, **Back** and **Forward** sit in the globe toolbar alongside
+the grid, border and zoom controls. **Help** remains directly below the globe. Their former area below the observer
 fields remains empty to leave room for country and town dropdowns. Other modes
 retain the usual action-row position; the same buttons and handlers are reused.
 Almanac hides **Evaluate** and **Clear** because its results update automatically.

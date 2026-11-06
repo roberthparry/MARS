@@ -5,8 +5,9 @@
  * Browser resources remain in host slots, while native dictionaries own keys and select reusable slots.
  * Each cache has a linked LRU order, a free-slot stack and a byte budget. Legacy windows inspect four GPU entries.
  * Fixed photographic pages use direct dictionary lookups, populated-level bitsets and sparse child nodes to retain
- * detail across scale changes. Visible and arrival ancestors are pinned among at most 64 slots; unchanged page bytes
- * keep their revision so camera redraws do not upload another GPU lookup texture.
+ * detail across scale changes. Visible cells take priority over arrival reservations among at most 64 slots;
+ * redundant fine cells can yield to useful replacements while a pinned complete ancestor supplies their pixels.
+ * Unchanged page bytes keep their revision so camera redraws do not upload another GPU lookup texture.
  * Serial dispatch protects native state; worker pixel batches use a fixed 512 KiB scratch buffer and never block drawing.
  */
 #include <math.h>
@@ -180,7 +181,9 @@ static uint64_t protected_slots(jsref request)
     return slots;
 }
 
-/* A completed geographic replacement may reuse a protected cell only if it covers that entire cell.
+static int photo_parent_slot(texture_cache_t *cache, const texture_entry_t *entry, uint64_t pinned);
+
+/* A completed geographic replacement may reuse a protected cell if another protected image covers it.
  * Walking the bounded LRU admission chain never searches resource keys or exposes an uncovered region. */
 static int replacement_slot(texture_cache_t *cache, uint64_t pinned, const double *bounds, bool complete)
 {
@@ -192,6 +195,7 @@ static int replacement_slot(texture_cache_t *cache, uint64_t pinned, const doubl
         double shift = 360 * nearbyint((bounds[0] + bounds[2] - b[0] - b[2]) / 720);
         if (b[0] + shift >= bounds[0] && b[2] + shift <= bounds[2] && b[1] >= bounds[1] && b[3] <= bounds[3])
             return slot;
+        if (photo_parent_slot(cache, entry, pinned) >= 0) return slot;
     }
     return -1;
 }
@@ -329,6 +333,24 @@ static int photo_complete_slot(texture_cache_t *cache, unsigned level, int x, un
 {
     int slot = photo_slot(cache, level, x, y);
     return slot >= 0 && cache->entries[slot].quality != 1 ? slot : -1;
+}
+
+/* At most eighteen indexed ancestor probes find an already protected, complete fallback. This releases
+ * redundant fine cells after zooming out without exposing pixels or dropping the only copy of a place. */
+static int photo_parent_slot(texture_cache_t *cache, const texture_entry_t *entry, uint64_t pinned)
+{
+    if (!entry->geographic || entry->zoom < 2 || entry->zoom > 18) return -1;
+    unsigned level = (unsigned)entry->zoom;
+    double step = 360.0 / (1u << level);
+    int x = (int)nearbyint((entry->bounds[0] + 180) / step);
+    unsigned y = (unsigned)nearbyint((90 - entry->bounds[3]) / step);
+    for (unsigned ancestor = level - 1; ancestor; --ancestor) {
+        if (!cache->photo_levels[ancestor]) continue;
+        unsigned shift = level - ancestor;
+        int slot = photo_complete_slot(cache, ancestor, (int)floor((double)x / (1u << shift)), y >> shift);
+        if (slot >= 0 && (pinned & (UINT64_C(1) << slot))) return slot;
+    }
+    return -1;
 }
 
 typedef struct _photo_plan_t {
@@ -569,6 +591,7 @@ static jsref photo_result(texture_cache_t *cache, const photo_plan_t *visible, c
     lab_dom_set(object, "span", lab_dom_numeric(visible ? visible->span : 360));
     lab_dom_set(object, "pace", lab_dom_numeric(pace));
     lab_dom_set(object, "coverage", lab_dom_numeric(visible ? visible->coverage : 1));
+    lab_dom_set(object, "detail", lab_dom_numeric(visible ? visible->detail : 1));
     lab_dom_set(object, "replace", lab_dom_scalar(LAB_VALUE_BOOLEAN, replace));
     lab_dom_set(object, "pointer", lab_dom_numeric((unsigned)(size_t)cache->page));
     lab_dom_set(object, "revision", lab_dom_numeric(cache->page_revision));
@@ -640,7 +663,19 @@ static jsref photo_journey(texture_cache_t *cache, jsref request)
         else if (destination && arrival.next_y >= 0) next = &arrival;
     }
     if (next && lab_dom_truth(lab_dom_get(request, "idle"))) ++cache->journey_turn;
-    uint64_t pinned = (display ? visible.pinned : 0) | (destination ? arrival.pinned : 0);
+    /* Keep arrival pixels within the spare capacity, reserving one admission slot while visible refinement
+     * remains. The bounded bitset walk retains small arrivals without letting a full arrival starve the map. */
+    uint64_t pinned = display ? visible.pinned : 0;
+    unsigned capacity = cache->budget / (512 * 512 * 4);
+    if (capacity > cache->limit) capacity = cache->limit;
+    unsigned count = (unsigned)__builtin_popcountll(pinned);
+    unsigned spare = capacity > count ? capacity - count : 0;
+    if (display && visible.detail < .999999 && spare) --spare;
+    uint64_t candidates = destination ? arrival.pinned & ~pinned : 0;
+    while (candidates && spare) {
+        uint64_t bit = candidates & -candidates;
+        pinned |= bit; candidates &= candidates - 1; --spare;
+    }
     jsref job = lab_dom_get(request, "current");
     bool replace = lab_dom_truth(job) && !photo_job_useful(job, display ? &visible : NULL) &&
                    !photo_job_useful(job, predicted ? &ahead : NULL) &&

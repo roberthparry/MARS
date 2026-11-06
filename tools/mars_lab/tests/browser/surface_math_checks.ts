@@ -1675,6 +1675,8 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                 // Constant geographic coordinates isolate real shader grid coverage from projection and imagery.
                 gl.uniform1i(gl.getUniformLocation(program, 'riverReady'), 0);
                 gl.uniform3f(gl.getUniformLocation(program, 'camera'), -89.875, .125, 100);
+                gl.uniform3fv(gl.getUniformLocation(program, 'gridSpacing'),
+                    labDOM.call('lab_globe_grid_spacing', 100, 800) as number[]);
                 for (const [unit, rgb] of [[0, [245, 250, 250]], [2, [70, 85, 34]]] as const) {
                     gl.activeTexture(gl.TEXTURE0 + unit);
                     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE,
@@ -1692,13 +1694,14 @@ window.checkLabSurfaceMath = async function checkLabSurfaceMath(): Promise<void>
                                   1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
                     return pixel;
                 };
-                for (const lat of [-89.875, 89.875]) {
+                for (const lat of [-89.875, -80.125, 80.125, 89.875]) {
                     const plain = polarPixel(lat, .125, false), gap = polarPixel(lat, .125, true);
                     const line = polarPixel(lat, 0, true);
                     check([0, 1, 2].every(i => Math.abs(plain[i] - gap[i]) <= 1),
                           'enabled polar grid preserves the surface between neighbouring meridians');
-                    check(line[0] < plain[0] - 10 && line[0] > plain[0] * .65,
-                          'polar meridians remain visible as restrained dark strokes on ice');
+                    check(Math.abs(lat) > 89 ? [0, 1, 2].every(i => Math.abs(plain[i] - line[i]) <= 1) :
+                          line[0] < plain[0] - 10 && line[0] > plain[0] * .65,
+                          'meridians remain restrained on ice and fade before dense polar strokes merge');
                 }
                 // Historical sea ice must not disappear when zoom selects the independent SVG map.
                 for (const lat of [-70, 70]) for (const zoom of [7.99, 8, 8.01, 16]) {

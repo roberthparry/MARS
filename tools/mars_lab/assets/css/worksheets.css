@@ -623,6 +623,7 @@ html[data-almanac-jurisdiction-flag] .almanac-summary .almanac-location-flag:has
 .almanac-globe { margin-bottom: 1rem; border: 1px solid var(--line, #52675b); border-radius: 16px; overflow: hidden; }
 .almanac-globe-toolbar { display: flex; align-items: center; gap: .5rem; padding: .7rem; flex-wrap: wrap; }
 .almanac-globe-toolbar strong { margin-right: auto; }
+.workspace-history { display: contents; }
 .globe-travel-notice {
   position: absolute;
   top: 0.6rem;

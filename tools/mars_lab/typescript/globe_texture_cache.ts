@@ -9,7 +9,7 @@ interface TextureSlot { token: number; slot: number; count: number; bytes: numbe
 export interface GlobePhotoCell { key: string; bounds: number[]; level: number; coverage?: boolean; }
 export interface GlobePhotoPage {
     bounds: number[]; span: number; pointer: number; revision: number; protect: number[]; next?: GlobePhotoCell;
-    visible: boolean; pace: number; coverage: number; replace: boolean;
+    visible: boolean; pace: number; coverage: number; detail: number; replace: boolean;
 }
 export class GlobeTextureCache<T> {
     private token: number;

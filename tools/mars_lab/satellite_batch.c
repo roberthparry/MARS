@@ -6,6 +6,7 @@
  * checkpoint individual coast-masked PNGs. Progress is written atomically and optionally announced on the local
  * desktop every fifteen minutes and at phase boundaries. A verified package is published by adding immutable
  * image links before atomically replacing its manifest. Installed databases are never modified here.
+ * Optional plan-limited block preparation runs after publication and resumes from a prepublication digest marker.
  */
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
@@ -84,7 +85,8 @@ static size_t progress(const char *path, int64_t *offset, size_t previous)
     string_t *line = NULL;
     while (ok && file_read_line(file, &line) && line) {
         size_t completed, total;
-        if (sscanf(string_c_str(line), "Tiles completed: %zu/%zu", &completed, &total) == 2 && completed <= total)
+        if ((sscanf(string_c_str(line), "Tiles completed: %zu/%zu", &completed, &total) == 2 ||
+             sscanf(string_c_str(line), "%zu/%zu sources;", &completed, &total) == 2) && completed <= total)
             previous = completed;
         string_free(line); line = NULL;
         ok = file_tell(file, offset);
@@ -165,8 +167,8 @@ static bool publish(const json_t *job, const char *staging)
             if (file) file_delete(file);
             file_free(file); string_free(image);
         }
-        static const char *const directories[] = {"regional", "earth_tiles", ""};
-        for (unsigned i = 0; i < 3; ++i) {
+        static const char *const directories[] = {"regional", "earth_tiles", "earth_tiles_detail", ""};
+        for (unsigned i = 0; i < sizeof directories / sizeof *directories; ++i) {
             string_t *name = string_sprintf("%s/%s", staging, directories[i]);
             file_t *directory = name ? file_new(name) : NULL;
             if (directory) file_remove_directory(directory);
@@ -174,6 +176,35 @@ static bool publish(const json_t *job, const char *staging)
         }
     }
     file_free(prepared); file_free(base); string_free(path); string_free(base_path); string_free(sha); json_free(manifest);
+    return ok;
+}
+
+static string_t *catalogue_digest(const char *directory)
+{
+    string_t *path = string_sprintf("%s/manifest.json", directory);
+    file_t *file = path ? file_new(path) : NULL;
+    string_t *digest = file ? file_sha256(file) : NULL;
+    file_free(file); string_free(path);
+    return digest;
+}
+
+static bool already_published(const json_t *job)
+{
+    file_t *file = file_new_cstr(text(field(job, "publication_marker")));
+    file_info_t *info = file ? file_get_info(file) : NULL;
+    string_t *expected = info && file_info_size(info) == 64 ? file_read_all_text(file) : NULL;
+    string_t *actual = expected ? catalogue_digest(text(field(job, "package"))) : NULL;
+    bool same = expected && actual && !strcmp(string_c_str(expected), string_c_str(actual));
+    string_free(expected); string_free(actual); file_info_free(info); file_free(file);
+    return same;
+}
+
+static bool mark_publication(const json_t *job, const char *staging)
+{
+    if (!field(job, "pyramid_builder")) return true;
+    string_t *digest = catalogue_digest(staging);
+    bool ok = digest && save(text(field(job, "publication_marker")), digest);
+    string_free(digest);
     return ok;
 }
 
@@ -192,6 +223,9 @@ int main(int argc, char **argv)
                                           "source_manifest_sha256", "validation_log"};
     for (unsigned i = 0; ok && i < sizeof required / sizeof *required; ++i)
         ok = *text(field(job, required[i])) != 0;
+    bool blocks = field(job, "pyramid_builder") != NULL;
+    if (blocks) ok = ok && *text(field(job, "pyramid_builder")) && *text(field(job, "block_log")) &&
+                     *text(field(job, "publication_marker"));
     for (size_t i = 0; ok && i < count; ++i) {
         const json_t *task = json_array_get(tasks, i);
         const char *label = text(field(task, "label"));
@@ -217,12 +251,13 @@ int main(int argc, char **argv)
         file_free(lock); string_free(lock_path); json_free(job);
         return EXIT_FAILURE;
     }
+    bool published = blocks && already_published(job);
     if (ok) {
         string_t *message = string_sprintf("Satellite tiling started: %zu coast-masked tiles; "
                                            "checkpoints and fifteen-minute updates enabled.", total);
         notify(message); string_free(message);
     }
-    for (size_t i = 0; ok && i < count; ++i) {
+    for (size_t i = 0; ok && !published && i < count; ++i) {
         const json_t *task = json_array_get(tasks, i);
         const char *label = text(field(task, "label"));
         char *const args[] = {(char *)text(field(job, "renderer")), "--render", (char *)text(field(task, "plan")),
@@ -250,11 +285,26 @@ int main(int argc, char **argv)
         assemble[4 + i * 3] = (char *)text(field(task, "plan"));
         assemble[5 + i * 3] = (char *)text(field(task, "directory"));
     }
-    if (ok) {
+    if (ok && !published) {
         string_t *notice = string_new_with("All tiles rendered; validating the complete coast-masked PNG catalogue.");
         notify(notice); string_free(notice);
         ok = run(assemble, text(field(job, "validation_log")), job, "Validating", completed, total) &&
-             publish(job, string_c_str(staging));
+             mark_publication(job, string_c_str(staging)) && publish(job, string_c_str(staging));
+    }
+    if (ok && blocks) {
+        string_t *notice = string_new_with("Photographs complete; preparing only this batch's image blocks.");
+        notify(notice); string_free(notice);
+        completed = 0;
+        for (size_t i = 0; ok && i < count; ++i) {
+            const json_t *task = json_array_get(tasks, i);
+            char *const args[] = {(char *)text(field(job, "pyramid_builder")), (char *)text(field(job, "package")),
+                                 "--plan", (char *)text(field(task, "plan")), NULL};
+            ok = run(args, text(field(job, "block_log")), job, "Preparing image blocks", completed, total);
+            json_t *plan = load(text(field(task, "plan")));
+            if (ok) completed += json_array_size(field(plan, "tiles"));
+            json_free(plan);
+            if (ok) status(job, "Preparing image blocks", completed, total, "working");
+        }
     }
     status(job, ok ? "Ready for make release" : "Stopped; checkpoints retained", completed, total, ok ? "ready" : "failed");
     string_t *notice = string_new_with(ok ? "Satellite imagery is coast-masked and ready for make release."

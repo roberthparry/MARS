@@ -334,6 +334,13 @@ void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage)
     int home = lab_dom_id(mode == LAB_MODE_ALMANAC ? "almanacActions" : "workspaceActionsHome");
     if (actions && home && !lab_dom_equal(lab_dom_get(actions, "parentElement"), home))
         lab_dom_append(home, actions);
+    int history = lab_dom_id(mode == LAB_MODE_ALMANAC ? "almanacGlobeHistory" : "workspaceHistoryHome");
+    static const char *const navigation[] = {"back", "forward"};
+    for (unsigned i = 0; history && i < sizeof navigation / sizeof *navigation; ++i) {
+        int button = lab_dom_id(navigation[i]);
+        if (button && !lab_dom_equal(lab_dom_get(button, "parentElement"), history))
+            lab_dom_append(history, button);
+    }
     unsigned flags = lab_view_mode_flags(mode, lab_workspace_dom_content(lab_dom_query(0, "#value"), LAB_DOM_TEXT));
     lab_workspace_dom_hidden(
         "#datetimeLocal",

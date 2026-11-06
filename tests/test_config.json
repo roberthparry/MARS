@@ -3203,6 +3203,13 @@
       "test_planner_requires_observations": true
     }
   },
+  "tools/mars_lab/tests/satellite/test_texture_preparation.c": {
+    "tests": {
+      "enabled": true,
+      "test_plan_prepares_only_selected_images": true,
+      "test_published_batch_resumes_block_preparation": true
+    }
+  },
   "tools/mars_lab/tests/test_lab_almanac_presentation.c": {
     "tests": {
       "enabled": true,
