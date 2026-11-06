@@ -102,6 +102,19 @@ array_t *globe_texture_png(globe_t *g, unsigned level, unsigned column, unsigned
     return textures_png(g ? g->geometry : NULL, level, column, row, expected);
 }
 
+/* Fetch one prepared source block without loading its original photograph. */
+array_t *globe_texture_block(globe_t *g, const char *sha256, unsigned tier, unsigned row,
+                             unsigned column, globe_texture_info_t *info)
+{
+    return textures_block(g ? g->geometry : NULL, sha256, tier, row, column, info);
+}
+
+/* Keep derived-image identities stable through unrelated geometry and block imports. */
+string_t *globe_texture_identity(globe_t *g)
+{
+    return textures_identity(g ? g->geometry : NULL);
+}
+
 /* Use a bounded indexed capability table, including explicit unavailable future layers. */
 bool globe_has_layer(const globe_t *g, globe_layer_t layer)
 {

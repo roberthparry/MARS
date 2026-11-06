@@ -491,6 +491,10 @@ Copyright (c) The OpenSSL Project Authors. All rights reserved.
 This product includes software developed by the OpenSSL Project for use in the
 OpenSSL Toolkit.
 
+Native image PNG encoding links system zlib under the zlib licence. The portable
+WASM image decoder and stored-block encoder are project implementations of the
+PNG and DEFLATE specifications; no third-party codec source is bundled.
+
 The OpenSSL build verified for MARS also loads system zlib and Zstandard
 libraries. They are not bundled by MARS. A self-contained distributor must
 include the zlib licence and the selected BSD 3-Clause or GPL version 2 terms

@@ -36,9 +36,11 @@
  * Jobs with no safe admission slot wait for camera movement or eviction of an offscreen entry rather than
  * repeatedly removing and rebuilding displayed imagery.
  * The revision changes only when these lookup bytes change, allowing camera redraws to reuse the GPU table.
- * Caches accept 1..64 resource slots within a byte budget of at most 64 MiB. Allocation or invalid input returns null.
+ * Caches accept 1..64 resource slots within a byte budget of at most 128 MiB. Allocation or invalid input returns null.
  * A stationary page rounds its 510-pixel geographic core up to meet display pixel demand within the level cap,
- * and requests that detail immediately, centre first. Caches with fewer than 32 slots omit offscreen prefetch.
+ * and requests detail centre first. Views at most one degree wide request it immediately; wider empty views
+ * fill drawable parents first, then refine. Fully hidden overview parents are not touched as recently used.
+ * Caches with fewer than 32 slots omit offscreen prefetch.
  * Larger caches also omit padding whenever its grid would exceed the resource-slot budget, so visible finer
  * cells fit without repeated eviction. The resident world image supplies
  * its background without waiting for additional coarse photographs.

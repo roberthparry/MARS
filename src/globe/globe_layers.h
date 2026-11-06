@@ -26,6 +26,35 @@ bool textures_regions(sqlite_t *db, const double bounds[4], globe_texture_region
 /** @brief Return owned checksum-verified PNG bytes matching the caller's metadata, or NULL. */
 array_t *textures_png(sqlite_t *db, unsigned level, unsigned column, unsigned row, const globe_texture_info_t *expected);
 
+/**
+ * @brief Check a committed source-pyramid completion marker without reading image payloads.
+ * @param db Borrowed geometry connection; calls must be serialised.
+ * @param sha256 Borrowed source content digest.
+ * @param width Expected square source width in pixels.
+ * @return True for a matching complete version-one pyramid; false for absent or invalid data.
+ */
+bool textures_pyramid_ready(sqlite_t *db, const char *sha256, unsigned width);
+
+/**
+ * @brief Read and verify one indexed block through the globe controller's borrowed connection.
+ * @param db Borrowed geometry database; serialise calls.
+ * @param sha256 Borrowed source digest, valid during the call.
+ * @param tier Decoded square source width.
+ * @param row Zero-based block row.
+ * @param column Zero-based block column.
+ * @param info Required metadata output, cleared on failure.
+ * @return Owned PNG bytes released with array_destroy, or NULL on missing, corrupt or invalid data.
+ */
+array_t *textures_block(sqlite_t *db, const char *sha256, unsigned tier, unsigned row,
+                        unsigned column, globe_texture_info_t *info);
+
+/**
+ * @brief Read the optional stable photographic catalogue identity.
+ * @param db Borrowed geometry database; serialise calls.
+ * @return Owned identity released with string_free, or NULL if unavailable or unreadable.
+ */
+string_t *textures_identity(sqlite_t *db);
+
 /** @brief Resolve a country polygon through bounded, indexed ray intersections; caller owns the returned name. */
 string_t *countries_at(sqlite_t *db, double latitude, double longitude);
 

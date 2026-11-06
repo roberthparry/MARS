@@ -160,6 +160,125 @@ Output:
 2048 x 1024; 2623195 bytes
 ```
 
+### Prepared photographic source blocks
+
+The recording from 5 November 2026 exposes a limitation in the current photographic
+pipeline: it discovers large overlapping source photographs, decodes and resizes
+them, then assembles fixed geographic cells in the browser. Fast source lookup
+does not make that work small. A narrow crop can still require an entire
+3600-square PNG, and new camera positions repeat preparation before complete
+coverage becomes visible. Increasing a decoded-image cache helps some revisits,
+but does not replace a display-oriented storage layout.
+
+Read-only native measurements of the installed catalogue confirm that SQLite uses
+the regional R-tree, followed by primary-key metadata lookups. Average warm
+discovery and metadata times over 100 iterations were 1.56 ms for Abruzzo,
+0.63 ms for Naples, 8.56 ms for the larger Spanish window, 1.31 ms around Richmond
+and 1.05 ms around Hawick. These are source-discovery measurements, not complete
+frame timings. The first Spanish lookup took 92 ms; it still does not account for
+the multi-second rendering delays in the recording.
+
+The replacement uses a **precomputed source-block pyramid**. Preparation
+does the large-image work once; camera movement requests small, directly indexed
+blocks at the resolution that the display can use. It retains the source's
+geographic mapping and finest pixels, rather than vectorising the photographs or
+inventing sharper detail.
+
+- Divide each source into 512-square cores with a one-pixel gutter on every side.
+  The encoded blocks are 514 square, including the gutters. Edge blocks retain
+  their actual core extents; padded pixels do not extend geographic coverage.
+- Prepare lower-resolution tiers offline, with alpha-aware filtering and gutters
+  taken from the same tier. Keep the original source resolution as the finest tier.
+  A 3600-square source can supply tiers 3600, 2048, 1024, 512, 256, 128 and 64.
+- Identify a block by source content digest, tier, row and column. A compact
+  metadata table has this tuple as its primary key, independently of the PNG BLOB
+  table. Metadata remains cheap to search and duplicate payloads can share a digest.
+  The spatial index selects relevant source coverage; it does not search individual
+  pixels or decoded images. Changing unrelated river or jurisdiction data must not
+  invalidate immutable image blocks.
+- Let native code and WASM own tier selection, visible-block addresses, request
+  priority, cache admission and resource lifetime. Browser code performs the
+  asynchronous HTTP, storage and WebGL operations. The shared [image module](image.md)
+  supplies tier selection, crop/gutter mappings, alpha coverage and prepared-block
+  PNG decoding in C/WASM. The worker paints only the
+  addressed small blocks into a 512-square display cell; it never reconstructs or
+  decodes the original large photograph when a prepared pyramid is available.
+- Retain a drawable parent until usable children cover its pixels. Keep displayed
+  detail when zooming out, prioritise missing visible coverage before offscreen
+  refinement, and cancel only work that has become irrelevant. An existing block
+  must not disappear merely because another resolution has been requested.
+- Keep bounded native dictionaries for decoded and GPU resources. Persist reusable
+  raw blocks asynchronously. Actual observation alpha distinguishes uncovered
+  pixels from water and from a completed transparent block; rectangular source
+  bounds alone cannot establish complete photographic coverage.
+
+A separate native experiment prepared UK source 201, covering the Richmond area,
+into a disposable plaintext SQLite database. All 88 encoded blocks were decoded
+again and compared with their prepared pixels. An independent check compared all
+16,908,544 finest-level block pixels, including gutters and edge padding, with the
+original photograph. The database passed its integrity
+check, and its block queries used the tuple primary key and indexed payload digest.
+The installed globe and original photograph were unchanged.
+
+In an isolated Firefox/WebGL comparison using the existing native source planner:
+
+| View of the same source | Full photograph | Prepared block | Full-image bytes | Block bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Overview | 760 ms | 238 ms | 21,701,755 | 538,032 |
+| Close crop | 726 ms | 34 ms | 21,701,755 | 440,949 |
+
+These times include local fetch, decode and GPU display for one source, not a
+complete globe scene. Five subsequent small pans within the resident fine block
+took 1–4 ms and needed no downloads. Sampled GPU colours differed by at most one
+channel value; the independently checked finest block pixels were lossless.
+The coarser prototype tiers use area filtering, so their pixels need not match
+the current browser's high-quality resize filter exactly.
+
+The prepared PNG payloads totalled 32,181,669 bytes, about 48% more than this
+source image. This single-source result is not an estimate for the whole catalogue;
+transparent blocks, source dimensions and compression affect the final size.
+Preparation must be resumable by source digest, report verified blocks completed
+out of the total, and publish atomically. Installing a small change must not rebuild
+all photographic data, and expensive preparation must not run during interaction.
+
+The production interface is `globe_texture_pyramid_build`, with a synchronous
+producer callback supplying owned PNG byte arrays. The writer consumes each array,
+validates dimensions, chunk CRCs and content digests, and publishes a completion
+marker only after every tier succeeds. A failed source rolls back. Repeating a
+complete source does not invoke the producer. `globe_texture_pyramid_import`
+streams prepared sources into another database with the same per-source atomicity;
+an interruption retains earlier completed sources.
+
+`globe_texture_metadata` reports whether its source has a complete pyramid.
+`globe_texture_block` reads one source digest/tier/row/column tuple and returns an
+owned, checksum-verified PNG byte array, released with `array_destroy`.
+`globe_texture_identity` returns an owned catalogue identity, released with
+`string_free`. This identity follows the source manifest rather than database file
+timestamps, so adding blocks or updating rivers does not expire photographic cells.
+
+The optional native `texture_pyramid` utility prepares packaged images under
+the configured texture directory's `pyramid` subdirectory, one SQLite shard per
+source digest. It retains the original PNGs. Its command-line arguments are the
+texture directory, an optional relative image name or `all`, and an optional
+existing plaintext globe path for immediate incremental installation. `--notify`
+adds desktop reports at fifteen-minute intervals and completion. The image module
+supplies PNG decoding, resizing and encoding; this tool requires no GDAL installation.
+Geographic source selection and SQLite block storage remain in globe.
+
+`make prepare-globe-blocks` prepares the packaged catalogue. Existing complete
+shards are reused. These generated SQLite shards are local preparation data and
+are excluded from Git. On another machine, run `make prepare-globe-blocks` before
+`make release` to prepare and import them from the versioned PNG sources.
+`make release`, database updates and fresh globe installation
+import available matching shards without rewriting original photographs. Missing
+optional shards keep the original loading path available during conversion.
+Import progress counts sources checked, and each completed source commits
+independently. Prepared sources use the directly indexed `/earth-block` route,
+immutable HTTP caching and native-selected addresses; the worker decodes at most
+two small blocks concurrently. Its decoded and persistent raw caches use the same
+content addresses. Wider empty views request drawable overview coverage before
+fine cells, while close views request useful detail immediately.
+
 ## Regional flag coverage
 
 `globe_import_regions(db, source)` transactionally imports a bounded GeoJSON

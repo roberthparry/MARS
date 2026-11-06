@@ -250,7 +250,7 @@ Optional libraries:
 On Debian/Ubuntu, install the packaged requirements used by the default build with:
 
 ```sh
-sudo apt install build-essential pkg-config clang lld wasi-libc libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
+sudo apt install build-essential pkg-config clang lld wasi-libc libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev zlib1g-dev libcurl4-openssl-dev libssl-dev
 ```
 
 Install the [standalone native TypeScript compiler](#native-typescript-compiler)
@@ -261,7 +261,7 @@ MARS Lab alone.
 If you disable libunistring support, it is not required:
 
 ```sh
-sudo apt install build-essential pkg-config clang lld wasi-libc libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
+sudo apt install build-essential pkg-config clang lld wasi-libc libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libzstd-dev libsodium-dev zlib1g-dev libcurl4-openssl-dev libssl-dev
 make ENABLE_UNISTRING=0
 ```
 
@@ -361,10 +361,11 @@ automatically. Run `make -j1 test_webserver` for its dedicated suite.
 
 ### File compression and encryption dependencies
 
-When the configuration tests include `test_cfg_texture_fixture.c`, their PNG
-generator also needs zlib development files (`zlib1g-dev` on Debian/Ubuntu).
-The dependency probe and test linker include zlib only when that generator is
-present in the source inventory.
+Native PNG encoding in the image module requires zlib development files
+(`zlib1g-dev` on Debian/Ubuntu). The dependency checker verifies its headers and
+link library for every native build. PNG regression fixtures also use system
+zlib independently. The WASM image module uses its portable C codec without
+JavaScript or external codec imports.
 
 The Makefile requires Zstandard and libsodium for the file module's streaming
 compression and authenticated encryption APIs. Applications invoke these APIs

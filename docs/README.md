@@ -47,6 +47,7 @@ This directory contains the longer module documentation for MARS.
   integration and helper APIs
 - [`almanac_t`](./almanac.md) — ephemeris-backed SHA/declination lookups and snapshot queries
 - [`globe_t`](./globe.md) — geographic controller for shorelines, rivers and regional map layers
+- [`image_t`](./image.md) — RGBA pixels, PNGs, alpha coverage and reusable image pyramids in native C and WASM
 - [`datetime_t`](./datetime.md) — civil and astronomical date/time utilities
 - [`jurisdiction_t`](./jurisdiction.md) — jurisdiction-aware holiday and working-day queries
 - [`timeseries_t`](./timeseries.md) — datetime-indexed forecasting and time-series analysis
@@ -98,6 +99,7 @@ multiprecision backends:
 SQLite-compatible storage.
 
 File compression and authenticated encryption use Zstandard and libsodium.
+Native PNG encoding uses zlib; the image module's WASM build needs no external codec library.
 HTTP transport uses libcurl; nghttp2 supplies HTTP/2 in the verified libcurl
 build. The native webserver, XML and Protobuf modules add no external runtime
 library. Clang and LLD build the Lab's C/WebAssembly browser module; TeX Live

@@ -153,6 +153,7 @@ int checks_markdown_api(const string_t *root)
         {"file-t.h", "file.md"},
         {"globe-t.h", "globe.md"},
         {"http-t.h", "http.md"},
+        {"image-t.h", "image.md"},
         {"integrator-t.h", "integrator.md"},
         {"json-t.h", "json.md"},
         {"jurisdiction-t.h", "jurisdiction.md"},

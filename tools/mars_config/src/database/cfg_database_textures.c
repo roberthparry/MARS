@@ -18,6 +18,7 @@
 
 #include "array-t.h"
 #include "globe-t.h"
+#include "image-t.h"
 #include "json-t.h"
 #include "string-t.h"
 #include "mars_paths.h"
@@ -67,31 +68,12 @@ static bool texture_number(const json_t *value, const char *name, uint64_t expec
     return start[0] >= '0' && start[0] <= '9' && end && !*end && !errno && number == expected;
 }
 
-/* Validate chunk bounds and the RGB header without decoding the photograph. */
-static unsigned texture_u32(const unsigned char *p)
-{
-    return ((unsigned)p[0] << 24) | ((unsigned)p[1] << 16) | ((unsigned)p[2] << 8) | p[3];
-}
-
+/* Validate dimensions, supported PNG layout and chunk checksums without decoding pixels. */
 static bool texture_dimensions(const unsigned char *data, size_t size, unsigned width, unsigned height)
 {
-    if (size < 57 || memcmp(data, "\211PNG\r\n\032\n", 8)) return false;
-    bool header = false, pixels = false;
-    for (size_t at = 8; at + 12 <= size;) {
-        unsigned length = texture_u32(data + at);
-        if (length > size - at - 12) return false;
-        const unsigned char *type = data + at + 4, *body = data + at + 8;
-        if (!header) {
-            if (memcmp(type, "IHDR", 4) || length != 13 || texture_u32(body) != width ||
-                texture_u32(body + 4) != height || body[8] != 8 || (body[9] != 2 && body[9] != 6) ||
-                body[10] || body[11] || body[12]) return false;
-            header = true;
-        } else if (!memcmp(type, "IHDR", 4)) return false;
-        if (!memcmp(type, "IDAT", 4)) pixels = true;
-        if (!memcmp(type, "IEND", 4)) return !length && pixels && at + 12 == size;
-        at += (size_t)length + 12;
-    }
-    return false;
+    unsigned actual_width, actual_height;
+    return image_png_header(data, size, &actual_width, &actual_height) &&
+           actual_width == width && actual_height == height && image_png_validate(data, size);
 }
 
 /* A matching content address retains its previously validated image without reading the PNG body again. */
@@ -273,6 +255,19 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root)
     sqlite_stmt_t *snapshot = ok ? sqlite_stmt_prepare(db,
         "insert into globe_texture_manifest(id,json) values(1,?1)") : NULL;
     ok = snapshot && sqlite_stmt_bind_text(snapshot, 1, string_c_str(text)) &&
+         sqlite_stmt_step(snapshot) == SQLITE_STEP_DONE;
+    sqlite_stmt_finalize(snapshot);
+    unsigned char catalogue_digest[crypto_hash_sha256_BYTES];
+    char catalogue_hex[65];
+    ok = ok && crypto_hash_sha256(catalogue_digest, (const unsigned char *)string_c_str(text),
+                                 string_byte_length(text)) == 0 &&
+         sodium_bin2hex(catalogue_hex, sizeof catalogue_hex, catalogue_digest, sizeof catalogue_digest) &&
+         sqlite_exec_cstr(db, "CREATE TABLE IF NOT EXISTS globe_texture_generation ("
+                             "id INTEGER PRIMARY KEY CHECK(id=1),sha256 TEXT NOT NULL)");
+    snapshot = ok ? sqlite_stmt_prepare(db,
+        "INSERT INTO globe_texture_generation VALUES(1,?1)\n"
+        "ON CONFLICT(id) DO UPDATE SET sha256=excluded.sha256") : NULL;
+    ok = snapshot && sqlite_stmt_bind_text(snapshot, 1, catalogue_hex) &&
          sqlite_stmt_step(snapshot) == SQLITE_STEP_DONE;
     sqlite_stmt_finalize(snapshot);
     sqlite_stmt_t *insert = ok ? sqlite_stmt_prepare(db,

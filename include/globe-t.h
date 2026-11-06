@@ -75,6 +75,7 @@ typedef struct _globe_texture_info_t {
     unsigned height; /**< PNG height in pixels. */
     size_t byte_count; /**< Encoded PNG size: at most 128 MiB globally, 64 MiB regionally, 16 MiB otherwise. */
     char sha256[65]; /**< Lower-case hexadecimal content digest, including its terminating NUL. */
+    bool pyramid; /**< True when a complete, validated source-block pyramid is installed for this content. */
 } globe_texture_info_t;
 
 /** @brief Receive a regional PNG slot and its west, south, east, north bounds; false stops enumeration. */
@@ -108,6 +109,66 @@ bool globe_texture_metadata(globe_t *globe, unsigned level, unsigned column, uns
  */
 array_t *globe_texture_png(globe_t *globe, unsigned level, unsigned column, unsigned row,
                             const globe_texture_info_t *expected);
+
+/**
+ * @brief Supply one encoded source-pyramid block during offline preparation.
+ * @param tier Square decoded source size selected by the writer, in pixels.
+ * @param row Zero-based block row at this tier; each core is 512 pixels high.
+ * @param column Zero-based block column at this tier; each core is 512 pixels wide.
+ * @param context Borrowed producer state, valid throughout the synchronous build.
+ * @return Owned byte array containing one 514-square RGB or RGBA PNG, including one-pixel gutters,
+ * or NULL to abort. The writer consumes the returned array and releases it with array_destroy.
+ * @note The writer requests every block once, tier by tier and row by row. Do not re-enter its database.
+ */
+typedef array_t *(*globe_texture_block_producer_fn)(unsigned tier, unsigned row, unsigned column, void *context);
+
+/**
+ * @brief Prepare one immutable source pyramid transactionally in a plaintext preparation database.
+ * @param database Borrowed writable SQLite connection; serialise calls and retain it until completion.
+ * @param sha256 Borrowed lower-case 64-character SHA-256 identity of the original source PNG.
+ * @param width Square source edge in pixels, from 64 to 8192 inclusive.
+ * @param produce Required synchronous block producer; the writer consumes its returned arrays.
+ * @param context Borrowed producer state; no ownership transfers.
+ * @return True for an already complete source or a successfully committed pyramid; false for invalid input,
+ * producer failure, malformed PNGs or database errors. A failed replacement preserves existing committed data.
+ * @note Tiers comprise the original size and successive lower powers of two down to 64. A completion marker
+ * becomes visible only after every expected block passes dimension, chunk-CRC and content-digest checks.
+ */
+bool globe_texture_pyramid_build(sqlite_t *database, const char *sha256, unsigned width,
+                                 globe_texture_block_producer_fn produce, void *context);
+
+/**
+ * @brief Import complete source pyramids from a prepared plaintext SQLite file.
+ * @param database Borrowed writable destination connection; calls must be serialised.
+ * @param source Borrowed existing preparation file, never modified or consumed.
+ * @return True after all complete sources have been verified and imported, including an unchanged import;
+ * false for malformed preparation data, missing blocks or database errors. Each source is published atomically;
+ * earlier successfully imported sources remain usable if a later source fails.
+ * @note Image originals, geographic layers and caller-owned settings are preserved. No image decoding occurs.
+ */
+bool globe_texture_pyramid_import(sqlite_t *database, file_t *source);
+
+/**
+ * @brief Read one directly indexed, checksum-verified source block.
+ * @param globe Borrowed geographic controller; serialise calls.
+ * @param sha256 Borrowed SHA-256 identity of an original source with a complete installed pyramid.
+ * @param tier Original source width or a lower power-of-two tier, at least 64 pixels.
+ * @param row Zero-based block row, within ceil(tier / 512).
+ * @param column Zero-based block column, within ceil(tier / 512).
+ * @param info Required metadata output, cleared on failure; successful dimensions are 514 by 514.
+ * @return Owned PNG byte array released with array_destroy, or NULL for missing, invalid or corrupt data.
+ * @note Uses tuple and digest indexes; it neither scans imagery nor decodes the original photograph.
+ */
+array_t *globe_texture_block(globe_t *globe, const char *sha256, unsigned tier, unsigned row,
+                             unsigned column, globe_texture_info_t *info);
+
+/**
+ * @brief Identify the installed photographic catalogue independently of unrelated database writes.
+ * @param globe Borrowed controller; calls must be serialised.
+ * @return Owned content-identity string released with string_free, or NULL when the optional identity is absent
+ * or unreadable. Adding prepared blocks does not change this identity; replacing the source catalogue does.
+ */
+string_t *globe_texture_identity(globe_t *globe);
 
 /** @brief Events in a clipped shoreline polygon, with a nesting level supplied separately. */
 typedef enum _globe_path_event_t {

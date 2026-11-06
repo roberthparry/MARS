@@ -15,12 +15,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sodium.h>
-#include <zlib.h>
 #include <gdal.h>
 
 #include "array-t.h"
 #include "file-t.h"
 #include "globe-t.h"
+#include "image-t.h"
 #include "json-t.h"
 #include "string-t.h"
 #include "satellite_overviews.h"
@@ -78,30 +78,11 @@ static json_t *load(const string_t *path)
     return value;
 }
 
-static uint32_t u32(const unsigned char *p)
+static bool png_valid(const unsigned char *data, size_t size, unsigned width, unsigned height)
 {
-    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3];
-}
-
-static bool png_valid(const unsigned char *p, size_t size, unsigned width, unsigned height)
-{
-    if (size < 57 || memcmp(p, "\211PNG\r\n\032\n", 8)) return false;
-    bool header = false, pixels = false;
-    for (size_t at = 8; at + 12 <= size;) {
-        uint32_t length = u32(p + at);
-        if (length > size - at - 12) return false;
-        const unsigned char *kind = p + at + 4, *body = kind + 4;
-        if (crc32(0, kind, length + 4) != u32(body + length)) return false;
-        if (!header) {
-            if (memcmp(kind, "IHDR", 4) || length != 13 || u32(body) != width || u32(body + 4) != height ||
-                body[8] != 8 || (body[9] != 2 && body[9] != 6) || body[10] || body[11] || body[12]) return false;
-            header = true;
-        } else if (!memcmp(kind, "IHDR", 4)) return false;
-        if (!memcmp(kind, "IDAT", 4)) pixels = true;
-        if (!memcmp(kind, "IEND", 4)) return !length && pixels && at + 12 == size;
-        at += (size_t)length + 12;
-    }
-    return false;
+    unsigned actual_width, actual_height;
+    return image_png_header(data, size, &actual_width, &actual_height) &&
+           actual_width == width && actual_height == height && image_png_validate(data, size);
 }
 
 static bool publish_image(const string_t *source, const string_t *output, const json_t *asset, uint64_t *total)

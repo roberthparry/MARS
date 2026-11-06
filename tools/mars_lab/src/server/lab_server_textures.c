@@ -7,6 +7,7 @@
  * listener does not open SQLite or preload imagery. Content digests identify images across database migrations.
  */
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "array-t.h"
@@ -74,6 +75,41 @@ static bool texture_request(const websrv_request_t *request, websrv_response_t *
     return ok;
 }
 
+static bool texture_block_request(const websrv_request_t *request, websrv_response_t *response, void *context)
+{
+    lab_texture_routes_t *owner = context;
+    if (!lab_svr_header(response, "Cache-Control", "no-store") ||
+        !lab_svr_header(response, "X-Content-Type-Options", "nosniff")) return false;
+    if (!lab_svr_request_permitted(request))
+        return lab_svr_message(request, response, 403, "MARS Lab is private; use this machine or a private network.");
+    const string_t *target = websrv_request_target(request);
+    char source[65] = {0}, tier[11] = {0}, row[11] = {0}, column[11] = {0};
+    int end = 0;
+    const char *text = target ? string_c_str(target) : "";
+    if (!target || string_byte_length(target) > 180 ||
+        sscanf(text, "/earth-block?v=1&sha=%64[a-f0-9]&tier=%10[0-9]&row=%10[0-9]&column=%10[0-9]%n",
+            source, tier, row, column, &end) != 4 || !end || text[end] || strlen(source) != 64)
+        return lab_svr_message(request, response, 400, "Invalid photographic block address");
+    unsigned long size = strtoul(tier, NULL, 10), y = strtoul(row, NULL, 10), x = strtoul(column, NULL, 10);
+    if (size < 64 || size > 8192 || x >= (size + 511) / 512 || y >= (size + 511) / 512)
+        return lab_svr_message(request, response, 400, "Invalid photographic block coordinates");
+    if (!owner->reader) owner->reader = globe_reader_new();
+    globe_t *globe = globe_reader_get(owner->reader);
+    globe_texture_info_t info;
+    array_t *bytes = globe_texture_block(globe, source, (unsigned)size, (unsigned)y, (unsigned)x, &info);
+    if (!bytes) return lab_svr_message(request, response, 404, "Photographic block is not installed");
+    string_t *etag = string_sprintf("\"sha256-%s\"", info.sha256);
+    bool cached = etag && texture_cached(lab_svr_request_header(request, "If-None-Match"), string_c_str(etag));
+    bool ok = etag && lab_svr_header(response, "Content-Type", "image/png") &&
+        lab_svr_header(response, "X-Content-Type-Options", "nosniff") &&
+        lab_svr_header(response, "Cache-Control", "private, max-age=31536000, immutable") &&
+        lab_svr_header(response, "ETag", string_c_str(etag)) &&
+        (cached ? websrv_response_status(response, 304) :
+            websrv_response_body(response, array_get(bytes, 0), array_size(bytes)));
+    string_free(etag); array_destroy(bytes);
+    return ok;
+}
+
 lab_texture_routes_t *lab_svr_textures_new(websrv_t *listener)
 {
     lab_texture_routes_t *owner = calloc(1, sizeof *owner);
@@ -96,6 +132,9 @@ lab_texture_routes_t *lab_svr_textures_new(websrv_t *listener)
             }
         }
     }
+    string_t *block = ok ? string_new_with("/earth-block") : NULL;
+    ok = block && websrv_route(listener, HTTP_GET, block, texture_block_request, owner);
+    string_free(block);
     if (!ok) { lab_svr_textures_free(owner); owner = NULL; }
     return owner;
 }

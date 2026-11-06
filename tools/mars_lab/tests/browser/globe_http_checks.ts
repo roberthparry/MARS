@@ -11,7 +11,7 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                           options: {endpoint: string; script: string; nativeShore: boolean; storageDenied?: boolean;
                                     surfaceProbe?: boolean; regionalAliases?: boolean; holdPhotograph?: boolean;
                                     denyPhotographs?: boolean; decodeProbe?: boolean; persistProbe?: boolean;
-                                    alphaProbe?: boolean; globalAliases?: boolean} =
+                                    alphaProbe?: boolean; globalAliases?: boolean; blockProbe?: boolean} =
                               {endpoint: '/almanac-globe', script: '/js/globe_worker.js', nativeShore: true}): {
     Worker: typeof Worker; releaseSurfaceCache(): void; waitForCache(key: string): Promise<void>; cacheCount(): number;
     sourcePlanCount(): number;
@@ -40,7 +40,7 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                     if (!photographLookup) {
                         photographLookup = module.GlobeTextureCache.prototype.getSlot;
                         module.GlobeTextureCache.prototype.getSlot = function(key) {
-                            if (bypassPhotographs && /^\\/earth_.*:[a-f0-9]{64}:\\d+:$/.test(key)) return null;
+                            if (bypassPhotographs && /^\\/earth_.*[a-f0-9]{64}:\\d+::$/.test(key)) return null;
                             return photographLookup.call(this, key);
                         };
                     }
@@ -63,6 +63,15 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                 event.data.bytes, {status: event.data.status, headers: event.data.headers}));
         });
         globalThis.fetch = (url, options) => {
+            if (${Boolean(options.blockProbe)} && String(url).startsWith('/earth-block?v=1&sha=')) {
+                return (async () => {
+                    const canvas = new OffscreenCanvas(514, 514), context = canvas.getContext('2d');
+                    context.fillStyle = 'rgb(180,80,40)'; context.fillRect(0, 0, 514, 514);
+                    const blob = await canvas.convertToBlob({type:'image/png'});
+                    canvas.width = canvas.height = 1;
+                    return new Response(blob, {headers:{ETag:'"sha256-' + 'c'.repeat(64) + '"'}});
+                })();
+            }
             if (${Boolean(options.globalAliases)} && url === '/earth_tiles_detail/47-23.png')
                 return networkFetch(new URL('/earth_tiles/00-00.png', ${JSON.stringify(location.origin)}), options);
             if (${Boolean(options.alphaProbe)} && (url === '/earth_regions/123.png' || url === '/earth_regions/4095.png')) {
@@ -109,6 +118,8 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
         if (${Boolean(options.decodeProbe)}) {
             const decode = globalThis.createImageBitmap.bind(globalThis);
             globalThis.createImageBitmap = async (...args) => {
+                if (${Boolean(options.blockProbe)} && args[0] instanceof Blob && args[0].type === 'image/png')
+                    throw new Error('Prepared PNG blocks must be decoded in WASM');
                 const bitmap = await decode(...args);
                 if (args[0] instanceof Blob && args[0].type === 'image/png') postMessage({fixtureDecoded: true});
                 return bitmap;
@@ -123,11 +134,13 @@ function globeHTTPFixture(handler: (body: Uint8Array<ArrayBuffer>) => Promise<Re
                 postMessage({fixtureCached: key});
             };
         }
-        if (${Boolean(options.surfaceProbe)}) {
+        if (${Boolean(options.surfaceProbe || (options.blockProbe && options.decodeProbe))}) {
             const call = labDOM.call;
             labDOM.call = (name, ...args) => {
                 if (name === 'lab_texture_cache' && args[0]?.action === 9) postMessage({fixtureSourcePlan: true});
-                return call(name, ...args);
+                const result = call(name, ...args);
+                if (name === 'lab_photo_decode' && result) postMessage({fixtureDecoded: true});
+                return result;
             };
         }
         if (${options.nativeShore}) {

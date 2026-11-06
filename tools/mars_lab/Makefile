@@ -83,6 +83,15 @@ LAB_TEST_TS_CONFIG := tools/mars_lab/tsconfig.tests.json
 # Optional offline asset preparation only; ordinary builds use the bundled tiles.
 LAB_GDAL_CFLAGS ?= $(shell pkg-config --cflags gdal 2>/dev/null)
 LAB_GDAL_LIBS ?= -lgdal
+.PHONY: prepare-globe-blocks
+prepare-globe-blocks: $(LAB_BUILD_DIR)/texture_pyramid
+	"$<" "$(GLOBE_DB_SOURCE_DIR)/textures" all --notify
+
+$(LAB_BUILD_DIR)/texture_pyramid: tools/mars_lab/texture_pyramid.c tools/mars_lab/texture_pyramid_notify.c tools/mars_lab/include/texture_pyramid.h $(STATIC_LIB)
+	@mkdir -p $(@D)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude -Itools/mars_lab/include $(LDFLAGS) -o $@ \
+	    tools/mars_lab/texture_pyramid.c tools/mars_lab/texture_pyramid_notify.c $(STATIC_LIB) $(LDLIBS)
+
 $(LAB_BUILD_DIR)/satellite_coastmask: tools/mars_lab/satellite_mask.c tools/mars_lab/satellite_mask_main.c tools/mars_lab/include/satellite_mask.h $(STATIC_LIB)
 	@mkdir -p $(@D)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Iinclude -Itools/mars_lab/include $(LAB_GDAL_CFLAGS) $(LDFLAGS) \
@@ -138,6 +147,14 @@ lab-test-typescript: lab-typescript
 
 LAB_WASM := $(LAB_BUILD_DIR)/wasm/lab_browser.wasm
 LAB_CODEC_WASM := $(LAB_BUILD_DIR)/wasm/lab_codec.wasm
+IMAGE_WASM := $(LAB_BUILD_DIR)/wasm/image.wasm
+IMAGE_WASM_OBJS := $(patsubst src/image/%.c,$(LAB_BUILD_DIR)/wasm/marslib/image_%.o,$(wildcard src/image/*.c))
+IMAGE_WASM_API := image_new image_from_rgba image_free image_width image_height image_size image_pixels image_data \
+    image_resize image_block image_png_header image_png_validate image_png_decode image_png_encode \
+    image_pyramid_new image_pyramid_free image_pyramid_levels image_pyramid_level image_pyramid_crop \
+    image_pyramid_select image_pyramid_visit image_coverage_new image_coverage_free image_coverage_write \
+    image_coverage_contains image_rectangle_intersection
+IMAGE_WASM_EXPORTS := $(addprefix --export=,$(IMAGE_WASM_API) array_get array_size array_destroy malloc free)
 LAB_WASM_SRCS := $(sort $(wildcard tools/mars_lab/wasm/src/*.c))
 LAB_WASM_OBJS := $(patsubst tools/mars_lab/wasm/src/%.c,$(LAB_BUILD_DIR)/wasm/src/%.o,$(LAB_WASM_SRCS))
 LAB_WASM_WIRE_OBJ := $(LAB_BUILD_DIR)/wasm/marslib/protobuf_wire.o
@@ -149,6 +166,7 @@ LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/webgl_mask.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/webgl_renderer.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/globe_view.o
 LAB_WASM_OBJS += $(LAB_BUILD_DIR)/wasm/marslib/quaternion.o
+LAB_WASM_OBJS += $(IMAGE_WASM_OBJS)
 LAB_WASM_ASM := $(LAB_WASM_OBJS:.o=.s)
 # Debian/Ubuntu's wasi-libc keeps musl maths in libc.a; libm.a is an empty compatibility archive.
 # Override both paths for another installation. Only referenced archive members are linked.
@@ -158,6 +176,22 @@ LAB_WASM_LIBC ?= /usr/lib/wasm32-wasi/libc.a
 LAB_WASM_MEMORY_EXPORTS := --export=memset --export=memcpy --export=memmove --export=memcmp
 LAB_WASM_CFLAGS := --target=wasm32-unknown-unknown -O2 -Wall -Wextra -Werror -ffreestanding -fno-builtin -fvisibility=default \
                    -nostdlib -nostdlibinc -Wmissing-prototypes -isystem "$(LAB_WASM_INCLUDE)" -Iinclude -Itools/mars_lab/wasm/include
+
+# Compile the actual library module for both browser integration and independent WASM clients.
+$(LAB_BUILD_DIR)/wasm/marslib/image_%.o: src/image/%.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $(@:.o=.d) -c $< -o $@
+
+$(LAB_BUILD_DIR)/wasm/marslib/image_%.s: src/image/%.c tools/mars_lab/Makefile | check-lab-wasm-deps
+	@mkdir -p $(dir $@)
+	"$(LAB_WASM_CC)" $(LAB_WASM_CFLAGS) --target=wasm32-wasi -fvisibility=hidden -MMD -MP -MF $@.d -MT $@ -S $< -o $@
+
+.PHONY: image-wasm
+image-wasm: $(IMAGE_WASM)
+
+$(IMAGE_WASM): $(IMAGE_WASM_OBJS) $(LAB_BUILD_DIR)/wasm/marslib/array.o $(LAB_WASM_LIBC)
+	"$(LAB_WASM_LD)" --no-entry --export-memory $(IMAGE_WASM_EXPORTS) \
+	    --initial-memory=2097152 --max-memory=100663296 $(filter %.o,$^) "$(LAB_WASM_LIBC)" -o $@
 
 # Link generic containers separately; do not pull in the native libmars archive.
 $(LAB_BUILD_DIR)/wasm/marslib/quaternion.o: src/quaternion/quaternion.c tools/mars_lab/Makefile | check-lab-wasm-deps
@@ -233,7 +267,7 @@ lab-wasm-asm: $(LAB_WASM_ASM)
 # Export application definitions, not the library's hidden helpers and WASI entry points.
 $(LAB_WASM): $(LAB_WASM_OBJS) $(LAB_WASM_LIBC) tools/mars_lab/wasm/lab_browser.imports tools/mars_lab/Makefile
 	"$(LAB_WASM_LD)" --no-entry --export-dynamic --export-memory --allow-undefined-file=tools/mars_lab/wasm/lab_browser.imports \
-	    $(LAB_WASM_MEMORY_EXPORTS) --initial-memory=69206016 --max-memory=100663296 \
+	    $(LAB_WASM_MEMORY_EXPORTS) $(IMAGE_WASM_EXPORTS) --initial-memory=69206016 --max-memory=100663296 \
 	    $(LAB_WASM_OBJS) "$(LAB_WASM_LIBC)" -o $@
 
 # Probe the actual compiler target and linker, not merely their presence on PATH.
@@ -312,7 +346,7 @@ $(LAB_SHARED_LIB): $(SHARED_LIB) tools/mars_lab/Makefile
 	@mkdir -p $(dir $@)
 	ln -sfr "$(SHARED_LIB)" "$@"
 
-$(LAB_SERVER): $(LAB_OBJS) $(LAB_SHARED_LIB) $(LAB_WASM) $(LAB_CODEC_WASM) | lab-typescript
+$(LAB_SERVER): $(LAB_OBJS) $(LAB_SHARED_LIB) $(LAB_WASM) $(LAB_CODEC_WASM) $(IMAGE_WASM) | lab-typescript
 	@mkdir -p $(dir $@)
 	$(CC) $(LDFLAGS) -Wl,-rpath,'$$ORIGIN' -o $@ $(LAB_OBJS) -L"$(LAB_BUILD_DIR)" -l:$(notdir $(SHARED_LIB)) $(LDLIBS)
 
@@ -332,7 +366,7 @@ $(LAB_TEST_BIN): $(LAB_TEST_OBJS) $(LAB_SUPPORT_OBJS) $(TEST_COMMON_HELPER_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(LAB_TEST_OBJS) $(LAB_SUPPORT_OBJS) $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(LDLIBS)
 
 .PHONY: native-lab clean-lab
-native-lab: $(LAB_SERVER)
+native-lab: $(LAB_SERVER) $(IMAGE_WASM)
 
 LAB_BROWSER_SRCS := tools/mars_lab/tests/browser/test_lab_browser.c tools/mars_lab/tests/browser/test_lab_browser_fixtures.c
 $(LAB_BUILD_DIR)/tests/test_lab_browser: $(LAB_BROWSER_SRCS) tools/mars_lab/tests/browser/test_lab_browser_fixtures.h $(LAB_TEST_HEADERS) $(LAB_BUILD_DIR)/tests/test_lab_support.o $(TEST_COMMON_HELPER_OBJS) $(LAB_SUPPORT_OBJS) $(STATIC_LIB) $(LAB_SERVER) $(LAB_WASM)

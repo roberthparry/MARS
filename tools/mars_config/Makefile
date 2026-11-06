@@ -82,6 +82,7 @@ $(CONFIG_PROGRAM): $(CONFIG_OBJS) $(STATIC_LIB)
 $(CONFIG_BUILD_DIR)/tests/test_cfg_calendar.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/calendar
 $(CONFIG_BUILD_DIR)/tests/test_cfg_database.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
 $(CONFIG_BUILD_DIR)/tests/test_cfg_rivers.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
+$(CONFIG_BUILD_DIR)/tests/test_cfg_pyramids.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
 $(CONFIG_BUILD_DIR)/tests/test_cfg_textures.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
 $(CONFIG_BUILD_DIR)/tests/test_cfg_rendering.o: CONFIG_TEST_INTERNAL_INCLUDES := -Itools/mars_config/src/database
 

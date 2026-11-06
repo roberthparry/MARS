@@ -99,6 +99,17 @@ bool cfg_database_textures(sqlite_t *db, const string_t *root);
  */
 bool cfg_database_textures_current(sqlite_t *db, const string_t *root);
 
+/**
+ * @brief Import available prepared source pyramids without rewriting original photographs.
+ * @param[in,out] db Borrowed writable globe connection, used serially without an enclosing transaction.
+ * @param[in] root Borrowed resource context for the configured texture directory; not retained.
+ * @return True when every available matching shard is already installed or imported successfully. Missing
+ * optional shards retain the original-image loading path. False indicates invalid prepared data or I/O failure;
+ * each previously completed source remains committed and the current failed source is rolled back.
+ * @note No argument is consumed. Progress reports source counts. Repeated calls resume from completion markers.
+ */
+bool cfg_database_pyramids(sqlite_t *db, const string_t *root);
+
 /** @brief Validate the complete installed photographic image set, including content digests. */
 bool cfg_database_textures_valid(sqlite_t *db);
 

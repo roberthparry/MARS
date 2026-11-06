@@ -103,3 +103,6 @@ AGENTS.md
 
 # Retained geographic inputs and prepared candidates survive make clean.
 /packaging/globe-db/source-cache/
+
+# Reproducible local source-block preparation databases; retain them across make clean.
+/packaging/globe-db/textures/pyramid/

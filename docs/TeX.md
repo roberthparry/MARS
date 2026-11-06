@@ -301,6 +301,18 @@ Output:
 444 333 222 555
 ```
 
+Rendered stack contents, from bottom to top in each row:
+
+$$
+\begin{array}{ll}
+\text{DUP} & 12\quad 34\quad 34 \\
+\text{DROP} & 12\quad 34 \\
+\text{SWAP} & 34\quad 12 \\
+\text{ROT} & 34\quad 56\quad 12 \\
+\text{ROLL} & 444\quad 333\quad 222\quad 555
+\end{array}
+$$
+
 
 ## Indexed expression with nested roots
 
@@ -3065,8 +3077,31 @@ Output:
 {\left| \psi \right\rangle}^{\dagger} = \left\langle \psi \right|
 ```
 
-These render as the same six mathematical statements above. Native text and
-RPN retain their existing spacing conventions.
+Rendered mathematics, retaining the native text renderer's spacing:
+
+$$
+\widehat{H} = \frac{\widehat{p}^{2}}{2\mkern-2mu m} + V\left(x, t\right)
+$$
+
+$$
+\left\langle p \right\rangle = \left\langle \psi \middle| \widehat{p} \middle| \psi \right\rangle
+$$
+
+$$
+\left\langle \phi \middle| \psi \right\rangle
+$$
+
+$$
+\left| \psi \right\rangle\!\left\langle \phi \right|
+$$
+
+$$
+{\widehat{A}}^{\dagger}
+$$
+
+$$
+{\left| \psi \right\rangle}^{\dagger} = \left\langle \psi \right|
+$$
 
 ## Optional input shortcuts
 
@@ -3515,6 +3550,8 @@ $$
 r_{n} = \frac{\sqrt[3]{x_{n}^{2} + 1}}{\sqrt{\lambda^{2} + 1}}
 $$
 
+scaled & normalised
+
 $$
 P\left(x\right) = \frac{1}{x^{2} + 1}\mkern-5mu \begin{bmatrix}1 & x \\[10pt] x & x^{2}\end{bmatrix}
 $$
@@ -3585,7 +3622,47 @@ i
 Rendered mathematics, in the same order:
 
 $$
-\infty,\quad \infty,\quad -\infty,\quad \gamma,\quad \gamma,\quad \pi,\quad \phi,\quad \tau,\quad e,\quad i,\quad \int_{0}^{\infty} e^{-x}\, dx
+\infty
+$$
+
+$$
+\infty
+$$
+
+$$
+-\infty
+$$
+
+$$
+\gamma
+$$
+
+$$
+\gamma
+$$
+
+$$
+\pi
+$$
+
+$$
+\phi
+$$
+
+$$
+\tau
+$$
+
+$$
+e
+$$
+
+$$
+i
+$$
+
+$$
+\int_{0}^{\infty} e^{-x}\, dx
 $$
 
 For the equivalent construction using symbols and stack operations, see

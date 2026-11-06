@@ -1156,7 +1156,7 @@ topography and bathymetry: 86400 × 43200 source pixels, nominally 500 metres pe
 resampling, checking the written pixels against the source before discarding a downloaded quadrant.
 Each tile covers 7.5 × 7.5 degrees. Native surface planning selects this grid when its extra detail improves
 the requested output; broad views retain the lighter grid. Regional Sentinel photographs still supply
-the closest detail. Existing GPU and decoded-source cache budgets are unchanged, and older databases
+the closest detail. Both source grids use the same bounded GPU and decoded-source caches, and older databases
 without the additional grid continue using the original tiles. Source GeoTIFFs are preparation inputs,
 not runtime dependencies. `make release` imports a changed prepared manifest even when the managed-data
 revision is unchanged, retaining matching PNG rows and the other geographic layers.
@@ -1234,6 +1234,10 @@ or drawing-time processing are needed. Original files remain untouched, even whe
 candidate package initially shares their hard links. The completed manifest records
 updated PNG checksums, sizes, observation counts and repair provenance before publication.
 Gaps without detailed observations remain transparent and require additional source coverage.
+Before publishing a catalogue, check all its overviews, including overlaps between
+batches for neighbouring countries and islands. A rectangular footprint does not
+prove complete observations: a gap in an overview can expose the blurred global
+photograph at wider zooms even when detailed tiles cover the same ground.
 
 Once the requested longitude and latitude spans are each at most 30°, the
 photographic globe uses fixed 512-square geographic cells from the **globe database**.
@@ -1271,7 +1275,8 @@ dragging, the existing native camera prediction directs prefetch towards the nex
 view once current detail is complete, ahead of padding behind the camera. Missing
 visible detail always takes priority. Free slots use a
 stack and protected slots use a bitset. `lab_photo_source` supplies exact pixel
-crops and stable source-block keys; JavaScript performs the browser codec, storage
+crops and stable source-block keys. The [image module](image.md) supplies the reusable
+pyramid, coverage and prepared-block PNG decoder through WASM; JavaScript performs browser storage
 and graphics calls. The renderer still uses eight texture units. The photographic
 atlas retains at most 64 one-MiB cells, or 16 cells on a smaller graphics budget;
 its geographic lookup texture occupies 16 KiB, including bounded sparse children.
@@ -1316,7 +1321,18 @@ Unobserved areas retain the global image, and cells without regional coverage ca
 still use the finer NASA source tiles. Existing opaque cached cells have a separate
 identity and cannot be mistaken for the new transparent cells.
 
-A dedicated worker can prepare the next source PNG while the current one is being
+Prepared sources use the [source-block pyramid](globe.md#prepared-photographic-source-blocks).
+Native metadata marks complete pyramids; the C image module in WASM selects their resolution and exact
+content-addressed block URLs. The worker fetches and decodes only the intersecting
+514-square PNG blocks, with at most two operations in flight. PNG decoding runs in C/WASM;
+the browser creates graphics resources from the decoded RGBA bytes. It reuses resident
+or asynchronously persisted raw blocks before requesting encoded data. Catalogue
+identities exclude unrelated database changes and preparation progress. Wider
+empty views fill parent coverage first; displayed fine cells remain visible.
+Overview parents fully hidden by detail are eligible for normal eviction and do
+not keep displacing useful neighbours. GPU storage limits remain unchanged.
+
+For sources not yet converted, a dedicated worker can prepare the next source PNG while the current one is being
 drawn. Read-ahead is limited by native admission to one additional photograph of
 at most 2048 square (16 MiB), keeping at most two PNG reads or decodes in flight.
 It splits the source into
@@ -1327,14 +1343,21 @@ therefore uses a small working image, rather than dozens of full-resolution bloc
 Native planning of the visible crop visits and returns only intersecting source
 rows and columns, avoiding construction and transport of unused block records
 during dragging.
-Decoded photographs and needed blocks share one 64 MiB cache. Resident photographs
+Decoded photographs and needed blocks share one 128 MiB cache. This permits the
+six overlapping 16 MiB photographs of a typical close view to coexist, rather
+than repeatedly evicting and decoding one another as neighbouring cells load.
+The GPU atlas keeps its existing budget. Resident photographs
 are drawn directly using native crop coordinates, without keeping duplicate block
 bitmaps or waiting for raw-cache reads. New source blocks still enter background
 persistence; a bounded native dictionary tracks queued or saved blocks without
 duplicating their pixels, and dropped queue entries remain eligible for saving.
 WASM retains a whole photograph only up to 16 MiB. Larger coastal overviews retain
 their needed blocks instead, so one 3600-square image cannot evict nearly the entire
-neighbourhood. Queued source Blobs also have a native dictionary index: a raw block
+neighbourhood. Native read-ahead also permits the narrow shared gutters between
+neighbouring source images, up to one sixteenth of the smaller destination area.
+Substantial overlaps remain deferred until actual alpha coverage is known; a
+gutter overlap cannot force every neighbouring PNG to load in sequence.
+Queued source Blobs also have a native dictionary index: a raw block
 can be read immediately before its disk write completes, without another PNG
 download after the whole photograph is evicted. These are references to the
 existing bounded write queue, rather than additional copies of its pixel data.
@@ -1366,9 +1389,10 @@ another PNG decode merely because the next view uses a different resolution.
 Initial coverage stays within 5.625-degree cells for views requesting that scale
 or finer, avoiding large photographic requests far beyond the current map.
 A complete geographic cell is uploaded as premultiplied
-RGBA without another image decode. WASM checks the PNG header before the browser
-decodes directly to the selected resolution, avoiding a separate full-size bitmap
-and resize pass. Encoded input, temporary codec allocations, upload buffers and
+RGBA without another image decode. Prepared PNG blocks are validated and decoded
+in WASM by marslib's image module. Older whole-photograph catalogues retain the
+browser decoder, which decodes directly to the selected resolution. Encoded input,
+temporary codec allocations, upload buffers and
 driver allocations use additional temporary memory.
 Source reads have an eight-second timeout; finishing useful source blocks does not
 hold up the animation thread.
@@ -1416,6 +1440,9 @@ Transparent observation gaps continue to reveal available imagery underneath.
 Newly decoded photographs paint their complete requested crop once; reusable
 source blocks are retained separately, avoiding repeated drawing and fractional
 block seams during that first composition.
+Completed-cell cache addresses include the compositor revision as well as the
+installed globe identity and geographic bounds. Composition fixes rebuild these
+cells while retaining reusable source photographs and decoded source blocks.
 
 River masks are requested and rasterised independently of the photographs. Their
 alpha coverage preserves surveyed water, islands and land without painting another

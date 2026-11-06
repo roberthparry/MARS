@@ -1,74 +1,61 @@
 /**
  * @file lab_photo_coverage.c
- * @brief Exact native alpha coverage for avoiding hidden photographic source reads.
+ * @brief Scoped browser-row adapter for the reusable image alpha-coverage accumulator.
  *
- * A serial photographic worker submits one 512-square cell in bounded row batches. Native row bitsets answer
- * whether a source rectangle can contribute any pixels, without inspecting browser objects or retaining images.
- * Only fully opaque pixels count; transparent observation gaps still require their underlying photographs.
+ * The image module owns bitset storage, contiguous-pass validation and exact pixel queries. This adapter copies
+ * bounded browser rows and retains the Lab's read-ahead admission policy; no browser handle survives a call.
  */
 #include <math.h>
-#include <stdint.h>
-#include <string.h>
 
+#include "image-t.h"
 #include "lab_dom.h"
 #include "lab_photo_source.h"
 
-static uint64_t coverage[512][8];
-static unsigned coverage_rows;
+static image_coverage_t *coverage;
 static unsigned char coverage_pixels[512 * 64 * 4];
 
-static bool target_rectangle(jsref target, double rectangle[4])
+static bool target_rectangle(jsref target, image_rectangle_t *r)
 {
     if (lab_dom_count(target) != 4) return false;
-    for (unsigned i = 0; i < 4; ++i) {
-        rectangle[i] = lab_dom_to_number(lab_dom_item(target, i));
-        if (!isfinite(rectangle[i])) return false;
-    }
-    return rectangle[0] >= 0 && rectangle[0] < 512 && rectangle[1] >= 0 && rectangle[1] < 512 &&
-           rectangle[2] > 0 && rectangle[3] > 0 &&
-           rectangle[0] + rectangle[2] <= 512.000001 && rectangle[1] + rectangle[3] <= 512.000001;
+    *r = (image_rectangle_t){lab_dom_to_number(lab_dom_item(target, 0)), lab_dom_to_number(lab_dom_item(target, 1)),
+                            lab_dom_to_number(lab_dom_item(target, 2)), lab_dom_to_number(lab_dom_item(target, 3))};
+    return isfinite(r->x) && isfinite(r->y) && isfinite(r->width) && isfinite(r->height) &&
+           r->x >= 0 && r->x < 512 && r->y >= 0 && r->y < 512 && r->width > 0 && r->height > 0 &&
+           r->x + r->width <= 512.000001 && r->y + r->height <= 512.000001;
 }
 
-/* Replace one sequential row batch; row zero also starts a fresh cell's coverage. */
+/* Copy one browser-owned batch; reusable C code validates and records its alpha. */
 void lab_photo_coverage_rows(jsref bytes, unsigned row)
 {
-    if (!row) coverage_rows = 0;
+    if (!coverage) coverage = image_coverage_new(512, 512);
     int size = lab_dom_bytes_copy(bytes, coverage_pixels, sizeof coverage_pixels);
-    if (row != coverage_rows || size <= 0 || size % (512 * 4) || row + size / (512 * 4) > 512) {
-        coverage_rows = 0;
+    if (size <= 0 || size % (512 * 4)) {
+        image_coverage_write(coverage, 0, NULL, 0, 0);
         return;
     }
-    unsigned rows = (unsigned)size / (512 * 4);
-    memset(coverage + row, 0, rows * sizeof *coverage);
-    for (unsigned y = 0; y < rows; ++y)
-        for (unsigned x = 0; x < 512; ++x)
-            if (coverage_pixels[(y * 512 + x) * 4 + 3] == 255)
-                coverage[row + y][x / 64] |= UINT64_C(1) << (x % 64);
-    coverage_rows += rows;
+    image_coverage_write(coverage, row, coverage_pixels, (unsigned)size / (512 * 4), 512 * 4);
 }
 
-/* Query only intersecting bitset words, conservatively including fractional edge pixels. */
+/* Delegate exact conservative fractional-edge queries to the image module. */
 bool lab_photo_target_covered(jsref target)
 {
-    double rectangle[4];
-    if (coverage_rows != 512 || !target_rectangle(target, rectangle)) return false;
-    unsigned left = (unsigned)floor(rectangle[0]), top = (unsigned)floor(rectangle[1]);
-    unsigned right = (unsigned)fmin(512, ceil(rectangle[0] + rectangle[2]));
-    unsigned bottom = (unsigned)fmin(512, ceil(rectangle[1] + rectangle[3]));
-    for (unsigned word = left / 64; word <= (right - 1) / 64; ++word) {
-        unsigned first = word == left / 64 ? left % 64 : 0;
-        unsigned last = word == (right - 1) / 64 ? (right - 1) % 64 + 1 : 64;
-        uint64_t mask = (UINT64_MAX << first) & (last == 64 ? UINT64_MAX : (UINT64_C(1) << last) - 1);
-        for (unsigned row = top; row < bottom; ++row)
-            if ((coverage[row][word] & mask) != mask) return false;
-    }
-    return true;
+    image_rectangle_t r;
+    return target_rectangle(target, &r) && image_coverage_contains(coverage, &r);
 }
 
-/* Defer speculative reads which the current foreground source may make unnecessary. */
+/* Keep invalid targets conservative while delegating rectangle intersection. */
 bool lab_photo_targets_overlap(jsref first, jsref second)
 {
-    double a[4], b[4];
-    if (!target_rectangle(first, a) || !target_rectangle(second, b)) return true;
-    return a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1];
+    image_rectangle_t a, b, intersection;
+    if (!target_rectangle(first, &a) || !target_rectangle(second, &b)) return true;
+    return image_rectangle_intersection(&a, &b, &intersection);
+}
+
+/* Lab scheduling permits one read-ahead with at most a one-sixteenth overlap. */
+bool lab_photo_read_ahead(jsref first, jsref second)
+{
+    image_rectangle_t a, b, intersection;
+    if (!target_rectangle(first, &a) || !target_rectangle(second, &b)) return false;
+    if (!image_rectangle_intersection(&a, &b, &intersection)) return true;
+    return intersection.width * intersection.height <= fmin(a.width * a.height, b.width * b.height) / 16;
 }

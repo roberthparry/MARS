@@ -91,6 +91,7 @@ ifeq ($(ENABLE_UNISTRING),1)
 endif
 
 LDLIBS += -lm
+LDLIBS += -lz
 LDLIBS += -pthread
 LDLIBS += -lmpfr -lmpc -lgmp
 
@@ -366,9 +367,7 @@ check-native-deps: check-sqlcipher-deps
 	check_dep "MPC" "mpc.h" "-lmpc -lmpfr -lgmp" "libmpc-dev" "mpc_t x; mpc_init2(x, 53); mpc_clear(x)"; \
 	check_dep "Zstandard" "zstd.h" "$(ZSTD_CFLAGS) $(if $(strip $(ZSTD_LIBS)),$(ZSTD_LIBS),-lzstd)" "libzstd-dev" "ZSTD_CCtx *ctx = ZSTD_createCCtx(); ZSTD_inBuffer in = {0}; ZSTD_outBuffer out = {0}; ZSTD_compressStream2(ctx, &out, &in, ZSTD_e_end); ZSTD_freeCCtx(ctx)"; \
 	check_dep "libsodium secretstream" "sodium.h" "$(SODIUM_CFLAGS) $(if $(strip $(SODIUM_LIBS)),$(SODIUM_LIBS),-lsodium)" "libsodium-dev" "crypto_secretstream_xchacha20poly1305_state state; unsigned char key[crypto_secretstream_xchacha20poly1305_KEYBYTES], header[crypto_secretstream_xchacha20poly1305_HEADERBYTES]; if (sodium_init() < 0) return 1; crypto_secretstream_xchacha20poly1305_keygen(key); return crypto_secretstream_xchacha20poly1305_init_push(&state, header, key)"; \
-	if [ -n "$(CONFIG_TEST_PNG_LIBS)" ]; then \
-	    check_dep "zlib PNG fixtures" "zlib.h" "$(CONFIG_TEST_PNG_LIBS)" "zlib1g-dev" "z_stream stream = {0}; (void)deflateInit(&stream, 1); deflateEnd(&stream)"; \
-	fi; \
+	check_dep "zlib image encoding" "zlib.h" "-lz" "zlib1g-dev" "z_stream stream = {0}; (void)deflateInit(&stream, 1); deflateEnd(&stream)"; \
 	if [ "$(ENABLE_UNISTRING)" = "1" ]; then \
 	    check_dep "libunistring" "unistr.h" "-lunistring" "libunistring-dev" "(void)u8_strlen((const uint8_t *)\"x\")"; \
 	fi; \
@@ -468,7 +467,8 @@ $(STATIC_LIB): Makefile $(OBJS)
 
 $(SHARED_LIB): Makefile $(OBJS)
 	@mkdir -p $(dir $@)
-	$(CC) -shared -o $@ $(OBJS) $(LDLIBS)
+	$(CC) -shared -o $@.tmp $(OBJS) $(LDLIBS)
+	mv -f $@.tmp $@
 
 # ------------------------------------------------------------
 # Test binaries
@@ -867,6 +867,7 @@ help:
 	@echo "    Existing databases receive pending updates; their other data and settings are preserved."
 	@printf '  %-40s %s\n' "make release-evidence" "Build a release and record its binary dependency evidence"
 	@printf '  %-40s %s\n' "make native-lab" "Build the Lab server and WebAssembly assets"
+	@printf '  %-40s %s\n' "make image-wasm" "Build the standalone image-library WebAssembly module"
 	@printf '  %-40s %s\n' "make native-config" "Build tools/mars_config/build/<mode>/mars_config"
 	@printf '  %-40s %s\n' "make native-checks" "Build tools/mars_checks/build/<mode>/mars_checks"
 	@printf '  %-40s %s\n' "make lab-wasm-asm" "Generate optional Lab WebAssembly assembly listings"
@@ -888,6 +889,7 @@ help:
 	@printf '  %-40s %s\n' "make install-globe-db" "Build a fresh globe database with geography and photographic textures"
 	@printf '  %-40s %s\n' "make update-globe-db" "Update packaged geography and textures, preserving river data"
 	@printf '  %-40s %s\n' "make check-globe-db" "Verify globe integrity, shoreline availability and photographic textures"
+	@printf '  %-40s %s\n' "make prepare-globe-blocks" "Optional native image-block preparation; release imports completed sources"
 	@printf '  %-40s %s\n' "make uninstall-globe-db" "Remove the default globe database and its configuration"
 	@printf '  %-40s %s\n' "make install-almanac-db" "Build and configure the Almanac database only"
 	@printf '  %-40s %s\n' "make uninstall-almanac-db" "Remove the default Almanac database and its configuration"

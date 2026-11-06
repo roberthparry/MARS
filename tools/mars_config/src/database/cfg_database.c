@@ -216,6 +216,13 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
         cfg_database_cleanup(staging);
         string_free(staging); string_free(parent); string_free(root);
     }
+    if (ok && exists && migration->rebuild_globe) {
+        /* A staged replacement closes the old connection before publishing the new database. */
+        if (!db) db = cfg_database_open(path, key);
+        string_t *root = string_new();
+        ok = db && root && cfg_database_pyramids(db, root);
+        string_free(root);
+    }
     if (ok && !exists && install_missing) {
         printf("Installing missing %s database...\n", migration->name);
         ok = migration->profile ?

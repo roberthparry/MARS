@@ -1370,6 +1370,8 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
             ok = transaction && cfg_globe_refresh_all(db, root, staging) &&
                  cfg_database_revision(db, "globe", CFG_GLOBE_DATA_REVISION);
         if (transaction) ok = cfg_database_finish_transaction(db, ok);
+        if (ok && !db) db = cfg_database_open(expanded, key);
+        if (ok) ok = cfg_database_pyramids(db, root);
         sqlite_close(db);
     } else if (ok && check) {
         db = exists ? cfg_database_open(expanded, key) : NULL;
@@ -1390,7 +1392,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
              cfg_globe_regions(db, root) && cfg_database_textures(db, root) &&
              cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
-             cfg_database_revision(db, "globe", CFG_GLOBE_DATA_REVISION);
+             cfg_database_revision(db, "globe", CFG_GLOBE_DATA_REVISION) && cfg_database_pyramids(db, root);
         sqlite_close(db);
         string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
         string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;

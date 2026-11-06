@@ -4097,5 +4097,26 @@
       "test_tba_stream": true,
       "test_tba_worker": true
     }
+  },
+  "tools/mars_config/tests/test_cfg_pyramids.c": {
+    "tests": {
+      "enabled": true,
+      "test_cfg_pyramid_atomic": true,
+      "test_cfg_pyramid_import": true,
+      "test_cfg_pyramid_installer": true
+    }
+  },
+  "tests/image/test_image.c": {
+    "tests": {
+      "enabled": true,
+      "test_image_png_external_streams": true,
+      "test_image_pixels_and_corruption": true,
+      "test_image_rectangular_pyramid": true,
+      "test_image_coverage_edges": true
+    },
+    "readme_examples": {
+      "enabled": true,
+      "example_image_readme": true
+    }
   }
 }

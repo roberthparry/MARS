@@ -7,6 +7,7 @@
  * decoding; restarted workers must still reuse persisted raw source blocks without PNG requests.
  */
 async function checkGlobeAtlas(check: (condition: boolean, message: string) => void): Promise<void> {
+    await checkImageModule(check);
     for (const [lat, lon] of [[52, -2], [-33, 151], [89.99, -179.9], [0, 180]]) {
         const start = [...labDOM.call('lab_globe_centre', 0, 179.9) as number[], 150];
         const end = [...labDOM.call('lab_globe_rotate',
@@ -46,10 +47,27 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
           !labDOM.call('lab_photo_target_covered', [0, 0, NaN, 1]) &&
           !labDOM.call('lab_photo_targets_overlap', [0, 0, 256, 512], [256, 0, 256, 512]) &&
           Boolean(labDOM.call('lab_photo_targets_overlap', [0, 0, 256.1, 512], [256, 0, 256, 512])),
-          'native read-ahead keeps disjoint crops concurrent and defers overlapping or invalid rectangles');
+          'native geometry distinguishes disjoint, overlapping and invalid source rectangles');
     labDOM.call('lab_photo_coverage_rows', new Uint8Array(0), 0);
     check(!labDOM.call('lab_photo_target_covered', [0, 0, 1, 1]),
           'the next photographic cell cannot reuse the previous cell\'s alpha coverage');
+    check(Boolean(labDOM.call('lab_photo_read_ahead', [0, 0, 260, 512], [256, 0, 256, 512])) &&
+          Boolean(labDOM.call('lab_photo_read_ahead', [0, 0, 256, 512], [256, 0, 256, 512])) &&
+          !labDOM.call('lab_photo_read_ahead', [0, 0, 256, 512], [128, 0, 256, 512]) &&
+          !labDOM.call('lab_photo_read_ahead', [0, 0, 256, 512], [0, 0, 256, 512]) &&
+          !labDOM.call('lab_photo_read_ahead', [0, 0, NaN, 512], [256, 0, 256, 512]),
+          'native read-ahead permits narrow catalogue gutters but defers duplicate, substantially overlapping or invalid sources');
+    const neighbourhood = new GlobeTextureCache<number>(64, 128 * 1024 * 1024, () => {});
+    try {
+        for (let i = 0; i < 6; ++i)
+            check(neighbourhood.put(`source-neighbour-${i}`, i, 2048 * 2048 * 4),
+                  'the bounded source cache admits a photograph needed by the same viewport');
+        check(neighbourhood.size === 6 && neighbourhood.get('source-neighbour-0') === 0,
+              'six neighbouring sixteen-MiB photographs coexist without repeatedly evicting the first source');
+        for (let i = 6; i < 10; ++i) neighbourhood.put(`source-neighbour-${i}`, i, 2048 * 2048 * 4);
+        check(neighbourhood.size === 8 && neighbourhood.get('source-neighbour-1') === null,
+              'the expanded source cache still enforces its exact 128-MiB budget');
+    } finally { neighbourhood.dispose(); }
     const descendants = new GlobeTextureCache<number>(64, 64 * 512 * 512 * 4, () => {});
     try {
         const level = 18, step = 360 / 2 ** level;
@@ -79,8 +97,9 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
             for (const displayPixels of [400, 800, 1536]) {
                 const page = spatial.page([-2.8, 52.7, -2.8 + extent, 52.7 + extent], displayPixels)!;
                 const span = page.next!.bounds[2] - page.next!.bounds[0];
-                check(510 * extent / span >= displayPixels,
-                      `settled photography meets the display pixel demand: ${extent} degrees, ${displayPixels} pixels`);
+                check(510 * extent / span >= displayPixels / (extent > 1 ? 4 : 1),
+                      `close views request detail; wider empty views first request drawable parents: ` +
+                      `${extent} degrees, ${displayPixels} pixels`);
                 check(page.bounds[0] <= -2.8 && page.bounds[1] <= 52.7 &&
                       page.bounds[2] >= -2.8 + extent && page.bounds[3] >= 52.7 + extent,
                       `photographic lookup covers the entire view: ${extent} degrees, ${displayPixels} pixels; ${page.bounds}`);
@@ -162,14 +181,16 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
             try {
                 const bounds = [longitude, latitude, longitude + extent, latitude + extent];
                 let page = filled.page(bounds, 1536)!;
-                for (let count = 0; count < 65 && page.next; ++count) {
+                for (let count = 0; count < 128 && page.next; ++count) {
                     const next = page.next;
                     check(filled.put(next.key, 1, 512 * 512 * 4, next.bounds, next.level, page.protect),
                           'all visible high-density cells fit within the fixed photographic cache budget');
                     page = filled.page(bounds, 1536)!;
                 }
                 check(!page.next && Math.abs(page.coverage - 1) < 1e-9 && filled.size <= 64,
-                      `a high-density page finishes the whole viewport and stops prefetch eviction: ${bounds}`);
+                      `a high-density page finishes the whole viewport and stops prefetch eviction: ${bounds}; ` +
+                      `coverage=${page.coverage}; size=${filled.size}; next=${JSON.stringify(page.next)}; ` +
+                      `protected=${page.protect.length}`);
             } finally { filled.dispose(); }
         }
         const aheadView = [2, 52.62, 2.14, 52.70];
@@ -282,7 +303,10 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
     } finally { travelling.dispose(); }
     const source = {url: '/earth_regions/01.png', sha256: 'a'.repeat(64), width: 3600,
         source: [500, 500, 40, 40], target: [0, 0, 512, 512]};
-    type SourcePlan = {width: number; retain: boolean; key: string; parts: {needed: number; target?: number[]; key: string}[]};
+    type SourcePlan = {
+        width: number; retain: boolean; key: string;
+        parts: {needed: number; target?: number[]; key: string; url?: string}[];
+    };
     const planned = labDOM.call('lab_photo_source', source) as SourcePlan;
     const parts = planned.parts;
     const needed = parts.filter(part => part.needed);
@@ -336,6 +360,37 @@ async function checkGlobeAtlas(check: (condition: boolean, message: string) => v
     } finally { sourceCache.dispose(); queuedCache.dispose(); }
     check(!labDOM.call('lab_photo_source', {...source, target: [0, 0, Infinity, 512]}),
           'non-finite photographic demand cannot allocate an unbounded decode');
+
+    const blockPlan = labDOM.call('lab_photo_source', {...source, pyramid: true}) as SourcePlan;
+    check(blockPlan.key === `block-v1:${'a'.repeat(64)}:3600:` && !blockPlan.retain &&
+          blockPlan.parts[0].url === `/earth-block?v=1&sha=${'a'.repeat(64)}&tier=3600&row=0&column=0`,
+          'WASM supplies canonical immutable block identities and directly indexed HTTP addresses');
+    const pyramidFixture = globeHTTPFixture(async bytes => {
+        const request = labWire.decode(bytes) as {west: number};
+        return new Response(labWire.encode({ok: true, key: `pyramid-only:${request.west}`, photos: [
+            {...source, pyramid: true, source: [500 + request.west, 500, 40, 40]}
+        ]}));
+    }, {endpoint: '/almanac-rivers', script: '/js/globe_photo_worker.js', nativeShore: false,
+        blockProbe: true, denyPhotographs: true, storageDenied: true, decodeProbe: true});
+    const pyramidWorker = new pyramidFixture.Worker('/js/globe_photo_worker.js');
+    try {
+        for (const west of [0, 1]) {
+            const pixels = await new Promise<ArrayBuffer>((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Prepared block fixture timed out')), 10000);
+                pyramidWorker.onmessage = event => {
+                    if (event.data.partial) return;
+                    clearTimeout(timeout);
+                    event.data.error ? reject(new Error(event.data.error)) : resolve(event.data.pixels);
+                };
+                pyramidWorker.onerror = event => { clearTimeout(timeout); reject(new Error(event.message)); };
+                pyramidWorker.postMessage({key: `block-only:${west}`, bounds: [west, 0, west + 1, 1], level: 8});
+            });
+            const centre = new Uint8Array(pixels, (256 * 512 + 256) * 4, 4);
+            check(centre[0] === 180 && centre[1] === 80 && centre[2] === 40 && centre[3] === 255,
+                  'the real worker paints prepared blocks while whole-photograph requests are forbidden');
+            await pyramidFixture.waitForDecode(4);
+        }
+    } finally { pyramidWorker.terminate(); pyramidFixture.dispose(); }
 
     const image = await fetch('/earth_regions/01.png');
     const digest = image.headers.get('ETag')!.replace(/^"sha256-|"$/g, '');

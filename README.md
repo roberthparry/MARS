@@ -114,6 +114,7 @@ worked examples, all seven modes and private mobile access through Tailscale.
 - SQLCipher 4.1.0 or newer development libraries, with embedded SQLite >= 3.27.0, FTS5 and window functions
   (SQLCipher 4.13.0 is verified; see the [database build requirements](docs/building.md#sqlcipher-version-and-database-features))
 - Zstandard and libsodium development libraries (streaming file compression and authenticated encryption)
+- zlib development library (native lossless PNG encoding)
 - libcurl 7.86.0 or newer development library (HTTP/HTTPS transport)
 - `pkg-config` for discovery of library compiler and linker flags
 - Clang and LLD for the Lab's WebAssembly assets, included in the default build
@@ -124,7 +125,7 @@ worked examples, all seven modes and private mobile access through Tailscale.
 On Debian/Ubuntu, install the packaged build requirements with:
 
 ```sh
-sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev libcurl4-openssl-dev libssl-dev
+sudo apt install build-essential pkg-config clang lld libgmp-dev libmpfr-dev libmpc-dev libsqlcipher-dev libunistring-dev libzstd-dev libsodium-dev zlib1g-dev libcurl4-openssl-dev libssl-dev
 ```
 
 Run `make typescript-install-help` for the [native TypeScript installation commands](docs/building.md#native-typescript-compiler).

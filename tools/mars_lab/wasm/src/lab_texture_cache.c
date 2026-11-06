@@ -130,7 +130,7 @@ static jsref create_cache(texture_cache_t *unused, jsref request)
     texture_service_t *state = texture_service();
     double limit = field(request, "limit"), budget = field(request, "bytes");
     if (!isfinite(limit) || limit < 1 || limit > 64 || floor(limit) != limit ||
-        !isfinite(budget) || budget < 1 || budget > 67108864 || floor(budget) != budget ||
+        !isfinite(budget) || budget < 1 || budget > 134217728 || floor(budget) != budget ||
         (state->caches && dictionary_size(state->caches) >= 16)) return 0;
     texture_cache_t *cache = calloc(1, sizeof *cache);
     if (!cache) return 0;
@@ -469,9 +469,9 @@ static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, cons
                 int ax = (int)floor((double)column / (1u << shift));
                 int slot = photo_slot(cache, ancestor, ax, (unsigned)row >> shift);
                 if (slot < 0) continue;
-                if (visible && (!found || ancestor == base)) touch(cache, slot, true);
                 bool incomplete = cache->entries[slot].quality == 1;
                 if (!found || (partial && !incomplete)) {
+                    if (visible) touch(cache, slot, true);
                     plan->page[4 * (y * 16 + x)] = (unsigned char)(slot + 1);
                     plan->page[4 * (y * 16 + x) + 1] = (unsigned char)shift;
                     found = true;
@@ -507,7 +507,7 @@ static bool photo_plan(texture_cache_t *cache, jsref bounds, double pixels, cons
             /* Padding must not displace an almost fully protected visible fine mosaic. */
             if (!visible && (unsigned)__builtin_popcountll(plan->pinned) + 1 >= cache->limit) continue;
             bool missing_base = visible && measured.coverage < area * .999999999;
-            unsigned wanted = missing_base && broad ? base : level, shift = fine - wanted;
+            unsigned wanted = missing_base && (broad || extent > 1) ? base : level, shift = fine - wanted;
             double wanted_step = 360.0 / (1u << wanted);
             int tx = (int)floor((double)column / (1u << shift)), ty = row >> shift;
             double tile_west = tx * wanted_step - 180, tile_north = 90 - ty * wanted_step;

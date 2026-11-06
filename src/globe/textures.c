@@ -50,6 +50,7 @@ bool textures_metadata(sqlite_t *db, unsigned level, unsigned column, unsigned r
         memcpy(info->sha256, digest, sizeof info->sha256);
     }
     sqlite_stmt_finalize(q);
+    if (ok) info->pyramid = textures_pyramid_ready(db, info->sha256, info->width);
     return ok;
 }
 

@@ -101,7 +101,7 @@ static bool lab_browser_prepare(const char *directory)
                                           "surface_hover_checks.js",   "surface_mesh_checks.js",
                                           "surface_export_checks.js",  "globe_http_checks.js", "globe_gpu_checks.js",
                                           "globe_flight_checks.js", "globe_photo_checks.js", "globe_surface_checks.js",
-                                          "globe_atlas_checks.js",
+                                          "image_checks.js", "globe_atlas_checks.js",
                                           "surface_math_checks.js", "history_checks.js",
                                           "memory_checks.js", "protobuf_wire_checks.js"};
     for (size_t i = 0; script && i < sizeof modules / sizeof *modules; ++i) {

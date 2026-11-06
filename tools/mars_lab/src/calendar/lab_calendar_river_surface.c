@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "globe-t.h"
+#include "image-t.h"
 #define MARS_LAB_CALENDAR_INTERNAL_ACCESS
 #include "lab_calendar_internal.h"
 
@@ -99,18 +100,23 @@ static bool surface_region(unsigned slot, const double original[4], void *contex
                        (b[3] - north) * state->pixels / (b[3] - b[1]),
                        (right - left) * state->pixels / (b[2] - b[0]),
                        (north - south) * state->pixels / (b[3] - b[1])};
+    image_rectangle_t crop = {source[0], source[1], source[2], source[3]};
+    image_rectangle_t destination = {target[0], target[1], target[2], target[3]};
+    image_pyramid_t *pyramid = image_pyramid_new(info.width, info.height, 512, 1, 64);
+    image_level_t level;
+    bool selected = image_pyramid_select(pyramid, &crop, &destination, NULL, NULL, &level, NULL);
+    image_pyramid_free(pyramid);
+    if (!selected) return false;
     json_t *photo = json_new_object();
     string_t *url = string_sprintf("/earth_regions/%02u.png", slot);
     if (photo && url) {
         lab_cal_set(photo, "url", string_c_str(url));
         lab_cal_set(photo, "sha256", info.sha256);
+        if (info.pyramid) lab_cal_take(photo, "pyramid", json_new_bool(true));
         lab_cal_take(photo, "source", surface_numbers(source, 4));
         lab_cal_take(photo, "target", surface_numbers(target, 4));
         lab_cal_take(photo, "regional", json_new_bool(true));
-        double scale = fmax(target[2] / source[2], target[3] / source[3]);
-        /* Stable resolution tiers reuse decoded source photographs across nearby windows and wheel steps. */
-        double decode = fmin(info.width, exp2(ceil(log2(fmax(64, info.width * scale)))));
-        string_t *width = string_sprintf("%u", info.width), *decoded = string_sprintf("%.0f", decode);
+        string_t *width = string_sprintf("%u", info.width), *decoded = string_sprintf("%u", level.edge);
         lab_cal_take(photo, "width", width ? json_new_number(width) : NULL);
         lab_cal_take(photo, "decode_size", decoded ? json_new_number(decoded) : NULL);
         string_free(width); string_free(decoded);
@@ -176,6 +182,7 @@ static json_t *surface_photographs(globe_t *globe, const double b[4], unsigned p
             if (photo && url) {
                 lab_cal_set(photo, "url", string_c_str(url));
                 lab_cal_set(photo, "sha256", info.sha256);
+                if (info.pyramid) lab_cal_take(photo, "pyramid", json_new_bool(true));
                 lab_cal_take(photo, "width", width ? json_new_number(width) : NULL);
                 lab_cal_take(photo, "source", surface_numbers(source, 4));
                 lab_cal_take(photo, "target", surface_numbers(target, 4));
@@ -207,8 +214,12 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
     globe_reader_t *reader = globe_reader_new();
     string_t *identity = globe_reader_identity(reader);
     globe_t *globe = identity ? globe_reader_get(reader) : NULL;
+    string_t *photographs = photograph && globe ? globe_texture_identity(globe) : NULL;
+    /* Completed cells also depend on the compositor, not just installed source images.
+     * Advance this revision when composition changes; content-addressed source blocks remain reusable. */
     string_t *key = identity ? string_sprintf("%s:%s:%.12g:%.12g:%.12g:%.12g",
-        photograph ? "photo-cell-5" : "river-surface-8", string_c_str(identity), b[0], b[1], b[2], b[3]) : NULL;
+        photograph ? "photo-cell-7" : "river-surface-8", string_c_str(photographs ? photographs : identity),
+        b[0], b[1], b[2], b[3]) : NULL;
     bool ok = key && globe;
     bool rivers = data && ok && globe_has_layer(globe, GLOBE_LAYER_RIVERS);
     bool complete = data && ok && globe_river_water_complete(globe, b[0], b[1], b[2], b[3]);
@@ -252,7 +263,7 @@ json_t *lab_cal_river_surface(const json_t *payload, unsigned *status)
     }
     json_free(photos); json_free(banks); string_free(surface.path); string_free(surface.fill);
     json_free(coverage.rectangles);
-    string_free(key); string_free(identity); string_free(after);
+    string_free(key); string_free(identity); string_free(after); string_free(photographs);
     globe_reader_free(reader);
     return result ? result : lab_cal_error(status, changed ? 409 : 503,
         changed ? "Globe changed during river preparation" : "River surface data unavailable");

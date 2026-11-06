@@ -161,7 +161,7 @@ static bool surface_fixture(const char *directory)
                    json_bool_value(test_lab_member(photographic, "alpha"), &alpha) && alpha &&
                    json_array_size(photographs) == 1 &&
                    !strcmp(test_lab_text(json_array_get(photographs, 0), "url"), "/earth_regions/00.png") &&
-                   !strncmp(test_lab_text(photographic, "key"), "photo-cell-5:", 13);
+                   !strncmp(test_lab_text(photographic, "key"), "photo-cell-7:", 13);
     for (size_t i = 0; imagery_only && i < json_array_size(photographs); ++i) {
         const json_t *photo = json_array_get(photographs, i), *target = test_lab_member(photo, "target");
         double rectangle[4];

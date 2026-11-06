@@ -30,6 +30,12 @@ void test_cfg_paths_cases(void);
 /** Register photographic storage, validation and rollback regressions. */
 void test_cfg_textures_cases(void);
 
+/**
+ * @brief Run transactional source-pyramid tests against disposable databases, serially.
+ * @return No value; failures are recorded by the shared test harness. No installed data is accessed.
+ */
+void test_cfg_pyramids_cases(void);
+
 /** Run the documented photographic metadata example after ordinary tests. */
 void test_cfg_textures_readme_cases(void);
 

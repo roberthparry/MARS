@@ -3,15 +3,17 @@
  * @brief Off-thread preparation of fixed photographic cells from reusable decoded source blocks.
  *
  * Reads at most two PNGs concurrently at native-selected resolutions, with one bounded read-ahead bitmap.
- * Photograph handles and source cores share one native-accounted 64 MiB cache, with one-pixel gutters.
+ * Photograph handles and source cores share one native-accounted 128 MiB cache, with one-pixel gutters.
  * A bounded browser-resource queue exposes queued raw cells immediately and persists one asynchronous block at a time.
  * Ready source crops transfer directly to WebGL before the whole cell finishes; only completed cells enter persistent storage.
  * Coarse regional overviews are never published as replacements for existing fine imagery. One bounded decoded snapshot
  * supplies unused source cores during idle gaps, avoiding another PNG decode after neighbouring crops or restarts.
- * Native alpha bitsets skip fully hidden source rectangles; only disjoint sources are read ahead concurrently.
+ * Native alpha bitsets skip hidden sources; read-ahead admits independent sources and their narrow shared gutters.
  */
-interface PhotoSource { url: string; sha256: string; width: number; source: number[]; target: number[]; }
-interface PhotoSourcePart { key: string; needed: number; read: number[]; write: number[]; source?: number[]; target?: number[]; }
+interface PhotoSource { url: string; sha256: string; width: number; source: number[]; target: number[]; pyramid?: boolean; }
+interface PhotoSourcePart {
+    key: string; needed: number; read: number[]; write: number[]; source?: number[]; target?: number[]; url?: string;
+}
 interface PhotoSourcePlan {
     key: string; prefix: string; width: number; retain: boolean; cached: boolean;
     source: number[]; parts: PhotoSourcePart[];
@@ -170,6 +172,18 @@ class GlobePhotoWorker {
         if (ahead) { await ahead.pending; if (ahead.failed) throw ahead.failed; }
         const plan = ahead?.plan ?? await this.storedPlan(photo, this.sourcePlan(photo), signal);
         signal.throwIfAborted();
+        if (photo.pyramid) {
+            // WASM supplies content addresses and exact crop rectangles. Only small prepared blocks enter decoding.
+            const parts = plan.parts;
+            for (let at = 0; at < parts.length; at += 2) {
+                const batch = parts.slice(at, at + 2);
+                const images = await Promise.all(batch.map(part => part.needed ? this.block(part, signal) : null));
+                signal.throwIfAborted();
+                for (let i = 0; i < batch.length; ++i)
+                    if (images[i]) this.paint(context, images[i]!, batch[i]);
+            }
+            return;
+        }
         const photograph = this.parts!.get(plan.key);
         if (photograph) {
             this.paint(context, photograph, {source: plan.source, target: photo.target});
@@ -200,6 +214,42 @@ class GlobePhotoWorker {
             await this.split(context, photo, plan, i, signal, true, ahead);
             return;
         }
+    }
+
+    private async block(part: PhotoSourcePart, signal: AbortSignal): Promise<ImageBitmap> {
+        let image = this.parts!.get(part.key);
+        if (image) return image;
+        const saved = this.bufferedSources!.get(part.key) ?? await this.sources.get(part.key, signal);
+        signal.throwIfAborted();
+        if (saved) {
+            const bytes = new Uint8ClampedArray(await saved.arrayBuffer());
+            if (bytes.byteLength !== 514 * 514 * 4) throw new Error('Invalid cached photographic block');
+            image = await createImageBitmap(new ImageData(bytes, 514, 514));
+        } else {
+            if (!part.url?.startsWith('/earth-block?v=1&sha=')) throw new Error('Missing native block address');
+            const response = await fetch(part.url, {signal: AbortSignal.any([signal, AbortSignal.timeout(8000)])});
+            if (!response.ok || !/^"sha256-[a-f0-9]{64}"$/.test(response.headers.get('ETag') ?? ''))
+                throw new Error('Photographic block unavailable');
+            const bytes = await response.arrayBuffer();
+            signal.throwIfAborted();
+            if (bytes.byteLength < 24 || bytes.byteLength > 2 * 1024 * 1024 ||
+                !labDOM.call('lab_photo_source_header', new Uint8Array(bytes, 0, 24), 514))
+                throw new Error('Invalid photographic block header');
+            const decoded = labDOM.call('lab_photo_decode', new Uint8Array(bytes)) as
+                {pointer: number; length: number} | null;
+            if (!decoded) throw new Error('Invalid photographic block PNG');
+            let pixels: Uint8ClampedArray<ArrayBuffer>;
+            try {
+                pixels = new Uint8ClampedArray(labWire.exports().memory.buffer, decoded.pointer, decoded.length).slice();
+            } finally { labDOM.call('lab_photo_decode_release'); }
+            image = await createImageBitmap(new ImageData(pixels, 514, 514));
+            if (!signal.aborted) this.save(this.sources, part.key, new Blob([pixels], {type: 'application/octet-stream'}));
+        }
+        if (signal.aborted) { image.close(); signal.throwIfAborted(); }
+        if (!this.parts!.put(part.key, image, 514 * 514 * 4)) {
+            image.close(); throw new Error('Photographic block cache unavailable');
+        }
+        return image;
     }
 
     private sourcePlan(photo: PhotoSource, stored?: string[]): PhotoSourcePlan {
@@ -339,7 +389,7 @@ class GlobePhotoWorker {
             if (!this.parts) {
                 const url = '/js/globe_texture_cache.js';
                 const {GlobeTextureCache} = await import(url) as typeof import('./globe_texture_cache.js');
-                this.parts = new GlobeTextureCache(64, 64 * 1024 * 1024, bitmap => bitmap.close());
+                this.parts = new GlobeTextureCache(64, 128 * 1024 * 1024, bitmap => bitmap.close());
                 this.savedParts = new GlobeTextureCache(64, 64, () => {});
                 this.savedPhotos = new GlobeTextureCache(64, 64, () => {});
                 this.bufferedSources = new GlobeTextureCache(25, 26 * 1024 * 1024, () => {});
@@ -381,7 +431,7 @@ class GlobePhotoWorker {
                 }
                 if (next >= 0 && next < plan.photos.length && (!plan.alpha ||
                     (!labDOM.call('lab_photo_target_covered', plan.photos[next].target) &&
-                     !labDOM.call('lab_photo_targets_overlap', plan.photos[i].target, plan.photos[next].target))))
+                     labDOM.call('lab_photo_read_ahead', plan.photos[i].target, plan.photos[next].target))))
                     ahead = this.readAhead(plan.photos[next], signal);
                 try { await this.source(context, plan.photos[i], signal, current); }
                 finally { this.releaseAhead(current); }

@@ -122,6 +122,7 @@ struct lab_svr_asset {
 static const struct lab_svr_asset lab_svr_assets[] = {
     {"/wasm/lab_browser.wasm", "@wasm/lab_browser.wasm", "application/wasm", 4194304},
     {"/wasm/lab_codec.wasm", "@wasm/lab_codec.wasm", "application/wasm", 4194304},
+    {"/wasm/image.wasm", "@wasm/image.wasm", "application/wasm", 4194304},
     {"/js/codec.js", "@scripts/codec.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/codec_types.js", "@scripts/codec_types.js", "text/javascript; charset=utf-8", 4194304},
     {"/js/jobs.js", "@scripts/jobs.js", "text/javascript; charset=utf-8", 4194304},

@@ -2,8 +2,9 @@
  * @file lab_photo_source.h
  * @brief Native pixel-grid planning for bounded photographic source reuse.
  *
- * Browser workers perform codec and storage operations. This interface owns the exact source crop, geographic
- * destination mapping, stable decoded resolution tiers and 512-pixel source-cell keys without retaining browser handles.
+ * Browser workers call marslib's image module for PNG decoding, crop mappings, resolution tiers and coverage.
+ * This adapter translates scoped browser values and owns Lab's source-cell keys and addresses. Browser storage
+ * remains asynchronous; planning retains no browser handles and decoded pixels have an explicit release boundary.
  */
 #ifndef LAB_PHOTO_SOURCE_H
 #define LAB_PHOTO_SOURCE_H
@@ -36,7 +37,8 @@ jsref lab_photo_source_plan(jsref photo, lab_photo_source_cached_fn cached, void
 
 /**
  * @brief Describe fixed source cells, their one-pixel gutters and their destination rectangles.
- * @param photo Scoped source metadata containing url, sha256, width, source and target rectangles.
+ * @param photo Scoped source metadata containing url, sha256, width, source and target rectangles,
+ * and an optional pyramid flag for directly addressed prepared blocks.
  * @return No C value; the scoped host result describes a decoded width, photograph key, content prefix,
  * retain flag, false cached flag, decoded source rectangle
  * and an array named parts with at most 64 cell records, or null for invalid, non-finite or out-of-bounds metadata.
@@ -49,21 +51,40 @@ jsref lab_photo_source_plan(jsref photo, lab_photo_source_cached_fn cached, void
  * by the worker; decoded photograph and block handles share its native-accounted byte budget. Only intersecting
  * rows and columns are visited and returned; unused source cells incur no host-object or key-construction work.
  * The retain flag permits whole photographs up to 2048 square (16 MiB). Larger images contribute only their
- * needed reusable blocks, preventing one 3600-square coastal overview from evicting most of the 64 MiB cache.
+ * needed reusable blocks, preventing a 3600-square coastal overview from displacing the photograph neighbourhood.
  * The same flag bounds optional read-ahead to one additional photograph of at most 16 MiB; admission and
  * geometric selection remain native, while the worker owns asynchronous browser codec handles.
+ * Prepared pyramids always disable whole-photograph retention and supply each part's exact immutable HTTP
+ * address. Their worker path decodes only the addressed 514-square blocks, at most two concurrently.
  */
 void lab_photo_source(jsref photo);
 
 /**
  * @brief Verify a source PNG's signature, IHDR marker and installed dimensions before a reduced browser decode.
  * @param bytes Borrowed scoped byte array containing exactly the first 24 encoded bytes.
- * @param width Expected square source width, either 1800 or 3600 pixels.
+ * @param width Expected square source width, either 1800 or 3600 pixels, or 514 for a prepared block.
  * @return True for the expected header; false for invalid bytes, signature, dimensions or unsupported width.
  * @note Does not allocate or retain input. The browser decoder still validates the remaining PNG stream;
  * this dimension check avoids allocating a full-sized ImageBitmap solely to inspect its width and height.
  */
 bool lab_photo_source_header(jsref bytes, unsigned width);
+
+/**
+ * @brief Decode one bounded prepared PNG block using the C image module compiled into this worker's WASM.
+ * @param bytes Borrowed scoped Uint8Array of at most 2 MiB, copied before decoding; no browser decoder is called.
+ * @return No C value. The scoped host result contains pointer and length for one 514-square RGBA buffer,
+ * or null for invalid input, unsupported data or allocation failure. Pixels belong to the adapter.
+ * @note Copy the returned bytes synchronously, then call lab_photo_decode_release(). The next decode also
+ * releases the preceding image. Calls have one serial worker owner and must not overlap across asynchronous work.
+ */
+void lab_photo_decode(jsref bytes);
+
+/**
+ * @brief Release the most recently decoded prepared block.
+ * @return No value. Calling repeatedly is harmless; any preceding pixel pointer becomes invalid.
+ * @note The serial worker must finish copying pixels before releasing them. No browser handles are retained.
+ */
+void lab_photo_decode_release(void);
 
 /**
  * @brief Replace the exact alpha coverage of sequential rows in one 512-square photographic cell.
@@ -95,5 +116,17 @@ bool lab_photo_target_covered(jsref target);
  * be considered after the foreground's real alpha coverage is available, rather than fetched speculatively.
  */
 bool lab_photo_targets_overlap(jsref first, jsref second);
+
+/**
+ * @brief Admit one photographic read-ahead across disjoint rectangles or a small shared catalogue gutter.
+ * @param first Borrowed scoped x, y, width and height array describing the source being prepared.
+ * @param second Borrowed scoped destination rectangle of the following source in composition order.
+ * @return True when both rectangles are valid and their intersection occupies at most one sixteenth of the
+ * smaller rectangle; false for substantial overlap, invalid coordinates or non-finite input.
+ * @note This is a scheduling decision, never proof of pixel coverage. Actual alpha still decides whether the
+ * following image is painted. The caller must keep at most one read-ahead, release unused images and cancel
+ * obsolete requests. Synchronous and allocation-free; no handles are retained and no release is required.
+ */
+bool lab_photo_read_ahead(jsref first, jsref second);
 
 #endif

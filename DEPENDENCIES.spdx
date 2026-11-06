@@ -89,7 +89,7 @@ FilesAnalyzed: false
 PackageLicenseConcluded: NOASSERTION
 PackageLicenseDeclared: Zlib
 PackageCopyrightText: NOASSERTION
-PackageComment: Transitive system dependency of the OpenSSL build verified for MARS.
+PackageComment: Direct system dependency for native image PNG encoding; also a transitive dependency of the OpenSSL build verified for MARS. The WASM image implementation requires no zlib library.
 
 PackageName: Zstandard
 SPDXID: SPDXRef-Package-zstd
@@ -463,6 +463,7 @@ Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-MPFR
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-MPC
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-SQLCipher
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-zstd
+Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-zlib
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-libsodium
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-glibc
 Relationship: SPDXRef-Package-MARS DEPENDS_ON SPDXRef-Package-WASILibc
