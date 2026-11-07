@@ -45,8 +45,8 @@ void lab_plot_pointer_prepare(jsref rendered)
     for (unsigned i = 0; i < lab_dom_count(titles); ++i) {
         unsigned mark = lab_dom_mark();
         int title = lab_dom_item(titles, i), text = label_text(title);
-        /* Impulse titles carry weights, not heights inferred from the drawn stem. */
-        if (lab_dom_closest(title, "[data-impulse]")) {
+        /* Discrete points and impulses describe actual samples, not interpolated curve heights. */
+        if (lab_dom_closest(title, "[data-impulse], [data-root-plane]")) {
             lab_dom_release(mark);
             continue;
         }
@@ -245,7 +245,8 @@ void lab_plot_pointer_dispatch(lab_plot_pointer_action_t action, event_jsref eve
     double box[4], bounds[4], x = number(event, "clientX"), y = number(event, "clientY");
     int dragging = lab_dom_truth(lab_dom_get(lab_dom_get(rendered, "marsPlotDrag"), "active"));
     if (action != LAB_PLOT_POINTER_INSPECT || dragging || number(event, "buttons") != 0 ||
-        !chart || lab_dom_query(chart, "[data-schematic-impulse]") || !frame(chart, box, bounds) ||
+        !chart || lab_dom_has(chart, "data-root-plane") || lab_dom_query(chart, "[data-schematic-impulse]") ||
+        !frame(chart, box, bounds) ||
         x < box[0] || x > box[0] + box[2] ||
         y < box[1] || y > box[1] + box[3]) {
         lab_dom_class(line, "hidden", 1);

@@ -128,6 +128,10 @@ static void lab_event_precision(lab_event_action_t action, event_jsref event, js
     if (!lab_dom_truth(slider) || lab_dom_truth(lab_dom_get(slider, "disabled")))
         return;
     unsigned bits = lab_workspace_precision_slider_bits(lab_dom_to_number(lab_dom_get(slider, "value")));
+    if (action == LAB_EVENT_PRECISION_INPUT)
+        lab_dom_set(slider, "precisionPreviewBits", lab_dom_numeric(bits));
+    else
+        lab_dom_delete(slider, "precisionPreviewBits");
     lab_workspace_dom_precision_preview(bits);
     if (action == LAB_EVENT_PRECISION_CHANGE && bits != lab_workspace_requested_precision(lab_workspace_mode()))
         lab_event_emit(calls, "setWorksheetPrecision", lab_dom_numeric(bits), 0, 1);

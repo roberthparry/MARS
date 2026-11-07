@@ -211,13 +211,32 @@ For an unseeded real affine equation in the Riemann zeta function, the numerical
 fallback searches several starting points instead of returning the first root
 it encounters. A zero target searches the critical strip up to imaginary
 magnitude eighty, returning up to forty roots, and reports the negative even
-integers as a separate trivial family. A non-zero target searches real parts
+integers as a separate trivial family. Zero searches first use the starting points
+
+$$
+s_n = \frac12 + i\,\frac{2\pi(n-11/8)}{W_0((n-11/8)/e)},\qquad n=1,2,\ldots,20.
+$$
+
+Here `W0` is the principal Lambert W branch, including the negative argument for
+the first estimate. These approximate heights come from inverting the smooth
+zero-counting formula; they are starting values rather than solutions.
+See [França and LeClair, section V](https://arxiv.org/html/1502.06003v1#S5).
+Newton refinement remains complex and does not constrain the final real part to
+one half. If fewer than forty roots are found, the bounded height grid remains
+available as a fallback. A non-zero target searches real parts
 between one and four, with imaginary magnitude at most fifty. Candidates are
 refined at the requested precision,
 checked against the original residual, deduplicated, and paired with verified
 conjugates. The input bindings are restored afterwards. This bounded search
 does not certify completeness or assume the Riemann hypothesis. Explicit
-starting bindings retain the existing single-root behaviour.
+starting bindings retain the existing single-root behaviour. The Lambert W
+estimates apply only when the affine equation has a zero zeta target; they are
+not used for non-zero targets or for an uncontinued inverse-power series.
+
+The complex zeta evaluator also extends its Euler–Maclaurin finite sum with
+working precision, so the higher precision needed during Newton refinement
+does not keep the former fixed summation length. Convergence checks and the
+bounded correction count still apply; this is not an unlimited-precision guarantee.
 
 The Lab combines verified numerical conjugates into one `±` row in both the
 Rendered TeX and Solutions cards. Inexact real and imaginary components round to the

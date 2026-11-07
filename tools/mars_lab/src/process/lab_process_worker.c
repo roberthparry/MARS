@@ -63,6 +63,8 @@ bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string
                 (!strcmp(argv[18], "equation") || !strcmp(argv[18], "diffequation"));
     string_t *plot_key = plot ? lab_proc_plot_key(argv, cwd, path, false) : NULL;
     string_t *prepared_key = plot_key ? lab_proc_plot_key(argv, cwd, path, true) : NULL;
+    bool equation = !external && !input && count == 3 && !strcmp(argv[0], "equation_lab");
+    string_t *equation_key = equation ? lab_proc_plot_key(argv, cwd, path, false) : NULL;
     string_t *prepared = NULL;
     lab_proc_cancel_context_t cancel = lab_proc_cancel_context();
     if (plot_key && !(cancel.check && cancel.check(cancel.argument))) {
@@ -71,6 +73,7 @@ bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string
             *output = cached;
             *exit_status = 0;
             string_free(prepared_key);
+            string_free(equation_key);
             string_free(plot_key);
             string_free(path);
             return true;
@@ -84,6 +87,7 @@ bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string
     if (!timeout) {
         string_free(prepared);
         string_free(prepared_key);
+        string_free(equation_key);
         string_free(plot_key);
         string_free(path);
         errno = ENOMEM;
@@ -98,7 +102,7 @@ bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string
     }
     for (size_t i = 1; i < count; ++i)
         command[next++] = argv[i];
-    if (prepared_key)
+    if (prepared_key || equation_key)
         command[next++] = "--plot-cache";
     bool ran = external ? lab_proc_run_input(command, cwd, input, timeout_ms, max_output, output, exit_status)
                         : lab_proc_run_input_cooperative(command, cwd, prepared ? prepared : input,
@@ -109,15 +113,19 @@ bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string
         error = errors[*exit_status - LAB_WORKER_CANCELLED];
         ran = false;
     }
-    if (ran && !*exit_status && plot_key && *output) {
+    if (ran && !*exit_status && (plot_key || equation_key) && *output) {
         string_t *record = lab_proc_plot_cache_extract(output);
+        string_t *record_key = equation_key ? lab_proc_plot_record_key(record, cwd, path) : NULL;
         if (record)
-            lab_proc_plot_cache_put(prepared_key, record, true);
-        lab_proc_plot_cache_put(plot_key, *output, false);
+            lab_proc_plot_cache_put(equation_key ? record_key : prepared_key, record, true);
+        if (plot_key)
+            lab_proc_plot_cache_put(plot_key, *output, false);
+        string_free(record_key);
         string_free(record);
     }
     string_free(prepared);
     string_free(prepared_key);
+    string_free(equation_key);
     string_free(plot_key);
     string_free(timeout);
     string_free(path);

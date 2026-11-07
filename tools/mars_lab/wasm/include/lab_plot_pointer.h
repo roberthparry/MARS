@@ -25,7 +25,9 @@ void lab_plot_pointer_install(void);
 
 /**
  * @brief Retain native curve labels for custom tooltips and accessibility without duplicate SVG tooltips.
- * @param rendered Scoped browser handle to the rendered region containing the curve SVGs.
+ * @param rendered Scoped browser handle to the rendered region containing native plot SVGs; not retained.
+ * @return Nothing. Updates only the live DOM; copied native SVG remains unchanged. Discrete root and impulse
+ * labels keep their native SVG tooltips. Missing charts are harmless; call on the browser UI thread.
  */
 void lab_plot_pointer_prepare(jsref rendered);
 

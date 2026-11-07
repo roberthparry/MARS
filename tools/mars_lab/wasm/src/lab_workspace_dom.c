@@ -306,6 +306,7 @@ void lab_workspace_dom_value(bool visible)
 void lab_workspace_dom_mode(lab_mode_t mode, jsref coverage)
 {
     lab_precision_close(0);
+    lab_dom_delete(lab_dom_id("precisionSlider"), "precisionPreviewBits");
     if ((unsigned)mode >= LAB_MODE_COUNT)
         mode = LAB_MODE_EXPRESSION;
     int status = lab_dom_query(0, "#status"), status_mode = lab_dom_format(mode, "", "");
@@ -471,11 +472,14 @@ void lab_workspace_dom_controls(lab_mode_t mode, bool busy, bool ready, unsigned
                            !(enabled & 8) && !busy && mode == LAB_MODE_EXPRESSION
                                ? "Goal seek needs at least one variable binding"
                                : "");
-    lab_dom_disabled(lab_dom_query(0, "#precisionSlider"), busy);
-    lab_dom_disabled(lab_dom_id("precisionCustomToggle"), busy);
-    if (busy)
-        lab_precision_close(0);
-    lab_workspace_dom_precision_slider(lab_workspace_requested_precision(mode));
+    int slider = lab_dom_id("precisionSlider");
+    lab_dom_disabled(slider, 0);
+    lab_dom_disabled(lab_dom_id("precisionCustomToggle"), 0);
+    unsigned preview = (unsigned)lab_dom_number(lab_dom_get(slider, "precisionPreviewBits"));
+    if (preview)
+        lab_workspace_dom_precision_preview(preview);
+    else
+        lab_workspace_dom_precision_slider(lab_workspace_requested_precision(mode));
 }
 
 static void lab_workspace_dom_disable_list(jsref controls, int busy, int preserve)

@@ -24,6 +24,8 @@
 #include "internal/equation_internal.h"
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
+#include "lab_worker_plot_prepared.h"
 
 static char *dup_string(const char *text)
 {
@@ -1059,8 +1061,76 @@ static void print_solution_numerics(const equation_solutions_t *solutions, expr_
     string_free(text);
 }
 
+/* Use finite native values only: never sample an arbitrary member of an infinite symbolic family for this view. */
+static number_t *solution_plot_roots(const equation_solutions_t *solutions, expr_bindings_t *bindings,
+                                      const size_t *order, size_t *root_count)
+{
+    *root_count = 0;
+    size_t count = equ_solutions_count(solutions);
+    if (!count || count > 256 || solutions_integer_branch_parameter(solutions, bindings, order))
+        return NULL;
+    number_t *roots = calloc(count, sizeof(*roots));
+    bool nonreal = false;
+    for (size_t i = 0; roots && i < count; ++i) {
+        const equation_t *solution = ordered_solution_at(solutions, order, i);
+        equation_t *display = solution_with_bound_constants(solution, bindings);
+        number_t value = expr_eval(equ_rhs(display ? display : solution));
+        if (num_is_finite(value)) {
+            nonreal |= !num_is_real(value);
+            roots[(*root_count)++] = value;
+        } else {
+            num_destroy(&value);
+        }
+        equ_free(display);
+    }
+    if (!nonreal) {
+        for (size_t i = 0; i < *root_count; ++i)
+            num_destroy(&roots[i]);
+        free(roots);
+        roots = NULL;
+        *root_count = 0;
+    }
+    return roots;
+}
+
+/* Retain the finished solve before automatic plotting; numerical roots must not be recomputed just for a chart. */
+static void prepare_equation_plot(const equation_t *equation, const equation_solutions_t *solutions,
+                                  const char *input, const char *precision_text, int precision)
+{
+    expr_bindings_t *bindings = equ_bindings(equation);
+    const char *axis = NULL;
+    for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
+        if (expr_bindings_is_constant_at(bindings, i))
+            continue;
+        if (axis)
+            return;
+        axis = expr_bindings_name_at(bindings, i);
+    }
+    if (!axis)
+        return;
+    size_t *order = ordered_solution_indices(solutions, bindings);
+    string_t *numeric = equ_solutions_count(solutions)
+        ? solution_numerics(solutions, bindings, order, precision, "plot_solutions ")
+        : string_sprintf("plot_solutions %s\n", equ_solutions_proven_empty(solutions)
+                                                   ? "No solutions." : "No explicit solutions found.");
+    const char *keys[] = {input, axis, precision_text, "equation"};
+    const expr_t *curves[] = {equ_lhs(equation), equ_rhs(equation)};
+    char *TeX = equ_to_TeX_body_wrapped(equation, 110);
+    size_t root_count = 0;
+    number_t *roots = solution_plot_roots(solutions, bindings, order, &root_count);
+    if (numeric && TeX)
+        lab_worker_plot_prepared_emit(keys, input, TeX, curves, NULL, 2, false, numeric, roots, root_count);
+    for (size_t i = 0; i < root_count; ++i)
+        num_destroy(&roots[i]);
+    free(roots);
+    free(TeX);
+    string_free(numeric);
+    free(order);
+}
+
 /* Retain worksheet-precision numerical solutions for reuse while only the viewport changes. */
-string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int precision)
+string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int precision,
+                                             number_t **roots, size_t *root_count)
 {
     equation_solutions_t *solutions = equ_derive_solutions_with_context(equation, NULL);
     expr_bindings_t *bindings = equ_bindings(equation);
@@ -1068,8 +1138,11 @@ string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int pre
     if (solutions && equ_solutions_count(solutions)) {
         size_t *order = ordered_solution_indices(solutions, bindings);
         text = solution_numerics(solutions, bindings, order, precision, "plot_solutions ");
+        *roots = solution_plot_roots(solutions, bindings, order, root_count);
         free(order);
     } else {
+        *roots = NULL;
+        *root_count = 0;
         text = string_sprintf("plot_solutions %s\n", solutions && equ_solutions_proven_empty(solutions)
                                         ? "No solutions." : "No explicit solutions found.");
     }
@@ -1177,9 +1250,11 @@ int lab_worker_equation(int argc, char **argv)
     else if (equ_solutions_proven_empty(solutions))
         status = "no solutions";
 
-    if (rc == 0)
+    if (rc == 0) {
         print_equation_fields(equation, solutions, equ_bindings(equation), input, status, precision);
-    else
+        if (argc == 4 && !strcmp(argv[3], "--plot-cache"))
+            prepare_equation_plot(equation, solutions, input, argv[2], precision);
+    } else
         fprintf(stderr, "could not solve equation\n");
 
     equ_solutions_free(solutions);

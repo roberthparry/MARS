@@ -252,8 +252,9 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
             labDOM.call('lab_workspace_dom_controls', mode, 1, 1, 1, 1, 1, 0, 0);
             check(
                 [WorksheetContext.run, WorksheetContext.back, WorksheetContext.forward].every(button => !button.disabled) &&
-                WorksheetContext.goalSeek.disabled && WorksheetContext.precisionSlider.disabled,
-                'busy retains replacement actions while locking calculation-dependent controls');
+                WorksheetContext.goalSeek.disabled && !WorksheetContext.precisionSlider.disabled &&
+                !(document.getElementById('precisionCustomToggle') as HTMLButtonElement).disabled,
+                'busy retains precision and replacement actions while locking calculation-dependent controls');
             check(WorksheetContext.goalSeek.title === '' && WorksheetContext.precisionSlider.title.includes('bits'), 'busy retains the precision description');
             for (const busy of [0, 1]) {
                 labDOM.call('lab_workspace_dom_controls', mode, busy, 0, 0, 0, 0, 1, 1);
@@ -271,6 +272,18 @@ window.checkLabWorkspaceDom = function checkLabWorkspaceDom() {
         check(
             WorksheetContext.goalSeek.title.includes('variable binding') && !WorksheetContext.precisionSlider.disabled,
             'precision remains adjustable at its endpoints');
+        const precisionToggle = document.getElementById('precisionCustomToggle') as HTMLButtonElement;
+        const precisionPanel = document.getElementById('precisionCustomPanel')!;
+        const precisionInput = document.getElementById('precisionCustomInput') as HTMLInputElement;
+        precisionToggle.click();
+        precisionInput.value = '156';
+        precisionInput.dispatchEvent(new Event('input', {bubbles: true}));
+        for (const busy of [1, 0, 1]) {
+            labDOM.call('lab_workspace_dom_controls', 0, busy, 1, 0, 0, 0, 0, 0);
+            check(!hidden(precisionPanel) && precisionInput.value === '156' && !precisionToggle.disabled,
+                  'an evaluation starting or finishing preserves an open custom precision draft');
+        }
+        precisionToggle.click();
 
         const enabled = document.createElement('input');
         const disabled = document.createElement('input');

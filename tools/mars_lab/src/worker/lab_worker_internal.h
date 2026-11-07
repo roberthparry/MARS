@@ -77,8 +77,33 @@ int lab_worker_equation_mesh(equation_t *equation, expr_t *first, expr_t *second
 /** @brief Plot a one-variable integrand, shading the supplied definite integration interval. */
 int lab_worker_integrand_plot(int argc, char **argv);
 
-/** @brief Return owning worksheet-precision solution records, using the normal equation solution formatter. */
-string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int precision);
+/**
+ * @brief Solve an equation once, retaining formatted numerical results and finite complex roots for plotting.
+ * @param[in] equation Borrowed equation, valid throughout this isolated-worker call; bindings remain unchanged.
+ * @param precision Decimal precision for the unchanged numerical-result text.
+ * @param[out] roots Required destination for an owned numerical array, or NULL when no finite non-real roots exist.
+ * @param[out] root_count Required destination for the number of populated roots, at most 256.
+ * @return Owned labelled result text, released with string_free(), or NULL on allocation failure. Destroy each
+ * returned root with num_destroy() and release its array with free(). No input ownership transfers.
+ * This operation performs a solve and must not be used when a completed replay record is available.
+ */
+string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int precision,
+                                             number_t **roots, size_t *root_count);
+
+/**
+ * @brief Render finite equation roots as unconnected points in their complex coordinate plane.
+ * @param[in] roots Borrowed finite numerical values; at least one must be non-real.
+ * @param count Number of values, from one to 256.
+ * @param[in] axis Borrowed variable name used in the real and imaginary axis labels.
+ * @param[in] title Borrowed plain-text authored equation title.
+ * @param[in] TeX Borrowed native TeX equation title, or NULL to omit it.
+ * @param[in] argv Borrowed validated solver-plot arguments; horizontal and manual vertical limits define the viewport.
+ * @return Zero after emitting a native SVG and explanatory caption, or one on invalid bounds, invalid roots or
+ * allocation failure. Inputs remain caller-owned, are not retained, and numerical precision is restored on return.
+ * No function evaluation or root solving occurs; use only within an isolated calculation process.
+ */
+int lab_worker_plot_roots(const number_t *roots, size_t count, const char *axis, const char *title,
+                           const char *TeX, char **argv);
 
 /** @brief Build up to sixteen labelled representative ODE curves, varying only generated integration constants. */
 bool lab_worker_plot_family(expr_bindings_t *authored, const char *axis, const expr_t *const *branches,

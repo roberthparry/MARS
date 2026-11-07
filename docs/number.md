@@ -1094,8 +1094,11 @@ MPFR and MPC values.
 
 The native Euler–Maclaurin zeta paths reuse successive rising products and
 endpoint powers, and omit derivative work for value-only calls. This also
-applies to Hurwitz zeta. Precision and convergence criteria are unchanged;
-arbitrary-precision real Riemann zeta continues to use MPFR.
+applies to Hurwitz zeta. Above 512 working bits, their finite sums grow with
+precision instead of retaining a fixed 128-term length. Both value and derivative
+paths retain their convergence checks and bounded Bernoulli corrections; an
+exhausted correction allowance still returns NaN rather than an unchecked value.
+Arbitrary-precision real Riemann zeta continues to use MPFR.
 
 Multiprecision real trigamma and tetragamma stop their Bernoulli corrections once
 the term is below a result-relative precision threshold with 16 guard bits. They

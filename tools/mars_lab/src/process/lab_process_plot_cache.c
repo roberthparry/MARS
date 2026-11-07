@@ -21,6 +21,7 @@
 #include <zstd.h>
 
 #include "file-t.h"
+#include "json-t.h"
 #include "lab_process.h"
 #define MARS_LAB_PROCESS_INTERNAL_ACCESS
 #include "lab_process_plot_cache.h"
@@ -116,6 +117,33 @@ string_t *lab_proc_plot_key(const char *const argv[], const char *cwd, const str
             key = NULL;
         }
     }
+    return key;
+}
+
+/* Recreate a plot preparation key from the four native identities emitted by an equation evaluation. */
+string_t *lab_proc_plot_record_key(const string_t *record, const char *cwd, const string_t *path)
+{
+    if (!record || string_byte_length(record) >= PREP_LIMIT)
+        return NULL;
+    json_t *data = json_from_text(record);
+    size_t count = json_array_size(data);
+    bool ok = count >= 9 && count <= 24;
+    const char *args[20];
+    /* Match the fixed plot-worker argument positions; non-key viewport arguments are empty. */
+    for (size_t i = 0; i < 19; ++i)
+        args[i] = "";
+    args[0] = "mars_lab";
+    args[19] = NULL;
+    static const unsigned positions[] = {1, 2, 3, 18};
+    for (size_t i = 0; ok && i < 4; ++i) {
+        const string_t *value = json_string_value(json_array_get(data, i));
+        ok = value && string_byte_length(value);
+        if (ok)
+            args[positions[i]] = string_c_str(value);
+    }
+    ok = ok && (!strcmp(args[18], "equation") || !strcmp(args[18], "diffequation"));
+    string_t *key = ok ? lab_proc_plot_key(args, cwd, path, true) : NULL;
+    json_free(data);
     return key;
 }
 

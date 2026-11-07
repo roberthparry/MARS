@@ -89,7 +89,9 @@ static TeX_t *render_number(const TeX_node_view_t *view, const TeX_t *const *chi
     }
     if (!digits)
         return invalid_node();
+    const char *scientific = NULL;
     if (*p == 'e' || *p == 'E') {
+        scientific = p;
         ++p;
         if (*p == '+' || *p == '-')
             ++p;
@@ -99,7 +101,20 @@ static TeX_t *render_number(const TeX_node_view_t *view, const TeX_t *const *chi
         if (start == p)
             return invalid_node();
     }
-    return (size_t)(p - text) == string_byte_length(view->text) ? TeX_compose_raw(text) : invalid_node();
+    if ((size_t)(p - text) != string_byte_length(view->text))
+        return invalid_node();
+    if (!scientific)
+        return TeX_compose_raw(text);
+    string_t *coefficient = string_new();
+    bool valid = coefficient && !string_append_bytes(coefficient, text, (size_t)(scientific - text));
+    const char *mantissa = valid ? string_c_str(coefficient) : "";
+    bool unit = !strcmp(mantissa, "1"), negative_unit = !strcmp(mantissa, "-1");
+    string_t *source = valid ? (unit || negative_unit
+        ? string_sprintf("%s10^{%s}", negative_unit ? "-" : "", scientific + 1)
+        : string_sprintf("%s \\times 10^{%s}", mantissa, scientific + 1)) : NULL;
+    TeX_t *notation = from_owned_source(source);
+    string_free(coefficient);
+    return TeX_classify(notation, *text == '-' ? TeX_NODE_NEGATIVE : unit ? TeX_NODE_POWER : TeX_NODE_PRODUCT);
 }
 
 static TeX_t *render_text(const TeX_node_view_t *view, const TeX_t *const *children)
@@ -1024,8 +1039,11 @@ static const TeX_t *render_node(dictionary_t *nodes, TeX_node_ref_t ref, size_t 
     string_free(text);
     if (!result)
         return NULL;
-    TeX_classify(result, view.kind);
-    cached = (TeX_cached_node_t){.notation = result, .kind = view.kind, .calculus = calculus,
+    /* A scientific number is displayed as a product or power; its enclosing operation must fence that form. */
+    TeX_node_kind_t rendered_kind = view.kind == TeX_NODE_NUMBER && TeX_kind(result) != TeX_NODE_COUNT
+        ? TeX_kind(result) : view.kind;
+    TeX_classify(result, rendered_kind);
+    cached = (TeX_cached_node_t){.notation = result, .kind = rendered_kind, .calculus = calculus,
                                  .projection = projection, .negative_exponential = negative_exponential};
     if (!dictionary_set(nodes, &ref, &cached)) {
         TeX_free(result);

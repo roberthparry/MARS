@@ -57,11 +57,44 @@ struct _expr_autoname_entry_t {
  * @param[in] value Borrowed numeric value; its stored precision and value are unchanged.
  * @return Owned numeric text released with string_free(), or NULL on formatting or allocation failure.
  * @note No mathematical markup is introduced. Inexact values round to the requested significant digits;
- * exact values retain the number module's exact spelling. With no precision override, ordinary output
+ * exact rationals use a lossless decimal when clearly shorter, otherwise their exact fractional spelling.
+ * With no precision override, ordinary output
  * retains the number module's default representation. The caller must restore any temporary formatting state
  * and serialise access to the owning renderer. No input ownership is transferred or retained.
  */
 string_t *expr_number_format_text_local(number_t value);
+
+/**
+ * @brief Select a strictly lossless, clearly shorter decimal spelling for an exact rational numeric atom.
+ * @param[in] value Borrowed number; it is neither modified nor retained.
+ * @return Owned fixed or scientific decimal text, released with string_free(), when it saves at least two
+ * characters over the ASCII fraction. Returns NULL for integers, inexact or non-real values, repeating decimals,
+ * fractions which remain more readable at similar size, or allocation failure. No rounding is performed.
+ * The decision is independent of output style and may be called concurrently for independent values.
+ */
+string_t *expr_number_preferred_decimal_local(number_t value);
+
+/**
+ * @brief Apply the same lossless display choice directly to an exact literal numerator and denominator.
+ * @param[in] numerator Borrowed signed ASCII integer text; not modified or retained.
+ * @param[in] denominator Borrowed positive ASCII integer text; not modified or retained.
+ * @return Owned fixed or scientific decimal text released with string_free(), or NULL for invalid inputs,
+ * an integral result, a repeating decimal, a fraction which remains preferable, or allocation failure.
+ * The fraction is reduced using integer arithmetic, independently of the current numeric precision; no digits
+ * are rounded. This renderer helper may be called concurrently for independent inputs.
+ */
+string_t *expr_rational_preferred_decimal_local(const string_t *numerator, const string_t *denominator);
+
+/**
+ * @brief Decode an ASCII or stacked Unicode literal fraction into ordinary integer component text.
+ * @param[in] text Borrowed complete numeric spelling; not modified or retained.
+ * @param[out] numerator Required destination for an owned signed ASCII numerator.
+ * @param[out] denominator Required destination for an owned ASCII denominator.
+ * @return True after populating both outputs; release each with string_free(). False for invalid spelling or
+ * allocation failure, leaving both outputs NULL. No numeric rounding or evaluation occurs; independent calls
+ * may run concurrently. Output destinations must be distinct and must not contain unreleased strings.
+ */
+bool expr_split_rational_text_local(const string_t *text, string_t **numerator, string_t **denominator);
 
 char *expr_number_to_string_local(number_t value);
 char *expr_const_to_string_local(const expr_t *expr);

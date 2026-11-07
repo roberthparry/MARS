@@ -2819,8 +2819,12 @@ direction's button is disabled; navigation attempts leave any active calculation
 alone. Run remains responsive when its input is ready; Run or navigation to an existing
 history entry cancels and supersedes unfinished work, and late results
 cannot overwrite the latest selection. Copy remains available for the displayed
-result. Actions that depend on an unfinished calculation, including precision
-changes and goal seeking, remain disabled until it completes.
+result. Precision controls also remain available during calculation. Committing a
+slider change or applying custom precision cancels and replaces unfinished work
+at the new precision; an obsolete result cannot overwrite the replacement.
+Previewing the slider or editing a custom draft leaves the running calculation
+alone. A calculation finishing during an edit preserves the slider preview and
+the open custom draft. Goal seeking remains disabled until calculation completes.
 New Almanac history records distinguish automatically supplied zones from manually
 entered offsets. Automatic zones are resolved at the saved UTC instant using the town's
 IANA rules, or the identified jurisdiction's rules when town rules are unavailable.
@@ -2829,8 +2833,7 @@ explicit offsets; the application does not guess whether they were intentional.
 Each mode retains its own precision. Values above the slider maximum show a
 Custom readout; moving the slider selects a value within its ordinary range again.
 Loading a saved precision does not round it to a slider step, although values
-outside the custom-entry bit limits are clamped. Precision controls are disabled
-while a calculation is busy. The result cards provide independent zoom, expansion and copy
+outside the custom-entry bit limits are clamped. The result cards provide independent zoom, expansion and copy
 controls; **Use as input** returns a suitable result to the editor.
 When numerical results use powers of ten, the mantissa is joined directly to
 `×10` and its superscript exponent, without an intervening space. Real and
@@ -3429,7 +3432,17 @@ limited to 65,536 bits; unresolved precision requirements produce an error.
 
 Equation mode generates a plot asynchronously after evaluation. It draws the left and right
 sides of a one-free-variable equation as separately coloured curves on common axes; their intersections
-represent real solutions within the plotted range. Select one equation variable
+represent real solutions within the plotted range. If the completed solve instead finds finite non-real roots,
+the plot shows its numerical solutions as unconnected points with `Re(z)` and `Im(z)` axes (using the selected
+variable name). Both members of a conjugate pair are plotted. Hover over a point for its numerical value;
+zoom, pan, expand and copy work on this diagram too. The horizontal range has a minimum initial width of one,
+so tiny numerical differences around a common real part do not become exaggerated. The root values are never
+forced onto a line. The caption reports the number found; it does not claim the finite search is exhaustive.
+For `zeta(z)=0`, the current search supplies 40 points: 20 positive ordinates and their conjugates. The separate
+exact family of negative-even trivial zeros remains in the solution notes. Symbolic infinite families are not
+sampled to invent a finite root set, and diagrams are limited to 256 roots. Real-only equations retain their
+curve plots. The completed solve supplies the point data directly, without repeating the solve for plotting
+or viewport changes. Select one equation variable
 and bind any remaining parameters. The equation in the editor is unchanged.
 With exactly two unset variable bindings, it instead draws the real zero contour
 of the residual in their coordinate plane. For example, evaluating `x^2+y^2=1`
@@ -3571,6 +3584,15 @@ Complete plot records larger than 1 MiB can now be compressed into the existing
 1 MiB cache slots, with an 8 MiB decoded-record limit. Compression and decompression
 run outside the shared cache lock; records that cannot fit still evaluate normally.
 Reuse restores the exact worker output, including SVG coordinates and labels.
+
+A completed one-variable equation evaluation also seeds this shared preparation
+cache with its original curves and verified numerical solutions. The following
+plot request reuses those solutions at their selected precision while sampling
+the chart at its own range-aware display precision. It does not repeat the
+completed high-precision solve merely to rebuild the Solutions card. Exact source,
+axis, precision and executable identities protect reuse; changed inputs or an
+unavailable preparation record retain the ordinary fresh-plot path. Preparation
+metadata is removed from the worker response before it reaches the browser.
 
 Adaptive curves use native first derivatives and repeated differentiation for
 second derivatives. Tangent/secant and curvature checks supplement the value

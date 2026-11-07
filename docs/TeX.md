@@ -18,6 +18,12 @@ The builder supplies typesetting syntax without doing algebra. Optional
 text or trusted TeX source. Mathematical objects already in memory keep their
 ordinary output APIs, which handle rendering internally. No entry point runs a TeX engine.
 
+Native numeric rendering uses the mathematical module's shared
+[lossless fraction-versus-decimal policy](expression.md#imaginary-axis-presentation). Compact fractions remain
+fractional; a long terminating rational uses the exact decimal when clearly shorter. This also applies inside
+complex arguments. Scientific numeric text is typeset with a power of ten, and compound scientific values
+retain their parentheses when used as a power's base. The TeX renderer does not approximate or alter the number.
+
 Every push and operation returns a Boolean. A failure leaves the stack unchanged and
 saves the first error. Later operations and finish fail until you explicitly
 clear that error. This means the examples can check the finished result once,

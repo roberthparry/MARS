@@ -121,15 +121,18 @@ void lab_workspace_dom_help(lab_workspace_help_action_t action);
  */
 void lab_workspace_dom_target(bool visible);
 
-/** @brief Project worksheet availability and disabled explanations.
+/** @brief Project worksheet availability while retaining precision edits during asynchronous evaluation.
+ * Precision controls remain usable while busy. An active slider preview and an open custom-precision draft
+ * survive control refreshes; committing precision uses the ordinary replacement-evaluation workflow.
  * @param mode Worksheet mode index, 0..6.
- * @param busy True disables all worksheet actions while a request is running.
+ * @param busy True disables actions that require a completed result, while replacement actions remain available.
  * @param ready True when the current input can be evaluated.
  * @param back Number of available backward-history entries.
  * @param forward Number of available forward-history entries.
  * @param goal True when variable bindings permit goal seeking.
  * @param minimum True when precision is already at its lower limit.
  * @param maximum True when precision is already at its upper limit.
+ * @return Nothing. Updates the current page's controls without retaining input handles or starting calculations.
  */
 void lab_workspace_dom_controls(lab_mode_t mode, bool busy, bool ready, unsigned back, unsigned forward, bool goal,
                                 bool minimum, bool maximum);

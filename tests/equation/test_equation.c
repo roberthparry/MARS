@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "computation-t.h"
 #include "equation-t.h"
 #include "expression-t.h"
 #include "test_harness.h"
@@ -2215,6 +2216,91 @@ static void test_equation_zeta_nontrivial_search(void)
     num_set_default_prec_digits(previous_digits);
 }
 
+typedef struct _test_equation_zeta_search_t {
+    equation_t *equation;
+    equation_solutions_t *solutions;
+    computation_t *control;
+    size_t seed_count;
+    bool cancel;
+} test_equation_zeta_search_t;
+
+static void test_equation_zeta_progress(const computation_progress_t *progress, void *argument)
+{
+    test_equation_zeta_search_t *search = argument;
+
+    if (strcmp(progress->stage, "equation.zeta_seed") != 0)
+        return;
+    search->seed_count++;
+    if (search->cancel && search->seed_count == 2u)
+        computation_cancel(search->control);
+}
+
+static bool test_equation_zeta_solve(void *argument)
+{
+    test_equation_zeta_search_t *search = argument;
+
+    search->solutions = equ_derive_solutions(search->equation);
+    return search->solutions != NULL;
+}
+
+static void test_equation_zeta_high_precision_starts(void)
+{
+    static const size_t precisions[] = {156u, 312u};
+    static const char *const sources[] = {"3*zeta(s)+2=2", "0=zeta(s)"};
+    size_t saved_bits = num_get_default_prec_bits();
+
+    for (size_t i = 0u; i < sizeof precisions / sizeof *precisions; ++i) {
+        num_set_default_prec_digits(precisions[i]);
+        size_t working_bits = num_get_default_prec_bits();
+        test_equation_zeta_search_t search = {.equation = equ_from_string(sources[i])};
+        computation_options_t options = {.progress = test_equation_zeta_progress, .argument = &search};
+
+        search.control = computation_new(&options);
+        ASSERT_NOT_NULL(search.equation);
+        ASSERT_NOT_NULL(search.control);
+        ASSERT_TRUE(computation_run(search.control, test_equation_zeta_solve, &search));
+        ASSERT_EQ_INT(equ_solutions_count(search.solutions), 40);
+        /* Twenty distinct conjugate pairs must come from twenty starts, without scanning the fallback grid. */
+        ASSERT_EQ_INT(search.seed_count, 20);
+        ASSERT_TRUE(test_equation_all_solutions_satisfy(search.equation, equ_binding(search.equation, "s"),
+                                                       search.solutions, i == 0u ? "1e-156" : "1e-312"));
+        ASSERT_TRUE(test_equation_nonreal_solutions_have_conjugates(search.solutions));
+        number_t binding = expr_eval(equ_binding(search.equation, "s"));
+
+        ASSERT_TRUE(num_is_nan(binding));
+        ASSERT_EQ_INT(num_get_default_prec_bits(), working_bits);
+        num_destroy(&binding);
+        equ_solutions_free(search.solutions);
+        computation_free(search.control);
+        equ_free(search.equation);
+    }
+    num_set_default_prec_bits(saved_bits);
+}
+
+static void test_equation_zeta_search_cancellation(void)
+{
+    size_t saved_bits = num_get_default_prec_bits();
+
+    num_set_default_prec_digits(78u);
+    test_equation_zeta_search_t search = {.equation = equ_from_string("zeta(s)=0"), .cancel = true};
+    computation_options_t options = {.progress = test_equation_zeta_progress, .argument = &search};
+
+    search.control = computation_new(&options);
+    ASSERT_NOT_NULL(search.control);
+    ASSERT_NOT_NULL(search.equation);
+    ASSERT_FALSE(computation_run(search.control, test_equation_zeta_solve, &search));
+    ASSERT_EQ_INT(computation_status(search.control), COMPUTATION_CANCELLED);
+    ASSERT_EQ_INT(search.seed_count, 2);
+    ASSERT_NULL(search.solutions);
+    number_t binding = expr_eval(equ_binding(search.equation, "s"));
+
+    ASSERT_TRUE(num_is_nan(binding));
+    num_destroy(&binding);
+    computation_free(search.control);
+    equ_free(search.equation);
+    num_set_default_prec_bits(saved_bits);
+}
+
 static void test_equation_infinite_series_domain(void)
 {
     static const struct {
@@ -2485,6 +2571,8 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_from_string_accepts_bare_equation, NULL);
     TEST_RUN_SUBTEST(test_equation_expands_algebraic_sequence_ellipsis, NULL);
     TEST_RUN_SUBTEST(test_equation_zeta_nontrivial_search, NULL);
+    TEST_RUN_SUBTEST(test_equation_zeta_high_precision_starts, NULL);
+    TEST_RUN_SUBTEST(test_equation_zeta_search_cancellation, NULL);
     TEST_RUN_SUBTEST(test_equation_infinite_series_domain, NULL);
     TEST_RUN_SUBTEST(test_equation_zeta_level_search, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_solves_all_variable_bindings, NULL);

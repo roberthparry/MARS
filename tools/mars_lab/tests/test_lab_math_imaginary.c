@@ -10,6 +10,23 @@
 #include "expression-t.h"
 #include "test_lab_math_support.h"
 
+static void test_long_complex_decimal_formula_cards(void)
+{
+    const char *coefficient = "14.134725141734693790457251983562470270784257115699243175685567460149963429809256764949"
+                              "010393171561013";
+    const char *source = lab_math_format("zeta(0.5+%si)", coefficient);
+    const json_t *result = lab_math_fields(source, "z", "evaluate", 97);
+    const char *fields[] = {"expression", "function", "tex"};
+    for (size_t i = 0; i < sizeof fields / sizeof *fields; ++i) {
+        const char *text = lab_math_text(result, fields[i]);
+        lab_math_contains(text, coefficient, true);
+        lab_math_contains(text, "100000000000000000000000", false);
+    }
+    lab_math_contains(lab_math_text(result, "tex"), "\\frac{1}{2}", true);
+    lab_math_contains(lab_math_text(result, "value"), "NAN", false);
+    lab_math_reset();
+}
+
 static void test_imaginary_axis_formula_cards(void)
 {
     const char *sources[] = {"cos(i)", "sin(i)", "tan(i)", "sinh(i)", "cosh(i)", "tanh(i)",
@@ -103,6 +120,7 @@ static void test_symbolic_imaginary_axis_bound_values(void)
 void test_lab_math_imaginary_cases(void)
 {
     TEST_RUN_IN_GROUP(test_imaginary_axis_formula_cards, tests, NULL);
+    TEST_RUN_IN_GROUP(test_long_complex_decimal_formula_cards, tests, NULL);
     TEST_RUN_IN_GROUP(test_symbolic_imaginary_axis_formula_cards, tests, NULL);
     TEST_RUN_IN_GROUP(test_symbolic_imaginary_axis_bound_values, tests, NULL);
     lab_math_reset();

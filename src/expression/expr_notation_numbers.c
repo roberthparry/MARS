@@ -165,6 +165,13 @@ const TeX_model_node_t *notation_build_number(notation_build_t *build, number_t 
         num_destroy(&magnitude);
         return notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &positive);
     }
+    string_t *decimal = expr_number_preferred_decimal_local(value);
+    if (decimal) {
+        const TeX_model_node_t *result = notation_build_node(build,
+            (TeX_node_view_t){.kind = TeX_NODE_NUMBER, .text = decimal}, NULL);
+        string_free(decimal);
+        return result;
+    }
     number_t numerator = num_new(), denominator = num_new();
     bool fraction = num_get_fraction_parts(value, &numerator, &denominator) && !num_eq(denominator, NUM_ONE);
     const TeX_model_node_t *result = fraction ? pair(build, TeX_NODE_FRACTION,

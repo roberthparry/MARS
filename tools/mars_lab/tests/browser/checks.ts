@@ -188,6 +188,38 @@
         if (!condition)
             throw new Error(message);
     }
+    async function checkComplexEquationPlot() {
+        const originalMode = WorksheetWorkspace.mode.currentMode();
+        try {
+            WorksheetWorkspace.mode.setMode('equation');
+            WorksheetWorkspace.presentation.syncModeUI();
+            WorksheetBindings.controller.setExpressionEditor('z^2+1=0');
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            await waitForAutomaticPlot();
+            const host = document.getElementById('plotRendered')!;
+            const chart = host.querySelector<SVGSVGElement>('[data-root-plane][data-plot-chart]');
+            check(chart && chart.querySelectorAll('circle').length === 2,
+                  'Non-real equation solutions reach the visible plot as two discrete points');
+            check(chart.textContent?.includes('Re(z)') && chart.textContent.includes('Im(z)') &&
+                  chart.querySelectorAll('[data-series] > title').length === 2 &&
+                  [...chart.querySelectorAll('[data-series] > title')].every(title => title.textContent?.includes('z ≈')),
+                  'Native root coordinates and point tooltips survive mathematical title composition and WASM installation');
+            check(Number(chart.dataset.xMin) === -0.5 && Number(chart.dataset.xMax) === 0.5,
+                  'A minimum-width real axis does not magnify numerical round-off');
+            const card = host.closest<HTMLElement>('.result-card')!;
+            card.querySelector<HTMLElement>('[data-zoom-step="1"]')!.click();
+            for (let attempt = 0; attempt < 1200 && chart.isConnected; ++attempt)
+                await LabTestBrowser.wait(25);
+            const zoomed = host.querySelector<SVGSVGElement>('[data-root-plane][data-plot-chart]');
+            check(zoomed && Number(zoomed.dataset.xMax) - Number(zoomed.dataset.xMin) < 1,
+                  'Complex root zoom requests a new coordinate viewport');
+            check(host.textContent?.includes('2 verified finite roots'),
+                  'Zooming preserves the completed root set rather than starting another solve');
+        } finally {
+            WorksheetWorkspace.mode.setMode(originalMode);
+            WorksheetWorkspace.presentation.syncModeUI();
+        }
+    }
     async function checkDistributionPlot() {
         WorksheetBindings.controller.setExpressionEditor('@F{step(x)}');
         await WorksheetRequests.evaluation.evaluateExpression();
@@ -3263,7 +3295,10 @@
             }
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('evaluation-check') === '1') {
+                await runBrowserGroup('complex equation root diagram', checkComplexEquationPlot);
                 await runBrowserGroup('first Almanac entry and interrupted re-entry', checkAlmanacFirstEntry);
+                await runBrowserGroup('checkLabWorkspaceDom', window.checkLabWorkspaceDom);
+                await runBrowserGroup('checkLabEvents', window.checkLabEvents);
                 await runBrowserGroup('checkLabStateFlow', window.checkLabStateFlow);
                 await runBrowserGroup('checkLabResultDom', window.checkLabResultDom);
                 await runBrowserGroup('checkLabEvaluation', window.checkLabEvaluation);

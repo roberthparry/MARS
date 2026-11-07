@@ -2585,17 +2585,20 @@ static void test_to_string_square_denominator(void)
 static void test_to_string_exact_rational_TeX(void)
 {
     static const struct { const char *source; const char *expected; bool radical; } cases[] = {
-        {"30864197253/250000000000", "\\frac{30864197253}{250000000000}", false},
-        {"-30864197253/250000000000", "-\\frac{30864197253}{250000000000}", false},
-        {"1957044392389164807/62500000000", "\\frac{1957044392389164807}{62500000000}", false},
-        {"-1957044392389164807/62500000000", "\\frac{1957044392389164807}{62500000000}", true}
+        {"1/3", "\\frac{1}{3}", false},
+        {"7/16", "\\frac{7}{16}", false},
+        {"30864197253/250000000000", "0.123456789012", false},
+        {"-30864197253/250000000000", "-0.123456789012", false},
+        {"1957044392389164807/62500000000", "31312710.278226636912", false},
+        {"-1957044392389164807/62500000000", "31312710.278226636912", true}
     };
     for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
         number_t value = num_create_from_string(cases[i].source);
         expr_t *atom = expr_new_const(value);
         expr_t *expr = cases[i].radical ? expr_sqrt(atom) : expr_clone(atom);
         char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
-        bool ok = num_is_exact(value) && TeX && strstr(TeX, cases[i].expected) && !strstr(TeX, ".");
+        bool ok = num_is_exact(value) && TeX && strstr(TeX, cases[i].expected) &&
+                  (!cases[i].radical || strstr(TeX, "\\sqrt{"));
         printf("  %s -> %s\n", cases[i].source, TeX ? TeX : "NULL");
         free(TeX);
         expr_free(expr);

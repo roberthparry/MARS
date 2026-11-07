@@ -460,6 +460,11 @@ window.checkLabEvents = function checkLabEvents(): boolean {
         try {
             send(slider, new Event('input'), '');
             check(previewValueWrites === 0, 'preview must not reset the native range change event');
+            for (const busy of [1, 0]) {
+                labDOM.call('lab_workspace_dom_controls', native.lab_workspace_mode(), busy, 1, 0, 0, 0, 0, 0);
+                check(previewValueWrites === 0 && slider.value === String(sliderPosition) && !slider.disabled,
+                      'an evaluation starting or finishing preserves the uncommitted precision slider value');
+            }
         } finally {
             Reflect.deleteProperty(slider, 'value');
         }

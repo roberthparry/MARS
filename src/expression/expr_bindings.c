@@ -34,6 +34,8 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_internal.h"
+#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
+#include "expr_stringout_internal.h"
 
 typedef struct {
     string_cursor_t *cursor;
@@ -3139,55 +3141,20 @@ void binding_simple_rational_clear(binding_simple_rational_t *rational)
 
 static bool binding_string_is_simple_rational(const string_t *text, binding_simple_rational_t *out)
 {
-    string_cursor_t *cursor;
-    string_pos_t numer_start;
-    string_pos_t slash_pos;
-    string_pos_t denom_start;
-    size_t numer_digits = 0u;
-    size_t denom_digits = 0u;
-    bool ok = false;
-
     if (!text || !out)
         return false;
-
-    out->negative = false;
-    out->numer = NULL;
-    out->denom = NULL;
-
-    cursor = string_cursor_new(text);
-    if (!cursor)
-        return false;
-
-    if (rune_is_equal(string_cursor_peek(cursor), '+') || rune_is_equal(string_cursor_peek(cursor), '-')) {
-        out->negative = rune_is_equal(string_cursor_peek(cursor), '-');
-        (void)string_cursor_next(cursor);
+    *out = (binding_simple_rational_t){0};
+    const char *source = string_c_str(text);
+    string_t *unsigned_text = source[0] == '+' ? string_new_with(source + 1) : NULL;
+    bool ok = expr_split_rational_text_local(unsigned_text ? unsigned_text : text, &out->numer, &out->denom);
+    string_free(unsigned_text);
+    if (ok && string_c_str(out->numer)[0] == '-') {
+        string_t *magnitude = string_new_with(string_c_str(out->numer) + 1);
+        string_free(out->numer);
+        out->numer = magnitude;
+        out->negative = true;
+        ok = magnitude != NULL;
     }
-
-    numer_start = string_cursor_position(cursor);
-    while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
-        numer_digits++;
-        (void)string_cursor_next(cursor);
-    }
-    if (numer_digits == 0u || !rune_is_equal(string_cursor_peek(cursor), '/'))
-        goto done;
-
-    slash_pos = string_cursor_position(cursor);
-    (void)string_cursor_next(cursor);
-    denom_start = string_cursor_position(cursor);
-
-    while (binding_cursor_peek_ascii_digit(cursor, NULL)) {
-        denom_digits++;
-        (void)string_cursor_next(cursor);
-    }
-    if (denom_digits == 0u || !string_cursor_done(cursor))
-        goto done;
-
-    out->numer = string_cursor_slice_between(numer_start, slash_pos, cursor);
-    out->denom = string_cursor_extract(denom_start, cursor);
-    ok = out->numer && out->denom;
-
-done:
-    string_cursor_free(cursor);
     if (!ok)
         binding_simple_rational_clear(out);
     return ok;
@@ -3259,12 +3226,7 @@ string_t *binding_decimal_display_text(const char *text)
         string_pos_t frac_start;
         string_pos_t keep_end;
         string_pos_t last_nonzero_end;
-        string_pos_t zero_start = 0u;
-        string_pos_t long_zero_start = 0u;
         size_t digit_count = 0u;
-        size_t zero_run = 0u;
-        bool seen_nonzero = false;
-        bool long_zero = false;
 
         if (!rune_is_equal(string_cursor_peek(cursor), '.')) {
             if (string_append_rune(out, string_cursor_peek(cursor)) != 0)
@@ -3280,28 +3242,12 @@ string_t *binding_decimal_display_text(const char *text)
         last_nonzero_end = frac_start;
 
         while (binding_cursor_peek_ascii_digit(cursor, &digit)) {
-            string_pos_t digit_start = string_cursor_position(cursor);
-
             if (string_cursor_next(cursor) != 0)
                 goto fail;
             digit_count++;
 
-            if (digit == '0') {
-                if (seen_nonzero) {
-                    if (zero_run == 0u)
-                        zero_start = digit_start;
-                    zero_run++;
-                    if (!long_zero && zero_run >= 24u) {
-                        long_zero = true;
-                        long_zero_start = zero_start;
-                    }
-                }
-            } else {
-                seen_nonzero = true;
-                zero_run = 0u;
-                if (!long_zero)
-                    last_nonzero_end = string_cursor_position(cursor);
-            }
+            if (digit != '0')
+                last_nonzero_end = string_cursor_position(cursor);
         }
 
         if (digit_count == 0u) {
@@ -3310,7 +3256,7 @@ string_t *binding_decimal_display_text(const char *text)
             continue;
         }
 
-        keep_end = long_zero ? long_zero_start : last_nonzero_end;
+        keep_end = last_nonzero_end;
         if (keep_end > frac_start) {
             if (string_append_char(out, '.') != 0)
                 goto fail;
@@ -3336,6 +3282,15 @@ static void emit_binding_number_text(const char *text, sbuf_t *b)
     binding_simple_rational_t rational = {false, NULL, NULL};
 
     if (binding_text_is_simple_rational(text, &rational)) {
+        string_t *decimal = expr_rational_preferred_decimal_local(rational.numer, rational.denom);
+        if (decimal) {
+            if (rational.negative)
+                sbuf_putc(b, '-');
+            sbuf_put_string(b, decimal);
+            string_free(decimal);
+            binding_simple_rational_clear(&rational);
+            return;
+        }
         if (rational.negative)
             sbuf_putc(b, '-');
         if (binding_string_is_single_ascii(rational.denom, '1')) {

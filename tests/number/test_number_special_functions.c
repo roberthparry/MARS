@@ -680,6 +680,39 @@ static void test_number_incomplete_gamma_precision(void)
     ASSERT_TRUE(ok);
 }
 
+static void test_number_zeta_high_precision(void)
+{
+    static const size_t precisions[] = {1040u, 2080u};
+    static const char *const arguments[] = {"0.5+14i", "0.5+77i"};
+    static const char *const tolerances[] = {"1e-300", "1e-610"};
+    size_t saved_bits = num_get_default_prec_bits();
+
+    for (size_t i = 0u; i < sizeof precisions / sizeof *precisions; ++i) {
+        NUM_SCOPE(scope);
+
+        num_set_default_prec_bits(precisions[i]);
+        number_t s = num_create_from_string(arguments[i]);
+        number_t value = num_zeta(s);
+        number_t derivative = num_zetap(s);
+        number_t hurwitz = num_zetah(s, NUM_ONE);
+        number_t hurwitz_derivative = num_zatahp(s, NUM_ONE);
+
+        ASSERT_TRUE(num_is_finite(value) && num_is_finite(derivative));
+        assert_number_close_number("Hurwitz at one matches Riemann zeta", hurwitz, value, tolerances[i]);
+        assert_number_close_number("Hurwitz at one matches the zeta derivative", hurwitz_derivative,
+                                   derivative, tolerances[i]);
+        /* A longer finite sum at independently increased precision must confirm both values. */
+        num_set_prec_bits(&s, precisions[i] + 128u);
+        number_t reference = num_zeta(s);
+        number_t reference_derivative = num_zetap(s);
+
+        assert_number_close_number("Complex zeta precision scaling", value, reference, tolerances[i]);
+        assert_number_close_number("Complex zeta derivative precision scaling", derivative,
+                                   reference_derivative, tolerances[i]);
+    }
+    num_set_default_prec_bits(saved_bits);
+}
+
 void run_number_special_function_tests(void)
 {
     {
@@ -738,6 +771,7 @@ void run_number_special_function_tests(void)
     printf(C_CYAN "Testing special functions and extended dispatch...\n" C_RESET);
 
     test_number_clausen();
+    TEST_RUN_SUBTEST(test_number_zeta_high_precision, "number,zeta,precision");
     TEST_RUN_SUBTEST(test_number_incomplete_gamma_precision, "number,gamma,precision");
     TEST_RUN_SUBTEST(test_number_sgn, "number,signal,sgn,precision");
     TEST_RUN_SUBTEST(test_number_struve_l, "number,struve,precision");

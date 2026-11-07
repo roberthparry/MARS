@@ -219,8 +219,11 @@ int lab_worker_solver_plot(int argc, char **argv)
         }
         lab_plot_prepared_t *prepared = lab_worker_plot_prepared_read(argc, argv);
         if (prepared && prepared->count == 2 && !prepared->family) {
-            int rc = plot_curves(argv[1], string_c_str(prepared->title), string_c_str(prepared->TeX), axis,
-                                 (const expr_t *const *)prepared->curves, NULL, 2, true, false, argv);
+            int rc = prepared->root_count
+                ? lab_worker_plot_roots(prepared->roots, prepared->root_count, axis,
+                                         string_c_str(prepared->title), string_c_str(prepared->TeX), argv)
+                : plot_curves(argv[1], string_c_str(prepared->title), string_c_str(prepared->TeX), axis,
+                                (const expr_t *const *)prepared->curves, NULL, 2, true, false, argv);
             if (!rc)
                 fputs(string_c_str(prepared->numeric), stdout);
             lab_worker_plot_prepared_free(prepared);
@@ -229,15 +232,22 @@ int lab_worker_solver_plot(int argc, char **argv)
         }
         lab_worker_plot_prepared_free(prepared);
         char *title = equ_to_TeX_body_wrapped(equ, 110);
-        int rc = plot_curves(argv[1], argv[1], title, axis, curves, NULL, 2, true, false, argv);
+        size_t root_count = 0;
+        number_t *roots = NULL;
+        string_t *numeric = lab_worker_equation_plot_solutions(equ, atoi(argv[3]), &roots, &root_count);
+        int rc = root_count ? lab_worker_plot_roots(roots, root_count, axis, argv[1], title, argv)
+                           : plot_curves(argv[1], argv[1], title, axis, curves, NULL, 2, true, false, argv);
         if (!rc) {
-            string_t *numeric = lab_worker_equation_plot_solutions(equ, atoi(argv[3]));
             if (numeric) {
                 fputs(string_c_str(numeric), stdout);
-                lab_worker_plot_prepared_write(argc, argv, argv[1], title, curves, NULL, 2, false, numeric);
+                lab_worker_plot_prepared_write(argc, argv, argv[1], title, curves, NULL, 2, false,
+                                               numeric, roots, root_count);
             }
-            string_free(numeric);
         }
+        string_free(numeric);
+        for (size_t i = 0; i < root_count; ++i)
+            num_destroy(&roots[i]);
+        free(roots);
         free(title);
         equ_free(equ);
         return rc;
@@ -330,7 +340,7 @@ int lab_worker_solver_plot(int argc, char **argv)
             printf("error Unable to format the solution plot title.\n");
         if (!rc)
             lab_worker_plot_prepared_write(argc, argv, string_c_str(title_text), string_c_str(title_TeX),
-                                           (const expr_t *const *)members, labels, member_count, family, NULL);
+                                           (const expr_t *const *)members, labels, member_count, family, NULL, NULL, 0);
         for (size_t i = 0; i < member_count; ++i) {
             expr_free(members[i]);
             string_free(labels[i]);

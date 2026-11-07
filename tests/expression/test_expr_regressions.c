@@ -2362,6 +2362,96 @@ static void test_exact_decimal_literal_stays_decimal_in_expression_render(void)
     expr_free(expr);
 }
 
+static void test_numeric_atom_fraction_presentation(void)
+{
+    const struct { const char *fraction, *native, *TeX; } cases[] = {
+        {"1/2", "½", "\\frac{1}{2}"},
+        {"1/3", "⅓", "\\frac{1}{3}"},
+        {"7/16", "⁷⁄₁₆", "\\frac{7}{16}"},
+        {"1/1024", "¹⁄₁₀₂₄", "\\frac{1}{1024}"},
+        {"355/113", "³⁵⁵⁄₁₁₃", "\\frac{355}{113}"},
+        {"123/1000", "0.123", "0.123"},
+        {"-123/1000", "-0.123", "-0.123"},
+        {"123456789/5000", "24691.3578", "24691.3578"},
+        {"100000000000000000000000001/100000000000000000000000000",
+         "1.00000000000000000000000001", "1.00000000000000000000000001"},
+        {"12345678901234567890123456789/100000000000000000000000000000",
+         "0.12345678901234567890123456789", "0.12345678901234567890123456789"},
+        {"1/1000000000000000000000000000000", "1e-30", "10^{-30}"},
+        {"-123/1000000000000000000000000000000", "-1.23e-28", "-1.23 \\times 10^{-28}"}
+    };
+    const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        number_t value = num_create_from_string(cases[i].fraction);
+        expr_t *atom = expr_new_const(value);
+        for (size_t s = 0; s < sizeof styles / sizeof *styles; ++s) {
+            char *text = expr_to_string(atom, styles[s]);
+            const char *expected = styles[s] == style_LATEX ? cases[i].TeX : cases[i].native;
+            if (styles[s] == style_FUNCTION) {
+                ASSERT_TRUE(text && strstr(text, "return "));
+                if (strchr(expected, '.'))
+                    ASSERT_TRUE(strstr(text, expected));
+            } else {
+                TEST_ASSERT_STR_EQ(text, expected);
+            }
+            number_t unchanged = expr_eval(atom);
+            ASSERT_TRUE(num_eq(value, unchanged));
+            num_destroy(&unchanged);
+            if (styles[s] == style_EXPRESSION) {
+                expr_t *roundtrip = text ? expr_from_string(text, NULL) : NULL;
+                number_t parsed = roundtrip ? expr_eval(roundtrip) : NUM_NAN;
+                ASSERT_TRUE(roundtrip && num_eq(value, parsed));
+                num_destroy(&parsed);
+                expr_free(roundtrip);
+            }
+            free(text);
+        }
+        expr_free(atom);
+        num_destroy(&value);
+    }
+}
+
+static void test_complex_numeric_atom_fraction_presentation(void)
+{
+    const char *decimal = "14.134725141734693790457251983562470270784257115699243175685567460149963429809256764949"
+                          "010393171561013";
+    size_t saved_precision = num_get_default_prec_bits();
+    num_set_default_prec_digits(120);
+    const char *names[] = {"zeta", "sin", "erf"};
+    const style_t styles[] = {style_EXPRESSION, style_FUNCTION, style_LATEX};
+    for (size_t i = 0; i < sizeof names / sizeof *names; ++i) {
+        string_t *source = string_sprintf("%s(0.5+%si)", names[i], decimal);
+        expr_t *expression = source ? expr_from_string(string_c_str(source), NULL) : NULL;
+        for (size_t s = 0; s < sizeof styles / sizeof *styles; ++s) {
+            char *text = expression ? expr_to_string(expression, styles[s]) : NULL;
+            if (!text || !strstr(text, decimal) || strstr(text, "100000000000000000000000"))
+                fprintf(stderr, "Complex coefficient (%s, style %d): %s\n", names[i], (int)styles[s],
+                         text ? text : "(null)");
+            ASSERT_TRUE(text && strstr(text, decimal) && !strstr(text, "100000000000000000000000"));
+            if (styles[s] == style_LATEX)
+                ASSERT_TRUE(strstr(text, "\\frac{1}{2}"));
+            free(text);
+        }
+        expr_free(expression);
+        string_free(source);
+    }
+    num_set_default_prec_bits(saved_precision);
+}
+
+static void test_scientific_numeric_atom_grouping(void)
+{
+    number_t coefficient = num_create_from_string("123/1000000000000000000000000000000");
+    expr_t *atom = expr_new_const(coefficient), *x = test_expr_new_named_var_d(0, "x");
+    expr_t *power = expr_pow_xp(atom, x);
+    char *TeX = expr_to_string(power, style_LATEX);
+    ASSERT_TRUE(TeX && strstr(TeX, "1.23 \\times 10^{-28}") && strstr(TeX, "\\left("));
+    free(TeX);
+    expr_free(power);
+    expr_free(x);
+    expr_free(atom);
+    num_destroy(&coefficient);
+}
+
 static void test_to_string_does_not_simplify_plain_expressions(void)
 {
     expr_t *x = test_expr_new_named_var_d(3.0, "x");
@@ -5000,6 +5090,9 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_negative_decimal_function_argument_stays_decimal, NULL);
     TEST_RUN_SUBTEST(test_function_infinity_atoms_use_callable_aliases, NULL);
     TEST_RUN_SUBTEST(test_exact_decimal_literal_stays_decimal_in_expression_render, NULL);
+    TEST_RUN_SUBTEST(test_numeric_atom_fraction_presentation, NULL);
+    TEST_RUN_SUBTEST(test_complex_numeric_atom_fraction_presentation, NULL);
+    TEST_RUN_SUBTEST(test_scientific_numeric_atom_grouping, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_derivative_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_pow_derivative_preserves_literal_base_log, NULL);
     TEST_RUN_SUBTEST(test_symbolic_complex_power_derivative_keeps_base_log, NULL);

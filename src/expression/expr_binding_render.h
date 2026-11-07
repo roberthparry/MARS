@@ -47,7 +47,13 @@ bool binding_text_is_simple_rational(const char *text, binding_simple_rational_t
 /** @brief Append the decimal digits of a borrowed string to a native output buffer. */
 void emit_binding_digits(sbuf_t *buffer, const string_t *digits);
 
-/** @brief Return an owned decimal spelling with redundant trailing precision removed. */
+/**
+ * @brief Remove redundant fractional trailing zeroes without discarding interior digits of a literal.
+ * @param[in] text Borrowed numeric spelling; NULL is treated as empty text and no input is retained.
+ * @return Owned cleaned text released with string_free(), or NULL on allocation or cursor failure.
+ * This operation performs no rounding; a long run of zeroes followed by a non-zero digit is preserved.
+ * Independent calls may run concurrently.
+ */
 string_t *binding_decimal_display_text(const char *text);
 
 /** @brief Whether native factor ordering should put a power before a radical. */

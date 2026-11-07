@@ -119,6 +119,17 @@ Proven rational powers simplify exactly when their integer roots are perfect:
 Irrational roots retain their symbolic form, and a supplied variable binding does
 not turn a symbolic power into a constant.
 
+Numeric atoms share a lossless fraction-versus-decimal rule across Expression, Function and TeX output,
+including both components of a complex number. Repeating rational values and compact familiar fractions
+retain fractional notation. A terminating rational uses a decimal only when that spelling saves at least
+two characters over its ordinary numerator/slash/denominator representation. The comparison considers the
+complete reduced fraction and both fixed and scientific decimal spellings before allocating decimal padding.
+Scientific notation is selected only when it also saves at least two characters over fixed notation; TeX
+typesets it as a product with a power of ten and preserves the grouping of any enclosing power.
+Every decimal digit is exact: display selection neither rounds the rational nor changes the stored value,
+and a long numerical coefficient is never approximated by a nearby simple fraction. Rational exponents
+still retain their mathematical role when root notation is appropriate.
+
 Exact function endpoint identities also simplify composite constant arguments
 that evaluate to real infinity. This includes scaled infinite arguments of
 the error function and its complement. Variable bindings are not frozen to

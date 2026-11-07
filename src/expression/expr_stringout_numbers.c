@@ -10,7 +10,6 @@
  */
 
 #include <ctype.h>
-#include <gmp.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -19,6 +18,8 @@
 
 #include "expression-t.h"
 #include "string-t.h"
+#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
+#include "internal/number_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_bindings.h"
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -27,8 +28,6 @@
 #include "expr_stringout.h"
 #define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
 #include "expr_stringout_internal.h"
-#define MARS_SHARED_NUMBER_INTERNAL_ACCESS
-#include "internal/number_internal.h"
 
 
 static bool expr_number_scientific_local = false;
@@ -55,6 +54,9 @@ int expr_set_number_precision_local(int precision)
 /* Semantic notation and native formatting share the same explicit display-rounding policy. */
 string_t *expr_number_format_text_local(number_t value)
 {
+    string_t *decimal = expr_number_preferred_decimal_local(value);
+    if (decimal)
+        return decimal;
     if (expr_number_precision_local >= 0)
         return num_sprintf_text(expr_number_scientific_local ? "%.*N" : "%.*n", expr_number_precision_local, value);
     return expr_number_scientific_local ? num_sprintf_text("%N", value) : num_to_string(value);
@@ -82,99 +84,6 @@ static char *expr_take_clean_decimal_text_object_as_c_string_local(string_t *tex
     }
 
     return expr_take_text_object_as_c_string_local(text_obj);
-}
-
-static bool expr_mpz_factor_out_ulong(mpz_t value, unsigned long factor, size_t *count)
-{
-    if (!count || factor == 0u)
-        return false;
-
-    while (true) {
-        if (mpz_cmp_ui(value, 1u) == 0)
-            return true;
-        if (!mpz_divisible_ui_p(value, factor))
-            return true;
-        mpz_divexact_ui(value, value, factor);
-        ++*count;
-    }
-}
-
-static void expr_mpz_mul_small_power(mpz_t value, unsigned long factor, size_t exponent)
-{
-    for (size_t i = 0u; i < exponent; ++i)
-        mpz_mul_ui(value, value, factor);
-}
-
-static char *expr_decimal_from_scaled_integer(mpz_t scaled, size_t scale)
-{
-    char *digits_raw = mpz_get_str(NULL, 10, scaled);
-    string_t *digits;
-    string_t *mag = NULL;
-    string_t *out = NULL;
-    bool negative;
-    size_t len;
-
-    if (!digits_raw)
-        return NULL;
-
-    digits = string_new_with(digits_raw);
-    free(digits_raw);
-    if (!digits)
-        return NULL;
-
-    len = string_length(digits);
-    negative = len > 0u && rune_is_equal(string_at(digits, 0u), '-');
-    mag = negative ? string_substring(digits, 1u, len - 1u) : string_clone(digits);
-    string_free(digits);
-    if (!mag)
-        return NULL;
-
-    len = string_length(mag);
-    out = string_new();
-    if (!out)
-        goto fail;
-
-    if (negative && string_append_char(out, '-') != 0)
-        goto fail;
-
-    if (scale == 0u || len > scale) {
-        if (scale == 0u) {
-            if (string_append_string(out, mag) != 0)
-                goto fail;
-        } else {
-            size_t int_len = len - scale;
-            string_t *intpart = string_substring(mag, 0u, int_len);
-            string_t *fracpart = string_substring(mag, int_len, scale);
-
-            if (!intpart || !fracpart || string_append_string(out, intpart) != 0 || string_append_char(out, '.') != 0 ||
-                string_append_string(out, fracpart) != 0) {
-                string_free(intpart);
-                string_free(fracpart);
-                goto fail;
-            }
-            string_free(intpart);
-            string_free(fracpart);
-        }
-    } else {
-        size_t zero_count = scale - len;
-
-        if (string_append_cstr(out, "0.") != 0)
-            goto fail;
-        for (size_t i = 0u; i < zero_count; ++i) {
-            if (string_append_char(out, '0') != 0)
-                goto fail;
-        }
-        if (string_append_string(out, mag) != 0)
-            goto fail;
-    }
-
-    string_free(mag);
-    return expr_take_clean_decimal_text_object_as_c_string_local(out);
-
-fail:
-    string_free(out);
-    string_free(mag);
-    return NULL;
 }
 
 static int expr_unicode_digit_value_local(rune_t rune, bool *subscript_out)
@@ -344,59 +253,27 @@ bool expr_split_rational_text_local(const string_t *text, string_t **numer_out, 
     return true;
 }
 
-/* Preserve exact rational atoms in mathematical output, independently of decimal text preferences. */
-
-
-static char *expr_decimal_string_from_rational_text_local(const string_t *text)
+/* Format complex components independently so a long rational coefficient cannot bypass the shared policy. */
+static char *expr_complex_number_text_local(number_t value)
 {
-    string_t *numer_text = NULL;
-    string_t *denom_text = NULL;
-    mpz_t den;
-    mpz_t scaled;
-    bool mpz_ready = false;
-    size_t twos = 0u;
-    size_t fives = 0u;
-    size_t scale;
-    char *out = NULL;
-
-    if (!expr_split_rational_text_local(text, &numer_text, &denom_text))
-        return NULL;
-
-    mpz_init(den);
-    mpz_init(scaled);
-    mpz_ready = true;
-    if (mpz_set_str(den, string_c_str(denom_text), 10) != 0 || mpz_set_str(scaled, string_c_str(numer_text), 10) != 0 ||
-        mpz_sgn(den) == 0)
-        goto done;
-    if (mpz_sgn(den) < 0) {
-        mpz_neg(den, den);
-        mpz_neg(scaled, scaled);
+    number_t real = num_real_part(value), imaginary = num_imag_part(value);
+    bool real_zero = num_is_zero(real), negative = num_get_sign(imaginary) < 0;
+    number_t magnitude = num_abs(imaginary);
+    bool unit = num_eq(magnitude, NUM_ONE);
+    char *real_text = real_zero ? NULL : expr_number_to_string_local(num_clone(real));
+    char *imaginary_text = unit ? NULL : expr_number_to_string_local(num_clone(magnitude));
+    string_t *text = NULL;
+    if ((real_zero || real_text) && (unit || imaginary_text)) {
+        const char *coefficient = unit ? "" : imaginary_text;
+        text = real_zero ? string_sprintf("%s%si", negative ? "-" : "", coefficient)
+                         : string_sprintf("%s %c %si", real_text, negative ? '-' : '+', coefficient);
     }
-
-    if (!expr_mpz_factor_out_ulong(den, 2u, &twos) || !expr_mpz_factor_out_ulong(den, 5u, &fives) ||
-        mpz_cmp_ui(den, 1u) != 0)
-        goto done;
-
-    scale = twos > fives ? twos : fives;
-    if (scale < 12u)
-        goto done;
-
-    if (fives > twos) {
-        expr_mpz_mul_small_power(scaled, 2u, fives - twos);
-    } else if (twos > fives) {
-        expr_mpz_mul_small_power(scaled, 5u, twos - fives);
-    }
-
-    out = expr_decimal_from_scaled_integer(scaled, scale);
-
-done:
-    if (mpz_ready) {
-        mpz_clear(scaled);
-        mpz_clear(den);
-    }
-    string_free(denom_text);
-    string_free(numer_text);
-    return out;
+    free(real_text);
+    free(imaginary_text);
+    num_destroy(&real);
+    num_destroy(&imaginary);
+    num_destroy(&magnitude);
+    return expr_take_text_object_as_c_string_local(text);
 }
 
 char *expr_number_to_string_local(number_t value)
@@ -416,6 +293,11 @@ char *expr_number_to_string_local(number_t value)
         number_t real = num_real_part(value);
         num_destroy(&value);
         value = real;
+    }
+    if (num_is_complex_backend(value) && num_is_finite(value)) {
+        text = expr_complex_number_text_local(value);
+        num_destroy(&value);
+        return text;
     }
 
     if (num_is_inf(value)) {
@@ -442,17 +324,9 @@ char *expr_number_to_string_local(number_t value)
 
     if (!scientific && ((!num_is_inexact_real_backend(value) && !num_is_complex_backend(value)) ||
                         num_is_exact(value) || !num_is_finite(value))) {
-        text_obj = num_to_string(value);
-        if (num_is_exact(value)) {
-            char *decimal = expr_decimal_string_from_rational_text_local(text_obj);
-
-            if (decimal) {
-                string_free(text_obj);
-                num_destroy(&value);
-                return decimal;
-            }
-        }
-        text = expr_take_clean_decimal_text_object_as_c_string_local(text_obj);
+        text_obj = expr_number_format_text_local(value);
+        text = num_is_exact(value) ? expr_take_text_object_as_c_string_local(text_obj)
+                                  : expr_take_clean_decimal_text_object_as_c_string_local(text_obj);
         num_destroy(&value);
         return text;
     }

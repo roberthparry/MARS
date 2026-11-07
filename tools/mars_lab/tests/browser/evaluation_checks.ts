@@ -666,6 +666,53 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
             replace(boundary, boundary === 'commitVisibleBindingInputs' ? commitBindings : retainSource);
         }
 
+        // Changing precision replaces pending work and rejects its eventual result.
+        {
+            const native = labWire.exports();
+            const savedNativeMode = native.lab_workspace_mode();
+            const savedPrecision = native.lab_workspace_requested_precision(0);
+            const savedSave = WorksheetPersistence.persistence.savePrecision;
+            const gate = createValueGate();
+            const entered = LabTestBrowser.signal();
+            let attempts = 0;
+            mode = 'expression';
+            native.lab_workspace_select(0);
+            reply = {ok: true};
+            WorksheetPersistence.persistence.savePrecision = () => {};
+            replace('fetch', function fetchAtPrecision() {
+                if (++attempts === 1) {
+                    entered.resolve();
+                    return gate.promise;
+                }
+                return fetchResult();
+            });
+            const pending = WorksheetRequests.evaluation.evaluateExpression({skipHistoryUpdate: true});
+            try {
+                await entered.promise;
+                const previous = WorksheetRequests.labRequests.latestMain();
+                check(WorksheetRequests.labRequests.busy(), 'original calculation remains pending');
+                const nextPrecision = savedPrecision === 384 ? 448 : 384;
+                await WorksheetWorkspace.precision.setWorksheetPrecision(nextPrecision);
+                equal(WorksheetWorkspace.precision.requestedPrecisionBits(), nextPrecision,
+                      'new precision is committed while the old evaluation is still pending');
+                equal(attempts, 2, 'precision starts a replacement before the original response arrives');
+                check(WorksheetRequests.labRequests.latestMain() !== previous &&
+                      !native.lab_request_live(0, previous), 'precision supersedes the previous calculation');
+                check(!WorksheetRequests.labRequests.busy(), 'replacement completion releases its busy state');
+                equal(calls('install').length, 1, 'only the replacement result is installed');
+                events.length = 0;
+                gate.resolve({response: {ok: true}, data: {ok: true}});
+                await pending;
+                assertNoCompletion();
+            } finally {
+                gate.resolve({response: {ok: true}, data: {ok: true}});
+                await pending;
+                WorksheetPersistence.persistence.savePrecision = savedSave;
+                native.lab_workspace_precision_set(0, savedPrecision);
+                native.lab_workspace_select(savedNativeMode);
+            }
+        }
+
         // A late success or rejection, including switching away and back, must be invisible.
         for (const scenario of ['success', 'rejection', 'mode change']) {
             const gate = createValueGate();

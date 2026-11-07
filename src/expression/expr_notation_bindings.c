@@ -36,6 +36,21 @@ static const TeX_model_node_t *build_number(notation_build_t *build, const expr_
         ++literal;
     if (*literal == '@')
         ++literal;
+    binding_simple_rational_t fraction = {0};
+    if (binding_text_is_simple_rational(literal, &fraction)) {
+        string_t *decimal = expr_rational_preferred_decimal_local(fraction.numer, fraction.denom);
+        negative ^= fraction.negative;
+        binding_simple_rational_clear(&fraction);
+        if (decimal) {
+            const TeX_model_node_t *node = notation_build_node(build,
+                (TeX_node_view_t){.kind = TeX_NODE_NUMBER, .text = decimal}, NULL);
+            string_free(decimal);
+            if (negative)
+                node = notation_build_node(build,
+                    (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &node);
+            return node;
+        }
+    }
     number_t value = binding_number_from_text(literal);
     if (num_is_inf(value) || num_is_nan(value)) {
         const TeX_model_node_t *node = num_is_inf(value)
