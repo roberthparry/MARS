@@ -57,3 +57,14 @@ pl-kas.svg: original MARS geometric SVG encoding of the traditional Kashubian
 black-over-yellow bicolour, under the repository MIT Licence.
 Design reference: Kaszëbskô Jednota, "Herb, godło i flaga narodowa".
 https://kaszebsko.com/herb-godlo-i-flaga-narodowa
+
+Additional artwork retrieved 6 November 2026:
+
+cy-ncy.svg: Northern Cyprus flag, unchanged 900 × 600 SVG from Wikimedia
+Commons, revision 11 July 2021 by Mike Rohsopht; earlier contributors are
+listed in the file history. Commons marks the simple geometric flag public
+domain and also records CC BY-SA 4.0; retain attribution and that licence
+for any adaptations. Displayed only within its mapped northern control area,
+alternating with the Republic of Cyprus flag; not a separate country entry.
+https://commons.wikimedia.org/wiki/File:Flag_of_the_Turkish_Republic_of_Northern_Cyprus.svg
+https://creativecommons.org/licenses/by-sa/4.0/

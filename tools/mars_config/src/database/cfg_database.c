@@ -138,9 +138,6 @@ static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root
     (void)staging;
     int64_t revision = 0;
     if (!cfg_database_current_revision(db, "jurisdiction", &revision)) return false;
-    if (revision >= 18)
-        return cfg_database_source(db, root, "packaging/jurisdiction-db/location_additions.sql", false) &&
-               cfg_database_source(db, root, "packaging/jurisdiction-db/town_search.sql", false);
     /* Unlike optional installation assets, a declared migration must not succeed without its source. */
     string_t *path = mars_path_resource(MARS_PATH_JURISDICTION, root, "flags/LICENSE");
     file_t *source = path ? file_new(path) : NULL;
@@ -148,13 +145,19 @@ static bool cfg_database_jurisdiction_refresh(sqlite_t *db, const string_t *root
     sqlite_stmt_t *emblem = ok ? sqlite_stmt_prepare(db,
         "select 1 from jurisdiction_flag_emblem e join jurisdiction_country_flag f on f.iso_country_code=e.code "
         "where e.code='ZZ-SEA' and length(f.svg)>0 "
-        "and exists(select 1 from jurisdiction_country_flag_source where id=3)") : NULL;
+        "and exists(select 1 from jurisdiction_country_flag_source where id=3) "
+        "and exists(select 1 from jurisdiction_flag_region r "
+        "join jurisdiction_country_flag a on a.iso_country_code=r.artwork_code "
+        "join jurisdiction_country_flag p on p.iso_country_code=r.parent_code "
+        "where r.code='CY-NCY' and r.parent_code='CY' and length(a.svg)>0 and length(p.svg)>0)") : NULL;
     ok = ok && emblem && sqlite_stmt_step(emblem) == SQLITE_STEP_ROW;
     sqlite_stmt_finalize(emblem);
     file_free(source); string_free(path);
-    return ok && cfg_database_source(db, root, "packaging/jurisdiction-db/town_catalogue_refresh.sql", false) &&
+    return ok && (revision >= 18 ||
+                  cfg_database_source(db, root, "packaging/jurisdiction-db/town_catalogue_refresh.sql", false)) &&
            cfg_database_source(db, root, "packaging/jurisdiction-db/location_additions.sql", false) &&
-           cfg_database_source(db, root, "packaging/jurisdiction-db/location_subdivisions.sql", false) &&
+           (revision >= 18 ||
+            cfg_database_source(db, root, "packaging/jurisdiction-db/location_subdivisions.sql", false)) &&
            cfg_database_source(db, root, "packaging/jurisdiction-db/town_search.sql", false);
 }
 
@@ -186,7 +189,7 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
     if (ok && exists)
         ok = db && sqlite_exec_cstr(db, "PRAGMA cache_size=-16384; PRAGMA temp.cache_size=-512;") &&
              cfg_database_current_revision(db, migration->name, &revision) && revision <= migration->revision;
-    string_t *texture_root = ok && exists && migration->rebuild_globe && revision == migration->revision ?
+    string_t *texture_root = ok && exists && migration->rebuild_globe ?
         string_new() : NULL;
     bool catalogue_changed = texture_root && cfg_database_texture_catalogue_changed(db, texture_root);
     string_free(texture_root);
@@ -208,7 +211,8 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
             printf("Updating %s database to managed-data revision %d...\n", migration->name, migration->revision);
             ok = migration->apply && migration->apply(db, root, staging) &&
                  cfg_database_revision(db, migration->name, migration->revision);
-        } else if (!staged_update && ok && catalogue_changed && !cfg_database_textures_current(db, root)) {
+        }
+        if (!staged_update && ok && catalogue_changed && !cfg_database_textures_current(db, root)) {
             puts("Updating globe photographic catalogue...");
             ok = cfg_database_textures(db, root);
         }
@@ -245,7 +249,7 @@ static int cfg_databases_prepare(bool install_missing)
          CFG_GLOBE_DATA_REVISION, cfg_database_globe_refresh, NULL, true},
         {"almanac", "MARS_ALMANAC_DB_PATH", "MARS_ALMANAC_DB_KEY", "almanac/almanac.db", 0, NULL, &cfg_database_almanac, false},
         {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "MARS_JURISDICTION_DB_KEY",
-         "jurisdiction/mars_jurisdiction_rules.db", 20, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
+         "jurisdiction/mars_jurisdiction_rules.db", 21, cfg_database_jurisdiction_refresh, &cfg_database_jurisdiction, false},
     };
     /* Three independent stores, in installation order; stop before later stores on failure. */
     for (size_t i = 0; i < sizeof(migrations) / sizeof(migrations[0]); ++i)
@@ -531,7 +535,7 @@ static const cfg_database_source_label_t *cfg_database_source_label(const string
         {"packaging/almanac-db/mars_almanac.sql", "Installing almanac tables"},
         {"packaging/almanac-db/mars_almanac_chebyshev.sql", "Installing almanac ephemeris coefficients"},
         {"packaging/almanac-db/mars_almanac_frame_rotation.sql", "Installing almanac frame rotations"},
-        {"packaging/globe-db/jurisdiction_subdivisions.sql", "Identifying Kaliningrad Oblast on the globe"},
+        {"packaging/globe-db/jurisdiction_subdivisions.sql", "Updating globe country and subdivision identifiers"},
         {"packaging/jurisdiction-db/flag_emblems.sql", "Installing flag emblems"},
         {"packaging/jurisdiction-db/flag_regions.sql", "Installing regional flag definitions"},
         {"packaging/jurisdiction-db/location_additions.sql", "Adding named reference locations"},

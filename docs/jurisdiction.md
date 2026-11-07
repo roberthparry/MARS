@@ -82,6 +82,10 @@ the jurisdiction and civil time remain Finnish.
 Mongolia's Kazakh cultural areas (`MN-KAZ`) alternate Kazakhstan's existing
 blue-and-gold flag artwork with Mongolia's flag. Mongolia remains the jurisdiction
 and supplies civil time; this is a cultural display convention, not a territorial claim.
+Northern Cyprus (`CY-NCY`) alternates its red crescent-and-star flag with the
+Republic of Cyprus flag only inside the mapped northern control area. The parent
+country remains Cyprus (`CY`); the south retains Cyprus's ordinary flag. The UN
+buffer zone, British bases and neighbouring sea are excluded from the regional fade.
 Cultural coverage, including historical Brittany and both sides of the
 Basque border, is defined by the independent [globe region layer](globe.md#regional-flag-coverage).
 

@@ -3,6 +3,7 @@ create table if not exists jurisdiction_flag_region(
     code text primary key,name text not null,parent_code text not null,artwork_code text not null);
 delete from jurisdiction_flag_region;
 insert into jurisdiction_flag_region values
+('CY-NCY','Northern Cyprus','CY','CY-NCY'),
 ('DE-NFR','North Frisia, Germany','DE','DE-NFR'),
 ('DE-OFR','East Frisia, Germany','DE','DE-OFR'),
 ('DE-SAT','Saterland, Germany','DE','DE-SAT'),

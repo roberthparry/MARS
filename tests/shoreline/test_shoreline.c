@@ -906,6 +906,17 @@ static void test_globe_regional_flags(void)
         {53.2012, 5.7999, "NL-FR"}, {53.4690, 7.4820, "DE-OFR"},
         {53.3675, 7.2060, "DE-OFR"}, {54.4858, 9.0533, "DE-NFR"},
         {54.9079, 8.3096, "DE-NFR"}, /* Sylt */
+        {35.3360, 33.3200, "CY-NCY"}, /* Kyrenia/Girne */
+        {35.1250, 33.9400, "CY-NCY"}, /* Famagusta/Gazimagusa */
+        {35.2100, 32.9950, "CY-NCY"}, /* Morphou/Guzelyurt */
+        {35.1850, 33.3650, "CY-NCY"}, /* Northern Nicosia */
+        {35.1750, 32.6200, "CY-NCY"}, /* Kokkina/Erenkoy exclave */
+        {35.1400, 33.3650, NULL}, /* Southern Nicosia: Strovolos */
+        {35.1700, 33.3650, NULL}, /* Nicosia buffer zone */
+        {34.6750, 33.0450, NULL}, {34.9170, 33.6300, NULL}, /* Limassol, Larnaca */
+        {34.7650, 32.4200, NULL}, {35.0990, 33.4190, NULL}, /* Paphos, UN buffer zone: Pyla */
+        {34.6000, 32.9600, NULL}, {34.9850, 33.7500, NULL}, /* Akrotiri, Dhekelia bases */
+        {35.8000, 33.3000, NULL}, /* Sea north of Cyprus */
         {51.5074, -0.1278, NULL}, {50.3755, -4.1427, NULL}, /* England, Devon not Cornwall */
         {48.0061, 0.1996, NULL}, {43.2951, -0.3708, NULL}, /* Le Mans, Bearn not Basque */
         {42.8105, 2.5040, NULL}, /* Saint-Paul-de-Fenouillet: Occitan */

@@ -5,7 +5,8 @@
  * Developer-only preparation tool: takes Natural Earth admin-1, geoBoundaries German
  * districts, the Pays Basque authority outline, French department 66 communes, French departments, PRG gminas,
  * the Finnish Sámi homeland, Frisian municipalities, Brandenburg/Saxon Sorbian settlement outlines,
- * and Mongolian districts, followed by an output path. Keeps source polygon geometry and selected identifiers;
+ * Mongolian districts and Natural Earth admin-0 map units, followed by an output path.
+ * Keeps source polygon geometry and selected identifiers;
  * it does not infer sovereignty, download data or modify installed databases.
  * See the existing globe guide and third-party notices for sources and scope.
  */
@@ -177,11 +178,16 @@ static const char *mongolian_code(const json_t *properties)
            mapped(districts, sizeof districts / sizeof *districts, text_field(properties, "shapeID")) : NULL;
 }
 
+static const char *cyprus_code(const json_t *properties)
+{
+    return !strcmp(text_field(properties, "GU_A3"), "CYN") ? "CY-NCY" : NULL;
+}
+
 static bool extract(json_t *output, const char *path, unsigned source)
 {
     static const char *(*const selectors[])(const json_t *) = {
         natural_code, german_code, basque_code, catalan_code, french_code, polish_code, sami_code,
-        frisian_code, brandenburg_code, saxon_code, mongolian_code
+        frisian_code, brandenburg_code, saxon_code, mongolian_code, cyprus_code
     };
     string_t *name = string_new_with(path);
     json_t *document = json_from_file(name);
@@ -208,15 +214,15 @@ static bool extract(json_t *output, const char *path, unsigned source)
 /* Prepare a reproducible offline subset; installation consumes only the resulting package. */
 int main(int argc, char **argv)
 {
-    if (argc != 13) {
+    if (argc != 14) {
         fprintf(stderr, "usage: region_extract admin1 districts basque communes departments gminas sami "
-                        "frisian brandenburg saxony mongolia output\n"); return 2;
+                        "frisian brandenburg saxony mongolia map_units output\n"); return 2;
     }
     json_t *document = json_new_object(), *features = json_new_array();
     bool ok = document && features;
-    for (unsigned i = 0; ok && i < 11; ++i) ok = extract(features, argv[i + 1], i);
+    for (unsigned i = 0; ok && i < 12; ++i) ok = extract(features, argv[i + 1], i);
     ok = ok && set_text(document, "type", "FeatureCollection") && set(document, "features", features);
-    string_t *path = string_new_with(argv[12]);
+    string_t *path = string_new_with(argv[13]);
     if (ok) ok = json_to_file(document, path) == 0;
     string_free(path); json_free(features); json_free(document);
     return ok ? 0 : 1;

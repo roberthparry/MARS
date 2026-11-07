@@ -1307,14 +1307,17 @@ bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string
 {
     int64_t revision = 0;
     if (!cfg_database_current_revision(db, "globe", &revision)) return false;
-    /* Revision nine already validated the geographic layers. This migration changes photographs only;
-       their installer verifies every image and rolls back atomically without rescanning gigabytes of rivers. */
-    if (revision >= 9 && revision < CFG_GLOBE_DATA_REVISION) return cfg_database_textures(db, root);
+    /* Keep later display-only migrations independent of river/coastline validation and image replacement. */
+    if (revision >= 9)
+        return (revision >= CFG_GLOBE_PHOTO_REVISION || cfg_database_textures(db, root)) &&
+               (revision >= 18 ||
+                (cfg_globe_regions(db, root) &&
+                 cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false)));
     return cfg_globe_valid(db) &&
            (revision >= 3 || cfg_database_coast(db, root, staging)) &&
            (revision >= 7 || cfg_globe_countries(db, root, staging)) &&
-           (revision >= 9 || cfg_globe_regions(db, root)) &&
-           (revision >= CFG_GLOBE_DATA_REVISION || cfg_database_textures(db, root)) &&
+           cfg_globe_regions(db, root) &&
+           cfg_database_textures(db, root) &&
            cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) && cfg_globe_valid(db);
 }
 

@@ -88,7 +88,7 @@ static bool texture_import_progress(sqlite_t *db, const string_t *root, const fi
     int saved = descriptor >= 0 ? dup(STDERR_FILENO) : -1;
     fflush(stderr);
     bool redirected = saved >= 0 && dup2(descriptor, STDERR_FILENO) >= 0;
-    bool imported = redirected && cfg_database_globe_refresh(db, root, root);
+    bool imported = redirected && cfg_database_textures(db, root);
     fflush(stderr);
     bool restored = !redirected || dup2(saved, STDERR_FILENO) >= 0;
     if (saved >= 0) close(saved);
@@ -112,7 +112,7 @@ static void test_cfg_textures_manifest(void)
     TEST_ASSERT_TRUE(db && expected && cfg_database_revision(db, "globe", 13) &&
                      sqlite_exec_cstr(db, "create table retained(value);insert into retained values(42)") &&
                      texture_import_progress(db, root, fixture),
-                     "revision thirteen upgrades imagery only and counts all 202 global/regional images");
+                     "photographic installation counts all 202 global/regional images");
     sqlite_stmt_t *query = sqlite_stmt_prepare(db, "select json from globe_texture_manifest where id=1");
     TEST_ASSERT_TRUE(query && sqlite_stmt_step(query) == SQLITE_STEP_ROW &&
                      !strcmp(sqlite_stmt_column_text(query, 0), string_c_str(expected)),
@@ -400,7 +400,7 @@ static bool texture_migration_fixture(const char *directory)
     q = db ? sqlite_stmt_prepare(db,
         "SELECT changed FROM texture_update_audit WHERE EXISTS (\n"
         "    SELECT 1 FROM sqlite_master WHERE name = 'texture_update_probe'\n"
-        ") AND EXISTS (SELECT 1 FROM mars_database_revision WHERE name = 'globe' AND revision = 17)") : NULL;
+        ") AND EXISTS (SELECT 1 FROM mars_database_revision WHERE name = 'globe' AND revision = 18)") : NULL;
     ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int(q, 0) == 1;
     sqlite_stmt_finalize(q);
     q = sqlite_stmt_prepare(db, "select source from rivers_dataset");
@@ -456,9 +456,14 @@ static bool texture_staged_fixture(const char *directory)
     string_t *parent = fixture ? string_new_with(file_path(fixture)) : NULL;
     string_t *staging = parent ? cfg_database_stage(parent) : NULL;
     file_t *installed = path ? file_new(path) : NULL;
-    bool ok = db && root && installed && staging && cfg_database_textures(db, root) &&
+    bool ok = db && root && installed && staging &&
+        !setenv("MARS_GLOBE_SOURCE_DIR", MARS_CONFIG_ROOT_DIR "/packaging/globe-db", 1) &&
+        cfg_database_textures(db, root) &&
         cfg_database_revision(db, "globe", 15) && sqlite_exec_cstr(db,
             "PRAGMA application_id=1296126547; PRAGMA user_version=27;\n"
+            "CREATE TABLE country_name(id INTEGER PRIMARY KEY,name TEXT,iso_country_code TEXT);\n"
+            "CREATE TABLE country_chunk(id INTEGER PRIMARY KEY,country INTEGER);\n"
+            "CREATE VIRTUAL TABLE country_bounds USING rtree_i32(id,west,east,south,north);\n"
             "CREATE TABLE retained(value BLOB, label TEXT, optional INTEGER);\n"
             "WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<5001)\n"
             "INSERT INTO retained(rowid,value,label) SELECT x,cast(x AS BLOB),'kept' FROM n;\n"

@@ -20,10 +20,11 @@
 #include "json-t.h"
 #include "sqlite-t.h"
 
-/** @brief Managed photographic migrations and their compatible in-place update boundary. */
+/** @brief Managed geographic and photographic migrations and their in-place update boundaries. */
 enum {
     CFG_GLOBE_TEXTURE_PATCH_BASE = 16, /**< First catalogue whose validated PNG rows support selective replacement. */
-    CFG_GLOBE_DATA_REVISION = 17      /**< Current catalogue, including finer Sydney photographs. */
+    CFG_GLOBE_PHOTO_REVISION = 17,     /**< Latest revision requiring a photographic catalogue update. */
+    CFG_GLOBE_DATA_REVISION = 18       /**< Current catalogue, including Northern Cyprus regional flag coverage. */
 };
 
 /** Open the selected format: an empty key means plaintext; NULL is a configuration failure. */

@@ -11,7 +11,7 @@ SVG and WebGL rendering remain application responsibilities.
 The offline source package is `packaging/globe-db/textures/`; its manifest records
 dimensions, byte counts, SHA-256 digests and NASA source attribution.
 Fresh installations include the 74 overview and original NASA images, 1,152 full-resolution NASA tiles
-and 4,971 regional Sentinel-2 photographs.
+and 5,242 regional Sentinel-2 photographs.
 Managed database revision 16 installs the expanded coastal PNG catalogue and its complete manifest
 to existing installations through `make update-mars-db` or `make release`,
 preserving coastline, country, regional and river layers. Import validates every
@@ -45,12 +45,12 @@ to overlay them. Catalogue capacity does not increase decoded-image cache budget
 Missing data or invalid addresses return false and clear the output structure.
 
 The prepared catalogue covers the UK, Ireland, Denmark, Netherlands, Italy, Corsica,
-Sardinia, Capri, Greek islands, mainland Portugal, Azores, Madeira, Spain, Canaries,
+Sardinia, Capri, Greece including its mainland and islands, mainland Portugal, Azores, Madeira, Spain, Canaries,
 Falklands, Ascension, Isle of Man, Jersey, Guernsey, coastal Svalbard and Cape Peninsula.
 The completed expansion adds mainland France, New Zealand and its offshore islands,
 Finland including Åland, Sweden, Norway, Iceland, and selected Australian areas: Brisbane,
 Sydney, Melbourne, Perth, Mooloolaba, Maroochydore, Canberra, Cairns, Alice Springs and Gold Coast.
-The regional PNG package occupies about 33.5 GiB after coastline trimming. The full-resolution NASA grid
+The regional PNG package occupies about 36.6 GiB after coastline trimming. The full-resolution NASA grid
 adds 2,199,613,908 bytes (about 2.05 GiB); its temporary source GeoTIFF downloads are removed after verification.
 France, New Zealand, Finland, Sweden, Norway, Iceland, the Australian areas, Spain and Svalbard use
 1800-square tiles; earlier regional coverage generally uses 3600-square tiles. These dimensions describe individual images,
@@ -304,7 +304,7 @@ Sardinia; Spanish Basque Country and Navarre; the French Pays Basque outline;
 Dutch Fryslân; East Frisia (Aurich, Leer, Wittmund, Emden); North Frisia
 (Nordfriesland district and islands, plus Helgoland); Saterland; Sorbian Lusatia;
 Kashubia in northern Poland; Finland's Sámi homeland; and selected Kazakh cultural
-areas in Mongolia.
+areas in Mongolia; and Northern Cyprus's mapped control area.
 It does not assign all of Lower Saxony,
 Schleswig-Holstein or Pyrénées-Atlantiques to those cultural areas. Other disputed
 or wider historical extensions are not inferred.
@@ -352,11 +352,19 @@ and central Ulaanbaatar retain Mongolia's ordinary flag. Bayan-Ölgii uses Natur
 Earth admin-1; the four additional districts use pinned geoBoundaries identifiers
 to avoid selecting identically named districts elsewhere. Jurisdiction remains `MN`.
 
-`tools/mars_config/region_extract.c` prepares the package from eleven offline
+Northern Cyprus (`CY-NCY`) uses the Natural Earth admin-0 `CYN` multipolygon,
+including its western exclave. Separate UN buffer-zone and British-base features
+are excluded. The country identifier for the northern control area is `CY`; its
+distinct regional flag is display metadata. Southern Cyprus retains its ordinary
+country flag. These generalised boundaries are suitable for globe display, rather
+than property-level decisions beside the Green Line.
+
+`tools/mars_config/region_extract.c` prepares the package from twelve offline
 GeoJSON inputs (Natural Earth admin-1, German districts, French Basque outline,
 department 66 communes, French departments, Polish PRG municipalities and the
 Finnish Sámi homeland, Frisian municipalities, Brandenburg Sorbian settlement
-and Saxon Sorbian settlement, Mongolian districts), followed by the output path.
+and Saxon Sorbian settlement, Mongolian districts, Natural Earth admin-0 map units),
+followed by the output path.
 It uses native MARS JSON
 and file APIs, retains selected source coordinates and requires no Python or
 runtime downloads. `make update-mars-db` applies the independent geometry and
@@ -364,7 +372,7 @@ artwork migrations, preserving installed coastline and river data. Fresh globe
 and jurisdiction installations include their respective parts.
 Sources, licences and attribution are in [third-party notices](../THIRD_PARTY_NOTICES.md#regional-flag-artwork-and-coverage).
 
-Package SHA-256: `2c7b7c789d1e55e823601579beacf18a8d9d3781d235511c885f0f002e5a4945`.
+Package SHA-256: `e980cf8bc5403ca93a6c3dcf88e0f5abb54445e004a5903a952ae691d6366269`.
 Preparation input SHA-256 values, in argument order:
 
 | Input | SHA-256 |
@@ -380,6 +388,7 @@ Preparation input SHA-256 values, in argument order:
 | Brandenburg Sorbian settlement | `80e4a443182d34d5bc6d559b2acb92eab81f33b0e0636c947da7c56fca7baa5f` |
 | Saxon Sorbian settlement | `1d433333b9bd9419b0096ebafa938af7871b62bea4b4d77fde30048c8450d2bb` |
 | Mongolian districts | `dc4ffaa394bfd6a5d278bea15d8c302cbce38d8650b8b4859862bacb1f63a91f` |
+| Natural Earth admin-0 map units | `57da82be755f4afccd8f3b14251bb2752f5df1395f47d2d86f817470c4a48862` |
 
 ## Named inland waters
 

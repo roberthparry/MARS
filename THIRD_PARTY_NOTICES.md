@@ -80,6 +80,10 @@ Xander89 is distributed under [CC BY-SA 3.0](https://creativecommons.org/license
 not MIT. The unchanged Saterland SVG by Ætoms (design Bernd Stolle) is marked
 as public-domain official flag artwork on Commons; its structured record also
 records CC BY-SA 4.0, retained in the regional notices.
+The unchanged Northern Cyprus SVG (Mike Rohsopht and earlier Commons contributors,
+retrieved 6 November 2026) is marked as simple geometric public-domain artwork;
+Commons also records [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/),
+retained with attribution in the regional notices.
 Cornish, East Frisian, North Frisian, Sorbian and Kashubian simple geometric SVG encodings
 are original MARS code. Catalan and Basque images reuse the existing flag-icons assets.
 
@@ -89,6 +93,10 @@ downloaded; properties are replaced by local display codes. Retrieved 24–25 Oc
 
 - [Natural Earth admin-1 5.1.1](https://github.com/nvkelso/natural-earth-vector/blob/v5.1.1/geojson/ne_10m_admin_1_states_provinces.geojson),
   public domain, supplies the selected European provinces/regions.
+- [Natural Earth admin-0 map units 5.1.1](https://github.com/nvkelso/natural-earth-vector/blob/v5.1.1/geojson/ne_10m_admin_0_map_units.geojson),
+  public domain, retrieved 6 November 2026, supplies the unchanged `GU_A3=CYN`
+  multipolygon for Northern Cyprus flag coverage, including its western exclave.
+  The UN buffer zone and British bases are separate source features and are excluded.
 - German districts: © GeoBasis-DE / BKG (2021), via
   [geoBoundaries DEU ADM3, revision 9469f09](https://github.com/wmgeolab/geoBoundaries/tree/9469f09/releaseData/gbOpen/DEU/ADM3),
   [Data licence Germany – attribution – version 2.0](https://www.govdata.de/dl-de/by-2-0).
@@ -309,7 +317,7 @@ geographic bounds, reprojection, colour scaling and the resulting image digest.
 These modified images are not official ESA products and imply no endorsement.
 The expanded catalogue uses the same published quarterly mosaics for the UK,
 Ireland, Denmark, Netherlands, Italy, the requested Mediterranean and Atlantic
-islands, Portugal, Spain, coastal Svalbard and Cape Peninsula. Regional names,
+islands, mainland Greece, Portugal, Spain, coastal Svalbard and Cape Peninsula. Regional names,
 coverage bounds, processing details and output checksums are retained in the
 complete manifest imported into the globe database.
 Preparation for mainland France, Brisbane, Sydney, Melbourne, Perth, the Sunshine Coast
