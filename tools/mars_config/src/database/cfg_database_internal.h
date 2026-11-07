@@ -159,17 +159,15 @@ bool cfg_database_rebuild_globe(sqlite_t **source, const string_t *path, const s
 
 /** Shared installer-owned settings; callbacks borrow these strings and never publish them directly. */
 typedef struct cfg_database_options {
-    string_t *home;
-    string_t *configuration_directory;
-    string_t *configuration_path;
-    file_t *configuration;
-    string_t *path;
-    string_t *expanded_path;
-    string_t *key;
-    string_t *requested_location;
-    string_t *saved_location;
-    string_t *requested_language;
-    string_t *saved_language;
+    string_t *home;                 /**< Owned MARS home, released by installer option cleanup. */
+    string_t *configuration_path;   /**< Owned central mars.db path, never a per-database sidecar. */
+    string_t *path;                 /**< Owned selected content-store path, retained for publication. */
+    string_t *expanded_path;        /**< Owned path after home-directory expansion. */
+    string_t *key;                  /**< Owned content-store credential; an empty string selects plaintext. */
+    string_t *requested_location;   /**< Owned explicit calendar location, possibly empty. */
+    string_t *saved_location;       /**< Owned previous calendar location from encrypted settings. */
+    string_t *requested_language;   /**< Owned explicit calendar language, possibly empty. */
+    string_t *saved_language;       /**< Owned previous calendar language from encrypted settings. */
 } cfg_database_options;
 
 /** Database-specific policy consumed by the common plaintext or encrypted installation lifecycle. */
@@ -182,21 +180,41 @@ typedef struct cfg_database_profile {
     bool (*read_options)(cfg_database_options *, const string_t *, const char *, const char *);
     bool (*import_sources)(sqlite_t *, const string_t *, const string_t *);
     bool (*populate)(sqlite_t *, const string_t *, const cfg_database_options *, bool, string_t **, string_t **);
-    bool (*export_settings)(string_t *, const string_t *, const string_t *);
+    /**
+     * @brief Add profile-specific values to the common installer's JSON transaction.
+     * @param[in,out] settings Borrowed JSON object; receives copied string values and remains caller-owned.
+     * @param[in] location Borrowed chosen location, valid throughout this call.
+     * @param[in] language Borrowed chosen language, valid throughout this call.
+     * @return True after every value is copied; false on invalid input or allocation failure.
+     * @note Never publishes files or retains arguments. Called serially before common data/settings publication.
+     */
+    bool (*export_settings)(json_t *settings, const string_t *location, const string_t *language);
 } cfg_database_profile;
 
-/** Almanac-specific settings, legacy-path migration and packaged ephemeris sources. */
+/** Almanac-specific option policy and packaged ephemeris sources. */
 extern const cfg_database_profile cfg_database_almanac;
 
 /** Jurisdiction-specific settings, packaged rules and calendar generation. */
 extern const cfg_database_profile cfg_database_jurisdiction;
 
-/** Resolve a setting in explicit, environment, saved and fallback order. */
-string_t *cfg_database_setting(file_t *configuration, const char *explicit_value, const char *name,
-                               const string_t *fallback);
+/**
+ * @brief Resolve an installer value from explicit arguments, the loaded settings environment or a default.
+ * @param[in] explicit_value Optional command-line value, including an explicitly empty key; copied.
+ * @param[in] name Borrowed variable name, already populated from mars.db during startup.
+ * @param[in] fallback Optional borrowed default used only when neither earlier source is present.
+ * @return Owned string, possibly empty; release with string_free. NULL reports allocation or configuration failure.
+ * No argument is retained or consumed. Stored values come from mars.db; no per-database sidecar is read.
+ */
+string_t *cfg_database_setting(const char *explicit_value, const char *name, const string_t *fallback);
 
-/** Append a safely quoted shell setting to an installer-owned configuration body. */
-bool cfg_database_export(string_t *body, const char *name, const string_t *value);
+/**
+ * @brief Copy one string setting into an installer-owned JSON update.
+ * @param[in,out] body Borrowed JSON object, retained by its caller.
+ * @param[in] name Borrowed setting name; copied into the object.
+ * @param[in] value Borrowed value; copied without shell quoting or expansion.
+ * @return True after insertion; false for invalid input or allocation failure. No argument is consumed.
+ */
+bool cfg_database_export(json_t *body, const char *name, const string_t *value);
 
 /** Import a packaged source, allowing absence only when optional is true. */
 bool cfg_database_source(sqlite_t *db, const string_t *root, const char *name, bool optional);
@@ -293,9 +311,17 @@ bool cfg_database_publish_rivers_limited(sqlite_t *destination, sqlite_t *source
 /** Create an unpredictable mode-0700 staging directory beneath the supplied directory. */
 string_t *cfg_database_stage(const string_t *directory);
 
-/** Publish a staged database and configuration, restoring the previous database if configuration rename fails. */
-bool cfg_database_publish(file_t *database, file_t *destination, file_t *configuration,
-                          const string_t *configuration_directory, const string_t *staging, const string_t *body);
+/**
+ * @brief Publish a validated staged store and its encrypted JSON settings update.
+ * @param[in,out] database Borrowed closed staged database; moved on success.
+ * @param[in,out] destination Borrowed content-store destination; must be absent or a safe regular file.
+ * @param[in] staging Borrowed private staging directory, retained throughout this call.
+ * @param[in] body Borrowed JSON settings object, never retained or printed.
+ * @return True after data replacement and settings commit; false on validation, file or settings failure.
+ * Restores the previous data on a settings failure. If restoration fails, retains recovery data in staging.
+ * @note Stop other database users before publication. No handle or string is consumed or freed.
+ */
+bool cfg_database_publish(file_t *database, file_t *destination, const string_t *staging, const string_t *body);
 
 /** Remove only installer-owned staging entries, leaving an unrecovered backup intact. */
 void cfg_database_cleanup(const string_t *staging);

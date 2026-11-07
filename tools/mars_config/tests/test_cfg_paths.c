@@ -111,24 +111,25 @@ static bool paths_relocation(const char *directory)
 static bool paths_literal_import(const char *directory)
 {
     mars_settings_key_provider(paths_test_key);
-    bool ok = !unsetenv("MARS_CONFIG_FILE") && mars_settings_initialise();
-    string_t *state = string_sprintf("%s/old state/current.json", directory);
-    string_t *cache = string_sprintf("%s/old cache/objects.db", directory);
-    char *migrate[] = {"migrate"};
-    ok = ok && state && cache && !setenv("MARS_LAB_STATE_FILE", string_c_str(state), 1) &&
-         !setenv("MARS_LAB_OBJECT_STORE_PATH", string_c_str(cache), 1) && !mars_settings_command(1, migrate);
-    string_t *text = string_new_with("export MARS_WEATHER_API_KEY='literal $(not-a-command)'\n"
-                                     "export MARS_ALMANAC_DB_PATH='data/almanac.db'\n");
+    char *initialise[] = {"init"};
+    bool ok = !unsetenv("MARS_CONFIG_FILE") && !mars_settings_command(1, initialise);
+    string_t *text = string_new_with("{\"MARS_WEATHER_API_KEY\":\"literal $(not-a-command)\","
+                                     "\"MARS_ALMANAC_DB_PATH\":\"data/almanac.db\"}");
     ok = ok && mars_settings_import(text, false);
-    string_free(text); text = string_new_with("MARS_WEATHER_API_KEY='replacement'\nINVALID_KEY='bad'\n");
+    string_free(text);
+    text = string_new_with("{\"MARS_WEATHER_API_KEY\":\"replacement\",\"INVALID_KEY\":\"bad\"}");
     ok = ok && !mars_settings_import(text, true) && !unsetenv("MARS_WEATHER_API_KEY") && mars_settings_load() &&
          !strcmp(getenv("MARS_WEATHER_API_KEY"), "literal $(not-a-command)");
-    ok = ok && !unsetenv("MARS_LAB_OBJECT_STORE_PATH") && !unsetenv("MARS_LAB_HISTORY_FILE") && mars_settings_load();
-    string_t *history = string_sprintf("%s/old state/mars_lab_history.db", directory);
+    string_t *history = string_sprintf("%s/config/../lab/mars_lab_history.db", directory);
+    string_t *cache = string_sprintf("%s/config/../lab/mars_lab_object_store.sqlite3", directory);
     ok = ok && getenv("MARS_LAB_HISTORY_FILE") && !strcmp(getenv("MARS_LAB_HISTORY_FILE"), string_c_str(history)) &&
          getenv("MARS_LAB_OBJECT_STORE_PATH") && !strcmp(getenv("MARS_LAB_OBJECT_STORE_PATH"), string_c_str(cache));
-    string_free(history); string_free(cache); string_free(state);
-    string_free(text);
+    string_t *secret = mars_settings_secret("MARS_LAB_OBJECT_STORE_KEY");
+    string_t *again = mars_settings_secret("MARS_LAB_OBJECT_STORE_KEY");
+    ok = ok && secret && again && string_byte_length(secret) == 64 && !string_compare(secret, again) &&
+         !mars_settings_secret("INVALID_KEY");
+    string_free(again); string_free(secret);
+    string_free(history); string_free(cache); string_free(text);
     return ok;
 }
 
@@ -169,11 +170,14 @@ static bool paths_isolation(const char *directory)
         do { waited = waitpid(setup, &status, 0); } while (waited < 0 && errno == EINTR);
     }
     ok = ok && setup > 0 && waited == setup && WIFEXITED(status) && !WEXITSTATUS(status);
+    if (!ok) fputs("Settings isolation: setup failed.\n", stderr);
     string_t *memory = string_new_with(":memory:");
     sqlite_t *db = ok ? sqlite_open_plain(memory) : NULL;
     ok = ok && db && paths_memory_security_disabled(db);
+    if (!ok) fputs("Settings isolation: initial plain connection failed.\n", stderr);
     sqlite_close(db);
     ok = ok && mars_settings_isolate() && mars_settings_load();
+    if (!ok) fputs("Settings isolation: load failed.\n", stderr);
     db = ok ? sqlite_open_plain(memory) : NULL;
     ok = !mars_settings_open(false) && errno == EPERM && ok;
     string_t *globe = string_sprintf("%s/config/../world/globe.db", directory);
@@ -182,9 +186,11 @@ static bool paths_isolation(const char *directory)
     ok = ok && getenv("MARS_GLOBE_DB_PATH") && !strcmp(getenv("MARS_GLOBE_DB_PATH"), string_c_str(globe)) &&
          getenv("MARS_WEATHER_API_KEY") && !strcmp(getenv("MARS_WEATHER_API_KEY"), "explicit") &&
          textures && !string_compare(textures, expected) && paths_memory_security_disabled(db);
-    string_t *update = string_new_with("MARS_GLOBE_DB_PATH='updated/globe.db'\n");
+    if (!ok) fputs("Settings isolation: initial paths failed.\n", stderr);
+    string_t *update = string_new_with("{\"MARS_GLOBE_DB_PATH\":\"updated/globe.db\"}");
     ok = ok && mars_settings_sync(update) && !unsetenv("MARS_GLOBE_DB_PATH") &&
          !unsetenv("MARS_WEATHER_API_KEY") && mars_settings_load();
+    if (!ok) fputs("Settings isolation: JSON update failed.\n", stderr);
     string_free(globe); globe = string_sprintf("%s/config/../updated/globe.db", directory);
     ok = ok && getenv("MARS_GLOBE_DB_PATH") && !strcmp(getenv("MARS_GLOBE_DB_PATH"), string_c_str(globe)) &&
          getenv("MARS_WEATHER_API_KEY") && !strcmp(getenv("MARS_WEATHER_API_KEY"), "fixture-secret") &&
@@ -193,6 +199,11 @@ static bool paths_isolation(const char *directory)
     sqlite_stmt_t *size = db ? sqlite_stmt_prepare(db, "select length(png) from image") : NULL;
     ok = ok && size && sqlite_stmt_step(size) == SQLITE_STEP_ROW && sqlite_stmt_column_int(size, 0) == 16777216;
     sqlite_stmt_finalize(size);
+    string_t *secret = mars_settings_secret("MARS_LAB_OBJECT_STORE_KEY");
+    string_t *again = mars_settings_secret("MARS_LAB_OBJECT_STORE_KEY");
+    ok = ok && secret && again && !string_compare(secret, again) && paths_memory_security_disabled(db);
+    if (!ok) fputs("Settings isolation: secret request failed.\n", stderr);
+    string_free(again); string_free(secret);
     string_t *locator = string_sprintf("%s/config/mars.json", directory);
     ok = paths_write(locator, "{broken json") && !mars_settings_load() && paths_memory_security_disabled(db) && ok;
     string_free(locator);
@@ -219,7 +230,7 @@ static void test_cfg_paths_relocation(void)
 static void test_cfg_settings_import(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(paths_literal_import),
-                     "literal imports preserve credentials and roll back invalid assignments");
+                     "JSON imports preserve credentials and roll back invalid settings");
 }
 
 /* Register configuration regressions before documented examples. */

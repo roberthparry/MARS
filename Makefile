@@ -548,10 +548,15 @@ $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(1)): \
 	    $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%.o,$(1)) \
 	    $(TEST_COMMON_HELPER_OBJS) \
 	    $(filter $(TEST_BUILD_DIR)/$(dir $(patsubst tests/%,%,$(1)))%.o,$(TEST_HELPER_OBJS)) \
+	    $$(TEST_CONFIGURATION_OBJS) \
 	    $(STATIC_LIB) $(LDLIBS)
 endef
 
 $(foreach src,$(TEST_SRCS),$(eval $(call TEST_BIN_RULE,$(src))))
+
+# Configured engine tests are application clients: load mars.db before entering library code.
+$(TEST_BUILD_DIR)/almanac/test_almanac $(TEST_BUILD_DIR)/jurisdiction/test_jurisdiction: TEST_CONFIGURATION_OBJS = $(APP_RESOURCE_OBJ)
+$(TEST_BUILD_DIR)/almanac/test_almanac $(TEST_BUILD_DIR)/jurisdiction/test_jurisdiction: $(APP_RESOURCE_OBJ)
 
 $(BUILD_DIR)/bench/%: $(BUILD_DIR)/bench/%.o $(STATIC_LIB) $(SHARED_LIB)
 	@mkdir -p $(dir $@)
@@ -699,7 +704,7 @@ to-be-announced-lab: native-tba-lab
 configure-mars: native-config
 	@echo "Preparing encrypted MARS settings; the desktop key store may request an unlock."
 	@"$(CONFIG_PROGRAM)" paths init
-	@"$(CONFIG_PROGRAM)" settings migrate
+	@"$(CONFIG_PROGRAM)" settings init
 	@echo "MARS configuration ready: mars.json locates encrypted mars.db; existing database paths and settings preserved."
 
 .PHONY: update-mars-db
@@ -720,22 +725,14 @@ check-globe-db: check-native-deps native-config
 update-globe-db: check-native-deps native-config
 	@"$(CONFIG_PROGRAM)" globe-update
 
-uninstall-globe-db:
-	rm -f "$(HOME)/.mars/globe/globe.db" \
-	    "$(HOME)/.mars/globe/globe.db-journal" \
-	    "$(HOME)/.mars/globe/globe.db-wal" \
-	    "$(HOME)/.mars/globe/globe.db-shm" \
-	    "$(HOME)/.mars/config/globe-db.env"
+uninstall-globe-db: native-config
+	@"$(CONFIG_PROGRAM)" uninstall globe
 
 install-almanac-db: check-native-deps native-config $(ALMANAC_RULES_SOURCES)
 	@"$(CONFIG_PROGRAM)" almanac
 
-uninstall-almanac-db:
-	rm -f "$(HOME)/.mars/almanac/almanac.db" \
-	    "$(HOME)/.mars/almanac/almanac.db-journal" \
-	    "$(HOME)/.mars/almanac/almanac.db-wal" \
-	    "$(HOME)/.mars/almanac/almanac.db-shm" \
-	    "$(HOME)/.mars/config/almanac-db.env"
+uninstall-almanac-db: native-config
+	@"$(CONFIG_PROGRAM)" uninstall almanac
 
 ifeq ($(firstword $(MAKECMDGOALS)),install-jurisdiction-db)
     ifneq ($(word 3,$(MAKECMDGOALS)),)
@@ -761,12 +758,8 @@ install-jurisdiction-db: export MARS_CALENDAR_LIBRARY = $(abspath $(SHARED_LIB))
 install-jurisdiction-db: check-native-deps native-config $(JURISDICTION_RULES_SOURCES)
 	@"$(CONFIG_PROGRAM)" jurisdiction
 
-uninstall-jurisdiction-db:
-	rm -f "$(HOME)/.mars/jurisdiction/mars_jurisdiction_rules.db" \
-	    "$(HOME)/.mars/jurisdiction/mars_jurisdiction_rules.db-journal" \
-	    "$(HOME)/.mars/jurisdiction/mars_jurisdiction_rules.db-wal" \
-	    "$(HOME)/.mars/jurisdiction/mars_jurisdiction_rules.db-shm" \
-	    "$(HOME)/.mars/config/jurisdiction-db.env"
+uninstall-jurisdiction-db: native-config
+	@"$(CONFIG_PROGRAM)" uninstall jurisdiction
 
 install-mars-lab: export MARS_CALENDAR_LIBRARY = $(abspath $(SHARED_LIB))
 install-mars-lab: native-lab native-config check-lab-deps $(SHARED_LIB) $(JURISDICTION_RULES_SOURCES) packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
@@ -879,24 +872,24 @@ help:
 	@printf '  %-40s %s\n' "make mars-lab-restart" "Stop and relaunch the local MARS Lab"
 	@printf '  %-40s %s\n' "make install-mars-lab" "Install a user desktop launcher for MARS Lab"
 	@printf '  %-40s %s\n' "make uninstall-mars-lab" "Remove the user desktop launcher for MARS Lab"
-	@printf '  %-40s %s\n' "make configure-mars" "Create tiny mars.json and encrypted mars.db; migrate existing settings using the desktop key store"
+	@printf '  %-40s %s\n' "make configure-mars" "Create tiny mars.json and encrypted mars.db using the desktop key store"
 	@printf '\n%s\n' "Databases — all three"
 	@printf '  %-40s %s\n' "make install-mars-db" "Install globe, almanac and jurisdiction databases sequentially"
 	@printf '  %-40s %s\n' "make update-mars-db" "Install missing databases and update existing ones using saved settings"
-	@printf '  %-40s %s\n' "make uninstall-mars-db" "Remove all three default databases and their configuration; preserve Lab history"
+	@printf '  %-40s %s\n' "make uninstall-mars-db" "Remove all three configured databases; preserve settings and Lab history"
 	@echo "    Stop the Lab before uninstalling. History and weather settings are preserved."
 	@printf '\n%s\n' "Databases — individual"
 	@printf '  %-40s %s\n' "make install-globe-db" "Build a fresh globe database with geography and photographic textures"
 	@printf '  %-40s %s\n' "make update-globe-db" "Update packaged geography and textures, preserving river data"
 	@printf '  %-40s %s\n' "make check-globe-db" "Verify globe integrity, shoreline availability and photographic textures"
 	@printf '  %-40s %s\n' "make prepare-globe-blocks" "Optional native image-block preparation; release imports completed sources"
-	@printf '  %-40s %s\n' "make uninstall-globe-db" "Remove the default globe database and its configuration"
+	@printf '  %-40s %s\n' "make uninstall-globe-db" "Remove the configured globe database; preserve its saved path"
 	@printf '  %-40s %s\n' "make install-almanac-db" "Build and configure the Almanac database only"
-	@printf '  %-40s %s\n' "make uninstall-almanac-db" "Remove the default Almanac database and its configuration"
+	@printf '  %-40s %s\n' "make uninstall-almanac-db" "Remove the configured Almanac database; preserve its saved path"
 	@printf '  %-40s %s\n' "make install-jurisdiction-db [town]" "Build the private database and calendar_local for a town"
 	@echo "    Use LOCATION='town, jurisdiction' for a qualified or multiword town."
 	@echo "    Add CALENDAR_LANGUAGE=code to preselect a calendar language (also works non-interactively)"
-	@printf '  %-40s %s\n' "make uninstall-jurisdiction-db" "Remove only the default jurisdiction database and its configuration"
+	@printf '  %-40s %s\n' "make uninstall-jurisdiction-db" "Remove the configured jurisdiction database; preserve its saved path"
 	@printf '\n%s\n' "Tests and benchmarks"
 	@printf '  %-40s %s\n' "make test" "Run all tests"
 	@printf '  %-40s %s\n' "make test_<name>" "Build and run a single test (e.g. make test_expression)"

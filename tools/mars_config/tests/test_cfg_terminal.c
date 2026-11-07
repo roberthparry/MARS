@@ -25,6 +25,7 @@
 
 #include "file-t.h"
 #include "sqlite-t.h"
+#include "mars_settings.h"
 #include "cfg_storage.h"
 #include "test_harness.h"
 #include "test_cfg_support.h"
@@ -302,14 +303,14 @@ static bool test_calendar_pty_fixture(const char *directory)
     ok = ok && db &&
          test_calendar_query(db, "SELECT location||'|'||locale FROM calendar_local_settings", "Vatican City|la_VA");
     sqlite_close(db);
-    string_t *config_path = string_sprintf("%s/config/jurisdiction-db.env", directory);
+    string_t *config_path = string_sprintf("%s/mars.db", directory);
     string_t *saved_path = string_sprintf("%s/saved.db", directory),
-             *saved_config = string_sprintf("%s/saved.env", directory);
+             *saved_config = string_sprintf("%s/saved-settings.db", directory);
     file_t *database = path ? file_new(path) : NULL, *config = config_path ? file_new(config_path) : NULL;
     file_t *copy = saved_path ? file_new(saved_path) : NULL,
            *config_copy = saved_config ? file_new(saved_config) : NULL;
-    string_t *language = config ? cfg_storage_setting(config, "MARS_CALENDAR_LANGUAGE") : NULL;
-    string_t *location = config ? cfg_storage_setting(config, "MARS_CALENDAR_LOCATION") : NULL;
+    string_t *language = config ? mars_settings_read("MARS_CALENDAR_LANGUAGE") : NULL;
+    string_t *location = config ? mars_settings_read("MARS_CALENDAR_LOCATION") : NULL;
     ok = ok && test_calendar_text(language, "la_VA") && test_calendar_text(location, "Vatican City, VA") && copy &&
          config_copy && file_copy(database, copy, false) && file_copy(config, config_copy, false);
     static const test_calendar_dialogue_t cancel[] = {

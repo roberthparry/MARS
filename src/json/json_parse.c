@@ -21,6 +21,7 @@
 
 typedef struct {
     string_cursor_t *cursor;
+    const string_t *source;
 } json_parser_t;
 
 static void json_skip_ws(json_parser_t *parser)
@@ -109,7 +110,10 @@ static bool json_parse_unicode_escape(json_parser_t *parser, string_t *out)
     }
 
     rune = rune_from_value(scalar);
-    return !rune_is_none(rune) && string_append_rune(out, rune) == 0;
+    string_t *encoded = !rune_is_none(rune) ? rune_to_string(rune) : NULL;
+    bool ok = encoded && !string_append_utf8_exact(out, string_c_str(encoded), string_byte_length(encoded));
+    string_free(encoded);
+    return ok;
 }
 
 static string_t *json_parse_string_text(json_parser_t *parser)
@@ -132,7 +136,10 @@ static string_t *json_parse_string_text(json_parser_t *parser)
             goto fail;
 
         if (!string_cursor_peek_ascii(parser->cursor, &ascii)) {
-            if (string_append_rune(text, rune) != 0 || string_cursor_next(parser->cursor) != 0)
+            string_pos_t start = string_cursor_position(parser->cursor);
+            if (string_cursor_next(parser->cursor) != 0 ||
+                string_append_utf8_exact(text, string_c_str(parser->source) + start,
+                                         string_cursor_position(parser->cursor) - start) != 0)
                 goto fail;
             continue;
         }
@@ -477,6 +484,7 @@ json_t *json_from_text(const string_t *text)
     if (!text)
         return NULL;
 
+    parser.source = text;
     parser.cursor = string_cursor_new(text);
     if (!parser.cursor)
         return NULL;

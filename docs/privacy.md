@@ -12,10 +12,10 @@ WeatherAPI.com account and deliberately configures that account's API key. If
 no key is configured, MARS makes no request to WeatherAPI.com and the calendar
 and astronomical features continue to work locally.
 
-The configured key is stored in the installing user's private
-`~/.mars/config/weather.env` file with owner-only permissions. It is read by
-the local MARS Lab server and is not sent to the browser. Removing that file or
-removing its `MARS_WEATHER_API_KEY` setting disables weather lookups.
+The configured key is stored as `MARS_WEATHER_API_KEY` in encrypted `mars.db`,
+located by the user's small `mars.json` configuration file. The desktop key store
+protects its encryption key. The local MARS Lab server reads the setting at startup;
+it is not sent to the browser. Remove that setting and restart Lab to disable lookups.
 
 ## Information sent during a lookup
 

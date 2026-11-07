@@ -20,6 +20,7 @@
 #include "almanac-t.h"
 #include "datetime-t.h"
 #include "jurisdiction-t.h"
+#include "mars_settings.h"
 #define MARS_SHARED_ALMANAC_INTERNAL_ACCESS
 #include "internal/almanac_internal.h"
 #define MARS_ALMANAC_INTERNAL_ACCESS
@@ -98,6 +99,7 @@ static bool configured_almanac_is_usable(void)
 
 static bool test_almanac_suite_setup(void)
 {
+    if (!mars_settings_isolate() || !mars_settings_load()) return false;
     if (configured_almanac_is_usable())
         return true;
 
@@ -1193,7 +1195,7 @@ static void test_almanac_configuration_file_io(void)
     TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, string_c_str(key), string_byte_length(key)), 0);
     TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, "\"  ", 3), 0);
     TEST_ASSERT_TRUE(file_write_all_text(source, contents), "write long Unicode configuration");
-    TEST_ASSERT_TRUE(file_create_symlink(source, config), "read configuration through symbolic link");
+    TEST_ASSERT_TRUE(file_create_symlink(source, config), "create an ignored obsolete configuration file");
     sqlite_t *database = sqlite_open_encrypted(database_path, key);
     TEST_ASSERT_NOT_NULL(database);
     TEST_ASSERT_TRUE(sqlite_init_object_store(database), "initialise encrypted fixture");
@@ -1210,6 +1212,8 @@ static void test_almanac_configuration_file_io(void)
     bool environment_ok = setenv(names[0], root, 1) == 0;
     for (size_t i = 1; i < sizeof(names) / sizeof(names[0]); ++i)
         environment_ok = unsetenv(names[i]) == 0 && environment_ok;
+    environment_ok = environment_ok && !setenv("MARS_ALMANAC_DB_PATH", string_c_str(database_path), 1) &&
+                     !setenv("MARS_ALMANAC_DB_KEY", string_c_str(key), 1);
     almanac_t *engine = environment_ok ? almanac_open() : NULL;
     bool opened = engine && almanac_last_error(engine) && !*almanac_last_error(engine);
     almanac_close(engine);
@@ -1229,7 +1233,7 @@ static void test_almanac_configuration_file_io(void)
     file_free(config);
     file_free(directory);
     TEST_ASSERT_TRUE(environment_ok && restored, "restore environment after isolated configuration test");
-    TEST_ASSERT_TRUE(opened, "configuration preserves decomposed paths and exact quoted Unicode keys beyond 4 KiB");
+    TEST_ASSERT_TRUE(opened, "inherited settings preserve decomposed paths and exact Unicode keys beyond 4 KiB");
 }
 
 /* README example: obtain the native geometry and observer-relative tilt for a solar preview. */

@@ -436,6 +436,21 @@ static void test_serialise_unicode_catalogue(void)
     json_free(array);
 }
 
+static void test_parse_exact_unicode(void)
+{
+    const char bytes[] = "cle\xcc\x81 cafe\xcc\x81";
+    string_t *input = string_new();
+    TEST_ASSERT_INT_EQ(string_append_utf8_exact(input, bytes, sizeof bytes - 1), 0);
+    json_t *value = json_new_string(input);
+    string_t *encoded = value ? json_to_string(value) : NULL;
+    json_t *parsed = encoded ? json_from_text(encoded) : NULL;
+    const string_t *output = json_string_value(parsed);
+    TEST_ASSERT_TRUE(output && string_byte_length(output) == sizeof bytes - 1 &&
+                     !memcmp(string_c_str(output), bytes, sizeof bytes - 1),
+                     "decomposed Unicode remains exact without duplicated combining marks");
+    json_free(parsed); string_free(encoded); json_free(value); string_free(input);
+}
+
 static void test_parse_leading_combining_marks(void)
 {
     static const char *const inputs[] = {
@@ -448,7 +463,8 @@ static void test_parse_leading_combining_marks(void)
         json_t *value = json_from_text(text);
         TEST_ASSERT_NOT_NULL(value);
         const json_t *name = i == 3 ? object_get_literal(value, "\u0301key") : value;
-        string_t *want = s(expected[i]);
+        string_t *want = string_new();
+        TEST_ASSERT_INT_EQ(string_append_utf8_exact(want, expected[i], strlen(expected[i])), 0);
         TEST_ASSERT_TRUE(name && json_string_value(name) && string_compare(json_string_value(name), want) == 0,
                          "combining marks and the full name are retained without dropping or duplicating characters");
         string_free(want);
@@ -467,6 +483,7 @@ int tests_main(void)
     TEST_SECTION("JSON Parsing");
     TEST_RUN_IN_GROUP(test_parse_object_array_and_escapes, tests, NULL);
     TEST_RUN_IN_GROUP(test_parse_leading_combining_marks, tests, NULL);
+    TEST_RUN_IN_GROUP(test_parse_exact_unicode, tests, NULL);
     TEST_RUN_IN_GROUP(test_rejects_non_json_number_forms, tests, NULL);
     TEST_RUN_IN_GROUP(test_number_t_extension_round_trip, tests, NULL);
     TEST_RUN_IN_GROUP(test_number_t_constants_use_math_spelling, tests, NULL);

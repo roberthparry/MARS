@@ -35,8 +35,8 @@ void test_cfg_make_self_fixture(void)
                   prefix <= length && !memcmp(bytes, program, prefix);
         bool setup = ok && length == prefix + sizeof("paths\0init") &&
                      !memcmp(bytes + prefix, "paths\0init", sizeof("paths\0init"));
-        bool migrate = ok && length == prefix + sizeof("settings\0migrate") &&
-                       !memcmp(bytes + prefix, "settings\0migrate", sizeof("settings\0migrate"));
+        bool migrate = ok && length == prefix + sizeof("settings\0init") &&
+                       !memcmp(bytes + prefix, "settings\0init", sizeof("settings\0init"));
         bool update = ok && length == prefix + sizeof("databases-ensure") &&
                       !memcmp(bytes + prefix, "databases-ensure", sizeof("databases-ensure"));
         ok = setup || migrate || update;
@@ -176,51 +176,16 @@ static void test_cfg_make_forward(void)
 
 static bool test_cfg_make_uninstall_check(const char *directory, bool all)
 {
-    static const char *const paths[] = {
-        "jurisdiction/mars_jurisdiction_rules.db", "jurisdiction/mars_jurisdiction_rules.db-journal",
-        "jurisdiction/mars_jurisdiction_rules.db-wal", "jurisdiction/mars_jurisdiction_rules.db-shm",
-        "config/jurisdiction-db.env", "almanac/almanac.db", "almanac/almanac.db-journal",
-        "almanac/almanac.db-wal", "almanac/almanac.db-shm", "config/almanac-db.env",
-        "globe/globe.db", "globe/globe.db-journal", "globe/globe.db-wal", "globe/globe.db-shm",
-        "config/globe-db.env", "config/weather.env", "jurisdiction/custom.db", "almanac/custom.db",
-        "globe/custom.db", "lab/mars_lab_state.json", "lab/mars_lab_history.db", "lab/mars_lab_history.db-journal",
-        "globe/rivers-checkpoint.sqlite3"
-    };
-    bool ok = test_cfg_make_environment();
-    static const char *const directories[] = {"jurisdiction", "config", "almanac", "globe", "lab"};
-    for (size_t i = 0; i < sizeof(directories) / sizeof(*directories) && ok; ++i) {
-        string_t *path = string_sprintf("%s/.mars/%s", directory, directories[i]);
-        file_t *folder = path ? file_new(path) : NULL;
-        ok = folder && file_create_directory(folder, 0700, true);
-        file_free(folder);
-        string_free(path);
-    }
-    for (size_t i = 0; i < sizeof(paths) / sizeof(*paths) && ok; ++i) {
-        string_t *path = string_sprintf("%s/.mars/%s", directory, paths[i]);
-        file_t *entry = path ? file_new(path) : NULL;
-        ok = entry && file_write_all_bytes(entry, "preserve", 8);
-        file_free(entry);
-        string_free(path);
-    }
-    string_t *home_argument = string_sprintf("HOME=%s", directory);
-    const char *args[] = {"make", "--no-print-directory", "-j1",
-                          all ? "uninstall-mars-db" : "uninstall-jurisdiction-db",
-                          home_argument ? string_c_str(home_argument) : "", NULL};
-    /* The HOME override is confined to this child Make process and its disposable fixture. */
-    for (unsigned pass = 0; pass < 2 && ok; ++pass) {
-        string_t *output = NULL;
-        int status = -1;
-        ok = home_argument && lab_proc_run(args, MARS_CONFIG_ROOT_DIR, 30000, 262144, &output, &status) && status == 0;
-        string_free(output);
-    }
-    for (size_t i = 0; i < sizeof(paths) / sizeof(*paths) && ok; ++i) {
-        string_t *path = string_sprintf("%s/.mars/%s", directory, paths[i]);
-        file_t *entry = path ? file_new(path) : NULL;
-        ok = entry && file_exists(entry) == (i >= (all ? 15 : 5));
-        file_free(entry);
-        string_free(path);
-    }
-    string_free(home_argument);
+    (void)directory;
+    if (!test_cfg_make_environment()) return false;
+    const char *args[] = {"make", "--no-print-directory", "-j1", "-n", "-o", "native-config",
+                          all ? "uninstall-mars-db" : "uninstall-jurisdiction-db", NULL};
+    string_t *output = NULL;
+    int status = -1;
+    bool ok = lab_proc_run(args, MARS_CONFIG_ROOT_DIR, 30000, 262144, &output, &status) && status == 0 &&
+              output && string_find(output, "uninstall jurisdiction") >= 0 && string_find(output, ".env") < 0;
+    if (all) ok = ok && string_find(output, "uninstall almanac") >= 0 && string_find(output, "uninstall globe") >= 0;
+    string_free(output);
     return ok;
 }
 

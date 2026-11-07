@@ -1334,17 +1334,6 @@ static bool route_rivers(const char *directory)
                       !setenv("MARS_GLOBE_DB_KEY", "river-globe-test", 1);
     string_free(globe_path);
     if (!configured) return false;
-    string_t *config_directory = string_sprintf("%s/config", directory);
-    string_t *config_path = string_sprintf("%s/config/globe-db.env", directory);
-    string_t *config_text = string_sprintf("MARS_GLOBE_DB_PATH=%s\nMARS_GLOBE_DB_KEY=river-globe-test\n",
-                                           getenv("MARS_GLOBE_DB_PATH"));
-    file_t *config_folder = config_directory ? file_new(config_directory) : NULL;
-    file_t *config_file = config_path ? file_new(config_path) : NULL;
-    configured = config_folder && config_file && config_text && file_create_directory(config_folder, 0700, false) &&
-                 file_write_all_text(config_file, config_text) && !setenv("MARS_HOME", directory, 1);
-    file_free(config_folder); file_free(config_file);
-    string_free(config_directory); string_free(config_path); string_free(config_text);
-    if (!configured) return false;
     if (setenv("NO_PROXY", "*", 1) || setenv("no_proxy", "*", 1)) return false;
     const char *bounds = "{\"west\":-1,\"south\":-1,\"east\":2,\"north\":2}";
     http_response_t *response = route_request(HTTP_POST, "/almanac-rivers", bounds,

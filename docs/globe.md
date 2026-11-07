@@ -885,8 +885,9 @@ to tables accidentally left in the town database. All connections are borrowed.
 The original two-connection API retains its existing behaviour for current callers.
 
 `globe_open_configured()` owns an independent geometry connection and optionally
-borrows a jurisdiction connection for towns. It resolves `MARS_GLOBE_DB_PATH` and
-`MARS_GLOBE_DB_KEY` before literal values in `MARS_HOME/config/globe-db.env`.
+borrows a jurisdiction connection for towns. It consumes the inherited `MARS_GLOBE_DB_PATH` and
+`MARS_GLOBE_DB_KEY` settings. Applications load these from encrypted `mars.db`, located by `mars.json`,
+before starting library work; explicit environment values retain precedence.
 An empty or absent key selects plaintext SQLite; a non-empty key selects encrypted SQLCipher.
 An explicitly empty environment key overrides a saved key. A failed keyed open never retries without encryption.
 It opens only an existing database, with read queries enabled, and closes its
@@ -901,7 +902,7 @@ the jurisdiction town catalogue.
 validated OSM/GSHHG shoreline, Natural Earth country sources, regional coverage
 and photographic texture package, with no download. Its default location is
 `$MARS_HOME/globe/globe.db` (normally `~/.mars/globe/globe.db`); settings are saved
-privately in `config/globe-db.env`. `MARS_GLOBE_DB_PATH` and `MARS_GLOBE_DB_KEY`
+in encrypted `mars.db`, located by `config/mars.json`. `MARS_GLOBE_DB_PATH` and `MARS_GLOBE_DB_KEY`
 override saved values. Fresh installations default to plaintext, without password prompts;
 non-empty configured keys retain encryption. Every installation builds a fresh staged database from the packaged
 sources, with import progress shown, even when a database already exists. The completed database replaces the
@@ -924,12 +925,11 @@ writer-locked until the validated replacement is atomically renamed into place; 
 replacement is required. Managed photographic migrations during `make release` use the same publication path,
 preserving installed geography and rivers. Individual image checks are performed during import, so publication
 does not hash the entire catalogue a second time. Stop MARS Lab before updating and restart it afterwards. This is
-not a river installation command. `make uninstall-globe-db` removes the default
-`~/.mars/globe/globe.db`, its SQLite sidecar files and `~/.mars/config/globe-db.env`.
-`make uninstall-mars-db` also removes the default almanac and jurisdiction databases,
-their SQLite sidecar files and database configuration files. Stop the Lab before
-uninstalling. Custom database paths, Lab history, weather settings and separate river
-processing files are preserved. Repeating an uninstall with absent files succeeds.
+not a river installation command. `make uninstall-globe-db` removes the configured globe
+database and its SQLite sidecars. `make uninstall-mars-db` also removes the configured almanac
+and jurisdiction stores, including custom paths. Stop the Lab before uninstalling.
+The saved paths, history, weather settings and separate river-processing files are preserved.
+Repeating an uninstall with absent files succeeds.
 When MARS Lab is installed, the next `make release` restores missing databases from
 packaged sources and migrates existing databases without rebuilding them. The same
 operation is available directly as `make update-mars-db`.
@@ -943,23 +943,8 @@ before rebuilding databases and restart it afterwards. New almanac installations
 contain no shoreline geometry; existing copies are not deleted merely by opening
 the configured globe.
 
-### Plaintext conversion
-
-Stop the Lab and all database writers before running `mars_config databases-plaintext`. The command processes
-globe, jurisdiction and almanac sequentially, stopping at the first failure. Remove path/key environment overrides
-first: conversion deliberately uses saved configuration only and refuses overrides that would mask the new settings.
-Each encrypted database is exported to a new private file with `.plain.db` appended to its existing pathname.
-Schema, spatial indexes, data, `user_version` and `application_id` are copied; integrity is checked before selection.
-Only then are the saved path and key changed. No geographic sources are reimported and no river tables are removed.
-Other saved settings, including calendar choices, survive. Already-plaintext stores are verified and skipped.
-
-The original encrypted file remains intact. Its old configuration is retained alongside the configuration file
-with an `.encrypted-backup` suffix. Both outputs are owner-only. Existing export or backup paths are never overwritten;
-inspect retained files after a failed conversion before retrying. Switching configuration is atomic per file, not
-across all three databases. Restart the Lab after conversion. For rollback, stop database users and restore the old
-configuration; subsequent changes made only to the plaintext copy will not be present in the encrypted original.
-River staging, resume and publication use unencrypted SQLite databases. These operations do not use a river
-encryption key; the desktop keyring protects only the separate `mars.db` configuration store.
+River staging, resume and publication use unencrypted SQLite databases. The desktop keyring
+protects the separate `mars.db` configuration store.
 
 `globe_has_layer()` reports availability through `globe_layer_t`. Shoreline and
 future detailed geometry belong in the globe database; towns remain in the

@@ -15,6 +15,7 @@ TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 int tests_main(void)
 {
     test_cfg_make_self_fixture();
+    test_cfg_command_self_fixture();
     TEST_SECTION("Native MARS configuration");
     test_cfg_progress_cases();
     test_cfg_storage_cases();

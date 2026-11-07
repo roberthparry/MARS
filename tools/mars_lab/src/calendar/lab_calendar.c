@@ -5,8 +5,8 @@
  * Implements the five calendar routes without a shell or Python interpreter.
  * Only allowlisted arguments reach the worker programmes. Process failures are
  * distinguished from optional holiday database unavailability. Native almanac
- * and jurisdiction modules load their own database paths and keys, including
- * MARS_HOME/config files; no process-global environment changes are made here.
+ * and jurisdiction modules consume the inherited settings snapshot; no configuration
+ * sidecar is opened and no process-global environment change is made here.
  */
 #include <ctype.h>
 #include <errno.h>
@@ -74,58 +74,7 @@ json_t *lab_cal_error(unsigned *status, unsigned code, const char *message)
     return response;
 }
 
-/* Read only the requested key, never interpreting shell syntax. */
-string_t *lab_cal_config(const char *filename, const char *key)
-{
-    const char *environment = getenv(key);
-    if (environment && *environment) {
-        string_t *value = string_new_with(environment);
-        string_trim(value);
-        if (string_byte_length(value))
-            return value;
-        string_free(value);
-    }
-    const char *home = getenv("HOME");
-    const char *mars_home = getenv("MARS_HOME");
-    string_t *base =
-        mars_home && *mars_home ? string_new_with(mars_home) : string_sprintf("%s/.mars", home ? home : ".");
-    string_t *path = string_sprintf("%s/config/%s", string_c_str(base), filename);
-    file_t *file = file_new(path);
-    string_t *result = NULL;
-    string_t *line = NULL;
-    if (file_open_read(file)) {
-        while (file_read_line(file, &line) && line) {
-            string_trim(line);
-            string_cursor_t *cursor = string_cursor_new(line);
-            string_cursor_consume(cursor, "export ");
-            if (string_cursor_consume(cursor, key) && string_cursor_consume(cursor, "=")) {
-                result = string_cursor_slice_between(string_cursor_position(cursor), string_cursor_end_position(cursor),
-                                                     cursor);
-                string_trim(result);
-                size_t size = string_length(result);
-                rune_t first = string_at(result, 0), last = string_at(result, size ? size - 1 : 0);
-                if (size >= 2 && (rune_is_equal(first, '\'') || rune_is_equal(first, '"')) &&
-                    rune_value(first) == rune_value(last)) {
-                    string_t *unquoted = string_substring(result, 1, size - 2);
-                    string_free(result);
-                    result = unquoted;
-                }
-                string_cursor_free(cursor);
-                string_free(line);
-                line = NULL;
-                break;
-            }
-            string_cursor_free(cursor);
-            string_free(line);
-            line = NULL;
-        }
-    }
-    string_free(line);
-    file_free(file);
-    string_free(path);
-    string_free(base);
-    return result ? result : string_new();
-}
+
 
 static json_t *lab_cal_parse_output(const string_t *output)
 {

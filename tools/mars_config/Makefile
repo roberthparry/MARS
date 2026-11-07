@@ -90,7 +90,7 @@ $(CONFIG_BUILD_DIR)/tests/%.o: tools/mars_config/tests/%.c tools/mars_config/tes
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_config/include -Itools/mars_lab/include \
 	    $(CONFIG_TEST_INTERNAL_INCLUDES) \
-	    -DMARS_CONFIG_PROGRAM='"$(abspath $(CONFIG_PROGRAM))"' -DMARS_CONFIG_ROOT_DIR='"$(CURDIR)"' -c $< -o $@
+	    -DMARS_CONFIG_PROGRAM='"$(abspath $(CONFIG_TEST_BIN))"' -DMARS_CONFIG_ROOT_DIR='"$(CURDIR)"' -c $< -o $@
 
 $(CONFIG_TEST_BIN): $(CONFIG_TEST_OBJS) $(CONFIG_SUPPORT_OBJS) $(LAB_BUILD_DIR)/process/lab_process.o $(TEST_COMMON_HELPER_OBJS) $(STATIC_LIB) $(CONFIG_PROGRAM)
 	$(CC) $(LDFLAGS) -o $@ $(CONFIG_TEST_OBJS) $(CONFIG_SUPPORT_OBJS) \

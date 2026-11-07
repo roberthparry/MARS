@@ -447,7 +447,8 @@ typedef struct _almanac_solar_transit_t almanac_solar_transit_t;
  *
  * The engine resolves its own configured backing store, using
  * @c MARS_ALMANAC_DB_PATH and @c MARS_ALMANAC_DB_KEY when available, otherwise
- * falling back to @c ~/.mars/almanac/almanac.db and any configured key file.
+ * falling back to @c ~/.mars/almanac/almanac.db with an absent key.
+ * Applications load persistent settings before opening the engine; no configuration sidecar is read here.
  * An empty or absent key selects plaintext SQLite. A non-empty key selects encryption;
  * unreadable databases never trigger an unencrypted retry.
  *

@@ -126,38 +126,20 @@ prove an exhaustive nearest-land solution. Release the event-local samples with
 
 ## Configuration
 
-`almanac_open()` resolves the backing store from the current configuration.
+MARS Lab and the configurator load the database path and key from encrypted
+`mars.db`, located by `mars.json`, before starting library work.
+`almanac_open()` consumes the inherited `MARS_ALMANAC_DB_PATH` and `MARS_ALMANAC_DB_KEY`
+settings; explicit environment values override the saved settings.
 
-It prefers:
-
-- `MARS_ALMANAC_DB_PATH`
-- `MARS_ALMANAC_DB_KEY`
-
-If those are not set in the environment, it also checks the standard MARS
-configuration file:
-
-- `~/.mars/config/almanac-db.env`
-
-With `MARS_HOME` set, its `config/almanac-db.env` is used instead.
-An absent or empty database key selects plaintext SQLite; a non-empty key retains encrypted SQLCipher.
-An explicitly empty environment key overrides a saved key. Opening does not convert files or retry a failed keyed open.
-Use the explicit [plaintext conversion](globe.md#plaintext-conversion) to preserve existing data and rollback copies.
-Configuration files are read through `file_t`, explicitly following symbolic
-links to regular files. Complete UTF-8 lines are parsed using `string_t`,
-without the former 4 KiB line limit. A leading BOM and LF, CRLF or CR line
-endings are accepted. Keys may have surrounding whitespace and an optional
-`export ` prefix; matching outer single or double quotes are removed from
-values. This is literal assignment parsing, not shell evaluation: variables,
-escapes and command substitutions are not expanded. The first matching key
-wins, including an empty value. Malformed UTF-8 or an I/O error before a match
-leaves that lookup unresolved. Environment variables retain precedence.
+An absent or empty key selects plaintext SQLite; a non-empty key selects encrypted SQLCipher.
+Opening neither converts existing files nor retries a failed keyed open as plaintext.
+Standalone library callers supply these inherited settings themselves.
 
 The default database location is:
 
 - `~/.mars/almanac/almanac.db`
 
-Opening fails when the engine cannot find both a usable database path and the
-decryption key. In that case, inspect `almanac_last_error()` for the recorded
+Opening fails when the selected database is unavailable or a supplied decryption key is invalid. In that case, inspect `almanac_last_error()` for the recorded
 failure reason.
 
 ## Ownership

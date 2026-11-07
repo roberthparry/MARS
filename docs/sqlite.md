@@ -56,8 +56,7 @@ in both modes. Plaintext files are not protected at rest; use filesystem permiss
 Plaintext opening does not disable process-wide memory protection enabled by an encrypted connection.
 
 Neither opener converts an existing file: encrypted files fail in plaintext mode and keyed opens reject plaintext
-files. Use an explicit export to a different file for conversion. The native configurator's `databases-plaintext`
-command converts globe, jurisdiction and almanac storage; see [conversion and rollback](globe.md#plaintext-conversion).
+files. Use an explicit export to a different file for conversion.
 
 ## Example: Plaintext query
 

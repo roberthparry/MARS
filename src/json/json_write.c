@@ -85,9 +85,14 @@ static bool json_escape_string(string_t *out, const string_t *text)
         return false;
 
     while (!string_cursor_done(cursor)) {
-        rune_t rune = string_cursor_peek(cursor);
-
-        if (!json_append_escaped_rune(out, rune) || string_cursor_next(cursor) != 0) {
+        unsigned char ascii;
+        bool single_ascii = string_cursor_peek_ascii(cursor, &ascii);
+        string_pos_t start = string_cursor_position(cursor);
+        bool advanced = string_cursor_next(cursor) == 0;
+        bool copied = advanced && (single_ascii
+            ? json_append_escaped_rune(out, rune_from_value(ascii))
+            : !string_append_utf8_exact(out, string_c_str(text) + start, string_cursor_position(cursor) - start));
+        if (!copied) {
             string_cursor_free(cursor);
             return false;
         }
@@ -99,7 +104,7 @@ static bool json_escape_string(string_t *out, const string_t *text)
 
 static bool json_append_escaped_string(string_t *out, const string_t *text)
 {
-    /* Normalise each escaped value locally, not the entire accumulated JSON document. */
+    /* Preserve each escaped value's UTF-8 bytes without reprocessing the accumulated document. */
     string_t *escaped = string_new();
     bool ok = out && escaped && json_escape_string(escaped, text) &&
               string_append_utf8_exact(out, string_c_str(escaped), string_byte_length(escaped)) == 0;

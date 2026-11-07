@@ -101,145 +101,21 @@ static char *mars_home_path(void)
     return NULL;
 }
 
-static char *jurisdiction_config_path(void)
-{
-    char *mars_home = mars_home_path();
-    char *config_path;
-
-    if (!mars_home)
-        return NULL;
-    config_path = dup_printf_path3(mars_home, "/config/", "jurisdiction-db.env");
-    free(mars_home);
-    return config_path;
-}
-
-static char *legacy_holiday_config_path(void)
-{
-    char *mars_home = mars_home_path();
-    char *config_path;
-
-    if (!mars_home)
-        return NULL;
-    config_path = dup_printf_path3(mars_home, "/config/", "holiday-db.env");
-    free(mars_home);
-    return config_path;
-}
-
-/* Parse complete configuration lines as MARS strings; this is not a shell interpreter. */
-static char *config_lookup_at_path(char *config_path, const char *name)
-{
-    file_t *file = NULL;
-    string_t *wanted = NULL;
-    string_t *line = NULL;
-    char *result = NULL;
-
-    if (!config_path || !name || !*name)
-        goto done;
-    wanted = string_new_with(name);
-    file = file_new_cstr(config_path);
-    if (!wanted || !file || !file_open_follow(file, FILE_MODE_OPEN, FILE_ACCESS_READ))
-        goto done;
-
-    while (file_read_line(file, &line) && line) {
-        string_t *key = NULL;
-        string_t *value = NULL;
-        string_trim(line);
-        if (string_starts_with(line, "export ")) {
-            string_t *body = string_substr(line, 7, string_byte_length(line) - 7);
-            string_free(line);
-            line = body;
-            if (!line)
-                break;
-        }
-        string_offset_t equals = string_find(line, "=");
-        if (equals >= 0) {
-            key = string_substr(line, 0, (size_t)equals);
-            value = string_substr(line, (size_t)equals + 1, string_byte_length(line) - (size_t)equals - 1);
-        }
-        bool matched = key && value && string_compare(key, wanted) == 0;
-        if (matched) {
-            string_trim(value);
-            string_t *unquoted = string_unquote_shell(value);
-            string_free(value);
-            value = unquoted;
-            if (value && string_byte_length(value))
-                result = jurisdiction_dup_c_string(string_c_str(value));
-        }
-        string_free(key);
-        string_free(value);
-        string_free(line);
-        line = NULL;
-        if (result)
-            break;
-    }
-    if (!file_close(file)) {
-        free(result);
-        result = NULL;
-    }
-
-done:
-    string_free(line);
-    string_free(wanted);
-    file_free(file);
-    free(config_path);
-    return result;
-}
-
-static char *jurisdiction_config_lookup(const char *name)
-{
-    return config_lookup_at_path(jurisdiction_config_path(), name);
-}
-
-static char *legacy_holiday_config_lookup(const char *name)
-{
-    return config_lookup_at_path(legacy_holiday_config_path(), name);
-}
-
+/* Applications provide their resolved configuration snapshot before using the library. */
 static char *jurisdiction_db_path_from_env(void)
 {
-    const char *path_env = getenv("MARS_JURISDICTION_DB_PATH");
-    char *configured_path;
-    char *mars_home;
-
-    if (path_env && *path_env)
-        return jurisdiction_dup_c_string(path_env);
-    path_env = getenv("MARS_HOLIDAY_DB_PATH");
-    if (path_env && *path_env)
-        return jurisdiction_dup_c_string(path_env);
-    configured_path = jurisdiction_config_lookup("MARS_JURISDICTION_DB_PATH");
-    if (!configured_path)
-        configured_path = legacy_holiday_config_lookup("MARS_HOLIDAY_DB_PATH");
-    if (configured_path)
-        return configured_path;
-    mars_home = mars_home_path();
-    if (mars_home) {
-        char *default_path = dup_printf_path3(mars_home, "/jurisdiction/", "mars_jurisdiction_rules.db");
-
-        free(mars_home);
-        return default_path;
-    }
-    return NULL;
+    const char *path = getenv("MARS_JURISDICTION_DB_PATH");
+    if (path && *path) return jurisdiction_dup_c_string(path);
+    char *home = mars_home_path();
+    char *result = home ? dup_printf_path3(home, "/jurisdiction/", "mars_jurisdiction_rules.db") : NULL;
+    free(home);
+    return result;
 }
 
 static char *jurisdiction_db_key_from_env(void)
 {
-    const char *env_key;
-    char *config_key;
-
-    env_key = getenv("MARS_JURISDICTION_DB_KEY");
-    if (env_key)
-        return jurisdiction_dup_c_string(env_key);
-    env_key = getenv("MARS_HOLIDAY_DB_KEY");
-    if (env_key)
-        return jurisdiction_dup_c_string(env_key);
-    config_key = jurisdiction_config_lookup("MARS_JURISDICTION_DB_KEY");
-    if (!config_key)
-        config_key = legacy_holiday_config_lookup("MARS_HOLIDAY_DB_KEY");
-    if (config_key && !*config_key) {
-        free(config_key);
-        return NULL;
-    }
-    return config_key;
+    const char *key = getenv("MARS_JURISDICTION_DB_KEY");
+    return key ? jurisdiction_dup_c_string(key) : NULL;
 }
 
 static void map_country_code_to_jurisdiction(const char *country_code, char out[32])

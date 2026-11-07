@@ -15,9 +15,9 @@ generic container layer without exposing those internals to callers.
 - round-trip standard JSON numbers as text and as `number_t`
 - preserve full `number_t` values through a valid JSON extension object
 
-Serialisation escapes and normalises each string value locally before appending
-its validated UTF-8 bytes. Adding an accented name therefore does not repeatedly
-normalise the entire accumulated document, which matters for large catalogues.
+Serialisation escapes string values while preserving their UTF-8 bytes, including
+decomposed accents. Adding a name neither duplicates combining marks nor normalises
+the accumulated document, which matters for credentials, filenames and large catalogues.
 Parsing recognises JSON punctuation and hexadecimal escape digits as ASCII,
 independently of display grapheme boundaries. Keys and values may therefore
 begin with Unicode combining marks, including names written in Burmese.

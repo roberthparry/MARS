@@ -506,13 +506,13 @@ make install-mars-lab
 ```
 
 That setup uses plaintext SQLite when no database key is configured, stores
-the resulting configuration in `~/.mars/config/jurisdiction-db.env`, and builds the
+the resulting configuration in encrypted `mars.db`, located by `mars.json`, and builds the
 jurisdiction database at `~/.mars/jurisdiction/mars_jurisdiction_rules.db`.
-A non-empty configured key retains encryption without a password prompt. Existing encrypted files require
-explicit [plaintext conversion](docs/globe.md#plaintext-conversion), not merely removing their key.
+A non-empty configured key retains encryption without a password prompt.
+Removing a key does not convert an existing encrypted file.
 MARS supplies no shared WeatherAPI account or key. If you choose to enable
 weather lookups, create your own WeatherAPI account; its key is stored in
-`~/.mars/config/weather.env`. Reinstalling replaces the selected jurisdiction
+encrypted `mars.db`. Reinstalling replaces the selected jurisdiction
 database and its configuration, preserving unrelated files and saved Lab state.
 A lookup sends that key, the selected date and the
 observer latitude and longitude from the local server to WeatherAPI.com over

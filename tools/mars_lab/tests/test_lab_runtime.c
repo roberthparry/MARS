@@ -1,23 +1,30 @@
 /**
  * @file test_lab_runtime.c
- * @brief Isolated native Lab runtime key creation and preservation regressions.
+ * @brief Isolated encrypted cache-key creation and preservation regressions.
  *
- * Exercises first-run secret generation, stable reloads, legacy configuration,
- * environment precedence and conflicting-key rejection under a private MARS_HOME.
- * Keys and configuration contents are compared only in memory and never printed.
- * All filesystem work uses the file module and the suite's bounded private-tree cleanup.
+ * Synthetic key providers avoid the desktop key store. Tests verify private configuration,
+ * stable keys, explicit overrides and rejection of invalid bootstrap JSON without plaintext sidecars.
  */
 #include <stdlib.h>
+#include <string.h>
 
 #include "file-t.h"
+#include "mars_settings.h"
 #include "lab_runtime.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
-static bool clear_runtime_environment(void)
+static string_t *runtime_key(bool create)
 {
-    return !unsetenv("MARS_LAB_OBJECT_STORE_KEY") && !unsetenv("MARS_LAB_OBJECT_STORE_PATH") &&
-           !unsetenv("MARS_LAB_CACHE_FILE");
+    (void)create;
+    return string_new_with("isolated-runtime-configuration-key");
+}
+
+static bool runtime_environment(void)
+{
+    mars_settings_key_provider(runtime_key);
+    return !unsetenv("MARS_CONFIG_FILE") && !unsetenv("MARS_LAB_OBJECT_STORE_KEY") &&
+           !unsetenv("MARS_LAB_OBJECT_STORE_PATH");
 }
 
 static file_t *runtime_file(const char *directory, const char *name)
@@ -28,96 +35,55 @@ static file_t *runtime_file(const char *directory, const char *name)
     return file;
 }
 
-static bool write_configuration(file_t *file, const char *contents)
-{
-    string_t *text = string_new_with(contents);
-    bool ok = file && text && file_write_all_text(file, text) && file_chmod(file, 0600);
-    string_free(text);
-    return ok;
-}
-
 static bool runtime_creation(const char *directory)
 {
-    bool prepared = clear_runtime_environment() && lab_runtime_prepare();
+    bool ok = runtime_environment() && lab_runtime_prepare();
     const char *environment_key = getenv("MARS_LAB_OBJECT_STORE_KEY");
     string_t *key = environment_key ? string_new_with(environment_key) : NULL;
-    file_t *configuration = runtime_file(directory, "config/mars-lab.env");
-    file_t *folder = runtime_file(directory, "config");
-    file_t *cache = runtime_file(directory, "lab/mars_lab_object_store.sqlite3");
-    string_t *before = configuration ? file_read_all_text(configuration) : NULL;
+    string_t *stored = mars_settings_read("MARS_LAB_OBJECT_STORE_KEY");
+    file_t *configuration = runtime_file(directory, "mars.db");
     file_info_t *info = configuration ? file_get_info(configuration) : NULL;
-    file_info_t *folder_info = folder ? file_get_info(folder) : NULL;
-    const char *cache_path = getenv("MARS_LAB_OBJECT_STORE_PATH");
-    string_t *actual_path = cache_path ? string_new_with(cache_path) : NULL;
-    bool ok = prepared && key && string_byte_length(key) == 64 && before && info && folder_info &&
-              (file_info_permissions(info) & 0777) == 0600 && (file_info_permissions(folder_info) & 0777) == 0700 &&
-              actual_path && cache && string_view_equals_literal(string_view_all(actual_path), file_path(cache)) &&
-              !file_exists(cache) && !file_last_error(cache);
-    bool reloaded = !unsetenv("MARS_LAB_OBJECT_STORE_KEY") && lab_runtime_prepare();
-    environment_key = getenv("MARS_LAB_OBJECT_STORE_KEY");
-    string_t *after = configuration ? file_read_all_text(configuration) : NULL;
-    ok = ok && reloaded && environment_key && string_view_equals_literal(string_view_all(key), environment_key) &&
-         before && after && string_compare(before, after) == 0;
-    string_free(after);
-    string_free(before);
-    string_free(key);
-    string_free(actual_path);
-    file_info_free(info);
-    file_info_free(folder_info);
-    file_free(configuration);
-    file_free(folder);
-    file_free(cache);
+    file_t *obsolete = runtime_file(directory, "config/mars-lab.env");
+    file_t *lock = runtime_file(directory, "config/mars-lab.env.lock");
+    ok = ok && key && stored && string_byte_length(key) == 64 && !string_compare(key, stored) &&
+         info && (file_info_permissions(info) & 0777) == 0600 &&
+         obsolete && !file_exists(obsolete) && lock && !file_exists(lock);
+    ok = ok && !unsetenv("MARS_LAB_OBJECT_STORE_KEY") && lab_runtime_prepare() &&
+         getenv("MARS_LAB_OBJECT_STORE_KEY") && !strcmp(getenv("MARS_LAB_OBJECT_STORE_KEY"), string_c_str(key));
+    string_free(stored); string_free(key);
+    file_info_free(info); file_free(configuration); file_free(obsolete); file_free(lock);
     return ok;
 }
 
 static bool runtime_preservation(const char *directory)
 {
-    file_t *folder = runtime_file(directory, "config");
-    file_t *configuration = runtime_file(directory, "config/mars-lab.env");
-    static const char legacy[] = "# fixture comment\nexport UNRELATED_SETTING='preserve me'\n"
-                                 "export MARS_LAB_OBJECT_STORE_KEY='synthetic-fixture-key'\n";
-    bool prepared = clear_runtime_environment() && folder && file_create_directory(folder, 0700, false) &&
-                    write_configuration(configuration, legacy) && lab_runtime_prepare();
-    const char *key = getenv("MARS_LAB_OBJECT_STORE_KEY");
-    string_t *key_copy = key ? string_new_with(key) : NULL;
-    string_t *contents = configuration ? file_read_all_text(configuration) : NULL;
-    bool ok = prepared && key_copy && string_view_equals_literal(string_view_all(key_copy), "synthetic-fixture-key") &&
-              contents && string_view_equals_literal(string_view_all(contents), legacy);
-    string_free(key_copy);
-    string_free(contents);
-    bool overridden = !setenv("MARS_LAB_OBJECT_STORE_KEY", "synthetic-environment-key", 1) && lab_runtime_prepare();
-    key = getenv("MARS_LAB_OBJECT_STORE_KEY");
-    key_copy = key ? string_new_with(key) : NULL;
-    contents = configuration ? file_read_all_text(configuration) : NULL;
-    ok = ok && overridden && key_copy &&
-         string_view_equals_literal(string_view_all(key_copy), "synthetic-environment-key") && contents &&
-         string_view_equals_literal(string_view_all(contents), legacy);
-    string_free(key_copy);
-    string_free(contents);
-    static const char conflict[] = "export MARS_LAB_OBJECT_STORE_KEY='synthetic-one'\n"
-                                   "export MARS_LAB_OBJECT_STORE_KEY='synthetic-two'\n";
-    bool rejected = write_configuration(configuration, conflict) && !unsetenv("MARS_LAB_OBJECT_STORE_KEY") &&
-                    !lab_runtime_prepare();
-    contents = configuration ? file_read_all_text(configuration) : NULL;
-    ok = ok && rejected && contents && string_view_equals_literal(string_view_all(contents), conflict);
-    string_free(contents);
-    file_free(configuration);
-    file_free(folder);
+    bool ok = runtime_environment();
+    string_t *settings = string_new_with("{\"MARS_LAB_OBJECT_STORE_KEY\":\"synthetic-fixture-key\"}");
+    ok = ok && settings && mars_settings_import(settings, true) && lab_runtime_prepare() &&
+         !strcmp(getenv("MARS_LAB_OBJECT_STORE_KEY"), "synthetic-fixture-key");
+    ok = ok && !setenv("MARS_LAB_OBJECT_STORE_KEY", "synthetic-environment-key", 1) && lab_runtime_prepare() &&
+         !strcmp(getenv("MARS_LAB_OBJECT_STORE_KEY"), "synthetic-environment-key");
+    string_t *stored = mars_settings_read("MARS_LAB_OBJECT_STORE_KEY");
+    ok = ok && stored && !strcmp(string_c_str(stored), "synthetic-fixture-key");
+    file_t *locator = runtime_file(directory, "config/mars.json");
+    string_t *broken = string_new_with("{broken json");
+    ok = ok && locator && broken && file_write_all_text(locator, broken) &&
+         !unsetenv("MARS_LAB_OBJECT_STORE_KEY") && !lab_runtime_prepare();
+    string_free(broken); file_free(locator); string_free(stored); string_free(settings);
     return ok;
 }
 
 static void test_lab_runtime_creation(void)
 {
-    TEST_ASSERT_TRUE(test_lab_isolated(runtime_creation), "new runtime keys are private, persistent and never rotated");
+    TEST_ASSERT_TRUE(test_lab_isolated(runtime_creation), "cache secrets persist only in encrypted settings");
 }
 
 static void test_lab_runtime_preservation(void)
 {
-    TEST_ASSERT_TRUE(test_lab_isolated(runtime_preservation),
-                     "existing keys survive overrides and conflicting configuration is preserved on rejection");
+    TEST_ASSERT_TRUE(test_lab_isolated(runtime_preservation), "saved keys survive overrides and malformed locators");
 }
 
-/* Register runtime cases without including secret values in assertion output. */
+/* Register runtime checks before documented examples. */
 void test_lab_runtime_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_runtime_creation, tests, NULL);

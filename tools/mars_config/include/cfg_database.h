@@ -15,7 +15,7 @@
 
 /**
  * @brief Install, verify or update independent shoreline storage using saved settings or environment overrides.
- * @param action globe-install, globe-check or globe-update; reserved removal commands fail without changing files.
+ * @param action globe-install, globe-check, globe-update or globe-uninstall.
  * @note Installation builds a fresh staged database and replaces the destination only after validation. Existing
  * river and custom tables are removed on success. Updating replaces packaged geography and texture tables in one
  * transaction, retaining the configuration and other layers. Both operations report import progress.
@@ -74,13 +74,14 @@ int cfg_databases_update(void);
 int cfg_databases_ensure(void);
 
 /**
- * @brief Export the three installed databases to plaintext and switch their saved configurations sequentially.
- * Requires stopped database users and no path/key environment overrides. Original encrypted databases and a
- * private configuration backup are retained. New files use the .plain.db suffix; existing outputs are never replaced.
- * Schema, data, user_version and application_id are preserved. Already-plaintext stores are validated and skipped.
- * @return Zero on success; one stops at the first failure, leaving later stores unchanged.
+ * @brief Remove one configured content database and its SQLite sidecars.
+ * @param[in] name Borrowed database name: globe, almanac or jurisdiction; not retained.
+ * @return Zero after removal (including an absent file), one on configuration, path or removal failure,
+ * or two for an unknown name. Settings, history and caches are retained.
+ * @note Stop database users before calling. The saved path remains registered for later reinstallation.
+ * Never removes mars.db or follows a symbolic link. Call before starting application threads.
  */
-int cfg_databases_plain(void);
+int cfg_database_uninstall(const char *name);
 
 /**
  * @brief Install the selected private database using native SQLCipher.

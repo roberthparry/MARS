@@ -53,8 +53,8 @@ static bool cfg_jurisdiction_options(cfg_database_options *options, const string
     (void)default_path;
     options->requested_location = cfg_jurisdiction_argument(location, "MARS_CALENDAR_LOCATION_ARGUMENT");
     options->requested_language = cfg_jurisdiction_argument(language, "MARS_CALENDAR_LANGUAGE_ARGUMENT");
-    options->saved_location = cfg_database_setting(options->configuration, NULL, "MARS_CALENDAR_LOCATION", NULL);
-    options->saved_language = cfg_database_setting(options->configuration, NULL, "MARS_CALENDAR_LANGUAGE", NULL);
+    options->saved_location = cfg_database_setting(NULL, "MARS_CALENDAR_LOCATION", NULL);
+    options->saved_language = cfg_database_setting(NULL, "MARS_CALENDAR_LANGUAGE", NULL);
     return options->requested_location && options->requested_language && options->saved_location &&
            options->saved_language;
 }
@@ -176,7 +176,7 @@ static bool cfg_jurisdiction_populate(sqlite_t *db, const string_t *path, const 
     return indexed;
 }
 
-static bool cfg_jurisdiction_export(string_t *body, const string_t *location, const string_t *language)
+static bool cfg_jurisdiction_export(json_t *body, const string_t *location, const string_t *language)
 {
     return location && language && cfg_database_export(body, "MARS_CALENDAR_LOCATION", location) &&
            cfg_database_export(body, "MARS_CALENDAR_LANGUAGE", language);

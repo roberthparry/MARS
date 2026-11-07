@@ -182,26 +182,17 @@ int main(void)
 AD: Andorra (42.5000, 1.5167), Europe/Andorra
 ```
 
-## Configuration files
+## Configuration
 
-An empty or absent database key selects plaintext SQLite; a non-empty key retains encrypted SQLCipher.
-An explicitly empty modern environment key overrides saved and legacy keys. Opening never retries a failed keyed
-connection as plaintext. Existing files require explicit [conversion](globe.md#plaintext-conversion), not a key deletion.
+MARS Lab and the configurator read `MARS_JURISDICTION_DB_PATH` and
+`MARS_JURISDICTION_DB_KEY` from encrypted `mars.db` before starting library work.
+The small `mars.json` file locates that store; relative database paths resolve from
+its directory. Explicit environment values override the saved settings.
+Standalone library callers provide the inherited settings themselves.
 
-Database path and key resolution retains its existing precedence: modern
-`MARS_JURISDICTION_DB_PATH` / `MARS_JURISDICTION_DB_KEY` environment values,
-legacy `MARS_HOLIDAY_DB_PATH` / `MARS_HOLIDAY_DB_KEY` values, then configuration
-files under `MARS_HOME/config` (or `~/.mars/config`).
-The modern file is `jurisdiction-db.env`; the fallback is `holiday-db.env`.
-
-These readers use `file_t` with explicit symbolic-link following, and parse
-complete lines entirely as `string_t`. UTF-8 BOMs, LF, CRLF and CR endings
-are supported; the old 4 KiB line limit is removed. A key must immediately
-precede `=`, optionally after an `export ` prefix and leading whitespace.
-Surrounding value whitespace and matching outer single or double quotes are
-removed. The first non-empty matching value wins. Shell expansion is not
-performed. Malformed UTF-8 or an I/O error before a match leaves the lookup
-unresolved, allowing the existing fallback rules to apply.
+An absent or empty key selects plaintext SQLite; a non-empty key selects encrypted SQLCipher.
+An explicitly empty environment key overrides the saved key.
+Opening neither converts an existing file nor retries a failed keyed open as plaintext.
 
 ## Scope
 
@@ -277,16 +268,15 @@ To remove that private jurisdiction database again, run:
 make uninstall-jurisdiction-db
 ```
 
-This removes only `~/.mars/jurisdiction/mars_jurisdiction_rules.db`, its SQLite
-journal/WAL sidecars and `~/.mars/config/jurisdiction-db.env`. Almanac data,
-weather configuration, Lab settings and other files are preserved. Databases
-installed at custom paths are not removed by this target.
+This removes the configured jurisdiction database and its SQLite sidecars, including
+a custom database location. Almanac data, weather settings, history and caches are preserved.
+The saved path remains registered, allowing a later release to reinstall the database.
 
 If you want the desktop app as well, use `make install-mars-lab`.
 
 MARS supplies no shared WeatherAPI account or key. When the installer chooses
 to create their own WeatherAPI account and configure weather lookups, that
-account's key is stored separately in `~/.mars/config/weather.env` and is
+account's key is stored in encrypted `mars.db` and is
 preserved when the jurisdiction database is rebuilt. A lookup sends the key,
 selected date and observer coordinates from the local MARS Lab server to
 WeatherAPI.com over HTTPS; the key is not sent to the browser. MARS does not

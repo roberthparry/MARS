@@ -1687,6 +1687,7 @@
       "test_file_stream_migration": true,
       "test_number_t_constants_use_math_spelling": true,
       "test_number_t_extension_round_trip": true,
+      "test_parse_exact_unicode": true,
       "test_parse_leading_combining_marks": true,
       "test_parse_object_array_and_escapes": true,
       "test_rejects_non_json_number_forms": true,
@@ -3057,7 +3058,6 @@
       "test_cfg_database_large": true,
       "test_cfg_database_packaged_almanac": true,
       "test_cfg_database_paths": true,
-      "test_cfg_database_plain": true,
       "test_cfg_database_precedence": true,
       "test_cfg_database_public_ddl": true,
       "test_cfg_database_rivers": true,
@@ -3065,6 +3065,7 @@
       "test_cfg_database_stream": true,
       "test_cfg_database_trace": true,
       "test_cfg_database_transaction_finish": true,
+      "test_cfg_database_uninstall": true,
       "test_cfg_database_update": true
     }
   },

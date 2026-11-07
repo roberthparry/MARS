@@ -97,12 +97,20 @@ static bool settings_sync_request(const string_t *input, string_t **output)
     return input && mars_settings_sync(input);
 }
 
+static bool settings_secret_request(const string_t *input, string_t **output)
+{
+    if (!input || string_byte_length(input) > 128) return false;
+    *output = mars_settings_secret(string_c_str(input));
+    return *output != NULL;
+}
+
 static void settings_serve(int socket)
 {
     static bool (*const handlers[])(const string_t *, string_t **) = {
         [MARS_SETTINGS_LOAD]     = settings_load_request,
         [MARS_SETTINGS_RESOURCE] = settings_resource_request,
-        [MARS_SETTINGS_SYNC]     = settings_sync_request
+        [MARS_SETTINGS_SYNC]     = settings_sync_request,
+        [MARS_SETTINGS_SECRET]   = settings_secret_request
     };
     for (;;) {
         uint64_t request;

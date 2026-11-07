@@ -99,81 +99,6 @@ static char *almanac_default_db_path(void)
     return path;
 }
 
-static char *almanac_config_path(void)
-{
-    char *mars_home = mars_home_path();
-    char *path;
-
-    if (!mars_home)
-        return NULL;
-    path = dup_printf_path3(mars_home, "/config/", "almanac-db.env");
-    free(mars_home);
-    return path;
-}
-
-/* Parse complete configuration lines as MARS strings; this is not a shell interpreter. */
-static char *almanac_config_lookup(const char *name)
-{
-    char *config_path = almanac_config_path();
-    file_t *file = NULL;
-    string_t *wanted = NULL;
-    string_t *line = NULL;
-    char *result = NULL;
-
-    if (!config_path || !name || !*name)
-        goto done;
-    wanted = string_new_with(name);
-    file = file_new_cstr(config_path);
-    if (!wanted || !file || !file_open_follow(file, FILE_MODE_OPEN, FILE_ACCESS_READ))
-        goto done;
-
-    while (file_read_line(file, &line) && line) {
-        string_t *key = NULL;
-        string_t *value = NULL;
-        string_trim(line);
-        if (string_starts_with(line, "export ")) {
-            string_t *body = string_substr(line, 7, string_byte_length(line) - 7);
-            string_free(line);
-            line = body;
-            if (!line)
-                break;
-        }
-        string_offset_t equals = string_find(line, "=");
-        if (equals >= 0) {
-            key = string_substr(line, 0, (size_t)equals);
-            value = string_substr(line, (size_t)equals + 1, string_byte_length(line) - (size_t)equals - 1);
-        }
-        if (key)
-            string_trim(key);
-        bool matched = key && value && string_compare(key, wanted) == 0;
-        if (matched) {
-            string_trim(value);
-            string_t *unquoted = string_unquote_shell(value);
-            string_free(value);
-            value = unquoted;
-            if (value)
-                result = dup_c_string(string_c_str(value));
-        }
-        string_free(key);
-        string_free(value);
-        string_free(line);
-        line = NULL;
-        if (matched)
-            break;
-    }
-    if (!file_close(file)) {
-        free(result);
-        result = NULL;
-    }
-
-done:
-    string_free(line);
-    string_free(wanted);
-    file_free(file);
-    free(config_path);
-    return result;
-}
-
 static string_t *almanac_string_from_cstr(const char *text)
 {
     if (!text || *text == '\0')
@@ -206,13 +131,9 @@ almanac_t *almanac_open(void)
     }
 
     configured = getenv("MARS_ALMANAC_DB_PATH") ? dup_c_string(getenv("MARS_ALMANAC_DB_PATH")) : NULL;
-    if (!configured)
-        configured = almanac_config_lookup("MARS_ALMANAC_DB_PATH");
     path_text = configured ? configured : almanac_default_db_path();
 
     configured = getenv("MARS_ALMANAC_DB_KEY") ? dup_c_string(getenv("MARS_ALMANAC_DB_KEY")) : NULL;
-    if (!configured)
-        configured = almanac_config_lookup("MARS_ALMANAC_DB_KEY");
     key_text = configured;
 
     path = almanac_string_from_cstr(path_text);

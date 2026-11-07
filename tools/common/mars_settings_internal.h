@@ -21,6 +21,7 @@ typedef enum {
     MARS_SETTINGS_LOAD,
     MARS_SETTINGS_RESOURCE,
     MARS_SETTINGS_SYNC,
+    MARS_SETTINGS_SECRET, /**< Obtain or atomically create secret material for one application setting. */
     MARS_SETTINGS_REQUEST_COUNT
 } mars_settings_request_t;
 

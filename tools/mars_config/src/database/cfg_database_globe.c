@@ -1194,19 +1194,11 @@ bool cfg_database_publish_rivers(sqlite_t *destination, sqlite_t *source)
     return cfg_database_publish_rivers_limited(destination, source, cfg_database_river_storage_budget);
 }
 
-static string_t *cfg_river_setting(file_t *config, const char *name)
-{
-    const char *environment = getenv(name);
-    return environment ? string_new_with(environment) : cfg_storage_setting(config, name);
-}
-
 /* Publish unencrypted river storage, preserving all non-river tables. */
 int cfg_globe_river_install(const char *candidate_path)
 {
     string_t *home = cfg_storage_home();
-    string_t *config_path = home ? string_sprintf("%s/config/globe-db.env", string_c_str(home)) : NULL;
-    file_t *config = config_path ? file_new(config_path) : NULL;
-    string_t *raw = config ? cfg_river_setting(config, "MARS_GLOBE_DB_PATH") : NULL;
+    string_t *raw = cfg_database_setting(NULL, "MARS_GLOBE_DB_PATH", NULL);
     if (raw && !string_byte_length(raw)) {
         string_free(raw);
         raw = string_sprintf("%s/globe/globe.db", string_c_str(home));
@@ -1228,22 +1220,16 @@ int cfg_globe_river_install(const char *candidate_path)
     globe_close(globe);
     if (ok) ok = cfg_database_publish_rivers(target, source);
     sqlite_close(target); sqlite_close(source);
-    file_free(target_file); file_free(source_file); file_free(config);
-    string_free(candidate); string_free(path); string_free(raw); string_free(config_path); string_free(home);
+    file_free(target_file); file_free(source_file);
+    string_free(candidate); string_free(path); string_free(raw); string_free(home);
     if (ok) puts("River tables installed in the globe database; shoreline and configuration preserved.");
     else fputs("River installation failed; no river replacement committed.\n", stderr);
     return ok ? 0 : 1;
 }
 
-static string_t *cfg_globe_setting(file_t *config, const char *name, const string_t *fallback)
+static string_t *cfg_globe_setting(const char *name, const string_t *fallback)
 {
-    const char *environment = getenv(name);
-    string_t *value = environment ? cfg_storage_value(environment) : cfg_storage_setting(config, name);
-    if (value && !string_byte_length(value) && fallback) {
-        string_free(value);
-        value = string_clone(fallback);
-    }
-    return value;
+    return cfg_database_setting(NULL, name, fallback);
 }
 
 static bool cfg_globe_countries(sqlite_t *db, const string_t *root, const string_t *staging)
@@ -1332,27 +1318,25 @@ static bool cfg_globe_refresh_all(sqlite_t *db, const string_t *root, const stri
 /* Keep globe setup independent; unsupported operations fail without changing storage. */
 static int cfg_globe_execute(const char *action, const char *explicit_key)
 {
+    if (action && !strcmp(action, "globe-uninstall")) return cfg_database_uninstall("globe");
     bool install = action && !strcmp(action, "globe-install");
     bool check = action && !strcmp(action, "globe-check");
     bool update = action && !strcmp(action, "globe-update");
     if (!install && !check && !update) {
-        fputs("Globe removal is not implemented yet; no files changed.\n", stderr);
+        fputs("Unknown globe operation; no files changed.\n", stderr);
         return 2;
     }
     string_t *home = cfg_storage_home();
     if (!home) return 1;
-    string_t *config_dir = string_sprintf("%s/config", string_c_str(home));
-    string_t *config_path = string_sprintf("%s/config/globe-db.env", string_c_str(home));
     string_t *default_path = string_sprintf("%s/globe/globe.db", string_c_str(home));
-    file_t *config = config_path ? file_new(config_path) : NULL;
-    string_t *path = config ? cfg_globe_setting(config, "MARS_GLOBE_DB_PATH", default_path) : NULL;
+    string_t *path = cfg_globe_setting("MARS_GLOBE_DB_PATH", default_path);
     string_t *key = explicit_key ? string_new_with(explicit_key) :
-                    config ? cfg_globe_setting(config, "MARS_GLOBE_DB_KEY", NULL) : NULL;
+                    cfg_globe_setting("MARS_GLOBE_DB_KEY", NULL);
     string_t *expanded = path ? cfg_storage_expand_path(path) : NULL;
     string_t *parent = expanded ? cfg_storage_parent(expanded) : NULL;
     file_t *destination = expanded ? file_new(expanded) : NULL;
     bool exists = false;
-    bool ok = config_dir && config && parent && destination && key &&
+    bool ok = parent && destination && key &&
               cfg_storage_safe_regular(destination, &exists);
     string_t *staging = NULL, *temporary_path = NULL, *root = NULL, *body = NULL;
     file_t *temporary = NULL;
@@ -1382,8 +1366,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
              cfg_globe_valid(db) && cfg_database_textures_valid(db);
         sqlite_close(db);
     } else if (ok && install) {
-        ok = cfg_storage_private_directory(home, true) && cfg_storage_private_directory(parent, true) &&
-             cfg_storage_private_directory(config_dir, true);
+        ok = cfg_storage_private_directory(home, true) && cfg_storage_private_directory(parent, true);
         staging = ok ? cfg_database_stage(parent) : NULL;
         temporary_path = staging ? string_sprintf("%s/database.db", string_c_str(staging)) : NULL;
         temporary = temporary_path ? file_new(temporary_path) : NULL;
@@ -1397,14 +1380,12 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
              cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
              cfg_database_revision(db, "globe", CFG_GLOBE_DATA_REVISION) && cfg_database_pyramids(db, root);
         sqlite_close(db);
-        string_t *quoted_path = path ? cfg_storage_quote(path) : NULL;
-        string_t *quoted_key = key ? cfg_storage_quote(key) : NULL;
-        body = ok && quoted_path && quoted_key ? string_sprintf(
-            "# Generated by mars_config globe-install\nexport MARS_GLOBE_DB_PATH=%s\nexport MARS_GLOBE_DB_KEY=%s\n",
-            string_c_str(quoted_path), string_c_str(quoted_key)) : NULL;
-        string_free(quoted_path);
-        string_free(quoted_key);
-        ok = ok && body && cfg_database_publish(temporary, destination, config, config_dir, staging, body);
+        json_t *settings = ok ? json_new_object() : NULL;
+        ok = settings && cfg_database_export(settings, "MARS_GLOBE_DB_PATH", path) &&
+             cfg_database_export(settings, "MARS_GLOBE_DB_KEY", key);
+        body = ok ? json_to_string(settings) : NULL;
+        json_free(settings);
+        ok = ok && body && cfg_database_publish(temporary, destination, staging, body);
     }
     if (ok) puts(update ? "Globe shoreline, countries and textures updated; other layers and settings preserved. Restart MARS Lab."
                         : install ? "Fresh globe database installed: shoreline, countries and textures imported. Restart MARS Lab."
@@ -1413,9 +1394,9 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
     file_free(temporary);
     cfg_database_cleanup(staging);
     string_free(staging); string_free(temporary_path); string_free(root); string_free(body);
-    file_free(destination); file_free(config);
+    file_free(destination);
     string_free(expanded); string_free(parent); string_free(path); string_free(key);
-    string_free(default_path); string_free(config_path); string_free(config_dir); string_free(home);
+    string_free(default_path); string_free(home);
     return ok ? 0 : 1;
 }
 

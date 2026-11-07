@@ -175,15 +175,13 @@ static bool cfg_database_texture_catalogue_changed(sqlite_t *db, const string_t 
 static bool cfg_database_update_one(const cfg_database_migration *migration, bool install_missing)
 {
     string_t *home = cfg_storage_home();
-    string_t *config_path = home ? string_sprintf("%s/config/%s-db.env", string_c_str(home), migration->name) : NULL;
     string_t *fallback = home ? string_sprintf("%s/%s", string_c_str(home), migration->default_path) : NULL;
-    file_t *config = config_path ? file_new(config_path) : NULL;
-    string_t *raw = config ? cfg_database_setting(config, NULL, migration->path_variable, fallback) : NULL;
+    string_t *raw = cfg_database_setting(NULL, migration->path_variable, fallback);
     string_t *path = raw ? cfg_storage_expand_path(raw) : NULL;
     file_t *destination = path ? file_new(path) : NULL;
     bool exists = false;
     bool ok = destination && cfg_storage_safe_regular(destination, &exists);
-    string_t *key = ok && exists ? cfg_database_setting(config, NULL, migration->key_variable, NULL) : NULL;
+    string_t *key = ok && exists ? cfg_database_setting(NULL, migration->key_variable, NULL) : NULL;
     sqlite_t *db = cfg_database_open(path, key);
     int64_t revision = 0;
     if (ok && exists)
@@ -237,8 +235,8 @@ static bool cfg_database_update_one(const cfg_database_migration *migration, boo
                    exists ? "up to date" : install_missing ? "installed" : "not installed; skipped");
     else fprintf(stderr, "%s database update failed; check saved credentials, source data and database availability.\n",
                  migration->name);
-    sqlite_close(db); file_free(destination); file_free(config);
-    string_free(key); string_free(path); string_free(raw); string_free(fallback); string_free(config_path); string_free(home);
+    sqlite_close(db); file_free(destination);
+    string_free(key); string_free(path); string_free(raw); string_free(fallback); string_free(home);
     return ok;
 }
 
@@ -842,7 +840,7 @@ void cfg_database_cleanup(const string_t *staging)
     if (!staging)
         return;
     static const char *const names[] = {"database.db", "database.db-journal", "database.db-wal", "database.db-shm",
-                                        "configuration.env", "shoreline.bin", "shoreline.zst", "shoreline-corrected.bin", "rivers.bin"};
+                                        "shoreline.bin", "shoreline.zst", "shoreline-corrected.bin", "rivers.bin"};
     for (size_t i = 0; i < sizeof(names) / sizeof(*names); ++i) {
         file_t *file = cfg_database_stage_file(staging, names[i]);
         if (file)
@@ -897,53 +895,44 @@ static string_t *cfg_database_canonical_destination(file_t *file)
     return result;
 }
 
-/* Complete both outputs before replacing either destination; recover on rename failure. */
-bool cfg_database_publish(file_t *database, file_t *destination, file_t *configuration,
-                          const string_t *configuration_directory, const string_t *staging, const string_t *body)
+/* Publish the validated data and its JSON settings together, restoring the previous data on failure. */
+bool cfg_database_publish(file_t *database, file_t *destination, const string_t *staging, const string_t *body)
 {
-    string_t *config_stage = cfg_database_stage(configuration_directory);
-    file_t *config_file = config_stage ? cfg_database_stage_file(config_stage, "configuration.env") : NULL;
+    string_t *settings_path = mars_settings_database();
+    file_t *settings_file = settings_path ? file_new(settings_path) : NULL;
     file_t *backup = cfg_database_stage_file(staging, "backup.db");
     string_t *database_path = cfg_database_canonical_destination(destination);
-    string_t *configuration_path = cfg_database_canonical_destination(configuration);
-    bool existed = false, configuration_existed = false;
-    bool ok = config_file && backup && database_path && configuration_path &&
+    string_t *configuration_path = settings_file ? cfg_database_canonical_destination(settings_file) : NULL;
+    bool existed = false;
+    bool ok = backup && body && database_path && configuration_path &&
               string_compare(database_path, configuration_path) && cfg_storage_safe_regular(destination, &existed) &&
-              cfg_storage_safe_regular(configuration, &configuration_existed) &&
-              cfg_database_no_sidecars(destination) && cfg_storage_publish(config_file, config_stage, body) &&
+              cfg_database_no_sidecars(destination) &&
               file_chmod(database, 0600) && file_open_read(database) && file_sync(database, false);
-    if (database && file_is_open(database))
-        ok = file_close(database) && ok;
+    if (database && file_is_open(database)) ok = file_close(database) && ok;
     bool backed_up = ok && existed && file_create_hard_link(destination, backup);
     ok = ok && (!existed || backed_up);
     bool replaced = ok && file_move(database, destination, true);
-    ok = replaced && file_move(config_file, configuration, true);
+    ok = replaced && mars_settings_sync(body);
     bool recovered = true;
     if (replaced && !ok)
         recovered = existed ? file_move(backup, destination, true) : file_delete(destination);
-    if (backed_up && recovered)
-        file_delete(backup);
-    if (!recovered)
-        fputs("Database rollback failed; the previous database is retained in its private staging backup.\n", stderr);
-    cfg_database_cleanup(config_stage);
-    file_free(backup);
-    file_free(config_file);
-    string_free(database_path);
-    string_free(configuration_path);
-    string_free(config_stage);
-    if (ok && !mars_settings_sync(body)) {
-        fputs("Database installed, but the encrypted settings could not be synchronised. Existing configuration is retained.\n", stderr);
-        return false;
+    if (backed_up && recovered) file_delete(backup);
+    if (!recovered) {
+        file_t *retained = cfg_database_stage_file(staging, "retained.db");
+        bool kept = retained && file_move(backup, retained, false);
+        fprintf(stderr, "Database rollback failed; recovery data remains at %s.\n",
+                kept ? file_path(retained) : file_path(backup));
+        file_free(retained);
     }
+    file_free(backup); file_free(settings_file); string_free(settings_path);
+    string_free(database_path); string_free(configuration_path);
     return ok;
 }
 
 static void cfg_database_options_free(cfg_database_options *options)
 {
     string_free(options->home);
-    string_free(options->configuration_directory);
     string_free(options->configuration_path);
-    file_free(options->configuration);
     string_free(options->path);
     string_free(options->expanded_path);
     string_free(options->key);
@@ -953,25 +942,17 @@ static void cfg_database_options_free(cfg_database_options *options)
     string_free(options->saved_language);
 }
 
-string_t *cfg_database_setting(file_t *configuration, const char *explicit_value, const char *name,
-                               const string_t *fallback)
+/* Resolve literal command/environment overrides before the stored value and default. */
+string_t *cfg_database_setting(const char *explicit_value, const char *name, const string_t *fallback)
 {
-    string_t *saved = cfg_storage_setting(configuration, name);
-    string_t *value = cfg_storage_value(explicit_value);
-    if (value && !explicit_value) {
-        string_free(value);
-        value = cfg_storage_value(getenv(name));
+    const char *value = explicit_value ? explicit_value : getenv(name);
+    if (value) return cfg_storage_value(value);
+    string_t *saved = mars_settings_read(name);
+    if (saved && !string_byte_length(saved) && fallback) {
+        string_free(saved);
+        saved = string_clone(fallback);
     }
-    if (value && !explicit_value && !getenv(name)) {
-        string_free(value);
-        value = saved ? string_clone(string_byte_length(saved) || !fallback ? saved : fallback) : NULL;
-    }
-    if (!saved) {
-        string_free(value);
-        value = NULL;
-    }
-    string_free(saved);
-    return value;
+    return saved;
 }
 
 static bool cfg_database_options_read(cfg_database_options *options, const cfg_database_profile *profile, const char *path,
@@ -980,47 +961,42 @@ static bool cfg_database_options_read(cfg_database_options *options, const cfg_d
     options->home = cfg_storage_home();
     if (!options->home)
         return false;
-    options->configuration_directory = string_sprintf("%s/config", string_c_str(options->home));
-    options->configuration_path =
-        string_sprintf("%s/config/%s-db.env", string_c_str(options->home), profile->name);
-    options->configuration = options->configuration_path ? file_new(options->configuration_path) : NULL;
+    options->configuration_path = mars_settings_database();
     string_t *default_path = string_sprintf("%s/%s", string_c_str(options->home), profile->default_path);
-    if (!options->configuration_directory || !options->configuration || !default_path) {
+    if (!options->configuration_path || !default_path) {
         string_free(default_path);
         return false;
     }
-    options->path = cfg_database_setting(options->configuration, path, profile->path_variable, default_path);
-    options->key = cfg_database_setting(options->configuration, key, profile->key_variable, NULL);
+    options->path = cfg_database_setting(path, profile->path_variable, default_path);
+    options->key = cfg_database_setting(key, profile->key_variable, NULL);
     options->expanded_path = options->path ? cfg_storage_expand_path(options->path) : NULL;
     bool ok = options->path && options->key && options->expanded_path &&
-              profile->read_options(options, default_path, location, language);
+              (!profile->read_options || profile->read_options(options, default_path, location, language));
     string_free(default_path);
     return ok;
 }
 
-bool cfg_database_export(string_t *body, const char *name, const string_t *value)
+/* Copy an application setting into the installer-owned JSON update. */
+bool cfg_database_export(json_t *body, const char *name, const string_t *value)
 {
-    string_t *quoted = cfg_storage_quote(value);
-    bool ok = quoted && string_append_format(body, "export %s=", name) >= 0 &&
-              !string_append_utf8_exact(body, string_c_str(quoted), string_byte_length(quoted)) &&
-              !string_append_char(body, '\n');
-    string_free(quoted);
+    string_t *key = name ? string_new_with(name) : NULL;
+    json_t *entry = value ? json_new_string(value) : NULL;
+    bool ok = body && json_type(body) == JSON_OBJECT && key && entry && json_object_set(body, key, entry);
+    json_free(entry); string_free(key);
     return ok;
 }
 
 static string_t *cfg_database_configuration(const cfg_database_options *options, const cfg_database_profile *profile,
                                             const string_t *location, const string_t *language)
 {
-    string_t *body = string_sprintf("# Generated by mars_config %s\n", profile->name);
+    json_t *body = json_new_object();
     bool ok = body && cfg_database_export(body, profile->path_variable, options->path) &&
               cfg_database_export(body, profile->key_variable, options->key);
     if (ok && profile->export_settings)
         ok = profile->export_settings(body, location, language);
-    if (!ok) {
-        string_free(body);
-        body = NULL;
-    }
-    return body;
+    string_t *text = ok ? json_to_string(body) : NULL;
+    json_free(body);
+    return text;
 }
 
 bool cfg_database_source(sqlite_t *db, const string_t *root, const char *name, bool optional)
@@ -1046,8 +1022,7 @@ static bool cfg_database_build(cfg_database_options *options, const cfg_database
 {
     string_t *parent = cfg_storage_parent(options->expanded_path);
     bool ok = parent && cfg_storage_private_directory(options->home, true) &&
-              cfg_storage_private_directory(parent, true) &&
-              cfg_storage_private_directory(options->configuration_directory, true);
+              cfg_storage_private_directory(parent, true);
     string_t *staging = ok ? cfg_database_stage(parent) : NULL;
     string_t *temporary_path = staging ? string_sprintf("%s/database.db", string_c_str(staging)) : NULL;
     file_t *temporary = temporary_path ? file_new(temporary_path) : NULL;
@@ -1078,8 +1053,7 @@ static bool cfg_database_build(cfg_database_options *options, const cfg_database
     sqlite_close(db);
     string_t *body = ok ? cfg_database_configuration(options, profile, chosen_location, chosen_language) : NULL;
     ok = ok && body &&
-         cfg_database_publish(temporary, destination, options->configuration, options->configuration_directory, staging,
-                              body);
+         cfg_database_publish(temporary, destination, staging, body);
     cfg_progress_finish(progress, ok);
     if (ok) {
         printf("Built %s database at %s\nWrote %s database configuration to %s\n",
@@ -1109,11 +1083,10 @@ static int cfg_database_install(const cfg_database_profile *profile, const char 
     cfg_database_options options = {0};
     bool ok = cfg_database_options_read(&options, profile, path, key, location, language);
     interactive = interactive && isatty(STDIN_FILENO);
-    string_t *quoted_key = ok ? cfg_storage_quote(options.key) : NULL;
-    string_t *quoted_path = ok ? cfg_storage_quote(options.path) : NULL;
-    ok = ok && quoted_key && quoted_path && string_byte_length(options.path);
-    string_free(quoted_key);
-    string_free(quoted_path);
+    const char *key_text = ok ? string_c_str(options.key) : NULL;
+    const char *path_text = ok ? string_c_str(options.path) : NULL;
+    ok = ok && key_text && path_text && *path_text &&
+         !strpbrk(key_text, "\r\n") && !strpbrk(path_text, "\r\n");
     if (ok)
         ok = cfg_database_build(&options, profile, interactive);
     if (!ok)
@@ -1142,5 +1115,52 @@ int cfg_databases_run(void)
         ok = cfg_database_install(&cfg_database_jurisdiction, NULL, NULL, NULL, NULL, interactive) == 0;
     if (!ok)
         fputs("Combined database installation stopped; later databases were not changed.\n", stderr);
+    return ok ? 0 : 1;
+}
+
+/* Remove only the selected configured store; retain settings for a subsequent release. */
+int cfg_database_uninstall(const char *name)
+{
+    static const struct {
+        const char *name;
+        const char *setting;
+        const char *relative;
+    } stores[] = {
+        {"globe", "MARS_GLOBE_DB_PATH", "globe/globe.db"},
+        {"almanac", "MARS_ALMANAC_DB_PATH", "almanac/almanac.db"},
+        {"jurisdiction", "MARS_JURISDICTION_DB_PATH", "jurisdiction/mars_jurisdiction_rules.db"}
+    };
+    /* The command vocabulary is fixed at three entries. */
+    size_t index = 0;
+    while (index < sizeof stores / sizeof *stores && (!name || strcmp(name, stores[index].name))) ++index;
+    if (index == sizeof stores / sizeof *stores) return 2;
+    string_t *home = cfg_storage_home();
+    string_t *fallback = home ? string_sprintf("%s/%s", string_c_str(home), stores[index].relative) : NULL;
+    string_t *raw = fallback ? cfg_database_setting(NULL, stores[index].setting, fallback) : NULL;
+    string_t *path = raw && string_byte_length(raw) ? cfg_storage_expand_path(raw) : NULL;
+    file_t *file = path ? file_new(path) : NULL;
+    bool exists = false;
+    bool ok = file && cfg_storage_safe_regular(file, &exists);
+    string_t *settings = mars_settings_database();
+    file_t *configuration = settings ? file_new(settings) : NULL;
+    string_t *canonical = exists ? cfg_database_canonical_destination(file) : NULL;
+    string_t *protected = exists && configuration ? cfg_database_canonical_destination(configuration) : NULL;
+    ok = ok && settings && (!exists || (canonical && protected && string_compare(canonical, protected)));
+    static const char *const suffixes[] = {"-journal", "-wal", "-shm", ""};
+    file_t *members[4] = {0};
+    bool present[4] = {0};
+    for (size_t i = 0; ok && i < 4; ++i) {
+        string_t *member = string_sprintf("%s%s", string_c_str(path), suffixes[i]);
+        members[i] = member ? file_new(member) : NULL;
+        ok = members[i] && cfg_storage_safe_regular(members[i], &present[i]);
+        string_free(member);
+    }
+    for (size_t i = 0; ok && i < 4; ++i)
+        if (present[i]) ok = file_delete(members[i]);
+    for (size_t i = 0; i < 4; ++i) file_free(members[i]);
+    file_free(configuration); file_free(file);
+    string_free(protected); string_free(canonical); string_free(settings);
+    string_free(path); string_free(raw); string_free(fallback); string_free(home);
+    if (!ok) fprintf(stderr, "Cannot remove configured %s database; no settings were removed.\n", name);
     return ok ? 0 : 1;
 }

@@ -2,7 +2,7 @@
  * @file lab_calendar_weather.c
  * @brief Optional WeatherAPI daily cards and hourly observing conditions for native MARS Lab.
  *
- * Reads the user's existing weather.env configuration through file_t, performs
+ * Reads the inherited encrypted-configuration snapshot, performs
  * verified HTTPS requests sharing a four-second deadline and emits the browser's
  * weather fields and sections. Provider errors remain an unavailable weather
  * card and never expose the API key in diagnostics. Almanac conditions use UTC
@@ -177,23 +177,10 @@ json_t *lab_cal_weather(const json_t *options)
         datetime_ymd_to_jdn((short)(local.tm_year + 1900), (month_t)(local.tm_mon + 1), (uint8_t)local.tm_mday);
     long span = datetime_jdn(selected) - today;
     datetime_dealloc(selected);
-    /* Both environment spellings take precedence over either file spelling. */
-    const char *primary = getenv("MARS_WEATHER_API_KEY"), *legacy = getenv("WEATHERAPI_KEY");
-    string_t *key = string_new_with(primary ? primary : "");
+    /* Startup supplied the encrypted configuration snapshot before request workers were forked. */
+    const char *configured = getenv("MARS_WEATHER_API_KEY");
+    string_t *key = string_new_with(configured ? configured : "");
     string_trim(key);
-    if (!string_byte_length(key) && legacy) {
-        string_free(key);
-        key = string_new_with(legacy);
-        string_trim(key);
-    }
-    if (!string_byte_length(key)) {
-        string_free(key);
-        key = lab_cal_config("weather.env", "MARS_WEATHER_API_KEY");
-    }
-    if (!string_byte_length(key)) {
-        string_free(key);
-        key = lab_cal_config("weather.env", "WEATHERAPI_KEY");
-    }
     const char *reason = NULL;
     if (strcmp(date, "2010-01-01") < 0 || span > 300)
         reason = "The selected date is outside the weather provider's supported range.";

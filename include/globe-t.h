@@ -267,7 +267,8 @@ globe_t *globe_open_databases(sqlite_t *shore_db, sqlite_t *map_db, sqlite_t *to
  * @brief Open the configured independent globe database, optionally borrowing a town catalogue.
  * @param town_db Borrowed jurisdiction connection, or NULL; must outlive the controller.
  * @return Owned controller, or NULL if configuration or the existing database cannot be read in its selected mode.
- * Reads MARS_GLOBE_DB_PATH and MARS_GLOBE_DB_KEY before literal settings in MARS_HOME/config/globe-db.env.
+ * Reads inherited MARS_GLOBE_DB_PATH and MARS_GLOBE_DB_KEY settings. Applications load their configuration
+ * before opening the library; explicit environment overrides take precedence in that application layer.
  * MARS_HOME defaults to ~/.mars; the default database path is MARS_HOME/globe/globe.db.
  * Empty or absent keys select plaintext; non-empty keys select encryption without fallback on failure.
  * The geometry connection is owned and closed by the controller. Opening never creates a missing database

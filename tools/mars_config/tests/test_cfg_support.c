@@ -16,7 +16,39 @@
 
 #include "string-t.h"
 #include "file-t.h"
+#include "mars_settings.h"
+#include "cfg_command.h"
 #include "test_cfg_support.h"
+
+static string_t *test_cfg_key(bool create)
+{
+    (void)create;
+    return string_new_with("isolated-installer-settings-key");
+}
+
+/* Subprocess commands use the production dispatcher and a process-local synthetic key source. */
+void test_cfg_command_self_fixture(void)
+{
+    if (!getenv("MARS_TEST_CONFIG_COMMAND")) return;
+    file_t *file = file_new_cstr("/proc/self/cmdline");
+    char input[16384];
+    size_t length = 0;
+    bool ok = file && file_open_read(file) && file_read(file, input, sizeof input, &length) &&
+              length && length < sizeof input && !input[length - 1];
+    char *arguments[64];
+    size_t count = 0;
+    for (size_t i = 0; ok && i < length;) {
+        if (count == sizeof arguments / sizeof *arguments) { ok = false; break; }
+        arguments[count++] = input + i;
+        i += strlen(input + i) + 1;
+    }
+    file_free(file);
+    mars_settings_key_provider(test_cfg_key);
+    int status = ok ? cfg_command_run((int)count, arguments) : 2;
+    mars_settings_isolation_close();
+    fflush(NULL);
+    _exit(status);
+}
 
 /* Used only beneath this fixture's successful mkdtemp directory, after its child has exited. */
 static bool test_cfg_remove_tree(file_t *directory, unsigned depth, size_t *remaining)
@@ -70,12 +102,16 @@ bool test_cfg_isolated(bool (*callback)(const char *directory))
     fflush(NULL);
     pid_t child = fork();
     if (!child) {
-        bool ready = !setenv("MARS_HOME", directory, 1) && !unsetenv("MARS_WEATHER_API_KEY") &&
+        mars_settings_key_provider(test_cfg_key);
+        bool ready = !unsetenv("MARS_CONFIG_FILE") && !setenv("MARS_TEST_CONFIG_COMMAND", "1", 1) &&
+                     !setenv("MARS_HOME", directory, 1) && !unsetenv("MARS_WEATHER_API_KEY") &&
                      !unsetenv("WEATHERAPI_KEY") && !unsetenv("MARS_JURISDICTION_DB_PATH") &&
+                     !unsetenv("MARS_GLOBE_DB_PATH") && !unsetenv("MARS_GLOBE_DB_KEY") &&
                      !unsetenv("MARS_JURISDICTION_DB_KEY") && !unsetenv("MARS_ALMANAC_DB_PATH") &&
                      !unsetenv("MARS_ALMANAC_DB_KEY") && !unsetenv("MARS_CALENDAR_LOCATION") &&
                      !unsetenv("MARS_CALENDAR_LANGUAGE");
         bool ok = ready && callback(directory);
+        mars_settings_isolation_close();
         /* Release the child's inherited handle; only the parent removes the directory. */
         file_free(root);
         fflush(NULL);
@@ -93,4 +129,20 @@ bool test_cfg_isolated(bool (*callback)(const char *directory))
     bool removed = root && test_cfg_remove_tree(root, 0, &remaining);
     file_free(root);
     return ok && removed;
+}
+
+static bool (*test_cfg_content_callback)(const char *);
+
+static bool test_cfg_content_child(const char *directory)
+{
+    return mars_settings_isolate() && test_cfg_content_callback(directory);
+}
+
+/* Keep small encrypted settings allocations out of bulk plaintext fixture processes. */
+bool test_cfg_content_isolated(bool (*callback)(const char *directory))
+{
+    test_cfg_content_callback = callback;
+    bool ok = callback && test_cfg_isolated(test_cfg_content_child);
+    test_cfg_content_callback = NULL;
+    return ok;
 }

@@ -588,19 +588,18 @@ The database-only targets `make install-mars-db` and `make uninstall-mars-db` ar
 listed in `make help`. When MARS Lab is installed, `make release` also installs any
 missing databases and applies pending updates to existing ones, preserving their other
 data and settings. `make update-mars-db` performs this database preparation separately.
-The uninstall target removes the default globe, almanac and
-jurisdiction databases under `~/.mars`, their SQLite sidecar files and their database
-configuration files. It preserves custom database files, Lab history, weather settings
-and river-processing checkpoints. Stop the Lab before uninstalling databases.
+The uninstall target removes the three configured databases and their SQLite sidecars,
+including custom database paths. Configuration, Lab history, weather settings and
+river-processing checkpoints are preserved. Stop the Lab before uninstalling databases.
 
 New content databases default to plaintext; existing encrypted databases retain
 their keys. The jurisdiction installer records its selected database location,
 with `~/.mars/jurisdiction/mars_jurisdiction_rules.db` as the default. MARS supplies no shared
 WeatherAPI account or key. If the installer creates their own WeatherAPI
 account and chooses to enable weather lookups, that account's key is stored in
-the encrypted configuration after setup. Legacy `~/.mars/config/weather.env`
-and database `.env` files are retained for compatibility. Reinstalling replaces the selected jurisdiction
-database and its configuration, preserving unrelated files and saved Lab state.
+encrypted `mars.db` after setup. The small `mars.json` file locates this configuration store.
+Reinstalling replaces the selected jurisdiction database and updates its settings transactionally,
+preserving unrelated settings and saved Lab state.
 Each lookup sends the configured key, selected date,
 latitude and longitude from the local MARS Lab server to WeatherAPI.com over
 HTTPS; the key is not sent to the browser. MARS does not cache or persist the

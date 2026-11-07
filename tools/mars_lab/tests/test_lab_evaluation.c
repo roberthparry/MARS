@@ -5,7 +5,8 @@
  * Calls the public-to-tools evaluation and calendar adapters with real prebuilt
  * Lab workers. Mathematical modes must return native result fields and typed
  * binding arrays. Optional TeX rendering may fail without losing the result.
- * Validation cases avoid external weather requests and database dependencies.
+ * Validation avoids external weather requests. The ocean-height check loads configured shoreline data
+ * in a separate process, leaving other fixtures independent of the user's settings and key store.
  * Deadline policy and failure-response cases call pure private helpers, without
  * spawning a worker or waiting for a real timeout.
  */
@@ -15,11 +16,17 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+/* Keep the POSIX signal-stack typedef distinct from the MARS stack API. */
+#define stack_t posix_signal_stack_t
+#include <sys/wait.h>
+#undef stack_t
+#include <unistd.h>
 
 #include "almanac-t.h"
 #include "file-t.h"
 #include "number-t.h"
 #include "sqlite-t.h"
+#include "mars_settings.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
 #include "lab_state.h"
@@ -134,7 +141,7 @@ static void test_lab_evaluation_validation(void)
     TEST_ASSERT_TRUE(ok, "invalid inputs, native parse errors, unsafe TeX and unknown routes have distinct contracts");
 }
 
-static void test_lab_calendar_validation(void)
+static void calendar_validation_checks(void)
 {
     const char *routes[] = {"/datetime-eval", "/datetime-weather", "/datetime-jurisdiction-location", "/almanac-eval", "/almanac-weather",
                             "/almanac-land-totality"};
@@ -166,6 +173,25 @@ static void test_lab_calendar_validation(void)
     json_free(response);
     json_free(payload);
     string_free(route);
+}
+
+static void test_lab_calendar_validation(void)
+{
+    fflush(NULL);
+    pid_t child = fork();
+    if (!child) {
+        bool ready = mars_settings_isolate() && mars_settings_load();
+        if (ready) calendar_validation_checks();
+        mars_settings_isolation_close();
+        fflush(NULL);
+        _exit(ready ? TEST_EXIT_CODE() : 1);
+    }
+    int status = 0;
+    pid_t waited = -1;
+    if (child > 0)
+        do { waited = waitpid(child, &status, 0); } while (waited < 0 && errno == EINTR);
+    TEST_ASSERT_TRUE(waited == child && child > 0 && WIFEXITED(status) && !WEXITSTATUS(status),
+                     "calendar validation loads the configured surface through the application bootstrap");
 }
 
 static void check_weather_local_day(void)

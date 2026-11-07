@@ -21,6 +21,7 @@
 #include "datetime-t.h"
 #include "file-t.h"
 #include "jurisdiction-t.h"
+#include "mars_settings.h"
 #include "sqlite-t.h"
 #include "string-t.h"
 #include "test_harness.h"
@@ -732,6 +733,7 @@ static void example_holiday_readme_queries(void)
 
 static bool holiday_suite_setup(void)
 {
+    if (!mars_settings_isolate() || !mars_settings_load()) return false;
     jurisdiction_t *holiday = jurisdict_open("GB-ENG");
 
     if (holiday) {
@@ -921,7 +923,7 @@ static void test_jurisdiction_configuration_file_io(void)
     TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, string_c_str(key), string_byte_length(key)), 0);
     TEST_ASSERT_INT_EQ(string_append_utf8_exact(contents, "\"  ", 3), 0);
     TEST_ASSERT_TRUE(file_write_all_text(source, contents), "write long Unicode configuration");
-    TEST_ASSERT_TRUE(file_create_symlink(source, config), "read configuration through symbolic link");
+    TEST_ASSERT_TRUE(file_create_symlink(source, config), "create an ignored obsolete configuration file");
     sqlite_t *database = sqlite_open_encrypted(database_path, key);
     TEST_ASSERT_NOT_NULL(database);
     TEST_ASSERT_TRUE(sqlite_init_object_store(database), "initialise encrypted fixture");
@@ -937,6 +939,8 @@ static void test_jurisdiction_configuration_file_io(void)
     bool environment_ok = setenv(names[0], root, 1) == 0;
     for (size_t i = 1; i < sizeof(names) / sizeof(names[0]); ++i)
         environment_ok = unsetenv(names[i]) == 0 && environment_ok;
+    environment_ok = environment_ok && !setenv("MARS_JURISDICTION_DB_PATH", string_c_str(database_path), 1) &&
+                     !setenv("MARS_JURISDICTION_DB_KEY", string_c_str(key), 1);
     jurisdiction_t *engine = environment_ok ? jurisdict_open("GB-ENG") : NULL;
     bool opened = engine != NULL;
     jurisdict_close(engine);
@@ -956,7 +960,7 @@ static void test_jurisdiction_configuration_file_io(void)
     file_free(config);
     file_free(directory);
     TEST_ASSERT_TRUE(environment_ok && restored, "restore environment after isolated configuration test");
-    TEST_ASSERT_TRUE(opened, "configuration preserves decomposed paths and exact quoted Unicode keys beyond 4 KiB");
+    TEST_ASSERT_TRUE(opened, "inherited settings preserve decomposed paths and exact Unicode keys beyond 4 KiB");
 }
 
 int tests_main(void)

@@ -523,8 +523,10 @@ Inside `mars.db`, `application_setting` holds settings and database locations;
 executables, time-zone data and temporary-directory locations. Relative paths
 resolve from `mars.db`'s directory. The native `mars_config` executable provides
 `settings list`, `settings set NAME VALUE`, `settings unset NAME` and
-`settings import FILE`, plus corresponding `paths list`, `paths set NAME PATH`
-and `paths unset NAME` commands. Settings listings redact credentials. Restart
+`settings import JSON_FILE`, plus corresponding `paths list`, `paths set NAME PATH`
+and `paths unset NAME` commands. JSON imports accept a bounded object of string-valued
+settings, committed in one transaction. `settings init` creates missing defaults without
+changing existing values. Settings listings redact credentials. Restart
 the Lab after editing settings; controlled calculations inherit the startup
 snapshot without looking up the key again.
 
@@ -534,9 +536,8 @@ public resource paths only, allowing development runs before user configuration.
 Runtime code resolves those paths through the shared configuration layer; it
 does not need the repository as its working directory. Installation records the
 actual resource locations, which can subsequently be edited without recompiling.
-The three content databases remain in their existing format. Migration also
-retains legacy `.env` files for compatibility, so existing plaintext credential
-copies are not removed by encrypting `mars.db`.
+The three content databases remain in their existing format. Installers and Lab read
+and persist application settings through `mars.db`; `mars.json` is the only bootstrap file.
 Standalone river staging and checkpoint resumption continue to use their explicit
 input/candidate files and existing candidate-key setting, so background jobs do
 not require a desktop session. Publishing a candidate still loads the normal
@@ -695,8 +696,8 @@ These persistence bounds do not pop entries from a running worksheet's native
 history, which retains its existing independent memory limits. Browser storage
 quotas or server I/O failures are reported without preventing normal navigation.
 
-The existing object-store key in `MARS_HOME/config/mars-lab.env` is reused;
-first-run key creation is locked and atomic, and never replaces an existing key.
+The object-store key is retained in encrypted `mars.db`. First-run key creation uses
+an immediate SQLite transaction and never replaces an existing non-empty key.
 The native server uses four separate request processes by default, not threads.
 Named-town time zones use the installed Linux zoneinfo data, including daylight
 saving at each event's instant. Jurisdiction choices, default locations and town
@@ -4732,13 +4733,13 @@ The installer runs `tools/mars_config/build/release/mars_config weather`, withou
 starting a listener, browser or object cache. This option can also be run later.
 Interactive setup offers an opt-out and hidden, confirmed key entry.
 `--noninteractive` suppresses prompts: `--weather-key KEY` takes precedence over
-`MARS_WEATHER_API_KEY`, then `WEATHERAPI_KEY`, then the saved configuration.
+`MARS_WEATHER_API_KEY`, then the saved setting in encrypted `mars.db`.
 Prefer the interactive prompt or environment to putting a secret in command-line
 history. With no key, non-interactive setup creates nothing.
-The key is saved atomically in `$MARS_HOME/config/weather.env` (by default
-`~/.mars/config/weather.env`), with directory mode 0700 and file mode 0600.
+The key is saved transactionally in encrypted `mars.db`, with owner-only file permissions.
+`mars.json` locates this store; the desktop key store retains its encryption key.
 Final symlinks, non-regular files and multiply-linked destinations are refused.
-Keys are limited to 4096 printable ASCII characters excluding apostrophes;
+Keys are limited to 4096 printable ASCII characters;
 outer whitespace is trimmed. Invalid input leaves existing contents intact.
 Setup prints only a confirmation or generic error, never the key. The C installer
 regressions are in `tools/mars_config/tests/test_cfg_weather.c`.

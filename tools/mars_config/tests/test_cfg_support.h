@@ -42,6 +42,14 @@ void test_cfg_textures_readme_cases(void);
 /** Run callback beneath a private temporary directory; return success after cleanup. */
 bool test_cfg_isolated(bool (*callback)(const char *directory));
 
+/**
+ * @brief Run one content-store fixture with encrypted settings confined to a helper process.
+ * @param[in] callback Borrowed fixture callback receiving its disposable home for the call's lifetime.
+ * @return True after the callback passes and all private files are removed; false on setup, test or cleanup failure.
+ * @note Invoke sequentially. Uses synthetic keys and owns/reaps the settings helper before removing fixture files.
+ */
+bool test_cfg_content_isolated(bool (*callback)(const char *directory));
+
 /** Register literal configuration and path tests. */
 void test_cfg_storage_cases(void);
 
@@ -71,6 +79,13 @@ void test_cfg_locales_cases(void);
 
 /** Exit in the explicitly requested Make executable-fixture mode; otherwise return. */
 void test_cfg_make_self_fixture(void);
+
+/**
+ * @brief Dispatch an explicitly marked subprocess command with an isolated settings key.
+ * @return No value; exits after command dispatch in fixture mode, otherwise returns unchanged.
+ * @note Uses only process-owned synthetic credentials; never accesses the desktop key store.
+ */
+void test_cfg_command_self_fixture(void);
 
 /** Register root Make installer dispatch and forwarding tests. */
 void test_cfg_make_cases(void);
