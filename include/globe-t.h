@@ -416,7 +416,7 @@ bool globe_import_shoreline(sqlite_t *db, file_t *source);
 /** @brief Geographic layers; unavailable detail must never be inferred from another layer. */
 typedef enum _globe_layer_t {
     GLOBE_LAYER_SHORELINE,
-    GLOBE_LAYER_RIVERS,
+    GLOBE_LAYER_RIVERS, /**< Accepted river centrelines or independently installed mapped water areas. */
     GLOBE_LAYER_TOWNS,
     GLOBE_LAYER_ROADS,
     GLOBE_LAYER_BUILDINGS,

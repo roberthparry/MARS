@@ -2679,6 +2679,30 @@ static void test_lab_extra_conjugate_pair_identity(void)
     expect_response("/equation-eval", "{\"equation\":\"x^2+2*x+3 = 0\"}", 200u, "display_TeX", "\\pm");
 }
 
+static void test_lab_extra_equation_zeta_precision(void)
+{
+    unsigned status = 0;
+    json_t *response = request("/equation-eval", "{\"equation\":\"zeta(z)=0\",\"precision\":78}", &status);
+    const char *TeX = lab_eval_text(response, "display_TeX");
+    const char *row = TeX;
+    size_t pairs = 0;
+    bool ok = status == 200 && test_lab_ok(response, true) &&
+              json_array_size(test_lab_member(response, "numeric_solutions")) == 40;
+    static const char prefix[] = "z &\\approx 0.5 \\pm ";
+    while (row && (row = strstr(row, prefix))) {
+        row += sizeof prefix - 1;
+        size_t digits = 0;
+        for (const char *p = row; (*p >= '0' && *p <= '9') || *p == '.'; ++p)
+            digits += *p != '.';
+        ok = ok && digits == 78;
+        ++pairs;
+    }
+    ok = ok && pairs == 20 && !strstr(TeX, "0.499999999") && !strstr(TeX, "0.500000000");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "all forty zeta zeros display as twenty 78-digit conjugate pairs centred on 0.5");
+}
+
 static void test_lab_extra_projection_fonts(void)
 {
     static const struct { const char *route; const char *payload; const char *field; } cases[] = {
@@ -2869,6 +2893,7 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_render_TeX, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_matrix_power_bindings, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_conjugate_pair_identity, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_equation_zeta_precision, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_projection_fonts, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_unsafe_TeX_input, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_unsafe_TeX_escape, tests, NULL);

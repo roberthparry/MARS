@@ -98,7 +98,13 @@ bool shoreline_import(sqlite_t *db, file_t *source);
 typedef struct _rivers_t rivers_t;
 /** @brief Private river visitor. */
 typedef globe_river_segment_fn rivers_segment_fn;
-/** @brief Open a river reader. */
+/**
+ * @brief Open independently available centreline and mapped-water readers.
+ * @param[in] db Borrowed geographic connection, retained until rivers_close(); serialise all access.
+ * @return Owned reader released with rivers_close(), or NULL if no accepted layer exists or setup fails.
+ * @note Mapped lakes and riverbanks remain usable without rivers_dataset. Retired WDBII centrelines are
+ * excluded. The caller keeps ownership of the database and must close the reader before its connection.
+ */
 rivers_t *rivers_open(sqlite_t *db);
 /** @brief Release a river reader. */
 void rivers_close(rivers_t *rivers);

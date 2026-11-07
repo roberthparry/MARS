@@ -927,6 +927,7 @@ static void test_cfg_database_trace(void)
         "packaging/almanac-db/mars_almanac_chebyshev.sql",
         "packaging/almanac-db/mars_almanac_frame_rotation.sql",
         "packaging/globe-db/jurisdiction_subdivisions.sql",
+        "packaging/globe-db/mapped_water.sql",
         "packaging/jurisdiction-db/flag_emblems.sql",
         "packaging/jurisdiction-db/flag_regions.sql",
         "packaging/jurisdiction-db/location_additions.sql",
@@ -1594,9 +1595,13 @@ static bool test_cfg_cyprus_coverage(globe_t *globe)
 
 static bool test_cfg_country_migration_mode(const char *directory, const char *key)
 {
+    /* Normal release initialises the central settings store before preparing content databases. */
+    string_t *settings = string_new_with("{}");
+    bool configured = settings && mars_settings_sync(settings);
+    string_free(settings);
     file_t *database = test_cfg_database_file(directory, "country_migration.db");
     sqlite_t *db = database ? test_cfg_database_open(database, key) : NULL;
-    bool ok = db && sqlite_exec_cstr(db,
+    bool ok = configured && db && sqlite_exec_cstr(db,
         "create table shoreline_dataset(id,format_version,point_count);"
         "insert into shoreline_dataset values(1,2,7);"
         "create table shoreline_blob(id,vertices);"
@@ -1632,13 +1637,17 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     file_t *subdivision_target = test_cfg_database_file(directory, "packaging/globe-db/jurisdiction_subdivisions.sql");
     ok = ok && subdivision_source && subdivision_target && file_copy(subdivision_source, subdivision_target, false);
     file_free(subdivision_source); file_free(subdivision_target);
+    file_t *water_source = test_cfg_database_file(MARS_CONFIG_ROOT_DIR, "packaging/globe-db/mapped_water.sql");
+    file_t *water_target = test_cfg_database_file(directory, "packaging/globe-db/mapped_water.sql");
+    ok = ok && water_source && water_target && file_copy(water_source, water_target, false);
+    file_free(water_source); file_free(water_target);
     /* No shoreline archive exists here: update countries, display regions and images independently. */
     ok = ok && test_cfg_copy_textures(directory) && !cfg_databases_update();
     db = ok ? test_cfg_database_open(database, key) : NULL;
     globe_t *globe = db ? globe_open_databases(db, db, NULL) : NULL;
     string_t *code = globe_country_code_at(globe, 44.95, 34.1);
     ok = ok && code && !strcmp(string_c_str(code), "UA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "18") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "19") &&
          test_cfg_database_query(db, "select count(distinct iso_country_code) from region_name", "20") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "7") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained") &&
@@ -1666,7 +1675,7 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe = db ? globe_open_databases(db, db, NULL) : NULL;
     code = globe_country_code_at(globe, -33.8064, 18.3688);
     ok = ok && code && !strcmp(string_c_str(code), "ZA") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "18") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "19") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained");
     string_free(code); globe_close(globe); sqlite_close(db);
     /* Revision eight adds display coverage and regional photographs, retaining installed countries. */
@@ -1680,7 +1689,7 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     globe = db ? globe_open_databases(db, db, NULL) : NULL;
     ok = ok && test_cfg_kashubian_coverage(globe) && test_cfg_sami_coverage(globe) &&
          test_cfg_german_region_coverage(globe) && test_cfg_kazakh_coverage(globe) &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "18");
+         test_cfg_database_query(db, "select revision from mars_database_revision", "19");
     globe_close(globe); sqlite_close(db);
     /* Revision seventeen needs flags and country metadata only, without replacing photographs. */
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1694,7 +1703,7 @@ static bool test_cfg_country_migration_mode(const char *directory, const char *k
     db = ok ? test_cfg_database_open(database, key) : NULL;
     globe = db ? globe_open_databases(db, db, NULL) : NULL;
     ok = ok && test_cfg_cyprus_coverage(globe) &&
-         test_cfg_database_query(db, "select revision from mars_database_revision", "18") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision", "19") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "7") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained") &&
          sqlite_exec_cstr(db, "drop trigger retain_photographs");
@@ -1828,7 +1837,10 @@ static void test_cfg_database_coast_corrections(void)
 
 static bool test_cfg_database_globe_packaged_mode(const char *directory, const char *key)
 {
-    bool ok = test_cfg_database_texture_fixture() && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) &&
+    string_t *settings = string_new_with("{}");
+    bool configured = settings && mars_settings_sync(settings);
+    string_free(settings);
+    bool ok = configured && test_cfg_database_texture_fixture() && !setenv("MARS_ROOT", MARS_CONFIG_ROOT_DIR, 1) &&
               !setenv("MARS_GLOBE_DB_KEY", "ignored-per-database-key", 1) && !unsetenv("MARS_GLOBE_DB_PATH") &&
               !cfg_globe_install_key(key) && !unsetenv("MARS_GLOBE_DB_KEY") && !cfg_globe_run("globe-check");
     file_t *database = test_cfg_database_file(directory, "globe/globe.db");
@@ -1836,7 +1848,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "SELECT count(*) FROM country_name", "299") &&
          test_cfg_database_query(db, "SELECT point_count FROM shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "18") &&
+         test_cfg_database_query(db, "SELECT revision FROM mars_database_revision WHERE name='globe'", "19") &&
          test_cfg_database_query(db, "SELECT count(*) FROM sqlite_master WHERE name IN"
                                     "('almanac_body','jurisdiction_town','rivers_dataset')", "0") &&
          test_cfg_coast_sydney(db) && sqlite_exec_cstr(db,
@@ -1849,7 +1861,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
          test_cfg_database_query(db, "select value from retained", "42") &&
          test_cfg_database_query(db, "select source from rivers_dataset", "retained fixture") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "18");
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "19");
     sqlite_close(db);
     /* Country metadata is independent of town selection and land/water classification. */
     db = ok ? test_cfg_database_open(database, key) : NULL;
@@ -1877,7 +1889,7 @@ static bool test_cfg_database_globe_packaged_mode(const char *directory, const c
     ok = ok && db && test_cfg_coast_sydney(db) && test_cfg_database_mode(database, 0600) &&
          test_cfg_database_query(db, "select count(*) from country_name", "299") &&
          test_cfg_database_query(db, "select point_count from shoreline_dataset", "35346818") &&
-         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "18") &&
+         test_cfg_database_query(db, "select revision from mars_database_revision where name='globe'", "19") &&
          test_cfg_database_query(db, "select count(*) from sqlite_master where name in ('retained','rivers_dataset')", "0") &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_KEY", key) &&
          test_cfg_database_setting(config, "MARS_GLOBE_DB_PATH", file_path(database)) &&

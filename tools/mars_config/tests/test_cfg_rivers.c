@@ -28,6 +28,82 @@ static sqlite_t *test_database(void)
 
 static file_t *temporary_directory(void);
 
+typedef struct {
+    size_t pieces, holes, points;
+} water_hits_t;
+
+static bool mapped_water_hit(const double *coordinates, const size_t *sizes, size_t count, void *context)
+{
+    water_hits_t *hits = context;
+    if (!coordinates || !sizes || !count) return false;
+    ++hits->pieces;
+    hits->holes += count - 1;
+    for (size_t i = 0; i < count; ++i) hits->points += sizes[i];
+    return true;
+}
+
+static bool mapped_water_line(int64_t id, unsigned kind, double ax, double ay, double bx, double by, void *context)
+{
+    (void)id; (void)kind; (void)ax; (void)ay; (void)bx; (void)by;
+    ++*(size_t *)context;
+    return true;
+}
+
+static bool mapped_water_counts(sqlite_t *db, int banks, int coverage)
+{
+    sqlite_stmt_t *q = sqlite_stmt_prepare(db,
+        "SELECT (SELECT count(*) FROM rivers_bank), (SELECT count(*) FROM rivers_water_coverage),\n"
+        "       (SELECT count(*) FROM rivers_bank b JOIN rivers_bank_bounds r ON r.id = b.id)");
+    bool ok = q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int(q, 0) == banks &&
+              sqlite_stmt_column_int(q, 1) == coverage && sqlite_stmt_column_int(q, 2) == banks;
+    sqlite_stmt_finalize(q);
+    return ok;
+}
+
+static void test_cfg_rivers_packaged_water(void)
+{
+    sqlite_t *db = test_database();
+    string_t *root = string_new_with(MARS_CONFIG_ROOT_DIR);
+    bool ok = db && root && cfg_database_mapped_water(db, root) && mapped_water_counts(db, 54987, 1);
+    globe_t *globe = ok ? globe_open_databases(db, db, NULL) : NULL;
+    water_hits_t hits = {0};
+    size_t lines = 0;
+    ok = ok && globe && globe_has_layer(globe, GLOBE_LAYER_RIVERS) &&
+         globe_river_water_complete(globe, 26.7, 68.83, 27.1, 68.95) &&
+         !globe_river_water_complete(globe, 26, 68, 28, 70) &&
+         globe_river_banks(globe, 26.65, 68.82, 27.15, 68.96, mapped_water_hit, &hits) &&
+         hits.pieces == 302 && hits.holes > 0 && hits.points > 10000 &&
+         globe_river_segments(globe, 26.65, 68.82, 27.15, 68.96, mapped_water_line, &lines) && !lines;
+    globe_close(globe);
+    TEST_ASSERT_TRUE(ok, "fresh installations retain detailed Inari water and islands without a centreline dataset");
+    ok = ok && sqlite_exec_cstr(db,
+        "CREATE TABLE rivers_dataset(id, source);\n"
+        "INSERT INTO rivers_dataset VALUES(1, 'retained custom river metadata');\n"
+        "INSERT INTO rivers_bank SELECT 900000001, 900000000001, 2, rings FROM rivers_bank WHERE id = 1;\n"
+        "INSERT INTO rivers_bank_bounds SELECT 900000001, min_x, max_x, min_y, max_y\n"
+        "    FROM rivers_bank_bounds WHERE id = 1;\n"
+        "INSERT INTO rivers_water_coverage VALUES(2, 0, 1000000, 0, 1000000);") &&
+        cfg_database_revision(db, "globe", 18) && cfg_database_globe_refresh(db, root, NULL) &&
+        cfg_database_mapped_water(db, root) && mapped_water_counts(db, 54988, 2);
+    sqlite_stmt_t *q = ok ? sqlite_stmt_prepare(db,
+        "SELECT source FROM rivers_dataset WHERE id = 1 AND EXISTS (\n"
+        "    SELECT 1 FROM rivers_bank WHERE id = 900000001 AND source_id = 900000000001\n"
+        ") AND NOT EXISTS (SELECT 1 FROM sqlite_temp_master WHERE name LIKE 'mars_water_%')") : NULL;
+    ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW &&
+         !strcmp(sqlite_stmt_column_text(q, 0), "retained custom river metadata");
+    sqlite_stmt_finalize(q);
+    TEST_ASSERT_TRUE(ok, "revision-18 upgrades preserve other features and repeated imports do not duplicate polygons");
+    ok = ok && sqlite_exec_cstr(db,
+        "CREATE TRIGGER reject_width BEFORE INSERT ON rivers_width BEGIN\n"
+        "    SELECT RAISE(ABORT, 'synthetic water import rejection');\n"
+        "END;") && !cfg_database_mapped_water(db, root) && mapped_water_counts(db, 54988, 2) &&
+        sqlite_exec_cstr(db, "DROP TRIGGER reject_width");
+    string_t *absent = string_new_with("/nonexistent-mars-water-package");
+    ok = ok && absent && !cfg_database_mapped_water(db, absent) && mapped_water_counts(db, 54988, 2);
+    TEST_ASSERT_TRUE(ok, "failed or missing packages roll back changed water tables rather than claiming success");
+    string_free(absent); string_free(root); sqlite_close(db);
+}
+
 static void test_cfg_rivers_main_selection(void)
 {
     file_t *directory = temporary_directory();
@@ -805,6 +881,7 @@ static void test_cfg_rivers_stage(void)
 void test_cfg_rivers_cases(void)
 {
     TEST_RUN_IN_GROUP(test_cfg_rivers_main_selection, tests, NULL);
+    TEST_RUN_IN_GROUP(test_cfg_rivers_packaged_water, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_osm_import_and_display, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_storage_detail, tests, NULL);
     TEST_RUN_IN_GROUP(test_cfg_rivers_neighbourhoods, tests, NULL);

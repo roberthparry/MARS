@@ -220,7 +220,10 @@ does not certify completeness or assume the Riemann hypothesis. Explicit
 starting bindings retain the existing single-root behaviour.
 
 The Lab combines verified numerical conjugates into one `±` row in both the
-Rendered TeX and Solutions cards. The native solution set still contains both
+Rendered TeX and Solutions cards. Inexact real and imaginary components round to the
+selected significant-digit precision in both cards; extra solver working digits remain
+internal. Exact fractions and symbolic constants retain their exact notation.
+The native solution set still contains both
 roots; pairing uses the numerical values, not their rounded display text.
 Stored complex roots with exact rational real and imaginary components use `=`
 in paired output and numerical evaluations; inexact components retain `≈`.

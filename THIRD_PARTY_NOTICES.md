@@ -715,6 +715,14 @@ and applicable ODbL obligations continue to apply to derived databases and their
 redistribution. Centreline display simplification does not establish navigability.
 See [OpenStreetMap copyright and licence](https://www.openstreetmap.org/copyright).
 
+The reviewed mapped-water areas and recorded widths in
+`packaging/globe-db/mapped_water.sql` are also derived from OpenStreetMap contributors'
+data under ODbL 1.0. They include the Severn corridor, Cape Peninsula, Inari and reviewed
+Danish water areas. Original extract dates, checksums, source identities, geographic
+coverage and review exclusions are retained in the package's `rivers_water_source`
+records and imported into the globe database. Polygon coordinates and island holes
+are preserved; redistribution of this derived database remains subject to ODbL.
+
 The full-resolution WDBII river network distributed with GSHHG 2.3.7 was formerly
 packaged as `packaging/jurisdiction-db/wdb_rivers_f.b.zst`, but has been withdrawn
 because its geometry is unsuitable for close views. The following provenance is

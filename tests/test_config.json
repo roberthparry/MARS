@@ -24,6 +24,7 @@
       "test_TeX_native_index_roundtrip": true,
       "test_TeX_native_layout": true,
       "test_TeX_native_text_array": true,
+      "test_TeX_numeric_display_precision": true,
       "test_TeX_prime_input": true,
       "test_TeX_prime_snapshot_modes": true,
       "test_TeX_quantum_input": true,
@@ -1588,6 +1589,19 @@
       "test_http_live_status_and_redirect": true
     }
   },
+  "tests/image/test_image.c": {
+    "readme_examples": {
+      "enabled": true,
+      "example_image_readme": true
+    },
+    "tests": {
+      "enabled": true,
+      "test_image_coverage_edges": true,
+      "test_image_pixels_and_corruption": true,
+      "test_image_png_external_streams": true,
+      "test_image_rectangular_pyramid": true
+    }
+  },
   "tests/integrator/test_integrator.c": {
     "readme_examples": {
       "enabled": true,
@@ -3112,6 +3126,14 @@
       "test_cfg_progress_output": true
     }
   },
+  "tools/mars_config/tests/test_cfg_pyramids.c": {
+    "tests": {
+      "enabled": true,
+      "test_cfg_pyramid_atomic": true,
+      "test_cfg_pyramid_import": true,
+      "test_cfg_pyramid_installer": true
+    }
+  },
   "tools/mars_config/tests/test_cfg_rendering.c": {
     "readme_examples": {
       "enabled": true,
@@ -3141,6 +3163,7 @@
       "test_cfg_rivers_neighbourhoods": true,
       "test_cfg_rivers_numeric_decoder": true,
       "test_cfg_rivers_osm_import_and_display": true,
+      "test_cfg_rivers_packaged_water": true,
       "test_cfg_rivers_section_widths": true,
       "test_cfg_rivers_stage": true,
       "test_cfg_rivers_storage_budget": true,
@@ -3299,6 +3322,7 @@
       "test_lab_extra_equation_greek_binding": true,
       "test_lab_extra_equation_inferred_binding": true,
       "test_lab_extra_equation_real_surd_numerics": true,
+      "test_lab_extra_equation_zeta_precision": true,
       "test_lab_extra_exact_derivative_round_trip": true,
       "test_lab_extra_excess_precision": true,
       "test_lab_extra_expression": true,
@@ -4104,27 +4128,6 @@
       "test_tba_rows": true,
       "test_tba_stream": true,
       "test_tba_worker": true
-    }
-  },
-  "tools/mars_config/tests/test_cfg_pyramids.c": {
-    "tests": {
-      "enabled": true,
-      "test_cfg_pyramid_atomic": true,
-      "test_cfg_pyramid_import": true,
-      "test_cfg_pyramid_installer": true
-    }
-  },
-  "tests/image/test_image.c": {
-    "tests": {
-      "enabled": true,
-      "test_image_png_external_streams": true,
-      "test_image_pixels_and_corruption": true,
-      "test_image_rectangular_pyramid": true,
-      "test_image_coverage_edges": true
-    },
-    "readme_examples": {
-      "enabled": true,
-      "example_image_readme": true
     }
   }
 }

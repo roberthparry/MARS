@@ -1298,13 +1298,15 @@ bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string
         return (revision >= CFG_GLOBE_PHOTO_REVISION || cfg_database_textures(db, root)) &&
                (revision >= 18 ||
                 (cfg_globe_regions(db, root) &&
-                 cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false)));
+                 cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false))) &&
+               (revision >= 19 || cfg_database_mapped_water(db, root));
     return cfg_globe_valid(db) &&
            (revision >= 3 || cfg_database_coast(db, root, staging)) &&
            (revision >= 7 || cfg_globe_countries(db, root, staging)) &&
            cfg_globe_regions(db, root) &&
            cfg_database_textures(db, root) &&
-           cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) && cfg_globe_valid(db);
+           cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
+           cfg_database_mapped_water(db, root) && cfg_globe_valid(db);
 }
 
 static bool cfg_globe_refresh_all(sqlite_t *db, const string_t *root, const string_t *staging)
@@ -1312,7 +1314,8 @@ static bool cfg_globe_refresh_all(sqlite_t *db, const string_t *root, const stri
     /* Check geographic integrity before adding photographs, whose importer verifies each payload separately. */
     return cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) &&
            cfg_globe_regions(db, root) && cfg_globe_valid(db) && cfg_database_textures(db, root) &&
-           cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false);
+           cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
+           cfg_database_mapped_water(db, root);
 }
 
 /* Keep globe setup independent; unsupported operations fail without changing storage. */
@@ -1378,6 +1381,7 @@ static int cfg_globe_execute(const char *action, const char *explicit_key)
              cfg_database_coast(db, root, staging) && cfg_globe_countries(db, root, staging) && cfg_globe_valid(db) &&
              cfg_globe_regions(db, root) && cfg_database_textures(db, root) &&
              cfg_database_source(db, root, "packaging/globe-db/jurisdiction_subdivisions.sql", false) &&
+             cfg_database_mapped_water(db, root) &&
              cfg_database_revision(db, "globe", CFG_GLOBE_DATA_REVISION) && cfg_database_pyramids(db, root);
         sqlite_close(db);
         json_t *settings = ok ? json_new_object() : NULL;

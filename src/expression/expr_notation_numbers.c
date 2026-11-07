@@ -14,6 +14,8 @@
 #include "internal/number_internal.h"
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expr_notation_internal.h"
+#define MARS_EXPR_STRINGOUT_INTERNAL_ACCESS
+#include "expr_stringout_internal.h"
 
 typedef struct {
     const char *left;
@@ -171,7 +173,7 @@ const TeX_model_node_t *notation_build_number(notation_build_t *build, number_t 
     num_destroy(&denominator);
     if (fraction)
         return result;
-    string_t *text = num_to_string(value);
+    string_t *text = expr_number_format_text_local(value);
     result = text ? notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_NUMBER, .text = text}, NULL) : NULL;
     string_free(text);
     return result;

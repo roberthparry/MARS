@@ -52,13 +52,7 @@ globe_t *globe_open_databases(sqlite_t *shore_db, sqlite_t *map_db, sqlite_t *to
     g->towns = globe_table(town_db, "jurisdiction_town");
     g->regions = globe_table(shore_db, "region_bounds") && globe_table(shore_db, "region_chunk") &&
                  globe_table(shore_db, "region_name");
-    if (globe_table(map_db, "rivers_dataset")) {
-        sqlite_stmt_t *q = sqlite_stmt_prepare(map_db,
-            "select 1 from rivers_dataset where id=1 and source not like 'WDBII%'");
-        bool accepted = q && sqlite_stmt_step(q) == SQLITE_STEP_ROW;
-        sqlite_stmt_finalize(q);
-        if (accepted) g->rivers = rivers_open(map_db);
-    }
+    g->rivers = rivers_open(map_db);
     return g;
 }
 

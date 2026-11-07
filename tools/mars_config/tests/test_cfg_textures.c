@@ -400,7 +400,7 @@ static bool texture_migration_fixture(const char *directory)
     q = db ? sqlite_stmt_prepare(db,
         "SELECT changed FROM texture_update_audit WHERE EXISTS (\n"
         "    SELECT 1 FROM sqlite_master WHERE name = 'texture_update_probe'\n"
-        ") AND EXISTS (SELECT 1 FROM mars_database_revision WHERE name = 'globe' AND revision = 18)") : NULL;
+        ") AND EXISTS (SELECT 1 FROM mars_database_revision WHERE name = 'globe' AND revision = 19)") : NULL;
     ok = ok && q && sqlite_stmt_step(q) == SQLITE_STEP_ROW && sqlite_stmt_column_int(q, 0) == 1;
     sqlite_stmt_finalize(q);
     q = sqlite_stmt_prepare(db, "select source from rivers_dataset");

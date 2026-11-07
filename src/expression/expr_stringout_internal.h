@@ -52,6 +52,17 @@ struct _expr_autoname_entry_t {
 };
 
 /* Local value formatting. */
+/**
+ * @brief Format a numeric atom using the active native display precision and scientific-notation policy.
+ * @param[in] value Borrowed numeric value; its stored precision and value are unchanged.
+ * @return Owned numeric text released with string_free(), or NULL on formatting or allocation failure.
+ * @note No mathematical markup is introduced. Inexact values round to the requested significant digits;
+ * exact values retain the number module's exact spelling. With no precision override, ordinary output
+ * retains the number module's default representation. The caller must restore any temporary formatting state
+ * and serialise access to the owning renderer. No input ownership is transferred or retained.
+ */
+string_t *expr_number_format_text_local(number_t value);
+
 char *expr_number_to_string_local(number_t value);
 char *expr_const_to_string_local(const expr_t *expr);
 char *expr_eval_to_string_local(const expr_t *expr);

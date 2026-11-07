@@ -1166,6 +1166,48 @@ static TeX_t *numeric_notation(number_t value)
     return notation;
 }
 
+static void test_TeX_numeric_display_precision(void)
+{
+    size_t old_bits = num_get_default_prec_bits();
+    num_set_default_prec_bits(1024);
+    number_t half = num_create_from_frac(1, 2), two = num_create_from_long(2);
+    number_t logarithm = num_log(two), scale = num_pow10(-120);
+    number_t offset = num_mul(logarithm, scale), imaginary = num_mul(logarithm, NUM_I);
+    number_t below = num_sub(half, offset), above = num_add(half, offset);
+    const number_t values[] = {below, above};
+    for (size_t i = 0; i < sizeof values / sizeof *values; ++i) {
+        number_t complex = num_add(values[i], imaginary);
+        expr_t *atom = expr_new_const(complex);
+        string_t *expected = num_sprintf_text("%.78n", logarithm);
+        string_t *rounded = atom ? expr_sprintf_text("%.78nt", atom) : NULL;
+        string_t *native = atom ? expr_sprintf_text("%.78nu", atom) : NULL;
+        string_t *full = atom ? expr_to_text(atom, style_LATEX) : NULL;
+        number_t retained = atom ? expr_eval(atom) : NUM_NAN;
+        number_t real = num_real_part(retained), imag = num_imag_part(retained);
+        bool ok = rounded && native && expected && full &&
+                  strstr(string_c_str(rounded), "0.5") &&
+                  strstr(string_c_str(rounded), string_c_str(expected)) &&
+                  !strstr(string_c_str(rounded), "0.499999999") &&
+                  !strstr(string_c_str(rounded), "0.500000000") &&
+                  string_byte_length(full) > string_byte_length(rounded) + 100 &&
+                  num_cmp(real, values[i]) == 0 && num_cmp(imag, logarithm) == 0;
+        TEST_ASSERT_TRUE(ok, "TeX rounds both complex components to 78 digits and restores full-precision formatting");
+        num_destroy(&imag); num_destroy(&real);
+        num_destroy(&retained); string_free(full); string_free(native); string_free(rounded); string_free(expected);
+        expr_free(atom); num_destroy(&complex);
+    }
+    number_t third = num_create_from_frac(1, 3);
+    expr_t *fraction = expr_new_const(third);
+    string_t *exact = fraction ? expr_sprintf_text("%.4nt", fraction) : NULL;
+    TEST_ASSERT_TRUE(exact && !strcmp(string_c_str(exact), "\\frac{1}{3}"),
+                     "requested display precision preserves exact fractions");
+    string_free(exact); expr_free(fraction);
+    num_destroy(&third);
+    num_destroy(&above); num_destroy(&below); num_destroy(&imaginary); num_destroy(&offset);
+    num_destroy(&scale); num_destroy(&logarithm); num_destroy(&two); num_destroy(&half);
+    num_set_default_prec_bits(old_bits);
+}
+
 static void test_TeX_numeric_constant_lookups(void)
 {
     static const struct { const number_t *value; const char *expected; } constants[] = {
@@ -1372,6 +1414,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_TeX_native_text_array, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_native_index_roundtrip, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_context_semantics, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_numeric_display_precision, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_context_callback_lifetime, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_context_validation, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_native_contexts, tests, NULL);

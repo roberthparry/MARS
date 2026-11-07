@@ -24,7 +24,7 @@
 enum {
     CFG_GLOBE_TEXTURE_PATCH_BASE = 16, /**< First catalogue whose validated PNG rows support selective replacement. */
     CFG_GLOBE_PHOTO_REVISION = 17,     /**< Latest revision requiring a photographic catalogue update. */
-    CFG_GLOBE_DATA_REVISION = 18       /**< Current catalogue, including Northern Cyprus regional flag coverage. */
+    CFG_GLOBE_DATA_REVISION = 19       /**< Current catalogue, including portable mapped-water geometry. */
 };
 
 /** Open the selected format: an empty key means plaintext; NULL is a configuration failure. */
@@ -75,6 +75,16 @@ bool cfg_database_select_main_rivers(sqlite_t *source, const string_t *output);
 
 /** Refresh versioned geography and textures using a caller-owned staging directory; retain rivers and credentials. */
 bool cfg_database_globe_refresh(sqlite_t *db, const string_t *root, const string_t *staging);
+
+/**
+ * @brief Import packaged mapped water, recorded widths and explicit survey coverage atomically.
+ * @param[in,out] db Borrowed writable globe connection; remains open and may have an enclosing transaction.
+ * @param[in] root Borrowed resource-location context used by the normal source resolver; not retained.
+ * @return True after the complete package is imported; false rolls back this import on source or SQL failure.
+ * @note Existing centrelines and unrelated mapped features survive. Repeating the import replaces matching
+ * source features without duplication. No argument is consumed; serialise access throughout the call.
+ */
+bool cfg_database_mapped_water(sqlite_t *db, const string_t *root);
 
 /**
  * @brief Atomically synchronise packaged photographs and their provenance, preserving other layers.

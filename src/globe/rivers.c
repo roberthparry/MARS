@@ -83,30 +83,36 @@ int32_t rivers_coordinate(const unsigned char *p)
 rivers_t *rivers_open(sqlite_t *db)
 {
     if (!db) return NULL;
-    sqlite_stmt_t *meta = sqlite_stmt_prepare(db,
-        "select format_version from rivers_dataset where id=1 and point_count>0");
+    sqlite_stmt_t *tables = sqlite_stmt_prepare(db,
+        "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'rivers_dataset'),\n"
+        "       EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'rivers_bank')");
+    bool found = tables && sqlite_stmt_step(tables) == SQLITE_STEP_ROW;
+    bool dataset = found && sqlite_stmt_column_int(tables, 0);
+    bool banks = found && sqlite_stmt_column_int(tables, 1);
+    sqlite_stmt_finalize(tables);
+    if (!dataset && !banks) return NULL;
+    sqlite_stmt_t *meta = dataset ? sqlite_stmt_prepare(db,
+        "SELECT format_version FROM rivers_dataset\n"
+        "WHERE id = 1 AND point_count > 0 AND source NOT LIKE 'WDBII%'") : NULL;
     int version = meta && sqlite_stmt_step(meta) == SQLITE_STEP_ROW ? sqlite_stmt_column_int(meta, 0) : 0;
     bool ready = version == 1 || version == 2;
     sqlite_stmt_finalize(meta);
-    if (!ready) return NULL;
+    if (!ready && !banks) return NULL;
     rivers_t *r = calloc(1, sizeof *r);
     if (!r) return NULL;
     r->anchors = version == 2;
-    r->query = sqlite_stmt_prepare(db, r->anchors ?
+    if (ready) r->query = sqlite_stmt_prepare(db, r->anchors ?
         "select c.feature_id,c.kind,case when length(c.vertices) between 16 and 2056 then c.vertices end,c.anchors "
         "from rivers_bounds b join rivers_chunk c on c.id=b.id "
         "where b.max_x>=?1 and b.min_x<=?2 and b.max_y>=?3 and b.min_y<=?4" :
         "select c.feature_id,c.kind,case when length(c.vertices) between 16 and 2056 "
         "then c.vertices end from rivers_bounds b join rivers_chunk c on c.id=b.id "
         "where b.max_x>=?1 and b.min_x<=?2 and b.max_y>=?3 and b.min_y<=?4");
-    sqlite_stmt_t *tables = sqlite_stmt_prepare(db,
+    tables = sqlite_stmt_prepare(db,
         "select 1 from sqlite_master where type='table' and name='rivers_width'");
     bool widths = tables && sqlite_stmt_step(tables) == SQLITE_STEP_ROW;
     sqlite_stmt_finalize(tables);
     if (widths) r->width_query = sqlite_stmt_prepare(db, "select metres from rivers_width where feature_id=?1");
-    tables = sqlite_stmt_prepare(db, "select 1 from sqlite_master where type='table' and name='rivers_bank'");
-    bool banks = tables && sqlite_stmt_step(tables) == SQLITE_STEP_ROW;
-    sqlite_stmt_finalize(tables);
     if (banks) r->bank_query = sqlite_stmt_prepare(db,
         "select case when length(c.rings) between 40 and 4194304 then c.rings end "
         "from rivers_bank_bounds b join rivers_bank c on c.id=b.id "
@@ -123,7 +129,10 @@ rivers_t *rivers_open(sqlite_t *db)
         "WHERE max_x > ?1 AND min_x < ?2\n"
         "  AND max_y > ?3 AND min_y < ?4");
     if (coverage && (!r->coverage_query || !r->coverage_regions_query)) { rivers_close(r); return NULL; }
-    if (!r->query || (widths && !r->width_query) || (banks && !r->bank_query)) { rivers_close(r); return NULL; }
+    if ((ready && !r->query) || (widths && !r->width_query) || (banks && !r->bank_query)) {
+        rivers_close(r);
+        return NULL;
+    }
     return r;
 }
 
@@ -280,6 +289,8 @@ bool rivers_display_segments(rivers_t *r, double west, double south, double east
         !isfinite(tolerance) || tolerance < 0 || tolerance > 1 ||
         west < -360 || west > 180 || east <= west || east - west > 360 || south < -90 || north > 90 || north <= south)
         return false;
+    /* Mapped lakes and banks do not require a separately prepared centreline network. */
+    if (!r->query) return true;
     r->busy = true;
     bool ok = true;
     sqlite_stmt_t *q = r->query;

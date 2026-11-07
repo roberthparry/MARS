@@ -1793,7 +1793,18 @@ the general open-water selection rule, without special rendering cases for
 individual towns or water bodies. Other regions still need mapped-water imports.
 
 The Inari extension supplies 322 mapped water pieces, including the Juutuanjoki
-connection and Lake Inari islands. `globe_river_water_complete()` checks the optional
+connection and Lake Inari islands. The reviewed water outlines, widths, source provenance
+and explicit survey coverage are bundled in `packaging/globe-db/mapped_water.sql`.
+Fresh globe installations and managed-data revision 19 import this required package,
+including upgrades through `make release` when Lab is installed. They require neither
+the ignored preparation databases nor a separately installed river centreline network.
+The package preserves 54,987 water pieces and 13,412 recorded widths across the reviewed
+regions. Imports preserve other source features and centrelines; repeated imports do not
+duplicate the packaged geometry. Missing or invalid package data fail the update and retain
+the previously installed tables. `GLOBE_LAYER_RIVERS` also reports independently available
+mapped-water geometry, and centreline enumeration then succeeds with no segments.
+
+`globe_river_water_complete()` checks the optional
 `rivers_water_coverage` integer R-tree for a complete survey enclosing the requested
 window. `globe_river_water_coverage()` streams the indexed survey rectangles intersecting a
 window, clipped into its longitude frame, including windows crossing the date line. Its

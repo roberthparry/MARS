@@ -3581,7 +3581,10 @@ int expr_sprintf(char *out, size_t out_size, const char *fmt, ...);
 
 ### `expr_sprintf_text()`
 
-Returns the public result described by sprintf text.
+Returns newly allocated expression-aware formatted text, released with `string_free()`.
+For inexact numeric atoms, a format precision specifies significant decimal digits in
+native and TeX output alike. Values are rounded for display; their stored values are
+preserved. Exact fractions and symbolic constants retain exact notation.
 
 ```c
 string_t *expr_sprintf_text(const char *fmt, ...);

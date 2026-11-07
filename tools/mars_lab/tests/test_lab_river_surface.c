@@ -355,10 +355,8 @@ static bool surface_partial_coverage_fixture(const char *directory)
     string_t *path = string_sprintf("%s/textures.db", directory);
     sqlite_t *db = path ? sqlite_open_plain(path) : NULL;
     bool ok = db && sqlite_exec_cstr(db,
-        "CREATE TABLE rivers_dataset(id, format_version, point_count, source);\n"
-        "INSERT INTO rivers_dataset VALUES(1, 1, 2, 'synthetic survey fixture');\n"
-        "CREATE TABLE rivers_chunk(id INTEGER PRIMARY KEY, feature_id, kind, vertices);\n"
-        "CREATE VIRTUAL TABLE rivers_bounds USING rtree_i32(id, min_x, max_x, min_y, max_y);\n"
+        "CREATE TABLE rivers_bank(id INTEGER PRIMARY KEY, rings BLOB);\n"
+        "CREATE VIRTUAL TABLE rivers_bank_bounds USING rtree_i32(id, min_x, max_x, min_y, max_y);\n"
         "CREATE VIRTUAL TABLE rivers_water_coverage USING rtree_i32(id, min_x, max_x, min_y, max_y);\n"
         "INSERT INTO rivers_water_coverage VALUES(1, 0, 1000000, 0, 1000000);\n"
         "INSERT INTO rivers_water_coverage VALUES(2, 500000, 1500000, 500000, 1500000);");
@@ -391,7 +389,7 @@ static bool surface_partial_coverage_fixture(const char *directory)
 static void test_lab_surface_partial_coverage(void)
 {
     TEST_ASSERT_TRUE(test_lab_isolated(surface_partial_coverage_fixture),
-                     "surveyed subregions survive a larger surface tile without declaring the whole tile surveyed");
+                     "mapped water needs no centreline dataset; surveyed subregions survive a larger surface tile");
 }
 
 static bool surface_global_detail_fixture(const char *directory)

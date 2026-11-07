@@ -1109,6 +1109,7 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     equation_t *display_equation = display_expanded_equation(equation);
     const equation_t *shown_equation = display_equation ? display_equation : equation;
     number_t residual_value = residual ? expr_eval(residual) : num_new();
+    int old_precision = expr_set_number_precision_local(precision > 0 ? precision : -1);
     char *equation_text = equ_text_dup(equation, style_EXPRESSION);
     char *unbound_text = equ_text_dup(shown_equation, style_UNBOUND);
     char *function_text = equ_text_dup(shown_equation, style_FUNCTION);
@@ -1146,6 +1147,7 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
     expr_free(display_residual);
     num_destroy(&residual_value);
     expr_free(residual);
+    expr_set_number_precision_local(old_precision);
 }
 
 /* Execute this built-in calculation mode in a fresh server child process. */

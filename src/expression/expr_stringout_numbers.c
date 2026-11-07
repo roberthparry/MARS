@@ -52,6 +52,14 @@ int expr_set_number_precision_local(int precision)
     return old;
 }
 
+/* Semantic notation and native formatting share the same explicit display-rounding policy. */
+string_t *expr_number_format_text_local(number_t value)
+{
+    if (expr_number_precision_local >= 0)
+        return num_sprintf_text(expr_number_scientific_local ? "%.*N" : "%.*n", expr_number_precision_local, value);
+    return expr_number_scientific_local ? num_sprintf_text("%N", value) : num_to_string(value);
+}
+
 static char *expr_take_text_object_as_c_string_local(string_t *text_obj)
 {
     char *text = text_obj ? expr_tostring_xstrdup(string_c_str(text_obj)) : NULL;
