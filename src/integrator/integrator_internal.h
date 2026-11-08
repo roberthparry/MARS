@@ -44,6 +44,22 @@ bool intg_report(integrator_t *ig, const char *stage, uint64_t completed);
 void intg_clear_exact_result(integrator_t *ig);
 void intg_set_exact_result_owned(integrator_t *ig, expr_t *expr);
 
+/**
+ * @brief Recognise a logarithmic Bose moment with positive integer power on the positive half-line.
+ * @param ig Borrowed mutable integrator receiving an owned exact expression on a match.
+ * @param expression Borrowed integrand; not modified or retained.
+ * @param coordinate Borrowed integration coordinate; not modified or retained.
+ * @param lower Borrowed lower bound, zero or positive infinity for a reversed integral.
+ * @param upper Borrowed upper bound, positive infinity or zero for a reversed integral.
+ * @param[out] result Required output receiving an owned number on success; release it with num_destroy.
+ * @param[out] error Optional output receiving owned zero on success; release it with num_destroy.
+ * @return One on success, zero when unsupported, or minus one on matched evaluation/allocation failure.
+ * Outputs are unchanged without success. Supports finite real scale, positive exponential rate and powers 1 to 32.
+ * The exact expression belongs to ig until its next calculation or intg_free. Serialise mutable integrator access.
+ */
+int intg_try_logarithmic_bose(integrator_t *ig, const expr_t *expression, const expr_t *coordinate,
+                               number_t lower, number_t upper, number_t *result, number_t *error);
+
 int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr, size_t ndim, expr_t *const *vars,
                                       const number_t *lo, const number_t *hi, number_t *result, number_t *error_est);
 

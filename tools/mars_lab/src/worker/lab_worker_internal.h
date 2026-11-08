@@ -222,6 +222,28 @@ int lab_worker_plot(const char *source, const expr_t *expression, const expr_t *
 string_t *lab_worker_number_text(number_t value, int precision);
 
 /**
+ * @brief Decide whether a numerical error estimate is significant at the requested display accuracy.
+ * @param value Borrowed real or complex result; ownership and numerical value are unchanged.
+ * @param error Borrowed absolute error estimate; negative, non-real or non-finite estimates remain visible.
+ * @param precision Requested decimal digits, or non-positive to use the current native number precision.
+ * @return False only for a finite non-negative estimate strictly below max(1, |value|) times 10^-precision.
+ * True for equality, a larger estimate, an unknown result, or arithmetic failure. No handles are retained.
+ */
+bool lab_worker_error_visible(number_t value, number_t error, int precision);
+
+/**
+ * @brief Format a significant numerical error estimate to three significant decimal digits for result cards.
+ * @param value Borrowed result used to determine whether the full estimate exceeds the display cutoff.
+ * @param error Borrowed absolute error estimate; its stored value and precision are unchanged.
+ * @param precision Requested decimal digits, or non-positive to use the current native number precision.
+ * @return Caller-owned text, released with string_free, or NULL on allocation failure. The text is empty
+ * when lab_worker_error_visible returns false. Otherwise finite estimates are rounded to three significant
+ * digits, using Unicode powers of ten where appropriate; invalid or unknown estimates remain visible.
+ * No numeric handles are retained, and the current native number precision is unchanged.
+ */
+string_t *lab_worker_error_text(number_t value, number_t error, int precision);
+
+/**
  * @brief Runs the built-in expression calculation.
  * @param argc Argument count including the mode name.
  * @param argv Borrowed argument vector with the mode name at index zero.

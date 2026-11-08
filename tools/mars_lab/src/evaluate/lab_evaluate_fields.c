@@ -46,6 +46,7 @@ static const field_t field_table[] = {
     {"differentiable", "differentiable", false},
     {"dimensions", "dimensions", false},
     {"display_TeX", "display_TeX", true},
+    {"display_error", "display_error", false},
     {"display_solutions", "display_solutions", true},
     {"display_wrapped_TeX", "display_wrapped_TeX", true},
     {"equation", "equation", false},

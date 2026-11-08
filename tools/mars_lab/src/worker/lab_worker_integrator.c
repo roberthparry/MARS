@@ -713,6 +713,7 @@ int lab_worker_integrator(int argc, char **argv)
     char *integrand_TeX = NULL;
     char *value_text = NULL;
     char *error_text = NULL;
+    string_t *display_error = NULL;
     char *symbolic_value_text = NULL;
     char *symbolic_text = NULL;
     char *symbolic_TeX = NULL;
@@ -744,11 +745,11 @@ int lab_worker_integrator(int argc, char **argv)
             size_t parsed;
 
             if (argi + 1 >= argc) {
-                fprintf(stderr, "--max-intervals needs a value\n");
+                fprintf(stderr, "error --max-intervals needs a value\n");
                 return 1;
             }
             if (parse_size_text(argv[argi + 1], &parsed) != 0 || parsed == 0u) {
-                fprintf(stderr, "Bad --max-intervals value\n");
+                fprintf(stderr, "error Bad --max-intervals value\n");
                 return 1;
             }
             max_intervals = parsed;
@@ -757,7 +758,7 @@ int lab_worker_integrator(int argc, char **argv)
             continue;
         }
 
-        fprintf(stderr, "Unknown option: %s\n", argv[argi]);
+        fprintf(stderr, "error Unknown option: %s\n", argv[argi]);
         return 1;
     }
 
@@ -767,7 +768,7 @@ int lab_worker_integrator(int argc, char **argv)
     input = raw_input;
 
     if (argi + 2 < argc && ((argc - (argi + 2)) % 3) != 0) {
-        fprintf(stderr, "Bounds must be supplied as repeated <var> <lo> <hi> triples\n");
+        fprintf(stderr, "error Bounds must be supplied as repeated <var> <lo> <hi> triples\n");
         return 1;
     }
 
@@ -780,7 +781,7 @@ int lab_worker_integrator(int argc, char **argv)
 
     expr = expr_from_string(input, &bindings);
     if (!expr) {
-        fprintf(stderr, "Could not parse integrand expression\n");
+        fprintf(stderr, "error Could not parse integrand expression\n");
         goto cleanup;
     }
 
@@ -831,7 +832,7 @@ int lab_worker_integrator(int argc, char **argv)
 
             vars[i] = binding_or_shadowing_var(&expr, bindings, name, &owned_vars[i]);
             if (!vars[i]) {
-                fprintf(stderr, "Could not create binding named '%s'\n", name);
+                fprintf(stderr, "error Could not create binding named '%s'\n", name);
                 goto cleanup;
             }
             has_lo = lo_text_in && lo_text_in[0] != '\0';
@@ -841,14 +842,14 @@ int lab_worker_integrator(int argc, char **argv)
                 lo_expr[i] = parse_bound_expression(lo_text_in, precision);
                 hi_expr[i] = parse_bound_expression(hi_text_in, precision);
                 if (!lo_expr[i] || !hi_expr[i]) {
-                    fprintf(stderr, "Could not parse bounds for %s\n", name);
+                    fprintf(stderr, "error Could not parse bounds for %s\n", name);
                     goto cleanup;
                 }
             } else if (!has_lo && has_hi) {
                 bound_kinds[i] = INTG_BOUND_UPPER_ONLY;
                 hi_expr[i] = parse_bound_expression(hi_text_in, precision);
                 if (!hi_expr[i]) {
-                    fprintf(stderr, "Could not parse upper bound for %s\n", name);
+                    fprintf(stderr, "error Could not parse upper bound for %s\n", name);
                     goto cleanup;
                 }
                 all_bounds_numeric = 0;
@@ -856,7 +857,7 @@ int lab_worker_integrator(int argc, char **argv)
                 bound_kinds[i] = INTG_BOUND_INDEFINITE;
                 all_bounds_numeric = 0;
             } else {
-                fprintf(stderr, "A one-sided bound for %s must be supplied as an upper bound\n", name);
+                fprintf(stderr, "error A one-sided bound for %s must be supplied as an upper bound\n", name);
                 goto cleanup;
             }
             if (bound_kinds[i] == INTG_BOUND_DEFINITE) {
@@ -980,7 +981,7 @@ int lab_worker_integrator(int argc, char **argv)
     } else {
         print_integrator_context(input, expr_text, binding_expr_text, ndim, bound_kinds, var_names, lo_display_inputs,
                                  hi_display_inputs, lo_inputs, hi_inputs);
-        fprintf(stderr, "Symbolic bounds need an integrand with a supported symbolic antiderivative\n");
+        fprintf(stderr, "error Symbolic bounds need an integrand with a supported symbolic antiderivative\n");
         goto cleanup;
     }
 
@@ -999,7 +1000,7 @@ int lab_worker_integrator(int argc, char **argv)
     if (ran_numeric_integrator && intg_rc < 0) {
         print_integrator_context(input, expr_text, binding_expr_text, ndim, bound_kinds, var_names, lo_display_inputs,
                                  hi_display_inputs, lo_inputs, hi_inputs);
-        fprintf(stderr, "Integration failed\n");
+        fprintf(stderr, "error Numerical integration could not obtain a finite real result within the selected bounds.\n");
         goto cleanup;
     }
 
@@ -1020,6 +1021,7 @@ int lab_worker_integrator(int argc, char **argv)
     if (ran_numeric_integrator) {
         value_text = number_text(value_num);
         error_text = number_text(error_num);
+        display_error = lab_worker_error_text(value_num, error_num, precision);
     } else {
         value_text = symbolic_value_text ? dup_string(symbolic_value_text) : dup_string("");
         error_text = dup_string("");
@@ -1048,6 +1050,7 @@ int lab_worker_integrator(int argc, char **argv)
     printf("symbolic_value %s\n", symbolic_value_text ? symbolic_value_text : "");
     printf("value       %s\n", value_text ? value_text : "");
     printf("error       %s\n", error_text ? error_text : "");
+    printf("display_error %s\n", display_error ? string_c_str(display_error) : error_text ? error_text : "");
     printf("work_units  %zu\n", ran_numeric_integrator ? intg_get_interval_count_used(ig) : 0u);
     printf("work_cap    %zu\n", ran_numeric_integrator ? (has_max_intervals ? max_intervals : 5000u) : 0u);
     printf("intervals   %zu\n", ran_numeric_integrator ? intg_get_interval_count_used(ig) : 0u);
@@ -1076,6 +1079,7 @@ int lab_worker_integrator(int argc, char **argv)
     rc = 0;
 
 cleanup:
+    string_free(display_error);
     string_free(symbolic_working);
     free(antiderivative_TeX);
     free(antiderivative_text);

@@ -1065,6 +1065,16 @@ int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr, size_t ndi
     if (!expr || !vars || !lo || !hi || !result || ndim == 0u || ndim > 4u)
         return 0;
 
+    if (ndim == 1u) {
+        matched = intg_try_logarithmic_bose(ig, expr, vars[0], lo[0], hi[0], result, error_est);
+        if (matched)
+            return matched;
+    }
+    /* Finite-box formulae must not form undefined infinity-times-zero endpoint products. */
+    for (size_t i = 0u; i < ndim; ++i)
+        if (!num_is_finite(lo[i]) || !num_is_finite(hi[i]))
+            return 0;
+
     matched = intg_eval_unit_box_exp_square_product(expr, ndim, vars, lo, hi, &value, &exact_result);
     if (matched > 0) {
         *result = value;

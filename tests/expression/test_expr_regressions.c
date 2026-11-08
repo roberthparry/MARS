@@ -1635,7 +1635,7 @@ static void test_simplify_common_minus_and_reciprocal_coefficients(void)
         {"5/(x*(-y-3))", "-5/(x·(y + 3))"},
         {"-(-x+y)", "-(y - x)"},
         {"-(-x-y)^0.5", "-√(-x - y)"},
-        {"-5*(-s-10/s^2-3)/(s*(s+4)+5)", "5/(s·(s + 4) + 5)·(s + 10/s² + 3)"},
+        {"-5*(-s-10/s^2-3)/(s*(s+4)+5)", "5·(s + 10/s² + 3)/(s·(s + 4) + 5)"},
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -1986,12 +1986,12 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
         },
         {
             "{ cos(x)*tan(x) | x = ? }",
-            "{ sin(x) | x = ? }",
+            "{ sin(x) | x = ?; cos(x) ≠ 0 }",
             "cos(x)*tan(x) simplifies to sin(x)",
         },
         {
             "{ tan(x)*cos(x) | x = ? }",
-            "{ sin(x) | x = ? }",
+            "{ sin(x) | x = ?; cos(x) ≠ 0 }",
             "tan(x)*cos(x) simplifies to sin(x)",
         },
         {
@@ -2082,12 +2082,12 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
         },
         {
             "{ cosh(x)*tanh(x) | x = ? }",
-            "{ sinh(x) | x = ? }",
+            "{ sinh(x) | x = ?; cosh(x) ≠ 0 }",
             "cosh(x)*tanh(x) simplifies to sinh(x)",
         },
         {
             "{ tanh(x)*cosh(x) | x = ? }",
-            "{ sinh(x) | x = ? }",
+            "{ sinh(x) | x = ?; cosh(x) ≠ 0 }",
             "tanh(x)*cosh(x) simplifies to sinh(x)",
         },
         {
@@ -2899,7 +2899,7 @@ static void test_negative_quotient_derivative_has_single_sign(void)
     expr_t *y = bindings ? expr_bindings_get(bindings, "y") : NULL;
     expr_t *deriv = (expr && y) ? expr_create_deriv(expr, y) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
-    const char *want = "{ 2y·exp(tan(x))/((tan²(x) + 1)²·exp(2·tan(x)) + y²)²·(tan²(x) + 1) | y = π/4, x = π/2 }";
+    const char *want = "{ 2y·exp(tan(x))·(tan²(x) + 1)/((tan²(x) + 1)²·exp(2·tan(x)) + y²)² | y = π/4, x = π/2 }";
 
     if (str_eq(deriv_text, want))
         to_string_pass("negative quotient derivative has a single sign", deriv_text, want);
@@ -5027,8 +5027,68 @@ static void test_composite_infinite_function_endpoints(void)
     expr_free(symbolic);
 }
 
+static void test_reciprocal_trigonometric_products(void)
+{
+    static const struct { const char *source, *body; bool pole_at_zero; } cases[] = {
+        {"sin(x)*cosec(x)", "1", true},
+        {"cosec(x)*sin(x)", "1", true},
+        {"-sin(x)*cosec(x)", "-1", true},
+        {"cos(x)*cosec(x)", "cot(x)", true},
+        {"cosec(x)*cos(x)", "cot(x)", true},
+        {"sin(x)*sec(x)", "tan(x)", false},
+        {"sec(x)*sin(x)", "tan(x)", false},
+        {"cos(x)*sec(x)", "1", false},
+        {"cos(x)*tan(x)", "sin(x)", false},
+        {"sin(x)*cot(x)", "cos(x)", true},
+        {"tan(x)*cot(x)", "1", true},
+        {"tan(x)*cosec(x)", "sec(x)", true},
+        {"sec(x)*cot(x)", "cosec(x)", true},
+        {"sinh(x)*cosech(x)", "1", true},
+        {"cosh(x)*cosech(x)", "coth(x)", true},
+        {"sinh(x)*sech(x)", "tanh(x)", false},
+        {"cosh(x)*sech(x)", "1", false},
+        {"cosh(x)*tanh(x)", "sinh(x)", false},
+        {"sinh(x)*coth(x)", "cosh(x)", true},
+        {"tanh(x)*coth(x)", "1", true},
+        {"tanh(x)*cosech(x)", "sech(x)", true},
+        {"sech(x)*coth(x)", "cosech(x)", true},
+    };
+    bool ok = true;
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *input = expr_from_string(cases[i].source, &bindings), *simple = expr_simplify(input);
+        const expr_t *body = simple;
+        while (expr_is_op(body, &ops_real_domain))
+            body = body->a;
+        char *text = body ? expr_to_string(body, style_UNBOUND) : NULL;
+        bool matches = text && !strcmp(text, cases[i].body);
+        expr_t *x = expr_bindings_get(bindings, "x");
+        number_t point = num_create_from_string("0.37");
+        if (x) expr_set_val(x, point);
+        num_destroy(&point);
+        number_t actual = expr_eval(simple), expected = expr_eval(input);
+        matches = matches && num_is_finite(actual) && num_is_finite(expected) &&
+                  fabs(num_to_double(actual) - num_to_double(expected)) < 1e-12;
+        num_destroy(&expected); num_destroy(&actual);
+        if (x) expr_set_val(x, NUM_ZERO);
+        actual = expr_eval(simple);
+        matches = matches && (num_is_finite(actual) != cases[i].pole_at_zero);
+        num_destroy(&actual);
+        if (!matches)
+            string_printf("Reciprocal identity: %s -> %s (wanted %s)\n", cases[i].source, text, cases[i].body);
+        ok = matches && ok;
+        free(text); expr_free(simple); expr_free(input); expr_bindings_free(bindings);
+    }
+    expr_t *different = expr_from_string("sin(x)*cosec(y)", NULL), *simple = expr_simplify(different);
+    char *text = simple ? expr_to_string(simple, style_UNBOUND) : NULL;
+    ok = ok && text && strstr(text, "sin(x)") && strstr(text, "cosec(y)");
+    free(text); expr_free(simple); expr_free(different);
+    ASSERT_TRUE(ok);
+}
+
 void test_runtime_regressions(void)
 {
+    TEST_RUN_SUBTEST(test_reciprocal_trigonometric_products, NULL);
     TEST_RUN_SUBTEST(test_composite_infinite_function_endpoints, NULL);
     TEST_RUN_SUBTEST(test_simplify_rebuilt_sum_fixed_points, NULL);
     TEST_RUN_SUBTEST(test_multivariable_arbitrary_function_derivatives, NULL);

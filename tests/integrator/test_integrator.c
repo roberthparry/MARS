@@ -18,12 +18,12 @@
 #include <string.h>
 #include <time.h>
 
-#include "test_harness.h"
 #include "expression-t.h"
 #include "integrator-t.h"
 #define MARS_SHARED_NUMBER_INTERNAL_ACCESS
 #include "internal/number_internal.h"
 #include "string-t.h"
+#include "test_harness.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static bool test_integrator_suite_setup(void);
@@ -112,6 +112,88 @@ static bool test_has_pending_want = false;
                                                      __LINE__))                                                        \
             return;                                                                                                    \
     } while (0)
+
+static void test_infinite_domains(void)
+{
+    static const struct { const char *source, *lower, *upper, *expected; } cases[] = {
+        {"{exp(-x) | x=?}", "0", "inf", "1"},
+        {"{exp(x) | x=?}", "-inf", "0", "1"},
+        {"{exp(-x) | x=?}", "inf", "0", "-1"},
+        {"{1/(1+x^2) | x=?}", "-inf", "inf", "pi"},
+        {"{1/(1+x^2) | x=?}", "inf", "-inf", "-pi"},
+    };
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(48u);
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *formula = expr_from_string(cases[i].source, &bindings);
+        expr_t *x = expr_bindings_get(bindings, "x"), *target = expr_from_string(cases[i].expected, NULL);
+        integrator_t *ig = intg_new();
+        number_t lower = num_create_from_string(cases[i].lower), upper = num_create_from_string(cases[i].upper);
+        number_t value = NUM_NAN, error = NUM_NAN, expected = expr_eval(target);
+        int status = intg_integral(ig, formula, x, lower, upper, &value, &error);
+        number_t difference = num_sub(value, expected), absolute = num_abs(difference);
+        number_t tolerance = num_create_from_string("1e-25");
+        bool ok = status >= 0 && num_is_real(value) && num_is_finite(value) && num_le(absolute, tolerance) &&
+                  !intg_get_exact_result(ig) && intg_get_interval_count_used(ig) > 1u;
+        TEST_ASSERT_TRUE(ok, "open rational mappings integrate half-lines and whole lines with either orientation");
+        num_destroy(&tolerance); num_destroy(&absolute); num_destroy(&difference); num_destroy(&expected);
+        num_destroy(&error); num_destroy(&value); num_destroy(&upper); num_destroy(&lower);
+        intg_free(ig); expr_free(target); expr_free(formula); expr_bindings_free(bindings);
+    }
+    num_set_default_prec_bits(saved);
+}
+
+static void test_logarithmic_bose_moments(void)
+{
+    static const struct { const char *source, *expected; } cases[] = {
+        {"{x*ln(e^x-1)/(e^x-1) | x=?}", "zeta(3)"},
+        {"{3*x*ln(exp(2*x)-1)/(exp(2*x)-1) | x=?}", "3*zeta(3)/4"},
+        {"{x^2*ln(exp(x)-1)/(exp(x)-1) | x=?}", "11*zeta(4)/2"},
+        {"{ln(exp(x)-1)*x/(exp(x)-1) | x=?}", "zeta(3)"},
+    };
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(482u);
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        expr_bindings_t *bindings = NULL;
+        expr_t *formula = expr_from_string(cases[i].source, &bindings);
+        expr_t *x = expr_bindings_get(bindings, "x"), *target = expr_from_string(cases[i].expected, NULL);
+        integrator_t *ig = intg_new();
+        number_t value = NUM_NAN, error = NUM_NAN, expected = expr_eval(target);
+        int status = intg_integral(ig, formula, x, NUM_ZERO, NUM_INF, &value, &error);
+        number_t difference = num_sub(value, expected), absolute = num_abs(difference);
+        number_t tolerance = num_create_from_string("1e-478");
+        string_t *exact = intg_get_exact_result(ig) ? expr_to_text(intg_get_exact_result(ig), style_UNBOUND) : NULL;
+        bool ok = status == 0 && exact && num_is_zero(error) && num_le(absolute, tolerance) &&
+                  intg_get_interval_count_used(ig) == 1u;
+        if (i == 0u)
+            ok = ok && !strcmp(string_c_str(exact), "ζ(3)");
+        TEST_ASSERT_TRUE(ok, "logarithmic Bose moments retain exact zeta formulae and requested multiprecision values");
+        string_free(exact);
+        num_destroy(&tolerance); num_destroy(&absolute); num_destroy(&difference); num_destroy(&expected);
+        num_destroy(&error); num_destroy(&value);
+        intg_free(ig); expr_free(target); expr_free(formula); expr_bindings_free(bindings);
+    }
+    num_set_default_prec_bits(saved);
+}
+
+/* README example from docs/integrator.md: retain the exact value of an improper integral. */
+static void example_improper_logarithmic_moment(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *formula = expr_from_string("{x*ln(e^x-1)/(e^x-1) | x=?}", &bindings);
+    expr_t *x = expr_bindings_get(bindings, "x");
+    integrator_t *ig = intg_new();
+    number_t value = NUM_NAN;
+    int status = intg_integral(ig, formula, x, NUM_ZERO, NUM_INF, &value, NULL);
+    const expr_t *exact = intg_get_exact_result(ig);
+    string_t *text = exact ? expr_to_text(exact, style_UNBOUND) : NULL;
+    bool ok = status == 0 && text && !strcmp(string_c_str(text), "ζ(3)");
+    if (ok)
+        printf("Exact result: %s\n", string_c_str(text));
+    string_free(text); num_destroy(&value); intg_free(ig); expr_free(formula); expr_bindings_free(bindings);
+    TEST_ASSERT_TRUE(ok, "README improper integral example retains its exact zeta result");
+}
 
 static bool test_integrator_suite_setup(void)
 {
@@ -3683,6 +3765,8 @@ int tests_main(void)
     TEST_SECTION("Turan T15/T4 expr_t Tests");
     TEST_RUN_IN_GROUP(test_expr_sin, tests, NULL);
     TEST_RUN_IN_GROUP(test_expr_exp, tests, NULL);
+    TEST_RUN_IN_GROUP(test_infinite_domains, tests, NULL);
+    TEST_RUN_IN_GROUP(test_logarithmic_bose_moments, tests, NULL);
     TEST_RUN_IN_GROUP(test_expr_arctan, tests, NULL);
     TEST_RUN_IN_GROUP(test_single_integral_num_high_precision_log, tests, NULL);
     TEST_RUN_IN_GROUP(test_exponential_endpoint_decay, tests, NULL);
@@ -3753,6 +3837,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_expression_backed_integration, readme_examples, "integrator,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_symbolic_fast_path, readme_examples, "integrator,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_ctx, readme_examples, "integrator,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_improper_logarithmic_moment, readme_examples, "integrator,readme,output");
 
     return TESTS_EXIT_CODE();
 }

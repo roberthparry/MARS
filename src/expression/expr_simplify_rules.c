@@ -1055,37 +1055,75 @@ static expr_t *expr_simplify_try_double_angle_product(expr_t *a, expr_t *b, cons
     return expr_make_scaled(NUM_HALF, double_angle);
 }
 
-expr_t *expr_simplify_try_trig_product(expr_t *a, expr_t *b)
+static expr_t *expr_simplify_trig_product_pair(expr_t *a, expr_t *b)
 {
-    const expr_t *arg = NULL;
-    expr_apply_unary_fn builder = NULL;
+    /* The circular and hyperbolic sextets share the same reciprocal identities.
+     * Direct indexing avoids trying unrelated rules for each pair of factors. */
+    enum { SINE, COSINE, TANGENT, SECANT, COSECANT, COTANGENT, TRIG_COUNT };
+    static const struct {
+        expr_apply_unary_fn circular, hyperbolic;
+        unsigned nonzero;
+        bool unity;
+    } products[TRIG_COUNT][TRIG_COUNT] = {
+        [SINE][SECANT]       = {expr_tan,   expr_tanh, 0u, false},
+        [SINE][COSECANT]     = {NULL,       NULL,      1u, true },
+        [SINE][COTANGENT]    = {expr_cos,   expr_cosh, 1u, false},
+        [COSINE][TANGENT]    = {expr_sin,   expr_sinh, 2u, false},
+        [COSINE][SECANT]     = {NULL,       NULL,      2u, true },
+        [COSINE][COSECANT]   = {expr_cot,   expr_coth, 0u, false},
+        [TANGENT][COSECANT]  = {expr_sec,   expr_sech, 1u, false},
+        [TANGENT][COTANGENT] = {NULL,       NULL,      3u, true },
+        [SECANT][COTANGENT]  = {expr_cosec, expr_cosech, 2u, false},
+    };
+    _Static_assert(EXPR_KIND_SINH - EXPR_KIND_SIN == TRIG_COUNT &&
+                   EXPR_KIND_COTH - EXPR_KIND_SINH + 1 == TRIG_COUNT, "Native trigonometric sextets must be contiguous");
+    unsigned first = a && a->ops ? (unsigned)a->ops->kind - EXPR_KIND_SIN : 2u * TRIG_COUNT;
+    unsigned second = b && b->ops ? (unsigned)b->ops->kind - EXPR_KIND_SIN : 2u * TRIG_COUNT;
+    if (first < 2u * TRIG_COUNT && second < 2u * TRIG_COUNT && first / TRIG_COUNT == second / TRIG_COUNT &&
+        expr_struct_eq(a->a, b->a)) {
+        bool hyperbolic = first >= TRIG_COUNT;
+        first %= TRIG_COUNT;
+        second %= TRIG_COUNT;
+        if (first > second) {
+            unsigned swap = first;
+            first = second;
+            second = swap;
+        }
+        expr_apply_unary_fn build = hyperbolic ? products[first][second].hyperbolic : products[first][second].circular;
+        expr_t *result = products[first][second].unity ? expr_const_one() : build ? build(a->a) : NULL;
+        /* Retain poles removed by cancellation. A quotient result already retains its own denominator. */
+        for (unsigned pole = 0u; result && pole < 2u; ++pole) {
+            if (!(products[first][second].nonzero & (1u << pole)))
+                continue;
+            expr_t *denominator = pole ? (hyperbolic ? expr_cosh(a->a) : expr_cos(a->a))
+                                       : (hyperbolic ? expr_sinh(a->a) : expr_sin(a->a));
+            expr_t *absolute = denominator ? expr_abs(denominator) : NULL;
+            expr_t *zero = expr_const_zero();
+            expr_t *arguments[] = {result, absolute, zero};
+            expr_t *restricted = absolute && zero ? expr_real_domain_from_args(3u, arguments) : NULL;
+            expr_free(zero);
+            expr_free(absolute);
+            expr_free(denominator);
+            expr_free(result);
+            result = restricted;
+        }
+        if (result)
+            return result;
+    }
     expr_t *double_angle = expr_simplify_try_double_angle_product(a, b, &ops_sin, &ops_cos, expr_sin);
 
     if (double_angle)
         return double_angle;
 
-    double_angle = expr_simplify_try_double_angle_product(a, b, &ops_sinh, &ops_cosh, expr_sinh);
-    if (double_angle)
-        return double_angle;
+    return expr_simplify_try_double_angle_product(a, b, &ops_sinh, &ops_cosh, expr_sinh);
+}
 
-    if (expr_is_op(a, &ops_cos) && expr_is_op(b, &ops_tan) && expr_struct_eq(a->a, b->a)) {
-        arg = a->a;
-        builder = expr_sin;
-    } else if (expr_is_op(a, &ops_tan) && expr_is_op(b, &ops_cos) && expr_struct_eq(a->a, b->a)) {
-        arg = a->a;
-        builder = expr_sin;
-    } else if (expr_is_op(a, &ops_cosh) && expr_is_op(b, &ops_tanh) && expr_struct_eq(a->a, b->a)) {
-        arg = a->a;
-        builder = expr_sinh;
-    } else if (expr_is_op(a, &ops_tanh) && expr_is_op(b, &ops_cosh) && expr_struct_eq(a->a, b->a)) {
-        arg = a->a;
-        builder = expr_sinh;
-    }
-
-    if (!arg || !builder)
-        return NULL;
-
-    return builder(arg);
+/* Apply the same identities with either ordering and with signed factors. */
+expr_t *expr_simplify_try_trig_product(expr_t *a, expr_t *b)
+{
+    bool negative = expr_is_neg(a) != expr_is_neg(b);
+    expr_t *result = expr_simplify_trig_product_pair(expr_is_neg(a) ? a->a : a, expr_is_neg(b) ? b->a : b);
+    return result && negative ? expr_negate_owned(result) : result;
 }
 
 static bool expr_simplify_match_tangent_product(const expr_t *expr, const expr_t *first_argument,

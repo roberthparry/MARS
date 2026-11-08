@@ -15,7 +15,7 @@
  * differential constraints.
  *
  * A problem consists of a base equation, its independent variables, constant
- * bindings, and optional initial or boundary conditions. The first symbolic
+ * bindings, optional strict real coordinate intervals, and optional initial or boundary conditions. The first symbolic
  * solvers cover exact differential forms, separable, linear, homogeneous,
  * affine-substitution, linear
  * changes of variables, quadratic Bernoulli, Riccati linearisations with supported
@@ -248,6 +248,10 @@ diffequ_t *de_new(const equation_t *equation);
  * Condition-only braced shorthand such as `{ y'' + y | y(0)=1, y'(0)=0 }` infers the independent variable.
  * A shorthand residual without an equals sign means an equation equal to zero. Canonical three-section input
  * continues to separate independent variables, constants and conditions explicitly.
+ * Strict real coordinate intervals may follow the equation or appear among canonical conditions. One-sided
+ * and chained inequalities are supported; endpoints must be finite real expressions independent of the coordinates.
+ * Repeated bounds are intersected. Intervals do not count as initial or boundary data. Inclusive bounds and
+ * arbitrary inequality constraints are not supported.
  *
  * @param text Null-terminated input text. Must not be `NULL`.
  * @return A newly allocated differential-equation problem, or `NULL` when the
@@ -300,6 +304,26 @@ size_t de_independent_count(const diffequ_t *de);
  * The returned expression remains owned by @p de and must not be freed.
  */
 const expr_t *de_independent_at(const diffequ_t *de, size_t index);
+
+/**
+ * @brief Access the strict lower endpoint of an independent variable's authored real interval.
+ * @param de Borrowed problem to inspect; NULL is permitted.
+ * @param index Zero-based independent-variable index.
+ * @return Borrowed bound expression, or NULL for an absent lower bound or invalid problem/index.
+ * The endpoint is excluded. Do not free the expression; it remains valid until de_free(de).
+ * This interval is separate from initial or boundary conditions. Concurrent mutation is unsupported.
+ */
+const expr_t *de_independent_lower_bound(const diffequ_t *de, size_t index);
+
+/**
+ * @brief Access the strict upper endpoint of an independent variable's authored real interval.
+ * @param de Borrowed problem to inspect; NULL is permitted.
+ * @param index Zero-based independent-variable index.
+ * @return Borrowed bound expression, or NULL for an absent upper bound or invalid problem/index.
+ * The endpoint is excluded. Do not free the expression; it remains valid until de_free(de).
+ * This interval is separate from initial or boundary conditions. Concurrent mutation is unsupported.
+ */
+const expr_t *de_independent_upper_bound(const diffequ_t *de, size_t index);
 
 /**
  * @brief Access all constant bindings associated with a problem.
@@ -385,10 +409,11 @@ const expr_t *de_condition_argument_at(const diffequ_t *de, size_t condition_ind
 string_t *de_to_text(const diffequ_t *de, style_t style);
 
 /**
- * @brief Render the complete problem as TeX, including initial and boundary conditions, without solving it.
+ * @brief Render the complete problem as TeX, including coordinate intervals and point conditions, without solving it.
  * @param de Borrowed problem; not modified or consumed.
  * @return Owned TeX body, released with string_free(), or NULL on invalid input or allocation failure.
- * @note Conditions retain their local argument values and use evaluation bars. Ordinary de_to_text() output is unchanged.
+ * @note Point conditions retain their local argument values and use evaluation bars. Strict coordinate intervals
+ * appear as inequalities. Ordinary de_to_text() output is unchanged.
  */
 string_t *de_problem_to_TeX(const diffequ_t *de);
 

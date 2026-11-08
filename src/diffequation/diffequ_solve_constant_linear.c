@@ -1370,6 +1370,18 @@ static expr_t *de_summed_amplitude(const expr_t *independent, size_t multiplicit
     return amplitude;
 }
 
+/* A particular solution's domain restricts the entire family, including the homogeneous terms. */
+static expr_t *de_complete_solution_domain(expr_t *owned, const expr_t *particular)
+{
+    expr_t *guarded = owned ? expr_with_domain_of(owned, particular) : NULL;
+    if (!guarded)
+        return owned;
+    expr_t *result = expr_simplify(guarded);
+    expr_free(guarded);
+    expr_free(owned);
+    return result;
+}
+
 static expr_t *de_grouped_repeated_quadratic_solution(const de_basis_t *basis, const expr_t *independent,
                                                       const expr_t *particular)
 {
@@ -1410,7 +1422,7 @@ cleanup:
     expr_free(first_term);
     expr_free(second_amplitude);
     expr_free(first_amplitude);
-    return solution;
+    return de_complete_solution_domain(solution, particular);
 }
 
 static expr_t *de_general_solution(const de_basis_t *basis, const expr_t *independent, const expr_t *particular)
@@ -1445,7 +1457,7 @@ static expr_t *de_general_solution(const de_basis_t *basis, const expr_t *indepe
             solution = sum;
         }
     }
-    return solution;
+    return de_complete_solution_domain(solution, particular);
 }
 
 de_attempt_t de_attempt_constant_coefficient_linear(const diffequ_t *de, const expr_t *independent,

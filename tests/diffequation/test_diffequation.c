@@ -31,6 +31,7 @@
 #include "test_diffequ_heat.h"
 #include "test_diffequ_notation.h"
 #include "test_diffequ_riccati.h"
+#include "test_diffequ_interval.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -2652,6 +2653,55 @@ static void test_diffequ_solves_secant_cubed_forcing(void)
     de_free(de);
 }
 
+static void test_diffequ_solves_reciprocal_trigonometric_forcing(void)
+{
+    const char *sources[] = {"y''+y=cosec(x)", "y''+y=csc(x)", "y''+y=sec(x)",
+                             "y''+4y=cosec(2x)", "y''+y=3cosec(x)+2sec(x)"};
+    bool ok = true;
+    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
+        diffequ_t *de = de_from_string(sources[i]);
+        diffequ_solve_result_t *result = de ? de_solve(de) : NULL;
+        const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+        string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+        string_t *TeX = solution ? equ_to_text(solution, style_LATEX) : NULL;
+        bool valid = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && text && TeX &&
+                     !strstr(string_c_str(text), "∫") && !strstr(string_c_str(TeX), "\\int") &&
+                     strstr(string_c_str(text), "ln(|") && strstr(string_c_str(text), "C₁") &&
+                     strstr(string_c_str(text), "C₂");
+        expr_bindings_t *bindings = solution ? expr_bindings_from_expr_internal(equ_rhs(solution)) : NULL;
+        const expr_t *x = de ? de_independent_at(de, 0u) : NULL;
+        for (size_t j = 0; valid && j < expr_bindings_count(bindings); ++j) {
+            expr_t *binding = expr_bindings_expr_at(bindings, j);
+            if (strcmp(expr_bindings_name_at(bindings, j), "x"))
+                expr_set_val(binding, NUM_ZERO);
+        }
+        expr_t *residual = de ? equ_residual(de_equation(de)) : NULL;
+        expr_t *applied = valid && residual ? expr_substitute(residual, equ_lhs(solution), equ_rhs(solution)) : NULL;
+        const long samples[] = {-1, 1, 4};
+        for (size_t j = 0; valid && j < sizeof samples / sizeof *samples; ++j) {
+            expr_t *point = expr_const_long(samples[j]);
+            expr_t *at = expr_substitute(applied, x, point), *value_at = expr_substitute(equ_rhs(solution), x, point);
+            number_t error = expr_eval(at), value = expr_eval(value_at), magnitude = num_abs(error);
+            number_t tolerance = num_create_from_string("1e-12");
+            valid = num_is_real(value) && num_is_finite(value) && num_is_finite(magnitude) && num_lt(magnitude, tolerance);
+            if (!valid) {
+                string_t *error_text = num_to_string(error), *value_text = num_to_string(value);
+                string_printf("ODE sample %ld: value=%S residual=%S\n", samples[j], value_text, error_text);
+                string_free(value_text); string_free(error_text);
+            }
+            num_destroy(&tolerance); num_destroy(&magnitude); num_destroy(&value); num_destroy(&error);
+            expr_free(value_at); expr_free(at); expr_free(point);
+        }
+        if (!valid)
+            string_printf("Reciprocal forcing %s: %s\n", sources[i], text ? string_c_str(text) : "NULL");
+        ok = valid && ok;
+        expr_free(applied); expr_free(residual); string_free(TeX); string_free(text);
+        expr_bindings_free(bindings);
+        de_solve_result_free(result); de_free(de);
+    }
+    ASSERT_TRUE(ok);
+}
+
 static void test_diffequ_solves_repeated_complex_roots(void)
 {
     const char *source = "Dxxxx(y) + 2*Dxx(y) + y = 0; "
@@ -5220,6 +5270,8 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_high_order_repeated_root);
     RUN_TEST_CASE(test_diffequ_solves_nonhomogeneous_constant_coefficient_problem);
     RUN_TEST_CASE(test_diffequ_solves_secant_cubed_forcing);
+    RUN_TEST_CASE(test_diffequ_solves_reciprocal_trigonometric_forcing);
+    RUN_TEST_CASE(test_diffequ_intervals);
     RUN_TEST_CASE(test_diffequ_solves_logarithmic_forcing);
     RUN_TEST_CASE(test_diffequ_solves_repeated_complex_roots);
     RUN_TEST_CASE(test_diffequ_solves_degree_six_characteristic_polynomial);
@@ -5384,6 +5436,8 @@ int tests_main(void)
 
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_riccati, readme_examples,
                                   "diffequation,readme,output,riccati");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_interval, readme_examples,
+                                  "diffequation,readme,output,interval");
 
     return TESTS_EXIT_CODE();
 }

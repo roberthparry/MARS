@@ -1132,6 +1132,34 @@ static void test_TeX_native_contexts(void)
                      !de_TeX_context(NULL), "native factories reject absent input");
 }
 
+static void test_TeX_real_interval_domains(void)
+{
+    static const struct { const char *source, *expected; } cases[] = {
+        {"{x | x=?; x ∈ ℝ; Re(x)>0; Re(pi)>x}", "x\\quad (0 < x < \\pi)"},
+        {"{x | x=?; Re(pi)>x; Re(x)>0; x ∈ ℝ}", "x\\quad (0 < x < \\pi)"},
+        {"{x | x=?; x ∈ ℝ; Re(x)>-1; Re(2)>x}", "x\\quad (-1 < x < 2)"},
+        {"{x | x=?; Re(x)>0}", "x\\quad (\\mathfrak{Re}(x)>0)"},
+        {"{x | x=?; x ≠ 0; x ∈ ℝ; Re(x)>-1; Re(1)>x}", "x\\quad (x\\ne 0,\\;-1 < x < 1)"},
+        {"{x | x=?; x ∈ ℝ}", "x\\quad (x\\in\\mathbb{R})"},
+        {"{x | x=?; x ∈ ℝ; Re(x)>0}", "x\\quad (x>0)"},
+        {"{x | x=?, a=?; a ∈ ℝ; x ∈ ℝ; Re(a)>0; Re(x)>a; Re(1)>x}",
+         "x\\quad (a>0,\\;x>a,\\;1>x)"},
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        expr_t *expression = expr_from_string(cases[i].source, NULL);
+        TeX_context_t *context = expression ? expr_TeX_result_context(expression) : NULL;
+        TeX_t *notation = context ? TeX_from_context(context) : NULL;
+        bool ok = notation && !strcmp(TeX_source(notation), cases[i].expected);
+        if (!ok)
+            printf("Domain input: %s\nActual: %s\nExpected: %s\n", cases[i].source,
+                   notation ? TeX_source(notation) : "NULL", cases[i].expected);
+        TEST_ASSERT_TRUE(ok, "real intervals form compact chains while complex half-planes retain their real-part projection");
+        TeX_free(notation);
+        TeX_context_free(context);
+        expr_free(expression);
+    }
+}
+
 static void test_TeX_context_calculus(void)
 {
     context_test_state_t state = {0};
@@ -1418,6 +1446,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_TeX_context_callback_lifetime, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_context_validation, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_native_contexts, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_real_interval_domains, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_context_calculus, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_compact_symbol_lookups, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_native_aggregate_contexts, tests, NULL);

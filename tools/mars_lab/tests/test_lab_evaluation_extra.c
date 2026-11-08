@@ -2484,6 +2484,69 @@ static void test_lab_extra_number_card_markup(void)
     }
 }
 
+static void test_lab_extra_cosecant_ode(void)
+{
+    unsigned status = 0u;
+    json_t *response = request("/diffequation-eval", "{\"diffequation\":\"y''+y=cosec(x)\",\"precision\":32}", &status);
+    bool ok = response && status == 200u && contains(response, "status", "solved") &&
+              contains(response, "solutions", "ln(|sin(x)|)") && !contains(response, "solutions", "∫") &&
+              !contains(response, "display_TeX", "\\int");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "cosecant forcing produces a real elementary solution and native TeX without formal integrals");
+
+    const char *ranges[] = {"", ",\"plot_lower\":\"0.1\",\"plot_upper\":\"3\""};
+    for (size_t i = 0; i < sizeof ranges / sizeof *ranges; ++i) {
+        string_t *payload = string_sprintf("{\"expression\":\"y''+y=cosec(x)\",\"action\":\"plot\","
+                                          "\"plot_source_mode\":\"diffequation\",\"precision\":32%s}", ranges[i]);
+        response = request("/eval", string_c_str(payload), &status);
+        ok = response && status == 200u && contains(response, "plot_svg", "data-series=\"8\"") &&
+             !contains(response, "plot_svg", "data-series=\"9\"") &&
+             contains(response, "plot_title", "representative real members") &&
+             !contains(response, "plot_title_TeX", "\\int") && !contains(response, "error", "timed out");
+        if (!ok) show_failure(response);
+        json_free(response);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "automatic and explicit ranges plot the two-constant cosecant solution family promptly");
+    }
+}
+
+static void test_lab_extra_ode_interval(void)
+{
+    unsigned status = 0u;
+    json_t *response = request("/diffequation-eval",
+        "{\"diffequation\":\"y'' + y = cosec(x); 0 < x < pi\",\"precision\":32}", &status);
+    bool ok = response && status == 200u && contains(response, "status", "solved") &&
+              contains(response, "problem", "0 < x < π") && contains(response, "problem_TeX", "\\pi") &&
+              contains(response, "problem_TeX", "0 < x < \\pi") &&
+              contains(response, "display_TeX", "\\quad (0 < x < \\pi,") &&
+              !contains(response, "display_TeX", "\\mathfrak{Re}") &&
+              !contains(response, "problem", "NAN") && !contains(response, "display_TeX", "NAN");
+    const char *display = test_lab_text(response, "display_TeX");
+    const char *constant = strstr(display, "C_{2}"), *condition = strstr(display, "\\quad (");
+    ok = ok && constant && condition && constant < condition && !strstr(condition + 1u, "\\quad (");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "authored DE intervals survive the native worker and mathematical presentation");
+
+    const char *payload = "{\"expression\":\"y'' + y = cosec(x); 0 < x < pi\",\"action\":\"plot\","
+                          "\"plot_source_mode\":\"diffequation\",\"precision\":32}";
+    for (size_t replay = 0; replay < 2u; ++replay) {
+        response = request("/eval", payload, &status);
+        const char *svg = test_lab_text(response, "plot_svg"), *right = strstr(svg, "data-x-max=\"");
+        const char *left = strstr(svg, "data-x-min=\"");
+        double lower = 0.0, upper = 0.0;
+        ok = response && status == 200u && left && right &&
+             sscanf(left, "data-x-min=\"%lf", &lower) == 1 && lower >= 0.0 && lower < 0.001 &&
+             sscanf(right, "data-x-max=\"%lf", &upper) == 1 && upper <= acos(-1.0) &&
+             upper > acos(-1.0) - 0.001 &&
+             strstr(svg, "data-series=\"8\"");
+        if (!ok) show_failure(response);
+        json_free(response);
+        TEST_ASSERT_TRUE(ok, "initial and repeated automatic plots use the authored open interval");
+    }
+}
+
 static void test_lab_extra_diffequation(void)
 {
     unsigned status = 0;
@@ -2885,6 +2948,8 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_number_card_markup, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_gaussian_endpoint, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_diffequation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_cosecant_ode, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_ode_interval, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_context_results, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_matrix, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_integrator, tests, NULL);

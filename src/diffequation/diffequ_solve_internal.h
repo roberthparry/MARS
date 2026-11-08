@@ -102,7 +102,20 @@ de_attempt_t de_attempt_modified_emden_linearization(const diffequ_t *de, const 
                                                      expr_t **scale_out);
 
 expr_t *de_simplify_unary_owned(expr_t *owned, expr_t *(*operation)(const expr_t *));
+
+/**
+ * @brief Construct a primitive for an ODE rate, retaining a formal integral when no rule succeeds.
+ * @param integrand Borrowed rate expression; ownership and bindings are unchanged.
+ * @param wrt Borrowed independent-variable node, interpreted as real for recognised real affine trigonometric rates.
+ * @return Owned primitive without an integration constant, released with expr_free, or NULL for missing inputs
+ * or allocation failure. Real affine tangent, cotangent and hyperbolic cotangent rates use logarithms of absolute
+ * values on each regular real interval. Other rates use the expression integrator and its branch conventions,
+ * then an exact formal integral if integration is unsupported. The returned graph owns its required nodes
+ * and may outlive the input expressions.
+ * As with the source expression graph, evaluation and mutable bindings are not safe for concurrent use.
+ */
 expr_t *de_integrate_or_formal(const expr_t *integrand, const expr_t *wrt);
+
 bool de_expr_contains(const expr_t *expr, const expr_t *needle);
 bool de_linear_decompose(const expr_t *expr, const expr_t *needle, expr_t **coefficient_out, expr_t **constant_out);
 bool de_expr_uses(const expr_t *expr, const expr_t *variable);

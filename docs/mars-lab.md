@@ -4484,6 +4484,14 @@ complete torus, with equal coordinate units and the retained 3-D controls.
 
 ## Differential-equation mode
 
+Strict real coordinate intervals can follow the equation after a semicolon.
+They restrict the returned solution and supply missing automatic limits for ODE plots,
+without counting as initial or boundary data. Explicit plot ranges may extend
+beyond an interval, but the solution is not evaluated outside its domain. See
+the [coordinate-interval example](diffequation.md#coordinate-intervals) for the
+accepted syntax and native endpoint accessors. Inclusive bounds and arbitrary
+inequality constraints are currently unsupported.
+
 Differential-equation mode accepts ordinary and partial derivatives,
 polynomial differential operators, differential forms and optional initial or
 boundary conditions. MARSlib selects a matching rule and, when derivations are
@@ -4709,6 +4717,18 @@ integrator. Add one bound row for each variable to be integrated. Leave both
 bounds blank for an antiderivative, or enter lower and upper bounds for a
 definite integral. Mark a symbol **Free** when it is a parameter rather than an
 integration variable. The work-budget selector limits numerical fallback.
+
+Infinite real bounds use the native integrator's improper-domain mapping.
+Recognised logarithmic Bose moments return exact zeta expressions and their
+requested-precision numerical values. Calculation failures display a concise
+labelled explanation; protocol fields remain in the diagnostic data rather than
+being appended to the error card.
+
+The Integral card omits the error-estimate line when the native estimate is strictly below the requested
+absolute/relative accuracy: `max(1, |result|) × 10^(-digits)`. Estimates at or above that threshold remain visible,
+as do invalid or unknown estimates. Visible finite estimates are rounded to three significant digits, with
+powers of ten for very small or large values. The full error estimate remains in the native result data. This changes
+only the card's presentation, not the computed integral, its convergence status or the integration tolerance.
 
 For exact definite results, the Exact Result card retains the antiderivative and
 bound-substitution working. Certified rational power reductions are shown before

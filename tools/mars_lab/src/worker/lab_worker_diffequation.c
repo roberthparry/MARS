@@ -133,7 +133,7 @@ int lab_worker_diffequation(int argc, char **argv)
     diffequ_t *de;
     diffequ_solve_result_t *result;
     char *problem;
-    char *problem_TeX;
+    string_t *problem_TeX;
     const char *diagnostic;
 
     if (argc < 2) {
@@ -156,11 +156,14 @@ int lab_worker_diffequation(int argc, char **argv)
     }
 
     problem = de_to_string(de, style_EXPRESSION);
-    problem_TeX = de_to_string(de, style_LATEX);
+    size_t dimensions = de_independent_count(de), count = de_solve_result_count(result);
+    bool intervals = false;
+    for (size_t i = 0; i < dimensions; ++i)
+        intervals |= de_independent_lower_bound(de, i) || de_independent_upper_bound(de, i);
+    problem_TeX = intervals ? de_problem_to_TeX(de) : de_to_text(de, style_LATEX);
     diagnostic = de_solve_result_diagnostic(result);
 
     printf("input %s\n", source);
-    size_t dimensions = de_independent_count(de), count = de_solve_result_count(result);
     bool plottable = de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && count > 0 && count <= 16 &&
                      (dimensions == 1 || (dimensions == 2 && count == 1));
     for (size_t i = 0; plottable && i < count; ++i)
@@ -174,7 +177,7 @@ int lab_worker_diffequation(int argc, char **argv)
         expr_free(axis);
     }
     printf("problem %s\n", problem ? problem : "");
-    printf("problem_TeX %s\n", problem_TeX ? problem_TeX : "");
+    printf("problem_TeX %s\n", problem_TeX ? string_c_str(problem_TeX) : "");
     printf("status %s\n", solve_status_name(de_solve_result_status(result)));
     printf("solver %s\n", solver_name(de_solve_result_solver(result)));
     printf("diagnostic %s\n", diagnostic ? diagnostic : "");
@@ -184,10 +187,10 @@ int lab_worker_diffequation(int argc, char **argv)
     print_solution_field("solutions", result, style_UNBOUND);
     print_result_TeX("solutions_TeX", result, NULL, SIZE_MAX);
     print_result_TeX("solutions_wrapped_TeX", result, NULL, 1u);
-    print_result_TeX("display_TeX", result, problem_TeX, SIZE_MAX);
-    print_result_TeX("display_wrapped_TeX", result, problem_TeX, 1u);
+    print_result_TeX("display_TeX", result, problem_TeX ? string_c_str(problem_TeX) : NULL, SIZE_MAX);
+    print_result_TeX("display_wrapped_TeX", result, problem_TeX ? string_c_str(problem_TeX) : NULL, 1u);
 
-    free(problem_TeX);
+    string_free(problem_TeX);
     free(problem);
     de_solve_result_free(result);
     de_free(de);

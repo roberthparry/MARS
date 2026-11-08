@@ -66,21 +66,47 @@ static const TeX_model_node_t *build_problem(notation_build_t *build, const diff
     if (!build || !problem)
         return NULL;
     size_t conditions = de_condition_count(problem);
-    if (conditions >= 65536u)
+    size_t coordinates = de_independent_count(problem);
+    if (conditions >= 65536u || coordinates > (65535u - conditions) / 2u)
         return NULL;
     notation_build_derivatives(build, de_independent_count(problem) > 1u || problem->partial_derivative_input);
     primes = primes && de_independent_count(problem) == 1u && !problem->partial_derivative_input;
     expr_notation_prime_derivatives(build, primes);
     notation_build_dependent_variables(build, true);
     notation_build_source_order(build, true);
-    const TeX_model_node_t **parts = calloc(conditions + 1u, sizeof *parts);
+    const TeX_model_node_t **parts = calloc(conditions + 1u + 2u * coordinates, sizeof *parts);
     if (!parts)
         return NULL;
     parts[0] = de_notation_equation(build, problem);
     for (size_t i = 0; i < conditions; ++i)
         parts[i + 1u] = build_condition(build, problem, i, primes);
-    const TeX_model_node_t *root = conditions ? notation_build_node(build,
-        (TeX_node_view_t){.kind = TeX_NODE_CONDITIONS, .child_count = conditions + 1u}, parts) : parts[0];
+    size_t count = conditions + 1u;
+    for (size_t i = 0; i < coordinates; ++i) {
+        const expr_t *lower = de_independent_lower_bound(problem, i), *upper = de_independent_upper_bound(problem, i);
+        if (!lower && !upper)
+            continue;
+        const TeX_model_node_t *coordinate = notation_build_expr(build, de_independent_at(problem, i));
+        if (lower && upper) {
+            const TeX_model_node_t *chain[] = {
+                notation_build_expr(build, lower), coordinate, notation_build_expr(build, upper)
+            };
+            parts[count++] = notation_build_node(build,
+                (TeX_node_view_t){.kind = TeX_NODE_RELATION, .relation = TeX_RELATION_LESS, .child_count = 3u}, chain);
+            continue;
+        }
+        if (lower) {
+            const TeX_model_node_t *sides[] = {notation_build_expr(build, lower), coordinate};
+            parts[count++] = notation_build_node(build,
+                (TeX_node_view_t){.kind = TeX_NODE_RELATION, .relation = TeX_RELATION_LESS, .child_count = 2u}, sides);
+        }
+        if (upper) {
+            const TeX_model_node_t *sides[] = {coordinate, notation_build_expr(build, upper)};
+            parts[count++] = notation_build_node(build,
+                (TeX_node_view_t){.kind = TeX_NODE_RELATION, .relation = TeX_RELATION_LESS, .child_count = 2u}, sides);
+        }
+    }
+    const TeX_model_node_t *root = count > 1u ? notation_build_node(build,
+        (TeX_node_view_t){.kind = TeX_NODE_CONDITIONS, .child_count = count}, parts) : parts[0];
     free(parts);
     return root;
 }

@@ -20,6 +20,9 @@
  *      total_error <= max(abs_tol, rel_tol * |result|)
  *
  * Work limits may stop refinement before that criterion is met; check status.
+ * Infinite real endpoints use open rational maps to a finite interval. Supported
+ * logarithmic Bose moments have retained exact zeta formulae; other improper
+ * integrals must satisfy the usual finite-evaluation and convergence checks.
  * An optional retained computation_t shares cancellation, deadlines and work
  * reservations across all dimensions and successive calls. Integrators remain
  * single-caller objects even when their computation control is shared.
@@ -117,8 +120,8 @@ bool intg_set_computation(integrator_t *ig, computation_t *computation);
  * @param expr       expr_t expression representing the integrand f(x).
  * @param x_var      Variable node in @p expr representing x.  Must have been
  *                   created with expr_new_var() or expr_new_named_var().
- * @param a          Lower bound.
- * @param b          Upper bound.
+ * @param a          Borrowed real lower bound; negative or positive infinity is permitted for improper integrals.
+ * @param b          Borrowed real upper bound; negative or positive infinity is permitted, including reversed bounds.
  * @param result     Receives a new owned integral estimate; release any previous value before calling.
  * @param error_est  If non-NULL, receives a new owned error estimate; release any previous value before calling.
  *

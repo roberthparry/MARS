@@ -3058,7 +3058,11 @@ static bool de_parse_conditions(diffequ_t *de, const char *text, const string_t 
             continue;
         {
             char *condition = de_trimmed_copy(text + start, i - start);
-            bool ok = condition && *condition && de_parse_one_condition(de, condition, names, symbols, symbol_count);
+            string_t *source = condition ? string_new_with(condition) : NULL;
+            int interval = source ? de_parse_interval(de, source, names, symbols, symbol_count) : -1;
+            bool ok = condition && *condition && interval >= 0 &&
+                      (interval == 1 || de_parse_one_condition(de, condition, names, symbols, symbol_count));
+            string_free(source);
 
             free(condition);
             if (!ok)

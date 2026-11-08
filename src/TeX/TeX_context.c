@@ -602,10 +602,17 @@ const char *TeX_relation_operator(TeX_relation_t relation)
 static TeX_t *render_relation(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     const char *operator = TeX_relation_operator(view->relation);
-    if (view->child_count != 2u || !operator)
+    bool ordered = view->relation == TeX_RELATION_LESS || view->relation == TeX_RELATION_LESS_EQUAL ||
+                   view->relation == TeX_RELATION_GREATER || view->relation == TeX_RELATION_GREATER_EQUAL;
+    if (view->child_count < 2u || (view->child_count > 2u && !ordered) || !operator)
         return invalid_node();
-    return from_owned_source(string_sprintf("%s%s%s", TeX_source(children[0]), operator,
-        TeX_source(children[1])));
+    string_t *source = string_new_with(TeX_source(children[0]));
+    for (size_t i = 1u; source && i < view->child_count; ++i)
+        if (string_append_format(source, "%s%s", operator, TeX_source(children[i])) < 0) {
+            string_free(source);
+            source = NULL;
+        }
+    return source ? from_owned_source(source) : NULL;
 }
 
 /* Share relation symbols with explicit construction without exposing semantic contexts. */

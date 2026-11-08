@@ -33,6 +33,25 @@
 #include "TeX_internal.h"
 
 /**
+ * @brief Restrict a formula to a conjunction of strict real lower-bound predicates.
+ * @param count Odd number of entries, at least three: a body followed by value/lower-bound pairs.
+ * @param args Borrowed expressions; the returned graph retains them and their live binding nodes.
+ * @return Owned expression released with expr_free, or NULL for invalid arguments or allocation failure.
+ * Each predicate requires a finite value and finite real lower bound, with Re(value) greater than the bound.
+ * No input is consumed; the result may outlive the array and inputs. Mutable graph access requires synchronisation.
+ */
+expr_t *expr_real_domain_from_args(size_t count, expr_t *const *args);
+
+/**
+ * @brief Construct an indicator for a finite real expression value, for native domain predicates.
+ * @param value Borrowed expression, retained with its live binding nodes; NULL is invalid.
+ * @return Owned indicator expression released with expr_free, or NULL for invalid input or allocation failure.
+ * Evaluation yields one for a finite real value and zero otherwise. No input ownership is transferred.
+ * The result may outlive its input handle; mutable graph access requires synchronisation.
+ */
+expr_t *expr_real_parameter(const expr_t *value);
+
+/**
  * @brief Receive one distribution impulse during native decomposition.
  * @param coordinate Borrowed support coordinate, valid during this callback.
  * @param weight Borrowed finite complex impulse weight, valid during this callback.

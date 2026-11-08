@@ -951,6 +951,69 @@ static int mp_eval_multi_outer(void *ctx, const number_t x, number_t *out)
     return 0;
 }
 
+typedef struct {
+    mp_eval_fn evaluate;
+    void *context;
+    number_t lower;
+    number_t upper;
+    bool lower_infinite;
+    bool upper_infinite;
+} mp_improper_ctx_t;
+
+/* Open rational maps cover half-lines or the whole real line without sampling infinity. */
+static int mp_eval_improper(void *context, const number_t t, number_t *out)
+{
+    const mp_improper_ctx_t *map = context;
+    number_t remaining = num_sub(NUM_ONE, t), distance = num_div(t, remaining);
+    number_t square = num_sqr(remaining), jacobian = num_div(NUM_ONE, square);
+    number_t point = NUM_NAN, value = NUM_NAN;
+    if (map->lower_infinite && map->upper_infinite) {
+        number_t other = num_div(remaining, t), left_square = num_sqr(t);
+        number_t left_weight = num_div(NUM_ONE, left_square), weight = num_add(jacobian, left_weight);
+        point = num_sub(distance, other);
+        num_destroy(&jacobian);
+        jacobian = weight;
+        num_destroy(&left_weight); num_destroy(&left_square); num_destroy(&other);
+    } else {
+        point = map->lower_infinite ? num_sub(map->upper, distance) : num_add(map->lower, distance);
+    }
+    int status = num_is_finite(point) ? map->evaluate(map->context, point, &value) : -1;
+    if (status == 0) {
+        number_t weighted = num_mul(value, jacobian);
+        if (num_is_real(weighted) && num_is_finite(weighted))
+            *out = weighted;
+        else {
+            num_destroy(&weighted);
+            status = -1;
+        }
+    }
+    num_destroy(&value); num_destroy(&point); num_destroy(&jacobian);
+    num_destroy(&square); num_destroy(&distance); num_destroy(&remaining);
+    return status;
+}
+
+static int mp_integral_domain(mp_eval_fn evaluate, void *context, integrator_t *ig,
+                                number_t a, number_t b, number_t *result, number_t *error)
+{
+    if (num_is_finite(a) && num_is_finite(b))
+        return mp_adaptive_integral(evaluate, context, ig, a, b, result, error);
+    if (!num_is_real(a) || !num_is_real(b) || num_is_nan(a) || num_is_nan(b) || num_eq(a, b))
+        return -1;
+    bool reverse = num_gt(a, b);
+    number_t lower = reverse ? b : a, upper = reverse ? a : b;
+    mp_improper_ctx_t map = {.evaluate = evaluate, .context = context, .lower = lower, .upper = upper,
+                              .lower_infinite = num_eq(lower, NUM_NINF), .upper_infinite = num_eq(upper, NUM_INF)};
+    if ((!map.lower_infinite && !num_is_finite(lower)) || (!map.upper_infinite && !num_is_finite(upper)))
+        return -1;
+    int status = mp_adaptive_integral(mp_eval_improper, &map, ig, NUM_ZERO, NUM_ONE, result, error);
+    if (status >= 0 && reverse) {
+        number_t negative = num_neg(*result);
+        num_destroy(result);
+        *result = negative;
+    }
+    return status;
+}
+
 int intg_integral_multi_num(integrator_t *ig, expr_t *expr, size_t ndim, expr_t *const *vars, const number_t *lo,
                             const number_t *hi, number_t *result, number_t *error_est)
 {
@@ -975,5 +1038,5 @@ int intg_integral_multi_num(integrator_t *ig, expr_t *expr, size_t ndim, expr_t 
     multi.lo = lo;
     multi.hi = hi;
 
-    return mp_adaptive_integral(mp_eval_multi_outer, &multi, ig, lo[ndim - 1u], hi[ndim - 1u], result, error_est);
+    return mp_integral_domain(mp_eval_multi_outer, &multi, ig, lo[ndim - 1u], hi[ndim - 1u], result, error_est);
 }

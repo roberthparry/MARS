@@ -34,9 +34,54 @@ expr_t *de_simplify_unary_owned(expr_t *owned, expr_t *(*operation)(const expr_t
     return simplified;
 }
 
+/* Choose the real logarithmic primitive for tangent rates with a real affine argument. */
+static expr_t *de_integrate_real_trigonometric_rate(const expr_t *integrand, const expr_t *wrt)
+{
+    number_t scale = num_new();
+    const expr_t *base = NULL;
+    if (expr_match_scaled_expr(integrand, &scale, &base)) {
+        expr_t *primitive = num_is_real(scale) && num_is_finite(scale)
+                                ? de_integrate_real_trigonometric_rate(base, wrt) : NULL;
+        expr_t *result = primitive ? expr_mul_num(primitive, &scale) : NULL;
+        expr_free(primitive);
+        num_destroy(&scale);
+        return result;
+    }
+    num_destroy(&scale);
+    const expr_t *argument = NULL;
+    bool tangent = expr_match_tan_expr(integrand, &argument);
+    bool cotangent = !tangent && expr_match_cot_expr(integrand, &argument);
+    bool hyperbolic = !tangent && !cotangent && expr_is_unary_pattern_kind(integrand, EXPR_PATTERN_UNARY_COTH);
+    if (!tangent && !cotangent && !hyperbolic)
+        return NULL;
+    if (hyperbolic && !expr_match_unary_expr(integrand, &argument))
+        return NULL;
+    expr_t *variables[] = {(expr_t *)wrt};
+    number_t offset = num_new(), coefficient = num_new();
+    expr_pattern_unary_affine_kind_t kind = tangent ? EXPR_PATTERN_UNARY_TAN
+                                                   : hyperbolic ? EXPR_PATTERN_UNARY_COTH : EXPR_PATTERN_UNARY_COT;
+    bool affine = expr_match_unary_affine_kind(integrand, kind, 1u, variables, &offset, &coefficient) &&
+                  num_is_real(offset) && num_is_finite(offset) && num_is_real(coefficient) &&
+                  num_is_finite(coefficient) && !num_is_zero(coefficient);
+    expr_t *trig = affine ? (tangent ? expr_cos(argument) : hyperbolic ? expr_sinh(argument) : expr_sin(argument)) : NULL;
+    expr_t *absolute = trig ? expr_abs(trig) : NULL;
+    expr_t *logarithm = absolute ? expr_log(absolute) : NULL;
+    expr_t *scaled = logarithm ? expr_div_num(logarithm, &coefficient) : NULL;
+    expr_t *result = scaled ? (tangent ? expr_neg(scaled) : expr_clone(scaled)) : NULL;
+    expr_free(scaled);
+    expr_free(logarithm);
+    expr_free(absolute);
+    expr_free(trig);
+    num_destroy(&coefficient);
+    num_destroy(&offset);
+    return result;
+}
+
 expr_t *de_integrate_or_formal(const expr_t *integrand, const expr_t *wrt)
 {
-    expr_t *integral = integrand && wrt ? expr_integrate(integrand, wrt) : NULL;
+    expr_t *integral = integrand && wrt ? de_integrate_real_trigonometric_rate(integrand, wrt) : NULL;
+    if (!integral && integrand && wrt)
+        integral = expr_integrate(integrand, wrt);
 
     if (!integral && integrand && wrt)
         integral = expr_integral(integrand, wrt);
@@ -721,6 +766,10 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
     if (!computation_step_current("diffequation.solve"))
         return NULL;
     diffequ_solve_result_t *result = de_solve_with_options_impl(de, options);
+    if (de && result && !de_result_apply_intervals(de, result)) {
+        de_solve_result_free(result);
+        result = NULL;
+    }
     if (!computation_poll_current()) {
         de_solve_result_free(result);
         return NULL;

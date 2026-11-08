@@ -402,19 +402,29 @@ static void test_lab_presentation_integrator_text(void)
          "work used: 3 / 9 (precision reached)", ""},
         {"{\"work_units\":\"0\",\"work_cap\":\"0\",\"intervals\":3}", "work used: 0 / 0", ""},
         {"{\"intervals\":4,\"error\":\"0\"}", "work used: 4", "error ≈ 0"},
+        {"{\"value\":\"0.625\",\"error\":\"1.23e-441\",\"display_error\":\"\",\"status\":\"converged\"}",
+         "status: converged", "0.625"},
+        {"{\"value\":\"0.625\",\"error\":\"0.01\",\"display_error\":\"0.01\",\"status\":\"max intervals reached\"}",
+         "status: max intervals reached", "0.625\nerror ≈ 0.01"},
+        {"{\"value\":\"0.625\",\"error\":\"NAN\",\"display_error\":\"NAN\"}", "", "0.625\nerror ≈ NAN"},
+        {"{\"value\":\"0.62432998854355\",\"error\":\"1.054321987654321e-57\",\"display_error\":\"1.05×10⁻⁵⁷\"}",
+         "", "0.62432998854355\nerror ≈ 1.05×10⁻⁵⁷"},
         {"{\"work_cap\":9,\"status\":\"numerical\"}", "status: numerical", "numerical"},
         {"{}", "", ""}};
     bool ok = true;
     for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
         json_t *fields = test_lab_json(cases[i].payload);
+        string_t *original_error = string_new_with(test_lab_text(fields, "error"));
         bool adapted = fields && lab_presentation_adapt(fields);
         const json_t *integrator = test_lab_member(test_lab_member(fields, "presentation"), "integrator");
         bool matches = adapted && !strcmp(test_lab_text(integrator, "detail_text"), cases[i].detail) &&
-                       !strcmp(test_lab_text(integrator, "value_text"), cases[i].value);
+                       !strcmp(test_lab_text(integrator, "value_text"), cases[i].value) && original_error &&
+                       !strcmp(test_lab_text(fields, "error"), string_c_str(original_error));
         if (!matches)
             printf("Integrator presentation case %zu:\n%s\nValue: %s\n", i,
                    test_lab_text(integrator, "detail_text"), test_lab_text(integrator, "value_text"));
         ok = ok && matches;
+        string_free(original_error);
         json_free(fields);
     }
     TEST_ASSERT_TRUE(

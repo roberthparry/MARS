@@ -96,6 +96,12 @@ This does not make graphs thread-safe or make parsing, rendering, every symbolic
 search loop or individual numerical primitives interruptible. Retain hard process
 supervision where needed. The computation guide includes a tested recovery example.
 
+Reciprocal circular and hyperbolic products with the same argument simplify in
+either factor order, including signed factors. Simplification retains explicit
+non-zero conditions for poles removed by cancellation; different arguments are
+not cancelled. These native reductions also apply before symbolic integration
+and differential-equation solving.
+
 ## Imaginary-axis presentation
 
 For authored quantum notation, use the TeX module's [operator and Dirac input](TeX.md#quantum-operators-states-and-adjoints).

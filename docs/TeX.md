@@ -3416,6 +3416,11 @@ identifiers, registered functions and domain conditions. The rendered result
 contains the symbolic body and its conditions, not the binding declarations;
 bound values are not substituted into ordinary algebra.
 
+Real-domain bounds are displayed as ordinary inequalities, with paired lower
+and upper bounds combined into a single ordered chain. Real-part projections
+are retained for complex half-plane conditions. Domain restrictions follow the
+complete formula and remain effective during numerical evaluation.
+
 This is useful when converting mathematical text produced by MARS, for example
 after loading a saved expression. The programme below prints that native text,
 then the TeX commands for a fraction containing a square root. The rendered

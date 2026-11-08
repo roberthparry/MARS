@@ -25,6 +25,37 @@
 #include "number-t.h"
 #include "TeX-t.h"
 
+/** @brief Mathematical relations recognised by the shared native input scanner. */
+typedef enum {
+    EQU_RELATION_EQUAL,         /**< Exact equality, written = or ==. */
+    EQU_RELATION_NOT_EQUAL,     /**< Unequal operands, written != or its Unicode sign. */
+    EQU_RELATION_LESS,          /**< Strict ordering, written <. */
+    EQU_RELATION_LESS_EQUAL,    /**< Inclusive ordering, written <= or its Unicode sign. */
+    EQU_RELATION_GREATER,       /**< Strict ordering, written >. */
+    EQU_RELATION_GREATER_EQUAL, /**< Inclusive ordering, written >= or its Unicode sign. */
+    EQU_RELATION_APPROXIMATE,   /**< Approximate equality, written ~~= or its Unicode sign. */
+    EQU_RELATION_CONGRUENT,     /**< Congruence, written ~== or its Unicode sign. */
+    EQU_RELATION_COUNT          /**< Dispatch bound; not a valid relation. */
+} equ_relation_kind_t;
+
+/** @brief One native relation token in a source view; contains no owning pointers. */
+typedef struct {
+    size_t position; /**< Byte position of the first rune in the input view. */
+    size_t width; /**< Number of bytes in the complete token. */
+    equ_relation_kind_t kind; /**< Mathematical meaning, independent of typesetting. */
+} equ_input_relation_t;
+
+/**
+ * @brief Read the next top-level relation, skipping nested mathematical expressions.
+ * @param body Borrowed source view; neither modified nor retained.
+ * @param[in,out] start Required byte offset, advanced beyond the token or to the end of the view.
+ * @param[out] relation Required output receiving the next token; unchanged when none is returned.
+ * @return One for a match, zero at end, or minus one with EINVAL for invalid arguments or malformed input.
+ * No allocations or ownership transfers occur. Parentheses, brackets and braces hide internal relations;
+ * longest-token matching distinguishes strict and inclusive signs. Views must remain alive during the call.
+ */
+int equ_input_next_relation(string_view_t body, size_t *start, equ_input_relation_t *relation);
+
 /**
  * @brief Interpret one borrowed native operand using caller-owned parser state.
  * @param context Borrowed callback state; its owner keeps it valid throughout the call.

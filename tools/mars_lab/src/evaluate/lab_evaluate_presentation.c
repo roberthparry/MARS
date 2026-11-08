@@ -262,7 +262,7 @@ static bool lab_pres_integrator_text(json_t *metadata, const json_t *fields)
     }
     if (ok && string_byte_length(domain)) ok = lab_pres_join(detail, string_c_str(domain), "\n\n");
     if (ok) ok = lab_pres_join(value, lab_eval_text(fields, "value"), "\n");
-    const char *error = lab_eval_text(fields, "error");
+    const char *error = lab_eval_text(fields, lab_eval_get(fields, "display_error") ? "display_error" : "error");
     if (ok && *error) {
         string_t *line = string_sprintf("error ≈ %s", error);
         ok = line && lab_pres_join(value, string_c_str(line), "\n");

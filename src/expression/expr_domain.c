@@ -125,15 +125,16 @@ static number_t real_parameter_eval(expr_t *expr)
     return num_clone(valid ? NUM_ONE : NUM_ZERO);
 }
 
-static expr_t *real_parameter_new(const expr_t *value)
+/* Retain a real-domain predicate's live coordinate rather than a detached copy. */
+expr_t *expr_real_parameter(const expr_t *value)
 {
-    return expr_new_unary_internal(&ops_real_parameter, expr_clone(value));
+    return value ? expr_new_unary_internal(&ops_real_parameter, expr_retain_expr(value)) : NULL;
 }
 
 const expr_ops_t ops_real_parameter = {
     .eval = real_parameter_eval, .kind = EXPR_KIND_REAL_PARAMETER, .arity = EXPR_OP_UNARY,
     .expression_name = "real_parameter", .function_name = "real_parameter",
-    .apply_unary = real_parameter_new,
+    .apply_unary = expr_real_parameter,
 };
 
 static number_t nonnegative_integer_eval(expr_t *expr)
@@ -345,12 +346,15 @@ expr_t *expr_real_domain_from_args(size_t count, expr_t *const *args)
 {
     if (!args || count < 3u || !(count & 1u))
         return NULL;
+    for (size_t index = 0u; index < count; ++index)
+        if (!args[index])
+            return NULL;
     expr_t *out = expr_alloc(&ops_real_domain);
-    out->a = expr_clone(args[0]);
+    out->a = expr_retain_expr(args[0]);
     expr_t **tail = &out->b;
     for (size_t index = 1u; index < count; ++index) {
         *tail = expr_alloc(&ops_argument_list);
-        (*tail)->a = expr_clone(args[index]);
+        (*tail)->a = expr_retain_expr(args[index]);
         tail = &(*tail)->b;
     }
     return out;

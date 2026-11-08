@@ -76,8 +76,13 @@ void de_free(diffequ_t *de)
     free(de->condition_texts);
     free(de->conditions);
 
-    for (size_t i = 0u; i < de->independent_count; ++i)
+    for (size_t i = 0u; i < de->independent_count; ++i) {
+        if (de->interval_lower) expr_free(de->interval_lower[i]);
+        if (de->interval_upper) expr_free(de->interval_upper[i]);
         expr_free(de->independent_vars[i]);
+    }
+    free(de->interval_lower);
+    free(de->interval_upper);
     free(de->independent_vars);
 
     string_free(de->constant_text);

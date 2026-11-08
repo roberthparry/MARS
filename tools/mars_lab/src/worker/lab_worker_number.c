@@ -6,7 +6,9 @@
  * notation where practical, and writes small magnitudes with Unicode powers of
  * ten. Real and imaginary components are formatted independently; no nonzero
  * component is discarded. This presentation helper does not alter stored values
- * or the machine-readable number and Function output formats.
+ * or the machine-readable number and Function output formats. Numerical error
+ * visibility uses the requested absolute/relative accuracy, with three significant
+ * digits for a visible estimate, without changing the estimate itself.
  */
 
 #include "number-t.h"
@@ -14,7 +16,7 @@
 #define MARS_LAB_WORKER_INTERNAL_ACCESS
 #include "lab_worker_internal.h"
 
-static string_t *lab_worker_number_real(number_t value, int precision)
+static string_t *lab_worker_number_real(number_t value, int precision, bool expand_positive)
 {
     string_t *raw = num_sprintf_text("%.*n", precision, value);
     string_view_t view = string_view_all(raw);
@@ -40,7 +42,7 @@ static string_t *lab_worker_number_real(number_t value, int precision)
 
     string_t *out = string_new();
     bool ok = out != NULL;
-    if (!negative && exponent <= 4096u) {
+    if (expand_positive && !negative && exponent <= 4096u) {
         size_t digits = 0u;
         for (size_t i = 0u; ok && i < marker; ++i) {
             string_view_peek_ascii(view, i, &byte);
@@ -77,14 +79,14 @@ string_t *lab_worker_number_text(number_t value, int precision)
     if (precision <= 0)
         precision = (int)num_get_default_prec_digits();
     if (num_is_real(value) || !num_is_finite(value))
-        return lab_worker_number_real(value, precision);
+        return lab_worker_number_real(value, precision, true);
 
     number_t real = num_real_part(value), imaginary = num_imag_part(value);
     number_t magnitude = num_abs(imaginary);
     /* Match number's complex formatting: render components at the requested working precision. */
     number_t zero = num_new(), real_decimal = num_add(real, zero), imag_decimal = num_add(magnitude, zero);
-    string_t *a = num_is_zero(real) ? string_new() : lab_worker_number_real(real_decimal, precision);
-    string_t *b = num_is_one(magnitude) ? string_new() : lab_worker_number_real(imag_decimal, precision);
+    string_t *a = num_is_zero(real) ? string_new() : lab_worker_number_real(real_decimal, precision, true);
+    string_t *b = num_is_one(magnitude) ? string_new() : lab_worker_number_real(imag_decimal, precision, true);
     bool negative = num_sign(imaginary) < 0;
     const char *separator = num_is_zero(real) ? (negative ? "-" : "") : (negative ? " - " : " + ");
     string_t *out = a && b ? string_sprintf("%S%s%Si", a, separator, b) : NULL;
@@ -97,4 +99,37 @@ string_t *lab_worker_number_text(number_t value, int precision)
     num_destroy(&imaginary);
     num_destroy(&real);
     return out;
+}
+
+/* Keep numerical diagnostics visible unless their finite estimate is below the requested accuracy. */
+bool lab_worker_error_visible(number_t value, number_t error, int precision)
+{
+    if (precision <= 0)
+        precision = (int)num_get_default_prec_digits();
+    if (!num_is_finite(value) || !num_is_finite(error) || !num_is_real(error) || num_sign(error) < 0)
+        return true;
+    /* Scale the error by an integer power: an exactly equal rational must not disappear through rounding. */
+    number_t digits = num_create_from_long(precision), scale = num_pow(NUM_TEN, digits);
+    number_t scaled_error = num_mul(error, scale), magnitude = num_abs(value);
+    bool visible = !num_is_finite(scaled_error) || !num_is_finite(magnitude) ||
+                   !num_lt(scaled_error, num_gt(magnitude, NUM_ONE) ? magnitude : NUM_ONE);
+    num_destroy(&scaled_error);
+    num_destroy(&magnitude);
+    num_destroy(&scale);
+    num_destroy(&digits);
+    return visible;
+}
+
+/* Round displayed estimates only after comparing their full values with the requested accuracy. */
+string_t *lab_worker_error_text(number_t value, number_t error, int precision)
+{
+    if (!lab_worker_error_visible(value, error, precision))
+        return string_new();
+    /* Inexact zero selects decimal formatting even for an exact rational estimate. */
+    number_t zero = num_new(), decimal = num_add(error, zero);
+    string_t *text = num_is_real(decimal) || !num_is_finite(decimal)
+                         ? lab_worker_number_real(decimal, 3, false) : lab_worker_number_text(decimal, 3);
+    num_destroy(&decimal);
+    num_destroy(&zero);
+    return text;
 }

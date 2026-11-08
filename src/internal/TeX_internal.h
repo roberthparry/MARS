@@ -80,7 +80,7 @@ typedef enum {
     TeX_NODE_EVALUATION,  /**< Body followed by variable-assignment equalities. */
     TeX_NODE_LINES,       /**< Successive mathematical or prose rows. */
     TeX_NODE_TRANSFORM,   /**< Body, source coordinate and target coordinate. */
-    TeX_NODE_RELATION,    /**< Two operands and their mathematical relation. */
+    TeX_NODE_RELATION,    /**< Two operands, or an ordered inequality chain, with the same relation between operands. */
     TeX_NODE_DOMAIN_RELATION, /**< Two operands and a relation within a domain restriction. */
     TeX_NODE_DOMAIN,      /**< An expression followed by its domain restrictions. */
     TeX_NODE_DISTRIBUTION_QUALIFICATION, /**< Body and optional distinct operand with a plain-text qualification. */

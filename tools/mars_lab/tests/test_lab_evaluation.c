@@ -29,11 +29,14 @@
 #include "mars_settings.h"
 #include "lab_calendar.h"
 #include "lab_evaluate.h"
+#include "lab_presentation.h"
 #include "lab_state.h"
 #define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
 #include "internal/lab_evaluate_internal.h"
 #define MARS_SHARED_LAB_CALENDAR_INTERNAL_ACCESS
 #include "internal/lab_calendar_internal.h"
+#define MARS_LAB_WORKER_INTERNAL_ACCESS
+#include "worker/lab_worker_internal.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 
@@ -715,6 +718,92 @@ static void test_lab_integrator_deadline_policy(void)
     }
 }
 
+static void test_lab_integrator_error_visibility(void)
+{
+    static const struct {
+        const char *value, *error;
+        int digits;
+        bool visible;
+    } cases[] = {
+        {"0.62432998854355087099", "1.23e-441", 386, false},
+        {"0.625", "1/100", 2, true},
+        {"0.625", "1/1000", 2, false},
+        {"0.625", "1/10", 2, true},
+        {"1e100", "1e59", 40, false},
+        {"-1e100", "1e61", 40, true},
+        {"1e-100", "1e-30", 40, true},
+        {"1e-100", "1e-50", 40, false},
+        {"3+4i", "1/20", 2, true},
+        {"3+4i", "1/100", 2, false},
+        {"0", "1/100", 2, true},
+        {"0", "1/1000", 2, false},
+        {"1", "0", 40, false},
+        {"1", "-1/1000", 2, true},
+        {"1", "NAN", 40, true},
+        {"1", "inf", 40, true},
+        {"NAN", "0", 40, true},
+        {"1", "1e-100+1e-200i", 40, true},
+        {"1", "1e-50", 0, false},
+    };
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(40);
+    bool ok = true;
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        number_t value = num_create_from_string(cases[i].value), error = num_create_from_string(cases[i].error);
+        bool shown = lab_worker_error_visible(value, error, cases[i].digits);
+        if (shown != cases[i].visible)
+            printf("Error visibility case %zu: result=%s error=%s digits=%d visible=%d\n", i,
+                   cases[i].value, cases[i].error, cases[i].digits, shown);
+        ok = ok && shown == cases[i].visible;
+        num_destroy(&value);
+        num_destroy(&error);
+    }
+    num_set_default_prec_bits(saved);
+    TEST_ASSERT_TRUE(ok, "error visibility respects requested absolute/relative accuracy and keeps uncertain estimates");
+}
+
+static void test_lab_integrator_error_text(void)
+{
+    static const struct {
+        const char *value, *error, *display;
+        int digits;
+    } cases[] = {
+        {"0.62432998854355", "1.054321987654321e-57", "1.05×10⁻⁵⁷", 386},
+        {"0.625", "1/3", "0.333", 40},
+        {"0.625", "0.12387654321", "0.124", 40},
+        {"0.625", "9.996e-57", "1×10⁻⁵⁶", 386},
+        {"0.625", "123456789", "1.23×10⁸", 40},
+        {"0.625", "1.23456789e100", "1.23×10¹⁰⁰", 40},
+        {"0.625", "0.009999", "", 2},
+        {"0.625", "0.0100001", "0.01", 2},
+        {"0.625", "1e-1000", "1×10⁻¹⁰⁰⁰", 1100},
+        {"0.625", "0", "", 40},
+        {"0.625", "-0.12387654321", "-0.124", 40},
+    };
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(80);
+    size_t working = num_get_default_prec_bits();
+    bool ok = true;
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        number_t value = num_create_from_string(cases[i].value), error = num_create_from_string(cases[i].error);
+        string_t *original = num_to_string(error);
+        string_t *display = lab_worker_error_text(value, error, cases[i].digits), *after = num_to_string(error);
+        bool matches = display && !strcmp(string_c_str(display), cases[i].display) && original && after &&
+                       !string_compare(original, after) && num_get_default_prec_bits() == working;
+        if (!matches)
+            string_printf("Error text case %zu: expected=%s actual=%s\n", i, cases[i].display,
+                          display ? string_c_str(display) : "allocation failure");
+        ok = matches && ok;
+        string_free(after);
+        string_free(display);
+        string_free(original);
+        num_destroy(&error);
+        num_destroy(&value);
+    }
+    num_set_default_prec_bits(saved);
+    TEST_ASSERT_TRUE(ok, "visible errors use three significant digits without changing raw estimates or precision");
+}
+
 static void test_lab_integrator_high_precision_deadline(void)
 {
     unsigned status = 0u;
@@ -732,7 +821,11 @@ static void test_lab_integrator_high_precision_deadline(void)
               !strcmp(test_lab_text(response, "work_cap"), "5000") &&
               !strcmp(test_lab_text(response, "max_intervals"), "5000") &&
               !test_lab_member(response, "error_code") && !*test_lab_text(response, "raw_error") &&
+              test_lab_member(response, "display_error") && !*test_lab_text(response, "display_error") &&
               num_is_real(estimate) && num_is_finite(estimate) && !num_is_nan(estimate) && num_sign(estimate) >= 0;
+    ok = ok && lab_presentation_adapt(response);
+    const json_t *presentation = test_lab_member(test_lab_member(response, "presentation"), "integrator");
+    ok = ok && !strcmp(test_lab_text(presentation, "value_text"), test_lab_text(response, "value"));
     if (!ok)
         string_printf("386-digit exp(Li(x)) route: HTTP=%u status=%s value=%s work=%s/%s error=%s\n",
                       status, test_lab_text(response, "status"), test_lab_text(response, "value"),
@@ -741,6 +834,56 @@ static void test_lab_integrator_high_precision_deadline(void)
     num_destroy(&estimate);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "386-digit exp(Li(x)) on [0,1] converges through the native route with a 5000 work cap");
+
+    response = evaluate("/integrator-eval",
+                        "{\"expression\":\"exp(Li(x))\",\"precision\":386,\"max_intervals\":500,"
+                        "\"bounds\":[{\"name\":\"x\",\"lo\":\"0\",\"hi\":\"1\"}]}", &status);
+    estimate = num_create_from_text(json_string_value(test_lab_member(response, "error")));
+    string_t *display = lab_worker_error_text(NUM_ONE, estimate, 386);
+    ok = response && status == 200u && display && string_byte_length(display) > 0u &&
+         string_byte_length(display) < 24u &&
+         !strcmp(test_lab_text(response, "display_error"), string_c_str(display)) &&
+         strcmp(test_lab_text(response, "error"), test_lab_text(response, "display_error")) &&
+         lab_presentation_adapt(response);
+    presentation = test_lab_member(test_lab_member(response, "presentation"), "integrator");
+    string_t *expected = string_sprintf("%s\nerror ≈ %s", test_lab_text(response, "value"),
+                                       test_lab_text(response, "display_error"));
+    ok = ok && expected && !strcmp(test_lab_text(presentation, "value_text"), string_c_str(expected));
+    string_free(expected);
+    string_free(display);
+    num_destroy(&estimate);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "a limited-budget numerical integral displays a short error while retaining its full estimate");
+}
+
+static void test_lab_integrator_improper(void)
+{
+    unsigned status = 0u;
+    json_t *response = evaluate("/integrator-eval",
+        "{\"expression\":\"x*ln(e^x-1)/(e^x-1)\",\"precision\":482,\"max_intervals\":5000,"
+        "\"bounds\":[{\"name\":\"x\",\"lo\":\"0\",\"hi\":\"inf\"}]}", &status);
+    bool ok = response && status == 200u && test_lab_ok(response, true) &&
+              !strcmp(test_lab_text(response, "status"), "closed-form fast path") &&
+              !strncmp(test_lab_text(response, "value"), "1.20205690315959428539973816151144999", 35u) &&
+              strstr(test_lab_text(response, "symbolic"), "ζ(3)") &&
+              !strcmp(test_lab_text(response, "work_units"), "1") && !*test_lab_text(response, "raw_error");
+    if (!ok) {
+        string_t *text = json_to_string(response);
+        printf("Improper integral response: %s\n", text ? string_c_str(text) : "NULL");
+        string_free(text);
+    }
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "482-digit improper logarithmic exponential integral returns a labelled exact zeta result");
+
+    response = evaluate("/integrator-eval",
+        "{\"expression\":\"exp(x^3)/(x-1)^2\",\"precision\":32,\"max_intervals\":500,"
+        "\"bounds\":[{\"name\":\"x\",\"lo\":\"0\",\"hi\":\"2\"}]}", &status);
+    const char *message = test_lab_text(response, "error");
+    ok = response && status == 422u && !strcmp(message,
+         "Numerical integration could not obtain a finite real result within the selected bounds.") &&
+         !strstr(message, "bound_") && strstr(test_lab_text(response, "raw_error"), "bound_upper");
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "integration failure cards use a concise message while raw protocol records remain diagnostic");
 }
 
 static void test_lab_worker_deadline_diagnostic(void)
@@ -781,7 +924,10 @@ void test_lab_evaluation_cases(void)
 {
     TEST_RUN_IN_GROUP(test_lab_integrator_deadline_policy, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_worker_deadline_diagnostic, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_integrator_error_visibility, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_integrator_error_text, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_integrator_high_precision_deadline, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_integrator_improper, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_math_modes, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_expression_contract, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_function_input, tests, NULL);

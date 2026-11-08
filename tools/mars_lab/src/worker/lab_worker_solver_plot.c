@@ -24,12 +24,22 @@
 
 static int plot_curves(const char *input, const char *title_text, const char *title, const char *axis,
                        const expr_t *const *curves, string_t *const *labels, size_t count,
-                       bool equation, bool family, char **argv)
+                       bool equation, bool family, char **argv, const diffequ_t *de)
 {
     char *sources[16] = {0};
     number_t bounds[4] = {NUM_NAN, NUM_NAN, NUM_NAN, NUM_NAN};
     number_t ymin = NUM_NAN, ymax = NUM_NAN;
     const char *limits[] = {argv[5], argv[6], "", ""};
+    string_t *interval_limits[2] = {NULL, NULL};
+    if (de && de_independent_count(de) == 1u) {
+        const expr_t *endpoints[] = {de_independent_lower_bound(de, 0u), de_independent_upper_bound(de, 0u)};
+        for (size_t i = 0; i < 2u; ++i)
+            if (!*limits[i] && endpoints[i]) {
+                interval_limits[i] = expr_to_text(endpoints[i], style_UNBOUND);
+                if (interval_limits[i])
+                    limits[i] = string_c_str(interval_limits[i]);
+            }
+    }
     bool manual = !strcmp(argv[7], "manual"), ranged = false, constants = true;
     bool ok = count && count <= 16 &&
               (!strcmp(argv[7], "auto") || !strcmp(argv[7], "all") || manual);
@@ -65,7 +75,7 @@ static int plot_curves(const char *input, const char *title_text, const char *ti
         bounds[1] = num_clone(NUM_ONE);
         ranged = true;
     }
-    if (ok && ranged && family && !*argv[5] && !*argv[6])
+    if (ok && ranged && family && !*limits[0] && !*limits[1])
         lab_worker_plot_frame(sources, count, axis, bounds);
     bool feature_frame = ok && ranged && equation && !strcmp(argv[7], "auto") &&
                          lab_worker_plot_equation_frame(curves, sources, axis, !*argv[5] && !*argv[6], bounds);
@@ -137,6 +147,8 @@ static int plot_curves(const char *input, const char *title_text, const char *ti
         num_destroy(&bounds[i]);
     num_destroy(&ymin);
     num_destroy(&ymax);
+    string_free(interval_limits[1]);
+    string_free(interval_limits[0]);
     num_set_default_prec_bits(saved_precision);
     return ok ? 0 : 1;
 }
@@ -223,7 +235,7 @@ int lab_worker_solver_plot(int argc, char **argv)
                 ? lab_worker_plot_roots(prepared->roots, prepared->root_count, equ, axis,
                                          string_c_str(prepared->title), string_c_str(prepared->TeX), argv)
                 : plot_curves(argv[1], string_c_str(prepared->title), string_c_str(prepared->TeX), axis,
-                                (const expr_t *const *)prepared->curves, NULL, 2, true, false, argv);
+                                (const expr_t *const *)prepared->curves, NULL, 2, true, false, argv, NULL);
             if (!rc)
                 fputs(string_c_str(prepared->numeric), stdout);
             lab_worker_plot_prepared_free(prepared);
@@ -236,7 +248,7 @@ int lab_worker_solver_plot(int argc, char **argv)
         number_t *roots = NULL;
         string_t *numeric = lab_worker_equation_plot_solutions(equ, atoi(argv[3]), &roots, &root_count);
         int rc = root_count ? lab_worker_plot_roots(roots, root_count, equ, axis, argv[1], title, argv)
-                           : plot_curves(argv[1], argv[1], title, axis, curves, NULL, 2, true, false, argv);
+                           : plot_curves(argv[1], argv[1], title, axis, curves, NULL, 2, true, false, argv, NULL);
         if (!rc) {
             if (numeric) {
                 fputs(string_c_str(numeric), stdout);
@@ -278,7 +290,7 @@ int lab_worker_solver_plot(int argc, char **argv)
         print_axis(axis);
         int rc = plot_curves(argv[1], string_c_str(prepared->title), string_c_str(prepared->TeX), axis,
                              (const expr_t *const *)prepared->curves, prepared->labels, prepared->count,
-                             false, prepared->family, argv);
+                             false, prepared->family, argv, de);
         lab_worker_plot_prepared_free(prepared);
         de_free(de);
         return rc;
@@ -335,7 +347,7 @@ int lab_worker_solver_plot(int argc, char **argv)
         print_axis(axis);
         if (titled && expanded)
             rc = plot_curves(argv[1], string_c_str(title_text), string_c_str(title_TeX), axis,
-                              (const expr_t *const *)members, labels, member_count, false, family, argv);
+                              (const expr_t *const *)members, labels, member_count, false, family, argv, de);
         else if (!titled)
             printf("error Unable to format the solution plot title.\n");
         if (!rc)

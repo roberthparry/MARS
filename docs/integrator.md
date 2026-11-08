@@ -128,6 +128,59 @@ by reciprocal exponential decay, without directly evaluating an undefined
 endpoint product. It is a numerical convergence check, not a general symbolic
 limit prover; a singular endpoint is never unconditionally assigned zero.
 
+### Infinite intervals and logarithmic Bose moments
+
+Real infinite endpoints are mapped to an open unit interval before numerical
+quadrature. Half-lines use a rational distance from their finite endpoint; the
+whole real line uses the difference of two such distances. Reversing the bounds
+reverses the result's sign. The existing error, cancellation and work-budget
+checks remain in force. Infinity itself is never sampled, and an undefined or
+overflowing interior value is not silently replaced with zero.
+
+Scaled logarithmic Bose moments have an exact path for positive real rate and
+integer powers from one through 32. A finite Euler sum reduces them to zeta
+values. In particular, the first moment equals the zeta function at three; its
+logarithmic singularity at zero is integrable. The numerical value is evaluated
+at the requested precision without quadrature. The exact expression returned by
+`intg_get_exact_result` belongs to the integrator until its next calculation or
+`intg_free`.
+
+```c
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "expression-t.h"
+#include "integrator-t.h"
+
+int main(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *formula = expr_from_string("{x*ln(e^x-1)/(e^x-1) | x=?}", &bindings);
+    expr_t *x = expr_bindings_get(bindings, "x");
+    integrator_t *ig = intg_new();
+    number_t value = NUM_NAN;
+    int status = intg_integral(ig, formula, x, NUM_ZERO, NUM_INF, &value, NULL);
+    const expr_t *exact = intg_get_exact_result(ig);
+    string_t *text = exact ? expr_to_text(exact, style_UNBOUND) : NULL;
+    bool ok = status == 0 && text;
+    if (ok)
+        printf("Exact result: %s\n", string_c_str(text));
+    string_free(text);
+    num_destroy(&value);
+    intg_free(ig);
+    expr_free(formula);
+    expr_bindings_free(bindings);
+    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+```
+
+Output:
+
+```text
+Exact result: ζ(3)
+```
+
 ### Adaptive Gauss–Kronrod fallback
 
 Each subinterval is evaluated with a 15-point Kronrod rule (K15) containing an
@@ -473,7 +526,7 @@ locking.
 
 ## Tradeoffs
 
-- Only finite intervals `[a, b]` are supported directly. For improper integrals, apply a substitution before passing the transformed integrand.
+- Finite intervals, real half-lines and the whole real line are supported. An infinite domain does not establish convergence; inspect the returned status and error estimate.
 - `intg_integral` and the multi-dimensional variants require the integrand to be expressible as an `expr_t` graph.
 - Functions with endpoint singularities or sharp peaks may require many subdivisions. Increase the max interval count via `intg_set_interval_count_max()` or apply a smoothing substitution.
 - Tanh–sinh refinement and the 15-point Gauss–Kronrod fallback have different sampling costs. Difficult integrands can exhaust the configured work limit without meeting tolerance.

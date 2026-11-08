@@ -5,7 +5,8 @@
 
 - the differential equation itself;
 - its independent variables;
-- fixed problem constants; and
+- fixed problem constants;
+- optional strict real coordinate intervals; and
 - initial or boundary conditions.
 
 TeX output is delegated to the shared [TeX module](TeX.md), including ordered
@@ -16,8 +17,8 @@ and layout. Private semantic providers carry these choices without exposing solv
 structures to TeX. The existing output APIs manage their contexts internally.
 Rendering does not reparse expressions or run the solver again.
 
-`de_problem_to_TeX(problem)` returns an owned `string_t` containing the equation
-and its initial or boundary conditions, displayed using evaluation bars. Release
+`de_problem_to_TeX(problem)` returns an owned `string_t` containing the equation,
+its coordinate intervals and any initial or boundary conditions. Point conditions use evaluation bars. Release
 it with `string_free`. This presentation-only API does not solve the problem;
 `de_to_text(problem, style_LATEX)` continues to return the equation alone.
 The parser also accepts condition-only braced shorthand and interprets a shorthand
@@ -43,6 +44,66 @@ PDE solvers include transport and characteristic families, selected
 second-order equations, one-dimensional forced wave initial-value problems
 using d'Alembert–Duhamel integrals, and the three-dimensional homogeneous wave
 equation using Kirchhoff's formula.
+
+## Coordinate intervals
+
+Append a strict real coordinate interval after a semicolon, separately from initial
+or boundary data. One-sided bounds, monotone chains and intersections of repeated
+bounds are supported. Endpoints must evaluate to finite real values and must not
+depend on an independent coordinate. Empty intersections, inclusive bounds and
+general inequality constraints are rejected. Intervals preserve the general
+solution's constants and restrict the complete result to the authored real domain.
+They are not additional initial or boundary conditions.
+
+`de_independent_lower_bound(problem, index)` and
+`de_independent_upper_bound(problem, index)` return borrowed endpoint expressions,
+or `NULL` when that endpoint is absent or the index/problem is invalid. Do not free
+them; they remain valid until `de_free(problem)`. The endpoints are excluded.
+Canonical text round-trips the intervals, and `de_problem_to_TeX()` includes them
+alongside the equation and any point conditions.
+
+The solver consolidates restrictions on individual arithmetic terms into the
+domain of the complete solution before formatting it. TeX combines real lower
+and upper bounds into one ordered interval, with the remaining restrictions
+after the complete formula rather than among its terms. Numerical domain checks
+remain in force.
+
+```c
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "diffequation-t.h"
+
+int main(void)
+{
+    diffequ_t *problem = de_from_string("y''+y=cosec(x); 0<x<pi");
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    const expr_t *lower = de_independent_lower_bound(problem, 0u);
+    const expr_t *upper = de_independent_upper_bound(problem, 0u);
+    string_t *a = lower ? expr_to_text(lower, style_UNBOUND) : NULL;
+    string_t *b = upper ? expr_to_text(upper, style_UNBOUND) : NULL;
+    bool ok = a && b && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
+    if (ok) {
+        printf("Interval: %s < x < %s\n", string_c_str(a), string_c_str(b));
+        printf("Point conditions: %zu\n", de_condition_count(problem));
+        printf("Solution families: %zu\n", de_solve_result_count(result));
+    }
+    string_free(b);
+    string_free(a);
+    de_solve_result_free(result);
+    de_free(problem);
+    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+```
+
+Output:
+
+```text
+Interval: 0 < x < π
+Point conditions: 0
+Solution families: 1
+```
 
 ## Riccati equations and linearisation
 
@@ -2039,6 +2100,11 @@ This works above degree four as well; it does not depend on radical formulae.
 For nonzero `f(x)`, the solver constructs the Wronskian and applies variation
 of parameters. The expression integrator simplifies the resulting integrals
 where possible and otherwise retains exact formal integrals.
+Reciprocal trigonometric products are reduced before integration, retaining
+any poles removed by cancellation. Real affine tangent, cotangent and hyperbolic
+cotangent rates use logarithms of absolute values, so the particular solution
+remains real on each regular real interval. Arbitrary constants are independent
+on intervals separated by a pole of the original equation.
 
 A complete set of `n` independent initial or boundary conditions is solved as
 a symbolic matrix system. With no conditions, the result retains
