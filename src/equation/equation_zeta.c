@@ -10,6 +10,8 @@
  * internal matching or numerical attempts are not independent application APIs.
  */
 
+#include <errno.h>
+#include <math.h>
 #include <stdbool.h>
 
 #define MARS_EQUATION_INTERNAL_ACCESS
@@ -82,20 +84,16 @@ static bool equ_is_real_zeta_equation(const expr_t *residual, expr_t *wrt, bool 
     return matched;
 }
 
-static bool equ_zeta_root_in_bounds(number_t root, bool zero_target)
+static bool equ_zeta_root_in_bounds(number_t root, bool zero_target, number_t lower, number_t upper)
 {
     number_t real = num_real_part(root);
     number_t imag = num_imag_part(root);
-    number_t magnitude = num_abs(imag);
     number_t right = num_create_from_long(4L);
-    number_t top = num_create_from_long(zero_target ? ZETA_ZERO_HEIGHT_LIMIT : ZETA_VALUE_HEIGHT_LIMIT);
-    bool inside = num_is_finite(root) && num_le(magnitude, top) &&
+    bool inside = num_is_finite(root) && num_ge(imag, lower) && num_le(imag, upper) &&
                   (zero_target ? (num_gt(real, NUM_ZERO) && num_lt(real, NUM_ONE))
                                : (num_gt(real, NUM_ONE) && num_le(real, right)));
 
-    num_destroy(&top);
     num_destroy(&right);
-    num_destroy(&magnitude);
     num_destroy(&imag);
     num_destroy(&real);
     return inside;
@@ -103,7 +101,7 @@ static bool equ_zeta_root_in_bounds(number_t root, bool zero_target)
 
 static bool equ_zeta_root_seen(const equation_solutions_t *solutions, number_t root, number_t tolerance)
 {
-    /* This bounded search stores at most 40 roots; compare numbers, not rounded display text. */
+    /* Default searches hold 40 roots and window searches at most 256; compare native values, not display labels. */
     for (size_t i = 0u; i < solutions->count; ++i) {
         number_t existing = expr_eval(equ_rhs(solutions->solutions[i]));
         number_t difference = num_sub(existing, root);
@@ -159,10 +157,11 @@ static number_t equ_zeta_zero_seed(long index)
 /* Both seed strategies share refinement, original-equation verification and conjugate checks. */
 static int equ_zeta_try_seed(expr_t *residual, expr_t *verification_residual, expr_t *wrt,
                             equation_solutions_t *solutions, number_t seed, bool zero_target, size_t digits,
-                            number_t tolerance, number_t duplicate_tolerance, const expr_newton_region_t *region)
+                            number_t tolerance, number_t duplicate_tolerance, const expr_newton_region_t *region,
+                            number_t lower, number_t upper, size_t maximum)
 {
     expr_goal_seek_options_t options = {
-        .precision_digits = 24u, .max_iterations = 32u, .allow_complex = true,
+        .precision_digits = digits < 24u ? digits : 24u, .max_iterations = 32u, .allow_complex = true,
         .simplify_result = false, .tolerance = NUM_NAN
     };
     number_t candidate;
@@ -174,7 +173,7 @@ static int equ_zeta_try_seed(expr_t *residual, expr_t *verification_residual, ex
     if (expr_goal_seek_newton_one(residual, wrt, NUM_ZERO, &options, region) != 0)
         return 0;
     candidate = expr_eval(wrt);
-    bool distinct = equ_zeta_root_in_bounds(candidate, zero_target) &&
+    bool distinct = equ_zeta_root_in_bounds(candidate, zero_target, lower, upper) &&
                     !equ_zeta_root_seen(solutions, candidate, duplicate_tolerance);
 
     num_destroy(&candidate);
@@ -189,13 +188,14 @@ static int equ_zeta_try_seed(expr_t *residual, expr_t *verification_residual, ex
             return 0;
     }
     candidate = expr_eval(wrt);
-    if (equ_zeta_root_in_bounds(candidate, zero_target) &&
+    if (equ_zeta_root_in_bounds(candidate, zero_target, lower, upper) &&
         equ_zeta_residual_verified(verification_residual, wrt, candidate, tolerance) &&
         !equ_zeta_root_seen(solutions, candidate, duplicate_tolerance)) {
         number_t conjugate = num_conj(candidate);
 
         rc = equ_append_solution_value(wrt, candidate, solutions);
-        if (rc == 0 && !num_is_real(candidate) &&
+        if (rc == 0 && solutions->count < maximum && !num_is_real(candidate) &&
+            equ_zeta_root_in_bounds(conjugate, zero_target, lower, upper) &&
             !equ_zeta_root_seen(solutions, conjugate, duplicate_tolerance) &&
             equ_zeta_residual_verified(verification_residual, wrt, conjugate, tolerance))
             rc = equ_append_solution_value(wrt, conjugate, solutions);
@@ -214,6 +214,7 @@ int equ_try_search_zeta_roots(const equation_t *equation, equation_solutions_t *
     number_t original = NUM_NAN;
     number_t duplicate_tolerance = NUM_NAN;
     number_t tolerance = NUM_NAN;
+    number_t lower = NUM_NAN, upper = NUM_NAN;
     expr_newton_region_t region = {NUM_NAN, NUM_NAN, NUM_NAN};
     size_t digits = num_get_default_prec_digits();
     bool zero_target = false;
@@ -269,6 +270,8 @@ int equ_try_search_zeta_roots(const equation_t *equation, equation_solutions_t *
     region.real_max = num_create_from_long(6L);
     long height_limit = zero_target ? ZETA_ZERO_HEIGHT_LIMIT : ZETA_VALUE_HEIGHT_LIMIT;
 
+    upper = num_create_from_long(height_limit);
+    lower = num_neg(upper);
     region.imaginary_magnitude_max = num_create_from_long(height_limit + 10L);
     solutions->search_kind = zero_target ? EQUATION_SEARCH_ZETA_ZEROS : EQUATION_SEARCH_ZETA_VALUE;
     solutions->status = EQUATION_SOLVE_UNSOLVED;
@@ -282,7 +285,7 @@ int equ_try_search_zeta_roots(const equation_t *equation, equation_solutions_t *
         number_t seed = equ_zeta_zero_seed(index);
 
         rc = equ_zeta_try_seed(residual, verification_residual, wrt, solutions, seed, zero_target, digits,
-                               tolerance, duplicate_tolerance, &region);
+                               tolerance, duplicate_tolerance, &region, lower, upper, ZETA_ZERO_ROOT_LIMIT);
         num_destroy(&seed);
         if (rc < 0 || solutions->count >= ZETA_ZERO_ROOT_LIMIT)
             break;
@@ -300,7 +303,8 @@ int equ_try_search_zeta_roots(const equation_t *equation, equation_solutions_t *
         number_t seed = num_add(zero_target ? NUM_HALF : NUM_TWO, imaginary);
 
         rc = equ_zeta_try_seed(residual, verification_residual, wrt, solutions, seed, zero_target, digits,
-                               tolerance, duplicate_tolerance, &region);
+                               tolerance, duplicate_tolerance, &region, lower, upper,
+                               zero_target ? ZETA_ZERO_ROOT_LIMIT : SIZE_MAX);
         num_destroy(&seed);
         num_destroy(&imaginary);
         num_destroy(&imaginary_height);
@@ -314,6 +318,8 @@ cleanup:
     num_destroy(&tolerance);
     num_destroy(&duplicate_tolerance);
     num_destroy(&original);
+    num_destroy(&lower);
+    num_destroy(&upper);
     expr_free(verification_residual);
     expr_free(residual);
     if (!equ_computation_active()) {
@@ -321,4 +327,96 @@ cleanup:
         return -1;
     }
     return rc;
+}
+
+/* Plan indices with ordinary doubles; only seed planning, never root verification, uses this approximation. */
+static double equ_zeta_index_at_height(double height)
+{
+    double turns = height / (2.0 * acos(-1.0));
+    return turns > 0 ? 1.375 + turns * (log(turns) - 1.0) : 1.0;
+}
+
+/* Search only the requested finite window; preserve the caller's separately derived high-precision solutions. */
+equation_solutions_t *equ_search_zeta_zeros(const equation_t *equation, number_t lower, number_t upper,
+                                         size_t maximum, bool *limited)
+{
+    if (limited)
+        *limited = false;
+    double low = num_to_double(lower), high = num_to_double(upper);
+    if (!equation || !num_is_real(lower) || !num_is_real(upper) || !isfinite(low) || !isfinite(high) ||
+        low >= high || low < -10000 || high > 10000 || !maximum || maximum > 256) {
+        errno = EINVAL;
+        return NULL;
+    }
+    expr_bindings_t *bindings = equ_bindings(equation);
+    expr_t *wrt = NULL;
+    for (size_t i = 0; i < expr_bindings_count(bindings); ++i) {
+        if (expr_bindings_is_constant_at(bindings, i))
+            continue;
+        if (wrt) {
+            errno = ENOTSUP;
+            return NULL;
+        }
+        wrt = expr_bindings_expr_at(bindings, i);
+    }
+    expr_t *residual = wrt ? equ_residual(equation) : NULL;
+    bool zero_target = false;
+    if (!residual || equ_find_zeta_term(residual, NULL, wrt, 0) ||
+        !equ_is_real_zeta_equation(residual, wrt, &zero_target) || !zero_target) {
+        expr_free(residual);
+        errno = ENOTSUP;
+        return NULL;
+    }
+    equation_solutions_t *solutions = equ_solutions_new();
+    if (!solutions) {
+        expr_free(residual);
+        errno = ENOMEM;
+        return NULL;
+    }
+    number_t original = expr_eval(wrt);
+    double near = low <= 0 && high >= 0 ? 0 : fmin(fabs(low), fabs(high));
+    double far = fmax(fabs(low), fabs(high));
+    long first = (long)floor(equ_zeta_index_at_height(near)) - 3;
+    long last = (long)ceil(equ_zeta_index_at_height(far)) + 3;
+    if (first < 1)
+        first = 1;
+    number_t duplicate_tolerance = num_create_from_string("1e-12");
+    size_t digits = num_get_default_prec_digits();
+    number_t tolerance = num_pow10(-(int)(digits ? digits : 16));
+    expr_newton_region_t region = {num_create_from_long(-2), num_create_from_long(6),
+                                    num_create_from_double(far + 10)};
+    int rc = 0;
+    size_t attempts = 0;
+    long index = first;
+    for (; index <= last && solutions->count < maximum && attempts < maximum * 2 + 16; ++index, ++attempts) {
+        if (!equ_computation_step("equation.zeta_window_seed")) {
+            rc = -1;
+            break;
+        }
+        number_t positive = equ_zeta_zero_seed(index);
+        number_t seed = high <= 0 ? num_conj(positive) : num_clone(positive);
+        rc = equ_zeta_try_seed(residual, residual, wrt, solutions, seed, true, digits,
+                               tolerance, duplicate_tolerance, &region, lower, upper, maximum);
+        num_destroy(&seed);
+        num_destroy(&positive);
+        if (rc < 0)
+            break;
+    }
+    expr_set_val(wrt, original);
+    num_destroy(&original);
+    num_destroy(&duplicate_tolerance);
+    num_destroy(&tolerance);
+    num_destroy(&region.real_min);
+    num_destroy(&region.real_max);
+    num_destroy(&region.imaginary_magnitude_max);
+    expr_free(residual);
+    if (rc < 0 || !equ_computation_active()) {
+        equ_solutions_free(solutions);
+        errno = equ_computation_active() ? ENOMEM : ECANCELED;
+        return NULL;
+    }
+    if (limited)
+        *limited = index <= last;
+    solutions->status = solutions->count ? EQUATION_SOLVE_SOLVED : EQUATION_SOLVE_UNSOLVED;
+    return solutions;
 }

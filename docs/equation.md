@@ -238,6 +238,17 @@ working precision, so the higher precision needed during Newton refinement
 does not keep the former fixed summation length. Convergence checks and the
 bounded correction count still apply; this is not an unlimited-precision guarantee.
 
+`equ_search_zeta_zeros(equation, lower, upper, maximum, &limited)` searches a specified imaginary-height
+window independently of the ordinary worksheet search. It returns an owned solution collection, released
+with `equ_solutions_free`, using the current number precision and the native derivative. Bounds must be finite
+real numbers within −10000 to 10000, with `lower < upper`; `maximum` is from one to 256. The optional `limited`
+flag reports a root or candidate-budget limit. Unsupported equations return NULL with `ENOTSUP`; invalid
+arguments use `EINVAL`, allocation failure `ENOMEM`, and cooperative cancellation `ECANCELED`.
+Every returned root is checked against the original residual, without fixing its real part. Starting bindings
+are restored. The search excludes the separate trivial real family and does not certify completeness.
+It is useful for bounded interactive exploration at double or double-double-equivalent precision while
+retaining a separately computed high-precision solution set.
+
 The Lab combines verified numerical conjugates into one `±` row in both the
 Rendered TeX and Solutions cards. Inexact real and imaginary components round to the
 selected significant-digit precision in both cards; extra solver working digits remain
@@ -692,4 +703,39 @@ Output:
 
 ```text
 Stopped: 1
+```
+
+## Example: explore further zeta zeros
+
+This README example searches only heights 80 to 100, independently of any completed high-precision solve.
+The returned collection owns its roots; no input binding is changed. The count is numerical evidence,
+not a certificate of completeness.
+
+```c
+#include <stdio.h>
+
+#include "equation-t.h"
+
+int main(void)
+{
+    num_set_default_prec_digits(31);
+    equation_t *equation = equ_from_string("zeta(z)=0");
+    number_t lower = num_create_from_long(80), upper = num_create_from_long(100);
+    bool limited = false;
+    equation_solutions_t *roots = equ_search_zeta_zeros(equation, lower, upper, 64, &limited);
+    if (roots)
+        printf("Roots in [80, 100]: %zu; limited: %d\n", equ_solutions_count(roots), limited);
+    bool ok = roots && equ_solutions_count(roots) == 8 && !limited;
+    equ_solutions_free(roots);
+    num_destroy(&lower);
+    num_destroy(&upper);
+    equ_free(equation);
+    return ok ? 0 : 1;
+}
+```
+
+Output:
+
+```text
+Roots in [80, 100]: 8; limited: 0
 ```

@@ -1226,6 +1226,17 @@ static void print_equation_fields(const equation_t *equation, const equation_sol
 /* Execute this built-in calculation mode in a fresh server child process. */
 int lab_worker_equation(int argc, char **argv)
 {
+    if (argc >= 5 && !strcmp(argv[3], "--solution-pages")) {
+        int paged = lab_worker_equation_pages(argc, argv);
+        if (paged != 2 || strcmp(argv[4], "0"))
+            return paged;
+        /* Ordinary equations and explicit starting bindings retain their existing solver. */
+        if (argc > 5 && !strcmp(argv[5], "--plot-cache")) {
+            char *ordinary[] = {argv[0], argv[1], argv[2], "--plot-cache", NULL};
+            return lab_worker_equation(4, ordinary);
+        }
+        argc = 3;
+    }
     const char *input = argc > 1 ? argv[1] : "{ 2*x + 3 = 7 | x = NAN }";
     int precision = argc > 2 ? atoi(argv[2]) : 64;
     equation_t *equation;

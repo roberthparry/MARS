@@ -9,10 +9,12 @@
  * run suites sequentially; this source is not part of the installed library.
  */
 
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "computation-t.h"
 #include "equation-t.h"
@@ -2222,13 +2224,14 @@ typedef struct _test_equation_zeta_search_t {
     computation_t *control;
     size_t seed_count;
     bool cancel;
+    bool window;
 } test_equation_zeta_search_t;
 
 static void test_equation_zeta_progress(const computation_progress_t *progress, void *argument)
 {
     test_equation_zeta_search_t *search = argument;
 
-    if (strcmp(progress->stage, "equation.zeta_seed") != 0)
+    if (strcmp(progress->stage, search->window ? "equation.zeta_window_seed" : "equation.zeta_seed") != 0)
         return;
     search->seed_count++;
     if (search->cancel && search->seed_count == 2u)
@@ -2239,7 +2242,14 @@ static bool test_equation_zeta_solve(void *argument)
 {
     test_equation_zeta_search_t *search = argument;
 
-    search->solutions = equ_derive_solutions(search->equation);
+    if (search->window) {
+        number_t lower = num_create_from_long(80), upper = num_create_from_long(100);
+        search->solutions = equ_search_zeta_zeros(search->equation, lower, upper, 64, NULL);
+        num_destroy(&lower);
+        num_destroy(&upper);
+    } else {
+        search->solutions = equ_derive_solutions(search->equation);
+    }
     return search->solutions != NULL;
 }
 
@@ -2299,6 +2309,97 @@ static void test_equation_zeta_search_cancellation(void)
     computation_free(search.control);
     equ_free(search.equation);
     num_set_default_prec_bits(saved_bits);
+}
+
+static void test_equation_zeta_window_search(void)
+{
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(31);
+    equation_t *equation = equ_from_string("{3*zeta(s)+2=2 | s=0.5+14i}");
+    expr_t *variable = equation ? equ_binding(equation, "s") : NULL;
+    number_t original = variable ? expr_eval(variable) : NUM_NAN;
+    const long lows[] = {80, -100, 1000};
+    const long highs[] = {100, -80, 1005};
+    for (size_t i = 0; i < 3; ++i) {
+        number_t lo = num_create_from_long(lows[i]), hi = num_create_from_long(highs[i]);
+        bool limited = true;
+        struct timespec start, end;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        equation_solutions_t *solutions = equ_search_zeta_zeros(equation, lo, hi, 64, &limited);
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        printf("Zeta window [%ld, %ld]: %zu roots in %.4fs\n", lows[i], highs[i],
+               equ_solutions_count(solutions), end.tv_sec - start.tv_sec + (end.tv_nsec - start.tv_nsec) * 1e-9);
+        ASSERT_NOT_NULL(solutions);
+        ASSERT_FALSE(limited);
+        if (i < 2)
+            ASSERT_EQ_INT(equ_solutions_count(solutions), 8);
+        else
+            ASSERT_TRUE(equ_solutions_count(solutions) > 0);
+        num_set_default_prec_digits(60);
+        ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, variable, solutions, "1e-25"));
+        num_set_default_prec_digits(31);
+        for (size_t j = 0; j < equ_solutions_count(solutions); ++j) {
+            number_t root = expr_eval(equ_rhs(equ_solutions_at(solutions, j)));
+            number_t real = num_real_part(root), imaginary = num_imag_part(root);
+            ASSERT_TRUE(num_ge(imaginary, lo) && num_le(imaginary, hi));
+            ASSERT_TRUE(num_gt(real, NUM_ZERO) && num_lt(real, NUM_ONE));
+            num_destroy(&imaginary); num_destroy(&real); num_destroy(&root);
+        }
+        number_t restored = expr_eval(variable);
+        ASSERT_TRUE(num_eq(original, restored));
+        num_destroy(&restored);
+        equ_solutions_free(solutions);
+        num_destroy(&lo); num_destroy(&hi);
+    }
+    num_destroy(&original);
+    equ_free(equation);
+    num_set_default_prec_bits(saved);
+}
+
+static void test_equation_zeta_window_limits(void)
+{
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(16);
+    number_t low = num_create_from_long(80), high = num_create_from_long(100);
+    equation_t *equation = equ_from_string("zeta(s)=0");
+    bool limited = false;
+    equation_solutions_t *solutions = equ_search_zeta_zeros(equation, low, high, 1, &limited);
+    ASSERT_NOT_NULL(solutions);
+    ASSERT_EQ_INT(equ_solutions_count(solutions), 1);
+    ASSERT_TRUE(limited);
+    ASSERT_TRUE(test_equation_all_solutions_satisfy(equation, equ_binding(equation, "s"), solutions, "1e-12"));
+    equ_solutions_free(solutions);
+    errno = 0;
+    ASSERT_NULL(equ_search_zeta_zeros(equation, high, low, 64, NULL));
+    ASSERT_EQ_INT(errno, EINVAL);
+    ASSERT_NULL(equ_search_zeta_zeros(equation, low, high, 0, NULL));
+    ASSERT_EQ_INT(errno, EINVAL);
+    equ_free(equation);
+    equation = equ_from_string("zeta(s)=1");
+    ASSERT_NULL(equ_search_zeta_zeros(equation, low, high, 64, NULL));
+    ASSERT_EQ_INT(errno, ENOTSUP);
+    equ_free(equation);
+    equation = equ_from_string("sum(n,1,inf,1/n^s)=0");
+    ASSERT_NULL(equ_search_zeta_zeros(equation, low, high, 64, NULL));
+    ASSERT_EQ_INT(errno, ENOTSUP);
+    equ_free(equation);
+    test_equation_zeta_search_t search = {
+        .equation = equ_from_string("{zeta(s)=0 | s=0.5+14i}"), .cancel = true, .window = true
+    };
+    computation_options_t options = {.progress = test_equation_zeta_progress, .argument = &search};
+    search.control = computation_new(&options);
+    ASSERT_FALSE(computation_run(search.control, test_equation_zeta_solve, &search));
+    ASSERT_EQ_INT(computation_status(search.control), COMPUTATION_CANCELLED);
+    ASSERT_NULL(search.solutions);
+    number_t restored = expr_eval(equ_binding(search.equation, "s"));
+    number_t original = num_create_from_string("0.5+14i");
+    ASSERT_TRUE(num_eq(original, restored));
+    num_destroy(&restored);
+    num_destroy(&original);
+    computation_free(search.control);
+    equ_free(search.equation);
+    num_destroy(&low); num_destroy(&high);
+    num_set_default_prec_bits(saved);
 }
 
 static void test_equation_infinite_series_domain(void)
@@ -2573,6 +2674,8 @@ static void test_equation_basics(void)
     TEST_RUN_SUBTEST(test_equation_zeta_nontrivial_search, NULL);
     TEST_RUN_SUBTEST(test_equation_zeta_high_precision_starts, NULL);
     TEST_RUN_SUBTEST(test_equation_zeta_search_cancellation, NULL);
+    TEST_RUN_SUBTEST(test_equation_zeta_window_search, NULL);
+    TEST_RUN_SUBTEST(test_equation_zeta_window_limits, NULL);
     TEST_RUN_SUBTEST(test_equation_infinite_series_domain, NULL);
     TEST_RUN_SUBTEST(test_equation_zeta_level_search, NULL);
     TEST_RUN_SUBTEST(test_equation_numeric_solves_all_variable_bindings, NULL);

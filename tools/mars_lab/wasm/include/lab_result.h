@@ -312,4 +312,35 @@ bool lab_result_almanac_variant(jsref data, jsref visibility);
  */
 void lab_result_almanac_render(jsref target, jsref variant);
 
+/**
+ * @brief Attach a native continuation capability to a newly installed limited solution card.
+ * @param data Scoped native response marked solution_page; cursors, precision and rendering are not interpreted.
+ * The card owns the retained browser record. Ordinary cards are ignored. Call only on the browser thread.
+ */
+void lab_solution_pages_install(jsref data);
+
+/**
+ * @brief Check whether the current solution card still belongs to the authored equation and precision.
+ * @return True for a current capability; false after edits, mode changes, reevaluation or invalidation.
+ * No ownership transfers, allocations or asynchronous work occur.
+ */
+bool lab_solution_pages_valid(void);
+
+/**
+ * @brief Admit one background or scroll-triggered continuation and return its opaque request through the DOM bridge.
+ * @param visible True when the continuation is visible or explicitly activated; false admits background completion only.
+ * @return No C value; the bridge receives a browser-owned request with payload, or null when no work is admitted.
+ * The card retains request identity until completion or invalidation. Duplicate concurrent requests are suppressed.
+ */
+void lab_solution_pages_request(bool visible);
+
+/**
+ * @brief Append a complete current page and update its cursor without replacing earlier rows.
+ * @param request Scoped opaque request from lab_solution_pages_request; identity must still match.
+ * @param data Scoped decoded native response, or zero on transport failure.
+ * @return No C value; the bridge receives the combined copy source on success, or null on failure or stale work.
+ * Failures preserve existing rows and permit retry. Inputs remain browser-owned; handles are never retained in C.
+ */
+void lab_solution_pages_finish(jsref request, jsref data);
+
 #endif

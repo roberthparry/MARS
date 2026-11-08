@@ -220,6 +220,101 @@
             WorksheetWorkspace.presentation.syncModeUI();
         }
     }
+    async function checkZetaPlotExpansion() {
+        const originalMode = WorksheetWorkspace.mode.currentMode();
+        try {
+            WorksheetWorkspace.mode.setMode('equation');
+            WorksheetWorkspace.presentation.syncModeUI();
+            WorksheetBindings.controller.setExpressionEditor('zeta(z)=0');
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            await waitForAutomaticPlot();
+            WorksheetResults.solutionPages.dispose();
+            const host = document.getElementById('plotRendered')!;
+            const original = WorksheetContext.rendered.innerHTML;
+            const chart = host.querySelector<SVGSVGElement>('[data-root-plane][data-plot-chart]');
+            check(chart && chart.querySelectorAll('circle').length >= 40,
+                  'The initial zeta plot reuses the completed worksheet batch');
+            const initialCount = chart.querySelectorAll('circle').length;
+            check([...chart.querySelectorAll('[data-series] > title')].every(title =>
+                      title.textContent!.includes('…') && title.textContent!.length < 110),
+                  'Root tooltips use shortened coordinates with an ellipsis');
+            for (const [id, value] of [['plotLower', '0'], ['plotUpper', '1'], ['plotScale', 'manual'],
+                                       ['plotYLower', '80'], ['plotYUpper', '100']])
+                (document.getElementById(id)! as HTMLInputElement).value = value;
+            await WorksheetRequests.plots.takePlot('z');
+            const expanded = host.querySelector<SVGSVGElement>('[data-root-plane][data-plot-chart]');
+            check(expanded && expanded.querySelectorAll('circle').length === 8 &&
+                  host.textContent!.includes(`${initialCount + 8} verified finite roots`),
+                  'Changing the imaginary viewport reveals eight newly calculated roots beyond height 80');
+            check(WorksheetContext.rendered.innerHTML === original,
+                  'Exploring further roots preserves the high-precision worksheet result');
+        } finally {
+            WorksheetWorkspace.mode.setMode(originalMode);
+            WorksheetWorkspace.presentation.syncModeUI();
+        }
+    }
+    async function checkIncrementalSolutionCard() {
+        const mode = WorksheetWorkspace.mode.currentMode();
+        const bits = labWire.exports().lab_workspace_requested_precision(1);
+        try {
+            WorksheetWorkspace.mode.setMode('equation');
+            WorksheetWorkspace.presentation.syncModeUI();
+            WorksheetBindings.controller.setExpressionEditor('zeta(z)=0');
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            await waitForAutomaticPlot();
+            const host = WorksheetContext.rendered;
+            const first = host.querySelector('svg');
+            const footer = host.querySelector<HTMLElement>('.solution-more');
+            check(first && footer?.textContent === '…', 'Only a native limited solution list gains an ellipsis');
+            footer.scrollIntoView({block: 'nearest'});
+            footer.click();
+            const scrollTop = host.scrollTop, scrollLeft = host.scrollLeft;
+            for (let attempt = 0; attempt < 1200 && !host.querySelector('.solution-page'); ++attempt)
+                await LabTestBrowser.wait(25);
+            check(host.querySelector('.solution-page svg') && host.querySelector('svg') === first,
+                  'Scrolling to the end appends new native mathematics without replacing earlier rows');
+            check(Math.abs(host.scrollTop - scrollTop) <= 1 && Math.abs(host.scrollLeft - scrollLeft) <= 1,
+                  'Appending a batch preserves both scroll coordinates');
+            check(WorksheetWorkspace.presentation.state.lastTex.includes('82.910380854086'),
+                  'Copy metadata includes the newly revealed roots at worksheet precision');
+            WorksheetResults.solutionPages.dispose();
+            const request = labDOM.call('lab_solution_pages_request', 1);
+            check(request, 'A current continuation admits one request');
+            check(!labDOM.call('lab_solution_pages_request', 1), 'Repeated scroll events cannot duplicate a request');
+            const before = host.innerHTML;
+            labDOM.call('lab_solution_pages_finish', request, {ok: false});
+            check(host.querySelector('svg') === first && host.querySelector('.solution-page svg'),
+                  'A failed continuation preserves every completed page');
+            const stale = labDOM.call('lab_solution_pages_request', 1);
+            WorksheetWorkspace.mode.setMode('expression');
+            check(!labDOM.call('lab_solution_pages_finish', stale, {ok: true, svg: '<svg></svg>',
+                       solution_page: 'yes', solutions_after: '104'}), 'Mode changes reject late solution pages');
+            check(host.querySelector('svg') === first && before.includes('solution-page'),
+                  'Stale completion does not replace earlier mathematics');
+            WorksheetWorkspace.presentation.syncModeUI();
+            WorksheetBindings.controller.setExpressionEditor('x+1');
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            check(!host.querySelector('.solution-more'), 'An ordinary TeX card never becomes an infinite solution list');
+            labWire.exports().lab_workspace_precision_set(1, 512);
+            WorksheetWorkspace.mode.setMode('equation');
+            WorksheetWorkspace.presentation.syncModeUI();
+            WorksheetBindings.controller.setExpressionEditor('zeta(z)=0');
+            await WorksheetWorkspace.mode.evaluateCurrentMode();
+            const highPrecisionFirst = host.querySelector('svg');
+            check(highPrecisionFirst, 'A high-precision zeta search publishes its small first batch');
+            let browserTurn = false;
+            window.setTimeout(() => { browserTurn = true; }, 0);
+            for (let attempt = 0; attempt < 1200 && !host.querySelector('.solution-page'); ++attempt)
+                await LabTestBrowser.wait(25);
+            check(browserTurn && host.querySelector('.solution-page svg') && host.querySelector('svg') === highPrecisionFirst,
+                  'Remaining initial roots arrive asynchronously without scrolling or replacing the first batch');
+        } finally {
+            WorksheetResults.solutionPages.dispose();
+            labWire.exports().lab_workspace_precision_set(1, bits);
+            WorksheetWorkspace.mode.setMode(mode);
+            WorksheetWorkspace.presentation.syncModeUI();
+        }
+    }
     async function checkDistributionPlot() {
         WorksheetBindings.controller.setExpressionEditor('@F{step(x)}');
         await WorksheetRequests.evaluation.evaluateExpression();
@@ -3308,6 +3403,8 @@
                 await runBrowserGroup('checkLabLocationFlow', window.checkLabLocationFlow);
                 await runBrowserGroup('checkLabLocationDom', window.checkLabLocationDom);
                 await runBrowserGroup('checkLabRequests', window.checkLabRequests);
+                await runBrowserGroup('zeta root viewport expansion', checkZetaPlotExpansion);
+                await runBrowserGroup('incremental solution card', checkIncrementalSolutionCard, 120000);
                 await report('PASS: asynchronous result installation, drawing opportunities and stale-request rejection');
                 return;
             }

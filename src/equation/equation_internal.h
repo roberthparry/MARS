@@ -161,6 +161,13 @@ expr_bindings_t *equ_bindings_borrow(const equation_t *equation);
 int equ_try_search_zeta_roots(const equation_t *equation, equation_solutions_t *solutions);
 
 /**
+ * @brief Allocate an empty equation-owned solution collection for a native solving strategy.
+ * @return Independently owned empty collection, released with equ_solutions_free(), or NULL on allocation failure.
+ * No graph or numeric state is retained or changed; independent allocations may run concurrently.
+ */
+equation_solutions_t *equ_solutions_new(void);
+
+/**
  * @brief Create an owned equation notation snapshot, released with TeX_context_free.
  * @param value Borrowed matrix or equation to copy into the semantic snapshot; the source remains unchanged.
  * @return Owned rendering context released with TeX_context_free, or NULL on invalid input or failure.

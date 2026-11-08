@@ -267,6 +267,7 @@ void lab_result_matrix_value(jsref caches, jsref data)
 /* Invalidate pending digit renders whenever the owning result changes. */
 void lab_result_render_invalidate(void)
 {
+    lab_dom_delete(lab_dom_query(0, "#rendered"), "labSolutionPages");
     lab_dom_delete(lab_dom_query(0, "#rendered"), "labResultRenderRequest");
     lab_dom_disabled(lab_dom_query(0, "#renderedMore"), 0);
 }
@@ -526,6 +527,9 @@ void lab_result_copy(jsref target, jsref last_TeX)
     if (lab_dom_equal(target, lab_dom_string("rendered"))) {
         int rendered = lab_dom_query(0, "#rendered");
         text = lab_dom_has_class(rendered, "error") ? lab_dom_read(rendered, LAB_DOM_TEXT, "") : last_TeX;
+        int pages = lab_dom_get(rendered, "labSolutionPages");
+        if (pages)
+            text = lab_dom_join_array(lab_dom_get(pages, "copies"), "\n\n");
         if (!lab_dom_has_class(rendered, "error")) {
             int latitude = lab_dom_query(rendered, ".almanac-summary [data-coordinate=\"latitude\"]");
             int longitude = lab_dom_query(rendered, ".almanac-summary [data-coordinate=\"longitude\"]");

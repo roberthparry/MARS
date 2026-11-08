@@ -3435,16 +3435,38 @@ sides of a one-free-variable equation as separately coloured curves on common ax
 represent real solutions within the plotted range. If the completed solve instead finds finite non-real roots,
 the plot shows its numerical solutions as unconnected points with `Re(z)` and `Im(z)` axes (using the selected
 variable name). Both members of a conjugate pair are plotted. Hover over a point for its numerical value;
-zoom, pan, expand and copy work on this diagram too. The horizontal range has a minimum initial width of one,
+tooltips show at most 30 significant digits, or 15 for double-precision previews, with an ellipsis to indicate
+an abbreviated decimal. The worksheet solution cards retain their selected precision.
+Zoom, pan, expand and copy work on this diagram too. The horizontal range has a minimum initial width of one,
 so tiny numerical differences around a common real part do not become exaggerated. The root values are never
 forced onto a line. The caption reports the number found; it does not claim the finite search is exhaustive.
-For `zeta(z)=0`, the current search supplies 40 points: 20 positive ordinates and their conjugates. The separate
+For `zeta(z)=0`, the plot reuses the first completed worksheet batch, including both conjugates. Panning or
+zooming to expose new imaginary-height bands searches those bands asynchronously, using double precision
+during a drag preview and 31-digit working precision for the completed view. The original roots are reused;
+newly plotted roots do not change the worksheet solutions. Requests are limited to 96 new roots per band,
+256 retained points and imaginary heights within ±10000; a caption identifies a reached search limit.
+Repeated identical views use the existing plot cache. The separate
 exact family of negative-even trivial zeros remains in the solution notes. Symbolic infinite families are not
 sampled to invent a finite root set, and diagrams are limited to 256 roots. Real-only equations retain their
 curve plots. The completed solve supplies the point data directly, without repeating the solve for plotting
 or viewport changes. Select one equation variable
 and bind any remaining parameters. The equation in the editor is unchanged.
-With exactly two unset variable bindings, it instead draws the real zero contour
+
+The Rendered TeX card can also extend a **limited numerical solution list**, when the native solver supplies
+a continuation. This currently applies to non-trivial zeta zeros, not ordinary finite solution sets, symbolic
+families or other TeX cards. An ellipsis at the end means more results are available: scroll down, or activate
+the ellipsis, to calculate another batch asynchronously. Existing rows stay visible and retain their scroll
+position. Every new row uses the worksheet's selected precision, independently of the shorter plot tooltips.
+Copy includes all loaded pages as separate TeX display blocks.
+
+At higher precision, the first zeta response contains a smaller batch instead of waiting for forty roots in
+one request. Background requests then fill the initial search range through imaginary height 80. Beyond
+that range, scrolling requests further batches. Editing the equation, changing precision, reevaluating or
+switching modes invalidates obsolete continuations. A failed later request preserves earlier results and
+allows retry through the ellipsis. A card is bounded to 128 pages and imaginary height 10000; this exploration
+does not certify completeness or turn the infinite set of zeros into a completed finite solution set.
+
+For an equation with exactly two unset variable bindings, the plot instead draws the real zero contour
 of the residual in their coordinate plane. For example, evaluating `x^2+y^2=1`
 produces a unit circle centred at the origin, with both coordinate ranges initially
 about −1.2 to 1.2. This is a curve, not a height surface. The first-axis choice

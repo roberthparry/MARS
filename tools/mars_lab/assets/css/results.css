@@ -445,6 +445,33 @@ pre {
   min-height: 1px;
 }
 
+.solution-page-heading {
+  color: var(--accent);
+  margin-bottom: 1rem;
+}
+
+#rendered:has(.solution-more) {
+  overflow-anchor: none;
+}
+
+#rendered:has(.solution-more) > .rendered-zoom-frame {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.solution-more {
+  display: block;
+  padding: 0.25rem 0.5rem;
+  color: var(--accent);
+  background: transparent;
+  box-shadow: none;
+  font-size: 1.6rem;
+}
+
+.solution-more[aria-busy="true"] {
+  opacity: 0.65;
+}
+
 .rendered svg:where(:not(.almanac-body-symbol):not(.almanac-eclipse-symbol)) {
   display: block;
   max-width: none;

@@ -78,6 +78,10 @@ void lab_evaluation_render(lab_mode_t mode, jsref data, bool expandable)
                          : mode == LAB_MODE_INTEGRATOR && lab_dom_truth(shown) && lab_dom_truth(full) &&
                                !lab_dom_equal(shown, full);
     lab_layout_more(lab_dom_query(0, "#renderedMore"), can_expand);
+    if (mode == LAB_MODE_EQUATION && lab_dom_equal(lab_dom_get(data, "solution_page"), lab_dom_string("yes"))) {
+        lab_solution_pages_install(data);
+        last = lab_dom_get(data, "solution_copy_TeX");
+    }
     lab_dom_return(last);
 }
 

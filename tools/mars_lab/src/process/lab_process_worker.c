@@ -63,7 +63,8 @@ bool lab_proc_run_worker(const char *const argv[], const char *cwd, const string
                 (!strcmp(argv[18], "equation") || !strcmp(argv[18], "diffequation"));
     string_t *plot_key = plot ? lab_proc_plot_key(argv, cwd, path, false) : NULL;
     string_t *prepared_key = plot_key ? lab_proc_plot_key(argv, cwd, path, true) : NULL;
-    bool equation = !external && !input && count == 3 && !strcmp(argv[0], "equation_lab");
+    bool equation = !external && !input && !strcmp(argv[0], "equation_lab") &&
+                    (count == 3 || (count == 5 && !strcmp(argv[3], "--solution-pages") && !strcmp(argv[4], "0")));
     string_t *equation_key = equation ? lab_proc_plot_key(argv, cwd, path, false) : NULL;
     string_t *prepared = NULL;
     lab_proc_cancel_context_t cancel = lab_proc_cancel_context();

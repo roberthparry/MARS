@@ -15,6 +15,91 @@
  */
 
 namespace WorksheetResults {
+    /** @brief Browser transport and visibility resources for native resumable solution cards. */
+    class SolutionPageController {
+        private lifetime: AbortController | null = null;
+        private pending: AbortController | null = null;
+        private request: {payload: unknown} | null = null;
+        private observer: IntersectionObserver | null = null;
+        private visible = false;
+        private timer = 0;
+
+        /** @brief Resume browser resources when the page returns from the browser's navigation cache. */
+        constructor() {
+            window.addEventListener('pageshow', event => { if (event.persisted) this.install(); });
+        }
+
+        /** @brief Replace owned browser resources after C installs a result capability. */
+        install(): void {
+            this.dispose();
+            if (!labDOM.call('lab_solution_pages_valid')) return;
+            const lifetime = this.lifetime = new AbortController();
+            window.addEventListener('pagehide', () => this.dispose(), {once: true, signal: lifetime.signal});
+            const host = WorksheetContext.rendered;
+            const footer = host.querySelector<HTMLElement>('.solution-more');
+            if (!footer) return;
+            this.observer = new IntersectionObserver(entries => {
+                this.visible = entries.some(entry => entry.isIntersecting);
+                if (this.visible) void this.load(true);
+            }, {rootMargin: '100px'});
+            this.observer.observe(footer);
+            host.addEventListener('scroll', () => { if (this.visible) void this.load(true); },
+                                  {passive: true, signal: lifetime.signal});
+            footer.addEventListener('click', () => { void this.load(true); }, {signal: lifetime.signal});
+            this.timer = window.setInterval(() => {
+                if (!labDOM.call('lab_solution_pages_valid')) this.dispose();
+            }, 250);
+            void this.load(false);
+        }
+
+        private async load(visible: boolean): Promise<void> {
+            const lifetime = this.lifetime;
+            if (!lifetime || lifetime.signal.aborted || this.pending) return;
+            const request = labDOM.call('lab_solution_pages_request', Number(visible)) as
+                {payload: unknown} | null;
+            if (!request) return;
+            this.request = request;
+            const controller = this.pending = new AbortController();
+            let data: unknown = null;
+            try {
+                const response = await labHttp.fetch('/equation-eval', {
+                    method: 'POST', body: labWire.encode(request.payload), signal: controller.signal
+                });
+                data = await response.labData();
+            } catch (error) {
+                if (controller.signal.aborted) return;
+            } finally {
+                if (this.pending === controller) this.pending = null;
+            }
+            if (lifetime.signal.aborted || this.lifetime !== lifetime) return;
+            const copy = labDOM.call('lab_solution_pages_finish', request, data) as string | null;
+            if (this.request === request) this.request = null;
+            if (copy) {
+                WorksheetWorkspace.presentation.state.lastTex = copy;
+                window.setTimeout(() => {
+                    if (!lifetime.signal.aborted) void this.load(false);
+                }, 0);
+            }
+        }
+
+        /** @brief Abort only this continuation's work, observers and liveness timer. */
+        dispose(): void {
+            this.lifetime?.abort();
+            if (this.request) labDOM.call('lab_solution_pages_finish', this.request, null);
+            this.request = null;
+            this.pending?.abort();
+            this.pending = this.lifetime = null;
+            this.observer?.disconnect();
+            this.observer = null;
+            clearInterval(this.timer);
+            this.timer = 0;
+            this.visible = false;
+        }
+    }
+
+    /** @brief Page-lifetime browser resources; all solution policy remains in native C. */
+    export const solutionPages = new SolutionPageController();
+
     /** @brief Native result workflow identifiers from the lab_flow result-action range. */
     const enum ResultFlowKind {
         reuseInput = 56,

@@ -85,6 +85,7 @@ namespace WorksheetResults {
         render(mode: WorksheetMode, data: WorksheetEvaluationData, expandable: unknown) {
             const text = labDOM.call('lab_evaluation_render', mode, data, Number(Boolean(expandable))) as string;
             WorksheetWorkspace.presentation.state.lastTex = text;
+            WorksheetResults.solutionPages.install();
             return text;
         },
 

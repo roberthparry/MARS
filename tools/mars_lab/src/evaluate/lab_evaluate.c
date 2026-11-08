@@ -439,8 +439,16 @@ json_t *lab_eval_request(const string_t *route, const json_t *payload, unsigned 
         valid = lab_eval_goal_arguments(&args, payload, string_c_str(digits));
     else if (valid && !strcmp(entry->mode, "integrator"))
         valid = lab_eval_argument(&args, string_c_str(digits)) && lab_eval_integrator_bounds(&args, payload);
-    else if (valid && !strcmp(entry->mode, "equation"))
+    else if (valid && !strcmp(entry->mode, "equation")) {
         valid = lab_eval_argument(&args, string_c_str(digits));
+        bool pages = false;
+        const json_t *paging = lab_eval_get(payload, "solution_pages");
+        if (paging && !json_bool_value(paging, &pages))
+            valid = false;
+        if (valid && pages)
+            valid = lab_eval_argument(&args, "--solution-pages") &&
+                    lab_eval_argument_member(&args, payload, "solutions_after", "0", true);
+    }
 
     json_t *result = NULL;
     string_t *output = NULL;

@@ -5,6 +5,8 @@
  * The opaque equation_t type represents two expressions joined by equality, with
  * optional symbol bindings. The API supports constructing and parsing equations,
  * inspecting their sides, formatting them and obtaining solution collections.
+ * A separate bounded zeta-zero search supports interactive imaginary-height windows at the current precision
+ * without replacing an independently derived solution collection.
  *
  * Use this module to solve algebraic constraints rather than merely evaluate an
  * expression. Supported symbolic and polynomial paths retain exact values and
@@ -197,6 +199,25 @@ equation_solutions_t *equ_derive_solutions(const equation_t *equation);
  * Search notes and completeness status are preserved. Recompute from the original problem after changes.
  */
 equation_solutions_t *equ_derive_solutions_with_context(const equation_t *equation, const expr_context_t *context);
+
+/**
+ * @brief Search a finite imaginary-height window for non-trivial zeros of an affine Riemann-zeta equation.
+ * @param[in] equation Borrowed equation with one variable and a real affine zero target in zeta(variable).
+ * @param[in] lower Borrowed finite real lower imaginary coordinate, at least -10000.
+ * @param[in] upper Borrowed finite real upper imaginary coordinate, at most 10000 and greater than lower.
+ * @param maximum Maximum number of returned roots, from one to 256.
+ * @param[out] limited Optional flag set when the root or candidate budget prevents searching the complete window.
+ * @return Owned numerical solutions released with equ_solutions_free(), or NULL with EINVAL for invalid bounds
+ * or limits, ENOTSUP for an unsupported equation or an uncontinued inverse-power series, ENOMEM on allocation
+ * failure, or ECANCELED when the active computation scope stops. Failure discards partial roots.
+ * Uses the current number precision, Lambert W estimates and complex Newton refinement with the native derivative.
+ * Every returned value passes the original residual check and lies strictly inside the critical strip. Real parts
+ * are not constrained to one half. The bounded search does not certify completeness, and trivial real zeros are
+ * excluded. Authored bindings and the default precision are restored; do not solve the same graph concurrently.
+ * Low precision is suitable for interactive previews; it does not alter separately derived worksheet solutions.
+ */
+equation_solutions_t *equ_search_zeta_zeros(const equation_t *equation, number_t lower, number_t upper,
+                                         size_t maximum, bool *limited);
 
 /**
  * @brief Return the number of solutions currently stored in @p solutions.

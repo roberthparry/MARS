@@ -639,7 +639,9 @@
         "test_equation_zeta_high_precision_starts": true,
         "test_equation_zeta_level_search": true,
         "test_equation_zeta_nontrivial_search": true,
-        "test_equation_zeta_search_cancellation": true
+        "test_equation_zeta_search_cancellation": true,
+        "test_equation_zeta_window_limits": true,
+        "test_equation_zeta_window_search": true
       },
       "test_equation_future_solver_cases": {
         "enabled": true,
@@ -2805,6 +2807,7 @@
       "docs_equation_003": true,
       "docs_equation_004": true,
       "docs_equation_005": true,
+      "docs_equation_016": true,
       "docs_executor_001": true,
       "docs_executor_002": true,
       "docs_expression_001": true,
@@ -3997,7 +4000,9 @@
       "enabled": true,
       "test_lab_equation_complex_solution_plot": true,
       "test_lab_equation_evaluation_plot_reuse": true,
-      "test_lab_plot_cache": true
+      "test_lab_equation_solution_pages": true,
+      "test_lab_plot_cache": true,
+      "test_lab_zeta_plot_window": true
     }
   },
   "tools/mars_lab/tests/test_lab_presentation.c": {

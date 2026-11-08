@@ -22,7 +22,10 @@
  * /integrator-eval, /function-run, /goal_seek and /render_TeX. Inputs are
  * bounded to 64 KiB per string, precision to 17–78914 decimal digits (10000
  * for Ophelia, which has that native limit), and
- * worker output to 4 MiB. Workers have individual bounded execution times.
+ * worker output to 8 MiB. Workers have individual bounded execution times.
+ * Equation requests may set solution_pages to true and supply an opaque solutions_after cursor. Only supported
+ * limited numerical searches return a continuation; ordinary equations retain their existing solve behaviour.
+ * Each continuation is an independent bounded worker request at the supplied worksheet precision.
  * Unknown routes return NULL without changing status, permitting dispatch to
  * other adapters. Recognised invalid requests return 400; worker failures return
  * 422. Optional rendering failures do not discard mathematical results.

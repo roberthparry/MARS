@@ -1875,19 +1875,23 @@ static int number_mpc_digamma_mut(mpc_ptr out, mpc_srcptr z, mpc_rnd_t rnd)
     return rc;
 }
 
-/* Extend the finite sum at higher precision before exhausting the bounded Bernoulli correction table. */
-static unsigned long number_zeta_sum_terms(mpfr_prec_t precision)
+/* Scale the finite sum once for accuracy and oscillation before using bounded Bernoulli corrections. */
+static unsigned long number_zeta_sum_terms(mpfr_prec_t precision, mpc_srcptr argument)
 {
-    return 128ul + (precision > 512 ? (unsigned long)(precision - 512) / 2ul : 0ul);
+    unsigned long accuracy = 128ul + (precision > 512 ? (unsigned long)(precision - 512) / 2ul : 0ul);
+    double height = fabs(mpfr_get_d(mpc_imagref(argument), MPFR_RNDU));
+    unsigned long oscillation = isfinite(height) ? 64ul + (unsigned long)fmin(131072.0, ceil(height / 2.0))
+                                                 : 128ul;
+    return accuracy > oscillation ? accuracy : oscillation;
 }
 
 static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_derivative, mpc_rnd_t rnd)
 {
     mpfr_prec_t target_prec = mpc_get_prec(out);
     mpfr_prec_t work_prec = target_prec + 128;
-    unsigned long endpoint = number_zeta_sum_terms(target_prec);
+    const unsigned long endpoint = number_zeta_sum_terms(target_prec, s);
     mpc_t sum, derivative, term, factor, rising, rising_derivative, power, power_step, s_minus_one, temporary;
-    mpfr_t magnitude, log_n, log_endpoint, bernoulli, factorial;
+    mpfr_t log_n, log_endpoint, bernoulli, factorial;
     bool converged = false;
     int rc = 0;
 
@@ -1901,11 +1905,8 @@ static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_
     mpc_init2(power_step, work_prec);
     mpc_init2(s_minus_one, work_prec);
     mpc_init2(temporary, work_prec);
-    mpfr_inits2(work_prec, magnitude, log_n, log_endpoint, bernoulli, factorial, (mpfr_ptr)0);
+    mpfr_inits2(work_prec, log_n, log_endpoint, bernoulli, factorial, (mpfr_ptr)0);
 
-    mpc_abs(magnitude, s, MPFR_RNDN);
-    if (mpfr_number_p(magnitude) && mpfr_cmp_ui(magnitude, 32u) > 0 && mpfr_cmp_ui(magnitude, 4096u) < 0)
-        endpoint += 2ul * mpfr_get_ui(magnitude, MPFR_RNDU);
     mpfr_log_ui(log_endpoint, endpoint, MPFR_RNDN);
     mpc_set_ui(sum, 0u, MPC_RNDNN);
     mpc_set_ui(derivative, 0u, MPC_RNDNN);
@@ -2010,7 +2011,7 @@ static int number_mpc_zeta_euler_maclaurin(mpc_ptr out, mpc_srcptr s, bool want_
         mpc_set(out, want_derivative ? derivative : sum, rnd);
 
 done:
-    mpfr_clears(magnitude, log_n, log_endpoint, bernoulli, factorial, (mpfr_ptr)0);
+    mpfr_clears(log_n, log_endpoint, bernoulli, factorial, (mpfr_ptr)0);
     mpc_clear(temporary);
     mpc_clear(s_minus_one);
     mpc_clear(power_step);
@@ -2039,7 +2040,7 @@ static int number_mpc_zetah_euler_maclaurin(mpc_ptr out, mpc_srcptr s, mpc_srcpt
 {
     mpfr_prec_t target_prec = mpc_get_prec(out);
     mpfr_prec_t work_prec = target_prec + 128;
-    const unsigned long term_count = number_zeta_sum_terms(target_prec);
+    const unsigned long term_count = number_zeta_sum_terms(target_prec, s);
     mpc_t sum, derivative, base, log_base, term, factor, rising, rising_derivative, power, s_minus_one;
     mpc_t endpoint, log_endpoint, temporary, power_step;
     mpfr_t bernoulli, factorial;

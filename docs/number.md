@@ -1096,7 +1096,9 @@ The native Euler–Maclaurin zeta paths reuse successive rising products and
 endpoint powers, and omit derivative work for value-only calls. This also
 applies to Hurwitz zeta. Above 512 working bits, their finite sums grow with
 precision instead of retaining a fixed 128-term length. Both value and derivative
-paths retain their convergence checks and bounded Bernoulli corrections; an
+paths also extend the finite sum with the magnitude of the imaginary argument, so higher zero-search windows
+do not retain a summation length suited only to small heights. Both paths retain their convergence checks and
+bounded Bernoulli corrections; an
 exhausted correction allowance still returns NaN rather than an unchecked value.
 Arbitrary-precision real Riemann zeta continues to use MPFR.
 

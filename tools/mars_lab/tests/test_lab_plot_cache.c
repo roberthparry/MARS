@@ -18,6 +18,8 @@
 
 #include "json-t.h"
 #include "lab_process.h"
+#define MARS_SHARED_LAB_EVALUATE_INTERNAL_ACCESS
+#include "internal/lab_evaluate_internal.h"
 #include "test_harness.h"
 #include "test_lab_support.h"
 #define MARS_LAB_PROCESS_INTERNAL_ACCESS
@@ -234,6 +236,121 @@ static size_t occurrences(const string_t *text, const char *needle)
     return count;
 }
 
+static bool zeta_window_checks(const char *directory)
+{
+    (void)directory;
+    unsetenv("MARS_LAB_BINARY");
+    unsetenv("MARS_LAB_EQUATION_BINARY");
+    unsetenv("MARS_LAB_PLOT_CACHE");
+    unsetenv("MARS_LAB_WORK_LIMIT");
+    lab_proc_plot_cache_init();
+    const char *equation[] = {"equation_lab", "zeta(z)=0", "78", NULL};
+    const char *plot[] = {"mars_lab", equation[1], "z", equation[2], "plot", "0", "1", "manual", "80", "100",
+                          "curve", "", "", "", "315", "30", "0", "preview", "equation", NULL};
+    string_t *solved = NULL;
+    int status = -1;
+    bool ok = lab_proc_run_worker(equation, NULL, NULL, 30000, plot_output_limit, &solved, &status) &&
+              !status && solved && strstr(string_c_str(solved), "numeric_indices 39\n");
+    string_t *path = lab_proc_worker_path("mars_lab");
+    string_t *key = path ? lab_proc_plot_key(plot, NULL, path, true) : NULL;
+    string_t *before = key ? lab_proc_plot_cache_get(key, true) : NULL;
+    for (unsigned pass = 0; ok && pass < 3; ++pass) {
+        plot[17] = pass ? "full" : "preview";
+        if (pass == 2) {
+            plot[8] = "-100";
+            plot[9] = "-80";
+        }
+        double seconds = 0;
+        string_t *drawn = run(plot, 30000, &seconds);
+        ok = drawn && occurrences(drawn, "<circle ") == 8 &&
+             strstr(string_c_str(drawn), "48 verified finite roots") &&
+             strstr(string_c_str(drawn), "…i</title>") &&
+             strstr(string_c_str(drawn), "82.910380854086");
+        const char *cursor = drawn ? string_c_str(drawn) : "";
+        /* Tooltips abbreviate coordinates; the retained worksheet protocol must keep all 78 digits. */
+        while (ok && (cursor = strstr(cursor, "<title>z ≈ "))) {
+            const char *end = strstr(cursor, "</title>");
+            ok = end && end - cursor < 110;
+            if (end)
+                cursor = end + 8;
+        }
+        string_t *after = key ? lab_proc_plot_cache_get(key, true) : NULL;
+        ok = ok && equal(before, after);
+        printf("Zeta plot %s, band %s..%s: %.4fs\n", plot[17], plot[8], plot[9], seconds);
+        fflush(stdout);
+        if (!ok && drawn)
+            fprintf(stderr, "Zeta viewport diagnostic: %.500s\n", string_c_str(drawn));
+        string_free(after);
+        string_free(drawn);
+    }
+    string_free(before);
+    string_free(key);
+    string_free(path);
+    string_free(solved);
+    return ok;
+}
+
+static void test_lab_zeta_plot_window(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(zeta_window_checks),
+                     "zeta plot expands at display precision, abbreviates tooltips and preserves the completed solve");
+}
+
+static json_t *solution_page_request(const char *source, unsigned precision, const char *after, unsigned *status)
+{
+    string_t *route = string_new_with("/equation-eval");
+    string_t *text = string_sprintf("{\"equation\":\"%s\",\"precision\":%u,\"solution_pages\":true,"
+                                    "\"solutions_after\":\"%s\"}", source, precision, after);
+    json_t *payload = text ? json_from_text(text) : NULL;
+    json_t *result = payload ? lab_eval_request(route, payload, status) : NULL;
+    json_free(payload);
+    string_free(text);
+    string_free(route);
+    return result;
+}
+
+static bool solution_page_checks(const char *directory)
+{
+    (void)directory;
+    unsetenv("MARS_LAB_BINARY");
+    unsetenv("MARS_LAB_EQUATION_BINARY");
+    unsetenv("MARS_LAB_WORK_LIMIT");
+    unsetenv("MARS_LAB_PLOT_CACHE");
+    lab_proc_plot_cache_init();
+    unsigned status = 0;
+    json_t *first = solution_page_request("zeta(z)=0", 156, "0", &status);
+    bool ok = status == 200 && !strcmp(lab_eval_text(first, "solution_page"), "yes") &&
+              !strcmp(lab_eval_text(first, "solutions_after"), "16") &&
+              !strcmp(lab_eval_text(first, "solutions_background"), "yes") &&
+              json_array_size(lab_eval_get(first, "numeric_solutions")) == 2 &&
+              strstr(lab_eval_text(first, "display_TeX"), "14.134725141734693790457251983562470270784257115699");
+    json_t *next = solution_page_request("zeta(z)=0", 156, "16", &status);
+    ok = ok && status == 200 && !strcmp(lab_eval_text(next, "solutions_after"), "24") &&
+         strstr(lab_eval_text(next, "display_TeX"), "21.022039638771554992628479593896902777334340524902");
+    json_t *later = solution_page_request("zeta(z)=0", 78, "80", &status);
+    ok = ok && status == 200 && !strcmp(lab_eval_text(later, "solutions_after"), "88") &&
+         !strcmp(lab_eval_text(later, "solutions_background"), "no") &&
+         strstr(lab_eval_text(later, "display_TeX"), "82.910380854086");
+    json_t *ordinary = solution_page_request("x^2=4", 78, "0", &status);
+    ok = ok && status == 200 && !*lab_eval_text(ordinary, "solution_page") &&
+         json_array_size(lab_eval_get(ordinary, "numeric_solutions")) == 2;
+    json_t *invalid = solution_page_request("zeta(z)=0", 78, "nan", &status);
+    ok = ok && status == 422;
+    if (!ok) {
+        string_t *detail = json_to_string(first);
+        fprintf(stderr, "Solution page diagnostic: %.1200s\n", detail ? string_c_str(detail) : "no response");
+        string_free(detail);
+    }
+    json_free(invalid); json_free(ordinary); json_free(later); json_free(next); json_free(first);
+    return ok;
+}
+
+static void test_lab_equation_solution_pages(void)
+{
+    TEST_ASSERT_TRUE(test_lab_isolated(solution_page_checks),
+                     "limited zeta cards retain worksheet precision and continue without repeating earlier pages");
+}
+
 static bool complex_solution_checks(const char *directory)
 {
     (void)directory;
@@ -302,4 +419,6 @@ void test_lab_plot_cache_cases(void)
     TEST_RUN_IN_GROUP(test_lab_plot_cache, tests, "plot,cache");
     TEST_RUN_IN_GROUP(test_lab_equation_evaluation_plot_reuse, tests, "plot,cache,equation");
     TEST_RUN_IN_GROUP(test_lab_equation_complex_solution_plot, tests, "plot,equation");
+    TEST_RUN_IN_GROUP(test_lab_zeta_plot_window, tests, "plot,equation");
+    TEST_RUN_IN_GROUP(test_lab_equation_solution_pages, tests, "equation,continuation");
 }

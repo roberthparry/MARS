@@ -143,6 +143,7 @@ static void lab_payload_equation(jsref payload, jsref inputs, jsref request, dou
     (void)request;
     (void)updated_at;
     lab_dom_set(payload, "equation", lab_payload_editor_source(inputs));
+    lab_dom_set(payload, "solution_pages", lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
 }
 
 static void lab_payload_diffequation(jsref payload, jsref inputs, jsref request, double updated_at)

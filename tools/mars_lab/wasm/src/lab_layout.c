@@ -65,16 +65,8 @@ double lab_layout_markup_width(jsref markup)
     return width > 0 ? width : lab_dom_measure(svg, LAB_DOM_MEASURE_VIEWBOX_WIDTH);
 }
 
-static void lab_layout_frame(jsref card, double scale, double zoom)
+static void lab_layout_frame(jsref card, jsref frame, double scale, double zoom)
 {
-    if (lab_dom_query(card, ".complex-grid")) {
-        int buttons = lab_dom_all(card, ".complex-panel button");
-        for (unsigned i = 0; i < lab_dom_count(buttons); ++i)
-            lab_dom_listen(lab_dom_item(buttons, i), "click", 31, 0);
-        lab_plot_controls_sync();
-        return;
-    }
-    int frame = lab_dom_query(card, ".rendered-zoom-frame");
     int svg = frame ? lab_dom_query(frame, "svg") : 0;
     if (!svg)
         return;
@@ -143,7 +135,17 @@ void lab_layout_zoom(jsref card)
     lab_layout_number(card, LAB_DOM_STYLE, "--render-font-size", render_font, "rem");
     lab_layout_number(card, LAB_DOM_STYLE, "--render-zoom", scale, "");
     lab_layout_number(card, LAB_DOM_STYLE, "--render-margin-bottom", margin, "rem");
-    lab_layout_frame(card, scale, zoom);
+    if (lab_dom_query(card, ".complex-grid")) {
+        int buttons = lab_dom_all(card, ".complex-panel button");
+        for (unsigned i = 0; i < lab_dom_count(buttons); ++i)
+            lab_dom_listen(lab_dom_item(buttons, i), "click", 31, 0);
+        lab_plot_controls_sync();
+    } else {
+        /* Each independently appended page needs its own geometry; there are at most 128 solution pages. */
+        int frames = lab_dom_all(card, ".rendered-zoom-frame");
+        for (unsigned i = 0; i < lab_dom_count(frames); ++i)
+            lab_layout_frame(card, lab_dom_item(frames, i), scale, zoom);
+    }
     int buttons = lab_dom_all(card, "[data-zoom-reset]");
     for (unsigned i = 0; i < lab_dom_count(buttons); ++i) {
         int button = lab_dom_item(buttons, i);

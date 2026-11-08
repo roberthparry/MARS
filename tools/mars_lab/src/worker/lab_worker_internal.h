@@ -94,16 +94,27 @@ string_t *lab_worker_equation_plot_solutions(const equation_t *equation, int pre
  * @brief Render finite equation roots as unconnected points in their complex coordinate plane.
  * @param[in] roots Borrowed finite numerical values; at least one must be non-real.
  * @param count Number of values, from one to 256.
+ * @param[in] equation Borrowed original equation, used to extend supported zero searches outside the retained roots.
  * @param[in] axis Borrowed variable name used in the real and imaginary axis labels.
  * @param[in] title Borrowed plain-text authored equation title.
  * @param[in] TeX Borrowed native TeX equation title, or NULL to omit it.
  * @param[in] argv Borrowed validated solver-plot arguments; horizontal and manual vertical limits define the viewport.
  * @return Zero after emitting a native SVG and explanatory caption, or one on invalid bounds, invalid roots or
  * allocation failure. Inputs remain caller-owned, are not retained, and numerical precision is restored on return.
- * No function evaluation or root solving occurs; use only within an isolated calculation process.
+ * Retained roots are never solved again. Newly exposed bands of supported zeta equations use display-precision
+ * searches; worksheet solutions are unchanged. Use only within an isolated calculation process.
  */
-int lab_worker_plot_roots(const number_t *roots, size_t count, const char *axis, const char *title,
-                           const char *TeX, char **argv);
+int lab_worker_plot_roots(const number_t *roots, size_t count, const equation_t *equation,
+                         const char *axis, const char *title, const char *TeX, char **argv);
+
+/**
+ * @brief Emit one bounded, resumable page of verified zeta-zero conjugate pairs at worksheet precision.
+ * @param argc Number of validated arguments, at least five: worker, source, precision, flag and height cursor.
+ * @param argv Borrowed NUL-terminated argument vector; no pointers are retained or modified.
+ * @return Zero on success, one on failure, or two when an initial equation is unsupported and ordinary solving
+ * should be used. The calculation owns and releases its equation, roots and notation. Run in an isolated worker.
+ */
+int lab_worker_equation_pages(int argc, char **argv);
 
 /** @brief Build up to sixteen labelled representative ODE curves, varying only generated integration constants. */
 bool lab_worker_plot_family(expr_bindings_t *authored, const char *axis, const expr_t *const *branches,

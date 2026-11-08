@@ -220,7 +220,7 @@ int lab_worker_solver_plot(int argc, char **argv)
         lab_plot_prepared_t *prepared = lab_worker_plot_prepared_read(argc, argv);
         if (prepared && prepared->count == 2 && !prepared->family) {
             int rc = prepared->root_count
-                ? lab_worker_plot_roots(prepared->roots, prepared->root_count, axis,
+                ? lab_worker_plot_roots(prepared->roots, prepared->root_count, equ, axis,
                                          string_c_str(prepared->title), string_c_str(prepared->TeX), argv)
                 : plot_curves(argv[1], string_c_str(prepared->title), string_c_str(prepared->TeX), axis,
                                 (const expr_t *const *)prepared->curves, NULL, 2, true, false, argv);
@@ -235,7 +235,7 @@ int lab_worker_solver_plot(int argc, char **argv)
         size_t root_count = 0;
         number_t *roots = NULL;
         string_t *numeric = lab_worker_equation_plot_solutions(equ, atoi(argv[3]), &roots, &root_count);
-        int rc = root_count ? lab_worker_plot_roots(roots, root_count, axis, argv[1], title, argv)
+        int rc = root_count ? lab_worker_plot_roots(roots, root_count, equ, axis, argv[1], title, argv)
                            : plot_curves(argv[1], argv[1], title, axis, curves, NULL, 2, true, false, argv);
         if (!rc) {
             if (numeric) {

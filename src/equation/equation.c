@@ -84,7 +84,8 @@ static void equ_solutions_reset(equation_solutions_t *solutions)
     solutions->search_kind = EQUATION_SEARCH_NONE;
 }
 
-static equation_solutions_t *equ_solutions_new(void)
+/* Share an empty owning collection with the module's bounded numerical search strategies. */
+equation_solutions_t *equ_solutions_new(void)
 {
     equation_solutions_t *solutions = calloc(1u, sizeof(*solutions));
 
