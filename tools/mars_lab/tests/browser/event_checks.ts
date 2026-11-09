@@ -210,7 +210,8 @@ window.checkLabEvents = function checkLabEvents(): boolean {
         const expectedRefresh = [
             'saveState,clearGoalSeekRequest,setSource,scheduleEditedExpressionBindingRefresh',
             'refreshVariableValuesFromEditor,saveState,updateHistoryButtons',
-            'setSource,setSource,updateHistoryButtons', 'refreshVariableValuesFromEditor,updateHistoryButtons',
+            'clearVariableValues,setSource,setSource,refreshVariableValuesFromEditor,updateHistoryButtons',
+            'refreshVariableValuesFromEditor,updateHistoryButtons',
             'refreshVariableValuesFromEditor,updateHistoryButtons', 'setModeEditor,updateHistoryButtons',
             'updateHistoryButtons'
         ];
@@ -221,6 +222,8 @@ window.checkLabEvents = function checkLabEvents(): boolean {
                     let expected = expectedRefresh[mode];
                     if (!mode && unchanged)
                         expected = 'saveState,cancelBindingRefresh,markBindingRefresh,updateHistoryButtons';
+                    if (mode === 2 && unchanged)
+                        expected = 'updateHistoryButtons';
                     if (!bound && [1, 3, 4].includes(mode))
                         expected = 'setSource,setSource,' + expected;
                     check(names(refresh) === expected, 'native refresh service order for mode ' + mode);
@@ -277,6 +280,7 @@ window.checkLabEvents = function checkLabEvents(): boolean {
             clearTimeout: window.clearTimeout,
             bindingParts: WorksheetBindings.editor.bindingParts,
             refreshVariableValuesFromEditor: WorksheetBindings.controller.refreshVariableValuesFromEditor,
+            clearVariableValues: WorksheetBindings.panel.clearVariableValues,
             saveWorksheetState: WorksheetPersistence.persistence.saveWorksheet,
             clearGoalSeekRequest: WorksheetBindings.goal.clearGoalSeekRequest,
             scheduleEditedExpressionBindingRefresh: WorksheetBindings.controller.scheduleEditedExpressionBindingRefresh,
@@ -304,9 +308,13 @@ window.checkLabEvents = function checkLabEvents(): boolean {
             Reflect.set(WorksheetBindings.controller, 'refreshVariableValuesFromEditor', function refreshBindings() {
                 refreshCalls.push('bindings');
                 check(
-                    WorksheetContext.labEditorState.fullText === (refreshBound ? 'previous full' : 'opaque input'),
+                    WorksheetContext.labEditorState.fullText ===
+                        (refreshBound && WorksheetWorkspace.mode.currentMode() !== 'diffequation' ?
+                             'previous full' : 'opaque input'),
                     'source setter precedes binding refresh without redefining its view');
             });
+            /** @brief Verify obsolete controls are invalidated before any asynchronous refresh. */
+            WorksheetBindings.panel.clearVariableValues = function clearBindings() { refreshCalls.push('clear'); };
             /** @brief Check save arguments before native reuse is projected. */
             Reflect.set(WorksheetPersistence.persistence, 'saveWorksheet', function saveWorksheet(
                 mode: string, text: string | undefined, options: {debounce: boolean}) {
@@ -343,7 +351,7 @@ window.checkLabEvents = function checkLabEvents(): boolean {
                     check(WorksheetContext.expr.dataset.bindingRefreshValid === 'true', 'reuse is projected before history refresh');
             });
             const hostOrder = [
-                'save,goal,schedule', 'bindings,save,history', 'history', 'bindings,history', 'bindings,history',
+                'save,goal,schedule', 'bindings,save,history', 'clear,bindings,history', 'bindings,history', 'bindings,history',
                 'history', 'history'
             ];
             for (let mode = 0; mode < 7; ++mode) {
@@ -384,6 +392,7 @@ window.checkLabEvents = function checkLabEvents(): boolean {
             window.clearTimeout = refreshSaved.clearTimeout;
             WorksheetBindings.editor.bindingParts = refreshSaved.bindingParts;
             WorksheetBindings.controller.refreshVariableValuesFromEditor = refreshSaved.refreshVariableValuesFromEditor;
+            WorksheetBindings.panel.clearVariableValues = refreshSaved.clearVariableValues;
             WorksheetPersistence.persistence.saveWorksheet = refreshSaved.saveWorksheetState;
             WorksheetBindings.goal.clearGoalSeekRequest = refreshSaved.clearGoalSeekRequest;
             WorksheetBindings.controller.scheduleEditedExpressionBindingRefresh = refreshSaved.scheduleEditedExpressionBindingRefresh;

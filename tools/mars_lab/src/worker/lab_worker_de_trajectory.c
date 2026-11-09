@@ -22,7 +22,9 @@ int lab_worker_de_trajectory_plot(const diffequ_t *de, char **argv)
 {
     number_t lower = NUM_NAN, upper = NUM_NAN, ymin = NUM_NAN, ymax = NUM_NAN;
     bool manual = !strcmp(argv[7], "manual");
-    bool ok = lab_worker_plot_bounds(*argv[5] ? argv[5] : "-2", *argv[6] ? argv[6] : "2", &lower, &upper);
+    string_t *time_lower = !*argv[5] ? lab_worker_de_time_lower(de, argv[2]) : NULL;
+    bool ok = lab_worker_plot_bounds(*argv[5] ? argv[5] : time_lower ? string_c_str(time_lower) : "-2",
+                                     *argv[6] ? argv[6] : "2", &lower, &upper);
     if (ok && manual) ok = lab_worker_plot_bounds(argv[8], argv[9], &ymin, &ymax);
     double lo = num_to_double(lower), hi = num_to_double(upper);
     double origin = lo <= 0 && hi >= 0 ? 0 : lo + (hi - lo) / 2;
@@ -61,6 +63,7 @@ int lab_worker_de_trajectory_plot(const diffequ_t *de, char **argv)
     }
     ok = svg && title;
     string_free(title); string_free(svg); plot_free(plot);
+    string_free(time_lower);
     num_destroy(&point); num_destroy(&ymax); num_destroy(&ymin); num_destroy(&upper); num_destroy(&lower);
     return ok ? 0 : 1;
 }

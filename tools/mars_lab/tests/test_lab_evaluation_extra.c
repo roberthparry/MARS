@@ -910,7 +910,8 @@ static void test_lab_extra_surface_slices(void)
         if (i == 4)
             ok = ok && contains(fields, "plot_slices", "\nw\t") && contains(fields, "plot_title", "w = ");
         if (i == 5)
-            ok = ok && contains(fields, "plot_slices", "z\t-2\t2\t⅓\t");
+            ok = ok && contains(fields, "plot_slices", "z\t-2\t2\t0.333333333333333") &&
+                 !contains(fields, "plot_slices", "⅓");
         if (i == 6)
             ok = ok && !strcmp(lab_eval_text(fields, "plot_slices"), "z\t-2\t2\t0\t500");
         if (!ok)
@@ -1239,8 +1240,8 @@ static void test_lab_extra_solver_plots(void)
     result = request("/eval", "{\"expression\":\"Dx(y)=x*y; y(0)=1\",\"wrt\":\"x\",\"action\":\"plot\","
                               "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", &status);
     bool de_ok = status == 200 && test_lab_ok(result, true) && contains(result, "plot_svg", "data-series=\"0\"") &&
-                 !contains(result, "plot_svg", "Solution 1") && contains(result, "plot_title", "y = ") &&
-                 !contains(result, "plot_title_TeX", "\\frac{d");
+                 !contains(result, "plot_svg", "Solution 1") && contains(result, "plot_title", "y(0)") &&
+                 contains(result, "plot_title_TeX", "\\frac{d");
     if (!de_ok)
         show_failure(result);
     json_free(result);
@@ -1258,15 +1259,15 @@ static void test_lab_extra_solver_plots(void)
                     200u, "plot_svg", "data-series=\"1\"");
     expect_response("/eval", "{\"expression\":\"Dx(y)=0; y(0)=1\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}",
-                    200u, "plot_title", "y = 1");
+                    200u, "plot_title", "y(0)");
     result = request("/eval", "{\"expression\":\"y''+6yy'+4y^3=0; y(0)=0; y'(0)=1\",\"action\":\"plot\","
                               "\"plot_source_mode\":\"diffequation\",\"plot_lower\":\"-10\",\"plot_upper\":\"10\"}", &status);
-    ok = status == 200 && contains(result, "plot_title_TeX", "\\frac{x}{") &&
-         contains(result, "plot_title", "y = (x)/(x² + 1)") && !contains(result, "plot_svg", "Solution 1");
+    ok = status == 200 && contains(result, "plot_title_TeX", "\\frac{d") &&
+         contains(result, "plot_title", "y(0)") && !contains(result, "plot_svg", "Solution 1");
     if (!ok)
         show_failure(result);
     json_free(result);
-    TEST_ASSERT_TRUE(ok, "ODE plot title identifies the exact solution without a redundant single-series legend");
+    TEST_ASSERT_TRUE(ok, "a conditioned ODE plot identifies the authored problem without a redundant single-series legend");
     expect_response("/eval", "{\"expression\":\"{x=a | x=?; a=?}\",\"action\":\"plot\","
                              "\"plot_source_mode\":\"equation\",\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}",
                     422u, "error", "parameters");
@@ -2519,6 +2520,31 @@ static void test_lab_extra_parameter_restrictions(void)
     TEST_ASSERT_TRUE(ok, "coefficient inequalities remain visible on the complete symbolic oscillator solution");
 }
 
+/* Check the actually rendered first segment against position and tangent data, including SVG rounding. */
+static bool ode_plot_initial_segment(const char *svg, double position, double velocity)
+{
+    const char *attributes[] = {"data-plot-left=\"", "data-plot-top=\"", "data-plot-width=\"", "data-plot-height=\"",
+                                "data-x-min=\"", "data-x-max=\"", "data-y-min=\"", "data-y-max=\""};
+    double frame[8];
+    for (size_t i = 0u; i < sizeof attributes / sizeof *attributes; ++i) {
+        const char *attribute = strstr(svg, attributes[i]);
+        if (!attribute)
+            return false;
+        frame[i] = strtod(attribute + strlen(attributes[i]), NULL);
+    }
+    const char *series = strstr(svg, "<g data-series=\"0\"");
+    const char *path = series ? strstr(series, "<path d=\"M ") : NULL;
+    double x0, y0, x1, y1;
+    if (!path || sscanf(path, "<path d=\"M %lf %lf L %lf %lf", &x0, &y0, &x1, &y1) != 4 ||
+        frame[2] <= 0 || frame[3] <= 0 || frame[5] <= frame[4] || frame[7] <= frame[6] || x1 <= x0)
+        return false;
+    double at = frame[4] + (x0 - frame[0]) / frame[2] * (frame[5] - frame[4]);
+    double value = frame[7] - (y0 - frame[1]) / frame[3] * (frame[7] - frame[6]);
+    double slope = -(y1 - y0) / (x1 - x0) * frame[2] / frame[3] *
+                   (frame[7] - frame[6]) / (frame[5] - frame[4]);
+    return fabs(at) < 1e-4 && fabs(value - position) < 1e-4 && fabs(slope - velocity) < 0.03;
+}
+
 static void test_lab_extra_ode_parameter_controls(void)
 {
     unsigned status = 0u;
@@ -2527,7 +2553,7 @@ static void test_lab_extra_ode_parameter_controls(void)
     const json_t *bindings = test_lab_member(response, "binding_values");
     bool ok = status == 200u && json_array_size(bindings) == 4u &&
               contains(response, "binding_expression", "c = ?") && contains(response, "binding_expression", "m = ?") &&
-              contains(response, "binding_expression", "k = ?") && contains(response, "binding_expression", "c ≥ 0") &&
+              contains(response, "binding_expression", "k = ?") && contains(response, "binding_expression", "c>=0") &&
               contains(response, "solutions", "½·(√(c² - 4km) - c)·t/m") &&
               contains(response, "solutions_TeX", "e^{\\frac{1}{2}") &&
               contains(response, "solutions_TeX", "e^{-\\frac{1}{2}") &&
@@ -2535,6 +2561,23 @@ static void test_lab_extra_ode_parameter_controls(void)
     if (!ok) show_failure(response);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "symbolic oscillator coefficients remain editable and precede their coordinate in the exponent");
+    const char *initial_sources[] = {
+        "m*d²x/dt² + c*dx/dt + k*x = 0; x(0)=1",
+        "mx''+cx'+kx=0; x(0)=1",
+        "{m*d²x/dt²+c*dx/dt+k*x=0 | t=?; c=?,k=?,m=?; x(0)=1}",
+    };
+    for (size_t i = 0u; i < sizeof initial_sources / sizeof *initial_sources; ++i) {
+        string_t *payload = string_sprintf("{\"diffequation\":\"%s\",\"precision\":78}", initial_sources[i]);
+        response = payload ? request("/diffequation-eval", string_c_str(payload), &status) : NULL;
+        ok = response && status == 200u && contains(response, "status", "solved") &&
+             contains(response, "solutions", "C₁") && !contains(response, "solutions", "C₂") &&
+             contains(response, "binding_expression", "x(0)=1") && contains(response, "svg", "<svg") &&
+             !*test_lab_text(response, "render_error");
+        if (!ok) show_failure(response);
+        json_free(response);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "one oscillator initial value retains one arbitrary constant and renders at 78 digits");
+    }
     response = request("/eval", "{\"expression\":\"{m*d²x/dt²+c*dx/dt+k*x=0 | t=?; c=?,k=?,m=?; c>=0; m>0; k>0}\","
         "\"wrt\":\"t\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\",\"precision\":32,"
         "\"plot_lower\":\"0\",\"plot_upper\":\"10\"}", &status);
@@ -2545,6 +2588,35 @@ static void test_lab_extra_ode_parameter_controls(void)
     if (!ok) show_failure(response);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "unassigned ODE coefficients receive labelled plot-local sliders and a real representative family");
+    response = request("/eval",
+        "{\"expression\":\"m*d²x/dt²+c*dx/dt+k*x=0; x(0)=1; x'(0)=0\","
+        "\"wrt\":\"t\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\",\"precision\":78}", &status);
+    ok = status == 200u && contains(response, "plot_svg", "data-x-min=\"0\"") &&
+         contains(response, "plot_title_TeX", "\\frac{d") && contains(response, "plot_title_TeX", "= 1") &&
+         contains(response, "plot_title_TeX", "= 0") && strlen(test_lab_text(response, "plot_title_TeX")) < 500u &&
+         !contains(response, "plot_title_TeX", "0.577350269") &&
+         !contains(response, "plot_svg", "data-series=\"1\"") &&
+         ode_plot_initial_segment(test_lab_text(response, "plot_svg"), 1.0, 0.0);
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "the conditioned oscillator has a compact symbolic problem heading and starts at time zero");
+    static const char *const time_sources[] = {
+        "x''+x=0; x(-2)=1; x'(-2)=0",
+        "x''+x=0; x(2)=1; x'(2)=0",
+        "x''=0; x(0)=1; x'(0)=0",
+        "{m*d²x/dt²+c*dx/dt+k*x=0 | t=?; m=1,c=1,k=1; x(0)=1; x'(0)=0}",
+    };
+    for (size_t i = 0u; i < sizeof time_sources / sizeof *time_sources; ++i) {
+        string_t *payload = string_sprintf("{\"expression\":\"%s\",\"wrt\":\"t\",\"action\":\"plot\","
+            "\"plot_source_mode\":\"diffequation\",\"precision\":32}", time_sources[i]);
+        response = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        ok = response && status == 200u && contains(response, "plot_svg", i ? "data-x-min=\"0\"" :
+                                                                              "data-x-min=\"-2\"");
+        if (!ok) show_failure(response);
+        json_free(response);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "automatic time plots include earlier point data and retain constant solutions");
+    }
     static const char *const damping[] = {"0", "2", "3", "1"};
     for (size_t i = 0; i < 4u; ++i) {
         string_t *payload = string_sprintf("{\"expression\":\"mx''+cx'+kx=0; c>=0; m>0; k>0\","
@@ -2559,6 +2631,15 @@ static void test_lab_extra_ode_parameter_controls(void)
         json_free(response); string_free(expected); string_free(payload);
         TEST_ASSERT_TRUE(ok, "slider changes re-solve undamped, critically damped and overdamped members natively");
     }
+    response = request("/eval", "{\"expression\":\"mx''+cx'+kx=0; x(0)=1; x'(0)=0\","
+        "\"wrt\":\"t\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\",\"precision\":78,"
+        "\"plot_lower\":\"-1\",\"plot_upper\":\"3\",\"plot_slices\":\"m\\t0.5\\t2\\t1\\t700\"}", &status);
+    ok = status == 200u && contains(response, "plot_svg", "data-x-min=\"-1\"") &&
+         contains(response, "plot_slices", "m\t0.5\t2\t1.55\t700") &&
+         !contains(response, "plot_slices", "³¹⁄₂₀");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "manual time bounds win and slider values use readable decimal control text");
     for (int mass = -1; mass <= 0; ++mass) {
         string_t *payload = string_sprintf("{\"expression\":\"mx''+cx'+kx=0; c>=0; m>0; k>0\","
             "\"wrt\":\"t\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\",\"precision\":32,"

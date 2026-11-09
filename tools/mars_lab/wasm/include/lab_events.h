@@ -39,9 +39,9 @@ typedef enum {
  * @brief Select worksheet input actions without mutating browser state.
  * @param mode Expression 0, equation 1, differential equation 2, matrix 3, integrator 4, DateTime 5 or almanac 6.
  * @param bound True when native editor metadata reports bindings; controls source replacement for modes 1, 3 and 4.
- * @param unchanged True when Expression input matches the retained native source; ignored in other modes.
+ * @param unchanged True when the input matches the retained native display; used in Expression and ODE modes.
  * @return Bitmask: calendar editor 1, source update 2, binding refresh 4, save 8, history 16,
- * reuse bindings 32 and new edit 64. Invalid modes return zero.
+ * reuse bindings 32, new edit 64 and clear obsolete binding controls 128. Invalid modes return zero.
  */
 unsigned lab_events_input(lab_mode_t mode, bool bound, bool unchanged);
 
@@ -55,7 +55,9 @@ unsigned lab_events_input(lab_mode_t mode, bool bound, bool unchanged);
  * @post lab_dom_return supplies ordered calls with real browser values, never retained handles.
  * The host cancels evaluation and binding requests before constructing this plan, then executes its services
  * outside the DOM scope. State setters remain host adapters, preserving the property descriptors of native
- * storage views. Equation saves omit text to preserve their live default after binding refresh.
+ * storage views. Changed ODE text clears obsolete controls synchronously before requesting fresh metadata;
+ * unchanged ODE display text retains its complete native source and coefficient values. Equation saves omit
+ * text to preserve their live default after binding refresh.
  */
 void lab_events_refresh(lab_mode_t mode, bool bound, bool unchanged, jsref context);
 

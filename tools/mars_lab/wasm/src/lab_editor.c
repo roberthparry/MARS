@@ -45,7 +45,8 @@ static jsref lab_editor_restore(jsref text, jsref editors)
 
 static jsref lab_editor_body(jsref text, jsref editors)
 {
-    int value = lab_dom_get(lab_editor_lookup(text, editors), "body");
+    int value = lab_dom_get(lab_editor_lookup(text, editors),
+                            lab_workspace_mode() == LAB_MODE_DIFFERENTIAL_EQUATION ? "differential_body" : "body");
     return value ? value : lab_editor_trim(text);
 }
 

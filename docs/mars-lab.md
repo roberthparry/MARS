@@ -4517,6 +4517,15 @@ enabled, returns the rule-derived working shown in the **Solver** card.
 
 The native editor preserves empty constant and condition sections when committing ODE parameters,
 so a second evaluation reads the same differential problem. Compact saved envelopes also remain readable.
+Replacing the equation removes its previous coefficient controls before evaluation, and merging new binding
+values keeps shorthand initial conditions and parameter assumptions outside the governing equation.
+Initial conditions and assumptions remain visible after the equation in the editor. Conditioned or parameterised
+ODE plots retain the symbolic equation and its conditions as their heading, with plot-local coefficient choices
+alongside it. Slider controls show decimal values while interpolation remains native; extra decimal places are
+retained when needed to distinguish very close range endpoints.
+Automatic scalar time plots start at zero, or at the earliest negative time appearing in the point conditions.
+Explicit plot limits and authored coordinate intervals take precedence. Other independent coordinates keep
+the ordinary automatic range selection.
 Only coefficient values have binding inputs in this mode. Independent coordinates keep the roles defined
 by the derivatives and are not offered a control to turn them into constants.
 

@@ -264,10 +264,19 @@ char *lab_worker_parameter_slices(const char *source, const char *first, const c
             number_t fraction = num_div(num_sub(value, bounds[0]), num_sub(bounds[1], bounds[0]));
             position = lround(1000 * num_to_double(fraction));
             expr_set_val(parameters[i], value);
-            int digits = (int)(num_get_default_prec_bits() * 30103 / 100000 + 3);
-            string_t *lo = num_sprintf_text("%.*n", digits, bounds[0]);
-            string_t *hi = num_sprintf_text("%.*n", digits, bounds[1]);
-            string_t *text = num_sprintf_text("%.*n", digits, value);
+            size_t bits = lab_worker_plot_range_precision(bounds[0], bounds[1]);
+            int digits = (int)(bits * 30103 / 100000 + 3);
+            /* Decimal control text retains close-coordinate detail without exposing rational glyphs or guard digits. */
+            size_t saved_bits = num_get_default_prec_bits();
+            if (saved_bits < bits + 64u)
+                num_set_default_prec_bits(bits + 64u);
+            number_t lower_decimal = num_as_inexact_real_prec(bounds[0], bits + 64u);
+            number_t upper_decimal = num_as_inexact_real_prec(bounds[1], bits + 64u);
+            number_t value_decimal = num_as_inexact_real_prec(value, bits + 64u);
+            num_set_default_prec_bits(saved_bits);
+            string_t *lo = num_sprintf_text("%.*n", digits, lower_decimal);
+            string_t *hi = num_sprintf_text("%.*n", digits, upper_decimal);
+            string_t *text = num_sprintf_text("%.*n", digits, value_decimal);
             expr_t *constant = expr_new_const(value);
             char *label = expr_to_TeX_body(parameters[i]), *value_TeX = constant ? expr_to_TeX_body(constant) : NULL;
             ok = lo && hi && text && label && value_TeX &&

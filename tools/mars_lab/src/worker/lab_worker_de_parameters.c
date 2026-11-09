@@ -5,8 +5,10 @@
  * Uses the differential problem's own constant catalogue and parameter assumptions. Slider values affect only
  * an isolated plotting problem; the original worksheet and its symbolic solution remain unchanged. The shared
  * native editor preserves authored restrictions, and the existing slider protocol supplies browser controls.
+ * Scalar time plots share a lower-endpoint policy derived from the problem's point conditions.
  */
 #include <stdlib.h>
+#include <string.h>
 
 #include "diffequation-t.h"
 #include "json-t.h"
@@ -34,9 +36,9 @@ static bool text(json_t *object, const char *name, const char *value)
 }
 
 /* Keep all unknown coefficients editable, retaining the native envelope's conditions and coordinate names. */
-string_t *lab_worker_de_source(const diffequ_t *de)
+string_t *lab_worker_de_source(const diffequ_t *de, const char *authored)
 {
-    string_t *source = de_to_text(de, style_EXPRESSION);
+    string_t *source = authored ? string_new_with(authored) : de_to_text(de, style_EXPRESSION);
     json_t *request = json_new_object(), *bindings = json_new_array();
     expr_bindings_t *constants = de_constants(de);
     bool ok = source && request && bindings;
@@ -54,6 +56,7 @@ string_t *lab_worker_de_source(const diffequ_t *de)
         json_free(entry); string_free(rendered); num_destroy(&value);
     }
     ok = ok && text(request, "action", "editor") && text(request, "operation", "bindings") &&
+         text(request, "syntax", "diffequation") &&
          text(request, "mode", "merge") && text(request, "text", string_c_str(source)) &&
          put(request, "bindings", bindings);
     unsigned status = 0;
@@ -65,6 +68,28 @@ string_t *lab_worker_de_source(const diffequ_t *de)
     string_free(expression_key); string_free(key);
     json_free(response); json_free(bindings); json_free(request); string_free(source);
     return result;
+}
+
+/* Time advances from zero unless authored point data begin earlier; explicit plot bounds are handled by callers. */
+string_t *lab_worker_de_time_lower(const diffequ_t *de, const char *axis)
+{
+    if (!de || !axis || strcmp(axis, "t") || de_independent_count(de) != 1u)
+        return NULL;
+    number_t lower = num_clone(NUM_ZERO);
+    /* Every authored condition may supply the earliest time; work is bounded by the problem's condition count. */
+    for (size_t i = 0u; i < de_condition_count(de); ++i) {
+        if (de_condition_argument_count(de, i) != 1u)
+            continue;
+        number_t point = expr_eval(de_condition_argument_at(de, i, 0u));
+        if (num_is_real(point) && num_is_finite(point) && num_lt(point, lower)) {
+            num_destroy(&lower);
+            lower = num_clone(point);
+        }
+        num_destroy(&point);
+    }
+    string_t *text = num_to_string(lower);
+    num_destroy(&lower);
+    return text;
 }
 
 /* Re-solve the actual native problem after selecting temporary coefficients, including repeated or complex roots. */

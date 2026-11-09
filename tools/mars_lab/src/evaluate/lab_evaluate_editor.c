@@ -661,7 +661,14 @@ json_t *lab_pres_editor_metadata(const string_t *source)
     string_t *formatted = model ? lab_pres_editor_format(model, false) : NULL;
     string_t *compact = formatted ? lab_pres_compact(formatted) : NULL;
     string_t *goal = model ? lab_pres_editor_format(model, true) : NULL;
-    bool ok = model && starts && formatted && compact && goal;
+    string_t *differential_body = model ? string_new_with(lab_eval_text(model, "body")) : NULL;
+    bool ok = model && starts && formatted && compact && goal && differential_body;
+    const json_t *conditions = lab_eval_get(model, "conditions");
+    for (size_t i = 0u; ok && i < json_array_size(conditions); ++i) {
+        const string_t *condition = json_string_value(json_array_get(conditions, i));
+        ok = condition && !string_append_cstr(differential_body, "; ") &&
+             !string_append_string(differential_body, condition);
+    }
     const json_t *bindings = lab_eval_get(model, "bindings");
     for (size_t i = 0; ok && i < json_array_size(bindings); ++i) {
         const json_t *binding = json_array_get(bindings, i);
@@ -672,11 +679,13 @@ json_t *lab_pres_editor_metadata(const string_t *source)
     ok = ok && lab_eval_set(model, "text", string_c_str(source)) &&
          lab_eval_set(model, "expression", string_c_str(formatted)) &&
          lab_eval_set(model, "display", string_c_str(compact)) &&
+         lab_eval_set(model, "differential_body", string_c_str(differential_body)) &&
          lab_eval_set(model, "goal_expression", string_c_str(goal)) &&
          lab_eval_put(model, "solved_variables", json_new_bool(json_object_size(starts) > 0u));
     if (!lab_eval_put(model, "starts", starts))
         ok = false;
     string_free(goal);
+    string_free(differential_body);
     string_free(formatted);
     string_free(compact);
     if (!ok) {
@@ -713,11 +722,28 @@ json_t *lab_pres_editor_action(const json_t *payload, const string_t *text)
     json_t *model = lab_pres_editor_parse(text);
     if (!model)
         return NULL;
-    /* The ODE adapter requires all three envelope fields, even when edits start from bare authored text. */
+    /* Bare ODE shorthand keeps its semicolon-delimited conditions outside the governing equation. */
     bool differential = !strcmp(lab_eval_text(payload, "syntax"), "diffequation");
-    if (differential && !lab_eval_put(model, "condition_section", json_new_bool(true))) {
-        json_free(model);
-        return NULL;
+    if (differential) {
+        string_t *body = string_new_with(lab_eval_text(model, "body"));
+        json_t *parts = body ? lab_pres_split(body, ";") : NULL;
+        json_t *conditions = json_clone(lab_eval_get(model, "conditions"));
+        bool retained = parts && conditions &&
+                        lab_eval_set(model, "body", lab_eval_text(json_array_get(parts, 0u), "text"));
+        for (size_t i = 1u; retained && i < json_array_size(parts); ++i) {
+            const string_t *condition = json_string_value(lab_eval_get(json_array_get(parts, i), "text"));
+            retained = condition && (!string_byte_length(condition) ||
+                                      lab_pres_append(conditions, json_new_string(condition)));
+        }
+        retained = retained && lab_eval_put(model, "condition_section", json_new_bool(true));
+        if (!lab_eval_put(model, "conditions", conditions))
+            retained = false;
+        json_free(parts);
+        string_free(body);
+        if (!retained) {
+            json_free(model);
+            return NULL;
+        }
     }
     bool ok = true;
     if (!strcmp(operation, "calculus")) {

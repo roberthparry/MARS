@@ -248,6 +248,8 @@ namespace WorksheetBindings {
                 setSource(field: WorksheetSourceKey, text: string) {
                     owner.host.sources[field] = text;
                 },
+                /** @brief Remove binding controls belonging to the preceding differential problem. */
+                clearVariableValues() { owner.host.bindingPanel.clearVariableValues(); },
                 refreshVariableValuesFromEditor: this.refreshVariableValuesFromEditor.bind(this),
 
                 /** @brief Save the native-selected text and persistence options. */

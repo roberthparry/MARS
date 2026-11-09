@@ -251,6 +251,33 @@ static void test_lab_presentation_editor_edits(void)
     de_free(problem);
     json_free(result);
     TEST_ASSERT_TRUE(ok, "ODE binding edits select a complete differential-equation envelope for bare source");
+
+    static const char *const sources[] = {
+        "y''+a*y*y'+4y^3=0; y'(0)=0; a>=0",
+        "{ y''+a*y*y'+4y^3=0 | y'(0)=0; a>=0 }",
+        "{ y''+a*y*y'+4y^3=0 | x=?; a=?; y'(0)=0; a>=0 }",
+    };
+    for (size_t i = 0u; i < sizeof sources / sizeof *sources; ++i) {
+        string_t *payload = string_sprintf(
+            "{\"action\":\"editor\",\"operation\":\"bindings\",\"syntax\":\"diffequation\",\"mode\":\"merge\","
+            "\"text\":\"%s\",\"bindings\":[{\"name\":\"a\",\"kind\":\"constant\",\"value\":\"6\"}]}", sources[i]);
+        result = payload ? lab_pres_test_request(string_c_str(payload), &status) : NULL;
+        const char *source = test_lab_text(test_lab_member(result, "editor"), "expression");
+        problem = result && status == 200u ? de_from_string(source) : NULL;
+        expr_t *coefficient = de_constant(problem, "a");
+        number_t value = coefficient ? expr_get_val(coefficient) : NUM_NAN;
+        ok = problem && de_condition_count(problem) == 1u &&
+             strstr(test_lab_text(test_lab_member(result, "editor"), "differential_body"), "y'(0)=0") &&
+             de_condition_argument_count(problem, 0u) == 1u && num_to_double(value) == 6.0 &&
+             strstr(source, "y'(0)=0") && strstr(source, "a>=0");
+        if (!ok)
+            string_printf("ODE edit failed: %s\n", source);
+        num_destroy(&value);
+        de_free(problem);
+        json_free(result);
+        string_free(payload);
+        TEST_ASSERT_TRUE(ok, "ODE coefficient edits preserve shorthand initial conditions and parameter restrictions");
+    }
 }
 
 static void test_lab_presentation_compaction(void)

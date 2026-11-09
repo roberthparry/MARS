@@ -291,17 +291,24 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
         mode = 'almanac';
         WorksheetRequests.labRequests.modeChanged(mode);
         events.length = 0;
-        let painted = false;
-        requestAnimationFrame(() => { painted = true; });
+        let painted = false, frameDelayed = false;
+        const paintingFrame = requestAnimationFrame(() => { painted = true; });
+        // The installer also yields through a bounded timer when the browser suspends frame callbacks.
+        const paintingTimeout = window.setTimeout(() => { frameDelayed = true; }, 100);
         replace('renderAlmanacWorksheet', (...args: unknown[]) => {
-            check(painted, 'the drawing callback runs before result installation');
+            check(painted || document.hidden || frameDelayed,
+                  'result installation follows a drawing opportunity or its bounded fallback');
             events.push({name: 'renderAlmanacWorksheet', args});
         });
         const drawingRequest = WorksheetRequests.labRequests.begin('evaluate', mode);
         requests.push(drawingRequest);
         const drawingTask = WorksheetRequests.evaluation.installEvaluationResult(6, data, context, 2, drawingRequest);
         equal(calls('renderAlmanacWorksheet').length, 0, 'a ready result does not render synchronously');
-        await drawingTask;
+        try { await drawingTask; }
+        finally {
+            cancelAnimationFrame(paintingFrame);
+            clearTimeout(paintingTimeout);
+        }
         equal(calls('renderAlmanacWorksheet').length, 1, 'current result installs once after drawing');
         WorksheetRequests.labRequests.finish(drawingRequest);
 

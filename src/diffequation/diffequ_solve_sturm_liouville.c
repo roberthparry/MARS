@@ -240,6 +240,24 @@ static expr_t *de_shifted_independent(const expr_t *independent, const expr_t *p
     return point ? expr_sub_simplify_owned(expr_clone(independent), expr_clone(point)) : expr_clone(independent);
 }
 
+static bool de_requires_basis_conditions(const diffequ_t *de, bool has_value, bool has_slope,
+                                         const expr_t *value_point, const expr_t *slope_point)
+{
+    return de->condition_count && (de->condition_count != 2u || !has_value || !has_slope ||
+                                  !expr_struct_eq(value_point, slope_point));
+}
+
+static expr_t *de_conditioned_pair(const diffequ_t *de, const expr_t *coordinate, const expr_t *dependent,
+                                   expr_t *first, expr_t *second)
+{
+    expr_t *basis[] = {first, second};
+    expr_t *zero = expr_const_zero();
+    expr_t *solution = first && second && zero ?
+        de_apply_basis_conditions(de, coordinate, dependent, basis, 2u, zero) : NULL;
+    expr_free(zero);
+    return solution;
+}
+
 static expr_t *de_distinct_root_solution(const diffequ_t *de, const expr_t *independent, const expr_t *dependent,
                                          expr_t *first_root, expr_t *second_root)
 {
@@ -261,9 +279,13 @@ static expr_t *de_distinct_root_solution(const diffequ_t *de, const expr_t *inde
 
     has_value = de_find_initial_condition(de, dependent, &value_point, &value);
     has_slope = de_find_derivative_condition(de, dependent, independent, 1u, &slope_point, &slope);
-    if (has_value != has_slope || (has_value && !expr_struct_eq(value_point, slope_point)))
+    if (de_requires_basis_conditions(de, has_value, has_slope, value_point, slope_point)) {
+        shift = de_shifted_independent(independent, has_value ? value_point : has_slope ? slope_point : NULL);
+        first_exponential = shift ? de_exp_owned(expr_mul(first_root, shift)) : NULL;
+        second_exponential = shift ? de_exp_owned(expr_mul(second_root, shift)) : NULL;
+        solution = de_conditioned_pair(de, independent, dependent, first_exponential, second_exponential);
         goto cleanup;
-
+    }
     shift = de_shifted_independent(independent, has_value ? value_point : NULL);
     first_exponential = shift ? de_exp_owned(expr_mul_simplify_owned(expr_clone(first_root), expr_clone(shift))) : NULL;
     second_exponential =
@@ -342,9 +364,13 @@ static expr_t *de_repeated_root_solution(const diffequ_t *de, const expr_t *inde
 
     has_value = de_find_initial_condition(de, dependent, &value_point, &value);
     has_slope = de_find_derivative_condition(de, dependent, independent, 1u, &slope_point, &slope);
-    if (has_value != has_slope || (has_value && !expr_struct_eq(value_point, slope_point)))
+    if (de_requires_basis_conditions(de, has_value, has_slope, value_point, slope_point)) {
+        shift = de_shifted_independent(independent, has_value ? value_point : has_slope ? slope_point : NULL);
+        exponential = shift ? de_exp_owned(expr_mul(root, shift)) : NULL;
+        linear_term = exponential ? expr_mul(shift, exponential) : NULL;
+        solution = de_conditioned_pair(de, independent, dependent, exponential, linear_term);
         goto cleanup;
-
+    }
     shift = de_shifted_independent(independent, has_value ? value_point : NULL);
     if (has_value) {
         first_coefficient = expr_clone(value);
@@ -408,9 +434,17 @@ static expr_t *de_oscillatory_solution(const diffequ_t *de, const expr_t *indepe
 
     has_value = de_find_initial_condition(de, dependent, &value_point, &value);
     has_slope = de_find_derivative_condition(de, dependent, independent, 1u, &slope_point, &slope);
-    if (has_value != has_slope || (has_value && !expr_struct_eq(value_point, slope_point)))
+    if (de_requires_basis_conditions(de, has_value, has_slope, value_point, slope_point)) {
+        shift = de_shifted_independent(independent, has_value ? value_point : has_slope ? slope_point : NULL);
+        phase = shift ? expr_mul(beta, shift) : NULL;
+        envelope = shift ? de_exp_owned(expr_mul(alpha, shift)) : NULL;
+        cosine = phase ? expr_cos(phase) : NULL;
+        sine = phase ? expr_sin(phase) : NULL;
+        cosine_term = cosine && envelope ? expr_mul(envelope, cosine) : NULL;
+        sine_term = sine && envelope ? expr_mul(envelope, sine) : NULL;
+        solution = de_conditioned_pair(de, independent, dependent, cosine_term, sine_term);
         goto cleanup;
-
+    }
     shift = de_shifted_independent(independent, has_value ? value_point : NULL);
     numeric_beta = expr_match_const_value(beta, &beta_value);
     phase = shift
@@ -652,9 +686,11 @@ static expr_t *de_factorized_basis_solution(const diffequ_t *de, const expr_t *i
     bool has_value = de_find_initial_condition(de, dependent, &value_point, &value);
     bool has_slope = de_find_derivative_condition(de, dependent, independent, 1u, &slope_point, &slope);
 
-    if (has_value != has_slope || (has_value && !expr_struct_eq(value_point, slope_point)))
+    if (de_requires_basis_conditions(de, has_value, has_slope, value_point, slope_point)) {
+        secondary = expr_mul(primary, second_factor);
+        solution = de_conditioned_pair(de, independent, dependent, (expr_t *)primary, secondary);
         goto cleanup;
-
+    }
     if (!has_value) {
         first_coefficient = de_named_constant("C1");
         second_coefficient = de_named_constant("C2");

@@ -225,6 +225,8 @@
               row.querySelector<HTMLInputElement>('.slice-value')!.value + '; position: ' +
               row.querySelector<HTMLInputElement>('.slice-position')!.value);
         check(WorksheetBindings.editor.currentExpressionText() === before, 'Slider choices keep the worksheet symbolic');
+        check(Number.isFinite(Number(row.querySelector<HTMLInputElement>('.slice-value')!.value)),
+              'A slider-generated value is readable decimal input rather than a displayed fraction');
         const mass = inputs.querySelector<HTMLInputElement>('.binding-value-input[data-binding-name="m"]')!;
         mass.value = '2';
         await WorksheetBindings.controller.queueBindingInputCommit(mass);
@@ -234,6 +236,47 @@
               'A supplied mass survives binding commit and ODE evaluation');
         check(!root.querySelector('.plot-slice[data-name="m"]') && root.querySelectorAll('.plot-slice').length === 2,
               'Supplied coefficients stay fixed while the remaining unknowns retain sliders');
+        const retained = WorksheetBindings.editor.currentExpressionText();
+        WorksheetContext.expr.dispatchEvent(new Event('input', {bubbles: true}));
+        check(WorksheetBindings.editor.currentExpressionText() === retained &&
+              inputs.querySelector<HTMLInputElement>('.binding-value-input[data-binding-name="m"]')?.value === '2',
+              'An unchanged input event preserves the complete ODE source and supplied coefficients');
+
+        WorksheetContext.expr.value = 'm*d²x/dt² + c*dx/dt + k*x = 0; x(0)=1';
+        WorksheetContext.expr.dispatchEvent(new Event('input', {bubbles: true}));
+        for (let repeat = 0; repeat < 3; ++repeat) {
+            await WorksheetRequests.evaluation.evaluateDiffequation();
+            check(WorksheetContext.renderedTitle.textContent === 'Equation and solutions' &&
+                  WorksheetContext.rendered.querySelector('svg') &&
+                  !WorksheetContext.rendered.textContent?.includes('could not parse') &&
+                  WorksheetContext.expr.value.includes('x(0)=1') &&
+                  WorksheetBindings.editor.currentExpressionText().includes('x(0)=1'),
+                  'The oscillator retains its position condition on evaluation ' + (repeat + 1) + ': ' +
+                  WorksheetBindings.editor.currentExpressionText() + '; ' + WorksheetContext.rendered.textContent);
+        }
+        await waitForAutomaticPlot();
+        check(document.querySelector('#plotRendered [data-series]') &&
+              document.querySelectorAll('#variableValues .binding-value-input').length === 3,
+              'The partially conditioned oscillator plots a family and retains its three coefficient inputs: ' +
+              document.getElementById('plotRendered')!.textContent?.slice(0, 350));
+        WorksheetContext.expr.value = "m*d²x/dt² + c*dx/dt + k*x = 0; x(0)=1; x'(0)=0";
+        WorksheetContext.expr.dispatchEvent(new Event('input', {bubbles: true}));
+        await WorksheetRequests.evaluation.evaluateDiffequation();
+        await waitForAutomaticPlot();
+        check(WorksheetContext.expr.value.includes('x(0)=1') && WorksheetContext.expr.value.includes("x'(0)=0"),
+              'Both initial conditions remain visible in the editable input: ' + WorksheetContext.expr.value +
+              '; source: ' + WorksheetBindings.editor.currentExpressionText());
+        check(document.querySelector('#plotRendered [data-x-min="0"]') &&
+              !document.getElementById('plotRendered')!.textContent?.includes('0.577350269'),
+              'The conditioned oscillator starts at time zero with a compact symbolic heading');
+        const conditionedMass = inputs.querySelector<HTMLInputElement>('.binding-value-input[data-binding-name="m"]')!;
+        conditionedMass.value = '2';
+        await WorksheetBindings.controller.queueBindingInputCommit(conditionedMass);
+        await WorksheetRequests.evaluation.evaluateDiffequation();
+        await waitForAutomaticPlot();
+        check(WorksheetContext.expr.value.includes('x(0)=1') && WorksheetContext.expr.value.includes("x'(0)=0") &&
+              document.querySelector('#plotRendered [data-x-min="0"]'),
+              'Editing a coefficient retains both visible initial conditions and the forward time range');
     }
 
     async function checkOdeEditorRoundTrip() {
@@ -243,9 +286,12 @@
                  ["d²x/dt² + alpha x*dx/dt + beta x³ = 0", 'Equation and quadratures'],
                  ["x'' + alpha xx' + beta x³ = 0", 'Equation and quadratures'],
                  ["{d²x/dt² + alpha*x*dx/dt + beta*x³ = 0 | t=?}", 'Equation and quadratures'],
-                 ["d²x/dt² + alpha x*dx/dt + alpha^2/9 x³ = 0", 'Equation and solutions']]) {
+                 ["d²x/dt² + alpha x*dx/dt + alpha^2/9 x³ = 0", 'Equation and solutions'],
+                 ["y''+6y*y'+4y^3=0; y'(0)=0", 'Equation and solutions']]) {
             WorksheetContext.expr.value = source;
             WorksheetContext.expr.dispatchEvent(new Event('input', {bubbles: true}));
+            check(!document.querySelector('#variableValues .binding-value-input'),
+                  'Replacing the ODE invalidates obsolete coefficient controls before any asynchronous work');
             for (let repeat = 0; repeat < 3; ++repeat) {
                 await WorksheetRequests.evaluation.evaluateDiffequation();
                 check(WorksheetContext.renderedTitle.textContent === title &&
@@ -265,12 +311,16 @@
             check(document.querySelector('#plotRendered [data-series]'),
                   'The screenshot equation produces real plotted curves: ' + source + '; ' +
                   document.getElementById('plotRendered')!.textContent?.slice(0, 350));
-            for (const name of source.includes('beta') ? ['α', 'β'] : ['α']) {
+            for (const name of source.includes('beta') ? ['α', 'β'] : source.includes('alpha') ? ['α'] : []) {
                 check(document.querySelector(`#variableValues .binding-value-input[data-binding-name="${name}"]`),
                       'Inferred coefficient ' + name + ' has an input');
                 check(document.querySelector(`#plotSlices .plot-slice[data-name="${name}"]`),
                       'Unassigned coefficient ' + name + ' has a plot-local slider');
             }
+            if (!source.includes('alpha'))
+                check(!document.querySelector('#variableValues .binding-value-input') &&
+                      !document.querySelector('#plotSlices .plot-slice'),
+                      'A numeric ODE removes coefficients and sliders belonging to the previous problem');
             if (title === 'Equation and quadratures') {
                 check(WorksheetContext.rendered.dataset.displayTex?.includes('read the next two equations together') &&
                       WorksheetContext.rendered.dataset.displayTex?.includes('Separate exceptional solutions'),
@@ -3484,6 +3534,7 @@
             }
             initialiseLabTestAdapters();
             if (new URLSearchParams(location.search).get('ode-check') === '1') {
+                await runBrowserGroup('worksheet input event policy', window.checkLabEvents);
                 await runBrowserGroup('binding DOM controls', window.checkLabBindingDom);
                 await runBrowserGroup('binding commit policy', window.checkLabBindingCommit);
                 await runBrowserGroup('ODE parameter inputs and sliders', checkOdeParameterControls);

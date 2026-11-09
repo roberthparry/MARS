@@ -159,9 +159,20 @@ char *lab_worker_parameter_slices(const char *source, const char *first, const c
 /**
  * @brief Assemble a differential problem's complete editable parameter envelope.
  * @param[in] de Borrowed native problem, inspected without mutation.
+ * @param[in] authored Borrowed original input, preserving derivative and condition spelling; NULL uses native text.
  * @return Owned native source released with string_free(), or NULL on formatting or allocation failure.
  */
-string_t *lab_worker_de_source(const diffequ_t *de);
+string_t *lab_worker_de_source(const diffequ_t *de, const char *authored);
+
+/**
+ * @brief Choose an automatic scalar time plot's lower endpoint from its initial data.
+ * @param[in] de Borrowed differential problem, inspected without modification.
+ * @param[in] axis Borrowed coordinate name; only the scalar time coordinate t uses this policy.
+ * @return Owned native numerical text for the lesser of zero and all finite real condition points, released
+ * with string_free(); NULL for other coordinates, invalid inputs or allocation failure.
+ * @note Explicit user bounds and authored interval bounds take precedence at the caller. Use in an isolated worker.
+ */
+string_t *lab_worker_de_time_lower(const diffequ_t *de, const char *axis);
 
 /**
  * @brief Apply illustrative slider choices to an isolated differential problem and emit plot metadata.

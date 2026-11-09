@@ -35,11 +35,12 @@ window.checkLabProjection = async function checkLabProjection(): Promise<void> {
     const savedWidth = Object.getOwnPropertyDescriptor(WorksheetContext.rendered, 'clientWidth');
     try {
         const native = labWire.exports();
-        for (const [mode, expected] of [[0, 72], [1, 28], [2, 18], [3, 20], [4, 20], [5, 17], [6, 16]]) {
+        for (const [mode, expected] of [[0, 72], [1, 28], [2, 150], [3, 20], [4, 20], [5, 17], [6, 16]]) {
             equal(native.lab_events_input(mode, 1, 0), expected, 'mode input action policy');
             equal(native.lab_events_flush(mode), Number(mode < 2), 'page inactivity save policy');
         }
         equal(native.lab_events_input(0, 0, 1), 56, 'matching source retains prepared bindings');
+        equal(native.lab_events_input(2, 1, 1), 16, 'unchanged ODE input retains its binding source and controls');
         equal(native.lab_events_input(1, 0, 0), 30, 'unbound equation updates source');
         equal(native.lab_events_input(4, 0, 0), 22, 'unbound integrator updates source');
         equal(native.lab_events_input(99, 0, 0), 0, 'invalid event mode ignored');

@@ -70,6 +70,11 @@ void lab_binding_editor(lab_mode_t mode, jsref inputs, jsref bound_names)
     int body_text = lab_dom_get(inputs, "body"), ready = lab_dom_get(inputs, "ready");
     int body = lab_dom_type(body_text) ? lab_binding_editor_body(body_text, lab_dom_get(inputs, "bodyMetadata"))
                                        : lab_binding_editor_body(text, metadata);
+    if (mode == LAB_MODE_DIFFERENTIAL_EQUATION) {
+        int differential = lab_dom_get(metadata, "differential_body");
+        if (lab_dom_type(differential))
+            body = differential;
+    }
     int bindings = lab_dom_get(inputs, "bindings");
     if (lab_dom_type(bindings) != LAB_VALUE_ARRAY)
         bindings = mode == LAB_MODE_EXPRESSION ? 0 : lab_dom_get(metadata, "bindings");

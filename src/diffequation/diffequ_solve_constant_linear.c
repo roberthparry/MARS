@@ -594,43 +594,6 @@ cleanup:
     return rc;
 }
 
-static expr_t *de_derivative_at(const expr_t *expr, const expr_t *independent, size_t order, const expr_t *point)
-{
-    expr_t *derivative = order ? expr_create_nth_deriv((unsigned int)order, expr, independent) : expr_clone(expr);
-    expr_t *at_point = derivative ? expr_substitute(derivative, independent, point) : NULL;
-    expr_t *simplified = at_point ? expr_simplify_owned(at_point) : NULL;
-
-    expr_free(derivative);
-    return simplified;
-}
-
-static bool de_condition_data(const diffequ_t *de, size_t index, const expr_t *dependent, const expr_t *independent,
-                              size_t *order_out, const expr_t **point_out, const expr_t **value_out)
-{
-    const equation_t *condition = de->conditions[index];
-    const expr_t *left = condition ? equ_lhs(condition) : NULL;
-
-    if (!condition || !left || de->condition_point_counts[index] != 1u)
-        return false;
-    if (expr_struct_eq(left, dependent)) {
-        *order_out = 0u;
-    } else {
-        size_t order;
-
-        if (!expr_is_formal_derivative(left) || !expr_struct_eq(expr_formal_derivative_dependent(left), dependent))
-            return false;
-        order = expr_formal_derivative_order(left);
-        for (size_t i = 0u; i < order; ++i) {
-            if (!expr_struct_eq(expr_formal_derivative_wrt_at(left, i), independent))
-                return false;
-        }
-        *order_out = order;
-    }
-    *point_out = de->condition_points[index][0];
-    *value_out = equ_rhs(condition);
-    return true;
-}
-
 static bool de_match_e_power_forcing(const expr_t *forcing, const expr_t **exponent_out)
 {
     const expr_t *base = NULL;
@@ -1244,78 +1207,6 @@ cleanup_scale:
     return particular;
 }
 
-static expr_t *de_apply_conditions(const diffequ_t *de, const expr_t *independent, const expr_t *dependent,
-                                   const de_basis_t *basis, const expr_t *particular)
-{
-    matrix_t *matrix = NULL;
-    matrix_t *right = NULL;
-    matrix_t *constants = NULL;
-    expr_t *solution = NULL;
-
-    if (de->condition_count != basis->count)
-        return NULL;
-
-    matrix = mat_new_expr(basis->count, basis->count);
-    right = mat_new_expr(basis->count, 1u);
-    if (!matrix || !right)
-        goto cleanup;
-
-    for (size_t row = 0u; row < basis->count; ++row) {
-        size_t derivative_order;
-        const expr_t *point;
-        const expr_t *value;
-        expr_t *particular_at;
-        expr_t *rhs;
-
-        if (!de_condition_data(de, row, dependent, independent, &derivative_order, &point, &value))
-            goto cleanup;
-        particular_at = de_derivative_at(particular, independent, derivative_order, point);
-        rhs = particular_at ? expr_sub_simplify_owned(expr_clone(value), particular_at) : NULL;
-        if (particular_at)
-            particular_at = NULL;
-        if (!rhs)
-            goto cleanup;
-        mat_set(right, row, 0u, &rhs);
-        expr_free(rhs);
-
-        for (size_t col = 0u; col < basis->count; ++col) {
-            expr_t *entry = de_derivative_at(basis->items[col], independent, derivative_order, point);
-
-            if (!entry)
-                goto cleanup;
-            mat_set(matrix, row, col, &entry);
-            expr_free(entry);
-        }
-    }
-
-    constants = mat_solve(matrix, right);
-    if (!constants)
-        goto cleanup;
-    solution = expr_clone(particular);
-    for (size_t i = 0u; solution && i < basis->count; ++i) {
-        expr_t *constant = NULL;
-        expr_t *term;
-
-        mat_get(constants, i, 0u, &constant);
-        term = constant ? expr_mul_simplify_owned(expr_clone(constant), expr_clone(basis->items[i])) : NULL;
-        solution = term ? expr_add_simplify_owned(solution, term) : NULL;
-    }
-    if (solution) {
-        expr_t *display = expr_display_simplified(solution);
-
-        if (display) {
-            expr_free(solution);
-            solution = display;
-        }
-    }
-
-cleanup:
-    mat_free(constants);
-    mat_free(right);
-    mat_free(matrix);
-    return solution;
-}
-
 static expr_t *de_indexed_arbitrary_constant(size_t index)
 {
     char name[32];
@@ -1482,7 +1373,7 @@ de_attempt_t de_attempt_constant_coefficient_linear(const diffequ_t *de, const e
     if (de->condition_count == 0u)
         solution = de_general_solution(&basis, independent, particular);
     else
-        solution = de_apply_conditions(de, independent, dependent, &basis, particular);
+        solution = de_apply_basis_conditions(de, independent, dependent, basis.items, basis.count, particular);
     if (!solution)
         goto cleanup;
 
@@ -1593,8 +1484,10 @@ de_attempt_t de_attempt_repeated_quadratic_operator(const diffequ_t *de, const e
     particular = expr_const_zero();
     if (!particular)
         goto cleanup;
-    solution = de->condition_count == 0u ? de_general_solution(&basis, independent, particular)
-                                         : de_apply_conditions(de, independent, dependent, &basis, particular);
+    if (de->condition_count == 0u)
+        solution = de_general_solution(&basis, independent, particular);
+    else
+        solution = de_apply_basis_conditions(de, independent, dependent, basis.items, basis.count, particular);
     if (!solution)
         goto cleanup;
 

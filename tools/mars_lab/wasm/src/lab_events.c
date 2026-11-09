@@ -19,7 +19,9 @@ enum {
     lab_events_save = 8,
     lab_events_history = 16,
     lab_events_match = 32,
-    lab_events_edit = 64
+    lab_events_edit = 64,
+    lab_events_clear_bindings = 128,
+    lab_events_ode_edit = lab_events_source | lab_events_bindings | lab_events_history | lab_events_clear_bindings
 };
 
 /* Input action masks preserve per-mode refresh and source-reuse semantics. */
@@ -28,7 +30,7 @@ unsigned lab_events_input(lab_mode_t mode, bool bound, bool unchanged)
     static const unsigned actions[] = {
         [LAB_MODE_EXPRESSION]            = lab_events_save,
         [LAB_MODE_EQUATION]              = lab_events_bindings | lab_events_save | lab_events_history,
-        [LAB_MODE_DIFFERENTIAL_EQUATION] = lab_events_source | lab_events_history,
+        [LAB_MODE_DIFFERENTIAL_EQUATION] = lab_events_ode_edit,
         [LAB_MODE_MATRIX]                = lab_events_bindings | lab_events_history,
         [LAB_MODE_INTEGRATOR]            = lab_events_bindings | lab_events_history,
         [LAB_MODE_DATETIME]              = lab_events_calendar_editor | lab_events_history,
@@ -45,6 +47,8 @@ unsigned lab_events_input(lab_mode_t mode, bool bound, bool unchanged)
     unsigned result = actions[mode];
     if (mode == LAB_MODE_EXPRESSION)
         return result | (unchanged ? lab_events_match | lab_events_history : lab_events_edit);
+    if (mode == LAB_MODE_DIFFERENTIAL_EQUATION && unchanged)
+        return lab_events_history;
     if (!bound)
         result |= unbound_actions[mode];
     return result;
@@ -76,6 +80,8 @@ void lab_events_refresh(lab_mode_t mode, bool bound, bool unchanged, jsref conte
                                         "integrator", "datetime", "almanac"};
     int name = lab_dom_string(modes[mode]), editor = lab_dom_get(context, "editor");
     int text = lab_dom_clean(lab_dom_read(editor, LAB_DOM_VALUE, ""), LAB_DOM_CLEAN_TRIM);
+    if (actions & lab_events_clear_bindings)
+        lab_events_emit(calls, "clearVariableValues", 0, 0, 0);
     if (actions & lab_events_calendar_editor)
         lab_events_emit(calls, "setModeEditor", 2, name,
                         lab_dom_length(text) ? text : lab_dom_get(context, "defaultDatetimeText"));

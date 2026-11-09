@@ -176,7 +176,7 @@ int lab_worker_diffequation(int argc, char **argv)
         if (rendered && name) printf("binding constant\t%s\t%s\n", name, string_c_str(rendered));
         free(name); string_free(rendered); num_destroy(&value);
     }
-    string_t *editor_source = lab_worker_de_source(de);
+    string_t *editor_source = lab_worker_de_source(de, source);
     if (editor_source) printf("binding_expression %s\n", string_c_str(editor_source));
     string_free(editor_source);
     /* Coordinate metadata remains valid for quadratures, series and unsupported exact solutions. */

@@ -210,6 +210,22 @@ de_attempt_t de_attempt_sturm_liouville(const diffequ_t *de, const expr_t *indep
                                         const expr_t *residual, equation_t **solution_out, de_solver_t *solver_out);
 int de_sturm_liouville_cubic_basis(const expr_t *independent, const expr_t *parameter, const expr_t *dependent,
                                    equation_t **solutions_out, size_t *solution_count_out);
+/**
+ * @brief Impose complete or partial point conditions on a known scalar linear solution basis.
+ * @param[in] de Borrowed ordinary differential problem with one to count linear point conditions.
+ * @param[in] coordinate Borrowed independent coordinate used for differentiation and point substitution.
+ * @param[in] dependent Borrowed scalar dependent field identifying the conditions.
+ * @param[in] basis Borrowed array of count homogeneous basis functions; neither array nor entries are consumed.
+ * @param[in] count Number of independent basis functions, equal to the differential order.
+ * @param[in] particular Borrowed particular solution, including zero for a homogeneous problem.
+ * @return Owned solution released with expr_free(), retaining arbitrary constants for undetermined directions,
+ * or NULL for invalid inputs, unsupported conditions, inconsistent data or allocation/algebra failure.
+ * @note Owning linear ODE solvers use this module-private interface. Exact matrix operations retain symbolic
+ * coefficient restrictions; inputs remain unchanged and must not be mutated concurrently.
+ */
+expr_t *de_apply_basis_conditions(const diffequ_t *de, const expr_t *coordinate, const expr_t *dependent,
+                                  expr_t *const *basis, size_t count, const expr_t *particular);
+
 de_attempt_t de_attempt_constant_coefficient_linear(const diffequ_t *de, const expr_t *independent,
                                                     const expr_t *dependent, size_t order, const expr_t *residual,
                                                     equation_t **solution_out);

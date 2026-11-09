@@ -39,6 +39,11 @@ static int plot_curves(const char *input, const char *title_text, const char *ti
                 if (interval_limits[i])
                     limits[i] = string_c_str(interval_limits[i]);
             }
+        if (!*limits[0]) {
+            interval_limits[0] = lab_worker_de_time_lower(de, axis);
+            if (interval_limits[0])
+                limits[0] = string_c_str(interval_limits[0]);
+        }
     }
     bool manual = !strcmp(argv[7], "manual"), ranged = false, constants = true;
     bool ok = count && count <= 16 &&
@@ -70,10 +75,17 @@ static int plot_curves(const char *input, const char *title_text, const char *ti
             num_destroy(&candidate[j]);
     }
     /* A pair of constants has no variation from which to infer a horizontal span. */
-    if (ok && !ranged && constants && !*argv[5] && !*argv[6]) {
+    if (ok && !ranged && constants && !*limits[0] && !*limits[1]) {
         bounds[0] = num_create_from_long(-1);
         bounds[1] = num_clone(NUM_ONE);
         ranged = true;
+    }
+    if (ok && !ranged && constants && interval_limits[0] && !*limits[1]) {
+        expr_t *lower = expr_from_string(limits[0], NULL);
+        bounds[0] = lower ? expr_eval(lower) : num_clone(NUM_NAN);
+        bounds[1] = num_add(bounds[0], NUM_TEN);
+        ranged = num_is_real(bounds[0]) && num_is_finite(bounds[0]);
+        expr_free(lower);
     }
     if (ok && ranged && family && !*limits[0] && !*limits[1])
         lab_worker_plot_frame(sources, count, axis, bounds);
@@ -325,9 +337,20 @@ int lab_worker_solver_plot(int argc, char **argv)
     } else if (explicit) {
         string_t *title_text = string_new(), *title_TeX = string_new();
         bool titled = title_text && title_TeX;
-        if (titled && count > 1)
+        diffequ_t *authored = de_from_string(argv[1]);
+        expr_bindings_t *coefficients = authored ? de_constants(authored) : NULL;
+        bool parameter_title = authored && (de_condition_count(authored) || expr_bindings_count(coefficients));
+        if (parameter_title) {
+            string_free(title_text);
+            string_free(title_TeX);
+            title_text = de_to_text(authored, style_EXPRESSION);
+            title_TeX = de_problem_to_TeX(authored);
+            titled = title_text && title_TeX;
+        }
+        de_free(authored);
+        if (titled && !parameter_title && count > 1)
             titled = string_append_cstr(title_TeX, "\\begin{aligned}") >= 0;
-        for (size_t i = 0; titled && i < count; ++i) {
+        for (size_t i = 0; titled && !parameter_title && i < count; ++i) {
             const equation_t *solution = de_solve_result_at(solutions, i);
             string_t *text = equ_to_text(solution, style_UNBOUND);
             char *TeX = equ_to_TeX_body_wrapped(solution, 110);
@@ -337,7 +360,7 @@ int lab_worker_solver_plot(int argc, char **argv)
             free(TeX);
             string_free(text);
         }
-        if (titled && count > 1)
+        if (titled && !parameter_title && count > 1)
             titled = string_append_cstr(title_TeX, "\\end{aligned}") >= 0;
         expr_t *members[16] = {NULL};
         string_t *labels[16] = {NULL};

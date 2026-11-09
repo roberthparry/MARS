@@ -1977,10 +1977,47 @@ The current symbolic scope is:
 - parameter-dependent first-order linear PDEs.
 
 An initial condition is used to determine the integration constant. Without
-one, the solution contains the arbitrary constant `C`. The linear solver uses
+one, a first-order solution contains the arbitrary constant `C`. Supported linear
+solution bases also accept incomplete point data: independent conditions fix
+combinations of constants while the remaining constants stay arbitrary. These
+paths accept at most as many point conditions as the equation's order; inconsistent
+data are rejected. They do not assume an initial velocity when only a position is supplied.
+The linear solver uses
 the expression module for exact symbolic integration. It may therefore return
 elementary functions, supported special functions, or an exact unevaluated
 integral when no closed form is available.
+
+This programme supplies only the oscillator's initial position:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "diffequation-t.h"
+
+int main(void)
+{
+    diffequ_t *problem = de_from_string("m*d²x/dt²+c*dx/dt+k*x=0; x(0)=1");
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    int status = text && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+                 puts(string_c_str(text)) != EOF ? EXIT_SUCCESS : EXIT_FAILURE;
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(problem);
+    return status;
+}
+```
+
+Output:
+
+```text
+x = C₁·exp(-½·(√(c² - 4km) + c)·t/m) + (1 - C₁)·exp(½·(√(c² - 4km) - c)·t/m)
+```
+
+The one-constant family satisfies $x(0)=1$. This displayed form uses distinct
+characteristic roots and non-zero mass; a repeated root uses the repeated-root basis instead.
 
 For example:
 

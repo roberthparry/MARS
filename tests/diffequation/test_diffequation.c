@@ -2845,6 +2845,91 @@ static void test_diffequ_solves_logarithmic_forcing(void)
                                                        "C₁·cos(x) + C₂·sin(x)");
 }
 
+static void test_diffequ_linear_partial_conditions(void)
+{
+    static const struct {
+        const char *source;
+        size_t free_constants;
+    } cases[] = {
+        {"m*d²x/dt²+c*dx/dt+k*x=0; x(0)=1", 1u},
+        {"y''+y=0; y(0)=1", 1u},
+        {"y''+y=0; y'(0)=2", 1u},
+        {"y''+2y'+y=0; y(1)=3", 1u},
+        {"y''-y=0; y'(2)=1", 1u},
+        {"y''=0; y'(0)=1", 1u},
+        {"y'''=0; y(0)=1", 2u},
+        {"y'''=0; y(0)=1; y'(0)=2", 1u},
+        {"y''+y=x; y(0)=1", 1u},
+        {"y'''=0; y(0)=1; y(0)=1", 2u},
+        {"y''+y=0; y(0)=1; y(@pi/2)=0", 0u},
+        {"y''-(x^2+1)*y=0; y(0)=1", 1u},
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        diffequ_t *problem = de_from_string(cases[i].source);
+        diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+        const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+        string_t *shown = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+        printf("Partial linear problem: %s\nSolution: %s\n", cases[i].source,
+               shown ? string_c_str(shown) : "(none)");
+        bool ok = shown && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+                  ((strstr(string_c_str(shown), "C₁") != NULL) == (cases[i].free_constants > 0u)) &&
+                  ((strstr(string_c_str(shown), "C₂") != NULL) == (cases[i].free_constants == 2u)) &&
+                  !strstr(string_c_str(shown), "C₃");
+        for (size_t j = 0u; ok && j < de_condition_count(problem); ++j) {
+            const equation_t *condition = de_condition_at(problem, j);
+            expr_t *left = expr_substitute(equ_lhs(condition), equ_lhs(solution), equ_rhs(solution));
+            expr_t *at = left ? expr_substitute(left, de_independent_at(problem, 0u),
+                                                de_condition_argument_at(problem, j, 0u)) : NULL;
+            expr_t *error = at ? expr_sub_simplify_owned(at, expr_clone(equ_rhs(condition))) : NULL;
+            ok = error && expr_is_exact_zero(error);
+            if (!ok && error) {
+                number_t residual = expr_eval(error);
+                number_t magnitude = num_abs(residual);
+                ok = num_is_finite(magnitude) && num_to_double(magnitude) < 1e-20;
+                num_destroy(&magnitude);
+                num_destroy(&residual);
+            }
+            if (!ok) {
+                string_t *description = error ? expr_to_text(error, style_UNBOUND) : NULL;
+                printf("Condition residual: %s\n", description ? string_c_str(description) : "(none)");
+                string_free(description);
+            }
+            expr_free(error);
+            expr_free(left);
+        }
+        string_free(shown);
+        de_solve_result_free(result);
+        de_free(problem);
+        TEST_ASSERT_TRUE(ok, "partial linear data are imposed exactly while the remaining constants stay arbitrary");
+    }
+    diffequ_t *contradiction = de_from_string("y'''=0; y(0)=1; y(0)=2");
+    diffequ_solve_result_t *result = contradiction ? de_solve(contradiction) : NULL;
+    bool rejected = result && de_solve_result_status(result) != DE_SOLVE_STATUS_SOLVED;
+    de_solve_result_free(result);
+    de_free(contradiction);
+    TEST_ASSERT_TRUE(rejected, "inconsistent partial data do not produce a fitted or invented exact solution");
+}
+
+/* README example in docs/diffequation.md: one oscillator position leaves one free integration constant. */
+static void example_diffequation_partial_linear_data(void)
+{
+    diffequ_t *problem = de_from_string("m*d²x/dt²+c*dx/dt+k*x=0; x(0)=1");
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    bool ok = text && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
+    if (ok) {
+        puts(string_c_str(text));
+        WANT_TEXT("README oscillator with partial initial data", string_c_str(text),
+                  "x = C₁·exp(-½·(√(c² - 4km) + c)·t/m) + "
+                  "(1 - C₁)·exp(½·(√(c² - 4km) - c)·t/m)");
+    }
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(problem);
+    TEST_ASSERT_TRUE(ok, "README partial-data oscillator retains a one-constant exact solution family");
+}
+
 static void test_diffequ_resolves_polynomial_differential_operator(void)
 {
     const char *source = "(Dx^2 + 4Dx + 20)^2(y) = 0";
@@ -5332,6 +5417,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_intervals);
     RUN_TEST_CASE(test_diffequ_autonomous_energy);
     RUN_TEST_CASE(test_diffequ_solves_logarithmic_forcing);
+    RUN_TEST_CASE(test_diffequ_linear_partial_conditions);
     RUN_TEST_CASE(test_diffequ_solves_repeated_complex_roots);
     RUN_TEST_CASE(test_diffequ_solves_degree_six_characteristic_polynomial);
     RUN_TEST_CASE(test_diffequ_resolves_polynomial_differential_operator);
@@ -5422,6 +5508,8 @@ int tests_main(void)
     TEST_SECTION("README Output Example");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_solving_an_ode, readme_examples, "diffequation,readme,output");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_emden_initial_value, readme_examples, "diffequation,readme,output");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_partial_linear_data, readme_examples,
+                                  "diffequation,readme,output,conditions");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_linearising_a_lie_symmetric_ode, readme_examples,
                                   "diffequation,readme,output,lie-symmetry");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_weighted_cyclic_pde, readme_examples,

@@ -487,6 +487,9 @@ char *de_to_string(const diffequ_t *de, style_t style);
  * linearized. The solver also normalizes regular second-order linear equations
  * to Sturm-Liouville form and solves arbitrary-order constant-coefficient
  * linear ODEs, including nonhomogeneous forcing.
+ * Supported linear bases accept incomplete point data: each independent condition fixes one combination
+ * of integration constants, leaving the others arbitrary. At most the differential order's number of point
+ * conditions is accepted by this path. Inconsistent conditions do not produce a least-squares solution.
  * Autonomous exponential forces `y'' = A*exp(B*y)` use their conserved energy when A and B evaluate to finite,
  * real, non-zero constants. All real positive-, negative- and zero-energy families are retained where present,
  * with pole restrictions. Two finite real initial data (value and slope) at one point fix the local solution.

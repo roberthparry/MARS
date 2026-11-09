@@ -391,7 +391,8 @@
       "example_diffequation_autonomous_energy": true,
       "example_diffequation_emden_quadrature": true,
       "example_diffequation_symbolic_emden": true,
-      "example_diffequation_trajectory": true
+      "example_diffequation_trajectory": true,
+      "example_diffequation_partial_linear_data": true
     },
     "test_diffequ_abs_pde_real_residual": true,
     "test_diffequ_affine_transport": true,
@@ -588,7 +589,8 @@
     "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true,
     "test_diffequ_compact_prime_coefficients": true,
     "test_diffequ_autonomous_energy": true,
-    "test_diffequ_emden_quadratures": true
+    "test_diffequ_emden_quadratures": true,
+    "test_diffequ_linear_partial_conditions": true
   },
   "tests/equation/test_equation.c": {
     "readme_examples": {
