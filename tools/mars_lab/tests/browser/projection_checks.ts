@@ -62,6 +62,7 @@ window.checkLabProjection = async function checkLabProjection(): Promise<void> {
         check(WorksheetContext.renderedMore.classList.contains('hidden'), 'identical integral TeX does not expand');
         for (const [status, title] of [
                  ['series', 'Equation and local series'], ['solved', 'Equation and solutions'],
+                 ['quadrature', 'Equation and quadratures'],
                  ['reduced', 'Reduction']]) {
             const data = {
                 status,

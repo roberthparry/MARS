@@ -229,6 +229,8 @@ typedef enum {
     EXPR_KIND_REAL_DOMAIN,
     EXPR_KIND_NONNEGATIVE_INTEGER,
     EXPR_KIND_REAL_PARAMETER,
+    EXPR_KIND_REAL_GREATER, /**< Indicator that two finite real operands satisfy strict ordering. */
+    EXPR_KIND_REAL_AT_LEAST, /**< Indicator that two finite real operands satisfy inclusive ordering. */
     EXPR_KIND_REAL_BOUND,
     EXPR_KIND_IMAG_COORDINATE,
     EXPR_KIND_ARGUMENT_LIST,
@@ -497,6 +499,10 @@ expr_t *expr_inverse_laplace_elementary_pair(const expr_t *f, const expr_t *s, c
 extern const expr_ops_t ops_real_domain;
 extern const expr_ops_t ops_nonnegative_integer;
 extern const expr_ops_t ops_real_parameter;
+/** @brief Finite strict real comparison; interpreted as a predicate by domain formatting. */
+extern const expr_ops_t ops_real_greater;
+/** @brief Finite inclusive real comparison; interpreted as a predicate by domain formatting. */
+extern const expr_ops_t ops_real_at_least;
 extern const expr_ops_t ops_real_bound;
 extern const expr_ops_t ops_imag_coordinate;
 

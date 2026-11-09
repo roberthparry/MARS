@@ -739,7 +739,24 @@ static void emit_function_body(sbuf_t *b, const expr_t *root, const varlist_t *v
             sbuf_t condition;
             sbuf_init(&condition);
             const expr_t *nonzero = expr_domain_nonzero_operand(pair);
-            if (nonzero) {
+            if (expr_is_op(pair->a, &ops_real_greater) || expr_is_op(pair->a, &ops_real_at_least)) {
+                sbuf_puts(&condition, "realpart(");
+                emit_func(pair->a->a, &condition, PREC_LOWEST);
+                sbuf_puts(&condition, ") == ");
+                emit_func(pair->a->a, &condition, PREC_ADD);
+                sbuf_puts(&condition, " && realpart(");
+                emit_func(pair->a->b, &condition, PREC_LOWEST);
+                sbuf_puts(&condition, ") == ");
+                emit_func(pair->a->b, &condition, PREC_ADD);
+                sbuf_puts(&condition, " && abs(");
+                emit_func(pair->a->a, &condition, PREC_LOWEST);
+                sbuf_puts(&condition, ") < @inf && abs(");
+                emit_func(pair->a->b, &condition, PREC_LOWEST);
+                sbuf_puts(&condition, ") < @inf && ");
+                emit_func(pair->a->a, &condition, PREC_ADD);
+                sbuf_puts(&condition, expr_is_op(pair->a, &ops_real_at_least) ? " >= " : " > ");
+                emit_func(pair->a->b, &condition, PREC_ADD);
+            } else if (nonzero) {
                 emit_func(nonzero, &condition, PREC_ADD);
                 sbuf_puts(&condition, " != 0");
             } else if (expr_is_op(pair->a, &ops_real_parameter)) {

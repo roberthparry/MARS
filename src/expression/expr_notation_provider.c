@@ -469,6 +469,9 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
             const TeX_model_node_t *calculus = expr_notation_calculus_quotient(build, expression);
             if (calculus)
                 return calculus;
+            const TeX_model_node_t *scaled = expr_notation_scalar_quotient(build, expression);
+            if (scaled)
+                return scaled;
             const expr_t *magnitude = NULL;
             if (expr_match_neg_expr(expression->a, &magnitude)) {
                 const TeX_model_node_t *parts[] = {notation_build_expr(build, magnitude),
@@ -478,9 +481,6 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
                 return notation_build_node(build,
                     (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &fraction);
             }
-            const TeX_model_node_t *flat = expr_notation_flat_fraction(build, expression);
-            if (flat)
-                return flat;
         }
         const TeX_model_node_t *children[] = {
             notation_build_expr(build, expression->a), notation_build_expr(build, expression->b)
@@ -620,7 +620,8 @@ static const TeX_model_node_t *build_expression(notation_build_t *build, const e
     if (kind == EXPR_KIND_ARGUMENT_LIST ||
         kind == EXPR_KIND_LERCH_PHI_PACK || kind == EXPR_KIND_LOMMEL_S_PACK || kind == EXPR_KIND_APPELL_F1_PACK ||
         kind == EXPR_KIND_HYPERGEOMETRIC_PFQ_PACK ||
-        kind == EXPR_KIND_NONNEGATIVE_INTEGER || kind == EXPR_KIND_REAL_PARAMETER) {
+        kind == EXPR_KIND_NONNEGATIVE_INTEGER || kind == EXPR_KIND_REAL_PARAMETER ||
+        kind == EXPR_KIND_REAL_GREATER || kind == EXPR_KIND_REAL_AT_LEAST) {
         errno = ENOTSUP;
         return NULL;
     }

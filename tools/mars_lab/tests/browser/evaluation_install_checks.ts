@@ -73,8 +73,8 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
         ],
         ['render,installEvaluationTextCards,renderVariableValues', 'setValueCardVisible,modeSource,saveWorksheetState,variables'],
         [
-            'render,scheduleRenderedTeXFit,solverTextCards,present',
-            'setValueText,setValueCardVisible,clearVariableValues,modeSource,saveWorksheetState,variables'
+            'render,scheduleRenderedTeXFit,solverTextCards,present,clearVariableValues',
+            'setValueText,setValueCardVisible,modeSource,saveWorksheetState,variables'
         ],
         ['displayMatrixResult,scalar,present,setExpressionEditor', 'modeSource,saveWorksheetState,variables'],
         [
@@ -93,6 +93,11 @@ window.checkLabEvaluationInstall = async function checkLabEvaluationInstall() {
         ]
     ];
     const beforeDOM = WorksheetContext.rendered.innerHTML, beforeEditor = WorksheetContext.expr.value;
+    const odeSource = '{ m*Dtt(x)+c*Dt(x)+k*x=0 | t=?; m=?,c=?,k=?; m>0; c>=0; k>0 }';
+    const odePlan = plan(2, 0, {binding_expression: odeSource, binding_values: bindings});
+    equal(service(odePlan, 'setExpressionEditor').args[0], odeSource, 'ODE editor retains native parameter envelope');
+    equal(service(odePlan, 'setExpressionEditor').args[1], bindings, 'ODE parameters reach editable numeric controls');
+    check(!names(plan(2, 1)).includes('clearVariableValues'), 'ODE completion retains its parameter inputs');
     for (let mode = 0; mode < modes.length; ++mode) {
         for (let phase = 0; phase < 2; ++phase)
             equal(names(plan(mode, phase)), expected[mode][phase], modes[mode] + ' phase ' + phase + ' service order');

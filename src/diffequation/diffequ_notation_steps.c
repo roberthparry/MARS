@@ -31,7 +31,7 @@ string_t *de_notation_symbol_text(const expr_t *expression)
 
 /* Every row is projected before any result text is replaced. */
 bool de_notation_steps(diffequ_solve_result_t *result, const char *plain,
-                       const de_notation_step_t *steps, size_t count)
+                       const de_notation_step_t *steps, size_t count, bool partial)
 {
     if (!result || !plain || !steps || !count || count > 65536u)
         return false;
@@ -42,6 +42,7 @@ bool de_notation_steps(diffequ_solve_result_t *result, const char *plain,
         return false;
     }
     notation_build_dependent_variables(build, true);
+    notation_build_derivatives(build, partial);
     for (size_t i = 0u; i < count; ++i) {
         const TeX_model_node_t *math = steps[i].left ? notation_build_formula(build, steps[i].left) : NULL;
         if (steps[i].right) {

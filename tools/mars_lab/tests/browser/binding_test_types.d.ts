@@ -56,6 +56,8 @@ interface BindingWidgetContext {
 
 /** @brief Request fields inspected by the binding commit checks. */
 interface BindingCommitPayload {
+    /** @brief Optional native mathematical-envelope selector; ODE edits preserve all three sections. */
+    syntax?: string;
     action: string;
     operation: string;
     mode: string;

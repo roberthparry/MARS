@@ -19,6 +19,7 @@
 #include "string-t.h"
 #include "expression-t.h"
 #include "equation-t.h"
+#include "diffequation-t.h"
 #include "sampler-t.h"
 #include "plot-t.h"
 
@@ -141,6 +142,45 @@ bool lab_worker_surface_refine(plot_t *plot, const char *source, const char *fir
 
 /** @brief Return owning plot-local bound source and emit exact slice metadata without changing the worksheet. */
 char *lab_worker_surface_slice(const char *source, const char *first, const char *second, const char *request);
+
+/**
+ * @brief Select native plot-local parameter values and emit exact slider metadata.
+ * @param[in] source Borrowed expression and binding envelope; not retained or changed.
+ * @param[in] first First plotting coordinate, or NULL for a parameter-domain predicate.
+ * @param[in] second Second plotting coordinate, or NULL when absent.
+ * @param[in] request Borrowed tab-separated slider records, or NULL for automatic choices.
+ * @param[out] bindings_out Optional destination for owned selected bindings, released with expr_bindings_free().
+ * @return Owned source released with free(), or NULL for invalid values, restrictions or allocation failure.
+ * @note Run serially in the calculation worker. Worksheet bindings remain untouched.
+ */
+char *lab_worker_parameter_slices(const char *source, const char *first, const char *second, const char *request,
+                                  expr_bindings_t **bindings_out);
+
+/**
+ * @brief Assemble a differential problem's complete editable parameter envelope.
+ * @param[in] de Borrowed native problem, inspected without mutation.
+ * @return Owned native source released with string_free(), or NULL on formatting or allocation failure.
+ */
+string_t *lab_worker_de_source(const diffequ_t *de);
+
+/**
+ * @brief Apply illustrative slider choices to an isolated differential problem and emit plot metadata.
+ * @param[in,out] de Worker-owned problem; only its previously unset constants receive values.
+ * @param[in] request Borrowed slider records, or NULL for native automatic choices.
+ * @return True on success or when no constants need values; false on invalid choices or allocation failure.
+ * @note No worksheet source or supplied constant value is changed. Use before solving for the plotted curves.
+ */
+bool lab_worker_de_plot_parameters(diffequ_t *de, const char *request);
+
+/**
+ * @brief Draw representative real numerical trajectories when an ODE has no explicit symbolic coordinate function.
+ * @param[in] de Borrowed scalar problem with plot-local numerical coefficients already selected; not modified.
+ * @param[in] argv Borrowed validated solver-plot arguments, including finite optional coordinate and height bounds.
+ * @return Zero after emitting SVG and native title fields, or one with an explanatory error field on failure.
+ * The library owns all numerical integration; this adapter releases its samples and plot before returning.
+ * This isolated-worker operation must not run concurrently against mutable problem bindings.
+ */
+int lab_worker_de_trajectory_plot(const diffequ_t *de, char **argv);
 
 /** @brief Parse a plotting range with guard precision; return owning bounds without changing worksheet precision. */
 bool lab_worker_plot_bounds(const char *lower, const char *upper, number_t *lo, number_t *hi);

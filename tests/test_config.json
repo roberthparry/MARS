@@ -33,7 +33,8 @@
       "test_TeX_relation_input_invalid": true,
       "test_TeX_tensor_slots_and_fences": true,
       "test_TeX_text_boundaries": true,
-      "test_TeX_real_interval_domains": true
+      "test_TeX_real_interval_domains": true,
+      "test_TeX_rational_quotient_coefficients": true
     }
   },
   "tests/TeX/test_TeX_builder.c": {
@@ -326,7 +327,10 @@
       "test_interval_parsing": true,
       "test_interval_rejections": true,
       "test_interval_series_domain": true,
-      "test_interval_solution_domain": true
+      "test_interval_solution_domain": true,
+      "test_parameter_restrictions": true,
+      "test_parameter_restriction_evaluation": true,
+      "test_parameter_expression_serialisation": true
     }
   },
   "tests/diffequation/test_diffequ_wave_ivp.c": {
@@ -381,7 +385,13 @@
       "example_diffequation_weighted_cyclic_pde": true,
       "test_diffequ_linear_solution_retains_formal_integral": true,
       "test_diffequ_series_general_data": true,
-      "test_diffequ_series_quartic_coefficients": true
+      "test_diffequ_series_quartic_coefficients": true,
+      "example_diffequation_compact_coefficients": true,
+      "example_diffequation_parameter_restrictions": true,
+      "example_diffequation_autonomous_energy": true,
+      "example_diffequation_emden_quadrature": true,
+      "example_diffequation_symbolic_emden": true,
+      "example_diffequation_trajectory": true
     },
     "test_diffequ_abs_pde_real_residual": true,
     "test_diffequ_affine_transport": true,
@@ -575,7 +585,10 @@
     "test_diffequ_wave_kirchhoff_family": true,
     "test_diffequ_wave_polynomial_data": true,
     "test_diffequ_wave_rejects_outside_family": true,
-    "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true
+    "test_diffequ_weighted_cyclic_rule_rejects_unverified_solutions": true,
+    "test_diffequ_compact_prime_coefficients": true,
+    "test_diffequ_autonomous_energy": true,
+    "test_diffequ_emden_quadratures": true
   },
   "tests/equation/test_equation.c": {
     "readme_examples": {
@@ -2939,7 +2952,8 @@
       "docs_xml_001": true,
       "docs_xml_002": true,
       "docs_xml_003": true,
-      "enabled": true
+      "enabled": true,
+      "docs_diffequation_007": true
     }
   },
   "tools/mars_checks/tests/test_checks_build.c": {
@@ -3403,7 +3417,12 @@
       "test_lab_extra_surface_slices": true,
       "test_lab_extra_unsafe_TeX_environment": true,
       "test_lab_extra_unsafe_TeX_escape": true,
-      "test_lab_extra_unsafe_TeX_input": true
+      "test_lab_extra_unsafe_TeX_input": true,
+      "test_lab_extra_compact_prime_coefficients": true,
+      "test_lab_extra_parameter_restrictions": true,
+      "test_lab_extra_ode_parameter_controls": true,
+      "test_lab_extra_autonomous_energy": true,
+      "test_lab_extra_emden_quadratures": true
     }
   },
   "tools/mars_lab/tests/test_lab_forms.c": {
@@ -4164,6 +4183,24 @@
       "test_tba_rows": true,
       "test_tba_stream": true,
       "test_tba_worker": true
+    }
+  },
+  "tests/diffequation/test_diffequ_energy.c": {
+    "test_diffequ_autonomous_energy": {
+      "enabled": true,
+      "test_energy_real_families": true,
+      "test_energy_initial_values": true,
+      "test_energy_rejections_and_poles": true
+    }
+  },
+  "tests/diffequation/test_diffequ_emden.c": {
+    "test_diffequ_emden_quadratures": {
+      "enabled": true,
+      "test_emden_independent_coefficients": true,
+      "test_emden_parametric_residual": true,
+      "test_emden_exceptional_families": true,
+      "test_emden_point_case_and_scope": true,
+      "test_emden_trajectory_samples": true
     }
   }
 }

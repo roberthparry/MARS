@@ -90,5 +90,5 @@ bool de_heat_set_steps(diffequ_solve_result_t *result)
         {"Assume continuous locally bounded data, g(0) = 0, and decay at infinity.", NULL, NULL},
         {"Here x, t and g denote the recognised space, time and boundary history.", NULL, NULL}
     };
-    return de_notation_steps(result, plain, rows, sizeof rows / sizeof *rows);
+    return de_notation_steps(result, plain, rows, sizeof rows / sizeof *rows, true);
 }

@@ -4336,6 +4336,22 @@ static bool condition_rune(expr_parse_state_t *p, uint32_t expected)
     return true;
 }
 
+static bool condition_ordering(expr_parse_state_t *p, bool *reverse, bool *inclusive)
+{
+    expr_parse_skip_spaces(p);
+    uint32_t cp = 0u;
+    size_t width = 0u;
+    if (!expr_parse_peek_value(p, &cp, &width) ||
+        (cp != '<' && cp != '>' && cp != 0x2264u && cp != 0x2265u))
+        return false;
+    expr_parse_skip(p, width);
+    *reverse = cp == '<' || cp == 0x2264u;
+    *inclusive = cp == 0x2264u || cp == 0x2265u;
+    if (!*inclusive)
+        *inclusive = expr_parse_cursor_consume_char(p->cursor, '=');
+    return true;
+}
+
 static expr_t *parse_where_clause(expr_parse_state_t *p, expr_t *body)
 {
     if (!parse_where_start(p, true))
@@ -4364,7 +4380,18 @@ static expr_t *parse_where_clause(expr_parse_state_t *p, expr_t *body)
         expr_parse_skip_spaces(p);
         bool nonzero = membership && (condition_rune(p, 0x2260u) ||
                                      (condition_prefix(p, "!=") && condition_rune(p, '!') && condition_rune(p, '=')));
-        if (nonzero) {
+        bool reverse = false, inclusive = false;
+        bool ordered = membership && !nonzero && condition_ordering(p, &reverse, &inclusive);
+        if (ordered) {
+            expr_parse_skip_spaces(p);
+            expr_t *right = parse_addexpr(p);
+            expr_t *comparison = right ? expr_real_comparison(reverse ? right : value, reverse ? value : right,
+                                                              inclusive) : NULL;
+            expr_free(right);
+            expr_free(value);
+            value = comparison;
+            limit = comparison ? expr_const_zero() : NULL;
+        } else if (nonzero) {
             expr_parse_skip_spaces(p);
             expr_t *right = parse_addexpr(p);
             if (!right) {
@@ -4399,7 +4426,7 @@ static expr_t *parse_where_clause(expr_parse_state_t *p, expr_t *body)
             predicate->a = value;
             value = predicate;
             limit = expr_const_zero();
-        } else if (!nonzero && parse_condition_char(p, '>', "expected '>' in condition")) {
+        } else if (!nonzero && !ordered && parse_condition_char(p, '>', "expected '>' in condition")) {
             expr_parse_skip_spaces(p);
             string_cursor_t *scan = string_cursor_clone(p->cursor);
             bool projection = scan && expr_parse_cursor_consume_char(scan, 'R') &&
@@ -5228,7 +5255,8 @@ static bool starts_membership_condition(string_view_t text)
             return false;
         if (!depth && (cp == '=' || cp == ';'))
             return false;
-        if (!depth && (cp == 0x2208u || cp == 0x2260u || cp == '!' || cp == ':'))
+        if (!depth && (cp == 0x2208u || cp == 0x2260u || cp == '!' || cp == ':' ||
+                       cp == '<' || cp == '>' || cp == 0x2264u || cp == 0x2265u))
             return true;
         if (cp == '(' || cp == '[')
             ++depth;

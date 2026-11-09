@@ -102,6 +102,8 @@ void de_solve_result_free(diffequ_solve_result_t *result)
         equ_free(result->solutions[i]);
     free(result->solutions);
     expr_free(result->envelope_parameter);
+    expr_free(result->quadrature_parameter);
+    expr_free(result->quadrature_reference);
     equ_free(result->parameter_constraint);
     if (result->series_coefficients) {
         for (size_t i = 0u; i <= result->series_degree; ++i)
@@ -162,6 +164,18 @@ const equation_t *de_solve_result_at(const diffequ_solve_result_t *result, size_
 const expr_t *de_solve_result_parameter(const diffequ_solve_result_t *result)
 {
     return result ? result->envelope_parameter : NULL;
+}
+
+/* Borrow the local curve parameter without transferring ownership. */
+const expr_t *de_solve_result_quadrature_parameter(const diffequ_solve_result_t *result)
+{
+    return result ? result->quadrature_parameter : NULL;
+}
+
+/* Borrow the fixed quadrature reference, which carries no extra degree of freedom. */
+const expr_t *de_solve_result_quadrature_reference(const diffequ_solve_result_t *result)
+{
+    return result ? result->quadrature_reference : NULL;
 }
 
 /* Borrow the equation that determines the first solution family's auxiliary parameter. */

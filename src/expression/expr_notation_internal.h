@@ -149,12 +149,14 @@ const expr_t *expr_notation_domain_distribution(const notation_build_t *build, c
 const TeX_model_node_t *expr_notation_calculus_quotient(notation_build_t *build, const expr_t *expression);
 
 /**
- * @brief Combine a positive rational numerator factor with an outer denominator when applicable.
+ * @brief Keep a rational coefficient before the remaining algebraic quotient, for either sign.
  * @param build Borrowed semantic snapshot builder; it owns all nodes added by this call.
  * @param expression Borrowed source expression to inspect or transform without transferring ownership.
- * @return Model-owned semantic node, or NULL on invalid input or allocation failure; do not free it individually.
+ * @return Model-owned semantic node, or NULL when no rational factor applies or allocation fails; do not free it.
+ * @note A purely numerical numerator is combined with its denominator to avoid a nested fraction. Calculus
+ * factors are excluded. The expression is neither mutated nor retained beyond the builder's snapshot lifetime.
  */
-const TeX_model_node_t *expr_notation_flat_fraction(notation_build_t *build, const expr_t *expression);
+const TeX_model_node_t *expr_notation_scalar_quotient(notation_build_t *build, const expr_t *expression);
 
 /**
  * @brief Rewrite a reciprocal exponential containing calculus as a negative exponential.

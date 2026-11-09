@@ -3177,13 +3177,13 @@ int main(void)
 Output:
 
 ```text
-\frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{2\mkern-2mu x\mkern-2mu \left(x - 1\right)}
+\frac{1}{2}\mkern-2mu \frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{x\mkern-2mu \left(x - 1\right)}
 ```
 
 Rendered mathematics:
 
 $$
-\frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{2\mkern-2mu x\mkern-2mu \left(x - 1\right)}
+\frac{1}{2}\mkern-2mu \frac{\left(x^{2} - 4\right)\mkern-2mu \sin(x)\mkern-2mu \lg(\frac{1}{x})}{x\mkern-2mu \left(x - 1\right)}
 $$
 
 Push the result with `TeX_notation` to use it in a matrix, sequence or any
@@ -3420,6 +3420,9 @@ Real-domain bounds are displayed as ordinary inequalities, with paired lower
 and upper bounds combined into a single ordered chain. Real-part projections
 are retained for complex half-plane conditions. Domain restrictions follow the
 complete formula and remain effective during numerical evaluation.
+Inclusive parameter comparisons retain their equality sign. Coefficient
+restrictions from a differential equation are displayed alongside the complete
+solution, independently of its initial and boundary conditions.
 
 This is useful when converting mathematical text produced by MARS, for example
 after loading a saved expression. The programme below prints that native text,

@@ -85,6 +85,12 @@ void de_free(diffequ_t *de)
     free(de->interval_upper);
     free(de->independent_vars);
 
+    for (size_t i = 0; i < de->parameter_restriction_count; ++i) {
+        expr_free(de->parameter_restrictions[i].greater);
+        expr_free(de->parameter_restrictions[i].lesser);
+    }
+    free(de->parameter_restrictions);
+
     string_free(de->constant_text);
     string_free(de->independent_text);
     string_free(de->differential_form_text);

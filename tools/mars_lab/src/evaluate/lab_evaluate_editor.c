@@ -518,7 +518,7 @@ static json_t *lab_pres_editor_parse(const string_t *source)
 {
     json_t *model = json_new_object(), *bindings = json_new_array(), *conditions = json_new_array();
     string_t *body = string_new_with(string_c_str(source));
-    bool ok = model && bindings && conditions && body, wrapped = false;
+    bool ok = model && bindings && conditions && body, wrapped = false, condition_section = false;
     for (unsigned level = 0u; ok && level < 128u; ++level) {
         string_trim(body);
         string_t *inner = string_starts_with(body, "{") && string_ends_with(body, "}")
@@ -572,6 +572,7 @@ static json_t *lab_pres_editor_parse(const string_t *source)
             string_free(name);
             string_free(text);
         }
+        condition_section |= sections >= 2u;
         string_t *next = ok ? string_new_with(lab_eval_text(json_array_get(halves, 0u), "text")) : NULL;
         json_free(parts);
         json_free(halves);
@@ -581,6 +582,7 @@ static json_t *lab_pres_editor_parse(const string_t *source)
     }
     ok =
         ok && lab_eval_set(model, "body", string_c_str(body)) && lab_eval_put(model, "wrapped", json_new_bool(wrapped));
+    ok = ok && lab_eval_put(model, "condition_section", json_new_bool(condition_section));
     if (!lab_eval_put(model, "bindings", bindings))
         ok = false;
     if (!lab_eval_put(model, "conditions", conditions))
@@ -599,6 +601,8 @@ static string_t *lab_pres_editor_format(const json_t *model, bool goal)
     size_t count = json_array_size(bindings);
     const json_t **ordered = count <= 256u ? calloc(count ? count : 1u, sizeof(*ordered)) : NULL;
     string_t *variables = string_new(), *constants = string_new();
+    bool condition_section = false;
+    json_bool_value(lab_eval_get(model, "condition_section"), &condition_section);
     bool ok = variables && constants && ordered;
     if (ordered) {
         size_t variable_count = 0u, constant_count = 0u;
@@ -624,15 +628,17 @@ static string_t *lab_pres_editor_format(const json_t *model, bool goal)
         string_free(assignment);
     }
     string_t *out = ok ? string_new_with(lab_eval_text(model, "body")) : NULL;
-    if (ok && (json_array_size(bindings) || json_array_size(conditions))) {
+    if (ok && (json_array_size(bindings) || json_array_size(conditions) || condition_section)) {
         string_free(out);
         out = string_sprintf("{ %s | %s", lab_eval_text(model, "body"), string_c_str(variables));
-        ok = out && ((!string_byte_length(constants) && !json_array_size(conditions)) ||
+        ok = out && ((!string_byte_length(constants) && !json_array_size(conditions) && !condition_section) ||
                      (!string_append_cstr(out, "; ") && !string_append_string(out, constants)));
         for (size_t i = 0; ok && i < json_array_size(conditions); ++i) {
             const string_t *condition = json_string_value(json_array_get(conditions, i));
             ok = condition && !string_append_cstr(out, "; ") && !string_append_string(out, condition);
         }
+        if (ok && condition_section && !json_array_size(conditions))
+            ok = !string_append_cstr(out, "; ");
         ok = ok && !string_append_cstr(out, " }");
     }
     string_free(constants);
@@ -707,6 +713,12 @@ json_t *lab_pres_editor_action(const json_t *payload, const string_t *text)
     json_t *model = lab_pres_editor_parse(text);
     if (!model)
         return NULL;
+    /* The ODE adapter requires all three envelope fields, even when edits start from bare authored text. */
+    bool differential = !strcmp(lab_eval_text(payload, "syntax"), "diffequation");
+    if (differential && !lab_eval_put(model, "condition_section", json_new_bool(true))) {
+        json_free(model);
+        return NULL;
+    }
     bool ok = true;
     if (!strcmp(operation, "calculus")) {
         ok = lab_pres_editor_calculus(model, payload);

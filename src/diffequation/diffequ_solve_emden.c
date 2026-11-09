@@ -18,7 +18,32 @@
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_notation_internal.h"
 
-/* Describe the native logarithmic-derivative substitution without browser rewriting. */
+/* Decompose atomic derivatives before the dependent factor, avoiding a compound product as a search key. */
+bool de_decompose_emden(const expr_t *residual, const expr_t *independent, const expr_t *dependent,
+    const expr_t *first, const expr_t *second, expr_t **leading, expr_t **mixed, expr_t **cubic)
+{
+    *leading = *mixed = *cubic = NULL;
+    expr_t *rest = NULL, *velocity = NULL, *potential = NULL, *velocity_remainder = NULL;
+    expr_t *cube = expr_pow_long(dependent, 3), *potential_remainder = NULL;
+    bool valid = residual && first && second && cube &&
+        de_linear_decompose(residual, second, leading, &rest) &&
+        de_linear_decompose(rest, first, &velocity, &potential) &&
+        de_linear_decompose(velocity, dependent, mixed, &velocity_remainder) &&
+        expr_is_exact_zero(velocity_remainder) &&
+        de_linear_decompose(potential, cube, cubic, &potential_remainder) &&
+        expr_is_exact_zero(potential_remainder) && !expr_is_exact_zero(*leading);
+    const expr_t *coefficients[] = {*leading, *mixed, *cubic};
+    for (size_t i = 0; valid && i < 3u; ++i)
+        valid = !de_expr_uses(coefficients[i], independent) && !de_expr_uses(coefficients[i], dependent) &&
+                !de_expr_contains(coefficients[i], first) && !de_expr_contains(coefficients[i], second);
+    expr_free(potential_remainder); expr_free(cube); expr_free(velocity_remainder);
+    expr_free(potential); expr_free(velocity); expr_free(rest);
+    if (!valid) {
+        expr_free(*leading); expr_free(*mixed); expr_free(*cubic);
+        *leading = *mixed = *cubic = NULL;
+    }
+    return valid;
+}
 
 /*
  * The modified Emden equation
@@ -58,14 +83,9 @@ de_attempt_t de_attempt_modified_emden_linearization(const diffequ_t *de, const 
                                                             expr_t **scale_out)
 {
     expr_t *leading = NULL;
-    expr_t *remainder = NULL;
-    expr_t *mixed_monomial = NULL;
     expr_t *mixed_coefficient = NULL;
-    expr_t *after_mixed = NULL;
     expr_t *cubic_coefficient = NULL;
-    expr_t *constant_remainder = NULL;
     expr_t *three = NULL;
-    expr_t *y_cubed = NULL;
     expr_t *three_leading = NULL;
     expr_t *scale = NULL;
     expr_t *scale_squared = NULL;
@@ -87,7 +107,8 @@ de_attempt_t de_attempt_modified_emden_linearization(const diffequ_t *de, const 
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
 
     if (!de || !solutions_out || !solution_count_out || !scale_out || !first_derivative ||
-        !de_linear_decompose(residual, second_derivative, &leading, &remainder))
+        !de_decompose_emden(residual, independent, dependent, first_derivative, second_derivative,
+                            &leading, &mixed_coefficient, &cubic_coefficient))
         goto cleanup;
     *solution_count_out = 0u;
     *scale_out = NULL;
@@ -103,23 +124,15 @@ de_attempt_t de_attempt_modified_emden_linearization(const diffequ_t *de, const 
             goto cleanup;
     }
 
-    mixed_monomial = expr_mul(dependent, first_derivative);
-    y_cubed = expr_pow_long(dependent, 3L);
-    if (!mixed_monomial || !y_cubed ||
-        !de_linear_decompose(remainder, mixed_monomial, &mixed_coefficient, &after_mixed) ||
-        !de_linear_decompose(after_mixed, y_cubed, &cubic_coefficient, &constant_remainder) ||
-        !expr_is_exact_zero(constant_remainder) || expr_is_exact_zero(leading))
-        goto cleanup;
-
     three = expr_const_long(3L);
     three_leading = three ? expr_mul_simplify_owned(expr_clone(three), expr_clone(leading)) : NULL;
     scale = three_leading ? expr_div_simplify_owned(expr_clone(mixed_coefficient), three_leading) : NULL;
     three_leading = NULL;
-    scale_squared = scale ? expr_mul(scale, scale) : NULL;
-    expected_cubic = scale_squared ? expr_mul_simplify_owned(scale_squared, expr_clone(leading)) : NULL;
-    scale_squared = NULL;
+    scale_squared = expr_pow_long(mixed_coefficient, 2);
+    expected_cubic = expr_mul_simplify_owned(expr_const_long(9),
+        expr_mul_simplify_owned(expr_clone(leading), expr_clone(cubic_coefficient)));
     coefficient_difference =
-        expected_cubic ? expr_sub_simplify_owned(expr_clone(cubic_coefficient), expected_cubic) : NULL;
+        expected_cubic ? expr_sub_simplify_owned(expr_clone(scale_squared), expected_cubic) : NULL;
     expected_cubic = NULL;
     if (!scale || expr_is_exact_zero(scale) || de_expr_uses(scale, independent) || de_expr_uses(scale, dependent) ||
         !coefficient_difference || !expr_is_exact_zero(coefficient_difference))
@@ -187,14 +200,9 @@ cleanup:
     expr_free(scale_squared);
     expr_free(scale);
     expr_free(three_leading);
-    expr_free(y_cubed);
     expr_free(three);
-    expr_free(constant_remainder);
     expr_free(cubic_coefficient);
-    expr_free(after_mixed);
     expr_free(mixed_coefficient);
-    expr_free(mixed_monomial);
-    expr_free(remainder);
     expr_free(leading);
     return attempt;
 }

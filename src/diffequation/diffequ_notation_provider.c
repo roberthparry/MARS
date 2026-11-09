@@ -67,14 +67,16 @@ static const TeX_model_node_t *build_problem(notation_build_t *build, const diff
         return NULL;
     size_t conditions = de_condition_count(problem);
     size_t coordinates = de_independent_count(problem);
-    if (conditions >= 65536u || coordinates > (65535u - conditions) / 2u)
+    size_t parameters = problem->parameter_restriction_count;
+    if (conditions >= 65536u || parameters > 65535u - conditions ||
+        coordinates > (65535u - conditions - parameters) / 2u)
         return NULL;
     notation_build_derivatives(build, de_independent_count(problem) > 1u || problem->partial_derivative_input);
     primes = primes && de_independent_count(problem) == 1u && !problem->partial_derivative_input;
     expr_notation_prime_derivatives(build, primes);
     notation_build_dependent_variables(build, true);
     notation_build_source_order(build, true);
-    const TeX_model_node_t **parts = calloc(conditions + 1u + 2u * coordinates, sizeof *parts);
+    const TeX_model_node_t **parts = calloc(conditions + 1u + 2u * coordinates + parameters, sizeof *parts);
     if (!parts)
         return NULL;
     parts[0] = de_notation_equation(build, problem);
@@ -104,6 +106,15 @@ static const TeX_model_node_t *build_problem(notation_build_t *build, const diff
             parts[count++] = notation_build_node(build,
                 (TeX_node_view_t){.kind = TeX_NODE_RELATION, .relation = TeX_RELATION_LESS, .child_count = 2u}, sides);
         }
+    }
+    for (size_t i = 0; i < parameters; ++i) {
+        const de_parameter_restriction_t *restriction = problem->parameter_restrictions + i;
+        const TeX_model_node_t *sides[] = {
+            notation_build_expr(build, restriction->greater), notation_build_expr(build, restriction->lesser)
+        };
+        parts[count++] = notation_build_node(build,
+            (TeX_node_view_t){.kind = TeX_NODE_RELATION, .child_count = 2u,
+                .relation = restriction->inclusive ? TeX_RELATION_GREATER_EQUAL : TeX_RELATION_GREATER}, sides);
     }
     const TeX_model_node_t *root = count > 1u ? notation_build_node(build,
         (TeX_node_view_t){.kind = TeX_NODE_CONDITIONS, .child_count = count}, parts) : parts[0];

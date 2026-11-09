@@ -1578,6 +1578,14 @@ static void test_to_string_unbound_omits_binding_wrapper(void)
     free(unbound_text);
     free(full_text);
     expr_free(expr);
+    const char *sources[] = {"{x | x=?}", "{x | x=2}"};
+    for (size_t i = 0; i < 2u; ++i) {
+        expr = expr_from_string(sources[i], NULL);
+        unbound_text = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+        TEST_ASSERT_STR_EQ(unbound_text, "x");
+        free(unbound_text);
+        expr_free(expr);
+    }
 }
 
 typedef expr_t *(*test_unary_expr_fn)(const expr_t *expr);

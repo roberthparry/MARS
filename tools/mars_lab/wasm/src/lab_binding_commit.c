@@ -49,7 +49,10 @@ void lab_binding_commit_request(lab_mode_t mode, jsref source, snapshot_jsref sn
     lab_dom_set(request, "mode", lab_dom_string("merge"));
     lab_dom_set(request, "text", source);
     lab_dom_set(request, "bindings", bindings);
-    lab_dom_set(request, "unset_constants", lab_dom_scalar(LAB_VALUE_BOOLEAN, mode != LAB_MODE_EXPRESSION));
+    if (mode == LAB_MODE_DIFFERENTIAL_EQUATION)
+        lab_dom_set(request, "syntax", lab_dom_string("diffequation"));
+    lab_dom_set(request, "unset_constants", lab_dom_scalar(LAB_VALUE_BOOLEAN,
+        mode != LAB_MODE_EXPRESSION && mode != LAB_MODE_DIFFERENTIAL_EQUATION));
     lab_dom_return(request);
 }
 

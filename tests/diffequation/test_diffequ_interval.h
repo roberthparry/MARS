@@ -9,7 +9,7 @@
 #define MARS_TEST_DIFFEQU_INTERVAL_H
 
 /**
- * @brief Run strict interval parsing, serialisation and solution-domain regression checks.
+ * @brief Run coordinate and parameter restriction parsing, serialisation and solution-domain checks.
  * @return No value; individual assertions report failures through the sequential test harness.
  * No arguments or ownership transfers; all fixtures are released before returning. Not a concurrent runner.
  */
@@ -21,5 +21,12 @@ void test_diffequ_intervals(void);
  * No arguments or ownership transfers; all fixtures are released before returning. Run sequentially.
  */
 void example_diffequation_interval(void);
+
+/**
+ * @brief Run the parameter-restriction example from docs/diffequation.md after ordinary tests.
+ * @return No value; printed output and assertions follow the README-example harness conventions.
+ * No arguments or ownership transfers; all fixtures are released before returning. Run sequentially.
+ */
+void example_diffequation_parameter_restrictions(void);
 
 #endif

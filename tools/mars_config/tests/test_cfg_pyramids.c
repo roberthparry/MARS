@@ -4,10 +4,14 @@
  *
  * Generates small synthetic PNGs in memory and exercises the production globe API against disposable stores.
  * No installed data is opened. Failure injection verifies that incomplete sources cannot become visible.
+ * Captured release progress distinguishes checking from actual imports, including read-only repeat runs.
  */
+#include <fcntl.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <zlib.h>
 
 #include "array-t.h"
@@ -131,6 +135,31 @@ static void test_cfg_pyramid_import(void)
                      "complete prepared sources import; missing final blocks roll back every earlier block");
 }
 
+static bool installer_progress(sqlite_t *db, const string_t *root, const char *directory, bool importing)
+{
+    string_t *path = string_sprintf("%s/progress.txt", directory);
+    file_t *capture = path ? file_new(path) : NULL;
+    bool ok = capture && file_open(capture, FILE_MODE_CREATE_NEW, FILE_ACCESS_WRITE) && file_close(capture);
+    int descriptor = ok ? open(file_path(capture), O_WRONLY | O_NOFOLLOW) : -1;
+    int saved = descriptor >= 0 ? dup(STDERR_FILENO) : -1;
+    fflush(stderr);
+    bool redirected = saved >= 0 && dup2(descriptor, STDERR_FILENO) >= 0;
+    bool checked = redirected && cfg_database_pyramids(db, root);
+    fflush(stderr);
+    bool restored = !redirected || dup2(saved, STDERR_FILENO) >= 0;
+    if (saved >= 0) close(saved);
+    if (descriptor >= 0) close(descriptor);
+    string_t *output = checked && restored ? file_read_all_text(capture) : NULL;
+    ok = output && string_find(output, "Checking photographic source blocks") >= 0 &&
+         (importing ? string_find(output, "Installing photographic source blocks 1/1 sources imported — done") >= 0 :
+          string_find(output, "Installing photographic source blocks") < 0 &&
+          string_find(output, "Photographic source blocks: up to date; nothing to import.") >= 0);
+    if (!ok && output) string_fprintf(stderr, "Source-block progress transcript: %S\n", output);
+    ok = capture && (!file_exists(capture) || file_delete(capture)) && ok;
+    file_free(capture); string_free(path); string_free(output);
+    return ok;
+}
+
 static bool installer_fixture(const char *directory)
 {
     const char *digest = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
@@ -154,16 +183,31 @@ static bool installer_fixture(const char *directory)
         "INSERT INTO globe_texture VALUES(3,0,0,1800,1800,4,"
         "'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',zeroblob(4));"
         "INSERT INTO globe_texture VALUES(3,1,0,1800,1800,4,"
-        "'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',zeroblob(4));") &&
-        cfg_database_pyramids(target, root) && cfg_database_pyramids(target, root);
+        "'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',zeroblob(4));"
+        "INSERT INTO globe_texture VALUES(4,0,0,1800,1800,4,"
+        "'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',zeroblob(4));") &&
+        installer_progress(target, root, directory, true) &&
+        sqlite_exec_cstr(target, "PRAGMA query_only=ON") && installer_progress(target, root, directory, false);
     globe_t *globe = globe_open_databases(target, target, NULL);
     globe_texture_info_t installed, missing;
     ok = ok && globe_texture_metadata(globe, 3, 0, 0, &installed) && installed.pyramid &&
         globe_texture_metadata(globe, 3, 1, 0, &missing) && !missing.pyramid;
-    globe_close(globe); sqlite_close(target);
+    globe_close(globe);
+    /* New preparations must still be discovered after a previous no-work check. */
+    const char *later_digest = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    string_t *later_path = string_sprintf("%s/%s.db", string_c_str(folder_path), later_digest);
+    file_t *later_file = later_path ? file_new(later_path) : NULL;
+    source = later_file ? sqlite_open_plain(later_path) : NULL;
+    remaining = 100;
+    ok = ok && source && globe_texture_pyramid_build(source, later_digest, 1800, produce, &remaining);
+    sqlite_close(source);
+    ok = ok && sqlite_exec_cstr(target, "PRAGMA query_only=OFF") && installer_progress(target, root, directory, true) &&
+         sqlite_exec_cstr(target, "PRAGMA query_only=ON") && installer_progress(target, root, directory, false);
+    sqlite_close(target);
     ok = (previous ? !setenv("MARS_GLOBE_TEXTURE_DIR", string_c_str(previous), 1) :
                      !unsetenv("MARS_GLOBE_TEXTURE_DIR")) && ok;
-    ok = file_delete(file) && file_remove_directory(folder) && ok;
+    ok = file_delete(file) && file_delete(later_file) && file_remove_directory(folder) && ok;
+    file_free(later_file); string_free(later_path);
     string_free(previous); file_free(file); file_free(folder); string_free(root);
     string_free(folder_path); string_free(path); string_free(memory);
     return ok;
@@ -172,7 +216,7 @@ static bool installer_fixture(const char *directory)
 static void test_cfg_pyramid_installer(void)
 {
     TEST_ASSERT_TRUE(test_cfg_isolated(installer_fixture),
-                     "release imports matching shards with per-source writer locks, resumes and retains missing originals");
+                     "release imports each missing digest once, discovers later shards and only checks completed sources");
 }
 
 /* Register the production storage regressions in the ordinary sequential installer suite. */

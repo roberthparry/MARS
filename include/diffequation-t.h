@@ -20,9 +20,14 @@
  * affine-substitution, linear
  * changes of variables, quadratic Bernoulli, Riccati linearisations with supported
  * monomial normal potentials, and autonomous
- * derivative-quadratic first-order ordinary differential equations, together
+ * derivative-quadratic first-order equations and real autonomous exponential-force
+ * second-order equations through their energy integral, together
  * with arbitrary-order constant-coefficient linear ODEs and second-order
  * equations that can be completed through Sturm-Liouville normalisation.
+ * Modified-Emden families use a rational point-linearisation when its coefficient relation holds;
+ * independent real constant coefficients instead give exact local parametric quadratures.
+ * A separate double-precision trajectory sampler handles real scalar first- and second-order initial-value
+ * problems numerically for visualisation, including equations without an explicit symbolic solution.
  * Two-variable constant-coefficient homogeneous transport PDEs are solved
  * from explicit axis-aligned boundary data. The two-dimensional Laplace
  * equation is solved in Cartesian and polar coordinates as a general
@@ -42,6 +47,7 @@
 
 #include "equation-t.h"
 #include "matrix-t.h"
+#include "sampler-t.h"
 
 /**
  * @brief An opaque differential-equation problem.
@@ -169,7 +175,10 @@ typedef enum {
     DE_SOLVE_STATUS_FAILED,
 
     /** A local Taylor expansion with an explicit remainder, not an exact finite solution. */
-    DE_SOLVE_STATUS_SERIES
+    DE_SOLVE_STATUS_SERIES,
+
+    /** Exact local parametric quadratures; the first two equations must be used together. */
+    DE_SOLVE_STATUS_QUADRATURE
 } de_solve_status_t;
 
 /**
@@ -217,7 +226,13 @@ typedef enum {
     DE_SOLVER_HALF_LINE_HEAT,
 
     /** Riccati logarithmic-derivative reduction to a supported second-order linear equation. */
-    DE_SOLVER_RICCATI
+    DE_SOLVER_RICCATI,
+
+    /** Real autonomous exponential-force solutions obtained from the conserved energy integral. */
+    DE_SOLVER_AUTONOMOUS_ENERGY,
+
+    /** Time-translation and scaling reduction of an autonomous modified-Emden equation. */
+    DE_SOLVER_EMDEN_QUADRATURE
 } de_solver_t;
 
 /**
@@ -247,11 +262,22 @@ diffequ_t *de_new(const equation_t *equation);
  * takes precedence.
  * Condition-only braced shorthand such as `{ y'' + y | y(0)=1, y'(0)=0 }` infers the independent variable.
  * A shorthand residual without an equals sign means an equation equal to zero. Canonical three-section input
- * continues to separate independent variables, constants and conditions explicitly.
+ * continues to separate independent variables, constants and conditions explicitly. Within its condition section,
+ * commas and semicolons are equivalent separators; nested expression delimiters retain their usual meaning.
+ * Empty trailing constant and condition sections may be omitted. An envelope containing only coordinate
+ * declarations such as `t=?` remains distinct from condition-only shorthand; coordinates must remain unset.
+ * An empty coordinate section infers coordinates from the derivatives while retaining any coefficient bindings.
+ * Prime notation recognises a shared dependent-name suffix with single-letter coefficient prefixes, so
+ * `my''+cy'+ky=0` means `m*Dxx(y)+c*Dx(y)+k*y=0`. Complete multi-letter dependent names and bracketed
+ * identifiers retain their identity; use explicit multiplication when a compact name would be ambiguous.
+ * Real parameter comparisons accept `<`, `<=`, `>`, `>=` and their Unicode equivalents after the equation
+ * or among canonical conditions. They are preserved on complete solutions and never count as point conditions;
+ * for example `mx''+cx'+kx=0; c>=0; m>0; k>0` keeps non-negative damping and positive mass and stiffness.
+ * Known non-real or false parameter comparisons are rejected. These assumptions do not select solver branches.
  * Strict real coordinate intervals may follow the equation or appear among canonical conditions. One-sided
  * and chained inequalities are supported; endpoints must be finite real expressions independent of the coordinates.
- * Repeated bounds are intersected. Intervals do not count as initial or boundary data. Inclusive bounds and
- * arbitrary inequality constraints are not supported.
+ * Repeated bounds are intersected. Intervals do not count as initial or boundary data. Inclusive coordinate bounds
+ * and restrictions involving the dependent field are not supported.
  *
  * @param text Null-terminated input text. Must not be `NULL`.
  * @return A newly allocated differential-equation problem, or `NULL` when the
@@ -335,6 +361,29 @@ const expr_t *de_independent_upper_bound(const diffequ_t *de, size_t index);
  * The returned bindings remain owned by @p de and must not be freed.
  */
 expr_bindings_t *de_constants(const diffequ_t *de);
+
+/**
+ * @brief Sample a real scalar first- or second-order ODE numerically, independently of symbolic solvability.
+ * @param[in] de Borrowed one-coordinate problem, linear in its highest derivative; coefficients must be bound.
+ * @param[in] initial_coordinate Borrowed finite real starting coordinate inside the closed sampling interval.
+ * @param[in] initial_value Borrowed finite real dependent value at the starting coordinate.
+ * @param[in] initial_slope Borrowed finite real first derivative for a second-order equation; ignored for first order.
+ * @param[in] lower Borrowed finite real lower sampling endpoint.
+ * @param[in] upper Borrowed finite real upper endpoint, strictly greater than lower.
+ * @param[in] options Borrowed sampler limits and tolerances, or NULL for defaults. Output is uniform with
+ * intervals + 1 points; adaptive Runge--Kutta step doubling controls integration error between those points.
+ * max_evaluations also bounds right-side evaluations. max_depth and method do not change the uniform output.
+ * @return Owned samples released with sampler_free(), or NULL with EINVAL for invalid arguments, ENOTSUP for
+ * unsupported equations, ENODATA for unavailable real initial rates or unbound coefficients, E2BIG for exhausted
+ * work, or ENOMEM for allocation failure. Cooperative cancellation propagates its error.
+ * @note This is double-precision visualisation, not an arbitrary-precision or certified solution. Each direction
+ * stops at its first non-real rate or unresolved singularity and leaves gaps beyond it; it never resumes across
+ * that singularity. The supplied problem and bindings are unchanged. No input ownership transfers; concurrent
+ * mutation of the problem is unsupported. Authored initial conditions are not inferred or overridden: supply
+ * their values explicitly. Restrict the interval to the problem's authored domain.
+ */
+sampler_t *de_sample_trajectory(const diffequ_t *de, number_t initial_coordinate, number_t initial_value,
+    number_t initial_slope, number_t lower, number_t upper, const sampler_options_t *options);
 
 /**
  * @brief Look up a named problem constant.
@@ -438,7 +487,17 @@ char *de_to_string(const diffequ_t *de, style_t style);
  * linearized. The solver also normalizes regular second-order linear equations
  * to Sturm-Liouville form and solves arbitrary-order constant-coefficient
  * linear ODEs, including nonhomogeneous forcing.
+ * Autonomous exponential forces `y'' = A*exp(B*y)` use their conserved energy when A and B evaluate to finite,
+ * real, non-zero constants. All real positive-, negative- and zero-energy families are retained where present,
+ * with pole restrictions. Two finite real initial data (value and slope) at one point fix the local solution.
+ * Other point-condition patterns and unresolved exponential coefficients are not handled by this method.
  * First-order linear equations use an integrating factor.
+ * Unconditioned modified-Emden equations with independent real constant coefficients reduce through
+ * time translation and scaling to exact simultaneous parametric quadratures, with status
+ * ::DE_SOLVE_STATUS_QUADRATURE. The first two returned equations are the dependent and independent
+ * coordinates; remaining equations are separate exceptional families. Initial/boundary conditions and
+ * coordinate intervals are not handled by this strategy. The simpler point-linearisation remains
+ * preferred when its coefficient relation holds.
  * Riccati equations reduce to a second-order linear equation; monomial normal potentials
  * admit entire hypergeometric bases, including the exceptional projective branch.
  * A single finite real initial value is supported at a regular real point with non-zero quadratic coefficient.
@@ -615,12 +674,34 @@ size_t de_solve_result_count(const diffequ_solve_result_t *result);
  * alternatives; for a gradient-envelope result, the second is the affine
  * complete integral. Native unbound and TeX renderings include these labels
  * and conditions; other consumers must inspect the constraint explicitly.
+ * For ::DE_SOLVE_STATUS_QUADRATURE, equations zero and one are simultaneous parametric coordinates,
+ * followed by separate exceptional families. Inspect de_solve_result_quadrature_parameter() and
+ * de_solve_result_quadrature_reference() rather than treating each equation as an explicit solution.
  *
  * @param result Result to inspect.
  * @param index Zero-based solution index.
  * @return A borrowed equation, or `NULL` when @p index is out of range.
  */
 const equation_t *de_solve_result_at(const diffequ_solve_result_t *result, size_t index);
+
+/**
+ * @brief Borrow the parameter of an exact quadrature solution.
+ * @param[in] result Borrowed solve result; neither changed nor retained. NULL is accepted.
+ * @return Borrowed parameter, or NULL when the result is not parametric; do not free it.
+ * @note For ::DE_SOLVE_STATUS_QUADRATURE, equations zero and one specify the dependent and independent
+ * coordinates together in this parameter. Later equations are separate exceptional families. The pointer
+ * remains valid until de_solve_result_free(); callers must serialise access to mutable expression graphs.
+ */
+const expr_t *de_solve_result_quadrature_parameter(const diffequ_solve_result_t *result);
+
+/**
+ * @brief Borrow the fixed reference parameter used by a quadrature family.
+ * @param[in] result Borrowed solve result; neither changed nor retained. NULL is accepted.
+ * @return Borrowed reference, or NULL without a quadrature family; do not free it.
+ * @note This reference selects a regular integration interval, not an additional integration constant.
+ * Changing it can be absorbed into the family's two constants. Its lifetime is that of result; use serially.
+ */
+const expr_t *de_solve_result_quadrature_reference(const diffequ_solve_result_t *result);
 
 /**
  * @brief Borrow the auxiliary parameter of a local envelope solution.

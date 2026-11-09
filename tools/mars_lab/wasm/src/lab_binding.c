@@ -17,6 +17,7 @@
 #include "lab_dom.h"
 #include "lab_forms.h"
 #include "lab_rows.h"
+#include "lab_workspace.h"
 #include "lab_binding.h"
 #define MARS_LAB_BINDING_INTERNAL_ACCESS
 #include "lab_binding_internal.h"
@@ -371,9 +372,11 @@ static void lab_binding_card(jsref root, jsref binding, jsref values, jsref kind
     lab_dom_write(clear, LAB_DOM_ATTRIBUTE, "title", clear_label);
     lab_dom_write(clear, LAB_DOM_ATTRIBUTE, "aria-label", clear_label);
     int actions = lab_binding_child(box, "div", "variable-value-actions");
-    int toggle = lab_binding_button(actions, "card-action variable-toggle", constant ? "Variable" : "Constant");
-    lab_dom_write(toggle, LAB_DOM_ATTRIBUTE, "title",
-                  lab_binding_caption("Treat ", label, constant ? " as a variable" : " as a constant"));
+    if (lab_workspace_mode() != LAB_MODE_DIFFERENTIAL_EQUATION) {
+        int toggle = lab_binding_button(actions, "card-action variable-toggle", constant ? "Variable" : "Constant");
+        lab_dom_write(toggle, LAB_DOM_ATTRIBUTE, "title",
+                      lab_binding_caption("Treat ", label, constant ? " as a variable" : " as a constant"));
+    }
     int copy = lab_binding_button(actions, "card-action variable-copy", "Copy");
     int card = lab_dom_object(LAB_VALUE_OBJECT);
     lab_dom_set(card, "input", input);
@@ -413,10 +416,15 @@ void lab_binding_render(jsref root, jsref bindings)
         index = lab_dom_get(root, "labBindingIndex");
     lab_dom_set(result, "values", values);
     lab_dom_set(result, "kinds", kinds);
-    unsigned count = lab_dom_count(bindings), mark = lab_dom_mark();
-    for (unsigned i = 0; i < count; ++i) {
+    unsigned count = 0u, mark = lab_dom_mark();
+    bool differential = lab_workspace_mode() == LAB_MODE_DIFFERENTIAL_EQUATION;
+    for (unsigned i = 0; i < lab_dom_count(bindings); ++i) {
         int binding = lab_dom_item(bindings, i);
-        lab_dom_push(lab_binding_is(lab_dom_get(binding, "kind"), "constant") ? constants : variables, binding);
+        bool constant = lab_binding_is(lab_dom_get(binding, "kind"), "constant");
+        if (!differential || constant) {
+            lab_dom_push(constant ? constants : variables, binding);
+            ++count;
+        }
         lab_dom_release(mark);
     }
     constants = lab_binding_sort(constants);

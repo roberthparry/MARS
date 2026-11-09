@@ -961,6 +961,7 @@ de_attempt_t de_attempt_sturm_liouville(const diffequ_t *de, const expr_t *indep
     expr_t *first_root = NULL;
     expr_t *second_root = NULL;
     expr_t *solution = NULL;
+    number_t discriminant_value = NUM_NAN;
     de_attempt_t attempt = DE_ATTEMPT_NOT_MATCHED;
 
     if (!solver_out || !de_decompose_second_order(residual, second_derivative, first_derivative, dependent, &form))
@@ -1009,7 +1010,9 @@ de_attempt_t de_attempt_sturm_liouville(const diffequ_t *de, const expr_t *indep
     if (!discriminant)
         goto cleanup;
 
-    if (expr_is_exact_zero(discriminant)) {
+    /* Bound coefficients can retain symbolic nodes; their values still determine the real solution basis. */
+    discriminant_value = expr_eval(discriminant);
+    if (expr_is_exact_zero(discriminant) || num_is_zero(discriminant_value)) {
         expr_t *denominator = expr_mul_simplify_owned(expr_const_long(2L), expr_clone(form.leading));
         expr_t *root = denominator ? expr_div_simplify_owned(de_simplify_unary_owned(expr_clone(form.first), expr_neg),
                                                              denominator)
@@ -1018,8 +1021,7 @@ de_attempt_t de_attempt_sturm_liouville(const diffequ_t *de, const expr_t *indep
         solution = root ? de_repeated_root_solution(de, independent, dependent, root) : NULL;
         root = NULL;
     } else {
-        number_t discriminant_value = num_new();
-        bool numeric_discriminant = expr_match_const_value(discriminant, &discriminant_value);
+        bool numeric_discriminant = num_is_finite(discriminant_value);
 
         if (numeric_discriminant && num_is_real(discriminant_value) && num_lt(discriminant_value, NUM_ZERO)) {
             number_t positive_value = num_neg(discriminant_value);
@@ -1056,7 +1058,6 @@ de_attempt_t de_attempt_sturm_liouville(const diffequ_t *de, const expr_t *indep
         } else {
             sqrt_discriminant = de_simplify_unary_owned(expr_clone(discriminant), expr_sqrt);
         }
-        num_destroy(&discriminant_value);
         if (!solution) {
             first_root = sqrt_discriminant ? de_root(&form, sqrt_discriminant, true) : NULL;
             second_root = sqrt_discriminant ? de_root(&form, sqrt_discriminant, false) : NULL;
@@ -1078,6 +1079,7 @@ make_solution:
         attempt = DE_ATTEMPT_SOLVED;
 
 cleanup:
+    num_destroy(&discriminant_value);
     expr_free(solution);
     expr_free(second_root);
     expr_free(first_root);

@@ -397,7 +397,7 @@ static string_t *de_conditions_to_text(const diffequ_t *de, bool partial_derivat
         string_free(condition);
         goto fail;
     }
-    string_t *intervals = de_intervals_to_text(de);
+    string_t *intervals = de_restrictions_to_text(de);
     bool ok = intervals && (!string_byte_length(intervals) ||
               ((!string_byte_length(out) || string_append_cstr(out, ", ") == 0) &&
                string_append_string(out, intervals) == 0));

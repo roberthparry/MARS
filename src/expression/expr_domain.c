@@ -137,6 +137,45 @@ const expr_ops_t ops_real_parameter = {
     .apply_unary = expr_real_parameter,
 };
 
+static number_t real_comparison_eval(expr_t *expr)
+{
+    number_t left = expr_eval(expr->a), right = expr_eval(expr->b);
+    bool valid = num_is_finite(left) && num_is_real(left) && num_is_finite(right) && num_is_real(right) &&
+                 (expr->ops == &ops_real_at_least ? num_ge(left, right) : num_gt(left, right));
+    num_destroy(&right);
+    num_destroy(&left);
+    return num_clone(valid ? NUM_ONE : NUM_ZERO);
+}
+
+static expr_t *real_greater_new(const expr_t *left, const expr_t *right)
+{
+    return expr_real_comparison(left, right, false);
+}
+
+static expr_t *real_at_least_new(const expr_t *left, const expr_t *right)
+{
+    return expr_real_comparison(left, right, true);
+}
+
+const expr_ops_t ops_real_greater = {
+    .eval = real_comparison_eval, .kind = EXPR_KIND_REAL_GREATER, .arity = EXPR_OP_BINARY,
+    .diff_kind = EXPR_DIFF_NONE, .expression_name = "real_greater", .function_name = "real_greater",
+    .apply_binary = real_greater_new,
+};
+
+const expr_ops_t ops_real_at_least = {
+    .eval = real_comparison_eval, .kind = EXPR_KIND_REAL_AT_LEAST, .arity = EXPR_OP_BINARY,
+    .diff_kind = EXPR_DIFF_NONE, .expression_name = "real_at_least", .function_name = "real_at_least",
+    .apply_binary = real_at_least_new,
+};
+
+/* Domain indicators retain both operands so later parameter bindings are checked when evaluated. */
+expr_t *expr_real_comparison(const expr_t *left, const expr_t *right, bool inclusive)
+{
+    return left && right ? expr_new_binary_internal(inclusive ? &ops_real_at_least : &ops_real_greater,
+                                                    expr_retain_expr(left), expr_retain_expr(right)) : NULL;
+}
+
 static number_t nonnegative_integer_eval(expr_t *expr)
 {
     number_t value = expr_eval(expr->a);

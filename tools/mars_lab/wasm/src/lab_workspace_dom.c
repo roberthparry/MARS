@@ -634,8 +634,8 @@ void lab_workspace_dom_derivatives(jsref names, jsref labels, bool differentiabl
         return;
     static const char *const suffixes[] = {" derivative", " integral"};
     int plots = !lab_dom_has_class(lab_dom_query(0, "#plotRange"), "hidden");
-    if (plots)
-        lab_plot_controls_variables(names, labels);
+    /* Hidden plots still need the native coordinate catalogue before their first asynchronous request. */
+    lab_plot_controls_variables(names, labels);
     for (lab_workspace_calculus_action_t action = LAB_WORKSPACE_DERIVATIVE; action <= LAB_WORKSPACE_INTEGRAL;
          ++action) {
         if (!differentiable)

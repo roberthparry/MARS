@@ -348,7 +348,7 @@ diffequ_solve_result_t *de_solve_series(const diffequ_t *de, size_t degree, unsi
     if (!computation_step_current("diffequation.result"))
         return NULL;
     diffequ_solve_result_t *result = de_solve_series_impl(de, degree, options);
-    if (de && result && !de_result_apply_intervals(de, result)) {
+    if (de && result && !de_result_apply_restrictions(de, result)) {
         de_solve_result_free(result);
         result = NULL;
     }

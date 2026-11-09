@@ -217,6 +217,12 @@ static void emit_expr_inner(const expr_t *f, sbuf_t *b, int parent_prec)
             if (pair != f->b)
                 sbuf_puts(b, "; ");
             const expr_t *nonzero = expr_domain_nonzero_operand(pair);
+            if (expr_is_op(pair->a, &ops_real_greater) || expr_is_op(pair->a, &ops_real_at_least)) {
+                emit_expr(pair->a->a, b, PREC_LOWEST);
+                sbuf_puts(b, expr_is_op(pair->a, &ops_real_at_least) ? " ≥ " : " > ");
+                emit_expr(pair->a->b, b, PREC_LOWEST);
+                continue;
+            }
             if (nonzero) {
                 emit_expr(nonzero, b, PREC_LOWEST);
                 sbuf_puts(b, " ≠ 0");

@@ -5,9 +5,9 @@
  * Parses equation graphs without browser-side rewriting. Both algebraic sides
  * share one viewport; explicit ODE solution branches are sampled independently.
  * Two-variable algebraic equations use real zero contours; PDE solutions use the
- * shared surface renderer. Implicit ODE solutions,
- * unset authored parameters and unsupported dimensions are reported,
- * never replaced by guessed functions. Existing guarded sampling and clipping
+ * shared surface renderer. Unset authored parameters use labelled, plot-local slider choices before solving;
+ * supplied values remain fixed. Implicit ODE solutions and unsupported dimensions are reported.
+ * Existing guarded sampling and clipping
  * policies apply to every curve in the isolated calculation process.
  */
 #include <errno.h>
@@ -285,6 +285,10 @@ int lab_worker_solver_plot(int argc, char **argv)
                "for a PDE surface.\n");
         return 1;
     }
+    if (!lab_worker_de_plot_parameters(de, argc > 19 && strcmp(argv[19], "--plot-cache") ? argv[19] : NULL)) {
+        de_free(de);
+        return 1;
+    }
     lab_plot_prepared_t *prepared = dimensions == 1 ? lab_worker_plot_prepared_read(argc, argv) : NULL;
     if (prepared) {
         print_axis(axis);
@@ -359,6 +363,9 @@ int lab_worker_solver_plot(int argc, char **argv)
         }
         string_free(title_TeX);
         string_free(title_text);
+    } else if (solutions && de_solve_result_status(solutions) == DE_SOLVE_STATUS_QUADRATURE) {
+        print_axis(axis);
+        rc = lab_worker_de_trajectory_plot(de, argv);
     } else {
         printf("error Plotting requires explicit real solution functions; implicit, series-only or unsupported "
                "solutions cannot yet be plotted.\n");

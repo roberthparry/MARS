@@ -107,6 +107,12 @@ static string_t *expr_to_text_expr_mode(const expr_t *f, bool preserve_root_symb
                 if (vl.count || cl.count || pair != g->b)
                     sbuf_puts(&b, "; ");
                 const expr_t *nonzero = expr_domain_nonzero_operand(pair);
+                if (expr_is_op(pair->a, &ops_real_greater) || expr_is_op(pair->a, &ops_real_at_least)) {
+                    emit_expr(pair->a->a, &b, PREC_LOWEST);
+                    sbuf_puts(&b, expr_is_op(pair->a, &ops_real_at_least) ? " ≥ " : " > ");
+                    emit_expr(pair->a->b, &b, PREC_LOWEST);
+                    continue;
+                }
                 if (nonzero) {
                     emit_expr(nonzero, &b, PREC_LOWEST);
                     sbuf_puts(&b, " ≠ 0");
@@ -234,7 +240,8 @@ string_t *expr_to_text_unbound(const expr_t *f)
     const expr_t *g = f;
     string_t *out;
 
-    if (f && f->binding_expr && !expr_is_const(f) && !expr_binding_expr_is_array(f->binding_expr))
+    if (f && f->binding_expr && !expr_is_const(f) && !expr_is_var(f) &&
+        !expr_binding_expr_is_array(f->binding_expr))
         return expr_text_from_owned_c_string(expr_binding_expr_to_string(f->binding_expr));
 
     autoname_init(&vnames);

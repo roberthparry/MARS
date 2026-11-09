@@ -188,6 +188,100 @@
         if (!condition)
             throw new Error(message);
     }
+    async function checkOdeParameterControls() {
+        WorksheetWorkspace.mode.setMode('diffequation');
+        WorksheetWorkspace.presentation.syncModeUI();
+        WorksheetBindings.controller.setExpressionEditor("mx''+cx'+kx=0; c>=0; m>0; k>0");
+        await WorksheetRequests.evaluation.evaluateDiffequation();
+        await waitForAutomaticPlot();
+        const inputs = document.getElementById('variableValues')!;
+        for (const name of ['m', 'c', 'k'])
+            check(inputs.querySelector<HTMLInputElement>(`.binding-value-input[data-binding-name="${name}"]`),
+                  'ODE parameter ' + name + ' has a numeric input');
+        const root = document.getElementById('plotSlices')!;
+        check(root.querySelectorAll('.plot-slice').length === 3,
+              'Unset ODE parameters have three plot-local sliders: ' + root.textContent + '; plot: ' +
+              document.getElementById('plotRendered')!.textContent?.slice(0, 500) + '; axes: ' +
+              (document.getElementById('plotFirst') as HTMLInputElement).value + ',' +
+              (document.getElementById('plotSecond') as HTMLInputElement).value + '; source: ' +
+              WorksheetBindings.editor.currentExpressionText());
+        check(document.querySelector('#plotRendered [data-series]'), 'Unset parameters still give a real family plot');
+        const before = WorksheetBindings.editor.currentExpressionText();
+        const choice = root.querySelector<HTMLInputElement>('.slice-choice[value="m"]')!;
+        choice.checked = true;
+        choice.dispatchEvent(new Event('change', {bubbles: true}));
+        const row = root.querySelector<HTMLElement>('.plot-slice[data-name="m"]')!;
+        const slider = row.querySelector<HTMLInputElement>('.slice-slider')!;
+        const previous = document.querySelector('#plotRendered [data-series]');
+        slider.value = '700';
+        slider.dispatchEvent(new Event('input', {bubbles: true}));
+        slider.dispatchEvent(new Event('change', {bubbles: true}));
+        for (let n = 0; n < 800 && (previous?.isConnected ||
+             row.querySelector<HTMLInputElement>('.slice-value')!.value === '1'); ++n)
+            await LabTestBrowser.wait(25);
+        check(!previous?.isConnected && row.querySelector<HTMLInputElement>('.slice-value')!.value !== '1',
+              'Moving the mass slider redraws the native family with a new coefficient: ' +
+              document.getElementById('plotFeedback')!.textContent + '; value: ' +
+              row.querySelector<HTMLInputElement>('.slice-value')!.value + '; position: ' +
+              row.querySelector<HTMLInputElement>('.slice-position')!.value);
+        check(WorksheetBindings.editor.currentExpressionText() === before, 'Slider choices keep the worksheet symbolic');
+        const mass = inputs.querySelector<HTMLInputElement>('.binding-value-input[data-binding-name="m"]')!;
+        mass.value = '2';
+        await WorksheetBindings.controller.queueBindingInputCommit(mass);
+        await WorksheetRequests.evaluation.evaluateDiffequation();
+        await waitForAutomaticPlot();
+        check(inputs.querySelector<HTMLInputElement>('.binding-value-input[data-binding-name="m"]')?.value === '2',
+              'A supplied mass survives binding commit and ODE evaluation');
+        check(!root.querySelector('.plot-slice[data-name="m"]') && root.querySelectorAll('.plot-slice').length === 2,
+              'Supplied coefficients stay fixed while the remaining unknowns retain sliders');
+    }
+
+    async function checkOdeEditorRoundTrip() {
+        WorksheetWorkspace.mode.setMode('diffequation');
+        WorksheetWorkspace.presentation.syncModeUI();
+        for (const [source, title] of [
+                 ["d²x/dt² + alpha x*dx/dt + beta x³ = 0", 'Equation and quadratures'],
+                 ["x'' + alpha xx' + beta x³ = 0", 'Equation and quadratures'],
+                 ["{d²x/dt² + alpha*x*dx/dt + beta*x³ = 0 | t=?}", 'Equation and quadratures'],
+                 ["d²x/dt² + alpha x*dx/dt + alpha^2/9 x³ = 0", 'Equation and solutions']]) {
+            WorksheetContext.expr.value = source;
+            WorksheetContext.expr.dispatchEvent(new Event('input', {bubbles: true}));
+            for (let repeat = 0; repeat < 3; ++repeat) {
+                await WorksheetRequests.evaluation.evaluateDiffequation();
+                check(WorksheetContext.renderedTitle.textContent === title &&
+                      !WorksheetContext.rendered.textContent?.includes('could not parse'),
+                      `ODE editor round trip ${repeat + 1}: ${source}; retained source: ` +
+                      WorksheetBindings.editor.currentExpressionText() + '; card: ' + WorksheetContext.rendered.textContent);
+                check(WorksheetContext.rendered.querySelector('svg') &&
+                      !WorksheetContext.rendered.textContent?.includes('error [lab.render:'),
+                      'The ODE card contains successfully rendered mathematics: ' + source + '; ' +
+                      WorksheetContext.rendered.textContent?.slice(0, 350));
+                check(!document.querySelector('#variableValues .binding-value-input[data-binding-kind="variable"]'),
+                      'Independent ODE coordinates are not editable coefficient values');
+                check(!document.querySelector('#variableValues .variable-toggle'),
+                      'ODE coordinate and coefficient roles cannot be toggled');
+            }
+            await waitForAutomaticPlot();
+            check(document.querySelector('#plotRendered [data-series]'),
+                  'The screenshot equation produces real plotted curves: ' + source + '; ' +
+                  document.getElementById('plotRendered')!.textContent?.slice(0, 350));
+            for (const name of source.includes('beta') ? ['α', 'β'] : ['α']) {
+                check(document.querySelector(`#variableValues .binding-value-input[data-binding-name="${name}"]`),
+                      'Inferred coefficient ' + name + ' has an input');
+                check(document.querySelector(`#plotSlices .plot-slice[data-name="${name}"]`),
+                      'Unassigned coefficient ' + name + ' has a plot-local slider');
+            }
+            if (title === 'Equation and quadratures') {
+                check(WorksheetContext.rendered.dataset.displayTex?.includes('read the next two equations together') &&
+                      WorksheetContext.rendered.dataset.displayTex?.includes('Separate exceptional solutions'),
+                      'The card distinguishes simultaneous parametric coordinates from separate equilibria');
+                check([...document.querySelectorAll('#plotRendered [data-plot-chart] text')].every(node =>
+                          !node.textContent?.includes('Representative numerical trajectories')),
+                      'The native chart leaves its title to the separate mathematical heading');
+            }
+        }
+    }
+
     async function checkComplexEquationPlot() {
         const originalMode = WorksheetWorkspace.mode.currentMode();
         try {
@@ -3389,6 +3483,18 @@
                 return;
             }
             initialiseLabTestAdapters();
+            if (new URLSearchParams(location.search).get('ode-check') === '1') {
+                await runBrowserGroup('binding DOM controls', window.checkLabBindingDom);
+                await runBrowserGroup('binding commit policy', window.checkLabBindingCommit);
+                await runBrowserGroup('ODE parameter inputs and sliders', checkOdeParameterControls);
+                await runBrowserGroup('ODE editor round trips', checkOdeEditorRoundTrip);
+                await runBrowserGroup('solver-card projection', window.checkLabProjection);
+                await runBrowserGroup('checkLabEvaluation', window.checkLabEvaluation);
+                await runBrowserGroup('checkLabEvaluationInstall', window.checkLabEvaluationInstall);
+                await runBrowserGroup('checkLabEvaluationSetup', window.checkLabEvaluationSetup);
+                await report('PASS: native ODE parameters, sliders, symbolic source and numeric binding edits');
+                return;
+            }
             if (new URLSearchParams(location.search).get('evaluation-check') === '1') {
                 await runBrowserGroup('complex equation root diagram', checkComplexEquationPlot);
                 await runBrowserGroup('first Almanac entry and interrupted re-entry', checkAlmanacFirstEntry);

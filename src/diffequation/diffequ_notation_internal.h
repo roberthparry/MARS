@@ -16,6 +16,33 @@
 #include "internal/expr_internal.h"
 
 /**
+ * @brief Label the two coordinates of a quadrature family as functions of their shared parameter.
+ * @param[in,out] result Borrowed result receiving independent display strings on its first two equations.
+ * @return True for a non-quadrature result or after successful formatting; false for missing coordinates,
+ * allocation or rendering failure. Mathematical equation graphs and ownership remain unchanged. Call serially.
+ */
+bool de_emden_quadrature_display(diffequ_solve_result_t *result);
+
+/**
+ * @brief Present the exact translation/scaling reduction without introducing typesetting syntax into the solver.
+ * @param[in,out] result Borrowed result receiving independent copies of plain and semantic explanations.
+ * @param[in] independent Borrowed original independent coordinate; neither changed nor consumed.
+ * @param[in] dependent Borrowed dependent coordinate; neither changed nor consumed.
+ * @param[in] first Borrowed original first derivative node.
+ * @param[in] a Borrowed normalised coefficient of the mixed dependent/velocity term.
+ * @param[in] b Borrowed normalised cubic coefficient; independent of a.
+ * @param[in] parameter Borrowed local curve parameter.
+ * @param[in] reference Borrowed fixed regular reference; not an integration constant.
+ * @param[in] polynomial Borrowed quadratic in the curve parameter.
+ * @param[in] primitive Borrowed bounded primitive defining the integrating factor.
+ * @return True after both explanations are installed; false on invalid input, allocation or formatting failure.
+ * @note No input ownership transfers. Returned descriptions survive the inputs; call serially with result.
+ */
+bool de_emden_quadrature_steps(diffequ_solve_result_t *result, const expr_t *independent,
+    const expr_t *dependent, const expr_t *first, const expr_t *a, const expr_t *b,
+    const expr_t *parameter, const expr_t *reference, const expr_t *polynomial, const expr_t *primitive);
+
+/**
  * @brief Describe a simplified Riccati reduction and its optional linear basis without typesetting syntax.
  * @param result Borrowed mutable result receiving independent copies of both explanations.
  * @param independent Borrowed differentiation coordinate; not retained.
@@ -160,9 +187,19 @@ typedef struct {
     const char *right;   /**< Optional right side; when supplied, the row is an equality. */
 } de_notation_step_t;
 
-/** @brief Snapshot and render native derivation rows, storing owned copies in the result. */
+/**
+ * @brief Snapshot native derivation rows with the solver's ordinary or partial derivative convention.
+ * @param result Borrowed mutable result receiving independently owned plain and TeX explanations.
+ * @param plain Borrowed native explanation, copied on success; not typesetting syntax.
+ * @param steps Borrowed array of native mathematical sides and literal captions, read during this call only.
+ * @param count Number of rows, from one to 65,536.
+ * @param partial Whether derivatives use partial rather than ordinary differentials.
+ * @return True when both representations are stored, or false for invalid input, parsing or allocation failure.
+ * No input ownership transfers. The result owns its strings until de_solve_result_free and must not be mutated
+ * concurrently. TeX alone supplies typesetting syntax; callers supply mathematical meaning.
+ */
 bool de_notation_steps(diffequ_solve_result_t *result, const char *plain,
-                       const de_notation_step_t *steps, size_t count);
+                       const de_notation_step_t *steps, size_t count, bool partial);
 
 /** @brief Render a prepared semantic right side and install its accompanying native display text. */
 bool de_notation_display(equation_t *solution, const string_t *left, const string_t *right,

@@ -137,19 +137,24 @@ static bool product_factors(const expr_t *expression, expr_t **factors, size_t *
     return true;
 }
 
-/* Combine one exact rational factor with an enclosing denominator without moving calculus. */
-const TeX_model_node_t *expr_notation_flat_fraction(notation_build_t *build, const expr_t *expression)
+/* Keep an exact rational coefficient first, consistently for both signs of an algebraic quotient. */
+const TeX_model_node_t *expr_notation_scalar_quotient(notation_build_t *build, const expr_t *expression)
 {
     if (contains_calculus(expression->a, 0u) || contains_calculus(expression->b, 0u))
         return NULL;
     expr_t *factors[256];
     size_t count = 0u, rational_index = 256u;
     number_t numerator = num_new(), denominator = num_new();
-    if (!product_factors(expression->a, factors, &count, 0u))
+    const expr_t *dividend = expression->a, *magnitude = NULL;
+    bool negative = expr_match_neg_expr(dividend, &magnitude);
+    if (negative)
+        dividend = magnitude;
+    if (!product_factors(dividend, factors, &count, 0u))
         goto no_match;
+    sort_factors(factors, (int)count);
     for (size_t i = 0u; i < count; ++i) {
         if (expr_is_const(factors[i]) && !factors[i]->name && num_is_real(factors[i]->c) &&
-            num_get_sign(factors[i]->c) > 0 && num_get_fraction_parts(factors[i]->c, &numerator, &denominator) &&
+            !num_is_zero(factors[i]->c) && num_get_fraction_parts(factors[i]->c, &numerator, &denominator) &&
             !num_eq(denominator, NUM_ONE)) {
             rational_index = i;
             break;
@@ -157,7 +162,10 @@ const TeX_model_node_t *expr_notation_flat_fraction(notation_build_t *build, con
     }
     if (rational_index == 256u)
         goto no_match;
-    const TeX_model_node_t *top = num_eq(numerator, NUM_ONE) ? NULL : notation_build_number(build, numerator);
+    negative ^= num_get_sign(numerator) < 0;
+    number_t positive = num_abs(numerator);
+    const TeX_model_node_t *top = count == 1u ? notation_build_number(build, positive) : NULL;
+    num_destroy(&positive);
     for (size_t i = 0u; i < count; ++i) {
         if (i == rational_index)
             continue;
@@ -170,12 +178,22 @@ const TeX_model_node_t *expr_notation_flat_fraction(notation_build_t *build, con
     }
     if (!top)
         top = notation_build_literal(build, TeX_NODE_NUMBER, "1");
-    const TeX_model_node_t *bottom_parts[] = {notation_build_number(build, denominator),
-                                              notation_build_expr(build, expression->b)};
-    const TeX_model_node_t *fraction_parts[] = {top, notation_build_node(build,
-        (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, bottom_parts)};
+    const TeX_model_node_t *bottom = notation_build_expr(build, expression->b);
+    if (count == 1u) {
+        const TeX_model_node_t *parts[] = {notation_build_number(build, denominator), bottom};
+        bottom = notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
+    }
+    const TeX_model_node_t *fraction_parts[] = {top, bottom};
     const TeX_model_node_t *result = notation_build_node(build,
         (TeX_node_view_t){.kind = TeX_NODE_FRACTION, .child_count = 2u}, fraction_parts);
+    if (count > 1u) {
+        number_t scale = num_abs(factors[rational_index]->c);
+        const TeX_model_node_t *parts[] = {notation_build_number(build, scale), result};
+        result = notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_PRODUCT, .child_count = 2u}, parts);
+        num_destroy(&scale);
+    }
+    if (negative)
+        result = notation_build_node(build, (TeX_node_view_t){.kind = TeX_NODE_NEGATIVE, .child_count = 1u}, &result);
     num_destroy(&numerator); num_destroy(&denominator);
     return result;
 no_match:

@@ -575,18 +575,17 @@ static bool de_split_three_sections(const char *text, char **first, char **secon
         else if (ch == '}' && braces > 0)
             braces--;
         else if (ch == ';' && parens == 0 && brackets == 0 && braces == 0) {
-            if (count >= 2u)
-                return false;
-            semicolons[count++] = i;
+            /* Later separators belong to the condition list, as in the editor's native envelope. */
+            if (count < 2u) semicolons[count++] = i;
         }
     }
 
-    if (count != 2u)
-        return false;
-
-    *first = de_trimmed_copy(text, semicolons[0]);
-    *second = de_trimmed_copy(text + semicolons[0] + 1u, semicolons[1] - semicolons[0] - 1u);
-    *third = de_trimmed_copy(text + semicolons[1] + 1u, length - semicolons[1] - 1u);
+    /* Empty trailing fields may be omitted by an editor; supplied field boundaries remain significant. */
+    *first = de_trimmed_copy(text, count ? semicolons[0] : length);
+    size_t second_start = count ? semicolons[0] + 1u : length;
+    size_t second_end = count > 1u ? semicolons[1] : length;
+    *second = de_trimmed_copy(text + second_start, second_end - second_start);
+    *third = count > 1u ? de_trimmed_copy(text + semicolons[1] + 1u, length - semicolons[1] - 1u) : strdup("");
     return *first && *second && *third;
 }
 
@@ -1544,7 +1543,7 @@ static bool de_declarations_contain_name(const char *declarations, const char *n
     return found;
 }
 
-static char *de_probe_independent_declarations(const char *equation, const char *independent)
+static char *de_probe_independent_declarations(const char *equation, const char *independent, bool all_dependents)
 {
     string_t *out = string_new_with(independent);
 
@@ -1555,8 +1554,6 @@ static char *de_probe_independent_declarations(const char *equation, const char 
         size_t open;
         size_t close;
         char *argument;
-        string_t *argument_text;
-        number_t value;
 
         if (!de_derivative_prefix(equation, i, &open))
             continue;
@@ -1566,29 +1563,38 @@ static char *de_probe_independent_declarations(const char *equation, const char 
         argument = de_trimmed_copy(equation + open + 1u, close - open - 1u);
         if (!argument)
             goto fail;
-        argument_text = string_new_with(argument);
-        if (!argument_text) {
+        size_t length = strlen(argument);
+        if (length > 2u && argument[0] == '[' && argument[length - 1u] == ']') {
+            memmove(argument, argument + 1u, length - 2u);
+            argument[length - 2u] = '\0';
+        }
+        /* A nested derivative is not a declaration name. Continue into it so its dependent leaf is found. */
+        bool scalar = *argument != '\0';
+        for (size_t j = 0; scalar && argument[j]; ++j)
+            scalar = isalnum((unsigned char)argument[j]) || (unsigned char)argument[j] >= 128u ||
+                     argument[j] == '_' || argument[j] == '@';
+        if (!scalar) {
             free(argument);
-            goto fail;
+            continue;
         }
-        if (expr_get_default_constant_num_text(argument_text, &value)) {
-            if (!de_declarations_contain_name(string_c_str(out), argument)) {
-                if (string_length(out) > 0u && string_append_cstr(out, ", ") != 0) {
-                    num_destroy(&value);
-                    string_free(argument_text);
-                    free(argument);
-                    goto fail;
-                }
-                if (string_append_format(out, "%s = ?", argument) < 0) {
-                    num_destroy(&value);
-                    string_free(argument_text);
-                    free(argument);
-                    goto fail;
-                }
-            }
+        if (!all_dependents) {
+            string_t *name = string_new_with(argument);
+            number_t value = NUM_NAN;
+            bool builtin = name && expr_get_default_constant_num_text(name, &value);
+            string_free(name);
             num_destroy(&value);
+            if (!builtin) {
+                free(argument);
+                continue;
+            }
         }
-        string_free(argument_text);
+        if (!de_declarations_contain_name(string_c_str(out), argument)) {
+            if ((string_length(out) > 0u && string_append_cstr(out, ", ") != 0) ||
+                string_append_format(out, "%s = ?", argument) < 0) {
+                free(argument);
+                goto fail;
+            }
+        }
         free(argument);
         i = close;
     }
@@ -1698,10 +1704,27 @@ static void de_name_formal_dependent(const expr_t *expr, const char *name)
 
 static char *de_prime_shorthand_independent(const char *equation);
 
+/* Bracketed names and index groups retain their authored identity during prime normalisation. */
+static size_t de_after_bracket_group(const char *text, size_t start)
+{
+    size_t end = start + 1u;
+    unsigned depth = 1u;
+    while (text[end] && depth) {
+        if (text[end] == '[')
+            ++depth;
+        else if (text[end] == ']')
+            --depth;
+        ++end;
+    }
+    return end;
+}
+
 static char *de_prime_shorthand_dependent(const char *text)
 {
     const char *best = NULL;
+    const char *common = NULL;
     size_t best_length = SIZE_MAX;
+    size_t common_length = 0u;
     size_t i = 0u;
 
     if (!text)
@@ -1711,6 +1734,10 @@ static char *de_prime_shorthand_dependent(const char *text)
         size_t start;
         size_t length;
 
+        if (text[i] == '[') {
+            i = de_after_bracket_group(text, i);
+            continue;
+        }
         if (!(isalpha((unsigned char)text[i]) || text[i] == '_')) {
             i++;
             continue;
@@ -1719,16 +1746,56 @@ static char *de_prime_shorthand_dependent(const char *text)
         while (isalnum((unsigned char)text[i]) || text[i] == '_')
             i++;
         length = i - start;
-        if (text[i] == '\'' && length < best_length) {
-            best = text + start;
-            best_length = length;
+        if (text[i] == '\'') {
+            if (!common) {
+                common = text + start;
+                common_length = length;
+            } else {
+                size_t shared = 0u;
+                while (shared < common_length && shared < length &&
+                       common[common_length - shared - 1u] == text[start + length - shared - 1u])
+                    ++shared;
+                common += common_length - shared;
+                common_length = shared;
+            }
+            if (length < best_length) {
+                best = text + start;
+                best_length = length;
+            }
         }
         while (text[i] == '\'')
             i++;
     }
 
+    if (common_length && common_length < best_length) {
+        /* A shared field suffix is unambiguous here only with single-letter coefficient prefixes. */
+        bool compact = true;
+        for (i = 0u; compact && text[i];) {
+            if (text[i] == '[') {
+                i = de_after_bracket_group(text, i);
+                continue;
+            }
+            if (!(isalpha((unsigned char)text[i]) || text[i] == '_')) {
+                ++i;
+                continue;
+            }
+            size_t start = i++;
+            while (isalnum((unsigned char)text[i]) || text[i] == '_')
+                ++i;
+            size_t length = i - start;
+            if (text[i] == '\'')
+                compact = length == common_length ||
+                          (length == common_length + 1u && isalpha((unsigned char)text[start]));
+            while (text[i] == '\'')
+                ++i;
+        }
+        if (compact)
+            return de_trimmed_copy(common, common_length);
+    }
     return best ? de_trimmed_copy(best, best_length) : NULL;
 }
+
+static int de_append_dependent_name(string_t *out, const char *name, size_t length, bool alias);
 
 static char *de_normalize_prime_derivatives(const char *text, const char *wrt)
 {
@@ -1750,7 +1817,15 @@ static char *de_normalize_prime_derivatives(const char *text, const char *wrt)
         size_t name_end;
         size_t order_end;
 
-        if (!(isalpha((unsigned char)text[i]) || text[i] == '_')) {
+        if (text[i] == '[') {
+            size_t end = de_after_bracket_group(text, i);
+            if (string_append_chars(out, text + i, end - i) != 0)
+                goto fail;
+            i = end;
+            continue;
+        }
+        bool alias = text[i] == '@' && isalpha((unsigned char)text[i + 1u]);
+        if (!alias && !(isalpha((unsigned char)text[i]) || text[i] == '_')) {
             if ((unsigned char)text[i] >= 0x80u) {
                 if (de_append_next_utf8_character(out, text, &i) != 0)
                     goto fail;
@@ -1760,6 +1835,8 @@ static char *de_normalize_prime_derivatives(const char *text, const char *wrt)
             continue;
         }
 
+        if (alias)
+            ++i;
         name_start = i++;
         while (isalnum((unsigned char)text[i]) || text[i] == '_')
             i++;
@@ -1769,12 +1846,31 @@ static char *de_normalize_prime_derivatives(const char *text, const char *wrt)
         order_end = i;
 
         if (order_end == name_end) {
-            if (string_append_chars(out, text + name_start, name_end - name_start) != 0)
+            if (alias) {
+                if (de_append_dependent_name(out, text + name_start, name_end - name_start, true) != 0)
+                    goto fail;
+                continue;
+            }
+            size_t dependent_length = dependent ? strlen(dependent) : 0u;
+            size_t name_length = name_end - name_start;
+            size_t following = name_end;
+            while (isspace((unsigned char)text[following]))
+                ++following;
+            bool field = dependent_length && text[following] != '(' &&
+                         name_length >= dependent_length &&
+                         !strncmp(text + name_end - dependent_length, dependent, dependent_length);
+            bool coefficient = field && name_length == dependent_length + 1u &&
+                               isalpha((unsigned char)text[name_start]);
+            if (coefficient && (string_append_char(out, text[name_start]) != 0 || string_append_char(out, '*') != 0))
+                goto fail;
+            if ((field && (coefficient || name_length == dependent_length))
+                    ? de_append_dependent_name(out, dependent, dependent_length, false) != 0
+                    : string_append_chars(out, text + name_start, name_length) != 0)
                 goto fail;
             continue;
         }
 
-        if (dependent) {
+        if (dependent && !alias) {
             size_t dependent_length = strlen(dependent);
             size_t name_length = name_end - name_start;
 
@@ -1808,7 +1904,7 @@ static char *de_normalize_prime_derivatives(const char *text, const char *wrt)
         }
 
         if (string_append_char(out, '(') != 0 ||
-            string_append_chars(out, text + name_start, name_end - name_start) != 0 ||
+            de_append_dependent_name(out, text + name_start, name_end - name_start, alias) != 0 ||
             string_append_char(out, ')') != 0)
             goto fail;
     }
@@ -1952,7 +2048,7 @@ static bool de_subscript_needs_implicit_product(const char *text, size_t token_s
     return isalnum(ch) || ch == '_' || ch == ')' || ch == ']' || ch >= 0x80u;
 }
 
-static int de_append_subscript_dependent(string_t *out, const char *name, size_t length, bool alias)
+static int de_append_dependent_name(string_t *out, const char *name, size_t length, bool alias)
 {
     string_t *raw;
     string_t *normalised;
@@ -2329,7 +2425,7 @@ static char *de_normalize_subscript_derivatives(const char *text, const char *in
               string_append_char(out, '*') != 0)) ||
             string_append_char(out, 'D') != 0 || string_append_cstr(out, derivative_suffix) != 0 ||
             string_append_char(out, '(') != 0 ||
-            de_append_subscript_dependent(out, text + dependent_start, underscore - dependent_start, alias) != 0 ||
+            de_append_dependent_name(out, text + dependent_start, underscore - dependent_start, alias) != 0 ||
             string_append_char(out, ')') != 0) {
             free(derivative_suffix);
             goto fail;
@@ -2445,6 +2541,29 @@ fail:
     return NULL;
 }
 
+/* Distinguish a compact independent-coordinate list from point-condition shorthand.
+ * Full identifier and duplicate-coordinate validation remains in the ordinary native parser. */
+static bool de_unset_coordinate_declarations(const char *text)
+{
+    size_t start = 0u, length = strlen(text);
+    bool any = false;
+    for (size_t i = 0u; i <= length; ++i) {
+        if (i < length && text[i] != ',')
+            continue;
+        char *entry = de_trimmed_copy(text + start, i - start);
+        size_t equals = 0u;
+        char *value = entry && de_find_top_level_char(entry, '=', &equals)
+            ? de_trimmed_copy(entry + equals + 1u, strlen(entry) - equals - 1u) : NULL;
+        bool valid = equals && value && !strcmp(value, "?");
+        free(value); free(entry);
+        if (!valid)
+            return false;
+        any = true;
+        start = i + 1u;
+    }
+    return any;
+}
+
 static char *de_expand_shorthand(const char *source)
 {
     char *trimmed = NULL;
@@ -2475,9 +2594,10 @@ static char *de_expand_shorthand(const char *source)
             free(trimmed);
             return NULL;
         }
-        /* A braced condition-only shorthand omits the independent/constant declarations. */
+        /* Compact coordinate envelopes and condition-only shorthand have different native meanings. */
         if (!de_find_top_level_char(inner, '|', &pipe) ||
-            de_find_top_level_char(inner + pipe + 1u, ';', &separator)) {
+            de_find_top_level_char(inner + pipe + 1u, ';', &separator) ||
+            de_unset_coordinate_declarations(inner + pipe + 1u)) {
             free(inner);
             return trimmed;
         }
@@ -3042,7 +3162,7 @@ static bool de_parse_conditions(diffequ_t *de, const char *text, const string_t 
 {
     size_t start = 0u;
     size_t length = strlen(text);
-    int parens = 0;
+    int parens = 0, brackets = 0, braces = 0;
 
     if (length == 0u)
         return true;
@@ -3054,12 +3174,16 @@ static bool de_parse_conditions(diffequ_t *de, const char *text, const string_t 
             parens++;
         else if (ch == ')' && parens > 0)
             parens--;
-        if (ch != ',' || parens != 0)
+        else if (ch == '[') ++brackets;
+        else if (ch == ']' && brackets > 0) --brackets;
+        else if (ch == '{') ++braces;
+        else if (ch == '}' && braces > 0) --braces;
+        if ((ch != ',' && ch != ';') || parens != 0 || brackets != 0 || braces != 0)
             continue;
         {
             char *condition = de_trimmed_copy(text + start, i - start);
             string_t *source = condition ? string_new_with(condition) : NULL;
-            int interval = source ? de_parse_interval(de, source, names, symbols, symbol_count) : -1;
+            int interval = source ? de_parse_restriction(de, source, names, symbols, symbol_count) : -1;
             bool ok = condition && *condition && interval >= 0 &&
                       (interval == 1 || de_parse_one_condition(de, condition, names, symbols, symbol_count));
             string_free(source);
@@ -3140,6 +3264,22 @@ diffequ_t *de_from_string(const char *text)
         return NULL;
     }
     free(expanded);
+    /* A binding editor may supply only coefficient declarations. Infer the coordinate section through
+     * the same derivative-aware shorthand parser rather than treating those coefficients as coordinates. */
+    if (!*parts.independent) {
+        de_parse_parts_t inferred = {0};
+        char *inferred_text = de_expand_shorthand(parts.equation);
+        bool valid = inferred_text && de_parse_parts(inferred_text, &inferred);
+        free(inferred_text);
+        if (!valid) {
+            de_parse_parts_dispose(&inferred);
+            goto cleanup;
+        }
+        free(parts.independent);
+        parts.independent = inferred.independent;
+        inferred.independent = NULL;
+        de_parse_parts_dispose(&inferred);
+    }
     if (repeated_operator.power >= 2u) {
         char *base_equation = de_repeated_quadratic_base_equation(&repeated_operator);
 
@@ -3173,7 +3313,7 @@ diffequ_t *de_from_string(const char *text)
 
     masked_lhs = de_mask_formal_derivatives(base_lhs);
     masked_rhs = de_mask_formal_derivatives(base_rhs);
-    probe_independent = de_probe_independent_declarations(parts.equation, parts.independent);
+    probe_independent = de_probe_independent_declarations(parts.equation, parts.independent, false);
     if (!masked_lhs || !masked_rhs || !probe_independent)
         goto cleanup;
 
@@ -3189,6 +3329,37 @@ diffequ_t *de_from_string(const char *text)
     probe = differential_probe ? equ_from_differential_text_internal(differential_probe) : NULL;
     string_free(differential_probe);
     if (!probe)
+        goto cleanup;
+    /* Coordinate/dependent declarations are short role lists. All remaining scalar symbols are coefficients,
+     * regardless of spelling; reparse once so the equation and catalogue share the same constant nodes. */
+    string_t *parameters = string_new_with(parts.constants);
+    char *roles = de_probe_independent_declarations(parts.equation, parts.independent, true);
+    bool inferred = false, complete = parameters && roles;
+    expr_bindings_t *probe_bindings = equ_bindings(probe);
+    for (size_t i = 0; complete && !partial_derivative_input && i < expr_bindings_count(probe_bindings); ++i) {
+        const char *name = expr_bindings_name_at(probe_bindings, i);
+        if (expr_bindings_is_constant_at(probe_bindings, i) ||
+            de_declarations_contain_name(roles, name))
+            continue;
+        string_t *declaration = expr_to_text(expr_bindings_expr_at(probe_bindings, i), style_UNBOUND);
+        complete = declaration && string_append_format(parameters, "%s%S = ?",
+            string_length(parameters) ? ", " : "", declaration) >= 0;
+        string_free(declaration);
+        inferred = true;
+    }
+    if (complete && inferred) {
+        free(parts.constants);
+        parts.constants = strdup(string_c_str(parameters));
+        string_t *replacement = parts.constants ? string_sprintf("{ %s = %s | %s; %s }",
+            masked_lhs, masked_rhs, probe_independent, parts.constants) : NULL;
+        equ_free(probe);
+        probe = replacement ? equ_from_differential_text_internal(replacement) : NULL;
+        string_free(replacement);
+        complete = probe != NULL;
+    }
+    string_free(parameters);
+    free(roles);
+    if (!complete)
         goto cleanup;
     de_name_contextual_dependents(parts.equation, equ_bindings(probe));
 

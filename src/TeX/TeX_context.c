@@ -628,9 +628,12 @@ TeX_t *TeX_compose_relation(const TeX_t *left, const TeX_t *right, TeX_relation_
 static TeX_t *render_domain_relation(const TeX_node_view_t *view, const TeX_t *const *children)
 {
     static const char *const operators[] = {
-        [TeX_RELATION_NOT_EQUAL] = "\\ne ",
-        [TeX_RELATION_GREATER]   = ">",
-        [TeX_RELATION_MEMBER]    = "\\in"
+        [TeX_RELATION_NOT_EQUAL]     = "\\ne ",
+        [TeX_RELATION_LESS]          = "<",
+        [TeX_RELATION_LESS_EQUAL]    = "\\le ",
+        [TeX_RELATION_GREATER]       = ">",
+        [TeX_RELATION_GREATER_EQUAL] = "\\ge ",
+        [TeX_RELATION_MEMBER]        = "\\in"
     };
     if (view->child_count != 2u || (unsigned)view->relation >= sizeof operators / sizeof *operators ||
         !operators[view->relation])

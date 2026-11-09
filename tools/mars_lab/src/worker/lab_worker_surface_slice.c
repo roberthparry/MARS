@@ -121,21 +121,22 @@ static bool domain_range(expr_t *expr, expr_t *parameter, number_t bounds[2])
 static bool probe(expr_t *expr, expr_t *parameter, number_t value, expr_t *x, expr_t *y)
 {
     NUM_SCOPE(numbers);
-    number_t saved_x = expr_get_val(x), saved_y = expr_get_val(y), saved = expr_get_val(parameter);
+    number_t saved_x = x ? expr_get_val(x) : NUM_NAN, saved_y = y ? expr_get_val(y) : NUM_NAN;
+    number_t saved = expr_get_val(parameter);
     expr_set_val(parameter, value);
     bool found = false;
     /* Twenty-five fixed real-domain probes; no unbounded search is attempted. */
     for (int r = -2; !found && r <= 2; ++r) {
-        expr_set_val(y, num_create_from_frac(r * 3, 2));
+        if (y) expr_set_val(y, num_create_from_frac(r * 3, 2));
         for (int c = -2; !found && c <= 2; ++c) {
-            expr_set_val(x, num_create_from_frac(c * 3, 2));
+            if (x) expr_set_val(x, num_create_from_frac(c * 3, 2));
             number_t height = expr_eval(expr);
             found = real(height);
             num_destroy(&height);
         }
     }
-    expr_set_val(x, saved_x);
-    expr_set_val(y, saved_y);
+    if (x) expr_set_val(x, saved_x);
+    if (y) expr_set_val(y, saved_y);
     expr_set_val(parameter, saved);
     return found;
 }
@@ -149,16 +150,18 @@ static number_t exact(const char *text)
 }
 
 /* The returned source owns its text; all mutations belong to this private graph. */
-char *lab_worker_surface_slice(const char *source, const char *first, const char *second, const char *request)
+char *lab_worker_parameter_slices(const char *source, const char *first, const char *second, const char *request,
+                                  expr_bindings_t **bindings_out)
 {
+    if (bindings_out) *bindings_out = NULL;
     NUM_SCOPE(numbers);
     expr_bindings_t *bindings = NULL;
     expr_t *expr = expr_from_string(source, &bindings);
-    expr_t *x = bindings ? expr_bindings_get(bindings, first) : NULL;
-    expr_t *y = bindings ? expr_bindings_get(bindings, second) : NULL;
+    expr_t *x = bindings && first ? expr_bindings_get(bindings, first) : NULL;
+    expr_t *y = bindings && second ? expr_bindings_get(bindings, second) : NULL;
     expr_t *parameters[8];
     size_t count = 0;
-    bool ok = expr && x && y;
+    bool ok = expr && (!first || x) && (!second || y);
     for (size_t i = 0; ok && i < expr_bindings_count(bindings); ++i) {
         expr_t *binding = expr_bindings_expr_at(bindings, i);
         number_t value = expr_get_val(binding);
@@ -169,7 +172,7 @@ char *lab_worker_surface_slice(const char *source, const char *first, const char
             break;
         }
         parameters[count++] = binding;
-        expr_set_val(binding, NUM_ZERO);
+        expr_set_val(binding, !first && !second ? NUM_ONE : NUM_ZERO);
     }
     string_t *input = string_new_with(request ? request : "");
     size_t rows_count = 0;
@@ -197,7 +200,7 @@ char *lab_worker_surface_slice(const char *source, const char *first, const char
                 string_split_free(parts, n);
             }
         }
-        number_t bounds[] = {NUM_NAN, NUM_NAN}, value = NUM_ZERO;
+        number_t bounds[] = {NUM_NAN, NUM_NAN}, value = !first && !second ? NUM_ONE : NUM_ZERO;
         long position = -1;
         bool automatic = fields && !strcmp(string_c_str(fields[4]), "-2");
         if (ok && fields && !automatic) {
@@ -214,12 +217,12 @@ char *lab_worker_surface_slice(const char *source, const char *first, const char
             else if (ok)
                 value = exact(string_c_str(fields[3]));
         } else if (ok) {
-            number_t saved_x = expr_get_val(x), saved_y = expr_get_val(y);
-            expr_set_val(x, NUM_NAN);
-            expr_set_val(y, NUM_NAN);
+            number_t saved_x = x ? expr_get_val(x) : NUM_NAN, saved_y = y ? expr_get_val(y) : NUM_NAN;
+            if (x) expr_set_val(x, NUM_NAN);
+            if (y) expr_set_val(y, NUM_NAN);
             bool bounded = domain_range(expr, parameters[i], bounds);
-            expr_set_val(x, saved_x);
-            expr_set_val(y, saved_y);
+            if (x) expr_set_val(x, saved_x);
+            if (y) expr_set_val(y, saved_y);
             if (!bounded) {
                 long radius = 1;
                 bool found = probe(expr, parameters[i], value, x, y);
@@ -246,9 +249,17 @@ char *lab_worker_surface_slice(const char *source, const char *first, const char
                 if (real(previous) && !num_lt(previous, bounds[0]) && !num_gt(previous, bounds[1]))
                     value = previous;
             }
+            /* Keep automatic ODE slider endpoints inside the authored parameter assumptions. */
+            if (!first && !second) {
+                for (unsigned edge = 0; edge < 2u; ++edge)
+                    for (unsigned attempt = 0; attempt < 16u &&
+                         !probe(expr, parameters[i], bounds[edge], NULL, NULL); ++attempt)
+                        bounds[edge] = num_mul(num_add(bounds[edge], value), NUM_HALF);
+            }
         }
         ok = ok && real(value) && real(bounds[0]) && real(bounds[1]) && num_lt(bounds[0], bounds[1]) &&
              !num_lt(value, bounds[0]) && !num_gt(value, bounds[1]);
+        if (ok && !first && !second) ok = probe(expr, parameters[i], value, NULL, NULL);
         if (ok) {
             number_t fraction = num_div(num_sub(value, bounds[0]), num_sub(bounds[1], bounds[0]));
             position = lround(1000 * num_to_double(fraction));
@@ -287,6 +298,13 @@ char *lab_worker_surface_slice(const char *source, const char *first, const char
     string_split_free(rows, rows_count);
     string_free(input);
     expr_free(expr);
-    expr_bindings_free(bindings);
+    if (result && bindings_out) *bindings_out = bindings;
+    else expr_bindings_free(bindings);
     return result;
+}
+
+/* Preserve the ordinary surface API while sharing exact slider interpolation with ODE parameter controls. */
+char *lab_worker_surface_slice(const char *source, const char *first, const char *second, const char *request)
+{
+    return lab_worker_parameter_slices(source, first, second, request, NULL);
 }

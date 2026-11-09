@@ -160,7 +160,7 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
         'Evaluation failed', 'Equation solving failed', 'Differential-equation solving failed',
         'Matrix evaluation failed', 'Integration failed', 'Datetime calculation failed', 'Almanac calculation failed'
     ];
-    const preparations = [7, 13, 12, 5, 5, 16, 32];
+    const preparations = [7, 13, 13, 5, 5, 16, 32];
     const successes = [1, 13, 141, 13, 13, 269, 269];
     const rejected = [6, 6, 6, 38, 70, 22, 6];
     const preparationNames = ['bindings', 'expression', 'input', 'trim', 'datetime', 'almanac', 'history'];
@@ -442,7 +442,7 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
                 reply = {ok, status: 'solved'};
                 WorksheetWorkspace.presentation.state.lastMatrixScalarExpression = 'previous scalar';
                 await evaluate[index]();
-                equal(calls('bindings').length, [0, 1, 3, 4].includes(index) ? 1 : 0, 'binding commit policy');
+                equal(calls('bindings').length, [0, 1, 2, 3, 4].includes(index) ? 1 : 0, 'binding commit policy');
                 equal(calls('fetch').length, 1, 'one evaluation fetch');
                 equal(calls('install').length, ok ? 1 : 0, 'install only accepted results');
                 equal(calls('scheduleAutomaticPlot').length, ok && (index < 3 || index === 4) ? 1 : 0,
@@ -535,7 +535,8 @@ window.checkLabEvaluation = async function checkLabEvaluation() {
         equal(calls('saveWorksheetState')[0][2], text, 'reuse still saves authored editor text');
 
         mode = 'diffequation';
-        for (const [status, expected] of [['series', 'Local series'], ['reduced', 'Not solved']]) {
+        for (const [status, expected] of [
+                 ['series', 'Local series'], ['reduced', 'Not solved'], ['quadrature', 'Exact quadratures']]) {
             events.length = 0;
             reply = {ok: true, status};
             await WorksheetRequests.evaluation.evaluateDiffequation();

@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "diffequation-t.h"
 #include "expression-t.h"
 #include "lab_presentation.h"
 #include "test_harness.h"
@@ -208,6 +209,11 @@ static void test_lab_presentation_editor_analysis(void)
          !strcmp(test_lab_text(test_lab_member(editor, "starts"), "x"), "1/3");
     json_free(result);
     TEST_ASSERT_TRUE(ok, "editor metadata preserves symbolic literals, conditions and exact goal starts");
+    result = lab_pres_test_request("{\"action\":\"editor\",\"text\":\"{ Dtt(x)+x=0 | t=?; ; }\"}", &status);
+    editor = test_lab_member(result, "editor");
+    ok = status == 200u && !strcmp(test_lab_text(editor, "expression"), "{ Dtt(x)+x=0 | t = ?; ;  }");
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "empty constant and condition sections survive editor normalisation");
 }
 
 static void test_lab_presentation_editor_edits(void)
@@ -234,6 +240,17 @@ static void test_lab_presentation_editor_edits(void)
     ok = ok && status == 400 && test_lab_ok(result, false);
     json_free(result);
     TEST_ASSERT_TRUE(ok, "native edits remove additive constants, move kinds and reject injected assignment groups");
+    result = lab_pres_test_request(
+        "{\"action\":\"editor\",\"operation\":\"bindings\",\"syntax\":\"diffequation\",\"mode\":\"merge\","
+        "\"text\":\"Dtt(x)+a*x=0\",\"bindings\":[{\"name\":\"a\",\"kind\":\"constant\",\"value\":\"2\"}]}", &status);
+    ok = status == 200u && !strcmp(test_lab_text(test_lab_member(result, "editor"), "expression"),
+                                  "{ Dtt(x)+a*x=0 | ; a = 2;  }");
+    diffequ_t *problem = de_from_string(test_lab_text(test_lab_member(result, "editor"), "expression"));
+    ok = ok && problem && de_independent_count(problem) == 1u &&
+         !strcmp(expr_symbol_name(de_independent_at(problem, 0u)), "t");
+    de_free(problem);
+    json_free(result);
+    TEST_ASSERT_TRUE(ok, "ODE binding edits select a complete differential-equation envelope for bare source");
 }
 
 static void test_lab_presentation_compaction(void)

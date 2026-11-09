@@ -88,7 +88,11 @@ static const TeX_model_node_t *build_condition(notation_build_t *build, const ex
     const expr_t *nonzero = expr_domain_nonzero_operand(pair);
     TeX_relation_t relation;
     const TeX_model_node_t *parts[2];
-    if (nonzero) {
+    if (expr_is_op(pair->a, &ops_real_greater) || expr_is_op(pair->a, &ops_real_at_least)) {
+        relation = expr_is_op(pair->a, &ops_real_at_least) ? TeX_RELATION_GREATER_EQUAL : TeX_RELATION_GREATER;
+        parts[0] = notation_build_expr(build, pair->a->a);
+        parts[1] = notation_build_expr(build, pair->a->b);
+    } else if (nonzero) {
         relation = TeX_RELATION_NOT_EQUAL;
         parts[0] = notation_build_expr(build, nonzero);
         parts[1] = notation_build_literal(build, TeX_NODE_NUMBER, "0");

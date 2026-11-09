@@ -17,6 +17,11 @@ and layout. Private semantic providers carry these choices without exposing solv
 structures to TeX. The existing output APIs manage their contexts internally.
 Rendering does not reparse expressions or run the solver again.
 
+Coordinate envelopes may omit empty trailing constant and condition sections. Canonical output retains
+all three sections, so editor normalisation and repeated evaluation preserve the coordinate declarations.
+This remains distinct from braced point-condition shorthand, whose right-hand side supplies initial data.
+An empty coordinate section infers the coordinates from the derivatives while preserving coefficient bindings.
+
 `de_problem_to_TeX(problem)` returns an owned `string_t` containing the equation,
 its coordinate intervals and any initial or boundary conditions. Point conditions use evaluation bars. Release
 it with `string_free`. This presentation-only API does not solve the problem;
@@ -34,6 +39,8 @@ linear equations are normalised to self-adjoint Sturm–Liouville form, with
 closed-form solutions for constant coefficients and affine Riccati
 factorisations. Selected modified-Emden equations are point-linearised and
 reported with their identified `SL(3, ℝ)` symmetry group.
+Independent real modified-Emden coefficients instead use time translation and
+scaling to give exact local parametric quadratures, including exceptional branches.
 Constant-coefficient linear ODEs of arbitrary order are solved through their
 characteristic polynomial and variation of parameters.
 The Lie-analysis API constructs prolongations, determining equations and
@@ -209,6 +216,75 @@ x\,J_{3/4}(x^2/2)/J_{-1/4}(x^2/2),&x\ne0,\\
 0,&x=0.
 \end{cases}$$
 
+## Autonomous exponential forces
+
+The native energy method recognises `y'' = A*exp(B*y)` when `A` and `B`
+evaluate to finite real non-zero constants, including coefficients supplied in
+the constant bindings. The selected family is `DE_SOLVER_AUTONOMOUS_ENERGY`.
+It also recognises equivalent exponential bases and
+renamed coordinates and fields. Multiplying by `y'` gives
+
+$$
+(y')^2 = \frac{2A}{B}e^{By}+E.
+$$
+
+For `y''=exp(y)`, all three real energy cases are explicit:
+
+$$
+\begin{aligned}
+E>0:&\quad y=\ln\!\left(\frac{2C_1^2}{\sinh^2(C_1(x-C_2))}\right),\\
+E<0:&\quad y=\ln\!\left(\frac{2C_1^2}{\cos^2(C_1(x-C_2))}\right),\\
+E=0:&\quad y=\ln\!\left(\frac{2}{(x-C_2)^2}\right).
+\end{aligned}
+$$
+
+Here `C₁ > 0`, `C₂` is real, and `E = ±4C₁²` in the first two
+families. Each solution applies on real intervals away from its denominator's
+zeros. There are no finite equilibrium solutions for a non-zero exponential
+force. When `A*B < 0`, the corresponding real family uses `cosh`; the energy
+cannot be zero or negative. Two finite real conditions specifying value and
+slope at the same point select the appropriate local solution. Partial or
+multi-point data are not yet supported by this method.
+
+This runnable example prints the native formulae, including their restrictions:
+
+```c
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "diffequation-t.h"
+
+int main(void)
+{
+    diffequ_t *problem = de_from_string("y''=exp(y)");
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    bool ok = result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED &&
+              de_solve_result_count(result) == 3u;
+    for (size_t i = 0; ok && i < de_solve_result_count(result); ++i) {
+        string_t *text = equ_to_text(de_solve_result_at(result, i), style_UNBOUND);
+        ok = text && puts(string_c_str(text)) != EOF;
+        string_free(text);
+    }
+    de_solve_result_free(result);
+    de_free(problem);
+    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+```
+
+Output:
+
+```text
+y = ln(2·C₁²/sinh²(C₁·(x - C₂))) where (x ∈ ℝ; C₂ ∈ ℝ; C₁ > 0; sinh(C₁·(x - C₂)) ≠ 0)
+y = ln(2·C₁²/cos²(C₁·(x - C₂))) where (x ∈ ℝ; C₂ ∈ ℝ; C₁ > 0; cos(C₁·(x - C₂)) ≠ 0)
+y = ln(2/(x - C₂)²) where (x ∈ ℝ; C₂ ∈ ℝ; x - C₂ ≠ 0)
+```
+
+MARS Lab plots representative real members from these explicit branches. Its
+sixteen-curve budget is shared across the branches; parameter sampling retains
+the domain restrictions and avoids inserting a zero reference when zero is
+excluded.
+
 ## Context-aware results
 
 `de_solve_with_context(de, options, context)` performs the ordinary solve, then
@@ -328,7 +404,8 @@ Dxx(y) = y; y(0) = 1; y'(0) = 1
 ```
 
 Here `Dxx(y)` identifies `x` as the independent variable. The remaining
-semicolon-separated equations are conditions. Prime notation in a condition
+semicolon-separated equations are conditions. Inside a full `{ equation | independent; constants; conditions }`
+envelope, conditions may likewise be separated by commas or semicolons. Prime notation in a condition
 is normalised to the formal derivative notation used internally:
 
 | Shorthand | MARS notation | Mathematical notation |
@@ -343,6 +420,91 @@ derivatives for consistent native round trips. Explicit coordinate derivatives
 and partial differential equations retain their labelled differential fractions.
 The complete [TeX prime example](TeX.md#prime-notation-with-rpn) also constructs
 the same ordinary equation and initial conditions through the RPN builder.
+
+Adjacent single-letter coefficients are accepted even when every primed term
+has a coefficient. The parser identifies the shared dependent-name suffix and
+normalises the corresponding undifferentiated term too. Multi-letter field
+names remain whole symbols, bracketed identifiers are preserved, and function
+names are not split. Use explicit multiplication for ambiguous names.
+
+This runnable example keeps the oscillator coefficients symbolic:
+
+```c
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "diffequation-t.h"
+#include "equation-t.h"
+
+int main(void)
+{
+    diffequ_t *problem = de_from_string("my''+cy'+ky=0");
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    bool ok = text && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
+    if (ok)
+        puts(string_c_str(text));
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(problem);
+    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+```
+
+Output:
+
+```text
+y = C₁·exp(½·(√(c² - 4km) - c)·x/m) + C₂·exp(-½·(√(c² - 4km) + c)·x/m)
+```
+
+This generic two-root form assumes non-zero mass and discriminant. Supplying
+coefficient values before solving selects the appropriate distinct-root,
+repeated-root or oscillatory form. Numerical plotting requires coefficient values;
+MARS Lab provides numeric inputs and plot-local sliders for unassigned coefficients.
+For example, `{my''+cy'+ky=0 | t=?; m=1,c=3,k=2;}` uses time as the coordinate.
+
+Coefficient assumptions can follow the equation too. Strict and inclusive real
+comparisons accept `<`, `<=`, `>`, `>=`, `≤` and `≥`. They remain restrictions
+on the complete solution; they do not fix integration constants or supply
+numerical parameter values. Known false or non-real supplied values are rejected.
+The assumptions do not select a damping branch: the generic solution above
+still requires a non-zero discriminant, or supplied coefficients for the
+solver to select the repeated-root form.
+
+```c
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "diffequation-t.h"
+
+int main(void)
+{
+    diffequ_t *problem = de_from_string("mx''+cx'+kx=0; c>=0; m>0; k>0");
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    string_t *text = problem ? de_to_text(problem, style_EXPRESSION) : NULL;
+    bool ok = text && result && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
+    if (ok) {
+        puts(string_c_str(text));
+        printf("Point conditions: %zu\n", de_condition_count(problem));
+        puts("Symbolic solution: solved");
+    }
+    string_free(text);
+    de_solve_result_free(result);
+    de_free(problem);
+    return ok ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+```
+
+Output:
+
+```text
+{ m*d²x/dt²+c*dx/dt+k*x=0 | t = ?; ; c ≥ 0, m > 0, k > 0 }
+Point conditions: 0
+Symbolic solution: solved
+```
 
 An explicit independent-variable declaration takes precedence. Otherwise, an
 explicit derivative operator supplies the coordinate; without one, the parser
@@ -542,6 +704,25 @@ symmetry = SL(3, ℝ)
 solution = y = (2x + C₁)/(2·(x² + C₁x + C₂))
 ```
 
+The coefficient relation can remain symbolic, and Unicode derivatives and powers
+can be entered directly. The native solver recognises this as the same family:
+
+```text
+input = d²x/dt² + alpha x*dx/dt + alpha^2/9 x³ = 0
+solver = linear transformation
+solution = x = (2t + C₁)/(⅓α·(t² + C₁t + C₂))
+```
+
+Equivalently, for $\alpha\ne0$ and a non-zero denominator,
+
+$$
+x(t)=\frac{3(2t+C_1)}{\alpha(t^2+C_1t+C_2)}.
+$$
+
+Set $x=3u'/(\alpha u)$ to obtain $u'''=0$; the auxiliary $u$ is quadratic.
+No separate instruction to linearise is required. The keyboard-only form
+`x'' + alpha*x*x' + alpha^2*x^3/9 = 0` is equivalent.
+
 The scaled family also accepts a value and/or first derivative at the same
 initial point. With scale $a$, set $t=x-x_0$ and
 $b=y'_0+a y_0^2$. The exact solution is
@@ -563,11 +744,95 @@ solver = linear transformation
 solution = y = (2x + 1)/(2x² + 2x + 1)
 ```
 
+### Independent modified-Emden coefficients
+
+The [linearisation notes](<books/Applied Differential Equations/02-linearisation-of-non-linear-odes.md>)
+give the point-linearisable family when $\beta=\alpha^2/9$. MARS also accepts
+`x'' + alpha xx' + beta x^3 = 0` with **independent** real constant coefficients.
+Time translation and scaling reduce this more general equation to exact local
+parametric quadratures, rather than imposing that coefficient relation or
+returning only a truncated Taylor expansion.
+
+On a local branch with $x\ne0$, put $r=x'/x^2$ and $Q(r)=2r^2+\alpha r+\beta$.
+On a connected interval where
+$Q$ is non-zero, choose a fixed reference $r_0$ and define
+
+$$
+J(r)=\int_{r_0}^{r}\frac{s}{Q(s)}\,ds,\qquad
+x(r)=C_1e^{-J(r)},\qquad
+t(r)=C_2-\frac{1}{C_1}\int_{r_0}^{r}\frac{e^{J(u)}}{Q(u)}\,du.
+$$
+
+Here $C_1\ne0$ and $C_2$ are the two integration constants. The reference $r_0$
+is fixed within that regular interval; changing it reparametrises these constants
+and does not add another one. The native derivation displays the substitution,
+reduced equation and restrictions. Non-zero constant leading coefficients are
+normalised first. The existing simpler rational solution is preferred whenever
+the point-linearisation criterion holds.
+
+The solver separately retains $x=0$ and the real non-zero constant-ratio branches
+$x=-1/[r_*(t-C_2)]$, where $Q(r_*)=0$. Repeated roots occur once. When $\beta=0$,
+all constant solutions $x=C_1$ are also included; unresolved coefficient conditions
+remain attached to the corresponding branches. These exceptional formulae are
+alternatives to the simultaneous parametric pair.
+
+The result has `DE_SOLVE_STATUS_QUADRATURE` and solver `DE_SOLVER_EMDEN_QUADRATURE`.
+Equations at indices zero and one must be read together, as $x(r)$ and $t(r)$.
+`de_solve_result_quadrature_parameter()` and `de_solve_result_quadrature_reference()`
+return the parameter and fixed reference respectively. These expressions belong
+to the result and must not be freed separately. Other result kinds return `NULL`.
+Generated names avoid authored symbols. This path currently handles problems
+without initial/boundary conditions or coordinate intervals; those retain the
+existing solver paths. An explicit $x(t)$ is not inferred from these unevaluated quadratures.
+The first two displayed equations explicitly use $x(r)$ and $t(r)$ to identify the common parameter.
+The library's numerical trajectory sampler can plot the original ODE independently of that symbolic inversion.
+For ordinary derivative input, scalar symbols other than the declared coordinates and differentiated dependent
+fields are inferred as constant coefficients, including bare Greek aliases such as `alpha` and `beta`.
+They appear in `de_constants()`. Partial-derivative input retains its existing coordinate/parameter rules.
+
+This executable example inspects the distinction between the parametric pair
+and its exceptional branches:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "diffequation-t.h"
+
+int main(void)
+{
+    diffequ_t *problem = de_from_string("x''+alpha*x*x'+beta*x^3=0");
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    const expr_t *parameter = de_solve_result_quadrature_parameter(result);
+    const expr_t *reference = de_solve_result_quadrature_reference(result);
+    int status = EXIT_FAILURE;
+    if (result && de_solve_result_status(result) == DE_SOLVE_STATUS_QUADRATURE && parameter && reference) {
+        printf("Parameter: %s\nFixed reference: %s\n", expr_symbol_name(parameter), expr_symbol_name(reference));
+        puts("Parametric coordinate equations: 2");
+        printf("Exceptional families: %zu\n", de_solve_result_count(result) - 2u);
+        status = EXIT_SUCCESS;
+    }
+    de_solve_result_free(result);
+    de_free(problem);
+    return status;
+}
+```
+
+Output:
+
+```text
+Parameter: r
+Fixed reference: r₀
+Parametric coordinate equations: 2
+Exceptional families: 4
+```
+
 ## Lie-Symmetry Analysis
 
 `de_solve_result_symmetry(...)` returns the borrowed UTF-8 name of a symmetry
-group identified by the selected solver. It currently returns `SL(3, ℝ)`
-for the two modified-Emden inputs shown above and `NULL` when the solver has
+group identified by the selected solver. It returns `SL(3, ℝ)`
+for the point-linearisable modified-Emden inputs, or identifies time translation
+and scaling for the independent-coefficient quadrature family, and `NULL` when the solver has
 not identified a group. The group name is separate from the TeX derivation
 available through `de_solve_result_steps_TeX(...)`; mathematically, it is
 written $\mathrm{SL}(3,\mathbb R)$.
@@ -2923,3 +3188,54 @@ body p:has(> .katex) {
     text-align: left;
 }
 </style>
+
+## Numerical trajectories
+
+`de_sample_trajectory()` samples a scalar first- or second-order equation that is linear in its highest derivative,
+without requiring an explicit symbolic solution. Supply the initial coordinate, dependent value and (for second
+order) slope, plus finite sampling limits. Every coefficient must have a numerical value; initial data are explicit
+arguments, not guessed from a family. Inputs remain unchanged and the returned `sampler_t` belongs to the caller.
+
+The sampler uses adaptive RK4 step doubling internally and returns `intervals + 1` uniformly spaced points.
+Absolute and relative tolerances control local error; `max_evaluations` also bounds right-side evaluations.
+This is double-precision visualisation, not a certified or arbitrary-precision solve. A singularity stops that
+integration direction and leaves invalid points beyond it; cancellation or exhausted work returns no sampler.
+Restrict the requested interval to the equation's authored domain. The numerical curve does not replace an exact
+quadrature or prove completeness of the symbolic result.
+
+For x(0) = 0 and x′(0) = 1, the following README example samples the rational modified-Emden trajectory:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "diffequation-t.h"
+
+int main(void)
+{
+    diffequ_t *problem = de_from_string("x''+3*x*x'+x^3=0");
+    sampler_options_t options = sampler_options_default();
+    options.intervals = 128;
+    options.absolute_tolerance = 1e-9;
+    options.relative_tolerance = 1e-8;
+    number_t lower = num_create_from_long(-1);
+    sampler_t *samples = de_sample_trajectory(problem, NUM_ZERO, NUM_ZERO, NUM_ONE, lower, NUM_ONE, &options);
+    const sampler_point_t *last = samples ? sampler_point(samples, sampler_count(samples) - 1) : NULL;
+    int status = EXIT_FAILURE;
+    if (last && last->valid) {
+        printf("Samples: %zu\nx(1): %.6f\n", sampler_count(samples), num_to_double(last->y));
+        status = EXIT_SUCCESS;
+    }
+    sampler_free(samples);
+    num_destroy(&lower);
+    de_free(problem);
+    return status;
+}
+```
+
+Output:
+
+```text
+Samples: 129
+x(1): 0.666667
+```

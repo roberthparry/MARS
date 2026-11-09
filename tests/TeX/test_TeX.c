@@ -222,10 +222,10 @@ static void test_TeX_from_expression(void)
     TEST_ASSERT_TRUE(input && strcmp(string_c_str(input),
                      "1/2(x^2 - 4)/(x-1)*sin(x)/x*log(1/x)") == 0, "mathematical input is borrowed unchanged");
     string_free(input);
-    const char *expected = "\\frac{\\left(x^{2} - 4\\right)\\mkern-2mu \\sin(x)\\mkern-2mu "
-                           "\\lg(\\frac{1}{x})}{2\\mkern-2mu x\\mkern-2mu \\left(x - 1\\right)}";
+    const char *expected = "\\frac{1}{2}\\mkern-2mu \\frac{\\left(x^{2} - 4\\right)\\mkern-2mu \\sin(x)\\mkern-2mu "
+                           "\\lg(\\frac{1}{x})}{x\\mkern-2mu \\left(x - 1\\right)}";
     TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), expected) == 0,
-                     "native beautification gathers the product into a readable fraction");
+                     "native beautification keeps the rational coefficient before the remaining quotient");
     TeX_free(notation);
 
     input = string_new_with("(1/2)*(x^2-4)/(x-1)*sin(x)/x*log(1/x)");
@@ -1160,6 +1160,44 @@ static void test_TeX_real_interval_domains(void)
     }
 }
 
+static void test_TeX_rational_quotient_coefficients(void)
+{
+    static const struct {
+        long numerator, denominator;
+        bool negative;
+        const char *prefix;
+    } cases[] = {
+        { 1, 2, false, "\\frac{1}{2}" },
+        {-1, 2, false, "-\\frac{1}{2}"},
+        { 2, 3, false, "\\frac{2}{3}" },
+        {-2, 3, false, "-\\frac{2}{3}"},
+        { 1, 2, true,  "-\\frac{1}{2}"},
+        {-1, 2, true,  "\\frac{1}{2}" },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
+        number_t scale = num_create_from_frac(cases[i].numerator, cases[i].denominator);
+        expr_t *coefficient = expr_new_const(scale), *body = expr_from_string("u*(a+b)", NULL);
+        expr_t *denominator = expr_new_named_var(NUM_ONE, "d");
+        expr_t *product = coefficient && body ? expr_mul(coefficient, body) : NULL;
+        expr_t *numerator = cases[i].negative ? expr_neg(product) : expr_clone(product);
+        expr_t *quotient = numerator && denominator ? expr_div(numerator, denominator) : NULL;
+        char *text = quotient ? expr_to_TeX_body(quotient) : NULL;
+        bool ok = text && !strncmp(text, cases[i].prefix, strlen(cases[i].prefix)) &&
+                  !strstr(text, "\\frac{\\frac") && strstr(text, "}{d}");
+        if (!ok)
+            fprintf(stderr, "Rational coefficient %zu: %s\n", i, text ? text : "NULL");
+        TEST_ASSERT_TRUE(ok, "either sign and an outer negation retain the rational coefficient first");
+        free(text); expr_free(quotient); expr_free(numerator); expr_free(product);
+        expr_free(denominator); expr_free(body); expr_free(coefficient); num_destroy(&scale);
+    }
+    expr_t *coefficient = expr_new_const(NUM_HALF), *denominator = expr_new_named_var(NUM_ONE, "d");
+    expr_t *quotient = expr_div(coefficient, denominator);
+    char *text = quotient ? expr_to_TeX_body(quotient) : NULL;
+    const char *fraction = text ? strstr(text, "\\frac") : NULL;
+    TEST_ASSERT_TRUE(fraction && !strstr(fraction + 1, "\\frac"), "a numerical numerator keeps one simple fraction");
+    free(text); expr_free(quotient); expr_free(denominator); expr_free(coefficient);
+}
+
 static void test_TeX_context_calculus(void)
 {
     context_test_state_t state = {0};
@@ -1448,6 +1486,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_TeX_native_contexts, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_real_interval_domains, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_context_calculus, tests, NULL);
+    TEST_RUN_IN_GROUP(test_TeX_rational_quotient_coefficients, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_compact_symbol_lookups, tests, NULL);
     TEST_RUN_IN_GROUP(test_TeX_native_aggregate_contexts, tests, NULL);
     return TESTS_EXIT_CODE();

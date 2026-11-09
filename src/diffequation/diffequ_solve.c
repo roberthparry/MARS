@@ -458,6 +458,12 @@ static diffequ_solve_result_t *de_solve_with_options_impl(const diffequ_t *de, u
     if (second_derivative) {
         if (!computation_step_current("diffequation.method"))
             goto cleanup;
+        result = de_solve_autonomous_exponential(de, independent, dependent, second_derivative,
+                                                 first_derivative, residual, include_steps);
+        if (result)
+            goto cleanup;
+        if (!computation_step_current("diffequation.method"))
+            goto cleanup;
         linear_transformation = de_attempt_modified_emden_linearization(
             de, independent, dependent, first_derivative, second_derivative, residual, modified_emden_solutions,
             &modified_emden_count, &modified_emden_scale);
@@ -513,6 +519,11 @@ static diffequ_solve_result_t *de_solve_with_options_impl(const diffequ_t *de, u
                                          "failed to complete the modified-Emden linearization");
             goto cleanup;
         }
+
+        result = de_solve_emden_quadrature(de, independent, dependent, second_derivative,
+                                          first_derivative, residual, include_steps);
+        if (result)
+            goto cleanup;
 
         if (!computation_step_current("diffequation.method"))
             goto cleanup;
@@ -766,7 +777,7 @@ diffequ_solve_result_t *de_solve_with_options(const diffequ_t *de, unsigned int 
     if (!computation_step_current("diffequation.solve"))
         return NULL;
     diffequ_solve_result_t *result = de_solve_with_options_impl(de, options);
-    if (de && result && !de_result_apply_intervals(de, result)) {
+    if (de && result && !de_result_apply_restrictions(de, result)) {
         de_solve_result_free(result);
         result = NULL;
     }

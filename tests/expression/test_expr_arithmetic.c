@@ -20,6 +20,19 @@ void test_add(void)
     check_q_at(__FILE__, __LINE__, 1, "2+3", expr_eval_qf(f), qf_from_double(5));
     print_expr_of(f);
 
+    /* Repeated edits to one leaf must not hide the next edit to a less frequently changed sibling. */
+    for (long i = 0; i < 8; ++i) {
+        number_t value = num_create_from_long(i);
+        expr_set_val(x0, value);
+        number_t cached = expr_eval(f);
+        num_destroy(&cached);
+        num_destroy(&value);
+    }
+    number_t value = num_create_from_long(23);
+    expr_set_val(x1, value);
+    num_destroy(&value);
+    check_q_at(__FILE__, __LINE__, 1, "cached sum after changing the other leaf", expr_eval_qf(f), qf_from_double(30));
+
     expr_free(f);
     expr_free(x0);
     expr_free(x1);

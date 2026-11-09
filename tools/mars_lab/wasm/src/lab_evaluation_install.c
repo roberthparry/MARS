@@ -175,8 +175,6 @@ static void lab_evaluation_install_solver_end(const lab_evaluation_install_t *st
         lab_evaluation_install_emit(state->calls, "setValueText", 1, lab_dom_get(state->cards, "value"));
     /* Plotting hides this card; every completed solver evaluation must restore it. */
     lab_evaluation_install_emit(state->calls, "setValueCardVisible", 1, lab_dom_scalar(LAB_VALUE_BOOLEAN, 1));
-    if (state->mode == LAB_MODE_DIFFERENTIAL_EQUATION)
-        lab_evaluation_install_emit(state->calls, "clearVariableValues", 0);
     lab_evaluation_install_emit(state->calls, "modeSource", 2, lab_dom_string(mode),
                                 lab_dom_get(state->context, "text"));
     lab_evaluation_install_emit(state->calls, "saveWorksheetState", 1, lab_dom_string(mode));
@@ -191,6 +189,12 @@ static void lab_evaluation_install_diffequation_begin(const lab_evaluation_insta
     lab_evaluation_install_emit(state->calls, "scheduleRenderedTeXFit", 0);
     lab_evaluation_install_emit(state->calls, "solverTextCards", 1, state->cards);
     lab_evaluation_install_present(state);
+    int bindings = lab_dom_get(state->data, "binding_values");
+    int source = lab_dom_get(state->data, "binding_expression");
+    if (lab_dom_type(bindings) == LAB_VALUE_ARRAY && lab_dom_truth(source))
+        lab_evaluation_install_emit(state->calls, "setExpressionEditor", 2, source, bindings);
+    else
+        lab_evaluation_install_emit(state->calls, "clearVariableValues", 0);
 }
 
 static void lab_evaluation_install_integrator_begin(const lab_evaluation_install_t *state)

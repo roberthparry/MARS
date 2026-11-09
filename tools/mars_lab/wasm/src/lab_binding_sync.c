@@ -12,6 +12,7 @@
 #include <stdbool.h>
 
 #include "lab_dom.h"
+#include "lab_workspace.h"
 #include "lab_binding.h"
 #include "lab_binding_editor.h"
 #include "lab_binding_sync.h"
@@ -68,6 +69,8 @@ void lab_binding_sync_request(jsref inputs)
     lab_dom_set(request, "mode", lab_dom_string("replace"));
     lab_dom_set(request, "text", source);
     lab_dom_set(request, "bindings", normalised);
+    if (lab_workspace_mode() == LAB_MODE_DIFFERENTIAL_EQUATION)
+        lab_dom_set(request, "syntax", lab_dom_string("diffequation"));
     lab_dom_set(result, "request", request);
     lab_dom_return(result);
 }

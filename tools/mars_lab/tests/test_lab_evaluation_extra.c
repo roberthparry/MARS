@@ -2484,6 +2484,119 @@ static void test_lab_extra_number_card_markup(void)
     }
 }
 
+static void test_lab_extra_compact_prime_coefficients(void)
+{
+    unsigned status = 0u;
+    json_t *response = request("/diffequation-eval",
+        "{\"diffequation\":\"my'' + cy' + ky = 0\",\"precision\":78}", &status);
+    const char *problem = test_lab_text(response, "problem_TeX");
+    const char *solution = test_lab_text(response, "solutions");
+    bool ok = response && status == 200u && contains(response, "status", "solved") &&
+              strstr(problem, "m\\mkern-2mu \\frac{d^{2} y}") &&
+              strstr(problem, "c\\mkern-2mu \\frac{d y}") && strstr(problem, "k\\mkern-2mu y") &&
+              strstr(solution, "C₁") && strstr(solution, "C₂") && strstr(solution, "m") &&
+              strstr(solution, "c") && strstr(solution, "k") && !strstr(problem, "NAN") &&
+              !strstr(solution, "NAN");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "adjacent primed coefficients retain both derivative terms and produce a symbolic oscillator solution");
+}
+
+static void test_lab_extra_parameter_restrictions(void)
+{
+    unsigned status = 0u;
+    json_t *response = request("/diffequation-eval",
+        "{\"diffequation\":\"mx''+cx'+kx=0; c≥0; m>0; k>0\",\"precision\":32}", &status);
+    const char *problem = test_lab_text(response, "problem_TeX");
+    const char *solution = test_lab_text(response, "solutions");
+    const char *TeX = test_lab_text(response, "solutions_TeX");
+    bool ok = response && status == 200u && contains(response, "status", "solved") &&
+              strstr(problem, "c \\ge 0") && strstr(problem, "m > 0") && strstr(problem, "k > 0") &&
+              strstr(solution, "C₁") && strstr(solution, "C₂") && strstr(solution, "c ≥ 0") &&
+              strstr(TeX, "\\ge ") && !strstr(TeX, "real_at_least") && !strstr(TeX, "NAN");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "coefficient inequalities remain visible on the complete symbolic oscillator solution");
+}
+
+static void test_lab_extra_ode_parameter_controls(void)
+{
+    unsigned status = 0u;
+    json_t *response = request("/diffequation-eval",
+        "{\"diffequation\":\"mx''+cx'+kx=0; c>=0; m>0; k>0\",\"precision\":32}", &status);
+    const json_t *bindings = test_lab_member(response, "binding_values");
+    bool ok = status == 200u && json_array_size(bindings) == 4u &&
+              contains(response, "binding_expression", "c = ?") && contains(response, "binding_expression", "m = ?") &&
+              contains(response, "binding_expression", "k = ?") && contains(response, "binding_expression", "c ≥ 0") &&
+              contains(response, "solutions", "½·(√(c² - 4km) - c)·t/m") &&
+              contains(response, "solutions_TeX", "e^{\\frac{1}{2}") &&
+              contains(response, "solutions_TeX", "e^{-\\frac{1}{2}") &&
+              !contains(response, "solutions_TeX", "\\frac{t\\mkern-2mu \\left(");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "symbolic oscillator coefficients remain editable and precede their coordinate in the exponent");
+    response = request("/eval", "{\"expression\":\"{m*d²x/dt²+c*dx/dt+k*x=0 | t=?; c=?,k=?,m=?; c>=0; m>0; k>0}\","
+        "\"wrt\":\"t\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\",\"precision\":32,"
+        "\"plot_lower\":\"0\",\"plot_upper\":\"10\"}", &status);
+    ok = status == 200u && contains(response, "plot_svg", "data-series=") &&
+         contains(response, "plot_slices", "m\t") && contains(response, "plot_slices", "c\t") &&
+         contains(response, "plot_slices", "k\t") && contains(response, "plot_title", "c = 1") &&
+         !contains(response, "plot_slices", "m\t0\t") && !contains(response, "plot_slices", "k\t0\t");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "unassigned ODE coefficients receive labelled plot-local sliders and a real representative family");
+    static const char *const damping[] = {"0", "2", "3", "1"};
+    for (size_t i = 0; i < 4u; ++i) {
+        string_t *payload = string_sprintf("{\"expression\":\"mx''+cx'+kx=0; c>=0; m>0; k>0\","
+            "\"wrt\":\"t\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\",\"precision\":32,"
+            "\"plot_lower\":\"0\",\"plot_upper\":\"10\",\"plot_slices\":\"m\\t0.5\\t2\\t%s\\t-1\\n"
+            "c\\t0\\t4\\t%s\\t-1\\nk\\t0.5\\t2\\t1\\t-1\"}", i == 3u ? "7/5" : "1", damping[i]);
+        response = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        string_t *expected = string_sprintf("c = %s", damping[i]);
+        ok = response && status == 200u && contains(response, "plot_svg", "data-series=") &&
+             contains(response, "plot_title", string_c_str(expected));
+        if (!ok) show_failure(response);
+        json_free(response); string_free(expected); string_free(payload);
+        TEST_ASSERT_TRUE(ok, "slider changes re-solve undamped, critically damped and overdamped members natively");
+    }
+    for (int mass = -1; mass <= 0; ++mass) {
+        string_t *payload = string_sprintf("{\"expression\":\"mx''+cx'+kx=0; c>=0; m>0; k>0\","
+            "\"wrt\":\"t\",\"action\":\"plot\",\"plot_source_mode\":\"diffequation\",\"precision\":32,"
+            "\"plot_slices\":\"m\\t-2\\t2\\t%d\\t-1\"}", mass);
+        response = payload ? request("/eval", string_c_str(payload), &status) : NULL;
+        ok = response && status == 422u && contains(response, "error", "Invalid slice");
+        if (!ok) show_failure(response);
+        json_free(response); string_free(payload);
+        TEST_ASSERT_TRUE(ok, "plot-local choices cannot override the authored strictly positive-mass restriction");
+    }
+}
+
+static void test_lab_extra_autonomous_energy(void)
+{
+    unsigned status = 0u;
+    json_t *response = request("/diffequation-eval",
+        "{\"diffequation\":\"y''=e^y\",\"precision\":32}", &status);
+    bool ok = response && status == 200u && contains(response, "status", "solved") &&
+              contains(response, "solver", "autonomous energy") && contains(response, "solutions", "sinh") &&
+              contains(response, "solutions", "cos") && contains(response, "solutions", "ln(2/(x - C₂)²)") &&
+              contains(response, "solutions_TeX", "\\ln") &&
+              contains(response, "steps", "Autonomous energy integral") &&
+              contains(response, "steps_TeX", "\\frac{d") &&
+              !contains(response, "steps_TeX", "\\partial") && !contains(response, "steps", "unsupported");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "autonomous exponential forcing exposes every real energy branch and its ordinary derivative integral");
+    response = request("/eval", "{\"expression\":\"y''=e^y\",\"action\":\"plot\","
+        "\"plot_source_mode\":\"diffequation\",\"precision\":32,\"plot_lower\":\"-2\",\"plot_upper\":\"2\"}", &status);
+    ok = response && status == 200u && contains(response, "plot_svg", "data-series=\"0\"") &&
+         contains(response, "plot_svg", "Solution 2") && contains(response, "plot_svg", "Solution 3") &&
+         contains(response, "plot_title", "representative real members") &&
+         !contains(response, "error", "sixteen") && !contains(response, "error", "timed out");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "all three energy branches share the plot budget and render a real solution family");
+}
+
 static void test_lab_extra_cosecant_ode(void)
 {
     unsigned status = 0u;
@@ -2559,10 +2672,11 @@ static void test_lab_extra_diffequation(void)
     json_free(response);
     TEST_ASSERT_TRUE(ok, "ODE results identify the independent coordinate by name, not its unset value");
     response = request("/diffequation-eval", "{\"diffequation\":\"y''+3y*y'+y^4=0; y(0)=1; y'(0)=0\"}", &status);
-    ok = status == 200 && contains(response, "status", "series") &&
-         json_array_size(test_lab_member(response, "binding_values")) == 0;
+    bindings = test_lab_member(response, "binding_values");
+    ok = status == 200 && contains(response, "status", "series") && json_array_size(bindings) == 1 &&
+         !strcmp(test_lab_text(json_array_get(bindings, 0), "name"), "x");
     json_free(response);
-    TEST_ASSERT_TRUE(ok, "Local-series results do not advertise plotting coordinates");
+    TEST_ASSERT_TRUE(ok, "local-series results retain their original independent coordinate without claiming plot support");
     expect_response("/diffequation-eval", "{\"diffequation\":\"y''+6y*y'+4y^3=0; y(0)=0; y'(0)=1\"}",
                     200u, "solutions", "y = (x)/(x² + 1)");
     response = request("/diffequation-eval", "{\"diffequation\":\"y' - y^2 = x^2\"}", &status);
@@ -2602,6 +2716,72 @@ static void test_lab_extra_diffequation(void)
         show_failure(response);
     json_free(response);
     TEST_ASSERT_TRUE(ok, "automatic Riccati plots show six finite curves at the displayed 32-digit precision");
+}
+
+static void test_lab_extra_emden_quadratures(void)
+{
+    unsigned status = 0u;
+    json_t *response = request("/diffequation-eval",
+        "{\"diffequation\":\"x'' + alpha xx' + beta x^3 = 0\",\"precision\":32}", &status);
+    const json_t *bindings = test_lab_member(response, "binding_values");
+    bool coordinate = false;
+    for (size_t i = 0; i < json_array_size(bindings); ++i)
+        coordinate |= !strcmp(test_lab_text(json_array_get(bindings, i), "name"), "t");
+    bool ok = status == 200u && test_lab_ok(response, true) && coordinate &&
+        !strcmp(test_lab_text(response, "status"), "quadrature") &&
+        contains(response, "solver", "translation/scaling") && contains(response, "quadrature_parameter", "r") &&
+        contains(response, "steps", "two integration constants") && contains(response, "solutions", "t(r) =") &&
+        contains(response, "solutions", "x(r) =") && contains(response, "binding_expression", "α = ?") &&
+        contains(response, "binding_expression", "β = ?") &&
+        !contains(response, "solutions", "NAN") && !contains(response, "solutions", "O(t") &&
+        !contains(response, "display_TeX", "\\middle|") &&
+        !*test_lab_text(response, "render_error") && !*test_lab_text(response, "wrapped_render_error") &&
+        contains(response, "svg", "<svg") &&
+        (!strcmp(test_lab_text(response, "display_TeX"), test_lab_text(response, "display_wrapped_TeX")) ||
+            contains(response, "wrapped_svg", "<svg"));
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "independent Emden coefficients expose exact parametric coordinates and the original time symbol");
+    response = request("/diffequation-eval",
+        "{\"diffequation\":\"d²x/dt² + alpha x*dx/dt + beta x³ = 0\",\"precision\":32}", &status);
+    ok = status == 200u && test_lab_ok(response, true) && contains(response, "svg", "<svg") &&
+        !*test_lab_text(response, "render_error") && !*test_lab_text(response, "wrapped_render_error");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "the screenshot's exact Unicode equation produces rendered quadrature mathematics");
+    /* A second Evaluate uses the editable source returned by the first, including empty envelope sections. */
+    response = request("/diffequation-eval",
+        "{\"diffequation\":\"x''+alpha*x*x'+beta*x^3=0\",\"precision\":32}", &status);
+    json_t *repeat_input = json_new_object();
+    string_t *repeat_route = string_new_with("/diffequation-eval");
+    ok = response && repeat_input && repeat_route &&
+         lab_eval_set(repeat_input, "diffequation", test_lab_text(response, "binding_expression"));
+    json_t *repeat = ok ? lab_eval_request(repeat_route, repeat_input, &status) : NULL;
+    ok = ok && status == 200u && test_lab_ok(repeat, true) && contains(repeat, "status", "quadrature");
+    if (!ok) show_failure(repeat);
+    json_free(repeat); json_free(repeat_input); string_free(repeat_route); json_free(response);
+    TEST_ASSERT_TRUE(ok, "the editable ODE returned to the browser parses on the next Evaluate");
+    response = request("/diffequation-eval",
+        "{\"diffequation\":\"d²x/dt² + alpha x*dx/dt + alpha^2/9 x³ = 0\",\"precision\":32}", &status);
+    ok = status == 200u && test_lab_ok(response, true) &&
+        !strcmp(test_lab_text(response, "status"), "solved") &&
+        !strcmp(test_lab_text(response, "solver"), "linear transformation") &&
+        contains(response, "solutions", "x = (2t + C₁)/(⅓α·(t² + C₁t + C₂))") &&
+        !contains(response, "solutions", "∫") && !contains(response, "solutions", "NAN");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "the authored symbolic coefficient relation gives the simple rational solution in Lab");
+    response = request("/eval", "{\"expression\":\"x''+alpha*x*x'+beta*x^3=0\",\"action\":\"plot\","
+        "\"plot_source_mode\":\"diffequation\",\"wrt\":\"t\",\"precision\":32}", &status);
+    ok = status == 200u && test_lab_ok(response, true) && contains(response, "plot_svg", "data-series=") &&
+        contains(response, "plot_title_TeX", "representative numerical trajectories") &&
+        !contains(response, "plot_svg", ">Representative numerical trajectories</text>");
+    if (!ok) show_failure(response);
+    json_free(response);
+    TEST_ASSERT_TRUE(ok, "numerical trajectories reserve their title for the mathematical heading without duplicate SVG text");
+    expect_response("/eval", "{\"expression\":\"d²x/dt²+alpha*x*dx/dt+alpha^2/9*x³=0\",\"action\":\"plot\","
+        "\"plot_source_mode\":\"diffequation\",\"wrt\":\"t\",\"precision\":32}",
+        200u, "plot_svg", "data-series=");
 }
 
 static void test_lab_extra_context_results(void)
@@ -2948,7 +3128,12 @@ void test_lab_evaluation_extra_cases(void)
     TEST_RUN_IN_GROUP(test_lab_extra_number_card_markup, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_gaussian_endpoint, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_diffequation, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_emden_quadratures, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_cosecant_ode, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_compact_prime_coefficients, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_parameter_restrictions, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_ode_parameter_controls, tests, NULL);
+    TEST_RUN_IN_GROUP(test_lab_extra_autonomous_energy, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_ode_interval, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_context_results, tests, NULL);
     TEST_RUN_IN_GROUP(test_lab_extra_matrix, tests, NULL);

@@ -4,7 +4,7 @@
  *
  * Inspects native binding metadata and specialises generated integration
  * constants only. Authored parameters are never guessed. Private variable copies
- * support derivative-guided parameter sweeps for five or nine representatives.
+ * support derivative-guided parameter sweeps within a shared branch budget.
  * General solution renderings remain unchanged in the calling plot worker.
  * The isolated calculation process bounds the total family to sixteen curves.
  */
@@ -17,14 +17,13 @@
 #include "lab_worker_internal.h"
 
 static void parameter_values(const expr_t *formula, expr_bindings_t *bindings, const char *axis,
-                              const char *const *names, size_t count, double selected[2][5])
+                              const char *const *names, size_t count, size_t side, double selected[2][5])
 {
     size_t saved_precision = num_get_default_prec_bits();
     /* Selection is a visual heuristic; retain guard precision without inheriting thousands of worksheet digits. */
     if (saved_precision > 128)
         num_set_default_prec_bits(128);
     expr_t *copy = NULL, *parameters[2] = {NULL, NULL};
-    size_t side = count == 1 ? 5 : 3;
     for (size_t p = 0; p < count; ++p) {
         for (size_t k = 0; k < side; ++k)
             selected[p][k] = (double)k - (double)(side / 2);
@@ -55,6 +54,7 @@ static void parameter_values(const expr_t *formula, expr_bindings_t *bindings, c
      * Each bin receives equal spatial weight despite adaptive sample clustering. */
     for (size_t p = 0; copy && x && p < count; ++p) {
         double density[64] = {0};
+        bool supported[64] = {false};
         for (unsigned slice = 0; slice < 6; ++slice) {
             number_t xv = num_create_from_long(2 * (long)(slice % 3) - 2);
             expr_set_val(x, xv);
@@ -80,6 +80,7 @@ static void parameter_values(const expr_t *formula, expr_bindings_t *bindings, c
                 if (!point->valid || !isfinite(t) || !isfinite(y) || !isfinite(dy) || t < -4 || t > 4)
                     continue;
                 unsigned bin = (unsigned)fmin(63, floor((t + 4) * 8));
+                supported[bin] = true;
                 /* Angular ordinate sensitivity limits the influence of poles.
                  * The sampler also uses second derivatives to refine its probes. */
                 double sensitivity = fabs(dy) / hypot(1, y) / hypot(1, y);
@@ -94,13 +95,15 @@ static void parameter_values(const expr_t *formula, expr_bindings_t *bindings, c
             total += density[bin];
         if (!(total > 0) || !isfinite(total))
             continue; /* Keep bounded seeds when no usable sensitivity exists. */
-        /* A uniform floor keeps quiet portions represented as well. */
+        /* A uniform floor covers quiet valid regions, without spending representatives outside the domain. */
         double floor_weight = total / 256;
-        total += 64 * floor_weight;
+        for (unsigned bin = 0; bin < 64; ++bin)
+            if (supported[bin])
+                total += floor_weight;
         for (size_t k = 0; k < side; ++k) {
             double target = total * (k + 0.5) / side, cumulative = 0;
             for (unsigned bin = 0; bin < 64; ++bin) {
-                double weight = density[bin] + floor_weight;
+                double weight = density[bin] + (supported[bin] ? floor_weight : 0);
                 if (cumulative + weight >= target) {
                     selected[p][k] = -4 + (bin + (target - cumulative) / weight) / 8;
                     break;
@@ -108,12 +111,17 @@ static void parameter_values(const expr_t *formula, expr_bindings_t *bindings, c
                 cumulative += weight;
             }
         }
-        /* Keep an exact zero reference among at most five ordered representatives. */
+        /* Keep zero only when it is a valid member of the authored domain. */
+        expr_set_val(parameters[p], NUM_ZERO);
+        number_t at_zero = expr_eval(copy);
+        bool zero_valid = num_is_finite(at_zero) && num_is_real(at_zero);
+        num_destroy(&at_zero);
         size_t nearest = 0u;
         for (size_t k = 1u; k < side; ++k)
             if (fabs(selected[p][k]) < fabs(selected[p][nearest]))
                 nearest = k;
-        selected[p][nearest] = 0;
+        if (zero_valid)
+            selected[p][nearest] = 0;
     }
     expr_free(copy);
     expr_free(x);
@@ -155,14 +163,18 @@ static bool append_family(const expr_t *formula, expr_bindings_t *bindings, cons
                            expr_t **curves, string_t **labels, size_t *count)
 {
     size_t side = parameter_count == 1 ? 5 : 3;
+    size_t budget = branches && branches <= 16u ? 16u / branches : 0u;
+    /* At most four decrements: split the fixed sixteen-curve budget across all solution branches. */
+    while (side > 1u && (parameter_count == 2u ? side * side : side) > budget)
+        --side;
     size_t members = parameter_count == 2 ? side * side : parameter_count ? side : 1;
-    if (*count + members > 16) {
+    if (!budget || *count + members > 16) {
         printf("error The representative solution family exceeds sixteen curves. Supply more initial conditions.\n");
         return false;
     }
     double selected[2][5] = {{0}};
     if (parameter_count)
-        parameter_values(formula, bindings, axis, names, parameter_count, selected);
+        parameter_values(formula, bindings, axis, names, parameter_count, side, selected);
     for (size_t member = 0; member < members; ++member) {
         expr_t *curve = expr_clone(formula);
         expr_bindings_t *values = bindings;

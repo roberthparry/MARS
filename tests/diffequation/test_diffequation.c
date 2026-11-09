@@ -32,6 +32,8 @@
 #include "test_diffequ_notation.h"
 #include "test_diffequ_riccati.h"
 #include "test_diffequ_interval.h"
+#include "test_diffequ_energy.h"
+#include "test_diffequ_emden.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
@@ -778,6 +780,60 @@ static void test_diffequ_parses_and_solves_prime_ode_shorthand(void)
     de_free(de);
 }
 
+static void test_diffequ_compact_prime_coefficients(void)
+{
+    static const struct {
+        const char *compact, *explicit;
+        bool solve;
+    } cases[] = {
+        {"my''+cy'+ky=0", "m*y''+c*y'+k*y=0", true},
+        {"cy'+my''+ky=0", "c*y'+m*y''+k*y=0", true},
+        {"ay''+by'+cy=0", "a*y''+b*y'+c*y=0", true},
+        {"mu''+cu'+ku=0", "m*u''+c*u'+k*u=0", true},
+        {"ax''+bx'+kx=0", "a*x''+b*x'+k*x=0", true},
+        {"{my''+cy'+ky=0 | t=?; m=1,c=3,k=2;}", "{m*Dtt(y)+c*Dt(y)+k*y=0 | t=?; m=1,c=3,k=2;}", true},
+        {"{my''+cy'+ky=0 | t=?; m=1,c=2,k=1;}", "{m*Dtt(y)+c*Dt(y)+k*y=0 | t=?; m=1,c=2,k=1;}", true},
+        {"{my''+cy'+ky=0 | t=?; m=1,c=1,k=1;}", "{m*Dtt(y)+c*Dt(y)+k*y=0 | t=?; m=1,c=1,k=1;}", true},
+        {"velocity''+2velocity'+velocity=0", "Dxx([velocity])+2Dx([velocity])+[velocity]=0", true},
+        {"mvelocity''+cvelocity'+kvelocity=0", "m*Dxx([velocity])+c*Dx([velocity])+k*[velocity]=0", true},
+        {"y''+[my]*y=0", "Dxx(y)+[my]*y=0", true},
+        {"n''+ln(n)=0", "Dxx(n)+ln(n)=0", false},
+        {"@phi''+2@phi'+@phi=0", "Dxx(@phi)+2Dx(@phi)+@phi=0", true},
+        {"phi''+2phi'+phi=0", "Dxx(@phi)+2Dx(@phi)+@phi=0", true},
+    };
+    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
+        diffequ_t *de = de_from_string(cases[i].compact), *explicit = de_from_string(cases[i].explicit);
+        string_t *a = de ? equ_to_text(de_equation(de), style_UNBOUND) : NULL;
+        string_t *b = explicit ? equ_to_text(de_equation(explicit), style_UNBOUND) : NULL;
+        WANT_POINTER(cases[i].compact, de, true);
+        WANT_POINTER(cases[i].explicit, explicit, true);
+        if (a && b)
+            WANT_TEXT("compact coefficients preserve the explicit differential equation", string_c_str(a), string_c_str(b));
+        diffequ_solve_result_t *result = de && cases[i].solve ? de_solve(de) : NULL;
+        if (cases[i].solve)
+            WANT_LONG("compact linear equation solves", result ? (long)de_solve_result_status(result) : -1L,
+                      (long)DE_SOLVE_STATUS_SOLVED);
+        de_solve_result_free(result); string_free(b); string_free(a); de_free(explicit); de_free(de);
+    }
+}
+
+/* README example from docs/diffequation.md: compact coefficients keep the symbolic oscillator intact. */
+static void example_diffequation_compact_coefficients(void)
+{
+    diffequ_t *problem = de_from_string("my''+cy'+ky=0");
+    diffequ_solve_result_t *result = problem ? de_solve(problem) : NULL;
+    const equation_t *solution = result ? de_solve_result_at(result, 0u) : NULL;
+    string_t *text = solution ? equ_to_text(solution, style_UNBOUND) : NULL;
+    bool ok = text && de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED;
+    if (ok) {
+        puts(string_c_str(text));
+        WANT_TEXT("README symbolic oscillator solution", string_c_str(text),
+                  "y = C₁·exp(½·(√(c² - 4km) - c)·x/m) + C₂·exp(-½·(√(c² - 4km) + c)·x/m)");
+    }
+    string_free(text); de_solve_result_free(result); de_free(problem);
+    TEST_ASSERT_TRUE(ok, "README compact coefficient example returns the two-constant symbolic solution");
+}
+
 static void test_diffequ_infers_prime_coordinate(void)
 {
     static const struct {
@@ -926,11 +982,11 @@ static void test_diffequ_compact_parameter_derivatives(void)
 static void test_diffequ_rejects_noncanonical_text(void)
 {
     diffequ_t *missing_derivative = de_from_string("y = 1");
-    diffequ_t *missing_section = de_from_string("{ Dx(y) = y | x = ?; }");
+    diffequ_t *bound_coordinate = de_from_string("{ Dx(y) = y | x = 1; }");
 
     WANT_POINTER("shorthand without a derivative", missing_derivative, false);
-    WANT_POINTER("explicit form missing a section", missing_section, false);
-    de_free(missing_section);
+    WANT_POINTER("independent coordinate cannot have a bound value", bound_coordinate, false);
+    de_free(bound_coordinate);
     de_free(missing_derivative);
 }
 
@@ -2875,63 +2931,63 @@ static void test_diffequ_defaults_bare_differential_operator(void)
         },
         {
             "(D^2 + @omega^2)x = 0",
-            "{ d²x/dt² + ω²*x = 0 | t = ?; ;  }",
+            "{ d²x/dt² + ω²*x = 0 | t = ?; ω = ?;  }",
             "x = C₁·cos(ωt) + C₂·sin(ωt)",
         },
         {
             "(D^2 - @omega^2)x = 0",
-            "{ d²x/dt² - ω²*x = 0 | t = ?; ;  }",
+            "{ d²x/dt² - ω²*x = 0 | t = ?; ω = ?;  }",
             "x = C₁·exp(ωt) + C₂·exp(-ωt)",
         },
         {
             "(D^2 - @omega^2)^2(x) = 0",
-            "{ d⁴x/dt⁴ - 2ω²*d²x/dt² + ω⁴*x = 0 | t = ?; ;  }",
+            "{ d⁴x/dt⁴ - 2ω²*d²x/dt² + ω⁴*x = 0 | t = ?; ω = ?;  }",
             "x = (C₁ + C₂t)·exp(ωt) + (C₃ + C₄t)·exp(-ωt)",
         },
         {
             "(D^2 + @omega^2)^2(x) = 0",
-            "{ d⁴x/dt⁴ + 2ω²*d²x/dt² + ω⁴*x = 0 | t = ?; ;  }",
+            "{ d⁴x/dt⁴ + 2ω²*d²x/dt² + ω⁴*x = 0 | t = ?; ω = ?;  }",
             "x = (C₁ + C₂t)·cos(ωt) + (C₃ + C₄t)·sin(ωt)",
         },
         {
             "(D^2 + @omega^2)^3x = 0",
             "{ d⁶x/dt⁶ + 3ω²*d⁴x/dt⁴ + 3ω⁴*d²x/dt² + "
-            "ω⁶*x = 0 | t = ?; ;  }",
+            "ω⁶*x = 0 | t = ?; ω = ?;  }",
             "x = (C₁ + C₂t + C₃t²)·cos(ωt) + "
             "(C₄ + C₅t + C₆t²)·sin(ωt)",
         },
         {
             "(D^2 - @omega^2)^3x = 0",
             "{ d⁶x/dt⁶ - 3ω²*d⁴x/dt⁴ + 3ω⁴*d²x/dt² - "
-            "ω⁶*x = 0 | t = ?; ;  }",
+            "ω⁶*x = 0 | t = ?; ω = ?;  }",
             "x = (C₁ + C₂t + C₃t²)·exp(ωt) + "
             "(C₄ + C₅t + C₆t²)·exp(-ωt)",
         },
         {
             "(D^2 + @omega^2)^4x = 0",
             "{ d⁸x/dt⁸ + 4ω²*d⁶x/dt⁶ + 6ω⁴*d⁴x/dt⁴ + "
-            "4ω⁶*d²x/dt² + ω⁸*x = 0 | t = ?; ;  }",
+            "4ω⁶*d²x/dt² + ω⁸*x = 0 | t = ?; ω = ?;  }",
             "x = (Σ_(k=0)^3 C_(k + 1)·t^k)·cos(ωt) + "
             "(Σ_(k=0)^3 C_(k + 5)·t^k)·sin(ωt)",
         },
         {
             "(D^2 + @omega^2)^4phi = 0",
             "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
-            "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
+            "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ω = ?;  }",
             "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
             "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
         },
         {
             "(D^2 + @omega^2)^4@phi = 0",
             "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
-            "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
+            "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ω = ?;  }",
             "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
             "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
         },
         {
             "(D^2 + @omega^2)^4φ = 0",
             "{ d⁸φ/dx⁸ + 4ω²*d⁶φ/dx⁶ + 6ω⁴*d⁴φ/dx⁴ + "
-            "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ;  }",
+            "4ω⁶*d²φ/dx² + ω⁸*φ = 0 | x = ?; ω = ?;  }",
             "φ = (Σ_(k=0)^3 C_(k + 1)·x^k)·cos(ωx) + "
             "(Σ_(k=0)^3 C_(k + 5)·x^k)·sin(ωx)",
         },
@@ -5218,6 +5274,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_applies_initial_condition_to_exact_differential_form);
     RUN_TEST_CASE(test_diffequ_solves_divided_differential_form);
     RUN_TEST_CASE(test_diffequ_parses_and_solves_prime_ode_shorthand);
+    RUN_TEST_CASE(test_diffequ_compact_prime_coefficients);
     RUN_TEST_CASE(test_diffequ_infers_prime_coordinate);
     RUN_TEST_CASE(test_diffequ_derivative_quotient_TeX);
     RUN_TEST_CASE(test_diffequ_parses_subscript_partial_derivatives);
@@ -5254,6 +5311,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_modified_emden_condition_scope);
     RUN_TEST_CASE(test_diffequ_linearizes_scaled_modified_emden_problem);
     RUN_TEST_CASE(test_diffequ_modified_emden_uses_coefficient_rule);
+    RUN_TEST_CASE(test_diffequ_emden_quadratures);
     RUN_TEST_CASE(test_diffequ_solves_hydrogen_ground_state);
     RUN_TEST_CASE(test_diffequ_stationary_eigenfunction_uses_general_rule);
     RUN_TEST_CASE(test_diffequ_rejects_quartic_emden_point_linearization);
@@ -5272,6 +5330,7 @@ int tests_main(void)
     RUN_TEST_CASE(test_diffequ_solves_secant_cubed_forcing);
     RUN_TEST_CASE(test_diffequ_solves_reciprocal_trigonometric_forcing);
     RUN_TEST_CASE(test_diffequ_intervals);
+    RUN_TEST_CASE(test_diffequ_autonomous_energy);
     RUN_TEST_CASE(test_diffequ_solves_logarithmic_forcing);
     RUN_TEST_CASE(test_diffequ_solves_repeated_complex_roots);
     RUN_TEST_CASE(test_diffequ_solves_degree_six_characteristic_polynomial);
@@ -5438,6 +5497,18 @@ int tests_main(void)
                                   "diffequation,readme,output,riccati");
     TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_interval, readme_examples,
                                   "diffequation,readme,output,interval");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_compact_coefficients, readme_examples,
+                                  "diffequation,readme,output,notation");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_parameter_restrictions, readme_examples,
+                                  "diffequation,readme,output,conditions");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_autonomous_energy, readme_examples,
+                                  "diffequation,readme,output,energy");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_emden_quadrature, readme_examples,
+                                  "diffequation,readme,output,quadrature");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_symbolic_emden, readme_examples,
+                                  "diffequation,readme,output,linearisation");
+    TEST_RUN_OUTPUT_IN_GROUP_TAGS(example_diffequation_trajectory, readme_examples,
+                                  "diffequation,readme,output,trajectory");
 
     return TESTS_EXIT_CODE();
 }

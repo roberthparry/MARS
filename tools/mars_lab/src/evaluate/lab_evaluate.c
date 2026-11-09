@@ -220,7 +220,10 @@ static bool lab_eval_expression_arguments(arguments_t *args, const json_t *paylo
                lab_eval_argument_member(args, payload, "plot_roll", "0", false) &&
                lab_eval_argument_member(args, payload, "plot_quality", "full", false) &&
                lab_eval_argument_member(args, payload, "plot_source_mode", "expression", false) &&
-               ((*lab_eval_text(payload, "plot_source_mode") &&
+               ((!strcmp(lab_eval_text(payload, "plot_source_mode"), "diffequation")) ?
+                (!*lab_eval_text(payload, "plot_slices") ||
+                 lab_eval_argument_member(args, payload, "plot_slices", "", false)) :
+                (*lab_eval_text(payload, "plot_source_mode") &&
                  strcmp(lab_eval_text(payload, "plot_source_mode"), "expression")) ||
                 (lab_eval_argument_member(args, payload, "plot_slices", "", false) &&
                  lab_eval_argument_member(args, payload, "plot_plane_real_lower", "", false) &&

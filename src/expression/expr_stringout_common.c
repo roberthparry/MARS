@@ -773,6 +773,18 @@ static bool expr_tostring_is_explicit_arbitrary_amplitude(const expr_t *expr)
  *   5 = everything else (unary/binary fns) — sort by primary arg var name,
  *       stable so same-arg functions keep their original tree order
  */
+static bool factor_constant_expression(const expr_t *f, unsigned depth)
+{
+    if (!f || depth > 128u) return false;
+    if (expr_is_const(f)) return true;
+    if (expr_is_var(f)) return false;
+    if (expr_is_pow_d_expr(f)) return factor_constant_expression(f->a, depth + 1u);
+    if (!f->ops) return false;
+    return f->ops->arity == EXPR_OP_UNARY ? factor_constant_expression(f->a, depth + 1u) :
+        f->ops->arity == EXPR_OP_BINARY && factor_constant_expression(f->a, depth + 1u) &&
+        factor_constant_expression(f->b, depth + 1u);
+}
+
 static int factor_group(const expr_t *f)
 {
     if (expr_is_neg(f))
@@ -808,6 +820,10 @@ static int factor_group(const expr_t *f)
         return 4;
 
     if (expr_tostring_is_named_const_pow_d(f))
+        return 3;
+
+    /* A symbolic coefficient remains before its coordinate even when written as an algebraic sum. */
+    if (expr_is_addsub(f) && factor_constant_expression(f, 0u))
         return 3;
 
     return 5;

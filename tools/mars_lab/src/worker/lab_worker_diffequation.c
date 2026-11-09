@@ -26,6 +26,7 @@ static const char *solve_status_name(de_solve_status_t status)
         [DE_SOLVE_STATUS_INVALID]     = "invalid",
         [DE_SOLVE_STATUS_FAILED]      = "failed",
         [DE_SOLVE_STATUS_SERIES]      = "series",
+        [DE_SOLVE_STATUS_QUADRATURE]  = "quadrature",
     };
     return (size_t)status < sizeof(names) / sizeof(*names) && names[status] ? names[status] : "invalid";
 }
@@ -59,6 +60,8 @@ static const char *solver_name(de_solver_t solver)
         [DE_SOLVER_GKDV_TRAVELLING_WAVE]           = "generalised KdV travelling waves",
         [DE_SOLVER_HALF_LINE_HEAT]                = "half-line heat boundary kernel",
         [DE_SOLVER_RICCATI]                       = "Riccati linearisation",
+        [DE_SOLVER_AUTONOMOUS_ENERGY]             = "autonomous energy integral",
+        [DE_SOLVER_EMDEN_QUADRATURE]              = "translation/scaling quadratures",
     };
     return (size_t)solver < sizeof(names) / sizeof(*names) && names[solver] ? names[solver] : "none";
 }
@@ -102,6 +105,9 @@ static void print_result_TeX(const char *key, const diffequ_solve_result_t *resu
     if (count > 1u)
         printf("\\begin{aligned}[t]\n");
     for (size_t i = 0u; i < count; ++i) {
+        if (de_solve_result_status(result) == DE_SOLVE_STATUS_QUADRATURE && (i == 0u || i == 2u))
+            printf("&\\text{%s} \\\\[0.5em]\n", i ? "Separate exceptional solutions (including equilibria):"
+                : "Parametric family: read the next two equations together.");
         const equation_t *solution = de_solve_result_at(result, i);
         char *TeX = solution ? equ_to_TeX_body_wrapped(solution, line_limit) : NULL;
 
@@ -156,19 +162,25 @@ int lab_worker_diffequation(int argc, char **argv)
     }
 
     problem = de_to_string(de, style_EXPRESSION);
-    size_t dimensions = de_independent_count(de), count = de_solve_result_count(result);
-    bool intervals = false;
-    for (size_t i = 0; i < dimensions; ++i)
-        intervals |= de_independent_lower_bound(de, i) || de_independent_upper_bound(de, i);
-    problem_TeX = intervals ? de_problem_to_TeX(de) : de_to_text(de, style_LATEX);
+    size_t dimensions = de_independent_count(de);
+    problem_TeX = de_problem_to_TeX(de);
     diagnostic = de_solve_result_diagnostic(result);
 
     printf("input %s\n", source);
-    bool plottable = de_solve_result_status(result) == DE_SOLVE_STATUS_SOLVED && count > 0 && count <= 16 &&
-                     (dimensions == 1 || (dimensions == 2 && count == 1));
-    for (size_t i = 0; plottable && i < count; ++i)
-        plottable = expr_is_variable(equ_lhs(de_solve_result_at(result, i)));
-    for (size_t i = 0; plottable && i < dimensions; ++i) {
+    expr_bindings_t *constants = de_constants(de);
+    for (size_t i = 0; i < expr_bindings_count(constants); ++i) {
+        expr_t *parameter = expr_bindings_expr_at(constants, i);
+        number_t value = expr_get_val(parameter);
+        string_t *rendered = num_to_string(value);
+        char *name = expr_to_string(parameter, style_UNBOUND);
+        if (rendered && name) printf("binding constant\t%s\t%s\n", name, string_c_str(rendered));
+        free(name); string_free(rendered); num_destroy(&value);
+    }
+    string_t *editor_source = lab_worker_de_source(de);
+    if (editor_source) printf("binding_expression %s\n", string_c_str(editor_source));
+    string_free(editor_source);
+    /* Coordinate metadata remains valid for quadratures, series and unsupported exact solutions. */
+    for (size_t i = 0; i < dimensions; ++i) {
         expr_t *axis = expr_new_named_var(NUM_NAN, expr_symbol_name(de_independent_at(de, i)));
         char *name = axis ? expr_to_string(axis, style_UNBOUND) : NULL;
         if (name)
@@ -179,6 +191,15 @@ int lab_worker_diffequation(int argc, char **argv)
     printf("problem %s\n", problem ? problem : "");
     printf("problem_TeX %s\n", problem_TeX ? string_c_str(problem_TeX) : "");
     printf("status %s\n", solve_status_name(de_solve_result_status(result)));
+    const expr_t *parameter = de_solve_result_quadrature_parameter(result);
+    if (parameter) {
+        string_t *name = expr_to_text(parameter, style_UNBOUND);
+        if (name) printf("quadrature_parameter %s\n", string_c_str(name));
+        string_free(name);
+        name = expr_to_text(de_solve_result_quadrature_reference(result), style_UNBOUND);
+        if (name) printf("quadrature_reference %s\n", string_c_str(name));
+        string_free(name);
+    }
     printf("solver %s\n", solver_name(de_solve_result_solver(result)));
     printf("diagnostic %s\n", diagnostic ? diagnostic : "");
     if (de_solve_result_symmetry(result))

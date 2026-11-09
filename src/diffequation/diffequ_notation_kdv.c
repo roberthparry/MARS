@@ -78,5 +78,5 @@ bool de_kdv_set_steps(diffequ_solve_result_t *result)
         {"k is positive and x0 is real.", NULL, NULL},
         {"Zero-background solitary-wave family; not the general solution.", NULL, NULL}
     };
-    return de_notation_steps(result, plain, rows, sizeof rows / sizeof *rows);
+    return de_notation_steps(result, plain, rows, sizeof rows / sizeof *rows, true);
 }

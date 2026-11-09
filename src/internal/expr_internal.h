@@ -52,6 +52,17 @@ expr_t *expr_real_domain_from_args(size_t count, expr_t *const *args);
 expr_t *expr_real_parameter(const expr_t *value);
 
 /**
+ * @brief Construct a finite real ordering predicate for a native domain restriction.
+ * @param left Borrowed greater operand, retained with its live binding nodes.
+ * @param right Borrowed lesser operand, retained with its live binding nodes.
+ * @param inclusive Whether equality is permitted: true means left >= right, false means left > right.
+ * @return Owned indicator released with expr_free, or NULL for invalid input or allocation failure.
+ * The indicator evaluates to one only when both values are finite real numbers satisfying the comparison;
+ * otherwise it evaluates to zero. Neither input is consumed. Mutable graph access requires synchronisation.
+ */
+expr_t *expr_real_comparison(const expr_t *left, const expr_t *right, bool inclusive);
+
+/**
  * @brief Receive one distribution impulse during native decomposition.
  * @param coordinate Borrowed support coordinate, valid during this callback.
  * @param weight Borrowed finite complex impulse weight, valid during this callback.
@@ -458,6 +469,16 @@ bool expr_bindings_promote_single_constant_internal(expr_bindings_t *bindings);
  * @return Owned binding collection released with expr_bindings_free, or NULL on failure.
  */
 expr_bindings_t *expr_bindings_from_expr_internal(const expr_t *expr);
+
+/**
+ * @brief Clone an expression, linking matching scalar leaves to those in a supplied source graph.
+ * @param[in] expr Borrowed expression to clone; not changed or consumed.
+ * @param[in] source Borrowed graph supplying live scalar leaves, matched by variable identity or symbol name.
+ * @return Owned expression released with expr_free(), or NULL on missing input or allocation failure.
+ * Matching leaves are retained references, not independently mutable copies; they remain alive with the result.
+ * Unmatched leaves are copied. Callers must synchronise changes to shared bindings and avoid ambiguous names.
+ */
+expr_t *expr_clone_linked_symbols(const expr_t *expr, const expr_t *source);
 
 /**
  * @brief Merge two borrowed binding collections into an independently owned collection.

@@ -3527,6 +3527,17 @@ title shows the solved equation or equations; a single solution has no redundant
 legend, while multiple branches retain numbered legends. With no or incomplete
 initial conditions, up to two free integration constants per branch produce representative
 family curves: one selects five values; two select a nine-member Cartesian grid.
+Independent-coefficient modified-Emden equations instead show **Equation and quadratures**,
+with the simultaneous parametric pair and its separate exceptional branches identified in the native result.
+The first two equations are labelled as functions of their common parameter, and must be read together.
+Constant solutions are separate equilibria, not missing time dependence. For this quadrature family the plot
+samples the original ODE natively, using nine combinations of initial value and slope from −1, 0 and 1.
+It is labelled **Representative numerical trajectories**. Adaptive double-precision integration stops at poles;
+it does not evaluate nested quadratures at every point or change the exact symbolic result.
+The point-linearisable case β = α²/9 uses its simpler exact rational family and the ordinary explicit plotter.
+Bare scalar coefficients such as `alpha` and `beta` are discovered automatically and receive inputs and sliders;
+the independent coordinate is not a coefficient input. Series and quadrature results retain their original
+independent-coordinate metadata.
 The parameter selection retains an exact zero reference when that member is defined.
 Private copies promote the generated constants to sampling variables. Adaptive
 sweeps use first and second derivatives with respect to each constant over
@@ -3534,7 +3545,14 @@ sweeps use first and second derivatives with respect to each constant over
 Values are selected by quantiles of bounded angular ordinate sensitivity, with
 a uniform floor to retain quieter regions. This bounded exploratory heuristic
 is not a global search; when no usable sensitivity exists, fixed seeds are retained.
-Authored parameters are never varied. The general solution stays in the title, marked as representative real
+Discovered equation parameters have numeric input boxes. Supplied values are honoured; unassigned parameters
+receive plot-local sliders and labelled illustrative values, selected subject to the authored assumptions.
+These controls reuse the native exact-value, automatic/manual range and slider protocol; the worksheet's
+general solution remains symbolic. Each change re-solves the plotted problem, so moving a damping parameter
+through a repeated characteristic root selects the appropriate oscillatory, repeated-root or exponential form.
+At most eight unassigned authored parameters have sliders. Manual values outside their declared domain are
+rejected. No finite probing strategy guarantees a suitable slice for every coupled parameter domain.
+The general solution stays in the title, marked as representative real
 members; hover over a curve to see its selected constants in a tooltip, without
 an overlapping family legend. Reaching a curve keeps it at full brightness and
 dims the other solution curves; moving into empty plot space or leaving the plot
@@ -4496,6 +4514,11 @@ Differential-equation mode accepts ordinary and partial derivatives,
 polynomial differential operators, differential forms and optional initial or
 boundary conditions. MARSlib selects a matching rule and, when derivations are
 enabled, returns the rule-derived working shown in the **Solver** card.
+
+The native editor preserves empty constant and condition sections when committing ODE parameters,
+so a second evaluation reads the same differential problem. Compact saved envelopes also remain readable.
+Only coefficient values have binding inputs in this mode. Independent coordinates keep the roles defined
+by the derivatives and are not offered a control to turn them into constants.
 
 The captured input is `y''+6y*y'+4y^3=0; y'(0)=0`. The modified Emden
 solver returns the one-constant family

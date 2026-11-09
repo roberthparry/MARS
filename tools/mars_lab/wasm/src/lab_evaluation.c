@@ -47,7 +47,7 @@ enum {
 static const unsigned lab_evaluation_preparation[LAB_MODE_COUNT] = {
     [LAB_MODE_EXPRESSION]            = lab_eval_bound_input | lab_eval_expression,
     [LAB_MODE_EQUATION]              = lab_eval_plain_input | lab_eval_bindings,
-    [LAB_MODE_DIFFERENTIAL_EQUATION] = lab_eval_plain_input,
+    [LAB_MODE_DIFFERENTIAL_EQUATION] = lab_eval_plain_input | lab_eval_bindings,
     [LAB_MODE_MATRIX]                = lab_eval_bound_input,
     [LAB_MODE_INTEGRATOR]            = lab_eval_bound_input,
     [LAB_MODE_DATETIME]              = lab_eval_datetime,
@@ -117,8 +117,10 @@ const char *lab_evaluation_text(lab_mode_t mode, lab_evaluation_label_t field)
         [LAB_EVALUATION_LABEL_ERROR]        = "Error",
         [LAB_EVALUATION_LABEL_LOCAL_SERIES] = "Local series",
         [LAB_EVALUATION_LABEL_NOT_SOLVED]   = "Not solved",
+        [LAB_EVALUATION_LABEL_EMPTY]        = "",
+        [LAB_EVALUATION_LABEL_QUADRATURE]   = "Exact quadratures",
     };
-    if ((unsigned)mode >= LAB_MODE_COUNT || (unsigned)field > LAB_EVALUATION_LABEL_NOT_SOLVED)
+    if ((unsigned)mode >= LAB_MODE_COUNT || (unsigned)field > LAB_EVALUATION_LABEL_QUADRATURE)
         return "";
     if (field < LAB_EVALUATION_LABEL_READY)
         return field == LAB_EVALUATION_LABEL_WORKING ? lab_evaluation_labels[mode].working
@@ -214,6 +216,9 @@ void lab_evaluation_response(lab_mode_t mode, lab_request_outcome_t outcome, jsr
     int status = lab_dom_get(data, "status");
     lab_evaluation_label_t label = lab_evaluation_status(mode, outcome, lab_dom_equal(status, lab_dom_string("series")),
                                            lab_dom_equal(status, lab_dom_string("solved")));
+    if (mode == LAB_MODE_DIFFERENTIAL_EQUATION && outcome == LAB_REQUEST_OUTCOME_SUCCESS &&
+        lab_dom_equal(status, lab_dom_string("quadrature")))
+        label = LAB_EVALUATION_LABEL_QUADRATURE;
     lab_dom_set(plan, "status", lab_dom_string(lab_evaluation_text(mode, label)));
     if (flags & lab_eval_clear_scalar)
         lab_evaluation_emit(calls, "clearMatrixScalar", 0, 0, 0);

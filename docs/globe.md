@@ -275,8 +275,13 @@ are excluded from Git. On another machine, run `make prepare-globe-blocks` befor
 `make release`, database updates and fresh globe installation
 import available matching shards without rewriting original photographs. Missing
 optional shards keep the original loading path available during conversion.
-Import progress counts sources checked, and each completed source commits
-independently. Prepared sources use the directly indexed `/earth-block` route,
+Checking progress counts sources checked and reports how many are already installed,
+unavailable locally or awaiting import. Completed sources are checked through their
+content-addressed completion markers without reopening preparation files or rewriting
+blocks. If nothing needs importing, release reports `Photographic source blocks: up to date;
+nothing to import.` An installation bar appears only for available missing sources and
+counts sources imported; each completed source commits independently.
+Prepared sources use the directly indexed `/earth-block` route,
 immutable HTTP caching and native-selected addresses; the worker decodes at most
 two small blocks concurrently. Its decoded and persistent raw caches use the same
 content addresses. Wider empty views request drawable overview coverage before

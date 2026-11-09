@@ -8,6 +8,7 @@
  * newer edits. The worksheet binding controls are never modified.
  */
 #include "lab_dom.h"
+#include "lab_workspace.h"
 #include "lab_plot_slices.h"
 
 static const char *const fields[] = {".slice-lower", ".slice-upper", ".slice-value", ".slice-position"};
@@ -111,7 +112,8 @@ void lab_plot_slices_apply(jsref records, jsref expected)
         int choices = lab_dom_create("fieldset"), legend = lab_dom_create("legend");
         lab_dom_write(choices, LAB_DOM_ATTRIBUTE, "class", lab_dom_string("slice-choices"));
         lab_dom_class(choices, "hidden", lab_dom_count(lines) < 2);
-        lab_dom_write(legend, LAB_DOM_TEXT, "", lab_dom_string("Slice"));
+        lab_dom_write(legend, LAB_DOM_TEXT, "", lab_dom_string(
+            lab_workspace_mode() == LAB_MODE_DIFFERENTIAL_EQUATION ? "Parameter" : "Slice"));
         lab_dom_append(choices, legend);
         lab_dom_append(root, choices);
     }
@@ -127,7 +129,8 @@ void lab_plot_slices_apply(jsref records, jsref expected)
             lab_dom_write(row, LAB_DOM_ATTRIBUTE, "class", lab_dom_string("plot-group plot-slice"));
             lab_dom_write(row, LAB_DOM_DATASET, "name", lab_dom_item(parts, 0));
             int slider = input(row, "slice-slider", "range",
-                               lab_dom_join(lab_dom_string("Slice: "), lab_dom_item(parts, 0), ""));
+                               lab_dom_join(lab_dom_string(lab_workspace_mode() == LAB_MODE_DIFFERENTIAL_EQUATION ?
+                                                          "Parameter: " : "Slice: "), lab_dom_item(parts, 0), ""));
             lab_dom_write(slider, LAB_DOM_ATTRIBUTE, "min", lab_dom_string("0"));
             lab_dom_write(slider, LAB_DOM_ATTRIBUTE, "max", lab_dom_string("1000"));
             lab_dom_write(slider, LAB_DOM_ATTRIBUTE, "step", lab_dom_string("1"));

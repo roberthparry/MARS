@@ -99,5 +99,5 @@ bool de_gkdv_set_steps(diffequ_solve_result_t *result)
         {"The singular branch excludes z = 0, the moving pole.", NULL, NULL},
         {"Particular travelling-wave families; not the general solution.", NULL, NULL}
     };
-    return de_notation_steps(result, plain, rows, sizeof rows / sizeof *rows);
+    return de_notation_steps(result, plain, rows, sizeof rows / sizeof *rows, true);
 }

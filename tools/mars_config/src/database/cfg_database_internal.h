@@ -117,7 +117,9 @@ bool cfg_database_textures_current(sqlite_t *db, const string_t *root);
  * @return True when every available matching shard is already installed or imported successfully. Missing
  * optional shards retain the original-image loading path. False indicates invalid prepared data or I/O failure;
  * each previously completed source remains committed and the current failed source is rolled back.
- * @note No argument is consumed. Progress reports source counts. Repeated calls resume from completion markers.
+ * @note No argument is consumed. Read-only checking reports installed and unavailable source counts. Installation
+ * progress appears only for available missing sources and counts successful imports. Repeated calls resume from
+ * completion markers without opening prepared files or writing blocks for already installed sources.
  */
 bool cfg_database_pyramids(sqlite_t *db, const string_t *root);
 

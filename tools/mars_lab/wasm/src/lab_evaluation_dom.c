@@ -54,9 +54,13 @@ void lab_evaluation_render(lab_mode_t mode, jsref data, bool expandable)
         shown = full = last;
         int status = lab_dom_get(data, "status");
         const char *title = lab_dom_equal(status, lab_dom_string("series"))    ? "Equation and local series"
+                            : lab_dom_equal(status, lab_dom_string("quadrature")) ? "Equation and quadratures"
                             : lab_dom_equal(status, lab_dom_string("solved")) ? "Equation and solutions"
                                                                              : "Reduction";
         lab_dom_write(lab_dom_query(0, "#renderedTitle"), LAB_DOM_TEXT, "", lab_dom_string(title));
+        if (lab_dom_equal(status, lab_dom_string("quadrature")))
+            lab_dom_write(lab_dom_query(0, "#valueTitle"), LAB_DOM_TEXT, "",
+                          lab_dom_string("Parametric family and exceptional branches"));
         fallback = lab_dom_truth(last)
                        ? last
                        : lab_evaluation_field(data, "diagnostic", lab_dom_string("No symbolic solution available"));

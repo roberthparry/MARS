@@ -32,7 +32,8 @@ typedef enum {
     LAB_EVALUATION_LABEL_ERROR = 3,        /**< Failed, partial or exceptional completion. */
     LAB_EVALUATION_LABEL_LOCAL_SERIES = 4, /**< Differential equation reduced to a local series. */
     LAB_EVALUATION_LABEL_NOT_SOLVED = 5,   /**< Differential equation not solved symbolically. */
-    LAB_EVALUATION_LABEL_EMPTY = 6         /**< No status for stale or invalid work; renders empty text. */
+    LAB_EVALUATION_LABEL_EMPTY = 6,       /**< No status for stale or invalid work; renders empty text. */
+    LAB_EVALUATION_LABEL_QUADRATURE = 7   /**< Exact parametric quadratures rather than an explicit coordinate function. */
 } lab_evaluation_label_t;
 
 /** @brief Source of the diagnostic shown for a rejected evaluation response. */

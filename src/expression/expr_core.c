@@ -34,6 +34,7 @@
  */
 
 #include <limits.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 
 #define MARS_EXPR_INTERNAL_ACCESS
@@ -48,6 +49,14 @@
  * expr_get_deriv / expr_create_deriv). This is differentiation context only,
  * not a general thread-safety mechanism for the DAG. */
 static const expr_t *tl_wrt = NULL;
+
+/* A change to any leaf must outrank every earlier sibling change in a cached graph. */
+static _Atomic uint64_t value_epoch;
+
+static uint64_t next_value_epoch(void)
+{
+    return atomic_fetch_add_explicit(&value_epoch, 1u, memory_order_relaxed) + 1u;
+}
 
 static struct _expr_t _EXPR_NAN_NODE = {.ops = &ops_const,
                                         .a = NULL,
@@ -102,7 +111,7 @@ static number_t expr_eval_cached_num(const expr_t *expr)
                 expr_store_const_num(m, num_clone(refreshed));
                 expr_store_value_num(m, refreshed);
                 m->x_valid = 1;
-                m->epoch++;
+                m->epoch = next_value_epoch();
             }
         }
         return m->x;
@@ -274,7 +283,7 @@ void expr_set_val(expr_t *expr, number_t value)
     expr_store_const_num(expr, num_clone(value));
     expr_store_value_num(expr, num_clone(expr->c));
     expr->x_valid = 1;
-    expr->epoch++;
+    expr->epoch = next_value_epoch();
     expr->simplified = false;
     expr->simplify_epoch = 0;
 }
@@ -328,7 +337,7 @@ void expr_set_name(expr_t *expr, const char *name)
     if (expr->name)
         free(expr->name);
     expr->name = expr_normalise_name(name);
-    expr->epoch++;
+    expr->epoch = next_value_epoch();
     expr->simplified = false;
     expr->simplify_epoch = 0;
 }
@@ -340,7 +349,7 @@ void expr_set_name_text(expr_t *expr, const string_t *name)
     if (expr->name)
         free(expr->name);
     expr->name = name ? expr_take_string_as_c_string(expr_normalise_name_text(name)) : NULL;
-    expr->epoch++;
+    expr->epoch = next_value_epoch();
     expr->simplified = false;
     expr->simplify_epoch = 0;
 }

@@ -124,6 +124,9 @@ Proven rational powers simplify exactly when their integer roots are perfect:
 `4^(3/2)` becomes `8`, `9^(3/2)` becomes `27`, and `(9/4)^(3/2)` becomes `27/8`.
 Irrational roots retain their symbolic form, and a supplied variable binding does
 not turn a symbolic power into a constant.
+Multiplication places an algebraic coefficient before its coordinate, including sums of constant parameters:
+the exponent of a linear ODE solution displays its characteristic rate before the time variable.
+Native and TeX output share this factor order; no algebraic substitution is performed by this rule.
 
 Numeric atoms share a lossless fraction-versus-decimal rule across Expression, Function and TeX output,
 including both components of a complex number. Repeating rational values and compact familiar fractions
@@ -309,6 +312,9 @@ For example, a rational result copied from Equation mode can be inverted directl
 @Linv{-5*(-s-10/s^2-3)/(s*(s+4)+5)}
 ```
 
+Unbound expression output retains a named scalar variable even when it is the entire expression;
+its supplied or unset binding is not substituted into the formula.
+
 Unbound expression output:
 
 ```text
@@ -353,6 +359,11 @@ For example, `@L(t)` produces `1/s² where (Re(s) > 0)` in unbound Expression ou
 The bound Expression card places conditions after the binding bar instead:
 `{ 1/s² | s = ?; Re(s) > 0 }`. This form is also accepted as input.
 Several conditions are separated by semicolons inside the `where` parentheses.
+Real ordering conditions also accept `<`, `<=`, `>`, `>=`, `≤` and `≥` without
+an explicit real-part projection. Both operands must be finite and real;
+inclusive comparisons permit equality. Native expression, Function and TeX
+output preserve these restrictions, including coefficient assumptions returned
+by the [differential-equation parser](diffequation.md).
 The Function card checks the restrictions before executing the calculation and
 returns `@nan` otherwise. For `@L(t)`, its function body is:
 
@@ -2419,6 +2430,11 @@ common centre first in TeX: $a+b$ together with $a-b$. The formatter recognises
 the common term and opposite shifts structurally, independently of function
 or variable names. Unpaired sums retain their ordinary ordering, and the
 underlying expressions are unchanged.
+Explicit rational coefficients stay at the start of an algebraic quotient's
+product in TeX, for both positive and negative terms. A shared factor such as
+½ therefore occupies the same position in paired exponents, rather than being
+absorbed into only one denominator. Purely numerical numerators retain a single
+fraction. This changes presentation only.
 
 When an elementary function has a supported symbolic Cartesian identity, the
 native display pass separates an explicit `x + iy` argument into real and

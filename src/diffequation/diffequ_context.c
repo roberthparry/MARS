@@ -11,6 +11,8 @@
 
 #define MARS_DIFFEQUATION_INTERNAL_ACCESS
 #include "diffequ_internal.h"
+#define MARS_DIFFEQUATION_INTERNAL_ACCESS
+#include "diffequ_notation_internal.h"
 
 static bool de_context_expression(expr_t **slot, const expr_context_t *context)
 {
@@ -49,12 +51,16 @@ static diffequ_solve_result_t *de_solve_with_context_impl(const diffequ_t *de, u
         if (!de_context_equation(&result->solutions[i], context))
             goto failure;
     if (!de_context_equation(&result->parameter_constraint, context) ||
+        !de_context_expression(&result->quadrature_parameter, context) ||
+        !de_context_expression(&result->quadrature_reference, context) ||
         !de_context_expression(&result->series_centre, context))
         goto failure;
     if (result->series_coefficients)
         for (size_t i = 0; i <= result->series_degree; ++i)
             if (!de_context_expression(&result->series_coefficients[i], context))
                 goto failure;
+    if (!de_emden_quadrature_display(result))
+        goto failure;
     return result;
 
 failure:

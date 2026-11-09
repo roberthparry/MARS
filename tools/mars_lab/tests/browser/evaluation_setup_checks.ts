@@ -48,13 +48,13 @@ window.checkLabEvaluationSetup = async function checkLabEvaluationSetup() {
         return {view: Object.freeze(view), reads};
     }
     const initialNames =
-        ['captureBindings,commitBindings', 'commitBindings', '', 'commitBindings', 'commitBindings', '', ''];
+        ['captureBindings,commitBindings', 'commitBindings', 'commitBindings', 'commitBindings', 'commitBindings', '', ''];
     const beforeEditor = WorksheetContext.expr.value, beforeRendered = WorksheetContext.rendered.innerHTML;
     for (let mode = 0; mode < 7; ++mode) {
         const context = Object.freeze({sentinel: 'retained'});
         const result = plan(mode, 0, context, {}, forbidden);
         equal(names(result), initialNames[mode], 'phase-zero service order for mode ' + mode);
-        equal(result.wait, [0, 1, 3, 4].includes(mode), 'phase-zero wait policy');
+        equal(result.wait, [0, 1, 2, 3, 4].includes(mode), 'phase-zero wait policy');
         equal(result.done, false, 'phase zero never finishes setup');
         equal(Object.keys(context).join(','), 'sentinel', 'phase zero cannot mutate captured context');
         if (mode === 0) {

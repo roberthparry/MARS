@@ -87,6 +87,8 @@ static const field_t field_table[] = {
     {"pretty", "pretty", true},
     {"problem", "problem", false},
     {"problem_TeX", "problem_TeX", true},
+    {"quadrature_parameter", "quadrature_parameter", false},
+    {"quadrature_reference", "quadrature_reference", false},
     {"residual", "residual", false},
     {"result", "result", false},
     {"root_expression", "root_expression", false},
