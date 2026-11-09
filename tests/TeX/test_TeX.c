@@ -32,6 +32,7 @@
 #define MARS_TeX_INTERNAL_ACCESS
 #include "TeX/TeX_internal.h"
 #include "test_harness.h"
+#include "test_database.h"
 #include "test_TeX_spellings.h"
 #include "test_TeX_builder.h"
 
@@ -268,91 +269,55 @@ static void test_TeX_from_expression_invalid(void)
     TEST_ASSERT_TRUE(!TeX_from_expression(NULL), "NULL mathematical text is invalid");
 }
 
+static void test_TeX_calculus_shorthand_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), string_c_str(row->expected)) == 0, string_c_str(row->input));
+    TeX_free(notation);
+    string_free(input);
+}
+
+static void test_TeX_calculus_shorthand_invalid_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(!notation, "mismatched or non-integer derivative orders are not silently multiplied");
+    TeX_free(notation);
+    string_free(input);
+}
+
 static void test_TeX_calculus_shorthand(void)
 {
-    static const struct { const char *input; const char *expected; } cases[] = {
-        {"@F{exp(-x^2)}", "\\mathcal{F}_{x\\to k}\\{e^{-x^{2}}\\}"},
-        {"Fourier(exp(-x^2),x,k)", "\\mathcal{F}_{x\\to k}\\{e^{-x^{2}}\\}"},
-        {"ℱ{exp(-x^2)}", "\\mathcal{F}_{x\\to k}\\{e^{-x^{2}}\\}"},
-        {"sin(@F{exp(-x^2)})", "\\sin(\\mathcal{F}_{x\\to k}\\{e^{-x^{2}}\\})"},
-        {"@Finv{exp(-k^2)}", "\\mathcal{F}^{-1}_{k\\to x}\\{e^{-k^{2}}\\}"},
-        {"@L{sin(t)}", "\\mathcal{L}_{t\\to s}\\{\\sin(t)\\}"},
-        {"@Linv{1/(s+1)}", "\\mathcal{L}^{-1}_{s\\to t}\\{\\frac{1}{s + 1}\\}"},
-        {"@P_(k=1)^3 k", "\\prod_{k=1}^{3}k"},
-        {"lambertw0(x)", "W_{0}(x)"},
-        {"BesselJ(2,x)", "J_{2}\\left(x\\right)"},
-        {"normalpdf(x)", "\\operatorname{normal\\_pdf}(x)"},
-        {"gamma(x)", "\\Gamma(x)"},
-        {"conj(x)", "\\overline{x}"},
-        {"Re(x)", "\\mathfrak{Re}\\mathopen{}\\left\\{x\\right\\}"},
-        {"Im(x)", "\\mathfrak{Im}\\mathopen{}\\left\\{x\\right\\}"},
-        {"zeta(x)", "\\zeta(x)"},
-        {"erf(x)", "\\operatorname{erf}(x)"},
-        {"sinh(x)", "\\sinh(x)"},
-        {"@inf", "\\infty"},
-        {"@infinity", "\\infty"},
-        {"-@inf", "-\\infty"},
-        {"∞", "\\infty"},
-        {"@eulermascheroni", "\\gamma"},
-        {"@gamma", "\\gamma"},
-        {"γ", "\\gamma"},
-        {"@pi", "\\pi"},
-        {"@phi", "\\phi"},
-        {"@tau", "\\tau"},
-        {"e", "e"},
-        {"i", "i"},
-        {"@S_0^(@inf) exp(-x) dx", "\\int_{0}^{\\infty} e^{-x}\\, dx"},
-        {"@S x^2 dx", "\\int x^{2}\\, dx"},
-        {"@S_0^1 x^2 dx", "\\int_{0}^{1} x^{2}\\, dx"},
-        {"@Z_(k=1)^3 k^2", "\\sum_{k=1}^{3}k^{2}"},
-        {"d/dx(sin(x))", "\\frac{\\partial}{\\partial x}\\left[\\sin(x)\\right]"},
-        {"d^2/dx^2(sin(x))", "\\frac{\\partial^{2}}{\\partial x^{2}}\\left[\\sin(x)\\right]"},
-        {"d^2/dxy(x^2*y^3)", "\\frac{\\partial^{2}}{\\partial y\\,\\partial x}\\left[x^{2}\\mkern-2mu y^{3}\\right]"},
-        {"Dxy(x^2*y^3)", "\\frac{\\partial^{2}}{\\partial y\\,\\partial x}\\left[x^{2}\\mkern-2mu y^{3}\\right]"},
-        {"Dxyx(x^3*y^2)", "\\frac{\\partial^{3}}{\\partial x\\,\\partial y\\,\\partial x}\\left[x^{3}\\mkern-2mu y^{2}\\right]"},
-        {"D[x^2y](x^3*y^2)", "\\frac{\\partial^{3}}{\\partial y\\,\\partial x^{2}}\\left[x^{3}\\mkern-2mu y^{2}\\right]"}
-    };
-    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), cases[i].expected) == 0, cases[i].input);
-        TeX_free(notation);
-        string_free(input);
-    }
-    const char *invalid[] = {"d^2/dx^3(x)", "d^0/dx(x)", "d^2/dxyx(x)", "d^2/dx^s(x)"};
-    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
-        string_t *input = string_new_with(invalid[i]);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(!notation, "mismatched or non-integer derivative orders are not silently multiplied");
-        TeX_free(notation);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_calculus_shorthand_cases", NULL,
+        test_TeX_calculus_shorthand_cases_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_calculus_shorthand_invalid", NULL,
+        test_TeX_calculus_shorthand_invalid_row);
+}
+
+static void test_TeX_expression_style_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    expr_t *expression = expr_from_string_preserving_calculus_internal(string_c_str(input));
+    string_t *serialised = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
+    TeX_t *notation = serialised ? TeX_from_expression(serialised) : NULL;
+    TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), string_c_str(row->expected)) == 0, string_c_str(row->input));
+    TeX_free(notation);
+    string_free(serialised);
+    expr_free(expression);
+    string_free(input);
 }
 
 static void test_TeX_expression_style(void)
 {
-    static const struct { const char *input; const char *expected; } cases[] = {
-        {"{sqrt(x^2+c)/(x+1) | x=2; c=4}", "\\frac{\\sqrt{x^{2} + c}}{x + 1}"},
-        {"{x²+c | x=[1,2,3]; c=4}", "x^{2} + c"},
-        {"{[radius]^2 | [radius]=5}", "\\mathit{radius}^{2}"},
-        {"{sin²(x)+cos²(x) | x=?}", "1"},
-        {"{x_0+@alpha | x_0=?; @alpha=2}", "x_{0} + \\alpha"},
-        {"{120/s^6 where (Re(s)>0) | s=2}", "\\frac{120}{s^{6}}\\quad \\left( \\mathfrak{Re}(s) > 0 \\right)"},
-        /* style_EXPRESSION has already evaluated this transform; convert the emitted result faithfully. */
-        {"@F{exp(-x^2)}", "\\sqrt{\\pi}\\mkern-2mu e^{-\\frac{1}{4}\\mkern-2mu k^{2}}\\quad \\left( k\\in \\mathbb{R} \\right)"},
-        {"@S_0^1 x^2 dx", "\\int_{0}^{1} x^{2}\\, dx"}
-    };
-    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        expr_t *expression = expr_from_string_preserving_calculus_internal(string_c_str(input));
-        string_t *serialised = expression ? expr_to_text(expression, style_EXPRESSION) : NULL;
-        TeX_t *notation = serialised ? TeX_from_expression(serialised) : NULL;
-        TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), cases[i].expected) == 0, cases[i].input);
-        TeX_free(notation);
-        string_free(serialised);
-        expr_free(expression);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_expression_style_cases", NULL,
+        test_TeX_expression_style_cases_row);
 }
 
 static void test_TeX_equations(void)
@@ -388,139 +353,120 @@ static void test_TeX_equations(void)
     TeX_free(plain);
 }
 
+static void test_TeX_relation_input_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), string_c_str(row->expected)), string_c_str(row->input));
+    TeX_builder_t *builder = TeX_builder_new();
+    bool pushed = TeX_math(builder, string_c_str(row->input));
+    TeX_t *stack_result = TeX_builder_finish(builder);
+    TEST_ASSERT_TRUE(pushed && stack_result && !strcmp(TeX_source(stack_result), string_c_str(row->expected)),
+                     "pushed mathematical text uses the same native relation grammar");
+    TeX_free(stack_result);
+    TeX_builder_free(builder);
+    TeX_free(notation);
+    string_free(input);
+}
+
 static void test_TeX_relation_input(void)
 {
-    static const struct { const char *input; const char *expected; } cases[] = {
-        {"x < y", "x < y"}, {"x<=y", "x \\le y"}, {"x >= y", "x \\ge y"}, {"x>y", "x > y"},
-        {"x != y", "x \\ne y"}, {"x == y", "x = y"}, {"x = y", "x = y"},
-        {"x ~~= y", "x \\approx y"}, {"x ~== y", "x \\cong y"},
-        {"x ≤ y", "x \\le y"}, {"x ≥ y", "x \\ge y"}, {"x ≠ y", "x \\ne y"},
-        {"x ≈ y", "x \\approx y"}, {"x ≅ y", "x \\cong y"},
-        {"0 < x <= 1", "0 < x \\le 1"}, {"a>=b>c!=d==e~~=f~==g", "a \\ge b > c \\ne d = e \\approx f \\cong g"},
-        {"x=y=z", "x = y = z"},
-        {"{x <= y | x = 3, y = 4}", "x \\le y"},
-        {"sin(x)~~=x", "\\sin(x) \\approx x"},
-        {"@Z_(k=1)^3 k == 6", "\\sum_{k=1}^{3}k = 6"},
-        {"{x | x != 0}", "x\\quad \\left( x \\ne 0 \\right)"},
-        {"{x | x = 1}", "x"},
-        {"(1,2;3,4) == (5,6;7,8)",
-         "\\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix} = "
-         "\\begin{bmatrix}5 & 6 \\\\[10pt] 7 & 8\\end{bmatrix}"}
-    };
-    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), cases[i].expected), cases[i].input);
-        TeX_builder_t *builder = TeX_builder_new();
-        bool pushed = TeX_math(builder, cases[i].input);
-        TeX_t *stack_result = TeX_builder_finish(builder);
-        TEST_ASSERT_TRUE(pushed && stack_result && !strcmp(TeX_source(stack_result), cases[i].expected),
-                         "pushed mathematical text uses the same native relation grammar");
-        TeX_free(stack_result);
-        TeX_builder_free(builder);
-        TeX_free(notation);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_relation_input_cases", NULL,
+        test_TeX_relation_input_cases_row);
+}
+
+static void test_TeX_relation_input_invalid_invalid_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(!notation, string_c_str(row->input));
+    TeX_free(notation);
+    string_free(input);
 }
 
 static void test_TeX_relation_input_invalid(void)
 {
-    static const char *const invalid[] = {
-        "x <", "<= y", "x < <= y", "x === y", "x ~= y", "x ~=== y", "x ~~== y",
-        "x < = y", "x >< y", "x !=", "x ≅", "x <= y >", "x) < y", "x < (y", "sin(x<y)"
-    };
-    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
-        string_t *input = string_new_with(invalid[i]);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(!notation, invalid[i]);
-        TeX_free(notation);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_relation_input_invalid_invalid", NULL,
+        test_TeX_relation_input_invalid_invalid_row);
+}
+
+static void test_TeX_matrix_input_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), string_c_str(row->expected)) == 0, string_c_str(row->input));
+    TeX_free(notation);
+    string_free(input);
+}
+
+static void test_TeX_matrix_input_invalid_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(!notation, string_c_str(row->input));
+    TeX_free(notation);
+    string_free(input);
 }
 
 static void test_TeX_matrix_input(void)
 {
-    static const struct { const char *input; const char *expected; } cases[] = {
-        {"(1, 2; 3, 4)^x", "{\\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix}}^{x}"},
-        {"(1, 2; 3, 4)^2", "{\\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix}}^{2}"},
-        {" (1 2; 3 4) ^ (x+1) ", "{\\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix}}^{x + 1}"},
-        {"(x, 1; 0, y)^(x+1)", "{\\begin{bmatrix}x & 1 \\\\[10pt] 0 & y\\end{bmatrix}}^{x + 1}"},
-        {"(1,2)", "\\begin{bmatrix}1 & 2\\end{bmatrix}"},
-        {"(sin(x), root(8,3); 3,4)^(@alpha+1)",
-         "{\\begin{bmatrix}\\sin(x) & 2 \\\\[10pt] 3 & 4\\end{bmatrix}}^{\\alpha + 1}"},
-        {"(x+1)^2", "\\left(x + 1\\right)^{2}"}
-    };
-    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), cases[i].expected) == 0, cases[i].input);
-        TeX_free(notation);
-        string_free(input);
-    }
-    const char *invalid[] = {"(1,2;3)", "(1,2;3,4", "(1,2;3,4)^", "(1,2;3,4)^x+1",
-                            "(1,2;3,4)^(x)+1", "(1,2;3,4)^x y", "(1,2;3,4)junk"};
-    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
-        string_t *input = string_new_with(invalid[i]);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(!notation, invalid[i]);
-        TeX_free(notation);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_matrix_input_cases", NULL,
+        test_TeX_matrix_input_cases_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_matrix_input_invalid", NULL,
+        test_TeX_matrix_input_invalid_row);
+}
+
+static void test_TeX_bound_problems_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), string_c_str(row->expected)) == 0, string_c_str(row->input));
+    TeX_free(notation);
+    string_free(input);
+}
+
+static void test_TeX_bound_problems_invalid_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(!notation, string_c_str(row->input));
+    TeX_free(notation);
+    string_free(input);
 }
 
 static void test_TeX_bound_problems(void)
 {
-    static const struct { const char *input; const char *expected; } cases[] = {
-        {"{ (1, 2; 3, 4)^x | x = 3 }", "{\\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix}}^{x}"},
-        {"{(x,1;0,x)^x | x=3}", "{\\begin{bmatrix}x & 1 \\\\[10pt] 0 & x\\end{bmatrix}}^{x}"},
-        {"{(1,2;3,4)^(x+1) | x=3}", "{\\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix}}^{x + 1}"},
-        {"{x | x=3}", "x"},
-        {"{ y'' + 3y' + 40y | y'(0) = 1, y(0) = 0 }",
-         "y'' + 3\\mkern-2mu y' + 40\\mkern-2mu y = 0,\\qquad "
-         "y'\\left(0\\right) = 1,\\qquad y\\left(0\\right) = 0"},
-        {"{ Dx(y) = x*y | x = ?;; y(0) = 1 }",
-         "\\frac{d y}{d x} = x\\mkern-2mu y,\\qquad \\left. y\\right|_{x=0} = 1"},
-        {"{ Dx(u)+Dy(u)=0 | x=?, y=?;; u(x,0)=sin(x) }",
-         "\\frac{\\partial u}{\\partial x} + \\frac{\\partial u}{\\partial y} = 0,\\qquad "
-         "\\left. u\\right|_{x=x,\\,y=0} = \\sin(x)"}
-    };
-    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), cases[i].expected) == 0, cases[i].input);
-        TeX_free(notation);
-        string_free(input);
-    }
-    const char *invalid[] = {"{(1,2;3,4)^x | x=}", "{y''+y|y'(0)=1,y(0)=}",
-                            "{(1,2;3,4)^x | x=3} trailing", "{(1,2;3,4)^x | x=3"};
-    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
-        string_t *input = string_new_with(invalid[i]);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(!notation, invalid[i]);
-        TeX_free(notation);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_bound_problems_cases", NULL,
+        test_TeX_bound_problems_cases_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_bound_problems_invalid", NULL,
+        test_TeX_bound_problems_invalid_row);
+}
+
+static void test_TeX_prime_input_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = input ? TeX_from_expression(input) : NULL;
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), string_c_str(row->expected)), string_c_str(row->input));
+    TeX_free(notation);
+    string_free(input);
 }
 
 static void test_TeX_prime_input(void)
 {
-    static const struct { const char *input; const char *expected; } cases[] = {
-        {"y''+y=0", "y'' + y = 0"},
-        {"{y''''+y | y'''(0)=1, y(0)=0}",
-         "y^{(4)} + y = 0,\\qquad y'''\\left(0\\right) = 1,\\qquad y\\left(0\\right) = 0"},
-        {"{z''+z | z'(1)=2, z(1)=0}",
-         "z'' + z = 0,\\qquad z'\\left(1\\right) = 2,\\qquad z\\left(1\\right) = 0"},
-        {"{ y''+y=0 | t=?;; y'(0)=1 }", "y'' + y = 0,\\qquad y'\\left(0\\right) = 1"},
-        {"{Dx(y)+y=0 | x=?;; y'(0)=1}",
-         "\\frac{d y}{d x} + y = 0,\\qquad \\left. \\frac{d y}{d x}\\right|_{x=0} = 1"}
-    };
-    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        TeX_t *notation = input ? TeX_from_expression(input) : NULL;
-        TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), cases[i].expected), cases[i].input);
-        TeX_free(notation);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__, "TeX.test_TeX_prime_input_cases", NULL, test_TeX_prime_input_cases_row);
 }
 
 static void test_TeX_prime_snapshot_modes(void)
@@ -582,59 +528,56 @@ static void test_TeX_native_layout(void)
 }
 
 
+static void test_TeX_native_text_array_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    string_free(input);
+    TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), string_c_str(row->expected)) == 0, string_c_str(row->input));
+    TeX_free(notation);
+}
+
+static void test_TeX_native_text_array_invalid_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(!notation, string_c_str(row->input));
+    TeX_free(notation);
+    string_free(input);
+}
+
 static void test_TeX_native_text_array(void)
 {
-    static const struct { const char *input; const char *expected; } cases[] = {
-        {"r_(n) = root(1+x_(n)^2,3)/sqrt(1+@lambda^2)",
-         "r_{n} = \\frac{\\sqrt[3]{x_{n}^{2} + 1}}{\\sqrt{\\lambda^{2} + 1}}"},
-        {"P(x) = 1/(1+x^2)*(1,x;x,x^2)",
-         "P\\left(x\\right) = \\frac{1}{x^{2} + 1}\\mkern-5mu "
-         "\\begin{bmatrix}1 & x \\\\[10pt] x & x^{2}\\end{bmatrix}"},
-        {"i*h*Dt(@psi) = -h^2/(2*m)*Dxx(@psi)+V*@psi",
-         "i\\mkern-2mu h\\mkern-2mu \\frac{\\partial}{\\partial t}\\left[\\psi\\right] = "
-         "-\\frac{h^{2}}{2\\mkern-2mu m}\\mkern-2mu "
-         "\\frac{\\partial^{2}}{\\partial x^{2}}\\left[\\psi\\right] + V\\mkern-2mu \\psi"},
-        {"{x=y|x=3;y=4}", "x = y"},
-        {"2*(1,2;3,4)", "2\\mkern-5mu \\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix}"},
-        {"(1,2;3,4)*2", "2\\mkern-5mu \\begin{bmatrix}1 & 2 \\\\[10pt] 3 & 4\\end{bmatrix}"},
-        {"-2*(1,2)", "-2\\mkern-5mu \\begin{bmatrix}1 & 2\\end{bmatrix}"},
-        {"(1,2)=(3,4)", "\\begin{bmatrix}1 & 2\\end{bmatrix} = \\begin{bmatrix}3 & 4\\end{bmatrix}"},
-        {"r_n", "r_{n}"},
-        {"x_(n+1)", "x_{n + 1}"}
-    };
-    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        TeX_t *notation = TeX_from_expression(input);
-        string_free(input);
-        TEST_ASSERT_TRUE(notation && strcmp(TeX_source(notation), cases[i].expected) == 0, cases[i].input);
-        TeX_free(notation);
-    }
-    const char *invalid[] = {"x=", "=x", "2*(1,2;3)", "(1,2)*", "x_()", "x_(n+1",
-                            "1/(1+x^2)+2*(1,2)", "(1,2)*(3,4)"};
-    for (size_t i = 0; i < sizeof invalid / sizeof *invalid; ++i) {
-        string_t *input = string_new_with(invalid[i]);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(!notation, invalid[i]);
-        TeX_free(notation);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_native_text_array_cases", NULL,
+        test_TeX_native_text_array_cases_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_native_text_array_invalid", NULL,
+        test_TeX_native_text_array_invalid_row);
+}
+
+static void test_TeX_native_index_roundtrip_inputs_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    expr_t *parsed = expr_from_string_preserving_calculus_internal(string_c_str(input));
+    string_t *native = parsed ? expr_to_text(parsed, style_EXPRESSION) : NULL;
+    TeX_t *original = TeX_from_expression(input), *roundtrip = native ? TeX_from_expression(native) : NULL;
+    TEST_ASSERT_TRUE(original && roundtrip && !strcmp(TeX_source(original), TeX_source(roundtrip)), string_c_str(row->input));
+    TeX_free(original);
+    TeX_free(roundtrip);
+    string_free(native);
+    expr_free(parsed);
+    string_free(input);
 }
 
 static void test_TeX_native_index_roundtrip(void)
 {
-    const char *inputs[] = {"x_(n+1)^2", "r_n+x_(n)", "{x_(n)|n=3}", "@S_0^1 x^2 dx"};
-    for (size_t i = 0; i < sizeof inputs / sizeof *inputs; ++i) {
-        string_t *input = string_new_with(inputs[i]);
-        expr_t *parsed = expr_from_string_preserving_calculus_internal(string_c_str(input));
-        string_t *native = parsed ? expr_to_text(parsed, style_EXPRESSION) : NULL;
-        TeX_t *original = TeX_from_expression(input), *roundtrip = native ? TeX_from_expression(native) : NULL;
-        TEST_ASSERT_TRUE(original && roundtrip && !strcmp(TeX_source(original), TeX_source(roundtrip)), inputs[i]);
-        TeX_free(original);
-        TeX_free(roundtrip);
-        string_free(native);
-        expr_free(parsed);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_native_index_roundtrip_inputs", NULL,
+        test_TeX_native_index_roundtrip_inputs_row);
 }
 
 
@@ -1132,32 +1075,27 @@ static void test_TeX_native_contexts(void)
                      !de_TeX_context(NULL), "native factories reject absent input");
 }
 
+static void test_TeX_real_interval_domains_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expression = expr_from_string(string_c_str(row->input), NULL);
+    TeX_context_t *context = expression ? expr_TeX_result_context(expression) : NULL;
+    TeX_t *notation = context ? TeX_from_context(context) : NULL;
+    bool ok = notation && !strcmp(TeX_source(notation), string_c_str(row->expected));
+    if (!ok)
+        printf("Domain input: %s\nActual: %s\nExpected: %s\n", string_c_str(row->input),
+               notation ? TeX_source(notation) : "NULL", string_c_str(row->expected));
+    TEST_ASSERT_TRUE(ok, "real intervals form compact chains while complex half-planes retain their real-part projection");
+    TeX_free(notation);
+    TeX_context_free(context);
+    expr_free(expression);
+}
+
 static void test_TeX_real_interval_domains(void)
 {
-    static const struct { const char *source, *expected; } cases[] = {
-        {"{x | x=?; x ∈ ℝ; Re(x)>0; Re(pi)>x}", "x\\quad (0 < x < \\pi)"},
-        {"{x | x=?; Re(pi)>x; Re(x)>0; x ∈ ℝ}", "x\\quad (0 < x < \\pi)"},
-        {"{x | x=?; x ∈ ℝ; Re(x)>-1; Re(2)>x}", "x\\quad (-1 < x < 2)"},
-        {"{x | x=?; Re(x)>0}", "x\\quad (\\mathfrak{Re}(x)>0)"},
-        {"{x | x=?; x ≠ 0; x ∈ ℝ; Re(x)>-1; Re(1)>x}", "x\\quad (x\\ne 0,\\;-1 < x < 1)"},
-        {"{x | x=?; x ∈ ℝ}", "x\\quad (x\\in\\mathbb{R})"},
-        {"{x | x=?; x ∈ ℝ; Re(x)>0}", "x\\quad (x>0)"},
-        {"{x | x=?, a=?; a ∈ ℝ; x ∈ ℝ; Re(a)>0; Re(x)>a; Re(1)>x}",
-         "x\\quad (a>0,\\;x>a,\\;1>x)"},
-    };
-    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
-        expr_t *expression = expr_from_string(cases[i].source, NULL);
-        TeX_context_t *context = expression ? expr_TeX_result_context(expression) : NULL;
-        TeX_t *notation = context ? TeX_from_context(context) : NULL;
-        bool ok = notation && !strcmp(TeX_source(notation), cases[i].expected);
-        if (!ok)
-            printf("Domain input: %s\nActual: %s\nExpected: %s\n", cases[i].source,
-                   notation ? TeX_source(notation) : "NULL", cases[i].expected);
-        TEST_ASSERT_TRUE(ok, "real intervals form compact chains while complex half-planes retain their real-part projection");
-        TeX_free(notation);
-        TeX_context_free(context);
-        expr_free(expression);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_real_interval_domains_cases", NULL,
+        test_TeX_real_interval_domains_cases_row);
 }
 
 static void test_TeX_rational_quotient_coefficients(void)
@@ -1362,89 +1300,61 @@ static void test_TeX_compact_symbol_lookups(void)
     TEST_ASSERT_TRUE(!TeX_semantic_greek(UINT32_MAX), "out-of-range Greek code point is rejected");
 }
 
+static void test_TeX_native_aggregate_contexts_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    expr_t *expression = expr_from_string_preserving_calculus_internal(string_c_str(input));
+    TeX_context_t *context = expression ? expr_TeX_context(expression) : NULL;
+    expr_free(expression);
+    string_free(input);
+    TeX_t *notation = context ? TeX_from_context(context) : NULL;
+    if (!notation || !strstr(TeX_source(notation), string_c_str(row->expected)))
+        fprintf(stderr, "%s -> %s\n", string_c_str(row->input), notation ? TeX_source(notation) : "no notation");
+    TEST_ASSERT_TRUE(notation && strstr(TeX_source(notation), string_c_str(row->expected)), string_c_str(row->input));
+    TeX_free(notation);
+    TeX_context_free(context);
+}
+
 static void test_TeX_native_aggregate_contexts(void)
 {
-    static const struct { const char *input; const char *required; } cases[] = {
-        {"@Z_(k=1)^n k^2", "\\sum_{k=1}^{n}"},
-        {"@P_(k=1)^n k", "\\prod_{k=1}^{n}"},
-        {"@L(f(t),t,s)", "\\mathcal{L}_{t\\to s}"},
-        {"@F(f(t),t,w)", "\\mathcal{F}_{t\\to w}"},
-        {"sin(x)", "\\sin(x)"},
-        {"gamma(x)", "\\Gamma(x)"},
-        {"f''(x)", "f''\\left(x\\right)"},
-        {"{1/s^2 | s = ?; Re(s)>0}", "\\mathfrak{Re}(s) > 0"},
-        {"LerchPhi(z,s,a)", "\\Phi\\left(z, s, a\\right)"},
-        {"LommelS(mu,nu,x)", "s_{"},
-        {"appell_f1(a,b1,b2,c,x,y)", "\\operatorname{F}_{1}\\left("},
-        {"lauricella_f(2,a,b1,b2,c,x,y)", "F_D^{"},
-        {"hypergeometric_pFq(1,1,a,b,x)", "{}_{1}F_{1}"},
-        {"@S x^2 dx", "\\int x^{2}\\, dx"},
-        {"x+x^2+1", "x^{2} + x + 1"}
-    };
-    for (size_t i = 0; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        expr_t *expression = expr_from_string_preserving_calculus_internal(string_c_str(input));
-        TeX_context_t *context = expression ? expr_TeX_context(expression) : NULL;
-        expr_free(expression);
-        string_free(input);
-        TeX_t *notation = context ? TeX_from_context(context) : NULL;
-        if (!notation || !strstr(TeX_source(notation), cases[i].required))
-            fprintf(stderr, "%s -> %s\n", cases[i].input, notation ? TeX_source(notation) : "no notation");
-        TEST_ASSERT_TRUE(notation && strstr(TeX_source(notation), cases[i].required), cases[i].input);
-        TeX_free(notation);
-        TeX_context_free(context);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_native_aggregate_contexts_cases", NULL,
+        test_TeX_native_aggregate_contexts_cases_row);
+}
+
+static void test_TeX_quantum_input_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), string_c_str(row->expected)), string_c_str(row->input));
+    TeX_free(notation);
+    string_free(input);
 }
 
 static void test_TeX_quantum_input(void)
 {
-    static const struct { const char *input; const char *expected; } cases[] = {
-        {"hat(H)", "\\widehat{H}"},
-        {"H_op", "\\widehat{H}"},
-        {"p_op^2", "\\widehat{p}^{2}"},
-        {"hat(A+B)", "\\widehat{A + B}"},
-        {"B_op*A_op", "\\widehat{B}\\mkern-2mu \\widehat{A}"},
-        {"dagger(A)*B_op", "{A}^{\\dagger}\\mkern-2mu \\widehat{B}"},
-        {"hat(x)*0", "\\widehat{x}\\mkern-2mu 0"},
-        {"sqrt(A_op^2)", "\\sqrt{\\widehat{A}^{2}}"},
-        {"hat(0)+sin(0)", "\\widehat{0} + \\sin(0)"},
-        {"dagger(p_op)", "{\\widehat{p}}^{\\dagger}"},
-        {"dagger(A*B)", "{\\left(A\\mkern-2mu B\\right)}^{\\dagger}"},
-        {"bra(@phi)", "\\left\\langle \\phi \\right|"},
-        {"ket(@psi)", "\\left| \\psi \\right\\rangle"},
-        {"braket(@phi,@psi)", "\\left\\langle \\phi \\middle| \\psi \\right\\rangle"},
-        {"ketbra(@psi,@phi)", "\\left| \\psi \\right\\rangle\\!\\left\\langle \\phi \\right|"},
-        {"matrix_element(@psi,p_op,@psi)",
-         "\\left\\langle \\psi \\middle| \\widehat{p} \\middle| \\psi \\right\\rangle"},
-        {"expect(p)", "\\left\\langle p \\right\\rangle"},
-        {"expect(p)=matrix_element(@psi,p_op,@psi)",
-         "\\left\\langle p \\right\\rangle = "
-         "\\left\\langle \\psi \\middle| \\widehat{p} \\middle| \\psi \\right\\rangle"},
-        {"hat (H)", "\\widehat{H}"},
-        {"dagger(dagger(A))", "{\\left({A}^{\\dagger}\\right)}^{\\dagger}"}
-    };
-    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(notation && !strcmp(TeX_source(notation), cases[i].expected), cases[i].input);
-        TeX_free(notation);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_quantum_input_cases", NULL,
+        test_TeX_quantum_input_cases_row);
+}
+
+static void test_TeX_quantum_input_errors_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    TeX_t *notation = TeX_from_expression(input);
+    TEST_ASSERT_TRUE(!notation, "invalid operator notation must not return partial or ordinary-call notation");
+    TeX_free(notation);
+    string_free(input);
 }
 
 static void test_TeX_quantum_input_errors(void)
 {
-    static const char *const cases[] = {
-        "hat()", "hat(A,B)", "bra(x,y)", "ket(x,y)", "dagger(A,B)", "braket(x)",
-        "ketbra(x,y,z)", "matrix_element(x,A)", "matrix_element(x,A,y,z)", "expect(x,y)", "hat(x"
-    };
-    for (size_t i = 0u; i < sizeof cases / sizeof *cases; ++i) {
-        string_t *input = string_new_with(cases[i]);
-        TeX_t *notation = TeX_from_expression(input);
-        TEST_ASSERT_TRUE(!notation, "invalid operator notation must not return partial or ordinary-call notation");
-        TeX_free(notation);
-        string_free(input);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "TeX.test_TeX_quantum_input_errors_cases", NULL,
+        test_TeX_quantum_input_errors_cases_row);
     string_t *ordinary = string_new_with("2+3");
     TeX_t *result = TeX_from_expression(ordinary);
     TEST_ASSERT_TRUE(result && !strcmp(TeX_source(result), "5"),

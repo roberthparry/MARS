@@ -40,9 +40,9 @@ $(CHECKS_BUILD_DIR)/%.o: tools/mars_checks/src/%.c $(CHECKS_HEADERS) tools/mars_
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -Itools/mars_checks/include -c $< -o $@
 
-$(CHECKS_BIN): $(CHECKS_OBJS) $(STATIC_LIB)
+$(CHECKS_BIN): $(CHECKS_OBJS) $(TEST_DATABASE_OBJS) $(STATIC_LIB)
 	@mkdir -p $(dir $@)
-	$(CC) $(LDFLAGS) -o $@ $(CHECKS_OBJS) $(STATIC_LIB) $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $(CHECKS_OBJS) $(TEST_DATABASE_OBJS) $(STATIC_LIB) $(LDLIBS)
 
 $(CHECKS_BUILD_DIR)/tests/%.o: tools/mars_checks/tests/%.c $(CHECKS_HEADERS) $(TEST_SHARED_HEADERS) tools/mars_checks/Makefile Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps

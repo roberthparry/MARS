@@ -20,6 +20,7 @@
 #include "equation-t.h"
 #include "expression-t.h"
 #include "test_harness.h"
+#include "test_database.h"
 #define MARS_SHARED_EQUATION_INTERNAL_ACCESS
 #include "internal/equation_internal.h"
 
@@ -2609,17 +2610,22 @@ static void test_equation_inverts_roots_and_constant_powers(void)
     ASSERT_TRUE(ok);
 }
 
+static void test_equation_preserves_principal_root_domain_sources_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    equation_t *equation = equ_from_string(string_c_str(row->input));
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    bool ok = solutions && !equ_solutions_count(solutions) && equ_solutions_proven_empty(solutions);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    ASSERT_TRUE(ok);
+}
+
 static void test_equation_preserves_principal_root_domain(void)
 {
-    static const char *const sources[] = {"sqrt(7^x) = -49", "sqrt(x) = -3", "sqrt(x) = -i", "7^x = 0"};
-    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
-        equation_t *equation = equ_from_string(sources[i]);
-        equation_solutions_t *solutions = equ_derive_solutions(equation);
-        bool ok = solutions && !equ_solutions_count(solutions) && equ_solutions_proven_empty(solutions);
-        equ_solutions_free(solutions);
-        equ_free(equation);
-        ASSERT_TRUE(ok);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "equation.test_equation_preserves_principal_root_domain_sources", NULL,
+        test_equation_preserves_principal_root_domain_sources_row);
     equation_t *equation = equ_from_string("{sqrt(x) = a | x=?; a=?}");
     equation_solutions_t *solutions = equ_derive_solutions(equation);
     bool ok = solutions && !equ_solutions_count(solutions) && !equ_solutions_proven_empty(solutions);
@@ -2642,26 +2648,36 @@ static void example_equation_root_inverse(void)
     ASSERT_EQ_INT(status, EXIT_SUCCESS);
 }
 
+static void test_equation_relation_separators_accepted_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    equation_t *equation = equ_from_string(string_c_str(row->input));
+    equation_solutions_t *solutions = equ_derive_solutions(equation);
+    TEST_ASSERT_TRUE(equation && test_equation_result_contains_long(solutions, 2),
+                     "double equals retains ordinary exact-equation solving");
+    string_t *native = equation ? equ_to_text(equation, style_UNBOUND) : NULL;
+    TEST_ASSERT_TRUE(native && strstr(string_c_str(native), " = "), "native output uses one equality sign");
+    string_free(native);
+    equ_solutions_free(solutions);
+    equ_free(equation);
+}
+
+static void test_equation_relation_separators_rejected_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    equation_t *equation = equ_from_string(string_c_str(row->input));
+    TEST_ASSERT_TRUE(!equation, "equation solvers must not reinterpret non-equality relations as exact equations");
+    equ_free(equation);
+}
+
 static void test_equation_relation_separators(void)
 {
-    static const char *const accepted[] = {"2*x + 3 == 7", "{2*x+3==7 | x=?}"};
-    for (size_t i = 0; i < sizeof accepted / sizeof *accepted; ++i) {
-        equation_t *equation = equ_from_string(accepted[i]);
-        equation_solutions_t *solutions = equ_derive_solutions(equation);
-        TEST_ASSERT_TRUE(equation && test_equation_result_contains_long(solutions, 2),
-                         "double equals retains ordinary exact-equation solving");
-        string_t *native = equation ? equ_to_text(equation, style_UNBOUND) : NULL;
-        TEST_ASSERT_TRUE(native && strstr(string_c_str(native), " = "), "native output uses one equality sign");
-        string_free(native);
-        equ_solutions_free(solutions);
-        equ_free(equation);
-    }
-    static const char *const rejected[] = {"x<=1", "x>=1", "x!=1", "x~~=1", "x~==1", "0<x<=1", "x==y==z"};
-    for (size_t i = 0; i < sizeof rejected / sizeof *rejected; ++i) {
-        equation_t *equation = equ_from_string(rejected[i]);
-        TEST_ASSERT_TRUE(!equation, "equation solvers must not reinterpret non-equality relations as exact equations");
-        equ_free(equation);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "equation.test_equation_relation_separators_accepted", NULL,
+        test_equation_relation_separators_accepted_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "equation.test_equation_relation_separators_rejected", NULL,
+        test_equation_relation_separators_rejected_row);
 }
 
 static void test_equation_basics(void)
@@ -2746,9 +2762,33 @@ static void test_equation_future_solver_cases(void)
     TEST_RUN_SUBTEST(test_equation_future_keeps_tan_sqrt_three_family_symbolic, "future,periodic");
 }
 
+static void test_equation_database_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    TEST_ASSERT_TRUE(!strcmp(string_c_str(row->operation), "solve_count"), "known equation case operation");
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(row->precision);
+    equation_t *equation = equ_from_text(row->input);
+    equation_solutions_t *solutions = equation ? equ_derive_solutions(equation) : NULL;
+    char *end = NULL;
+    unsigned long count = strtoul(string_c_str(row->expected), &end, 10);
+    bool ok = solutions && end && end != string_c_str(row->expected) && !*end &&
+              equ_solutions_count(solutions) == (size_t)count;
+    equ_solutions_free(solutions);
+    equ_free(equation);
+    num_set_default_prec_bits(saved);
+    TEST_ASSERT_TRUE(ok, "equation table input produces the expected number of solutions");
+}
+
+static void test_equation_database_cases(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "equation", "tests.test_equation_database_cases", test_equation_database_row);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Equation Basics");
+    TEST_RUN_IN_GROUP(test_equation_database_cases, tests, "equation,database-cases");
     TEST_RUN_IN_GROUP(test_equation_inverts_roots_and_constant_powers, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_preserves_principal_root_domain, tests, NULL);
     TEST_RUN_IN_GROUP(test_equation_relation_separators, tests, NULL);

@@ -59,6 +59,11 @@ __pycache__/
 tests/build/
 build/
 
+# Keep test definitions and results in version control; SQLite sidecars are temporary.
+/tests/*.db-journal
+/tests/*.db-wal
+/tests/*.db-shm
+
 # Generated files
 test_output.txt
 /a.out

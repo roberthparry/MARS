@@ -11,6 +11,7 @@
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
+#include "test_database.h"
 
 #include "test_expr.h"
 
@@ -19,118 +20,84 @@ static void check_parse_expr(const char *label, const char *s, const char *want_
 static void check_parse_TeX(const char *label, const char *s, const char *want_TeX, int line);
 static void check_parse_simplified_expr(const char *label, const char *s, const char *want_expr, int line);
 
+static void check_parse_num_database_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    check_parse_num(string_c_str(row->name), string_c_str(row->input), string_c_str(row->expected), __LINE__);
+}
+
+static void check_parse_expr_database_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    check_parse_expr(string_c_str(row->name), string_c_str(row->input), string_c_str(row->expected), __LINE__);
+}
+
+static void check_parse_TeX_database_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    check_parse_TeX(string_c_str(row->name), string_c_str(row->input), string_c_str(row->expected), __LINE__);
+}
+
+static void check_parse_simplified_expr_database_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    check_parse_simplified_expr(string_c_str(row->name), string_c_str(row->input), string_c_str(row->expected), __LINE__);
+}
+
+static void test_from_string_laplace_prime_shorthand_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *shorthand = expr_from_string(string_c_str(row->input), NULL);
+    expr_t *explicit = expr_from_string(string_c_str(row->expected), NULL);
+    char *got = shorthand ? expr_to_string(shorthand, style_UNBOUND) : NULL;
+    char *want = explicit ? expr_to_string(explicit, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(shorthand);
+    ASSERT_NOT_NULL(explicit);
+    TEST_ASSERT_STR_EQ(got, want);
+    free(want);
+    free(got);
+    expr_free(explicit);
+    expr_free(shorthand);
+}
+
 static void test_from_string_laplace_prime_shorthand(void)
 {
-    static const struct {
-        const char *shorthand;
-        const char *explicit;
-    } cases[] = {
-        { "@L{y''+4y'+5y-50t}", "@L{y''(t)+4*y'(t)+5*y(t)-50*t}" },
-        { "@L{5y+4y'+y''-50t}", "@L{5*y(t)+4*y'(t)+y''(t)-50*t}" },
-        { "@L(y''+a*y'+b*y,x,p)", "@L(y''(x)+a*y'(x)+b*y(x),x,p)" },
-        { "@L(y'+@L(z',x,p),t,s)", "@L(y'(t)+@L(z'(x),x,p),t,s)" },
-        { "y+@L{y'+y}", "y+@L{y'(t)+y(t)}" },
-        { "@L{y'+y}+@L{y*t}", "@L{y'(t)+y(t)}+@L{y*t}" },
-    };
-
-    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-        expr_t *shorthand = expr_from_string(cases[i].shorthand, NULL);
-        expr_t *explicit = expr_from_string(cases[i].explicit, NULL);
-        char *got = shorthand ? expr_to_string(shorthand, style_UNBOUND) : NULL;
-        char *want = explicit ? expr_to_string(explicit, style_UNBOUND) : NULL;
-
-        ASSERT_NOT_NULL(shorthand);
-        ASSERT_NOT_NULL(explicit);
-        TEST_ASSERT_STR_EQ(got, want);
-        free(want);
-        free(got);
-        expr_free(explicit);
-        expr_free(shorthand);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_laplace_prime_shorthand_cases", NULL,
+        test_from_string_laplace_prime_shorthand_cases_row);
 }
 
 static void test_from_string_inverse_rational(void)
 {
-    check_parse_num("inverse of Equation-mode rational output",
-                    "{@Linv{-5*(-s-10/s^2-3)/(s*(s+4)+5)} | t=0}", "5", __LINE__);
-    check_parse_num("expanded rational denominator",
-                    "{@Linv{(5*s^3+15*s^2+50)/(s^4+4*s^3+5*s^2)} | t=0}", "5", __LINE__);
-    check_parse_num("repeated quadratic inverse",
-                    "{2*@Linv{1/(s^2+1)^2}/(sin(t)-t*cos(t)) | t=1}", "1", __LINE__);
-    check_parse_num("distinct quadratic inverse",
-                    "{3*@Linv{1/((s^2+1)*(s^2+4))}/(sin(t)-sin(2*t)/2) | t=1}", "1", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_inverse_rational_check_parse_num_1", NULL, check_parse_num_database_row);
 }
 
 static void test_from_string_laplace(void)
 {
-    check_parse_num("Laplace zero hyperbolic tangent", "{@L(tanh(c*t)) | c=0}", "0", __LINE__);
-    check_parse_num("Laplace zero tangent without target", "{@L(tan(c*t)) | c=0}", "0", __LINE__);
-    check_parse_num("Laplace zero tangent no half-plane restriction", "{@L(tan(c*t)) | s=-2; c=0}", "0", __LINE__);
-    check_parse_num("Inverse Laplace logarithm", "{@Linv{-(ln(s)+γ)/s} | t=1}", "0", __LINE__);
-    check_parse_num("Inverse Laplace logarithmic coefficient", "{@Linv{-(ln(s)+γ)/s}/ln(2) | t=2}", "1", __LINE__);
-    check_parse_num("Laplace braced logarithm", "{@L{ln(t)}/@eulermascheroni | s=1}", "-1", __LINE__);
-    check_parse_num("Laplace braced inverse", "{@Linv{1/s^2} | t=2}", "2", __LINE__);
-    check_parse_num("Inverse Laplace pole", "{@Linv(1/s) | t=2}", "1", __LINE__);
-    check_parse_num("Inverse Laplace repeated pole", "{InverseLaplace(1/s^3) | t=2}", "2", __LINE__);
-    check_parse_num("Inverse Laplace Unicode", "{ℒ⁻¹(s/(s^2+1)) | t=0}", "1", __LINE__);
-    check_parse_num("Inverse Laplace shifted cosine", "{@Linv((s-a)/((s-a)^2+1)) | t=0; a=2}", "1", __LINE__);
-    check_parse_num("Laplace polynomial", "{@L(t^2+3*t+2) | s=2}", "2", __LINE__);
-    check_parse_num("Laplace Bessel zero", "{@L(J_0(t))*sqrt(5) | s=2}", "1", __LINE__);
-    check_parse_num("Bessel ASCII alias", "J0(0)", "1", __LINE__);
-    check_parse_num("Bessel subscript alias", "J₀(0)", "1", __LINE__);
-    check_parse_num("Laplace symbolic power", "{@L(t^n,t) | s=2; n=3}", "3/8", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_laplace_check_parse_num_1", NULL, check_parse_num_database_row);
     expr_t *obsolete_guard = expr_from_string("where_real_gt(1/s,s,0)", NULL);
     ASSERT_NULL(obsolete_guard);
     expr_free(obsolete_guard);
-    check_parse_num("Laplace fractional power", "{@L(t^(-1/2)) | s=1}", "sqrt(pi)", __LINE__);
-    check_parse_num("Laplace square root", "{2*@L(sqrt(t))/sqrt(pi) | s=1}", "1", __LINE__);
-    check_parse_num("Laplace cube root", "{@L(cubrt(t))/gamma(4/3) | s=1}", "1", __LINE__);
-    check_parse_num("Laplace fourth root", "{@L(root(t,4))/gamma(5/4) | s=1}", "1", __LINE__);
-    check_parse_num("Laplace reciprocal root", "{@L(1/sqrt(t)) | s=1}", "sqrt(pi)", __LINE__);
-    check_parse_num("Readable transform domain", "{120/s^6 where (Re(s)>0) | s=2}", "15/8", __LINE__);
-    check_parse_num("Binding domain condition", "{120/s^6 | s=2; Re(s)>0}", "15/8", __LINE__);
-    check_parse_expr("Binding condition rendering", "{120/s^6 where (Re(s)>0) | s=2}",
-                     "{ 120/s⁶ | s = 2; Re(s) > 0 }", __LINE__);
-    check_parse_num("Multiple domain conditions", "{gamma(n+1)/s^(n+1) where (Re(s) > 0; Re(n) > -1) | s=2; n=5}",
-                    "15/8", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_laplace_check_parse_num_2", NULL, check_parse_num_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_laplace_check_parse_expr_3", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_laplace_check_parse_num_4", NULL, check_parse_num_database_row);
     expr_t *guard = expr_from_string("1/s^2 where (Re(s) > 0)", NULL);
     expr_t *copy = expr_clone(guard);
     ASSERT_NOT_NULL(copy);
     expr_free(copy);
     expr_free(guard);
-    check_parse_num("Laplace exponential", "{@L(exp(-t)) | s=2}", "1/3", __LINE__);
-    check_parse_num("Laplace symbolic exponential notation", "{@L(e^(a*t)) | s=2; a=1}", "1", __LINE__);
-    check_parse_num("Laplace negative rate half-plane", "{@L(exp(a*t)) | s=-1; a=-2}", "1", __LINE__);
-    check_parse_num("Laplace complex rate", "{@L(exp(a*t)) | s=2+i; a=1+i}", "1", __LINE__);
-    check_parse_num("Real-part bound round trip", "{1/(s-a) | s=2+i; a=1+i; Re(s)>Re(a)}", "1", __LINE__);
-    check_parse_num("Laplace sine", "{ℒ(sin(t)) | s=2}", "1/5", __LINE__);
-    check_parse_num("Laplace inferred time with Greek frequency", "{@L(sinh(@omega*t)) | s=2; @omega=1}",
-                    "1/3", __LINE__);
-    check_parse_num("Laplace inferred time with free parameter", "{@L(sinh(x*t)) | s=2; x=1}", "1/3", __LINE__);
-    check_parse_num("Laplace explicit source overrides time", "{@L(sinh(x*t),x) | s=2; t=1}", "1/3", __LINE__);
-    check_parse_num("Laplace complementary error functions", "{@L(erf(t))+@L(erfc(t)) | s=2}", "1/2", __LINE__);
-    check_parse_num("Laplace opposite error function rates", "{@L(erf(t))+@L(erf(-t)) | s=2}", "0", __LINE__);
-    check_parse_num("Laplace zero error function rate", "{@L(erf(at)) | s=2; a=0}", "0", __LINE__);
-    check_parse_num("Laplace time-weighted symbolic sine", "{@L(tsin(at)) | s=2; a=1}", "4/25", __LINE__);
-    check_parse_num("Laplace time-weighted cosine", "{@L(tcos(at)) | s=2; a=1}", "3/25", __LINE__);
-    check_parse_num("Laplace squared-time cosine", "{@L(t^2*cos(at),t) | s=2; a=1}", "4/125", __LINE__);
-    check_parse_num("Laplace time-weighted exponential", "{@L(t*exp(at)) | s=2; a=1}", "1", __LINE__);
-    check_parse_num("Laplace hyperbolic sine", "{@L(sinh(at)) | s=2; a=1}", "1/3", __LINE__);
-    check_parse_num("Laplace hyperbolic cosine", "{@L(cosh(at)) | s=2; a=1}", "2/3", __LINE__);
-    check_parse_num("Laplace imaginary hyperbolic rate", "{@L(cosh(at)) | s=2; a=i}", "2/5", __LINE__);
-    check_parse_num("Laplace bound sine power", "{@L(sin^n(t)) | s=1; n=5}", "3/13", __LINE__);
-    check_parse_num("Laplace even sine power", "{ℒ(sin(t)^2) | s=1}", "2/5", __LINE__);
-    check_parse_num("Laplace even cosine power", "{Laplace(cos(t)^4,t,p) | p=1}", "41/85", __LINE__);
-    check_parse_num("Laplace odd cosine power", "{@L(cos(t)^3) | s=1}", "2/5", __LINE__);
-    check_parse_num("Laplace symbolic cosine sum", "{@L(cos(t)^n,t) | s=1, n=3}", "2/5", __LINE__);
-    check_parse_num("Laplace symbolic sine sum", "{@L(sin(t)^n,t) | s=1, n=5}", "3/13", __LINE__);
-    check_parse_num("Integer domain satisfied", "{1/s | s=2; n=5; nonnegative_integer(n)}", "1/2", __LINE__);
-    check_parse_num("Laplace negative frequency", "{@L(sin(-2*t)^3) | s=1}", "-48/185", __LINE__);
-    check_parse_num("Laplace explicit target", "{Laplace(t,t,p) | p=2}", "1/4", __LINE__);
-    check_parse_expr("Laplace canonical call", "@L(f(t),t,p)", "{ ℒ(f(t), t, p) | p = ? }", __LINE__);
-    check_parse_TeX("Laplace convergence", "@L(t)",
-                    "\\left\\{ \\frac{1}{s^{2}}\\quad (\\mathfrak{Re}(s)>0) \\;\\middle|\\; s = ? \\right\\}",
-                    __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_laplace_check_parse_num_5", NULL, check_parse_num_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_laplace_check_parse_expr_6", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_laplace_check_parse_TeX_7", NULL, check_parse_TeX_database_row);
 }
 
 static void test_from_string_clausen(void)
@@ -379,67 +346,34 @@ static void test_from_string_function_hash(void)
     }
     check_parse_val("bare Lambert aliases remain ordinary algebra without call parentheses",
                     "{ w + w0 + wm1 + wn | w = 1; w0 = 2; m1 = 3; n = 4 }", 10.0, __LINE__);
-    check_parse_expr("w followed by call parentheses selects principal Lambert W", "w(x)",
-                     "{ W(x) | x = ? }", __LINE__);
-    check_parse_expr("w0 followed by call parentheses selects Lambert W zero branch", "w0(x)",
-                     "{ W₀(x) | x = ? }", __LINE__);
-    check_parse_expr("wm1 followed by call parentheses selects Lambert W minus-one branch", "wm1(x)",
-                     "{ W₋₁(x) | x = ? }", __LINE__);
-    check_parse_expr("wn followed by call parentheses selects a named Lambert W branch", "wn(n,x)",
-                     "{ Wₙ(n, x) | x = ?; n = ? }", __LINE__);
-    check_parse_num("zeta is registered in the perfect hash", "zeta(3)",
-                    "1.202056903159594285399738161511449990764986292340498881792271555", __LINE__);
-    check_parse_expr("zetap is registered in the perfect hash", "zetap(x)", "{ ζ'(x) | x = ? }", __LINE__);
-    check_parse_expr("zetap bindings use the binding perfect hash", "{ zetap(x) | x = 3 }",
-                     "{ ζ'(x) | x = 3 }", __LINE__);
-    check_parse_expr("zeta-prime symbol selects the Riemann derivative", "ζ'(x)", "{ ζ'(x) | x = ? }", __LINE__);
-    check_parse_expr("zeta-prime symbol selects the Hurwitz derivative", "ζ'(s, a)",
-                     "{ ζ'(s, a) | s = ?; a = ? }", __LINE__);
-    check_parse_expr("the zeta symbol is a perfect-hash alias", "ζ(x)", "{ ζ(x) | x = ? }", __LINE__);
-    check_parse_num("the zeta symbol evaluates through its alias", "ζ(3)",
-                    "1.202056903159594285399738161511449990764986292340498881792271555", __LINE__);
-    check_parse_num("two-argument zeta selects Hurwitz zeta", "zeta(2.5, 101)",
-                    "0.000661687499453171542062211501479711744239330816315948606222019329", __LINE__);
-    check_parse_num("two-argument zeta symbol selects Hurwitz zeta", "ζ(2.5, 101)",
-                    "0.000661687499453171542062211501479711744239330816315948606222019329", __LINE__);
-    check_parse_num("zetah is registered in the perfect hash", "zetah(2.5, 101)",
-                    "0.000661687499453171542062211501479711744239330816315948606222019329", __LINE__);
-    check_parse_num("zeta2 is a perfect-hash alias", "zeta2(2.5, 101)",
-                    "0.000661687499453171542062211501479711744239330816315948606222019329", __LINE__);
-    check_parse_num("zatahp is registered in the perfect hash", "zatahp(2.5, 101)",
-                    "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
-    check_parse_num("qdigamma is registered in the perfect hash", "qdigamma(1/2,1)",
-                    "-0.4205290343560457797847369304069241", __LINE__);
-    check_parse_num("q-digamma symbol is registered in the perfect hash", "ψq(1/2,1)",
-                    "-0.4205290343560457797847369304069241", __LINE__);
-    check_parse_expr("qdigamma bindings use the binding perfect hash", "{ qdigamma(q,z) | q=1/2; z=1 }",
-                     "{ ψq(q, z) | q = ¹⁄₂; z = 1 }", __LINE__);
-    check_parse_expr("q-digamma symbol bindings use the binding perfect hash", "{ ψq(q,z) | q=1/2; z=1 }",
-                     "{ ψq(q, z) | q = ¹⁄₂; z = 1 }", __LINE__);
-    check_parse_num("zeta2p is a perfect-hash alias", "zeta2p(2.5, 101)",
-                    "-0.003491619656530338106744558404347153037971242923601833749838331612", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_expr_1", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_num_2", NULL, check_parse_num_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_expr_3", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_num_4", NULL, check_parse_num_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_expr_5", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_num_6", NULL, check_parse_num_database_row);
     check_parse_val("finite sum is registered in the perfect hash", "sum(k,1,10,k)", 55.0, __LINE__);
     check_parse_val("finite product is a built-in function", "product(k,1,4,k)", 24.0, __LINE__);
-    check_parse_expr("infinite product is a built-in function", "product(k,1,inf,1-1/k^2)",
-                     "Π_(k=1)^∞ (1 - 1/k²)", __LINE__);
-    check_parse_num("harmonic_poly is registered in the perfect hash", "harmonic_poly(4, 1/2)", "131/192",
-                    __LINE__);
-    check_parse_expr("harmonic_poly bindings use the binding perfect hash",
-                     "{ harmonic_poly(n,x) | x=1/2; n=4 }", "{ Hn(n, x) | x = ¹⁄₂; n = 4 }", __LINE__);
-    check_parse_num("Lerch phi evaluates through its polylogarithm reduction", "lerch_phi(0.5,2,1)",
-                    "1.164481052930025011805312640319360217488396949612252850868694096", __LINE__);
-    check_parse_num("LerchPhi is registered in the perfect hash", "LerchPhi(0.5,2,1)",
-                    "1.164481052930025011805312640319360217488396949612252850868694096", __LINE__);
-    check_parse_num("capital phi is registered in the perfect hash", "Φ(0.5,2,1)",
-                    "1.164481052930025011805312640319360217488396949612252850868694096", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_expr_7", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_num_8", NULL, check_parse_num_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_expr_9", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_num_10", NULL, check_parse_num_database_row);
     check_parse_val("Li1 aliases polylogarithm of order one", "Li1(0.5)", 0.6931471805599453, __LINE__);
     check_parse_val("display Li subscript one aliases polylogarithm of order one", "Li₁(0.5)",
                     0.6931471805599453, __LINE__);
     check_parse_val("display Li subscript two aliases dilogarithm", "Li₂(0.5)", 0.5822405264650125, __LINE__);
-    check_parse_TeX("Lerch phi renders as capital phi", "lerch_phi(1/2,2,1)",
-                    "\\Phi\\left(\\frac{1}{2}, 2, 1\\right)", __LINE__);
-    check_parse_TeX("q-digamma renders its base as a subscript", "qdigamma(1/2,1)",
-                    "\\psi_{\\frac{1}{2}}\\left(1\\right)", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_function_hash_check_parse_TeX_11", NULL, check_parse_TeX_database_row);
     {
         expr_t *lerch = expr_from_string("lerch_phi(1/2,2,1)", NULL);
         char *expression_text = lerch ? expr_to_string(lerch, style_EXPRESSION) : NULL;
@@ -626,13 +560,12 @@ static void test_from_function_body_syntax(void)
 
 static void test_from_string_conjugation(void)
 {
-    check_parse_expr("conj alias parses", "conj(1 + 2i)", "conj(1 + 2i)", __LINE__);
-    check_parse_expr("conjugate alias canonicalises", "conjugate(1 + 2i)", "conj(1 + 2i)", __LINE__);
-    check_parse_expr("postfix conjugate parses", "(1 + 2i)^*", "conj(1 + 2i)", __LINE__);
-    check_parse_num("conj alias evaluates", "conj(1 + 2i)", "1 - 2i", __LINE__);
-    check_parse_num("conjugate alias evaluates", "conjugate(1 + 2i)", "1 - 2i", __LINE__);
-    check_parse_num("postfix conjugate evaluates", "(1 + 2i)^*", "1 - 2i", __LINE__);
-    check_parse_expr("symbolic modulus bars parse", "|z|", "{ |z| | z = ? }", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_conjugation_check_parse_expr_1", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_conjugation_check_parse_num_2", NULL, check_parse_num_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_conjugation_check_parse_expr_3", NULL, check_parse_expr_database_row);
     check_parse_val("complex modulus bars evaluate", "|1 + 2i|", sqrt(5.0), __LINE__);
     check_parse_val("implicit coefficient before modulus", "{2|x| | x=-3}", 6.0, __LINE__);
     check_parse_val("adjacent moduli multiply", "{|x||x+1| | x=-3}", 6.0, __LINE__);
@@ -673,7 +606,8 @@ static void test_from_string_arithmetic(void)
     /* Implicit multiplication (juxtaposition) */
     check_parse_val("x\xe2\x82\x80x\xe2\x82\x81 implicit = 12",
                     "{ x\xe2\x82\x80x\xe2\x82\x81 | x\xe2\x82\x80 = 3, x\xe2\x82\x81 = 4 }", 12.0, __LINE__);
-    check_parse_num("whitespace separates implicitly multiplied factors", "44 i", "44i", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_arithmetic_check_parse_num_1", NULL, check_parse_num_database_row);
     /* Explicit middle-dot multiplication */
     check_parse_val("x\xe2\x82\x80\xc2\xb7x\xe2\x82\x81 middle-dot = 12",
                     "{ x\xe2\x82\x80\xc2\xb7x\xe2\x82\x81 | x\xe2\x82\x80 = 3, x\xe2\x82\x81 = 4 }", 12.0, __LINE__);
@@ -686,30 +620,16 @@ static void test_from_string_arithmetic(void)
     check_parse_val("x\xc2\xb3 = 8", "{ x\xc2\xb3 | x = 2 }", 8.0, __LINE__);
     /* Caret exponent */
     check_parse_val("x^2.5 at 4 = 32", "{ x^2.5 | x = 4 }", 32.0, __LINE__);
-    check_parse_expr("power binds before following division", "{ x^2/6 | x = NAN }", "{ x²/6 | x = ? }", __LINE__);
-    check_parse_expr("unit fractional exponent shorthand remains an exponent", "{ x^1/3 | x = NAN }",
-                     "{ x^⅓ | x = ? }", __LINE__);
-    check_parse_expr("parenthesised rational remains an exponent", "{ x^(2/6) | x = NAN }", "{ x^⅓ | x = ? }",
-                     __LINE__);
-    check_parse_num("decimal binding stays exact through cancellation-sensitive cube",
-                    "{ (5x)^3 | x = 128064.000000000120974 }",
-                    "262537412640768744007706072064702817249456224221302405921303/"
-                    "1000000000000000000000000000000000000000000",
-                    __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_arithmetic_check_parse_expr_2", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_arithmetic_check_parse_num_3", NULL, check_parse_num_database_row);
     /* Parenthesised sub-expression with superscript */
     check_parse_val("(x\xe2\x82\x80 + x\xe2\x82\x81)\xc2\xb2 = 25",
                     "{ (x\xe2\x82\x80 + x\xe2\x82\x81)\xc2\xb2 | x\xe2\x82\x80 = 2, x\xe2\x82\x81 = 3 }", 25.0,
                     __LINE__);
-    check_parse_simplified_expr("parenthesised exponent can itself be powered", "{ a^(ix)\xc2\xb2 | x = NAN; a = NAN }",
-                                "{ a^(2ix) | x = ?; a = ? }", __LINE__);
-    check_parse_simplified_expr("ASCII parenthesised exponent can itself be powered", "{ a^(ix)^2 | x = NAN; a = NAN }",
-                                "{ a^(2ix) | x = ?; a = ? }", __LINE__);
-    check_parse_simplified_expr("unparenthesised chained powers are left associative", "{ a^x^2 | x = NAN; a = NAN }",
-                                "{ a^(2x) | x = ?; a = ? }", __LINE__);
-    check_parse_simplified_expr("explicit exponent power stays inside exponent", "{ a^((ix)^2) | x = NAN; a = NAN }",
-                                "{ a^(-x\xc2\xb2) | x = ?; a = ? }", __LINE__);
-    check_parse_simplified_expr("power of symbolic power folds integer exponent",
-                                "{ (a^(-x))\xc2\xb2 | x = NAN; a = NAN }", "{ a^(-2x) | x = ?; a = ? }", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_arithmetic_check_parse_simplified_expr_4", NULL, check_parse_simplified_expr_database_row);
     /* Chained addition */
     check_parse_val(
         "x\xe2\x82\x80 + x\xe2\x82\x81 + x\xe2\x82\x82 = 6",
@@ -1747,24 +1667,18 @@ static void test_from_string_functions(void)
     check_parse_val("sqrt(x) at 4", "{ sqrt(x) | x = 4 }", 2.0, __LINE__);
     check_parse_val("cubrt(x) at 27", "{ cubrt(x) | x = 27 }", 3.0, __LINE__);
     check_parse_val("root(x,n) at 81,4", "{ root(x,n) | x = 81, n = 4 }", 3.0, __LINE__);
-    check_parse_TeX("cubrt uses an indexed radical in TeX", "cubrt(x)",
-                    "\\left\\{ \\sqrt[3]{x} \\;\\middle|\\; x = ? \\right\\}", __LINE__);
-    check_parse_TeX("root uses its order as the TeX radical index", "root(x, n)",
-                    "\\left\\{ \\sqrt[n]{x} \\;\\middle|\\; x = ?; n = ? \\right\\}", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_functions_check_parse_TeX_1", NULL, check_parse_TeX_database_row);
     check_parse_val("floor(x) at 1.75", "{ floor(x) | x = 1.75 }", 1.0, __LINE__);
     check_parse_val("ceil(x) at 1.25", "{ ceil(x) | x = 1.25 }", 2.0, __LINE__);
-    check_parse_num("10! lowers to gamma(11)", "{ 10! }", "3628800", __LINE__);
-    check_parse_num("x! lowers to gamma(x+1)", "{ x! | x = 5 }", "120", __LINE__);
-    check_parse_num("exp(pi*i/2) = i", "{ exp(@pi*i/2) }", "i", __LINE__);
-    check_parse_expr("1/pi stays symbolic", "{ 1/pi }", "1/π", __LINE__);
-    check_parse_expr("pi/2 stays symbolic", "{ pi/2 }", "π/2", __LINE__);
-    check_parse_expr("i^i stays symbolic", "{ i^i }", "i^i", __LINE__);
-    check_parse_expr("i^(1+i) parses", "{ i^(1+i) }", "i^(1 + i)", __LINE__);
-    check_parse_simplified_expr("W0 identity keeps unbound argument", "{ W_0(x)*exp(W_0(x)) }", "{ x | x = ? }",
-                                __LINE__);
-    check_parse_simplified_expr("W0 identity resolves bound pi", "{ W_0(x)*exp(W_0(x)) | x = pi }", "π", __LINE__);
-    check_parse_simplified_expr("W-1 identity resolves bound e", "{ W-1(x)*exp(W-1(x)) | x = e }", "e", __LINE__);
-    check_parse_expr("W identity recognises e power", "{ W(2e^2) }", "2", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_functions_check_parse_num_2", NULL, check_parse_num_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_functions_check_parse_expr_3", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_functions_check_parse_simplified_expr_4", NULL, check_parse_simplified_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_functions_check_parse_expr_5", NULL, check_parse_expr_database_row);
     check_parse_val("√(x) at 4", "{ √(x) | x = 4 }", 2.0, __LINE__);
     /* Binary functions */
     check_parse_val("atan2(1, 1) = π/4",
@@ -1789,8 +1703,8 @@ static void test_from_string_functions(void)
     check_parse_val("exp(sin(x)) at 0 = 1", "{ exp(sin(x)) | x = 0 }", 1.0, __LINE__);
     check_parse_val("Greek aliases in ordinary expressions parse", "{ sin(@alpha) + @beta | @alpha = 0, @beta = 1 }",
                     1.0, __LINE__);
-    check_parse_expr("plain Greek aliases use the perfect hash", "{ cos(theta) + i*sin(theta) }",
-                     "{ cos(θ) + i·sin(θ) | θ = ? }", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_functions_check_parse_expr_6", NULL, check_parse_expr_database_row);
     check_parse_val("sqrt(exp(x)) at 0 = 1", "{ sqrt(exp(x)) | x = 0 }", 1.0, __LINE__);
     /* Function applied to parenthesised expression */
     check_parse_val("sin(x\xe2\x82\x80 + x\xe2\x82\x81) = sin(π/2) = 1",
@@ -1839,16 +1753,13 @@ static void test_from_string_special_functions(void)
     check_parse_val("digamma(1) = -gamma_E", "{ digamma(x) | x = 1 }", -0.5772156649015329, __LINE__);
     check_parse_val("ψ⁽⁰⁾(1) = -gamma_E", "{ ψ⁽⁰⁾(x) | x = 1 }", -0.5772156649015329, __LINE__);
     check_parse_val("ψ⁽¹⁾(1) = pi²/6", "{ ψ⁽¹⁾(x) | x = 1 }", M_PI * M_PI / 6.0, __LINE__);
-    check_parse_simplified_expr("trigamma at positive infinity is zero", "trigamma(inf)", "0", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_special_functions_check_parse_simplified_expr_1", NULL, check_parse_simplified_expr_database_row);
     check_parse_val("polygamma(3, 2) = pi^4/15 - 6", "{ polygamma(3, x) | x = 2 }", pow(M_PI, 4.0) / 15.0 - 6.0,
                     __LINE__);
     check_parse_val("ψ⁽³⁾(2) = pi^4/15 - 6", "{ ψ⁽³⁾(x) | x = 2 }", pow(M_PI, 4.0) / 15.0 - 6.0, __LINE__);
-    check_parse_expr("polygamma expression uses standard symbol", "{ polygamma(2, x) | x = ? }",
-                     "{ ψ⁽²⁾(x) | x = ? }", __LINE__);
-    check_parse_expr("symbolic polygamma order uses the base psi symbol", "{ polygamma(n, x) | n = ?; x = ? }",
-                     "{ ψ(n, x) | n = ?; x = ? }", __LINE__);
-    check_parse_expr("base psi symbol round-trips symbolic polygamma", "{ ψ(n, x) | n = ?; x = ? }",
-                     "{ ψ(n, x) | n = ?; x = ? }", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_special_functions_check_parse_expr_2", NULL, check_parse_expr_database_row);
     check_parse_val("dilog(1/2) = pi^2/12 - log(2)^2/2", "{ dilog(x) | x = 0.5 }", 0.5822405264650125, __LINE__);
     check_parse_val("Li2(1/2) aliases dilog", "{ Li2(x) | x = 0.5 }", 0.5822405264650125, __LINE__);
     check_parse_val("polylog(2, 1/2) = dilog(1/2)", "{ polylog(2, x) | x = 0.5 }", 0.5822405264650125, __LINE__);
@@ -1875,13 +1786,8 @@ static void test_from_string_special_functions(void)
     check_parse_val("W₀(0) = 0 via W", "{ W(x) | x = 0 }", 0.0, __LINE__);
     check_parse_val("W₀(0) = 0 via W0", "{ W0(x) | x = 0 }", 0.0, __LINE__);
     check_parse_val("W₀(0) = 0 via W_0", "{ W_0(x) | x = 0 }", 0.0, __LINE__);
-    check_parse_expr("W(x) infers x binding", "{ W(x) }", "{ W(x) | x = ? }", __LINE__);
-    check_parse_expr("W_0(x) infers x binding", "{ W_0(x) }", "{ W₀(x) | x = ? }", __LINE__);
-    check_parse_expr("lambert_wn parses branch-aware Lambert W", "{ lambert_wn(2, x) | x = ? }",
-                     "{ Wₙ(2, x) | x = ? }", __LINE__);
-    check_parse_expr("Wn parses branch-aware Lambert W", "{ Wn(2, x) | x = ? }", "{ Wₙ(2, x) | x = ? }", __LINE__);
-    check_parse_expr("W_n parses branch-aware Lambert W", "{ W_n(2, x) | x = ? }", "{ Wₙ(2, x) | x = ? }", __LINE__);
-    check_parse_expr("Wₙ parses branch-aware Lambert W", "{ Wₙ(2, x) | x = ? }", "{ Wₙ(2, x) | x = ? }", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_special_functions_check_parse_expr_3", NULL, check_parse_expr_database_row);
     check_parse_val("W₋₁(-0.2) via lambert_wm1", "{ lambert_wm1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
     check_parse_val("W₋₁(-0.2)", "{ W₋₁(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
     check_parse_val("W₋₁(-0.2) via W-1", "{ W-1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
@@ -1893,9 +1799,8 @@ static void test_from_string_special_functions(void)
     check_parse_val("pdf(0) aliases normal_pdf", "{ pdf(x) | x = 0 }", 1.0 / sqrt(2.0 * M_PI), __LINE__);
     check_parse_val("cdf(0) aliases normal_cdf", "{ cdf(x) | x = 0 }", 0.5, __LINE__);
     check_parse_val("logpdf(0) aliases normal_logpdf", "{ logpdf(x) | x = 0 }", -0.5 * log(2.0 * M_PI), __LINE__);
-    check_parse_expr("cdf alias keeps user spelling", "{ cdf(1.96) - cdf(-1.96) }", "cdf(1.96) - cdf(-1.96)", __LINE__);
-    check_parse_expr("pdf and logpdf aliases keep user spelling", "{ pdf(0) + logpdf(0) }", "pdf(0) + logpdf(0)",
-                     __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_special_functions_check_parse_expr_4", NULL, check_parse_expr_database_row);
     {
         expr_bindings_t *bindings = NULL;
         expr_t *expr = expr_from_string("{ cdf(x) | x = ? }", &bindings);
@@ -1942,25 +1847,8 @@ static void test_from_string_exact_value_functions(void)
     expr_t *deriv = NULL;
     number_t deriv_value;
 
-    check_parse_num("factorial(10) = 10!", "{ factorial(n) | n = 10 }", "3628800", __LINE__);
-    check_parse_num("fibonacci(50)", "{ fibonacci(n) | n = 50 }", "12586269025", __LINE__);
-    check_parse_num("partition(5)", "{ partition(n) | n = 5 }", "7", __LINE__);
-    check_parse_num("isqrt(200)", "{ isqrt(n) | n = 200 }", "14", __LINE__);
-    check_parse_num("gcd(84, 30)", "{ gcd(a, b) | a = 84, b = 30 }", "6", __LINE__);
-    check_parse_num("lcm(-21, 6)", "{ lcm(a, b) | a = -21, b = 6 }", "42", __LINE__);
-    check_parse_num("mod(29, 5)", "{ mod(a, b) | a = 29, b = 5 }", "4", __LINE__);
-    check_parse_num("modinv(3, 11)", "{ modinv(a, b) | a = 3, b = 11 }", "4", __LINE__);
-    check_parse_num("is_prime(97)", "{ is_prime(n) | n = 97 }", "1", __LINE__);
-    check_parse_num("is_prime(221)", "{ is_prime(n) | n = 221 }", "0", __LINE__);
-    check_parse_num("next_prime(14)", "{ next_prime(n) | n = 14 }", "17", __LINE__);
-    check_parse_num("prev_prime(14)", "{ prev_prime(n) | n = 14 }", "13", __LINE__);
-    check_parse_num("AND(13, 11)", "{ AND(a, b) | a = 13, b = 11 }", "9", __LINE__);
-    check_parse_num("OR(13, 11)", "{ OR(a, b) | a = 13, b = 11 }", "15", __LINE__);
-    check_parse_num("XOR(13, 8)", "{ XOR(a, b) | a = 13, b = 8 }", "5", __LINE__);
-    check_parse_num("NOT(8)", "{ NOT(a) | a = 8 }", "7", __LINE__);
-    check_parse_num("SHL(7, 3)", "{ SHL(a, n) | a = 7, n = 3 }", "56", __LINE__);
-    check_parse_num("SHR(56, 3)", "{ SHR(a, n) | a = 56, n = 3 }", "7", __LINE__);
-    check_parse_num("factors(360)", "{ a₀³·a₁²·a₂ | ; a₀ = 2, a₁ = 3, a₂ = 5 }", "360", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_exact_value_functions_check_parse_num_1", NULL, check_parse_num_database_row);
 
     expr = expr_from_string("{ gcd(x, y) | x = 84, y = 30 }", &bindings);
     if (!expr || expr_is_differentiable(expr)) {
@@ -2828,22 +2716,16 @@ static void check_parse_simplified_expr(const char *label, const char *s, const 
 
 static void test_from_string_number_literals(void)
 {
-    check_parse_num("pure const rational", "{ [half] = 1/2 }", "1/2", __LINE__);
-    check_parse_num("rational atom expression", "{ 1/2 + 1/4 }", "3/4", __LINE__);
-    check_parse_num("unicode rational atom expression", "{ ½ + ¼ }", "3/4", __LINE__);
-    check_parse_num("stacked unicode rational atom", "{ ³⁵⁵⁄₁₁₃ }", "355/113", __LINE__);
-    check_parse_expr("rational atom expression simplifies display", "{ 231/2310 }", "⅒", __LINE__);
-    check_parse_expr("stacked unicode rational atom simplifies display", "{ ²³¹⁄₂₃₁₀ }", "⅒", __LINE__);
-    check_parse_expr("unparenthesised radical constant round-trips", "{ √3/2 }", "√(3)/2", __LINE__);
-    check_parse_expr("unparenthesised radical supports implicit multiplication", "{ 4√3/2 }", "2·√(3)", __LINE__);
-    check_parse_TeX("stacked unicode rational atom renders TeX", "{ ²³¹⁄₂₃₁₀ }", "\\frac{1}{10}", __LINE__);
-    check_parse_expr("NAN is a numeric placeholder, not a variable name", "{ NAN }", "NAN", __LINE__);
-    check_parse_expr("lowercase nan is a numeric placeholder", "{ nan }", "NAN", __LINE__);
-    check_parse_expr("repeated unary signs simplify", "{ --2x | x = ? }", "{ 2x | x = ? }", __LINE__);
-    check_parse_num("pure imaginary coefficient atom", "{ 3/2i }", "3/2i", __LINE__);
-    check_parse_num("pure const rational complex", "{ [z] = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
-    check_parse_num("binding rational complex", "{ z | z = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
-    check_parse_num("binding parenthesized imag coeff", "{ z | z = 1/2 + (2)i }", "1/2 + 2i", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_number_literals_check_parse_num_1", NULL, check_parse_num_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_number_literals_check_parse_expr_2", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_number_literals_check_parse_TeX_3", NULL, check_parse_TeX_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_number_literals_check_parse_expr_4", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_number_literals_check_parse_num_5", NULL, check_parse_num_database_row);
 }
 
 static void test_from_string_deriv(void)
@@ -2883,27 +2765,11 @@ static void test_from_string_deriv(void)
     check_parse_val("exp((x_0 + x_1)^2) at (0,0) = 1", "{ exp((x_0 + x_1)^2) | x_0 = 0, x_1 = 0 }", 1.0, __LINE__);
     check_parse_val("(x^2 + 1)^2 at x=2 = 25", "{ (x^2 + 1)^2 | x = 2 }", 25.0, __LINE__);
 
-    check_parse_simplified_expr("Dx(...) parses as expression derivative", "{ Dx(exp(x^2)) | x = ? }",
-                                "{ 2x·exp(x²) | x = ? }", __LINE__);
-    check_parse_simplified_expr("Dx(...) infers only its derivative variable", "{ Dx(exp(x^2)) }",
-                                "{ 2x·exp(x²) | x = ? }", __LINE__);
-    check_parse_simplified_expr("Dxx(...) parses as repeated expression derivative", "{ Dxx(x^3) | x = ? }",
-                                "{ 6x | x = ? }", __LINE__);
-    check_parse_simplified_expr("Dxy(...) parses as mixed expression derivative", "{ Dxy(x^2*y^3) | x = ?, y = ? }",
-                                "{ 6xy² | x = ?, y = ? }", __LINE__);
-    check_parse_simplified_expr("Leibniz first derivative uses the native derivative parser", "{ d/dx(x^3) }",
-                                "{ 3x² | x = ? }", __LINE__);
-    check_parse_simplified_expr("Leibniz second derivative uses matching orders", "{ d^2/dx^2(x^3) }",
-                                "{ 6x | x = ? }", __LINE__);
-    check_parse_simplified_expr("Leibniz mixed derivative matches Dxy", "{ d^2/dxy(x^2*y^3) | x = ?, y = ? }",
-                                "{ 6xy² | x = ?, y = ? }", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_deriv_check_parse_simplified_expr_1", NULL, check_parse_simplified_expr_database_row);
     check_parse_val("ordinary division of d is not a derivative", "{ d/d | ; d = 2 }", 1.0, __LINE__);
-    check_parse_simplified_expr("D[x^5](...) parses as compact high-order derivative", "{ D[x^5](x^7) }",
-                                "{ 2520x² | x = ? }", __LINE__);
-    check_parse_simplified_expr("D[x^2y^3](...) preserves mixed derivative order", "{ D[x^2y^3](x^3*y^4) }",
-                                "{ 144xy | x = ?, y = ? }", __LINE__);
-    check_parse_simplified_expr("canonical superscript derivative input round trips", "{ Dx²(x^3) }",
-                                "{ 6x | x = ? }", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_deriv_check_parse_simplified_expr_2", NULL, check_parse_simplified_expr_database_row);
     {
         expr_bindings_t *bindings = NULL;
         expr_t *parsed = expr_from_string("{ Dxxxxx((x + 1)/(x^2 + 3*x + 5)) | x = ? }", &bindings);
@@ -3309,67 +3175,24 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     number_t two;
 
     check_parse_val("binding value may be builtin constant expression", "{ e^(sin(x)) | x = pi/2 }", M_E, __LINE__);
-    check_parse_expr("binding value preserves symbolic pi/2", "{ e^(sin(x)) | x = pi/2 }", "{ e^sin(x) | x = π/2 }",
-                     __LINE__);
-    check_parse_expr("binding value preserves symbolic 3/2*pi", "{ e^(sin(x)) | x = 3/2*pi }",
-                     "{ e^sin(x) | x = ³⁄₂π }", __LINE__);
-    check_parse_expr("binding value preserves symbolic pi^2/2", "{ x | x = (pi^2)/2 }", "π²/2", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_bindings_with_constant_expression_value_check_parse_expr_1", NULL, check_parse_expr_database_row);
     check_parse_val("binding value accepts Unicode integer powers", "{ x | x = 2³ }", 8.0, __LINE__);
     check_parse_val("constant binding accepts Unicode integer powers", "{ c | ; c = 2³ }", 8.0, __LINE__);
     check_parse_val("binding value accepts multi-digit superscripts", "{ x | x = 2¹² }", 4096.0, __LINE__);
     check_parse_val("binding power chains retain left association", "{ x | x = 2²^3 }", 64.0, __LINE__);
-    check_parse_expr("binding value round-trips Unicode powers", "{ x | x = (pi²)/2 }", "π²/2", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_bindings_with_constant_expression_value_check_parse_expr_2", NULL, check_parse_expr_database_row);
     {
         expr_t *oversized = expr_from_string("{ x | x = 2²¹⁴⁷⁴⁸³⁶⁴⁸ }", NULL);
         bool rejected = oversized == NULL;
         expr_free(oversized);
         ASSERT_TRUE(rejected);
     }
-    check_parse_expr("pure numeric expression preserves full mathematical tree", "{ phi - 1/2(1+sqrt(5)) }",
-                     "φ - ½·(1 + √(5))", __LINE__);
-    check_parse_expr("binding value preserves full mathematical tree", "{ x | x = 1/2(1+sqrt(5)) }", "¹⁄₂·(1 + √(5))",
-                     __LINE__);
-    check_parse_expr("binding value round-trips pretty multiply", "{ -x + phi | x = ½·(1 + √(5)) }",
-                     "{ -x + φ | x = ½·(1 + √(5)) }", __LINE__);
-    check_parse_expr("binding value simplifies numeric magnitude and preserves symbolic functions",
-                     "{ x | x = abs(-3)+floor(pi)+ceil(phi) }", "3 + ⌊π⌋ + ⌈φ⌉", __LINE__);
-    check_parse_expr("binding value accepts unknown marker", "{ sinh(x) | x = ? }", "{ sinh(x) | x = ? }", __LINE__);
-    check_parse_expr("user-bound e remains symbolic", "{ E - M - e·sin(E) | ; M = pi/1.234, e=0.0167 }",
-                     "{ E - M - e·sin(E) | E = ?; M = π/1.234, e = 0.0167 }", __LINE__);
-    check_parse_expr("constant binding simplifies Lambert e power",
-                     "{ polygamma(9, x*y*c) | x = 7, y = 1; c = W(2e^2) }", "{ ψ⁽⁹⁾(cxy) | x = 7, y = 1; c = 2 }",
-                     __LINE__);
-    check_parse_expr("simplified constants keep bindings",
-                     "{ ax + yb + zc - 8 | a = NAN, b = NAN, c = NAN; x=1, y = 2, z = 3 }",
-                     "{ ax + by + cz - 8 | a = ?, b = ?, c = ?; x = 1, y = 2, z = 3 }", __LINE__);
-    check_parse_expr("constant bindings accept semicolon separators",
-                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1; y = 2, z = 3 }",
-                     "{ ax + by + cz - 8 | a = ?, b = ?, c = ?; x = 1, y = 2, z = 3 }", __LINE__);
-    check_parse_expr("const-only binding preserves leading semicolon", "{ exp(π·√H) | ;H = 163 }",
-                     "{ exp(π·√H) | ; H = 163 }", __LINE__);
-    check_parse_expr("const-only binding accepts trailing digit subscript", "{ exp(π·√(H8)) | ; H8 = 163 }",
-                     "{ exp(π·√(H₈)) | ; H₈ = 163 }", __LINE__);
-    check_parse_expr("minus after factor remains subtraction", "{ exp(π·√(H8))-(5x)^3 | H8 = 163, x = NAN }",
-                     "{ exp(π·√(H₈)) - (5x)³ | H₈ = 163, x = ? }", __LINE__);
-    check_parse_expr("absolute-value bars omit inner spaces", "{ exp(pi*sqrt(x)) - | exp(pi*sqrt(x)) | | x = NAN }",
-                     "{ exp(π·√x) - |exp(π·√x)| | x = ? }", __LINE__);
-    check_parse_expr("symbolic pi quotient cancels powers", "{ pi/pi^2 }", "π/π²", __LINE__);
-    check_parse_simplified_expr(
-        "generated derivative with NaN bindings simplifies explicitly",
-        "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
-        "{ y²z²·exp(sin(xyz))·(cos²(xyz) - sin(xyz)) | y = ?, z = ?, x = ? }", __LINE__);
-    check_parse_simplified_expr("reparsed symbolic pi derivative simplifies explicitly",
-                                "{ (-2π·exp(π·√x) + 2·π²·√x·exp(π·√x))/(2·√x)/(2·√x)² | x = 163 }",
-                                "{ ¼π·exp(π·√x)/x^³⁄₂·(π·√x - 1) | x = 163 }", __LINE__);
-    check_parse_simplified_expr(
-        "nested rational derivative numerator canonicalizes",
-        "{ (2*(x^2 + 3*x + 5)*(2*(x + 1)*(2*x + 3) - 9*x - (-x - 1)*(2*x + 3) - 3*x^2 - 15) - 6*(2*x + 3)*((-x - "
-        "1)*(x^2 + 3*x + 5) - (2*x + 3)*(3*x - (x + 1)*(2*x + 3) + x^2 + 5)))/(x^2 + 3*x + 5)^4 | x = 1 }",
-        "{ 6/(x² + 3x + 5)⁴·(12x² + 44x - x⁴ - 4x³ + 23) | x = 1 }", __LINE__);
-    check_parse_simplified_expr("higher rational derivative numerator canonicalizes",
-                                "{ (24*(x^2 + 3*x + 5)*(6*x - x^3 - 3*x^2 + 11) - 24*(2*x + 3)*(12*x^2 + 44*x - x^4 - "
-                                "4*x^3 + 23))/(x^2 + 3*x + 5)^5 | x = ? }",
-                                "{ 24/(x² + 3x + 5)⁵·(x⁵ + 5x⁴ - 20x³ - 110x² - 115x - 14) | x = ? }", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_bindings_with_constant_expression_value_check_parse_expr_3", NULL, check_parse_expr_database_row);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_bindings_with_constant_expression_value_check_parse_simplified_expr_4", NULL, check_parse_simplified_expr_database_row);
     bindings = NULL;
     expr = expr_from_string(
         "{ 720*(x^7 + 7*x^6 - 42*x^5 - 385*x^4 - 805*x^3 - 294*x^2 + 511*x + 289)/(x^2 + 3*x + 5)^7 | x = ? }",
@@ -3531,12 +3354,12 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text && strcmp(deriv_text, "{ ¼π·exp(π·√x)/x^³⁄₂·(π·√x - 1) | x = 163 }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ ¼π·exp(π·√x)·(π·√x - 1)/x^³⁄₂ | x = 163 }") == 0) {
         to_string_pass("symbolic pi derivative keeps exact coefficient", deriv_text,
-                       "{ ¼π·exp(π·√x)/x^³⁄₂·(π·√x - 1) | x = 163 }");
+                       "{ ¼π·exp(π·√x)·(π·√x - 1)/x^³⁄₂ | x = 163 }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "symbolic pi derivative keeps exact coefficient",
-                       deriv_text ? deriv_text : "(null)", "{ ¼π·exp(π·√x)/x^³⁄₂·(π·√x - 1) | x = 163 }");
+                       deriv_text ? deriv_text : "(null)", "{ ¼π·exp(π·√x)·(π·√x - 1)/x^³⁄₂ | x = 163 }");
     }
 
     free(deriv_text);
@@ -3552,12 +3375,12 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = ⅙π }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√x)·(3 - 3π·√x + π²·x)/x^⁵⁄₂ | x = ⅙π }") == 0) {
         to_string_pass("symbolic coefficient folding happens in derivative DAG", deriv_text,
-                       "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = ⅙π }");
+                       "{ ⅛π·exp(π·√x)·(3 - 3π·√x + π²·x)/x^⁵⁄₂ | x = ⅙π }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "symbolic coefficient folding happens in derivative DAG",
-                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = ⅙π }");
+                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√x)·(3 - 3π·√x + π²·x)/x^⁵⁄₂ | x = ⅙π }");
     }
 
     free(deriv_text);
@@ -3573,12 +3396,12 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
 
-    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = 163 }") == 0) {
+    if (deriv_text && strcmp(deriv_text, "{ ⅛π·exp(π·√x)·(3 - 3π·√x + π²·x)/x^⁵⁄₂ | x = 163 }") == 0) {
         to_string_pass("nested symbolic pi derivative factors common terms", deriv_text,
-                       "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = 163 }");
+                       "{ ⅛π·exp(π·√x)·(3 - 3π·√x + π²·x)/x^⁵⁄₂ | x = 163 }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "nested symbolic pi derivative factors common terms",
-                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√x)/x^⁵⁄₂·(3 - 3π·√x + π²·x) | x = 163 }");
+                       deriv_text ? deriv_text : "(null)", "{ ⅛π·exp(π·√x)·(3 - 3π·√x + π²·x)/x^⁵⁄₂ | x = 163 }");
     }
 
     free(deriv_text);
@@ -3923,8 +3746,8 @@ static void test_from_string_unevaluated_integral(void)
     bindings = NULL;
     expr = NULL;
 
-    check_parse_simplified_expr("unevaluated integral explicit bounds simplify structurally", "{ ∫_1^3 1/t·dt }",
-                                "∫^3_1 1/t·dt", __LINE__);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_from_string_unevaluated_integral_check_parse_simplified_expr_1", NULL, check_parse_simplified_expr_database_row);
 
     check_parse_val("unevaluated integral explicit bounds evaluate numerically", "{ @S^3_1 1/t dt }", log(3.0),
                     __LINE__);

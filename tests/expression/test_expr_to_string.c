@@ -11,6 +11,7 @@
 
 #define MARS_EXPR_INTERNAL_ACCESS
 #include "expression/expr_internal.h"
+#include "test_database.h"
 
 #include "test_expr.h"
 
@@ -2398,74 +2399,28 @@ static void test_to_string_clausen(void)
     }
 }
 
+static void test_to_string_function_uses_lowercase_builtin_names_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expression = expr_from_string(string_c_str(row->input), NULL);
+    char *function = expression ? expr_to_string(expression, style_FUNCTION) : NULL;
+
+    ASSERT_NOT_NULL(expression);
+    if (function && strstr(function, string_c_str(row->expected)))
+        to_string_pass("canonical lowercase FUNCTION name", function, string_c_str(row->expected));
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "canonical lowercase FUNCTION name", function,
+                       string_c_str(row->expected));
+
+    free(function);
+    expr_free(expression);
+}
+
 static void test_to_string_function_uses_lowercase_builtin_names(void)
 {
-    static const struct {
-        const char *source;
-        const char *want;
-    } cases[] = {
-        {"{ Li1(x) }", "return li1("},
-        {"{ Li2(x) }", "return li2("},
-        {"{ Ei(x) }", "return ei("},
-        {"{ E1(x) }", "return e1("},
-        {"{ normal_pdf(x) }", "return normalpdf("},
-        {"{ normal_cdf(x) }", "return normalcdf("},
-        {"{ normal_logpdf(x) }", "return normallogpdf("},
-        {"{ gammainc_lower(a, x) }", "return gammainclower("},
-        {"{ gammainc_upper(a, x) }", "return gammaincupper("},
-        {"{ gammainc_P(a, x) }", "return gammaincp("},
-        {"{ gammainc_Q(a, x) }", "return gammaincq("},
-        {"{ is_prime(n) }", "return isprime("},
-        {"{ next_prime(n) }", "return nextprime("},
-        {"{ prev_prime(n) }", "return prevprime("},
-        {"{ AND(a, b) }", "return and("},
-        {"{ OR(a, b) }", "return or("},
-        {"{ XOR(a, b) }", "return xor("},
-        {"{ NOT(a) }", "return not("},
-        {"{ SHL(a, b) }", "return shl("},
-        {"{ SHR(a, b) }", "return shr("},
-        {"{ BesselJ(n, x) }", "return besselj("},
-        {"{ BesselY(n, x) }", "return bessely("},
-        {"{ BesselK(n, x) }", "return besselk("},
-        {"{ BesselI(n, x) }", "return besseli("},
-        {"{ bessel_i(n, x) }", "return besseli("},
-        {"{ besseli(n, x) }", "return besseli("},
-        {"{ StruveH(n, x) }", "return struveh("},
-        {"{ struve_h(n, x) }", "return struveh("},
-        {"{ struveh(n, x) }", "return struveh("},
-        {"{ StruveL(n, x) }", "return struvel("},
-        {"{ struve_l(n, x) }", "return struvel("},
-        {"{ struvel(n, x) }", "return struvel("},
-        {"{ harmonic_poly(n, x) }", "return harmonicpoly("},
-        {"{ legendre_chi(s, x) }", "return legendrechi("},
-        {"{ Cl2(x) }", "return clausen2("},
-        {"{ Cl(n, x) }", "return cl("},
-        {"{ LommelS(mu, nu, x) }", "return lommels("},
-        {"{ LerchPhi(z, s, a) }", "return lerchphi("},
-        {"{ qdigamma(q, z) }", "return qdigamma("},
-        {"{ W(x) }", "return w("},
-        {"{ W0(x) }", "return w0("},
-        {"{ W-1(x) }", "return wm1("},
-        {"{ Wn(n, x) }", "return wn("},
-        {"{ appell_f1(a, b1, b2, c, x, y) }", "return appellf1("},
-        {"{ lauricella_f(2, a, b1, b2, c, x, y) }", "return lauricellaf("},
-        {"{ hypergeometric_pFq(1, 1, a, b, x) }", "return hypergeometricpfq("},
-    };
-
-    for (size_t index = 0u; index < sizeof(cases) / sizeof(cases[0]); ++index) {
-        expr_t *expression = expr_from_string(cases[index].source, NULL);
-        char *function = expression ? expr_to_string(expression, style_FUNCTION) : NULL;
-
-        ASSERT_NOT_NULL(expression);
-        if (function && strstr(function, cases[index].want))
-            to_string_pass("canonical lowercase FUNCTION name", function, cases[index].want);
-        else
-            to_string_fail(__FILE__, __LINE__, 1, "canonical lowercase FUNCTION name", function,
-                           cases[index].want);
-
-        free(function);
-        expr_free(expression);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_to_string_function_uses_lowercase_builtin_names_cases", NULL,
+        test_to_string_function_uses_lowercase_builtin_names_cases_row);
 }
 
 /* ============================================================
@@ -2608,27 +2563,27 @@ static void test_to_string_exact_rational_TeX(void)
     }
 }
 
+static void test_to_string_exact_rational_powers_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *source = expr_from_string(string_c_str(row->input), NULL), *result = expr_simplify(source);
+    number_t value = NUM_NAN, expected = num_create_from_string(string_c_str(row->expected));
+    bool ok = result && expr_match_const_value(result, &value) && num_is_exact(value) && num_eq(value, expected);
+    char *text = result ? expr_to_string(result, style_UNBOUND) : NULL;
+    printf("  %s = %s\n", string_c_str(row->input), text ? text : "NULL");
+    free(text);
+    num_destroy(&expected);
+    num_destroy(&value);
+    expr_free(result);
+    expr_free(source);
+    ASSERT_TRUE(ok);
+}
+
 static void test_to_string_exact_rational_powers(void)
 {
-    static const struct { const char *source, *value; } cases[] = {
-        {"4^(3/2)", "8"}, {"9^(3/2)", "27"}, {"36^(3/2)", "216"},
-        {"9^(-3/2)", "1/27"}, {"(9/4)^(3/2)", "27/8"}, {"8^(2/3)", "4"},
-        {"625^(3/4)", "125"}, {"(169/144)^(3/2)", "2197/1728"},
-        {"2/5*(4*9^(3/2)+4^(3/2))", "232/5"}
-    };
-    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
-        expr_t *source = expr_from_string(cases[i].source, NULL), *result = expr_simplify(source);
-        number_t value = NUM_NAN, expected = num_create_from_string(cases[i].value);
-        bool ok = result && expr_match_const_value(result, &value) && num_is_exact(value) && num_eq(value, expected);
-        char *text = result ? expr_to_string(result, style_UNBOUND) : NULL;
-        printf("  %s = %s\n", cases[i].source, text ? text : "NULL");
-        free(text);
-        num_destroy(&expected);
-        num_destroy(&value);
-        expr_free(result);
-        expr_free(source);
-        ASSERT_TRUE(ok);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_to_string_exact_rational_powers_cases", NULL,
+        test_to_string_exact_rational_powers_cases_row);
     expr_t *symbolic = expr_from_string("{x^(3/2) | x=9}", NULL);
     expr_t *irrational = expr_from_string("2^(3/2)", NULL);
     expr_t *binding = expr_from_string("{x+c | x=?; c=9^(3/2)}", NULL);
@@ -2664,6 +2619,41 @@ static void test_to_string_exact_rational_powers(void)
     num_destroy(&exponent);
 }
 
+static void test_to_string_indexed_principal_roots_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expr = expr_from_string(string_c_str(row->input), NULL);
+    char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    expr_t *parsed = text ? expr_from_string(text, NULL) : NULL;
+    number_t before = expr_eval(expr), after = expr_eval(parsed);
+    number_t difference = num_sub(before, after), error = num_abs(difference);
+    number_t tolerance = num_create_from_string("1/1000000000000");
+    long before_order = 0, after_order = 0;
+    bool before_family = expr_explicit_root_order(expr, &before_order);
+    bool after_family = expr_explicit_root_order(parsed, &after_order);
+    bool ok = expr && parsed && text && strstr(text, string_c_str(row->expected)) && num_is_finite(after) &&
+              num_le(error, tolerance) && before_family == after_family && before_order == after_order;
+    printf("  %s -> %s\n", string_c_str(row->input), text ? text : "NULL");
+    num_destroy(&tolerance);
+    num_destroy(&error);
+    num_destroy(&difference);
+    num_destroy(&after);
+    num_destroy(&before);
+    expr_free(parsed);
+    free(text);
+    expr_free(expr);
+    ASSERT_TRUE(ok);
+}
+
+static void test_to_string_indexed_principal_roots_invalid_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expr = expr_from_string(string_c_str(row->input), NULL);
+    bool rejected = expr == NULL;
+    expr_free(expr);
+    ASSERT_TRUE(rejected);
+}
+
 static void test_to_string_indexed_principal_roots(void)
 {
     expr_t *quarter = expr_from_string("1/4", NULL), *half = expr_new_const(NUM_HALF);
@@ -2674,65 +2664,9 @@ static void test_to_string_indexed_principal_roots(void)
     expr_free(simplified); expr_free(raw); expr_free(half); expr_free(quarter);
     ASSERT_TRUE(folded);
 
-    static const struct { const char *source, *expected; } cases[] = {
-        {"{cubrt(x) | x=2}", "³√x"},
-        {"{root(x,4) | x=2}", "⁴√x"},
-        {"{root(x,12) | x=2}", "¹²√x"},
-        {"{²√(x) | x=2}", "√x"},
-        {"{root(x,2147483647) | x=2}", "²¹⁴⁷⁴⁸³⁶⁴⁷√x"},
-        {"{³√(⁴√(x)) | x=2}", "³√(⁴√x)"},
-        {"{root(x,n) | x=2; n=4}", "root(x, n)"},
-        {"{2*cubrt(x) | x=2}", "2·³√x"},
-        {"{2*root(x,4) | x=2}", "2·⁴√x"},
-        {"{cubrt(x+1) | x=2}", "³√(x + 1)"},
-        {"{cubrt(x^2) | x=-2}", "³√(x²)"},
-        {"{³√x+1 | x=2}", "³√x + 1"},
-        {"{³√x*y | x=2; y=3}", "y·³√x"},
-        {"{cubrt([long name]) | [long name]=2}", "³√([long name])"},
-        {"{cubrt(@alpha) | @alpha=2}", "³√α"},
-        {"{cubrt(x_1) | x_1=2}", "³√(x₁)"},
-        {"{x*cubrt(2) | x=3}", "³√(2)·x"},
-        {"{x*root(2,4) | x=3}", "⁴√(2)·x"},
-        {"{cubrt(x)^2 | x=2}", "³√(x)"},
-        {"{1/root(x,12) | x=2}", "¹²√(x)"},
-        {"{³√(x) | x=-8}", "³√x"},
-        {"{⁴√(x) | x=-16}", "⁴√x"},
-        {"{¹²√(x) | x=3+4i}", "¹²√x"},
-        {"{x | x=³√π}", "³√π"},
-        {"{x | x=⁴√π}", "⁴√π"},
-        {"{x | x=√π}", "√π"},
-        {"{x | x=³√π*2}", "³√π"},
-        {"{x | x=(⁴√π)^2}", "⁴√"},
-        {"{x | x=(³√π)^2}", "³√(π)²"},
-        {"{x | x=³√(2)}", "³√(2)"},
-        {"{x | x=⁴√(2)}", "⁴√(2)"},
-        {"{x | x=2*³√(2)}", "·³√(2)"},
-        {"{x | x=2*¹²√(2)}", "·¹²√(2)"},
-        {"{x^(1/3) | x=-8}", "^⅓"},
-    };
-    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
-        expr_t *expr = expr_from_string(cases[i].source, NULL);
-        char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-        expr_t *parsed = text ? expr_from_string(text, NULL) : NULL;
-        number_t before = expr_eval(expr), after = expr_eval(parsed);
-        number_t difference = num_sub(before, after), error = num_abs(difference);
-        number_t tolerance = num_create_from_string("1/1000000000000");
-        long before_order = 0, after_order = 0;
-        bool before_family = expr_explicit_root_order(expr, &before_order);
-        bool after_family = expr_explicit_root_order(parsed, &after_order);
-        bool ok = expr && parsed && text && strstr(text, cases[i].expected) && num_is_finite(after) &&
-                  num_le(error, tolerance) && before_family == after_family && before_order == after_order;
-        printf("  %s -> %s\n", cases[i].source, text ? text : "NULL");
-        num_destroy(&tolerance);
-        num_destroy(&error);
-        num_destroy(&difference);
-        num_destroy(&after);
-        num_destroy(&before);
-        expr_free(parsed);
-        free(text);
-        expr_free(expr);
-        ASSERT_TRUE(ok);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_to_string_indexed_principal_roots_cases", NULL,
+        test_to_string_indexed_principal_roots_cases_row);
     /* Unsupported numeric orders remain readable function calls, not overflowing radical indices. */
     expr_t *large = expr_from_string("root(x,2147483648)", NULL);
     char *large_text = large ? expr_to_string(large, style_UNBOUND) : NULL;
@@ -2740,76 +2674,73 @@ static void test_to_string_indexed_principal_roots(void)
     free(large_text);
     expr_free(large);
     ASSERT_TRUE(large_ok);
-    static const char *const invalid[] = {
-        "⁰√(2)", "¹√(2)", "⁻³√(2)", "³√", "³√()", "³√(2", "²¹⁴⁷⁴⁸³⁶⁴⁸√(2)"
-    };
-    for (size_t i = 0; i < sizeof(invalid) / sizeof(*invalid); ++i) {
-        expr_t *expr = expr_from_string(invalid[i], NULL);
-        bool rejected = expr == NULL;
-        expr_free(expr);
-        ASSERT_TRUE(rejected);
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_to_string_indexed_principal_roots_invalid", NULL,
+        test_to_string_indexed_principal_roots_invalid_row);
+}
+
+static void test_to_string_compact_product_quotient_TeX_sources_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expr = expr_from_string(string_c_str(row->input), NULL);
+    char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+    char *native = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
+    const char *slash = native ? strchr(native, '/') : NULL;
+    const char *sum = native ? strpbrk(native, "+-") : NULL;
+    bool numerator_first = slash && sum && sum < slash;
+    const char *cursor = TeX && !strncmp(TeX, "\\frac{", 6) ? TeX + 5 : NULL;
+    /* A single complete fraction must contain both the coefficient and its sum. */
+    for (unsigned part = 0; cursor && part < 2; ++part) {
+        unsigned depth = 0;
+        if (*cursor != '{') {
+            cursor = NULL;
+            break;
+        }
+        do {
+            if (*cursor == '{') ++depth;
+            if (*cursor == '}') --depth;
+            ++cursor;
+        } while (*cursor && depth);
+        if (depth) cursor = NULL;
     }
+    bool complete = cursor && !*cursor;
+    printf("Compact quotient: %s -> %s\n", string_c_str(row->input), TeX ? TeX : "(null)");
+    free(TeX);
+    free(native);
+    expr_free(expr);
+    ASSERT_TRUE(complete);
+    ASSERT_TRUE(numerator_first);
 }
 
 static void test_to_string_compact_product_quotient_TeX(void)
 {
-    const char *sources[] = {"a*(x+1)/(x^2+1)", "b*(t-2)/(t^2+3)",
-                             "(x+1)/(2*(x^2+1))", "c*(2*c*x+1)/(2*c*x*(c*x+1)+1)"};
-    for (size_t i = 0; i < sizeof sources / sizeof *sources; ++i) {
-        expr_t *expr = expr_from_string(sources[i], NULL);
-        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
-        char *native = expr ? expr_to_string(expr, style_UNBOUND) : NULL;
-        const char *slash = native ? strchr(native, '/') : NULL;
-        const char *sum = native ? strpbrk(native, "+-") : NULL;
-        bool numerator_first = slash && sum && sum < slash;
-        const char *cursor = TeX && !strncmp(TeX, "\\frac{", 6) ? TeX + 5 : NULL;
-        /* A single complete fraction must contain both the coefficient and its sum. */
-        for (unsigned part = 0; cursor && part < 2; ++part) {
-            unsigned depth = 0;
-            if (*cursor != '{') {
-                cursor = NULL;
-                break;
-            }
-            do {
-                if (*cursor == '{') ++depth;
-                if (*cursor == '}') --depth;
-                ++cursor;
-            } while (*cursor && depth);
-            if (depth) cursor = NULL;
-        }
-        bool complete = cursor && !*cursor;
-        printf("Compact quotient: %s -> %s\n", sources[i], TeX ? TeX : "(null)");
-        free(TeX);
-        free(native);
-        expr_free(expr);
-        ASSERT_TRUE(complete);
-        ASSERT_TRUE(numerator_first);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_to_string_compact_product_quotient_TeX_sources", NULL,
+        test_to_string_compact_product_quotient_TeX_sources_row);
+}
+
+static void test_to_string_complex_projection_TeX_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expr = expr_from_string(string_c_str(row->input), NULL);
+    char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+    string_t *expected = string_sprintf("\\mathfrak{%s}", string_c_str(row->expected));
+    bool ok = TeX && expected && strstr(TeX, string_c_str(expected)) && !strstr(TeX, "\\operatorname") &&
+              strstr(TeX, "\\mathopen{}\\left\\{");
+    if (ok && strchr(string_c_str(row->input), '*'))
+        ok = strstr(TeX, "\\,") && !strstr(TeX, "\\mkern-2mu");
+    printf("  %s -> %s\n", string_c_str(row->input), TeX ? TeX : "NULL");
+    string_free(expected);
+    free(TeX);
+    expr_free(expr);
+    ASSERT_TRUE(ok);
 }
 
 static void test_to_string_complex_projection_TeX(void)
 {
-    static const struct { const char *source; const char *glyph; } cases[] = {
-        {"Re(z)", "Re"}, {"realpart(z)", "Re"}, {"real_part(z)", "Re"}, {"ℜ(z)", "Re"},
-        {"Im(z)", "Im"}, {"imagpart(z)", "Im"}, {"imag_part(z)", "Im"}, {"ℑ(z)", "Im"},
-        {"Re(x+y)", "Re"}, {"Im(x+y)", "Im"}, {"Re(z)^2", "Re"}, {"Im(z)^2", "Im"},
-        {"8*Re(z)", "Re"}, {"8*Im(z)", "Im"}, {"8*Re(z)^2", "Re"}, {"8*Im(z)^2", "Im"},
-        {"Re(z)*x", "Re"}, {"Im(z)*x", "Im"}, {"(1/2)*Re(z)", "Re"}, {"(1/2)*Im(z)", "Im"}
-    };
-    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
-        expr_t *expr = expr_from_string(cases[i].source, NULL);
-        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
-        string_t *expected = string_sprintf("\\mathfrak{%s}", cases[i].glyph);
-        bool ok = TeX && expected && strstr(TeX, string_c_str(expected)) && !strstr(TeX, "\\operatorname") &&
-                  strstr(TeX, "\\mathopen{}\\left\\{");
-        if (ok && i >= 12u)
-            ok = strstr(TeX, "\\,") && !strstr(TeX, "\\mkern-2mu");
-        printf("  %s -> %s\n", cases[i].source, TeX ? TeX : "NULL");
-        string_free(expected);
-        free(TeX);
-        expr_free(expr);
-        ASSERT_TRUE(ok);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_to_string_complex_projection_TeX_cases", NULL,
+        test_to_string_complex_projection_TeX_cases_row);
 }
 
 static void test_to_string_equal_conjugate_sums(void)
@@ -2899,33 +2830,29 @@ static void test_to_string_symmetric_shifts_TeX(void)
     expr_free(unpaired);
 }
 
+static void test_to_string_integrals_outside_fractions_TeX_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    expr_t *expr = expr_from_string(string_c_str(row->input), NULL);
+    char *before = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
+    char *after = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    ASSERT_TRUE(TeX && strstr(TeX, string_c_str(row->expected)) == TeX);
+    ASSERT_TRUE(strstr(TeX, "\\int") && !strstr(TeX, "\\frac{\\int"));
+    ASSERT_TRUE(!strstr(TeX, "\\frac{1}{\\int") && !strstr(TeX, "\\frac{1}{e^{\\int"));
+    ASSERT_TRUE(before && after && strcmp(before, after) == 0);
+    printf("  %s -> %s\n", string_c_str(row->input), TeX ? TeX : "NULL");
+    free(after);
+    free(TeX);
+    free(before);
+    expr_free(expr);
+}
+
 static void test_to_string_integrals_outside_fractions_TeX(void)
 {
-    static const struct { const char *source; const char *prefix; } cases[] = {
-        {"integral(exp(cosh(t)),t,0,x)/exp(x)", "e^{-x}\\,"},
-        {"-integral(exp(cosh(t)),t,0,x)/exp(x)", "-e^{-x}\\,"},
-        {"integral(exp(cosh(t)),t,0,x)/c", "\\frac{1}{c}\\,"},
-        {"(1+integral(exp(cosh(t)),t,0,x))/c", "\\frac{1}{c}\\,"},
-        {"1/integral(exp(cosh(t)),t,0,x)", "\\left("},
-        {"1/exp(integral(exp(cosh(t)),t,0,x))", "e^{-"},
-        {"integral(exp(cosh(t)),t,0,x)^(-2)", "\\left("},
-        {"integral(exp(cosh(t)),t,0,x)^(-1/2)", "\\left("}
-    };
-    for (size_t i = 0u; i < sizeof(cases) / sizeof(*cases); ++i) {
-        expr_t *expr = expr_from_string(cases[i].source, NULL);
-        char *before = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-        char *TeX = expr ? expr_to_TeX_body(expr) : NULL;
-        char *after = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
-        ASSERT_TRUE(TeX && strstr(TeX, cases[i].prefix) == TeX);
-        ASSERT_TRUE(strstr(TeX, "\\int") && !strstr(TeX, "\\frac{\\int"));
-        ASSERT_TRUE(!strstr(TeX, "\\frac{1}{\\int") && !strstr(TeX, "\\frac{1}{e^{\\int"));
-        ASSERT_TRUE(before && after && strcmp(before, after) == 0);
-        printf("  %s -> %s\n", cases[i].source, TeX ? TeX : "NULL");
-        free(after);
-        free(TeX);
-        free(before);
-        expr_free(expr);
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "expression.test_to_string_integrals_outside_fractions_TeX_cases", NULL,
+        test_to_string_integrals_outside_fractions_TeX_cases_row);
 }
 
 void test_to_string_all(void)

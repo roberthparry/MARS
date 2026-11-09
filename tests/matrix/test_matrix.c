@@ -10,6 +10,7 @@
  */
 
 #include "test_matrix.h"
+#include "test_database.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static bool test_matrix_suite_setup(void);
@@ -300,9 +301,34 @@ static void test_readme_example_sgn(void)
     mat_free(a);
 }
 
+static void test_matrix_database_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    TEST_ASSERT_TRUE(!strcmp(string_c_str(row->operation), "determinant"), "known matrix case operation");
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(row->precision);
+    matrix_t *matrix = mat_from_string(string_c_str(row->input));
+    number_t got = NUM_NAN;
+    expr_t *expected = expr_from_text(row->expected, NULL);
+    number_t want = expected ? expr_eval(expected) : NUM_NAN;
+    bool ok = matrix && expected && mat_det(matrix, &got) == 0 && num_eq(got, want);
+    num_destroy(&got);
+    num_destroy(&want);
+    expr_free(expected);
+    mat_free(matrix);
+    num_set_default_prec_bits(saved);
+    TEST_ASSERT_TRUE(ok, "matrix table input has its expected determinant");
+}
+
+static void test_matrix_database_cases(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "matrix", "tests.test_matrix_database_cases", test_matrix_database_row);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("Core");
+    TEST_RUN_IN_GROUP(test_matrix_database_cases, tests, "matrix,database-cases");
     TEST_RUN_IN_GROUP(run_matrix_core_tests, tests, NULL);
 
     TEST_SECTION("Functions");

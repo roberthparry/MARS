@@ -10,11 +10,13 @@
  */
 
 #include <math.h>
+#include <string.h>
 
 #include "computation-t.h"
 #define MARS_SHARED_EXPR_INTERNAL_ACCESS
 #include "internal/expr_internal.h"
 #include "test_expr.h"
+#include "test_database.h"
 
 static bool test_expr_suite_setup(void);
 static int expr_number_exact_equal(const void *got, const void *want, void *ctx);
@@ -727,10 +729,34 @@ static void test_expr_real_sample(void)
     expr_bindings_free(bindings);
 }
 
+static void test_expression_database_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    TEST_ASSERT_TRUE(!strcmp(string_c_str(row->operation), "evaluate"), "known expression case operation");
+    size_t saved = num_get_default_prec_bits();
+    num_set_default_prec_digits(row->precision);
+    expr_t *input = expr_from_text(row->input, NULL), *expected = expr_from_text(row->expected, NULL);
+    number_t got = input ? expr_eval(input) : NUM_NAN, want = expected ? expr_eval(expected) : NUM_NAN;
+    bool ok = input && expected && num_eq(got, want);
+    num_destroy(&got);
+    num_destroy(&want);
+    expr_free(input);
+    expr_free(expected);
+    num_set_default_prec_bits(saved);
+    TEST_ASSERT_TRUE(ok, "expression table input evaluates to its expected exact value");
+}
+
+static void test_expression_database_cases(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "expression", "tests.test_expression_database_cases",
+                              test_expression_database_row);
+}
+
 int tests_main(void)
 {
     /* ---------------- Arithmetic ---------------- */
     TEST_SECTION("Arithmetic");
+    TEST_RUN_IN_GROUP(test_expression_database_cases, tests, "expression,database-cases");
     TEST_RUN_IN_GROUP(test_arithmetic, tests, NULL);
 
     /* ---------------- _d variants ---------------- */

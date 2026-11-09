@@ -143,6 +143,9 @@ TEST_SUITE_HEADERS  := $(shell find tests -mindepth 2 -maxdepth 2 -name 'test_*.
 TEST_OBJS         := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_HELPER_OBJS  := $(TEST_HELPER_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_COMMON_HELPER_OBJS := $(TEST_COMMON_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
+TEST_DATABASE_OBJS := $(filter %/test_database_store.o %/test_database_profile.o %/test_database_cases.o \
+    %/test_database_command.o %/test_database_seed.o %/test_database_history.o %/test_database_migrate.o,\
+    $(TEST_COMMON_HELPER_OBJS))
 BENCH_SRCS        := $(shell find bench -name 'bench_*.c' 2>/dev/null | sort)
 BENCH_OBJS        := $(BENCH_SRCS:bench/%.c=$(BUILD_DIR)/bench/%.o)
 BENCH_BINS        := $(patsubst bench/%.c,$(BUILD_DIR)/bench/%,$(BENCH_SRCS))
@@ -191,13 +194,13 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 TEST_BINS += $(TBA_TEST_BIN) $(LAB_TEST_BIN) $(CONFIG_TEST_BIN) $(CHECKS_TEST_BIN)
 
 # Bootstrap the maintenance applications before compiling downstream programs.
-# Their common static library must remain outside this barrier: both tools link it.
+# Their common static library and checker storage objects must remain outside this barrier: tools link them.
 # Order-only prerequisites enforce this even with parallel make, without forcing
 # otherwise up-to-date outputs to rebuild because native-tools is phony.
 .PHONY: native-tools
 native-tools: $(CHECKS_BIN) $(CONFIG_PROGRAM)
 
-$(SHARED_LIB) $(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS) \
+$(SHARED_LIB) $(TEST_OBJS) $(TEST_HELPER_OBJS) $(filter-out $(TEST_DATABASE_OBJS),$(TEST_COMMON_HELPER_OBJS)) \
 $(TEST_BINS) $(BENCH_OBJS) $(BENCH_BINS) $(SCRATCH_OBJS) $(SCRATCH_BINS) \
 $(filter-out $(APP_RESOURCE_OBJ),$(LAB_OBJS)) $(LAB_TEST_OBJS) $(LAB_SERVER) \
 $(filter-out $(APP_RESOURCE_OBJ),$(TBA_OBJS)) $(TBA_SERVER) \
@@ -583,10 +586,14 @@ README_EXAMPLE_CHECK = "$(CHECKS_BIN)" readme-examples --cc="$(CC)" --cflags="$(
 test-readme-examples: $(STATIC_LIB) $(CHECKS_BIN) $(HTTP_FIXTURE_BIN)
 	@$(README_EXAMPLE_CHECK)
 
+.PHONY: test-db test-db-sync
+test-db test-db-sync: $(CHECKS_BIN)
+	@"$(CHECKS_BIN)" test-db $(if $(strip $(ARGS)),$(ARGS),sync)
+
 test: check-public-distribution $(TEST_BINS)
 	@rc=0; "$(CHECKS_BIN)" source-policy || rc=1; for t in $(TEST_BINS); do \
 	    printf "  %-40s" "$$t ..."; \
-	    if $$t > /dev/null 2>&1; then \
+	    if $$t $(TEST_ARGS) > /dev/null 2>&1; then \
 	        echo "PASS"; \
 	    else \
 	        echo "FAIL"; rc=1; \
@@ -596,16 +603,16 @@ test: check-public-distribution $(TEST_BINS)
 memtest: $(TEST_BINS)
 	@rc=0; for t in $(TEST_BINS); do \
 	    echo "=== $$t ==="; \
-	    $(VALGRIND) $$t || rc=1; \
+	    $(VALGRIND) $$t --test-memory $(TEST_ARGS) || rc=1; \
 	done; exit $$rc
 
 define TEST_ALIAS_RULES
 .PHONY: $(1) mem$(1)
 $(1): $(2)
-	@$(2)
+	@$(2) $$(TEST_ARGS)
 
 mem$(1): $(2)
-	$(VALGRIND) $(2)
+	$(VALGRIND) $(2) --test-memory $$(TEST_ARGS)
 endef
 
 TEST_ALIAS_EXCLUDES := test_almanac memtest_almanac
@@ -615,7 +622,7 @@ $(foreach bin,$(filter-out $(addprefix tests/build/release/almanac/,$(TEST_ALIAS
 test_almanac: tests/build/release/almanac/test_almanac $(CONFIG_PROGRAM)
 	@tmp_out=$$(mktemp); \
 	tmp_status=$$(mktemp); \
-	{ stdbuf -oL -eL $< 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
+	{ stdbuf -oL -eL $< $(TEST_ARGS) 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
 	rc=$$(cat "$$tmp_status"); \
 	rm -f "$$tmp_status"; \
 	if [ "$$rc" -eq 0 ]; then \
@@ -625,7 +632,7 @@ test_almanac: tests/build/release/almanac/test_almanac $(CONFIG_PROGRAM)
 	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
 	    rm -f "$$tmp_out"; \
 	    "$(CONFIG_PROGRAM)" almanac || exit $$?; \
-	    exec stdbuf -oL -eL $<; \
+	    exec stdbuf -oL -eL $< $(TEST_ARGS); \
 	fi; \
 	rm -f "$$tmp_out"; \
 	exit 1
@@ -633,7 +640,7 @@ test_almanac: tests/build/release/almanac/test_almanac $(CONFIG_PROGRAM)
 memtest_almanac: tests/build/release/almanac/test_almanac $(CONFIG_PROGRAM)
 	@tmp_out=$$(mktemp); \
 	tmp_status=$$(mktemp); \
-	{ $(VALGRIND) $< 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
+	{ $(VALGRIND) $< --test-memory $(TEST_ARGS) 2>&1; echo $$? >"$$tmp_status"; } | tee "$$tmp_out"; \
 	rc=$$(cat "$$tmp_status"); \
 	rm -f "$$tmp_status"; \
 	if [ "$$rc" -eq 0 ]; then \
@@ -643,7 +650,7 @@ memtest_almanac: tests/build/release/almanac/test_almanac $(CONFIG_PROGRAM)
 	if grep -q "Almanac tests require a configured almanac database." "$$tmp_out"; then \
 	    rm -f "$$tmp_out"; \
 	    "$(CONFIG_PROGRAM)" almanac || exit $$?; \
-	    exec $(VALGRIND) $<; \
+	    exec $(VALGRIND) $< --test-memory $(TEST_ARGS); \
 	fi; \
 	rm -f "$$tmp_out"; \
 	exit 1
@@ -898,6 +905,10 @@ help:
 	@printf '  %-40s %s\n' "make test_http_live" "Test the HTTP client against the native loopback web server"
 	@printf '  %-40s %s\n' "make test_webserver" "Run offline Linux web server tests and its README example"
 	@printf '  %-40s %s\n' "make test-readme-examples" "Compile/run complete Markdown C examples"
+	@printf '  %-40s %s\n' "make test-db-sync" "Synchronise the versioned tests/tests.db case catalogue (survives clean)"
+	@printf '  %-40s %s\n' "make test-db ARGS='help'" "Manage saved selections, case tables and bounded run history"
+	@echo "    Test executables accept TEST_ARGS='--test-profile NAME' or '--test-database off'."
+	@echo "    Builds, make release, installation and running the Labs do not create a test database."
 	@printf '  %-40s %s\n' "make memtest" "Run all tests under valgrind"
 	@printf '  %-40s %s\n' "make memtest_<name>" "Build and run a single test under valgrind"
 	@printf '  %-40s %s\n' "make bench_<name>" "Build and run a benchmark (e.g. make bench_integrator)"

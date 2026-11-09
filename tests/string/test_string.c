@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include "string-t.h"
+#include "test_database.h"
 #include "test_string.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -723,14 +724,14 @@ static void test_text_ascii_stays_stable(void)
 
 static void test_text_construction_canonicalises_combining_marks(void)
 {
-    string_t *s1 = string_new_with("é");
+    string_t *s1 = string_new_with("é");
     string_t *s2 = string_new_with("é");
 
 #ifdef HAVE_UNISTRING
     ASSERT_STREQ(string_c_str(s1), "é");
     ASSERT_STREQ(string_c_str(s2), "é");
 #else
-    ASSERT_STREQ(string_c_str(s1), "é");
+    ASSERT_STREQ(string_c_str(s1), "é");
     ASSERT_STREQ(string_c_str(s2), "é");
 #endif
 
@@ -740,14 +741,14 @@ static void test_text_construction_canonicalises_combining_marks(void)
 
 static void test_text_construction_canonicalises_hangul(void)
 {
-    string_t *s1 = string_new_with("가");
+    string_t *s1 = string_new_with("가");
     string_t *s2 = string_new_with("가");
 
 #ifdef HAVE_UNISTRING
     ASSERT_STREQ(string_c_str(s1), "가");
     ASSERT_STREQ(string_c_str(s2), "가");
 #else
-    ASSERT_STREQ(string_c_str(s1), "가");
+    ASSERT_STREQ(string_c_str(s1), "가");
     ASSERT_STREQ(string_c_str(s2), "가");
 #endif
 
@@ -797,7 +798,7 @@ static void test_text_fast_append_still_allows_later_normalisation(void)
 #ifdef HAVE_UNISTRING
     ASSERT_STREQ(string_c_str(s), "café");
 #else
-    ASSERT_STREQ(string_c_str(s), "café");
+    ASSERT_STREQ(string_c_str(s), "café");
 #endif
 
     string_free(s);
@@ -809,14 +810,14 @@ static void test_text_mutation_canonicalises_when_needed(void)
     string_t *insert = string_new_with("caf");
 
     string_append_cstr(append, "́");
-    string_insert(insert, 3, "é");
+    string_insert(insert, 3, "é");
 
 #ifdef HAVE_UNISTRING
     ASSERT_STREQ(string_c_str(append), "é");
     ASSERT_STREQ(string_c_str(insert), "café");
 #else
-    ASSERT_STREQ(string_c_str(append), "é");
-    ASSERT_STREQ(string_c_str(insert), "café");
+    ASSERT_STREQ(string_c_str(append), "é");
+    ASSERT_STREQ(string_c_str(insert), "café");
 #endif
 
     string_free(insert);
@@ -987,76 +988,47 @@ static void example_utf8_exact(void)
     string_free(text);
 }
 
+static void test_string_unquote_shell_words_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    string_t *output = input ? string_unquote_shell(input) : NULL;
+    bool ok = output && input != output && string_byte_length(output) == strlen(string_c_str(row->expected)) &&
+              memcmp(string_c_str(output), string_c_str(row->expected), strlen(string_c_str(row->expected))) == 0 &&
+              strcmp(string_c_str(input), string_c_str(row->input)) == 0;
+    string_free(output);
+    string_free(input);
+    if (!ok)
+        test_set_failure_detailf("shell-word fixture %s", string_c_str(row->name));
+    TEST_ASSERT_TRUE(ok, "single literal word, quoted fragments, escapes and comments");
+}
+
 static void test_string_unquote_shell_words(void)
 {
-    static const struct { const char *input; const char *expected; } cases[] = {
-        {"", ""},
-        {" \t ", ""},
-        {"''", ""},
-        {"\"\"", ""},
-        {" \t# comment", ""},
-        {"literal", "literal"},
-        {"  literal\t ", "literal"},
-        {"'two words'", "two words"},
-        {"\"two words\"", "two words"},
-        {"one\\ two", "one two"},
-        {"one\\\ttwo", "one\ttwo"},
-        {"'pa'\"'\"'ss word'", "pa'ss word"},
-        {"'pa'\\''ss'", "pa'ss"},
-        {"un'quo'\"ted\"", "unquoted"},
-        {"a''b\"\"c", "abc"},
-        {"a#b", "a#b"},
-        {"'a'#b", "a#b"},
-        {"a\\#b", "a#b"},
-        {"'a # b' # trailing comment", "a # b"},
-        {"a \t# unmatched ' and dangling \\", "a"},
-        {"\\'\\\"\\\\", "'\"\\"},
-        {"'a\\b'", "a\\b"},
-        {"\"a\\\\b\"", "a\\b"},
-        {"\"a\\\"b\"", "a\"b"},
-        {"\"a\\qb\"", "a\\qb"},
-        {"\"a\\'b\"", "a\\'b"},
-        {"\"\\$HOME\\`id\\`\"", "\\$HOME\\`id\\`"},
-        {"a\\nb", "anb"},
-        {"'$HOME $(id) `id` ~ * ; | &'", "$HOME $(id) `id` ~ * ; | &"},
-        {"$HOME", "$HOME"},
-        {"$(id)", "$(id)"},
-        {"~/*.env", "~/*.env"},
-        {"'é'\"λ\"😀", "éλ😀"},
-        {"a\xc2\xa0" "b", "a\xc2\xa0" "b"}
-    };
-    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
-        string_t *input = string_new_with(cases[i].input);
-        string_t *output = input ? string_unquote_shell(input) : NULL;
-        bool ok = output && input != output && string_byte_length(output) == strlen(cases[i].expected) &&
-                  memcmp(string_c_str(output), cases[i].expected, strlen(cases[i].expected)) == 0 &&
-                  strcmp(string_c_str(input), cases[i].input) == 0;
-        string_free(output);
-        string_free(input);
-        if (!ok)
-            test_set_failure_detailf("shell-word fixture %zu", i);
-        TEST_ASSERT_TRUE(ok, "single literal word, quoted fragments, escapes and comments");
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "string.test_string_unquote_shell_words_cases", NULL,
+        test_string_unquote_shell_words_cases_row);
+}
+
+static void test_string_unquote_shell_invalid_cases_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    string_t *input = string_new_with(string_c_str(row->input));
+    errno = 0;
+    string_t *output = input ? string_unquote_shell(input) : NULL;
+    bool ok = input && !output && errno == EINVAL;
+    string_free(output);
+    string_free(input);
+    if (!ok)
+        test_set_failure_detailf("invalid shell-word fixture %s", string_c_str(row->name));
+    TEST_ASSERT_TRUE(ok, "malformed words and line breaks are rejected");
 }
 
 static void test_string_unquote_shell_invalid(void)
 {
-    static const char *const cases[] = {
-        "one two", "'one' two", "one \"two\"", "'' ''", "one\ttwo", "one # comment\n",
-        "'unterminated", "\"unterminated", "trailing\\", "\"trailing\\", "a\nb", "a\rb",
-        "'a\nb'", "\"a\rb\"", "a\\\nb", "a\\\rb", "\"a\\\nb\"", "# comment\r"
-    };
-    for (size_t i = 0; i < sizeof(cases) / sizeof(*cases); ++i) {
-        string_t *input = string_new_with(cases[i]);
-        errno = 0;
-        string_t *output = input ? string_unquote_shell(input) : NULL;
-        bool ok = input && !output && errno == EINVAL;
-        string_free(output);
-        string_free(input);
-        if (!ok)
-            test_set_failure_detailf("invalid shell-word fixture %zu", i);
-        TEST_ASSERT_TRUE(ok, "malformed words and line breaks are rejected");
-    }
+    test_run_database_cases(__FILE__, __LINE__,
+        "string.test_string_unquote_shell_invalid_cases", NULL,
+        test_string_unquote_shell_invalid_cases_row);
     const char embedded[][8] = {"a\0b", "a\\\0b", "a #\0b"};
     for (size_t i = 0; i < sizeof(embedded) / sizeof(*embedded); ++i) {
         string_t *input = string_new();

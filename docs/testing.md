@@ -6,7 +6,7 @@ The project provides per-module test targets.
 
 The native harness prints individual case results, group totals, a final
 summary and the slowest cases to the terminal. It does not currently emit
-JUnit XML. Capture both standard output and standard error when preserving
+JUnit XML. Optional SQLite run reports are described below. Capture both standard output and standard error when preserving
 verification evidence, and keep a separate log for every isolated batch.
 
 ```sh
@@ -17,6 +17,250 @@ make test_qfloat
 - A successful process exit and final summary are required for a completed
   batch. Reconcile the cases across partitions; a skipped group does not
   establish coverage for its children.
+
+## Optional test database
+
+The unencrypted **`tests/tests.db`** contains case definitions, the catalogue,
+selection profiles, run reports and lifetime timing statistics. It belongs in Git alongside the test
+sources, so another checkout receives the same database-backed cases. The
+shared schema is in `tests/test_database.sql`; module-owned SQL files contain
+the reviewable test inputs and expectations.
+
+Running tests appends results and updates statistics in that same database;
+case definitions and selection profiles are preserved. The file survives
+`make clean`. Compiling, installing, `make release` and running MARS Lab never
+create a test database. A missing database is initialised only by test execution
+or explicit test-database commands. The test database is not installed with the
+application.
+
+The first writable open consolidates a recognised older `tests/test_results.db`
+transactionally, preserving reports, timestamps and missing definitions and
+profiles. Existing definitions win conflicts. Reports are fingerprinted so that
+retrying an interrupted cleanup cannot duplicate them. The old file is removed
+only after the merge commits; an invalid source or failed merge leaves it for
+retry. Compatible older single-file schemas are upgraded in place as well.
+
+The default test selection remains `tests/test_config.json`. Run a suite with
+`TEST_ARGS='--test-database off'` to suppress shared test storage. Database-backed
+case definitions then use a disposable in-memory schema. To use another existing
+parent directory, pass `TEST_ARGS='--test-database /path/to/tests.db'`.
+An explicit override uses that single file for definitions, reports and statistics,
+without looking for another database alongside it.
+
+The sequential harness keeps counters, diagnostics, nested-case state, owned
+records, cleanup stacks and selection snapshots in one private process-lifetime
+object. Its resources are released through a common shutdown path, including
+command-line exits. Suites continue to use the ordinary harness functions and
+hooks; they do not construct or access this internal state.
+
+`make test-db-sync` explicitly merges configured test and group identities into
+the catalogue, together with all module case rows. It prints
+`Test database: sync complete.` Repeating sync is safe: keys combine the
+repository-relative source path and complete dotted group/case path. A missing
+entry is retained as **unconfirmed**, rather than deleted or disabled. A renamed
+entry gets a new identity while its old identity remains available for review.
+Unconfirmed status never controls execution. Sync never deletes test definitions,
+case rows, saved selections or run reports, and an invalid import rolls back in
+full. History retention is a separate operation after a completed run.
+
+The catalogue is populated from the JSON registration catalogue, module case
+tables and registrations observed during execution. Sync does not parse arbitrary
+C source or discover an unexecuted C registration absent from JSON. Neither an
+incomplete JSON selection nor a partial test run is evidence that a test should
+be removed. `test-db list` includes confirmed/unconfirmed status for review.
+Normal execution records observed registrations and results in `tests/tests.db`;
+explicit sync also updates its catalogue from JSON configuration and case tables.
+
+Use `make test-db ARGS='help'` for the administration commands; help creates
+nothing. `profile-save NAME` explicitly snapshots the current JSON selection,
+replacing that named snapshot atomically. `profile-create NAME all` or
+`profile-create NAME none` creates a profile without replacing an existing one.
+`profile-set NAME SOURCE PATH on|off` changes one rule; a disabled parent excludes
+its descendants. Profiles in `tests/tests.db` are shared test configuration.
+Pass `TEST_ARGS='--test-profile NAME'` when running a test target
+to select a saved profile. Missing profiles fail before executing any cases;
+profile runs do not rewrite JSON. `runs` shows recent reports and identifies memory
+tool runs. `stats`, optionally followed by a source prefix, displays per-test
+statistics; the same data is directly queryable through the `test_case_metrics`
+view in SQLite or DBeaver.
+
+Profiles are loaded into dictionary indexes and the connection is closed before
+tests run. Reports are written afterwards in a transaction. A reporting failure
+prints a warning and leaves the console result and exit status intact. Storage
+is capped at 64 MiB of SQLite pages, 200 runs and 50,000 detailed results, with
+each detail limited to 4,096 characters. Lifetime statistics survive detailed
+report pruning. A counted duration distribution preserves the exact lifetime
+median, alongside lifetime count, fastest, slowest and mean durations. It also
+keeps the last execution date, outcome and duration, the last two ordinary run
+durations, their absolute and percentage change, whether the latest ordinary run
+took longer, and the last memory-test date. Unexecuted tests have no fabricated
+timing or outcome. Dates use UTC; durations use milliseconds.
+
+Significant slowdowns are retained as timing outliers, with the measured duration,
+baseline median and threshold recorded in `test_result`. They print a warning to
+review recent changes. The assertion outcome remains independent: a passing test
+can also have a suspicious timing. Flagged durations are excluded from baseline
+means, medians and future regression assessments, so a persistent regression
+cannot quietly become normal. Recorded fastest and slowest durations still show
+the actual ordinary-run extremes, including flagged timings. The metrics view
+also shows outlier counts and the last flagged timing.
+
+The default policy requires seven accepted ordinary samples. A new duration must
+exceed the largest of 1.5 times the prior median, that median plus six median
+absolute deviations, and that median plus 0.05 ms. These settings live in
+`test_timing_policy` and survive synchronisation edits. They help reject normal
+jitter; an outlier is a reason to investigate, not proof that a fix is faulty.
+Insufficient history never produces a regression warning. Skips and memory-tool
+runs are never classified as ordinary timing outliers.
+
+Ordinary timing statistics include executed passes and failures and exclude skips,
+disabled cases and memory-tool runs. Valgrind is detected through its client
+request when its headers are available. Make's memory-test targets also pass
+`--test-memory`, which is available for other instrumentation or builds without
+those headers. That flag records classification; it does not launch a memory
+checker. Memory-test dates record execution, not a claim that a later Valgrind
+leak report was clean. Older reports did not record instrumentation, and retain
+their original ordinary classification when imported.
+
+The 64 MiB limit applies to the complete database, including lifetime duration
+samples. Reaching it causes a reporting warning and transaction rollback; it
+never silently discards case definitions or lifetime statistics. SQLite journal
+files can temporarily require additional space.
+
+Storage implementation details stay private to `tests/test_config`. Authorised
+storage fixtures use `tests/internal/test_database_internal.h`, which exposes
+only required declarations and no implementation representation. Ordinary test
+support interfaces remain in `tests/include`.
+
+### Module case tables
+
+Each migrated module supplies `tests/<module>/test_<module>.sql`. The importer
+discovers these files automatically and applies them in a deterministic order,
+inside the same transaction as catalogue synchronisation. The shared
+`tests/test_database.sql` contains only the management schema. For example:
+
+| SQL source | Case data |
+| --- | --- |
+| `tests/TeX/test_TeX.sql` | Calculus, relations, matrices, bindings, indices, quantum notation and rejection cases |
+| `tests/expression/test_expression.sql` | Parser equivalence, function names, rational powers, roots, projection notation and fractions |
+| `tests/string/test_string.sql` | Quoted shell words, escapes, comments and malformed input |
+| `tests/equation/test_equation.sql` | Solution counts, principal-root domains and relation separators |
+| `tests/diffequation/test_diffequation.sql` | Partial initial and boundary conditions |
+| `tests/matrix/test_matrix.sql` | Determinants |
+| `tests/sqlite/test_sqlite.sql` | Queries against isolated fixtures |
+
+The original C groups and their checking logic remain in place. Migrated rows
+retain their original assertions, including round trips, ownership, exactness
+and rejection checks. Tests requiring stateful fixtures or executable setup
+remain C tests. Catalogue entries describe tests; they are not substitutes for
+executable cases. The initial general-purpose checking operations also remain:
+
+| Table | Operation | Expected data |
+| --- | --- | --- |
+| `expression_cases` | `evaluate` | Exact numerical value |
+| `equation_cases` | `solve_count` | Number of derived solutions |
+| `matrix_cases` | `determinant` | Exact determinant |
+| `diffequation_cases` | `partial_conditions` | Remaining constants: 0, 1 or 2 |
+| `sql_cases` | `scalar_query` | Single text-convertible result |
+
+Each table stores `name`, `operation`, `input`, `expected`, `precision` and
+`enabled`. Native C callbacks supply the assertions and reject unknown operations.
+Each enabled row is independently selectable and reported. Adding a row for an
+existing operation needs no new C test function. A new kind of assertion still
+requires a C callback. `test_case_runner` maps each group to its module table and
+operation using indexed lookups; there is no compiled list of module tables.
+Case names are stable within their original groups. Seed imports use
+`INSERT OR IGNORE`, preserving existing edits and disabled cases. Removing a row
+from an SQL file never removes it from the database during synchronisation.
+
+Prefer new data-driven cases in the appropriate module SQL file and synchronise
+them into `tests/tests.db`. README examples are deliberately different: their
+explicit runnable C functions or programmes remain synchronised with the
+Markdown source and expected output, and run after ordinary tests.
+
+For example, this complete programme demonstrates inserting and inspecting a row
+in an isolated in-memory fixture. To add a real case, apply its `INSERT` to the
+test database, or add the row to the tracked SQL source. The standalone source is
+[`tests/test_database/readme_case_table.c`](../tests/test_database/readme_case_table.c).
+
+```c
+/**
+ * @file readme_case_table.c
+ * @brief Runnable README example: add a mathematical case row to a disposable in-memory table.
+ *
+ * Kept byte-for-byte in docs/testing.md. The README checker compiles that documented programme and compares
+ * its output. This example uses a minimal case-table fixture and never opens the shared test catalogue.
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "sqlite-t.h"
+#include "string-t.h"
+
+/* Add and inspect one isolated case without changing shared test definitions. */
+int main(void)
+{
+    int status = EXIT_FAILURE;
+    string_t *path = string_new_with(":memory:");
+    sqlite_t *database = path ? sqlite_open_plain(path) : NULL;
+    string_free(path);
+    sqlite_stmt_t *query = NULL;
+    if (!database || !sqlite_exec_cstr(database,
+        "CREATE TABLE expression_cases (\n"
+        "    name TEXT PRIMARY KEY, operation TEXT NOT NULL, input TEXT NOT NULL, expected TEXT NOT NULL,\n"
+        "    precision INTEGER NOT NULL DEFAULT 32, enabled INTEGER NOT NULL DEFAULT 1\n"
+        ") WITHOUT ROWID;\n"
+        "INSERT INTO expression_cases(name, operation, input, expected)\n"
+        "VALUES ('another_sum', 'evaluate', '1/2+1/3', '5/6');"))
+        goto done;
+    query = sqlite_stmt_prepare(database,
+        "SELECT name, expected FROM expression_cases WHERE name = 'another_sum'");
+    if (query && sqlite_stmt_step(query) == SQLITE_STEP_ROW &&
+        printf("%s|%s\n", sqlite_stmt_column_text(query, 0), sqlite_stmt_column_text(query, 1)) >= 0 &&
+        sqlite_stmt_step(query) == SQLITE_STEP_DONE)
+        status = EXIT_SUCCESS;
+done:
+    sqlite_stmt_finalize(query);
+    sqlite_close(database);
+    if (status != EXIT_SUCCESS)
+        fputs("Could not add or read the example case.\n", stderr);
+    return status;
+}
+```
+
+Output:
+
+```text
+another_sum|5/6
+```
+
+The source-synchronisation and fixture README test runs last in
+`make -j1 test_database`. `make -j1 test-readme-examples` compiles the exact
+documented programme and checks the output above. Keep shared case changes in both
+the readable SQL source and `tests/tests.db`. After adding seed rows to the SQL
+source, run `make test-db-sync` and include both files in the same commit.
+Ordinary test runs read the database without applying seed changes.
+Initialisation and explicit sync use `INSERT OR IGNORE`: they add new seed names
+without replacing edited expectations or disabling cases. Updating an existing
+expectation therefore requires an explicit reviewed database change as well as
+the SQL edit; a fresh database imports the updated SQL source. Bulk migration remains
+incremental so compiled coverage is retained until equivalent row runners pass.
+Moving text fixtures can reduce embedded data; it does not remove compiled
+assertion code or the linked mathematical library, which make up most binary size.
+
+### SQLite tests and fixtures
+
+The test-storage implementation uses the raw SQLite C API, independently of the
+MARS `sqlite_t` wrapper. The SQLite suite and test-storage suite disable shared
+database selection, retaining JSON selection and isolated case data. Their results
+are saved only after execution; a reporting failure never changes their exit status.
+Use `--test-database off` to suppress that final report as well. Their
+normal table/query tests can explicitly initialise a disposable database from the
+same schema using `test_database_fixture()`. They never open the shared history
+as the connection under test, and existing fixture destinations are rejected.
+Encryption, wrong-key, corruption and other engine-specific tests retain their
+dedicated fixtures. No test-storage connection remains open while native module
+case callbacks execute.
 
 ## Run Tests
 

@@ -2,7 +2,7 @@
  * @file checks_main.c
  * @brief Command dispatcher for the native MARS repository checks.
  *
- * Resolves the source repository from the build-time root and dispatches the
+ * Resolves the source repository from MARS_ROOT or the current directory and dispatches the
  * repository checks, coverage reports and release-evidence commands. No library build or test is initiated
  * implicitly; readme-examples alone compiles the programmes it is asked to check.
  */
@@ -10,13 +10,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "file-t.h"
 #include "checks_process.h"
 #include "checks_controls.h"
 #include "checks_coverage.h"
 #include "checks_evidence.h"
 #include "checks_policy.h"
 #include "checks_readme.h"
-
+#include "test_database.h"
 
 static void checks_app_usage(void)
 {
@@ -25,6 +26,7 @@ static void checks_app_usage(void)
          "       mars_checks file-coverage DIRECTORY\n"
          "       mars_checks release-evidence [--library FILE] [--output FILE] [--allow-dirty]\n"
          "       mars_checks source-policy\n"
+         "       mars_checks test-db help\n"
          "       mars_checks public-distribution [--staged]\n"
          "       mars_checks readme-examples --libs LIBS [--cc CC] [--cflags FLAGS]\n"
          "           [--archive FILE] [--compile-only] [--timeout SECONDS] [--output DIRECTORY]");
@@ -88,7 +90,8 @@ int main(int argc, char **argv)
                                               {"public-distribution", checks_app_distribution_command},
                                               {"readme-examples", checks_readme},
                                               {"release-evidence", checks_evidence},
-                                              {"source-policy", checks_policy}};
+                                              {"source-policy", checks_policy},
+                                              {"test-db", test_database_command}};
     if (argc < 2) {
         checks_app_usage();
         return 2;
@@ -109,7 +112,16 @@ int main(int argc, char **argv)
         return 2;
     }
     const char *configured_root = getenv("MARS_ROOT");
-    string_t *root = checks_text(configured_root && *configured_root ? configured_root : ".");
+    string_t *requested = checks_text(configured_root && *configured_root ? configured_root : ".");
+    file_t *directory = file_new(requested), *resolved = directory ? file_resolve(directory) : NULL;
+    string_t *root = resolved ? string_new_with(file_path(resolved)) : NULL;
+    file_free(resolved);
+    file_free(directory);
+    string_free(requested);
+    if (!root) {
+        fputs("Cannot resolve the repository directory.\n", stderr);
+        return 2;
+    }
     if (!checks_process_interrupt_begin())
         checks_fatal("installing interruption handlers");
     int result = command->run(root, argc - 2, argv + 2);

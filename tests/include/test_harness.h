@@ -1,3 +1,11 @@
+/**
+ * @file test_harness.h
+ * @brief Sequential native test registration, assertions, fixtures and result reporting.
+ *
+ * Suites register compiled C callbacks and use JSON selection by default. Optional test-database profiles are
+ * loaded and closed before execution, and reports are persisted afterwards. Database implementation suites
+ * can disable all automatic test-storage access independently of their own disposable fixtures.
+ */
 #ifndef TEST_HARNESS_H
 #define TEST_HARNESS_H
 
@@ -33,6 +41,17 @@ const test_validity_contract_t *test_validity_contract_long(void);
 const test_validity_contract_t *test_validity_contract_cstr(void);
 
 extern const test_config_mode_t test_suite_mode;
+
+/**
+ * @brief Report whether this suite may load shared database selections and case data before execution.
+ * @details The weak default returns true. Override to return false in SQLite and test-storage suites,
+ * so shared storage cannot control their selection or initialise engine state before their cases run.
+ * Those suites use JSON selections and isolated case data. Results may still be saved after execution;
+ * use --test-database off to disable reporting as well. Explicit fixture operations are unaffected.
+ * @return True permits shared selections and case data; false requires isolated selection and fixtures.
+ */
+bool test_suite_database_selection_enabled(void);
+
 extern test_suite_setup_fn test_suite_setup_hook;
 extern test_fixture_setup_fn test_fixture_setup_hook;
 extern test_fixture_teardown_fn test_fixture_teardown_hook;
@@ -103,6 +122,34 @@ void test_run_subtest(const char *file, int line, const char *name, const char *
 
 /** Run one test case beneath an explicit parent group. */
 void test_run_in_group(const char *file, int line, const char *name, const char *parent, const char *tags, test_fn fn);
+
+/**
+ * @brief Run a named data row through a synchronous module-owned checking callback.
+ * @param[in] file Borrowed source-file identity, normally __FILE__.
+ * @param[in] line Declaration line, normally __LINE__.
+ * @param[in] name Borrowed stable row name used in selection and reporting.
+ * @param[in] parent Borrowed containing group name, or NULL for a top-level row.
+ * @param[in] tags Borrowed comma-separated tags, or NULL.
+ * @param[in] data Borrowed case data valid throughout the call; not consumed.
+ * @param[in] check Borrowed callback invoked when selected, using the ordinary fixtures and assertions.
+ * @return No value. Failures and skips use the normal harness accounting. Nested data callbacks restore prior context.
+ * @note The caller retains data ownership; this sequential interface is not safe for concurrent use.
+ */
+void test_run_data_case(const char *file, int line, const char *name, const char *parent, const char *tags,
+                         const void *data, void (*check)(const void *data));
+
+/**
+ * @brief Load enabled module-table rows, close storage and register each as a separate native case.
+ * @param[in] file Borrowed source identity for the module runner.
+ * @param[in] line Runner registration line.
+ * @param[in] module Borrowed registry key selecting a module case table and optional operation group.
+ * @param[in] parent Borrowed parent group identifying this runner; NULL uses the currently executing case path.
+ * @param[in] check Borrowed checking callback receiving one test_database_case_t as opaque data.
+ * @return No value. Storage errors fail the containing group; an empty enabled table skips it.
+ * @note With automatic storage disabled, rows come from a temporary in-memory schema; no test database file is created.
+ */
+void test_run_database_cases(const char *file, int line, const char *module, const char *parent,
+                              void (*check)(const void *data));
 
 /** Run an output/demo case, counted separately from correctness cases. */
 void test_run_output_case(const char *file, int line, const char *tags, const char *name, test_fn fn);

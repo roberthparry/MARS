@@ -21,9 +21,16 @@
 #include "timeseries-t.h"
 #include "string-t.h"
 #include "test_harness.h"
+#include "test_database.h"
 #include "test_sqlite_csv.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+
+/* SQLite engine and fixture behaviour must not depend on automatic harness database activity. */
+bool test_suite_database_selection_enabled(void)
+{
+    return false;
+}
 
 static string_t *s(const char *text)
 {
@@ -467,6 +474,35 @@ static void example_sqlite_readme_expression_object_storage(void)
     string_free(path);
 }
 
+static void test_sqlite_database_row(const void *data)
+{
+    const test_database_case_t *row = data;
+    TEST_ASSERT_TRUE(!strcmp(string_c_str(row->operation), "scalar_query"), "known SQLite case operation");
+    const char *base = getenv("MARS_ROOT");
+    string_t *root = string_new_with(base && *base ? base : ".");
+    string_t *path = string_new_with(test_case_temp_path("module-case.db")), *error = NULL;
+    bool created = path && test_database_fixture(root, path, &error);
+    sqlite_t *database = created ? sqlite_open_plain(path) : NULL;
+    sqlite_stmt_t *statement = database ? sqlite_stmt_prepare(database, string_c_str(row->input)) : NULL;
+    bool ok = statement && sqlite_stmt_step(statement) == SQLITE_STEP_ROW &&
+              sqlite_stmt_column_text(statement, 0) &&
+              !strcmp(sqlite_stmt_column_text(statement, 0), string_c_str(row->expected)) &&
+              sqlite_stmt_step(statement) == SQLITE_STEP_DONE;
+    if (!ok && error)
+        fprintf(stderr, "%s\n", string_c_str(error));
+    sqlite_stmt_finalize(statement);
+    sqlite_close(database);
+    string_free(error);
+    string_free(path);
+    string_free(root);
+    TEST_ASSERT_TRUE(ok, "the MARS SQLite module queries an isolated copy of the test schema");
+}
+
+static void test_sqlite_database_cases(void)
+{
+    test_run_database_cases(__FILE__, __LINE__, "sqlite", "tests.test_sqlite_database_cases", test_sqlite_database_row);
+}
+
 int tests_main(void)
 {
     TEST_SECTION("SQLCipher Storage");
@@ -476,6 +512,7 @@ int tests_main(void)
     TEST_RUN_IN_GROUP(test_sqlite_requires_key, tests, NULL);
     TEST_RUN_IN_GROUP(test_sqlite_plain_storage, tests, NULL);
     test_sqlite_csv_cases();
+    TEST_RUN_IN_GROUP(test_sqlite_database_cases, tests, "sqlite,database-cases");
 
     TEST_SECTION("README Output Examples");
     printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
